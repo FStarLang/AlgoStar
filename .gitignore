@@ -1,0 +1,8 @@
+_cache/
+_output/
+.depend
+*.pdf
+*.pdf:*
+*.txt:*
+*:Zone.Identifier
+*:sec.endpointdlp
