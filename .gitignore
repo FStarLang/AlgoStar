@@ -6,3 +6,5 @@ _output/
 *.txt:*
 *:Zone.Identifier
 *:sec.endpointdlp
+test/extracted/
+test/run_tests
