@@ -4,6 +4,9 @@
    Proves O(log n) comparison complexity for binary search.
    Specifically: at most ⌊log₂(n)⌋ + 1 comparisons for an array of length n.
 
+   Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
+   Each comparison in the loop body gets one ghost tick.
+
    NO admits. NO assumes.
 *)
 
@@ -17,8 +20,21 @@ open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+
+// ========== Ghost tick ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
 
 // ========== Pure helper: log₂ floor ==========
 
@@ -26,8 +42,6 @@ let rec log2f (n: int) : Tot nat (decreases (if n > 0 then n else 0)) =
   if Prims.op_LessThanOrEqual n 1 then 0
   else Prims.op_Addition 1 (log2f (Prims.op_Division n 2))
 
-// Composition lemma: if new_range <= old_range / 2 and old_range > 1,
-// then log2f(new_range) + 1 <= log2f(old_range)
 let rec lemma_log2f_mono (a b: int)
   : Lemma (requires a >= 1 /\ b >= 1 /\ a <= b)
           (ensures log2f a <= log2f b)
@@ -39,8 +53,6 @@ let rec lemma_log2f_mono (a b: int)
       lemma_log2f_mono (Prims.op_Division a 2) (Prims.op_Division b 2)
     )
 
-// When the range halves, the remaining budget decreases by 1
-// Handles all cases including when new_range = 0
 let lemma_log2f_step (old_range new_range: int)
   : Lemma (requires old_range >= 1 /\ new_range >= 0 /\ new_range <= old_range / 2)
           (ensures (new_range >= 1 ==> log2f new_range + 1 <= log2f old_range) /\
@@ -87,15 +99,15 @@ fn binary_search_complexity
   let mut hi: SZ.t = len;
   let mut found: bool = false;
   let mut result_idx: SZ.t = len;
-  let mut ctr: nat = 0;
+  let ctr = GR.alloc #nat 0;
   
   while (!lo <^ !hi && not !found)
-  invariant exists* vlo vhi vfound vresult vc.
+  invariant exists* vlo vhi vfound vresult (vc : nat).
     R.pts_to lo vlo **
     R.pts_to hi vhi **
     R.pts_to found vfound **
     R.pts_to result_idx vresult **
-    R.pts_to ctr vc **
+    GR.pts_to ctr vc **
     A.pts_to a s0 **
     pure (
       (forall (i j: nat). {:pattern Seq.index s0 i; Seq.index s0 j}
@@ -132,8 +144,8 @@ fn binary_search_complexity
     
     let mid_val : int = a.(mid);
     
-    let vc = !ctr;
-    ctr := vc + 1;
+    // Count the comparison — one ghost tick
+    tick ctr;
     
     if (mid_val = key) {
       found := true;
@@ -142,13 +154,11 @@ fn binary_search_complexity
     } else if (mid_val < key) {
       lo := mid +^ 1sz;
       
-      // Complexity: new_range = hi - (mid+1) <= (hi-lo)/2
       lemma_log2f_step (SZ.v vhi - SZ.v vlo) (SZ.v vhi - (SZ.v mid + 1));
       ()
     } else {
       hi := mid;
       
-      // Complexity: new_range = mid - lo <= (hi-lo)/2
       lemma_log2f_step (SZ.v vhi - SZ.v vlo) (SZ.v mid - SZ.v vlo);
       ()
     }
@@ -159,8 +169,8 @@ fn binary_search_complexity
   let vlo = !lo;
   let vhi = !hi;
   
-  let final_ctr = !ctr;
-  assert (pure (final_ctr <= log2f (SZ.v len) + 1));
+  let final_ctr = GR.op_Bang ctr;
+  assert (pure (reveal final_ctr <= log2f (SZ.v len) + 1));
   
   assert (pure (vfound \/ SZ.v vlo >= SZ.v vhi));
   assert (pure (not vfound ==> (
@@ -168,5 +178,6 @@ fn binary_search_complexity
     (forall (i:nat). i < Seq.length s0 ==> Seq.index s0 i =!= key)
   )));
   
+  GR.free ctr;
   vresult
 }

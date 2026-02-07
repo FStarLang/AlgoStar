@@ -4,9 +4,8 @@
    Proves O(n) comparison complexity for find_minimum and find_maximum.
    Specifically: exactly (n - 1) comparisons for an array of length n.
 
-   Approach: a local mutable nat counter tracks comparisons.
-   The loop invariant relates the counter to the loop index,
-   and the postcondition proves the final count equals (len - 1).
+   Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
+   A ghost `tick` function increments the counter by 1 for each comparison.
 
    NO admits. NO assumes.
 *)
@@ -21,8 +20,21 @@ open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+
+// ========== Ghost tick: increment counter by 1 ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
 
 // ========== Minimum Finding with Complexity Bound ==========
 
@@ -48,13 +60,13 @@ fn find_minimum_complexity
   let min_val = a.(0sz);
   let mut min: int = min_val;
   let mut i: SZ.t = 1sz;
-  let mut ctr: nat = 0;
+  let ctr = GR.alloc #nat 0;
   
   while (!i <^ len)
-  invariant exists* vi vmin vc.
+  invariant exists* vi vmin (vc : nat).
     R.pts_to i vi **
     R.pts_to min vmin **
-    R.pts_to ctr vc **
+    GR.pts_to ctr vc **
     A.pts_to a #p s0 **
     pure (
       SZ.v vi > 0 /\
@@ -68,9 +80,8 @@ fn find_minimum_complexity
     let curr = a.(vi);
     let vmin = !min;
     
-    // Count the comparison
-    let vc = !ctr;
-    ctr := vc + 1;
+    // Count the comparison — one ghost tick
+    tick ctr;
     
     if (curr < vmin) {
       min := curr
@@ -81,9 +92,10 @@ fn find_minimum_complexity
   
   // At loop exit: i == len, so ctr == len - 1.
   // This proves exactly (n-1) comparisons were performed.
-  let final_ctr = !ctr;
-  assert (pure (final_ctr == SZ.v len - 1));
+  let final_ctr = GR.op_Bang ctr;
+  assert (pure (reveal final_ctr == SZ.v len - 1));
   
+  GR.free ctr;
   !min
 }
 
@@ -111,13 +123,13 @@ fn find_maximum_complexity
   let max_val = a.(0sz);
   let mut max: int = max_val;
   let mut i: SZ.t = 1sz;
-  let mut ctr: nat = 0;
+  let ctr = GR.alloc #nat 0;
   
   while (!i <^ len)
-  invariant exists* vi vmax vc.
+  invariant exists* vi vmax (vc : nat).
     R.pts_to i vi **
     R.pts_to max vmax **
-    R.pts_to ctr vc **
+    GR.pts_to ctr vc **
     A.pts_to a #p s0 **
     pure (
       SZ.v vi > 0 /\
@@ -131,9 +143,8 @@ fn find_maximum_complexity
     let curr = a.(vi);
     let vmax = !max;
     
-    // Count the comparison
-    let vc = !ctr;
-    ctr := vc + 1;
+    // Count the comparison — one ghost tick
+    tick ctr;
     
     if (curr > vmax) {
       max := curr
@@ -142,10 +153,9 @@ fn find_maximum_complexity
     i := vi + 1sz
   };
   
-  // At loop exit: i == len, so ctr == len - 1.
-  // This proves exactly (n-1) comparisons were performed.
-  let final_ctr = !ctr;
-  assert (pure (final_ctr == SZ.v len - 1));
+  let final_ctr = GR.op_Bang ctr;
+  assert (pure (reveal final_ctr == SZ.v len - 1));
   
+  GR.free ctr;
   !max
 }

@@ -4,6 +4,10 @@
    Proves O(n²) comparison complexity for insertion sort.
    Specifically: at most n*(n-1)/2 comparisons for an array of length n.
 
+   Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
+   Each comparison gets one ghost tick (one at a time).
+   Both the initial comparison and every inner loop comparison are ticked.
+
    Also proves functional correctness (sorted + permutation).
 
    NO admits. NO assumes.
@@ -19,9 +23,22 @@ open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
+
+// ========== Ghost tick ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
 
 // ========== Definitions ==========
 
@@ -141,8 +158,7 @@ let lemma_combine_sorted_regions
 let lemma_triangle_step (vj: nat)
   : Lemma (requires vj >= 1)
           (ensures op_Multiply vj (vj - 1) / 2 + vj == op_Multiply (vj + 1) vj / 2)
-  = // vj*(vj-1) + 2*vj = vj*vj - vj + 2*vj = vj*vj + vj = vj*(vj+1)
-    assert (op_Multiply vj (vj - 1) + op_Multiply 2 vj == op_Multiply vj (vj + 1))
+  = assert (op_Multiply vj (vj - 1) + op_Multiply 2 vj == op_Multiply vj (vj + 1))
 
 // ========== Main Algorithm with Complexity ==========
 
@@ -163,13 +179,13 @@ fn insertion_sort_complexity
   )
 {
   let mut j: SZ.t = 1sz;
-  let mut ctr: nat = 0;
+  let ctr = GR.alloc #nat 0;
   
   while (!j <^ len)
-  invariant exists* vj s vc.
+  invariant exists* vj s (vc : nat).
     R.pts_to j vj **
     A.pts_to a s **
-    R.pts_to ctr vc **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vj > 0 /\
       SZ.v vj <= SZ.v len /\
@@ -188,20 +204,25 @@ fn insertion_sort_complexity
     let mut i: SZ.t = vj;
     let mut continue: bool = true;
     
+    // Initial comparison: tick for the first comparison
     if (vj >^ 0sz) {
       let prev = a.(vj - 1sz);
       continue := (prev > key);
+      tick ctr;
     } else {
       continue := false;
     };
     
-    // Inner loop: swap key backwards
+    // Inner loop: each iteration swaps, decrements i, and makes a comparison (with tick).
+    // Invariant tracks vc + vi <= vj*(vj-1)/2 + vj + 1 (sum invariant).
+    // At exit (not continue), vc <= vj*(vj-1)/2 + vj (tight bound).
     while (!continue)
-    invariant exists* vi vcont s_inner.
+    invariant exists* vi vcont s_inner (vc_inner : nat).
       R.pts_to i vi **
       R.pts_to continue vcont **
       R.pts_to j vj **
       A.pts_to a s_inner **
+      GR.pts_to ctr vc_inner **
       pure (
         SZ.v vi <= SZ.v vj /\
         SZ.v vj < SZ.v len /\
@@ -217,7 +238,12 @@ fn insertion_sort_complexity
         (forall (k1 k2: nat). SZ.v vi < k1 /\ k1 <= k2 /\ k2 <= SZ.v vj ==>
           Seq.index s_inner k1 <= Seq.index s_inner k2) /\
         (forall (k1 k2: nat). k1 < SZ.v vi /\ SZ.v vi < k2 /\ k2 <= SZ.v vj ==>
-          Seq.index s_inner k1 <= Seq.index s_inner k2)
+          Seq.index s_inner k1 <= Seq.index s_inner k2) /\
+        // Complexity: vc + vi bounded
+        vc_inner + SZ.v vi <= op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj + 1 /\
+        // At exit: tight bound (because vi >= 1 when we exit via comparison,
+        // or vi = 0 when we exit via i reaching 0 — but then sum was preserved)
+        (not vcont ==> vc_inner <= op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj)
       )
     {
       let vi = !i;
@@ -238,6 +264,8 @@ fn insertion_sort_complexity
       if (new_i >^ 0sz) {
         let new_prev = a.(new_i - 1sz);
         continue := (new_prev > key);
+        // Tick for inner comparison
+        tick ctr;
       } else {
         continue := false;
       };
@@ -245,7 +273,7 @@ fn insertion_sort_complexity
       ()
     };
     
-    // After inner loop
+    // After inner loop: not continue, so vc <= vj*(vj-1)/2 + vj
     with s_after. assert (A.pts_to a s_after);
     let vi_final = !i;
     
@@ -254,13 +282,7 @@ fn insertion_sort_complexity
     lemma_prefix_le_key s_after s_outer (SZ.v vi_final) (SZ.v vj) key;
     lemma_combine_sorted_regions s_after (SZ.v vi_final) (SZ.v vj) key;
     
-    // Complexity: inner loop did at most vj comparisons (one per swap step)
-    // vj - vi_final <= vj swaps, each with a comparison
-    // Add vj to ctr. Since old ctr <= vj*(vj-1)/2, new ctr <= vj*(vj-1)/2 + vj = vj*(vj+1)/2 = (vj+1)*vj/2
-    let vc = !ctr;
-    ctr := vc + (SZ.v vj - SZ.v vi_final);
-    
-    // Help SMT with the triangle number arithmetic
+    // Complexity: vc <= vj*(vj-1)/2 + vj = (vj+1)*vj/2
     lemma_triangle_step (SZ.v vj);
     
     j := vj + 1sz;
@@ -270,8 +292,9 @@ fn insertion_sort_complexity
   assert (pure (prefix_sorted s_final (Seq.length s0)));
   
   // Complexity: total comparisons <= len*(len-1)/2 = O(n²)
-  let final_ctr = !ctr;
-  assert (pure (final_ctr <= op_Multiply (SZ.v len) (SZ.v len - 1) / 2));
+  let final_ctr = GR.op_Bang ctr;
+  assert (pure (reveal final_ctr <= op_Multiply (SZ.v len) (SZ.v len - 1) / 2));
   
+  GR.free ctr;
   ()
 }
