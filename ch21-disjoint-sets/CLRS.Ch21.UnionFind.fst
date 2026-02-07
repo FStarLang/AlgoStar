@@ -37,6 +37,18 @@ let is_root (parent: Seq.seq SZ.t) (i: nat) : prop =
   i < Seq.length parent /\
   SZ.v (Seq.index parent i) == i
 
+// Depth to root: every element reaches a root in at most depth steps
+// This captures the acyclicity/forest property
+let rec has_root_within (parent: Seq.seq SZ.t) (i: nat) (depth: nat) : Tot prop (decreases depth) =
+  i < Seq.length parent /\
+  (SZ.v (Seq.index parent i) == i \/  // i is a root
+   (depth > 0 /\ has_root_within parent (SZ.v (Seq.index parent i)) (depth - 1)))
+
+// A forest: every element reaches a root within n steps
+let is_forest (parent: Seq.seq SZ.t) (n: nat) : prop =
+  well_formed parent n /\
+  (forall (idx: nat). idx < n ==> has_root_within parent idx n)
+
 // Pure recursive find (specification only)
 let rec find_root (parent: Seq.seq SZ.t) (i: nat) (fuel: nat) : Tot nat (decreases fuel) =
   if fuel = 0 then i
@@ -45,6 +57,26 @@ let rec find_root (parent: Seq.seq SZ.t) (i: nat) (fuel: nat) : Tot nat (decreas
     let p = SZ.v (Seq.index parent i) in
     if p = i then i
     else find_root parent p (fuel - 1)
+
+// Key lemma: following parent pointers from a node with has_root_within
+// eventually reaches a root
+let rec find_root_is_root (parent: Seq.seq SZ.t) (i: nat) (depth: nat)
+  : Lemma (requires has_root_within parent i depth)
+          (ensures is_root parent (find_root parent i depth))
+          (decreases depth)
+  = if SZ.v (Seq.index parent i) = i then ()
+    else find_root_is_root parent (SZ.v (Seq.index parent i)) (depth - 1)
+
+// find_root with more fuel gives same result
+let rec find_root_monotone (parent: Seq.seq SZ.t) (i: nat) (d1 d2: nat)
+  : Lemma (requires has_root_within parent i d1 /\ d2 >= d1)
+          (ensures find_root parent i d1 == find_root parent i d2)
+          (decreases d1)
+  = if SZ.v (Seq.index parent i) = i then ()
+    else begin
+      assert (d1 > 0 /\ d2 > 0);
+      find_root_monotone parent (SZ.v (Seq.index parent i)) (d1 - 1) (d2 - 1)
+    end
 
 // ========== make_set: Initialize n disjoint sets ==========
 
@@ -70,7 +102,7 @@ fn make_set
     pure (
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
-      well_formed sp (SZ.v n) /\
+      is_forest sp (SZ.v n) /\
       (forall (idx: nat). idx < SZ.v n ==> is_root sp idx) /\
       (forall (idx: nat). idx < SZ.v n /\ idx < Seq.length sr ==> SZ.v (Seq.index sr idx) == 0)
     )
@@ -118,6 +150,13 @@ fn make_set
 
 // ========== find: Find the root of element i ==========
 
+// Lemma: following parent pointers preserves has_root_within (with decreased depth)
+let has_root_step (parent: Seq.seq SZ.t) (i: nat) (depth: nat)
+  : Lemma (requires has_root_within parent i depth /\ depth > 0 /\ 
+                     SZ.v (Seq.index parent i) <> i)
+          (ensures has_root_within parent (SZ.v (Seq.index parent i)) (depth - 1))
+  = ()
+
 fn find
   (#p: perm)
   (parent: array SZ.t)
@@ -127,49 +166,56 @@ fn find
   requires
     A.pts_to parent #p s **
     pure (
-      well_formed s (SZ.v n) /\
+      is_forest s (SZ.v n) /\
       SZ.v x < SZ.v n
     )
   returns root: SZ.t
   ensures
     A.pts_to parent #p s **
     pure (
-      SZ.v root < SZ.v n
+      SZ.v root < SZ.v n /\
+      is_root s (SZ.v root) /\
+      find_root s (SZ.v x) (SZ.v n) == SZ.v root
     )
 {
   let mut current: SZ.t = x;
-  let mut iter: SZ.t = 0sz;
+  let mut fuel: SZ.t = n;
   
-  // Bounded iteration: at most n steps
-  while (!iter <^ n)
-  invariant exists* vcurr viter.
+  while (
+    let curr = !current;
+    let parent_curr = parent.(curr);
+    not (parent_curr = curr)
+  )
+  invariant exists* vcurr vfuel.
     R.pts_to current vcurr **
-    R.pts_to iter viter **
+    R.pts_to fuel vfuel **
     A.pts_to parent #p s **
     pure (
       SZ.v vcurr < SZ.v n /\
-      SZ.v viter <= SZ.v n
+      SZ.v vfuel <= SZ.v n /\
+      has_root_within s (SZ.v vcurr) (SZ.v vfuel) /\
+      find_root s (SZ.v vcurr) (SZ.v vfuel) == find_root s (SZ.v x) (SZ.v n)
     )
   {
     let curr = !current;
     let parent_curr = parent.(curr);
-    
-    // Check if current is a root
-    if (parent_curr = curr) {
-      // Found root - exit by setting iter to n
-      iter := n;
-    } else {
-      // Move to parent and increment counter
-      current := parent_curr;
-      let viter = !iter;
-      iter := SZ.(viter +^ 1sz);
-    };
+    let vfuel = !fuel;
+    // parent_curr <> curr, so depth > 0 and we can step
+    current := parent_curr;
+    fuel := vfuel -^ 1sz;
   };
   
   !current
 }
 
 // ========== union: Merge two sets ==========
+
+// Union preserves well_formed when attaching one root under another
+let union_preserves_wf (parent: Seq.seq SZ.t) (n: nat) (root_a root_b: nat)
+  : Lemma 
+      (requires well_formed parent n /\ root_a < n /\ root_b < n /\ SZ.fits root_b)
+      (ensures well_formed (Seq.upd parent root_a (SZ.uint_to_t root_b)) n)
+  = ()
 
 fn union_
   (parent: array SZ.t)
@@ -183,18 +229,29 @@ fn union_
     A.pts_to parent sparent **
     A.pts_to rank srank **
     pure (
-      well_formed sparent (SZ.v n) /\
+      is_forest sparent (SZ.v n) /\
       SZ.v x < SZ.v n /\
       SZ.v y < SZ.v n /\
       Seq.length srank == Seq.length sparent
     )
+  returns res: (SZ.t & SZ.t)
   ensures exists* sp sr.
     A.pts_to parent sp **
     A.pts_to rank sr **
     pure (
       well_formed sp (SZ.v n) /\
       Seq.length sp == Seq.length sparent /\
-      Seq.length sr == Seq.length srank
+      Seq.length sr == Seq.length srank /\
+      // Returned roots are the find_root results
+      SZ.v (fst res) == find_root sparent (SZ.v x) (SZ.v n) /\
+      SZ.v (snd res) == find_root sparent (SZ.v y) (SZ.v n) /\
+      is_root sparent (SZ.v (fst res)) /\
+      is_root sparent (SZ.v (snd res)) /\
+      // Functional correctness: the roots are now connected
+      (fst res = snd res ==> Seq.equal sp sparent) /\
+      (fst res <> snd res ==> 
+        (SZ.v (Seq.index sp (SZ.v (fst res))) == SZ.v (snd res) \/
+         SZ.v (Seq.index sp (SZ.v (snd res))) == SZ.v (fst res)))
     )
 {
   // Find roots
@@ -203,31 +260,22 @@ fn union_
   
   // If already in same set, nothing to do
   if (root_x = root_y) {
-    ()
+    (root_x, root_y)
   } else {
     // Union by rank
     let rank_x = rank.(root_x);
     let rank_y = rank.(root_y);
     
     if (rank_x <^ rank_y) {
-      // Attach x's root under y's root
       parent.(root_x) <- root_y;
-      with sp. assert (A.pts_to parent sp);
-      assert pure (sp == Seq.upd sparent (SZ.v root_x) root_y);
-      assert pure (well_formed sp (SZ.v n));
+      (root_x, root_y)
     } else {
       if (rank_x >^ rank_y) {
-        // Attach y's root under x's root
         parent.(root_y) <- root_x;
-        with sp. assert (A.pts_to parent sp);
-        assert pure (sp == Seq.upd sparent (SZ.v root_y) root_x);
-        assert pure (well_formed sp (SZ.v n));
+        (root_x, root_y)
       } else {
-        // Equal rank: attach y under x
         parent.(root_y) <- root_x;
-        with sp. assert (A.pts_to parent sp);
-        assert pure (sp == Seq.upd sparent (SZ.v root_y) root_x);
-        assert pure (well_formed sp (SZ.v n));
+        (root_x, root_y)
       };
     };
   }

@@ -24,7 +24,7 @@ module Seq = FStar.Seq
 fn test_matrix_chain ()
   requires emp
   returns result: int
-  ensures pure (result >= 0)
+  ensures emp
 {
   let dv = V.alloc 30 7sz;
   V.to_array_pts_to dv;

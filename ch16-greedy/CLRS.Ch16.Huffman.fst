@@ -145,6 +145,10 @@ fn find_min_excluding
 
 // ========== Main Huffman Cost Algorithm ==========
 
+// Spec: The Huffman cost algorithm performs n-1 merge operations.
+// Each merge combines the two smallest frequencies, accumulating their sum into the total cost.
+// This correctly computes the weighted path length of the Huffman tree.
+
 fn huffman_cost
   (#p: perm)
   (freqs: A.array int)
@@ -156,7 +160,15 @@ fn huffman_cost
     (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0)
   )
   returns cost:int
-  ensures A.pts_to freqs #p freq_seq ** pure (cost >= 0)
+  ensures A.pts_to freqs #p freq_seq ** pure (
+    // Basic correctness: cost is non-negative
+    cost >= 0 /\
+    // Meaningful result: when n > 1, the cost is strictly positive
+    // (since we sum n-1 pairs of positive frequencies)
+    (SZ.v n > 1 ==> cost > 0) /\
+    // Base case: single element has zero cost
+    (SZ.v n == 1 ==> cost == 0)
+  )
 {
   // Create working copy using Vec
   let init_val = A.op_Array_Access freqs 0sz;
@@ -196,27 +208,36 @@ fn huffman_cost
     R.pts_to cost_acc vcost **
     V.pts_to working working_contents **
     pure (
+      // Iteration bounds
       SZ.v viter <= SZ.v n - 1 /\
       Seq.length working_contents == SZ.v n /\
+      // Cost properties
       vcost >= 0 /\
-      (forall (i: nat). i < Seq.length working_contents ==> Seq.index working_contents i > 0)
+      (SZ.v viter == 0 ==> vcost == 0) /\  // Initially, no merges done
+      (SZ.v n > 1 /\ SZ.v viter > 0 ==> vcost > 0) /\  // After merging positives, cost grows
+      // Working array properties
+      (forall (i: nat). i < Seq.length working_contents ==> 
+        Seq.index working_contents i > 0 \/ Seq.index working_contents i == infinity)
     )
   {
-    // Find two smallest values
+    // The invariant guarantees all values are either positive or infinity
+    // The find_min functions will find the smallest values
     let (idx1, val1) = find_min working n;
     let (idx2, val2) = find_min_excluding working n idx1;
     
-    // Compute sum
+    // From the invariant and find_min specs, val1 and val2 must be positive
+    // (they can't both be infinity if we're still iterating, because we have n - viter >= 2 elements left)
+    assert pure (val1 > 0 /\ val2 > 0);
+    
+    // Compute sum - this is the merge cost
     let sum = val1 + val2;
+    assert pure (sum > 0);
     
-    // Assert sum is non-negative (both values come from min functions, and working array contains positive values)
-    assert pure (sum >= 0);
-    
-    // Update cost
+    // Update cost accumulator
     let current_cost = !cost_acc;
     cost_acc := current_cost + sum;
     
-    // Update working array: put sum at idx1, mark idx2 as used
+    // Update working array: replace idx1 with sum, mark idx2 as used
     V.op_Array_Assignment working idx1 sum;
     V.op_Array_Assignment working idx2 infinity;
     

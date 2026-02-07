@@ -13,6 +13,35 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+// Specification predicates
+
+// All weights are non-negative or "no edge" (represented as >= 1000000)
+let all_weights_non_negative (sweights: Seq.seq int) : prop =
+  forall (i:nat). i < Seq.length sweights ==> Seq.index sweights i >= 0
+
+// All distances are non-negative  
+let all_non_negative (sdist: Seq.seq int) : prop =
+  forall (i:nat). i < Seq.length sdist ==> Seq.index sdist i >= 0
+
+// All distances are bounded by 1000000
+let all_bounded (sdist: Seq.seq int) : prop =
+  forall (i:nat). i < Seq.length sdist ==> 
+    Seq.index sdist i >= 0 /\ Seq.index sdist i <= 1000000
+
+// Triangle inequality: all edges are "relaxed"
+// After algorithm completes, for all edges (u,v), if the edge exists and dist[u] is finite,
+// then dist[v] <= dist[u] + weight(u,v)
+let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : prop =
+  Seq.length sdist == n /\
+  (forall (u v:nat). 
+    u < n /\ v < n /\ u * n + v < Seq.length sweights ==>
+    (let w = Seq.index sweights (u * n + v) in
+     let dist_u = Seq.index sdist u in
+     let dist_v = Seq.index sdist v in
+     // If there's a real edge and dist_u is finite, then the edge is relaxed
+     (w < 1000000 /\ dist_u < 1000000 /\ dist_u + w <= 1000000) ==> 
+       dist_v <= dist_u + w))
+
 // Helper function to find minimum distance vertex among unvisited
 fn find_min_unvisited
   (dist: A.array int)
@@ -92,14 +121,25 @@ fn dijkstra
       SZ.v source < SZ.v n /\
       Seq.length sweights == SZ.v n * SZ.v n /\
       Seq.length sdist == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      all_weights_non_negative sweights  // Dijkstra requires non-negative weights
     )
   ensures exists* sdist'.
     A.pts_to weights sweights **
     A.pts_to dist sdist' **
     pure (
       Seq.length sdist' == SZ.v n /\
-      (SZ.v source < Seq.length sdist' ==> Seq.index sdist' (SZ.v source) <= 0)
+      SZ.v source < Seq.length sdist' /\
+      // Functional correctness properties we've proven:
+      // 1. dist[source] == 0 (not just <= 0 as before)
+      Seq.index sdist' (SZ.v source) == 0 /\
+      // 2. All distances are non-negative
+      all_non_negative sdist' /\
+      // 3. All distances are bounded [0, 1000000]
+      all_bounded sdist'
+      // Note: Triangle inequality (dist[v] <= dist[u] + w(u,v) for all edges)
+      // is the full correctness property but requires more complex invariants
+      // involving visited sets and path properties to prove automatically.
     )
 {
   // Initialization: dist[source] = 0, all others = 1000000
@@ -115,7 +155,11 @@ fn dijkstra
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
-      (SZ.v vi > SZ.v source ==> Seq.index sdist_current (SZ.v source) == 0)
+      // After source is initialized, it stays 0
+      (SZ.v vi > SZ.v source ==> Seq.index sdist_current (SZ.v source) == 0) /\
+      // All initialized indices are non-negative and bounded
+      (forall (j:nat). j < SZ.v vi ==> 
+        Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= 1000000)
     )
   {
     let vi = !init_i;
@@ -125,6 +169,9 @@ fn dijkstra
   };
   
   let _ = !init_i;
+  
+  // At this point, dist[source] = 0 and all others = 1000000
+  // Triangle inequality holds vacuously because 1000000 is treated as infinity
   
   // Allocate visited array
   let visited = V.alloc 0 n;
@@ -144,7 +191,10 @@ fn dijkstra
       SZ.v vround <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
       Seq.length svisited_current == SZ.v n /\
-      Seq.index sdist_current (SZ.v source) <= 0
+      // Key invariants:
+      Seq.index sdist_current (SZ.v source) == 0 /\
+      all_non_negative sdist_current /\
+      all_bounded sdist_current
     )
   {
     let vround = !round;
@@ -173,7 +223,9 @@ fn dijkstra
         SZ.v vv <= SZ.v n /\
         Seq.length sdist_v == SZ.v n /\
         Seq.length svisited_v == SZ.v n /\
-        Seq.index sdist_v (SZ.v source) <= 0
+        Seq.index sdist_v (SZ.v source) == 0 /\
+        all_non_negative sdist_v /\
+        all_bounded sdist_v
       )
     {
       let vv = !v;
@@ -192,7 +244,10 @@ fn dijkstra
       let should_update = (can_relax && sum < old_dist);
       let new_dist: int = (if should_update then sum else old_dist);
       
-      // Unconditional write
+      // This write maintains our invariants:
+      // - dist[source] unchanged (because we only update v = vv)
+      // - non-negativity: maintained because new_dist <= old_dist, and old_dist >= 0
+      // - boundedness: maintained because new_dist <= old_dist <= 1000000
       A.op_Array_Assignment dist vv new_dist;
       
       v := vv +^ 1sz;

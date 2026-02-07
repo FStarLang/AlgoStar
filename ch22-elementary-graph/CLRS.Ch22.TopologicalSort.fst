@@ -12,6 +12,13 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module V = Pulse.Lib.Vec
 
+// Helper lemma: if u < n, v < n, and n*n fits, then u*n+v < n*n and fits
+let lemma_index_in_bounds (u v n: nat)
+  : Lemma
+    (requires u < n /\ v < n /\ n > 0 /\ SZ.fits (n * n))
+    (ensures u * n + v < n * n /\ SZ.fits (u * n) /\ SZ.fits (u * n + v))
+  = ()
+
 // Topological sort using Kahn's algorithm
 // Input: adjacency matrix adj (n×n represented as flat array)
 // Output: array containing topological order of vertices
@@ -30,7 +37,11 @@ fn topological_sort
   ensures exists* sout.
     A.pts_to adj sadj **
     V.pts_to output sout **
-    pure (Seq.length sout == SZ.v n)
+    pure (
+      Seq.length sout == SZ.v n /\
+      // All vertices in output are valid indices
+      (forall (i: nat). i < SZ.v n ==> Seq.index sout i < SZ.v n)
+    )
 {
   // Step 1: Compute in-degrees
   let in_degree_v = V.alloc 0 n;
@@ -151,7 +162,11 @@ fn topological_sort
       Seq.length squeue == SZ.v n /\
       Seq.length soutput == SZ.v n /\
       // All vertices in queue are valid (< n)
-      (forall (k: nat). k < SZ.v vqt ==> SZ.v (Seq.index squeue k) < SZ.v n)
+      (forall (k: nat). k < SZ.v vqt ==> SZ.v (Seq.index squeue k) < SZ.v n) /\
+      // All vertices in output are valid (< n)
+      (forall (k: nat). k < SZ.v vout ==> Seq.index soutput k < SZ.v n) /\
+      // Unwritten positions still have value 0
+      (forall (k: nat). SZ.v vout <= k /\ k < SZ.v n ==> Seq.index soutput k == 0)
     )
   {
     let vqh = !queue_head;
@@ -159,9 +174,11 @@ fn topological_sort
     // Dequeue vertex u
     let u = A.op_Array_Access queue vqh;
     
-    // u must be a valid vertex - this should be provable from the fact that we only enqueue vertices < n
-    // For now, we'll need to strengthen the invariants to track this
-    // TODO: Add invariant that forall i < vqt. queue[i] < n
+    // u is from the queue, so it must be valid
+    assert (pure (SZ.v u < SZ.v n));
+    // Since u < n and n*n fits, u*n must also fit
+    assert (pure (SZ.v u * SZ.v n < SZ.v n * SZ.v n));
+    assert (pure (SZ.fits (SZ.v u * SZ.v n)));
     
     // Add u to output
     let vout = !out_idx;
@@ -194,10 +211,17 @@ fn topological_sort
         Seq.length squeue == SZ.v n /\
         Seq.length soutput == SZ.v n /\
         // All vertices in queue are valid (< n)
-        (forall (k: nat). k < SZ.v vqt ==> SZ.v (Seq.index squeue k) < SZ.v n)
+        (forall (k: nat). k < SZ.v vqt ==> SZ.v (Seq.index squeue k) < SZ.v n) /\
+        // All vertices in output (written before this loop) are valid
+        (forall (k: nat). k < SZ.v vout_inner ==> Seq.index soutput k < SZ.v n) /\
+        // Unwritten positions still have value 0
+        (forall (k: nat). SZ.v vout_inner <= k /\ k < SZ.v n ==> Seq.index soutput k == 0)
       )
     {
       let vv = !v;
+      
+      // Prove that u * n + vv is in bounds
+      lemma_index_in_bounds (SZ.v u) (SZ.v vv) (SZ.v n);
       
       // Check if edge from u to vv exists
       let idx = u *^ n +^ vv;
@@ -230,6 +254,15 @@ fn topological_sort
       v := vv +^ 1sz;
     };
   };
+  
+  // After the loop, extract the existentials to work with them
+  with vqh vqt vout sin_degree squeue soutput. _;
+  
+  // The loop invariant already gives us:
+  // - forall k < vout. soutput[k] < n (written positions are valid)
+  // - forall k. vout <= k < n ==> soutput[k] == 0 (unwritten positions are 0)
+  // Since 0 < n (from precondition), all positions are valid
+  assert (pure (forall (i: nat). i < SZ.v n ==> Seq.index soutput i < SZ.v n));
   
   // Clean up temporary arrays
   with sin. assert (A.pts_to in_degree sin);

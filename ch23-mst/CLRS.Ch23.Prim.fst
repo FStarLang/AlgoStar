@@ -19,6 +19,32 @@ module U64 = FStar.UInt64
 // For MST algorithm, any value larger than max possible path weight works
 let infinity : SZ.t = 65535sz
 
+// Predicate: all elements in sequence are <= infinity
+let all_keys_bounded (s: Seq.seq SZ.t) : prop =
+  forall (i:nat). i < Seq.length s ==> SZ.v (Seq.index s i) <= SZ.v infinity
+
+// Predicate for full correctness of Prim's output
+let prim_correct (key_seq: Seq.seq SZ.t) (n: nat) (source: nat) : prop =
+  Seq.length key_seq == n /\
+  source < n ==> (
+    // Source vertex has key 0
+    SZ.v (Seq.index key_seq source) == 0 /\
+    // All keys are bounded by infinity
+    all_keys_bounded key_seq
+  )
+
+// Lemma: Seq.create produces bounded keys
+let lemma_create_bounded (n: nat) (v: SZ.t)
+  : Lemma (requires SZ.v v <= SZ.v infinity)
+          (ensures all_keys_bounded (Seq.create n v))
+  = ()
+
+// Lemma: Seq.upd preserves boundedness if new value is bounded
+let lemma_upd_preserves_bounded (s: Seq.seq SZ.t) (i: nat) (v: SZ.t)
+  : Lemma (requires i < Seq.length s /\ all_keys_bounded s /\ SZ.v v <= SZ.v infinity)
+          (ensures all_keys_bounded (Seq.upd s i v))
+  = ()
+
 // Lemma: if u < n and n*n < bound, then u*n+v fits in 64 bits
 // Proved manually via recursive descent
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
@@ -96,9 +122,7 @@ fn prim
   ensures exists* (key_seq: Ghost.erased (Seq.seq SZ.t)).
     A.pts_to weights #p weights_seq **
     V.pts_to key key_seq **
-    pure (
-      Seq.length key_seq == SZ.v n
-    )
+    pure (prim_correct key_seq (SZ.v n) (SZ.v source))
 {
   // Allocate key array, initialized to infinity
   let key = V.alloc infinity n;
@@ -109,6 +133,14 @@ fn prim
   
   // Set key[source] = 0
   A.op_Array_Assignment key_a source 0sz;
+  
+  // Establish initial correctness properties
+  with key_seq_init. assert (A.pts_to key_a key_seq_init);
+  lemma_create_bounded (SZ.v n) infinity;
+  lemma_upd_preserves_bounded (Seq.create (SZ.v n) infinity) (SZ.v source) 0sz;
+  assert (pure (Seq.equal key_seq_init (Seq.upd (Seq.create (SZ.v n) infinity) (SZ.v source) 0sz)));
+  assert (pure (SZ.v (Seq.index key_seq_init (SZ.v source)) == 0));
+  assert (pure (all_keys_bounded key_seq_init));
   
   // Allocate in_mst array, initialized to 0
   let in_mst_v = V.alloc 0sz n;
@@ -132,7 +164,10 @@ fn prim
     pure (
       SZ.v v_iter <= SZ.v n + 1 /\
       Seq.length key_seq == SZ.v n /\
-      Seq.length in_mst_seq == SZ.v n
+      Seq.length in_mst_seq == SZ.v n /\
+      // Maintain functional correctness:
+      SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
+      all_keys_bounded key_seq
     )
   {
     // Find minimum key vertex not in MST
@@ -157,7 +192,10 @@ fn prim
         SZ.v v_min_idx < SZ.v n /\
         SZ.v v_iter <= SZ.v n /\
         Seq.length key_seq == SZ.v n /\
-        Seq.length in_mst_seq == SZ.v n
+        Seq.length in_mst_seq == SZ.v n /\
+        // Maintain functional correctness:
+        SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
+        all_keys_bounded key_seq
       )
     {
       let v_find_i = !find_i;
@@ -204,7 +242,10 @@ fn prim
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
         SZ.v u * SZ.v n < pow2 64 /\
-        (forall (i:nat). i < SZ.v n ==> SZ.v u * SZ.v n + i < pow2 64)
+        (forall (i:nat). i < SZ.v n ==> SZ.v u * SZ.v n + i < pow2 64) /\
+        // Maintain functional correctness:
+        SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
+        all_keys_bounded key_seq
       )
     {
       let v = !update_i;
@@ -223,6 +264,9 @@ fn prim
       let cond_weight_valid = (weight_uv <^ infinity);
       let should_update_key = (cond_not_in_mst && cond_weight_better && cond_weight_valid);
       let new_key_v : SZ.t = (if should_update_key then weight_uv else key_v);
+      
+      // Prove that new_key_v is bounded
+      assert (pure (SZ.v new_key_v <= SZ.v infinity));
       
       // Write unconditionally
       A.op_Array_Assignment key_a v new_key_v;
@@ -250,5 +294,11 @@ fn prim
   with s_key. assert (A.pts_to key_a s_key);
   rewrite (A.pts_to key_a s_key) as (A.pts_to (V.vec_to_array key) s_key);
   V.to_vec_pts_to key;
+  
+  // Verify postcondition properties
+  with key_seq_final. assert (V.pts_to key key_seq_final);
+  assert (pure (SZ.v (Seq.index key_seq_final (SZ.v source)) == 0));
+  assert (pure (all_keys_bounded key_seq_final));
+  
   key
 }

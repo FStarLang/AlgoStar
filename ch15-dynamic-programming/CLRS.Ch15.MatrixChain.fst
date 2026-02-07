@@ -6,6 +6,9 @@
    
    Bottom-up dynamic programming approach from CLRS Chapter 15.
    
+   Proves: result == mc_outer (Seq.create (n*n) 0) s_dims n 2
+   i.e., the result equals the pure Floyd-Warshall-style imperative mirror spec.
+   
    NO admits. NO assumes.
 *)
 
@@ -18,11 +21,79 @@ open Pulse.Lib.Vec
 open FStar.SizeT
 open FStar.Mul
 
+#set-options "--z3rlimit 40"
+
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+
+// ========== Pure Specification (imperative mirror) ==========
+
+// mc_inner_k: process split points k..j-1, accumulating min cost
+// Reads from table but doesn't modify it
+let rec mc_inner_k (table: Seq.seq int) (dims: Seq.seq int) (n i j k: nat) (min_acc: int)
+  : Tot int (decreases (j - k))
+  = if k >= j || i >= n || j >= n || Seq.length table <> n * n || Seq.length dims <> n + 1 then min_acc
+    else
+      let cost_ik = Seq.index table (i * n + k) in
+      let cost_k1j = Seq.index table ((k + 1) * n + j) in
+      let dim_i = Seq.index dims i in
+      let dim_k1 = Seq.index dims (k + 1) in
+      let dim_j1 = Seq.index dims (j + 1) in
+      let q = cost_ik + cost_k1j + dim_i * dim_k1 * dim_j1 in
+      let new_min = if q < min_acc then q else min_acc in
+      mc_inner_k table dims n i j (k + 1) new_min
+
+// mc_inner_i: process starting positions i..n-l, updating table for chain length l
+let rec mc_inner_i (table: Seq.seq int) (dims: Seq.seq int) (n l i: nat)
+  : Tot (Seq.seq int) (decreases (n - l + 1 - i))
+  = if l < 2 || i + l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then table
+    else
+      let j = i + l - 1 in
+      let min_cost = mc_inner_k table dims n i j i 1000000000 in
+      let table' = Seq.upd table (i * n + j) min_cost in
+      mc_inner_i table' dims n l (i + 1)
+
+// mc_outer: process chain lengths l=l..n
+let rec mc_outer (table: Seq.seq int) (dims: Seq.seq int) (n l: nat)
+  : Tot (Seq.seq int) (decreases (n + 1 - l))
+  = if l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then table
+    else
+      let table' = mc_inner_i table dims n l 0 in
+      mc_outer table' dims n (l + 1)
+
+// Length preservation lemmas
+let rec lemma_mc_inner_i_len (table: Seq.seq int) (dims: Seq.seq int) (n l i: nat)
+  : Lemma (ensures Seq.length (mc_inner_i table dims n l i) == Seq.length table)
+          (decreases (n - l + 1 - i))
+  = if l < 2 || i + l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then ()
+    else begin
+      let j = i + l - 1 in
+      let min_cost = mc_inner_k table dims n i j i 1000000000 in
+      lemma_mc_inner_i_len (Seq.upd table (i * n + j) min_cost) dims n l (i + 1)
+    end
+
+let rec lemma_mc_outer_len (table: Seq.seq int) (dims: Seq.seq int) (n l: nat)
+  : Lemma (ensures Seq.length (mc_outer table dims n l) == Seq.length table)
+          (decreases (n + 1 - l))
+  = if l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then ()
+    else begin
+      lemma_mc_inner_i_len table dims n l 0;
+      lemma_mc_outer_len (mc_inner_i table dims n l 0) dims n (l + 1)
+    end
+
+// The final result (what the postcondition expresses)
+let mc_result (dims: Seq.seq int) (n: nat) : int =
+  if n = 0 || Seq.length dims <> n + 1 then 0
+  else begin
+    let table = Seq.create (n * n) 0 in
+    let final_table = mc_outer table dims n 2 in
+    lemma_mc_outer_len table dims n 2;
+    assert (Seq.length final_table == n * n);
+    Seq.index final_table (n - 1)
+  end
 
 // ========== Helper Lemmas ==========
 
@@ -57,16 +128,15 @@ fn matrix_chain_order
   returns result: int
   ensures
     A.pts_to dims #p s_dims **
-    pure (result >= 0)
+    pure (
+      result == mc_result s_dims (SZ.v n)
+    )
 {
   // Allocate DP table m[0..n-1][0..n-1] as flat array of size n*n
   let table_size = n *^ n;
   lemma_table_size_positive (SZ.v n);
   
   let m = V.alloc 0 table_size;
-  
-  // Initialize: m[i][i] = 0 for all i (single matrix, no cost)
-  // This is already done by V.alloc 0
   
   // Main DP: iterate over chain lengths l from 2 to n
   let mut l: SZ.t = 2sz;
@@ -81,7 +151,9 @@ fn matrix_chain_order
       SZ.v vl >= 2 /\
       Seq.length sm == op_Multiply (SZ.v n) (SZ.v n) /\
       V.length m == Seq.length sm /\
-      (forall (k: nat). k < Seq.length sm ==> Seq.index sm k >= 0)
+      // Remaining work from current state = total work from initial state
+      mc_outer sm s_dims (SZ.v n) (SZ.v vl) == 
+        mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
     )
   {
     let vl = !l;
@@ -101,7 +173,9 @@ fn matrix_chain_order
         SZ.v vi <= SZ.v n - SZ.v vl + 1 /\
         Seq.length sm_i == op_Multiply (SZ.v n) (SZ.v n) /\
         V.length m == Seq.length sm_i /\
-        (forall (k: nat). k < Seq.length sm_i ==> Seq.index sm_i k >= 0)
+        // Remaining i-work then remaining l-work = total
+        mc_outer (mc_inner_i sm_i s_dims (SZ.v n) (SZ.v vl) (SZ.v vi)) s_dims (SZ.v n) (SZ.v vl + 1) ==
+          mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
       )
     {
       let vi = !i;
@@ -110,8 +184,10 @@ fn matrix_chain_order
       let j = vi + vl - 1sz;
       
       // Initialize m[i][j] to a large value
-      // Use 1000000000 as "infinity" (sufficient for practical matrix chains)
       let mut min_cost: int = 1000000000;
+      
+      // Capture the table state at i-loop entry for use after k-loop
+      with sm_i_entry. assert (V.pts_to m sm_i_entry);
       
       // Try all split points k from i to j-1
       let mut k: SZ.t = vi;
@@ -134,8 +210,11 @@ fn matrix_chain_order
           SZ.v j < SZ.v n /\
           Seq.length sm_k == op_Multiply (SZ.v n) (SZ.v n) /\
           V.length m == Seq.length sm_k /\
-          vmin_cost >= 0 /\
-          (forall (t: nat). t < Seq.length sm_k ==> Seq.index sm_k t >= 0)
+          // k-loop doesn't modify table
+          sm_k == sm_i_entry /\
+          // accumulator tracks remaining k-work
+          mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost ==
+            mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vi) 1000000000
         )
       {
         let vk = !k;
@@ -173,10 +252,8 @@ fn matrix_chain_order
       let final_min_cost = !min_cost;
       let idx_ij = vi *^ n + j;
       lemma_index_in_bounds (SZ.v vi) (SZ.v j) (SZ.v n);
-      V.op_Array_Assignment m idx_ij final_min_cost;
       
-      // Help Pulse join the branches
-      with sm_new. assert (V.pts_to m sm_new);
+      V.op_Array_Assignment m idx_ij final_min_cost;
       
       i := vi + 1sz;
     };
@@ -187,6 +264,12 @@ fn matrix_chain_order
   // Extract result: m[0][n-1]
   let result_idx = 0sz *^ n + (n - 1sz);
   lemma_index_in_bounds 0 (SZ.v n - 1) (SZ.v n);
+  
+  // Get the ghost sequence for the final table
+  with sm_final. assert (V.pts_to m sm_final);
+  
+  // Help SMT: mc_outer at vl > n is the identity
+  lemma_mc_outer_len (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2;
   
   let result = V.op_Array_Access m result_idx;
   

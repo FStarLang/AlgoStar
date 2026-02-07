@@ -165,7 +165,14 @@ fn tree_insert
     A.pts_to t.valid valid_seq' **
     pure (
       Seq.length keys_seq' == Seq.length keys_seq /\
-      Seq.length valid_seq' == Seq.length valid_seq
+      Seq.length valid_seq' == Seq.length valid_seq /\
+      // If successful, key exists at some valid position
+      (success ==> (exists (k: nat). k < SZ.v t.cap /\ k < Seq.length keys_seq' /\ k < Seq.length valid_seq' /\
+                     Seq.index keys_seq' k == key /\
+                     Seq.index valid_seq' k == true)) /\
+      // If not successful, arrays unchanged
+      (not success ==> Seq.equal keys_seq' keys_seq /\
+                       Seq.equal valid_seq' valid_seq)
     )
 {
   let mut current : SZ.t = 0sz;
@@ -182,7 +189,13 @@ fn tree_insert
     R.pts_to done vd **
     R.pts_to success_flag vs **
     (exists* ks vs'. A.pts_to t.keys ks ** A.pts_to t.valid vs' ** 
-      pure (Seq.length ks == A.length t.keys /\ Seq.length vs' == A.length t.valid)) **
+      pure (Seq.length ks == A.length t.keys /\ Seq.length vs' == A.length t.valid /\
+        // If success, key is stored; if not yet done, arrays unchanged
+        (vs ==> (exists (k: nat). k < SZ.v t.cap /\ k < Seq.length ks /\ k < Seq.length vs' /\
+                  Seq.index ks k == key /\
+                  Seq.index vs' k == true)) /\
+        (not vs ==> Seq.equal ks keys_seq /\ Seq.equal vs' valid_seq)
+      )) **
     pure (SZ.v vc <= SZ.v t.cap)
   {
     let idx = !current;
