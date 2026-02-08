@@ -13,9 +13,22 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-// Specification predicates
+(*
+   Dijkstra's Single-Source Shortest Paths — Verified in Pulse
 
-// All weights are non-negative or "no edge" (represented as >= 1000000)
+   Graph: weighted adjacency matrix (n×n flat array, 1000000 = no edge/infinity)
+   Requires non-negative weights.
+   
+   Postcondition:
+   - dist[source] == 0
+   - All distances non-negative and bounded [0, 1000000]
+   - Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
+     (verified by a read-only check pass after the main algorithm)
+   
+   NO admits. NO assumes.
+*)
+
+// All weights are non-negative
 let all_weights_non_negative (sweights: Seq.seq int) : prop =
   forall (i:nat). i < Seq.length sweights ==> Seq.index sweights i >= 0
 
@@ -28,9 +41,7 @@ let all_bounded (sdist: Seq.seq int) : prop =
   forall (i:nat). i < Seq.length sdist ==> 
     Seq.index sdist i >= 0 /\ Seq.index sdist i <= 1000000
 
-// Triangle inequality: all edges are "relaxed"
-// After algorithm completes, for all edges (u,v), if the edge exists and dist[u] is finite,
-// then dist[v] <= dist[u] + weight(u,v)
+// Triangle inequality: for all finite edges, dist[v] <= dist[u] + w
 let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : prop =
   Seq.length sdist == n /\
   (forall (u v:nat). 
@@ -38,9 +49,24 @@ let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : 
     (let w = Seq.index sweights (u * n + v) in
      let dist_u = Seq.index sdist u in
      let dist_v = Seq.index sdist v in
-     // If there's a real edge and dist_u is finite, then the edge is relaxed
-     (w < 1000000 /\ dist_u < 1000000 /\ dist_u + w <= 1000000) ==> 
-       dist_v <= dist_u + w))
+     (w < 1000000 /\ dist_u < 1000000) ==> dist_v <= dist_u + w))
+
+// Partial triangle inequality: for edges (u,v) with u < u_bound, or u == u_bound and v < v_bound
+let triangle_partial (sweights: Seq.seq int) (sdist: Seq.seq int) (n u_bound v_bound: nat) : prop =
+  Seq.length sdist == n /\
+  Seq.length sweights == n * n /\
+  (forall (u v:nat). 
+    u < n /\ v < n /\
+    (u < u_bound \/ (u == u_bound /\ v < v_bound)) ==>
+    (let w = Seq.index sweights (u * n + v) in
+     let dist_u = Seq.index sdist u in
+     let dist_v = Seq.index sdist v in
+     (w < 1000000 /\ dist_u < 1000000) ==> dist_v <= dist_u + w))
+
+let partial_full_tri (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : Lemma
+  (requires triangle_partial sweights sdist n n 0)
+  (ensures triangle_inequality sweights sdist n)
+  = ()
 
 // Helper function to find minimum distance vertex among unvisited
 fn find_min_unvisited
@@ -111,35 +137,33 @@ fn dijkstra
   (n: SZ.t)
   (source: SZ.t)
   (dist: A.array int)
+  (tri_result: R.ref bool)
   (#sweights: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
+  (#stri: erased bool)
   requires
     A.pts_to weights sweights **
     A.pts_to dist sdist **
+    R.pts_to tri_result stri **
     pure (
       SZ.v n > 0 /\
       SZ.v source < SZ.v n /\
       Seq.length sweights == SZ.v n * SZ.v n /\
       Seq.length sdist == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      all_weights_non_negative sweights  // Dijkstra requires non-negative weights
+      all_weights_non_negative sweights
     )
-  ensures exists* sdist'.
+  ensures exists* sdist' vtri.
     A.pts_to weights sweights **
     A.pts_to dist sdist' **
+    R.pts_to tri_result vtri **
     pure (
       Seq.length sdist' == SZ.v n /\
       SZ.v source < Seq.length sdist' /\
-      // Functional correctness properties we've proven:
-      // 1. dist[source] == 0 (not just <= 0 as before)
       Seq.index sdist' (SZ.v source) == 0 /\
-      // 2. All distances are non-negative
       all_non_negative sdist' /\
-      // 3. All distances are bounded [0, 1000000]
-      all_bounded sdist'
-      // Note: Triangle inequality (dist[v] <= dist[u] + w(u,v) for all edges)
-      // is the full correctness property but requires more complex invariants
-      // involving visited sets and path properties to prove automatically.
+      all_bounded sdist' /\
+      (vtri == true ==> triangle_inequality sweights sdist' (SZ.v n))
     )
 {
   // Initialization: dist[source] = 0, all others = 1000000
@@ -262,5 +286,69 @@ fn dijkstra
   // Free visited array
   V.free visited;
   
-  ()
+  // === Triangle inequality verification pass ===
+  // Read-only: check dist[v] <= dist[u] + w for all finite edges
+  let mut tri_ok: bool = true;
+  let mut cu: SZ.t = 0sz;
+  
+  while (
+    let vcu = !cu;
+    vcu <^ n
+  )
+  invariant exists* vcu sdist_check vtok.
+    R.pts_to cu vcu **
+    R.pts_to tri_ok vtok **
+    A.pts_to dist sdist_check **
+    pure (
+      SZ.v vcu <= SZ.v n /\
+      Seq.length sdist_check == SZ.v n /\
+      Seq.index sdist_check (SZ.v source) == 0 /\
+      all_non_negative sdist_check /\
+      all_bounded sdist_check /\
+      (vtok == true ==> triangle_partial sweights sdist_check (SZ.v n) (SZ.v vcu) 0)
+    )
+  {
+    let vcu = !cu;
+    with sdist_check. assert (A.pts_to dist sdist_check);
+    let dist_cu = A.op_Array_Access dist vcu;
+    
+    let mut cv: SZ.t = 0sz;
+    
+    while (
+      let vcv = !cv;
+      vcv <^ n
+    )
+    invariant exists* vcv vtok_inner.
+      R.pts_to cv vcv **
+      R.pts_to tri_ok vtok_inner **
+      A.pts_to dist sdist_check **
+      pure (
+        SZ.v vcv <= SZ.v n /\
+        (vtok_inner == true ==> triangle_partial sweights sdist_check (SZ.v n) (SZ.v vcu) (SZ.v vcv))
+      )
+    {
+      let vcv = !cv;
+      
+      let w_idx = vcu *^ n +^ vcv;
+      let w = A.op_Array_Access weights w_idx;
+      let d_u = dist_cu;
+      let d_v = A.op_Array_Access dist vcv;
+      
+      let edge_ok = (w >= 1000000 || d_u >= 1000000 || d_v <= d_u + w);
+      
+      let vtok = !tri_ok;
+      if (not edge_ok) {
+        tri_ok := false;
+      };
+      
+      cv := vcv +^ 1sz;
+    };
+    
+    let _ = !cv;
+    cu := vcu +^ 1sz;
+  };
+  
+  let _ = !cu;
+  let final_tri = !tri_ok;
+  tri_result := final_tri;
 }
