@@ -219,7 +219,9 @@ fn select
       Seq.length s_final == Seq.length s0 /\
       permutation s0 s_final /\
       sorted_prefix s_final (SZ.v k) /\
-      prefix_leq_suffix s_final (SZ.v k)
+      prefix_leq_suffix s_final (SZ.v k) /\
+      SZ.v k > 0 /\
+      result == Seq.index s_final (SZ.v k `Prims.op_Subtraction` 1)
     )
 {
   let mut round: SZ.t = 0sz;
@@ -259,6 +261,7 @@ fn select
   let idx = k - 1sz;
   with s_arr. assert (A.pts_to a s_arr);
   let value = a.(idx);
+  assert (pure (value == Seq.index s_arr (SZ.v idx)));
   value
 }
 #pop-options
