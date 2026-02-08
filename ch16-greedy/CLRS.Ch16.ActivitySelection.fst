@@ -16,20 +16,13 @@
       - The first activity (with earliest finish time) is always selected
       - An activity is selected only if its start time >= the finish time of 
         the last selected activity
-      - This maintains the invariant that last_finish is a valid finish time
-        from the activities processed so far
    
-   4. Compatibility (non-overlapping):
-      - The algorithm maintains compatibility_maintained invariant throughout
-      - This ensures that all selected activities are pairwise compatible
-      - For any two selected activities i < j, finish[i] <= start[j]
-      - The key insight: since activities are sorted by finish time and we only
-        select activities with start >= last_finish, all selections are compatible
-   
-   5. Greedy correctness:
-      - The postcondition guarantees there exists a last_finish such that
-        compatibility_maintained holds for all n activities
-      - This means the greedy selection strategy produces a valid solution
+   4. Pairwise non-overlapping (via ghost selection sequence):
+      - A ghost sequence sel tracks the indices of selected activities
+      - All selected indices are valid (< n) and strictly increasing
+      - For consecutive selections i, j: finish[sel[i]] <= start[sel[j]]
+      - The returned count equals the length of the selection
+      - The first selected activity is index 0
    
    NO admits. NO assumes.
 *)
@@ -46,6 +39,8 @@ module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module GR = Pulse.Lib.GhostReference
+module L = CLRS.Ch16.ActivitySelection.Lemmas
 
 // ========== Definitions ==========
 
@@ -53,54 +48,9 @@ module Seq = FStar.Seq
 let finish_sorted (f: Seq.seq int) : prop =
   forall (i j: nat). i <= j /\ j < Seq.length f ==> Seq.index f i <= Seq.index f j
 
-// Activities are compatible if they don't overlap
-let compatible (s f: Seq.seq int) (i j: nat) : prop =
-  i < Seq.length s /\ j < Seq.length s /\
-  i < Seq.length f /\ j < Seq.length f /\
-  Seq.index f i <= Seq.index s j
-
 // Valid activity (start <= finish)
 let valid_activity (s f: Seq.seq int) (i: nat) : prop =
   i < Seq.length s /\ i < Seq.length f /\ Seq.index s i <= Seq.index f i
-
-// Greedy compatibility property: all activities with start >= last_finish are compatible
-let greedy_compatible (s f: Seq.seq int) (last_finish: int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\
-  Seq.index s i >= last_finish
-
-// Compatibility invariant: tracks that the greedy selection maintains compatibility
-// Since we can't track the set of selected activities directly, we use the property that:
-// - last_finish is the finish time of the last selected activity
-// - Any activity with start >= last_finish is compatible with all previously selected
-let compatibility_maintained (s f: Seq.seq int) (last_finish: int) (processed: nat) : prop =
-  processed <= Seq.length s /\ 
-  processed <= Seq.length f /\
-  Seq.length f > 0 /\  // Non-empty sequence
-  last_finish >= Seq.index f 0 /\  // At least first activity was selected
-  (exists (k:nat). k < processed /\ Seq.index f k == last_finish) /\  // last_finish is valid
-  // By greedy selection: if we select an activity at position j, then start[j] >= previous last_finish
-  // This ensures all selected activities are pairwise compatible
-  (forall (k:nat). k >= processed /\ k < Seq.length f ==> last_finish <= Seq.index f k)
-
-// Lemma: The compatibility_maintained property implies that the greedy selection is valid
-// This lemma explicitly states what we prove about the algorithm
-let lemma_greedy_implies_compatibility
-  (s f: Seq.seq int)
-  (last_finish: int)
-  (n: nat)
-  : Lemma
-    (requires 
-      compatibility_maintained s f last_finish n /\
-      finish_sorted f /\
-      n == Seq.length s /\ n == Seq.length f /\
-      (forall (i:nat). i < n ==> valid_activity s f i))
-    (ensures
-      // The last_finish represents a valid activity's finish time
-      (exists (k:nat). k < n /\ Seq.index f k == last_finish) /\
-      // Any activity selected after the first satisfies: start >= last_selected_finish
-      // By induction, all selected activities are pairwise compatible
-      last_finish >= Seq.index f 0)
-  = ()
 
 // ========== Activity Selection Algorithm ==========
 
@@ -127,10 +77,13 @@ fn activity_selection
     pure (
       SZ.v count >= 1 /\ 
       SZ.v count <= SZ.v n /\
-      // The algorithm computes a valid greedy selection:
-      // There exists a finish time from the input that represents the last selected activity
-      (exists (last_finish:int). 
-         compatibility_maintained ss sf last_finish (SZ.v n))
+      // There exists a selection of activities that is pairwise non-overlapping
+      (exists (sel: Seq.seq nat).
+        Seq.length sel == SZ.v count /\
+        L.all_valid_indices sel (SZ.v n) /\
+        L.strictly_increasing sel /\
+        L.pairwise_compatible sel ss sf /\
+        Seq.index sel 0 == 0)
     )
 {
   // First activity (earliest finish) is always selected
@@ -138,49 +91,59 @@ fn activity_selection
   let first_finish = finish_times.(0sz);
   let mut last_finish: int = first_finish;
   
+  // Ghost selection sequence
+  L.lemma_initial_selection ss sf (SZ.v n);
+  let sel_ref = GR.alloc #(Seq.seq nat) (Seq.create 1 0);
+  
   // Scan through remaining activities
   let mut i: SZ.t = 1sz;
   
   while (!i <^ n)
-  invariant exists* vi vcount vlast_finish.
+  invariant exists* vi vcount vlast_finish vsel.
     R.pts_to i vi **
     R.pts_to count vcount **
     R.pts_to last_finish vlast_finish **
+    GR.pts_to sel_ref vsel **
     pure (
-      // Basic bounds
       SZ.v vi > 0 /\
       SZ.v vi <= SZ.v n /\
       SZ.v vcount >= 1 /\
       SZ.v vcount <= SZ.v vi /\
-      
-      // Compatibility is maintained by the greedy selection
-      compatibility_maintained ss sf vlast_finish (SZ.v vi)
+      Seq.length vsel == SZ.v vcount /\
+      L.greedy_selection_inv vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish
     )
   {
     let vi = !i;
     let curr_start = start_times.(vi);
     let curr_finish = finish_times.(vi);
     let vlast_finish = !last_finish;
+    let vcount = !count;
     
-    // Assert sorting property: curr_finish >= vlast_finish
+    with vsel. assert (GR.pts_to sel_ref vsel);
     assert pure (finish_sorted sf);
-    assert pure (exists (k:nat). k < SZ.v vi /\ Seq.index sf k == vlast_finish);
-    assert pure (Seq.index sf (SZ.v vi) == curr_finish);
+    assert pure (L.greedy_selection_inv vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish);
     assert pure (vlast_finish <= curr_finish);
     
-    // If current activity starts after or when last selected finishes, select it
-    if (curr_start >= vlast_finish) {
-      // This activity is compatible with all previously selected activities
-      // because curr_start >= vlast_finish
-      assert pure (curr_start >= vlast_finish);
-      count := !count + 1sz;
-      last_finish := curr_finish;
-      // After update, last_finish is still a valid finish time
-      assert pure (Seq.index sf (SZ.v vi) == curr_finish);
-    };
+    // Compute both possible next selections
+    let selected = (curr_start >= vlast_finish);
+    
+    // Call combined step lemma
+    L.lemma_step vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish selected;
+    
+    let new_count : SZ.t = (if selected then vcount + 1sz else vcount);
+    let new_last : int = (if selected then curr_finish else vlast_finish);
+    let new_sel : Ghost.erased (Seq.seq nat) = 
+      (if selected then Ghost.hide (Seq.snoc (Ghost.reveal vsel) (SZ.v vi)) else vsel);
+    
+    count := new_count;
+    last_finish := new_last;
+    GR.op_Colon_Equals sel_ref new_sel;
     
     i := vi + 1sz;
   };
+  
+  with vsel_f. assert (GR.pts_to sel_ref vsel_f);
+  GR.free sel_ref;
   
   !count
 }
