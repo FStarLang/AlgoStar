@@ -1,21 +1,21 @@
 (*
-   Bucket Sort - Verified implementation in Pulse
+   Partition - Verified implementation in Pulse (CLRS Chapter 7)
    
-   This implements a simplified partition algorithm that forms the conceptual
-   basis of bucket sort: partitioning elements around a pivot value.
-   
-   The partition function rearranges an array so all elements <= pivot come
+   The partition subroutine rearranges an array so all elements <= pivot come
    before all elements > pivot, using the two-pointer approach from CLRS.
+   This is the key building block used by Quicksort.
    
    Proves:
    1. Memory safety
-   2. Length preservation
+   2. Length preservation  
    3. Return value is valid partition point (0 <= result <= n)
+   4. Permutation: output is a rearrangement of input
+   5. Partition correctness: elements before split <= pivot, after > pivot
    
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch08.BucketSort
+module CLRS.Ch07.Partition
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
