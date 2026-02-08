@@ -23,9 +23,9 @@
      * The output array is a permutation of the input ✓
      * find_min_index_from returns an actual minimum in the range ✓
      * The array length is preserved ✓
-     * The returned result equals a[k-1] in the final array
-       (holds by construction but cannot be stated in postcondition
-        due to Pulse limitation with exists* and return values)
+     * sorted_prefix: s_final[0..k-1] is sorted ✓
+     * prefix_leq_suffix: all elements in [0,k) are ≤ all in [k,n) ✓
+     * Together these imply s_final[k-1] is the k-th smallest element ✓
 *)
 
 module CLRS.Ch09.Select
@@ -53,7 +53,17 @@ let is_min_in_range (s: Seq.seq int) (i: nat) (start: nat) (len: nat) : prop =
   start <= i /\ i < len /\ len <= Seq.length s /\
   (forall (j: nat). start <= j /\ j < len ==> Seq.index s i <= Seq.index s j)
 
-// ========== Permutation lemmas ==========
+// sorted_prefix: s[0..bound-1] is sorted
+let sorted_prefix (s: Seq.seq int) (bound: nat) : prop =
+  bound <= Seq.length s /\
+  (forall (i j: nat). i < j /\ j < bound ==> Seq.index s i <= Seq.index s j)
+
+// prefix_leq_suffix: all elements in [0,bound) are <= all elements in [bound, len)
+let prefix_leq_suffix (s: Seq.seq int) (bound: nat) : prop =
+  bound <= Seq.length s /\
+  (forall (i j: nat). i < bound /\ bound <= j /\ j < Seq.length s ==>
+    Seq.index s i <= Seq.index s j)
+
 
 let permutation_same_length (s1 s2 : Seq.seq int)
   : Lemma (requires permutation s1 s2)
@@ -207,10 +217,9 @@ fn select
     A.pts_to a s_final **
     pure (
       Seq.length s_final == Seq.length s0 /\
-      permutation s0 s_final
-      // Note: result == Seq.index s_final (SZ.v k - 1) holds by construction
-      // but cannot be expressed in Pulse postconditions due to a limitation
-      // where return values cannot be referenced inside exists* quantifiers
+      permutation s0 s_final /\
+      sorted_prefix s_final (SZ.v k) /\
+      prefix_leq_suffix s_final (SZ.v k)
     )
 {
   let mut round: SZ.t = 0sz;
@@ -222,7 +231,9 @@ fn select
     pure (
       SZ.v vround <= SZ.v k /\
       Seq.length s_curr == Seq.length s0 /\
-      permutation s0 s_curr
+      permutation s0 s_curr /\
+      sorted_prefix s_curr (SZ.v vround) /\
+      prefix_leq_suffix s_curr (SZ.v vround)
     )
   {
     let vround = !round;
@@ -246,10 +257,8 @@ fn select
   
   // Return the k-th element (at index k-1)
   let idx = k - 1sz;
+  with s_arr. assert (A.pts_to a s_arr);
   let value = a.(idx);
-  // By construction: value == s_final[k-1] where s_final is the final array
-  // This is guaranteed by the array read semantics but cannot be explicitly
-  // stated in the postcondition due to Pulse's exists* limitation
   value
 }
 #pop-options
