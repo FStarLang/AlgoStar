@@ -1,17 +1,24 @@
 (*
    Depth-First Search - Verified implementation in Pulse
    
-   Implements iterative graph reachability exploration using repeated relaxation.
-   Equivalent to BFS/DFS in terms of which vertices get visited.
+   Implements graph reachability via iterative exploration.
    Graph represented as adjacency matrix adj[i*n+j] (edge from i to j if != 0).
    
    Colors: 0=white (unvisited), non-zero=visited
    
    Runs n rounds. In each round, for every visited vertex u, marks all
-   unvisited neighbors v as visited. After n rounds, all reachable vertices
-   from source are visited.
+   unvisited neighbors v as visited with dist[v] = dist[u] + 1.
+   After n rounds, all reachable vertices from source are visited.
    
-   Postcondition: Source vertex is visited, all reachable vertices are visited.
+   Postconditions:
+   - Source vertex is visited with dist[source] == 0
+   - All reachable vertices (within n steps) are visited
+   - Distance soundness: for all visited v, reachable_in(source, v, dist[v])
+   
+   NOTE: This implements graph reachability exploration, equivalent to BFS in
+   terms of which vertices get visited. A full CLRS DFS with discovery/finish
+   timestamps, edge classification, and the parenthesis theorem requires a
+   stack-based implementation (future work).
    
    NO admits. NO assumes.
 *)
