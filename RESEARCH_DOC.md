@@ -442,3 +442,38 @@ Despite the criticisms, several aspects deserve praise:
 ## 7. Conclusion
 
 AutoCLRS is an ambitious project with a solid foundation in some areas (sorting, DP, number theory) but significant gaps in others (graphs, trees, flow). The most concerning issue is that several modules claim to implement CLRS algorithms but actually implement something much simpler — the BFS/DFS/MaxFlow situation is particularly egregious. The complexity proof infrastructure is excellent where it exists but covers less than a third of the algorithms. To be credible as a verified CLRS library, the project needs to either implement the actual CLRS algorithms or honestly label the simplifications, and every algorithm should have both a functional correctness proof against a clean spec and a verified complexity bound.
+
+---
+
+## 8. Improvements Made (Post-Audit)
+
+### 8.1 Functional Correctness Strengthening
+
+| Algorithm | Change | Commit |
+|-----------|--------|--------|
+| **BFS (Ch22)** | Added distance soundness postcondition: `dist[v] >= 0 ∧ reachable_in(source, v, dist[v])` | `810d419` |
+| **KMP (Ch32)** | Implemented full KMP-MATCHER search with pure spec (matches_at, count_matches_spec) | `8b105f1` |
+| **BST (Ch12)** | Added `subtree_in_range` (recursive BST with bounds) and `key_in_subtree` stepping lemmas | `789051c` |
+
+### 8.2 Complexity Proof Improvements
+
+| Algorithm | Change | Commit |
+|-----------|--------|--------|
+| **GCD (Ch31)** | Tightened from O(b) to O(log b) via Lamé's theorem (two-step halving argument) | `5c9cead` |
+| **Partition (Ch07)** | New file proving exactly n comparisons per partition call | `29f3c68` |
+
+### 8.3 Documentation Honesty
+
+| Algorithm | Change | Commit |
+|-----------|--------|--------|
+| **DFS (Ch22)** | Documented as reachability (not true DFS); stack-based DFS is future work | `dce09be` |
+| **MaxFlow (Ch26)** | Removed misleading "Ford-Fulkerson" claims; documented as zero-flow initialization | `1121164` |
+| **TopSort (Ch22)** | Documented postcondition limitations and proof strategy for ordering/distinctness | `7eb3520` |
+
+### 8.4 Summary
+
+- **Zero admits maintained** across all changes — no regression in proof completeness
+- **7 of 21 planned tasks completed** (see PROGRESS_PLAN.md)
+- Key insight: Pulse's ownership model makes queue-based algorithms (BFS, Kahn's TopSort) very challenging for full functional correctness proofs; iterative relaxation patterns are more tractable
+- The `subtree_in_range` + `key_in_subtree` framework provides a clean foundation for BST completeness proofs
+- The two-step Lamé argument (a%b ≤ a/2 when a ≥ b) is an elegant way to prove O(log b) without Fibonacci numbers
