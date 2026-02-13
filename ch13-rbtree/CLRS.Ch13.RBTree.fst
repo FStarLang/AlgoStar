@@ -1,16 +1,32 @@
 (*
    Red-Black Tree - Simplified verified implementation in Pulse
    
-   Array-backed BST with search and insert operations.
+   CLRS Chapter 13 presents Red-Black Trees with:
+   - RB-INSERT with INSERT-FIXUP (6 cases: 3 + 3 symmetric)
+   - RB-DELETE with DELETE-FIXUP (8 cases: 4 + 4 symmetric)
+   - Invariants: root is black, red nodes have black children,
+     all root-to-leaf paths have equal black-height
+   - Height bound: h ≤ 2·lg(n+1)
    
-   Representation:
-   - key[i]: key at node i
-   - left[i], right[i]: child indices (-1 = null)  
-   - color[i]: 0 = red, 1 = black
+   CRITICAL LIMITATION: This implementation is an array-backed BST
+   WITHOUT any Red-Black invariants or fixup operations:
+   - The color field exists but is never maintained
+   - Insert appends at the next free slot (not at the correct BST position)
+   - No rotations or recoloring
+   - No RB invariant enforcement
+   - The BST ordering property is NOT maintained by insert
    
-   Operations:
-   - Search: traverse BST path to find key
-   - Insert: add key as new node at next position
+   Postconditions proven:
+   - Search: if found, the returned key matches (trivially correct)
+   - Insert: key exists at some position after insert
+   
+   What a correct implementation would need:
+   - Walk to correct BST insert position (compare keys)
+   - Color new node red
+   - RB-INSERT-FIXUP: fix red-red violations via rotations/recoloring
+   - Prove BST ordering maintained
+   - Prove RB invariants maintained
+   - Prove O(log n) height bound
    
    NO admits. NO assumes.
 *)

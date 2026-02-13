@@ -1,12 +1,28 @@
 (*
    Huffman Encoding - Simplified Cost Computation
    
-   Implements a simplified version of the Huffman algorithm from CLRS Chapter 16.
-   Given n character frequencies, computes the total cost of the Huffman tree
-   without building the actual tree structure.
+   CLRS Section 16.3 presents HUFFMAN(C):
+   1. Build a priority queue Q from the character frequencies
+   2. For i = 1 to |C|-1:
+      a. Extract two minimum-frequency nodes z.left, z.right from Q
+      b. Create new node z with freq = z.left.freq + z.right.freq
+      c. Insert z into Q
+   3. Return the remaining tree in Q (the Huffman tree)
    
-   Algorithm: Repeatedly combine the two smallest frequencies until one remains,
-   accumulating the sum at each step as the total cost.
+   This implementation computes only the total cost (sum of all internal
+   node frequencies), NOT the actual tree structure. It uses linear-scan
+   min-finding instead of a priority queue.
+   
+   Limitation: No tree is constructed. The postcondition only proves:
+   - cost >= 0
+   - cost > 0 when n > 1
+   
+   What a full implementation would need:
+   - Inductive Huffman tree type: Leaf freq | Internal freq left right
+   - Priority queue (min-heap or sorted list)
+   - Proof that the tree is prefix-free
+   - Proof of optimality: cost == minimum weighted path length
+     (requires greedy choice property from CLRS Theorem 16.3)
    
    NO admits. NO assumes.
 *)

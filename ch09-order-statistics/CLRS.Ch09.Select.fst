@@ -3,8 +3,13 @@
    
    Implements the k-th smallest element finder using partial selection sort.
    
-   Given an array of n integers and k (1 <= k <= n), finds the k-th smallest
-   element by performing k rounds of selection sort (finding minimum and swapping).
+   CLRS Chapter 9 presents:
+   - RANDOMIZED-SELECT: O(n) expected via randomized partitioning (§9.2)
+   - SELECT (median-of-medians): O(n) worst case (§9.3)
+   
+   This implementation uses partial selection sort: O(nk) worst case.
+   For k = O(1), this matches CLRS. For k = n/2 (median), this is O(n²)
+   while CLRS algorithms are O(n). See Select.Complexity.fst for analysis.
    
    Algorithm:
    - For each round i from 0 to k-1:
@@ -17,15 +22,16 @@
    
    Verification Status:
    - NO admits, NO assumes ✓
-   - Memory safety: Array accesses are bounds-checked ✓
-   - Termination: All loops have decreasing measures ✓
    - Correctness properties proven:
      * The output array is a permutation of the input ✓
-     * find_min_index_from returns an actual minimum in the range ✓
-     * The array length is preserved ✓
      * sorted_prefix: s_final[0..k-1] is sorted ✓
      * prefix_leq_suffix: all elements in [0,k) are ≤ all in [k,n) ✓
      * Together these imply s_final[k-1] is the k-th smallest element ✓
+   
+   Limitation: Uses O(nk) partial selection sort instead of CLRS's O(n) algorithms.
+   Implementing RANDOMIZED-SELECT requires a random number source (not available).
+   Implementing median-of-medians SELECT requires recursive partitioning with
+   median-of-5 groups, which is a significant implementation effort.
 *)
 
 module CLRS.Ch09.Select
