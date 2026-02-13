@@ -454,6 +454,9 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 | **BFS (Ch22)** | Added distance soundness postcondition: `dist[v] >= 0 ∧ reachable_in(source, v, dist[v])` | `810d419` |
 | **KMP (Ch32)** | Implemented full KMP-MATCHER search with pure spec (matches_at, count_matches_spec) | `8b105f1` |
 | **BST (Ch12)** | Added `subtree_in_range` (recursive BST with bounds) and `key_in_subtree` stepping lemmas | `789051c` |
+| **Union-Find (Ch21)** | Added `find_compress` (one-step path compression: parent[x]=root); fixed rank increment on equal-rank merge (CLRS line 5-6) | `9c8734c` |
+| **Activity Selection (Ch16)** | Proved greedy choice property (CLRS Theorem 16.1) | `099106d` |
+| **Vertex Cover (Ch35)** | Documented 2-approximation analysis (CLRS Theorem 35.1) | `539b921` |
 
 ### 8.2 Complexity Proof Improvements
 
@@ -461,6 +464,9 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 |-----------|--------|--------|
 | **GCD (Ch31)** | Tightened from O(b) to O(log b) via Lamé's theorem (two-step halving argument) | `5c9cead` |
 | **Partition (Ch07)** | New file proving exactly n comparisons per partition call | `29f3c68` |
+| **Quicksort (Ch07)** | Proved T(n) = n(n-1)/2 worst case (CLRS Thm 7.4), maximality over all partition splits via convexity | `6208a58` |
+| **Heapsort (Ch06)** | Proved T(n) ≤ 2n(1 + log₂ n), O(n log n) with log₂ monotonicity | `695f9e5` |
+| **MergeSort (Ch02)** | Proved T(n) ≤ 4n(log₂ n + 1), O(n log n) via recurrence analysis | `2a62747` |
 
 ### 8.3 Documentation Honesty
 
@@ -473,7 +479,10 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 ### 8.4 Summary
 
 - **Zero admits maintained** across all changes — no regression in proof completeness
-- **7 of 21 planned tasks completed** (see PROGRESS_PLAN.md)
+- **13 of 21 planned tasks completed** (see PROGRESS_PLAN.md)
+- **20 algorithms now have formal complexity proofs** (up from 15)
 - Key insight: Pulse's ownership model makes queue-based algorithms (BFS, Kahn's TopSort) very challenging for full functional correctness proofs; iterative relaxation patterns are more tractable
 - The `subtree_in_range` + `key_in_subtree` framework provides a clean foundation for BST completeness proofs
 - The two-step Lamé argument (a%b ≤ a/2 when a ≥ b) is an elegant way to prove O(log b) without Fibonacci numbers
+- Pure F* complexity proofs (without Pulse tick counters) provide clean mathematical bounds; connecting them to Pulse implementations is future work
+- Path compression in union-find: full compression (all nodes on path → root) requires proving path acyclicity, which is involved; one-step compression is simpler and still provides benefit
