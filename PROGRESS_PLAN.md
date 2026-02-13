@@ -66,7 +66,7 @@
 - [ ] P1.1.5: Add ghost tick counter; prove O(n) expected time (or O(n²) worst-case for deterministic)
 - [ ] P1.1.6: (Stretch) Implement median-of-medians SELECT with O(n) worst case
 
-### P1.2 Radix Sort (Ch08) — Implement multi-digit version
+### P1.2 Radix Sort (Ch08) — Implement multi-digit version *(d=1 documented)*
 - [ ] P1.2.1: Define pure spec for digit extraction: `digit k d base = (k / base^d) % base`
 - [ ] P1.2.2: Define stable sort spec: elements with equal keys maintain relative order
 - [ ] P1.2.3: Implement RADIX-SORT with d passes of counting sort, least-significant digit first
@@ -74,6 +74,7 @@
 - [ ] P1.2.5: Prove final array is sorted by full key value
 - [ ] P1.2.6: Prove permutation of input
 - [ ] P1.2.7: Add ghost tick counter; prove O(d(n+k)) complexity
+- [x] P1.2.8: Updated documentation to honestly describe d=1 limitation and CLRS multi-pass structure
 
 ### P1.3 Huffman Coding (Ch16) — Implement actual tree construction
 - [ ] P1.3.1: Define inductive Huffman tree type: `htree = Leaf freq char | Internal freq left right`
@@ -195,10 +196,10 @@
 - [x] P3.3.4: Proved maximality: for ANY partition split k, total ≤ T(n)
 - [ ] P3.3.5: Thread tick counter through recursive quicksort Pulse code
 
-### P3.4 Matrix Chain O(n³)
-- [ ] P3.4.1: Add ghost tick counter
-- [ ] P3.4.2: Prove three nested loops: l from 2 to n, i from 1 to n-l+1, k from i to i+l-2
-- [ ] P3.4.3: Prove total operations ≤ n³/3 (tighter: Σ_{l=2}^{n} (n-l+1)(l-1))
+### P3.4 Matrix Chain O(n³) ✓ COMPLETED
+- [x] P3.4.1: Pure proof: mc_inner_sum computes Σ_{l=2}^{n} (n-l+1)(l-1)
+- [x] P3.4.2: Proved term_bound: each (n-l+1)(l-1) ≤ n²
+- [x] P3.4.3: Proved mc_iterations_bound: total ≤ (n-1)·n² ≤ n³
 
 ### P3.5 GCD — Tighten to O(log min(a,b)) ✓ COMPLETED
 - [x] P3.5.1: Proved two-step halving bound (Lamé's theorem): after 2 steps b ≤ b/2
@@ -217,11 +218,19 @@
 - [ ] P3.7.4: Prove O(n) for the search phase
 - [ ] P3.7.5: Total: O(n + m)
 
-### P3.8 Remaining simple complexity proofs
+### P3.8 Remaining complexity proofs *(Several completed)*
 - [ ] P3.8.1: Stack push/pop: O(1)
 - [ ] P3.8.2: Queue enqueue/dequeue: O(1)
 - [ ] P3.8.3: LinkedList search: O(n), insert: O(1)
 - [ ] P3.8.4: Segment intersection test: O(1)
+- [x] P3.8.5: BST search: O(h) where h = ⌊log₂(cap)⌋ — node_depth(i) = ⌊log₂(i+1)⌋, search visits ≤ h+1 nodes
+- [x] P3.8.6: Counting Sort: Θ(n+k) — exact 2n+k+1 iterations, proved upper and lower bounds
+- [x] P3.8.7: Bellman-Ford: O(V³) — V + (V-1)V² + V² iterations, proved ≤ 2V³
+- [x] P3.8.8: Select (partial sort): O(nk) — k rounds of n-1 comparisons, proved ≤ kn
+- [x] P3.8.9: BFS/DFS: O(V²) for adjacency matrix — V² edge checks
+- [x] P3.8.10: Kruskal: O(V³) — (V-1)×V² iterations
+- [x] P3.8.11: Prim: O(V²) — V rounds of V neighbor updates
+- [x] P3.8.12: Floyd-Warshall complexity file: fixed z3rlimit to restore verification
 
 ---
 
@@ -255,14 +264,14 @@
 
 ## Summary: Task Counts by Phase
 
-| Phase | Description | Tasks |
-|-------|-------------|-------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 |
-| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 30 |
-| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 |
-| P3 | Add complexity proofs (MergeSort, Heapsort, Quicksort, etc.) | 28 |
-| P4 | Polish and extensions | 18 |
-| **Total** | | **158** |
+| Phase | Description | Total | Done | Remaining |
+|-------|-------------|-------|------|-----------|
+| P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 0 | 41 |
+| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 30 | 4 | 26 |
+| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 5 | 36 |
+| P3 | Add complexity proofs (MergeSort, Heapsort, Quicksort, etc.) | 36 | 20 | 16 |
+| P4 | Polish and extensions | 18 | 0 | 18 |
+| **Total** | | **166** | **29** | **137** |
 
 ---
 

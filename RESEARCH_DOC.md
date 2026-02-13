@@ -467,6 +467,15 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 | **Quicksort (Ch07)** | Proved T(n) = n(n-1)/2 worst case (CLRS Thm 7.4), maximality over all partition splits via convexity | `6208a58` |
 | **Heapsort (Ch06)** | Proved T(n) ≤ 2n(1 + log₂ n), O(n log n) with log₂ monotonicity | `695f9e5` |
 | **MergeSort (Ch02)** | Proved T(n) ≤ 4n(log₂ n + 1), O(n log n) via recurrence analysis | `2a62747` |
+| **MatrixChain (Ch15)** | Proved Σ(n-l+1)(l-1) ≤ n³; term bound n² per summand | `bf17506` |
+| **BST Search (Ch12)** | Proved O(h) where h = ⌊log₂(cap)⌋; node_depth(i) = ⌊log₂(i+1)⌋ | `8a68e0d` |
+| **CountingSort (Ch08)** | Proved Θ(n+k): exact 2n+k+1 iterations, upper and lower bounds | `c26b29f` |
+| **Select (Ch09)** | Proved O(nk): k rounds × (n-1) comparisons; documented CLRS RANDOMIZED-SELECT gap | `388302a` |
+| **Bellman-Ford (Ch24)** | Proved O(V³): V + (V-1)V² + V² iterations ≤ 2V³ | `388302a` |
+| **BFS/DFS (Ch22)** | Proved O(V²) for adjacency matrix; O(V+E) ≤ O(V²) subsumption | `6bb362a` |
+| **Kruskal (Ch23)** | Proved O(V³): (V-1) × V² iterations | `6bb362a` |
+| **Prim (Ch23)** | Proved O(V²): V rounds × 2V operations | `6bb362a` |
+| **Floyd-Warshall (Ch25)** | Fixed z3rlimit to restore verification of existing O(n³) proof | `c0dde7e` |
 
 ### 8.3 Documentation Honesty
 
@@ -479,10 +488,11 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 ### 8.4 Summary
 
 - **Zero admits maintained** across all changes — no regression in proof completeness
-- **13 of 21 planned tasks completed** (see PROGRESS_PLAN.md)
-- **20 algorithms now have formal complexity proofs** (up from 15)
+- **29 of 166 planned tasks completed** (see PROGRESS_PLAN.md)
+- **27 algorithms now have formal complexity proofs** (up from 15), covering all major chapters
 - Key insight: Pulse's ownership model makes queue-based algorithms (BFS, Kahn's TopSort) very challenging for full functional correctness proofs; iterative relaxation patterns are more tractable
 - The `subtree_in_range` + `key_in_subtree` framework provides a clean foundation for BST completeness proofs
 - The two-step Lamé argument (a%b ≤ a/2 when a ≥ b) is an elegant way to prove O(log b) without Fibonacci numbers
 - Pure F* complexity proofs (without Pulse tick counters) provide clean mathematical bounds; connecting them to Pulse implementations is future work
 - Path compression in union-find: full compression (all nodes on path → root) requires proving path acyclicity, which is involved; one-step compression is simpler and still provides benefit
+- RadixSort d=1 limitation honestly documented; multi-digit version would require digit extraction + stability proof
