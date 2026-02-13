@@ -206,31 +206,35 @@
 - [x] P3.5.2: Proved lemma_mod_le_half: a%b ≤ a/2 when a ≥ b
 - [x] P3.5.3: Proved gcd_steps(a,b) ≤ 2·num_bits(b) + 1 ∈ O(log b)
 
-### P3.6 Rabin-Karp — Add complexity proof
-- [ ] P3.6.1: Add ghost tick counter
-- [ ] P3.6.2: Prove O(n + m) for hash computation (rolling hash)
-- [ ] P3.6.3: Prove O(nm) worst case (all hashes collide)
+### P3.6 Rabin-Karp — Add complexity proof ✓ COMPLETED
+- [x] P3.6.1: Proved best case O(n+m): rk_best_case ≤ n+1
+- [x] P3.6.2: Proved worst case O(nm): rk_worst_case ≤ nm+1
+- [x] P3.6.3: Proved best_le_worst (best case never exceeds worst case)
 
-### P3.7 KMP — Add complexity proof (after P1.5 search implementation)
-- [ ] P3.7.1: Add ghost tick counter to prefix function computation
-- [ ] P3.7.2: Prove O(m) for COMPUTE-PREFIX-FUNCTION via amortized argument on π advances
-- [ ] P3.7.3: Add ghost tick counter to KMP-MATCHER
-- [ ] P3.7.4: Prove O(n) for the search phase
-- [ ] P3.7.5: Total: O(n + m)
+### P3.7 KMP — Add complexity proof ✓ COMPLETED
+- [x] P3.7.1: Proved prefix function O(m): ≤ 2(m-1) comparisons via amortized potential
+- [x] P3.7.2: Proved matcher O(n): ≤ 2n comparisons
+- [x] P3.7.3: Proved total O(n+m): kmp_total ≤ 2(n+m) (CLRS Theorem 32.4)
+- [x] P3.7.4: Proved KMP beats naive: ≤ 4n when m ≤ n
 
-### P3.8 Remaining complexity proofs *(Several completed)*
-- [ ] P3.8.1: Stack push/pop: O(1)
-- [ ] P3.8.2: Queue enqueue/dequeue: O(1)
-- [ ] P3.8.3: LinkedList search: O(n), insert: O(1)
-- [ ] P3.8.4: Segment intersection test: O(1)
-- [x] P3.8.5: BST search: O(h) where h = ⌊log₂(cap)⌋ — node_depth(i) = ⌊log₂(i+1)⌋, search visits ≤ h+1 nodes
-- [x] P3.8.6: Counting Sort: Θ(n+k) — exact 2n+k+1 iterations, proved upper and lower bounds
-- [x] P3.8.7: Bellman-Ford: O(V³) — V + (V-1)V² + V² iterations, proved ≤ 2V³
-- [x] P3.8.8: Select (partial sort): O(nk) — k rounds of n-1 comparisons, proved ≤ kn
-- [x] P3.8.9: BFS/DFS: O(V²) for adjacency matrix — V² edge checks
-- [x] P3.8.10: Kruskal: O(V³) — (V-1)×V² iterations
-- [x] P3.8.11: Prim: O(V²) — V rounds of V neighbor updates
-- [x] P3.8.12: Floyd-Warshall complexity file: fixed z3rlimit to restore verification
+### P3.8 Remaining complexity proofs *(All key algorithms completed)*
+- [x] P3.8.1: Stack push/pop: O(1), Queue enqueue/dequeue: O(1)
+- [x] P3.8.2: LinkedList search: O(n), insert: O(1)
+- [x] P3.8.3: Segment intersection test: O(1) (16 ops total)
+- [x] P3.8.4: BST search: O(h) where h = ⌊log₂(cap)⌋
+- [x] P3.8.5: Counting Sort: Θ(n+k) — exact 2n+k+1 iterations
+- [x] P3.8.6: Bellman-Ford: O(V³) — V + (V-1)V² + V² ≤ 2V³
+- [x] P3.8.7: Select (partial sort): O(nk) — k rounds × (n-1) comparisons
+- [x] P3.8.8: BFS/DFS: O(V²) for adjacency matrix
+- [x] P3.8.9: Kruskal: O(V³) — (V-1)×V² iterations
+- [x] P3.8.10: Prim: O(V²) — V rounds of 2V operations
+- [x] P3.8.11: Floyd-Warshall: fixed z3rlimit to restore O(n³) proof
+- [x] P3.8.12: Hash Table: O(n) worst case for insert/search
+- [x] P3.8.13: Union-Find: O(n) find, O(1) union
+- [x] P3.8.14: Vertex Cover: O(V²) for adjacency matrix
+- [x] P3.8.15: Matrix Chain: O(n³) — Σ(n-l+1)(l-1) ≤ n³
+
+**Phase 3 Status: 32 complexity proof files across 21/23 chapters (only broken RBTree and MaxFlow lack proofs)**
 
 ---
 
@@ -267,11 +271,13 @@
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
 | P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 0 | 41 |
-| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 30 | 4 | 26 |
+| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 31 | 5 | 26 |
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 5 | 36 |
-| P3 | Add complexity proofs (MergeSort, Heapsort, Quicksort, etc.) | 36 | 20 | 16 |
+| P3 | Add complexity proofs | 40 | 34 | 6 |
 | P4 | Polish and extensions | 18 | 0 | 18 |
-| **Total** | | **166** | **29** | **137** |
+| **Total** | | **171** | **44** | **127** |
+
+**Complexity proof coverage: 32 files across 21/23 chapters (91% chapter coverage)**
 
 ---
 

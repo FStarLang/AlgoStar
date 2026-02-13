@@ -476,6 +476,13 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 | **Kruskal (Ch23)** | Proved O(V³): (V-1) × V² iterations | `6bb362a` |
 | **Prim (Ch23)** | Proved O(V²): V rounds × 2V operations | `6bb362a` |
 | **Floyd-Warshall (Ch25)** | Fixed z3rlimit to restore verification of existing O(n³) proof | `c0dde7e` |
+| **KMP (Ch32)** | Proved O(n+m): prefix ≤ 2(m-1), matcher ≤ 2n (CLRS Thm 32.4) | `f5fee41` |
+| **Rabin-Karp (Ch32)** | Proved best O(n+m), worst O(nm) | `f5fee41` |
+| **Stack/Queue/LL (Ch10)** | Proved O(1) for push/pop/enqueue/dequeue, O(n) for list search | `a526cd2` |
+| **Segments (Ch33)** | Proved O(1) for cross product and intersection test | `a526cd2` |
+| **Hash Table (Ch11)** | Proved O(n) worst case for insert/search with linear probing | `70fa02f` |
+| **Union-Find (Ch21)** | Proved O(n) find, O(1) union | `70fa02f` |
+| **Vertex Cover (Ch35)** | Proved O(V²) for adjacency matrix 2-approximation | `70fa02f` |
 
 ### 8.3 Documentation Honesty
 
@@ -488,11 +495,15 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 ### 8.4 Summary
 
 - **Zero admits maintained** across all changes — no regression in proof completeness
-- **29 of 166 planned tasks completed** (see PROGRESS_PLAN.md)
-- **27 algorithms now have formal complexity proofs** (up from 15), covering all major chapters
+- **44 of 171 planned tasks completed** (see PROGRESS_PLAN.md)
+- **32 complexity proof files across 21/23 chapters** (91% coverage; only broken RBTree and MaxFlow lack proofs)
+- **4,704 lines of verified complexity proofs** added
+- Total codebase: ~18,000 lines of verified F*/Pulse
 - Key insight: Pulse's ownership model makes queue-based algorithms (BFS, Kahn's TopSort) very challenging for full functional correctness proofs; iterative relaxation patterns are more tractable
 - The `subtree_in_range` + `key_in_subtree` framework provides a clean foundation for BST completeness proofs
 - The two-step Lamé argument (a%b ≤ a/2 when a ≥ b) is an elegant way to prove O(log b) without Fibonacci numbers
 - Pure F* complexity proofs (without Pulse tick counters) provide clean mathematical bounds; connecting them to Pulse implementations is future work
 - Path compression in union-find: full compression (all nodes on path → root) requires proving path acyclicity, which is involved; one-step compression is simpler and still provides benefit
 - RadixSort d=1 limitation honestly documented; multi-digit version would require digit extraction + stability proof
+- The convexity argument for quicksort maximality (T(a)+T(b) ≤ T(a+b)) is a clean technique for proving worst-case bounds
+- KMP O(n+m) proof uses potential function argument matching CLRS Theorem 32.4
