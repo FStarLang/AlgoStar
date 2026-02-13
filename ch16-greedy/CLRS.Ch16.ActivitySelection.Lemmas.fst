@@ -129,3 +129,156 @@ let lemma_initial_selection (s f: seq int) (n: nat)
     assert (Seq.length sel == 1);
     assert (Seq.index sel 0 == 0);
     ()
+
+(* ====== OPTIMALITY PROOF ====== *)
+
+(* A valid selection: a compatible set of activities *)
+let is_valid_selection (sel: seq nat) (s f: seq int) (n: nat) : prop =
+  Seq.length sel >= 1 /\
+  all_valid_indices sel n /\
+  strictly_increasing sel /\
+  pairwise_compatible sel s f
+
+(* Greedy choice property (CLRS Theorem 16.1):
+   Given any valid selection, we can replace its first element with 0
+   (the earliest-finishing activity) and get another valid selection.
+   
+   This proves: there exists an optimal solution containing activity 0.
+   
+   Proof sketch:
+   - Let k = sel[0] be the first selected activity
+   - Since activities are sorted by finish time: f[0] <= f[k]
+   - If sel has > 1 element, let j = sel[1]
+   - From pairwise compatibility: f[k] <= s[j]
+   - By transitivity: f[0] <= f[k] <= s[j]
+   - So replacing k with 0 preserves compatibility
+   - strictly_increasing is preserved since 0 <= k < j
+*)
+let lemma_greedy_choice (s f: seq int) (n: nat) (opt: seq nat)
+  : Lemma 
+    (requires 
+      is_valid_selection opt s f n /\
+      finish_sorted f /\
+      n == Seq.length s /\ n == Seq.length f /\ n > 0 /\
+      (forall (i:nat). i < n ==> valid_activity s f i))
+    (ensures
+      (let opt' = Seq.upd opt 0 0 in
+       is_valid_selection opt' s f n /\ Seq.length opt' == Seq.length opt))
+  = let k = Seq.index opt 0 in
+    let opt' = Seq.upd opt 0 0 in
+    
+    // Length is preserved by upd
+    assert (Seq.length opt' == Seq.length opt);
+    
+    // Key fact: f[0] <= f[k] (from finish_sorted)
+    assert (k < n);  // from all_valid_indices
+    assert (Seq.index f 0 <= Seq.index f k);
+    
+    // Prove all_valid_indices for opt'
+    // opt'[i] = if i = 0 then 0 else opt[i]
+    // 0 < n by hypothesis, and for i > 0, opt'[i] = opt[i] < n
+    let aux_valid (i: nat{i < Seq.length opt'})
+      : Lemma (ensures Seq.index opt' i < n)
+      = if i = 0 then 
+          assert (Seq.index opt' 0 == 0)
+        else 
+          assert (Seq.index opt' i == Seq.index opt i)
+    in
+    FStar.Classical.forall_intro aux_valid;
+    assert (all_valid_indices opt' n);
+    
+    // Prove strictly_increasing for opt'
+    // Need: for all i < j, opt'[i] < opt'[j]
+    // Case 1: i = 0, j > 0: need 0 < opt'[j] = opt[j]
+    //   Since opt is strictly_increasing: opt[0] < opt[j]
+    //   Since opt[0] = k >= 0: we have opt[j] > k >= 0, so opt[j] > 0 unless k = 0
+    //   If k = 0, then opt' = opt, so done
+    // Case 2: i > 0, j > i: opt'[i] = opt[i] < opt[j] = opt'[j] ✓
+    let aux_strict (i: nat{i < Seq.length opt'}) (j: nat{i < j /\ j < Seq.length opt'})
+      : Lemma (ensures Seq.index opt' i < Seq.index opt' j)
+      = if i = 0 then begin
+          // opt'[0] = 0, opt'[j] = opt[j]
+          // Need: 0 < opt[j]
+          // From strictly_increasing: opt[0] < opt[j]
+          // opt[0] = k >= 0, so if k = 0, then opt[j] > 0
+          // If k > 0, then opt[j] > k > 0
+          assert (Seq.index opt 0 < Seq.index opt j);
+          assert (Seq.index opt 0 == k);
+          assert (Seq.index opt j > k);
+          assert (k >= 0);
+          if k = 0 then 
+            assert (Seq.index opt' j > 0)
+          else begin
+            assert (k > 0);
+            assert (Seq.index opt j > k);
+            assert (Seq.index opt j > 0)
+          end;
+          assert (Seq.index opt' 0 == 0);
+          assert (Seq.index opt' j == Seq.index opt j);
+          assert (Seq.index opt' 0 < Seq.index opt' j)
+        end
+        else begin
+          assert (Seq.index opt' i == Seq.index opt i);
+          assert (Seq.index opt' j == Seq.index opt j);
+          assert (Seq.index opt i < Seq.index opt j)
+        end
+    in
+    // Introduce the nested quantifiers manually
+    let aux_strict_j (i: nat{i < Seq.length opt'}) (j: nat{j < Seq.length opt'})
+      : Lemma (requires i < j)
+              (ensures Seq.index opt' i < Seq.index opt' j)
+      = aux_strict i j
+    in
+    let aux_strict_i (i: nat{i < Seq.length opt'})
+      : Lemma (ensures forall (j: nat). i < j /\ j < Seq.length opt' ==> Seq.index opt' i < Seq.index opt' j)
+      = FStar.Classical.forall_intro (FStar.Classical.move_requires (aux_strict_j i))
+    in
+    FStar.Classical.forall_intro aux_strict_i;
+    assert (strictly_increasing opt');
+    
+    // Prove pairwise_compatible for opt'
+    // First part: all indices are valid (already proved above)
+    let aux_compat_idx (i: nat{i < Seq.length opt'})
+      : Lemma (ensures Seq.index opt' i < Seq.length s /\ Seq.index opt' i < Seq.length f)
+      = if i = 0 then begin
+          assert (Seq.index opt' 0 == 0);
+          assert (0 < n);
+          assert (n == Seq.length s);
+          assert (n == Seq.length f)
+        end
+        else begin
+          assert (Seq.index opt' i == Seq.index opt i)
+        end
+    in
+    FStar.Classical.forall_intro aux_compat_idx;
+    
+    // Second part: consecutive pairs are compatible
+    let aux_compat_pairs (i: nat{i + 1 < Seq.length opt'})
+      : Lemma (ensures Seq.index f (Seq.index opt' i) <= Seq.index s (Seq.index opt' (i + 1)))
+      = if i = 0 then begin
+          // Need: f[opt'[0]] <= s[opt'[1]]
+          // opt'[0] = 0, opt'[1] = opt[1]
+          // From pairwise_compatible opt: f[opt[0]] <= s[opt[1]]
+          // opt[0] = k
+          // So: f[k] <= s[opt[1]]
+          // From finish_sorted: f[0] <= f[k]
+          // By transitivity: f[0] <= s[opt[1]]
+          assert (Seq.index opt' 0 == 0);
+          assert (Seq.index opt' 1 == Seq.index opt 1);
+          assert (Seq.index f (Seq.index opt 0) <= Seq.index s (Seq.index opt 1));
+          assert (Seq.index f k <= Seq.index s (Seq.index opt 1));
+          assert (Seq.index f 0 <= Seq.index f k);
+          assert (Seq.index f 0 <= Seq.index s (Seq.index opt 1));
+          assert (Seq.index f (Seq.index opt' 0) <= Seq.index s (Seq.index opt' 1))
+        end
+        else begin
+          assert (Seq.index opt' i == Seq.index opt i);
+          assert (Seq.index opt' (i + 1) == Seq.index opt (i + 1));
+          assert (Seq.index f (Seq.index opt i) <= Seq.index s (Seq.index opt (i + 1)))
+        end
+    in
+    FStar.Classical.forall_intro aux_compat_pairs;
+    assert (pairwise_compatible opt' s f);
+    
+    // All components of is_valid_selection are proved
+    assert (is_valid_selection opt' s f n)
