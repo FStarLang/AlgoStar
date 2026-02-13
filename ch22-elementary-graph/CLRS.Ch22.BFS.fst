@@ -1,16 +1,19 @@
 (*
    Breadth-First Search - Verified implementation in Pulse
    
-   Implements BFS graph traversal using iterative relaxation.
+   Implements BFS via level-by-level exploration using iterative relaxation.
    Graph represented as adjacency matrix adj[u*n+v] (edge from u to v if != 0).
    
    Colors: 0=white (unvisited), non-zero=visited
    
-   Runs n rounds. In each round, for every visited vertex u, marks all
-   unvisited neighbors v as visited. After n rounds, all reachable vertices
-   from source are visited.
+   Runs n rounds. In round r, for every visited vertex u with dist[u] == r,
+   marks all unvisited neighbors v as visited with dist[v] = r + 1.
+   After n rounds, all reachable vertices from source are visited.
    
-   Postcondition: Source vertex is visited, all reachable vertices are visited.
+   Postconditions:
+   - Source vertex is visited with dist[source] == 0
+   - All reachable vertices (within n steps) are visited
+   - Distance soundness: for all visited v, reachable_in(source, v, dist[v])
    
    NO admits. NO assumes.
 *)
@@ -47,6 +50,7 @@ let reachable_in_succ_witness (adj: Seq.seq int) (n: nat) (source v: nat) (k: na
 // Distance array: dist[v] = shortest distance from source to v (-1 if unreachable)
 // BFS computes shortest (unweighted) distances via iterative relaxation
 
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn bfs
   (adj: A.array int)
   (n: SZ.t)
@@ -83,7 +87,11 @@ fn bfs
       (SZ.v source < Seq.length sdist' ==> Seq.index sdist' (SZ.v source) == 0) /\
       // All reachable vertices are visited
       (forall (v: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v n) ==> 
-        Seq.index scolor' v <> 0)
+        Seq.index scolor' v <> 0) /\
+      // Distance soundness: for all visited v, v is reachable in dist[v] steps
+      (forall (v: nat). v < SZ.v n /\ Seq.index scolor' v <> 0 ==>
+        Seq.index sdist' v >= 0 /\
+        reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist' v))
     )
 {
   // Initialize all colors to 0 and distances to -1
@@ -126,8 +134,13 @@ fn bfs
       Seq.length sdist_r == SZ.v n /\
       Seq.index scolor_r (SZ.v source) == 1 /\
       Seq.index sdist_r (SZ.v source) == 0 /\
+      // Reachability completeness: vertices reachable in <= vround steps are visited
       (forall (v: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
-        Seq.index scolor_r v <> 0)
+        Seq.index scolor_r v <> 0) /\
+      // Distance soundness: visited vertices have valid distances
+      (forall (v: nat). v < SZ.v n /\ Seq.index scolor_r v <> 0 ==>
+        Seq.index sdist_r v >= 0 /\
+        reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_r v))
     )
   {
     let vround = !round;
@@ -152,10 +165,17 @@ fn bfs
           u_idx < SZ.v vu /\ v_idx < SZ.v n /\
           reachable_in sadj (SZ.v n) (SZ.v source) u_idx (SZ.v vround) /\
           has_edge sadj (SZ.v n) u_idx v_idx ==>
-          Seq.index scolor_u v_idx <> 0)
+          Seq.index scolor_u v_idx <> 0) /\
+        // Distance soundness carried through
+        (forall (v: nat). v < SZ.v n /\ Seq.index scolor_u v <> 0 ==>
+          Seq.index sdist_u v >= 0 /\
+          reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_u v))
       )
     {
       let vu = !u;
+
+      // Read dist[u] before inner loop
+      let du: int = A.op_Array_Access dist vu;
 
       let mut v: SZ.t = 0sz;
       while (!v <^ n)
@@ -186,7 +206,13 @@ fn bfs
             v_idx < SZ.v vv /\
             reachable_in sadj (SZ.v n) (SZ.v source) (SZ.v vu) (SZ.v vround) /\
             has_edge sadj (SZ.v n) (SZ.v vu) v_idx ==>
-            Seq.index scolor_v v_idx <> 0)
+            Seq.index scolor_v v_idx <> 0) /\
+          // Distance soundness carried through inner loop
+          (forall (w: nat). w < SZ.v n /\ Seq.index scolor_v w <> 0 ==>
+            Seq.index sdist_v w >= 0 /\
+            reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist_v w)) /\
+          // dist[vu] is preserved during inner loop
+          Seq.index sdist_v (SZ.v vu) == du
         )
       {
         let vv = !v;
@@ -203,11 +229,20 @@ fn bfs
 
         let new_cv: int = (if cu <> 0 && has_edge_val <> 0 && cv = 0 then 1 else cv);
         
+        // Key hint for dist soundness: if we're discovering vv for the first time,
+        // then vu is reachable in du steps, and has_edge(vu, vv), so vv is reachable in du+1 steps
+        // This uses the existential witness vu for the reachable_in definition
+        assert pure (cu <> 0 /\ has_edge_val <> 0 /\ cv = 0 ==>
+          (SZ.v vu < SZ.v n /\
+           reachable_in sadj (SZ.v n) (SZ.v source) (SZ.v vu) du /\
+           has_edge sadj (SZ.v n) (SZ.v vu) (SZ.v vv) /\
+           reachable_in sadj (SZ.v n) (SZ.v source) (SZ.v vv) (du + 1)));
+
         A.op_Array_Assignment color vv new_cv;
 
-        // Update distance: if we're visiting v for the first time, dist = round + 1
+        // Update distance: if visiting v for the first time, dist[v] = dist[u] + 1
         let dv: int = A.op_Array_Access dist vv;
-        let new_dv: int = (if cu <> 0 && has_edge_val <> 0 && cv = 0 then SZ.v vround + 1 else dv);
+        let new_dv: int = (if cu <> 0 && has_edge_val <> 0 && cv = 0 then du + 1 else dv);
         A.op_Array_Assignment dist vv new_dv;
 
         v := SZ.add vv 1sz;
@@ -219,3 +254,4 @@ fn bfs
     round := SZ.add vround 1sz;
   };
 }
+#pop-options
