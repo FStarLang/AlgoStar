@@ -68,6 +68,40 @@ let partial_full_tri (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : Lem
   (ensures triangle_inequality sweights sdist n)
   = ()
 
+/// Import pure shortest-path specification
+module SP = CLRS.Ch24.ShortestPath.Spec
+
+/// Connect Dijkstra's triangle_inequality + all_bounded to SP.has_triangle_inequality
+let dijkstra_to_sp_triangle (sdist sweights: Seq.seq int) (n: nat) : Lemma
+  (requires triangle_inequality sweights sdist n /\
+            all_bounded sdist /\
+            Seq.length sweights == n * n /\
+            Seq.length sdist == n)
+  (ensures SP.has_triangle_inequality sdist sweights n)
+  = ()
+
+/// Helper: establish sp_dist upper bound from triangle inequality + all_bounded
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let dijkstra_sp_upper_bound_cond (sdist sweights: Seq.seq int) (n source: nat) (flag: bool) : Lemma
+  (requires Seq.length sdist == n /\
+            Seq.length sweights == n * n /\
+            n > 0 /\ source < n /\
+            Seq.index sdist source == 0 /\
+            all_bounded sdist /\
+            (flag == true ==> triangle_inequality sweights sdist n))
+  (ensures flag == true ==>
+    (forall (v: nat). v < n ==>
+      Seq.index sdist v <= SP.sp_dist sweights n source v))
+  = if flag then begin
+      dijkstra_to_sp_triangle sdist sweights n;
+      let aux (v: nat{v < n}) : Lemma
+        (ensures Seq.index sdist v <= SP.sp_dist sweights n source v) =
+        SP.triangle_ineq_implies_upper_bound sdist sweights n source v
+      in
+      FStar.Classical.forall_intro aux
+    end
+#pop-options
+
 // Helper function to find minimum distance vertex among unvisited
 fn find_min_unvisited
   (dist: A.array int)
@@ -163,7 +197,9 @@ fn dijkstra
       Seq.index sdist' (SZ.v source) == 0 /\
       all_non_negative sdist' /\
       all_bounded sdist' /\
-      (vtri == true ==> triangle_inequality sweights sdist' (SZ.v n))
+      (vtri == true ==> triangle_inequality sweights sdist' (SZ.v n)) /\
+      (vtri == true ==> (forall (v: nat). v < SZ.v n ==>
+        Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
     )
 {
   // Initialization: dist[source] = 0, all others = 1000000
@@ -350,5 +386,8 @@ fn dijkstra
   
   let _ = !cu;
   let final_tri = !tri_ok;
+  with sdist_final. assert (A.pts_to dist sdist_final);
+  // Connect triangle inequality to shortest-path upper bound
+  dijkstra_sp_upper_bound_cond sdist_final sweights (SZ.v n) (SZ.v source) final_tri;
   tri_result := final_tri;
 }
