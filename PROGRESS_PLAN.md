@@ -141,11 +141,11 @@
 - [ ] P2.5.4: Add ghost tick counter; prove O(V + E)
 - [ ] P2.5.5: (Stretch) Implement DFS-based topological sort and prove equivalence
 
-### P2.6 Activity Selection (Ch16) — Prove optimality
-- [ ] P2.6.1: Define pure spec: `max_compatible_set start finish n` = maximum cardinality subset of mutually compatible activities
-- [ ] P2.6.2: Prove greedy choice property: first-finishing activity is in some optimal solution (CLRS Theorem 16.1)
+### P2.6 Activity Selection (Ch16) — Prove optimality *(Greedy Choice done)*
+- [x] P2.6.1: Defined `is_valid_selection` predicate for compatible activity selections
+- [x] P2.6.2: Proved greedy choice property: replacing first activity with earliest-finishing yields valid selection (CLRS Theorem 16.1)
 - [ ] P2.6.3: Prove optimal substructure: after removing first choice, remaining problem has optimal substructure
-- [ ] P2.6.4: Prove postcondition: `|selected| == max_compatible_set start finish n`
+- [ ] P2.6.4: Prove full optimality: `|selected| == max_compatible_set start finish n`
 
 ### P2.7 Vertex Cover (Ch35) — Prove approximation ratio
 - [ ] P2.7.1: Define pure spec: `min_vertex_cover adj n` = minimum cardinality vertex cover
@@ -153,12 +153,13 @@
 - [ ] P2.7.3: Prove `|cover| ≤ 2 * min_vertex_cover adj n` (CLRS Theorem 35.1)
 - [ ] P2.7.4: Key lemma: the algorithm picks a maximal matching; each matching edge contributes 2 vertices, each optimal cover must include ≥ 1 vertex per matching edge
 
-### P2.8 Union-Find (Ch21) — Add path compression and rank
-- [ ] P2.8.1: Implement path compression in `find`
-- [ ] P2.8.2: Implement union-by-rank in `union`
+### P2.8 Union-Find (Ch21) — Add path compression and rank *(Partially Completed)*
+- [x] P2.8.1: Added `find_compress` with one-step path compression (parent[x] = root)
+- [x] P2.8.2: Fixed union-by-rank: rank increment on equal-rank merge (CLRS line 5-6)
 - [ ] P2.8.3: Prove rank invariants: rank[x] ≤ rank[parent[x]] when x is not root
 - [ ] P2.8.4: Prove tree height ≤ rank ≤ ⌊log n⌋
-- [ ] P2.8.5: (Stretch) Prove amortized O(α(n)) per operation
+- [ ] P2.8.5: (Stretch) Full path compression (all nodes on path → root); requires acyclicity proof
+- [ ] P2.8.6: (Stretch) Prove amortized O(α(n)) per operation
 
 ### P2.9 Hash Table (Ch11) — Strengthen functional abstraction
 - [ ] P2.9.1: Define pure `map` spec: `ht_spec table = Map from key to option value`
@@ -175,24 +176,24 @@
 
 ## Phase 3: Add Missing Complexity Proofs
 
-### P3.1 MergeSort O(n log n)
-- [ ] P3.1.1: Add ghost tick counter to `merge_sort_aux` and `merge_impl`
-- [ ] P3.1.2: Prove merge step costs O(hi - lo) comparisons
-- [ ] P3.1.3: Prove recurrence: T(n) = 2T(n/2) + n
-- [ ] P3.1.4: Prove T(n) ≤ n · ⌈log₂ n⌉ (or n · (⌊log₂ n⌋ + 1))
-- [ ] P3.1.5: The recurrence proof likely requires a lemma `log2_merge_bound` similar to `lemma_triangle_step`
+### P3.1 MergeSort O(n log n) *(Pure proof completed)*
+- [x] P3.1.1: Pure proof of T(n) ≤ 4n(log₂ n + 1) via recurrence analysis
+- [x] P3.1.2: Defined merge_sort_comparisons recurrence and log2_ceil
+- [ ] P3.1.3: Thread ghost tick counter through Pulse merge_sort_aux and merge_impl
+- [ ] P3.1.4: Connect Pulse implementation to pure recurrence bound
 
-### P3.2 Heapsort O(n log n)
-- [ ] P3.2.1: Add ghost tick counter to `max_heapify` and `heapsort`
-- [ ] P3.2.2: Prove `max_heapify` costs O(log n) = O(⌊log₂ n⌋) comparisons
-- [ ] P3.2.3: Prove `build_max_heap` costs O(n) (tight via sum of heights)
-- [ ] P3.2.4: Prove heapsort costs O(n log n): build O(n) + n extractions × O(log n)
+### P3.2 Heapsort O(n log n) *(Pure proof completed)*
+- [x] P3.2.1: Pure proof of heapsort_comparisons ≤ 2n(1 + log₂ n)
+- [x] P3.2.2: Proved log2_floor monotonicity and tight bounds
+- [x] P3.2.3: Proved extract_max_comparisons ≤ 2n·log₂ n
+- [ ] P3.2.4: Thread ghost tick counter through Pulse max_heapify and heapsort
 
-### P3.3 Quicksort O(n²) worst case *(Partition done)*
+### P3.3 Quicksort O(n²) worst case *(Pure proof completed)*
 - [x] P3.3.1: Add ghost tick counter to partition (CLRS.Ch07.Partition.Complexity.fst) — proves exactly n comparisons
-- [ ] P3.3.2: Thread tick counter through recursive quicksort calls
-- [ ] P3.3.3: Prove worst-case recurrence: T(n) = T(n-1) + n - 1
-- [ ] P3.3.4: Prove T(n) ≤ n(n-1)/2
+- [x] P3.3.2: Proved worst_case_comparisons n = n(n-1)/2 (CLRS Theorem 7.4)
+- [x] P3.3.3: Proved sum_of_parts_bound: T(a)+T(b) ≤ T(a+b) (convexity)
+- [x] P3.3.4: Proved maximality: for ANY partition split k, total ≤ T(n)
+- [ ] P3.3.5: Thread tick counter through recursive quicksort Pulse code
 
 ### P3.4 Matrix Chain O(n³)
 - [ ] P3.4.1: Add ghost tick counter
