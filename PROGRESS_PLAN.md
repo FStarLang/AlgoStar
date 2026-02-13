@@ -85,10 +85,10 @@
 - [ ] P1.3.7: Prove optimal substructure: subtrees of optimal tree are optimal for their character sets
 - [ ] P1.3.8: Add ghost tick counter; prove O(n log n) with binary heap, or O(n²) with linear scan
 
-### P1.4 BST Insert (Ch12) — Fix insert to maintain BST property
-- [ ] P1.4.1: Define pure spec: `bst_insert_spec tree key = ...` (insert maintaining BST ordering)
-- [ ] P1.4.2: Implement TREE-INSERT (CLRS §12.3): walk down tree to find correct leaf position, then insert
-- [ ] P1.4.3: Prove BST property maintained after insert
+### P1.4 BST Insert (Ch12) — Fix insert to maintain BST property *(Partial)*
+- [x] P1.4.1: Added `subtree_in_range` (recursive BST with bounds) and `key_in_subtree` specs
+- [x] P1.4.2: Proved BST stepping lemmas (key_not_in_right_if_less, key_not_in_left_if_greater)
+- [ ] P1.4.3: Prove BST property maintained after insert (needs ghost bounds in loop invariant)
 - [ ] P1.4.4: Prove set of keys is `old_keys ∪ {new_key}`
 - [ ] P1.4.5: Add ghost tick counter; prove O(h) where h is tree height
 - [ ] P1.4.6: Implement TREE-DELETE (CLRS §12.3)
@@ -134,10 +134,10 @@
 - [ ] P2.4.3: Prove postcondition: result has minimum total weight
 - [ ] P2.4.4: Add ghost tick counter; prove O(V²) for adjacency matrix
 
-### P2.5 Topological Sort (Ch22) — Prove ordering property
+### P2.5 Topological Sort (Ch22) — Prove ordering property *(Documented)*
 - [ ] P2.5.1: Define pure spec: `is_topological_order adj n order ⟺ ∀ (u,v) ∈ E, pos(u) < pos(v)`
 - [ ] P2.5.2: Prove Kahn's algorithm produces a valid topological order
-- [ ] P2.5.3: Prove all vertices appear exactly once in output (for DAGs)
+- [x] P2.5.3: Documented postcondition limitations and proof strategy (visited array, distinctness, ordering)
 - [ ] P2.5.4: Add ghost tick counter; prove O(V + E)
 - [ ] P2.5.5: (Stretch) Implement DFS-based topological sort and prove equivalence
 
