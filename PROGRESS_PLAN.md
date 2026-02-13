@@ -188,9 +188,9 @@
 - [ ] P3.2.3: Prove `build_max_heap` costs O(n) (tight via sum of heights)
 - [ ] P3.2.4: Prove heapsort costs O(n log n): build O(n) + n extractions × O(log n)
 
-### P3.3 Quicksort O(n²) worst case
-- [ ] P3.3.1: Add ghost tick counter to partition and quicksort
-- [ ] P3.3.2: Prove partition costs n - 1 comparisons
+### P3.3 Quicksort O(n²) worst case *(Partition done)*
+- [x] P3.3.1: Add ghost tick counter to partition (CLRS.Ch07.Partition.Complexity.fst) — proves exactly n comparisons
+- [ ] P3.3.2: Thread tick counter through recursive quicksort calls
 - [ ] P3.3.3: Prove worst-case recurrence: T(n) = T(n-1) + n - 1
 - [ ] P3.3.4: Prove T(n) ≤ n(n-1)/2
 
