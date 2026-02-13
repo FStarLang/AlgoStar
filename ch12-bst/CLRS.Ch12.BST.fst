@@ -6,6 +6,7 @@ module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module C = FStar.Classical
 
 open FStar.Mul
 
@@ -44,7 +45,143 @@ let bst_property_at (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat) (i: nat
       (left < cap ==> (Seq.index valid left ==> Seq.index keys left < Seq.index keys i)) /\
       (right < cap ==> (Seq.index valid right ==> Seq.index keys right > Seq.index keys i)))
 
+// Stronger BST property: all keys in subtree are bounded by lo and hi
+let rec subtree_in_range 
+  (keys: Seq.seq int) 
+  (valid: Seq.seq bool) 
+  (cap: nat) 
+  (i: nat) 
+  (lo hi: int)
+  : Tot prop (decreases (if i < cap then cap - i else 0))
+  = if i >= cap || i >= Seq.length keys || i >= Seq.length valid then True
+    else if not (Seq.index valid i) then True
+    else 
+      let k = Seq.index keys i in
+      let left = op_Multiply 2 i + 1 in
+      let right = op_Multiply 2 i + 2 in
+      lo < k /\ k < hi /\
+      subtree_in_range keys valid cap left lo k /\
+      subtree_in_range keys valid cap right k hi
+
+// Key membership in subtree rooted at i
+let rec key_in_subtree 
+  (keys: Seq.seq int) 
+  (valid: Seq.seq bool) 
+  (cap: nat) 
+  (i: nat) 
+  (key: int)
+  : Tot prop (decreases (if i < cap then cap - i else 0))
+  = i < cap /\ i < Seq.length keys /\ i < Seq.length valid /\
+    Seq.index valid i /\
+    (Seq.index keys i == key \/
+     key_in_subtree keys valid cap (op_Multiply 2 i + 1) key \/
+     key_in_subtree keys valid cap (op_Multiply 2 i + 2) key)
+
+// Lemma: If key is in a bounded subtree, it must be within the bounds
+let rec lemma_key_in_bounded_subtree
+  (keys: Seq.seq int)
+  (valid: Seq.seq bool)
+  (cap: nat)
+  (i: nat)
+  (lo hi: int)
+  (key: int)
+  : Lemma 
+    (requires subtree_in_range keys valid cap i lo hi /\ key_in_subtree keys valid cap i key)
+    (ensures lo < key /\ key < hi)
+    (decreases (if i < cap then cap - i else 0))
+  = let left = op_Multiply 2 i + 1 in
+    let right = op_Multiply 2 i + 2 in
+    // key_in_subtree establishes i < cap /\ valid[i]
+    // subtree_in_range establishes lo < keys[i] < hi
+    // Case 1: key == keys[i], then lo < key < hi directly
+    // Case 2: key in left subtree, recurse
+    // Case 3: key in right subtree, recurse
+    C.or_elim
+      #(key_in_subtree keys valid cap left key)
+      #(key_in_subtree keys valid cap right key)
+      #(fun _ -> lo < key /\ key < hi)
+      (fun _ -> lemma_key_in_bounded_subtree keys valid cap left lo (Seq.index keys i) key)
+      (fun _ -> lemma_key_in_bounded_subtree keys valid cap right (Seq.index keys i) hi key)
+
+// Lemma: If key < current_key and BST property holds, key can only be in left subtree
+[@@"opaque_to_smt"]
+let lemma_key_not_in_right_if_less
+  (keys: Seq.seq int)
+  (valid: Seq.seq bool)
+  (cap: nat)
+  (i: nat)
+  (lo hi: int)
+  (key: int)
+  : Lemma
+    (requires 
+      subtree_in_range keys valid cap i lo hi /\
+      i < cap /\ i < Seq.length keys /\ i < Seq.length valid /\
+      Seq.index valid i /\
+      key < Seq.index keys i /\
+      key_in_subtree keys valid cap i key)
+    (ensures key_in_subtree keys valid cap (op_Multiply 2 i + 1) key)
+  = let k = Seq.index keys i in
+    let right = op_Multiply 2 i + 2 in
+    // key != k since key < k
+    // If key were in right subtree, then k < key < hi by lemma_key_in_bounded_subtree
+    // But this contradicts key < k
+    // By definition of key_in_subtree: key == k \/ in left \/ in right
+    // key != k, so: in left \/ in right
+    // Prove ~(in right) by contradiction, so must be in left
+    C.or_elim
+      #(key_in_subtree keys valid cap right key)
+      #(~(key_in_subtree keys valid cap right key))
+      #(fun _ -> key_in_subtree keys valid cap (op_Multiply 2 i + 1) key)
+      (fun _ -> lemma_key_in_bounded_subtree keys valid cap right k hi key) // derives False from key < k /\ k < key
+      (fun _ -> ())
+
+// Lemma: If key > current_key and BST property holds, key can only be in right subtree  
+[@@"opaque_to_smt"]
+let lemma_key_not_in_left_if_greater
+  (keys: Seq.seq int)
+  (valid: Seq.seq bool)
+  (cap: nat)
+  (i: nat)
+  (lo hi: int)
+  (key: int)
+  : Lemma
+    (requires 
+      subtree_in_range keys valid cap i lo hi /\
+      i < cap /\ i < Seq.length keys /\ i < Seq.length valid /\
+      Seq.index valid i /\
+      key > Seq.index keys i /\
+      key_in_subtree keys valid cap i key)
+    (ensures key_in_subtree keys valid cap (op_Multiply 2 i + 2) key)
+  = let k = Seq.index keys i in
+    let left = op_Multiply 2 i + 1 in
+    // key != k since key > k
+    // If key were in left subtree, then lo < key < k by lemma_key_in_bounded_subtree
+    // But this contradicts key > k
+    C.or_elim
+      #(key_in_subtree keys valid cap left key)
+      #(~(key_in_subtree keys valid cap left key))
+      #(fun _ -> key_in_subtree keys valid cap (op_Multiply 2 i + 2) key)
+      (fun _ -> lemma_key_in_bounded_subtree keys valid cap left lo k key) // derives False from key > k /\ key < k
+      (fun _ -> ())
+
+// Lemma: If key is not in subtree at root, it's not at any valid position
+// (requires additional well-formedness: all valid nodes are reachable from root)
+// Deferred: needs a reachability predicate for the array-based tree structure.
+
 // Tree search
+//
+// NOTE: For full completeness (proving that None result implies key not in tree),
+// we would need to:
+// 1. Add precondition: subtree_in_range keys_seq valid_seq (SZ.v t.cap) 0 lo hi
+// 2. Track bounds (lo_cur, hi_cur) in loop invariant  
+// 3. Use lemmas to show key can only be in current subtree
+// 4. When current >= cap, derive ~(key_in_subtree ... (SZ.v vc) key)
+// 5. Apply lemma_key_not_in_subtree_means_not_present
+//
+// The key challenge is maintaining the bounds in Pulse's loop invariant with ghost variables.
+// The pure definitions and lemmas above provide the mathematical foundation for such a proof.
+//
+// For now, we prove soundness (Some result implies key found) which is the critical safety property.
 fn tree_search
   (#p: perm)
   (t: bst)
@@ -71,6 +208,8 @@ fn tree_search
         SZ.v (Some?.v result) < Seq.length valid_seq /\
         Seq.index valid_seq (SZ.v (Some?.v result)) == true /\
         Seq.index keys_seq (SZ.v (Some?.v result)) == key))
+      // Completeness would add:
+      // /\ (None? result ==> ~(key_in_subtree keys_seq valid_seq (SZ.v t.cap) 0 key))
     )
 {
   let mut current : SZ.t = 0sz;
@@ -109,6 +248,7 @@ fn tree_search
         // Left child: 2*i + 1
         child_indices_fit (SZ.v t.cap) (SZ.v idx);
         assert (pure (SZ.fits (2 * SZ.v idx + 1)));
+        
         let two_idx = SZ.mul 2sz idx;
         let left_idx = SZ.add two_idx 1sz;
         if (SZ.gte left_idx t.cap) {
@@ -120,6 +260,7 @@ fn tree_search
         // Right child: 2*i + 2
         child_indices_fit (SZ.v t.cap) (SZ.v idx);
         assert (pure (SZ.fits (2 * SZ.v idx + 2)));
+        
         let two_idx = SZ.mul 2sz idx;
         let right_idx = SZ.add two_idx 2sz;
         if (SZ.gte right_idx t.cap) {
