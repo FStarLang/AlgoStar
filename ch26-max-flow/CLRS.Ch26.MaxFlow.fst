@@ -96,17 +96,22 @@ let lemma_zero_respects_cap (flow cap: Seq.seq int) (n: nat) : Lemma
   = ()
 
 // Main max flow function
-// Computes a valid flow by finding 2-hop augmenting paths source → u → sink
-// and pushing flow along them. This maintains both capacity constraints and
-// flow conservation.
 //
-// For each intermediate vertex u, we find the minimum residual capacity on
-// edges (source,u) and (u,sink), then push that amount of flow along the
-// 2-hop path. This guarantees conservation because for each unit of flow
-// entering u from source, an equal unit leaves u to sink.
+// CURRENT IMPLEMENTATION: Initializes flow to zero.
+// This trivially satisfies capacity constraints and flow conservation
+// but the flow value is 0 (not maximum).
 //
-// This may not find the maximum flow (which requires general augmenting paths),
-// but it computes a valid, non-trivial flow that satisfies all CLRS properties.
+// A correct Ford-Fulkerson/Edmonds-Karp implementation would:
+// 1. While BFS finds an augmenting path from source to sink in residual graph:
+//    a. Find bottleneck (minimum residual capacity) along the path
+//    b. Push flow along the path
+// 2. Return when no augmenting path exists
+//
+// Key verification challenges:
+// - BFS on residual graph requires queue-based traversal (hard in Pulse)
+// - Flow conservation must be maintained through augmentation
+// - Termination: flow value strictly increases (integer capacities)
+// - Max-flow min-cut theorem: final flow == minimum cut capacity
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
 fn max_flow
   (capacity: array int)
