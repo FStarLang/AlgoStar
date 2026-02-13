@@ -181,3 +181,33 @@ fn approx_vertex_cover
   V.to_vec_pts_to cover;
   cover
 }
+
+(* 
+ * 2-APPROXIMATION ANALYSIS (CLRS Theorem 35.1)
+ *
+ * The algorithm implements APPROX-VERTEX-COVER from CLRS:
+ * It scans all edges (u,v) with u < v. When an edge is found where
+ * neither endpoint is covered (cover[u]=0, cover[v]=0), it adds BOTH
+ * endpoints to the cover.
+ *
+ * PROVEN: The output is a valid vertex cover (is_cover).
+ *
+ * NOT YET PROVEN (but true): The output has size ≤ 2 × |OPT|.
+ * 
+ * The 2-approximation argument:
+ * 1. The edges (u,v) where the algorithm adds both endpoints form a MATCHING:
+ *    no two such edges share an endpoint (because after adding u and v,
+ *    neither will be 0 again, so no future edge involving u or v triggers
+ *    the addition).
+ * 2. |cover| = 2 × |matching| (each matching edge contributes exactly 2 vertices).
+ * 3. Any vertex cover must include ≥ 1 endpoint of each matching edge.
+ * 4. Since matching edges have disjoint endpoints, these cover vertices are
+ *    distinct: |OPT| ≥ |matching|.
+ * 5. Therefore: |cover| = 2|matching| ≤ 2|OPT|.
+ *
+ * To mechanize this proof, one would need:
+ * - A ghost counter for matching edges (GhostReference.ref nat)
+ * - A ghost predicate tracking that matching edges have disjoint endpoints
+ * - A pure lemma connecting matching size to cover size
+ * - The pigeonhole argument for step 4
+ *)
