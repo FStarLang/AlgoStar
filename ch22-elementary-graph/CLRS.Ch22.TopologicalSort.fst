@@ -19,6 +19,34 @@ let lemma_index_in_bounds (u v n: nat)
     (ensures u * n + v < n * n /\ SZ.fits (u * n) /\ SZ.fits (u * n + v))
   = ()
 
+(* 
+ * POSTCONDITION LIMITATION:
+ * 
+ * The current postcondition only guarantees that the output contains n valid vertex indices.
+ * It does NOT guarantee:
+ * 1. Distinctness: each vertex appears exactly once
+ * 2. Permutation: the output is a permutation of [0, ..., n-1]
+ * 3. Topological ordering: for every edge (u,v), u appears before v in the output
+ *
+ * PROVING DISTINCTNESS would require:
+ * - A "visited" array tracking which vertices have been enqueued
+ * - Loop invariant: visited[v] == 1 iff v is in queue[0..queue_tail)
+ * - Loop invariant: queue has pairwise distinct elements
+ * - Reasoning: when enqueueing vertex w with in_degree 0, visited[w] == 0,
+ *   so w is not already in queue, preserving distinctness
+ *
+ * This proof is feasible but significantly increases verification complexity.
+ * The key challenge is maintaining the bidirectional relationship between
+ * the visited array and queue membership through conditional updates.
+ *
+ * PROVING TOPOLOGICAL ORDERING would additionally require:
+ * - Tracking ghost "position" of each vertex in output
+ * - For each edge (u,v) in adjacency matrix: pos(u) < pos(v)
+ * - This requires invariants about how in-degree decrements relate to edge presence
+ *
+ * For a fully specified topological sort, see textbook proof or model checking approaches.
+ *)
+
 // Topological sort using Kahn's algorithm
 // Input: adjacency matrix adj (n×n represented as flat array)
 // Output: array containing topological order of vertices
