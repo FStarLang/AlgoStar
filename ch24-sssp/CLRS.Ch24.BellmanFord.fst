@@ -10,6 +10,7 @@ module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module SP = CLRS.Ch24.ShortestPath.Spec
 
 (*
    Bellman-Ford Single-Source Shortest Paths — Verified in Pulse
@@ -20,7 +21,9 @@ module Seq = FStar.Seq
    - dist[source] == 0
    - All distances valid (< 1000000 or == 1000000)
    - If no negative cycle (result == true):
-     Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
+     * Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
+     * Upper bound: dist[v] <= sp_dist(weights, n, source, v) for all v
+       (from CLRS Corollary 24.3, proved in ShortestPath.Spec)
    
    NO admits. NO assumes.
 *)
@@ -74,6 +77,36 @@ let partial_full (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
   (ensures no_violations dist weights n)
   = ()
 
+/// Connect BF triangle_inequality + valid_distances to SP.has_triangle_inequality
+let bf_to_sp_triangle (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
+  (requires triangle_inequality dist weights n /\
+            valid_distances dist n /\
+            Seq.length weights == n * n)
+  (ensures SP.has_triangle_inequality dist weights n)
+  = ()
+
+/// Helper: establish sp_dist upper bound from triangle inequality + valid_distances
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let bf_sp_upper_bound_cond (dist weights: Seq.seq int) (n source: nat) (flag: bool) : Lemma
+  (requires Seq.length dist == n /\
+            Seq.length weights == n * n /\
+            n > 0 /\ source < n /\
+            Seq.index dist source == 0 /\
+            valid_distances dist n /\
+            (flag == true ==> triangle_inequality dist weights n))
+  (ensures flag == true ==>
+    (forall (v: nat). v < n ==>
+      Seq.index dist v <= SP.sp_dist weights n source v))
+  = if flag then begin
+      bf_to_sp_triangle dist weights n;
+      let aux (v: nat{v < n}) : Lemma 
+        (ensures Seq.index dist v <= SP.sp_dist weights n source v) =
+        SP.triangle_ineq_implies_upper_bound dist weights n source v
+      in
+      FStar.Classical.forall_intro aux
+    end
+#pop-options
+
 #push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
 fn bellman_ford
   (weights: A.array int)
@@ -104,7 +137,12 @@ fn bellman_ford
       SZ.v source < Seq.length sdist' /\
       Seq.index sdist' (SZ.v source) == 0 /\
       valid_distances sdist' (SZ.v n) /\
-      (no_neg_cycle == true ==> triangle_inequality sdist' sweights (SZ.v n))
+      (no_neg_cycle == true ==> triangle_inequality sdist' sweights (SZ.v n)) /\
+      // Shortest-path upper bound (CLRS Corollary 24.3):
+      // When no negative cycle, dist[v] ≤ shortest-path distance for all v
+      (no_neg_cycle == true ==>
+        (forall (v: nat). v < SZ.v n ==>
+          Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
     )
 {
   // Initialization: dist[source] = 0, all others = 1000000
@@ -298,12 +336,9 @@ fn bellman_ford
   
   let final_no_neg = !no_neg;
   with sdist_final. assert (A.pts_to dist sdist_final);
-  // Call lemmas — when final_no_neg is false, preconditions don't hold, 
-  // so we can't call unconditionally. Instead, rely on SMT seeing the implication.
-  // The outer loop invariant already has:
-  //   (vno == true ==> no_violations_partial sdist_check sweights n n 0)
-  // And no_violations_partial ... n 0 ==> no_violations ==> triangle_inequality
-  // SMT should derive: final_no_neg == true ==> triangle_inequality
+  // Connect triangle inequality to shortest-path upper bound
+  bf_sp_upper_bound_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
+  
   result := final_no_neg;
 }
 #pop-options
