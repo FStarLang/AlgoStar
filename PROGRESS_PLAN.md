@@ -259,10 +259,11 @@
 - [ ] P4.4.3: Strassen's Matrix Multiplication (Ch28) — O(n^{2.81})
 - [ ] P4.4.4: Extended Euclidean Algorithm (Ch31) — prove Bézout coefficients
 
-### P4.5 Documentation and README
-- [ ] P4.5.1: Update README.md to accurately reflect what each algorithm proves
-- [ ] P4.5.2: Remove false claims (e.g., "Ford-Fulkerson", "DFS")
-- [ ] P4.5.3: Add a verification status table: algorithm × {correctness, complexity, CLRS fidelity}
+### P4.5 Documentation and README ✓ COMPLETED
+- [x] P4.5.1: Updated README.md with per-chapter verification status table
+- [x] P4.5.2: Removed false claims (Bucket Sort, Ford-Fulkerson 2-hop comment)
+- [x] P4.5.3: Added verification status table with correctness, complexity, and CLRS fidelity columns
+- [x] P4.5.4: Updated module-level documentation for Select, Huffman, RBTree, MaxFlow, RadixSort
 
 ---
 
@@ -270,14 +271,15 @@
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 0 | 41 |
-| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 31 | 5 | 26 |
+| P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 3 | 38 |
+| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 31 | 6 | 25 |
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 5 | 36 |
 | P3 | Add complexity proofs | 40 | 34 | 6 |
-| P4 | Polish and extensions | 18 | 0 | 18 |
-| **Total** | | **171** | **44** | **127** |
+| P4 | Polish and extensions | 19 | 4 | 15 |
+| **Total** | | **172** | **52** | **120** |
 
-**Complexity proof coverage: 32 files across 21/23 chapters (91% chapter coverage)**
+**Complexity proof coverage: 32 files across 21/23 chapters (91% chapter coverage, 4,704 lines)**
+**Documentation: README, RESEARCH_DOC.md, PROGRESS_PLAN.md all up to date**
 
 ---
 
