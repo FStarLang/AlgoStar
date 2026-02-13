@@ -16,7 +16,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 100 --ifuel 2 --fuel 2"
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -230,12 +230,208 @@ fn compute_prefix_function
     let final_k = !k;
     A.op_Array_Assignment pi vq final_k;
     
+    // After this assignment, pi[vq] = final_k and is_prefix_suffix pattern vq final_k
+    // We need to show this for the invariant restoration
+    assert pure (is_prefix_suffix s_pat (SZ.v vq) (SZ.v final_k));
+    assert pure (SZ.v final_k >= 0);
+    assert pure (SZ.v final_k <= SZ.v vq);
+    assert pure (SZ.v final_k < SZ.v vq + 1);
+    
     // Move to next position
     q := vq +^ 1sz;
   };
   
   let final_q = !q;
   assert pure (SZ.v final_q == SZ.v m);
+}
+
+#pop-options
+
+// ========== KMP Matcher Specification ==========
+
+#push-options "--z3rlimit 20 --ifuel 2 --fuel 2"
+
+// Does the pattern match at position s in the text?
+let matches_at (text pattern: Seq.seq int) (s: nat) : prop =
+  s + Seq.length pattern <= Seq.length text /\
+  (forall (j: nat). j < Seq.length pattern ==> 
+    Seq.index text (s + j) == Seq.index pattern j)
+
+// Pure check if pattern matches at position s
+let rec check_match_at (text pattern: Seq.seq int) (s: nat) (j: nat) 
+  : Tot bool (decreases (Seq.length pattern - j))
+  = if j >= Seq.length pattern then true
+    else if s + j >= Seq.length text then false
+    else if Seq.index text (s + j) <> Seq.index pattern j then false
+    else check_match_at text pattern s (j + 1)
+
+// Count matches from position s to n
+let rec count_matches_up_to (text pattern: Seq.seq int) (n m s: nat) 
+  : Pure nat 
+    (requires s <= n /\ m > 0) 
+    (ensures fun _ -> True) 
+    (decreases (n - s))
+  = if s + m > n then 0
+    else (if check_match_at text pattern s 0 then 1 else 0) + 
+         count_matches_up_to text pattern n m (s + 1)
+
+// The spec: count all matches in text
+let count_matches_spec (text pattern: Seq.seq int) (n m: nat{m > 0}) : nat =
+  count_matches_up_to text pattern n m 0
+
+#pop-options
+
+// ========== KMP Matcher Implementation ==========
+
+#push-options "--z3rlimit 50 --ifuel 1 --fuel 1"
+
+fn kmp_matcher
+  (#p_text #p_pat #p_pi: perm)
+  (text: array int)
+  (pattern: array int)
+  (pi: array SZ.t)
+  (#s_text: Ghost.erased (Seq.seq int))
+  (#s_pat: Ghost.erased (Seq.seq int))
+  (#s_pi: Ghost.erased (Seq.seq SZ.t))
+  (n: SZ.t)
+  (m: SZ.t)
+  requires 
+    A.pts_to text #p_text s_text **
+    A.pts_to pattern #p_pat s_pat **
+    A.pts_to pi #p_pi s_pi **
+    pure (
+      SZ.v n == Seq.length s_text /\
+      SZ.v m == Seq.length s_pat /\
+      Seq.length s_text <= A.length text /\
+      Seq.length s_pat <= A.length pattern /\
+      Seq.length s_pi <= A.length pi /\
+      SZ.v m > 0 /\
+      SZ.v n >= SZ.v m /\
+      SZ.fits (SZ.v n + 1) /\
+      SZ.fits (SZ.v m + 1) /\
+      pi_correct s_pat s_pi
+    )
+  returns count: SZ.t
+  ensures 
+    A.pts_to text #p_text s_text **
+    A.pts_to pattern #p_pat s_pat **
+    A.pts_to pi #p_pi s_pi **
+    pure (
+      SZ.v count >= 0 /\
+      SZ.v count <= SZ.v n + 1
+    )
+{
+  let mut q: SZ.t = 0sz;               // number of characters matched
+  let mut count_matches: SZ.t = 0sz;  // number of matches found
+  let mut i: SZ.t = 0sz;               // current position in text
+  
+  // Main loop: scan through text
+  while (!i <^ n)
+  invariant exists* vi vq vcount.
+    R.pts_to i vi **
+    R.pts_to q vq **
+    R.pts_to count_matches vcount **
+    A.pts_to text #p_text s_text **
+    A.pts_to pattern #p_pat s_pat **
+    A.pts_to pi #p_pi s_pi **
+    pure (
+      SZ.v vi <= SZ.v n /\
+      SZ.v vq >= 0 /\
+      SZ.v vq < SZ.v m /\
+      SZ.v vcount >= 0 /\
+      SZ.v vcount <= SZ.v vi + 1
+    )
+  {
+    let vi = !i;
+    let vq_init = !q;
+    let vcount_outer = !count_matches;
+    
+    // Inner while loop: follow failure links while chars don't match
+    let mut done_follow: bool = false;
+    
+    while (not !done_follow)
+    invariant exists* vdone vq_inner vcount_inner.
+      R.pts_to i vi **
+      R.pts_to q vq_inner **
+      R.pts_to count_matches vcount_inner **
+      R.pts_to done_follow vdone **
+      A.pts_to text #p_text s_text **
+      A.pts_to pattern #p_pat s_pat **
+      A.pts_to pi #p_pi s_pi **
+      pure (
+        SZ.v vi < SZ.v n /\
+        SZ.v vq_inner >= 0 /\
+        SZ.v vq_inner < SZ.v m /\
+        SZ.v vcount_inner == SZ.v vcount_outer /\
+        SZ.v vcount_inner >= 0 /\
+        SZ.v vcount_inner <= SZ.v vi + 1 /\
+        (vdone ==> (SZ.v vq_inner == 0 \/ Seq.index s_pat (SZ.v vq_inner) == Seq.index s_text (SZ.v vi)))
+      )
+    {
+      let vq = !q;
+      let text_char = A.op_Array_Access text vi;
+      let pat_char = A.op_Array_Access pattern vq;
+      
+      let should_follow: bool = (SZ.v vq > 0 && pat_char <> text_char);
+      
+      if should_follow {
+        let safe_idx = vq -^ 1sz;
+        let pi_val = A.op_Array_Access pi safe_idx;
+        // pi[vq-1] is a valid prefix-suffix for pattern[0..vq-1]
+        // By failure_chain lemma, it's also valid for the current position
+        q := pi_val;
+        assert pure (is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v pi_val))
+      } else {
+        done_follow := true
+      }
+    };
+    
+    // After inner loop: q == 0 or pattern[q] == text[i]
+    let vq_after = !q;
+    let text_char_final = A.op_Array_Access text vi;
+    let pat_char_final = A.op_Array_Access pattern vq_after;
+    
+    // Check if characters match
+    let chars_match = (pat_char_final = text_char_final);
+    
+    // Compute new q value (will be written only if chars match)
+    let new_q_val: SZ.t = (if chars_match then vq_after +^ 1sz else vq_after);
+    
+    // Write new q
+    q := new_q_val;
+    
+    // Check if we have a complete match  
+    let vq_final = !q;
+    let have_match = (vq_final = m);
+    
+    // Compute new count value
+    let old_count = !count_matches;
+    let new_count_val: SZ.t = (if have_match then old_count +^ 1sz else old_count);
+    
+    // Compute new q value (reset to pi[m-1] if match, else stay same)
+    let pi_idx_for_reset = m -^ 1sz;
+    let pi_val_for_reset = A.op_Array_Access pi pi_idx_for_reset;
+    let new_q_after_match: SZ.t = (if have_match then pi_val_for_reset else vq_final);
+    
+    // Assertions to help prove the invariant
+    let vi_next = vi +^ 1sz;
+    assert pure (SZ.v old_count <= SZ.v vi + 1);
+    assert pure (SZ.v new_count_val <= SZ.v vi + 2);
+    assert pure (SZ.v vi_next == SZ.v vi + 1);
+    assert pure (SZ.v new_count_val <= SZ.v vi_next + 1);
+    assert pure (SZ.v pi_val_for_reset < SZ.v m);
+    assert pure (SZ.v new_q_after_match < SZ.v m);
+    
+    // Write new values unconditionally
+    count_matches := new_count_val;
+    q := new_q_after_match;
+    
+    // Move to next position in text
+    i := vi_next
+  };
+  
+  let final_count = !count_matches;
+  final_count
 }
 
 #pop-options
