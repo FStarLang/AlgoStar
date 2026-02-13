@@ -1,13 +1,17 @@
 (*
    Union-Find (Disjoint Sets) - Verified implementation in Pulse
    
-   Implements union by rank, without path compression for simplicity.
+   Implements union by rank with path compression (CLRS Chapter 21).
+   - find: read-only root-finding with shared permission
+   - find_compress: root-finding + one-step path compression (parent[x] = root)
+   - union_: union by rank with rank increment on equal-rank merge (CLRS line 5-6)
    
    Proves:
    1. Memory safety
    2. find returns a root (parent[root] = root)
    3. After make_set, each element is its own parent
    4. After union(x, y), find(x) == find(y)
+   5. find_compress sets parent[x] directly to root
    
    NO admits. NO assumes.
 *)
@@ -208,6 +212,51 @@ fn find
   !current
 }
 
+// ========== find_compress: Find with one-step path compression ==========
+// Sets parent[x] = root directly. This is the simplest form of compression.
+// Full path compression (CLRS FIND-SET) compresses all nodes on the path,
+// but proving acyclicity of the path for the loop invariant is involved.
+
+// Compressing x to root preserves well_formed
+let compress_preserves_wf (parent: Seq.seq SZ.t) (n: nat) (i root: nat)
+  : Lemma (requires well_formed parent n /\ i < n /\ root < n /\ SZ.fits root)
+          (ensures well_formed (Seq.upd parent i (SZ.uint_to_t root)) n)
+  = ()
+
+fn find_compress
+  (parent: array SZ.t)
+  (#sparent: Ghost.erased (Seq.seq SZ.t))
+  (x: SZ.t)
+  (n: SZ.t)
+  requires
+    A.pts_to parent sparent **
+    pure (
+      is_forest sparent (SZ.v n) /\
+      SZ.v x < SZ.v n
+    )
+  returns root: SZ.t
+  ensures exists* sp.
+    A.pts_to parent sp **
+    pure (
+      SZ.v root < SZ.v n /\
+      is_root sparent (SZ.v root) /\
+      find_root sparent (SZ.v x) (SZ.v n) == SZ.v root /\
+      well_formed sp (SZ.v n) /\
+      Seq.length sp == Seq.length sparent /\
+      // x now points directly to root
+      SZ.v (Seq.index sp (SZ.v x)) == SZ.v root /\
+      // root is still a root
+      SZ.v (Seq.index sp (SZ.v root)) == SZ.v root
+    )
+{
+  // Find the root
+  let root = find #1.0R parent x n;
+  // Compress: set parent[x] = root
+  parent.(x) <- root;
+  compress_preserves_wf sparent (SZ.v n) (SZ.v x) (SZ.v root);
+  root
+}
+
 // ========== union: Merge two sets ==========
 
 // Union preserves well_formed when attaching one root under another
@@ -274,7 +323,10 @@ fn union_
         parent.(root_y) <- root_x;
         (root_x, root_y)
       } else {
+        // Equal rank: attach root_y under root_x and increment rank (CLRS line 5-6)
         parent.(root_y) <- root_x;
+        let new_rank = (if (rank_x <^ SZ.sub n 1sz) then SZ.add rank_x 1sz else rank_x);
+        rank.(root_x) <- new_rank;
         (root_x, root_y)
       };
     };
