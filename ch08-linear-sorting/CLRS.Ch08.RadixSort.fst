@@ -1,12 +1,22 @@
 (*
    Radix Sort - Verified implementation in Pulse
    
-   Implements CLRS radix sort for non-negative integers bounded by k.
-   Uses counting sort (from CLRS.Ch08.CountingSort) as the stable
-   subroutine for sorting by digit.
+   CLRS RADIX-SORT (Section 8.3) for d-digit numbers sorts by digit
+   using a stable sort subroutine:
    
-   For integers in [0, k], this is a single-digit radix sort:
-   one pass of counting sort with base k+1.
+     RADIX-SORT(A, d)
+       for i = 1 to d
+         use a stable sort to sort array A on digit i
+   
+   Current scope: Integers in [0, k] — single-digit (d=1) radix sort
+   with counting sort as the stable subroutine.
+   
+   Limitation: A multi-digit version (d > 1) would require:
+   - Digit extraction: digit_i(x) = (x / base^i) mod base
+   - Stability proof for counting sort (currently proven as permutation)
+   - Inductive argument: after i passes, elements are sorted on low i digits
+   
+   The d=1 case is correct but does not exercise the multi-pass structure.
    
    Proves:
    1. The result is sorted
