@@ -95,9 +95,9 @@
 - [ ] P1.4.7: Prove BST property maintained after delete
 
 ### P1.5 KMP Matcher (Ch32) — Complete the search
-- [ ] P1.5.1: Define pure spec for KMP match positions: `kmp_matches text pattern = [list of match positions]`
-- [ ] P1.5.2: Implement KMP-MATCHER using the existing prefix function
-- [ ] P1.5.3: Prove match count/positions equal spec
+- [x] P1.5.1: Define pure spec for KMP match positions: `matches_at`, `check_match_at`, `count_matches_spec`
+- [x] P1.5.2: Implement KMP-MATCHER using the existing prefix function (inner failure-link loop + match counting)
+- [ ] P1.5.3: Strengthen postcondition to prove match count equals `count_matches_spec`
 - [ ] P1.5.4: Add ghost tick counter; prove O(n + m) complexity
 
 ---
@@ -199,10 +199,10 @@
 - [ ] P3.4.2: Prove three nested loops: l from 2 to n, i from 1 to n-l+1, k from i to i+l-2
 - [ ] P3.4.3: Prove total operations ≤ n³/3 (tighter: Σ_{l=2}^{n} (n-l+1)(l-1))
 
-### P3.5 GCD — Tighten to O(log min(a,b))
-- [ ] P3.5.1: Prove Fibonacci-based bound: if GCD takes k steps, then b ≥ F_k (CLRS Theorem 31.11)
-- [ ] P3.5.2: Prove F_k ≥ φ^{k-2} where φ = (1+√5)/2
-- [ ] P3.5.3: Conclude k ≤ 2·⌊log_φ b⌋ + 1 = O(log b) = O(log min(a,b))
+### P3.5 GCD — Tighten to O(log min(a,b)) ✓ COMPLETED
+- [x] P3.5.1: Proved two-step halving bound (Lamé's theorem): after 2 steps b ≤ b/2
+- [x] P3.5.2: Proved lemma_mod_le_half: a%b ≤ a/2 when a ≥ b
+- [x] P3.5.3: Proved gcd_steps(a,b) ≤ 2·num_bits(b) + 1 ∈ O(log b)
 
 ### P3.6 Rabin-Karp — Add complexity proof
 - [ ] P3.6.1: Add ghost tick counter
