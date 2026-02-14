@@ -271,12 +271,12 @@
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 3 | 38 |
+| P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 4 | 37 |
 | P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 31 | 12 | 19 |
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 11 | 30 |
-| P3 | Add complexity proofs | 40 | 34 | 6 |
+| P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 5 | 14 |
-| **Total** | | **172** | **65** | **107** |
+| **Total** | | **172** | **68** | **104** |
 
 **Complexity proof coverage: 33 files across 21/23 chapters (91% chapter coverage)**
 **This session: InsertionSort/BinarySearch/MaxSubarray/Partition external ghost counters, Vertex Cover 2-approximation proof**
@@ -327,7 +327,7 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 11 | Hash Table (open addr.) | §11.4 | **Medium**: insert/search with linear probing; `hash_probe == spec` | **Pure** O(n) worst | 224+35 | ✓ |
 | 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; `subtree_in_range` ordering | **Pure** O(h) | 382+125 | ✓ |
 | 12 | BST Insert | §12.3 | **Medium**: key exists at some position after insert; no ordering proof for insert | — | (in BST.fst) | ✓ |
-| 13 | Red-Black Tree | §13.1–13.4 | **Broken**: array-backed BST, no RB invariants, no rotations, no correct insert position | — | 257 | ✓ |
+| 13 | Red-Black Tree | §13.1–13.4 | **Strong**: pure spec with `is_rbtree`, `insert_is_rbtree`, `insert_preserves_bst`, CLRS Theorem 13.1 `h ≤ 2·lg(n+1)`. Imperative code still array-backed BST | — | 257+486 | ✓ |
 | 15 | Rod Cutting | §15.1 | **Strong**: `result == optimal_revenue prices n` (pure DP spec) | **Pulse** O(n²) — ghost ticks (263 lines) | 253+263 | ✓ |
 | 15 | LCS | §15.4 | **Strong**: `result == lcs_length x y m n` (pure recursive spec) | **Pulse** O(mn) — ghost ticks (246 lines) | 293+246 | ✓ |
 | 15 | Matrix Chain | §15.2 | **Strong**: `result == mc_cost dims n` (pure recursive spec) | **Pure** O(n³) | 280+106 | ✓ |
@@ -341,9 +341,9 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 23 | Kruskal's MST | §23.2 | **Weak**: `valid_parents` only — no MST property (cut/spanning tree) | **Pure** O(V³) | 273+102 | ✓ |
 | 23 | Prim's MST | §23.2 | **Weak**: `valid_endpoints ∧ keys_bounded` — no MST property | **Pure** O(V²) | 304+102 | ✓ |
 | 24 | Bellman-Ford | §24.1 | **Strong**: `no_neg ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pure** O(V³) | 344+101 | ✓ |
-| 24 | Dijkstra | §24.3 | **Strong**: `tri ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pure** O(V²) | 393+285 | ✓ |
+| 24 | Dijkstra | §24.3 | **Strong**: `tri ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pulse** O(V²) — external ghost counter, `dijkstra_complexity_bounded` | 393+285 | ✓ |
 | 24 | ShortestPath.Spec | §24 | **Strong**: pure `sp_dist_k`, `triangle_ineq_implies_upper_bound` theorem | — | 409 | ✓ |
-| 25 | Floyd-Warshall | §25.2 | **Strong**: `result == fw_spec weights n` (pure DP spec) | **Pure** O(V³) | 175+206 | ✓ |
+| 25 | Floyd-Warshall | §25.2 | **Strong**: `result == fw_spec weights n` (pure DP spec) | **Pulse** O(V³) — external ghost counter, `fw_complexity_bounded` | 175+206 | ✓ |
 | 26 | Max Flow | §26.2 | **Broken**: initializes flow to zero and returns it; no augmenting paths | — | 175 | ✓ |
 | 28 | Matrix Multiply | §4.2 | **Strong**: `result == matmul_spec a b n` (pure spec) | **Pure** O(n³) | 191+212 | ✓ |
 | 31 | GCD (Euclid) | §31.2 | **Strong**: `result == gcd_spec a b` (pure recursive spec) | **Pulse** O(log b) — ghost ticks, Lamé's thm (207 lines) | 82+207 | ✓ |
@@ -359,8 +359,8 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Metric | Count |
 |--------|-------|
 | Total algorithms/data structures | 40 |
-| **Strong** functional spec | 26 (65%) |
-| **Medium** functional spec | 9 (23%) |
+| **Strong** functional spec | 27 (68%) |
+| **Medium** functional spec | 8 (20%) |
 | **Weak** functional spec | 3 (8%) |
 | **Broken** (not the claimed algorithm) | 2 (5%) |
 | Complexity proofs (Pulse, in postcondition) | 10 |
