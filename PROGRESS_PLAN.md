@@ -105,7 +105,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P0.4.7: Add ghost tick counter — DoublyLinkedList.Complexity.fst
 
 **Step 0 — Housekeeping:**
-- [ ] P0.4.8: Rename `CLRS.Ch10.DoublyLinkedList.fst` → `CLRS.Ch10.SinglyLinkedList.fst`
+- [x] P0.4.8: Rename `CLRS.Ch10.DoublyLinkedList.fst` → `CLRS.Ch10.SinglyLinkedList.fst`
 
 **Step 1 — Node type with `prev` (file: `CLRS.Ch10.DLL.fst`):**
 - [x] P0.4.9: Define node type with prev: `noeq type node = { key: int; prev: dptr; next: dptr }` and `let dptr = option (box node)`
