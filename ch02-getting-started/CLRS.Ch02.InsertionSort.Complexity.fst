@@ -162,24 +162,31 @@ let lemma_triangle_step (vj: nat)
 
 // ========== Main Algorithm with Complexity ==========
 
+// Complexity bound predicate (avoids BoundedIntegers issues in Pulse ensures)
+let complexity_bounded (cf c0: nat) (n: nat) : prop =
+  cf >= c0 /\
+  cf - c0 <= op_Multiply n (n - 1) / 2
+
 fn insertion_sort_complexity
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
-  requires A.pts_to a s0
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0
   requires pure (
     SZ.v len == Seq.length s0 /\
     Seq.length s0 <= A.length a /\
     SZ.v len > 0
   )
-  ensures exists* s. A.pts_to a s ** pure (
+  ensures exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf ** pure (
     Seq.length s == Seq.length s0 /\
     sorted s /\
-    permutation s0 s
+    permutation s0 s /\
+    complexity_bounded cf (reveal c0) (SZ.v len)
   )
 {
   let mut j: SZ.t = 1sz;
-  let ctr = GR.alloc #nat 0;
   
   while (!j <^ len)
   invariant exists* vj s (vc : nat).
@@ -194,7 +201,8 @@ fn insertion_sort_complexity
       permutation s0 s /\
       prefix_sorted s (SZ.v vj) /\
       // Complexity: comparisons so far <= vj*(vj-1)/2
-      vc <= op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2
+      vc >= reveal c0 /\
+      vc <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2
     )
   {
     let vj = !j;
@@ -240,10 +248,9 @@ fn insertion_sort_complexity
         (forall (k1 k2: nat). k1 < SZ.v vi /\ SZ.v vi < k2 /\ k2 <= SZ.v vj ==>
           Seq.index s_inner k1 <= Seq.index s_inner k2) /\
         // Complexity: vc + vi bounded
-        vc_inner + SZ.v vi <= op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj + 1 /\
-        // At exit: tight bound (because vi >= 1 when we exit via comparison,
-        // or vi = 0 when we exit via i reaching 0 — but then sum was preserved)
-        (not vcont ==> vc_inner <= op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj)
+        vc_inner >= reveal c0 /\
+        vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj + 1 - SZ.v vi /\
+        (not vcont ==> vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj)
       )
     {
       let vi = !i;
@@ -290,11 +297,5 @@ fn insertion_sort_complexity
   
   with s_final. assert (A.pts_to a s_final);
   assert (pure (prefix_sorted s_final (Seq.length s0)));
-  
-  // Complexity: total comparisons <= len*(len-1)/2 = O(n²)
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr <= op_Multiply (SZ.v len) (SZ.v len - 1) / 2));
-  
-  GR.free ctr;
   ()
 }
