@@ -53,6 +53,7 @@
 module CLRS.Ch16.Huffman.Complete
 
 open FStar.List.Tot
+open FStar.List.Tot.Properties
 open CLRS.Ch16.Huffman.Spec
 
 (*** Re-export Key Types and Functions ***)
@@ -91,22 +92,72 @@ let map_nonempty (#a #b: Type) (f: a -> b) (l: list a{Cons? l})
   = ()
 
 // Lemma: sortWith preserves non-emptiness
-let sortWith_nonempty (#a: Type) (f: a -> a -> int) (l: list a{Cons? l})
+let rec sortWith_nonempty (#a: Type) (f: a -> a -> int) (l: list a{Cons? l})
   : Lemma (ensures Cons? (sortWith f l))
-  = admit() // From sortWith specification
+          (decreases (length l))
+  = // sortWith is defined as:
+    // | [] -> []
+    // | pivot::tl -> append (sortWith f lo) (pivot::sortWith f hi)
+    // When l is non-empty (pivot::tl), the result is append ... (pivot::...)
+    // which is always non-empty (contains at least pivot)
+    match l with
+    | [_] -> ()  // sortWith [x] = [x], which is non-empty
+    | pivot :: tl ->
+        // After partition, we get lo and hi
+        // Result is: append (sortWith f lo) (pivot :: sortWith f hi)
+        // This contains at least pivot, so it's non-empty
+        // The append of any list with a non-empty list is non-empty
+        ()  // F* can figure this out from the definition
 
 // Lemma: sortWith produces a sorted result
 let sortWith_produces_sorted (f: htree -> htree -> int) (l: list htree{Cons? l})
   : Lemma (requires (forall t1 t2. f t1 t2 <= 0 <==> freq_of t1 <= freq_of t2))
           (ensures is_sorted_by_freq (sortWith f l))
-  = admit() // Provable from sortWith specification
+  = // Prove by showing library's sorted implies our is_sorted_by_freq
+    // bool_of_compare f t1 t2 = (f t1 t2 < 0)
+    // Our requirement: f t1 t2 <= 0 <==> freq_of t1 <= freq_of t2
+    // So: f t1 t2 < 0 <==> freq_of t1 < freq_of t2 (when not equal)
+    //     f t1 t2 <= 0 <==> freq_of t1 <= freq_of t2
+    
+    // We need to prove that sortWith produces a result satisfying is_sorted_by_freq
+    // This follows from the sortWith implementation, but requires showing the
+    // comparison function defines a proper ordering
+    
+    // For a full proof, we'd need to:
+    // 1. Show (fun t1 t2 -> freq_of t1 <= freq_of t2) is a total order
+    // 2. Use sortWith_sorted from the library
+    // 3. Convert from library's sorted to our is_sorted_by_freq
+    
+    admit() // Would require full total_order proof and conversion lemma
+
+// Lemma: map preserves length
+let rec map_length (#a #b: Type) (f: a -> b) (l: list a)
+  : Lemma (ensures length (map f l) = length l)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | _ :: tl -> map_length f tl
+
+// Lemma: sortWith preserves length  
+let sortWith_length (#a: Type) (f: a -> a -> int) (l: list a)
+  : Lemma (ensures length (sortWith f l) = length l)
+  = // This follows from sortWith's definition using partition and append
+    // partition_length shows partition preserves total length
+    // append_length shows append sums lengths
+    // A complete proof would require induction matching sortWith's structure
+    admit()
 
 // Initialize PQ from frequency list
-let init_pq (freqs: list pos{Cons? freqs}) : pq:priority_queue{is_valid_pq pq} =
+let init_pq (freqs: list pos{Cons? freqs}) : pq:priority_queue{is_valid_pq pq /\ length pq = length freqs} =
   let trees = map (fun f -> Leaf f) freqs in
   map_nonempty (fun f -> Leaf f) freqs;
+  map_length (fun f -> Leaf f) freqs;
+  assert (length trees = length freqs);
   sortWith_nonempty freq_cmp trees;
+  sortWith_length freq_cmp trees;
   let sorted = sortWith freq_cmp trees in
+  assert (length sorted = length trees);
+  assert (length sorted = length freqs);
   // Prove freq_cmp satisfies the comparison requirement
   assert (forall (t1 t2: htree). 
     freq_cmp t1 t2 <= 0 <==> freq_of t1 - freq_of t2 <= 0);
@@ -122,9 +173,9 @@ let extract_min (pq: priority_queue{is_valid_pq pq})
     | [t] -> (t, None)
     | t :: rest -> (t, Some rest)
     | [] -> 
-        // Unreachable: pq is non-empty
-        admit();
-        (Leaf 1, None)
+        // Unreachable: pq is non-empty by precondition
+        assert (Cons? pq);  // From is_valid_pq
+        false_elim ()
 
 // Lemma: extract_min preserves sortedness of remainder
 let extract_min_preserves_sorted (pq: priority_queue{is_valid_pq pq /\ length pq >= 2})
@@ -184,8 +235,8 @@ let rec huffman_from_pq (pq: priority_queue{is_valid_pq pq})
         huffman_from_pq new_pq
     | [] -> 
         // Unreachable: pq is non-empty by precondition
-        admit();
-        Leaf 1
+        assert (Cons? pq);  // From is_valid_pq
+        false_elim ()
 
 // Main entry point: Build Huffman tree from list of frequencies
 let huffman_complete (freqs: list pos{Cons? freqs}) : htree =
@@ -213,7 +264,18 @@ let rec is_prefix_free_code (t: htree) : prop =
 
 let huffman_produces_prefix_free_code (freqs: list pos{Cons? freqs})
   : Lemma (ensures is_prefix_free_code (huffman_complete freqs))
-  = admit()
+  = // All htrees are full binary trees by construction
+    // is_prefix_free_code is trivially satisfied by the htree type
+    let rec all_htrees_prefix_free (t: htree) 
+      : Lemma (ensures is_prefix_free_code t)
+              (decreases t)
+      = match t with
+        | Leaf _ -> ()
+        | Internal _ l r -> 
+            all_htrees_prefix_free l;
+            all_htrees_prefix_free r
+    in
+    all_htrees_prefix_free (huffman_complete freqs)
 
 // Property 2: Total frequency is preserved
 let rec sum_list (l: list pos{Cons? l}) : pos =
@@ -318,10 +380,69 @@ let huffman_cost_nonnegative (freqs: list pos{Cons? freqs})
   : Lemma (ensures cost (huffman_complete freqs) >= 0)
   = ()
 
+// Lemma: huffman_from_pq with length >= 2 returns Internal
+let rec huffman_from_pq_multi_returns_internal (pq: priority_queue{is_valid_pq pq /\ length pq >= 2})
+  : Lemma (ensures (match huffman_from_pq pq with
+                    | Internal _ _ _ -> True
+                    | Leaf _ -> False))
+          (decreases (length pq))
+  = match pq with
+    | [_] -> ()  // Unreachable due to length >= 2
+    | [t1; t2] -> 
+        // huffman_from_pq [t1; t2] merges them, creating Internal
+        // new_pq = insert_sorted (merge t1 t2) []
+        //        = [merge t1 t2]
+        //        = [Internal (freq_of t1 + freq_of t2) t1 t2]
+        // huffman_from_pq [Internal ...] returns that Internal node
+        ()
+    | t1 :: t2 :: rest ->
+        // Merges t1 and t2, creates new_pq with at least 1 element
+        let merged = merge t1 t2 in
+        insert_sorted_length merged rest;
+        let new_pq = insert_sorted merged rest in
+        // If rest is empty, new_pq = [merged]
+        // If rest is non-empty, new_pq has >= 2 elements
+        if length rest = 0 then 
+          // new_pq = [merged], huffman_from_pq returns merged which is Internal
+          ()
+        else (
+          // new_pq has >= 2 elements, recurse
+          assert (length new_pq >= 2);
+          insert_sorted_nonempty merged rest;
+          insert_sorted_maintains_sorted merged rest;
+          huffman_from_pq_multi_returns_internal new_pq
+        )
+
 // Property: For n > 1, cost is strictly positive
 let huffman_cost_positive (freqs: list pos{length freqs > 1})
   : Lemma (ensures cost (huffman_complete freqs) > 0)
-  = admit() // Follows from the fact that we do n-1 merges of positive frequencies
+  = // When length freqs > 1, huffman_from_pq performs at least one merge
+    // Each merge adds freq_of left + freq_of right to the cost (both positive)
+    // We'll prove this by showing cost of Internal nodes is always positive
+    let rec internal_has_positive_cost (t: htree) 
+      : Lemma (ensures (match t with 
+                        | Leaf _ -> cost t == 0
+                        | Internal _ _ _ -> cost t > 0))
+              (decreases t)
+      = match t with
+        | Leaf _ -> ()
+        | Internal _ l r -> 
+            internal_has_positive_cost l;
+            internal_has_positive_cost r;
+            // cost (Internal f l r) = freq_of l + freq_of r + cost l + cost r
+            // freq_of l > 0 and freq_of r > 0 (both are pos)
+            // cost l >= 0 and cost r >= 0
+            // Therefore cost (Internal f l r) > 0
+            assert (freq_of l > 0);
+            assert (freq_of r > 0)
+    in
+    let pq = init_pq freqs in
+    // pq has length = length freqs > 1, so >= 2
+    assert (length pq = length freqs);
+    // Therefore huffman_from_pq pq returns an Internal node
+    huffman_from_pq_multi_returns_internal pq;
+    let t = huffman_complete freqs in
+    internal_has_positive_cost t
 
 (*** Example Usage ***)
 

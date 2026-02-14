@@ -383,17 +383,17 @@ against CLRS algorithm semantics. Prioritized by severity.
 The `hash_insert` postcondition only states `Seq.length s' == size` — NO guarantee
 that the key was actually inserted. `hash_search` doesn't relate result index to key.
 
-- [ ] P5.1.1: Tighten `hash_insert` postcondition to prove `Seq.index s' (hash key) == key` (or chain contains key)
+- [x] P5.1.1: Tighten `hash_insert` postcondition to prove `Seq.index s' (hash key) == key` (or chain contains key)
 - [ ] P5.1.2: Tighten `hash_search` postcondition to prove `result < size ==> s'[result] == key`
-- [ ] P5.1.3: Verify both specs compile with fstar.exe
+- [x] P5.1.3: Verify both specs compile with fstar.exe
 
 ### P5.2 BST Specs (Ch12) — INCOMPLETE
 `tree_search` lacks completeness (`None ==> key ∉ subtree`). `tree_insert` has weak
 existential. `tree_delete` has 3 admits.
 
-- [ ] P5.2.1: Add completeness to `tree_search`: `None? result ==> ~(key_in_subtree ...)`
+- [x] P5.2.1: Add completeness to `tree_search`: `None? result ==> ~(key_in_subtree ...)`
 - [ ] P5.2.2: Tighten `tree_insert` postcondition to relate old key set to new key set
-- [ ] P5.2.3: Eliminate 3 admits in `tree_delete` (structural rebuild reasoning)
+- [x] P5.2.3: Eliminate 3 admits in `tree_delete` (structural rebuild reasoning)
 - [ ] P5.2.4: Eliminate 13 admits in BST.Insert.Spec.fst (tree structure preservation)
 - [ ] P5.2.5: Eliminate 5 admits in BST.Delete.Spec.fst (FiniteSet algebra)
 
@@ -401,8 +401,8 @@ existential. `tree_delete` has 3 admits.
 Postcondition only ensures `Seq.length sout == n` and valid indices. Does NOT
 guarantee distinct vertices, permutation property, or topological ordering.
 
-- [ ] P5.3.1: Add `distinct_vertices sout` predicate to postcondition
-- [ ] P5.3.2: Add `is_topological_order adj n sout` predicate to postcondition
+- [x] P5.3.1: Add `distinct_vertices sout` predicate to postcondition
+- [x] P5.3.2: Add `is_topological_order adj n sout` predicate to postcondition
 - [ ] P5.3.3: Prove Kahn's algorithm maintains topological ordering invariant
 
 ### P5.4 MST Specs (Ch23) — INCOMPLETE
@@ -410,7 +410,7 @@ Kruskal postcondition only checks edge count ≤ n-1 and valid endpoints.
 Prim postcondition only bounds key values. Neither verifies acyclicity,
 minimality, or spanning property in the IMPLEMENTATION postcondition.
 
-- [ ] P5.4.1: Add `is_spanning_tree result adj n` to Kruskal postcondition
+- [x] P5.4.1: Add `is_spanning_tree result adj n` to Kruskal postcondition
 - [ ] P5.4.2: Add `is_minimum_weight result adj n` or reference to pure MST spec
 - [ ] P5.4.3: Similarly tighten Prim postcondition
 
@@ -426,7 +426,7 @@ Pure specs and proofs exist but the Pulse code is broken.
 Implementation proves valid cover but postcondition doesn't include the
 2-approximation ratio bound.
 
-- [ ] P5.6.1: Add `|cover| <= 2 * min_vertex_cover adj n` to Pulse postcondition
+- [x] P5.6.1: Add `|cover| <= 2 * min_vertex_cover adj n` to Pulse postcondition
 
 ### P5.7 DLL list_delete_node Ghost Split (Ch10)
 The O(1) delete has correct spec but 1 admit for ghost dls_split_at.
@@ -438,8 +438,8 @@ The O(1) delete has correct spec but 1 admit for ghost dls_split_at.
 ### P5.8 Union-Find FullCompress (Ch21)
 Uses `assume_` instead of proving path compression correctness.
 
-- [ ] P5.8.1: Replace `assume_` in `compress_path` with actual proof
-- [ ] P5.8.2: Replace `assume_` in `find_set` with actual proof
+- [x] P5.8.1: Replace `assume_` in `compress_path` with actual proof
+- [x] P5.8.2: Replace `assume_` in `find_set` with actual proof
 
 ### P5.9 KMP Complexity Admits (Ch32)
 8 admits in amortized analysis for O(m+n) bound.
@@ -466,13 +466,13 @@ core shortest-path properties.
 ### P5.12 Strassen Admits (Ch28)
 3 admits for logarithm properties in recursive complexity proof.
 
-- [ ] P5.12.1: Prove log₂ properties needed for recurrence
-- [ ] P5.12.2: Eliminate 3 admits
+- [x] P5.12.1: Prove log₂ properties needed for recurrence
+- [x] P5.12.2: Eliminate 3 admits
 
 ### P5.13 Rod Cutting Spec Admits (Ch15)
 3 admits in RodCutting.Spec.fst for accum_max lemma.
 
-- [ ] P5.13.1: Prove accum_max induction
+- [x] P5.13.1: Prove accum_max induction
 - [ ] P5.13.2: Eliminate remaining admits
 
 | Phase | Description | Total | Done | Remaining |
@@ -482,8 +482,8 @@ core shortest-path properties.
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 37 | 4 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 8 | 11 |
-| P5 | Audit: spec tightness & admits elimination | 37 | 0 | 37 |
-| **Total** | | **222** | **146** | **76** |
+| P5 | Audit: spec tightness & admits elimination | 37 | 13 | 24 |
+| **Total** | | **222** | **159** | **63** |
 
 **DLL spec fixes this session**: Tightened `list_insert` postcondition (same existential `l` from pre to post), tightened `list_delete` postcondition (same `l`), added real O(1) `list_delete_node` with correct CLRS spec (1 admit for ghost split).
 
