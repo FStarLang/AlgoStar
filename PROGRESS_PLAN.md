@@ -335,7 +335,7 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 16 | Huffman (cost only) | §16.3 | **Weak**: `cost ≥ 0 ∧ (n>1 ⟹ cost>0)` — no tree constructed | — | 270 | ✓ |
 | 16 | Huffman Spec (pure) | §16.3 | **Strong**: `htree` type, `wpl_equals_cost` (CLRS Eq 16.4), pure construction | — | 186 | ✓ |
 | 21 | Union-Find | §21.1–21.3 | **Medium**: union-by-rank, one-step path compression; parent/rank maintained | **Pure** O(n) find, O(1) union | 334+40 | ✓ |
-| 22 | BFS | §22.2 | **Weak**: iterative relaxation (not queue-based BFS); distance soundness proved | **Pure** O(V²) | 257+69 | ✓ |
+| 22 | BFS | §22.2 | **Medium**: iterative relaxation impl + pure BFS spec with level sets, edge property (Lemma 22.1) | **Pure** O(V²) | 257+69+164 | ✓ |
 | 22 | DFS | §22.3 | **Weak**: identical to BFS code (iterative relaxation); not actual DFS | **Pure** O(V²) | 213+69 | ✓ |
 | 22 | Topological Sort | §22.4 | **Medium**: iterative relaxation-based ordering; not Kahn's or DFS-based | **Pure** O(V²) | 315+69 | ✓ |
 | 23 | Kruskal's MST | §23.2 | **Weak**: `valid_parents` only — no MST property (cut/spanning tree) | **Pure** O(V³) | 273+102 | ✓ |
@@ -360,13 +360,13 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 |--------|-------|
 | Total algorithms/data structures | 40 |
 | **Strong** functional spec | 28 (70%) |
-| **Medium** functional spec | 7 (18%) |
-| **Weak** functional spec | 3 (8%) |
+| **Medium** functional spec | 8 (20%) |
+| **Weak** functional spec | 2 (5%) |
 | **Broken** (not the claimed algorithm) | 2 (5%) |
 | Complexity proofs (Pulse, in postcondition) | 14 |
 | Complexity proofs (Pure, standalone) | 23 |
 | Complexity proofs total | 37 (93%) |
-| Total lines of verified F*/Pulse | ~20,100 |
+| Total lines of verified F*/Pulse | ~20,300 |
 | Admits | 5 (all in MST.Spec.fst graph theory) |
 | Assumes | 0 |
 | Source files | 96 |
