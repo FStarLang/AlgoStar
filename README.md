@@ -27,17 +27,17 @@ make clean  # clean build artifacts
 | ch06 | Heapsort | sorted ∧ permutation | O(n log n) |
 | ch07 | Quicksort, Partition | sorted ∧ permutation | O(n²) worst, O(n) partition |
 | ch08 | Counting Sort, Radix Sort (d=1) | sorted ∧ permutation | Θ(n+k) |
-| ch09 | Min/Max, Select (partial sort) | k-th smallest element | O(nk) |
+| ch09 | Min/Max, Select, **Quickselect** | k-th smallest, partition ordering | O(nk), O(n²) worst |
 | ch10 | Stack, Queue, Linked List | list abstraction | O(1) push/pop, O(n) search |
 | ch11 | Hash Table (open addressing) | functional map spec | O(n) worst case |
 | ch12 | Binary Search Tree | key found ⟹ key at index | O(h) search |
 | ch13 | Red-Black Tree ⚠ | ⚠ no RB invariants | — |
 | ch15 | Rod Cutting, Matrix Chain, LCS | result == optimal_spec | O(n²), O(n³), O(mn) |
-| ch16 | Activity Selection, Huffman ⚠ | greedy choice property | O(n log n) |
+| ch16 | Activity Selection, Huffman ⚠, **Huffman.Spec** | greedy choice, CLRS Eq 16.4 | O(n log n) |
 | ch21 | Union-Find (path compression) | find returns root | O(n) find, O(1) union |
 | ch22 | BFS, DFS, Topological Sort | distance soundness, reachability | O(V²) |
 | ch23 | Kruskal, Prim | valid endpoints only | O(V³), O(V²) |
-| ch24 | Bellman-Ford, Dijkstra | triangle inequality (post-check) | O(V³), O(V²) |
+| ch24 | Bellman-Ford, Dijkstra, **ShortestPath.Spec** | dist[v] ≤ sp_dist(s,v) | O(V³), O(V²) |
 | ch25 | Floyd-Warshall | result == fw_spec | O(n³) with ghost ticks |
 | ch26 | Max Flow ⚠ | ⚠ returns zero flow | — |
 | ch28 | Matrix Multiply | C == A × B (dot product) | O(n³) |
@@ -63,10 +63,10 @@ make clean  # clean build artifacts
 
 - **RBTree (Ch13)**: Array-backed BST without RB invariants, fixup, or correct insert position
 - **MaxFlow (Ch26)**: Initializes flow to zero; does not implement augmenting path search
-- **Huffman (Ch16)**: Computes cost only; no tree construction or optimality proof
-- **Select (Ch09)**: Uses O(nk) partial sort; CLRS RANDOMIZED-SELECT is O(n) expected
+- **Huffman (Ch16)**: Imperative code computes cost only; pure spec with tree type and CLRS Eq 16.4 proof added
+- **Select (Ch09)**: New Quickselect (CLRS §9.2) with partition ordering; old O(nk) selection sort kept for comparison
 - **RadixSort (Ch08)**: Single-digit (d=1) only; wraps counting sort
-- **Bellman-Ford/Dijkstra (Ch24)**: Triangle inequality proved via post-verification pass, not from algorithm invariants
+- **Bellman-Ford/Dijkstra (Ch24)**: Postcondition now includes `dist[v] ≤ sp_dist(weights, n, source, v)` via pure shortest-path spec
 - **Kruskal/Prim (Ch23)**: Prove valid endpoints only; no MST property (cut property, spanning tree)
 
 See `RESEARCH_DOC.md` for comprehensive audit and `PROGRESS_PLAN.md` for improvement roadmap.
