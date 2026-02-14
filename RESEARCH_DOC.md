@@ -1000,3 +1000,28 @@ The following implementations are **faithful to CLRS** (with only 0-indexing dif
 | Total lines of verified code | ~33,000+ |
 | Total tasks completed | 132/185 (71%) |
 | Files created this session | 17 new files, ~6,800 lines |
+
+### 12.11 True Doubly-Linked List (Session 11)
+
+**Problem:** `CLRS.Ch10.DoublyLinkedList.fst` was actually a singly-linked list
+mislabelled as doubly-linked. Node type had no `prev` field. LIST-DELETE took
+a key (O(n)) not a pointer (O(1)). LIST-SEARCH returned bool, not a node pointer.
+
+**Solution:** Created `CLRS.Ch10.DLL.fst` — a true DLL with:
+- Node type `{key: int; prev: option (box node); next: option (box node)}`
+- DLS segment predicate adapted from `Pulse.Lib.Deque.is_deque_suffix`
+- Factor/unfactor ghost helpers (from Deque pattern)
+- Ghost helpers: `factored_next_none_nil`, `factored_next_some_cons`,
+  `elim_factored_next`, `intro_factored_next` — all fully proven
+- LIST-INSERT: O(1), fully verified (0 assumes)
+- LIST-SEARCH: O(n), fully verified (0 assumes)
+- LIST-DELETE: admitted (needs `dls_split_at`/`dls_join`)
+
+**Key technical insight:** Matching on concrete `nd.next` (None vs Some np)
+determines singleton vs multi-element list structure, then ghost helpers
+(which CAN match on erased lists) prove the structural properties needed
+for fold/unfold. This avoids matching on erased values in non-ghost code.
+
+**Renamed:** `CLRS.Ch10.DoublyLinkedList.fst` → `CLRS.Ch10.SinglyLinkedList.fst`
+
+Stats: 439 lines, 0 assumes, 1 admit (delete), 158/203 tasks done (78%)
