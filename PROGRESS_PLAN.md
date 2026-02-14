@@ -124,15 +124,19 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P0.4.16: Implement `list_insert (hd_ref tl_ref: ref dptr) (x: int)` mutating L.head in-place
 - [x] P0.4.17: Prove postcondition: `dll hd' tl' (x :: old_l)` (0 assumes in insert itself)
 
-**Step 5 — LIST-DELETE(L, x) by pointer, O(1) splice (CLRS lines 1–5):**
-- [ ] P0.4.18: Define `dls_split_at` ghost helper: split `dll hd tl l` around pointer `x` into prefix ∗ node ∗ suffix
-- [ ] P0.4.19: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice matching CLRS
-- [ ] P0.4.20: Define `dls_join` ghost helper: rejoin prefix and suffix after pointer surgery
-- [ ] P0.4.21: Prove postcondition: `dll new_hd new_tl (remove_at l idx)`
+**Step 5 — LIST-DELETE(L, k) search + delete (O(n)):**
+- [x] P0.4.18: Implement `delete_in_dls` recursive traversal (5 admits for ghost wrapping)
+- [x] P0.4.19: Implement `list_delete (hd_ref tl_ref: ref dptr) (k: int)` — search + delete
+- [x] P0.4.20: Define `remove_first` pure spec; prove postcondition: `dll hd' tl' (remove_first k l')`
+- [ ] P0.4.21: Reduce admits in delete_in_dls (ghost dls↔dll wrapping with erased lists)
 
-**Step 6 — Complexity and wrap-up:**
-- [ ] P0.4.22: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-pointer = O(1), LIST-SEARCH = O(n)
-- [ ] P0.4.23: Convenience `list_delete_key` = search + delete_ptr, prove O(n)
+**Step 6 — O(1) pointer-based delete (stretch):**
+- [ ] P0.4.22: Modify LIST-SEARCH to return pointer instead of bool
+- [ ] P0.4.23: Define `dls_split_at` ghost helper: split `dll` around pointer `x`
+- [ ] P0.4.24: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice
+
+**Step 7 — Complexity and wrap-up:**
+- [ ] P0.4.25: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-key = O(n), LIST-SEARCH = O(n)
 
 ### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
 - [x] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
