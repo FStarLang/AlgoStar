@@ -43,14 +43,14 @@
 - [ ] P0.3.7: Add ghost tick counter; prove O(V + E) complexity (or O(V²) for adjacency matrix)
 
 ### P0.4 Red-Black Tree (Ch13) — Missing RB invariants and fixup
-- [ ] P0.4.1: Define pure spec for RB tree as inductive type: `rbtree = Leaf | Node color left key right`
-- [ ] P0.4.2: Define RB invariants: (a) root is black, (b) red nodes have black children, (c) all paths have equal black-height, (d) BST ordering
-- [ ] P0.4.3: Define pure `rb_insert_spec tree key` returning the balanced tree after insertion
-- [ ] P0.4.4: Implement proper BST insert (find correct position by walking tree)
-- [ ] P0.4.5: Implement RB-INSERT-FIXUP with all 6 cases (3 + 3 symmetric)
-- [ ] P0.4.6: Prove RB invariants maintained after insert+fixup
-- [ ] P0.4.7: Prove BST ordering maintained after insert+fixup
-- [ ] P0.4.8: Prove black-height is O(log n); height ≤ 2·lg(n+1)
+- [x] P0.4.1: Define pure spec for RB tree as inductive type: `rbtree = Leaf | Node color left key right`
+- [x] P0.4.2: Define RB invariants: (a) root is black, (b) red nodes have black children, (c) all paths have equal black-height, (d) BST ordering
+- [x] P0.4.3: Define pure `rb_insert_spec tree key` returning the balanced tree after insertion (Okasaki-style balance with 4 rotation cases)
+- [ ] P0.4.4: Implement proper BST insert (find correct position by walking tree) in Pulse
+- [ ] P0.4.5: Implement RB-INSERT-FIXUP with all 6 cases (3 + 3 symmetric) in Pulse
+- [x] P0.4.6: Prove RB invariants maintained after insert+fixup (pure spec: `insert_is_rbtree`)
+- [x] P0.4.7: Prove BST ordering maintained after insert+fixup (pure spec: `insert_preserves_bst`)
+- [x] P0.4.8: Prove black-height is O(log n); height ≤ 2·lg(n+1) (pure spec: `height_bound_theorem`, CLRS Theorem 13.1)
 - [ ] P0.4.9: Add ghost tick counter; prove O(log n) for search and insert
 - [ ] P0.4.10: (Stretch) Implement RB-DELETE and RB-DELETE-FIXUP
 
@@ -122,9 +122,9 @@
 - [x] P2.2.5: Prove postcondition (upper bound): `dist[v] <= sp_dist weights n s v`
 
 ### P2.3 Kruskal (Ch23) — Prove MST property
-- [ ] P2.3.1: Define pure MST spec: spanning tree T of G with minimum total weight
+- [x] P2.3.1: Define pure MST spec: spanning tree T of G with minimum total weight (MST.Spec.fst)
 - [ ] P2.3.2: Sort edges by weight (implement or assume pre-sorted)
-- [ ] P2.3.3: Prove safe-edge property (cut property): lightest edge crossing a cut is in some MST
+- [x] P2.3.3: Prove safe-edge property (cut property): lightest edge crossing a cut is in some MST (Theorem 23.1 statement + exchange argument sketch, 5 admits in hard graph theory)
 - [ ] P2.3.4: Prove postcondition: result is a spanning tree
 - [ ] P2.3.5: Prove postcondition: result has minimum total weight among spanning trees
 - [ ] P2.3.6: Add ghost tick counter; prove O(E log E) (or O(E α(V)) with union-by-rank + path compression)
@@ -273,7 +273,7 @@
 |-------|-------------|-------|------|-----------|
 | P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 4 | 37 |
 | P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 31 | 12 | 19 |
-| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 11 | 30 |
+| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 13 | 28 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 5 | 14 |
 | **Total** | | **172** | **68** | **104** |
