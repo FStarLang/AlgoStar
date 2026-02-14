@@ -506,6 +506,91 @@ fn list_search (hd tl: dptr) (k: int)
   }
 }
 
+// --- LIST-SEARCH-PTR: Return pointer to found node ---
+
+// Search within DLS segment returning pointer to found node
+fn rec search_dls_ptr
+  (p: box node) (k: int)
+  (#l: erased (list int) {Cons? l})
+  (#prev_ptr: erased dptr)
+  (#tail: erased (box node))
+  preserves dls p l prev_ptr tail None
+  returns result: dptr
+  ensures pure (
+    match result with
+    | None -> ~(L.mem k l)
+    | Some _ -> L.mem k l
+  )
+{
+  factor_dls p l prev_ptr tail None;
+  unfold (dls_factored p l prev_ptr tail None);
+  with v. assert (pts_to p v);
+  let nd = Box.(!p);
+  let nxt = nd.next;
+  if (nd.key = k) {
+    rewrite each nd.next as v.next;
+    fold (dls_factored p l prev_ptr tail None);
+    unfactor_dls p l prev_ptr tail None;
+    Some p
+  } else {
+    match nxt {
+      norewrite None -> {
+        // nd.next == None with last_ptr == None => singleton
+        rewrite each nd.next as v.next;
+        factored_next_none_nil p;
+        fold (dls_factored p l prev_ptr tail None);
+        unfactor_dls p l prev_ptr tail None;
+        None
+      }
+      norewrite Some np -> {
+        // nd.next == Some np with last_ptr == None => multi-element
+        rewrite each nd.next as v.next;
+        factored_next_some_cons p np;
+        // Extract tail segment, recurse, reinsert
+        elim_factored_next p np;
+        let r = search_dls_ptr np k;
+        intro_factored_next p np;
+        rewrite each (Some np) as v.next;
+        fold (dls_factored p l prev_ptr tail None);
+        unfactor_dls p l prev_ptr tail None;
+        r
+      }
+    }
+  }
+}
+
+fn list_search_ptr (hd tl: dptr) (k: int)
+  preserves dll hd tl 'l
+  returns result: dptr
+  ensures pure (
+    match result with
+    | None -> ~(L.mem k 'l)
+    | Some _ -> L.mem k 'l
+  )
+{
+  match hd {
+    norewrite None -> {
+      dll_none_nil hd tl;
+      None
+    }
+    norewrite Some hp -> {
+      dll_some_cons hd tl;
+      let lk = hide (L.hd 'l);
+      let lr = hide (L.tl 'l);
+      rewrite each 'l as (reveal lk :: reveal lr) in (dll hd tl 'l);
+      unfold (dll hd tl (reveal lk :: reveal lr));
+      with hp' tp. _;
+      rewrite each hp' as hp;
+      let r = search_dls_ptr hp k;
+      fold (dll (Some hp) (Some tp) (reveal lk :: reveal lr));
+      rewrite each (Some hp) as hd;
+      rewrite each (Some tp) as tl;
+      rewrite each (reveal lk :: reveal lr) as 'l;
+      r
+    }
+  }
+}
+
 // --- LIST-DELETE ---
 
 let rec remove_first (k: int) (l: list int) : list int =

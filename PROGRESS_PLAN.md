@@ -131,7 +131,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P0.4.21: Reduce admits in delete_in_dls (DONE: 0 admits!) (ghost dls↔dll wrapping with erased lists)
 
 **Step 6 — O(1) pointer-based delete (stretch):**
-- [ ] P0.4.22: Modify LIST-SEARCH to return pointer instead of bool
+- [x] P0.4.22: Modify LIST-SEARCH to return pointer instead of bool
 - [ ] P0.4.23: Define `dls_split_at` ghost helper: split `dll` around pointer `x`
 - [ ] P0.4.24: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice
 
@@ -196,7 +196,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P1.4.2: Proved BST stepping lemmas (key_not_in_right_if_less, key_not_in_left_if_greater)
 - [x] P1.4.3: Prove BST property maintained after insert (needs ghost bounds in loop invariant)
 - [x] P1.4.4: Prove set of keys is `old_keys ∪ {new_key}`
-- [ ] P1.4.5: Add ghost tick counter; prove O(h) where h is tree height
+- [x] P1.4.5: Add ghost tick counter; prove O(h) where h is tree height
 - [x] P1.4.6: ~~Implement TREE-DELETE (CLRS §12.3)~~ → Done as P0.5.4
 - [x] P1.4.7: ~~Prove BST property maintained after delete~~ → Done as P0.5.5
 
@@ -292,7 +292,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P3.2.1: Pure proof of heapsort_comparisons ≤ 2n(1 + log₂ n)
 - [x] P3.2.2: Proved log2_floor monotonicity and tight bounds
 - [x] P3.2.3: Proved extract_max_comparisons ≤ 2n·log₂ n
-- [ ] P3.2.4: Thread ghost tick counter through Pulse max_heapify and heapsort
+- [x] P3.2.4: Thread ghost tick counter through Pulse max_heapify and heapsort
 
 ### P3.3 Quicksort O(n²) worst case *(Pure proof completed)*
 - [x] P3.3.1: Add ghost tick counter to partition (CLRS.Ch07.Partition.Complexity.fst) — proves exactly n comparisons
@@ -362,7 +362,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [ ] P4.4.1: Bucket Sort (Ch08) — implement and prove O(n) average case
 - [ ] P4.4.2: Fibonacci Heap operations (Ch19) — if feasible
 - [ ] P4.4.3: Strassen's Matrix Multiplication (Ch28) — O(n^{2.81})
-- [ ] P4.4.4: Extended Euclidean Algorithm (Ch31) — prove Bézout coefficients
+- [x] P4.4.4: Extended Euclidean Algorithm (Ch31) — prove Bézout coefficients
 
 ### P4.5 Documentation and README ✓ COMPLETED
 - [x] P4.5.1: Updated README.md with per-chapter verification status table
