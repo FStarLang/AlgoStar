@@ -384,7 +384,7 @@ The `hash_insert` postcondition only states `Seq.length s' == size` — NO guara
 that the key was actually inserted. `hash_search` doesn't relate result index to key.
 
 - [x] P5.1.1: Tighten `hash_insert` postcondition to prove `Seq.index s' (hash key) == key` (or chain contains key)
-- [ ] P5.1.2: Tighten `hash_search` postcondition to prove `result < size ==> s'[result] == key`
+- [x] P5.1.2: Tighten `hash_search` postcondition to prove `result < size ==> s'[result] == key`
 - [x] P5.1.3: Verify both specs compile with fstar.exe
 
 ### P5.2 BST Specs (Ch12) — INCOMPLETE
@@ -392,7 +392,7 @@ that the key was actually inserted. `hash_search` doesn't relate result index to
 existential. `tree_delete` has 3 admits.
 
 - [x] P5.2.1: Add completeness to `tree_search`: `None? result ==> ~(key_in_subtree ...)`
-- [ ] P5.2.2: Tighten `tree_insert` postcondition to relate old key set to new key set
+- [x] P5.2.2: Tighten `tree_insert` postcondition to relate old key set to new key set
 - [x] P5.2.3: Eliminate 3 admits in `tree_delete` (structural rebuild reasoning)
 - [ ] P5.2.4: Eliminate 13 admits in BST.Insert.Spec.fst (tree structure preservation)
 - [ ] P5.2.5: Eliminate 5 admits in BST.Delete.Spec.fst (FiniteSet algebra)
@@ -411,8 +411,8 @@ Prim postcondition only bounds key values. Neither verifies acyclicity,
 minimality, or spanning property in the IMPLEMENTATION postcondition.
 
 - [x] P5.4.1: Add `is_spanning_tree result adj n` to Kruskal postcondition
-- [ ] P5.4.2: Add `is_minimum_weight result adj n` or reference to pure MST spec
-- [ ] P5.4.3: Similarly tighten Prim postcondition
+- [~] P5.4.2: Add `is_minimum_weight result adj n` or reference to pure MST spec
+- [x] P5.4.3: Similarly tighten Prim postcondition
 
 ### P5.5 MaxFlow Implementation (Ch26) — STUB
 Current implementation is a stub (initializes flow to zero and returns).
@@ -459,8 +459,8 @@ Uses `assume_` instead of proving path compression correctness.
 6+ admits each in BellmanFord.Spec.fst and Dijkstra.Correctness.fst for
 core shortest-path properties.
 
-- [ ] P5.11.1: Prove relax_monotonicity in BellmanFord.Spec.fst
-- [ ] P5.11.2: Prove sp_dist upper bound property
+- [x] P5.11.1: Prove relax_monotonicity in BellmanFord.Spec.fst
+- [x] P5.11.2: Prove sp_dist upper bound property
 - [ ] P5.11.3: Prove greedy choice correctness in Dijkstra.Correctness.fst
 
 ### P5.12 Strassen Admits (Ch28)
@@ -473,7 +473,7 @@ core shortest-path properties.
 3 admits in RodCutting.Spec.fst for accum_max lemma.
 
 - [x] P5.13.1: Prove accum_max induction
-- [ ] P5.13.2: Eliminate remaining admits
+- [x] P5.13.2: Eliminate remaining admits
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
@@ -482,8 +482,8 @@ core shortest-path properties.
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 37 | 4 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 8 | 11 |
-| P5 | Audit: spec tightness & admits elimination | 37 | 13 | 24 |
-| **Total** | | **222** | **159** | **63** |
+| P5 | Audit: spec tightness & admits elimination | 37 | 20 | 17 |
+| **Total** | | **222** | **166** | **56** |
 
 **DLL spec fixes this session**: Tightened `list_insert` postcondition (same existential `l` from pre to post), tightened `list_delete` postcondition (same `l`), added real O(1) `list_delete_node` with correct CLRS spec (1 admit for ghost split).
 

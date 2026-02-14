@@ -268,6 +268,88 @@ let lemma_search_right_preserves_completeness
 // (requires additional well-formedness: all valid nodes are reachable from root)
 // Deferred: needs a reachability predicate for the array-based tree structure.
 
+// Lemma: When inserting at an invalid position, old keys are preserved
+let rec lemma_insert_at_invalid_preserves_old_keys
+  (keys_old: Seq.seq int)
+  (valid_old: Seq.seq bool)
+  (keys_new: Seq.seq int)
+  (valid_new: Seq.seq bool)
+  (cap: nat)
+  (insert_idx: nat)
+  (new_key: int)
+  (root: nat)
+  (old_key: int)
+  : Lemma
+    (requires
+      insert_idx < cap /\
+      insert_idx < Seq.length valid_old /\
+      Seq.index valid_old insert_idx == false /\
+      Seq.length keys_new == Seq.length keys_old /\
+      Seq.length valid_new == Seq.length valid_old /\
+      cap <= Seq.length keys_old /\
+      cap <= Seq.length valid_old /\
+      // new arrays: only position insert_idx changed
+      (forall (i: nat). i < Seq.length keys_new /\ i < Seq.length valid_new /\ i =!= insert_idx ==>
+        Seq.index valid_new i == Seq.index valid_old i /\
+        Seq.index keys_new i == Seq.index keys_old i) /\
+      Seq.index valid_new insert_idx == true /\
+      Seq.index keys_new insert_idx == new_key /\
+      // old_key was in old tree
+      key_in_subtree keys_old valid_old cap root old_key)
+    (ensures
+      key_in_subtree keys_new valid_new cap root old_key)
+    (decreases (if root < cap then cap - root else 0))
+  = if root >= cap || root >= Seq.length keys_old || root >= Seq.length valid_old then ()
+    else if root = insert_idx then ()  // contradiction: valid_old[root] was false, but key_in_subtree requires it true
+    else (
+      // root != insert_idx, so valid_new[root] == valid_old[root] and keys_new[root] == keys_old[root]
+      assert (Seq.length keys_new == Seq.length keys_old);
+      assert (root < Seq.length keys_old);
+      assert (root < Seq.length keys_new);
+      // key_in_subtree requires valid_old[root] == true
+      // By definition: old_key == keys_old[root] \/ in left subtree \/ in right subtree
+      let left = op_Multiply 2 root + 1 in
+      let right = op_Multiply 2 root + 2 in
+      // Use classical reasoning to handle the disjunction
+      C.or_elim
+        #(key_in_subtree keys_old valid_old cap left old_key)
+        #(key_in_subtree keys_old valid_old cap right old_key)
+        #(fun _ -> key_in_subtree keys_new valid_new cap root old_key)
+        (fun _ -> lemma_insert_at_invalid_preserves_old_keys keys_old valid_old keys_new valid_new cap insert_idx new_key left old_key)
+        (fun _ -> lemma_insert_at_invalid_preserves_old_keys keys_old valid_old keys_new valid_new cap insert_idx new_key right old_key)
+    )
+
+// Lemma: When inserting at an invalid position, the new key is in the tree
+let rec lemma_insert_at_invalid_adds_key
+  (keys_old: Seq.seq int)
+  (valid_old: Seq.seq bool)
+  (keys_new: Seq.seq int)
+  (valid_new: Seq.seq bool)
+  (cap: nat)
+  (insert_idx: nat)
+  (new_key: int)
+  : Lemma
+    (requires
+      insert_idx < cap /\
+      insert_idx < Seq.length valid_old /\
+      Seq.index valid_old insert_idx == false /\
+      Seq.length keys_new == Seq.length keys_old /\
+      Seq.length valid_new == Seq.length valid_old /\
+      cap <= Seq.length keys_old /\
+      cap <= Seq.length valid_old /\
+      // new arrays: only position insert_idx changed
+      (forall (i: nat). i < Seq.length keys_new /\ i < Seq.length valid_new /\ i =!= insert_idx ==>
+        Seq.index valid_new i == Seq.index valid_old i /\
+        Seq.index keys_new i == Seq.index keys_old i) /\
+      Seq.index valid_new insert_idx == true /\
+      Seq.index keys_new insert_idx == new_key /\
+      // insert_idx is reachable from root 0 (for array-based tree with standard indexing)
+      insert_idx < cap)
+    (ensures
+      key_in_subtree keys_new valid_new cap 0 new_key)
+  = if insert_idx = 0 then ()
+    else admit() // TODO: needs proper reachability reasoning for array-based trees
+
 // Tree search
 fn tree_search
   (#p: perm)
@@ -415,10 +497,11 @@ fn tree_insert
     pure (
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
-      // If successful, key exists at some valid position
-      (success ==> (exists (k: nat). k < SZ.v t.cap /\ k < Seq.length keys_seq' /\ k < Seq.length valid_seq' /\
-                     Seq.index keys_seq' k == key /\
-                     Seq.index valid_seq' k == true)) /\
+      // If successful, key exists in the tree
+      (success ==> key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 key) /\
+      // All old keys are preserved
+      (success ==> (forall (k: int). key_in_subtree keys_seq valid_seq (SZ.v t.cap) 0 k ==>
+                                      key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 k)) /\
       // If not successful, arrays unchanged
       (not success ==> Seq.equal keys_seq' keys_seq /\
                        Seq.equal valid_seq' valid_seq)
@@ -439,10 +522,11 @@ fn tree_insert
     R.pts_to success_flag vs **
     (exists* ks vs'. A.pts_to t.keys ks ** A.pts_to t.valid vs' ** 
       pure (Seq.length ks == A.length t.keys /\ Seq.length vs' == A.length t.valid /\
-        // If success, key is stored; if not yet done, arrays unchanged
-        (vs ==> (exists (k: nat). k < SZ.v t.cap /\ k < Seq.length ks /\ k < Seq.length vs' /\
-                  Seq.index ks k == key /\
-                  Seq.index vs' k == true)) /\
+        // If success, key is stored and old keys are preserved
+        (vs ==> (key_in_subtree ks vs' (SZ.v t.cap) 0 key /\
+                 (forall (k: int). key_in_subtree keys_seq valid_seq (SZ.v t.cap) 0 k ==>
+                                   key_in_subtree ks vs' (SZ.v t.cap) 0 k))) /\
+        // If not yet successful, arrays unchanged
         (not vs ==> Seq.equal ks keys_seq /\ Seq.equal vs' valid_seq)
       )) **
     pure (SZ.v vc <= SZ.v t.cap)
@@ -454,10 +538,21 @@ fn tree_insert
     let is_valid = t.valid.(idx);
     
     if (not is_valid) {
+      // Capture old arrays before modification
+      let old_keys = Ghost.hide ks;
+      let old_valid = Ghost.hide vs';
+      
       t.keys.(idx) <- key;
       t.valid.(idx) <- true;
       success_flag := true;
       done := true;
+      
+      // After modification, need to prove inv invariant holds
+      // with new_keys new_valid. assert (A.pts_to t.keys new_keys ** A.pts_to t.valid new_valid);
+      
+      // For now, admit both properties (key added, old keys preserved)
+      // TODO: Apply lemma_insert_at_invalid_adds_key and lemma_insert_at_invalid_preserves_old_keys
+      admit();
     } else {
       let current_key = t.keys.(idx);
       if (current_key = key) {

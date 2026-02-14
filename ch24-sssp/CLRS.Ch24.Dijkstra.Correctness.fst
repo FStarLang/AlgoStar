@@ -126,24 +126,23 @@ let all_weights_non_negative (weights: Seq.seq int) : prop =
 /// 
 /// This is CLRS Theorem 24.6.
 ///
-/// The proof strategy is to show that dist[u] <= δ(s,u).
-/// Combined with the upper bound property (dist[u] >= δ(s,u)), this gives equality.
+/// Proof approach:
+/// From upper bound property: dist[u] >= δ(s,u)
+/// Need to show: dist[u] <= δ(s,u)
+/// Combined these give equality.
 ///
-/// Key insight: If δ(s,u) < ∞, then there exists a shortest path from s to u.
-/// This path must cross from settled to unsettled vertices at some point (x,y).
+/// The key insight for dist[u] <= δ(s,u):
+/// If δ(s,u) < ∞, there exists a shortest path from s to u.
+/// This path must cross from settled to unsettled vertices at some edge (x,y).
 /// By triangle inequality (applied when x was settled), dist[y] <= dist[x] + w(x,y).
-/// Since x is settled: dist[x] = δ(s,x) (by settled optimality).
+/// Since x is settled: dist[x] = δ(s,x).
 /// Since (x,y) is on shortest path: δ(s,y) = δ(s,x) + w(x,y).
 /// Therefore: dist[y] <= δ(s,y).
-/// But also: dist[y] >= δ(s,y) (upper bound property).
-/// So: dist[y] = δ(s,y).
-/// Since y is on path to u: δ(s,y) <= δ(s,u) (non-negative weights).
+/// Combined with upper bound: dist[y] = δ(s,y).
+/// Since y is on path to u and weights are non-negative: δ(s,y) <= δ(s,u).
 /// Since u is minimum unvisited and y is unvisited: dist[u] <= dist[y].
 /// Therefore: dist[u] <= dist[y] = δ(s,y) <= δ(s,u).
-///
-/// For the formal proof, we need to handle the path decomposition carefully.
-/// The current version admits this detailed path-based reasoning.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 20"
 let greedy_choice_invariant
   (dist: Seq.seq int)
   (weights: Seq.seq int)
@@ -186,7 +185,6 @@ let greedy_choice_invariant
     // The greedy choice is correct: dist[u] equals true shortest path distance
     Seq.index dist u == SP.sp_dist weights n source u)
   =
-  // Get the distance values
   let d_u = Seq.index dist u in
   let delta_u = SP.sp_dist weights n source u in
   
@@ -194,23 +192,9 @@ let greedy_choice_invariant
   assert (d_u >= delta_u);
   
   // Need to prove: dist[u] <= δ(s,u)
-  //
-  // The formal proof requires reasoning about path decomposition:
-  // 1. If δ(s,u) = ∞, then dist[u] = ∞ (by minimality and initialization)
-  // 2. If δ(s,u) < ∞, then exists shortest path p from s to u
-  // 3. Path p crosses from settled to unsettled at some edge (x,y)
-  // 4. dist[y] = δ(s,y) by triangle inequality + settled optimality
-  // 5. δ(s,y) <= δ(s,u) because y is on path to u (non-negative weights)
-  // 6. dist[u] <= dist[y] because u is minimum unvisited
-  // 7. Therefore: dist[u] <= dist[y] = δ(s,y) <= δ(s,u)
-  //
-  // Steps 2-4 require formalizing path decomposition and proving properties
-  // about paths in graphs. This is a substantial proof that requires:
-  // - Path induction lemmas
-  // - Edge crossing lemmas
-  // - Subpath weight monotonicity
-  //
-  // These lemmas are sketched below but not yet fully proven.
+  // This requires formalizing path decomposition and proving that
+  // the first unsettled vertex on any shortest path has optimal distance.
+  // These path-based lemmas are sketched below but require substantial work.
   admit()
 #pop-options
 
@@ -266,7 +250,22 @@ let optimal_settled_implies_upper_bounds
     all_weights_non_negative weights)
   (ensures
     all_distances_upper_bounds dist weights n source)
-  = admit() // TODO: Prove using induction on path length
+  = 
+  // To prove this, we'd need to show that our partial triangle inequality
+  // (from settled vertices) is sufficient to establish upper bounds.
+  // The key insight: triangle inequality from settled + settled optimality
+  // means distances are computed correctly via relaxation.
+  //
+  // Formal proof strategy:
+  // 1. Source is settled with dist[source] = 0 = δ(source, source)
+  // 2. For any vertex v:
+  //    a) If v is settled: dist[v] = δ(source, v) by all_settled_optimal, so dist[v] >= δ(source, v)
+  //    b) If v is unsettled:
+  //       - Any shortest path to v goes through settled vertices
+  //       - By triangle inequality from settled, dist[v] doesn't underestimate
+  //       - This requires path-based reasoning (not yet formalized)
+  //
+  admit() // TODO: Requires formalizing paths through settled vertices
 
 /// The minimum unvisited vertex cannot have distance greater than any
 /// shortest path that stays within settled vertices
@@ -411,6 +410,7 @@ let minimum_property
 
 /// Main lemma: Combining first_unsettled and minimum properties gives us
 /// dist[u] <= δ(s,u)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 let greedy_choice_upper_bound
   (dist: Seq.seq int)
   (weights: Seq.seq int)
@@ -458,14 +458,23 @@ let greedy_choice_upper_bound
   // Apply first_unsettled_has_optimal_distance to get y
   first_unsettled_has_optimal_distance dist weights n source u settled path;
   
-  // There exists y with:
-  // - y is unsettled
-  // - dist[y] = δ(s,y)
-  // - δ(s,y) <= δ(s,u)
+  // The lemma establishes exists y. We use classical reasoning to extract witness
+  // Key insight: we don't need to explicitly extract y.
+  // The existential gives us that there exists y with the desired properties.
+  // Combined with the fact that u is minimum unvisited, this is sufficient for SMT.
   
-  // By minimum property: dist[u] <= dist[y]
+  // From first_unsettled_has_optimal_distance:
+  // exists y. y < n /\ not (settled y) /\ dist[y] = δ(s,y) /\ δ(s,y) <= δ(s,u)
+  
+  // From minimum property (precondition):
+  // forall v. not (settled v) => dist[u] <= dist[v]
+  
   // Therefore: dist[u] <= dist[y] = δ(s,y) <= δ(s,u)
-  admit() // Need to extract witness from exists
+  
+  // This follows by quantifier instantiation, which Z3 should handle
+  // But we need to help it by invoking the lemma
+  admit() // Still needs witness extraction pattern
+#pop-options
 
 (* ===== Alternative Formulation Using sp_dist Properties ===== *)
 
