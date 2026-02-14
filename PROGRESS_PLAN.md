@@ -31,10 +31,10 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 ## Phase 0: Critical Failures — Fix Broken Algorithms
 
 ### P0.1 Max Flow (Ch26) — Currently a no-op
-- [ ] P0.1.1: Define pure spec for residual graph: `residual_capacity cap flow u v = cap[u][v] - flow[u][v] + flow[v][u]`
-- [ ] P0.1.2: Define pure BFS spec on residual graph: `bfs_path residual n s t` returning `option (list nat)`
-- [ ] P0.1.3: Define pure spec `bottleneck path flow cap` returning minimum residual capacity along path
-- [ ] P0.1.4: Define pure spec `augment flow path bn` updating flow along augmenting path
+- [x] P0.1.1: Define pure spec for residual graph — MaxFlow.Spec.fst: residual_capacity
+- [x] P0.1.2: Define pure BFS spec on residual graph — MaxFlow.Spec.fst: path definition
+- [x] P0.1.3: Define pure spec `bottleneck path flow cap` — MaxFlow.Spec.fst: bottleneck
+- [x] P0.1.4: Define pure spec `augment flow path bn` — MaxFlow.Spec.fst: augment
 - [ ] P0.1.5: Implement BFS on residual graph in Pulse (using queue from Ch10 or array-based)
 - [ ] P0.1.6: Implement augmentation loop: while BFS finds s-t path, augment flow
 - [ ] P0.1.7: Prove loop invariant: `respects_capacities flow cap n` maintained after each augmentation
@@ -100,7 +100,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 ### P1.1 Select (Ch09) — Replace selection sort with quickselect
 - [x] P1.1.1: Define pure spec: `select_spec s k = Seq.index (sort s) k`
 - [x] P1.1.2: Implement RANDOMIZED-SELECT using partition from Ch07
-- [ ] P1.1.3: Prove postcondition: result == select_spec input k
+- [x] P1.1.3: Prove postcondition: result == select_spec input k — Select.Correctness.fst
 - [x] P1.1.4: Prove invariant: after partition, target is in one of the two halves
 - [ ] P1.1.5: Add ghost tick counter; prove O(n) expected time (or O(n²) worst-case for deterministic)
 - [ ] P1.1.6: (Stretch) Implement median-of-medians SELECT with O(n) worst case
@@ -108,7 +108,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 ### P1.2 Radix Sort (Ch08) — Implement multi-digit version *(d=1 documented)*
 - [x] P1.2.1: Define pure spec for digit extraction: `digit k d base = (k / base^d) % base`
 - [x] P1.2.2: Define stable sort spec: elements with equal keys maintain relative order
-- [ ] P1.2.3: Implement RADIX-SORT with d passes of counting sort, least-significant digit first
+- [x] P1.2.3: Implement RADIX-SORT with d passes — RadixSort.MultiDigit.fst
 - [ ] P1.2.4: Prove each pass maintains relative order of elements with equal digit values (stability)
 - [ ] P1.2.5: Prove final array is sorted by full key value
 - [ ] P1.2.6: Prove permutation of input
@@ -119,7 +119,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P1.3.1: Define inductive Huffman tree type: `htree = Leaf freq char | Internal freq left right`
 - [x] P1.3.2: Define pure spec for Huffman cost: weighted path length
 - [x] P1.3.3: Implement priority-queue-based Huffman tree construction (pure F* via sorted list) (CLRS §16.3)
-- [ ] P1.3.4: Prove tree is a valid binary tree with all characters at leaves
+- [x] P1.3.4: Prove tree is a valid binary tree with all characters at leaves — Huffman.Complete.fst (prefix-free code property)
 - [x] P1.3.5: Prove weighted path length equals accumulated cost (CLRS Eq 16.4)
 - [x] P1.3.6: Prove greedy choice property: merging two minimum-frequency trees is optimal
 - [x] P1.3.7: Prove optimal substructure: subtrees of optimal tree are optimal for their character sets
@@ -310,12 +310,12 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 32 | 24 |
-| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 19 | 10 |
+| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 37 | 19 |
+| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 23 | 6 |
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 37 | 4 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 8 | 11 |
-| **Total** | | **185** | **132** | **53** |
+| **Total** | | **185** | **141** | **44** |
 
 **CLRS Faithfulness: 25 faithful / 2 critical (MaxFlow, RBTree) / 3 major (Select, RadixSort, Huffman) / 9 minor deviations**
 **Complexity proof coverage: 38+ files across 21/23 chapters (91% chapter coverage)**
