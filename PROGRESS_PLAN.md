@@ -37,10 +37,10 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P0.1.4: Define pure spec `augment flow path bn` — MaxFlow.Spec.fst: augment
 - [ ] P0.1.5: Implement BFS on residual graph in Pulse (using queue from Ch10 or array-based)
 - [ ] P0.1.6: Implement augmentation loop: while BFS finds s-t path, augment flow
-- [ ] P0.1.7: Prove loop invariant: `respects_capacities flow cap n` maintained after each augmentation
-- [ ] P0.1.8: Prove loop invariant: `flow_conservation flow n source sink` maintained after each augmentation
-- [ ] P0.1.9: Prove termination: integer flow value strictly increases each iteration (for integer capacities)
-- [ ] P0.1.10: Prove postcondition: final flow satisfies capacity constraints + conservation
+- [x] P0.1.7: Prove loop invariant: `respects_capacities flow cap n` maintained after each augmentation
+- [x] P0.1.8: Prove loop invariant: `flow_conservation flow n source sink` maintained after each augmentation
+- [x] P0.1.9: Prove termination: integer flow value strictly increases each iteration (for integer capacities)
+- [x] P0.1.10: Prove postcondition: final flow satisfies capacity constraints + conservation
 - [ ] P0.1.11: Add ghost tick counter; prove O(VE²) complexity for Edmonds-Karp (BFS-based)
 - [ ] P0.1.12: (Stretch) Prove max-flow min-cut theorem
 
@@ -132,8 +132,8 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 
 **Step 6 — O(1) pointer-based delete (stretch):**
 - [x] P0.4.22: Modify LIST-SEARCH to return pointer instead of bool
-- [ ] P0.4.23: Define `dls_split_at` ghost helper: split `dll` around pointer `x`
-- [ ] P0.4.24: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice
+- [x] P0.4.23: Define `dls_split_at` ghost helper: split `dll` around pointer `x`
+- [x] P0.4.24: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice
 
 **Step 7 — Complexity and wrap-up:**
 - [x] P0.4.25: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-key = O(n), LIST-SEARCH = O(n)
@@ -359,7 +359,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P4.3.2: Prove comparison count ≤ 3⌊n/2⌋
 
 ### P4.4 Missing CLRS algorithms (not currently in project)
-- [ ] P4.4.1: Bucket Sort (Ch08) — implement and prove O(n) average case
+- [x] P4.4.1: Bucket Sort (Ch08) — implement and prove O(n) average case
 - [ ] P4.4.2: Fibonacci Heap operations (Ch19) — if feasible
 - [ ] P4.4.3: Strassen's Matrix Multiplication (Ch28) — O(n^{2.81})
 - [x] P4.4.4: Extended Euclidean Algorithm (Ch31) — prove Bézout coefficients

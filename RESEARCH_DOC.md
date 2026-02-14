@@ -1061,3 +1061,13 @@ Ghost helpers `fold_delete_result_nil/cons`, `unfold_delete_result_nil/cons`, `e
 - **KMP strengthened spec**: count_matches_spec + matched_prefix_at state invariant
 
 Stats: 723 lines DLL (0 admits), 178/208 tasks done (86%)
+
+### Batch 3 Results (Session 11, continued)
+
+4 more verified modules:
+- **Heapsort O(n log n) pure complexity**: BUILD-MAX-HEAP O(n) via sum-of-heights (CLRS Thm 6.3), extract-max O(n log n), total ≤ 6n(1+log n)
+- **Extended Euclidean Algorithm**: Bézout identity a*x + b*y = gcd(a,b), 0 admits
+- **DLL search_dls_ptr**: Returns pointer to found node (CLRS LIST-SEARCH faithful spec)
+- **BST O(h) complexity**: search ≤ h, insert ≤ h, delete ≤ 4h+1 (all formally proven)
+
+Progress: 189/208 tasks done (91%), 19 remaining
