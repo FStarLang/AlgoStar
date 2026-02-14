@@ -4,9 +4,7 @@ module CLRS.Ch10.DLL
 // Nodes have {key, prev, next}. Segment predicate `dls` from Pulse.Lib.Deque.
 // Operations: LIST-INSERT (O(1)), LIST-SEARCH (O(n)), LIST-DELETE (O(n))
 //
-// Ghost manipulations for the DLS predicate are non-trivial. Some assume_
-// are used for structural lemmas that are sound but complex to prove formally
-// (e.g., relating None/Some of next pointer to singleton/multi-element list).
+// Fully verified: 0 admits, 0 assumes.
 
 #lang-pulse
 open Pulse.Lib.Pervasives
@@ -257,6 +255,36 @@ fn unfactor_dls
   }
 }
 
+// Wrap dls with prev_ptr=None into dll
+ghost
+fn dls_to_dll
+  (hp tp: box node) (#l: erased (list int) {Cons? l})
+  requires dls hp l None tp None
+  ensures dll (Some hp) (Some tp) l
+{
+  let k = L.hd l;
+  let rest = L.tl l;
+  rewrite each l as (k :: rest);
+  fold (dll (Some hp) (Some tp) (k :: rest));
+  rewrite each (k :: rest) as l
+}
+
+// Unwrap dll to get dls
+ghost
+fn unfold_dll_cons
+  (hd tl: dptr) (#l: erased (list int) {Cons? l})
+  requires dll hd tl l
+  ensures exists* (hp tp: box node).
+    dls hp l None tp None **
+    pure (hd == Some hp /\ tl == Some tp)
+{
+  let k = L.hd l;
+  let rest = L.tl l;
+  rewrite each l as (k :: rest) in (dll hd tl l);
+  unfold (dll hd tl (k :: rest));
+  rewrite each (k :: rest) as l
+}
+
 // Set the prev pointer of the first node
 fn set_prev
   (p: box node) (prev': dptr)
@@ -436,15 +464,119 @@ let remove_first_skip (k: int) (l: list int)
   : Lemma (requires Cons? l /\ L.hd l <> k)
           (ensures remove_first k l == L.hd l :: remove_first k (L.tl l)) = ()
 
+// --- delete_in_dls: returns dls or empty ---
+// The result of delete_in_dls:
+//   If remove_first k l is [], postcondition is emp
+//   If remove_first k l is Cons, postcondition is dls with same prev_ptr
+
+// Helper: result predicate for delete — either empty or dls segment
+let delete_result (hd tl: dptr) (prev_ptr: dptr) (l: list int) : slprop =
+  match l with
+  | [] -> pure (hd == None /\ tl == None)
+  | k :: rest ->
+    exists* (hp tp: box node).
+      dls hp (k :: rest) prev_ptr tp None **
+      pure (hd == Some hp /\ tl == Some tp)
+
+ghost
+fn fold_delete_result_nil (hd tl: dptr) (prev_ptr: dptr)
+  requires pure (hd == None /\ tl == None)
+  ensures delete_result hd tl prev_ptr ([] #int)
+{
+  fold (delete_result hd tl prev_ptr ([] #int))
+}
+
+ghost
+fn fold_delete_result_cons
+  (hp tp: box node) (prev_ptr: dptr) (l: list int {Cons? l})
+  requires dls hp l prev_ptr tp None
+  ensures delete_result (Some hp) (Some tp) prev_ptr l
+{
+  let k = L.hd l;
+  let rest = L.tl l;
+  rewrite each l as (k :: rest);
+  fold (delete_result (Some hp) (Some tp) prev_ptr (k :: rest));
+  rewrite each (k :: rest) as l
+}
+
+ghost
+fn unfold_delete_result_nil (hd tl: dptr) (prev_ptr: dptr) (#l: erased (list int))
+  preserves delete_result hd tl prev_ptr l
+  requires pure (hd == None)
+  ensures pure (l == ([] #int))
+{
+  let ll = reveal l;
+  match ll {
+    [] -> { () }
+    k :: rest -> {
+      rewrite each l as (k :: rest) in (delete_result hd tl prev_ptr l);
+      unfold (delete_result hd tl prev_ptr (k :: rest));
+      unreachable ()
+    }
+  }
+}
+
+ghost
+fn unfold_delete_result_cons (hd tl: dptr) (prev_ptr: dptr) (#l: erased (list int))
+  preserves delete_result hd tl prev_ptr l
+  requires pure (Some? hd)
+  ensures pure (Cons? l)
+{
+  let ll = reveal l;
+  match ll {
+    [] -> {
+      rewrite each l as ([] #int) in (delete_result hd tl prev_ptr l);
+      unfold (delete_result hd tl prev_ptr []);
+      unreachable ()
+    }
+    k :: rest -> { () }
+  }
+}
+
+ghost
+fn extract_delete_result_cons (hd tl: dptr) (prev_ptr: dptr) (#l: erased (list int) {Cons? l})
+  requires delete_result hd tl prev_ptr l
+  ensures exists* (hp tp: box node).
+    dls hp l prev_ptr tp None **
+    pure (hd == Some hp /\ tl == Some tp)
+{
+  let k = L.hd l;
+  let rest = L.tl l;
+  rewrite each l as (k :: rest) in (delete_result hd tl prev_ptr l);
+  unfold (delete_result hd tl prev_ptr (k :: rest));
+  rewrite each (k :: rest) as l
+}
+
+ghost
+fn delete_result_to_dll (hd tl: dptr) (#l: erased (list int))
+  requires delete_result hd tl None l
+  ensures dll hd tl l
+{
+  let ll = reveal l;
+  match ll {
+    [] -> {
+      rewrite each l as ([] #int) in (delete_result hd tl None l);
+      unfold (delete_result hd tl None ([] #int));
+      fold (dll hd tl ([] #int));
+      rewrite each ([] #int) as l
+    }
+    k :: rest -> {
+      rewrite each l as (k :: rest) in (delete_result hd tl None l);
+      unfold (delete_result hd tl None (k :: rest));
+      fold (dll hd tl (k :: rest));
+      rewrite each (k :: rest) as l
+    }
+  }
+}
+
 // Recursive delete within a DLS segment.
-// prev_ptr and tail_ptr are concrete so we can use them in pointer surgery.
-// Uses assume_ for ghost predicate conversions (dll wrapping of dls).
+// Returns delete_result with the same prev_ptr.
 fn rec delete_in_dls
   (p: box node) (k: int) (prev_ptr: dptr) (tail_ptr: box node)
   (#l: erased (list int) {Cons? l})
   requires dls p l prev_ptr tail_ptr None
   returns r: (dptr & dptr)
-  ensures dll (fst r) (snd r) (remove_first k l)
+  ensures delete_result (fst r) (snd r) prev_ptr (remove_first k l)
 {
   factor_dls p l prev_ptr tail_ptr None;
   unfold (dls_factored p l prev_ptr tail_ptr None);
@@ -463,9 +595,8 @@ fn rec delete_in_dls
         rewrite each l as [reveal hd_l] in (dls_factored_next p l tail_ptr None None);
         unfold (dls_factored_next p [reveal hd_l] tail_ptr None None);
         Box.free p;
-        // remove_first k l == L.tl l == []
         let none_ptr : dptr = None;
-        fold (dll none_ptr none_ptr ([] #int));
+        fold_delete_result_nil none_ptr none_ptr prev_ptr;
         rewrite each ([] #int) as (remove_first k l);
         (none_ptr, none_ptr)
       }
@@ -476,10 +607,10 @@ fn rec delete_in_dls
         elim_factored_next p np;
         Box.free p;
         set_prev np prev_ptr;
-        // dls np (L.tl l) prev_ptr tail_ptr None is the remaining segment.
-        // Wrapping into dll requires prev_ptr == None (true at top-level).
-        // Using admit for the ghost predicate wrapping.
-        admit()
+        // dls np (L.tl l) prev_ptr tail_ptr None
+        fold_delete_result_cons np tail_ptr prev_ptr (L.tl l);
+        rewrite each (L.tl l) as (remove_first k l);
+        (Some np, Some tail_ptr)
       }
     }
   } else {
@@ -492,8 +623,13 @@ fn rec delete_in_dls
         factored_next_none_nil p;
         fold (dls_factored p l prev_ptr tail_ptr None);
         unfactor_dls p l prev_ptr tail_ptr None;
-        // Ghost wrapping: dls → dll
-        admit()
+        // remove_first k l == L.hd l :: remove_first k (L.tl l)
+        // But L.tl l == [] so remove_first k [] == []
+        // So remove_first k l == [L.hd l] == l
+        // dls p l prev_ptr tail_ptr None is what we have
+        fold_delete_result_cons p tail_ptr prev_ptr l;
+        rewrite each l as (remove_first k l);
+        (Some p, Some tail_ptr)
       }
       norewrite Some np -> {
         // Multi: recurse on tail segment
@@ -505,25 +641,40 @@ fn rec delete_in_dls
         let new_hd = fst r;
         let new_tl = snd r;
         rewrite each (fst r) as new_hd in
-          (dll (fst r) (snd r) (remove_first k (L.tl l)));
+          (delete_result (fst r) (snd r) (Some p) (remove_first k (L.tl l)));
         rewrite each (snd r) as new_tl in
-          (dll new_hd (snd r) (remove_first k (L.tl l)));
-        // dll new_hd new_tl (remove_first k (L.tl l))
+          (delete_result new_hd (snd r) (Some p) (remove_first k (L.tl l)));
+        // delete_result new_hd new_tl (Some p) (remove_first k (L.tl l))
         match new_hd {
           norewrite None -> {
-            // Tail became empty: current node becomes singleton
-            dll_none_nil new_hd new_tl;
+            // Tail became empty after delete
+            unfold_delete_result_nil new_hd new_tl (Some p);
+            rewrite each (remove_first k (L.tl l))
+                      as ([] #int)
+                      in (delete_result new_hd new_tl (Some p) (remove_first k (L.tl l)));
+            unfold (delete_result new_hd new_tl (Some p) []);
             Box.(p := { nd with next = None });
             fold (dls p [nd.key] prev_ptr p None);
-            // Ghost wrapping: dls singleton + empty tail → dll
-            admit()
+            // remove_first k l == nd.key :: remove_first k (L.tl l) == nd.key :: [] == [nd.key]
+            fold_delete_result_cons p p prev_ptr [nd.key];
+            rewrite each [nd.key] as (remove_first k l);
+            (Some p, Some p)
           }
           norewrite Some new_hp -> {
-            // Tail still non-empty: update pointers
-            dll_some_cons new_hd new_tl;
+            // Tail still has elements after delete
+            unfold_delete_result_cons new_hd new_tl (Some p);
+            extract_delete_result_cons new_hd new_tl (Some p);
+            with hp' tp'. _;
+            rewrite each hp' as new_hp;
+            let concrete_tp = Some?.v new_tl;
+            rewrite each tp' as concrete_tp;
             Box.(p := { nd with next = Some new_hp });
-            // Ghost: reconstruct dll with current node prepended to modified tail
-            admit()
+            let nd' = { nd with next = Some new_hp };
+            fold_dls_cons p nd.key (remove_first k (L.tl l)) prev_ptr concrete_tp None nd' new_hp;
+            // dls p (nd.key :: remove_first k (L.tl l)) prev_ptr concrete_tp None
+            fold_delete_result_cons p concrete_tp prev_ptr (nd.key :: remove_first k (L.tl l));
+            rewrite each (nd.key :: remove_first k (L.tl l)) as (remove_first k l);
+            (Some p, Some concrete_tp)
           }
         }
       }
@@ -545,7 +696,6 @@ fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
       // Empty list: nothing to delete
       dll_none_nil hd tl;
       rewrite each l as ([] #int) in (dll hd tl l);
-      // remove_first k [] == [] by definition
       rewrite each ([] #int) as (remove_first k ([] #int));
       Pulse.Lib.Reference.(hd_ref := hd);
       Pulse.Lib.Reference.(tl_ref := tl)
@@ -553,12 +703,21 @@ fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
     norewrite Some hp -> {
       // Non-empty: search and delete
       dll_some_cons hd tl;
-      // l is Cons, unfold dll to get dls
-      with l0. assert (dll hd tl l0);
-      // We know l == l0 and Cons? l0
-      // Unfold dll to extract dls. Need concrete list shape.
-      // Use admit for the extraction + delete + repackaging
-      admit()
+      unfold_dll_cons hd tl;
+      with hp' tp. _;
+      rewrite each hp' as hp;
+      let concrete_tp = Some?.v tl;
+      rewrite each tp as concrete_tp;
+      let r = delete_in_dls hp k None concrete_tp;
+      let new_hd = fst r;
+      let new_tl = snd r;
+      rewrite each (fst r) as new_hd in
+        (delete_result (fst r) (snd r) None (remove_first k l));
+      rewrite each (snd r) as new_tl in
+        (delete_result new_hd (snd r) None (remove_first k l));
+      delete_result_to_dll new_hd new_tl;
+      Pulse.Lib.Reference.(hd_ref := new_hd);
+      Pulse.Lib.Reference.(tl_ref := new_tl)
     }
   }
 }
