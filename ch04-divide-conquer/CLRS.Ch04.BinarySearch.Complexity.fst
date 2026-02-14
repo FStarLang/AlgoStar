@@ -66,6 +66,11 @@ let lemma_log2f_step (old_range new_range: int)
 let is_sorted (s: Seq.seq int) : prop =
   forall (i j: nat). i < j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
+// ========== Complexity bound predicate ==========
+// (Avoids BoundedIntegers elaboration issues in Pulse ensures)
+let complexity_bounded_log (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 <= log2f n + 1
+
 // ========== Binary Search with Complexity Bound ==========
 
 #set-options "--z3rlimit 20"
@@ -75,7 +80,9 @@ fn binary_search_complexity
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
   (key: int)
-  requires A.pts_to a s0 **
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0 **
     pure (
       SZ.v len == Seq.length s0 /\
       Seq.length s0 <= A.length a /\
@@ -83,7 +90,7 @@ fn binary_search_complexity
       is_sorted s0
     )
   returns result: SZ.t
-  ensures A.pts_to a s0 **
+  ensures exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf **
     pure (
       SZ.v result <= SZ.v len /\
       (SZ.v result < SZ.v len ==> (
@@ -92,14 +99,15 @@ fn binary_search_complexity
       )) /\
       (SZ.v result == SZ.v len ==> (
         forall (i:nat). i < Seq.length s0 ==> Seq.index s0 i =!= key
-      ))
+      )) /\
+      // Complexity: at most ⌊log₂ n⌋ + 1 comparisons = O(log n)
+      complexity_bounded_log cf (reveal c0) (SZ.v len)
     )
 {
   let mut lo: SZ.t = 0sz;
   let mut hi: SZ.t = len;
   let mut found: bool = false;
   let mut result_idx: SZ.t = len;
-  let ctr = GR.alloc #nat 0;
   
   while (!lo <^ !hi && not !found)
   invariant exists* vlo vhi vfound vresult (vc : nat).
@@ -129,10 +137,11 @@ fn binary_search_complexity
           SZ.v vlo <= i /\ i < SZ.v vhi)
       )) /\
       
-      // Complexity: overall bound and remaining budget
-      vc <= log2f (SZ.v len) + 1 /\
+      // Complexity: overall bound and remaining budget (relative to c0)
+      vc >= reveal c0 /\
+      vc - reveal c0 <= log2f (SZ.v len) + 1 /\
       (not vfound /\ SZ.v vhi > SZ.v vlo ==>
-        vc + log2f (SZ.v vhi - SZ.v vlo) <= log2f (SZ.v len))
+        (vc - reveal c0) + log2f (SZ.v vhi - SZ.v vlo) <= log2f (SZ.v len))
     )
   {
     let vlo = !lo;
@@ -166,18 +175,6 @@ fn binary_search_complexity
   
   let vfound = !found;
   let vresult = !result_idx;
-  let vlo = !lo;
-  let vhi = !hi;
   
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr <= log2f (SZ.v len) + 1));
-  
-  assert (pure (vfound \/ SZ.v vlo >= SZ.v vhi));
-  assert (pure (not vfound ==> (
-    SZ.v vlo >= SZ.v vhi /\
-    (forall (i:nat). i < Seq.length s0 ==> Seq.index s0 i =!= key)
-  )));
-  
-  GR.free ctr;
   vresult
 }

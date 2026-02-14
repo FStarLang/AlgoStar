@@ -62,27 +62,35 @@ let max_subarray_spec (s: Seq.seq int) : Tot int =
   if Seq.length s = 0 then 0
   else kadane_spec s 0 0 initial_min
 
+// ========== Complexity bound predicate ==========
+// (Avoids BoundedIntegers elaboration issues in Pulse ensures)
+let complexity_bounded_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n
+
 // ========== Main Algorithm with Complexity ==========
 
 fn max_subarray_complexity
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
-  requires A.pts_to a s0
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0
   requires pure (
     SZ.v len == Seq.length s0 /\
     Seq.length s0 <= A.length a /\
     SZ.v len > 0
   )
   returns result: int
-  ensures A.pts_to a s0 ** pure (
-    result == max_subarray_spec s0
+  ensures exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf ** pure (
+    result == max_subarray_spec s0 /\
+    // Complexity: exactly n operations = Θ(n)
+    complexity_bounded_linear cf (reveal c0) (SZ.v len)
   )
 {
   let mut current_sum: int = 0;
   let mut best_sum: int = initial_min;
   let mut i: SZ.t = 0sz;
-  let ctr = GR.alloc #nat 0;
 
   while (!i <^ len)
   invariant exists* vi vcur vbest (vc : nat).
@@ -94,8 +102,8 @@ fn max_subarray_complexity
     pure (
       SZ.v vi <= SZ.v len /\
       kadane_spec s0 (SZ.v vi) vcur vbest == kadane_spec s0 0 0 initial_min /\
-      // Complexity: exactly i ticks so far
-      vc == SZ.v vi
+      // Complexity: exactly i ticks so far (relative to c0)
+      vc == reveal c0 + SZ.v vi
     )
   {
     let vi = !i;
@@ -125,11 +133,6 @@ fn max_subarray_complexity
     i := vi + 1sz;
   };
 
-  // At loop exit: i == len, so ctr == len.
-  // This proves exactly n operations were performed.
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v len));
-
-  GR.free ctr;
+  // At loop exit: i == len, so ctr == c0 + len = Θ(n) operations
   !best_sum
 }

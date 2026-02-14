@@ -171,6 +171,10 @@ let lemma_no_swap_preserves_partition
       (forall (k: nat). i <= k /\ k <= j ==> Seq.index s k > pivot))
   = ()
 
+// ========== Complexity bound predicate ==========
+let complexity_bounded_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n
+
 // ========== Main Algorithm with Complexity ==========
 
 // Partition function with complexity tracking: rearranges array so all elements <= pivot
@@ -181,8 +185,10 @@ fn partition_complexity
   (n: SZ.t)
   (pivot: int)
   (#s0: erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
 requires
-  A.pts_to a s0 **
+  A.pts_to a s0 ** GR.pts_to ctr c0 **
   pure (
     SZ.v n <= A.length a /\
     SZ.v n == Seq.length s0 /\
@@ -190,18 +196,19 @@ requires
     (forall (i: nat). i < Seq.length s0 ==> Seq.index s0 i >= 0)
   )
 returns result:SZ.t
-ensures exists* s.
-  A.pts_to a s **
+ensures exists* s (cf: nat).
+  A.pts_to a s ** GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     SZ.v result <= SZ.v n /\
     permutation s0 s /\
-    is_partitioned s pivot (SZ.v result)
+    is_partitioned s pivot (SZ.v result) /\
+    // Complexity: exactly n comparisons = Θ(n)
+    complexity_bounded_linear cf (reveal c0) (SZ.v n)
   )
 {
   let mut i: SZ.t = 0sz;
   let mut j: SZ.t = 0sz;
-  let ctr = GR.alloc #nat 0;
   
   while (!j <^ n)
   invariant exists* vi vj s_cur (vc: nat).
@@ -218,8 +225,8 @@ ensures exists* s.
       permutation s0 s_cur /\
       (forall (k: nat). k < SZ.v vi ==> Seq.index s_cur k <= pivot) /\
       (forall (k: nat). SZ.v vi <= k /\ k < SZ.v vj ==> Seq.index s_cur k > pivot) /\
-      // Complexity: exactly vj comparisons so far (one per iteration)
-      vc == SZ.v vj
+      // Complexity: exactly vj comparisons so far (relative to c0)
+      vc == reveal c0 + SZ.v vj
     )
   {
     let vj = !j;
@@ -262,11 +269,6 @@ ensures exists* s.
     }
   };
   
-  // At loop exit: vj == n, so vc == n
-  // This proves exactly n comparisons were made
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v n));
-  
-  GR.free ctr;
+  // At loop exit: vj == n, so cf == c0 + n
   !i
 }
