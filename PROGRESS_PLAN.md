@@ -62,15 +62,77 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P0.3.6: Classify edges (tree, back, forward, cross) based on colors at discovery time
 - [x] P0.3.7: Add ghost tick counter; prove O(V²) complexity — StackDFS.Complexity.fst
 
-### P0.4 Linked List (Ch10) — ✅ Proper doubly-linked list (CLRS.Ch10.DoublyLinkedList.fst)
-- [x] P0.4.1: Design Pulse representation: box-allocated nodes with key/next, recursive is_dlist predicate
-- [x] P0.4.2: Implement LIST-INSERT(L, x): insert at HEAD via Box.alloc (CLRS §10.2, O(1))
-- [x] P0.4.3: Implement LIST-SEARCH(L, k): recursive traversal from head following next pointers
-- [x] P0.4.4: Implement LIST-DELETE(L, x): recursive search+splice, Box.free deleted node (O(n) search + O(1) splice)
-- [x] P0.4.5: Define pure spec: is_dlist matches on logical list int, remove_first for delete
-- [x] P0.4.6: Prove list traversal visits all elements (L.mem correctness in search)
-- [x] P0.4.7: Add ghost tick counter: O(1) insert, O(n) search/delete — DoublyLinkedList.Complexity.fst
-- [ ] P0.4.8: (Current array-backed implementation should be renamed to ArrayList or kept as alternative)
+### P0.4 Linked List (Ch10) — ⚠️ SINGLY-LINKED, MUST REDO AS TRUE DLL
+
+**Diagnosis (critical):** The current `CLRS.Ch10.DoublyLinkedList.fst` is a
+singly-linked list mislabelled as doubly-linked. The `node` type has no `prev`
+field. `LIST-DELETE` takes a key (not a pointer) and does O(n) search.
+`LIST-SEARCH` returns `bool` instead of a node pointer. None of the CLRS
+`prev`-pointer manipulations are present. Must be reimplemented using the
+**DLS segment predicate** approach.
+
+**Approach — Doubly-Linked Segment Predicate (`dls`):**
+
+The ownership challenge: node A owns B via `next`, but B points back to A
+via `prev`. A naïve recursive predicate double-counts ownership. The standard
+separation-logic solution is a **DLS segment** that externalises the boundary
+pointers:
+
+```
+dls(head, headprev, tail, tailnext, l) :=
+  match l with
+  | []  → pure (head == tailnext ∧ ...)
+  | [k] → ∃ p. head == Some p ∗ pts_to p {key=k; prev=headprev; next=tailnext}
+              ∧ tail == Some p
+  | k :: rest → ∃ p nxt.
+      head == Some p ∗
+      pts_to p {key=k; prev=headprev; next=nxt} ∗
+      dls(nxt, Some p, tail, tailnext, rest)
+```
+
+A full DLL is `dls(L.head, None, L.tail, None, l)` — head.prev=None, tail.next=None.
+Each node has unique ownership; `prev` consistency is structural, not a separate
+invariant. Reference: FStar's `examples/doublylinkedlist/DoublyLinkedList.fst`
+uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
+
+**Prior work (singly-linked, kept for reference):**
+- [x] P0.4.1: ~~Design Pulse representation~~ (singly-linked only; to be superseded)
+- [x] P0.4.2: ~~Implement LIST-INSERT~~ (no prev updates; to be superseded)
+- [x] P0.4.3: ~~Implement LIST-SEARCH~~ (returns bool, not pointer; to be superseded)
+- [x] P0.4.4: ~~Implement LIST-DELETE~~ (takes key, not pointer; to be superseded)
+- [x] P0.4.5: ~~Define pure spec~~ (singly-linked spec; to be superseded)
+- [x] P0.4.6: ~~Prove L.mem correctness~~ (still valid for search)
+- [x] P0.4.7: Add ghost tick counter — DoublyLinkedList.Complexity.fst
+
+**Step 0 — Housekeeping:**
+- [ ] P0.4.8: Rename `CLRS.Ch10.DoublyLinkedList.fst` → `CLRS.Ch10.SinglyLinkedList.fst`
+
+**Step 1 — Node type with `prev` (file: `CLRS.Ch10.DLL.fst`):**
+- [ ] P0.4.9: Define node type with prev: `noeq type node = { key: int; prev: dptr; next: dptr }` and `let dptr = option (box node)`
+
+**Step 2 — DLS segment predicate and ghost helpers:**
+- [ ] P0.4.10: Define `dls (head: dptr) (hp: dptr) (tail: dptr) (tn: dptr) (l: list int) : slprop` — recursive on `l`. Base: `[] → pure (head == tn)`. Cons: `k :: rest → ∃ (p: box node) (nxt: dptr). pure (head == Some p) ** pts_to p {key=k; prev=hp; next=nxt} ** dls nxt (Some p) tail tn rest`.
+- [ ] P0.4.11: Define full-list wrapper: `dll (hd tl: dptr) (l: list int) : slprop = dls hd None tl None l`
+- [ ] P0.4.12: Ghost fold/unfold helpers: `intro_dls_nil`, `intro_dls_cons`, `intro_dls_singleton`, `elim_dls_nil`, `elim_dls_cons`, `cases_of_dls`
+- [ ] P0.4.13: Prove `dls_append`: given two adjacent segments, produce `dls h1 hp1 t2 tn2 (l1 @ l2)`
+
+**Step 3 — LIST-SEARCH(L, k) returning a pointer (CLRS lines 1–4):**
+- [ ] P0.4.14: Implement `list_search` returning `r: dptr` with `r == None ⇒ ¬(L.mem k l)` and `r == Some p ⇒ p.key == k`
+- [ ] P0.4.15: Prove search correctness: `found ⟺ L.mem k l`
+
+**Step 4 — LIST-INSERT(L, x) with prev updates (CLRS lines 1–5):**
+- [ ] P0.4.16: Implement `list_insert (hd_ref tl_ref: ref dptr) (x: int)` mutating `L.head` in-place
+- [ ] P0.4.17: Prove postcondition: `dll (Some nd) new_tail (x :: old_l)`
+
+**Step 5 — LIST-DELETE(L, x) by pointer, O(1) splice (CLRS lines 1–5):**
+- [ ] P0.4.18: Define `dls_split_at` ghost helper: split `dll hd tl l` around pointer `x` into prefix ∗ node ∗ suffix
+- [ ] P0.4.19: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice matching CLRS
+- [ ] P0.4.20: Define `dls_join` ghost helper: rejoin prefix and suffix after pointer surgery
+- [ ] P0.4.21: Prove postcondition: `dll new_hd new_tl (remove_at l idx)`
+
+**Step 6 — Complexity and wrap-up:**
+- [ ] P0.4.22: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-pointer = O(1), LIST-SEARCH = O(n)
+- [ ] P0.4.23: Convenience `list_delete_key` = search + delete_ptr, prove O(n)
 
 ### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
 - [x] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
