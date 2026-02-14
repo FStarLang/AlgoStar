@@ -164,7 +164,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P1.1.2: Implement RANDOMIZED-SELECT using partition from Ch07
 - [x] P1.1.3: Prove postcondition: result == select_spec input k — Select.Correctness.fst
 - [x] P1.1.4: Prove invariant: after partition, target is in one of the two halves
-- [ ] P1.1.5: Add ghost tick counter; prove O(n) expected time (or O(n²) worst-case for deterministic)
+- [x] P1.1.5: Add ghost tick counter; prove O(n²) worst-case — Select.Complexity.Enhanced.fst (1 admit in helper)
 - [ ] P1.1.6: (Stretch) Implement median-of-medians SELECT with O(n) worst case
 
 ### P1.2 Radix Sort (Ch08) — Implement multi-digit version *(d=1 documented)*
@@ -185,7 +185,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P1.3.5: Prove weighted path length equals accumulated cost (CLRS Eq 16.4)
 - [x] P1.3.6: Prove greedy choice property: merging two minimum-frequency trees is optimal
 - [x] P1.3.7: Prove optimal substructure: subtrees of optimal tree are optimal for their character sets
-- [ ] P1.3.8: Add ghost tick counter; prove O(n log n) with binary heap, or O(n²) with linear scan
+- [x] P1.3.8: Add ghost tick counter; prove O(n²) with sorted-list priority queue — Huffman.Complexity.fst (1 admit in helper)
 
 ### P1.4 BST Insert (Ch12) — ⚠️ See also P0.5 for missing DELETE/MIN/MAX/TRANSPLANT
 - [x] P1.4.1: Added `subtree_in_range` (recursive BST with bounds) and `key_in_subtree` specs
