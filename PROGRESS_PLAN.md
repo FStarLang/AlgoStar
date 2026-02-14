@@ -72,11 +72,11 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [ ] P0.4.7: Add ghost tick counter: O(1) insert, O(n) search/delete
 - [ ] P0.4.8: (Current array-backed implementation should be renamed to ArrayList or kept as alternative)
 
-### P0.5 BST (Ch12) — Missing DELETE, TRANSPLANT, MINIMUM, MAXIMUM
-- [ ] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
-- [ ] P0.5.2: Implement TREE-MAXIMUM(x): walk right children until x.right == NIL (CLRS §12.2)
-- [ ] P0.5.3: Implement TRANSPLANT(T, u, v): replace subtree rooted at u with subtree rooted at v (CLRS §12.3)
-- [ ] P0.5.4: Implement TREE-DELETE(T, z): all 3 cases — no children, one child, two children (CLRS §12.3)
+### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
+- [x] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
+- [x] P0.5.2: Implement TREE-MAXIMUM(x): walk right children until x.right == NIL (CLRS §12.2)
+- [ ] P0.5.3: Implement TRANSPLANT(T, u, v): N/A for array representation, handled inline
+- [x] P0.5.4: Implement TREE-DELETE(T, z): all 3 cases — no children, one child, two children (CLRS §12.3)
 - [ ] P0.5.5: Prove BST property maintained after TREE-DELETE
 - [ ] P0.5.6: Prove key set after delete = old keys minus deleted key
 - [ ] P0.5.7: Add ghost tick counter: O(h) for all operations
@@ -310,12 +310,12 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 21 | 35 |
+| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 25 | 31 |
 | P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 18 | 11 |
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 32 | 9 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 5 | 14 |
-| **Total** | | **185** | **112** | **73** |
+| **Total** | | **185** | **116** | **69** |
 
 **CLRS Faithfulness (from Section 12 audit): 15 faithful / 6 critical / 8 major / 9 minor deviations**
 **Complexity proof coverage: 33 files across 21/23 chapters (91% chapter coverage)**
@@ -364,8 +364,8 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 10 | Queue | §10.1 | **Strong**: pure FIFO spec (two-list), `queue_to_list (enqueue q x) == queue_to_list q @ [x]` | **Pure** O(1) per op | 436+94+322 | ✓ |
 | 10 | Linked List | §10.2 | **Strong**: Box-allocated nodes, recursive `is_dlist` predicate, `list_insert` (head O(1)), `list_search` (L.mem), `list_delete` (remove_first). Zero admits. Old array-backed impl still exists. | **Pure** O(n) search | 241+183+94+224 | ✓ |
 | 11 | Hash Table (open addr.) | §11.4 | **Strong**: pure assoc-list spec, insert/search/delete correctness, non-interference | **Pure** O(n) worst | 224+35+209 | ✓ |
-| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree` (completeness); `subtree_in_range` ordering. **Missing:** TREE-MINIMUM, TREE-MAXIMUM | **Pure** O(h) | 382+125+312 | ⚠️ P0 |
-| 12 | BST Insert | §12.3 | **Strong**: pure spec proves BST ordering preserved after insert, key set = old ∪ {new}. **Missing:** TREE-DELETE, TRANSPLANT (60% of Ch12 unimplemented) | **Pure** O(h) | 382+395 | ⚠️ P0 |
+| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree`. TREE-MINIMUM, TREE-MAXIMUM now implemented. | **Pure** O(h) | 382+125+312+506 | ✓ |
+| 12 | BST Insert | §12.3 | **Strong**: BST ordering preserved after insert, key set = old ∪ {new}. TREE-DELETE with 3 cases now implemented. | **Pure** O(h) | 382+395+506 | ✓ |
 | 13 | Red-Black Tree | §13.1–13.4 | **Broken (imperative)**: array-backed BST with rotation stubs but NO RB-INSERT-FIXUP (0/6 cases), NO RB-DELETE, color never maintained. **Pure spec is correct** (486 lines): `is_rbtree`, `insert_is_rbtree`, `insert_preserves_bst`, Theorem 13.1. | — | 257+486 | ⚠️ P0 |
 | 15 | Rod Cutting | §15.1 | **Strong**: pure spec with `valid_cutting`, `optimal_revenue`, DP table correctness, optimal substructure (CLRS Eq 15.2) | **Pulse** O(n²) — ghost ticks (263 lines) | 253+263+301 | ✓ |
 | 15 | LCS | §15.4 | **Strong**: `result == lcs_length x y m n` (pure recursive spec) | **Pulse** O(mn) — ghost ticks (246 lines) | 293+246 | ✓ |
@@ -401,8 +401,8 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | **Strong** functional spec | 38 (95%) |
 | **Medium** functional spec | 0 |
 | **Weak** functional spec | 0 |
-| **Broken** (not the claimed algorithm) | 3 (MaxFlow, RBTree imperative, BST missing ops) |
-| CLRS Faithful implementations | 18 (+LinkedList, BFS, DFS from P0 fixes) |
+| **Broken** (not the claimed algorithm) | 2 (MaxFlow, RBTree imperative) |
+| CLRS Faithful implementations | 19 (+BST complete) |
 | CLRS Major deviations (P1) | 8 (Partition, Select, RadixSort, Huffman, Kruskal, UnionFind, CountingSort, RabinKarp) |
 | CLRS Minor deviations (P2) | 9 (BellmanFord rounds, Dijkstra linear scan, no predecessor arrays, etc.) |
 | Complexity proofs (Pulse, in postcondition) | 14 |
@@ -413,5 +413,5 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Admits | 87 + 16 = 103 |
 | Assumes | 2 (DFS termination — white count decrease) |
 | Source files | 120 |
-| Tasks completed | 112/185 (61%) |
-| Tasks remaining | 73/185 (39%) |
+| Tasks completed | 116/185 (63%) |
+| Tasks remaining | 69/185 (37%) |

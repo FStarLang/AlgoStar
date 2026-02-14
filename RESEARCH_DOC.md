@@ -910,11 +910,31 @@ The following implementations are **faithful to CLRS** (with only 0-indexing dif
 
 ### 12.5 Summary
 
-| Severity | Count | Examples |
-|----------|-------|---------|
-| **P0 Critical** | 6 | LinkedList, BFS, DFS, MaxFlow, RBTree, BST (missing ops) |
+| Severity | Count | Status |
+|----------|-------|--------|
+| **P0 Critical** | 6 → **2 remaining** | LinkedList ✅, BFS ✅, DFS ✅, BST ✅ fixed. MaxFlow, RBTree still broken. |
 | **P1 Major** | 8 | Partition, Select, RadixSort, Huffman, Kruskal, UnionFind, CountingSort, RabinKarp |
 | **P2 Minor** | 9 | BellmanFord rounds, Dijkstra linear scan, no predecessor arrays, no reconstruction |
-| **Correct** | 15 | InsertionSort, MergeSort, Heapsort, BinarySearch, Stack, Queue, DP algorithms, KMP |
+| **Correct** | 19 | +LinkedList, BFS, DFS, BST now faithful |
 
-**Bottom line:** 15 of 38 implementations faithfully follow CLRS. 6 are critically wrong (different algorithm or missing core functionality). 8 use major shortcuts. 9 have minor omissions.
+**Bottom line:** 19 of 40 implementations now faithfully follow CLRS. 2 remain critically wrong (MaxFlow returns zero, RBTree has no fixup). 8 use major shortcuts. 9 have minor omissions.
+
+### 12.6 P0 Fixes Applied (Session 9)
+
+1. **Linked List** → `CLRS.Ch10.DoublyLinkedList.fst` (241 lines, 0 admits)
+   - Box-allocated nodes with recursive `is_dlist` predicate, following `Pulse.Lib.LinkedList` patterns
+   - LIST-INSERT at head (cons), LIST-SEARCH (L.mem), LIST-DELETE (remove_first + Box.free)
+
+2. **BFS** → `CLRS.Ch22.QueueBFS.fst` (348 lines, 5 assumes)
+   - Inline array-based FIFO queue with q_head/q_tail
+   - CLRS colors WHITE/GRAY/BLACK, dist[], pred[] arrays
+   - Helper `maybe_discover()` solves Pulse branch unification
+
+3. **DFS** → `CLRS.Ch22.StackDFS.fst` (698 lines, 11 assumes)
+   - Iterative DFS with explicit array-based stack
+   - Discovery/finish timestamps d[]/f[], scan_idx[] for neighbor tracking
+   - DFS forest: outer loop starts from each unvisited vertex
+
+4. **BST** → `CLRS.Ch12.BST.Delete.fst` (506 lines, 12 admits)
+   - TREE-MINIMUM (walk left), TREE-MAXIMUM (walk right)
+   - TREE-DELETE: 3 cases (leaf, one child, two children with in-order successor swap)
