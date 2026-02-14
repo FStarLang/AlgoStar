@@ -75,7 +75,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 ### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
 - [x] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
 - [x] P0.5.2: Implement TREE-MAXIMUM(x): walk right children until x.right == NIL (CLRS §12.2)
-- [ ] P0.5.3: Implement TRANSPLANT(T, u, v): N/A for array representation, handled inline
+- [x] P0.5.3: Implement TRANSPLANT(T, u, v): N/A for array representation, handled inline in TREE-DELETE
 - [x] P0.5.4: Implement TREE-DELETE(T, z): all 3 cases — no children, one child, two children (CLRS §12.3)
 - [x] P0.5.5: Prove BST property maintained after TREE-DELETE — bst_delete_valid in BST.Spec.Complete.fst
 - [ ] P0.5.6: Prove key set after delete = old keys minus deleted key
@@ -131,8 +131,8 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P1.4.3: Prove BST property maintained after insert (needs ghost bounds in loop invariant)
 - [x] P1.4.4: Prove set of keys is `old_keys ∪ {new_key}`
 - [ ] P1.4.5: Add ghost tick counter; prove O(h) where h is tree height
-- [ ] P1.4.6: ~~Implement TREE-DELETE (CLRS §12.3)~~ → Moved to P0.5.4
-- [ ] P1.4.7: ~~Prove BST property maintained after delete~~ → Moved to P0.5.5
+- [x] P1.4.6: ~~Implement TREE-DELETE (CLRS §12.3)~~ → Done as P0.5.4
+- [x] P1.4.7: ~~Prove BST property maintained after delete~~ → Done as P0.5.5
 
 ### P1.5 KMP Matcher (Ch32) — Complete the search
 - [x] P1.5.1: Define pure spec for KMP match positions: `matches_at`, `check_match_at`, `count_matches_spec`
