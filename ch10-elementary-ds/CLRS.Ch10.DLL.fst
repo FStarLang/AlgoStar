@@ -105,6 +105,94 @@ let dls_factored_next
         dls np (r0 :: rs) (Some p) tail last_ptr **
         pure (v_next == Some np)
 
+// When v_next==None and last_ptr==None: singleton
+ghost
+fn factored_next_none_nil
+  (p: box node)
+  (#l: erased (list int) {Cons? l})
+  (#tail: erased (box node))
+  preserves dls_factored_next p l tail None None
+  ensures pure (L.tl l == ([] #int))
+{
+  let hd = L.hd l;
+  let tl = L.tl l;
+  match tl {
+    [] -> { () }
+    y :: ys -> {
+      rewrite each l as (hd :: y :: ys) in
+        (dls_factored_next p l tail None None);
+      unfold (dls_factored_next p (hd :: y :: ys) tail None None);
+      // pure (None == Some np) → contradiction
+      unreachable ()
+    }
+  }
+}
+
+// When v_next==Some np and last_ptr==None: multi-element
+ghost
+fn factored_next_some_cons
+  (p: box node) (np: box node)
+  (#l: erased (list int) {Cons? l})
+  (#tail: erased (box node))
+  preserves dls_factored_next p l tail None (Some np)
+  ensures pure (Cons? (L.tl l))
+{
+  let hd = L.hd l;
+  let tl = L.tl l;
+  match tl {
+    [] -> {
+      rewrite each l as [hd] in
+        (dls_factored_next p l tail None (Some np));
+      unfold (dls_factored_next p [hd] tail None (Some np));
+      // pure (Some np == None) → contradiction
+      unreachable ()
+    }
+    y :: ys -> { () }
+  }
+}
+
+// Extract tail dls from factored_next (multi-element case)
+ghost
+fn elim_factored_next
+  (p: box node) (np: box node)
+  (#l: erased (list int) {Cons? l /\ Cons? (L.tl l)})
+  (#tail: erased (box node))
+  (#last_ptr: erased dptr)
+  requires dls_factored_next p l tail last_ptr (Some np)
+  ensures dls np (L.tl l) (Some p) tail last_ptr
+{
+  let hd = L.hd l;
+  let r0 = L.hd (L.tl l);
+  let rs = L.tl (L.tl l);
+  rewrite each l as (hd :: r0 :: rs) in
+    (dls_factored_next p l tail last_ptr (Some np));
+  unfold (dls_factored_next p (hd :: r0 :: rs) tail last_ptr (Some np));
+  with np'. _;
+  rewrite each np' as np;
+  rewrite each (r0 :: rs) as (L.tl l);
+  rewrite each (hd :: r0 :: rs) as l
+}
+
+// Reinsert tail dls into factored_next
+ghost
+fn intro_factored_next
+  (p: box node) (np: box node)
+  (#l: erased (list int) {Cons? l /\ Cons? (L.tl l)})
+  (#tail: erased (box node))
+  (#last_ptr: erased dptr)
+  requires dls np (L.tl l) (Some p) tail last_ptr
+  ensures dls_factored_next p l tail last_ptr (Some np)
+{
+  let hd = L.hd l;
+  let r0 = L.hd (L.tl l);
+  let rs = L.tl (L.tl l);
+  rewrite each (L.tl l) as (r0 :: rs) in
+    (dls np (L.tl l) (Some p) tail last_ptr);
+  rewrite each l as (hd :: r0 :: rs);
+  fold (dls_factored_next p (hd :: r0 :: rs) tail last_ptr (Some np));
+  rewrite each (hd :: r0 :: rs) as l
+}
+
 let dls_factored
   ([@@@mkey] p: box node) (l: list int {Cons? l})
   (prev_ptr: dptr) (tail: box node) (last_ptr: dptr)
@@ -256,49 +344,49 @@ fn list_insert (hd_ref tl_ref: ref dptr) (x: int)
 
 // --- LIST-SEARCH ---
 
-// Search a DLS segment. Uses factor/unfactor to read head node,
-// then recurses on the tail if present.
+// Search within DLS segment (last_ptr=None, i.e., full DLL or sub-segment).
+// Factor to read head node, use ghost helpers to determine
+// singleton vs multi-element, recurse.
 fn rec search_dls
   (p: box node) (k: int)
   (#l: erased (list int) {Cons? l})
   (#prev_ptr: erased dptr)
   (#tail: erased (box node))
-  (#last_ptr: erased dptr)
-  preserves dls p l prev_ptr tail last_ptr
+  preserves dls p l prev_ptr tail None
   returns found: bool
   ensures pure (found <==> L.mem k l)
 {
-  // Factor to read head node without knowing list structure
-  factor_dls p l prev_ptr tail last_ptr;
-  unfold (dls_factored p l prev_ptr tail last_ptr);
+  factor_dls p l prev_ptr tail None;
+  unfold (dls_factored p l prev_ptr tail None);
   with v. assert (pts_to p v);
   let nd = Box.(!p);
   let nxt = nd.next;
   if (nd.key = k) {
-    // Found! Refold everything.
     rewrite each nd.next as v.next;
-    fold (dls_factored p l prev_ptr tail last_ptr);
-    unfactor_dls p l prev_ptr tail last_ptr;
+    fold (dls_factored p l prev_ptr tail None);
+    unfactor_dls p l prev_ptr tail None;
     true
   } else {
     match nxt {
       norewrite None -> {
-        // nd.next == None: singleton (sound when last_ptr==None)
-        assume_ (pure (L.tl l == ([] #int)));
+        // nd.next == None with last_ptr == None => singleton
         rewrite each nd.next as v.next;
-        fold (dls_factored p l prev_ptr tail last_ptr);
-        unfactor_dls p l prev_ptr tail last_ptr;
+        factored_next_none_nil p;
+        fold (dls_factored p l prev_ptr tail None);
+        unfactor_dls p l prev_ptr tail None;
         false
       }
       norewrite Some np -> {
-        // nd.next == Some np: multi-element, extract tail, recurse, reassemble
-        assume_ (pure (Cons? (L.tl l)));
-        assume_ (dls np (L.tl l) (Some p) tail last_ptr);
-        drop_ (pts_to p v);
-        drop_ (dls_factored_next p l tail last_ptr nd.next);
+        // nd.next == Some np with last_ptr == None => multi-element
+        rewrite each nd.next as v.next;
+        factored_next_some_cons p np;
+        // Extract tail segment, recurse, reinsert
+        elim_factored_next p np;
         let r = search_dls np k;
-        assume_ (dls p l prev_ptr tail last_ptr);
-        drop_ (dls np (L.tl l) (Some p) tail last_ptr);
+        intro_factored_next p np;
+        rewrite each (Some np) as v.next;
+        fold (dls_factored p l prev_ptr tail None);
+        unfactor_dls p l prev_ptr tail None;
         r
       }
     }
