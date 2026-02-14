@@ -150,6 +150,10 @@ let lemma_triangle_step (n: nat)
   : Lemma (triangle n + (n + 1) == triangle (n + 1))
   = ()
 
+// ========== Complexity bound predicate ==========
+let rod_cutting_bounded (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == triangle n
+
 // ========== Main Implementation with Complexity ==========
 
 open Pulse.Lib.BoundedIntegers
@@ -159,8 +163,11 @@ fn rod_cutting_complexity
   (prices: A.array int)
   (n: SZ.t)
   (#s_prices: erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to prices #p s_prices **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n == Seq.length s_prices /\
       SZ.v n == A.length prices /\
@@ -169,14 +176,17 @@ fn rod_cutting_complexity
       (forall (i: nat). i < Seq.length s_prices ==> Seq.index s_prices i >= 0)
     )
   returns result: int
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to prices #p s_prices **
-    pure (result == optimal_revenue s_prices (SZ.v n))
+    GR.pts_to ctr cf **
+    pure (
+      result == optimal_revenue s_prices (SZ.v n) /\
+      rod_cutting_bounded cf (reveal c0) (SZ.v n)
+    )
 {
   let n_plus_1 = n + 1sz;
   let r = V.alloc 0 n_plus_1;
   let mut j: SZ.t = 1sz;
-  let ctr = GR.alloc #nat 0;
 
   while (!j <=^ n)
   invariant exists* vj sr (vc : nat).
@@ -191,8 +201,9 @@ fn rod_cutting_complexity
       V.length r == Seq.length sr /\
       dp_correct s_prices sr (SZ.v vj - 1) /\
       (forall (k: nat). k < Seq.length sr ==> Seq.index sr k >= 0) /\
-      // Complexity: vc == triangle(vj - 1) = 1+2+...+(vj-1)
-      vc == triangle (SZ.v vj - 1)
+      // Complexity: vc == c0 + triangle(vj - 1)
+      vc >= reveal c0 /\
+      vc - reveal c0 == triangle (SZ.v vj - 1)
     )
   {
     let vj = !j;
@@ -219,7 +230,8 @@ fn rod_cutting_complexity
         (forall (k: nat). k < Seq.length sr_inner ==> Seq.index sr_inner k >= 0) /\
         vq == accum_max s_prices sr_inner (SZ.v vj) (SZ.v vi - 1) /\
         // Complexity: inner ticks track i-1 within this j-iteration
-        vc_inner == triangle (SZ.v vj - 1) + (SZ.v vi - 1)
+        vc_inner >= reveal c0 /\
+        vc_inner - reveal c0 == triangle (SZ.v vj - 1) + (SZ.v vi - 1)
       )
     {
       let vi = !i;
@@ -244,17 +256,12 @@ fn rod_cutting_complexity
     V.op_Array_Assignment r vj final_q;
     with sr_new. assert (V.pts_to r sr_new);
 
-    // After inner loop: vc == triangle(vj-1) + vj == triangle(vj)
+    // After inner loop: vc - c0 == triangle(vj-1) + vj == triangle(vj)
     lemma_triangle_step (SZ.v vj - 1);
 
     j := vj + 1sz;
   };
 
-  // At exit: vc == triangle(n) == n*(n+1)/2
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == triangle (SZ.v n)));
-
-  GR.free ctr;
   let result = V.op_Array_Access r n;
   V.free r;
   result

@@ -119,6 +119,10 @@ let lemma_table_size_positive (m n: nat)
 
 open Pulse.Lib.BoundedIntegers
 
+// Complexity bound predicate
+let lcs_complexity_bounded (cf c0 m n: nat) : prop =
+  cf >= c0 /\ cf - c0 == op_Multiply (m + 1) (n + 1)
+
 // ========== Main Implementation with Complexity ==========
 
 fn lcs_complexity
@@ -128,9 +132,12 @@ fn lcs_complexity
   (m: SZ.t)
   (n: SZ.t)
   (#sx #sy: erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to x #px sx **
     A.pts_to y #py sy **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v m == Seq.length sx /\
       SZ.v m == A.length x /\
@@ -140,10 +147,14 @@ fn lcs_complexity
       SZ.fits (op_Multiply (SZ.v m + 1) (SZ.v n + 1))
     )
   returns result: int
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to x #px sx **
     A.pts_to y #py sy **
-    pure (result == lcs_length sx sy (SZ.v m) (SZ.v n))
+    GR.pts_to ctr cf **
+    pure (
+      result == lcs_length sx sy (SZ.v m) (SZ.v n) /\
+      lcs_complexity_bounded cf (reveal c0) (SZ.v m) (SZ.v n)
+    )
 {
   let m_plus_1 = m + 1sz;
   let n_plus_1 = n + 1sz;
@@ -151,7 +162,6 @@ fn lcs_complexity
   lemma_table_size_positive (SZ.v m) (SZ.v n);
   let table = V.alloc 0 table_size;
   let mut i: SZ.t = 0sz;
-  let ctr = GR.alloc #nat 0;
 
   while (!i <=^ m)
   invariant exists* vi stable (vc : nat).
@@ -165,8 +175,9 @@ fn lcs_complexity
       Seq.length stable == op_Multiply (SZ.v m + 1) (SZ.v n + 1) /\
       V.length table == Seq.length stable /\
       lcs_table_correct sx sy stable (SZ.v m) (SZ.v n) (SZ.v vi) 0 /\
-      // Complexity: vc == vi * (n+1)
-      vc == op_Multiply (SZ.v vi) (SZ.v n + 1)
+      // Complexity: vc == c0 + vi * (n+1)
+      vc >= reveal c0 /\
+      vc - reveal c0 == op_Multiply (SZ.v vi) (SZ.v n + 1)
     )
   {
     let vi = !i;
@@ -186,8 +197,9 @@ fn lcs_complexity
         Seq.length stable_inner == op_Multiply (SZ.v m + 1) (SZ.v n + 1) /\
         V.length table == Seq.length stable_inner /\
         lcs_table_correct sx sy stable_inner (SZ.v m) (SZ.v n) (SZ.v vi) (SZ.v vj) /\
-        // Complexity: vc == vi*(n+1) + vj
-        vc_inner == op_Multiply (SZ.v vi) (SZ.v n + 1) + SZ.v vj
+        // Complexity: vc == c0 + vi*(n+1) + vj
+        vc_inner >= reveal c0 /\
+        vc_inner - reveal c0 == op_Multiply (SZ.v vi) (SZ.v n + 1) + SZ.v vj
       )
     {
       let vj = !j;
@@ -233,11 +245,6 @@ fn lcs_complexity
     i := vi + 1sz;
   };
 
-  // At exit: vc == (m+1)*(n+1)
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == op_Multiply (SZ.v m + 1) (SZ.v n + 1)));
-
-  GR.free ctr;
   let result_idx = m *^ (n + 1sz) + n;
   lemma_index_in_bounds (SZ.v m) (SZ.v n) (SZ.v m) (SZ.v n);
   let result = V.op_Array_Access table result_idx;

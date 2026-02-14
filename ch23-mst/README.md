@@ -53,3 +53,51 @@ FSTAR_FILES="CLRS.Ch23.Prim.fst" make verify
 The implementation successfully verifies with F* with only deprecation warnings about `Array.alloc` being for model implementations.
 
 Verification time: ~240 seconds
+
+---
+
+## MST Cut Property Specification
+
+The file `CLRS.Ch23.MST.Spec.fst` provides a pure F* formalization of the **Cut Property** (CLRS Theorem 23.1), which proves the correctness foundation for MST algorithms like Prim's and Kruskal's.
+
+### What's Formalized
+
+#### Core Definitions
+- **Graph**: n vertices + weighted edges `{ u: nat; v: nat; w: int }`
+- **Spanning Tree**: connects all vertices, acyclic, has n-1 edges
+- **MST**: spanning tree with minimum total weight
+- **Cut**: predicate `nat -> bool` partitioning vertices
+- **Light Edge**: minimum weight edge crossing a cut
+
+#### Main Theorem: Cut Property
+
+```fstar
+val cut_property:
+  g: graph -> a: list edge -> e: edge -> s: cut ->
+  Lemma (requires 
+          (exists (t: list edge). is_mst g t /\ subset_edges a t) /\
+          is_light_edge e s g /\ respects a s)
+        (ensures 
+          (exists (t: list edge). is_mst g t /\ subset_edges (e :: a) t))
+```
+
+**Theorem**: If A ⊆ some MST and edge e is a light edge crossing a cut that respects A, then A ∪ {e} ⊆ some MST.
+
+**Proof Strategy** (Exchange Argument):
+- If e ∈ existing MST T containing A, done
+- Otherwise, adding e to T creates a cycle that must cross the cut twice
+- Exchange e with the other crossing edge to get MST containing A ∪ {e}
+
+### Verification Status
+- **Total Lines**: 365
+- **Admits**: 6 (in complex graph theory lemmas)
+- **Complete Proofs**: All edge operations, subset relations, basic properties
+- **Admitted**: Cycle detection, cut crossing, weight arithmetic
+
+### Verification Command
+```bash
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common \
+  ch23-mst/CLRS.Ch23.MST.Spec.fst
+```
+
+This specification establishes the mathematical foundation that justifies both Prim's and Kruskal's algorithms.

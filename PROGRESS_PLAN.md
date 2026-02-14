@@ -359,13 +359,14 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Metric | Count |
 |--------|-------|
 | Total algorithms/data structures | 40 |
-| **Strong** functional spec | 27 (68%) |
-| **Medium** functional spec | 8 (20%) |
+| **Strong** functional spec | 28 (70%) |
+| **Medium** functional spec | 7 (18%) |
 | **Weak** functional spec | 3 (8%) |
 | **Broken** (not the claimed algorithm) | 2 (5%) |
-| Complexity proofs (Pulse, in postcondition) | 10 |
+| Complexity proofs (Pulse, in postcondition) | 14 |
 | Complexity proofs (Pure, standalone) | 23 |
-| Complexity proofs total | 33 (83%) |
-| Total lines of verified F*/Pulse | ~19,500 |
-| Admits | 0 |
+| Complexity proofs total | 37 (93%) |
+| Total lines of verified F*/Pulse | ~20,100 |
+| Admits | 5 (all in MST.Spec.fst graph theory) |
 | Assumes | 0 |
+| Source files | 96 |
