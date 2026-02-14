@@ -425,6 +425,155 @@ let rec bst_minimum_in_tree (t: bst)
             ()
         | None -> ()
 
+// Helper: if all elements are < bound and x is a member, then x < bound
+let rec lemma_all_less_implies_mem_less (bound x: int) (xs: list int)
+  : Lemma
+    (requires all_less bound xs /\ mem x xs)
+    (ensures x < bound)
+  = match xs with
+    | [] -> ()
+    | y :: ys -> 
+        if x = y then ()
+        else lemma_all_less_implies_mem_less bound x ys
+
+// Helper: all_greater is transitive with list elements
+let rec lemma_all_greater_transitive (bound1 bound2: int) (xs: list int)
+  : Lemma
+    (requires all_greater bound2 xs /\ bound2 > bound1)
+    (ensures all_greater bound1 xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> 
+        // x > bound2 from assumption, and bound2 > bound1
+        // Therefore x > bound1 by transitivity
+        lemma_all_greater_transitive bound1 bound2 xs'
+
+// Helper: all_greater on filtered list
+let rec lemma_all_greater_filter (bound: int) (xs: list int)
+  : Lemma (requires all_less bound xs)
+          (ensures all_less bound (FStar.List.Tot.filter (fun x -> x <> bound) xs))
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> lemma_all_greater_filter bound xs'
+
+// Helper: filtered list membership
+let rec lemma_filter_mem (x y: int) (xs: list int)
+  : Lemma (mem x (FStar.List.Tot.filter (fun z -> z <> y) xs) <==> (mem x xs /\ x <> y))
+  = match xs with
+    | [] -> ()
+    | z :: zs -> lemma_filter_mem x y zs
+
+// Helper: if no element in xs equals y, then filter is identity
+let rec lemma_filter_identity (y: int) (xs: list int)
+  : Lemma (requires ~(mem y xs))
+          (ensures FStar.List.Tot.filter (fun x -> x <> y) xs == xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> lemma_filter_identity y xs'
+
+// Helper: if all elements in xs are > m, then m is not in xs
+let rec lemma_all_greater_excludes_bound (m: int) (xs: list int)
+  : Lemma (requires all_greater m xs)
+          (ensures ~(mem m xs))
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> lemma_all_greater_excludes_bound m xs'
+
+// Helper: if all elements in xs are > m, then filtered list also has all > m
+let rec lemma_all_greater_on_filter (m: int) (xs: list int)
+  : Lemma (requires all_greater m xs)
+          (ensures all_greater m (FStar.List.Tot.filter (fun x -> x <> m) xs))
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> lemma_all_greater_on_filter m xs'
+
+// Helper: filter distributes over append
+let rec lemma_filter_append (p: int -> bool) (xs ys: list int)
+  : Lemma (FStar.List.Tot.filter p (xs @ ys) == 
+           FStar.List.Tot.filter p xs @ FStar.List.Tot.filter p ys)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> lemma_filter_append p xs' ys
+
+// Helper: filtering out m from a BST tree where m is the minimum
+// Results in all elements being > m
+let rec lemma_filter_all_greater_tree (t: bst) (m: int)
+  : Lemma (requires bst_valid t /\ bst_minimum t = Some m)
+          (ensures all_greater m (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder t)))
+  = match t with
+    | Leaf -> ()
+    | Node Leaf key right ->
+        // m = key
+        // bst_inorder t = [key] @ bst_inorder right
+        // Filter removes key, leaving just bst_inorder right
+        // All elements in right are > key = m
+        assert (m = key);
+        lemma_filter_append (fun x -> x <> m) [key] (bst_inorder right);
+        // filter [key] with (x <> key) = []
+        // So filter (bst_inorder t) = filter (bst_inorder right)
+        // All elements in right are > m from BST validity
+        assert (all_greater m (bst_inorder right));
+        // Since all elements in right > m, m is not in right
+        lemma_all_greater_excludes_bound m (bst_inorder right);
+        assert (~(mem m (bst_inorder right)));
+        // So filter right = right
+        lemma_filter_identity m (bst_inorder right);
+        assert (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder right) == bst_inorder right);
+        ()
+    | Node left key right ->
+        // m = bst_minimum left
+        // By induction on left
+        lemma_filter_all_greater_tree left m;
+        assert (all_greater m (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder left)));
+        
+        // m < key (because m is in left and all of left < key)
+        bst_minimum_in_tree left;
+        lemma_all_less_implies_mem_less key m (bst_inorder left);
+        assert (m < key);
+        
+        // All elements in right are > key, so > m
+        assert (all_greater key (bst_inorder right));
+        lemma_all_greater_transitive m key (bst_inorder right);
+        assert (all_greater m (bst_inorder right));
+        
+        // Now apply filter to bst_inorder t = bst_inorder left @ [key] @ bst_inorder right
+        lemma_filter_append (fun x -> x <> m) (bst_inorder left) ([key] @ bst_inorder right);
+        lemma_filter_append (fun x -> x <> m) [key] (bst_inorder right);
+        
+        // Filter on each part:
+        // - filter left: all > m (by induction)
+        // - key <> m, so filter [key] = [key], and key > m
+        // - no element in right equals m, so filter right = right, and all > m
+        
+        // Since m <> key, filter [key] = [key]
+        assert (key <> m);
+        assert (FStar.List.Tot.filter (fun x -> x <> m) [key] == [key]);
+        
+        // No element in right equals m (since all in right > key > m)
+        lemma_all_greater_excludes_bound m (bst_inorder right);
+        lemma_filter_identity m (bst_inorder right);
+        assert (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder right) == bst_inorder right);
+        
+        // Combine: filtered result = filter left @ [key] @ right
+        // Need to show all > m
+        // filter left: all > m by induction
+        assert (all_greater m (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder left)));
+        
+        // [key] @ right: all > m
+        lemma_append_all_greater m [key] (bst_inorder right);
+        assert (all_greater m ([key] @ bst_inorder right));
+        
+        // So filter [key] @ right = [key] @ right, which is all > m
+        assert (FStar.List.Tot.filter (fun x -> x <> m) ([key] @ bst_inorder right) == 
+                [key] @ bst_inorder right);
+        
+        // Combine
+        lemma_append_all_greater m 
+          (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder left))
+          (FStar.List.Tot.filter (fun x -> x <> m) ([key] @ bst_inorder right));
+        ()
+
+
 // Lemma: bst_minimum returns the smallest element
 let rec bst_minimum_is_minimum (t: bst)
   : Lemma
@@ -446,17 +595,6 @@ let rec lemma_all_greater_implies_mem_greater (bound x: int) (xs: list int)
     | y :: ys -> 
         if x = y then ()
         else lemma_all_greater_implies_mem_greater bound x ys
-
-// Helper: if all elements are < bound and x is a member, then x < bound
-let rec lemma_all_less_implies_mem_less (bound x: int) (xs: list int)
-  : Lemma
-    (requires all_less bound xs /\ mem x xs)
-    (ensures x < bound)
-  = match xs with
-    | [] -> ()
-    | y :: ys -> 
-        if x = y then ()
-        else lemma_all_less_implies_mem_less bound x ys
 
 // Simpler version: minimum of right subtree is greater than all of left
 let rec bst_minimum_greater_than_left (left right: bst) (key: int)
@@ -484,12 +622,48 @@ let rec bst_minimum_greater_than_left (left right: bst) (key: int)
         lemma_all_less_transitive key m (bst_inorder left)
     | None -> ()
 
-// Lemma: minimum is less than all other elements in right subtree
+// Lemma: minimum is less than all other elements in tree after deleting it
 let rec bst_minimum_less_than_rest (t: bst) (m: int)
   : Lemma
     (requires bst_valid t /\ bst_minimum t = Some m)
     (ensures all_greater m (bst_inorder (bst_delete t m)))
-  = admit() // This would require showing minimum property more carefully
+  = match t with
+    | Leaf -> ()  // Can't have minimum in Leaf
+    | Node left key right ->
+        match left with
+        | Leaf -> 
+            // When left is Leaf, m = key (minimum is the root)
+            // After deleting key, we're left with right
+            // Need: all_greater key (bst_inorder right)
+            // We have this from BST validity
+            assert (m = key);
+            assert (bst_delete t m = right);
+            ()
+        | _ -> 
+            // When left is not Leaf, m = bst_minimum left
+            // After deleting m, we get Node (bst_delete left m) key right
+            // Need: all elements in (bst_delete left m), key, and right are > m
+            
+            // By induction: all elements in (bst_delete left m) are > m
+            bst_minimum_less_than_rest left m;
+            assert (all_greater m (bst_inorder (bst_delete left m)));
+            
+            // m is in left, and all elements in left are < key (BST validity)
+            bst_minimum_in_tree left;
+            assert (mem m (bst_inorder left));
+            lemma_all_less_implies_mem_less key m (bst_inorder left);
+            assert (m < key);
+            
+            // So key > m
+            // All elements in right are > key > m
+            assert (all_greater key (bst_inorder right));
+            lemma_all_greater_transitive m key (bst_inorder right);
+            assert (all_greater m (bst_inorder right));
+            
+            // Combine: (bst_delete left m) @ [key] @ right all > m
+            lemma_append_all_greater m (bst_inorder (bst_delete left m)) ([key] @ bst_inorder right);
+            lemma_append_all_greater m [key] (bst_inorder right);
+            ()
 
 // Helper: deleting from subtree preserves all_less bound
 let rec lemma_delete_preserves_bounds_less (t: bst) (k: int) (bound: int)
