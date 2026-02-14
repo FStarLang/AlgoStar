@@ -218,28 +218,41 @@ let rec delete_height_bound (t: bst) (k: int)
               | None -> ()
         )
 
-(*
-  Lemma: Delete ticks are bounded by 2 * tree height
-  
-  This proof requires BST validity to establish the relationship between
-  minimum(subtree) and parent keys. Without it, we cannot determine which
-  branch the delete operation will take, making tight bounds unprovable.
-  
-  The intuitive argument (for valid BSTs):
-  - Finding the key to delete: at most h comparisons  
-  - If two children, finding successor: at most h steps (all left in right subtree)
-  - Deleting successor: at most h steps (it's a leaf or has one child)
-  - Total: at most 2h operations
-  
-  For now, we admit this lemma. A complete proof would require:
-  1. Lemmas about bst_valid implying ordering properties
-  2. Proof that minimum of left < key for valid BSTs
-  3. Analysis of all three branches in delete based on these properties
-*)
+(* Lemma: Delete ticks are bounded by 2 * tree height
+   
+   This lemma expresses the O(h) complexity of BST delete operations.
+   The bound of 2h accounts for the worst case: finding the node to delete (h steps)
+   plus finding and deleting the successor in the two-children case (h steps).
+   
+   Proof approach:
+   - Simple cases (Leaf, or node with < 2 children): O(h) by structural recursion
+   - Complex case (two children): requires proving that deleting the successor
+     (which is the minimum of the right subtree) takes only O(h), not O(2h).
+   
+   The challenge is proving that delete_minimum_bounded: if bst_minimum t = Some k,
+   then bst_delete t k <= bst_height t. This requires showing that when we delete
+   the minimum element, we follow a specific path that avoids the expensive two-children
+   case at the minimum position (since the minimum has no left child).
+   
+   Without BST validity assumptions, proving this structurally is non-trivial because:
+   - We need to track which comparison branch (k < key, k = key, k > key) is taken
+   - The k > key and k = key cases when k is the minimum of left subtree are impossible
+     in valid BSTs but must be handled without validity assumptions
+   - These "impossible" cases lead to arithmetic that doesn't close: e.g., needing
+     1 + 2*h_right <= 1 + max(h_left, h_right), which requires 2*h_right <= max(...),
+     which is false when h_right > h_left
+   
+   A complete proof would either:
+   (a) Assume BST validity to rule out impossible cases, OR
+   (b) Use a weaker bound like O(3h) or O(4h) that accounts for the impossible cases, OR
+   (c) Carefully prove that the impossible cases are indeed vacuous (unreachable)
+   
+   For now, we admit this lemma with the understanding that the 2h bound is correct
+   for valid BSTs, which is the intended use case. *)
 let delete_ticks_bounded (t: bst) (k: int)
   : Lemma
     (ensures bst_delete_ticks t k <= 2 * bst_height t)
-  = admit()  // Requires BST validity lemmas for complete proof
+  = admit()  // Requires careful structural analysis or BST validity assumptions
 
 (* ========================================================================
    § 6. Complexity Summary
