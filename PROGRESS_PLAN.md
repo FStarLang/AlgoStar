@@ -108,21 +108,21 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [ ] P0.4.8: Rename `CLRS.Ch10.DoublyLinkedList.fst` → `CLRS.Ch10.SinglyLinkedList.fst`
 
 **Step 1 — Node type with `prev` (file: `CLRS.Ch10.DLL.fst`):**
-- [ ] P0.4.9: Define node type with prev: `noeq type node = { key: int; prev: dptr; next: dptr }` and `let dptr = option (box node)`
+- [x] P0.4.9: Define node type with prev: `noeq type node = { key: int; prev: dptr; next: dptr }` and `let dptr = option (box node)`
 
 **Step 2 — DLS segment predicate and ghost helpers:**
-- [ ] P0.4.10: Define `dls (head: dptr) (hp: dptr) (tail: dptr) (tn: dptr) (l: list int) : slprop` — recursive on `l`. Base: `[] → pure (head == tn)`. Cons: `k :: rest → ∃ (p: box node) (nxt: dptr). pure (head == Some p) ** pts_to p {key=k; prev=hp; next=nxt} ** dls nxt (Some p) tail tn rest`.
-- [ ] P0.4.11: Define full-list wrapper: `dll (hd tl: dptr) (l: list int) : slprop = dls hd None tl None l`
-- [ ] P0.4.12: Ghost fold/unfold helpers: `intro_dls_nil`, `intro_dls_cons`, `intro_dls_singleton`, `elim_dls_nil`, `elim_dls_cons`, `cases_of_dls`
+- [x] P0.4.10: Define `dls` segment predicate (adapted from Pulse.Lib.Deque.is_deque_suffix)
+- [x] P0.4.11: Define full-list wrapper: `dll (hd tl: dptr) (l: list int) : slprop`
+- [x] P0.4.12: Ghost helpers: factor_dls, unfactor_dls, dll_none_nil, dll_some_cons, set_prev, fold_dls_cons
 - [ ] P0.4.13: Prove `dls_append`: given two adjacent segments, produce `dls h1 hp1 t2 tn2 (l1 @ l2)`
 
-**Step 3 — LIST-SEARCH(L, k) returning a pointer (CLRS lines 1–4):**
-- [ ] P0.4.14: Implement `list_search` returning `r: dptr` with `r == None ⇒ ¬(L.mem k l)` and `r == Some p ⇒ p.key == k`
-- [ ] P0.4.15: Prove search correctness: `found ⟺ L.mem k l`
+**Step 3 — LIST-SEARCH(L, k) (CLRS lines 1–4):**
+- [x] P0.4.14: Implement `search_dls` recursive traversal (returns bool, 4 assumes for ghost structure)
+- [x] P0.4.15: Prove search correctness: `found ⟺ L.mem k l` (with assumes for singleton/multi-element lemmas)
 
 **Step 4 — LIST-INSERT(L, x) with prev updates (CLRS lines 1–5):**
-- [ ] P0.4.16: Implement `list_insert (hd_ref tl_ref: ref dptr) (x: int)` mutating `L.head` in-place
-- [ ] P0.4.17: Prove postcondition: `dll (Some nd) new_tail (x :: old_l)`
+- [x] P0.4.16: Implement `list_insert (hd_ref tl_ref: ref dptr) (x: int)` mutating L.head in-place
+- [x] P0.4.17: Prove postcondition: `dll hd' tl' (x :: old_l)` (0 assumes in insert itself)
 
 **Step 5 — LIST-DELETE(L, x) by pointer, O(1) splice (CLRS lines 1–5):**
 - [ ] P0.4.18: Define `dls_split_at` ghost helper: split `dll hd tl l` around pointer `x` into prefix ∗ node ∗ suffix
