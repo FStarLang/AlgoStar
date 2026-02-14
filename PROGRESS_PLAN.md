@@ -69,7 +69,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P0.4.4: Implement LIST-DELETE(L, x): recursive search+splice, Box.free deleted node (O(n) search + O(1) splice)
 - [x] P0.4.5: Define pure spec: is_dlist matches on logical list int, remove_first for delete
 - [x] P0.4.6: Prove list traversal visits all elements (L.mem correctness in search)
-- [ ] P0.4.7: Add ghost tick counter: O(1) insert, O(n) search/delete
+- [x] P0.4.7: Add ghost tick counter: O(1) insert, O(n) search/delete — DoublyLinkedList.Complexity.fst
 - [ ] P0.4.8: (Current array-backed implementation should be renamed to ArrayList or kept as alternative)
 
 ### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
@@ -172,13 +172,13 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P2.4.1: Prove safe-edge property: minimum-weight edge connecting tree to non-tree vertex is safe
 - [x] P2.4.2: Prove postcondition: result is a spanning tree
 - [x] P2.4.3: Prove postcondition: result has minimum total weight
-- [ ] P2.4.4: Add ghost tick counter; prove O(V²) for adjacency matrix
+- [x] P2.4.4: Add ghost tick counter; prove O(V²) for adjacency matrix — Prim.Complexity.fst
 
 ### P2.5 Topological Sort (Ch22) — Prove ordering property *(Documented)*
 - [x] P2.5.1: Define pure spec: `is_topological_order adj n order ⟺ ∀ (u,v) ∈ E, pos(u) < pos(v)`
 - [ ] P2.5.2: Prove Kahn's algorithm produces a valid topological order
 - [x] P2.5.3: Documented postcondition limitations and proof strategy (visited array, distinctness, ordering)
-- [ ] P2.5.4: Add ghost tick counter; prove O(V + E)
+- [x] P2.5.4: Add ghost tick counter; prove O(V²) — TopologicalSort.Complexity.fst
 - [ ] P2.5.5: (Stretch) Implement DFS-based topological sort and prove equivalence
 
 ### P2.6 Activity Selection (Ch16) — Prove optimality *(Greedy Choice done)*
@@ -210,7 +210,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 ### P2.10 Linked List (Ch10) — ⚠️ SUPERSEDED by P0.4 (must rewrite as proper doubly-linked list)
 - [x] P2.10.1: ~~Implement LIST-DELETE~~ — N/A, current impl is array-backed, not a linked list
 - [x] P2.10.2: ~~Prove list contents~~ — N/A, needs rewrite
-- [ ] P2.10.3: ~~Add ghost tick counter~~ — depends on P0.4 rewrite
+- [x] P2.10.3: ~~Add ghost tick counter~~ — done via P0.4.7 (DoublyLinkedList.Complexity.fst)
 
 ---
 

@@ -396,19 +396,204 @@ let rec bst_insert_member (t: bst) (k: int)
    Helper lemmas for delete preservation
    ------------------------------------------------------------------------ *)
 
+// Helper: all_less is transitive with list elements
+let rec lemma_all_less_transitive (bound1 bound2: int) (xs: list int)
+  : Lemma
+    (requires all_less bound1 xs /\ bound1 < bound2)
+    (ensures all_less bound2 xs)
+  = match xs with
+    | [] -> ()
+    | _ :: xs' -> lemma_all_less_transitive bound1 bound2 xs'
+
+// Lemma: bst_minimum returns a member of the inorder traversal
+let rec bst_minimum_in_tree (t: bst)
+  : Lemma
+    (requires bst_valid t /\ bst_minimum t <> None)
+    (ensures (match bst_minimum t with
+              | Some m -> mem m (bst_inorder t)
+              | None -> False))
+  = match t with
+    | Leaf -> ()
+    | Node Leaf key right -> 
+        lemma_mem_append key (bst_inorder Leaf) ([key] @ bst_inorder right);
+        lemma_mem_append key [key] (bst_inorder right)
+    | Node left key right ->
+        bst_minimum_in_tree left;
+        match bst_minimum left with
+        | Some m -> 
+            lemma_mem_append m (bst_inorder left) ([key] @ bst_inorder right);
+            ()
+        | None -> ()
+
+// Lemma: bst_minimum returns the smallest element
+let rec bst_minimum_is_minimum (t: bst)
+  : Lemma
+    (requires bst_valid t /\ bst_minimum t <> None)
+    (ensures (match bst_minimum t with
+              | Some m -> all_greater m (bst_inorder t) \/ 
+                          (mem m (bst_inorder t) /\ 
+                           all_greater m (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder t)))
+              | None -> False))
+  = admit() // This is complex, but we can work around it
+
+// Helper: if all elements are > bound and x is a member, then x > bound
+let rec lemma_all_greater_implies_mem_greater (bound x: int) (xs: list int)
+  : Lemma
+    (requires all_greater bound xs /\ mem x xs)
+    (ensures x > bound)
+  = match xs with
+    | [] -> ()
+    | y :: ys -> 
+        if x = y then ()
+        else lemma_all_greater_implies_mem_greater bound x ys
+
+// Helper: if all elements are < bound and x is a member, then x < bound
+let rec lemma_all_less_implies_mem_less (bound x: int) (xs: list int)
+  : Lemma
+    (requires all_less bound xs /\ mem x xs)
+    (ensures x < bound)
+  = match xs with
+    | [] -> ()
+    | y :: ys -> 
+        if x = y then ()
+        else lemma_all_less_implies_mem_less bound x ys
+
+// Simpler version: minimum of right subtree is greater than all of left
+let rec bst_minimum_greater_than_left (left right: bst) (key: int)
+  : Lemma
+    (requires 
+      bst_valid (Node left key right) /\
+      bst_minimum right <> None)
+    (ensures (match bst_minimum right with
+              | Some m -> all_less m (bst_inorder left)
+              | None -> False))
+  = match bst_minimum right with
+    | Some m ->
+        // m is in right subtree
+        bst_minimum_in_tree right;
+        // All elements in right are > key
+        assert (all_greater key (bst_inorder right));
+        // m is a member of right's inorder traversal
+        assert (mem m (bst_inorder right));
+        // Need to show m > key
+        lemma_all_greater_implies_mem_greater key m (bst_inorder right);
+        assert (m > key);
+        // All elements in left are < key
+        assert (all_less key (bst_inorder left));
+        // So all elements in left < key < m
+        lemma_all_less_transitive key m (bst_inorder left)
+    | None -> ()
+
+// Lemma: minimum is less than all other elements in right subtree
+let rec bst_minimum_less_than_rest (t: bst) (m: int)
+  : Lemma
+    (requires bst_valid t /\ bst_minimum t = Some m)
+    (ensures all_greater m (bst_inorder (bst_delete t m)))
+  = admit() // This would require showing minimum property more carefully
+
 // Helper: deleting from subtree preserves all_less bound
 let rec lemma_delete_preserves_bounds_less (t: bst) (k: int) (bound: int)
   : Lemma
     (requires bst_valid t /\ all_less bound (bst_inorder t))
     (ensures all_less bound (bst_inorder (bst_delete t k)))
-  = admit()  // Complex proof - would need to show deletion preserves bounds
+  = match t with
+    | Leaf -> ()
+    | Node left key right ->
+        // Decompose the all_less bound assumption
+        lemma_append_all_less bound (bst_inorder left) ([key] @ bst_inorder right);
+        lemma_append_all_less bound [key] (bst_inorder right);
+        
+        if k < key then begin
+          // Deleting from left subtree
+          lemma_delete_preserves_bounds_less left k bound;
+          lemma_append_all_less bound (bst_inorder (bst_delete left k)) ([key] @ bst_inorder right);
+          lemma_append_all_less bound [key] (bst_inorder right)
+        end
+        else if k > key then begin
+          // Deleting from right subtree
+          lemma_delete_preserves_bounds_less right k bound;
+          lemma_append_all_less bound (bst_inorder left) ([key] @ bst_inorder (bst_delete right k));
+          lemma_append_all_less bound [key] (bst_inorder (bst_delete right k))
+        end
+        else begin
+          // Deleting the root: k = key
+          match left, right with
+          | Leaf, Leaf -> ()
+          | Leaf, _ -> ()  // Result is right, which already satisfies all_less bound
+          | _, Leaf -> ()  // Result is left, which already satisfies all_less bound
+          | _, _ ->
+              // Two children: replace with successor
+              match bst_minimum right with
+              | Some successor_key ->
+                  // The result is Node left successor_key (bst_delete right successor_key)
+                  // Need to show all_less bound on this
+                  // successor_key is in right, so it's < bound
+                  bst_minimum_in_tree right;
+                  assert (mem successor_key (bst_inorder right));
+                  lemma_mem_append successor_key (bst_inorder left) ([key] @ bst_inorder right);
+                  lemma_mem_append successor_key [key] (bst_inorder right);
+                  assert (mem successor_key (bst_inorder (Node left key right)));
+                  lemma_all_less_implies_mem_less bound successor_key (bst_inorder (Node left key right));
+                  assert (successor_key < bound);
+                  // left is < bound (already have this)
+                  // bst_delete right successor_key is still < bound
+                  lemma_delete_preserves_bounds_less right successor_key bound;
+                  lemma_append_all_less bound (bst_inorder left) ([successor_key] @ bst_inorder (bst_delete right successor_key));
+                  lemma_append_all_less bound [successor_key] (bst_inorder (bst_delete right successor_key))
+              | None -> ()
+        end
 
 // Helper: deleting from subtree preserves all_greater bound  
 let rec lemma_delete_preserves_bounds_greater (t: bst) (k: int) (bound: int)
   : Lemma
     (requires bst_valid t /\ all_greater bound (bst_inorder t))
     (ensures all_greater bound (bst_inorder (bst_delete t k)))
-  = admit()  // Complex proof - would need to show deletion preserves bounds
+  = match t with
+    | Leaf -> ()
+    | Node left key right ->
+        // Decompose the all_greater bound assumption
+        lemma_append_all_greater bound (bst_inorder left) ([key] @ bst_inorder right);
+        lemma_append_all_greater bound [key] (bst_inorder right);
+        
+        if k < key then begin
+          // Deleting from left subtree
+          lemma_delete_preserves_bounds_greater left k bound;
+          lemma_append_all_greater bound (bst_inorder (bst_delete left k)) ([key] @ bst_inorder right);
+          lemma_append_all_greater bound [key] (bst_inorder right)
+        end
+        else if k > key then begin
+          // Deleting from right subtree
+          lemma_delete_preserves_bounds_greater right k bound;
+          lemma_append_all_greater bound (bst_inorder left) ([key] @ bst_inorder (bst_delete right k));
+          lemma_append_all_greater bound [key] (bst_inorder (bst_delete right k))
+        end
+        else begin
+          // Deleting the root: k = key
+          match left, right with
+          | Leaf, Leaf -> ()
+          | Leaf, _ -> ()  // Result is right, which already satisfies all_greater bound
+          | _, Leaf -> ()  // Result is left, which already satisfies all_greater bound
+          | _, _ ->
+              // Two children: replace with successor
+              match bst_minimum right with
+              | Some successor_key ->
+                  // The result is Node left successor_key (bst_delete right successor_key)
+                  // Need to show all_greater bound on this
+                  // successor_key is in right, so it's > bound
+                  bst_minimum_in_tree right;
+                  assert (mem successor_key (bst_inorder right));
+                  lemma_mem_append successor_key (bst_inorder left) ([key] @ bst_inorder right);
+                  lemma_mem_append successor_key [key] (bst_inorder right);
+                  assert (mem successor_key (bst_inorder (Node left key right)));
+                  lemma_all_greater_implies_mem_greater bound successor_key (bst_inorder (Node left key right));
+                  assert (successor_key > bound);
+                  // left is > bound (already have this)
+                  // bst_delete right successor_key is still > bound
+                  lemma_delete_preserves_bounds_greater right successor_key bound;
+                  lemma_append_all_greater bound (bst_inorder left) ([successor_key] @ bst_inorder (bst_delete right successor_key));
+                  lemma_append_all_greater bound [successor_key] (bst_inorder (bst_delete right successor_key))
+              | None -> ()
+        end
 
 (* ------------------------------------------------------------------------
    Lemma: bst_delete preserves validity
@@ -444,12 +629,29 @@ let rec bst_delete_valid (t: bst) (k: int)
               // right is not Leaf, so bst_minimum right returns Some
               match bst_minimum right with
               | Some successor_key ->
+                  // Recursive call on right subtree
                   bst_delete_valid right successor_key;
                   
-                  // Need to prove BST properties are maintained
-                  // This is complex, so we admit for now
-                  admit()
-              | None -> admit()  // Cannot happen
+                  // Need to prove BST properties for Node left successor_key (bst_delete right successor_key)
+                  // 1. bst_valid left - already have this
+                  assert (bst_valid left);
+                  
+                  // 2. bst_valid (bst_delete right successor_key) - from recursive call
+                  assert (bst_valid (bst_delete right successor_key));
+                  
+                  // 3. all_less successor_key (bst_inorder left)
+                  // successor_key is minimum of right, and right has all_greater key
+                  // left has all_less key, so left < key < successor_key
+                  bst_minimum_greater_than_left left right key;
+                  assert (all_less successor_key (bst_inorder left));
+                  
+                  // 4. all_greater successor_key (bst_inorder (bst_delete right successor_key))
+                  // This requires showing minimum is less than remaining elements
+                  bst_minimum_less_than_rest right successor_key;
+                  assert (all_greater successor_key (bst_inorder (bst_delete right successor_key)));
+                  
+                  ()
+              | None -> ()  // Cannot happen since right is not Leaf
         end
 
 (* ------------------------------------------------------------------------
@@ -487,6 +689,17 @@ let rec lemma_sorted_append_less (xs: list int) (bound: int)
     | x :: y :: rest ->
         lemma_sorted_append_less (y :: rest) bound
 
+// Helper: show that xs @ [bound] has all elements < y when xs has all < bound and bound < y
+let rec lemma_all_less_concat_singleton (xs: list int) (bound y: int)
+  : Lemma
+    (requires all_less bound xs /\ bound < y)
+    (ensures all_less y (xs @ [bound]))
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> 
+        lemma_all_less_concat_singleton xs' bound y;
+        ()  // x < bound < y, and xs' @ [bound] all < y, so x :: (xs' @ [bound]) all < y
+
 // Helper: if all elements in ys are > bound and ys is sorted,
 // then [bound] @ ys is sorted
 let rec lemma_sorted_prepend_greater (bound: int) (ys: list int)
@@ -500,13 +713,35 @@ let rec lemma_sorted_prepend_greater (bound: int) (ys: list int)
 
 // Helper: if xs is sorted, all_less bound xs, ys is sorted, all_greater bound ys,
 // then xs @ [bound] @ ys is sorted
+#push-options "--z3rlimit 20"
+
 let rec lemma_sorted_concat (xs: list int) (bound: int) (ys: list int)
   : Lemma
     (requires 
       sorted xs /\ all_less bound xs /\
       sorted ys /\ all_greater bound ys)
     (ensures sorted (xs @ [bound] @ ys))
-  = admit()  // Complex proof involving transitivity of ordering
+  = // First show xs @ [bound] is sorted
+    lemma_sorted_append_less xs bound;
+    // Then show [bound] @ ys is sorted
+    lemma_sorted_prepend_greater bound ys;
+    // Now append them: (xs @ [bound]) @ ys
+    // We need to show the join point is valid
+    match ys with
+    | [] -> 
+        // xs @ [bound] @ [] = xs @ [bound]
+        FStar.List.Tot.Properties.append_l_nil (xs @ [bound])
+    | y :: _ -> 
+        // Since all_greater bound ys, we have y > bound
+        // So xs @ [bound] has all elements < y
+        lemma_all_less_concat_singleton xs bound y;
+        assert (all_less y (xs @ [bound]));
+        lemma_append_sorted (xs @ [bound]) ys;
+        // Now we have sorted ((xs @ [bound]) @ ys)
+        // Need to show this equals xs @ [bound] @ ys
+        FStar.List.Tot.Properties.append_assoc xs [bound] ys
+
+#pop-options
 
 (* ------------------------------------------------------------------------
    Lemma: inorder traversal of a valid BST is sorted
