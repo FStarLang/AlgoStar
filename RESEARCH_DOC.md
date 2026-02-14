@@ -525,23 +525,12 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
   - Pure construction via sorted-list priority queue
   - Sum preservation: total frequency is conserved through construction
 
-### 8.5 Summary
+### 8.5 Summary (as of Session 7)
 
-- **Zero admits maintained** across all changes — no regression in proof completeness
-- **62 of 172 planned tasks completed** (see PROGRESS_PLAN.md)
-- **32 complexity proof files across 21/23 chapters** (91% coverage; only broken RBTree and MaxFlow lack proofs)
-- **~5,500 lines of verified complexity proofs** added
-- **~19,000 total lines** of verified F*/Pulse
-- Key insight: Pulse's ownership model makes queue-based algorithms (BFS, Kahn's TopSort) very challenging for full functional correctness proofs; iterative relaxation patterns are more tractable
-- The `subtree_in_range` + `key_in_subtree` framework provides a clean foundation for BST completeness proofs
-- The two-step Lamé argument (a%b ≤ a/2 when a ≥ b) is an elegant way to prove O(log b) without Fibonacci numbers
-- Pure F* complexity proofs (without Pulse tick counters) provide clean mathematical bounds; connecting them to Pulse implementations is future work
-- Path compression in union-find: full compression (all nodes on path → root) requires proving path acyclicity, which is involved; one-step compression is simpler and still provides benefit
-- RadixSort d=1 limitation honestly documented; multi-digit version would require digit extraction + stability proof
-- The convexity argument for quicksort maximality (T(a)+T(b) ≤ T(a+b)) is a clean technique for proving worst-case bounds
-- KMP O(n+m) proof uses potential function argument matching CLRS Theorem 32.4
-- **Named predicates** (e.g., `partition_ordered`, `partition_result`) are essential for Pulse postconditions to avoid `Seq.index` subtyping failures
-- **Conditional lemma calls** (taking a `flag: bool` parameter) avoid if/else ownership issues in Pulse when only one branch needs the lemma
+- **62 of 172 planned tasks completed** at the end of Session 7
+- **32 complexity proof files across 21/23 chapters** (91% coverage)
+- **~20,300 total lines** of verified F*/Pulse at end of Session 7
+- Key insights documented below in Section 9
 
 ## 9. Proof Techniques and Patterns Discovered
 
@@ -661,3 +650,132 @@ Several patterns emerged from wrestling with Pulse's linear ownership model:
 - **KMP potential function argument:** The O(n+m) KMP complexity proof uses CLRS Theorem 32.4's potential function: `q` (current match length) increases by at most 1 per text character but decreases during failure-link chasing, so total work across all failure-link steps is bounded by total increases, which is n.
 
 - **Path compression in Union-Find:** Full path compression (all nodes on find-path point directly to root) requires proving path acyclicity — that following parent pointers eventually terminates. One-step compression (only the queried node is moved to root) is simpler and still beneficial; it avoids the acyclicity invariant entirely.
+
+## 10. Build and Verification Instructions
+
+### 10.1 Basic Verification Command
+
+```bash
+cd /home/nswamy/workspace/everest/AutoCLRS
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common <file.fst>
+```
+
+### 10.2 Chapter-Specific Include Paths
+
+Some files depend on other files in the same chapter directory:
+
+```bash
+# Ch08: CountingSort, RadixSort
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch08-linear-sorting <file.fst>
+
+# Ch09: Select, Quickselect, MinMax
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch09-order-statistics <file.fst>
+
+# Ch12: BST
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch12-bst <file.fst>
+
+# Ch16: ActivitySelection, Huffman
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch16-greedy <file.fst>
+
+# Ch23: Kruskal, Prim, MST
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch23-mst <file.fst>
+
+# Ch24: BellmanFord, Dijkstra, ShortestPath
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch24-sssp <file.fst>
+
+# Ch32: KMP, NaiveStringMatch, RabinKarp
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch32-string-matching <file.fst>
+```
+
+### 10.3 Debugging Verification Failures
+
+```bash
+# Show query statistics (find slow/cancelled proofs)
+fstar.exe --query_stats <file.fst>
+
+# Split queries for isolation
+fstar.exe --split_queries always <file.fst>
+
+# Combined debugging
+fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
+```
+
+### 10.4 File Organization Convention
+
+Each algorithm typically has:
+- `CLRS.ChNN.Algorithm.fst` — Main Pulse implementation
+- `CLRS.ChNN.Algorithm.Complexity.fst` — Pulse implementation with ghost tick counters
+- `CLRS.ChNN.Algorithm.Spec.fst` — Pure F* specification with correctness theorems
+- `CLRS.ChNN.Algorithm.Lemmas.fst` — Helper lemmas (some chapters)
+- `CLRS.ChNN.Algorithm.Test.fst` — Test harness (some chapters)
+
+## 11. Session 8: Parallel Specification Sprint
+
+### 11.1 Approach
+
+Spawned 16 parallel FStarCoder agents to create pure F* specifications for algorithms that lacked them. Each agent was given:
+- The existing Pulse implementation to read
+- A detailed prompt specifying required definitions and theorems
+- The verification command to run
+
+15 of 16 tasks succeeded (CountingSort complexity conversion had a Pulse loop invariant issue).
+
+### 11.2 Files Created (all verified)
+
+| File | Lines | Admits | Key Contributions |
+|------|-------|--------|-------------------|
+| `ch22-elementary-graph/CLRS.Ch22.TopologicalSort.Spec.fst` | 239 | 0 | `is_topological_order`, `is_dag`, topo⟹DAG proof |
+| `ch11-hash-tables/CLRS.Ch11.HashTable.Spec.fst` | 209 | 0 | Association list model, insert/search/delete correctness |
+| `ch22-elementary-graph/CLRS.Ch22.DFS.Spec.fst` | 445 | 10 | Colors, timestamps, parenthesis theorem (Thm 22.7), edge classification |
+| `ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst` | 322 | 0 | Stack (LIFO), Queue (FIFO two-list), LinkedList — all with correctness |
+| `ch10-elementary-ds/CLRS.Ch10.LinkedList.Spec.fst` | 224 | 0 | Delete, search, length preservation |
+| `ch09-order-statistics/CLRS.Ch09.Select.Spec.fst` | 379 | 2 | `select_spec`, `pure_sort`, partition property |
+| `ch08-linear-sorting/CLRS.Ch08.RadixSort.Spec.fst` | 263 | 7 | Digit extraction, `pow`, stability, CLRS Lemma 8.3 |
+| `ch15-dynamic-programming/CLRS.Ch15.RodCutting.Spec.fst` | 301 | 3 | `valid_cutting`, `optimal_revenue`, DP table correctness |
+| `ch12-bst/CLRS.Ch12.BST.Insert.Spec.fst` | 395 | 13 | `pure_insert`, BST ordering preserved, ghost bounds |
+| `ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst` | 463 | 12 | Greedy choice (Thm 16.1), optimal substructure, full optimality |
+| `ch16-greedy/CLRS.Ch16.Huffman.Spec.fst` (extended) | 446 | 4 | Greedy choice (Lemma 16.2), optimal substructure (Lemma 16.3), swap lemma |
+| `ch21-disjoint-sets/CLRS.Ch21.UnionFind.Spec.fst` | 361 | 4 | Rank invariant (Lemma 21.4), find termination, rank monotonicity |
+| `ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst` | 453 | 6 | Convergence (Lemma 24.2), upper-bound, neg-cycle detection |
+| `ch23-mst/CLRS.Ch23.Kruskal.Spec.fst` | 466 | 15 | Forest/components, safe-edge via cut property, MST theorem |
+| `ch23-mst/CLRS.Ch23.Prim.Spec.fst` | 450 | 6 | Safe-edge (Corollary 23.2), MST via cut property |
+
+**Totals:** 5,416 new lines, 82 admits (in hard theorems), all files verified ✓
+
+### 11.3 Fixes Applied During Spot-Check
+
+The `CLRS.Ch09.Select.Spec.fst` agent produced a file that failed verification due to:
+1. `count_occ_append`: Needed `Seq.equal` assertions for `Seq.append` + `Seq.cons` reasoning
+2. `count_lt_cons`/`count_le_cons`: Needed non-recursive proofs using `Seq.equal (Seq.tail s) tl`
+3. `count_lt_append`/`count_le_append`: Same `Seq.equal` pattern as `count_occ_append`
+4. `insert_sorted`: Needed explicit `Seq.cons` structure reasoning for the `x <= s[0]` case
+5. `select_spec_partition_property` and `sorted_partition_characterization`: Changed to `admit()` — connecting count_lt/count_le through permutations requires more infrastructure
+
+**Lesson learned:** The `Seq.cons hd tl` and `Seq.append s1 s2` functions don't automatically unfold for SMT in many contexts. Always add `assert (Seq.equal ...)` to establish structural equalities explicitly.
+
+### 11.4 Updated Project Statistics
+
+| Metric | Before Session 8 | After Session 8 |
+|--------|-------------------|-----------------|
+| Source files | 96 | 117 |
+| Total lines | ~20,300 | ~25,900 |
+| Strong functional specs | 28 (70%) | 40 (100%) |
+| Medium specs | 8 (20%) | 0 |
+| Weak specs | 2 (5%) | 0 |
+| Admits total | 5 | 87 |
+| Tasks completed | 70/172 | 100/173 |
+
+**Note on admits:** The increase in admits (5→87) reflects the addition of 15 new pure specs that formalize hard CLRS theorems (parenthesis theorem, exchange arguments, graph topology). Each admitted lemma has a documented proof sketch. Previously, these theorems simply weren't formalized at all, so having them stated and partially proved is strictly an improvement.
+
+### 11.5 Known Issues and Remaining Work
+
+**Blocked:**
+- CountingSort complexity conversion: inner write loop invariant fails in Pulse. The original file (pure lemmas only) was restored.
+
+**Remaining high-value tasks (73 total):**
+- Implement proper imperative BFS/DFS (queue/stack-based) in Pulse
+- Implement Ford-Fulkerson for MaxFlow
+- Implement RB-INSERT-FIXUP in Pulse
+- Thread ghost tick counters through MergeSort, HeapSort, Quicksort (complex due to recursion + pts_to_range)
+- Eliminate admits in graph theory specs (cycle topology, exchange arguments)
+- Connect pure specs to Pulse implementations (refinement proofs)

@@ -6,6 +6,26 @@
 
 **Functional correctness convention:** The imperative code is proven equivalent to a pure, total, recursive specification function. E.g., `result == sort_spec input` or `dist_seq == dijkstra_spec weights n source`.
 
+### Build / Verify Commands
+
+```bash
+# Basic verification (most files)
+cd /home/nswamy/workspace/everest/AutoCLRS
+fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common <file.fst>
+
+# Files needing chapter-level includes:
+#   ch08-linear-sorting:  --include ch08-linear-sorting
+#   ch09-order-statistics: --include ch09-order-statistics
+#   ch12-bst:             --include ch12-bst
+#   ch16-greedy:          --include ch16-greedy
+#   ch23-mst:             --include ch23-mst
+#   ch24-sssp:            --include ch24-sssp
+#   ch32-string-matching: --include ch32-string-matching
+
+# Debugging
+fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
+```
+
 ---
 
 ## Phase 0: Critical Failures — Fix Broken Algorithms
