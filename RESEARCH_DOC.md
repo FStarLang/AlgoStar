@@ -492,13 +492,46 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 | **MaxFlow (Ch26)** | Removed misleading "Ford-Fulkerson" claims; documented as zero-flow initialization | `1121164` |
 | **TopSort (Ch22)** | Documented postcondition limitations and proof strategy for ordering/distinctness | `7eb3520` |
 
-### 8.4 Summary
+### 8.4 Session 4 Improvements
+
+#### 8.4.1 Shortest-Path Specification (Ch24)
+- **New file: `CLRS.Ch24.ShortestPath.Spec.fst`** (409 lines)
+  - Pure recursive specification of shortest-path distances: `sp_dist_k` (at most k edges)
+  - `sp_dist` (unbounded, via k = n-1)
+  - Key theorem: `triangle_ineq_implies_upper_bound` — if triangle inequality holds on `dist`, then `dist[v] ≤ sp_dist(s, v)`
+  - This is the theoretical backbone connecting Bellman-Ford/Dijkstra triangle inequality checks to actual shortest-path bounds
+
+#### 8.4.2 Bellman-Ford Strengthening (Ch24)
+- **Postcondition now includes:** `no_neg_cycle ==> dist[v] <= sp_dist(weights, n, source, v)`
+- Uses `bf_sp_upper_bound_cond` helper lemma with conditional flag to avoid if/else ownership issues in Pulse
+
+#### 8.4.3 Dijkstra Strengthening (Ch24)
+- **Postcondition now includes:** `tri_result == true ==> dist[v] <= sp_dist(weights, n, source, v)`
+- Same approach: `dijkstra_sp_upper_bound_cond` connecting local triangle inequality to pure SP spec
+
+#### 8.4.4 Quickselect (Ch09)
+- **New file: `CLRS.Ch09.Quickselect.fst`** (264 lines)
+  - Implements CLRS RANDOMIZED-SELECT (§9.2) using iterative partition
+  - O(n²) worst case, O(n) expected (vs O(nk) of old selection sort)
+  - Proves: permutation of input, correct value at position k
+  - Includes verified `partition_in_range` with full ordering proof:
+    elements [lo,p) ≤ pivot ≤ elements (p,hi)
+
+#### 8.4.5 Huffman Tree Specification (Ch16)
+- **New file: `CLRS.Ch16.Huffman.Spec.fst`** (186 lines)
+  - Inductive `htree` type: `Leaf freq | Internal freq left right`
+  - `weighted_path_length` and `cost` functions
+  - **CLRS Equation 16.4 proved:** `weighted_path_length t == cost t`
+  - Pure construction via sorted-list priority queue
+  - Sum preservation: total frequency is conserved through construction
+
+### 8.5 Summary
 
 - **Zero admits maintained** across all changes — no regression in proof completeness
-- **44 of 171 planned tasks completed** (see PROGRESS_PLAN.md)
+- **62 of 172 planned tasks completed** (see PROGRESS_PLAN.md)
 - **32 complexity proof files across 21/23 chapters** (91% coverage; only broken RBTree and MaxFlow lack proofs)
-- **4,704 lines of verified complexity proofs** added
-- Total codebase: ~18,000 lines of verified F*/Pulse
+- **~5,500 lines of verified complexity proofs** added
+- **~19,000 total lines** of verified F*/Pulse
 - Key insight: Pulse's ownership model makes queue-based algorithms (BFS, Kahn's TopSort) very challenging for full functional correctness proofs; iterative relaxation patterns are more tractable
 - The `subtree_in_range` + `key_in_subtree` framework provides a clean foundation for BST completeness proofs
 - The two-step Lamé argument (a%b ≤ a/2 when a ≥ b) is an elegant way to prove O(log b) without Fibonacci numbers
@@ -507,3 +540,5 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 - RadixSort d=1 limitation honestly documented; multi-digit version would require digit extraction + stability proof
 - The convexity argument for quicksort maximality (T(a)+T(b) ≤ T(a+b)) is a clean technique for proving worst-case bounds
 - KMP O(n+m) proof uses potential function argument matching CLRS Theorem 32.4
+- **Named predicates** (e.g., `partition_ordered`, `partition_result`) are essential for Pulse postconditions to avoid `Seq.index` subtyping failures
+- **Conditional lemma calls** (taking a `flag: bool` parameter) avoid if/else ownership issues in Pulse when only one branch needs the lemma
