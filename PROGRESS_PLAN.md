@@ -325,7 +325,7 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 10 | Queue | §10.1 | **Medium**: enqueue/dequeue maintain abstract sequence | **Pure** O(1) per op | 436+94 | ✓ |
 | 10 | Linked List | §10.2 | **Medium**: insert/delete/search on `is_list` predicate | **Pure** O(n) search | 183+94 | ✓ |
 | 11 | Hash Table (open addr.) | §11.4 | **Medium**: insert/search with linear probing; `hash_probe == spec` | **Pure** O(n) worst | 224+35 | ✓ |
-| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; `subtree_in_range` ordering | **Pure** O(h) | 382+125 | ✓ |
+| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree` (completeness); `subtree_in_range` ordering | **Pure** O(h) | 382+125+312 | ✓ |
 | 12 | BST Insert | §12.3 | **Medium**: key exists at some position after insert; no ordering proof for insert | — | (in BST.fst) | ✓ |
 | 13 | Red-Black Tree | §13.1–13.4 | **Strong**: pure spec with `is_rbtree`, `insert_is_rbtree`, `insert_preserves_bst`, CLRS Theorem 13.1 `h ≤ 2·lg(n+1)`. Imperative code still array-backed BST | — | 257+486 | ✓ |
 | 15 | Rod Cutting | §15.1 | **Strong**: `result == optimal_revenue prices n` (pure DP spec) | **Pulse** O(n²) — ghost ticks (263 lines) | 253+263 | ✓ |
