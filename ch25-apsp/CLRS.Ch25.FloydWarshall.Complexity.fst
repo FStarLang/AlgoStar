@@ -100,27 +100,35 @@ open Pulse.Lib.BoundedIntegers
 
 // ========== Main Algorithm with Complexity ==========
 
+// Complexity bound predicate
+let fw_complexity_bounded (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n * n * n
+
 fn floyd_warshall_complexity
   (dist: array int)
   (#contents: Ghost.erased (Seq.seq int))
   (n: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to dist contents **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       Seq.length contents == SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n)
     )
   returns _:unit
-  ensures exists* contents'.
+  ensures exists* contents' (cf: nat).
     A.pts_to dist contents' **
+    GR.pts_to ctr cf **
     pure (
       Seq.length contents' == SZ.v n * SZ.v n /\
-      contents' == fw_outer contents (SZ.v n) 0
+      contents' == fw_outer contents (SZ.v n) 0 /\
+      fw_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 {
   let mut k : SZ.t = 0sz;
-  let ctr = GR.alloc #nat 0;
 
   while (!k <^ n)
   invariant exists* vk contents_k (vc : nat).
@@ -131,8 +139,9 @@ fn floyd_warshall_complexity
       SZ.v vk <= SZ.v n /\
       Seq.length contents_k == SZ.v n * SZ.v n /\
       fw_outer contents_k (SZ.v n) (SZ.v vk) == fw_outer contents (SZ.v n) 0 /\
-      // Complexity: vc == vk * n * n
-      vc == SZ.v vk * SZ.v n * SZ.v n
+      // Complexity: vc - c0 == vk * n * n
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vk * SZ.v n * SZ.v n
     )
   {
     let vk = !k;
@@ -148,8 +157,9 @@ fn floyd_warshall_complexity
         Seq.length contents_i == SZ.v n * SZ.v n /\
         fw_outer (fw_inner_i contents_i (SZ.v n) (SZ.v vk) (SZ.v vi)) (SZ.v n) (SZ.v vk + 1)
           == fw_outer contents (SZ.v n) 0 /\
-        // Complexity: vc == vk*n*n + vi*n
-        vc_i == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n
+        // Complexity: vc_i - c0 == vk*n*n + vi*n
+        vc_i >= reveal c0 /\
+        vc_i - reveal c0 == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n
       )
     {
       let vi = !i;
@@ -171,8 +181,9 @@ fn floyd_warshall_complexity
                         (SZ.v n) (SZ.v vk) (SZ.v vi + 1))
             (SZ.v n) (SZ.v vk + 1)
             == fw_outer contents (SZ.v n) 0 /\
-          // Complexity: vc == vk*n*n + vi*n + vj
-          vc_j == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n + SZ.v vj
+          // Complexity: vc_j - c0 == vk*n*n + vi*n + vj
+          vc_j >= reveal c0 /\
+          vc_j - reveal c0 == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n + SZ.v vj
         )
       {
         let vj = !j;
@@ -197,10 +208,6 @@ fn floyd_warshall_complexity
     k := vk +^ 1sz;
   };
 
-  // At exit: vc == n * n * n == n³
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v n * SZ.v n * SZ.v n));
-
-  GR.free ctr;
+  // At exit: cf - c0 == n³
   ()
 }

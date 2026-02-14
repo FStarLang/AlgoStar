@@ -130,6 +130,10 @@ fn find_min_unvisited_complexity
 
 // ========== Main Algorithm with Complexity ==========
 
+// Complexity bound predicate
+let dijkstra_complexity_bounded (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n + 2 * n * n
+
 fn dijkstra_complexity
   (weights: A.array int)
   (n: SZ.t)
@@ -137,9 +141,12 @@ fn dijkstra_complexity
   (dist: A.array int)
   (#sweights: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to weights sweights **
     A.pts_to dist sdist **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       SZ.v source < SZ.v n /\
@@ -148,19 +155,19 @@ fn dijkstra_complexity
       SZ.fits (SZ.v n * SZ.v n) /\
       all_weights_non_negative sweights
     )
-  ensures exists* sdist'.
+  ensures exists* sdist' (cf: nat).
     A.pts_to weights sweights **
     A.pts_to dist sdist' **
+    GR.pts_to ctr cf **
     pure (
       Seq.length sdist' == SZ.v n /\
       SZ.v source < Seq.length sdist' /\
       Seq.index sdist' (SZ.v source) == 0 /\
       all_non_negative sdist' /\
-      all_bounded sdist'
+      all_bounded sdist' /\
+      dijkstra_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 {
-  let ctr = GR.alloc #nat 0;
-
   // Initialization
   let mut init_i: SZ.t = 0sz;
 
@@ -178,8 +185,9 @@ fn dijkstra_complexity
       (SZ.v vi > SZ.v source ==> Seq.index sdist_current (SZ.v source) == 0) /\
       (forall (j:nat). j < SZ.v vi ==>
         Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= 1000000) /\
-      // Complexity: vc == vi
-      vc == SZ.v vi
+      // Complexity: vc == c0 + vi
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi
     )
   {
     let vi = !init_i;
@@ -212,8 +220,9 @@ fn dijkstra_complexity
       Seq.index sdist_current (SZ.v source) == 0 /\
       all_non_negative sdist_current /\
       all_bounded sdist_current /\
-      // Complexity: vc == n + vround * (n + n) == n + 2*vround*n
-      vc == SZ.v n + 2 * SZ.v vround * SZ.v n
+      // Complexity: vc == c0 + n + 2*vround*n
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v n + 2 * SZ.v vround * SZ.v n
     )
   {
     let vround = !round;
@@ -245,8 +254,9 @@ fn dijkstra_complexity
         Seq.index sdist_v (SZ.v source) == 0 /\
         all_non_negative sdist_v /\
         all_bounded sdist_v /\
-        // Complexity: vc == n + 2*vround*n + n + vv == n + (2*vround+1)*n + vv
-        vc_v == SZ.v n + 2 * SZ.v vround * SZ.v n + SZ.v n + SZ.v vv
+        // Complexity: vc == c0 + n + (2*vround+1)*n + vv
+        vc_v >= reveal c0 /\
+        vc_v - reveal c0 == SZ.v n + 2 * SZ.v vround * SZ.v n + SZ.v n + SZ.v vv
       )
     {
       let vv = !v;
@@ -275,11 +285,7 @@ fn dijkstra_complexity
 
   let _ = !round;
 
-  // At exit: vc == n + 2*n*n == n + 2n²
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v n + 2 * SZ.v n * SZ.v n));
-
-  GR.free ctr;
+  // At exit: cf - c0 == n + 2n²
   V.free visited;
   ()
 }
