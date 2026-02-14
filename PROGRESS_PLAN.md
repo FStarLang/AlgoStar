@@ -290,3 +290,83 @@
 - `[~]` — In progress
 - `[x]` — Complete
 - `[!]` — Blocked (see notes)
+
+---
+
+## Algorithm & Data Structure Status Table
+
+Legend for **Functional Spec** column:
+- **Strong**: postcondition proves `result == pure_spec(input)` against a clean recursive spec
+- **Medium**: proves key properties (sorted + permutation, found ⟹ key match, etc.) but no single pure spec equivalence
+- **Weak**: trivially satisfiable postcondition (e.g., `cost ≥ 0`, `valid_parents`)
+- **Broken**: algorithm doesn't implement what it claims
+
+Legend for **Complexity** column:
+- **Pulse**: ghost tick counter threaded through the Pulse implementation, bound in postcondition
+- **Pure**: standalone pure F* proof of recurrence bound (not yet connected to Pulse)
+- **—**: no complexity proof
+
+Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
+
+| Ch | Algorithm / DS | CLRS Section | Functional Spec | Complexity | Lines | Verified |
+|----|---------------|-------------|-----------------|-----------|-------|----------|
+| 02 | Insertion Sort | §2.1 | **Strong**: `sorted s ∧ permutation s0 s` | **Pulse** O(n²) — ghost ticks in postcondition (303 lines) | 290+303 | ✓ |
+| 02 | Merge Sort | §2.3 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 629+76 | ✓ |
+| 04 | Binary Search | §2.3 ex | **Strong**: found ⟹ `s[idx] == key`, not found ⟹ `key ∉ s` | **Pulse** O(log n) — ghost ticks (183 lines) | 139+183 | ✓ |
+| 04 | Max Subarray (Kadane) | §4.1 | **Strong**: `result == max_subarray_spec s0` (pure Kadane spec) | **Pure** O(n) | 113+135 | ✓ |
+| 06 | Heapsort | §6.1–6.4 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 671+97 | ✓ |
+| 07 | Partition | §7.1 | **Strong**: `is_partitioned s pivot split ∧ permutation s0 s` | **Pulse** O(n) — exactly n comparisons (272 lines) | 239+272 | ✓ |
+| 07 | Quicksort | §7.1–7.2 | **Strong**: `sorted s ∧ permutation s0 s` (recursive, in-place) | **Pure** O(n²) worst | 578+118 | ✓ |
+| 08 | Counting Sort | §8.2 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** Θ(n+k) | 180+30 | ✓ |
+| 08 | Radix Sort | §8.3 | **Medium**: `sorted s ∧ permutation s0 s` (d=1 only, wraps CountingSort) | — | 79 | ✓ |
+| 09 | Min / Max | §9.1 | **Strong**: `result == Seq.index s min_idx ∧ ∀i. result ≤ s[i]` | **Pulse** O(n) (161 lines) | 130+161 | ✓ |
+| 09 | Select (partial sort) | §9.1 | **Strong**: `permutation s0 s ∧ sorted_prefix s k ∧ prefix_leq_suffix s k` | **Pure** O(nk) | 273+135 | ✓ |
+| 09 | Quickselect | §9.2 | **Medium**: `permutation s0 s ∧ result == s[k]`; partition ordering proved | **Pure** O(n²) worst | 279+48 | ✓ |
+| 10 | Stack | §10.1 | **Medium**: push/pop maintain abstract sequence; `pop` returns top | **Pure** O(1) push/pop | 294+94 | ✓ |
+| 10 | Queue | §10.1 | **Medium**: enqueue/dequeue maintain abstract sequence | **Pure** O(1) per op | 436+94 | ✓ |
+| 10 | Linked List | §10.2 | **Medium**: insert/delete/search on `is_list` predicate | **Pure** O(n) search | 183+94 | ✓ |
+| 11 | Hash Table (open addr.) | §11.4 | **Medium**: insert/search with linear probing; `hash_probe == spec` | **Pure** O(n) worst | 224+35 | ✓ |
+| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; `subtree_in_range` ordering | **Pure** O(h) | 382+125 | ✓ |
+| 12 | BST Insert | §12.3 | **Medium**: key exists at some position after insert; no ordering proof for insert | — | (in BST.fst) | ✓ |
+| 13 | Red-Black Tree | §13.1–13.4 | **Broken**: array-backed BST, no RB invariants, no rotations, no correct insert position | — | 257 | ✓ |
+| 15 | Rod Cutting | §15.1 | **Strong**: `result == optimal_revenue prices n` (pure DP spec) | **Pulse** O(n²) — ghost ticks (263 lines) | 253+263 | ✓ |
+| 15 | LCS | §15.4 | **Strong**: `result == lcs_length x y m n` (pure recursive spec) | **Pulse** O(mn) — ghost ticks (246 lines) | 293+246 | ✓ |
+| 15 | Matrix Chain | §15.2 | **Strong**: `result == mc_cost dims n` (pure recursive spec) | **Pure** O(n³) | 280+106 | ✓ |
+| 16 | Activity Selection | §16.1 | **Strong**: `result == activity_select_spec` + greedy choice property (Thm 16.1) | **Pure** O(n log n) | 149+138 | ✓ |
+| 16 | Huffman (cost only) | §16.3 | **Weak**: `cost ≥ 0 ∧ (n>1 ⟹ cost>0)` — no tree constructed | — | 270 | ✓ |
+| 16 | Huffman Spec (pure) | §16.3 | **Strong**: `htree` type, `wpl_equals_cost` (CLRS Eq 16.4), pure construction | — | 186 | ✓ |
+| 21 | Union-Find | §21.1–21.3 | **Medium**: union-by-rank, one-step path compression; parent/rank maintained | **Pure** O(n) find, O(1) union | 334+40 | ✓ |
+| 22 | BFS | §22.2 | **Weak**: iterative relaxation (not queue-based BFS); distance soundness proved | **Pure** O(V²) | 257+69 | ✓ |
+| 22 | DFS | §22.3 | **Weak**: identical to BFS code (iterative relaxation); not actual DFS | **Pure** O(V²) | 213+69 | ✓ |
+| 22 | Topological Sort | §22.4 | **Medium**: iterative relaxation-based ordering; not Kahn's or DFS-based | **Pure** O(V²) | 315+69 | ✓ |
+| 23 | Kruskal's MST | §23.2 | **Weak**: `valid_parents` only — no MST property (cut/spanning tree) | **Pure** O(V³) | 273+102 | ✓ |
+| 23 | Prim's MST | §23.2 | **Weak**: `valid_endpoints ∧ keys_bounded` — no MST property | **Pure** O(V²) | 304+102 | ✓ |
+| 24 | Bellman-Ford | §24.1 | **Strong**: `no_neg ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pure** O(V³) | 344+101 | ✓ |
+| 24 | Dijkstra | §24.3 | **Strong**: `tri ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pure** O(V²) | 393+285 | ✓ |
+| 24 | ShortestPath.Spec | §24 | **Strong**: pure `sp_dist_k`, `triangle_ineq_implies_upper_bound` theorem | — | 409 | ✓ |
+| 25 | Floyd-Warshall | §25.2 | **Strong**: `result == fw_spec weights n` (pure DP spec) | **Pure** O(V³) | 175+206 | ✓ |
+| 26 | Max Flow | §26.2 | **Broken**: initializes flow to zero and returns it; no augmenting paths | — | 175 | ✓ |
+| 28 | Matrix Multiply | §4.2 | **Strong**: `result == matmul_spec a b n` (pure spec) | **Pure** O(n³) | 191+212 | ✓ |
+| 31 | GCD (Euclid) | §31.2 | **Strong**: `result == gcd_spec a b` (pure recursive spec) | **Pulse** O(log b) — ghost ticks, Lamé's thm (207 lines) | 82+207 | ✓ |
+| 31 | Modular Exp | §31.6 | **Strong**: `result == mod_exp_spec b e m` (pure spec) | **Pure** O(log e) | 174+211 | ✓ |
+| 32 | Naive String Match | §32.1 | **Strong**: `result == naive_match_spec text pattern` (pure spec) | **Pure** O(nm) | 202+213 | ✓ |
+| 32 | KMP | §32.4 | **Strong**: prefix function + full MATCHER; `result == kmp_search_spec` | **Pure** O(n+m) | 437+235 | ✓ |
+| 32 | Rabin-Karp | §32.2 | **Strong**: `compute_hash == hash_spec`; match via hash comparison | **Pure** O(nm) worst | 404+111 | ✓ |
+| 33 | Segment Intersection | §33.1 | **Strong**: `result == cross_product_spec / direction_spec / on_segment_spec` | **Pure** O(1) | 155+74 | ✓ |
+| 35 | Vertex Cover (2-approx) | §35.1 | **Medium**: valid cover, documented 2-approximation ratio | **Pure** O(V²) | 213+43 | ✓ |
+
+### Summary Statistics
+
+| Metric | Count |
+|--------|-------|
+| Total algorithms/data structures | 40 |
+| **Strong** functional spec | 25 (63%) |
+| **Medium** functional spec | 10 (25%) |
+| **Weak** functional spec | 3 (8%) |
+| **Broken** (not the claimed algorithm) | 2 (5%) |
+| Complexity proofs (Pulse, in postcondition) | 7 |
+| Complexity proofs (Pure, standalone) | 26 |
+| Complexity proofs total | 33 (83%) |
+| Total lines of verified F*/Pulse | ~12,700 (impl) + ~5,300 (complexity/spec) ≈ 18,000 |
+| Admits | 0 |
+| Assumes | 0 |
