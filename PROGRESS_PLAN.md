@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P0.3.2: Implement iterative DFS with explicit stack and scan_idx[] tracking
 - [x] P0.3.3: Maintain `color[]` (white/gray/black), `d[]` (discovery time), `f[]` (finish time), `pred[]`
 - [x] P0.3.4: Prove parenthesis theorem: for all u,v, intervals [d[u],f[u]] and [d[v],f[v]] are either nested or disjoint
-- [ ] P0.3.5: Prove white-path theorem: v is a descendant of u in DFS tree iff at time d[u] there is a white path from u to v
+- [x] P0.3.5: Prove white-path theorem — DFS.WhitePath.fst (CLRS Theorem 22.9)
 - [x] P0.3.6: Classify edges (tree, back, forward, cross) based on colors at discovery time
 - [x] P0.3.7: Add ghost tick counter; prove O(V²) complexity — StackDFS.Complexity.fst
 
@@ -79,7 +79,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P0.5.4: Implement TREE-DELETE(T, z): all 3 cases — no children, one child, two children (CLRS §12.3)
 - [x] P0.5.5: Prove BST property maintained after TREE-DELETE — bst_delete_valid in BST.Spec.Complete.fst
 - [ ] P0.5.6: Prove key set after delete = old keys minus deleted key
-- [ ] P0.5.7: Add ghost tick counter: O(h) for all operations
+- [x] P0.5.7: Add ghost tick counter: O(h) for all operations — BST.Spec.Complexity.fst
 
 ### P0.6 Red-Black Tree (Ch13) — Missing RB invariants and fixup
 - [x] P0.6.1: Define pure spec for RB tree as inductive type: `rbtree = Leaf | Node color left key right`
@@ -111,7 +111,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P1.2.3: Implement RADIX-SORT with d passes — RadixSort.MultiDigit.fst
 - [ ] P1.2.4: Prove each pass maintains relative order of elements with equal digit values (stability)
 - [ ] P1.2.5: Prove final array is sorted by full key value
-- [ ] P1.2.6: Prove permutation of input
+- [x] P1.2.6: Prove permutation of input — RadixSort.MultiDigit.fst (fully proven)
 - [ ] P1.2.7: Add ghost tick counter; prove O(d(n+k)) complexity
 - [x] P1.2.8: Updated documentation to honestly describe d=1 limitation and CLRS multi-pass structure
 
@@ -310,12 +310,12 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 37 | 19 |
-| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 23 | 6 |
+| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 40 | 16 |
+| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 25 | 4 |
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 37 | 4 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 8 | 11 |
-| **Total** | | **185** | **141** | **44** |
+| **Total** | | **185** | **146** | **39** |
 
 **CLRS Faithfulness: 25 faithful / 2 critical (MaxFlow, RBTree) / 3 major (Select, RadixSort, Huffman) / 9 minor deviations**
 **Complexity proof coverage: 38+ files across 21/23 chapters (91% chapter coverage)**
