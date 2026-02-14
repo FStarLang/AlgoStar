@@ -451,7 +451,7 @@ Uses `assume_` instead of proving path compression correctness.
 ### P5.10 Huffman Complete Construction (Ch16)
 15 admits in Huffman.Complete.fst for sortWith, multiset preservation, wpl bounds.
 
-- [ ] P5.10.1: Prove sortWith produces sorted output
+- [x] P5.10.1: Prove sortWith produces sorted output
 - [ ] P5.10.2: Prove multiset preservation through tree construction
 - [ ] P5.10.3: Prove wpl bounds for optimal prefix-free codes
 

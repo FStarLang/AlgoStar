@@ -109,26 +109,176 @@ let rec sortWith_nonempty (#a: Type) (f: a -> a -> int) (l: list a{Cons? l})
         // The append of any list with a non-empty list is non-empty
         ()  // F* can figure this out from the definition
 
-// Lemma: sortWith produces a sorted result
-let sortWith_produces_sorted (f: htree -> htree -> int) (l: list htree{Cons? l})
-  : Lemma (requires (forall t1 t2. f t1 t2 <= 0 <==> freq_of t1 <= freq_of t2))
-          (ensures is_sorted_by_freq (sortWith f l))
-  = // Prove by showing library's sorted implies our is_sorted_by_freq
-    // bool_of_compare f t1 t2 = (f t1 t2 < 0)
-    // Our requirement: f t1 t2 <= 0 <==> freq_of t1 <= freq_of t2
-    // So: f t1 t2 < 0 <==> freq_of t1 < freq_of t2 (when not equal)
-    //     f t1 t2 <= 0 <==> freq_of t1 <= freq_of t2
-    
-    // We need to prove that sortWith produces a result satisfying is_sorted_by_freq
-    // This follows from the sortWith implementation, but requires showing the
-    // comparison function defines a proper ordering
-    
-    // For a full proof, we'd need to:
-    // 1. Show (fun t1 t2 -> freq_of t1 <= freq_of t2) is a total order
-    // 2. Use sortWith_sorted from the library
-    // 3. Convert from library's sorted to our is_sorted_by_freq
-    
-    admit() // Would require full total_order proof and conversion lemma
+// Helper: all elements in a list satisfy a predicate relative to a pivot
+let rec all_le_pivot (pivot: htree) (l: list htree) : prop =
+  match l with
+  | [] -> True
+  | hd :: tl -> freq_of hd <= freq_of pivot /\ all_le_pivot pivot tl
+
+let rec all_ge_pivot (pivot: htree) (l: list htree) : prop =
+  match l with
+  | [] -> True
+  | hd :: tl -> freq_of pivot <= freq_of hd /\ all_ge_pivot pivot tl
+
+// Lemma: freq_cmp satisfies antisymmetry for the <= relation
+let freq_cmp_antisymmetry (t1 t2: htree)
+  : Lemma (freq_cmp t1 t2 >= 0 <==> freq_cmp t2 t1 <= 0)
+  = ()
+
+// Lemma: partition with bool_of_compare and freq_cmp separates elements correctly
+let rec partition_by_freq_cmp (pivot: htree) (l: list htree)
+  : Lemma (ensures (let hi, lo = partition (bool_of_compare freq_cmp pivot) l in
+                    all_le_pivot pivot lo /\ all_ge_pivot pivot hi))
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+        partition_by_freq_cmp pivot tl;
+        // bool_of_compare freq_cmp pivot hd = (freq_cmp pivot hd < 0)
+        //                                    = (freq_of pivot - freq_of hd < 0)
+        //                                    = (freq_of pivot < freq_of hd)
+        // If this is true, hd goes to hi, and we need freq_of pivot <= freq_of hd (✓)
+        // If this is false, hd goes to lo, and we need freq_of hd <= freq_of pivot
+        //   freq_cmp pivot hd >= 0 means freq_of pivot - freq_of hd >= 0
+        //   which means freq_of pivot >= freq_of hd, i.e., freq_of hd <= freq_of pivot (✓)
+        ()
+
+// Lemma: if all elements are >= pivot and the rest is sorted, prepending maintains sort
+let rec prepend_maintains_sorted (pivot: htree) (sorted_rest: list htree)
+  : Lemma (requires is_sorted_by_freq sorted_rest /\ all_ge_pivot pivot sorted_rest)
+          (ensures is_sorted_by_freq (pivot :: sorted_rest))
+          (decreases sorted_rest)
+  = match sorted_rest with
+    | [] -> ()
+    | hd :: tl ->
+        // Need to show: is_sorted_by_freq (pivot :: hd :: tl)
+        // Which is: freq_of pivot <= freq_of hd /\ is_sorted_by_freq (hd :: tl)
+        // From all_ge_pivot pivot (hd :: tl): freq_of pivot <= freq_of hd /\ all_ge_pivot pivot tl
+        // From is_sorted_by_freq (hd :: tl): already have this
+        ()
+
+// Lemma: sortWith preserves all_ge_pivot
+let rec sortWith_preserves_all_ge (pivot: htree) (l: list htree)
+  : Lemma (requires all_ge_pivot pivot l)
+          (ensures all_ge_pivot pivot (sortWith freq_cmp l))
+          (decreases (length l))
+  = match l with
+    | [] -> ()
+    | [x] -> ()
+    | p :: tl ->
+        let hi, lo = partition (bool_of_compare freq_cmp p) tl in
+        partition_length (bool_of_compare freq_cmp p) tl;
+        // Need to show: all_ge_pivot pivot hi and all_ge_pivot pivot lo
+        let rec partition_preserves_all_ge (pivot: htree) (p: htree) (l: list htree)
+          : Lemma (requires all_ge_pivot pivot l)
+                  (ensures (let hi, lo = partition (bool_of_compare freq_cmp p) l in
+                            all_ge_pivot pivot hi /\ all_ge_pivot pivot lo))
+                  (decreases l)
+          = match l with
+            | [] -> ()
+            | hd :: tl -> partition_preserves_all_ge pivot p tl
+        in
+        partition_preserves_all_ge pivot p tl;
+        // From all_ge_pivot pivot (p :: tl): freq_of pivot <= freq_of p /\ all_ge_pivot pivot tl
+        assert (freq_of pivot <= freq_of p);
+        sortWith_preserves_all_ge pivot lo;
+        sortWith_preserves_all_ge pivot hi;
+        // Now show that append (sortWith freq_cmp lo) (p :: sortWith freq_cmp hi) has all_ge_pivot pivot
+        let rec append_all_ge (pivot: htree) (l1 l2: list htree)
+          : Lemma (requires all_ge_pivot pivot l1 /\ all_ge_pivot pivot l2)
+                  (ensures all_ge_pivot pivot (append l1 l2))
+                  (decreases l1)
+          = match l1 with
+            | [] -> ()
+            | hd :: tl -> append_all_ge pivot tl l2
+        in
+        append_all_ge pivot (sortWith freq_cmp lo) (p :: sortWith freq_cmp hi);
+        ()
+
+// Lemma: sortWith preserves all_le_pivot
+let rec sortWith_preserves_all_le (pivot: htree) (l: list htree)
+  : Lemma (requires all_le_pivot pivot l)
+          (ensures all_le_pivot pivot (sortWith freq_cmp l))
+          (decreases (length l))
+  = match l with
+    | [] -> ()
+    | [x] -> ()
+    | p :: tl ->
+        let hi, lo = partition (bool_of_compare freq_cmp p) tl in
+        partition_length (bool_of_compare freq_cmp p) tl;
+        let rec partition_preserves_all_le (pivot: htree) (p: htree) (l: list htree)
+          : Lemma (requires all_le_pivot pivot l)
+                  (ensures (let hi, lo = partition (bool_of_compare freq_cmp p) l in
+                            all_le_pivot pivot hi /\ all_le_pivot pivot lo))
+                  (decreases l)
+          = match l with
+            | [] -> ()
+            | hd :: tl -> partition_preserves_all_le pivot p tl
+        in
+        partition_preserves_all_le pivot p tl;
+        assert (freq_of p <= freq_of pivot);
+        sortWith_preserves_all_le pivot lo;
+        sortWith_preserves_all_le pivot hi;
+        let rec append_all_le (pivot: htree) (l1 l2: list htree)
+          : Lemma (requires all_le_pivot pivot l1 /\ all_le_pivot pivot l2)
+                  (ensures all_le_pivot pivot (append l1 l2))
+                  (decreases l1)
+          = match l1 with
+            | [] -> ()
+            | hd :: tl -> append_all_le pivot tl l2
+        in
+        append_all_le pivot (sortWith freq_cmp lo) (p :: sortWith freq_cmp hi);
+        ()
+
+// Lemma: appending sorted lists with all elements in first <= all in second gives sorted
+let rec append_sorted (l1 l2: list htree)
+  : Lemma (requires is_sorted_by_freq l1 /\ is_sorted_by_freq l2 /\
+                    (match l1, l2 with
+                     | _, [] -> True
+                     | [], _ -> True
+                     | _, hd2 :: _ -> all_le_pivot hd2 l1))
+          (ensures is_sorted_by_freq (append l1 l2))
+          (decreases l1)
+  = match l1 with
+    | [] -> ()
+    | hd1 :: tl1 ->
+        append_sorted tl1 l2;
+        match tl1, l2 with
+        | [], [] -> ()
+        | [], hd2 :: _ -> ()
+        | hd_tl1 :: _, [] -> ()
+        | hd_tl1 :: _, hd2 :: _ ->
+            // From is_sorted_by_freq l1: freq_of hd1 <= freq_of hd_tl1
+            // From all_le_pivot hd2 l1: freq_of hd_tl1 <= freq_of hd2
+            // From append_sorted tl1 l2: is_sorted_by_freq (append tl1 l2)
+            // append l1 l2 = hd1 :: append tl1 l2
+            // Need: freq_of hd1 <= freq_of (head of append tl1 l2)
+            ()
+
+// Lemma: sortWith with freq_cmp produces a sorted result
+let rec sortWith_produces_sorted_freq_cmp (l: list htree)
+  : Lemma (ensures is_sorted_by_freq (sortWith freq_cmp l))
+          (decreases (length l))
+  = match l with
+    | [] -> ()
+    | [x] -> ()
+    | pivot :: tl ->
+        let hi, lo = partition (bool_of_compare freq_cmp pivot) tl in
+        partition_length (bool_of_compare freq_cmp pivot) tl;
+        // From partition_length: length lo + length hi = length tl
+        // Therefore length lo < length l and length hi < length l
+        partition_by_freq_cmp pivot tl;
+        // From partition_by_freq_cmp: all_le_pivot pivot lo /\ all_ge_pivot pivot hi
+        sortWith_produces_sorted_freq_cmp lo;
+        sortWith_produces_sorted_freq_cmp hi;
+        // sortWith freq_cmp lo is sorted and all elements are <= pivot
+        // sortWith freq_cmp hi is sorted and all elements are >= pivot
+        sortWith_preserves_all_ge pivot hi;
+        sortWith_preserves_all_le pivot lo;
+        prepend_maintains_sorted pivot (sortWith freq_cmp hi);
+        // pivot :: sortWith freq_cmp hi is sorted
+        append_sorted (sortWith freq_cmp lo) (pivot :: sortWith freq_cmp hi)
+        // Result: append (sortWith freq_cmp lo) (pivot :: sortWith freq_cmp hi) is sorted
 
 // Lemma: map preserves length
 let rec map_length (#a #b: Type) (f: a -> b) (l: list a)
@@ -139,13 +289,28 @@ let rec map_length (#a #b: Type) (f: a -> b) (l: list a)
     | _ :: tl -> map_length f tl
 
 // Lemma: sortWith preserves length  
-let sortWith_length (#a: Type) (f: a -> a -> int) (l: list a)
+let rec sortWith_length (#a: Type) (f: a -> a -> int) (l: list a)
   : Lemma (ensures length (sortWith f l) = length l)
-  = // This follows from sortWith's definition using partition and append
-    // partition_length shows partition preserves total length
-    // append_length shows append sums lengths
-    // A complete proof would require induction matching sortWith's structure
-    admit()
+          (decreases (length l))
+  = match l with
+    | [] -> ()
+    | pivot :: tl ->
+        // sortWith definition: append (sortWith f lo) (pivot::sortWith f hi)
+        // where (hi, lo) = partition (bool_of_compare f pivot) tl
+        let hi, lo = partition (bool_of_compare f pivot) tl in
+        partition_length (bool_of_compare f pivot) tl;
+        // From partition_length: length lo + length hi = length tl
+        sortWith_length f lo;
+        sortWith_length f hi;
+        // length (sortWith f lo) = length lo
+        // length (sortWith f hi) = length hi
+        // length (pivot :: sortWith f hi) = 1 + length hi
+        append_length (sortWith f lo) (pivot :: sortWith f hi)
+        // length (append ...) = length (sortWith f lo) + length (pivot :: sortWith f hi)
+        //                     = length lo + 1 + length hi
+        //                     = length lo + length hi + 1
+        //                     = length tl + 1
+        //                     = length l
 
 // Initialize PQ from frequency list
 let init_pq (freqs: list pos{Cons? freqs}) : pq:priority_queue{is_valid_pq pq /\ length pq = length freqs} =
@@ -158,12 +323,7 @@ let init_pq (freqs: list pos{Cons? freqs}) : pq:priority_queue{is_valid_pq pq /\
   let sorted = sortWith freq_cmp trees in
   assert (length sorted = length trees);
   assert (length sorted = length freqs);
-  // Prove freq_cmp satisfies the comparison requirement
-  assert (forall (t1 t2: htree). 
-    freq_cmp t1 t2 <= 0 <==> freq_of t1 - freq_of t2 <= 0);
-  assert (forall (t1 t2: htree). 
-    freq_of t1 - freq_of t2 <= 0 <==> freq_of t1 <= freq_of t2);
-  sortWith_produces_sorted freq_cmp trees;
+  sortWith_produces_sorted_freq_cmp trees;
   sorted
 
 // EXTRACT-MIN: take head (O(1))

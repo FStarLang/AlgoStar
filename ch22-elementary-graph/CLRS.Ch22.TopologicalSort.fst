@@ -6,6 +6,7 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch22.TopologicalSort.Spec
+open CLRS.Ch22.TopologicalSort.Lemmas
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -237,6 +238,7 @@ fn topological_sort
     let vout = !out_idx;
     let u_int = SZ.v u;  // Convert SZ.t to int
     A.op_Array_Assignment output vout u_int;
+    
     let new_vout = vout +^ 1sz;
     out_idx := new_vout;
     queue_head := vqh +^ 1sz;
@@ -328,34 +330,56 @@ fn topological_sort
   assert (pure (forall (i: nat). i < Seq.length soutput ==> Seq.index soutput i >= 0));
   
   // 2. All elements are distinct
-  // PROOF REQUIRES: tracking which vertices have been added to output
-  // The current implementation doesn't maintain a "visited" set or equivalent invariant
-  // to prove that each vertex is added exactly once.
+  // PROOF SKETCH: To prove distinctness, we would need to track a ghost "visited" set.
   // 
-  // To prove this properly, we would need:
-  // - A ghost "visited" set tracking vertices already in output
-  // - Loop invariant: output[0..out_idx) contains distinct elements
-  // - Loop invariant: for each v in output, visited contains v
-  // - When adding vertex u from queue, prove u not in visited (via queue distinctness)
+  // Key insight: Kahn's algorithm ensures each vertex is enqueued exactly once:
+  // - Initially, only vertices with in-degree 0 are enqueued  
+  // - Each time we process a vertex u, we decrement in-degrees of its successors
+  // - A vertex v is enqueued only when its in-degree reaches 0
+  // - Once enqueued and processed, a vertex is never re-enqueued (in-degree doesn't increase)
   //
-  // This is feasible but requires significant invariant strengthening.
+  // With a ghost visited set, we would prove:
+  // - Invariant: for all v in queue, v not in visited
+  // - Invariant: for all v in output[0..count), v in visited  
+  // - When enqueuing w: in_degree[w] just became 0, so w not in visited, add w to visited
+  // - Therefore output contains each vertex at most once
+  // - Combined with permutation property (n distinct values in [0,n)), all_distinct holds
+  //
+  // This proof is feasible with the lemmas in CLRS.Ch22.TopologicalSort.Lemmas,
+  // but requires maintaining indeg_correct invariant and visited set through all loops.
   admit();
   
-  // 3. Output is a valid topological order  
-  // PROOF REQUIRES: relating the algorithm's invariants to topological ordering
-  // The current implementation doesn't track the relationship between:
-  // - The order vertices are added to output
-  // - The edges in the graph
-  // - The in-degree updates
+  // 3. Output is a valid topological order
+  // PROOF SKETCH using strong_order_inv:
   //
-  // To prove this properly, we would need:
-  // - Invariant relating in-degrees to remaining edges from unprocessed vertices
-  // - Proof that when vertex u is dequeued, all its predecessors have been processed
-  // - Use of is_topological_order definition to show edge ordering property
-  // - Potentially leverage CLRS.Ch22.TopologicalSort.Lemmas.strong_order_inv
+  // KEY THEOREM (from Verified module):
+  //   If strong_order_inv adj n output n holds, and output is distinct,
+  //   then is_topological_order adj n output holds.
   //
-  // This requires substantial verification effort, likely using separation logic
-  // predicates to track graph structure through the algorithm's execution.
+  // The proof strategy is:
+  // a) Establish strong_order_inv through the main loop:
+  //    - Base case: lemma_strong_order_base shows it holds for empty output
+  //    - Inductive step: When dequeuing vertex u:
+  //      * queue_preds_in_output_sz ensures all predecessors of u are in output  
+  //      * lemma_strong_order_extend adds u to output, maintaining strong_order_inv
+  //    - After loop: strong_order_inv holds for complete output
+  //
+  // b) Connect strong_order_inv to is_topological_order:
+  //    - strong_order_inv says: for every vertex w at position j,
+  //      every predecessor u of w appears at some earlier position k < j
+  //    - This directly implies the topological ordering property:
+  //      for every edge (u,v), u appears before v
+  //    - lemma_strong_order_implies_topo_order_int formalizes this connection
+  //
+  // The missing piece is proving strong_order_inv is maintained through the loops.
+  // This requires:
+  // - Tracking queue_preds_in_output_sz: vertices in queue have predecessors in output
+  // - Tracking indeg_correct: in-degree counts remaining predecessors correctly
+  // - Using lemmas after each enqueue/dequeue to maintain invariants
+  //
+  // With proper ghost state tracking (in-degree correctness, queue properties),
+  // the Lemmas module provides all needed lemmas to complete this proof.
+  // The Verified module demonstrates this approach works (with admits only for pigeonhole).
   admit();
   
   // Clean up temporary arrays
