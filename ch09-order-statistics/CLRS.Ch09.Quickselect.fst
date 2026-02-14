@@ -94,6 +94,14 @@ let unchanged_outside (s1 s2: Seq.seq int) (lo hi: nat) : prop =
     (i < lo \/ hi <= i) ==>
     Seq.index s1 i == Seq.index s2 i)
 
+// Partition ordering property
+let partition_ordered (s: Seq.seq int) (lo p hi: nat) : prop =
+  lo <= p /\ p < hi /\ hi <= Seq.length s /\
+  (forall (idx: nat). idx < Seq.length s ==>
+    (lo <= idx /\ idx < p) ==> Seq.index s idx <= Seq.index s p) /\
+  (forall (idx: nat). idx < Seq.length s ==>
+    (p < idx /\ idx < hi) ==> Seq.index s idx >= Seq.index s p)
+
 // ========== In-place partition of a[lo..hi) using a[hi-1] as pivot ==========
 // Returns pivot position p such that:
 //   - a[lo..p) all <= pivot_value
@@ -119,7 +127,8 @@ fn partition_in_range
       Seq.length s1 == Seq.length s0 /\
       SZ.v lo <= SZ.v pivot_pos /\
       SZ.v pivot_pos < SZ.v hi /\
-      permutation s0 s1
+      permutation s0 s1 /\
+      partition_ordered s1 (SZ.v lo) (SZ.v pivot_pos) (SZ.v hi)
     )
 {
   // CLRS partition: use a[hi-1] as pivot
@@ -143,7 +152,13 @@ fn partition_in_range
       SZ.v vj <= SZ.v hi_m1 /\
       Seq.length s_cur == Seq.length s0 /\
       permutation s0 s_cur /\
-      Seq.index s_cur (SZ.v hi_m1) == pivot
+      Seq.index s_cur (SZ.v hi_m1) == pivot /\
+      // [lo, vi) all <= pivot
+      (forall (idx: nat). idx < Seq.length s_cur ==>
+        (SZ.v lo <= idx /\ idx < SZ.v vi) ==> Seq.index s_cur idx <= pivot) /\
+      // [vi, vj) all > pivot
+      (forall (idx: nat). idx < Seq.length s_cur ==>
+        (SZ.v vi <= idx /\ idx < SZ.v vj) ==> Seq.index s_cur idx > pivot)
     )
   {
     let vj = !j_ref;
