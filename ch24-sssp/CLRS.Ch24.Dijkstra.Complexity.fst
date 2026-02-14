@@ -1,14 +1,31 @@
 (*
-   Dijkstra's Algorithm with Complexity Bound
+   Dijkstra's Algorithm with Complexity Bound — CLRS §24.3
 
    Proves O(V²) complexity for Dijkstra with adjacency-matrix representation.
-   Specifically: exactly n initialization operations + n rounds of
-   (n find-min comparisons + n relaxation operations) = n + 2·n² total.
+   
+   CLRS Analysis (§24.3):
+   - With array-based min-priority queue and adjacency matrix
+   - n EXTRACT-MIN operations: O(n) each → O(n²) total
+   - n vertices × n edge relaxations: O(n²) total
+   - Overall: O(V²)
+   
+   Our Implementation:
+   - Initialization: n ticks (set dist[i] for each vertex)
+   - Main loop: n rounds
+     * Each round: n ticks for find_min_unvisited (scan all vertices)
+     * Each round: n ticks for relaxation (check all potential edges)
+   - Total: n + 2n² ticks
+   - Bound: n + 2n² ≤ 3n² (proven in dijkstra_quadratic_bound)
 
-   Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
-   Each comparison/relaxation gets one ghost tick.
+   Ghost Tick Counter:
+   - Uses Pulse.Lib.GhostReference.ref nat — fully erased at runtime
+   - Each vertex scan or edge relaxation = 1 ghost tick
+   - Postcondition: cf - c0 == n + 2n²
 
-   Also proves functional correctness (source dist == 0, non-negative, bounded).
+   Functional Correctness:
+   - dist[source] == 0
+   - All distances non-negative and ≤ 1000000
+   - (Implementation in CLRS.Ch24.Dijkstra.fst also proves triangle inequality)
 
    NO admits. NO assumes.
 *)
@@ -52,6 +69,74 @@ let all_non_negative (sdist: Seq.seq int) : prop =
 let all_bounded (sdist: Seq.seq int) : prop =
   forall (i:nat). i < Seq.length sdist ==>
     Seq.index sdist i >= 0 /\ Seq.index sdist i <= 1000000
+
+// ========== Pure Complexity Bounds ==========
+
+(**
+ * Total iterations count for Dijkstra with adjacency matrix:
+ * - Initialization: n iterations
+ * - Main loop: n rounds × (n find-min + n relax) = 2n² operations
+ * Total: n + 2n²
+ *)
+let dijkstra_iterations (n: nat) : nat =
+  n + 2 * n * n
+
+(**
+ * Prove the bound: n + 2n² ≤ 3n²
+ * This establishes O(n²) asymptotic complexity.
+ *)
+let dijkstra_quadratic_bound (n: nat) : Lemma
+  (ensures dijkstra_iterations n <= 3 * n * n)
+  =
+  if n = 0 then (
+    // Base case: 0 + 0 = 0 ≤ 0
+    ()
+  ) else (
+    // n ≥ 1: need to show n + 2n² ≤ 3n²
+    // Equivalently: n ≤ n²
+    // For n ≥ 1: n ≤ n × n
+    assert (n >= 1);
+    assert (n * n >= n);  // n² ≥ n for n ≥ 1
+    assert (n + 2 * n * n <= n * n + 2 * n * n);
+    assert (n * n + 2 * n * n == 3 * n * n)
+  )
+
+(**
+ * For the exact bound: iterations = n + 2n²
+ *)
+let dijkstra_exact_bound (n: nat) : Lemma
+  (ensures dijkstra_iterations n == n + 2 * n * n)
+  = ()
+
+(**
+ * Lower bound: for n ≥ 1, we do at least n² operations
+ *)
+let dijkstra_lower_bound (n: nat) : Lemma
+  (requires n >= 1)
+  (ensures dijkstra_iterations n >= n * n)
+  =
+  // n + 2n² ≥ n² for n ≥ 1
+  // Equivalently: n + n² ≥ 0, which is always true
+  assert (dijkstra_iterations n == n + 2 * n * n);
+  assert (n + 2 * n * n >= n * n)
+
+// ========== Complexity bound predicate for runtime verification ==========
+
+// Complexity bound predicate: connects pure math to ghost counter
+let dijkstra_complexity_bounded (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == dijkstra_iterations n
+
+// Show equivalence with explicit formula
+let dijkstra_complexity_equiv (cf c0 n: nat) : Lemma
+  (ensures dijkstra_complexity_bounded cf c0 n <==> (cf >= c0 /\ cf - c0 == n + 2 * n * n))
+  = ()
+
+// The actual O(V²) bound
+let dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
+  (requires dijkstra_complexity_bounded cf c0 n)
+  (ensures cf - c0 <= 3 * n * n)
+  =
+  dijkstra_quadratic_bound n
 
 // ========== Find min with tick counting ==========
 
@@ -129,10 +214,6 @@ fn find_min_unvisited_complexity
 }
 
 // ========== Main Algorithm with Complexity ==========
-
-// Complexity bound predicate
-let dijkstra_complexity_bounded (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 == n + 2 * n * n
 
 fn dijkstra_complexity
   (weights: A.array int)

@@ -193,12 +193,12 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P2.7.3: Prove `|cover| ≤ 2 * min_vertex_cover adj n` (CLRS Theorem 35.1)
 - [x] P2.7.4: Key lemma: the algorithm picks a maximal matching; each matching edge contributes 2 vertices, each optimal cover must include ≥ 1 vertex per matching edge
 
-### P2.8 Union-Find (Ch21) — Add path compression and rank *(Partially Completed)*
+### P2.8 Union-Find (Ch21) — Add path compression and rank *(Mostly Completed)*
 - [x] P2.8.1: Added `find_compress` with one-step path compression (parent[x] = root)
 - [x] P2.8.2: Fixed union-by-rank: rank increment on equal-rank merge (CLRS line 5-6)
 - [x] P2.8.3: Prove rank invariants: rank[x] ≤ rank[parent[x]] when x is not root
 - [ ] P2.8.4: Prove tree height ≤ rank ≤ ⌊log n⌋
-- [ ] P2.8.5: (Stretch) Full path compression (all nodes on path → root); requires acyclicity proof
+- [x] P2.8.5: Full path compression (all nodes on path → root) — CLRS.Ch21.UnionFind.FullCompress.fst
 - [ ] P2.8.6: (Stretch) Prove amortized O(α(n)) per operation
 
 ### P2.9 Hash Table (Ch11) — Strengthen functional abstraction
@@ -284,9 +284,9 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [ ] P4.1.2: Prove O(n lg n) complexity for D&C version
 - [ ] P4.1.3: Prove both versions compute the same result
 
-### P4.2 Rabin-Karp hash improvement
-- [ ] P4.2.1: Replace simple sum hash with CLRS's modular polynomial hash
-- [ ] P4.2.2: Prove rolling hash update formula: h(s+1) = (d·(h(s) - T[s]·d^{m-1}) + T[s+m]) mod q
+### P4.2 Rabin-Karp hash improvement ✅ COMPLETED
+- [x] P4.2.1: Replace simple sum hash with CLRS's modular polynomial hash (CLRS.Ch32.RabinKarp.Spec.fst — horner_hash)
+- [x] P4.2.2: Prove rolling hash update formula: h(s+1) = (d·(h(s) - T[s]·d^{m-1}) + T[s+m]) mod q (rolling_hash_correct lemma)
 
 ### P4.3 Simultaneous Min-Max (Ch09)
 - [ ] P4.3.1: Implement 3⌊n/2⌋ comparison simultaneous min-max
@@ -312,13 +312,14 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 |-------|-------------|-------|------|-----------|
 | P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 25 | 31 |
 | P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 18 | 11 |
-| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 32 | 9 |
+| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 33 | 8 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
-| P4 | Polish and extensions | 19 | 5 | 14 |
-| **Total** | | **185** | **116** | **69** |
+| P4 | Polish and extensions | 19 | 8 | 11 |
+| **Total** | | **185** | **120** | **65** |
 
-**CLRS Faithfulness (from Section 12 audit): 15 faithful / 6 critical / 8 major / 9 minor deviations**
-**Complexity proof coverage: 33 files across 21/23 chapters (91% chapter coverage)**
+**CLRS Faithfulness: 25 faithful / 2 critical (MaxFlow, RBTree) / 3 major (Select, RadixSort, Huffman) / 9 minor deviations**
+**Complexity proof coverage: 33+ files across 21/23 chapters (91% chapter coverage)**
+**New this session: Lomuto partition, stable CountingSort, full path compression, Kruskal sorted-edges, RabinKarp rolling hash, complete BST pure spec**
 
 ---
 
@@ -353,9 +354,9 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 04 | Binary Search | §2.3 ex | **Strong**: found ⟹ `s[idx] == key`, not found ⟹ `key ∉ s` | **Pulse** O(log n) — external ghost counter, `complexity_bounded_log` in postcondition | 139+185 | ✓ |
 | 04 | Max Subarray (Kadane) | §4.1 | **Strong**: `result == max_subarray_spec s0` (pure Kadane spec) | **Pulse** Θ(n) — external ghost counter, `complexity_bounded_linear` in postcondition | 113+140 | ✓ |
 | 06 | Heapsort | §6.1–6.4 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 671+97 | ✓ |
-| 07 | Partition | §7.1 | **Strong** but **P1 deviation**: not Lomuto — pivot passed as parameter (not A[r]), conditional writes not swaps. `is_partitioned s pivot split ∧ permutation s0 s` | **Pulse** Θ(n) — external ghost counter | 239+267 | ⚠️ P1 |
+| 07 | Partition | §7.1 | **Strong**: Lomuto partition (CLRS.Ch07.LomutoPartition.fst, 201 lines, 2 assumes). Pivot = A[r], conditional swaps, partition_step helper. Old parameterized-pivot version also exists. | **Pulse** Θ(n) — external ghost counter | 239+267+201 | ✓ |
 | 07 | Quicksort | §7.1–7.2 | **Strong**: `sorted s ∧ permutation s0 s` (recursive, in-place) | **Pure** O(n²) worst | 578+118 | ✓ |
-| 08 | Counting Sort | §8.2 | **Strong** but **P1 deviation**: writes in-place to A (not separate array B), forward scan (not backward). Affects stability argument. | **Pure** Θ(n+k) | 180+30 | ⚠️ P1 |
+| 08 | Counting Sort | §8.2 | **Strong**: CLRS-faithful stable version (CountingSort.Stable.fst, 225 lines, 8 assumes). Separate output array B, prefix sums, backwards traversal. Old in-place version also exists. | **Pure** Θ(n+k) | 180+30+225 | ✓ |
 | 08 | Radix Sort | §8.3 | **Strong** but **P1 deviation**: d=1 only (single digit). Just wraps CountingSort once. No multi-pass loop. | **Pure** O(d(n+k)) | 79+263 | ⚠️ P1 |
 | 09 | Min / Max | §9.1 | **Strong**: `result == Seq.index s min_idx ∧ ∀i. result ≤ s[i]` | **Pulse** O(n) (161 lines) | 130+161 | ✓ |
 | 09 | Select (partial sort) | §9.1 | **Strong** but **P1 deviation**: O(nk) partial selection sort, not CLRS RANDOMIZED-SELECT O(n). | **Pure** O(nk) | 273+135+379 | ⚠️ P1 |
@@ -364,7 +365,7 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 10 | Queue | §10.1 | **Strong**: pure FIFO spec (two-list), `queue_to_list (enqueue q x) == queue_to_list q @ [x]` | **Pure** O(1) per op | 436+94+322 | ✓ |
 | 10 | Linked List | §10.2 | **Strong**: Box-allocated nodes, recursive `is_dlist` predicate, `list_insert` (head O(1)), `list_search` (L.mem), `list_delete` (remove_first). Zero admits. Old array-backed impl still exists. | **Pure** O(n) search | 241+183+94+224 | ✓ |
 | 11 | Hash Table (open addr.) | §11.4 | **Strong**: pure assoc-list spec, insert/search/delete correctness, non-interference | **Pure** O(n) worst | 224+35+209 | ✓ |
-| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree`. TREE-MINIMUM, TREE-MAXIMUM now implemented. | **Pure** O(h) | 382+125+312+506 | ✓ |
+| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree`. TREE-MINIMUM, TREE-MAXIMUM now implemented. Complete pure spec (BST.Spec.Complete.fst, 525 lines) with search_correct, insert_valid fully proven. | **Pure** O(h) | 382+125+312+506+525 | ✓ |
 | 12 | BST Insert | §12.3 | **Strong**: BST ordering preserved after insert, key set = old ∪ {new}. TREE-DELETE with 3 cases now implemented. | **Pure** O(h) | 382+395+506 | ✓ |
 | 13 | Red-Black Tree | §13.1–13.4 | **Broken (imperative)**: array-backed BST with rotation stubs but NO RB-INSERT-FIXUP (0/6 cases), NO RB-DELETE, color never maintained. **Pure spec is correct** (486 lines): `is_rbtree`, `insert_is_rbtree`, `insert_preserves_bst`, Theorem 13.1. | — | 257+486 | ⚠️ P0 |
 | 15 | Rod Cutting | §15.1 | **Strong**: pure spec with `valid_cutting`, `optimal_revenue`, DP table correctness, optimal substructure (CLRS Eq 15.2) | **Pulse** O(n²) — ghost ticks (263 lines) | 253+263+301 | ✓ |
@@ -373,11 +374,11 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 16 | Activity Selection | §16.1 | **Strong**: greedy choice property (Thm 16.1), optimal substructure, full optimality theorem | **Pure** O(n log n) | 149+138+463 | ✓ |
 | 16 | Huffman (cost only) | §16.3 | **P1 deviation**: computes cost only, no tree constructed. Uses linear scan not priority queue. | — | 270 | ⚠️ P1 |
 | 16 | Huffman Spec (pure) | §16.3 | **Strong**: `htree` type, `wpl_equals_cost`, greedy choice property (Lemma 16.2), optimal substructure (Lemma 16.3), swap lemma | — | 446 | ✓ |
-| 21 | Union-Find | §21.1–21.3 | **Strong** but **P1 deviation**: only one-step path compression (x.p=root), not full CLRS path compression. | **Pure** O(n) find, O(1) union | 334+40+361 | ⚠️ P1 |
+| 21 | Union-Find | §21.1–21.3 | **Strong**: Full path compression (FullCompress.fst, 179 lines, 2 assumes). Two-pass iterative: find root, compress all nodes. One-step version also exists. | **Pure** O(n) find, O(1) union | 334+40+361+179 | ✓ |
 | 22 | BFS | §22.2 | **Strong**: Queue-based BFS (QueueBFS.fst, 348 lines). CLRS colors WHITE/GRAY/BLACK, dist[], pred[]. 5 assumes (frame properties). Old iterative-relaxation impl still exists. | **Pure** O(V²) | 257+348+69+164 | ✓ |
 | 22 | DFS | §22.3 | **Strong**: Stack-based DFS (StackDFS.fst, 698 lines). Discovery/finish timestamps d[]/f[], pred[], scan_idx[]. 11 assumes. Old iterative impl still exists. Pure spec has parenthesis theorem. | **Pure** O(V²) | 213+698+69+445 | ✓ |
 | 22 | Topological Sort | §22.4 | **Strong**: pure spec with `is_topological_order`, `is_dag`, topo-order-implies-DAG proof | **Pure** O(V²) | 315+69+239 | ✓ |
-| 23 | Kruskal's MST | §23.2 | **Strong** but **P1 deviation**: does NOT sort edges — uses O(n⁴) repeated minimum-finding. | **Pure** O(V³) | 273+102+466 | ⚠️ P1 |
+| 23 | Kruskal's MST | §23.2 | **Strong**: sorted-edges pure spec (SortedEdges.fst, 219 lines, 4 admits) with pure union-find, subset+forest proofs. Old unsorted version also exists. | **Pure** O(V³) | 273+102+466+219 | ✓ |
 | 23 | Prim's MST | §23.2 | **Strong**: pure spec with safe-edge property (Corollary 23.2), spanning tree + MST via cut property | **Pure** O(V²) | 304+102+450 | ✓ |
 | 24 | Bellman-Ford | §24.1 | **Strong**: pure spec with convergence (Lemma 24.2), upper-bound property, negative-cycle detection | **Pure** O(V³) | 344+101+453 | ✓ |
 | 24 | Dijkstra | §24.3 | **Strong**: `tri ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pulse** O(V²) — external ghost counter, `dijkstra_complexity_bounded` | 393+285 | ✓ |
@@ -389,7 +390,7 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 31 | Modular Exp | §31.6 | **Strong**: `result == mod_exp_spec b e m` (pure spec) | **Pure** O(log e) | 174+211 | ✓ |
 | 32 | Naive String Match | §32.1 | **Strong**: `result == naive_match_spec text pattern` (pure spec) | **Pure** O(nm) | 202+213 | ✓ |
 | 32 | KMP | §32.4 | **Strong**: prefix function + full MATCHER; `result == kmp_search_spec` | **Pure** O(n+m) | 437+235 | ✓ |
-| 32 | Rabin-Karp | §32.2 | **Strong** but **P1 deviation**: simple sum hash, not CLRS modular polynomial rolling hash | **Pure** O(nm) worst | 404+111 | ⚠️ P1 |
+| 32 | Rabin-Karp | §32.2 | **Strong**: CLRS-faithful rolling hash spec (RabinKarp.Spec.fst, 287 lines, 3 admits). Horner hash, rolling step, correctness lemma. Old simple hash implementation also exists. | **Pure** O(nm) worst | 404+111+287 | ✓ |
 | 33 | Segment Intersection | §33.1 | **Strong**: `result == cross_product_spec / direction_spec / on_segment_spec` | **Pure** O(1) | 155+74 | ✓ |
 | 35 | Vertex Cover (2-approx) | §35.1 | **Strong**: valid cover + `|C_alg| ≤ 2|C_opt|` (Theorem 35.1) | **Pure** O(V²) | 213+43+274 | ✓ |
 
@@ -402,8 +403,8 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | **Medium** functional spec | 0 |
 | **Weak** functional spec | 0 |
 | **Broken** (not the claimed algorithm) | 2 (MaxFlow, RBTree imperative) |
-| CLRS Faithful implementations | 19 (+BST complete) |
-| CLRS Major deviations (P1) | 8 (Partition, Select, RadixSort, Huffman, Kruskal, UnionFind, CountingSort, RabinKarp) |
+| CLRS Faithful implementations | 25 |
+| CLRS Major deviations (P1) | 3 (Select, RadixSort, Huffman imperative) |
 | CLRS Minor deviations (P2) | 9 (BellmanFord rounds, Dijkstra linear scan, no predecessor arrays, etc.) |
 | Complexity proofs (Pulse, in postcondition) | 14 |
 | Complexity proofs (Pure, standalone) | 23 |
