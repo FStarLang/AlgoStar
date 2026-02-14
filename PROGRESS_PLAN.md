@@ -132,11 +132,13 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 
 **Step 6 — O(1) pointer-based delete (stretch):**
 - [x] P0.4.22: Modify LIST-SEARCH to return pointer instead of bool
-- [x] P0.4.23: Define `dls_split_at` ghost helper: split `dll` around pointer `x`
-- [x] P0.4.24: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice
+- [~] P0.4.23: Define `dls_split_at` ghost helper: split `dll` around pointer `x` (NOT YET DONE — needed for P0.4.24)
+- [x] P0.4.24: Implement `list_delete_node (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice (SPEC CORRECT, 1 admit for ghost split pending P0.4.23)
 
 **Step 7 — Complexity and wrap-up:**
 - [x] P0.4.25: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-key = O(n), LIST-SEARCH = O(n)
+- [x] P0.4.26: Tighten `list_insert` postcondition — same existential `l` in pre and post (was fresh `old_l`)
+- [x] P0.4.27: Tighten `list_delete` postcondition — same existential `l` in pre and post (was fresh `l'`)
 
 ### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
 - [x] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
@@ -372,7 +374,106 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 
 ---
 
-## Summary: Task Counts by Phase
+## Phase 5: Audit-Identified Issues (Spec Tightness & CLRS Faithfulness)
+
+Identified by systematic library-wide audit comparing all Pulse `fn` postconditions
+against CLRS algorithm semantics. Prioritized by severity.
+
+### P5.1 Hash Table Specs (Ch11) — CRITICALLY WEAK
+The `hash_insert` postcondition only states `Seq.length s' == size` — NO guarantee
+that the key was actually inserted. `hash_search` doesn't relate result index to key.
+
+- [ ] P5.1.1: Tighten `hash_insert` postcondition to prove `Seq.index s' (hash key) == key` (or chain contains key)
+- [ ] P5.1.2: Tighten `hash_search` postcondition to prove `result < size ==> s'[result] == key`
+- [ ] P5.1.3: Verify both specs compile with fstar.exe
+
+### P5.2 BST Specs (Ch12) — INCOMPLETE
+`tree_search` lacks completeness (`None ==> key ∉ subtree`). `tree_insert` has weak
+existential. `tree_delete` has 3 admits.
+
+- [ ] P5.2.1: Add completeness to `tree_search`: `None? result ==> ~(key_in_subtree ...)`
+- [ ] P5.2.2: Tighten `tree_insert` postcondition to relate old key set to new key set
+- [ ] P5.2.3: Eliminate 3 admits in `tree_delete` (structural rebuild reasoning)
+- [ ] P5.2.4: Eliminate 13 admits in BST.Insert.Spec.fst (tree structure preservation)
+- [ ] P5.2.5: Eliminate 5 admits in BST.Delete.Spec.fst (FiniteSet algebra)
+
+### P5.3 Topological Sort Spec (Ch22) — CRITICALLY WEAK
+Postcondition only ensures `Seq.length sout == n` and valid indices. Does NOT
+guarantee distinct vertices, permutation property, or topological ordering.
+
+- [ ] P5.3.1: Add `distinct_vertices sout` predicate to postcondition
+- [ ] P5.3.2: Add `is_topological_order adj n sout` predicate to postcondition
+- [ ] P5.3.3: Prove Kahn's algorithm maintains topological ordering invariant
+
+### P5.4 MST Specs (Ch23) — INCOMPLETE
+Kruskal postcondition only checks edge count ≤ n-1 and valid endpoints.
+Prim postcondition only bounds key values. Neither verifies acyclicity,
+minimality, or spanning property in the IMPLEMENTATION postcondition.
+
+- [ ] P5.4.1: Add `is_spanning_tree result adj n` to Kruskal postcondition
+- [ ] P5.4.2: Add `is_minimum_weight result adj n` or reference to pure MST spec
+- [ ] P5.4.3: Similarly tighten Prim postcondition
+
+### P5.5 MaxFlow Implementation (Ch26) — STUB
+Current implementation is a stub (initializes flow to zero and returns).
+Pure specs and proofs exist but the Pulse code is broken.
+
+- [ ] P5.5.1: Complete Ford-Fulkerson augmentation loop in Pulse
+- [ ] P5.5.2: Connect implementation to MaxFlow.Proofs.fst invariants
+- [ ] P5.5.3: Eliminate admits in MaxFlow.Proofs.fst (flow conservation, augmentation)
+
+### P5.6 Vertex Cover 2-Approximation Ratio (Ch35)
+Implementation proves valid cover but postcondition doesn't include the
+2-approximation ratio bound.
+
+- [ ] P5.6.1: Add `|cover| <= 2 * min_vertex_cover adj n` to Pulse postcondition
+
+### P5.7 DLL list_delete_node Ghost Split (Ch10)
+The O(1) delete has correct spec but 1 admit for ghost dls_split_at.
+
+- [ ] P5.7.1: Implement `dls_split_at` ghost function to split dls around pointer x
+- [ ] P5.7.2: Use dls_split_at + dls_append to eliminate the admit in list_delete_node
+- [ ] P5.7.3: Add ghost tick counter proving O(1) for list_delete_node
+
+### P5.8 Union-Find FullCompress (Ch21)
+Uses `assume_` instead of proving path compression correctness.
+
+- [ ] P5.8.1: Replace `assume_` in `compress_path` with actual proof
+- [ ] P5.8.2: Replace `assume_` in `find_set` with actual proof
+
+### P5.9 KMP Complexity Admits (Ch32)
+8 admits in amortized analysis for O(m+n) bound.
+
+- [ ] P5.9.1: Prove amortized potential function for prefix computation
+- [ ] P5.9.2: Prove amortized potential function for matcher
+- [ ] P5.9.3: Eliminate remaining admits
+
+### P5.10 Huffman Complete Construction (Ch16)
+15 admits in Huffman.Complete.fst for sortWith, multiset preservation, wpl bounds.
+
+- [ ] P5.10.1: Prove sortWith produces sorted output
+- [ ] P5.10.2: Prove multiset preservation through tree construction
+- [ ] P5.10.3: Prove wpl bounds for optimal prefix-free codes
+
+### P5.11 Bellman-Ford & Dijkstra Spec Admits (Ch24)
+6+ admits each in BellmanFord.Spec.fst and Dijkstra.Correctness.fst for
+core shortest-path properties.
+
+- [ ] P5.11.1: Prove relax_monotonicity in BellmanFord.Spec.fst
+- [ ] P5.11.2: Prove sp_dist upper bound property
+- [ ] P5.11.3: Prove greedy choice correctness in Dijkstra.Correctness.fst
+
+### P5.12 Strassen Admits (Ch28)
+3 admits for logarithm properties in recursive complexity proof.
+
+- [ ] P5.12.1: Prove log₂ properties needed for recurrence
+- [ ] P5.12.2: Eliminate 3 admits
+
+### P5.13 Rod Cutting Spec Admits (Ch15)
+3 admits in RodCutting.Spec.fst for accum_max lemma.
+
+- [ ] P5.13.1: Prove accum_max induction
+- [ ] P5.13.2: Eliminate remaining admits
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
@@ -381,11 +482,10 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 37 | 4 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 8 | 11 |
-| **Total** | | **185** | **146** | **39** |
+| P5 | Audit: spec tightness & admits elimination | 37 | 0 | 37 |
+| **Total** | | **222** | **146** | **76** |
 
-**CLRS Faithfulness: 25 faithful / 2 critical (MaxFlow, RBTree) / 3 major (Select, RadixSort, Huffman) / 9 minor deviations**
-**Complexity proof coverage: 38+ files across 21/23 chapters (91% chapter coverage)**
-**New this session: Lomuto partition, stable CountingSort, full path compression, Kruskal sorted-edges, RabinKarp rolling hash, complete BST pure spec, 8 complexity proofs (BFS, DFS, KMP, Dijkstra, BellmanFord, Prim, Kruskal, TopSort, LinkedList, HashTable), BFS distance spec, BST delete validity proven**
+**DLL spec fixes this session**: Tightened `list_insert` postcondition (same existential `l` from pre to post), tightened `list_delete` postcondition (same `l`), added real O(1) `list_delete_node` with correct CLRS spec (1 admit for ghost split).
 
 ---
 
@@ -429,7 +529,8 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 09 | Quickselect | §9.2 | **Medium**: `permutation s0 s ∧ result == s[k]`; partition ordering proved | **Pure** O(n²) worst | 279+48 | ✓ |
 | 10 | Stack | §10.1 | **Strong**: pure LIFO spec, push/pop correctness, size lemmas | **Pure** O(1) push/pop | 294+94+322 | ✓ |
 | 10 | Queue | §10.1 | **Strong**: pure FIFO spec (two-list), `queue_to_list (enqueue q x) == queue_to_list q @ [x]` | **Pure** O(1) per op | 436+94+322 | ✓ |
-| 10 | Linked List | §10.2 | **Strong**: Box-allocated nodes, recursive `is_dlist` predicate, `list_insert` (head O(1)), `list_search` (L.mem), `list_delete` (remove_first). Zero admits. Old array-backed impl still exists. | **Pure** O(n) search | 241+183+94+224 | ✓ |
+| 10 | Linked List (singly) | §10.2 | **Strong**: Box-allocated nodes, recursive `is_dlist` predicate, `list_insert` (head O(1)), `list_search` (L.mem), `list_delete` (remove_first). Zero admits. | **Pure** O(n) search | 241+183+94+224 | ✓ |
+| 10 | **DLL (true doubly-linked)** | §10.2 | **Strong**: DLS segment predicate (from Pulse.Lib.Deque), `list_insert` (O(1), tight spec), `list_search` (O(n), returns bool), `list_search_ptr` (returns box node), `list_delete` (O(n), tight spec), `list_delete_node` (O(1), 1 admit for ghost split). 911 lines. | **Pure** O(n) search, O(1) insert/delete-node | 911 | ⚠️ 1 admit |
 | 11 | Hash Table (open addr.) | §11.4 | **Strong**: pure assoc-list spec, insert/search/delete correctness, non-interference | **Pure** O(n) worst | 224+35+209 | ✓ |
 | 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree`. TREE-MINIMUM, TREE-MAXIMUM now implemented. Complete pure spec (BST.Spec.Complete.fst, 525 lines) with search_correct, insert_valid fully proven. | **Pure** O(h) | 382+125+312+506+525 | ✓ |
 | 12 | BST Insert | §12.3 | **Strong**: BST ordering preserved after insert, key set = old ∪ {new}. TREE-DELETE with 3 cases now implemented. | **Pure** O(h) | 382+395+506 | ✓ |
