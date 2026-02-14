@@ -54,6 +54,11 @@ let compatibility_maintained (s f: Seq.seq int) (last_finish: int) (processed: n
   (exists (k:nat). k < processed /\ Seq.index f k == last_finish) /\
   (forall (k:nat). k >= processed /\ k < Seq.length f ==> last_finish <= Seq.index f k)
 
+// ========== Complexity bound predicate ==========
+
+let complexity_bounded_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n - 1
+
 // ========== Activity Selection with Complexity ==========
 
 fn activity_selection_complexity
@@ -61,8 +66,11 @@ fn activity_selection_complexity
   (start_times finish_times: A.array int)
   (n: SZ.t)
   (#ss #sf: Ghost.erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to start_times #p ss ** A.pts_to finish_times #p sf **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n == Seq.length ss /\
       SZ.v n == Seq.length sf /\
@@ -73,21 +81,22 @@ fn activity_selection_complexity
       (forall (i:nat). i < Seq.length ss ==> valid_activity ss sf i)
     )
   returns count: SZ.t
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to start_times #p ss **
     A.pts_to finish_times #p sf **
+    GR.pts_to ctr cf **
     pure (
       SZ.v count >= 1 /\
       SZ.v count <= SZ.v n /\
       (exists (last_finish:int).
-         compatibility_maintained ss sf last_finish (SZ.v n))
+         compatibility_maintained ss sf last_finish (SZ.v n)) /\
+      complexity_bounded_linear cf (reveal c0) (SZ.v n)
     )
 {
   let mut count: SZ.t = 1sz;
   let first_finish = finish_times.(0sz);
   let mut last_finish: int = first_finish;
   let mut i: SZ.t = 1sz;
-  let ctr = GR.alloc #nat 0;
 
   while (!i <^ n)
   invariant exists* vi vcount vlast_finish (vc : nat).
@@ -102,7 +111,8 @@ fn activity_selection_complexity
       SZ.v vcount <= SZ.v vi /\
       compatibility_maintained ss sf vlast_finish (SZ.v vi) /\
       // Complexity: exactly (i - 1) comparisons so far
-      vc == SZ.v vi - 1
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi - 1
     )
   {
     let vi = !i;
@@ -128,11 +138,5 @@ fn activity_selection_complexity
     i := vi + 1sz;
   };
 
-  // At loop exit: i == n, so ctr == n - 1.
-  // This proves exactly (n-1) comparisons were performed.
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v n - 1));
-
-  GR.free ctr;
   !count
 }
