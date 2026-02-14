@@ -570,3 +570,94 @@ The BFS spec (`ch22-elementary-graph/CLRS.Ch22.BFS.Spec.fst`, 164 lines) uses co
 - **`has_frontier_neighbor` scans vertices 0..n:** To prove the edge property (CLRS Lemma 22.1), we need a function that checks whether a vertex has a neighbor in the current frontier. This scans all vertices in range [0, n) rather than iterating over an adjacency list, which is cleaner for proofs.
 
 - **Length lemma needs explicit induction:** The proof that `List.length (visited_after k)` is monotonically non-decreasing requires explicit induction; fuel 2 is insufficient for arbitrary k.
+
+### 9.3 External Ghost Counter Pattern for Complexity Proofs
+
+The single most important reusable pattern across the entire codebase. Used in 14 Pulse implementations (InsertionSort, BinarySearch, MaxSubarray, Partition, GCD, ModExp, NaiveStringMatch, RodCutting, LCS, Dijkstra, FloydWarshall, MatrixMultiply, MinMax, ActivitySelection). The pattern has five parts:
+
+1. **Function takes `ctr: GR.ref nat` and `#c0: erased nat` parameters.** The caller owns the counter; the function merely increments it. This allows composing complexity proofs (caller can sum ticks from multiple function calls).
+
+2. **Requires includes `GR.pts_to ctr c0`.** The initial counter value is ghost-erased.
+
+3. **Named predicate defined BEFORE `open Pulse.Lib.BoundedIntegers`:**
+   ```fstar
+   let complexity_bounded (cf c0: nat) (n: nat) : prop =
+     cf >= c0 /\ cf - c0 <= op_Multiply n (n - 1) / 2
+   ```
+   This is **critical**: when `open Pulse.Lib.BoundedIntegers` is active, `*` resolves to a type-level operator (`&`), not integer multiplication. Writing `cf - c0 <= n * (n-1) / 2` directly in a Pulse `ensures` clause fails elaboration with a confusing type error. The named predicate uses `op_Multiply` explicitly and is defined before the `open`, so it works correctly.
+
+4. **Ensures uses the named predicate:**
+   ```fstar
+   ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (... /\ complexity_bounded cf (reveal c0) n)
+   ```
+
+5. **Loop invariants use `vc >= reveal c0` pattern (not `vc <= ...`):**
+   ```fstar
+   invariant exists* (vc: nat). GR.pts_to ctr vc ** pure (
+     vc >= reveal c0 /\
+     vc - reveal c0 <= ...bound expression...
+   )
+   ```
+   This formulation avoids underflow issues and composes cleanly when the initial counter value is non-zero.
+
+**Anti-patterns that were fixed during conversion:**
+- Functions that internally `GR.alloc` / `GR.free` the counter (prevents composition)
+- Using `GR.op_Bang` to read the counter (unnecessary, the value is in the existential)
+- Writing `vc <= bound` instead of `vc - reveal c0 <= bound` (breaks when c0 > 0)
+
+### 9.4 BoundedIntegers `*` Operator Conflict
+
+When `open Pulse.Lib.BoundedIntegers` is in scope (which is needed for `SZ.t` arithmetic like `<^`, `+^`, `-^`), the `*` operator is rebound to the type-level pair operator `&`. This means any arithmetic expression using `*` in a Pulse `ensures`, `requires`, or `invariant` clause will silently produce a type error like:
+
+```
+Expected type 'prop', got type 'Type'
+```
+
+**Solutions:**
+1. Use `op_Multiply a b` instead of `a * b` in Pulse annotations
+2. Define a named predicate/function containing the multiplication BEFORE the `open Pulse.Lib.BoundedIntegers` line, then reference the predicate name in annotations
+3. For simple cases, reformulate to avoid multiplication (e.g., use addition in a loop)
+
+Option 2 (named predicates) is the established pattern across AutoCLRS. Examples: `complexity_bounded`, `dijkstra_complexity_bounded`, `fw_complexity_bounded`, `partition_ordered`.
+
+### 9.5 MST Spec: Graph Theory Admits and Exchange Arguments (Ch23)
+
+The MST spec (`ch23-mst/CLRS.Ch23.MST.Spec.fst`, 364 lines) formalizes CLRS Theorem 23.1 (cut property). Five admits remain, all in genuinely hard graph theory:
+
+1. **`lemma_cycle_has_crossing_edge`** — If adding edge (u,v) to a tree creates a cycle, and u,v are on opposite sides of a cut, then the cycle must contain another edge crossing the cut. This requires reasoning about cycle topology in undirected graphs.
+
+2. **`lemma_cut_path_recross`** — A path that starts on one side of a cut and ends on the other must cross the cut boundary. Requires formalization of path connectivity and cut crossing.
+
+3. **`lemma_exchange_preserves_mst`** — Removing edge `e_rem` from MST T and adding light edge `e_add` produces T' with `w(T') ≤ w(T)`. Requires proving that the exchange doesn't disconnect the tree (the cycle-based argument) and that `w(e_add) ≤ w(e_rem)`.
+
+4. **`cut_property` main theorem** — Ties together the exchange argument: given safe edge set A ⊆ MST T, if e is a light edge crossing a cut that respects A, then A ∪ {e} ⊆ some MST T'.
+
+5. **`kruskal_correctness` sketch** — Applies cut_property iteratively to show Kruskal's algorithm produces an MST.
+
+**Design insight:** Edge equality uses symmetry (`edge_eq` checks both (u,v,w) and (v,u,w) orientations) since the graph is undirected. The `subset_edges` relation uses `List.Tot.memP` with `edge_eq` for flexibility.
+
+### 9.6 Pulse Ownership Patterns for Verified Algorithms
+
+Several patterns emerged from wrestling with Pulse's linear ownership model:
+
+- **Queue-based algorithms are extremely hard in Pulse.** BFS and Kahn's topological sort both require a queue/worklist with elements being consumed and produced during iteration. Proving functional correctness requires tracking the exact queue contents as a ghost sequence, and showing that dequeue+enqueue operations maintain the invariant. The iterative relaxation pattern (simple loop over all vertices/edges) is far more tractable.
+
+- **`subtree_in_range` + `key_in_subtree` framework** for BST completeness proofs: Define `subtree_in_range arr i lo hi` (vertex i is in the valid subtree rooted at some ancestor with bounds lo..hi) and `key_in_subtree arr i k` (key k appears somewhere in the subtree rooted at i). Then completeness is: if `subtree_in_range` holds and `pure_search` returns `None`, then `k` is not in the subtree. This framework cleanly separates the structural property (range) from the content property (key membership).
+
+- **Conditional lemma calls** avoid if/else ownership issues: When only one branch of an if/else needs a lemma call, Pulse's ownership tracking can get confused. Solution: define a helper `fn conditional_lemma (flag: bool) ...` that calls the lemma only when `flag` is true, and call it unconditionally with the branch condition as the flag.
+
+- **Two-step Lamé argument for GCD O(log b):** Proving `a % b ≤ a / 2` when `a ≥ b` without Fibonacci numbers. Split into two cases: if `b ≤ a/2`, then `a % b < b ≤ a/2`; if `b > a/2`, then `a % b = a - b < a/2`. This halving at each step gives O(log b) directly.
+
+### 9.7 F* Verification Pragmatics
+
+- **`decreases (height t)` not `decreases t` for inductive types with complex patterns.** F*'s built-in structural ordering doesn't always work when you pattern-match subtrees of an inductive type (especially when balance functions rearrange structure). Using an explicit measure function like `height` is more robust.
+
+- **`Seq.equal` over `==` for sequences.** Extensional equality (`Seq.equal s1 s2`, which is `forall i. Seq.index s1 i == Seq.index s2 i`) is more reliably solved by SMT than abstract equality `==`. Always prefer it in assertions and postconditions.
+
+- **`FS.all_finite_set_facts_lemma()`** is needed whenever reasoning about finite sets (membership, subset, union, intersection). Without it, SMT cannot establish basic set facts. Call it once at the beginning of any lemma that uses `FStar.FiniteSet`.
+
+- **Convexity argument for worst-case bounds:** For quicksort, proving `T(a) + T(b) ≤ T(a+b)` (that splitting evenly is best) uses convexity of the quadratic bound. This cleanly establishes that the worst case is the maximally unbalanced partition.
+
+- **KMP potential function argument:** The O(n+m) KMP complexity proof uses CLRS Theorem 32.4's potential function: `q` (current match length) increases by at most 1 per text character but decreases during failure-link chasing, so total work across all failure-link steps is bounded by total increases, which is n.
+
+- **Path compression in Union-Find:** Full path compression (all nodes on find-path point directly to root) requires proving path acyclicity — that following parent pointers eventually terminates. One-step compression (only the queried node is moved to root) is simpler and still beneficial; it avoids the acyclicity invariant entirely.
