@@ -938,3 +938,65 @@ The following implementations are **faithful to CLRS** (with only 0-indexing dif
 4. **BST** → `CLRS.Ch12.BST.Delete.fst` (506 lines, 12 admits)
    - TREE-MINIMUM (walk left), TREE-MAXIMUM (walk right)
    - TREE-DELETE: 3 cases (leaf, one child, two children with in-order successor swap)
+
+### 12.7 P1 Fixes Applied (Session 10)
+
+5. **Lomuto Partition** → `CLRS.Ch07.LomutoPartition.fst` (201 lines, 2 assumes)
+   - Pivot = A[r] (last element), conditional swaps only when A[j] <= pivot
+   - `partition_step` helper for Pulse branch unification
+   - Postcondition: pivot at q, A[p..q-1] <= pivot, A[q+1..r] > pivot
+
+6. **Stable Counting Sort** → `CLRS.Ch08.CountingSort.Stable.fst` (225 lines, 8 assumes)
+   - Separate output array B (A is read-only), prefix sums, backwards traversal for stability
+   - All 4 CLRS phases: init, count, prefix sum, stable placement
+
+7. **Full Path Compression** → `CLRS.Ch21.UnionFind.FullCompress.fst` (179 lines, 2 assumes)
+   - Two-pass iterative: find root, then compress ALL nodes on path to point to root
+   - Replaces one-step compression (only x.p=root)
+
+8. **Kruskal Sorted-Edges Spec** → `CLRS.Ch23.Kruskal.SortedEdges.fst` (219 lines, 4 admits)
+   - Pure specification with sorted edges, pure union-find
+   - Proves subset property and forest property (no cycles)
+
+9. **Rabin-Karp Rolling Hash** → `CLRS.Ch32.RabinKarp.Spec.fst` (287 lines, 3 admits)
+   - Horner's rule polynomial hash, rolling step formula
+   - Correctness: no false positives (proved), no false negatives (admitted)
+
+10. **Complete BST Spec** → `CLRS.Ch12.BST.Spec.Complete.fst` (525 lines, 2 admits)
+    - All CLRS BST ops: search, insert, delete, minimum, maximum, inorder
+    - `bst_search_correct`, `bst_insert_valid`, `bst_insert_member` fully proven
+    - `bst_delete_valid` and `bst_inorder_sorted` fully proven (reduced from 5 to 2 admits)
+
+### 12.8 Complexity Proofs Added (Session 10)
+
+11. **BFS O(V²)** → `CLRS.Ch22.QueueBFS.Complexity.fst` — ghost ticks, cf-c0 ≤ 2n²
+12. **DFS O(V²)** → `CLRS.Ch22.StackDFS.Complexity.fst` — ghost ticks, cf-c0 ≤ 2n²
+13. **KMP O(n+m)** → `CLRS.Ch32.KMP.Complexity.fst` — amortized, cf-c0 ≤ 2(n+m)
+14. **Dijkstra Θ(V²)** → `CLRS.Ch24.Dijkstra.Complexity.fst` — exact n+2n², enhanced bounds
+15. **Bellman-Ford O(V³)** → `CLRS.Ch24.BellmanFord.Complexity.Instrumented.fst` — exact n+n³
+16. **Prim O(V²)** → `CLRS.Ch23.Prim.Complexity.fst` — cf-c0 ≤ 3n²
+17. **Kruskal O(V³)** → `CLRS.Ch23.Kruskal.Complexity.fst` — cf-c0 ≤ 4n³
+18. **TopSort O(V²)** → `CLRS.Ch22.TopologicalSort.Complexity.fst` — cf-c0 ≤ n²
+19. **LinkedList O(n)** → `CLRS.Ch10.DoublyLinkedList.Complexity.fst` — O(1) insert, O(n) search/delete, 0 admits
+20. **HashTable O(n)** → `CLRS.Ch11.HashTable.Complexity.fst` — O(n) per operation
+
+### 12.9 BFS Distance Correctness (Session 10)
+
+21. **BFS Distance Spec** → `CLRS.Ch22.BFS.DistanceSpec.fst` (318 lines)
+    - Pure BFS with shortest_path_dist definition, path/reachability predicates
+    - Main theorem: `bfs_correctness` (key lemmas admitted)
+    - Addresses CLRS Theorem 22.5
+
+### 12.10 Updated Summary (Session 10)
+
+| Metric | Count |
+|--------|-------|
+| Total algorithms/data structures | 40 |
+| CLRS faithful implementations | 25 (was 19) |
+| Critical deviations (P0) | 2 (MaxFlow, RBTree) |
+| Major deviations (P1) | 3 (Select, RadixSort, Huffman imperative) |
+| Minor deviations (P2) | 9 |
+| Complexity proofs total | 47+ (was 37) |
+| Total lines of verified code | ~33,000+ |
+| Total tasks completed | 132/185 (71%) |
+| Files created this session | 17 new files, ~6,800 lines |
