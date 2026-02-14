@@ -542,3 +542,31 @@ AutoCLRS is an ambitious project with a solid foundation in some areas (sorting,
 - KMP O(n+m) proof uses potential function argument matching CLRS Theorem 32.4
 - **Named predicates** (e.g., `partition_ordered`, `partition_result`) are essential for Pulse postconditions to avoid `Seq.index` subtyping failures
 - **Conditional lemma calls** (taking a `flag: bool` parameter) avoid if/else ownership issues in Pulse when only one branch needs the lemma
+
+## 9. Proof Techniques and Patterns Discovered
+
+### 9.1 RBTree Balance Correctness (Ch13)
+
+The pure RBTree spec (`ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst`, 486 lines) proves that `insert` preserves BST ordering and all five Red-Black invariants, plus CLRS Theorem 13.1 (h ≤ 2·lg(n+1)). Key techniques discovered through iterative debugging:
+
+- **Okasaki-style `balance` with `almost_no_red_red`:** The standard Okasaki balance function handles four rotation cases. To prove it restores the no-red-red invariant, we introduce `almost_no_red_red`: a tree whose children satisfy `no_red_red` but whose root might violate (red root with a red child). The key insight is that `balance` applied to a black parent with one `almost_no_red_red` child produces a fully valid tree. This is split into `balance_restores_no_red_red_left` and `balance_restores_no_red_red_right` lemmas.
+
+- **First-order BST bounds (`all_lt` / `all_gt`) instead of higher-order predicates:** SMT cannot reason about BST ordering through rotations when using higher-order predicates like `all_keys (fun k -> k < v)`. The solution is first-order `all_lt t bound` / `all_gt t bound` predicates, with explicit `all_lt_weaken` and `all_gt_weaken` transitivity lemmas (if `all_lt t x` and `x < y`, then `all_lt t y`). These must be called explicitly in each of the four balance rotation cases.
+
+- **`color_bonus` for height bound:** Proving `height t ≤ 2 * bh t` fails for red-rooted subtrees. The fix uses a `color_bonus` function: `height t ≤ 2 * bh t + color_bonus t` where `color_bonus` is 1 for Red, 0 for Black. This accounts for the extra height a red root contributes without increasing black-height.
+
+- **Fuel requirements:** The `balance_restores_no_red_red` proofs require `--fuel 8 --ifuel 4 --z3rlimit 200` due to the deep case analysis (4 rotation patterns × 2 sides × color cases). Reducing fuel causes timeouts.
+
+- **`ins_properties` case split:** The main `ins` correctness lemma must case-split on the color of the current node, calling different balance lemmas for Black parents (where balance is applied) vs Red parents (where no rotation occurs).
+
+- **Termination via `height`:** F*'s `decreases t` metric doesn't work for pattern-matched subtrees of inductive `rbtree` type. Use `decreases (height t)` instead, which decreases on recursive calls to left/right subtrees.
+
+### 9.2 BFS Pure Specification Design (Ch22)
+
+The BFS spec (`ch22-elementary-graph/CLRS.Ch22.BFS.Spec.fst`, 164 lines) uses constructive level sets to avoid mutual recursion termination issues:
+
+- **`visited_after` / `frontier_at` with `(decreases k)`:** Define `frontier_at k` as vertices discovered at exactly level k, and `visited_after k` as all vertices discovered up to level k. These use simple recursion on level number k, with helper functions `next_visited` / `next_frontier` that don't recurse (they just scan the graph). This avoids mutual recursion termination issues.
+
+- **`has_frontier_neighbor` scans vertices 0..n:** To prove the edge property (CLRS Lemma 22.1), we need a function that checks whether a vertex has a neighbor in the current frontier. This scans all vertices in range [0, n) rather than iterating over an adjacency list, which is cleaner for proofs.
+
+- **Length lemma needs explicit induction:** The proof that `List.length (visited_after k)` is monotonically non-decreasing requires explicit induction; fuel 2 is insufficient for arbitrary k.
