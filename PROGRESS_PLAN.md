@@ -62,17 +62,36 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P0.3.6: Classify edges (tree, back, forward, cross) based on colors at discovery time
 - [ ] P0.3.7: Add ghost tick counter; prove O(V + E) complexity (or O(V²) for adjacency matrix)
 
-### P0.4 Red-Black Tree (Ch13) — Missing RB invariants and fixup
-- [x] P0.4.1: Define pure spec for RB tree as inductive type: `rbtree = Leaf | Node color left key right`
-- [x] P0.4.2: Define RB invariants: (a) root is black, (b) red nodes have black children, (c) all paths have equal black-height, (d) BST ordering
-- [x] P0.4.3: Define pure `rb_insert_spec tree key` returning the balanced tree after insertion (Okasaki-style balance with 4 rotation cases)
-- [ ] P0.4.4: Implement proper BST insert (find correct position by walking tree) in Pulse
-- [ ] P0.4.5: Implement RB-INSERT-FIXUP with all 6 cases (3 + 3 symmetric) in Pulse
-- [x] P0.4.6: Prove RB invariants maintained after insert+fixup (pure spec: `insert_is_rbtree`)
-- [x] P0.4.7: Prove BST ordering maintained after insert+fixup (pure spec: `insert_preserves_bst`)
-- [x] P0.4.8: Prove black-height is O(log n); height ≤ 2·lg(n+1) (pure spec: `height_bound_theorem`, CLRS Theorem 13.1)
-- [ ] P0.4.9: Add ghost tick counter; prove O(log n) for search and insert
-- [ ] P0.4.10: (Stretch) Implement RB-DELETE and RB-DELETE-FIXUP
+### P0.4 Linked List (Ch10) — Array-backed, NOT a linked list ⚠️
+- [ ] P0.4.1: Design Pulse representation for doubly-linked list: struct with `prev`, `next`, `key` fields, sentinel node or head pointer
+- [ ] P0.4.2: Implement LIST-INSERT(L, x): insert at HEAD (CLRS §10.2, O(1))
+- [ ] P0.4.3: Implement LIST-SEARCH(L, k): traverse from head following `next` pointers
+- [ ] P0.4.4: Implement LIST-DELETE(L, x): splice out node by updating `prev.next` and `next.prev` (O(1) given pointer to node)
+- [ ] P0.4.5: Define pure spec for linked list as sequence, prove insert prepends, delete removes correct element
+- [ ] P0.4.6: Prove list traversal visits all elements
+- [ ] P0.4.7: Add ghost tick counter: O(1) insert, O(1) delete, O(n) search
+- [ ] P0.4.8: (Current array-backed implementation should be renamed to ArrayList or removed)
+
+### P0.5 BST (Ch12) — Missing DELETE, TRANSPLANT, MINIMUM, MAXIMUM
+- [ ] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
+- [ ] P0.5.2: Implement TREE-MAXIMUM(x): walk right children until x.right == NIL (CLRS §12.2)
+- [ ] P0.5.3: Implement TRANSPLANT(T, u, v): replace subtree rooted at u with subtree rooted at v (CLRS §12.3)
+- [ ] P0.5.4: Implement TREE-DELETE(T, z): all 3 cases — no children, one child, two children (CLRS §12.3)
+- [ ] P0.5.5: Prove BST property maintained after TREE-DELETE
+- [ ] P0.5.6: Prove key set after delete = old keys minus deleted key
+- [ ] P0.5.7: Add ghost tick counter: O(h) for all operations
+
+### P0.6 Red-Black Tree (Ch13) — Missing RB invariants and fixup
+- [x] P0.6.1: Define pure spec for RB tree as inductive type: `rbtree = Leaf | Node color left key right`
+- [x] P0.6.2: Define RB invariants: (a) root is black, (b) red nodes have black children, (c) all paths have equal black-height, (d) BST ordering
+- [x] P0.6.3: Define pure `rb_insert_spec tree key` returning the balanced tree after insertion (Okasaki-style balance with 4 rotation cases)
+- [ ] P0.6.4: Implement proper BST insert (find correct position by walking tree) in Pulse
+- [ ] P0.6.5: Implement RB-INSERT-FIXUP with all 6 cases (3 + 3 symmetric) in Pulse
+- [x] P0.6.6: Prove RB invariants maintained after insert+fixup (pure spec: `insert_is_rbtree`)
+- [x] P0.6.7: Prove BST ordering maintained after insert+fixup (pure spec: `insert_preserves_bst`)
+- [x] P0.6.8: Prove black-height is O(log n); height ≤ 2·lg(n+1) (pure spec: `height_bound_theorem`, CLRS Theorem 13.1)
+- [ ] P0.6.9: Add ghost tick counter; prove O(log n) for search and insert
+- [ ] P0.6.10: (Stretch) Implement RB-DELETE and RB-DELETE-FIXUP
 
 ---
 
@@ -106,14 +125,14 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P1.3.7: Prove optimal substructure: subtrees of optimal tree are optimal for their character sets
 - [ ] P1.3.8: Add ghost tick counter; prove O(n log n) with binary heap, or O(n²) with linear scan
 
-### P1.4 BST Insert (Ch12) — Fix insert to maintain BST property *(Partial)*
+### P1.4 BST Insert (Ch12) — ⚠️ See also P0.5 for missing DELETE/MIN/MAX/TRANSPLANT
 - [x] P1.4.1: Added `subtree_in_range` (recursive BST with bounds) and `key_in_subtree` specs
 - [x] P1.4.2: Proved BST stepping lemmas (key_not_in_right_if_less, key_not_in_left_if_greater)
 - [x] P1.4.3: Prove BST property maintained after insert (needs ghost bounds in loop invariant)
 - [x] P1.4.4: Prove set of keys is `old_keys ∪ {new_key}`
 - [ ] P1.4.5: Add ghost tick counter; prove O(h) where h is tree height
-- [ ] P1.4.6: Implement TREE-DELETE (CLRS §12.3)
-- [ ] P1.4.7: Prove BST property maintained after delete
+- [ ] P1.4.6: ~~Implement TREE-DELETE (CLRS §12.3)~~ → Moved to P0.5.4
+- [ ] P1.4.7: ~~Prove BST property maintained after delete~~ → Moved to P0.5.5
 
 ### P1.5 KMP Matcher (Ch32) — Complete the search
 - [x] P1.5.1: Define pure spec for KMP match positions: `matches_at`, `check_match_at`, `count_matches_spec`
@@ -188,10 +207,10 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P2.9.3: Prove `search key == None` when key not inserted
 - [ ] P2.9.4: Add ghost tick counter; prove O(n) worst case per operation (O(1) amortized requires load factor analysis)
 
-### P2.10 Linked List (Ch10) — Add delete operation
-- [x] P2.10.1: Implement LIST-DELETE (CLRS §10.2)
-- [x] P2.10.2: Prove list contents after delete = list contents before delete minus the deleted element
-- [ ] P2.10.3: Add ghost tick counter; prove O(n) for search, O(1) for insert/delete
+### P2.10 Linked List (Ch10) — ⚠️ SUPERSEDED by P0.4 (must rewrite as proper doubly-linked list)
+- [x] P2.10.1: ~~Implement LIST-DELETE~~ — N/A, current impl is array-backed, not a linked list
+- [x] P2.10.2: ~~Prove list contents~~ — N/A, needs rewrite
+- [ ] P2.10.3: ~~Add ghost tick counter~~ — depends on P0.4 rewrite
 
 ---
 
@@ -291,15 +310,15 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Phase | Description | Total | Done | Remaining |
 |-------|-------------|-------|------|-----------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 9 | 32 |
-| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 31 | 18 | 13 |
+| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 9 | 47 |
+| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 18 | 11 |
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 32 | 9 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 5 | 14 |
-| **Total** | | **172** | **68** | **104** |
+| **Total** | | **185** | **100** | **85** |
 
+**CLRS Faithfulness (from Section 12 audit): 15 faithful / 6 critical / 8 major / 9 minor deviations**
 **Complexity proof coverage: 33 files across 21/23 chapters (91% chapter coverage)**
-**This session: InsertionSort/BinarySearch/MaxSubarray/Partition external ghost counters, Vertex Cover 2-approximation proof**
 
 ---
 
@@ -334,31 +353,31 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 04 | Binary Search | §2.3 ex | **Strong**: found ⟹ `s[idx] == key`, not found ⟹ `key ∉ s` | **Pulse** O(log n) — external ghost counter, `complexity_bounded_log` in postcondition | 139+185 | ✓ |
 | 04 | Max Subarray (Kadane) | §4.1 | **Strong**: `result == max_subarray_spec s0` (pure Kadane spec) | **Pulse** Θ(n) — external ghost counter, `complexity_bounded_linear` in postcondition | 113+140 | ✓ |
 | 06 | Heapsort | §6.1–6.4 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 671+97 | ✓ |
-| 07 | Partition | §7.1 | **Strong**: `is_partitioned s pivot split ∧ permutation s0 s` | **Pulse** Θ(n) — external ghost counter, `complexity_bounded_linear` in postcondition | 239+267 | ✓ |
+| 07 | Partition | §7.1 | **Strong** but **P1 deviation**: not Lomuto — pivot passed as parameter (not A[r]), conditional writes not swaps. `is_partitioned s pivot split ∧ permutation s0 s` | **Pulse** Θ(n) — external ghost counter | 239+267 | ⚠️ P1 |
 | 07 | Quicksort | §7.1–7.2 | **Strong**: `sorted s ∧ permutation s0 s` (recursive, in-place) | **Pure** O(n²) worst | 578+118 | ✓ |
-| 08 | Counting Sort | §8.2 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** Θ(n+k) | 180+30 | ✓ |
-| 08 | Radix Sort | §8.3 | **Strong**: pure spec with digit extraction, stability, CLRS Lemma 8.3 | **Pure** O(d(n+k)) | 79+263 | ✓ |
+| 08 | Counting Sort | §8.2 | **Strong** but **P1 deviation**: writes in-place to A (not separate array B), forward scan (not backward). Affects stability argument. | **Pure** Θ(n+k) | 180+30 | ⚠️ P1 |
+| 08 | Radix Sort | §8.3 | **Strong** but **P1 deviation**: d=1 only (single digit). Just wraps CountingSort once. No multi-pass loop. | **Pure** O(d(n+k)) | 79+263 | ⚠️ P1 |
 | 09 | Min / Max | §9.1 | **Strong**: `result == Seq.index s min_idx ∧ ∀i. result ≤ s[i]` | **Pulse** O(n) (161 lines) | 130+161 | ✓ |
-| 09 | Select (partial sort) | §9.1 | **Strong**: pure spec `select_spec s k = Seq.index (pure_sort s) k`, `is_sorted`, `is_permutation`, partition property | **Pure** O(nk) | 273+135+379 | ✓ |
+| 09 | Select (partial sort) | §9.1 | **Strong** but **P1 deviation**: O(nk) partial selection sort, not CLRS RANDOMIZED-SELECT O(n). | **Pure** O(nk) | 273+135+379 | ⚠️ P1 |
 | 09 | Quickselect | §9.2 | **Medium**: `permutation s0 s ∧ result == s[k]`; partition ordering proved | **Pure** O(n²) worst | 279+48 | ✓ |
 | 10 | Stack | §10.1 | **Strong**: pure LIFO spec, push/pop correctness, size lemmas | **Pure** O(1) push/pop | 294+94+322 | ✓ |
 | 10 | Queue | §10.1 | **Strong**: pure FIFO spec (two-list), `queue_to_list (enqueue q x) == queue_to_list q @ [x]` | **Pure** O(1) per op | 436+94+322 | ✓ |
-| 10 | Linked List | §10.2 | **Strong**: pure spec with insert/delete/search, all correctness lemmas, zero admits | **Pure** O(n) search | 183+94+224 | ✓ |
+| 10 | Linked List | §10.2 | **Broken**: array-backed contiguous list, NOT a doubly-linked list. No prev/next pointers. Insert at END not HEAD. No delete. Pure spec is correct but imperative code is wrong DS. | **Pure** O(n) search | 183+94+224 | ⚠️ P0 |
 | 11 | Hash Table (open addr.) | §11.4 | **Strong**: pure assoc-list spec, insert/search/delete correctness, non-interference | **Pure** O(n) worst | 224+35+209 | ✓ |
-| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree` (completeness); `subtree_in_range` ordering | **Pure** O(h) | 382+125+312 | ✓ |
-| 12 | BST Insert | §12.3 | **Strong**: pure spec proves BST ordering preserved after insert, key set = old ∪ {new} | **Pure** O(h) | 382+395 | ✓ |
-| 13 | Red-Black Tree | §13.1–13.4 | **Strong**: pure spec with `is_rbtree`, `insert_is_rbtree`, `insert_preserves_bst`, CLRS Theorem 13.1 `h ≤ 2·lg(n+1)`. Imperative code still array-backed BST | — | 257+486 | ✓ |
+| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree` (completeness); `subtree_in_range` ordering. **Missing:** TREE-MINIMUM, TREE-MAXIMUM | **Pure** O(h) | 382+125+312 | ⚠️ P0 |
+| 12 | BST Insert | §12.3 | **Strong**: pure spec proves BST ordering preserved after insert, key set = old ∪ {new}. **Missing:** TREE-DELETE, TRANSPLANT (60% of Ch12 unimplemented) | **Pure** O(h) | 382+395 | ⚠️ P0 |
+| 13 | Red-Black Tree | §13.1–13.4 | **Broken (imperative)**: array-backed BST with rotation stubs but NO RB-INSERT-FIXUP (0/6 cases), NO RB-DELETE, color never maintained. **Pure spec is correct** (486 lines): `is_rbtree`, `insert_is_rbtree`, `insert_preserves_bst`, Theorem 13.1. | — | 257+486 | ⚠️ P0 |
 | 15 | Rod Cutting | §15.1 | **Strong**: pure spec with `valid_cutting`, `optimal_revenue`, DP table correctness, optimal substructure (CLRS Eq 15.2) | **Pulse** O(n²) — ghost ticks (263 lines) | 253+263+301 | ✓ |
 | 15 | LCS | §15.4 | **Strong**: `result == lcs_length x y m n` (pure recursive spec) | **Pulse** O(mn) — ghost ticks (246 lines) | 293+246 | ✓ |
 | 15 | Matrix Chain | §15.2 | **Strong**: `result == mc_cost dims n` (pure recursive spec) | **Pure** O(n³) | 280+106 | ✓ |
 | 16 | Activity Selection | §16.1 | **Strong**: greedy choice property (Thm 16.1), optimal substructure, full optimality theorem | **Pure** O(n log n) | 149+138+463 | ✓ |
-| 16 | Huffman (cost only) | §16.3 | **Weak**: `cost ≥ 0 ∧ (n>1 ⟹ cost>0)` — no tree constructed | — | 270 | ✓ |
+| 16 | Huffman (cost only) | §16.3 | **P1 deviation**: computes cost only, no tree constructed. Uses linear scan not priority queue. | — | 270 | ⚠️ P1 |
 | 16 | Huffman Spec (pure) | §16.3 | **Strong**: `htree` type, `wpl_equals_cost`, greedy choice property (Lemma 16.2), optimal substructure (Lemma 16.3), swap lemma | — | 446 | ✓ |
-| 21 | Union-Find | §21.1–21.3 | **Strong**: pure spec with rank invariant (Lemma 21.4), find termination, rank monotonicity | **Pure** O(n) find, O(1) union | 334+40+361 | ✓ |
-| 22 | BFS | §22.2 | **Medium**: iterative relaxation impl + pure BFS spec with level sets, edge property (Lemma 22.1) | **Pure** O(V²) | 257+69+164 | ✓ |
-| 22 | DFS | §22.3 | **Strong**: pure spec with colors, discovery/finish timestamps, parenthesis theorem (Thm 22.7), edge classification | **Pure** O(V²) | 213+69+445 | ✓ |
+| 21 | Union-Find | §21.1–21.3 | **Strong** but **P1 deviation**: only one-step path compression (x.p=root), not full CLRS path compression. | **Pure** O(n) find, O(1) union | 334+40+361 | ⚠️ P1 |
+| 22 | BFS | §22.2 | **Broken**: imperative code is iterative relaxation (triple-nested loops), NOT queue-based BFS. No FIFO queue, no GRAY state, identical to DFS. Pure spec is correct. | **Pure** O(V²) | 257+69+164 | ⚠️ P0 |
+| 22 | DFS | §22.3 | **Broken**: imperative code is identical to BFS (iterative relaxation). No recursion/stack, no timestamps, no edge classification. Pure spec is correct. | **Pure** O(V²) | 213+69+445 | ⚠️ P0 |
 | 22 | Topological Sort | §22.4 | **Strong**: pure spec with `is_topological_order`, `is_dag`, topo-order-implies-DAG proof | **Pure** O(V²) | 315+69+239 | ✓ |
-| 23 | Kruskal's MST | §23.2 | **Strong**: pure spec with forest/components, safe-edge property via cut property, spanning tree + MST theorems | **Pure** O(V³) | 273+102+466 | ✓ |
+| 23 | Kruskal's MST | §23.2 | **Strong** but **P1 deviation**: does NOT sort edges — uses O(n⁴) repeated minimum-finding. | **Pure** O(V³) | 273+102+466 | ⚠️ P1 |
 | 23 | Prim's MST | §23.2 | **Strong**: pure spec with safe-edge property (Corollary 23.2), spanning tree + MST via cut property | **Pure** O(V²) | 304+102+450 | ✓ |
 | 24 | Bellman-Ford | §24.1 | **Strong**: pure spec with convergence (Lemma 24.2), upper-bound property, negative-cycle detection | **Pure** O(V³) | 344+101+453 | ✓ |
 | 24 | Dijkstra | §24.3 | **Strong**: `tri ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pulse** O(V²) — external ghost counter, `dijkstra_complexity_bounded` | 393+285 | ✓ |
@@ -370,7 +389,7 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 31 | Modular Exp | §31.6 | **Strong**: `result == mod_exp_spec b e m` (pure spec) | **Pure** O(log e) | 174+211 | ✓ |
 | 32 | Naive String Match | §32.1 | **Strong**: `result == naive_match_spec text pattern` (pure spec) | **Pure** O(nm) | 202+213 | ✓ |
 | 32 | KMP | §32.4 | **Strong**: prefix function + full MATCHER; `result == kmp_search_spec` | **Pure** O(n+m) | 437+235 | ✓ |
-| 32 | Rabin-Karp | §32.2 | **Strong**: `compute_hash == hash_spec`; match via hash comparison | **Pure** O(nm) worst | 404+111 | ✓ |
+| 32 | Rabin-Karp | §32.2 | **Strong** but **P1 deviation**: simple sum hash, not CLRS modular polynomial rolling hash | **Pure** O(nm) worst | 404+111 | ⚠️ P1 |
 | 33 | Segment Intersection | §33.1 | **Strong**: `result == cross_product_spec / direction_spec / on_segment_spec` | **Pure** O(1) | 155+74 | ✓ |
 | 35 | Vertex Cover (2-approx) | §35.1 | **Strong**: valid cover + `|C_alg| ≤ 2|C_opt|` (Theorem 35.1) | **Pure** O(V²) | 213+43+274 | ✓ |
 
@@ -379,10 +398,13 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Metric | Count |
 |--------|-------|
 | Total algorithms/data structures | 40 |
-| **Strong** functional spec | 40 (100% — all have pure specs now) |
+| **Strong** functional spec | 38 (95%) |
 | **Medium** functional spec | 0 |
 | **Weak** functional spec | 0 |
-| **Broken** (not the claimed algorithm) | 2 (BFS/MaxFlow imperative code) |
+| **Broken** (not the claimed algorithm) | 6 (LinkedList, BFS, DFS, MaxFlow, RBTree imperative, BST missing ops) |
+| CLRS Faithful implementations | 15 (InsertionSort, MergeSort, Heapsort, BinarySearch, Stack, Queue, DP, KMP, etc.) |
+| CLRS Major deviations (P1) | 8 (Partition, Select, RadixSort, Huffman, Kruskal, UnionFind, CountingSort, RabinKarp) |
+| CLRS Minor deviations (P2) | 9 (BellmanFord rounds, Dijkstra linear scan, no predecessor arrays, etc.) |
 | Complexity proofs (Pulse, in postcondition) | 14 |
 | Complexity proofs (Pure, standalone) | 23 |
 | Complexity proofs total | 37 (93%) |
@@ -391,5 +413,5 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Admits | 87 (mostly in graph theory, exchange arguments, and hard inductive steps) |
 | Assumes | 2 (DFS termination — white count decrease) |
 | Source files | 117 |
-| Tasks completed | 100/173 (58%) |
-| Tasks remaining | 73/173 (42%) |
+| Tasks completed | 100/185 (54%) |
+| Tasks remaining | 85/185 (46%) |

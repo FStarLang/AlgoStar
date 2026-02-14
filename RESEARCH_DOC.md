@@ -779,3 +779,142 @@ The `CLRS.Ch09.Select.Spec.fst` agent produced a file that failed verification d
 - Thread ghost tick counters through MergeSort, HeapSort, Quicksort (complex due to recursion + pts_to_range)
 - Eliminate admits in graph theory specs (cycle topology, exchange arguments)
 - Connect pure specs to Pulse implementations (refinement proofs)
+
+## 12. Systematic CLRS Pseudocode Audit (Session 8)
+
+A line-by-line comparison of every AutoCLRS implementation against the CLRS 3rd edition pseudocode. Findings are classified by severity:
+- **P0 (Critical):** Algorithm is fundamentally not what CLRS describes — wrong data structure, missing core logic, or produces trivially wrong output.
+- **P1 (Major):** Algorithm works but uses a significantly different approach than CLRS — different partitioning scheme, simplified hash, single-digit only, etc.
+- **P2 (Minor):** Algorithm follows CLRS closely but has minor omissions — no predecessor arrays, no solution reconstruction, linear scan instead of heap, etc.
+
+### 12.1 P0 — Critical Deviations (Must Fix)
+
+**1. Linked List (Ch10 §10.2): Array-backed, not a linked list at all**
+- CLRS defines a **doubly linked list** with `prev`, `next`, `key` pointers
+- AutoCLRS uses a **contiguous array** (like ArrayList/Vec) with a size counter
+- `list_insert` appends at the END; CLRS inserts at the HEAD in O(1)
+- No `prev`/`next` pointer manipulation; no `list_delete` operation
+- This is not a linked list in any sense — it's an unrelated data structure
+
+**2. BFS (Ch22 §22.2): Iterative relaxation, not BFS**
+- CLRS uses a **FIFO queue**, dequeuing vertices level-by-level
+- AutoCLRS uses triple-nested loops (`round × vertex × vertex`) doing iterative relaxation
+- No queue, no GRAY state, no predecessor array `π[]`
+- **Identical code to DFS** — both files implement the same algorithm
+
+**3. DFS (Ch22 §22.3): Copy of BFS, not DFS**
+- CLRS uses **recursion** (or explicit stack) with discovery/finish timestamps
+- AutoCLRS has identical code to BFS (iterative relaxation)
+- No `d[]`/`f[]` timestamps, no edge classification, no parenthesis theorem
+- Explicitly admitted in file comments
+
+**4. Max Flow (Ch26 §26.2): Returns zero flow**
+- CLRS Ford-Fulkerson requires BFS on residual graph, augmenting paths, flow augmentation
+- AutoCLRS initializes all flow to zero and returns immediately
+- Proves capacity/conservation constraints are satisfied — trivially, by the zero flow
+- **Not an algorithm — it's a proof that zero is a valid flow**
+
+**5. Red-Black Tree (Ch13 §13.1-13.4): BST skeleton with color field**
+- CLRS requires LEFT-ROTATE, RIGHT-ROTATE, RB-INSERT-FIXUP (6 cases), RB-DELETE-FIXUP (8 cases)
+- AutoCLRS has rotation stubs but **no RB-INSERT-FIXUP** — insertions don't restore RB properties
+- Color field exists but is **never maintained**
+- No RB-DELETE at all
+- Array-backed representation (not pointer-based)
+
+**6. BST (Ch12 §12.1-12.3): Missing 60% of operations**
+- Array-backed (implicit binary tree at indices 2i+1, 2i+2), not pointer-based
+- TREE-SEARCH and TREE-INSERT implemented correctly for array representation
+- **Missing:** TREE-DELETE, TRANSPLANT, TREE-MINIMUM, TREE-MAXIMUM
+- Only 40% of CLRS Chapter 12 is implemented
+
+### 12.2 P1 — Major Deviations (Should Fix)
+
+**7. Partition (Ch07 §7.1): Not Lomuto partition**
+- CLRS: pivot is `A[r]` (last element), single `i` pointer, conditional swaps
+- AutoCLRS: pivot passed as parameter, uses conditional writes (always writes to array even when not swapping)
+- Functionally produces a correct partition but algorithmically different
+
+**8. Select (Ch09 §9.2): O(nk) selection sort, not O(n) quickselect**
+- CLRS RANDOMIZED-SELECT uses partition-based selection in O(n) expected
+- AutoCLRS `Select.fst` uses partial selection sort: O(nk)
+- A separate `Quickselect.fst` exists with proper partition-based selection
+
+**9. RadixSort (Ch08 §8.3): Single digit (d=1)**
+- CLRS iterates over d digits, calling stable sort each time
+- AutoCLRS just calls CountingSort once — effectively d=1
+- No digit extraction, no multi-pass loop
+
+**10. Huffman (Ch16 §16.3): Cost only, no tree**
+- CLRS builds a tree by merging minimum-frequency nodes from a priority queue
+- AutoCLRS computes the total cost but constructs no tree
+- Uses linear scan instead of priority queue
+
+**11. Kruskal (Ch23 §23.2): No edge sorting**
+- CLRS sorts edges by weight, then greedily adds safe edges
+- AutoCLRS uses repeated linear-scan minimum finding (O(n⁴) vs O(E log E))
+- Union-Find is correctly implemented
+
+**12. Union-Find (Ch21 §21.3): One-step path compression only**
+- CLRS FIND-SET uses **full** path compression: all nodes on path point to root
+- AutoCLRS only compresses one step: `x.p = root` (only the queried node)
+- Functionally correct but doesn't achieve CLRS's amortized O(α(n))
+
+**13. CountingSort (Ch08 §8.2): In-place output**
+- CLRS writes to separate output array B for stability
+- AutoCLRS writes back to input array A
+- Phase 2 writes values in ascending order by value (forward scan), not CLRS's backward scan
+
+**14. Rabin-Karp (Ch32 §32.2): Sum-based hash**
+- CLRS uses modular polynomial rolling hash: `t_{s+1} = (d(t_s - T[s]·h) + T[s+m]) mod q`
+- AutoCLRS uses simple character sum as hash
+- Still performs spurious hit checks, but hash quality is worse
+
+### 12.3 P2 — Minor Deviations
+
+**15. Bellman-Ford (Ch24 §24.1):** Runs V rounds instead of V-1 (harmless extra round)
+
+**16. Dijkstra (Ch24 §24.3):** Linear scan O(V²) instead of min-heap O((V+E) log V). Correct for dense graphs.
+
+**17. Prim (Ch23 §23.2):** No predecessor array π[]. Returns key values but cannot reconstruct MST edges.
+
+**18. Extended-GCD (Ch31 §31.2):** Not implemented. Only basic Euclid GCD.
+
+**19. ModExp (Ch31 §31.6):** Processes bits LSB→MSB (right-to-left). CLRS does MSB→LSB. Mathematically equivalent.
+
+**20. MatrixChain/LCS (Ch15 §15.3-15.4):** No solution reconstruction tables (s[] for MatrixChain, b[] for LCS).
+
+**21. BellmanFord/Dijkstra (Ch24):** Neither maintains predecessor array π[] for path reconstruction.
+
+**22. HashTable insert (Ch11 §11.4):** Unconditionally writes to slot even when not inserting (harmless — writes same value back).
+
+**23. MinMax (Ch09 §9.1):** Separate find_min/find_max. CLRS describes simultaneous min-max with 3⌊n/2⌋ comparisons.
+
+### 12.4 What's Correct
+
+The following implementations are **faithful to CLRS** (with only 0-indexing differences):
+- **Insertion Sort** (Ch02): Correct inner/outer loop, shift+insert ✓
+- **Merge Sort** (Ch02): Correct merge + recursive split ✓
+- **Heapsort** (Ch06): Correct max-heapify, build-max-heap, heapsort ✓
+- **Binary Search** (Ch04): Correct lo/hi/mid ✓
+- **Stack** (Ch10): Array + top pointer, correct push/pop ✓
+- **Queue** (Ch10): Circular buffer with head/tail wrapping ✓
+- **Rod Cutting** (Ch15): Correct DP recurrence ✓
+- **Matrix Chain** (Ch15): Correct triple-nested loop (l, i, k) ✓
+- **LCS** (Ch15): Correct diagonal/left/up table filling ✓
+- **Activity Selection** (Ch16): Correct earliest-finish greedy ✓
+- **Floyd-Warshall** (Ch25): Correct triple-nested loop ✓
+- **GCD** (Ch31): Correct Euclid's algorithm (iterative) ✓
+- **ModExp** (Ch31): Correct repeated squaring ✓
+- **Naive String Match** (Ch32): Correct all-shifts check ✓
+- **KMP** (Ch32): Both prefix function AND matcher ✓
+
+### 12.5 Summary
+
+| Severity | Count | Examples |
+|----------|-------|---------|
+| **P0 Critical** | 6 | LinkedList, BFS, DFS, MaxFlow, RBTree, BST (missing ops) |
+| **P1 Major** | 8 | Partition, Select, RadixSort, Huffman, Kruskal, UnionFind, CountingSort, RabinKarp |
+| **P2 Minor** | 9 | BellmanFord rounds, Dijkstra linear scan, no predecessor arrays, no reconstruction |
+| **Correct** | 15 | InsertionSort, MergeSort, Heapsort, BinarySearch, Stack, Queue, DP algorithms, KMP |
+
+**Bottom line:** 15 of 38 implementations faithfully follow CLRS. 6 are critically wrong (different algorithm or missing core functionality). 8 use major shortcuts. 9 have minor omissions.
