@@ -73,6 +73,11 @@ let mat_mul_partial_ij (sa sb sc: Seq.seq int) (n ri cj: nat) : prop =
   (forall (i j: nat). (i < ri \/ (i == ri /\ j < cj)) /\ i < n /\ j < n ==>
     Seq.index sc (flat_index n i j) == dot_product_spec sa sb n i j n)
 
+// ========== Complexity bound predicate ==========
+
+let complexity_bounded_cubic (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n * n * n
+
 // ========== Main Algorithm with Complexity ==========
 
 fn matrix_multiply_complexity
@@ -84,10 +89,13 @@ fn matrix_multiply_complexity
   (#sb: Ghost.erased (Seq.seq int))
   (#sc: Ghost.erased (Seq.seq int))
   (n: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to a #pa sa **
     A.pts_to b #pb sb **
     A.pts_to c sc **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       SZ.fits (SZ.v n * SZ.v n) /\
@@ -95,14 +103,17 @@ fn matrix_multiply_complexity
       Seq.length sb == SZ.v n * SZ.v n /\
       Seq.length sc == SZ.v n * SZ.v n
     )
-  ensures exists* sc'.
+  ensures exists* sc' (cf: nat).
     A.pts_to a #pa sa **
     A.pts_to b #pb sb **
     A.pts_to c sc' **
-    pure (mat_mul_correct sa sb sc' (SZ.v n))
+    GR.pts_to ctr cf **
+    pure (
+      mat_mul_correct sa sb sc' (SZ.v n) /\
+      complexity_bounded_cubic cf (reveal c0) (SZ.v n)
+    )
 {
   let mut i: SZ.t = 0sz;
-  let ctr = GR.alloc #nat 0;
 
   while (!i <^ n)
   invariant exists* vi sc_i (vc : nat).
@@ -115,8 +126,9 @@ fn matrix_multiply_complexity
       SZ.v vi <= SZ.v n /\
       Seq.length sc_i == SZ.v n * SZ.v n /\
       mat_mul_partial_ij sa sb sc_i (SZ.v n) (SZ.v vi) 0 /\
-      // Complexity: vc == vi * n * n
-      vc == SZ.v vi * SZ.v n * SZ.v n
+      // Complexity: vc - c0 == vi * n * n
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi * SZ.v n * SZ.v n
     )
   {
     let vi = !i;
@@ -135,8 +147,9 @@ fn matrix_multiply_complexity
         SZ.v vj <= SZ.v n /\
         Seq.length sc_ij == SZ.v n * SZ.v n /\
         mat_mul_partial_ij sa sb sc_ij (SZ.v n) (SZ.v vi) (SZ.v vj) /\
-        // Complexity: vc == vi*n*n + vj*n
-        vc_ij == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n
+        // Complexity: vc - c0 == vi*n*n + vj*n
+        vc_ij >= reveal c0 /\
+        vc_ij - reveal c0 == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n
       )
     {
       let vj = !j;
@@ -168,8 +181,9 @@ fn matrix_multiply_complexity
           SZ.v idx_c < SZ.v n * SZ.v n /\
           mat_mul_partial_k sa sb sc_ijk (SZ.v n) (SZ.v vi) (SZ.v vj) (SZ.v vk) /\
           mat_mul_partial_ij sa sb sc_ijk (SZ.v n) (SZ.v vi) (SZ.v vj) /\
-          // Complexity: vc == vi*n*n + vj*n + vk
-          vc_ijk == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n + SZ.v vk
+          // Complexity: vc - c0 == vi*n*n + vj*n + vk
+          vc_ijk >= reveal c0 /\
+          vc_ijk - reveal c0 == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n + SZ.v vk
         )
       {
         let vk = !k;
@@ -201,11 +215,6 @@ fn matrix_multiply_complexity
     i := vi +^ 1sz;
   };
 
-  // At exit: vc == n * n * n == n³
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v n * SZ.v n * SZ.v n));
-
-  GR.free ctr;
   ()
 }
 
