@@ -24,6 +24,7 @@ open FStar.SizeT
 module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
+module Classical = FStar.Classical
 
 // ========== Ghost tick ==========
 
@@ -146,18 +147,29 @@ let rec lemma_gcd_steps_log (a b: nat)
     )
 #pop-options
 
+// ========== Complexity bound predicate ==========
+let gcd_complexity_bounded (cf c0: nat) (a_init b_init: nat) : prop =
+  cf >= c0 /\
+  cf - c0 == gcd_steps a_init b_init /\
+  (b_init > 0 ==> cf - c0 <= op_Multiply 2 (num_bits b_init) + 1)
+
 // ========== Pulse Implementation with Complexity ==========
 
 #set-options "--z3rlimit 10"
 
 fn gcd_complexity (a_init b_init: SZ.t)
-  requires pure (SZ.v a_init > 0 \/ SZ.v b_init > 0)
+  (ctr: GR.ref nat) (#c0: erased nat)
+  requires GR.pts_to ctr c0 ** pure (SZ.v a_init > 0 \/ SZ.v b_init > 0)
   returns result: SZ.t
-  ensures pure (SZ.v result == gcd_spec (SZ.v a_init) (SZ.v b_init))
+  ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (
+    SZ.v result == gcd_spec (SZ.v a_init) (SZ.v b_init) /\
+    cf >= reveal c0 /\
+    cf - reveal c0 == gcd_steps (SZ.v a_init) (SZ.v b_init) /\
+    (SZ.v b_init > 0 ==> cf - reveal c0 <= op_Multiply 2 (num_bits (SZ.v b_init)) + 1)
+  )
 {
   let mut a: SZ.t = a_init;
   let mut b: SZ.t = b_init;
-  let ctr = GR.alloc #nat 0;
   
   while (!b >^ 0sz)
   invariant exists* va vb (vc : nat).
@@ -168,7 +180,8 @@ fn gcd_complexity (a_init b_init: SZ.t)
       gcd_spec (SZ.v va) (SZ.v vb) == gcd_spec (SZ.v a_init) (SZ.v b_init) /\
       (SZ.v va > 0 \/ SZ.v vb > 0) /\
       // Track number of steps taken + steps remaining = total steps
-      vc + gcd_steps (SZ.v va) (SZ.v vb) == gcd_steps (SZ.v a_init) (SZ.v b_init)
+      vc - reveal c0 + gcd_steps (SZ.v va) (SZ.v vb) == gcd_steps (SZ.v a_init) (SZ.v b_init) /\
+      vc >= reveal c0
     )
   {
     let va = !a;
@@ -177,31 +190,19 @@ fn gcd_complexity (a_init b_init: SZ.t)
     let temp = SZ.rem va vb;
     
     assert pure (gcd_spec (SZ.v va) (SZ.v vb) == gcd_spec (SZ.v vb) (SZ.v temp));
-    
-    // Maintain gcd_steps invariant: gcd_steps va vb = 1 + gcd_steps vb temp
     assert pure (gcd_steps (SZ.v va) (SZ.v vb) == 1 + gcd_steps (SZ.v vb) (SZ.v temp));
     
     a := vb;
     b := temp;
-    
-    // Count the division — one ghost tick
     tick ctr;
   };
   
   let va = !a;
   assert pure (gcd_spec (SZ.v va) 0 == SZ.v va);
-  
-  // At termination: vb = 0, so gcd_steps(va, 0) = 0
   assert pure (gcd_steps (SZ.v va) 0 == 0);
   
-  // Complexity bound: vc = gcd_steps(a_init, b_init)
   // Apply logarithmic bound theorem
-  // When b_init > 0: vc ≤ 2 * num_bits(b_init) + 1 ∈ O(log b)  
-  // When b_init = 0: vc = 0 (loop never executed)
+  Classical.move_requires (lemma_gcd_steps_log (SZ.v a_init)) (SZ.v b_init);
   
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == gcd_steps (SZ.v a_init) (SZ.v b_init)));
-  
-  GR.free ctr;
   va
 }

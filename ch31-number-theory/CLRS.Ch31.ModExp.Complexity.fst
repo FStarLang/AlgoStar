@@ -141,20 +141,27 @@ let lemma_log2f_halve_le (n: int)
   = if n > 1 then lemma_log2f_halve n
     else ()
 
+// ========== Complexity bound predicate ==========
+let modexp_complexity_bounded (cf c0: nat) (e_init: nat) : prop =
+  cf >= c0 /\ cf - c0 <= log2f e_init + 1
+
 // ========== Pulse Implementation with Complexity ==========
 
 #push-options "--z3rlimit 20"
 fn mod_exp_complexity (b_init: int) (e_init: nat) (m_init: pos)
-  requires emp ** pure (m_init > 1 /\ e_init > 0)
+  (ctr: GR.ref nat) (#c0: erased nat)
+  requires GR.pts_to ctr c0 ** pure (m_init > 1 /\ e_init > 0)
   returns result: int
-  ensures emp ** pure (result == mod_exp_spec b_init e_init m_init)
+  ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (
+    result == mod_exp_spec b_init e_init m_init /\
+    modexp_complexity_bounded cf (reveal c0) e_init
+  )
 {
   pow_mod_base b_init e_init m_init;
 
   let mut result: int = 1;
   let mut base: int = b_init % m_init;
   let mut exp: int = e_init;
-  let ctr = GR.alloc #nat 0;
 
   while (
     let ve = !exp;
@@ -170,10 +177,10 @@ fn mod_exp_complexity (b_init: int) (e_init: nat) (m_init: pos)
       vr >= 0 /\ vr < m_init /\
       vb >= 0 /\ vb < m_init /\
       (vr * pow vb ve) % m_init == mod_exp_spec b_init e_init m_init /\
-      // Complexity: overall bound
-      vc <= log2f e_init + 1 /\
-      // Tighter bound while loop is still running
-      (ve > 0 ==> vc + log2f ve <= log2f e_init)
+      // Complexity: overall bound (relative to c0)
+      vc >= reveal c0 /\
+      vc - reveal c0 <= log2f e_init + 1 /\
+      (ve > 0 ==> (vc - reveal c0) + log2f ve <= log2f e_init)
     )
   {
     let ve = !exp;
@@ -181,11 +188,7 @@ fn mod_exp_complexity (b_init: int) (e_init: nat) (m_init: pos)
     let vb = !base;
 
     mod_exp_step vr vb ve m_init;
-
-    // Count the squaring step — one ghost tick
     tick ctr;
-
-    // Complexity: halving ve reduces log2f (or stays within bound)
     lemma_log2f_halve_le ve;
 
     if (ve % 2 = 1) {
@@ -201,11 +204,6 @@ fn mod_exp_complexity (b_init: int) (e_init: nat) (m_init: pos)
     exp := ve2 / 2;
   };
 
-  // At loop exit: ve == 0, so vc <= log2f(e_init) + 1
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr <= log2f e_init + 1));
-
-  GR.free ctr;
   !result
 }
 #pop-options
