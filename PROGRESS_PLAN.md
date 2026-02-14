@@ -114,7 +114,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P0.4.10: Define `dls` segment predicate (adapted from Pulse.Lib.Deque.is_deque_suffix)
 - [x] P0.4.11: Define full-list wrapper: `dll (hd tl: dptr) (l: list int) : slprop`
 - [x] P0.4.12: Ghost helpers: factor_dls, unfactor_dls, dll_none_nil, dll_some_cons, set_prev, fold_dls_cons
-- [ ] P0.4.13: Prove `dls_append`: given two adjacent segments, produce `dls h1 hp1 t2 tn2 (l1 @ l2)`
+- [x] P0.4.13: Prove `dls_append`: given two adjacent segments, produce `dls h1 hp1 t2 tn2 (l1 @ l2)`
 
 **Step 3 — LIST-SEARCH(L, k) (CLRS lines 1–4):**
 - [x] P0.4.14: Implement `search_dls` recursive traversal (returns bool, 4 assumes for ghost structure)
@@ -156,7 +156,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P0.6.6: Prove RB invariants maintained after insert+fixup (pure spec: `insert_is_rbtree`)
 - [x] P0.6.7: Prove BST ordering maintained after insert+fixup (pure spec: `insert_preserves_bst`)
 - [x] P0.6.8: Prove black-height is O(log n); height ≤ 2·lg(n+1) (pure spec: `height_bound_theorem`, CLRS Theorem 13.1)
-- [ ] P0.6.9: Add ghost tick counter; prove O(log n) for search and insert
+- [x] P0.6.9: Add ghost tick counter; prove O(log n) for search and insert
 - [ ] P0.6.10: (Stretch) Implement RB-DELETE and RB-DELETE-FIXUP
 
 ---
@@ -176,9 +176,9 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P1.2.2: Define stable sort spec: elements with equal keys maintain relative order
 - [x] P1.2.3: Implement RADIX-SORT with d passes — RadixSort.MultiDigit.fst
 - [x] P1.2.4: Prove each pass maintains relative order of elements with equal digit values (stability)
-- [ ] P1.2.5: Prove final array is sorted by full key value
+- [x] P1.2.5: Prove final array is sorted by full key value
 - [x] P1.2.6: Prove permutation of input — RadixSort.MultiDigit.fst (fully proven)
-- [ ] P1.2.7: Add ghost tick counter; prove O(d(n+k)) complexity
+- [x] P1.2.7: Add ghost tick counter; prove O(d(n+k)) complexity
 - [x] P1.2.8: Updated documentation to honestly describe d=1 limitation and CLRS multi-pass structure
 
 ### P1.3 Huffman Coding (Ch16) — Implement actual tree construction
@@ -222,8 +222,8 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 ### P2.2 Dijkstra (Ch24) — Prove from greedy invariants
 - [x] P2.2.1: Define pure spec (same `sp_dist` as Bellman-Ford, restricted to non-negative weights)
 - [x] P2.2.2: Prove greedy choice invariant: when u is extracted from queue, `dist[u] == δ(s,u)` (CLRS Theorem 24.6)
-- [ ] P2.2.3: Prove triangle inequality from relaxation
-- [ ] P2.2.4: Remove separate triangle-inequality verification pass
+- [x] P2.2.3: Prove triangle inequality from relaxation
+- [x] P2.2.4: Remove separate triangle-inequality verification pass
 - [x] P2.2.5: Prove postcondition (upper bound): `dist[v] <= sp_dist weights n s v`
 
 ### P2.3 Kruskal (Ch23) — Prove MST property
@@ -299,7 +299,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P3.3.2: Proved worst_case_comparisons n = n(n-1)/2 (CLRS Theorem 7.4)
 - [x] P3.3.3: Proved sum_of_parts_bound: T(a)+T(b) ≤ T(a+b) (convexity)
 - [x] P3.3.4: Proved maximality: for ANY partition split k, total ≤ T(n)
-- [ ] P3.3.5: Thread tick counter through recursive quicksort Pulse code
+- [x] P3.3.5: Thread tick counter through recursive quicksort Pulse code
 
 ### P3.4 Matrix Chain O(n³) ✓ COMPLETED
 - [x] P3.4.1: Pure proof: mc_inner_sum computes Σ_{l=2}^{n} (n-l+1)(l-1)

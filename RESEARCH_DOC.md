@@ -1025,3 +1025,39 @@ for fold/unfold. This avoids matching on erased values in non-ghost code.
 **Renamed:** `CLRS.Ch10.DoublyLinkedList.fst` → `CLRS.Ch10.SinglyLinkedList.fst`
 
 Stats: 439 lines, 0 assumes, 1 admit (delete), 158/203 tasks done (78%)
+
+### DLL Delete — 0 Admits via `delete_result` Predicate (Session 11)
+
+**Problem**: `delete_in_dls` operated on `dls` with arbitrary `prev_ptr` but returned `dll` which hardcodes `prev_ptr=None`. Ghost wrapping dls↔dll required matching on erased lists in non-ghost context — impossible.
+
+**Solution**: Introduced `delete_result` predicate that mirrors `dll` but preserves `prev_ptr`:
+```
+let delete_result (hd tl: dptr) (prev_ptr: dptr) (l: list int) : slprop =
+  match l with
+  | [] -> pure (hd == None /\ tl == None)
+  | k :: rest -> exists* (hp tp: box node). dls hp (k::rest) prev_ptr tp None ** pure (...)
+```
+
+Ghost helpers `fold_delete_result_nil/cons`, `unfold_delete_result_nil/cons`, `extract_delete_result_cons`, and `delete_result_to_dll` handle all conversions by matching on erased lists in ghost context.
+
+**Key insight**: Ghost functions CAN match on erased data; the pattern `let ll = reveal l; match ll { ... }` works in `ghost fn`. The wrapper predicate (`dll` → `delete_result`) that preserves parameters needed by the recursive function eliminates all wrapping admits.
+
+**Result**: 723 lines, 0 admits, 0 assumes. LIST-INSERT, LIST-SEARCH, LIST-DELETE fully verified.
+
+### Batch Results (Session 11)
+
+12 new verified modules in one batch:
+- **DLL complexity**: O(1) insert, O(n) search/delete with ghost tick counters
+- **MergeSort complexity**: O(n log n) via T(n)=2T(n/2)+n recurrence, proven ≤ 4n⌈log₂n⌉+4n
+- **D&C MaxSubarray**: CLRS §4.1 divide-and-conquer algorithm + O(n lg n) proof
+- **RadixSort stability**: Each stable-sort pass preserves ordering on previous digits
+- **Simultaneous MinMax**: Returns correct min/max with 2(n-1) comparisons (CLRS §9.1)
+- **BST delete key set**: key_set(delete(t,k)) = remove(k, key_set(t))
+- **Union-Find rank bound**: height ≤ rank ≤ ⌊log₂ n⌋ (CLRS Lemma 21.4)
+- **Kruskal edge sorting**: Formal predicate for sorted edges, can_sort_edges lemma
+- **BF triangle inequality**: No-violations-implies-triangle, stable-distances-have-triangle
+- **Dijkstra greedy choice**: Greedy choice invariant structure (CLRS Theorem 24.6)
+- **Vertex cover spec**: min_vertex_cover, is_valid_graph_cover, 2-approximation
+- **KMP strengthened spec**: count_matches_spec + matched_prefix_at state invariant
+
+Stats: 723 lines DLL (0 admits), 178/208 tasks done (86%)

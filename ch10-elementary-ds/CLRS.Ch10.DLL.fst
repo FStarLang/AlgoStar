@@ -11,6 +11,7 @@ open Pulse.Lib.Pervasives
 module Box = Pulse.Lib.Box
 open Pulse.Lib.Box { box, (:=), (!) }
 module L = FStar.List.Tot
+open FStar.List.Tot
 
 noeq
 type node = {
@@ -324,6 +325,62 @@ fn fold_dls_cons
   rewrite each rest as (r0 :: r1);
   fold (dls p (k :: r0 :: r1) prev_ptr tail last_ptr);
   rewrite each (k :: r0 :: r1) as (k :: rest)
+}
+
+// --- DLS APPEND ---
+
+// Append two adjacent DLS segments: l1 @ l2
+// The proof is by induction on l1.
+ghost
+fn rec dls_append
+  (h1: box node) (t1: box node)
+  (#l1: erased (list int) {Cons? l1})
+  (#prev1: erased dptr)
+  (h2: box node) (t2: box node)
+  (#l2: erased (list int) {Cons? l2})
+  (#last2: erased dptr)
+  requires dls h1 l1 prev1 t1 (Some h2) ** dls h2 l2 (Some t1) t2 last2
+  ensures dls h1 (l1 @ l2) prev1 t2 last2
+  decreases L.length l1
+{
+  let k1 = L.hd l1;
+  let r1 = L.tl l1;
+  rewrite each l1 as (k1 :: r1) in (dls h1 l1 prev1 t1 (Some h2));
+  match r1 {
+    [] -> {
+      // l1 = [k1], so h1 == t1
+      unfold (dls h1 [k1] prev1 t1 (Some h2));
+      with v1. assert (pts_to h1 v1);
+      // v1.next == Some h2, so we already have the link
+      // Result: dls h1 ([k1] @ l2) prev1 t2 last2
+      //       = dls h1 (k1 :: l2) prev1 t2 last2
+      // Need to fold this as a multi-node dls
+      let k2 = L.hd l2;
+      let r2 = L.tl l2;
+      rewrite each l2 as (k2 :: r2) in (dls h2 l2 (Some t1) t2 last2);
+      rewrite each t1 as h1;
+      fold (dls h1 (k1 :: k2 :: r2) prev1 t2 last2);
+      rewrite each (k1 :: k2 :: r2) as ([k1] @ (k2 :: r2));
+      rewrite each (k2 :: r2) as l2;
+      rewrite each ([k1] @ l2) as (l1 @ l2)
+    }
+    k1' :: r1' -> {
+      // l1 = k1 :: k1' :: r1', so it's multi-element
+      unfold (dls h1 (k1 :: k1' :: r1') prev1 t1 (Some h2));
+      with v1 np1. assert (pts_to h1 v1);
+      // np1 is the second node of l1
+      // Recursive call: append (np1, l1.tail) with (h2, l2)
+      rewrite each (k1' :: r1') as r1;
+      dls_append np1 t1 h2 t2;
+      // Now we have: dls np1 (r1 @ l2) (Some h1) t2 last2
+      // Fold h1 back on
+      rewrite each (r1 @ l2) as ((k1' :: r1') @ l2);
+      fold_dls_cons h1 k1 ((k1' :: r1') @ l2) prev1 t2 last2 v1 np1;
+      // dls h1 (k1 :: (k1' :: r1') @ l2) prev1 t2 last2
+      rewrite each (k1 :: (k1' :: r1') @ l2) as ((k1 :: k1' :: r1') @ l2);
+      rewrite each (k1 :: k1' :: r1') as l1
+    }
+  }
 }
 
 // --- LIST-INSERT ---
