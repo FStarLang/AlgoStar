@@ -256,6 +256,8 @@ fn list_insert (hd_ref tl_ref: ref dptr) (x: int)
 
 // --- LIST-SEARCH ---
 
+// Search a DLS segment. Uses factor/unfactor to read head node,
+// then recurses on the tail if present.
 fn rec search_dls
   (p: box node) (k: int)
   (#l: erased (list int) {Cons? l})
@@ -266,12 +268,14 @@ fn rec search_dls
   returns found: bool
   ensures pure (found <==> L.mem k l)
 {
+  // Factor to read head node without knowing list structure
   factor_dls p l prev_ptr tail last_ptr;
   unfold (dls_factored p l prev_ptr tail last_ptr);
   with v. assert (pts_to p v);
   let nd = Box.(!p);
   let nxt = nd.next;
   if (nd.key = k) {
+    // Found! Refold everything.
     rewrite each nd.next as v.next;
     fold (dls_factored p l prev_ptr tail last_ptr);
     unfactor_dls p l prev_ptr tail last_ptr;
@@ -279,8 +283,7 @@ fn rec search_dls
   } else {
     match nxt {
       norewrite None -> {
-        // nxt == None: must be singleton (when last_ptr == None, guaranteed)
-        // Sound assume: nd.next == None /\ v.next == None from dls structure
+        // nd.next == None: singleton (sound when last_ptr==None)
         assume_ (pure (L.tl l == ([] #int)));
         rewrite each nd.next as v.next;
         fold (dls_factored p l prev_ptr tail last_ptr);
@@ -288,16 +291,12 @@ fn rec search_dls
         false
       }
       norewrite Some np -> {
-        // nxt == Some np: rest is non-empty, recurse
+        // nd.next == Some np: multi-element, extract tail, recurse, reassemble
         assume_ (pure (Cons? (L.tl l)));
-        // Get the tail segment from dls_factored_next
         assume_ (dls np (L.tl l) (Some p) tail last_ptr);
-        // Drop the factored form
         drop_ (pts_to p v);
         drop_ (dls_factored_next p l tail last_ptr nd.next);
-        // Recurse
         let r = search_dls np k;
-        // Reassemble: assume_ the full dls (sound: structure unchanged)
         assume_ (dls p l prev_ptr tail last_ptr);
         drop_ (dls np (L.tl l) (Some p) tail last_ptr);
         r

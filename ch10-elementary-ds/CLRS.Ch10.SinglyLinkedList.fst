@@ -1,5 +1,6 @@
-module CLRS.Ch10.DoublyLinkedList
-// CLRS §10.2: Doubly-linked list with LIST-INSERT, LIST-SEARCH, LIST-DELETE
+module CLRS.Ch10.SinglyLinkedList
+// Singly-linked list (originally mislabelled as DoublyLinkedList)
+// See CLRS.Ch10.DLL.fst for the true doubly-linked list with prev pointers.
 //
 // Representation: Each node is a heap-allocated box containing {key, prev, next}.
 // The list is a nullable pointer (option (box node)).
