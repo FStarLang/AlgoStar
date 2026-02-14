@@ -36,6 +36,11 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
+// ========== Complexity bound predicate ==========
+
+let complexity_bounded_min (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n - 1
+
 // ========== Minimum Finding with Complexity Bound ==========
 
 // Proves: exactly (len - 1) comparisons, i.e., Θ(n)
@@ -44,23 +49,25 @@ fn find_minimum_complexity
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
-  requires A.pts_to a #p s0 **
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a #p s0 ** GR.pts_to ctr c0 **
     pure (
       SZ.v len == Seq.length s0 /\
       SZ.v len > 0 /\
       SZ.v len == A.length a
     )
   returns min_val: int
-  ensures A.pts_to a #p s0 **
+  ensures exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
     pure (
       (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == min_val) /\
-      (forall (k:nat). k < Seq.length s0 ==> min_val <= Seq.index s0 k)
+      (forall (k:nat). k < Seq.length s0 ==> min_val <= Seq.index s0 k) /\
+      complexity_bounded_min cf (reveal c0) (SZ.v len)
     )
 {
   let min_val = a.(0sz);
   let mut min: int = min_val;
   let mut i: SZ.t = 1sz;
-  let ctr = GR.alloc #nat 0;
   
   while (!i <^ len)
   invariant exists* vi vmin (vc : nat).
@@ -73,7 +80,8 @@ fn find_minimum_complexity
       SZ.v vi <= SZ.v len /\
       (exists (k:nat). k < SZ.v vi /\ Seq.index s0 k == vmin) /\
       (forall (k:nat). k < SZ.v vi ==> vmin <= Seq.index s0 k) /\
-      vc == SZ.v vi - 1
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi - 1
     )
   {
     let vi = !i;
@@ -90,12 +98,6 @@ fn find_minimum_complexity
     i := vi + 1sz
   };
   
-  // At loop exit: i == len, so ctr == len - 1.
-  // This proves exactly (n-1) comparisons were performed.
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v len - 1));
-  
-  GR.free ctr;
   !min
 }
 
@@ -107,23 +109,25 @@ fn find_maximum_complexity
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
-  requires A.pts_to a #p s0 **
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a #p s0 ** GR.pts_to ctr c0 **
     pure (
       SZ.v len == Seq.length s0 /\
       SZ.v len > 0 /\
       SZ.v len == A.length a
     )
   returns max_val: int
-  ensures A.pts_to a #p s0 **
+  ensures exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
     pure (
       (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == max_val) /\
-      (forall (k:nat). k < Seq.length s0 ==> max_val >= Seq.index s0 k)
+      (forall (k:nat). k < Seq.length s0 ==> max_val >= Seq.index s0 k) /\
+      complexity_bounded_min cf (reveal c0) (SZ.v len)
     )
 {
   let max_val = a.(0sz);
   let mut max: int = max_val;
   let mut i: SZ.t = 1sz;
-  let ctr = GR.alloc #nat 0;
   
   while (!i <^ len)
   invariant exists* vi vmax (vc : nat).
@@ -136,7 +140,8 @@ fn find_maximum_complexity
       SZ.v vi <= SZ.v len /\
       (exists (k:nat). k < SZ.v vi /\ Seq.index s0 k == vmax) /\
       (forall (k:nat). k < SZ.v vi ==> vmax >= Seq.index s0 k) /\
-      vc == SZ.v vi - 1
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi - 1
     )
   {
     let vi = !i;
@@ -153,9 +158,5 @@ fn find_maximum_complexity
     i := vi + 1sz
   };
   
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr == SZ.v len - 1));
-  
-  GR.free ctr;
   !max
 }
