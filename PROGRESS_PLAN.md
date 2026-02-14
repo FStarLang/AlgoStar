@@ -35,13 +35,13 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P0.1.2: Define pure BFS spec on residual graph — MaxFlow.Spec.fst: path definition
 - [x] P0.1.3: Define pure spec `bottleneck path flow cap` — MaxFlow.Spec.fst: bottleneck
 - [x] P0.1.4: Define pure spec `augment flow path bn` — MaxFlow.Spec.fst: augment
-- [ ] P0.1.5: Implement BFS on residual graph in Pulse (using queue from Ch10 or array-based)
-- [ ] P0.1.6: Implement augmentation loop: while BFS finds s-t path, augment flow
+- [x] P0.1.5: Implement BFS on residual graph in Pulse (using queue from Ch10 or array-based)
+- [x] P0.1.6: Implement augmentation loop: while BFS finds s-t path, augment flow
 - [x] P0.1.7: Prove loop invariant: `respects_capacities flow cap n` maintained after each augmentation
 - [x] P0.1.8: Prove loop invariant: `flow_conservation flow n source sink` maintained after each augmentation
 - [x] P0.1.9: Prove termination: integer flow value strictly increases each iteration (for integer capacities)
 - [x] P0.1.10: Prove postcondition: final flow satisfies capacity constraints + conservation
-- [ ] P0.1.11: Add ghost tick counter; prove O(VE²) complexity for Edmonds-Karp (BFS-based)
+- [x] P0.1.11: Add ghost tick counter; prove O(VE²) complexity for Edmonds-Karp (BFS-based)
 - [ ] P0.1.12: (Stretch) Prove max-flow min-cut theorem
 
 ### P0.2 BFS (Ch22) — ✅ Queue-based BFS implemented (CLRS.Ch22.QueueBFS.fst)
@@ -361,7 +361,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 ### P4.4 Missing CLRS algorithms (not currently in project)
 - [x] P4.4.1: Bucket Sort (Ch08) — implement and prove O(n) average case
 - [ ] P4.4.2: Fibonacci Heap operations (Ch19) — if feasible
-- [ ] P4.4.3: Strassen's Matrix Multiplication (Ch28) — O(n^{2.81})
+- [x] P4.4.3: Strassen Matrix Multiplication (Ch28) — O(n^{2.81})
 - [x] P4.4.4: Extended Euclidean Algorithm (Ch31) — prove Bézout coefficients
 
 ### P4.5 Documentation and README ✓ COMPLETED
