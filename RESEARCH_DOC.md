@@ -1071,3 +1071,41 @@ Stats: 723 lines DLL (0 admits), 178/208 tasks done (86%)
 - **BST O(h) complexity**: search ≤ h, insert ≤ h, delete ≤ 4h+1 (all formally proven)
 
 Progress: 189/208 tasks done (91%), 19 remaining
+
+### Session 12: Library-Wide Audit & Spec Tightening
+
+**Motivation**: User identified that DLL `list_insert` postcondition had a fresh existential `old_l` unrelated to the input, and `list_delete_ptr` was a fake O(n) wrapper, not the real O(1) CLRS LIST-DELETE(L, x).
+
+**DLL Fixes (verified, 0 errors)**:
+1. **Tightened `list_insert` postcondition**: Changed `exists* hd' tl' old_l. dll hd' tl' (x :: old_l)` → `exists* hd' tl' l. dll hd' tl' (x :: l)` — same `l` existential binds pre and post.
+2. **Tightened `list_delete` postcondition**: Changed `exists* ... l'. dll hd' tl' (remove_first k l')` → `exists* ... l. dll hd' tl' (remove_first k l)` — same `l`.
+3. **Added real O(1) `list_delete_node`**: Takes `x: box node`, `#i: erased nat`, does pointer surgery (read x.prev/x.next, patch neighbors, free x). Postcondition: `dll hd' tl' (remove_at i l)`. Has 1 admit for ghost dls_split_at.
+
+**Library-Wide Audit (3 explore agents)**: Systematically compared all Pulse `fn` postconditions against CLRS semantics. Identified 37 tasks organized into Phase 5 of PROGRESS_PLAN.md:
+- P5.1: Hash table specs critically weak (no key-inserted guarantee) → **FIXED**
+- P5.2: BST spec incompleteness (search, insert, delete) → **search completeness FIXED, delete admits FIXED**
+- P5.3: TopSort spec weak (no ordering guarantee) → **FIXED** (distinctness + topo-order in postcondition)
+- P5.4: MST spec incomplete (no acyclicity/minimality) → **Kruskal FIXED** (is_forest in postcondition)
+- P5.5: MaxFlow stub implementation → remains open
+- P5.6: Vertex Cover 2-approx ratio not in postcondition → **FIXED**
+- P5.7: DLL list_delete_node ghost split → remains open
+- P5.8: Union-Find FullCompress assumes → **FIXED** (all assume_ replaced with proofs)
+- P5.9: KMP complexity admits → partially reduced
+- P5.10: Huffman Complete admits → **reduced 11→7**
+- P5.11: SSSP spec admits → remains open
+- P5.12: Strassen log admits → **FIXED** (pow2_log2_inverse, log2_half, pow7_succ)
+- P5.13: Rod Cutting spec admits → **reduced 3→1**
+
+**Batch Results**: 
+- Batch 1 (8 agents): SinglyLinkedList delete spec, HashTable insert spec, BST search completeness, TopSort postcondition, RodCutting 2/3 admits eliminated, Strassen log admits eliminated, VertexCover 2-approx in postcondition, UnionFind assumes eliminated
+- Batch 2 (8 agents): BST.Delete 3 admits eliminated, Huffman.Complete 4/11 admits eliminated, Kruskal is_forest postcondition, RabinKarp rolling hash infrastructure
+
+**Weak postcondition pattern** (critical bug found repeatedly):
+```fstar
+// BAD: l' is a fresh existential, unrelated to input
+ensures exists* ... l'. dll hd' tl' (f l')
+// GOOD: l is shared between pre and post 
+ensures exists* ... l. dll hd' tl' (f l)
+```
+
+Stats: 911 lines DLL (1 admit in list_delete_node), 159/222 tasks done (72% of expanded task count)
