@@ -128,7 +128,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P0.4.18: Implement `delete_in_dls` recursive traversal (5 admits for ghost wrapping)
 - [x] P0.4.19: Implement `list_delete (hd_ref tl_ref: ref dptr) (k: int)` — search + delete
 - [x] P0.4.20: Define `remove_first` pure spec; prove postcondition: `dll hd' tl' (remove_first k l')`
-- [ ] P0.4.21: Reduce admits in delete_in_dls (ghost dls↔dll wrapping with erased lists)
+- [x] P0.4.21: Reduce admits in delete_in_dls (DONE: 0 admits!) (ghost dls↔dll wrapping with erased lists)
 
 **Step 6 — O(1) pointer-based delete (stretch):**
 - [ ] P0.4.22: Modify LIST-SEARCH to return pointer instead of bool
@@ -136,7 +136,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [ ] P0.4.24: Implement `list_delete_ptr (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice
 
 **Step 7 — Complexity and wrap-up:**
-- [ ] P0.4.25: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-key = O(n), LIST-SEARCH = O(n)
+- [x] P0.4.25: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-key = O(n), LIST-SEARCH = O(n)
 
 ### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
 - [x] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
@@ -144,14 +144,14 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P0.5.3: Implement TRANSPLANT(T, u, v): N/A for array representation, handled inline in TREE-DELETE
 - [x] P0.5.4: Implement TREE-DELETE(T, z): all 3 cases — no children, one child, two children (CLRS §12.3)
 - [x] P0.5.5: Prove BST property maintained after TREE-DELETE — bst_delete_valid in BST.Spec.Complete.fst
-- [ ] P0.5.6: Prove key set after delete = old keys minus deleted key
+- [x] P0.5.6: Prove key set after delete = old keys minus deleted key
 - [x] P0.5.7: Add ghost tick counter: O(h) for all operations — BST.Spec.Complexity.fst
 
 ### P0.6 Red-Black Tree (Ch13) — Missing RB invariants and fixup
 - [x] P0.6.1: Define pure spec for RB tree as inductive type: `rbtree = Leaf | Node color left key right`
 - [x] P0.6.2: Define RB invariants: (a) root is black, (b) red nodes have black children, (c) all paths have equal black-height, (d) BST ordering
 - [x] P0.6.3: Define pure `rb_insert_spec tree key` returning the balanced tree after insertion (Okasaki-style balance with 4 rotation cases)
-- [ ] P0.6.4: Implement proper BST insert (find correct position by walking tree) in Pulse
+- [x] P0.6.4: Implement proper BST insert (find correct position by walking tree) in Pulse
 - [ ] P0.6.5: Implement RB-INSERT-FIXUP with all 6 cases (3 + 3 symmetric) in Pulse
 - [x] P0.6.6: Prove RB invariants maintained after insert+fixup (pure spec: `insert_is_rbtree`)
 - [x] P0.6.7: Prove BST ordering maintained after insert+fixup (pure spec: `insert_preserves_bst`)
@@ -175,7 +175,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P1.2.1: Define pure spec for digit extraction: `digit k d base = (k / base^d) % base`
 - [x] P1.2.2: Define stable sort spec: elements with equal keys maintain relative order
 - [x] P1.2.3: Implement RADIX-SORT with d passes — RadixSort.MultiDigit.fst
-- [ ] P1.2.4: Prove each pass maintains relative order of elements with equal digit values (stability)
+- [x] P1.2.4: Prove each pass maintains relative order of elements with equal digit values (stability)
 - [ ] P1.2.5: Prove final array is sorted by full key value
 - [x] P1.2.6: Prove permutation of input — RadixSort.MultiDigit.fst (fully proven)
 - [ ] P1.2.7: Add ghost tick counter; prove O(d(n+k)) complexity
@@ -203,7 +203,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 ### P1.5 KMP Matcher (Ch32) — Complete the search
 - [x] P1.5.1: Define pure spec for KMP match positions: `matches_at`, `check_match_at`, `count_matches_spec`
 - [x] P1.5.2: Implement KMP-MATCHER using the existing prefix function (inner failure-link loop + match counting)
-- [ ] P1.5.3: Strengthen postcondition to prove match count equals `count_matches_spec`
+- [x] P1.5.3: Strengthen postcondition to prove match count equals `count_matches_spec`
 - [x] P1.5.4: Add ghost tick counter; prove O(n + m) complexity — CLRS.Ch32.KMP.Complexity.fst
 
 ---
@@ -214,21 +214,21 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P2.1.1: Define pure shortest-path spec: `sp_dist weights n s v = minimum weight path from s to v` (or infinity)
 - [x] P2.1.2: Prove upper-bound property: `dist[v] ≥ δ(s,v)` at all times (Lemma 24.11)
 - [x] P2.1.3: Prove convergence: after i rounds, dist[v] correct for all v reachable in ≤ i edges (Lemma 24.2)
-- [ ] P2.1.4: Prove triangle inequality as consequence of relaxation (not post-verification pass)
-- [ ] P2.1.5: Remove the separate triangle-inequality verification pass
+- [x] P2.1.4: Prove triangle inequality as consequence of relaxation (not post-verification pass)
+- [x] P2.1.5: Remove the separate triangle-inequality verification pass
 - [x] P2.1.6: Prove postcondition (upper bound): `no_neg_cycle ⟹ dist[v] <= sp_dist weights n s v`
 - [x] P2.1.7: Prove negative-cycle detection correctness
 
 ### P2.2 Dijkstra (Ch24) — Prove from greedy invariants
 - [x] P2.2.1: Define pure spec (same `sp_dist` as Bellman-Ford, restricted to non-negative weights)
-- [ ] P2.2.2: Prove greedy choice invariant: when u is extracted from queue, `dist[u] == δ(s,u)` (CLRS Theorem 24.6)
+- [x] P2.2.2: Prove greedy choice invariant: when u is extracted from queue, `dist[u] == δ(s,u)` (CLRS Theorem 24.6)
 - [ ] P2.2.3: Prove triangle inequality from relaxation
 - [ ] P2.2.4: Remove separate triangle-inequality verification pass
 - [x] P2.2.5: Prove postcondition (upper bound): `dist[v] <= sp_dist weights n s v`
 
 ### P2.3 Kruskal (Ch23) — Prove MST property
 - [x] P2.3.1: Define pure MST spec: spanning tree T of G with minimum total weight (MST.Spec.fst)
-- [ ] P2.3.2: Sort edges by weight (implement or assume pre-sorted)
+- [x] P2.3.2: Sort edges by weight (implement or assume pre-sorted)
 - [x] P2.3.3: Prove safe-edge property (cut property): lightest edge crossing a cut is in some MST (Theorem 23.1 statement + exchange argument sketch, 5 admits in hard graph theory)
 - [x] P2.3.4: Prove postcondition: result is a spanning tree
 - [x] P2.3.5: Prove postcondition: result has minimum total weight among spanning trees
@@ -242,7 +242,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 
 ### P2.5 Topological Sort (Ch22) — Prove ordering property *(Documented)*
 - [x] P2.5.1: Define pure spec: `is_topological_order adj n order ⟺ ∀ (u,v) ∈ E, pos(u) < pos(v)`
-- [ ] P2.5.2: Prove Kahn's algorithm produces a valid topological order
+- [x] P2.5.2: Prove Kahn's algorithm produces a valid topological order
 - [x] P2.5.3: Documented postcondition limitations and proof strategy (visited array, distinctness, ordering)
 - [x] P2.5.4: Add ghost tick counter; prove O(V²) — TopologicalSort.Complexity.fst
 - [ ] P2.5.5: (Stretch) Implement DFS-based topological sort and prove equivalence
@@ -254,8 +254,8 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P2.6.4: Prove full optimality: `|selected| == max_compatible_set start finish n`
 
 ### P2.7 Vertex Cover (Ch35) — Prove approximation ratio
-- [ ] P2.7.1: Define pure spec: `min_vertex_cover adj n` = minimum cardinality vertex cover
-- [ ] P2.7.2: Prove output is a valid vertex cover (already done)
+- [x] P2.7.1: Define pure spec: `min_vertex_cover adj n` = minimum cardinality vertex cover
+- [x] P2.7.2: Prove output is a valid vertex cover (already done)
 - [x] P2.7.3: Prove `|cover| ≤ 2 * min_vertex_cover adj n` (CLRS Theorem 35.1)
 - [x] P2.7.4: Key lemma: the algorithm picks a maximal matching; each matching edge contributes 2 vertices, each optimal cover must include ≥ 1 vertex per matching edge
 
@@ -263,7 +263,7 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 - [x] P2.8.1: Added `find_compress` with one-step path compression (parent[x] = root)
 - [x] P2.8.2: Fixed union-by-rank: rank increment on equal-rank merge (CLRS line 5-6)
 - [x] P2.8.3: Prove rank invariants: rank[x] ≤ rank[parent[x]] when x is not root
-- [ ] P2.8.4: Prove tree height ≤ rank ≤ ⌊log n⌋
+- [x] P2.8.4: Prove tree height ≤ rank ≤ ⌊log n⌋
 - [x] P2.8.5: Full path compression (all nodes on path → root) — CLRS.Ch21.UnionFind.FullCompress.fst
 - [ ] P2.8.6: (Stretch) Prove amortized O(α(n)) per operation
 
@@ -285,8 +285,8 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 ### P3.1 MergeSort O(n log n) *(Pure proof completed)*
 - [x] P3.1.1: Pure proof of T(n) ≤ 4n(log₂ n + 1) via recurrence analysis
 - [x] P3.1.2: Defined merge_sort_comparisons recurrence and log2_ceil
-- [ ] P3.1.3: Thread ghost tick counter through Pulse merge_sort_aux and merge_impl
-- [ ] P3.1.4: Connect Pulse implementation to pure recurrence bound
+- [x] P3.1.3: Thread ghost tick counter through Pulse merge_sort_aux and merge_impl
+- [x] P3.1.4: Connect Pulse implementation to pure recurrence bound
 
 ### P3.2 Heapsort O(n log n) *(Pure proof completed)*
 - [x] P3.2.1: Pure proof of heapsort_comparisons ≤ 2n(1 + log₂ n)
@@ -346,17 +346,17 @@ uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
 ## Phase 4: Polish and Extensions
 
 ### P4.1 Clean up MaxSubarray
-- [ ] P4.1.1: Add CLRS's divide-and-conquer maximum subarray as a separate module
-- [ ] P4.1.2: Prove O(n lg n) complexity for D&C version
-- [ ] P4.1.3: Prove both versions compute the same result
+- [x] P4.1.1: Add CLRS divide-and-conquer maximum subarray as a separate module
+- [x] P4.1.2: Prove O(n lg n) complexity for D&C version
+- [x] P4.1.3: Prove both versions compute the same result
 
 ### P4.2 Rabin-Karp hash improvement ✅ COMPLETED
 - [x] P4.2.1: Replace simple sum hash with CLRS's modular polynomial hash (CLRS.Ch32.RabinKarp.Spec.fst — horner_hash)
 - [x] P4.2.2: Prove rolling hash update formula: h(s+1) = (d·(h(s) - T[s]·d^{m-1}) + T[s+m]) mod q (rolling_hash_correct lemma)
 
 ### P4.3 Simultaneous Min-Max (Ch09)
-- [ ] P4.3.1: Implement 3⌊n/2⌋ comparison simultaneous min-max
-- [ ] P4.3.2: Prove comparison count ≤ 3⌊n/2⌋
+- [x] P4.3.1: Implement simultaneous min-max
+- [x] P4.3.2: Prove comparison count ≤ 3⌊n/2⌋
 
 ### P4.4 Missing CLRS algorithms (not currently in project)
 - [ ] P4.4.1: Bucket Sort (Ch08) — implement and prove O(n) average case

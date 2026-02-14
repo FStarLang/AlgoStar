@@ -8,6 +8,7 @@ module CLRS.Ch35.VertexCover.Spec
 
 open FStar.Mul
 open FStar.List.Tot
+open FStar.Seq
 
 (*** Type definitions ***)
 
@@ -35,6 +36,38 @@ let is_valid_cover_for_edges (c: cover_fn) (edges: list edge) : Type0 =
 let rec count_cover (c: cover_fn) (n: nat) : Tot nat (decreases n) =
   if n = 0 then 0
   else (if c (n - 1) then 1 else 0) + count_cover c (n - 1)
+
+(*** Minimum vertex cover specification (P2.7.1) ***)
+
+// Extract edges from adjacency matrix representation
+// adj is a sequence of length n*n where adj[i*n+j] != 0 means edge (i,j) exists
+// We only consider edges (u,v) where u < v to avoid counting each edge twice
+let rec extract_edges (adj: seq int) (n: nat) (u v: nat) 
+  : Tot (list edge) (decreases ((if u >= n then 0 else n - u) * (n + 1) + (if v > n then 0 else n + 1 - v))) =
+  if u >= n then []
+  else if v >= n then extract_edges adj n (u + 1) (u + 2)
+  else if v > u && Seq.length adj = n * n && Seq.index adj (u * n + v) <> 0
+       then (u, v) :: extract_edges adj n u (v + 1)
+       else extract_edges adj n u (v + 1)
+
+// A cover is valid for a graph if it covers all edges
+let is_valid_graph_cover (adj: seq int) (n: nat) (c: cover_fn) : Type0 =
+  let edges = extract_edges adj n 0 1 in
+  is_valid_cover_for_edges c edges
+
+// Minimum vertex cover: a cover with the smallest possible cardinality
+// This is the optimization problem that the approximation algorithm targets
+let is_minimum_vertex_cover (adj: seq int) (n: nat) (c_min: cover_fn) : Type0 =
+  is_valid_graph_cover adj n c_min /\
+  (forall (c': cover_fn). is_valid_graph_cover adj n c' ==>
+    count_cover c_min n <= count_cover c' n)
+
+// OPT(adj, n) = the size of the minimum vertex cover
+// (as a logical proposition - existence is guaranteed for finite graphs)
+let min_vertex_cover_size (adj: seq int) (n: nat) (opt: nat) : Type0 =
+  exists (c_min: cover_fn). 
+    is_minimum_vertex_cover adj n c_min /\ 
+    count_cover c_min n = opt
 
 (*** Counting lemmas (non-mutually-recursive) ***)
 
@@ -114,7 +147,7 @@ let rec sum_contributions (c: cover_fn) (m: list edge) : Tot nat (decreases m) =
 
 let rec sum_ge_length (c: cover_fn) (m: list edge)
   : Lemma (requires is_valid_cover_for_edges c m)
-          (ensures sum_contributions c m >= length m)
+          (ensures sum_contributions c m >= List.Tot.length m)
           (decreases m)
   = match m with
     | [] -> ()
@@ -176,7 +209,7 @@ let matching_lower_bound (c: cover_fn) (m: list edge) (n: nat)
               pairwise_disjoint m /\
               is_valid_cover_for_edges c m /\
               (forall (e: edge). memP e m ==> (let (u, v) = e in u < n /\ v < n /\ u <> v)))
-          (ensures count_cover c n >= length m)
+          (ensures count_cover c n >= List.Tot.length m)
   = sum_ge_length c m;
     sum_le_count c m n
 
@@ -231,7 +264,7 @@ let rec matching_cover_size (m: list edge) (n: nat)
               (forall (e: edge). memP e m ==> (let (u, v) = e in u < n /\ v < n /\ u <> v)))
           (ensures 
               count_cover (fun (x:nat) -> existsb (fun e -> edge_uses_vertex e x) m) n ==
-              2 * length m)
+              2 * List.Tot.length m)
           (decreases m)
   = let c : cover_fn = fun (x:nat) -> existsb (fun e -> edge_uses_vertex e x) m in
     match m with
@@ -267,8 +300,75 @@ let theorem_35_1
               is_valid_cover_for_edges c_opt m)
           (ensures (
               let c_alg : cover_fn = fun (x:nat) -> existsb (fun e -> edge_uses_vertex e x) m in
-              count_cover c_alg n == 2 * length m /\
-              count_cover c_opt n >= length m /\
+              count_cover c_alg n == 2 * List.Tot.length m /\
+              count_cover c_opt n >= List.Tot.length m /\
               count_cover c_alg n <= 2 * count_cover c_opt n))
   = matching_cover_size m n;
     matching_lower_bound c_opt m n
+
+(*** Connection to Pulse implementation (P2.7.2) ***)
+
+// The is_cover predicate from the Pulse implementation
+let is_cover_pulse (s_adj s_cover: seq int) (n: nat) (bound_u bound_v: nat) : prop =
+  Seq.length s_adj == n * n /\
+  Seq.length s_cover == n /\
+  (forall (u v: nat). (u < bound_u \/ (u == bound_u /\ v < bound_v)) ==>
+    u < n ==> v < n ==> u < v ==>
+    Seq.index s_adj (u * n + v) <> 0 ==>
+    (Seq.index s_cover u <> 0 \/ Seq.index s_cover v <> 0))
+
+// Convert sequence to cover function (with bounds check)
+let seq_to_cover_fn (s_cover: seq int) (n: nat{Seq.length s_cover = n}) : cover_fn =
+  fun (i: nat) -> i < n && Seq.index s_cover i <> 0
+
+// Lemma: extract_edges collects all edges progressively
+let rec extract_edges_complete (adj: seq int) (n: nat) (u v u' v': nat)
+  : Lemma (requires u <= u' /\ u' < n /\ v' > u' /\ v' < n /\
+                    Seq.length adj = n * n /\
+                    (u < u' \/ (u = u' /\ v <= v')))
+          (ensures (let edges_now = extract_edges adj n u v in
+                   let edges_later = extract_edges adj n u' v' in
+                   Seq.index adj (u' * n + v') <> 0 ==>
+                   memP (u', v') edges_now \/ memP (u', v') edges_later))
+          (decreases ((if u >= n then 0 else n - u) * (n + 1) + (if v > n then 0 else n + 1 - v)))
+  = if u >= n then ()
+    else if v >= n then extract_edges_complete adj n (u + 1) (u + 2) u' v'
+    else if v > u then
+      if u = u' && v = v' then ()
+      else extract_edges_complete adj n u (v + 1) u' v'
+    else extract_edges_complete adj n u (v + 1) u' v'
+
+// Lemma: every edge in extract_edges is valid
+let rec extract_edges_valid (adj: seq int) (n: nat) (u v: nat)
+  : Lemma (requires Seq.length adj = n * n)
+          (ensures (forall (e: edge). memP e (extract_edges adj n u v) ==>
+                    (let (u', v') = e in
+                     u' < n /\ v' < n /\ u' < v' /\
+                     Seq.index adj (u' * n + v') <> 0)))
+          (decreases ((if u >= n then 0 else n - u) * (n + 1) + (if v > n then 0 else n + 1 - v)))
+  = if u >= n then ()
+    else if v >= n then extract_edges_valid adj n (u + 1) (u + 2)
+    else if v > u && Seq.length adj = n * n && Seq.index adj (u * n + v) <> 0
+         then extract_edges_valid adj n u (v + 1)
+         else extract_edges_valid adj n u (v + 1)
+
+// Main connection lemma: Pulse is_cover implies pure spec is_valid_graph_cover
+let pulse_cover_is_valid (s_adj s_cover: seq int) (n: nat)
+  : Lemma (requires is_cover_pulse s_adj s_cover n n 0 /\ Seq.length s_cover = n)
+          (ensures is_valid_graph_cover s_adj n (seq_to_cover_fn s_cover n))
+  = let edges = extract_edges s_adj n 0 1 in
+    let c = seq_to_cover_fn s_cover n in
+    extract_edges_valid s_adj n 0 1;
+    let aux (e: edge) : Lemma (requires memP e edges)
+                              (ensures (let (u, v) = e in c u \/ c v)) =
+      let (u, v) = e in
+      // From extract_edges_valid, we know u < n, v < n, u < v, and edge exists
+      assert (u < n /\ v < n /\ u < v);
+      assert (Seq.index s_adj (u * n + v) <> 0);
+      // From is_cover_pulse with bound_u = n and bound_v = 0, 
+      // all edges (u, v) with u < n and v < n and u < v are covered
+      assert (Seq.index s_cover u <> 0 \/ Seq.index s_cover v <> 0);
+      // Therefore c u \/ c v
+      ()
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
