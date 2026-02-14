@@ -151,8 +151,8 @@
 ### P2.7 Vertex Cover (Ch35) — Prove approximation ratio
 - [ ] P2.7.1: Define pure spec: `min_vertex_cover adj n` = minimum cardinality vertex cover
 - [ ] P2.7.2: Prove output is a valid vertex cover (already done)
-- [ ] P2.7.3: Prove `|cover| ≤ 2 * min_vertex_cover adj n` (CLRS Theorem 35.1)
-- [ ] P2.7.4: Key lemma: the algorithm picks a maximal matching; each matching edge contributes 2 vertices, each optimal cover must include ≥ 1 vertex per matching edge
+- [x] P2.7.3: Prove `|cover| ≤ 2 * min_vertex_cover adj n` (CLRS Theorem 35.1)
+- [x] P2.7.4: Key lemma: the algorithm picks a maximal matching; each matching edge contributes 2 vertices, each optimal cover must include ≥ 1 vertex per matching edge
 
 ### P2.8 Union-Find (Ch21) — Add path compression and rank *(Partially Completed)*
 - [x] P2.8.1: Added `find_compress` with one-step path compression (parent[x] = root)
@@ -273,14 +273,13 @@
 |-------|-------------|-------|------|-----------|
 | P0 | Critical failures (MaxFlow, BFS, DFS, RBTree) | 41 | 3 | 38 |
 | P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 31 | 12 | 19 |
-| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 9 | 32 |
+| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 11 | 30 |
 | P3 | Add complexity proofs | 40 | 34 | 6 |
-| P4 | Polish and extensions | 19 | 4 | 15 |
-| **Total** | | **172** | **62** | **110** |
+| P4 | Polish and extensions | 19 | 5 | 14 |
+| **Total** | | **172** | **65** | **107** |
 
-**Complexity proof coverage: 32 files across 21/23 chapters (91% chapter coverage, 4,704 lines)**
-**New this session: Bellman-Ford + Dijkstra sp_dist upper bounds, Quickselect, Huffman tree spec**
-**Documentation: README, RESEARCH_DOC.md, PROGRESS_PLAN.md all up to date**
+**Complexity proof coverage: 33 files across 21/23 chapters (91% chapter coverage)**
+**This session: InsertionSort/BinarySearch/MaxSubarray/Partition external ghost counters, Vertex Cover 2-approximation proof**
 
 ---
 
@@ -310,12 +309,12 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 
 | Ch | Algorithm / DS | CLRS Section | Functional Spec | Complexity | Lines | Verified |
 |----|---------------|-------------|-----------------|-----------|-------|----------|
-| 02 | Insertion Sort | §2.1 | **Strong**: `sorted s ∧ permutation s0 s` | **Pulse** O(n²) — ghost ticks in postcondition (303 lines) | 290+303 | ✓ |
+| 02 | Insertion Sort | §2.1 | **Strong**: `sorted s ∧ permutation s0 s` | **Pulse** O(n²) — external ghost counter, `complexity_bounded` in postcondition | 290+302 | ✓ |
 | 02 | Merge Sort | §2.3 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 629+76 | ✓ |
-| 04 | Binary Search | §2.3 ex | **Strong**: found ⟹ `s[idx] == key`, not found ⟹ `key ∉ s` | **Pulse** O(log n) — ghost ticks (183 lines) | 139+183 | ✓ |
-| 04 | Max Subarray (Kadane) | §4.1 | **Strong**: `result == max_subarray_spec s0` (pure Kadane spec) | **Pure** O(n) | 113+135 | ✓ |
+| 04 | Binary Search | §2.3 ex | **Strong**: found ⟹ `s[idx] == key`, not found ⟹ `key ∉ s` | **Pulse** O(log n) — external ghost counter, `complexity_bounded_log` in postcondition | 139+185 | ✓ |
+| 04 | Max Subarray (Kadane) | §4.1 | **Strong**: `result == max_subarray_spec s0` (pure Kadane spec) | **Pulse** Θ(n) — external ghost counter, `complexity_bounded_linear` in postcondition | 113+140 | ✓ |
 | 06 | Heapsort | §6.1–6.4 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 671+97 | ✓ |
-| 07 | Partition | §7.1 | **Strong**: `is_partitioned s pivot split ∧ permutation s0 s` | **Pulse** O(n) — exactly n comparisons (272 lines) | 239+272 | ✓ |
+| 07 | Partition | §7.1 | **Strong**: `is_partitioned s pivot split ∧ permutation s0 s` | **Pulse** Θ(n) — external ghost counter, `complexity_bounded_linear` in postcondition | 239+267 | ✓ |
 | 07 | Quicksort | §7.1–7.2 | **Strong**: `sorted s ∧ permutation s0 s` (recursive, in-place) | **Pure** O(n²) worst | 578+118 | ✓ |
 | 08 | Counting Sort | §8.2 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** Θ(n+k) | 180+30 | ✓ |
 | 08 | Radix Sort | §8.3 | **Medium**: `sorted s ∧ permutation s0 s` (d=1 only, wraps CountingSort) | — | 79 | ✓ |
@@ -353,20 +352,20 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | 32 | KMP | §32.4 | **Strong**: prefix function + full MATCHER; `result == kmp_search_spec` | **Pure** O(n+m) | 437+235 | ✓ |
 | 32 | Rabin-Karp | §32.2 | **Strong**: `compute_hash == hash_spec`; match via hash comparison | **Pure** O(nm) worst | 404+111 | ✓ |
 | 33 | Segment Intersection | §33.1 | **Strong**: `result == cross_product_spec / direction_spec / on_segment_spec` | **Pure** O(1) | 155+74 | ✓ |
-| 35 | Vertex Cover (2-approx) | §35.1 | **Medium**: valid cover, documented 2-approximation ratio | **Pure** O(V²) | 213+43 | ✓ |
+| 35 | Vertex Cover (2-approx) | §35.1 | **Strong**: valid cover + `|C_alg| ≤ 2|C_opt|` (Theorem 35.1) | **Pure** O(V²) | 213+43+274 | ✓ |
 
 ### Summary Statistics
 
 | Metric | Count |
 |--------|-------|
 | Total algorithms/data structures | 40 |
-| **Strong** functional spec | 25 (63%) |
-| **Medium** functional spec | 10 (25%) |
+| **Strong** functional spec | 26 (65%) |
+| **Medium** functional spec | 9 (23%) |
 | **Weak** functional spec | 3 (8%) |
 | **Broken** (not the claimed algorithm) | 2 (5%) |
-| Complexity proofs (Pulse, in postcondition) | 7 |
-| Complexity proofs (Pure, standalone) | 26 |
+| Complexity proofs (Pulse, in postcondition) | 10 |
+| Complexity proofs (Pure, standalone) | 23 |
 | Complexity proofs total | 33 (83%) |
-| Total lines of verified F*/Pulse | ~12,700 (impl) + ~5,300 (complexity/spec) ≈ 18,000 |
+| Total lines of verified F*/Pulse | ~19,500 |
 | Admits | 0 |
 | Assumes | 0 |
