@@ -51,7 +51,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [ ] P0.2.4: Prove invariant: when vertex v is dequeued, `dist[v] = δ(s,v)` (shortest path distance)
 - [ ] P0.2.5: Prove postcondition: `dist[v] == bfs_dist adj n source v` for all v
 - [x] P0.2.6: Prove postcondition: source visited, dist[source]=0, distance soundness
-- [ ] P0.2.7: Add ghost tick counter; prove O(V + E) complexity (or O(V²) for adjacency matrix)
+- [x] P0.2.7: Add ghost tick counter; prove O(V²) complexity — CLRS.Ch22.QueueBFS.Complexity.fst
 
 ### P0.3 DFS (Ch22) — ✅ Stack-based DFS implemented (CLRS.Ch22.StackDFS.fst)
 - [x] P0.3.1: Define pure spec for DFS visit order with timestamps: `dfs_spec adj n source` returning `(discovery, finish, pred)` sequences
@@ -138,7 +138,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - [x] P1.5.1: Define pure spec for KMP match positions: `matches_at`, `check_match_at`, `count_matches_spec`
 - [x] P1.5.2: Implement KMP-MATCHER using the existing prefix function (inner failure-link loop + match counting)
 - [ ] P1.5.3: Strengthen postcondition to prove match count equals `count_matches_spec`
-- [ ] P1.5.4: Add ghost tick counter; prove O(n + m) complexity
+- [x] P1.5.4: Add ghost tick counter; prove O(n + m) complexity — CLRS.Ch32.KMP.Complexity.fst
 
 ---
 
