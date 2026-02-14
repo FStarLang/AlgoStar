@@ -482,10 +482,12 @@ core shortest-path properties.
 | P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 37 | 4 |
 | P3 | Add complexity proofs | 40 | 36 | 4 |
 | P4 | Polish and extensions | 19 | 8 | 11 |
-| P5 | Audit: spec tightness & admits elimination | 37 | 20 | 17 |
-| **Total** | | **222** | **166** | **56** |
+| P5 | Audit: spec tightness & admits elimination | 37 | 21 | 16 |
+| **Total** | | **222** | **167** | **55** |
 
 **DLL spec fixes this session**: Tightened `list_insert` postcondition (same existential `l` from pre to post), tightened `list_delete` postcondition (same `l`), added real O(1) `list_delete_node` with correct CLRS spec (1 admit for ghost split).
+
+**Current codebase stats**: 164 F* files, ~45K lines, 289 admits/assumes in 58 files.
 
 ---
 
