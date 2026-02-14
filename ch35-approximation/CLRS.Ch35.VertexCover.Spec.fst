@@ -372,3 +372,30 @@ let pulse_cover_is_valid (s_adj s_cover: seq int) (n: nat)
       ()
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+// 2-approximation theorem for Pulse implementation
+// If the cover is valid and consists of 0/1 values, its size is at most 2 * OPT
+//
+// NOTE: This is a simplified version. The full proof requires:
+// 1. Extracting the implicit matching from the cover
+// 2. Proving that matching gives pairwise_disjoint edges
+// 3. Proving count_cover equals 2 * matching size
+// 4. Applying theorem_35_1
+// 
+// This is left as future work - for now we state the desired property with admit
+let approximation_ratio_theorem (s_adj s_cover: seq int) (n: nat) (opt: nat)
+  : Lemma (requires 
+            is_cover_pulse s_adj s_cover n n 0 /\
+            Seq.length s_cover = n /\
+            Seq.length s_adj = n * n /\
+            (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+            min_vertex_cover_size s_adj n opt)
+          (ensures count_cover (seq_to_cover_fn s_cover n) n <= 2 * opt)
+  = pulse_cover_is_valid s_adj s_cover n;
+    // The full proof would:
+    // 1. Extract the implicit matching (edges where both endpoints have value 1)
+    // 2. Prove this matching is pairwise_disjoint (follows from algorithm logic)
+    // 3. Prove count_cover (seq_to_cover_fn s_cover n) n == 2 * matching_size
+    // 4. Apply theorem_35_1 to get matching_size <= opt
+    // 5. Conclude count_cover <= 2 * opt
+    admit()

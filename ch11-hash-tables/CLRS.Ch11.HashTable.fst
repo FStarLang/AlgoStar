@@ -77,7 +77,10 @@ fn hash_insert
   returns result: bool
   ensures exists* s'.
     A.pts_to table s' **
-    pure (Seq.length s' == SZ.v size)
+    pure (
+      Seq.length s' == SZ.v size /\
+      (if result then key_in_table s' (SZ.v size) key else s' == s)
+    )
 {
   let mut i: SZ.t = 0sz;
   let mut inserted: bool = false;
@@ -167,6 +170,10 @@ fn hash_search
         SZ.v result < Seq.length s /\
         Seq.index s (SZ.v result) == key
       ))
+      // Note: When result == size (not found), the loop invariant establishes  
+      // probes_not_key for some prefix, but proving ~(key_in_table) requires
+      // additional lemmas about linear probing correctness with empty slots.
+      // The search_post predicate defined above captures the full specification.
     )
 {
   let mut i: SZ.t = 0sz;

@@ -202,12 +202,7 @@ let rec remove_first (k: int) (l: list int) : list int =
 fn rec list_delete (head: dlist) (k: int)
   requires is_dlist head 'l
   returns new_head: dlist
-  ensures exists* l'.
-    is_dlist new_head l' **
-    pure (
-      (L.mem k 'l ==> l' == remove_first k 'l) /\
-      (~(L.mem k 'l) ==> l' == 'l)
-    )
+  ensures is_dlist new_head (remove_first k 'l)
 {
   match head {
     norewrite None -> {

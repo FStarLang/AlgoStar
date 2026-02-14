@@ -36,6 +36,23 @@ let well_formed (parent: Seq.seq SZ.t) (n: nat) : prop =
   Seq.length parent >= n /\
   (forall (i: nat). i < n ==> SZ.v (Seq.index parent i) < n)
 
+// Depth to root: element reaches a root in at most depth steps
+let rec has_root_within (parent: Seq.seq SZ.t) (i: nat) (depth: nat) : Tot prop (decreases depth) =
+  i < Seq.length parent /\
+  (SZ.v (Seq.index parent i) == i \/  // i is a root
+   (depth > 0 /\ has_root_within parent (SZ.v (Seq.index parent i)) (depth - 1)))
+
+// A forest: every element reaches a root within n steps
+let is_forest (parent: Seq.seq SZ.t) (n: nat) : prop =
+  well_formed parent n /\
+  (forall (idx: nat). idx < n ==> has_root_within parent idx n)
+
+// Helper lemma: has_root_within with depth 0 means i is a root
+let has_root_within_zero (parent: Seq.seq SZ.t) (i: nat)
+  : Lemma (requires i < Seq.length parent /\ has_root_within parent i 0)
+          (ensures SZ.v (Seq.index parent i) == i)
+  = ()
+
 // ========== Two-pass full path compression ==========
 
 // Pass 2 helper: walk from x towards root, setting parent[x] = root for each node
@@ -48,7 +65,7 @@ fn compress_path
   requires
     A.pts_to parent sparent **
     pure (
-      well_formed sparent (SZ.v n) /\
+      is_forest sparent (SZ.v n) /\
       SZ.v x < SZ.v n /\
       SZ.v root < SZ.v n /\
       is_root_at sparent (SZ.v root)
@@ -102,13 +119,26 @@ fn compress_path
   // In either case, set parent[x] = root one more time to be safe
   parent.(x) <- root;
   with sp_final. assert (A.pts_to parent sp_final);
-  assume_ (pure (
-    well_formed sp_final (SZ.v n) /\
-    SZ.v x < SZ.v n /\
-    SZ.v root < SZ.v n /\
-    SZ.v (Seq.index sp_final (SZ.v x)) == SZ.v root /\
-    SZ.v (Seq.index sp_final (SZ.v root)) == SZ.v root
-  ))
+  
+  // Prove the postcondition properties
+  // 1. Length is preserved by writes
+  assert (pure (Seq.length sp_final == Seq.length sparent));
+  
+  // 2. The write sets parent[x] = root
+  assert (pure (SZ.v (Seq.index sp_final (SZ.v x)) == SZ.v root));
+  
+  // 3. x and root bounds follow from precondition
+  assert (pure (SZ.v x < SZ.v n));
+  assert (pure (SZ.v root < SZ.v n));
+  
+  // 4. Root is still a root - the loop invariant maintained is_root_at,
+  //    and we only wrote to parent[x], not parent[root]
+  assert (pure (SZ.v (Seq.index sp_final (SZ.v root)) == SZ.v root));
+  
+  // 5. Well-formedness: all indices point within bounds
+  //    The loop invariant maintained well_formed, and writing root (which is < n) 
+  //    at position x preserves this
+  assert (pure (well_formed sp_final (SZ.v n)))
 }
 #pop-options
 
@@ -123,7 +153,7 @@ fn find_set
   requires
     A.pts_to parent sparent **
     pure (
-      well_formed sparent (SZ.v n) /\
+      is_forest sparent (SZ.v n) /\
       SZ.v x < SZ.v n /\
       SZ.v n > 0
     )
@@ -156,7 +186,8 @@ fn find_set
     pure (
       SZ.v vc < SZ.v n /\
       SZ.v vb <= SZ.v n /\
-      well_formed sparent (SZ.v n)
+      is_forest sparent (SZ.v n) /\
+      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb)
     )
   {
     let vc = !curr;
@@ -167,9 +198,40 @@ fn find_set
   };
 
   let root = !curr;
-  // root is a self-loop: parent[root] == root
+  let b = !bound;
+  // After loop exit: either (parent[root] == root) or (bound >= n)
+  // From the invariant, we have has_root_within sparent root (n - bound)
+  // If parent[root] == root, then root is_root_at
+  // If bound >= n, then (n - bound) <= 0, but has_root_within with depth 0 is impossible
+  // unless root is a root. Actually, let's check explicitly:
   let p_root = parent.(root);
-  assume_ (pure (is_root_at sparent (SZ.v root)));
+  if (p_root = root) {
+    // Direct case: root is a root
+    ()
+  } else {
+    // parent[root] != root, so loop exited due to bound >= n
+    // From invariant: has_root_within sparent root (n - bound)
+    // If bound >= n, then n - bound <= 0
+    // has_root_within with depth <= 0 requires root to be a root (parent[root] == root)
+    // But we have parent[root] != root, contradiction
+    // This means SMT should derive False
+    assert (pure (SZ.v b >= SZ.v n));  // loop exited due to bound
+    assert (pure (has_root_within sparent (SZ.v root) (SZ.v n - SZ.v b)));
+    assert (pure (SZ.v n - SZ.v b <= 0));
+    // has_root_within with depth 0 requires parent[root] == root
+    has_root_within_zero sparent (SZ.v root);
+    // Now SMT knows SZ.v (Seq.index sparent (SZ.v root)) == SZ.v root
+    // but we have p_root != root, which contradicts
+    assert (pure (SZ.v p_root == SZ.v (Seq.index sparent (SZ.v root))));
+    assert (pure (SZ.v p_root == SZ.v root));
+    assert (pure (p_root == root));
+    // But the else branch assumes p_root != root, so False
+    assert (pure False);
+    unreachable ()
+  };
+  // Now we know p_root == root
+  assert (pure (SZ.v (Seq.index sparent (SZ.v root)) == SZ.v root));
+  assert (pure (is_root_at sparent (SZ.v root)));
 
   // Pass 2: Compress path — set all nodes from x to root to point to root
   compress_path parent x root n;
