@@ -90,6 +90,10 @@ let rec count_matches_up_to_bounded (#a: eqtype) (text: Seq.seq a) (pattern: Seq
   = if limit = 0 then ()
     else count_matches_up_to_bounded text pattern (limit - 1)
 
+// ========== Complexity bound predicate ==========
+let string_match_complexity_bounded (cf c0 n m: nat) : prop =
+  cf >= c0 /\ cf - c0 <= op_Multiply (n - m + 1) m
+
 // ========== Pulse Implementation with Complexity ==========
 
 fn naive_string_match_complexity
@@ -102,9 +106,12 @@ fn naive_string_match_complexity
   (#s_pat: Ghost.erased (Seq.seq a))
   (n: SZ.t)
   (m: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n == Seq.length s_text /\
       SZ.v m == Seq.length s_pat /\
@@ -116,17 +123,18 @@ fn naive_string_match_complexity
       SZ.fits (op_Multiply (SZ.v n - SZ.v m + 1) (SZ.v m))
     )
   returns result: SZ.t
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
+    GR.pts_to ctr cf **
     pure (
       SZ.v result <= SZ.v n - SZ.v m + 1 /\
-      SZ.v result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1)
+      SZ.v result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1) /\
+      string_match_complexity_bounded cf (reveal c0) (SZ.v n) (SZ.v m)
     )
 {
   let mut count: SZ.t = 0sz;
   let mut s: SZ.t = 0sz;
-  let ctr = GR.alloc #nat 0;
 
   while (!s <=^ (n -^ m))
   invariant exists* vs vcount (vc : nat).
@@ -140,7 +148,8 @@ fn naive_string_match_complexity
       SZ.v vcount == count_matches_up_to s_text s_pat (SZ.v vs) /\
       SZ.v vcount <= SZ.v vs /\
       // Complexity: at most vs * m comparisons so far
-      vc <= op_Multiply (SZ.v vs) (SZ.v m)
+      vc >= reveal c0 /\
+      vc - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m)
     )
   {
     let vs = !s;
@@ -166,8 +175,9 @@ fn naive_string_match_complexity
         (vall_match == false ==> (exists (k: nat). k < SZ.v vj /\
           Seq.index s_text (SZ.v vs + k) <> Seq.index s_pat k)) /\
         // Complexity: inner ticks track j comparisons
-        vc_inner <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v vj /\
-        vc_inner <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v m
+        vc_inner >= reveal c0 /\
+        vc_inner - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v vj /\
+        vc_inner - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v m
       )
     {
       let vj = !j;
@@ -201,11 +211,7 @@ fn naive_string_match_complexity
     s := vs +^ 1sz;
   };
 
-  // At exit: vc <= (n-m+1) * m
-  let final_ctr = GR.op_Bang ctr;
-  assert (pure (reveal final_ctr <= op_Multiply (SZ.v n - SZ.v m + 1) (SZ.v m)));
-
-  GR.free ctr;
+  // At exit: cf - c0 <= (n-m+1) * m
   let final_count = !count;
   final_count
 }
