@@ -575,15 +575,13 @@ let rec lemma_filter_all_greater_tree (t: bst) (m: int)
 
 
 // Lemma: bst_minimum returns the smallest element
-let bst_minimum_is_minimum (t: bst)
-  : Lemma
-    (requires bst_valid t /\ bst_minimum t <> None)
-    (ensures (match bst_minimum t with
-              | Some m -> all_greater m (bst_inorder t) \/ 
-                          (mem m (bst_inorder t) /\ 
-                           all_greater m (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder t)))
-              | None -> False))
-  = admit() // This is complex, but we can work around it
+// The minimum is a member and all other elements are strictly greater
+let bst_minimum_is_minimum (t: bst) (m: int)
+  : Lemma (requires bst_valid t /\ bst_minimum t = Some m)
+          (ensures mem m (bst_inorder t) /\ 
+                   all_greater m (FStar.List.Tot.filter (fun x -> x <> m) (bst_inorder t)))
+  = bst_minimum_in_tree t;
+    lemma_filter_all_greater_tree t m
 
 // Helper: if all elements are > bound and x is a member, then x > bound
 let rec lemma_all_greater_implies_mem_greater (bound x: int) (xs: list int)

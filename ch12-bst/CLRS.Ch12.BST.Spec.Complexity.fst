@@ -255,15 +255,28 @@ let rec minimum_exists (t: bst)
    - It's provable with BST validity
    - Even without it, a conservative bound of 2h suffices for O(h) complexity
 *)
-let delete_minimum_bounded (t: bst)
+let rec delete_minimum_bounded (t: bst)
   : Lemma
-    (requires Node? t)
+    (requires Node? t /\ bst_valid t)
     (ensures (
       match bst_minimum t with
       | Some min_key -> bst_delete_ticks t min_key <= 2 * bst_height t
       | None -> False  // Cannot happen for non-empty tree
     ))
-  = admit()  // Provable with BST validity or detailed structural analysis
+    (decreases t)
+  = match t with
+    | Leaf -> ()  // Impossible by precondition
+    | Node Leaf key right ->
+      ()
+    | Node left key right ->
+      minimum_exists left;
+      (match bst_minimum left with
+       | Some min_key ->
+         bst_minimum_in_tree left;
+         lemma_all_less_implies_mem_less key min_key (bst_inorder left);
+         assert (min_key < key);
+         delete_minimum_bounded left
+       | None -> ())
 
 (* Lemma: Delete ticks are bounded by 4 * tree height + 1
    
@@ -287,60 +300,28 @@ let delete_minimum_bounded (t: bst)
 *)
 let rec delete_ticks_bounded (t: bst) (k: int)
   : Lemma
+    (requires bst_valid t)
     (ensures bst_delete_ticks t k <= 4 * bst_height t + 1)
     (decreases t)
   = match t with
     | Leaf -> ()
     | Node left key right ->
         if k < key then (
-          // Recurse left
           delete_ticks_bounded left k;
-          // delete_ticks left k <= 4 * height left + 1
-          // Total: 1 + delete_ticks left k <= 1 + 4 * height left + 1 = 2 + 4 * height left
-          // Need: 2 + 4 * height left <= 4 * height t + 1
-          // i.e., 4 * height left + 1 <= 4 * height t - 1
-          // i.e., 4 * height left + 2 <= 4 * height t
-          // Since height t >= 1 + height left
-          // We have: 4 * height t >= 4 * (1 + height left) = 4 + 4 * height left >= 4 * height left + 2 ✓
           assert (bst_height t >= 1 + bst_height left)
         ) else if k > key then (
-          // Recurse right - symmetric to left case
           delete_ticks_bounded right k;
           assert (bst_height t >= 1 + bst_height right)
         ) else (
-          // k = key: found the node to delete
           match left, right with
-          | Leaf, Leaf ->
-              // No children: 1 operation
-              ()
-          | Leaf, _ ->
-              // Only right child: 1 operation
-              ()
-          | _, Leaf ->
-              // Only left child: 1 operation
-              ()
+          | Leaf, Leaf -> ()
+          | Leaf, _ -> ()
+          | _, Leaf -> ()
           | Node _ _ _, Node _ _ _ ->
-              // Two children: find and delete successor
               minimum_exists right;
               let Some successor_key = bst_minimum right in
-              
-              // Bound minimum_ticks
               minimum_ticks_bounded right;
-              // minimum_ticks right <= height right
-              
-              // Bound delete successor (using conservative 2h bound)
               delete_minimum_bounded right;
-              // delete_ticks right successor_key <= 2 * height right
-              
-              // Total: 1 + minimum_ticks right + delete_ticks right successor_key
-              //     <= 1 + height right + 2 * height right
-              //      = 1 + 3 * height right
-              
-              // Need: 1 + 3 * height right <= 4 * height t + 1
-              // i.e., 3 * height right <= 4 * height t
-              
-              // Since height t = 1 + max(height left, height right) >= height right
-              // We have: 4 * height t >= 4 * height right >= 3 * height right ✓
               assert (bst_height t >= bst_height right);
               assert (4 * bst_height t >= 4 * bst_height right);
               assert (3 * bst_height right <= 4 * bst_height right)
