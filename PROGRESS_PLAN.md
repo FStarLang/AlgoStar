@@ -491,6 +491,22 @@ core shortest-path properties.
 
 ---
 
+## Phase 6: Build System Fixes
+
+**Problem**: `make` from top level failed on 7 chapters. Root cause: `pulse/mk/test.mk` adds `--ext optimize_let_vc` and `--ext fly_deps` globally, which change VC encoding and break proofs involving quantifier instantiation and SizeT arithmetic.
+
+- [x] P6.1: ch08 RadixSort — rlimit bump (40) around `radix_sort_sorted_on_lower_digits`
+- [x] P6.2: ch09 Select.Spec — strip optimize_let_vc/fly_deps in Makefile (quantifier instantiation failure)
+- [x] P6.3: ch10 Queue — strip optimize_let_vc/fly_deps in Makefile + rlimit bump for `dequeue`
+- [x] P6.4: ch15 MatrixChain — strip optimize_let_vc/fly_deps in Makefile (SizeT overflow)
+- [x] P6.5: ch21 UnionFind.RankBound — add `--include ../common` (fly_deps can't resolve it)
+- [x] P6.6: ch23 Prim — strip optimize_let_vc/fly_deps in Makefile (SizeT overflow)
+- [x] P6.7: ch24 BellmanFord.Complexity.Pure — remove duplicate file (wrong module name)
+- [x] P6.8: ch32 KMP.Complexity — strip optimize_let_vc/fly_deps in Makefile
+- [x] P6.9: Full `make -j4` passes cleanly (verified 2x)
+
+---
+
 ## Status Key
 
 - `[ ]` — Not started
@@ -579,9 +595,10 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Complexity proofs (Pure, standalone) | 23 |
 | Complexity proofs total | 37 (93%) |
 | Total lines of verified F*/Pulse | ~27,200 |
-| New P0 files this session | 3 (DoublyLinkedList 241, QueueBFS 348, StackDFS 698) |
 | Admits | 87 + 16 = 103 |
 | Assumes | 2 (DFS termination — white count decrease) |
+| **Tasks completed** | **228 / 250 (91%)** |
+| **`make -j4` clean build** | **✓ (all 22 chapters)** |
 | Source files | 120 |
 | Tasks completed | 116/185 (63%) |
 | Tasks remaining | 69/185 (37%) |
