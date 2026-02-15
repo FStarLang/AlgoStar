@@ -114,45 +114,144 @@ let rec log2_floor_lower_bound (n: pos)
     end
 
 /// ========================================================================
-/// Lemmas about BUILD-MAX-HEAP complexity
+/// Lemmas about BUILD-MAX-HEAP complexity (CLRS Theorem 6.3)
 /// ========================================================================
 
-/// Key lemma: Sum of h * ceil(n / 2^(h+1)) for h from 0 to log2(n) is O(n)
-/// This is CLRS equation (6.5): sum <= n * sum_{h=0}^{floor(log n)} h/2^h
-/// And sum_{h=0}^{inf} h/2^h = 2 (standard series)
+/// Weighted power-of-2 sum: sum_{h=start}^{max_h} h * 2^{max_h - h}
+let rec weighted_pow2_sum (h max_h: nat)
+  : Tot nat (decreases (if h > max_h then 0 else max_h - h + 1))
+  = if h > max_h then 0
+    else h * pow2 (max_h - h) + weighted_pow2_sum (h + 1) max_h
 
-/// The sum is bounded - we prove by providing an explicit upper bound
-/// This follows from CLRS Theorem 6.3: BUILD-MAX-HEAP runs in O(n) time
-/// The proof uses the fact that sum_{h=0}^{inf} h/2^h = 2
-let rec simple_sum_bound (n: pos) (h: nat)
+/// Recurrence: S(H) = 2 * S(H-1) + H
+let rec factor_two_lemma (h max_h: nat)
+  : Lemma (requires h <= max_h /\ max_h > 0)
+          (ensures weighted_pow2_sum h max_h = 2 * weighted_pow2_sum h (max_h - 1) + max_h)
+          (decreases (max_h - h))
+  = if h = max_h then ()
+    else begin factor_two_lemma (h + 1) max_h; assert (pow2 (max_h - h) = 2 * pow2 (max_h - 1 - h)) end
+
+/// Exact formula: sum_{h=0}^{H} h * 2^{H-h} = 2^{H+1} - H - 2
+let rec weighted_pow2_sum_exact (max_h: nat)
+  : Lemma (ensures weighted_pow2_sum 0 max_h = pow2 (max_h + 1) - (max_h + 2))
+          (decreases max_h)
+  = if max_h = 0 then () else begin weighted_pow2_sum_exact (max_h - 1); factor_two_lemma 0 max_h; assert (pow2 (max_h + 1) = 2 * pow2 max_h) end
+
+private let cancel_mul_div (a: nat) (b: pos) : Lemma ((a * b) / b = a) = lemma_div_plus 0 a b
+
+private let floor_mul_le (a: nat) (b: pos) (c: nat) : Lemma ((a / b) * c <= a * c / b) =
+  lemma_div_mod a b; lemma_div_plus ((a % b) * c) ((a / b) * c) b
+
+/// Scaling: pow2(H) * sum floor(n*h/2^h) <= n * weighted_pow2_sum(0,H)
+private let rec scaled_floor_sum_bound (n: pos) (h max_h: nat)
+  : Lemma (requires h <= max_h + 1)
+          (ensures pow2 max_h * sum_from_to (fun i -> n * i / pow2 i) h max_h <= n * weighted_pow2_sum h max_h)
+          (decreases (if h > max_h then 0 else max_h - h + 1))
+  = if h > max_h then ()
+    else begin
+      scaled_floor_sum_bound n (h + 1) max_h;
+      floor_mul_le (n * h) (pow2 h) (pow2 max_h);
+      pow2_plus h (max_h - h);
+      cancel_mul_div (n * h * pow2 (max_h - h)) (pow2 h)
+    end
+
+/// Core bound: sum floor(n*h/2^h) < 2n (geometric series convergence)
+private let floor_sum_lt_2n (n: pos) (max_h: nat)
+  : Lemma (ensures sum_from_to (fun i -> n * i / pow2 i) 0 max_h < 2 * n)
+  = scaled_floor_sum_bound n 0 max_h;
+    weighted_pow2_sum_exact max_h;
+    assert (pow2 max_h * sum_from_to (fun i -> n * i / pow2 i) 0 max_h < 2 * n * pow2 max_h)
+
+private let cancel_2_div (a: nat) (b: pos) : Lemma ((2 * a) / (2 * b) = a / b) =
+  lemma_div_mod a b;
+  let q = a / b in let r = a % b in
+  assert (2 * a = (2 * b) * q + 2 * r /\ 0 <= 2 * r /\ 2 * r < 2 * b);
+  lemma_div_plus (2 * r) q (2 * b)
+
+private let ceil_bound_1 (a: nat) (b: pos) : Lemma ((a + b - 1) / b <= a / b + 1) =
+  lemma_div_le (a + b - 1) (a + b) b
+
+/// Each term: ceil(n/2^{h+1}) * 2h <= n*h/2^h + 2h
+private let ceil_term_bound (n: pos) (h: nat)
+  : Lemma (ensures nodes_at_height n h * max_heapify_ops h <= n * h / pow2 h + max_heapify_ops h)
+  = ceil_bound_1 n (pow2 (h + 1));
+    floor_mul_le n (pow2 (h + 1)) (max_heapify_ops h);
+    assert (pow2 (h + 1) = 2 * pow2 h);
+    assert (n * (2 * h) = 2 * (n * h));
+    cancel_2_div (n * h) (pow2 h)
+
+/// Decompose: sum ceil(...)*2h <= sum floor_part + sum correction
+private let rec sum_bound_decomp (n: pos) (h max_h: nat)
+  : Lemma (requires h <= max_h + 1)
+          (ensures sum_from_to (fun i -> nodes_at_height n i * max_heapify_ops i) h max_h
+                   <= sum_from_to (fun i -> n * i / pow2 i) h max_h
+                    + sum_from_to (fun i -> max_heapify_ops i) h max_h)
+          (decreases (if h > max_h then 0 else max_h - h + 1))
+  = if h > max_h then () else begin sum_bound_decomp n (h + 1) max_h; ceil_term_bound n h end
+
+/// Split sum: sum f 0 max_h = sum f 0 (max_h-1) + f(max_h)
+private let sum_split_last (f: nat -> nat) (max_h: nat{max_h > 0})
+  : Lemma (ensures sum_from_to f 0 max_h = sum_from_to f 0 (max_h - 1) + f max_h)
+          (decreases max_h)
+  = if max_h = 1 then ()
+    else begin
+      // sum f 0 max_h = f(0) + sum f 1 max_h
+      // sum f 0 (max_h-1) = f(0) + sum f 1 (max_h-1)
+      // So need: sum f 1 max_h = sum f 1 (max_h-1) + f(max_h)
+      sum_split_last_from f 1 max_h
+    end
+
+and sum_split_last_from (f: nat -> nat) (start: nat) (max_h: nat{max_h >= start /\ max_h > 0})
+  : Lemma (ensures sum_from_to f start max_h = sum_from_to f start (max_h - 1) + f max_h)
+          (decreases (max_h - start))
+  = if start = max_h then ()
+    else if start = max_h - 1 then ()
+    else sum_split_last_from f (start + 1) max_h
+
+/// Bound on correction: sum_{i=0}^{max_h} 2i = max_h*(max_h+1)
+private let rec sum_heapify_ops (max_h: nat)
+  : Lemma (ensures sum_from_to (fun i -> max_heapify_ops i) 0 max_h <= max_h * (max_h + 1))
+          (decreases max_h)
+  = if max_h = 0 then ()
+    else begin
+      sum_heapify_ops (max_h - 1);
+      sum_split_last (fun i -> max_heapify_ops i) max_h
+      // sum(0..max_h) = sum(0..max_h-1) + 2*max_h
+      // By IH: sum(0..max_h-1) <= (max_h-1)*max_h
+      // Total: (max_h-1)*max_h + 2*max_h = max_h^2 + max_h = max_h*(max_h+1)
+    end
+
+/// h+1 <= 2^h for all h
+private let rec h_le_pow2 (h: nat) : Lemma (ensures h + 1 <= pow2 h) (decreases h) =
+  if h = 0 then () else h_le_pow2 (h - 1)
+
+/// h*(h+1) <= 2*2^h
+private let rec h_sq_bound (h: nat) : Lemma (ensures h * (h + 1) <= 2 * pow2 h) (decreases h) =
+  if h <= 1 then () else begin h_sq_bound (h - 1); h_le_pow2 (h - 1) end
+
+/// log2_floor(n)*(log2_floor(n)+1) <= 2n
+private let log2_sq_bound (n: pos) : Lemma (ensures log2_floor n * (log2_floor n + 1) <= 2 * n) =
+  h_sq_bound (log2_floor n); log2_floor_lower_bound n
+
+/// CLRS Theorem 6.3: BUILD-MAX-HEAP sum is O(n)
+/// Proof: decompose ceil into floor + correction, bound each part
+///   floor part: sum n*h/2^h < 2n  (geometric series via weighted_pow2_sum identity)
+///   correction: sum 2h = H(H+1) <= 2*2^H <= 2n  (since 2^H <= n)
+///   total < 2n + 2n = 4n
+let simple_sum_bound (n: pos) (h: nat)
   : Lemma (requires h <= log2_floor n)
           (ensures sum_from_to (fun i -> nodes_at_height n i * max_heapify_ops i) 0 h <= 4 * n)
           (decreases h)
-  = if h = 0 then begin
-      // Base case: h=0 contributes 0 since max_heapify_ops 0 = 0
-      ()
-    end
-    else begin
-      // Inductive case
-      simple_sum_bound n (h - 1);
-      // We have: sum from 0 to h-1 <= 4n
-      // Need to show: sum from 0 to h <= 4n
-      
-      // The key insight from CLRS: the terms decrease geometrically
-      // Term at height h: approximately (n/2^h) * 2h = hn/2^(h-1)
-      // This forms a geometric series that converges
-      
-      // The formal proof requires:
-      // 1. Showing each term nodes_at_height n h * max_heapify_ops h <= hn/2^(h-1) 
-      // 2. Summing the geometric series: sum_{h=0}^k hn/2^(h-1) = n * sum_{h=0}^k h/2^(h-1)
-      // 3. Bounding the series: sum_{h=0}^infty h/2^(h-1) = 4 (from calculus)
-      // 4. Therefore the sum is <= 4n
-      
-      // This is a standard result in algorithmic analysis (CLRS Theorem 6.3)
-      // The detailed proof requires lemmas about geometric series that are
-      // beyond the scope of this file's current lemma library
-      admit()
-    end
+  = sum_bound_decomp n 0 h;
+    floor_sum_lt_2n n h;
+    sum_heapify_ops h;
+    h_sq_bound h;
+    log2_floor_lower_bound n;
+    // sum ceil*2h <= sum(n*h/2^h) + sum(2h) < 2n + h*(h+1) <= 2n + 2*pow2(h) <= 2n + 2n = 4n
+    assert (h * (h + 1) <= 2 * pow2 h);
+    pow2_le_compat (log2_floor n) h;
+    assert (pow2 h <= pow2 (log2_floor n));
+    assert (pow2 (log2_floor n) <= n)
 
 /// First, prove that sum_from_to of operations is bounded by a simpler expression
 let sum_height_ops_bound (n: pos) (max_h: nat)
