@@ -159,9 +159,11 @@ fn topological_sort_complexity
     
     // After inner loop: vc2 - c0 <= vi * n + n = (vi + 1) * n
     with vc_outer. assert (GR.pts_to ctr vc_outer);
-    assume_ (pure (
-      reveal vc_outer - reveal c0 <= (SZ.v vi + 1) * SZ.v n
-    ));
+    // The inner loop invariant tells us: vc2 - c0 <= vi * n + vj
+    // At loop exit: vj == n
+    // Therefore: vc_outer - c0 <= vi * n + n == (vi + 1) * n
+    assert (pure (reveal vc_outer - reveal c0 <= SZ.v vi * SZ.v n + SZ.v n));
+    assert (pure (SZ.v vi * SZ.v n + SZ.v n == (SZ.v vi + 1) * SZ.v n));
     
     i := vi +^ 1sz
   };
@@ -342,10 +344,11 @@ fn topological_sort_complexity
     };
     
     // Restore outer loop invariant
+    // The inner loop doesn't tick, so vc_outer == vc2 from before the loop
+    // The outer loop invariant gave us vc - c0 <= n * n before this iteration
+    // No ticks were added during queue processing, so the bound is maintained
     with vc_outer. assert (GR.pts_to ctr vc_outer);
-    assume_ (pure (
-      reveal vc_outer - reveal c0 <= SZ.v n * SZ.v n
-    ))
+    assert (pure (reveal vc_outer - reveal c0 <= SZ.v n * SZ.v n))
   };
   
   // After the loop, extract the existentials to work with them

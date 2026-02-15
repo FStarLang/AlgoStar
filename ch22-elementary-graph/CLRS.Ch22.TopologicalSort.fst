@@ -7,6 +7,7 @@ open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch22.TopologicalSort.Spec
 open CLRS.Ch22.TopologicalSort.Lemmas
+open CLRS.Ch22.TopologicalSort.Verified
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -330,56 +331,111 @@ fn topological_sort
   assert (pure (forall (i: nat). i < Seq.length soutput ==> Seq.index soutput i >= 0));
   
   // 2. All elements are distinct
-  // PROOF SKETCH: To prove distinctness, we would need to track a ghost "visited" set.
-  // 
-  // Key insight: Kahn's algorithm ensures each vertex is enqueued exactly once:
-  // - Initially, only vertices with in-degree 0 are enqueued  
-  // - Each time we process a vertex u, we decrement in-degrees of its successors
-  // - A vertex v is enqueued only when its in-degree reaches 0
-  // - Once enqueued and processed, a vertex is never re-enqueued (in-degree doesn't increase)
+  // PROOF STRATEGY: To prove all_distinct, we need to establish that:
+  // (a) Each vertex is enqueued at most once (would need "visited" ghost tracking)
+  // (b) The output contains exactly those vertices that were enqueued
+  // (c) By (a) and (b), output has no duplicates
   //
-  // With a ghost visited set, we would prove:
-  // - Invariant: for all v in queue, v not in visited
-  // - Invariant: for all v in output[0..count), v in visited  
-  // - When enqueuing w: in_degree[w] just became 0, so w not in visited, add w to visited
-  // - Therefore output contains each vertex at most once
-  // - Combined with permutation property (n distinct values in [0,n)), all_distinct holds
+  // Key invariant (would need to add to loops):
+  //   - visited: ghost set of vertices that have been enqueued
+  //   - queue[qh..qt) ∩ visited = ∅ (queue contains only unvisited)
+  //   - output[0..count) ⊆ visited (output contains only visited)
+  //   - vertex v enqueued only when in_deg[v] reaches 0 for first time
   //
-  // This proof is feasible with the lemmas in CLRS.Ch22.TopologicalSort.Lemmas,
-  // but requires maintaining indeg_correct invariant and visited set through all loops.
+  // With this invariant + Kahn's algorithm property (in-degree only decreases),
+  // we'd prove: each vertex enqueued exactly once → all_distinct holds
+  //
+  // Since we lack the ghost state tracking in current implementation,
+  // we cannot complete this proof without refactoring loop invariants.
+  //
+  // The lemmas needed are in CLRS.Ch22.TopologicalSort.Lemmas:
+  //   - indeg_correct: relates in_deg array to actual predecessors
+  //   - lemma_zero_indeg_preds_exist: zero in-degree means all preds in output
+  //
+  // The Verified module demonstrates this proof is possible (modulo pigeonhole).
+  
+  // For now, we assert the property but cannot prove it in current structure
+  assert (pure (Seq.length soutput == SZ.v n));
+  assert (pure (forall (i: nat). i < SZ.v n ==> Seq.index soutput i < SZ.v n));
+  assert (pure (forall (i: nat). i < Seq.length soutput ==> Seq.index soutput i >= 0));
+  
+  // Would need to prove: all_distinct (seq_int_to_nat soutput)
+  // This requires: distinct property from algorithm invariants
+  //
+  // IF we had maintained the visited-set invariant through the loops, we could prove:
+  // - Each vertex enqueued at most once
+  // - vout == n (all vertices processed)
+  // - Therefore output contains n distinct values from [0,n)
+  // - Therefore all_distinct holds
+  //
+  // Since we cannot establish this without the invariants, we admit:
   admit();
   
   // 3. Output is a valid topological order
-  // PROOF SKETCH using strong_order_inv:
+  // PROOF STRATEGY using strong_order_inv:
   //
-  // KEY THEOREM (from Verified module):
-  //   If strong_order_inv adj n output n holds, and output is distinct,
-  //   then is_topological_order adj n output holds.
+  // THEOREM (lemma_strong_order_implies_topo_order_int from Verified module):
+  //   strong_order_inv adj n output n ∧ all_distinct output
+  //   → is_topological_order adj n output
   //
-  // The proof strategy is:
-  // a) Establish strong_order_inv through the main loop:
-  //    - Base case: lemma_strong_order_base shows it holds for empty output
-  //    - Inductive step: When dequeuing vertex u:
-  //      * queue_preds_in_output_sz ensures all predecessors of u are in output  
-  //      * lemma_strong_order_extend adds u to output, maintaining strong_order_inv
-  //    - After loop: strong_order_inv holds for complete output
+  // To use this theorem, we need to establish strong_order_inv through the algorithm:
   //
-  // b) Connect strong_order_inv to is_topological_order:
-  //    - strong_order_inv says: for every vertex w at position j,
-  //      every predecessor u of w appears at some earlier position k < j
-  //    - This directly implies the topological ordering property:
-  //      for every edge (u,v), u appears before v
-  //    - lemma_strong_order_implies_topo_order_int formalizes this connection
+  // INVARIANTS NEEDED (would add to loop at line 199):
+  //   (1) strong_order_inv sadj (SZ.v n) soutput (SZ.v vout)
+  //   (2) queue_preds_in_output_sz sadj (SZ.v n) squeue (SZ.v vqh) (SZ.v vqt) soutput (SZ.v vout)
+  //   (3) indeg_correct sadj (SZ.v n) sin_degree soutput (SZ.v vout)
   //
-  // The missing piece is proving strong_order_inv is maintained through the loops.
-  // This requires:
-  // - Tracking queue_preds_in_output_sz: vertices in queue have predecessors in output
-  // - Tracking indeg_correct: in-degree counts remaining predecessors correctly
-  // - Using lemmas after each enqueue/dequeue to maintain invariants
+  // INITIALIZATION (after Step 2, before Step 3):
+  //   - lemma_strong_order_base: strong_order_inv holds at count=0
+  //   - Vertices in initial queue have in_deg=0, so no predecessors
+  //   - Therefore queue_preds_in_output_sz holds (vacuously)
   //
-  // With proper ghost state tracking (in-degree correctness, queue properties),
-  // the Lemmas module provides all needed lemmas to complete this proof.
-  // The Verified module demonstrates this approach works (with admits only for pigeonhole).
+  // LOOP BODY (maintaining invariants):
+  //   When dequeuing vertex u at position vout:
+  //   a) From (2): all predecessors of u are in output[0..vout)
+  //   b) lemma_strong_order_extend: adding u preserves strong_order_inv
+  //   c) After processing u's neighbors (inner loop at line 247):
+  //      - Decrement in_deg for each successor
+  //      - Enqueue successors whose in_deg reaches 0
+  //      - lemma_queue_preds_enqueue: maintains queue_preds for new items
+  //   d) Update indeg_correct for new output length
+  //
+  // POSTCONDITION (after loop, vout == n):
+  //   - strong_order_inv sadj (SZ.v n) soutput (SZ.v n) holds
+  //   - all_distinct soutput (from previous property)
+  //   - lemma_strong_order_implies_topo_order_int gives us the result
+  //
+  // CONCLUSION:
+  //   is_topological_order_int sadj (SZ.v n) soutput
+  //   
+  // By conversion lemmas in Verified module, this gives us:
+  //   is_topological_order sadj (SZ.v n) (seq_int_to_nat soutput)
+  //
+  // Since current implementation lacks these loop invariants, we cannot complete
+  // the proof without refactoring. The Lemmas module provides all needed helper
+  // lemmas (lemma_strong_order_extend, lemma_queue_preds_enqueue, etc.).
+  
+  // We have these facts from loop postcondition:
+  assert (pure (SZ.v vout == SZ.v vqh));  // Processed all dequeued items
+  assert (pure (Seq.length soutput == SZ.v n));
+  assert (pure (forall (i: nat). i < SZ.v n ==> Seq.index soutput i < SZ.v n));
+  
+  // Would need to prove: is_topological_order sadj (SZ.v n) (seq_int_to_nat soutput)
+  // This requires: strong_order_inv from algorithm invariants
+  //
+  // IF we had maintained strong_order_inv through the main loop (line 199):
+  // - By lemma_strong_order_implies_topo_order_int, we'd have:
+  //   is_topological_order_int sadj (SZ.v n) soutput
+  // - By conversion from int to nat sequences, this gives us the desired property
+  //
+  // The proof requires calling lemmas at these points:
+  // - After line 196: lemma_strong_order_base (initialization)
+  // - In loop body (line 226-312): 
+  //   * Before dequeue: use queue_preds_in_output_sz
+  //   * After writing output: lemma_strong_order_extend
+  //   * After inner loop: lemma_queue_preds_enqueue for new queue items
+  //
+  // Since we cannot establish strong_order_inv without the invariants, we admit:
   admit();
   
   // Clean up temporary arrays
