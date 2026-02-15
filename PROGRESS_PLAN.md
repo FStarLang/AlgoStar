@@ -56,9 +56,9 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ---
 
-## Current Status (2025-02-15)
+## Current Status (2025-02-15, updated)
 
-**167 F* files, ~49K lines, 155 admits across 38 files, `make -j128` clean (0 warnings, 0 errors)**
+**167 F* files, ~50K lines, 147 admits across 35 files**
 
 ### Per-Algorithm Status Table
 
@@ -67,22 +67,22 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 02 | Insertion Sort | §2.1 | ✅ sorted ∧ perm | ✅ Linked O(n²) | 0 | |
 | 02 | Merge Sort | §2.3 | ✅ sorted ∧ perm | ⚠️ Separate O(n lg n) | 0 | |
 | 04 | Binary Search | §2.3 | ✅ found⟹match, ¬found⟹∉ | ✅ Linked O(lg n) | 0 | |
-| 04 | MaxSubarray (Kadane) | — | ✅ result=spec | ✅ Linked O(n) | 0 | ⚠️ Not CLRS; rename pending |
+| 04 | MaxSubarray.Kadane | — | ✅ result=spec | ✅ Linked O(n) | 0 | ✅ Renamed (not CLRS) |
 | 04 | MaxSubarray D&C | §4.1 | ⚠️ 1 axiom | ⚠️ Separate O(n lg n) | 1 | Pure F* only |
 | 06 | Heapsort | §6.4 | ✅ sorted ∧ perm | ⚠️ Separate O(n lg n) | 0 | |
 | 07 | Partition (Lomuto) | §7.1 | ✅ partitioned ∧ perm | ✅ Linked O(n) | 0 | |
 | 07 | Quicksort | §7.1 | ✅ sorted ∧ perm | ⚠️ Separate O(n²) | 0 | |
 | 08 | CountingSort | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate O(n+k) | 0 | In-place (not CLRS 4-phase) |
-| 08 | CountingSort.Stable | §8.2 | ⚠️ assumed postcond | ⚠️ Separate | 4 | CLRS 4-phase, stability unproven |
+| 08 | CountingSort.Stable | §8.2 | ⚠️ assumed postcond | ⚠️ Separate | 3 | CLRS 4-phase, stability unproven |
 | 08 | RadixSort (d=1) | §8.3 | ✅ sorted ∧ perm | ⚠️ Separate Θ(d(n+k)) | 0 | d=1 only |
 | 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 4 | Pure F* only |
-| 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 2 | |
+| 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
-| 09 | Select (partial sort) | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 6 | ⚠️ Not CLRS; rename pending |
+| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 5 | ✅ Renamed (not CLRS) |
 | 09 | Quickselect | §9.2 | ✅ perm ∧ result=s[k] | ⚠️ Separate O(n²) | 0 | |
 | 10 | Stack | §10.1 | ✅ ghost list LIFO | ⚠️ Separate O(1) | 0 | |
 | 10 | Queue | §10.1 | ✅ ghost list FIFO | ⚠️ Separate O(1) | 0 | |
-| 10 | DLL | §10.2 | ✅ DLS segment pred | ✅ Linked | 1 | O(1) delete-node: ghost admit |
+| 10 | DLL | §10.2 | ✅ DLS segment pred | ✅ Linked | 0 | ✅ Fixed |
 | 11 | HashTable | §11.4 | ✅ key_in_table | ✅ Linked O(n) | 0 | |
 | 12 | BST Search/Min/Max | §12.2 | ✅ correct search | ✅ Linked O(h) | 0 | |
 | 12 | BST Insert | §12.3 | ⚠️ membership only | ⚠️ Separate O(h) | 3 | ⚠️ Doesn't walk BST path |
@@ -93,19 +93,19 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | 1 assume val in Spec |
 | 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 9 | Optimality unproven |
-| 16 | Huffman (cost only) | §16.3 | ❌ no tree built | ✅ Linked (cost) | 2 | No tree/PQ |
+| 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
 | 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 0 | Disconnected from Pulse |
 | 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 5 | One-step compress |
-| 22 | BFS (iterative) | — | ⚠️ reachability only | — | 0 | ⚠️ Not queue-based; rename pending |
+| 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 | d[v]=δ(s,v) not proven |
-| 22 | DFS (iterative) | — | ⚠️ reachability only | — | 0 | ⚠️ Not stack-based; rename pending |
-| 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 26 | Parenthesis thm admitted |
-| 22 | TopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 3 | ⚠️ Kahn's; rename pending |
+| 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
+| 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 24 | Parenthesis thm admitted |
+| 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 4 | ✅ Renamed (not CLRS) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 13 | Distance, timestamps, white-path |
-| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 22 | Cut property admitted |
-| 23 | Prim | §23.2 | ⚠️ not MST | ✅ Linked O(n²) | 9 | MST correctness admitted |
+| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 21 | Cut property admitted |
+| 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 7 | ✅ Vacuous admit removed |
 | 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 5 | |
-| 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 3 | d[v]=δ(s,v) not proven |
+| 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
 | 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 0 | Stretch goal |
@@ -124,30 +124,30 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Chapter | Admits | Top files |
 |---------|--------|-----------|
-| ch22 (graphs) | 53 | StackDFS(11+15), QueueBFS(4+7), DFS.Spec(5), BFS.DistSpec(5), WhitePath(3), TopSort(3) |
-| ch23 (MST) | 36 | Kruskal.Spec(15), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(4), EdgeSort(2), Prim.Cmplx(2), main(2) |
-| ch08 (sorting) | 24 | RadixSort.FullSort(8), CS.Stable(4), RS.MultiDigit(4), RS.Stability(4), BucketSort(2), RS.Spec(2) |
+| ch22 (graphs) | 45 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5), BFS.DistSpec(5), WhitePath(3), KahnTopoSort(4) |
+| ch23 (MST) | 33 | Kruskal.Spec(15), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(3), EdgeSort(2), Prim.Cmplx(1), main(1) |
+| ch08 (sorting) | 22 | RadixSort.FullSort(8), RS.MultiDigit(4), RS.Stability(4), CS.Stable(3), RS.Spec(2), BucketSort(1) |
 | ch16 (greedy) | 11 | ActivitySelection.Spec(9), Huffman.Complete(2) |
-| ch32 (strings) | 6 | KMP.Complexity(3), RabinKarp.Spec(3) |
-| ch24 (SSSP) | 6 | BellmanFord.Spec(3), Dijkstra.TriIneq(3) |
-| ch09 (select) | 6 | Select.Correctness(6) |
+| ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
+| ch09 (select) | 5 | PartialSelectionSort.Correctness(5) |
+| ch24 (SSSP) | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
 | ch21 (UF) | 5 | UnionFind.Spec(4), RankBound(1) |
 | ch12 (BST) | 3 | BST.Insert.Spec(3) |
-| Other | 5 | MaxSubarray.DC(1), DLL(1), RodCutting.Spec(1), Strassen(1), VertexCover.Spec(1) |
-| **Total** | **155** | |
+| Other | 8 | MaxSubarray.DC(1), RodCutting.Spec(1), Strassen(1), VertexCover.Spec(1), Huffman.Complete(2), Prim.Cmplx(1), Kruskal(1) |
+| **Total** | **147** | |
 
 ---
 
 ## Action Plan
 
-### Phase A: Rename Non-CLRS Algorithms
+### Phase A: Rename Non-CLRS Algorithms ✅
 Keep all code and proofs. Rename to clarify what they actually implement.
 
-- [ ] A1: `MaxSubarray.fst` → `MaxSubarray.Kadane.fst` (ch04)
-- [ ] A2: `BFS.fst` → `IterativeBFS.fst` (ch22)
-- [ ] A3: `DFS.fst` → `IterativeDFS.fst` (ch22)
-- [ ] A4: `TopologicalSort.fst` → `KahnTopologicalSort.fst` (ch22)
-- [ ] A5: `Select.fst` → `PartialSelectionSort.fst` (ch09)
+- [x] A1: `MaxSubarray.fst` → `MaxSubarray.Kadane.fst` (ch04)
+- [x] A2: `BFS.fst` → `IterativeBFS.fst` (ch22)
+- [x] A3: `DFS.fst` → `IterativeDFS.fst` (ch22)
+- [x] A4: `TopologicalSort.fst` → `KahnTopologicalSort.fst` (ch22)
+- [x] A5: `Select.fst` → `PartialSelectionSort.fst` (ch09)
 
 ### Phase B: Critical Implementations (Highest Priority)
 
@@ -157,7 +157,9 @@ Keep all code and proofs. Rename to clarify what they actually implement.
 
 - [ ] B2: **Dijkstra d[v]=δ(s,v)** — Prove CLRS Theorem 24.6 (exact shortest paths).
   Currently only upper bound. At extract-min, extracted vertex has exact distance.
-  Files: Dijkstra.TriangleInequality.fst (3 admits), Dijkstra.Correctness.fst.
+  Files: Dijkstra.TriangleInequality.fst (2 admits, was 3), Dijkstra.Correctness.fst.
+  Progress: Proved `relax_from_u_establishes_triangle_from_u` + infrastructure lemmas.
+  Remaining: Need Dijkstra invariant (processed=optimal) for preservation proof.
 
 - [ ] B3: **BST Insert path** — Walk comparison path, not append at next slot.
   Prove `keys(new) = keys(old) ∪ {k}`. BST.Insert.Spec.fst (3 admits).
