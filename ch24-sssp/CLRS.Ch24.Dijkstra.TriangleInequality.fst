@@ -101,24 +101,111 @@ let rec relax_from_u (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
   if v >= n then dist
   else relax_from_u (relax_edge dist weights u v) weights u (v + 1)
 
-(* Lemma: After relaxing all edges from u, triangle inequality holds for all edges from u *)
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
-let relax_from_u_establishes_triangle_from_u (#n: nat) (dist: dist_vec n) 
-                                                  (weights: weight_matrix n)
-                                                  (u: nat{u < n}) (v_start: nat)
-  : Lemma 
-    (ensures (
-      let dist' = relax_from_u dist weights u v_start in
-      forall (v: nat). v_start <= v /\ v < n ==> 
-        edge_satisfies_triangle dist' weights u v))
+(* Key structural lemma: relax_from_u starting at v_start preserves dist[j] for j < v_start and j <> u *)
+(* Actually, relax_edge only modifies dist[v], never dist[u] when non-negative weights *)
+(* So relax_from_u from v_start only modifies dist[v_start], dist[v_start+1], ..., dist[n-1] *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 15"
+let rec relax_from_u_preserves_index (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                      (u: nat{u < n}) (v_start: nat) (j: nat{j < n})
+  : Lemma
+    (requires j < v_start \/ j = u)
+    (ensures 
+      all_weights_non_negative weights ==>
+      Seq.index (relax_from_u dist weights u v_start) j == Seq.index dist j)
     (decreases (n - v_start))
   =
   if v_start >= n then ()
   else begin
-    // TODO: Need preservation lemma showing that relaxing u->v' preserves triangle inequality for u->v
-    // This is true because relaxation only makes distances smaller, which cannot violate
-    // an existing inequality d_v <= d_u + w
-    admit()
+    let dist1 = relax_edge dist weights u v_start in
+    // relax_edge only modifies dist[v_start]
+    // If j < v_start: j <> v_start, so dist1[j] = dist[j]
+    // If j = u: need to check if u = v_start. If so, self-loop with non-neg weights means no change.
+    //           If u <> v_start, then j = u <> v_start, so dist1[j] = dist[j].
+    // In either case, dist1[j] = dist[j]
+    // Then by IH: relax_from_u dist1 ... [j] = dist1[j] = dist[j]
+    relax_from_u_preserves_index dist1 weights u (v_start + 1) j
+  end
+#pop-options
+
+(* Self-loop relaxation with non-negative weights doesn't change dist[u] *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+let relax_self_loop_noop (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                         (u: nat{u < n})
+  : Lemma
+    (requires all_weights_non_negative weights)
+    (ensures relax_edge dist weights u u == dist)
+  =
+  let d_u = Seq.index dist u in
+  let w = Seq.index weights (u * n + u) in
+  // w >= 0 (non-negative weights), so d_u + w >= d_u
+  // Therefore d_u + w < d_u is false, so relax_edge returns dist unchanged
+  assert (w >= 0);
+  if w < inf && d_u < inf && d_u + w < d_u then () // impossible branch
+  else ()
+#pop-options
+
+(* After relaxing u->v, triangle inequality for edge u->v' (already satisfied) is preserved
+   because dist[u] is NOT modified by relax_edge (it only modifies dist[v]) *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 15"
+let relax_edge_preserves_triangle_from_u (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                          (u: nat{u < n}) (v v': nat{v < n /\ v' < n})
+  : Lemma
+    (requires
+      edge_satisfies_triangle dist weights u v' /\
+      u <> v /\ u <> v')  // u is neither the target of relaxation nor v'
+    (ensures
+      edge_satisfies_triangle (relax_edge dist weights u v) weights u v')
+  =
+  // relax_edge only modifies dist[v]
+  // Since u <> v: dist'[u] = dist[u]
+  // Since v' <> v: dist'[v'] = dist[v']  (if v = v', this doesn't apply, but u <> v' handles that)
+  // Actually we need v <> v' OR the change makes dist[v'] smaller
+  // Wait: if v = v', dist'[v'] could change. Let's think again.
+  // edge_satisfies_triangle dist weights u v' means:
+  //   (w(u,v') < inf /\ d_u < inf) ==> d_v' <= d_u + w(u,v')
+  // After relaxing u->v: dist'[u] = dist[u] (since u <> v)
+  // If v <> v': dist'[v'] = dist[v'], so same inequality holds
+  // If v = v': dist'[v'] <= dist[v'] (relaxation only decreases), so still <= d_u + w
+  ()
+#pop-options
+
+(* Lemma: After relaxing all edges from u, triangle inequality holds for all edges from u *)
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+let rec relax_from_u_establishes_triangle_from_u (#n: nat) (dist: dist_vec n) 
+                                                  (weights: weight_matrix n)
+                                                  (u: nat{u < n}) (v_start: nat)
+  : Lemma 
+    (requires all_weights_non_negative weights)
+    (ensures (
+      let dist' = relax_from_u dist weights u v_start in
+      forall (v: nat). v_start <= v /\ v < n /\ u <> v ==> 
+        edge_satisfies_triangle dist' weights u v))
+    (decreases (n - v_start))
+  =
+  if v_start >= n then ()
+  else if u = v_start then begin
+    // Self-loop: relax_edge dist weights u u == dist (non-negative weights)
+    relax_self_loop_noop dist weights u;
+    assert (relax_edge dist weights u u == dist);
+    // So relax_from_u dist weights u v_start = relax_from_u dist weights u (v_start+1)
+    relax_from_u_establishes_triangle_from_u dist weights u (v_start + 1)
+  end else begin
+    // u <> v_start
+    let dist1 = relax_edge dist weights u v_start in
+    // After relaxing u->v_start: triangle inequality holds for u->v_start
+    relax_edge_establishes_triangle dist weights u v_start;
+    // Recursively establish for v_start+1, ..., n-1  
+    relax_from_u_establishes_triangle_from_u dist1 weights u (v_start + 1);
+    // Need to show: earlier edge u->v_start is preserved through later relaxations
+    // IH gives us: forall v. v_start+1 <= v < n /\ u <> v ==> edge_satisfies_triangle dist' u v
+    // We need: edge_satisfies_triangle dist' u v_start (where dist' = relax_from_u dist1 ...)
+    // dist'[u] = dist1[u] because u = u (j = u case of preserves_index)
+    relax_from_u_preserves_index dist1 weights u (v_start + 1) u;
+    // dist'[v_start] = dist1[v_start] because v_start < v_start + 1
+    relax_from_u_preserves_index dist1 weights u (v_start + 1) v_start;
+    // So edge_satisfies_triangle dist1 u v_start ==> edge_satisfies_triangle dist' u v_start
+    assert (Seq.index (relax_from_u dist1 weights u (v_start + 1)) u == Seq.index dist1 u);
+    assert (Seq.index (relax_from_u dist1 weights u (v_start + 1)) v_start == Seq.index dist1 v_start)
   end
 #pop-options
 
@@ -126,9 +213,10 @@ let relax_from_u_establishes_triangle_from_u (#n: nat) (dist: dist_vec n)
 let relax_from_u_establishes_all_from_u (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
                                         (u: nat{u < n})
   : Lemma
+    (requires all_weights_non_negative weights)
     (ensures (
       let dist' = relax_from_u dist weights u 0 in
-      forall (v: nat). v < n ==> edge_satisfies_triangle dist' weights u v))
+      forall (v: nat). v < n /\ u <> v ==> edge_satisfies_triangle dist' weights u v))
   =
   relax_from_u_establishes_triangle_from_u dist weights u 0
 
@@ -154,35 +242,50 @@ let relax_edge_preserves_triangle_others (#n: nat) (dist: dist_vec n) (weights: 
   : Lemma
     (requires 
       edge_satisfies_triangle dist weights x y /\
-      all_weights_non_negative weights)
+      all_weights_non_negative weights /\
+      x <> v)  // Key: we only preserve triangle inequality for edges NOT starting from v
     (ensures
       edge_satisfies_triangle (relax_edge dist weights u v) weights x y)
   =
-  // TODO: This should be provable by Seq.upd reasoning:
-  // Relaxation only updates dist[v], making it smaller or keeping it same
-  // This preserves all existing triangle inequalities
-  admit()
+  // When x <> v, dist'[x] = dist[x] (relax_edge only modifies dist[v])
+  // And dist'[y] <= dist[y] (either unchanged if y <> v, or relaxed if y = v)
+  // 
+  // Precondition: (w_xy < inf /\ d_x < inf) ==> d_y <= d_x + w_xy
+  // Need: (w_xy < inf /\ d_x' < inf) ==> d_y' <= d_x' + w_xy
+  //
+  // Since x <> v: d_x' = d_x
+  // Since d_y' <= d_y, the implication follows
+  ()
 #pop-options
 
-(* Relaxing all edges from u preserves triangle inequality for other edges *)
+(* Relaxing all edges from u preserves triangle inequality for edges from processed vertices *)
+(* The key insight: processed vertices != u, and != any vertex being relaxed TO *)
 #push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
-let rec relax_from_u_preserves_triangle_others (#n: nat) (dist: dist_vec n) 
+let rec relax_from_u_preserves_triangle_from_processed 
+                                               (#n: nat) (dist: dist_vec n) 
                                                (weights: weight_matrix n)
                                                (u: nat{u < n}) (v_start: nat)
-                                               (x y: nat{x < n /\ y < n})
+                                               (processed: processed_set)
   : Lemma
     (requires
-      edge_satisfies_triangle dist weights x y /\
-      all_weights_non_negative weights)
+      triangle_inequality_from_processed dist weights processed /\
+      all_weights_non_negative weights /\
+      not (is_processed processed u)) // u is not yet processed
     (ensures
-      edge_satisfies_triangle (relax_from_u dist weights u v_start) weights x y)
+      triangle_inequality_from_processed (relax_from_u dist weights u v_start) weights processed)
     (decreases (n - v_start))
   =
   if v_start >= n then ()
   else begin
     let dist1 = relax_edge dist weights u v_start in
-    relax_edge_preserves_triangle_others dist weights u v_start x y;
-    relax_from_u_preserves_triangle_others dist1 weights u (v_start + 1) x y
+    // For edges x->y where x is processed and u is not:
+    //   x <> u (since x is processed, u is not)
+    //   If x <> v_start: use relax_edge_preserves_triangle_others (x <> v)
+    //   If x = v_start: dist[x] may change, potentially breaking triangle inequality
+    //     This case requires Dijkstra invariant (processed vertices have optimal distances)
+    //     which ensures relax_edge never reduces dist[x] for processed x.
+    // TODO: Add precondition: forall x. processed(x) ==> dist[u] + w(u,x) >= dist[x]
+    admit()
   end
 #pop-options
 
