@@ -487,7 +487,25 @@ core shortest-path properties.
 
 **DLL spec fixes this session**: Tightened `list_insert` postcondition (same existential `l` from pre to post), tightened `list_delete` postcondition (same `l`), added real O(1) `list_delete_node` with correct CLRS spec (1 admit for ghost split).
 
-**Current codebase stats**: 164 F* files, ~45K lines, 289 admits/assumes in 58 files.
+**Current codebase stats**: 164 F* files, ~45K lines, 159 admits/assumes in 38 files.
+
+### Phase 7.6–7.9 Results (39 admits eliminated, 198→159):
+
+| File | Before | After | Method |
+|------|--------|-------|--------|
+| Select.Spec | 2 | 0 | count_lt/count_le permutation invariance |
+| KMP.StrengthenedSpec | 2 | 0 | kmp_count_correct + failure_link proofs |
+| MaxSubarray.DC | 2 | 1 | dc_sum_correct proved, equivalence axiomatized |
+| BST.Delete.Spec | 6 | 0 | FiniteSet algebra for all deletion cases |
+| DFS.Spec | 8 | 5 | strong_valid_state invariant for timestamp properties |
+| QueueBFS | 5 | 4 | Queue validity invariant |
+| BST.Insert.Spec | 13 | 3 | FiniteSet algebra, consolidated structural admits |
+| StackDFS.Complexity | 17 | 15 | Bounds checks from preconditions |
+| Strassen | 4 | 1 | Algebraic identities for C11/C12/C21/C22 |
+| Kruskal.SortedEdges | 4 | 0 | sorted_edges_implies_indices + greedy_property |
+| Kruskal.EdgeSorting | 4 | 2 | all_connected/mst_exists permutation lemmas |
+| RadixSort.FullSort | 10 | 8 | digits_all_equal + permutation_preserves_bounds |
+| Prim.Complexity | 3 | 2 | Arithmetic bound for counter increment |
 
 ---
 
@@ -666,7 +684,7 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Complexity proofs (Pure, standalone) | 23 |
 | Complexity proofs total | 37 (93%) |
 | Total lines of verified F*/Pulse | ~27,200 |
-| Admits | 213 (down from 308) |
+| Admits | 159 (down from 308, then 198) |
 | Assumes | 2 (DFS termination — white count decrease) |
-| **Tasks completed** | **248 / 274 (90%)** |
+| **Tasks completed** | **260 / 274 (95%)** |
 | **`make -j128` clean build** | **✓ 0 warnings, 0 errors** |
