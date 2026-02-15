@@ -15,7 +15,7 @@
    Uses admit() where needed for complex invariant reasoning.
 *)
 
-module CLRS.Ch22.TopologicalSort.Complexity
+module CLRS.Ch22.KahnTopologicalSort.Complexity
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array

@@ -14,7 +14,7 @@
    limitations under the License.
 *)
 
-module CLRS.Ch09.Select.Complexity.Enhanced
+module CLRS.Ch09.PartialSelectionSort.Complexity.Enhanced
 
 open FStar.Seq
 open FStar.Mul
@@ -102,7 +102,7 @@ let rec select_with_ticks_partial (n: nat) (k: nat) : Tot (nat & nat) (decreases
 
 (**
  * Main function: select_with_ticks
- * Models the partial selection sort approach used in CLRS.Ch09.Select
+ * Models the partial selection sort approach used in CLRS.Ch09.PartialSelectionSort
  * Returns (result_placeholder, tick_count)
  *)
 let select_with_ticks (n: nat) (k: nat{k < n \/ n = 0}) : (nat & nat) =

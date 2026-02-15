@@ -4,7 +4,7 @@
 
 module Test.MaxSubarray
 
-open CLRS.Ch04.MaxSubarray
+open CLRS.Ch04.MaxSubarray.Kadane
 open FStar.IO
 open FStar.All
 

@@ -19,7 +19,7 @@
    state their correctness theorems.
 *)
 
-module CLRS.Ch09.Select.Spec
+module CLRS.Ch09.PartialSelectionSort.Spec
 
 open FStar.Seq
 open FStar.Classical

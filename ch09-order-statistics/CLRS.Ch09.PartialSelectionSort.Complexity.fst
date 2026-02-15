@@ -14,7 +14,7 @@
    limitations under the License.
 *)
 
-module CLRS.Ch09.Select.Complexity
+module CLRS.Ch09.PartialSelectionSort.Complexity
 
 open FStar.Mul
 
@@ -22,7 +22,7 @@ open FStar.Mul
  * Complexity Analysis for Partial Selection Sort
  *
  * This module proves the O(nk) complexity bound for the partial selection sort
- * algorithm used in CLRS.Ch09.Select. The algorithm finds the k smallest elements
+ * algorithm used in CLRS.Ch09.PartialSelectionSort. The algorithm finds the k smallest elements
  * by performing k rounds of selection, where each round finds the minimum of the
  * remaining unsorted portion.
  *

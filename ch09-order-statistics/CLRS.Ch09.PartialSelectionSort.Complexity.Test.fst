@@ -2,10 +2,10 @@
    Test file demonstrating the use of Select Complexity Analysis
 *)
 
-module CLRS.Ch09.Select.Complexity.Test
+module CLRS.Ch09.PartialSelectionSort.Complexity.Test
 
 open FStar.Mul
-open CLRS.Ch09.Select.Complexity.Enhanced
+open CLRS.Ch09.PartialSelectionSort.Complexity.Enhanced
 
 (**
  * Example 1: Finding the minimum (k=0)

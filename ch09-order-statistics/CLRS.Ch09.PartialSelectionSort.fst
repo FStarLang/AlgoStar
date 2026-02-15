@@ -34,7 +34,7 @@
    median-of-5 groups, which is a significant implementation effort.
 *)
 
-module CLRS.Ch09.Select
+module CLRS.Ch09.PartialSelectionSort
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array

@@ -24,7 +24,7 @@
    - Uses admit() where complex permutation reasoning is needed
 *)
 
-module CLRS.Ch09.Select.Correctness
+module CLRS.Ch09.PartialSelectionSort.Correctness
 
 open FStar.Seq
 open FStar.Classical
@@ -33,7 +33,7 @@ open FStar.Mul
 module Seq = FStar.Seq
 
 // Import the specification module
-open CLRS.Ch09.Select.Spec
+open CLRS.Ch09.PartialSelectionSort.Spec
 
 (*** Pure Quickselect - Recursive Specification ***)
 
