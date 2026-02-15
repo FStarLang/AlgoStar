@@ -66,6 +66,20 @@ let valid_state (st: dfs_state) : prop =
   (forall (u: nat). u < st.n ==>
     (Seq.index st.color u = Black ==> Seq.index st.f u > Seq.index st.d u /\ Seq.index st.f u <= st.time))
 
+// Enhanced invariant with bidirectional properties
+// (This is what's actually maintained but harder to prove)
+let strong_valid_state (st: dfs_state) : prop =
+  valid_state st /\
+  // White vertices have unset timestamps
+  (forall (u: nat). u < st.n ==>
+    (Seq.index st.color u = White ==> Seq.index st.d u = 0 /\ Seq.index st.f u = 0)) /\
+  // Gray vertices have discovery set but not finish
+  (forall (u: nat). u < st.n ==>
+    (Seq.index st.color u = Gray ==> Seq.index st.d u > 0 /\ Seq.index st.f u = 0)) /\
+  // All timestamps bounded by time
+  (forall (u: nat). u < st.n ==>
+    Seq.index st.d u <= st.time /\ Seq.index st.f u <= st.time)
+
 // Count white vertices (for termination measure)
 let rec count_white (colors: Seq.seq color) (i: nat) : Tot nat (decreases (Seq.length colors - i)) =
   if i >= Seq.length colors then 0
@@ -247,6 +261,11 @@ let init_state_valid (n: nat)
   : Lemma (valid_state (init_state n))
   = ()
 
+// Initial state satisfies strong invariant
+let init_state_strong_valid (n: nat)
+  : Lemma (strong_valid_state (init_state n))
+  = ()
+
 // Discovering a vertex preserves validity
 let discover_preserves_validity (u: nat) (st: dfs_state)
   : Lemma
@@ -286,6 +305,64 @@ let discover_preserves_validity (u: nat) (st: dfs_state)
         )
     in
     Classical.forall_intro (Classical.move_requires aux2)
+
+// Discovering a vertex preserves strong validity
+let discover_preserves_strong_validity (u: nat) (st: dfs_state)
+  : Lemma
+    (requires strong_valid_state st /\ u < st.n /\ u < Seq.length st.color /\ Seq.index st.color u = White)
+    (ensures strong_valid_state (discover_vertex u st))
+  = let st' = discover_vertex u st in
+    discover_preserves_validity u st;
+    // Now prove the additional conjuncts of strong_valid_state
+    
+    // White vertices have unset timestamps
+    let aux1 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.d /\ v < Seq.length st'.f}) : Lemma
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v = White ==> 
+                Seq.index st'.d v = 0 /\ Seq.index st'.f v = 0))
+      = if v = u then (
+          assert (Seq.index st'.color u = Gray);
+          assert (Gray <> White)
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.d v = Seq.index st.d v);
+          assert (Seq.index st'.f v = Seq.index st.f v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux1);
+    
+    // Gray vertices have discovery set but not finish
+    let aux2 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.d /\ v < Seq.length st'.f}) : Lemma
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v = Gray ==> 
+                Seq.index st'.d v > 0 /\ Seq.index st'.f v = 0))
+      = if v = u then (
+          assert (Seq.index st'.color u = Gray);
+          assert (Seq.index st'.d u = st.time + 1);
+          assert (Seq.index st'.f u = Seq.index st.f u)  // unchanged
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.d v = Seq.index st.d v);
+          assert (Seq.index st'.f v = Seq.index st.f v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux2);
+    
+    // All timestamps bounded
+    let aux3 (v: nat{v < Seq.length st'.d /\ v < Seq.length st'.f}) : Lemma
+      (requires v < st'.n)
+      (ensures Seq.index st'.d v <= st'.time /\ Seq.index st'.f v <= st'.time)
+      = if v = u then (
+          assert (Seq.index st'.d u = st.time + 1);
+          assert (st'.time = st.time + 1);
+          assert (Seq.index st'.f u = Seq.index st.f u)
+        ) else (
+          assert (Seq.index st'.d v = Seq.index st.d v);
+          assert (Seq.index st'.f v = Seq.index st.f v);
+          assert (st'.time = st.time + 1)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux3)
 
 // Finishing a vertex preserves validity
 let finish_preserves_validity (u: nat) (st: dfs_state)
@@ -332,6 +409,62 @@ let finish_preserves_validity (u: nat) (st: dfs_state)
     in
     Classical.forall_intro (Classical.move_requires aux2)
 
+// Finishing a vertex preserves strong validity  
+let finish_preserves_strong_validity (u: nat) (st: dfs_state)
+  : Lemma
+    (requires strong_valid_state st /\ u < st.n /\ u < Seq.length st.color /\ Seq.index st.color u = Gray)
+    (ensures strong_valid_state (finish_vertex u st))
+  = let st' = finish_vertex u st in
+    finish_preserves_validity u st;
+    
+    // White vertices have unset timestamps
+    let aux1 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.d /\ v < Seq.length st'.f}) : Lemma
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v = White ==> 
+                Seq.index st'.d v = 0 /\ Seq.index st'.f v = 0))
+      = if v = u then (
+          assert (Seq.index st'.color u = Black);
+          assert (Black <> White)
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.d v = Seq.index st.d v);
+          assert (Seq.index st'.f v = Seq.index st.f v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux1);
+    
+    // Gray vertices have discovery set but not finish
+    let aux2 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.d /\ v < Seq.length st'.f}) : Lemma
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v = Gray ==> 
+                Seq.index st'.d v > 0 /\ Seq.index st'.f v = 0))
+      = if v = u then (
+          assert (Seq.index st'.color u = Black);
+          assert (Black <> Gray)
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.d v = Seq.index st.d v);
+          assert (Seq.index st'.f v = Seq.index st.f v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux2);
+    
+    // All timestamps bounded
+    let aux3 (v: nat{v < Seq.length st'.d /\ v < Seq.length st'.f}) : Lemma
+      (requires v < st'.n)
+      (ensures Seq.index st'.d v <= st'.time /\ Seq.index st'.f v <= st'.time)
+      = if v = u then (
+          assert (Seq.index st'.f u = st.time + 1);
+          assert (st'.time = st.time + 1);
+          assert (Seq.index st'.d u = Seq.index st.d u)
+        ) else (
+          assert (Seq.index st'.d v = Seq.index st.d v);
+          assert (Seq.index st'.f v = Seq.index st.f v);
+          assert (st'.time = st.time + 1)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux3)
+
 #pop-options
 
 (*** Timestamp Properties ***)
@@ -362,6 +495,40 @@ let time_increases_on_finish (u: nat) (st: dfs_state)
     (ensures (finish_vertex u st).time = st.time + 1)
   = ()
 
+// Discovery sets timestamp to current time + 1
+let discover_sets_timestamp (u: nat) (st: dfs_state)
+  : Lemma
+    (requires u < st.n /\ u < Seq.length st.color /\ u < Seq.length st.d /\ Seq.index st.color u = White)
+    (ensures (let st' = discover_vertex u st in
+              u < Seq.length st'.d /\ Seq.index st'.d u = st.time + 1))
+  = ()
+
+// Finish sets timestamp to current time + 1
+let finish_sets_timestamp (u: nat) (st: dfs_state)
+  : Lemma
+    (requires u < st.n /\ u < Seq.length st.color /\ u < Seq.length st.f /\ Seq.index st.color u = Gray)
+    (ensures (let st' = finish_vertex u st in
+              u < Seq.length st'.f /\ Seq.index st'.f u = st.time + 1))
+  = ()
+
+// Discovery doesn't change finish times
+let discover_preserves_finish_times (u: nat) (st: dfs_state)
+  : Lemma
+    (requires u < st.n /\ u < Seq.length st.color /\ u < Seq.length st.d)
+    (ensures (let st' = discover_vertex u st in
+              Seq.length st'.f = Seq.length st.f /\
+              (forall (v: nat). v < Seq.length st.f ==> Seq.index st'.f v = Seq.index st.f v)))
+  = ()
+
+// Finish doesn't change discovery times
+let finish_preserves_discovery_times (u: nat) (st: dfs_state)
+  : Lemma
+    (requires u < st.n /\ u < Seq.length st.color /\ u < Seq.length st.f)
+    (ensures (let st' = finish_vertex u st in
+              Seq.length st'.d = Seq.length st.d /\
+              (forall (v: nat). v < Seq.length st.d ==> Seq.index st'.d v = Seq.index st.d v)))
+  = ()
+
 (*** Parenthesis Theorem (CLRS Theorem 22.7) ***)
 
 // Timestamp intervals: [d[u], f[u]] and [d[v], f[v]]
@@ -383,6 +550,21 @@ let interval_contained (i1 i2: interval) : bool =
 // Intervals are disjoint: no overlap
 let intervals_disjoint (i1 i2: interval) : bool =
   i1.finish < i2.start || i2.finish < i1.start
+
+// Simple interval arithmetic lemmas
+let intervals_disjoint_symmetric (i1 i2: interval)
+  : Lemma (intervals_disjoint i1 i2 <==> intervals_disjoint i2 i1)
+  = ()
+
+let interval_containment_reflexive (i: interval)
+  : Lemma (requires i.start <= i.finish)
+          (ensures interval_contained i i)
+  = ()
+
+let interval_containment_transitive (i1 i2 i3: interval)
+  : Lemma (requires interval_contained i1 i2 /\ interval_contained i2 i3)
+          (ensures interval_contained i1 i3)
+  = ()
 
 // Parenthesis property: for any two vertices u, v, their intervals either:
 // 1. Are disjoint
@@ -546,46 +728,44 @@ let topological_sort_property (adj: Seq.seq (Seq.seq int)) (n: nat)
 let discovered_means_gray_or_black (st: dfs_state) (u: nat)
   : Lemma
     (requires 
-      valid_state st /\ 
+      strong_valid_state st /\ 
       u < st.n /\ 
       u < Seq.length st.color /\ 
       u < Seq.length st.d /\
       Seq.index st.d u > 0)
     (ensures Seq.index st.color u = Gray \/ Seq.index st.color u = Black)
-  = // This requires the converse of valid_state's implication
-    // Would need: d[u] > 0 ==> color[u] <> White
-    // valid_state only gives: color[u] <> White ==> d[u] > 0
-    // Provable from invariant that discover_vertex sets both, but needs induction
-    admit()
+  = // From strong_valid_state:
+    // White ==> d[u] = 0
+    // Since d[u] > 0, we have color[u] <> White
+    // Therefore color[u] = Gray or Black
+    ()
 
 // Finish time is set when vertex turns black
 let finished_means_black (st: dfs_state) (u: nat)
   : Lemma
     (requires 
-      valid_state st /\ 
+      strong_valid_state st /\ 
       u < st.n /\ 
       u < Seq.length st.color /\ 
       u < Seq.length st.f /\
       Seq.index st.f u > 0)
     (ensures Seq.index st.color u = Black)
-  = // This requires the converse: f[u] > 0 ==> color[u] = Black
-    // valid_state gives: color[u] = Black ==> f[u] > d[u] /\ f[u] <= time
-    // Provable from invariant but needs induction over DFS execution
-    admit()
+  = // From strong_valid_state:
+    // White ==> f[u] = 0
+    // Gray ==> f[u] = 0
+    // Since f[u] > 0, we have color[u] <> White and color[u] <> Gray
+    // Therefore color[u] = Black
+    ()
 
 // Timestamps are bounded by current time
 let timestamps_bounded (st: dfs_state) (u: nat)
   : Lemma
-    (requires valid_state st /\ u < st.n /\ u < Seq.length st.d /\ u < Seq.length st.f)
+    (requires strong_valid_state st /\ u < st.n /\ u < Seq.length st.d /\ u < Seq.length st.f)
     (ensures 
       Seq.index st.d u <= st.time /\
       Seq.index st.f u <= st.time)
-  = // Partially provable from valid_state:
-    // - For non-White: d[u] <= time (from valid_state)
-    // - For Black: f[u] <= time (from valid_state)
-    // Missing: White vertices have d[u]=0, Gray vertices have f[u]=0
-    // These properties hold but aren't in valid_state definition
-    admit()
+  = // Directly from strong_valid_state
+    ()
 
 #pop-options
 

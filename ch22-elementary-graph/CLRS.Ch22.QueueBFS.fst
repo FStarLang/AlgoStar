@@ -67,10 +67,16 @@ fn discover_vertex
       SZ.v vv < SZ.v n /\
       SZ.v u < SZ.v n /\
       SZ.v vtail < SZ.v n /\
+      du >= 0 /\
       Seq.length scolor == SZ.v n /\
       Seq.length sdist == SZ.v n /\
       Seq.length spred == SZ.v n /\
-      Seq.length squeue == SZ.v n
+      Seq.length squeue == SZ.v n /\
+      // vv must be WHITE (this is checked before calling discover_vertex)
+      Seq.index scolor (SZ.v vv) == 0 /\
+      // Distance soundness for discovered vertices
+      (forall (w: nat). w < SZ.v n /\ Seq.index scolor w <> 0 ==>
+        Seq.index sdist w >= 0)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
     A.pts_to color scolor' **
@@ -84,11 +90,17 @@ fn discover_vertex
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
       SZ.v vtail' <= SZ.v n /\
-      SZ.v vtail' >= SZ.v vtail
+      SZ.v vtail' == SZ.v vtail + 1 /\
+      // The new element at queue[vtail] is vv, which is < n
+      Seq.index squeue' (SZ.v vtail) == vv /\
+      // Distance soundness preserved and extended
+      (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
+        Seq.index sdist' w >= 0)
     )
 {
   // v.color = GRAY
   A.op_Array_Assignment color vv 1;
+  
   // v.d = u.d + 1
   A.op_Array_Assignment dist vv (du + 1);
   // v.pi = u
@@ -103,7 +115,7 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
 fn maybe_discover
   (color: A.array int) (dist: A.array int) (pred: A.array int)
   (queue_data: A.array SZ.t) (q_tail: ref SZ.t)
@@ -128,7 +140,12 @@ fn maybe_discover
       Seq.length sdist == SZ.v n /\
       Seq.length spred == SZ.v n /\
       Seq.length squeue == SZ.v n /\
-      du >= 0
+      du >= 0 /\
+      // cv is the color of vertex vv
+      cv == Seq.index scolor (SZ.v vv) /\
+      // Distance soundness for discovered vertices
+      (forall (w: nat). w < SZ.v n /\ Seq.index scolor w <> 0 ==>
+        Seq.index sdist w >= 0)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
     A.pts_to color scolor' **
@@ -142,17 +159,25 @@ fn maybe_discover
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
       SZ.v vtail' <= SZ.v n /\
-      SZ.v vtail' >= SZ.v vtail
+      SZ.v vtail' >= SZ.v vtail /\
+      // Distance soundness preserved
+      (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
+        Seq.index sdist' w >= 0)
     )
 {
   if (has_edge_val <> 0 && cv = 0) {
+    // When cv = 0 (WHITE), vertex vv hasn't been discovered yet.
+    // Ideally vtail < n follows from invariants, but proving this requires
+    // tracking that each vertex is discovered at most once, which is complex.
     assume_ (pure (SZ.v vtail < SZ.v n));
     discover_vertex color dist pred queue_data q_tail u vv du n
+  } else {
+    ()
   }
 }
 #pop-options
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)
@@ -273,18 +298,28 @@ fn queue_bfs
       Seq.index sdist_q (SZ.v source) == 0 /\
       // Distance soundness
       (forall (w: nat). w < SZ.v n /\ Seq.index scolor_q w <> 0 ==>
-        Seq.index sdist_q w >= 0)
+        Seq.index sdist_q w >= 0) /\
+      // Queue validity: all elements in queue are valid vertices
+      (forall (i: nat). i >= SZ.v vhead /\ i < SZ.v vtail ==> 
+        SZ.v (Seq.index squeue_q i) < SZ.v n)
     )
   {
     // u = DEQUEUE(Q)
     let vhead = !q_head;
     let u: SZ.t = A.op_Array_Access queue_data vhead;
+    // By queue validity invariant, u < n
+    with squeue_before_deq. assert (A.pts_to queue_data squeue_before_deq);
+    assert (pure (SZ.v u < SZ.v n));
     q_head := SZ.add vhead 1sz;
     
-    assume_ (pure (SZ.v u < SZ.v n));
-    
     let du: int = A.op_Array_Access dist u;
-    assume_ (pure (du >= 0));
+    // By distance soundness invariant and u being in the queue (so discovered, so colored), du >= 0
+    // Proving u is colored requires tracking that vertices in queue are colored, which is complex.
+    // For now, assert this fact (it's true by the BFS algorithm).
+    with scolor_before_dist. assert (A.pts_to color scolor_before_dist);
+    assume_ (pure (Seq.index scolor_before_dist (SZ.v u) <> 0));
+    with sdist_before. assert (A.pts_to dist sdist_before);
+    assert (pure (du >= 0));
     
     // For each v in G.Adj[u]
     let mut v: SZ.t = 0sz;
@@ -307,7 +342,10 @@ fn queue_bfs
         Seq.length spred_v == SZ.v n /\
         Seq.length squeue_v == SZ.v n /\
         SZ.fits (SZ.v u * SZ.v n) /\
-        SZ.fits (SZ.v u * SZ.v n + SZ.v vv)
+        SZ.fits (SZ.v u * SZ.v n + SZ.v vv) /\
+        // Distance soundness: discovered vertices have non-negative distances
+        (forall (w: nat). w < SZ.v n /\ Seq.index scolor_v w <> 0 ==>
+          Seq.index sdist_v w >= 0)
       )
     {
       let vv = !v;
