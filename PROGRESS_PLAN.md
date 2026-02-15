@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, updated)
 
-**167 F* files, ~50K lines, 147 admits across 35 files**
+**167 F* files, ~50K lines, 146 admits across 34 files**
 
 ### Per-Algorithm Status Table
 
@@ -110,7 +110,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 0 | Stretch goal |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
-| 28 | Strassen | §28.2 | ⚠️ 1 structural admit | ⚠️ Separate | 1 | Pure F* |
+| 28 | Strassen | §28.2 | ✅ quadrant algebra proven | ⚠️ Separate | 0 | Pure F* |
 | 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
 | 31 | ExtendedGCD | §31.2 | ✅ Bézout identity | — | 0 | Pure F* |
 | 31 | ModExp | §31.6 | ✅ (b^e)%m | ✅ Linked O(lg e) | 0 | |
@@ -133,7 +133,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | ch24 (SSSP) | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
 | ch21 (UF) | 5 | UnionFind.Spec(4), RankBound(1) |
 | ch12 (BST) | 3 | BST.Insert.Spec(3) |
-| Other | 8 | MaxSubarray.DC(1), RodCutting.Spec(1), Strassen(1), VertexCover.Spec(1), Huffman.Complete(2), Prim.Cmplx(1), Kruskal(1) |
+| Other | 7 | MaxSubarray.DC(1), RodCutting.Spec(1), VertexCover.Spec(1), Huffman.Complete(2), Prim.Cmplx(1), Kruskal(1) |
 | **Total** | **147** | |
 
 ---
@@ -187,18 +187,88 @@ Keep all code and proofs. Rename to clarify what they actually implement.
 - [ ] E2: Medium: MergeSort O(n lg n), Heapsort O(n lg n), Quicksort O(n²)
 - [ ] E3: Remaining: RadixSort, Quickselect, Select, Stack/Queue, BST, UF, RabinKarp, Segments, VtxCover
 
-### Phase F: Admit Elimination
+### Phase F: Admit Elimination — Categorized by Approach
 
-- [ ] F1: StackDFS bounds (ch22, 26 admits) — strengthen loop invariant
-- [ ] F2: QueueBFS (ch22, 11 admits) — loop invariant framing
-- [ ] F3: CountingSort.Stable (ch08, 4 admits) — cumulative count reasoning
-- [ ] F4: RadixSort (ch08, 18 admits) — stability + digit arithmetic
-- [ ] F5: Select.Correctness (ch09, 6 admits) — permutation reasoning
-- [ ] F6: UnionFind.Spec (ch21, 5 admits) — union correctness + rank bound
-- [ ] F7: BST.Insert.Spec (ch12, 3 admits) — structural BST reasoning (linked to B3)
-- [ ] F8: RabinKarp.Spec (ch32, 3 admits) — hash correctness
-- [ ] F9: DFS.Spec (ch22, 5 admits) — timestamp properties
-- [ ] F10: BucketSort (ch08, 2 admits) — permutation proof
+#### Tier 1: Automatable (Z3 with hints / simple lemma calls) — 16 admits
+These can be attempted with extended reasoning chains and iterative tool use.
+
+| File | Line(s) | Admits | What's needed |
+|------|---------|--------|---------------|
+| Prim.Complexity | 130 | 1 | Tighten loop invariant `v≤n+1` → `v≤n`; then `v≥n ∧ v≤n ⟹ v=n` is trivial. Blocked by Pulse while-loop encoding: condition truth not available in body. |
+| Kruskal.Complexity | 371, 390 | 2 | Pure polynomial arithmetic: expand `n + (vround+1)*2*n²` and `vc ≤ 4n³`. Add `assert` chain. |
+| Kruskal.Spec | 452, 378 | 2 | L452: `n` components in empty forest (trivial induction). L378: edge is light from sorted order (arithmetic comparison). |
+| RadixSort.Stability | 150, 208 | 2 | L150: quantifier monotonicity (`d'≤d` subset). L208: unfold `sorted_on_digit` to `sorted_up_to_digit` base case. |
+| RadixSort.FullSort | 269 | 1 | `Seq.index (tail s) i == Seq.index s (i+1)` + pairwise property propagation. |
+| RadixSort.FullSort | 183 | 1 | Modular arithmetic: `k == digit_sum k bigD base`. Needs `FStar.Math.Lemmas` about `div`/`mod`. |
+| PartialSelect.Correctness | 117 | 1 | Two sorted permutations of same length with same min are equal. Structural uniqueness. |
+| UnionFind.RankBound | 190 | 1 | Two disjoint subsets of `[0,n)` have sizes summing to `≤n`. FiniteSet cardinality. |
+| UnionFind.Spec | 92 | 1 | `n` steps of fuel suffice for `pure_find` under rank invariant. Path length ≤ n. |
+| Prim.Spec | 209, 270 | 2 | L209: `find_min_edge_aux` returns minimum (trace arithmetic). L270: loop adds 1 edge/iteration × (n-1) iterations. |
+| RabinKarp.Spec | 162 | 1 | Rolling hash inductive step. Complex modular arithmetic; needs `FStar.Math.Lemmas` chain. |
+| ActivitySelection.Spec | 305 | 1 | Empty optimal solution contradicts `n>0`. Direct contradiction. |
+
+#### Tier 2: Helper lemmas (provable separately, then plugged in) — 70 admits
+These need a standalone lemma proved first, then called at the admit site. Each lemma is
+self-contained but requires careful F* proof engineering (induction, case analysis, etc.).
+
+| File | Line(s) | Admits | Helper lemma needed |
+|------|---------|--------|---------------------|
+| **StackDFS.fst** | 192,364,369-371,432,435,440,540 | 9 | **Stack validity invariant**: peeked values < n, stack depth ≤ n, scan positions bounded. Single invariant addition to outer loop propagates to all sites. |
+| **StackDFS.Complexity** | 219,479,485-488,557-559,672 | 9 | Same stack validity invariant as above, plus tick-count monotonicity lemmas. |
+| **QueueBFS.fst** | 320 | 1 | **Queue-colored invariant**: all enqueued vertices are non-WHITE. Add to loop invariant; discover_vertex colors GRAY before enqueue. |
+| **QueueBFS.fst** | 172 | 1 | **Queue cardinality**: each vertex enqueued at most once ⟹ `vtail < n`. Needs ghost set tracking discovered vertices. |
+| **QueueBFS.fst** | 372, 379 | 2 | **Loop invariant restoration**: show `maybe_discover` preserves source properties and distance soundness for non-modified vertices. Frame reasoning. |
+| **QueueBFS.Complexity** | 167,324,327,384,391,403 | 6 | Mirror of QueueBFS.fst: same invariants + tick arithmetic. |
+| **RadixSort.Stability** | 179, 222 | 2 | **Stable-sort preservation**: equal-key elements maintain relative order ⟹ lower-digit ordering preserved. Needs pair-extraction from stability definition. |
+| **RadixSort.Spec** | 342 | 1 | Same as Stability.179 but at spec level. |
+| **RadixSort.FullSort** | 227 | 1 | **Digit dominance**: differing digit at position d₀ contributes ≥ base^d₀, overwhelming all lower digits. Geometric series bound. |
+| **RadixSort.FullSort** | 352,356,377,381 | 4 | **Bridge admits**: reference results from RadixSort.Stability module. Resolve by completing that module first, then import. |
+| **Kruskal.Spec** | 39,45,51,96,102,349,356,446,458,466 | 10 | Graph path lemmas: reversal, concatenation, component membership, decidability, spanning tree characterization. Each is 5-15 lines with path induction. |
+| **Prim.Spec** | 195, 359, 380 | 3 | Prim step verification: trace `find_min_edge_aux`, inductive safety invariant, base case. |
+| **BFS.DistanceSpec** | 219, 297 | 2 | L219: visited ⟹ path exists (parent-pointer reconstruction). L297: path concatenation (reachable transitivity). |
+| **BellmanFord.Spec** | 452 | 1 | Negative cycle detection: post-(n-1)-round distance change ⟹ path with n+ edges ⟹ cycle. |
+| **Dijkstra.TriIneq** | 311 | 1 | Combine `relax_from_u_establishes_all_from_u` + preservation for processed set to extend triangle. |
+| **KahnTopologicalSort** | 372 | 1 | Output contains all n vertices: maintain visited-set invariant + pigeonhole. |
+| **PartialSelect.Correctness** | 255, 297 | 2 | Count-based uniqueness: if `count_lt s v == k` and `count_le s v ≥ k+1`, then `v` is the k-th element. |
+| **UnionFind.Spec** | 310, 320 | 2 | Path tracing after parent update / union: forest topology reasoning. |
+| **ActivitySelection.Spec** | 112,319,491,521,550,637 | 6 | Exchange argument helpers: sorted compatibility, seq-to-list preservation, greedy optimality by list reasoning. |
+| **RabinKarp.Spec** | 365, 394 | 2 | Hash no-false-negatives (depends on Tier 1 rolling hash proof) + combined correctness. |
+| **MaxSubarray.DC** | 346 | 1 | D&C and Kadane equivalence: both compute max over all subarrays. |
+| **BucketSort** | 359 | 1 | Sorted bucket concatenation: buckets with key₁ < key₂ maintain global order when concatenated. |
+| **CountingSort.Stable** | 258 | 1 | Cumulative count bounds: after prefix sum + decrements, `1 ≤ C[v] ≤ len`. |
+| **RodCutting.Spec** | 224 | 1 | `accum_max` equivalence with explicit recursion. α-equivalent functions in different scopes; needs restructuring. |
+
+#### Tier 3: Expert guidance required (deep structural / new invariants) — 60 admits
+These require fundamental proof architecture changes: new ghost state, new invariants
+threaded through entire algorithms, or deep mathematical theorems.
+
+| File | Line(s) | Admits | Why expert guidance is needed |
+|------|---------|--------|------------------------------|
+| **StackDFS.fst** | 455, 691 | 2 | Full DFS correctness postcondition: all vertices BLACK, valid discovery/finish times. Requires DFS tree formalization. |
+| **StackDFS.Complexity** | 566,581,842,859 | 4 | Final complexity postconditions depend on full DFS correctness (Tier 3 above). |
+| **CountingSort.Stable** | 282, 283 | 2 | Stability proof: backward traversal preserves relative order. Needs full loop invariant tracking position assignments. Permutation proof: each input element placed exactly once. |
+| **RadixSort.FullSort** | 296 | 1 | Chain of 3 non-trivial lemmas: sorted_up_to_digit on all digits → pairwise ≤ → sorted. |
+| **RadixSort.Spec** | 366 | 1 | Inductive radix sort correctness: permutation composition across d stable sorts. |
+| **RadixSort.MultiDigit** | 395,416,499,535 | 4 | Full multi-digit radix sort correctness: stability reasoning + positional notation arithmetic. |
+| **PartialSelect.Correctness** | 55, 65 | 2 | Entire partition and quickselect specs admitted as axioms. Needs ground-up implementation. |
+| **BST.Insert.Spec** | 203,227,310 | 3 | Mutually-recursive structural induction on array-based tree. SMT struggles with `subtree_in_range` unfolding. |
+| **DFS.Spec** | 590,654,685,704,721 | 5 | CLRS Theorems 22.7-22.8: parenthesis theorem, reachability, white-path theorem, cycle detection, topological sort property. Each requires induction over entire DFS execution. |
+| **DFS.WhitePath** | 168,249,280 | 3 | White path transitivity + DFS ancestor equivalence. Needs DFS tree structure formalization. |
+| **BFS.DistanceSpec** | 67,236,251 | 3 | L67: axiomatic definition. L236: hard direction of BFS correctness (no shorter path). L251: combines both directions. |
+| **KahnTopologicalSort** | 439 | 1 | Topological order correctness: maintain `strong_order_inv` through main loop. |
+| **Kruskal.Spec** | 283,410,435 | 3 | L283: acyclicity preservation (reachability/cycle equivalence). L410: spanning tree from n-1 edges + connectivity. L435: MST optimality by safe-edge induction. |
+| **Kruskal.EdgeSorting** | 138, 173 | 2 | Insertion sort stability: position tracking through swap operations. |
+| **Kruskal.fst** | 81 | 1 | Union-find cycle detection ⟹ forest acyclicity. Needs UF component invariant. |
+| **Kruskal.Complexity** | 333 | 1 | Inner loop invariant restoration with complexity tracking. |
+| **MST.Spec** | 253,270,302,340,358 | 5 | Core MST theory: cycle characterization, cut-crossing topology, MST exchange lemma (Theorem 23.1), generic MST correctness. |
+| **Prim.Spec** | 410 | 1 | Result connects all vertices (spanning tree characterization). |
+| **BellmanFord.Spec** | 235, 405 | 2 | L235: relaxation upper bound preservation (triangle inequality algebra). L405: CLRS Lemma 24.2 (path relaxation property). |
+| **Dijkstra.TriIneq** | 288 | 1 | Triangle preservation for processed vertices: needs Dijkstra invariant coupling (processed = optimal distance). |
+| **KMP.Complexity** | 191,265,294,301,435,474,480 | 7 | Amortized complexity: formal potential function + per-iteration progress. Stretch goal. |
+| **ActivitySelection.Spec** | 176, 420 | 2 | L176: ghost supremum definition (cardinality over predicates). L420: full greedy optimality induction. |
+| **Huffman.Complete** | 654, 824 | 2 | Multiset/permutation formalization + CLRS Theorem 16.3 (Huffman optimality). |
+| **UnionFind.Spec** | 342 | 1 | Rank logarithmic bound: needs subtree_size ≥ 2^rank invariant formalization. |
+| **VertexCover.Spec** | 506 | 1 | 2-approximation: ghost state tracking disjoint edge selection + matching lower bound. |
 
 ### Stretch Goals (Deferred)
 
