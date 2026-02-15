@@ -504,6 +504,17 @@ core shortest-path properties.
 - [x] P6.7: ch24 BellmanFord.Complexity.Pure — remove duplicate file (wrong module name)
 - [x] P6.8: ch32 KMP.Complexity — strip optimize_let_vc/fly_deps in Makefile
 - [x] P6.9: Full `make -j4` passes cleanly (verified 2x)
+- [x] P6.10: ch22 TopologicalSort — strip optimize_let_vc/fly_deps in Makefile
+
+### P6.B: Warning Elimination (68 → 0)
+
+- [x] P6.B.1: Warning 328 — removed `rec` from 40+ non-recursive functions across 22 files
+- [x] P6.B.2: Warning 328 — suppressed 3 cases where removing `rec` breaks Z3 encoding
+- [x] P6.B.3: Warning 288 — migrated CountingSort.fst, CountingSort.Stable.fst, KMP.Complexity.fst from deprecated Array.alloc/free to Vec.alloc/free
+- [x] P6.B.4: Warning 331 — fixed unused type binders in ExtendedGCD
+- [x] P6.B.5: Warning 349 — added rlimit bump for TopologicalSort.Lemmas split-query fragility
+- [x] P6.B.6: Warning unknown — removed 14 unnecessary `rewrite each` calls in DLL.fst
+- [x] P6.B.7: Full `make -j128` — **0 warnings, 0 errors**
 
 ---
 
@@ -597,8 +608,5 @@ Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
 | Total lines of verified F*/Pulse | ~27,200 |
 | Admits | 87 + 16 = 103 |
 | Assumes | 2 (DFS termination — white count decrease) |
-| **Tasks completed** | **228 / 250 (91%)** |
-| **`make -j4` clean build** | **✓ (all 22 chapters)** |
-| Source files | 120 |
-| Tasks completed | 116/185 (63%) |
-| Tasks remaining | 69/185 (37%) |
+| **Tasks completed** | **236 / 258 (91%)** |
+| **`make -j128` clean build** | **✓ 0 warnings, 0 errors** |
