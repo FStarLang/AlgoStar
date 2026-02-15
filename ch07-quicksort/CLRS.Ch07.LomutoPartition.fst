@@ -26,6 +26,74 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+// ========== Swap Lemmas ==========
+
+// Lemma: When we swap A[i] with A[j] where A[j] <= pivot and A[i] is in the ">" region,
+// the Lomuto invariant is preserved
+let lemma_lomuto_swap_small
+  (s: Seq.seq int)
+  (pivot: int)
+  (p i j r: nat)
+  (vi vj: int)
+  : Lemma
+    (requires
+      p <= i /\ i <= j /\ j < r /\ r < Seq.length s /\
+      Seq.index s i == vi /\
+      Seq.index s j == vj /\
+      vj <= pivot /\
+      (i < j ==> vi > pivot) /\  // If i < j, then vi must be in the ">" region
+      (forall (k: nat). p <= k /\ k < i ==> Seq.index s k <= pivot) /\
+      (forall (k: nat). i <= k /\ k < j ==> Seq.index s k > pivot) /\
+      Seq.index s r == pivot)
+    (ensures
+      (let s1 = Seq.upd s i vj in
+       let s2 = Seq.upd s1 j vi in
+       (forall (k: nat). p <= k /\ k < i + 1 ==> Seq.index s2 k <= pivot) /\
+       (forall (k: nat). i + 1 <= k /\ k < j + 1 ==> Seq.index s2 k > pivot) /\
+       Seq.index s2 r == pivot))
+  = ()
+
+// Lemma: When A[j] > pivot, no swap occurs and we just extend the "> pivot" region
+let lemma_lomuto_no_swap_large
+  (s: Seq.seq int)
+  (pivot: int)
+  (p i j r: nat)
+  (vj: int)
+  : Lemma
+    (requires
+      p <= i /\ i <= j /\ j < r /\ r < Seq.length s /\
+      Seq.index s j == vj /\
+      vj > pivot /\
+      (forall (k: nat). p <= k /\ k < i ==> Seq.index s k <= pivot) /\
+      (forall (k: nat). i <= k /\ k < j ==> Seq.index s k > pivot) /\
+      Seq.index s r == pivot)
+    (ensures
+      (forall (k: nat). p <= k /\ k < i ==> Seq.index s k <= pivot) /\
+      (forall (k: nat). i <= k /\ k < j + 1 ==> Seq.index s k > pivot) /\
+      Seq.index s r == pivot)
+  = ()
+
+// Lemma: Final swap of A[i+1] with A[r] (pivot) completes the partition
+let lemma_lomuto_final_swap
+  (s: Seq.seq int)
+  (pivot: int)
+  (p i r: nat)
+  (vi: int)
+  : Lemma
+    (requires
+      p <= i /\ i <= r /\ r < Seq.length s /\
+      Seq.index s i == vi /\
+      Seq.index s r == pivot /\
+      (forall (k: nat). p <= k /\ k < i ==> Seq.index s k <= pivot) /\
+      (forall (k: nat). i <= k /\ k < r ==> Seq.index s k > pivot))
+    (ensures
+      (let s1 = Seq.upd s i pivot in
+       let s2 = Seq.upd s1 r vi in
+       Seq.index s2 i == pivot /\
+       (forall (k: nat). p <= k /\ k < i ==> Seq.index s2 k <= pivot) /\
+       (forall (k: nat). i < k /\ k <= r ==> Seq.index s2 k > pivot)))
+  = ()
+
 // Partition correctness for subarray A[p..r]
 let is_lomuto_partitioned (s: Seq.seq int) (p q r: nat) (pivot: int) : prop =
   p <= q /\ q <= r /\ r < Seq.length s /\
@@ -164,36 +232,57 @@ fn lomuto_partition
     )
   {
     let vj = !j;
-
-    // Process element A[j]: swap if <= pivot, else skip
-    partition_step a i_plus_1 vj pivot r;
-
-    // Restore loop invariant
-    with s' vi1'. _;
-    assume_ (pure (
-      (forall (k: nat). SZ.v p <= k /\ k < SZ.v vi1' ==>
-        Seq.index s' k <= pivot) /\
-      (forall (k: nat). SZ.v vi1' <= k /\ k < SZ.v vj + 1 ==>
-        Seq.index s' k > pivot) /\
-      Seq.index s' (SZ.v r) == pivot
-    ));
-
-    j := SZ.add vj 1sz
+    let vi = !i_plus_1;
+    
+    // Increment j first (unconditionally)
+    j := SZ.add vj 1sz;
+    
+    with s_before. assert (A.pts_to a s_before);
+    
+    // Read both values before modification
+    let aj = a.(vj);
+    let ai = a.(vi);
+    
+    // Determine if we should swap
+    let should_swap = (aj <= pivot);
+    
+    // Unconditional writes with conditional values
+    let new_ai = (if should_swap then aj else ai);
+    let new_aj = (if should_swap then ai else aj);
+    a.(vi) <- new_ai;
+    a.(vj) <- new_aj;
+    
+    with s_after. assert (A.pts_to a s_after);
+    
+    // Prove partition invariant is maintained
+    if (should_swap) {
+      lemma_lomuto_swap_small s_before pivot (SZ.v p) (SZ.v vi) (SZ.v vj) (SZ.v r) ai aj;
+      i_plus_1 := SZ.add vi 1sz;
+      ()
+    } else {
+      assert (pure (new_ai == ai /\ new_aj == aj));
+      assert (pure (Seq.equal s_after s_before));
+      lemma_lomuto_no_swap_large s_before pivot (SZ.v p) (SZ.v vi) (SZ.v vj) (SZ.v r) aj;
+      ()
+    }
   };
 
   // exchange A[i+1] with A[r]
   let final_i1 = !i_plus_1;
-  do_swap a final_i1 r;
+  with s_before_swap. assert (A.pts_to a s_before_swap);
+  
+  // Save values before swap
+  let vi_val = a.(final_i1);
+  let pivot_val = a.(r);
+  
+  // Swap manually
+  a.(final_i1) <- pivot_val;
+  a.(r) <- vi_val;
+  
   with s_final. assert (A.pts_to a s_final);
-
-  // Postcondition: pivot is now at position i+1
-  assume_ (pure (
-    Seq.index s_final (SZ.v final_i1) == pivot /\
-    (forall (k: nat). SZ.v p <= k /\ k < SZ.v final_i1 ==>
-      Seq.index s_final k <= pivot) /\
-    (forall (k: nat). SZ.v final_i1 < k /\ k <= SZ.v r ==>
-      Seq.index s_final k > pivot)
-  ));
+  
+  // Apply lemma to prove the final swap creates the correct partition
+  lemma_lomuto_final_swap s_before_swap pivot (SZ.v p) (SZ.v final_i1) (SZ.v r) vi_val;
 
   // return i + 1
   final_i1

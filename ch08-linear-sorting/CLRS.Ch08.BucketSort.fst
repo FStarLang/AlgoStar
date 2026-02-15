@@ -52,6 +52,15 @@ let rec in_range (xs: list int) (lb ub: int) : prop =
 
 (* ========== Insertion Sort ========== *)
 
+/// Lemma: if sorted list starts with h and y is in the tail, then h <= y
+let rec sorted_cons_mem (h: int) (t: list int) (y: int)
+  : Lemma (requires sorted (h :: t) /\ List.mem y t)
+          (ensures h <= y)
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | z :: zs -> if z = y then () else sorted_cons_mem h zs y
+
 /// Insert element into sorted list, maintaining sortedness
 let rec insert (x: int) (xs: list int{sorted xs}) 
   : Tot (ys:list int{sorted ys /\ List.length ys == List.length xs + 1})
@@ -59,18 +68,12 @@ let rec insert (x: int) (xs: list int{sorted xs})
   = match xs with
     | [] -> [x]
     | h :: t -> 
-      if x <= h then (
-        // x goes at front, list becomes x :: h :: t
-        // Need to prove: x <= h /\ sorted (h :: t) ==> sorted (x :: h :: t)
-        x :: xs
-      ) else (
-        // x goes deeper in list  
+      if x <= h then x :: xs
+      else (
         let r = insert x t in
-        assert (sorted r);
-        assert (List.length r == List.length t + 1);
-        // Need to prove: h <= elements of r ==> sorted (h :: r)
-        // This requires showing x goes after h in recursion
-        admit(); // Proof about cons preserving sortedness when head <= all elements
+        let (z :: _) = r in
+        if List.mem z t then sorted_cons_mem h t z;
+        admit(); // Still needed: SMT can't connect the pieces
         h :: r
       )
 
@@ -152,6 +155,74 @@ let list_max (xs: list int{Cons? xs}) : int =
 
 (* ========== Correctness Lemmas ========== *)
 
+/// Lemma: list_min_from returns a value <= current_min
+let rec list_min_from_bound (xs: list int) (current_min: int)
+  : Lemma (ensures list_min_from xs current_min <= current_min)
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> list_min_from_bound xs' (if x < current_min then x else current_min)
+
+/// Lemma: list_max_from returns a value >= current_max
+let rec list_max_from_bound (xs: list int) (current_max: int)
+  : Lemma (ensures list_max_from xs current_max >= current_max)
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> list_max_from_bound xs' (if x > current_max then x else current_max)
+
+/// Lemma: list_min_from is <= all elements and <= current_min
+let rec list_min_from_le_all (xs: list int) (current_min: int)
+  : Lemma (ensures (let result = list_min_from xs current_min in
+                   result <= current_min /\
+                   (forall y. List.mem y xs ==> result <= y)))
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> list_min_from_le_all xs' (if x < current_min then x else current_min)
+
+/// Lemma: list_max_from is >= all elements and >= current_max
+let rec list_max_from_ge_all (xs: list int) (current_max: int)
+  : Lemma (ensures (let result = list_max_from xs current_max in
+                   result >= current_max /\
+                   (forall y. List.mem y xs ==> result >= y)))
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> list_max_from_ge_all xs' (if x > current_max then x else current_max)
+
+/// Lemma: list_min_from when all elements >= bound
+let rec list_min_from_ge_bound (xs: list int) (bound: int)
+  : Lemma (requires forall y. List.mem y xs ==> y >= bound)
+          (ensures list_min_from xs bound >= bound)
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> list_min_from_ge_bound xs' (if x < bound then x else bound)
+
+/// Lemma: list_max_from when all elements <= bound
+let rec list_max_from_le_bound (xs: list int) (bound: int)
+  : Lemma (requires forall y. List.mem y xs ==> y <= bound)
+          (ensures list_max_from xs bound <= bound)
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | x :: xs' -> list_max_from_le_bound xs' (if x > bound then x else bound)
+
+/// Lemma: when min = max, all elements are equal to that value
+let min_max_equal_implies_all_equal (xs: list int{Cons? xs})
+  : Lemma (requires list_min xs == list_max xs)
+          (ensures (forall x. List.mem x xs ==> x == list_min xs))
+  = let hd = Cons?.hd xs in
+    let tl = Cons?.tl xs in
+    let min_val = list_min xs in
+    // list_min <= all elements (from definition)
+    list_min_from_le_all tl hd;
+    // list_max >= all elements (from definition) 
+    list_max_from_ge_all tl hd;
+    // Since min = max and min <= all <= max, all elements = min = max
+    ()
+
 /// Lemma: insertion maintains sortedness
 let rec insert_maintains_sorted (x: int) (xs: list int)
   : Lemma (requires sorted xs)
@@ -207,7 +278,7 @@ let bucket_sort (xs: list int) (k: pos)
     
     // Special case: all elements equal
     if min_val = max_val then (
-      admit(); // Need to prove min_val == max_val ==> all elements equal ==> sorted
+      min_max_equal_implies_all_equal xs;
       all_equal_sorted xs min_val;
       xs
     ) else (

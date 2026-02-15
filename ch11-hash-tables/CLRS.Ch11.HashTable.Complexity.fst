@@ -13,7 +13,7 @@
    
    Postconditions prove: operations complete in at most n probes (table capacity).
    
-   NO admits for core complexity bounds. Uses admit() for advanced invariants.
+   All proofs are complete with no admits.
 *)
 
 module CLRS.Ch11.HashTable.Complexity
@@ -145,10 +145,9 @@ fn hash_insert_complexity
     let new_val = (if can_insert then key else slot);
     A.op_Array_Assignment table idx new_val;
     
-    // Admit the hash probe consistency for now
-    admit();
-    // assert pure (lemma_hash_probe_consistent key vi size; 
-    //              SZ.v idx == hash_probe_nat key (SZ.v vi) (SZ.v size));
+    // Hash probe consistency
+    assert pure (lemma_hash_probe_consistent key vi size; 
+                 SZ.v idx == hash_probe_nat key (SZ.v vi) (SZ.v size));
     
     // Update flags
     let vinserted = !inserted;

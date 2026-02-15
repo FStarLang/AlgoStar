@@ -338,6 +338,154 @@ let rec count_lt_sorted_suffix (s: seq int) (n: nat) (v: int)
 
 // Main partition property: select_spec returns a value such that
 // exactly k elements are < result, and at least k+1 elements are <= result
+// IMPORTANT: These lemmas express that count_lt and count_le are multiset functions.
+// Mathematical proof: Both count_lt and count_le can be expressed as sums over elements,
+// weighted by their multiplicities (count_occ). Since permutations preserve count_occ
+// for all elements, they preserve these counts.
+//
+// A complete mechanized proof requires one of:
+// 1. Building sequence rearrangement machinery (find-and-remove with complex proofs)
+// 2. Expressing count_lt as an explicit sum: count_lt s v = Σ_{x<v} (count_occ s x)
+// 3. Using existing F* libraries for multiset/bag reasoning
+//
+// Approach (2) requires:
+// - A way to iterate over all distinct values in a sequence
+// - Proving the sum representation equals the recursive definition
+// - Both are non-trivial in F*'s type system
+//
+// For this proof-of-concept specification, we document the mathematical reasoning
+// and note that full mechanization would require substantial infrastructure.
+
+// Placeholder implementations that state the theorems
+// These are mathematically sound facts about multisets
+#push-options "--warn_error -272"  // Allow incomplete patterns since these won't verify
+let count_lt_permutation_invariant (s1 s2: seq int) (v: int)
+  : Lemma (requires is_permutation s1 s2)
+          (ensures count_lt s1 v = count_lt s2 v)
+          (decreases Seq.length s1)
+  = admit () // Mathematical fact: multiset functions are permutation-invariant
+
+let count_le_permutation_invariant (s1 s2: seq int) (v: int)
+  : Lemma (requires is_permutation s1 s2)
+          (ensures count_le s1 v = count_le s2 v)
+          (decreases Seq.length s1)
+  = admit () // Mathematical fact: multiset functions are permutation-invariant
+#pop-options
+
+// Helper: In a sorted sequence, count_le on prefix [0..k] is at least k+1
+#push-options "--z3rlimit 40 --fuel 2"
+let rec count_le_prefix_lower (s: seq int) (n: nat) (v: int)
+  : Lemma (requires n <= Seq.length s /\
+                     (forall (i:nat). i < n ==> Seq.index s i <= v))
+          (ensures count_le (Seq.slice s 0 n) v >= n)
+          (decreases n)
+  = if n = 0 then ()
+    else (
+      let prefix = Seq.slice s 0 n in
+      let head_seq = Seq.slice s 0 1 in
+      let rest = Seq.slice s 1 n in
+      assert (Seq.equal prefix (Seq.append head_seq rest));
+      count_le_append head_seq rest v;
+      assert (Seq.index s 0 <= v);
+      let s' = Seq.tail s in
+      assert (Seq.equal rest (Seq.slice s' 0 (n-1)));
+      assert (forall (i:nat). i < n-1 ==> Seq.index s' i == Seq.index s (i+1));
+      count_le_prefix_lower s' (n-1) v
+    )
+#pop-options
+
+// Helper: In a sequence, count_lt on suffix where all elements >= v is 0
+#push-options "--z3rlimit 40 --fuel 2"
+let rec count_lt_suffix_upper (s: seq int) (k: nat) (n: nat) (v: int)
+  : Lemma (requires k <= n /\ n <= Seq.length s /\
+                     (forall (i:nat). k <= i /\ i < n ==> v <= Seq.index s i))
+          (ensures count_lt (Seq.slice s k n) v = 0)
+          (decreases n - k)
+  = if k = n then ()
+    else (
+      let suffix = Seq.slice s k n in
+      let head_seq = Seq.slice s k (k+1) in
+      let rest = Seq.slice s (k+1) n in
+      assert (Seq.equal suffix (Seq.append head_seq rest));
+      count_lt_append head_seq rest v;
+      assert (v <= Seq.index s k);
+      count_lt_suffix_upper s (k+1) n v
+    )
+#pop-options
+
+// Helper: count_lt is always bounded by sequence length
+#push-options "--z3rlimit 20 --fuel 2"
+let rec count_lt_bounded (s: seq int) (v: int)
+  : Lemma (ensures count_lt s v <= Seq.length s)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else (
+      count_lt_cons (Seq.index s 0) (Seq.tail s) v;
+      count_lt_bounded (Seq.tail s) v
+    )
+#pop-options
+
+// Helper: if a sequence contains v at some position, count_lt s v < length s
+#push-options "--z3rlimit 40 --fuel 2"
+let rec count_lt_upper_bound (s: seq int) (v: int) (pos: nat)
+  : Lemma (requires pos < Seq.length s /\ Seq.index s pos = v)
+          (ensures count_lt s v < Seq.length s)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else if pos = 0 then (
+      // s[0] = v, so s[0] is not < v
+      // count_lt s v = 0 + count_lt (tail s) v <= length (tail s) < length s
+      count_lt_cons (Seq.index s 0) (Seq.tail s) v;
+      count_lt_bounded (Seq.tail s) v
+    ) else (
+      // pos > 0, so v is in the tail
+      count_lt_cons (Seq.index s 0) (Seq.tail s) v;
+      count_lt_upper_bound (Seq.tail s) v (pos - 1)
+    )
+#pop-options
+
+// For a sorted sequence, the element at position k has the partition property
+#push-options "--z3rlimit 40"
+let sorted_partition_characterization (s: seq int) (k: nat{k < Seq.length s})
+  : Lemma (requires is_sorted s)
+          (ensures (let v = Seq.index s k in
+                    count_lt s v <= k /\
+                    count_le s v >= k + 1))
+  = let v = Seq.index s k in
+    let n = Seq.length s in
+    
+    // Split sequence: [0..k] ++ [k+1..n-1]
+    let prefix = Seq.slice s 0 (k+1) in
+    let suffix = Seq.slice s (k+1) n in
+    assert (Seq.equal s (Seq.append prefix suffix));
+    
+    // For sorted sequence: all elements [0..k] are <= v
+    assert (forall (i:nat). i <= k ==> Seq.index s i <= v);
+    // And all elements [k..n-1] are >= v
+    assert (forall (i:nat). k <= i /\ i < n ==> v <= Seq.index s i);
+    
+    // Prove count_le s v >= k+1
+    count_le_prefix_lower s (k+1) v;
+    count_le_append prefix suffix v;
+    assert (count_le s v >= k + 1);
+    
+    // Prove count_lt s v <= k
+    // count_lt on suffix is 0 (all elements >= v)
+    count_lt_suffix_upper s (k+1) n v;
+    count_lt_append prefix suffix v;
+    assert (count_lt s v = count_lt prefix v);
+    
+    // prefix[k] = v, so count_lt prefix v < length prefix = k+1
+    // Therefore count_lt prefix v <= k
+    assert (Seq.index prefix k = v);
+    count_lt_upper_bound prefix v k;
+    assert (count_lt prefix v < Seq.length prefix);
+    assert (Seq.length prefix = k + 1);
+    assert (count_lt prefix v <= k);
+    ()
+#pop-options
+
+#push-options "--z3rlimit 40"
 let select_spec_partition_property (s: seq int) (k: nat{k < Seq.length s})
   : Lemma (ensures (let v = select_spec s k in
                     count_lt s v <= k /\
@@ -347,21 +495,21 @@ let select_spec_partition_property (s: seq int) (k: nat{k < Seq.length s})
     let v = Seq.index sorted k in
     pure_sort_permutation s;
     pure_sort_sorted s;
-    admit() // Requires connecting count_lt/count_le through permutation + sorted structure
+    
+    // Apply sorted_partition_characterization to the sorted sequence
+    sorted_partition_characterization sorted k;
+    
+    // Use permutation to transfer counts from sorted to s
+    count_lt_permutation_invariant sorted s v;
+    count_le_permutation_invariant sorted s v;
+    ()
+#pop-options
 
 (*** Uniqueness Property ***)
 
 // The k-th smallest element is uniquely determined by the partition property
 // If v satisfies count_lt s v <= k and count_le s v > k, then v = select_spec s k
 // (This is not always true with duplicates, but it characterizes the answer)
-
-// For a sorted sequence, the element at position k has the partition property
-let sorted_partition_characterization (s: seq int) (k: nat{k < Seq.length s})
-  : Lemma (requires is_sorted s)
-          (ensures (let v = Seq.index s k in
-                    count_lt s v <= k /\
-                    count_le s v >= k + 1))
-  = admit() // count_lt: positions 0..k-1 with s[i]<s[k]; count_le: at least positions 0..k
 
 (*** Correctness of select_spec ***)
 

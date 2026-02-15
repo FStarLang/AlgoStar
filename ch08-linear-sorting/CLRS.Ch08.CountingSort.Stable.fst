@@ -23,17 +23,53 @@ module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module SeqP = FStar.Seq.Properties
+module L = CLRS.Ch08.CountingSort.Lemmas
 
 // ========== Specifications ==========
 
-let sorted (s: Seq.seq int) : prop =
-  forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
+let sorted (s: Seq.seq int) : prop = L.sorted s
 
-let permutation (s1 s2: Seq.seq int) : prop =
-  FStar.Seq.Properties.permutation int s1 s2
+let permutation (s1 s2: Seq.seq int) : prop = L.permutation s1 s2
 
-let in_range (s: Seq.seq int) (k: nat) : prop =
-  forall (i: nat). i < Seq.length s ==> Seq.index s i >= 0 /\ Seq.index s i <= k
+let in_range (s: Seq.seq int) (k: nat) : prop = L.in_range s k
+
+// Helper: count elements in s that are <= v
+let rec count_le (s: Seq.seq int) (v: int) 
+  : Tot nat (decreases (Seq.length s))
+  = if Seq.length s = 0 then 0
+    else if Seq.head s >= 0 && Seq.head s <= v then 1 + count_le (Seq.tail s) v
+    else count_le (Seq.tail s) v
+
+// Cumulative count property: C[v] = number of elements in s that are <= v
+// This is what phase 3 should establish
+let cumulative_counts (c: Seq.seq int) (s: Seq.seq int) (k: nat) : prop =
+  Seq.length c = k + 1 /\
+  (forall (v: nat). v <= k ==> Seq.index c v = count_le s v)
+
+// Key property: cumulative counts are bounded by sequence length  
+let rec lemma_count_le_bounded (s: Seq.seq int) (v: int)
+  : Lemma (ensures count_le s v <= Seq.length s)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else lemma_count_le_bounded (Seq.tail s) v
+
+let lemma_cumulative_bounded (c: Seq.seq int) (s: Seq.seq int) (k: nat) (v: nat)
+  : Lemma (requires cumulative_counts c s k /\ v <= k)
+          (ensures Seq.index c v >= 0 /\ Seq.index c v <= Seq.length s)
+  = lemma_count_le_bounded s v
+
+// After phase 3, positions used for placement are valid
+let valid_positions_after_prefix (c: Seq.seq int) (s: Seq.seq int) (k: nat) : prop =
+  Seq.length c = k + 1 /\
+  cumulative_counts c s k /\
+  (forall (v: nat). v <= k /\ Seq.index c v > 0 ==> 
+    Seq.index c v - 1 >= 0 /\ Seq.index c v - 1 < Seq.length s)
+
+let lemma_valid_positions (c: Seq.seq int) (s: Seq.seq int) (k: nat) (v: nat)
+  : Lemma (requires cumulative_counts c s k /\ v <= k /\ Seq.index c v > 0)
+          (ensures Seq.index c v - 1 >= 0 /\ Seq.index c v - 1 < Seq.length s)
+  = lemma_cumulative_bounded c s k v
 
 // ========== Main Algorithm ==========
 
@@ -82,7 +118,8 @@ ensures exists* sb'.
   
   let mut j : SZ.t = 0sz;
   
-  assume_ (pure (Seq.length sa > 0));
+  // Seq.length sa == SZ.v len > 0 from precondition
+  assert (pure (Seq.length sa > 0));
   
   while (
     let vj = !j;
@@ -95,11 +132,13 @@ ensures exists* sb'.
     V.pts_to c sc **
     pure (
       SZ.v vj <= SZ.v len /\
-      Seq.length sc == SZ.v k_val + 1
-      // Counts match prefix [0..vj) of input
+      Seq.length sc == SZ.v k_val + 1 /\
+      L.counts_match_prefix sc sa (SZ.v k_val) (SZ.v vj)
     )
   {
     let vj = !j;
+    
+    with sc. assert (V.pts_to c sc);
     
     // Read A[j]
     let val_j = A.op_Array_Access a vj;
@@ -110,9 +149,18 @@ ensures exists* sb'.
     // C[val_j] = C[val_j] + 1
     V.op_Array_Assignment c (SZ.uint_to_t val_j) (count_old + 1);
     
+    with sc'. assert (V.pts_to c sc');
+    
+    // Establish new invariant using lemma
+    L.count_phase_step sa sc sc' (SZ.v vj) (SZ.v k_val) val_j;
+    
     // j++
     j := vj +^ 1sz;
   };
+  
+  // After phase 2: C contains counts
+  with sc_after_phase2. assert (V.pts_to c sc_after_phase2);
+  assert (pure (L.counts_match sc_after_phase2 sa (SZ.v k_val)));
   
   // ========== Phase 3: Prefix sum ==========
   // for i = 1 to k: C[i] = C[i] + C[i-1]
@@ -138,7 +186,8 @@ ensures exists* sb'.
   {
     let vi = !i;
     
-    assume_ (pure (SZ.v vi >= 1 /\ SZ.v vi <= SZ.v k_val));
+    // From loop invariant: SZ.v vi >= 1 and loop guard: vi <=^ k_val
+    assert (pure (SZ.v vi >= 1 /\ SZ.v vi <= SZ.v k_val));
     
     let vi_minus_1 = vi -^ 1sz;
     
@@ -160,6 +209,11 @@ ensures exists* sb'.
   //   B[C[A[j]]] = A[j]
   //   C[A[j]]--
   // Backwards traversal ensures stability
+  
+  // KEY PROPERTY NEEDED: After phase 3, C contains cumulative counts
+  // This would require strengthening phase 3 invariant to track cumulative_counts
+  // For now, we assume it (this is one of the 3 remaining admits):
+  // assume_ (pure (cumulative_counts sc_after_phase3 sa (SZ.v k_val)));
   
   // Start from len-1 (last element)
   let mut j_back : SZ.t = len -^ 1sz;
@@ -184,16 +238,23 @@ ensures exists* sb'.
   {
     let vj_back = !j_back;
     
-    assume_ (pure (SZ.v vj_back < SZ.v len));
+    // From loop invariant: not vdone ==> SZ.v vj_back < SZ.v len
+    assert (pure (SZ.v vj_back < SZ.v len));
     
     // Read A[j_back]
     let val_j = A.op_Array_Access a vj_back;
     
-    assume_ (pure (val_j >= 0 /\ val_j <= SZ.v k_val));
+    // From precondition in_range sa (SZ.v k_val) and vj_back < len
+    assert (pure (val_j >= 0 /\ val_j <= SZ.v k_val));
     
     // Read C[val_j]
     let pos = V.op_Array_Access c (SZ.uint_to_t val_j);
     
+    // We need pos >= 1 and pos <= len for the algorithm to be safe
+    // In a full proof, this would follow from tracking that C contains valid cumulative counts
+    // For now, we can at least assert that pos fits in the required range
+    // The key insight: after prefix sum, each C[i] should be <= total count
+    // and after decrements, it should remain >= 0
     assume_ (pure (pos >= 1 /\ pos <= SZ.v len));
     
     // B[C[A[j]]-1] = A[j]  (CLRS uses 1-based, we use 0-based)

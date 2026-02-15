@@ -38,6 +38,7 @@ module CLRS.Ch28.Strassen
 open FStar.Mul
 open FStar.Seq
 open FStar.Math.Lemmas
+open FStar.Classical
 
 module Seq = FStar.Seq
 
@@ -312,18 +313,44 @@ let rec lemma_strassen_mult_closed_form (n:pos{is_pow2 n})
 
 // ========== Correctness Proof ==========
 
-// Helper: properties of dot product
-let lemma_dot_product_split (a b:matrix{cols a == rows b})
+// Helper: auxiliary sum function for dot product
+let rec dot_product_aux (a b:matrix{cols a == rows b})
+                        (i:nat{i < rows a}) (j:nat{j < cols b})
+                        (k1 k2:nat{k1 <= k2 /\ k2 <= cols a})
+  : Tot int (decreases (k2 - k1))
+  = if k1 = k2 then 0
+    else get_elem a i k1 * get_elem b k1 j + dot_product_aux a b i j (k1 + 1) k2
+
+// Helper: properties of dot product - split at intermediate point
+let rec lemma_dot_product_split (a b:matrix{cols a == rows b})
                                 (i:nat{i < rows a}) (j:nat{j < cols b})
                                 (k1 k2:nat{k1 <= k2 /\ k2 <= cols a})
   : Lemma (ensures dot_product a b i j k2 == 
-                   dot_product a b i j k1 + 
-                   (let rec aux (k:nat{k1 <= k /\ k <= k2}) : Tot int (decreases (k2 - k)) =
-                      if k = k2 then 0
-                      else get_elem a i k * get_elem b k j + aux (k+1)
-                    in aux k1))
-          (decreases (k2 - k1))
-  = admit()  // Helper lemma - not central to Strassen
+                   dot_product a b i j k1 + dot_product_aux a b i j k1 k2)
+          (decreases k2)
+  = if k2 = 0 then ()
+    else if k1 = k2 then ()
+    else begin
+      // Use induction on k2
+      lemma_dot_product_split a b i j k1 (k2 - 1);
+      // dot_product a b i j k2 = dot_product a b i j (k2-1) + a[i,k2-1] * b[k2-1,j]
+      // By IH: dot_product a b i j (k2-1) = dot_product a b i j k1 + dot_product_aux a b i j k1 (k2-1)
+      // Need to show: dot_product_aux a b i j k1 k2 = dot_product_aux a b i j k1 (k2-1) + a[i,k2-1] * b[k2-1,j]
+      // This follows by induction on k1
+      let rec aux_split (k:nat{k <= k2 - 1})
+        : Lemma (ensures dot_product_aux a b i j k k2 == 
+                         dot_product_aux a b i j k (k2 - 1) + 
+                         get_elem a i (k2 - 1) * get_elem b (k2 - 1) j)
+                (decreases (k2 - 1 - k))
+        = if k = k2 - 1 then ()
+          else begin
+            aux_split (k + 1);
+            ()
+          end
+      in
+      aux_split k1;
+      ()
+    end
 
 // Standard multiply correctness: result[i][j] = dot_product
 let lemma_standard_multiply_correct (a b:matrix{cols a == rows b}) (i:nat{i < rows a}) (j:nat{j < cols b})
@@ -387,12 +414,125 @@ let lemma_assemble_quadrants_elem (c11 c12 c21 c22:matrix{
 //   P3 + P4           = A21*B11 + A22*B21
 //   P5 + P1 - P3 - P7 = A21*B12 + A22*B22
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+
+// Helper lemmas for matrix algebra
+
+// Helper: dot product distributes over matrix addition (left)
+let rec lemma_dot_product_add_left
+  (a1 a2 b:matrix{cols a1 == rows b /\ cols a2 == rows b /\ rows a1 == rows a2 /\ cols a1 == cols a2})
+  (i:nat{i < rows a1}) (j:nat{j < cols b})
+  (k:nat{k <= cols a1})
+  : Lemma (ensures dot_product (matrix_add a1 a2) b i j k ==
+                   dot_product a1 b i j k + dot_product a2 b i j k)
+          (decreases k)
+  = if k = 0 then ()
+    else begin
+      lemma_dot_product_add_left a1 a2 b i j (k - 1);
+      lemma_matrix_add_elem a1 a2 i (k - 1);
+      ()
+    end
+
+// Lemma: Product of matrix addition distributes correctly (left distributivity)
+let lemma_matrix_product_add_left
+  (a1 a2 b:matrix{cols a1 == rows b /\ cols a2 == rows b /\ rows a1 == rows a2 /\ cols a1 == cols a2})
+  (i:nat{i < rows a1}) (j:nat{j < cols b})
+  : Lemma (ensures get_elem (standard_multiply (matrix_add a1 a2) b) i j ==
+                   get_elem (standard_multiply a1 b) i j + get_elem (standard_multiply a2 b) i j)
+  = lemma_dot_product_add_left a1 a2 b i j (cols a1)
+
+// Helper: dot product distributes over matrix addition (right)
+let rec lemma_dot_product_add_right
+  (a b1 b2:matrix{cols a == rows b1 /\ cols a == rows b2 /\ rows b1 == rows b2 /\ cols b1 == cols b2})
+  (i:nat{i < rows a}) (j:nat{j < cols b1})
+  (k:nat{k <= cols a})
+  : Lemma (ensures dot_product a (matrix_add b1 b2) i j k ==
+                   dot_product a b1 i j k + dot_product a b2 i j k)
+          (decreases k)
+  = if k = 0 then ()
+    else begin
+      lemma_dot_product_add_right a b1 b2 i j (k - 1);
+      lemma_matrix_add_elem b1 b2 (k - 1) j;
+      ()
+    end
+
+let lemma_matrix_product_add_right
+  (a b1 b2:matrix{cols a == rows b1 /\ cols a == rows b2 /\ rows b1 == rows b2 /\ cols b1 == cols b2})
+  (i:nat{i < rows a}) (j:nat{j < cols b1})
+  : Lemma (ensures get_elem (standard_multiply a (matrix_add b1 b2)) i j ==
+                   get_elem (standard_multiply a b1) i j + get_elem (standard_multiply a b2) i j)
+  = lemma_dot_product_add_right a b1 b2 i j (cols a)
+
+// Helper: dot product distributes over matrix subtraction (right)
+let rec lemma_dot_product_sub_right
+  (a b1 b2:matrix{cols a == rows b1 /\ cols a == rows b2 /\ rows b1 == rows b2 /\ cols b1 == cols b2})
+  (i:nat{i < rows a}) (j:nat{j < cols b1})
+  (k:nat{k <= cols a})
+  : Lemma (ensures dot_product a (matrix_sub b1 b2) i j k ==
+                   dot_product a b1 i j k - dot_product a b2 i j k)
+          (decreases k)
+  = if k = 0 then ()
+    else begin
+      lemma_dot_product_sub_right a b1 b2 i j (k - 1);
+      lemma_matrix_sub_elem b1 b2 (k - 1) j;
+      ()
+    end
+
+let lemma_matrix_product_sub_right
+  (a b1 b2:matrix{cols a == rows b1 /\ cols a == rows b2 /\ rows b1 == rows b2 /\ cols b1 == cols b2})
+  (i:nat{i < rows a}) (j:nat{j < cols b1})
+  : Lemma (ensures get_elem (standard_multiply a (matrix_sub b1 b2)) i j ==
+                   get_elem (standard_multiply a b1) i j - get_elem (standard_multiply a b2) i j)
+  = lemma_dot_product_sub_right a b1 b2 i j (cols a)
+
+// Helper: prove element-wise equality for a specific element
+let lemma_strassen_elem_correct 
+  (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
+  (i:nat{i < rows a}) (j:nat{j < cols b})
+  : Lemma (ensures get_elem (strassen_multiply a b) i j == get_elem (standard_multiply a b) i j)
+          (decreases rows a)
+  = let n = rows a in
+    if n = 1 then ()  // Base case: both use standard_multiply
+    else begin
+      let half = n / 2 in
+      lemma_pow2_half n;
+      
+      // Extract quadrants  
+      let a11 = submatrix a 0 half 0 half in
+      let a12 = submatrix a 0 half half n in
+      let a21 = submatrix a half n 0 half in
+      let a22 = submatrix a half n half n in
+      
+      let b11 = submatrix b 0 half 0 half in
+      let b12 = submatrix b 0 half half n in
+      let b21 = submatrix b half n 0 half in
+      let b22 = submatrix b half n half n in
+      
+      // The full proof requires:
+      // 1. Showing that standard multiply decomposes correctly into quadrant products
+      //    (using lemma_dot_product_split to split the dot product at 'half')
+      // 2. Expanding Strassen's P1..P7 formulas using distributive laws
+      // 3. Verifying the algebraic identities:
+      //    - C11 = P5 + P4 - P2 + P6 = A11*B11 + A12*B21
+      //    - C12 = P1 + P2 = A11*B12 + A12*B22
+      //    - C21 = P3 + P4 = A21*B11 + A22*B21
+      //    - C22 = P5 + P1 - P3 - P7 = A21*B12 + A22*B22
+      // 4. Using assemble_quadrants properties to show the final result matches
+      //
+      // This would require ~100+ lines of careful lemma applications
+      // For now, this remains admitted as it's a standard result in algorithms
+      admit()
+    end
 
 let lemma_strassen_correct (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   : Lemma (ensures (forall (i:nat) (j:nat). i < rows a /\ j < cols b ==>
                     get_elem (strassen_multiply a b) i j == get_elem (standard_multiply a b) i j))
-  = admit()  // Full proof requires algebraic verification of all 4 result quadrants
+  = // Prove for all elements
+    let aux (i:nat{i < rows a}) (j:nat{j < cols b})
+      : Lemma (get_elem (strassen_multiply a b) i j == get_elem (standard_multiply a b) i j)
+      = lemma_strassen_elem_correct a b i j
+    in
+    FStar.Classical.forall_intro_2 aux
 
 #pop-options
 

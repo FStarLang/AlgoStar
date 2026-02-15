@@ -374,15 +374,110 @@ let pulse_cover_is_valid (s_adj s_cover: seq int) (n: nat)
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 
 // 2-approximation theorem for Pulse implementation
-// If the cover is valid and consists of 0/1 values, its size is at most 2 * OPT
+// The algorithm produces a valid cover. To prove |C_alg| <= 2*OPT, we need to:
+// 1. Extract the implicit matching from the algorithm's execution
+// 2. Prove the matching is pairwise disjoint
+// 3. Apply theorem_35_1
 //
-// NOTE: This is a simplified version. The full proof requires:
-// 1. Extracting the implicit matching from the cover
-// 2. Proving that matching gives pairwise_disjoint edges
-// 3. Proving count_cover equals 2 * matching size
-// 4. Applying theorem_35_1
-// 
-// This is left as future work - for now we state the desired property with admit
+// The key challenge: without ghost state tracking which edges triggered additions,
+// we cannot formally extract the matching. However, we know from the algorithm's
+// structure (lines 186-187 of .fst) that vertices are added in pairs for uncovered edges.
+//
+// For a complete proof, we would need to either:
+// (a) Add ghost state to track the matching during execution
+// (b) Prove that ANY cover satisfying the algorithm's properties has the bound
+// (c) Use the existence of a maximal matching and classical reasoning
+//
+// We take approach (c) with the following argument:
+// - The algorithm implicitly constructs a matching M (edges where both endpoints were 0)
+// - By the algorithm's logic, M is pairwise disjoint (once a vertex is set to 1, it stays 1)
+// - C_alg consists exactly of endpoints of M, so |C_alg| = 2|M|
+// - Any optimal cover must cover at least one endpoint of each edge in M
+// - Therefore |M| <= OPT, and |C_alg| = 2|M| <= 2*OPT
+//
+// This argument is sound but requires formalizing properties of the algorithm's
+// execution trace, which the current Pulse invariants don't capture.
+
+// Helper: For any cover produced by the greedy algorithm, every vertex in the cover
+// is incident to at least one edge (otherwise it wouldn't have been added)
+let cover_has_incident_edges (adj: seq int) (cover: seq int) (n: nat) : prop =
+  Seq.length adj = n * n /\ Seq.length cover = n /\
+  (forall (v: nat). v < n /\ Seq.index cover v <> 0 ==>
+    (exists (u: nat). u < n /\ u <> v /\ 
+      ((u < v /\ Seq.index adj (u * n + v) <> 0) \/
+       (v < u /\ Seq.index adj (v * n + u) <> 0))))
+
+// Key property: if every vertex in the cover is incident to an edge,
+// and the cover is minimal in some sense, then we can bound its size
+// However, this still doesn't give us the factor of 2 without matching structure
+
+// Alternative approach: Use a probabilistic or counting argument
+// For a valid cover C with binary values, we can partition the edges into:
+// - Edges where both endpoints are in C (set B)
+// - Edges where exactly one endpoint is in C (set S)
+// Since C is a valid cover, there are no edges with neither endpoint in C.
+//
+// Key insight: |C| = |vertices with at least one edge in B union S|
+// For the greedy algorithm specifically, B forms a matching (pairwise disjoint)
+// Therefore |C| <= 2|B| + |S \ B| where S\B is edges contributing one endpoint
+//
+// But we don't have enough information to bound this without tracking the matching.
+
+// Final approach: Add a helper lemma that asserts a property about greedy covers
+// This would be provable if we had execution traces, but requires an axiom otherwise.
+
+// AXIOM: For covers produced by the APPROX-VERTEX-COVER greedy algorithm,
+// the 2-approximation bound holds. This is CLRS Theorem 35.1.
+// A complete proof requires either:
+// 1. Ghost state tracking the matching during execution
+// 2. A formal model of the algorithm's execution traces
+// 3. Meta-reasoning about algorithm correctness
+
+// For now, we document the gap and admit the final step:
+
+// Strategy: Extract a matching from the cover that witnesses the 2-approximation
+// Define: a "witnessing matching" is a set of edges where both endpoints are in the cover
+// and no vertex appears in multiple edges (pairwise disjoint)
+
+// Extract edges where both endpoints are in the cover
+let rec extract_both_covered (adj: seq int) (cover: seq int) (n: nat) (u v: nat)
+  : Tot (list edge) (decreases ((if u >= n then 0 else n - u) * (n + 1) + (if v > n then 0 else n + 1 - v))) =
+  if u >= n then []
+  else if v >= n then extract_both_covered adj cover n (u + 1) (u + 2)
+  else if v > u && Seq.length adj = n * n && Seq.length cover = n &&
+          Seq.index adj (u * n + v) <> 0 &&
+          Seq.index cover u <> 0 && Seq.index cover v <> 0
+       then (u, v) :: extract_both_covered adj cover n u (v + 1)
+       else extract_both_covered adj cover n u (v + 1)
+
+// Lemma: edges in extract_both_covered are valid
+let rec extract_both_covered_valid (adj: seq int) (cover: seq int) (n: nat) (u v: nat)
+  : Lemma (requires Seq.length adj = n * n /\ Seq.length cover = n)
+          (ensures (forall (e: edge). memP e (extract_both_covered adj cover n u v) ==>
+                    (let (u', v') = e in
+                     u' < n /\ v' < n /\ u' < v' /\
+                     Seq.index adj (u' * n + v') <> 0 /\
+                     Seq.index cover u' <> 0 /\ Seq.index cover v' <> 0)))
+          (decreases ((if u >= n then 0 else n - u) * (n + 1) + (if v > n then 0 else n + 1 - v)))
+  = if u >= n then ()
+    else if v >= n then extract_both_covered_valid adj cover n (u + 1) (u + 2)
+    else if v > u && Seq.length adj = n * n && Seq.length cover = n &&
+            Seq.index adj (u * n + v) <> 0 &&
+            Seq.index cover u <> 0 && Seq.index cover v <> 0
+         then extract_both_covered_valid adj cover n u (v + 1)
+         else extract_both_covered_valid adj cover n u (v + 1)
+
+// Key insight: For covers produced by the greedy algorithm, extract_both_covered
+// yields a matching that explains the cover. However, proving this requires
+// knowing that the algorithm added vertices in pairs.
+
+// For now, we assert that such a matching exists (which it does by construction)
+// and that it has size at most opt (by matching_lower_bound).
+// The missing piece is proving that the cover size equals 2 * matching size.
+
+// This property holds for the greedy algorithm but cannot be proven from
+// the cover alone without execution trace information.
+
 let approximation_ratio_theorem (s_adj s_cover: seq int) (n: nat) (opt: nat)
   : Lemma (requires 
             is_cover_pulse s_adj s_cover n n 0 /\
@@ -392,10 +487,20 @@ let approximation_ratio_theorem (s_adj s_cover: seq int) (n: nat) (opt: nat)
             min_vertex_cover_size s_adj n opt)
           (ensures count_cover (seq_to_cover_fn s_cover n) n <= 2 * opt)
   = pulse_cover_is_valid s_adj s_cover n;
-    // The full proof would:
-    // 1. Extract the implicit matching (edges where both endpoints have value 1)
-    // 2. Prove this matching is pairwise_disjoint (follows from algorithm logic)
-    // 3. Prove count_cover (seq_to_cover_fn s_cover n) n == 2 * matching_size
-    // 4. Apply theorem_35_1 to get matching_size <= opt
-    // 5. Conclude count_cover <= 2 * opt
-    admit()
+    let c_alg = seq_to_cover_fn s_cover n in
+    
+    // Extract edges where both endpoints are covered
+    let both_covered = extract_both_covered s_adj s_cover n 0 1 in
+    extract_both_covered_valid s_adj s_cover n 0 1;
+    
+    // Key lemmas we would need:
+    // 1. both_covered is pairwise disjoint (requires algorithm trace)
+    // 2. Every vertex in c_alg is in some edge of both_covered (requires algorithm trace)  
+    // 3. Therefore count_cover c_alg n <= 2 * List.Tot.length both_covered
+    // 4. By matching_lower_bound applied to both_covered: List.Tot.length both_covered <= opt
+    // 5. Therefore count_cover c_alg n <= 2 * opt
+    
+    // Lemmas 1-3 cannot be proven from the cover alone without knowing
+    // which edges triggered vertex additions during execution.
+    
+    admit() // Requires ghost state tracking the algorithm's execution trace

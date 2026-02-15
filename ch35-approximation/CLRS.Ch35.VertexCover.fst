@@ -70,15 +70,35 @@ let is_cover_step (s_adj s_cover: Seq.seq int) (n vu vv: nat)
       (Seq.index s2 u <> 0 \/ Seq.index s2 v <> 0))
 #pop-options
 
+// Lemma: updating cover with 0/1 values preserves binary property
+let is_cover_binary_step (s_cover: Seq.seq int) (n vu vv: nat) 
+  (cu cv: int) (new_cu new_cv: int)
+  : Lemma
+    (requires
+      vu < n /\ vv < n /\
+      Seq.length s_cover == n /\
+      (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+      cu == Seq.index s_cover vu /\
+      cv == Seq.index s_cover vv /\
+      (new_cu = 0 \/ new_cu = 1) /\
+      (new_cv = 0 \/ new_cv = 1))
+    (ensures (
+      let s1 = Seq.upd s_cover vu new_cu in
+      let s2 = Seq.upd s1 vv new_cv in
+      forall (i: nat). i < n ==> (Seq.index s2 i = 0 \/ Seq.index s2 i = 1)))
+  = let s1 = Seq.upd s_cover vu new_cu in
+    let s2 = Seq.upd s1 vv new_cv in
+    assert (forall (i: nat). (i < n /\ i <> vu /\ i <> vv) ==> Seq.index s2 i == Seq.index s_cover i)
+
 // Lemma: The algorithm only writes 0 or 1 to cover array
-// Proof sketch: initially all 0, updates compute (if ... then 1 else old_value)
-// This admits the proof - full verification would track this invariant through loops
+// This is now proven by the loop invariants
 let cover_values_are_binary (s_adj s_cover: Seq.seq int) (n: nat)
   : Lemma (requires 
             is_cover s_adj s_cover n n 0 /\
-            Seq.length s_cover = n)
+            Seq.length s_cover = n /\
+            (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)))
           (ensures forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1))
-  = admit()  // Full proof needs to strengthen loop invariants
+  = () // Trivial since it's in the requires
 
 // Lemma: Apply the approximation bound for all possible opt values
 let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat)
@@ -140,7 +160,8 @@ fn approx_vertex_cover
       SZ.v n < 256 /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length s_cover == SZ.v n /\
-      is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0
+      is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0 /\
+      (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1))
     )
   {
     let vu = !u;
@@ -166,7 +187,8 @@ fn approx_vertex_cover
         SZ.fits (SZ.v vu * SZ.v n) /\
         SZ.fits (SZ.v vu * SZ.v n + SZ.v n) /\
         Seq.length s_cover_inner == SZ.v n /\
-        is_cover s_adj s_cover_inner (SZ.v n) (SZ.v vu) (SZ.v vv)
+        is_cover s_adj s_cover_inner (SZ.v n) (SZ.v vu) (SZ.v vv) /\
+        (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover_inner i = 0 \/ Seq.index s_cover_inner i = 1))
       )
     {
       let vv = !v;
@@ -189,6 +211,9 @@ fn approx_vertex_cover
       // Prove the step preserves the cover property
       is_cover_step s_adj s_cov_before (SZ.v n) (SZ.v vu) (SZ.v vv) cu cv has_edge new_cu new_cv;
       
+      // Prove the binary property is preserved
+      is_cover_binary_step s_cov_before (SZ.v n) (SZ.v vu) (SZ.v vv) cu cv new_cu new_cv;
+      
       // Write unconditionally
       A.op_Array_Assignment cover_a vu new_cu;
       A.op_Array_Assignment cover_a vv new_cv;
@@ -208,8 +233,10 @@ fn approx_vertex_cover
   // Convert back to vec for return
   with s_final. assert (A.pts_to cover_a s_final);
   
-  // Prove that cover values are binary (0 or 1)
-  // This follows from initialization to 0 and updates that only set to 1
+  // Binary property is maintained by loop invariant
+  assert pure (forall (i: nat). i < SZ.v n ==> (Seq.index s_final i = 0 \/ Seq.index s_final i = 1));
+  
+  // Prove that cover values are binary (0 or 1) - now trivial
   cover_values_are_binary s_adj s_final (SZ.v n);
   
   // Apply 2-approximation theorem for all possible OPT values
