@@ -356,20 +356,162 @@ let rec count_lt_sorted_suffix (s: seq int) (n: nat) (v: int)
 // For this proof-of-concept specification, we document the mathematical reasoning
 // and note that full mechanization would require substantial infrastructure.
 
-// Placeholder implementations that state the theorems
-// These are mathematically sound facts about multisets
-#push-options "--warn_error -272"  // Allow incomplete patterns since these won't verify
-let count_lt_permutation_invariant (s1 s2: seq int) (v: int)
+// Prove that count_lt and count_le are multiset functions (permutation-invariant)
+// Strategy: Prove by induction using find-and-remove technique
+
+// Helper: find an element in a sequence given that it exists
+let rec find_element (s: seq int) (x: int) 
+  : Lemma (requires count_occ s x > 0)
+          (ensures exists (i:nat). i < Seq.length s /\ Seq.index s i = x)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else if Seq.index s 0 = x then ()
+    else (
+      count_occ_cons (Seq.index s 0) (Seq.tail s) x;
+      find_element (Seq.tail s) x
+    )
+
+// Helper: remove one occurrence of an element from a sequence
+let rec remove_element (s: seq int) (x: int) (i: nat{i < Seq.length s /\ Seq.index s i = x})
+  : Tot (seq int) (decreases i)
+  = if i = 0 then Seq.tail s
+    else Seq.cons (Seq.index s 0) (remove_element (Seq.tail s) x (i - 1))
+
+// Properties of remove_element
+let rec remove_element_length (s: seq int) (x: int) (i: nat{i < Seq.length s /\ Seq.index s i = x})
+  : Lemma (ensures Seq.length (remove_element s x i) = Seq.length s - 1)
+          (decreases i)
+  = if i = 0 then ()
+    else remove_element_length (Seq.tail s) x (i - 1)
+
+#push-options "--z3rlimit 40"
+let rec remove_element_count_occ (s: seq int) (x: int) (y: int) 
+                                   (i: nat{i < Seq.length s /\ Seq.index s i = x})
+  : Lemma (ensures count_occ (remove_element s x i) y = 
+                   (if x = y then count_occ s y - 1 else count_occ s y))
+          (decreases i)
+  = if i = 0 then (
+      count_occ_cons x (Seq.tail s) y
+    ) else (
+      count_occ_cons (Seq.index s 0) (Seq.tail s) y;
+      remove_element_count_occ (Seq.tail s) x y (i - 1);
+      count_occ_cons (Seq.index s 0) (remove_element (Seq.tail s) x (i - 1)) y
+    )
+#pop-options
+
+// If s1 and s2 are permutations, removing the same element gives permutations
+#push-options "--z3rlimit 40"
+let remove_preserves_permutation (s1 s2: seq int) (x: int)
+                                   (i1: nat{i1 < Seq.length s1 /\ Seq.index s1 i1 = x})
+                                   (i2: nat{i2 < Seq.length s2 /\ Seq.index s2 i2 = x})
+  : Lemma (requires is_permutation s1 s2)
+          (ensures is_permutation (remove_element s1 x i1) (remove_element s2 x i2))
+  = remove_element_length s1 x i1;
+    remove_element_length s2 x i2;
+    let r1 = remove_element s1 x i1 in
+    let r2 = remove_element s2 x i2 in
+    let aux (y: int) : Lemma (count_occ r1 y = count_occ r2 y) =
+      remove_element_count_occ s1 x y i1;
+      remove_element_count_occ s2 x y i2
+    in
+    Classical.forall_intro aux
+#pop-options
+
+// Helper: count_lt after removing an element
+#push-options "--z3rlimit 40"
+let rec remove_element_count_lt (s: seq int) (x: int) (v: int)
+                                  (i: nat{i < Seq.length s /\ Seq.index s i = x})
+  : Lemma (ensures count_lt (remove_element s x i) v = 
+                   (if x < v then count_lt s v - 1 else count_lt s v))
+          (decreases i)
+  = if i = 0 then (
+      count_lt_cons x (Seq.tail s) v
+    ) else (
+      count_lt_cons (Seq.index s 0) (Seq.tail s) v;
+      remove_element_count_lt (Seq.tail s) x v (i - 1);
+      count_lt_cons (Seq.index s 0) (remove_element (Seq.tail s) x (i - 1)) v
+    )
+#pop-options
+
+// Main theorem: count_lt is permutation-invariant
+#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+let rec count_lt_permutation_invariant (s1 s2: seq int) (v: int)
   : Lemma (requires is_permutation s1 s2)
           (ensures count_lt s1 v = count_lt s2 v)
           (decreases Seq.length s1)
-  = admit () // Mathematical fact: multiset functions are permutation-invariant
+  = if Seq.length s1 = 0 then ()
+    else (
+      let h = Seq.index s1 0 in
+      let t1 = Seq.tail s1 in
+      
+      // h appears in s2 with the same count
+      count_occ_cons h t1 h;
+      find_element s2 h;
+      
+      // Find h in s2
+      let i2 = FStar.IndefiniteDescription.indefinite_description_tot
+                 (i:nat{i < Seq.length s2 /\ Seq.index s2 i = h})
+                 (fun i -> i < Seq.length s2 && Seq.index s2 i = h)
+      in
+      
+      let t2 = remove_element s2 h i2 in
+      
+      // t1 and t2 are permutations
+      remove_preserves_permutation s1 s2 h 0 i2;
+      
+      // Apply induction hypothesis
+      count_lt_permutation_invariant t1 t2 v;
+      
+      // Relate to original sequences
+      count_lt_cons h t1 v;
+      remove_element_count_lt s2 h v i2;
+      ()
+    )
+#pop-options
 
-let count_le_permutation_invariant (s1 s2: seq int) (v: int)
+// Helper: count_le after removing an element
+#push-options "--z3rlimit 40"
+let rec remove_element_count_le (s: seq int) (x: int) (v: int)
+                                  (i: nat{i < Seq.length s /\ Seq.index s i = x})
+  : Lemma (ensures count_le (remove_element s x i) v = 
+                   (if x <= v then count_le s v - 1 else count_le s v))
+          (decreases i)
+  = if i = 0 then (
+      count_le_cons x (Seq.tail s) v
+    ) else (
+      count_le_cons (Seq.index s 0) (Seq.tail s) v;
+      remove_element_count_le (Seq.tail s) x v (i - 1);
+      count_le_cons (Seq.index s 0) (remove_element (Seq.tail s) x (i - 1)) v
+    )
+#pop-options
+
+// Main theorem: count_le is permutation-invariant
+#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+let rec count_le_permutation_invariant (s1 s2: seq int) (v: int)
   : Lemma (requires is_permutation s1 s2)
           (ensures count_le s1 v = count_le s2 v)
           (decreases Seq.length s1)
-  = admit () // Mathematical fact: multiset functions are permutation-invariant
+  = if Seq.length s1 = 0 then ()
+    else (
+      let h = Seq.index s1 0 in
+      let t1 = Seq.tail s1 in
+      
+      count_occ_cons h t1 h;
+      find_element s2 h;
+      
+      let i2 = FStar.IndefiniteDescription.indefinite_description_tot
+                 (i:nat{i < Seq.length s2 /\ Seq.index s2 i = h})
+                 (fun i -> i < Seq.length s2 && Seq.index s2 i = h)
+      in
+      
+      let t2 = remove_element s2 h i2 in
+      
+      remove_preserves_permutation s1 s2 h 0 i2;
+      count_le_permutation_invariant t1 t2 v;
+      count_le_cons h t1 v;
+      remove_element_count_le s2 h v i2;
+      ()
+    )
 #pop-options
 
 // Helper: In a sorted sequence, count_le on prefix [0..k] is at least k+1
