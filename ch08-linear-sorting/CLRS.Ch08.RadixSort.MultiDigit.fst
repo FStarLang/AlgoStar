@@ -437,6 +437,7 @@ let rec radix_sort_permutation
 ///   We then apply stable_sort on digit (num_digits-1)
 ///   Stability ensures elements with equal digit (num_digits-1) keep their order
 ///   This preserves the sorting on lower digits!
+#push-options "--z3rlimit 40"
 let rec radix_sort_sorted_on_lower_digits
   (s: seq nat) (num_digits: nat) (base: nat) (check_digit: nat)
   : Lemma (requires base > 0 /\ check_digit < num_digits)
@@ -469,6 +470,7 @@ let rec radix_sort_sorted_on_lower_digits
       // check_digit = num_digits - 1, which is the last digit we sort on
       stable_sort_on_digit_sorted (radix_sort s (num_digits - 1) base) (num_digits - 1) base
     )
+#pop-options
 
 /// Helper: if all digits 0..num_digits-1 match lexicographically, values are ordered
 /// This is the fundamental property of positional notation:

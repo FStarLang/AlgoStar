@@ -358,6 +358,7 @@ fn enqueue (#t:Type0) (q: queue t) (#contents: erased (list t)) (x: t)
 }
 
 // Dequeue an element from the head
+#push-options "--z3rlimit 40"
 fn dequeue (#t:Type0) (q: queue t) (#contents: erased (list t))
   requires queue_inv q contents
   requires pure (L.length (reveal contents) > 0)
@@ -434,3 +435,4 @@ fn dequeue (#t:Type0) (q: queue t) (#contents: erased (list t))
   
   elem
 }
+#pop-options
