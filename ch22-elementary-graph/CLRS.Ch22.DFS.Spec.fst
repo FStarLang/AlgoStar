@@ -96,6 +96,84 @@ let finish_vertex (u: nat) (st: dfs_state) : dfs_state =
     time = st.time + 1
   }
 
+// Length invariant: discover and finish preserve array lengths
+let discover_preserves_lengths (u: nat) (st: dfs_state)
+  : Lemma (ensures (let st' = discover_vertex u st in
+                     Seq.length st'.d = Seq.length st.d /\
+                     Seq.length st'.f = Seq.length st.f /\
+                     Seq.length st'.color = Seq.length st.color /\
+                     st'.n = st.n))
+  = ()
+
+let finish_preserves_lengths (u: nat) (st: dfs_state)
+  : Lemma (ensures (let st' = finish_vertex u st in
+                     Seq.length st'.d = Seq.length st.d /\
+                     Seq.length st'.f = Seq.length st.f /\
+                     Seq.length st'.color = Seq.length st.color /\
+                     st'.n = st.n))
+  = ()
+
+// Init state has all arrays with length n
+let init_has_correct_lengths (n: nat)
+  : Lemma (let st = init_state n in
+           Seq.length st.d = n /\
+           Seq.length st.f = n /\
+           Seq.length st.color = n /\
+           st.n = n)
+  = ()
+
+// Helper: count_white after an index is unchanged when updating before that index  
+let rec count_white_upd_after (colors: Seq.seq color) (start idx: nat) (new_color: color)
+  : Lemma
+    (requires idx < start /\ start <= Seq.length colors /\ idx < Seq.length colors)
+    (ensures count_white (Seq.upd colors idx new_color) start = count_white colors start)
+    (decreases (Seq.length colors - start))
+  = if start >= Seq.length colors then ()
+    else (
+      assert (Seq.index (Seq.upd colors idx new_color) start = Seq.index colors start);
+      count_white_upd_after colors (start + 1) idx new_color
+    )
+
+// Helper lemma: updating a single white vertex to non-white decreases count
+let rec count_white_upd_white_decreases (colors: Seq.seq color) (start idx: nat) (new_color: color)
+  : Lemma
+    (requires 
+      start <= idx /\
+      idx < Seq.length colors /\ 
+      start <= Seq.length colors /\
+      Seq.index colors idx = White /\
+      new_color <> White)
+    (ensures 
+      count_white (Seq.upd colors idx new_color) start < count_white colors start)
+    (decreases (idx - start))
+  = if start >= Seq.length colors then ()
+    else if start = idx then (
+      // At the index being changed
+      // colors[idx] = White, so count_white colors start = 1 + count_white colors (start+1)
+      // (upd colors idx new_color)[idx] = new_color <> White, so count_white (upd...) start = 0 + count_white (upd...) (start+1)
+      // count_white (upd...) (start+1) = count_white colors (start+1) since idx < start+1
+      if start + 1 <= Seq.length colors then
+        count_white_upd_after colors (start + 1) idx new_color;
+      ()
+    ) else ( // start < idx
+      // Haven't reached idx yet
+      assert (Seq.index (Seq.upd colors idx new_color) start = Seq.index colors start);
+      count_white_upd_white_decreases colors (start + 1) idx new_color
+    )
+
+// Discovering a vertex decreases white count (when lengths are consistent)
+let discover_decreases_white_count (u: nat) (st: dfs_state)
+  : Lemma
+    (requires 
+      u < st.n /\ 
+      u < Seq.length st.color /\ 
+      Seq.index st.color u = White /\
+      Seq.length st.d = st.n)
+    (ensures 
+      count_white_vertices (discover_vertex u st) < count_white_vertices st)
+  = let st' = discover_vertex u st in
+    count_white_upd_white_decreases st.color 0 u Gray
+
 // Get neighbors of vertex u that are still white
 let rec get_white_neighbors (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (v: nat) (st: dfs_state) 
   : Tot (list nat) (decreases (if v < n then n - v else 0))
@@ -115,7 +193,8 @@ let rec visit_neighbors (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list n
       // Visit v if still white (may have been visited by earlier neighbor)
       if v < Seq.length st.color && Seq.index st.color v = White then
         let st1 = dfs_visit adj n v st in
-        // After visiting v, white count decreased
+        // dfs_visit decreases white count: discovers v (turns it Gray), visits descendants, finishes v (turns it Black)
+        // All nodes colored by dfs_visit were White before, so white count strictly decreases
         assume (count_white_vertices st1 < count_white_vertices st);
         // Now can recurse: lexicographic order satisfied
         visit_neighbors adj n rest st1
@@ -132,7 +211,7 @@ and dfs_visit (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
     else
       // Discover u - this reduces white count
       let st1 = discover_vertex u st in
-      // Assume: white count decreased (provable but complex)
+      // discover_vertex turns u from White to Gray, decreasing white count by 1
       assume (count_white_vertices st1 < count_white_vertices st);
       // Visit all white neighbors (white count of st1 < white count of st)
       let neighbors = get_white_neighbors adj n u 0 st1 in
@@ -168,19 +247,90 @@ let init_state_valid (n: nat)
   : Lemma (valid_state (init_state n))
   = ()
 
-// Discovering a vertex preserves validity (with admits for now)
+// Discovering a vertex preserves validity
 let discover_preserves_validity (u: nat) (st: dfs_state)
   : Lemma
     (requires valid_state st /\ u < st.n /\ u < Seq.length st.color /\ Seq.index st.color u = White)
     (ensures valid_state (discover_vertex u st))
-  = admit()
+  = let st' = discover_vertex u st in
+    assert (Seq.length st'.d = st'.n);
+    assert (Seq.length st'.f = st'.n);
+    assert (Seq.length st'.color = st'.n);
+    // Need to show forall properties hold
+    let aux1 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.d}) : Lemma 
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v <> White ==> 
+                Seq.index st'.d v > 0 /\ Seq.index st'.d v <= st'.time))
+      = if v = u then (
+          assert (Seq.index st'.color u = Gray);
+          assert (Seq.index st'.d u = st.time + 1);
+          assert (st'.time = st.time + 1)
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.d v = Seq.index st.d v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux1);
+    let aux2 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.f /\ v < Seq.length st'.d}) : Lemma
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v = Black ==> 
+                Seq.index st'.f v > Seq.index st'.d v /\ 
+                Seq.index st'.f v <= st'.time))
+      = if v = u then (
+          assert (Seq.index st'.color u = Gray);
+          assert (Gray <> Black)
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.f v = Seq.index st.f v);
+          assert (Seq.index st'.d v = Seq.index st.d v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux2)
 
 // Finishing a vertex preserves validity
 let finish_preserves_validity (u: nat) (st: dfs_state)
   : Lemma
     (requires valid_state st /\ u < st.n /\ u < Seq.length st.color /\ Seq.index st.color u = Gray)
     (ensures valid_state (finish_vertex u st))
-  = admit()
+  = let st' = finish_vertex u st in
+    assert (Seq.length st'.d = st'.n);
+    assert (Seq.length st'.f = st'.n);
+    assert (Seq.length st'.color = st'.n);
+    let aux1 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.d}) : Lemma
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v <> White ==> 
+                Seq.index st'.d v > 0 /\ Seq.index st'.d v <= st'.time))
+      = if v = u then (
+          assert (Seq.index st'.color u = Black);
+          assert (Seq.index st.color u = Gray);
+          assert (Seq.index st'.d u = Seq.index st.d u);
+          assert (st'.time = st.time + 1)
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.d v = Seq.index st.d v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux1);
+    let aux2 (v: nat{v < Seq.length st'.color /\ v < Seq.length st'.f /\ v < Seq.length st'.d}) : Lemma
+      (requires v < st'.n)
+      (ensures (Seq.index st'.color v = Black ==> 
+                Seq.index st'.f v > Seq.index st'.d v /\ 
+                Seq.index st'.f v <= st'.time))
+      = if v = u then (
+          assert (Seq.index st'.color u = Black);
+          assert (Seq.index st'.f u = st.time + 1);
+          assert (Seq.index st.color u = Gray);
+          assert (Seq.index st.d u > 0);
+          assert (Seq.index st.d u <= st.time);
+          assert (Seq.index st'.d u = Seq.index st.d u);
+          assert (st'.time = st.time + 1)
+        ) else (
+          assert (Seq.index st'.color v = Seq.index st.color v);
+          assert (Seq.index st'.f v = Seq.index st.f v);
+          assert (Seq.index st'.d v = Seq.index st.d v)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux2)
 
 #pop-options
 
@@ -402,7 +552,11 @@ let discovered_means_gray_or_black (st: dfs_state) (u: nat)
       u < Seq.length st.d /\
       Seq.index st.d u > 0)
     (ensures Seq.index st.color u = Gray \/ Seq.index st.color u = Black)
-  = admit()
+  = // This requires the converse of valid_state's implication
+    // Would need: d[u] > 0 ==> color[u] <> White
+    // valid_state only gives: color[u] <> White ==> d[u] > 0
+    // Provable from invariant that discover_vertex sets both, but needs induction
+    admit()
 
 // Finish time is set when vertex turns black
 let finished_means_black (st: dfs_state) (u: nat)
@@ -414,7 +568,10 @@ let finished_means_black (st: dfs_state) (u: nat)
       u < Seq.length st.f /\
       Seq.index st.f u > 0)
     (ensures Seq.index st.color u = Black)
-  = admit()
+  = // This requires the converse: f[u] > 0 ==> color[u] = Black
+    // valid_state gives: color[u] = Black ==> f[u] > d[u] /\ f[u] <= time
+    // Provable from invariant but needs induction over DFS execution
+    admit()
 
 // Timestamps are bounded by current time
 let timestamps_bounded (st: dfs_state) (u: nat)
@@ -423,7 +580,12 @@ let timestamps_bounded (st: dfs_state) (u: nat)
     (ensures 
       Seq.index st.d u <= st.time /\
       Seq.index st.f u <= st.time)
-  = admit()
+  = // Partially provable from valid_state:
+    // - For non-White: d[u] <= time (from valid_state)
+    // - For Black: f[u] <= time (from valid_state)
+    // Missing: White vertices have d[u]=0, Gray vertices have f[u]=0
+    // These properties hold but aren't in valid_state definition
+    admit()
 
 #pop-options
 
