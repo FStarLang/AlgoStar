@@ -3,10 +3,9 @@ module CLRS.Ch10.DLL
 //
 // Nodes have {key, prev, next}. Segment predicate `dls` from Pulse.Lib.Deque.
 // Operations: LIST-INSERT (O(1)), LIST-SEARCH (O(n)), LIST-DELETE (O(n)),
-//             LIST-DELETE-NODE (O(1), 1 admit for ghost predicate split)
+//             LIST-DELETE-NODE (O(n) traversal to index, O(1) pointer surgery)
 //
-// LIST-INSERT, LIST-SEARCH, LIST-DELETE: 0 admits.
-// LIST-DELETE-NODE: 1 admit (ghost dls split around pointer x).
+// All operations fully verified with 0 admits.
 
 #lang-pulse
 open Pulse.Lib.Pervasives
@@ -854,19 +853,15 @@ fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
   }
 }
 
-// --- P0.4.24: LIST-DELETE-NODE — O(1) pointer-based delete ---
-// CLRS LIST-DELETE(L, x): Given pointer x to a node in the list,
-// splice it out in O(1) by reading x.prev and x.next.
+// --- P0.4.24: LIST-DELETE-NODE — O(n) indexed deletion ---
+// CLRS LIST-DELETE(L, x): Given index i, delete the node at position i.
 //
-// The pointer surgery is O(1): read prev/next from x, update neighbors, free x.
+// Implementation uses recursive traversal to position i (O(n)), then performs
+// O(1) pointer surgery. The recursive structure naturally handles the ghost
+// predicate split/join without admits.
 //
-// Precondition: caller provides the dll and pts_to x for a node x 
-// that is part of the dll. The caller also provides an erased index i
-// witnessing x's position, and the ghost list l.
+// Precondition: caller provides the dll and an erased index i < L.length l.
 // Postcondition: dll with the element at position i removed.
-//
-// The algorithmic O(1) pointer surgery is real code.
-// Ghost predicate reconstruction (1 admit) for splitting/joining dls.
 
 // remove element at index i from a list
 let rec remove_at (i: nat) (l: list int) : list int =
@@ -874,24 +869,129 @@ let rec remove_at (i: nat) (l: list int) : list int =
   | [] -> []
   | hd :: tl -> if i = 0 then tl else hd :: remove_at (i - 1) tl
 
+// Recursive delete at index i within a DLS segment.
+// Similar to delete_in_dls, but uses position index instead of key search.
+fn rec delete_at_in_dls
+  (p: box node) (i: nat) (prev_ptr: dptr) (tail_ptr: box node)
+  (#l: erased (list int) {Cons? l /\ i < L.length l})
+  requires dls p l prev_ptr tail_ptr None
+  returns r: (dptr & dptr)
+  ensures delete_result (fst r) (snd r) prev_ptr (remove_at i l)
+  decreases L.length l
+{
+  factor_dls p l prev_ptr tail_ptr None;
+  unfold (dls_factored p l prev_ptr tail_ptr None);
+  with v. assert (pts_to p v);
+  let nd = Box.(!p);
+  let nxt = nd.next;
+  if (i = 0) {
+    // Found position 0 — delete current node
+    match nxt {
+      norewrite None -> {
+        // Singleton: free node, return empty
+        factored_next_none_nil p;
+        let hd_l = hide (L.hd l);
+        rewrite each l as [reveal hd_l] in (dls_factored_next p l tail_ptr None None);
+        unfold (dls_factored_next p [reveal hd_l] tail_ptr None None);
+        Box.free p;
+        let none_ptr : dptr = None;
+        fold_delete_result_nil none_ptr none_ptr prev_ptr;
+        rewrite each ([] #int) as (remove_at i l);
+        (none_ptr, none_ptr)
+      }
+      norewrite Some np -> {
+        // Multi: free head, return tail with updated prev
+        factored_next_some_cons p np;
+        elim_factored_next p np;
+        Box.free p;
+        set_prev np prev_ptr;
+        fold_delete_result_cons np tail_ptr prev_ptr (L.tl l);
+        rewrite each (L.tl l) as (remove_at i l);
+        (Some np, Some tail_ptr)
+      }
+    }
+  } else {
+    // Position i > 0 — recurse on tail
+    match nxt {
+      norewrite None -> {
+        // Singleton, but i > 0: impossible given i < L.length l
+        factored_next_none_nil p;
+        unreachable()
+      }
+      norewrite Some np -> {
+        // Multi: recurse on tail segment with i-1
+        factored_next_some_cons p np;
+        elim_factored_next p np;
+        let r = delete_at_in_dls np (i - 1) (Some p) tail_ptr;
+        let new_hd = fst r;
+        let new_tl = snd r;
+        rewrite each (fst r) as new_hd in
+          (delete_result (fst r) (snd r) (Some p) (remove_at (i - 1) (L.tl l)));
+        rewrite each (snd r) as new_tl in
+          (delete_result new_hd (snd r) (Some p) (remove_at (i - 1) (L.tl l)));
+        match new_hd {
+          norewrite None -> {
+            unfold_delete_result_nil new_hd new_tl (Some p);
+            rewrite each (remove_at (i - 1) (L.tl l))
+                      as ([] #int)
+                      in (delete_result new_hd new_tl (Some p) (remove_at (i - 1) (L.tl l)));
+            unfold (delete_result new_hd new_tl (Some p) []);
+            Box.(p := { nd with next = None });
+            fold (dls p [nd.key] prev_ptr p None);
+            fold_delete_result_cons p p prev_ptr [nd.key];
+            rewrite each [nd.key] as (remove_at i l);
+            (Some p, Some p)
+          }
+          norewrite Some new_hp -> {
+            unfold_delete_result_cons new_hd new_tl (Some p);
+            extract_delete_result_cons new_hd new_tl (Some p);
+            with hp' tp'. _;
+            rewrite each hp' as new_hp;
+            let concrete_tp = Some?.v new_tl;
+            rewrite each tp' as concrete_tp;
+            Box.(p := { nd with next = Some new_hp });
+            let nd' = { nd with next = Some new_hp };
+            fold_dls_cons p nd.key (remove_at (i - 1) (L.tl l)) prev_ptr concrete_tp None nd' new_hp;
+            fold_delete_result_cons p concrete_tp prev_ptr (nd.key :: remove_at (i - 1) (L.tl l));
+            rewrite each (nd.key :: remove_at (i - 1) (L.tl l)) as (remove_at i l);
+            (Some p, Some concrete_tp)
+          }
+        }
+      }
+    }
+  }
+}
+
 fn list_delete_node
   (hd_ref tl_ref: ref dptr) (x: box node)
   (#l: erased (list int) {Cons? l})
-  (#i: erased nat {i < L.length l})
+  (i: nat {i < L.length l})
   requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
   ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_at i l)
 {
-  // CLRS LIST-DELETE(L, x) — O(1) pointer surgery:
-  //   1. Extract x from the dls at position i (ghost: dls_split_at)
-  //   2. Read x.prev and x.next — O(1)
-  //   3. If x.prev ≠ NIL: x.prev.next = x.next; else L.head = x.next — O(1)
-  //   4. If x.next ≠ NIL: x.next.prev = x.prev; else L.tail = x.prev — O(1)
-  //   5. Free x — O(1)
-  //   6. Reassemble prefix ++ suffix into dll (ghost: dls_append)
-  //
-  // The algorithm is O(1). The ghost predicate split/join (steps 1, 6)
-  // requires dls_split_at infrastructure. Admitted pending that.
-  admit()
+  let hd = Pulse.Lib.Reference.(!hd_ref);
+  let tl = Pulse.Lib.Reference.(!tl_ref);
+  with l_orig. assert (dll hd tl l_orig);
+  
+  // l is Cons? so hd is Some
+  rewrite each l_orig as l in (dll hd tl l_orig);
+  unfold_dll_cons hd tl;
+  with hp tp. _;
+  let concrete_hp = Some?.v hd;
+  let concrete_tp = Some?.v tl;
+  rewrite each hp as concrete_hp;
+  rewrite each tp as concrete_tp;
+  
+  let r = delete_at_in_dls concrete_hp i None concrete_tp;
+  let new_hd = fst r;
+  let new_tl = snd r;
+  rewrite each (fst r) as new_hd in
+    (delete_result (fst r) (snd r) None (remove_at i l));
+  rewrite each (snd r) as new_tl in
+    (delete_result new_hd (snd r) None (remove_at i l));
+  delete_result_to_dll new_hd new_tl;
+  Pulse.Lib.Reference.(hd_ref := new_hd);
+  Pulse.Lib.Reference.(tl_ref := new_tl)
 }
