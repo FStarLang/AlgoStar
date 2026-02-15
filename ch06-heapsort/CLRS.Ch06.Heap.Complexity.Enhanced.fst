@@ -142,6 +142,8 @@ private let cancel_mul_div (a: nat) (b: pos) : Lemma ((a * b) / b = a) = lemma_d
 private let floor_mul_le (a: nat) (b: pos) (c: nat) : Lemma ((a / b) * c <= a * c / b) =
   lemma_div_mod a b; lemma_div_plus ((a % b) * c) ((a / b) * c) b
 
+#push-options "--z3rlimit 40"
+
 /// Scaling: pow2(H) * sum floor(n*h/2^h) <= n * weighted_pow2_sum(0,H)
 private let rec scaled_floor_sum_bound (n: pos) (h max_h: nat)
   : Lemma (requires h <= max_h + 1)
@@ -190,23 +192,17 @@ private let rec sum_bound_decomp (n: pos) (h max_h: nat)
   = if h > max_h then () else begin sum_bound_decomp n (h + 1) max_h; ceil_term_bound n h end
 
 /// Split sum: sum f 0 max_h = sum f 0 (max_h-1) + f(max_h)
-private let sum_split_last (f: nat -> nat) (max_h: nat{max_h > 0})
-  : Lemma (ensures sum_from_to f 0 max_h = sum_from_to f 0 (max_h - 1) + f max_h)
-          (decreases max_h)
-  = if max_h = 1 then ()
-    else begin
-      // sum f 0 max_h = f(0) + sum f 1 max_h
-      // sum f 0 (max_h-1) = f(0) + sum f 1 (max_h-1)
-      // So need: sum f 1 max_h = sum f 1 (max_h-1) + f(max_h)
-      sum_split_last_from f 1 max_h
-    end
-
-and sum_split_last_from (f: nat -> nat) (start: nat) (max_h: nat{max_h >= start /\ max_h > 0})
+private let rec sum_split_last_from (f: nat -> nat) (start: nat) (max_h: nat{max_h >= start /\ max_h > 0})
   : Lemma (ensures sum_from_to f start max_h = sum_from_to f start (max_h - 1) + f max_h)
           (decreases (max_h - start))
   = if start = max_h then ()
     else if start = max_h - 1 then ()
     else sum_split_last_from f (start + 1) max_h
+
+private let sum_split_last (f: nat -> nat) (max_h: nat{max_h > 0})
+  : Lemma (ensures sum_from_to f 0 max_h = sum_from_to f 0 (max_h - 1) + f max_h)
+  = if max_h = 1 then ()
+    else sum_split_last_from f 1 max_h
 
 /// Bound on correction: sum_{i=0}^{max_h} 2i = max_h*(max_h+1)
 private let rec sum_heapify_ops (max_h: nat)
@@ -252,6 +248,8 @@ let simple_sum_bound (n: pos) (h: nat)
     pow2_le_compat (log2_floor n) h;
     assert (pow2 h <= pow2 (log2_floor n));
     assert (pow2 (log2_floor n) <= n)
+
+#pop-options
 
 /// First, prove that sum_from_to of operations is bounded by a simpler expression
 let sum_height_ops_bound (n: pos) (max_h: nat)
@@ -435,13 +433,8 @@ let heapsort_better_than_quadratic (n: pos{n >= 11})
     end
     else begin
       // For 11 <= n < 16: log2_floor n = 3 for all these values
-      // heapsort_ops n <= 2n*3 + 4n = 10n
-      // Need: 10n < n^2, i.e., 10 < n, which holds for n >= 11
-      log2_floor_pow2 3;
-      log2_floor_monotonic 8 n;
-      log2_floor_pow2 4;
+      log2_floor_monotonic n 15;
+      assert_norm (log2_floor 15 = 3);
       log2_floor_upper_bound n 3;
-      // log2_floor n = 3, so bound is 6n + 4n = 10n
-      // 10n < n*n iff 10 < n, which holds since n >= 11
       ()
     end
