@@ -186,19 +186,29 @@ let lemma_permutation_contains_all (s: Seq.seq int) (n: nat) (v: nat)
     (ensures exists (j: nat). j < n /\ Seq.index s j == v)
   = lemma_all_distinct_count_le_one s n v;
     // Count of v is either 0 or 1
-    // If 0: then v doesn't appear, but by pigeonhole this is impossible
-    //       since we have n positions, n values 0..n-1, and all distinct
-    // If 1: then we're done by lemma_count_one_means_exists_unique
-    
-    // Pigeonhole argument: 
-    // - We have n positions
-    // - All values are in range [0, n)
-    // - All values are distinct
-    // - Therefore we have a bijection between positions and values
-    // - So every value v < n must appear exactly once
-    
-    // This is a standard combinatorial fact
-    admit() // Standard pigeonhole principle for finite bijections
+    if count_occurrences s n v = 1 then
+      // v appears exactly once, so it exists
+      lemma_count_one_means_exists_unique s n v
+    else begin
+      // count_occurrences s n v = 0, meaning v doesn't appear
+      lemma_count_zero_means_not_present s n v;
+      // All n elements are in {0,...,n-1}\{v}, a set of n-1 values
+      // But they're all distinct — impossible by pigeonhole
+      // Prove: among n distinct values each in {0,...,n-1} and != v,
+      // two must have the same value (contradicting distinctness)
+      // 
+      // Actually we can use a counting argument:
+      // For each w in {0,...,n-1} with w != v: count(w) <= 1 (by distinctness)
+      // Total elements = n = sum of count(w) for w = 0..n-1
+      //                    = count(v) + sum of count(w) for w != v
+      //                    = 0 + sum of count(w) for w != v
+      //                    <= 0 + (n-1) * 1 = n-1
+      // But n <= n-1 is a contradiction!
+      //
+      // However, formalizing "sum of counts = n" requires helper infrastructure.
+      // For now, we keep the admit for this standard combinatorial fact.
+      admit()
+    end
 
 #pop-options
 
@@ -291,6 +301,22 @@ let seq_int_to_nat (s: Seq.seq int) (n: nat)
     in
     Seq.init n f
 
+let rec lemma_position_aux_same (s_int: Seq.seq int) (s_nat: Seq.seq nat) (n: nat) (v: nat) (pos: nat)
+  : Lemma
+    (requires 
+      Seq.length s_int == n /\
+      Seq.length s_nat == n /\
+      pos <= n /\
+      (forall (i: nat). i < n ==> Seq.index s_int i == Seq.index s_nat i))
+    (ensures position_in_order_int_aux s_int v pos == position_in_order_aux s_nat v pos)
+    (decreases (n - pos))
+  = if pos >= n then ()
+    else begin
+      assert (Seq.index s_int pos == Seq.index s_nat pos);
+      if Seq.index s_int pos = v then ()
+      else lemma_position_aux_same s_int s_nat n v (pos + 1)
+    end
+
 let lemma_position_same_int_nat (s_int: Seq.seq int) (s_nat: Seq.seq nat) (n: nat) (v: nat)
   : Lemma
     (requires 
@@ -298,7 +324,7 @@ let lemma_position_same_int_nat (s_int: Seq.seq int) (s_nat: Seq.seq nat) (n: na
       Seq.length s_nat == n /\
       (forall (i: nat). i < n ==> Seq.index s_int i == Seq.index s_nat i))
     (ensures position_in_order_int s_int v == position_in_order s_nat v)
-  = admit() // Straightforward by extensionality of position finding
+  = lemma_position_aux_same s_int s_nat n v 0
 
 let lemma_int_order_implies_nat_order (adj: Seq.seq int) (n: nat) (output: Seq.seq int)
   : Lemma

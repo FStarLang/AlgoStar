@@ -319,9 +319,9 @@ let log_linear_bound (n: pos{n >= 16})
       ()
     end
 
-/// For n >= 8, heapsort beats naive O(n^2) sorting
-/// We use the tighter bound: 2n log n + 4n < n^2
-let heapsort_better_than_quadratic (n: pos{n >= 8})
+/// For n >= 11, heapsort beats naive O(n^2) sorting
+/// We use the bound: 2n log n + 4n < n^2 (valid when 2*log2_floor n + 4 < n)
+let heapsort_better_than_quadratic (n: pos{n >= 11})
   : Lemma (ensures heapsort_ops n < op_Multiply n n)
   = heapsort_practical_bound n;
     // From heapsort_practical_bound: heapsort_ops n <= 2n*log2_floor n + 4n
@@ -335,11 +335,14 @@ let heapsort_better_than_quadratic (n: pos{n >= 8})
       ()
     end
     else begin
-      // For 8 <= n < 16, the bound requires tighter analysis
-      // log2_floor n = 3 for all these values
+      // For 11 <= n < 16: log2_floor n = 3 for all these values
       // heapsort_ops n <= 2n*3 + 4n = 10n
-      // Need: 10n < n^2, i.e., 10 < n
-      // This holds for n >= 11, but proving it requires connecting
-      // multiple facts that SMT doesn't automatically link
-      admit() // For 8 <= n < 16, need tighter bound or case-by-case analysis
+      // Need: 10n < n^2, i.e., 10 < n, which holds for n >= 11
+      log2_floor_pow2 3;
+      log2_floor_monotonic 8 n;
+      log2_floor_pow2 4;
+      log2_floor_upper_bound n 3;
+      // log2_floor n = 3, so bound is 6n + 4n = 10n
+      // 10n < n*n iff 10 < n, which holds since n >= 11
+      ()
     end

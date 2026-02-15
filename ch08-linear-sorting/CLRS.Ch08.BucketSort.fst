@@ -62,8 +62,11 @@ let rec sorted_cons_mem (h: int) (t: list int) (y: int)
     | z :: zs -> if z = y then () else sorted_cons_mem h zs y
 
 /// Insert element into sorted list, maintaining sortedness
+/// Key property: result contains exactly the same elements as x :: xs
+#push-options "--fuel 2 --ifuel 2 --z3rlimit 30"
 let rec insert (x: int) (xs: list int{sorted xs}) 
-  : Tot (ys:list int{sorted ys /\ List.length ys == List.length xs + 1})
+  : Tot (ys:list int{sorted ys /\ List.length ys == List.length xs + 1 /\
+                      (forall y. List.mem y ys <==> (y = x \/ List.mem y xs))})
     (decreases xs)
   = match xs with
     | [] -> [x]
@@ -71,11 +74,15 @@ let rec insert (x: int) (xs: list int{sorted xs})
       if x <= h then x :: xs
       else (
         let r = insert x t in
-        let (z :: _) = r in
-        if List.mem z t then sorted_cons_mem h t z;
-        admit(); // Still needed: SMT can't connect the pieces
+        let (z :: r_tail) = r in
+        // z is in r, so z = x \/ mem z t (from IH on insert)
+        // If z = x: h <= x since x > h. Wait, x > h means h < x, so h <= z = x. ✓
+        // If mem z t: sorted (h::t) gives h <= z via sorted_cons_mem. ✓
+        if z <> x && List.mem z t then sorted_cons_mem h t z
+        else (); // z = x, and h < x (since not (x <= h))
         h :: r
       )
+#pop-options
 
 /// Insertion sort: sort list by repeated insertion
 let rec insertion_sort (xs: list int)

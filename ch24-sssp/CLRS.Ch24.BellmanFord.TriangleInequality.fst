@@ -105,41 +105,204 @@ let rec bf_k_rounds (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) (k: 
 
 (* ===== Stability Implies Triangle Inequality ===== *)
 
-(* Key lemma: If relaxing an edge doesn't change dist[v], then that edge satisfies triangle inequality *)
+(* ---- Monotonicity: relaxation only decreases distances ---- *)
+
+let relax_edge_monotone (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                        (u v: nat{u < n /\ v < n}) (i: nat{i < n})
+  : Lemma (ensures Seq.index (relax_edge dist weights u v) i <= Seq.index dist i)
+  = ()
+
+let rec relax_from_u_monotone (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                              (u: nat{u < n}) (v: nat) (i: nat{i < n})
+  : Lemma (ensures Seq.index (relax_from_u dist weights u v) i <= Seq.index dist i)
+          (decreases (n - v))
+  = if v >= n then ()
+    else (relax_edge_monotone dist weights u v i;
+          relax_from_u_monotone (relax_edge dist weights u v) weights u (v + 1) i)
+
+let rec relax_all_monotone (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                           (u: nat) (i: nat{i < n})
+  : Lemma (ensures Seq.index (relax_all dist weights u) i <= Seq.index dist i)
+          (decreases (n - u))
+  = if u >= n then ()
+    else (relax_from_u_monotone dist weights u 0 i;
+          relax_all_monotone (relax_from_u dist weights u 0) weights (u + 1) i)
+
+(* ---- Order preservation: pointwise-smaller input gives pointwise-smaller output ---- *)
+
+let relax_edge_order (#n: nat) (d1 d2: dist_vec n) (weights: weight_matrix n)
+                     (u v: nat{u < n /\ v < n}) (i: nat{i < n})
+  : Lemma (requires forall (j: nat{j < n}). Seq.index d1 j <= Seq.index d2 j)
+          (ensures Seq.index (relax_edge d1 weights u v) i <= Seq.index (relax_edge d2 weights u v) i)
+  = ()
+
+let rec relax_from_u_order (#n: nat) (d1 d2: dist_vec n) (weights: weight_matrix n)
+                           (u: nat{u < n}) (v: nat) (i: nat{i < n})
+  : Lemma (requires forall (j: nat{j < n}). Seq.index d1 j <= Seq.index d2 j)
+          (ensures Seq.index (relax_from_u d1 weights u v) i <= Seq.index (relax_from_u d2 weights u v) i)
+          (decreases (n - v))
+  = if v >= n then ()
+    else begin
+      let d1' = relax_edge d1 weights u v in
+      let d2' = relax_edge d2 weights u v in
+      let aux (j: nat{j < n}) : Lemma (Seq.index d1' j <= Seq.index d2' j)
+        = relax_edge_order d1 d2 weights u v j
+      in
+      FStar.Classical.forall_intro aux;
+      relax_from_u_order d1' d2' weights u (v + 1) i
+    end
+
+let rec relax_all_order (#n: nat) (d1 d2: dist_vec n) (weights: weight_matrix n)
+                        (u: nat) (i: nat{i < n})
+  : Lemma (requires forall (j: nat{j < n}). Seq.index d1 j <= Seq.index d2 j)
+          (ensures Seq.index (relax_all d1 weights u) i <= Seq.index (relax_all d2 weights u) i)
+          (decreases (n - u))
+  = if u >= n then ()
+    else begin
+      let d1' = relax_from_u d1 weights u 0 in
+      let d2' = relax_from_u d2 weights u 0 in
+      let aux (j: nat{j < n}) : Lemma (Seq.index d1' j <= Seq.index d2' j)
+        = relax_from_u_order d1 d2 weights u 0 j
+      in
+      FStar.Classical.forall_intro aux;
+      relax_all_order d1' d2' weights (u + 1) i
+    end
+
+(* ---- Stability decomposition: bf_round fixpoint => each relax_from_u is identity ---- *)
+
+(* Key lemma: If bf_round(dist) = dist, then relax_all(dist, u) = dist for all u <= n.
+   In particular, relax_from_u(dist, u, 0) = dist for each u.
+   
+   Proof by induction on u (ascending from 0).
+   relax_all(dist, 0) = relax_all(relax_from_u(dist, 0, 0), 1)   [unfolding, since 0 < n]
+   
+   By monotonicity: relax_from_u(dist, 0, 0) <= dist (pointwise).
+   By order-preservation: relax_all(relax_from_u(dist, 0, 0), 1) <= relax_all(dist, 1) (pointwise).
+   Also: relax_all(dist, 1) <= dist by monotonicity.
+   
+   But relax_all(relax_from_u(dist, 0, 0), 1) = relax_all(dist, 0) = dist.
+   So: dist = relax_all(relax_from_u(dist, 0, 0), 1) <= relax_from_u(dist, 0, 0) <= dist.
+   Hence relax_from_u(dist, 0, 0) = dist (pointwise).
+   
+   Then relax_all(dist, 1) = relax_all(relax_from_u(dist, 0, 0), 1) = relax_all(dist, 1) = dist.
+   Repeat for u = 1, 2, ...  *)
+
+let relax_all_stable_step (#n: pos) (dist: dist_vec n) (weights: weight_matrix n) (u: nat{u < n})
+  : Lemma
+    (requires Seq.equal (relax_all dist weights u) dist)
+    (ensures Seq.equal (relax_from_u dist weights u 0) dist /\
+             Seq.equal (relax_all dist weights (u + 1)) dist)
+  = let d' = relax_from_u dist weights u 0 in
+    // relax_all dist u = relax_all d' (u+1)  [unfolding since u < n]
+    assert (relax_all dist weights u == relax_all d' weights (u + 1));
+    // So relax_all d' (u+1) = dist
+    let squeeze (i: nat{i < n})
+      : Lemma (Seq.index d' i == Seq.index dist i)
+      = relax_from_u_monotone dist weights u 0 i;       // d'[i] <= dist[i]
+        relax_all_monotone d' weights (u + 1) i;          // (relax_all d' (u+1))[i] <= d'[i]
+        // dist[i] = (relax_all d' (u+1))[i] <= d'[i] <= dist[i]
+        ()
+    in
+    FStar.Classical.forall_intro squeeze;
+    Seq.lemma_eq_intro d' dist;
+    // Now: relax_all dist (u+1) = relax_all d' (u+1) = dist
+    ()
+
+let rec relax_all_fixpoint_decompose (#n: pos) (dist: dist_vec n) (weights: weight_matrix n) (u: nat{u < n})
+  : Lemma
+    (requires Seq.equal (relax_all dist weights 0) dist)
+    (ensures Seq.equal (relax_from_u dist weights u 0) dist /\
+             Seq.equal (relax_all dist weights (u + 1)) dist)
+    (decreases u)
+  = if u = 0 then
+      relax_all_stable_step dist weights 0
+    else begin
+      relax_all_fixpoint_decompose dist weights (u - 1);
+      // IH gives: relax_from_u(dist, u-1, 0) = dist AND relax_all(dist, u) = dist
+      relax_all_stable_step dist weights u
+    end
+
+(* ---- relax_from_u identity => each edge satisfies triangle inequality ---- *)
+
+(* relax_edge only modifies position v *)
+let relax_edge_other (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                     (u v: nat{u < n /\ v < n}) (i: nat{i < n /\ i <> v})
+  : Lemma (ensures Seq.index (relax_edge dist weights u v) i == Seq.index dist i)
+  = ()
+
+(* During relax_from_u(dist, u, 0), edges 0, 1, ..., v-1 are processed before edge v.
+   Since relax_edge(d, u, j) for j != v doesn't change position v,
+   the state at position v just before processing edge v equals dist[v]. *)
+let rec relax_from_u_preserves_before (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                      (u: nat{u < n}) (v_start: nat) (target: nat{target < n /\ target >= v_start})
+  : Lemma (ensures Seq.index (relax_from_u dist weights u v_start) target <=
+                   Seq.index (relax_edge dist weights u target) target)
+          (decreases (n - v_start))
+  = if v_start >= n then
+      relax_edge_monotone dist weights u target target
+    else if v_start = target then
+      // About to process edge target: relax_from_u dist u target = relax_from_u (relax_edge dist u target) u (target+1)
+      // Result at target <= (relax_edge dist u target) at target (by monotonicity of remaining steps)
+      relax_from_u_monotone (relax_edge dist weights u target) weights u (target + 1) target
+    else begin
+      // v_start < target: process edge v_start first, which doesn't change position target
+      let d' = relax_edge dist weights u v_start in
+      relax_edge_other dist weights u v_start target;
+      assert (Seq.index d' target == Seq.index dist target);
+      // relax_from_u dist u v_start = relax_from_u d' u (v_start + 1)
+      // By IH on d' from (v_start+1):
+      relax_from_u_preserves_before d' weights u (v_start + 1) target;
+      // relax_from_u d' u (v_start+1) at target <= relax_edge d' u target at target
+      // Since d'[target] = dist[target] and d'[u] depends on whether u = v_start or not:
+      // But relax_edge d' u target depends on d'[u] and d'[target].
+      // d'[target] = dist[target]. 
+      // d'[u]: if u != v_start, then d'[u] = dist[u], so relax_edge d' u target = relax_edge dist u target.
+      // if u = v_start, then d'[u] <= dist[u], so d'[u] + w <= dist[u] + w.
+      //   relax_edge d' u target: sets target to min(d'[target], d'[u]+w) = min(dist[target], d'[u]+w)
+      //   relax_edge dist u target: sets target to min(dist[target], dist[u]+w)
+      //   Since d'[u] <= dist[u]: d'[u]+w <= dist[u]+w
+      //   So min(dist[target], d'[u]+w) <= min(dist[target], dist[u]+w)
+      //   i.e., relax_edge d' u target at target <= relax_edge dist u target at target
+      // In either case: result <= relax_edge dist u target at target.
+      relax_edge_monotone dist weights u v_start u;
+      // d'[u] <= dist[u]
+      ()
+    end
+
+(* If relax_from_u(dist, u, 0) = dist at position v, then relax_edge(dist, u, v) = dist at position v *)
+let from_u_stable_implies_edge_stable (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                      (u: nat{u < n}) (v: nat{v < n})
+  : Lemma
+    (requires Seq.index (relax_from_u dist weights u 0) v == Seq.index dist v)
+    (ensures Seq.index (relax_edge dist weights u v) v == Seq.index dist v)
+  = relax_from_u_preserves_before dist weights u 0 v;
+    // (relax_from_u dist u 0)[v] <= (relax_edge dist u v)[v] 
+    // dist[v] = (relax_from_u dist u 0)[v] <= (relax_edge dist u v)[v] <= dist[v]
+    relax_edge_monotone dist weights u v v
+
+(* If relax_edge(dist, u, v) = dist at position v, then triangle inequality holds for edge (u,v) *)
 let stable_edge_satisfies_triangle (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
                                    (u v: nat{u < n /\ v < n})
   : Lemma
     (requires Seq.index (relax_edge dist weights u v) v == Seq.index dist v)
     (ensures edge_satisfies_triangle dist weights u v)
-  =
-  // relax_edge would update dist[v] to min(dist[v], dist[u] + w) if:
-  //   w < inf AND d_u < inf AND d_u + w < d_v
-  // If dist[v] doesn't change, then at least one condition fails:
-  //   w >= inf OR d_u >= inf OR d_u + w >= d_v
-  // This is exactly: (w < inf /\ d_u < inf) ==> d_v <= d_u + w
-  // Which is the triangle inequality for edge (u,v).
-  ()
+  = ()
 
-(* Theorem: If distances are stable (one more round changes nothing), then triangle inequality holds *)
-(* Note: The full proof requires showing that bf_round stability implies each relax_edge is stable.
-   This is technically tedious but conceptually straightforward: if the composition of operations
-   is identity, each individual operation must be identity. *)
+(* ---- Main theorem ---- *)
+
 let stable_distances_have_triangle (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
   : Lemma
     (requires Seq.equal (bf_round dist weights) dist)
     (ensures triangle_inequality dist weights)
-  =
-  (* Full proof sketch:
-     - bf_round = relax_all dist 0
-     - relax_all applies relax_from_u for each u
-     - relax_from_u applies relax_edge for each (u,v)
-     - If bf_round dist = dist, then each relax_edge must return its input unchanged
-     - By stable_edge_satisfies_triangle, each edge satisfies triangle inequality
-     - Therefore, triangle inequality holds for all edges.
-     
-     The detailed proof requires proving composition properties of relax operations,
-     which is tedious. The key insight is established above. *)
-  admit()
+  = if n = 0 then ()
+    else
+      let aux (u v: nat{u < n /\ v < n})
+        : Lemma (ensures edge_satisfies_triangle dist weights u v)
+        = relax_all_fixpoint_decompose dist weights u;
+          from_u_stable_implies_edge_stable dist weights u v;
+          stable_edge_satisfies_triangle dist weights u v
+      in
+      FStar.Classical.forall_intro_2 (FStar.Classical.move_requires_2 aux)
 
 (* Corollary: After k rounds, if one more round changes nothing, triangle inequality holds *)
 let bf_k_rounds_stable_implies_triangle (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) (k: nat)
@@ -154,7 +317,6 @@ let bellman_ford_stable_establishes_triangle (#n: nat) (dist: dist_vec n) (weigh
   : Lemma
     (requires 
       n >= 1 /\
-      // After n-1 rounds, one more round changes nothing (no negative cycle)
       Seq.equal (bf_k_rounds dist weights n) (bf_k_rounds dist weights (n - 1))
     )
     (ensures triangle_inequality (bf_k_rounds dist weights (n - 1)) weights)
@@ -162,37 +324,16 @@ let bellman_ford_stable_establishes_triangle (#n: nat) (dist: dist_vec n) (weigh
   bf_k_rounds_stable_implies_triangle dist weights (n - 1)
 
 (*
- * ===== Summary and Application to Pulse Implementation =====
- * 
- * In CLRS.Ch24.BellmanFord.fst (lines 272-336), the implementation performs
- * a "verification pass" that checks if any edge violates the triangle inequality.
- * 
- * Key results from this file:
+ * ===== Summary =====
  * 
  * 1. [no_violations_implies_triangle]
- *    The check "no edge can be relaxed" IS the triangle inequality.
- *    They are logically equivalent, not separate properties.
+ *    "No edge can be relaxed" is logically equivalent to triangle inequality.
  * 
- * 2. [stable_edge_satisfies_triangle]
- *    If relaxing an edge doesn't change anything, that edge satisfies
- *    the triangle inequality.
+ * 2. [stable_distances_have_triangle]
+ *    If bf_round is stable (fixpoint), triangle inequality holds.
+ *    Proof: stability => each relax_from_u is identity => each relax_edge is identity
+ *    => triangle inequality by contrapositive of relaxation condition.
  * 
- * 3. [stable_distances_have_triangle]
- *    If a full round of relaxation is stable (changes nothing), then
- *    all edges satisfy the triangle inequality.
- * 
- * 4. [bellman_ford_stable_establishes_triangle]
- *    After n-1 rounds with no negative cycle (stable), triangle inequality
- *    holds automatically.
- * 
- * Practical impact:
- * - The verification pass (lines 272-336) serves ONE purpose: negative cycle detection
- * - The triangle inequality follows automatically if the check passes
- * - No separate "prove triangle inequality" step needed in the postcondition reasoning
- * - The postcondition can simply state: (no_neg_cycle == true) ==> triangle_inequality
- *   and this follows from the verification pass by [no_violations_implies_triangle]
- * 
- * To fully remove the verification pass, we would need to prove that after n-1 rounds
- * with no negative cycles, distances automatically stabilize (CLRS Theorem 24.4,
- * convergence property). That proof requires the path-relaxation property and is more complex.
+ * 3. [bellman_ford_stable_establishes_triangle]
+ *    After n-1 rounds with no negative cycle, triangle inequality holds.
  *)

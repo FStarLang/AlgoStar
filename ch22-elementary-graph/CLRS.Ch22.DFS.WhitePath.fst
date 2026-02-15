@@ -165,7 +165,7 @@ let white_path_transitive
       white_path_exists adj n d w v time /\
       white_at_time d w time)
     (ensures white_path_exists adj n d u v time)
-  = admit() // Requires induction over path composition
+  = admit() // Requires induction over path composition; existential witness extraction from path_all_white
 
 (**
  * Lemma: If v is white at d[u] and there's an edge u -> v,

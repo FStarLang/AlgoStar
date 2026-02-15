@@ -79,6 +79,7 @@ let relax_edge (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
 let relax_edge_establishes_triangle (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
                                     (u v: nat{u < n /\ v < n})
   : Lemma
+    (requires u <> v)
     (ensures (
       let dist' = relax_edge dist weights u v in
       let d_u' = Seq.index dist' u in
@@ -86,13 +87,10 @@ let relax_edge_establishes_triangle (#n: nat) (dist: dist_vec n) (weights: weigh
       let w = Seq.index weights (u * n + v) in
       (w < inf /\ d_u' < inf) ==> d_v' <= d_u' + w))
   =
-  // TODO: This should be provable by unfolding relax_edge and Seq.upd
-  // The proof is straightforward:
-  //   - If relaxation happens: dist'[v] = dist[u] + w, which satisfies the inequality
-  //   - If no relaxation: either w >= inf or dist[u] >= inf (making antecedent false)
-  //     or dist[u] + w >= dist[v] (making consequent true)
-  // However, Z3 is having trouble with the Seq.upd reasoning
-  admit()
+  // When u <> v: dist'[u] = dist[u] (unchanged), dist'[v] = min(dist[v], dist[u]+w)
+  // If relaxed: d_v' = d_u + w = d_u' + w. QED.
+  // If not relaxed: d_v' = d_v <= d_u + w = d_u' + w (or antecedent is false). QED.
+  ()
 #pop-options
 
 (* Relax all edges from u to all other vertices *)
