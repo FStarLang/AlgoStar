@@ -1,690 +1,206 @@
-# AutoCLRS: Progress Plan — Full Functional Correctness & Complexity Analysis
+# AutoCLRS: Verified CLRS Algorithms in Pulse/F*
 
-**Goal:** For every algorithm, prove (1) functional correctness against a clean pure spec, and (2) complexity bounds via ghost tick counters in the postcondition.
+## Quick Reference
 
-**Complexity proof convention:** Each algorithm takes a `ghost_ctr: GR.ref nat` input. The postcondition asserts `GR.pts_to ghost_ctr (c0 + bound)` where `bound` is a formula on the input size (e.g., `n * (n - 1) / 2`).
-
-**Functional correctness convention:** The imperative code is proven equivalent to a pure, total, recursive specification function. E.g., `result == sort_spec input` or `dist_seq == dijkstra_spec weights n source`.
-
-### Build / Verify Commands
+### Build & Verify
 
 ```bash
-# Basic verification (most files)
 cd /home/nswamy/workspace/everest/AutoCLRS
+
+# Full build (all chapters, parallel)
+make -j128
+
+# Verify a single file
 fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common <file.fst>
 
 # Files needing chapter-level includes:
-#   ch08-linear-sorting:  --include ch08-linear-sorting
-#   ch09-order-statistics: --include ch09-order-statistics
-#   ch12-bst:             --include ch12-bst
-#   ch16-greedy:          --include ch16-greedy
-#   ch23-mst:             --include ch23-mst
-#   ch24-sssp:            --include ch24-sssp
-#   ch32-string-matching: --include ch32-string-matching
+#   --include ch08-linear-sorting    (RadixSort, CountingSort.Stable, BucketSort)
+#   --include ch09-order-statistics  (Select.Correctness, etc.)
+#   --include ch12-bst               (BST.Insert.Spec, BST.Delete.Spec)
+#   --include ch16-greedy            (Huffman.Complete)
+#   --include ch22-elementary-graph  (DFS.WhitePath, DFS.Spec, TopologicalSort)
+#   --include ch23-mst               (Kruskal.Spec, Prim.Spec, etc.)
+#   --include ch24-sssp              (Dijkstra.TriangleInequality, BellmanFord.Spec)
+#   --include ch32-string-matching   (KMP.StrengthenedSpec, RabinKarp.Spec)
 
-# Debugging
+# Debugging verification failures
 fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 ```
 
----
+### Conventions
 
-## Phase 0: Critical Failures — Fix Broken Algorithms
+- **Functional correctness**: Imperative code proven equivalent to a pure, total, recursive spec.
+  E.g., postcondition `result == sort_spec input` or `sorted s ∧ permutation s0 s`.
+- **Complexity proofs**: Ghost tick counter `ctr: GR.ref nat` threaded through Pulse code.
+  Postcondition asserts `GR.pts_to ctr (c0 + bound)` where `bound` is a formula on input size.
+  "**Linked**" = ghost ticks in Pulse code. "**Separate**" = pure F* analysis only, not connected.
+- **Graphs**: Adjacency matrix as flat `array int` of size `n*n`, `1000000` as infinity.
+- **Trees**: Array-backed with `left[i]`, `right[i]`, `color[i]`, `key[i]` arrays; `-1` as null.
+- **DLL**: True doubly-linked via DLS segment predicate (separation logic, box-allocated nodes).
 
-### P0.1 Max Flow (Ch26) — Currently a no-op
-- [x] P0.1.1: Define pure spec for residual graph — MaxFlow.Spec.fst: residual_capacity
-- [x] P0.1.2: Define pure BFS spec on residual graph — MaxFlow.Spec.fst: path definition
-- [x] P0.1.3: Define pure spec `bottleneck path flow cap` — MaxFlow.Spec.fst: bottleneck
-- [x] P0.1.4: Define pure spec `augment flow path bn` — MaxFlow.Spec.fst: augment
-- [x] P0.1.5: Implement BFS on residual graph in Pulse (using queue from Ch10 or array-based)
-- [x] P0.1.6: Implement augmentation loop: while BFS finds s-t path, augment flow
-- [x] P0.1.7: Prove loop invariant: `respects_capacities flow cap n` maintained after each augmentation
-- [x] P0.1.8: Prove loop invariant: `flow_conservation flow n source sink` maintained after each augmentation
-- [x] P0.1.9: Prove termination: integer flow value strictly increases each iteration (for integer capacities)
-- [x] P0.1.10: Prove postcondition: final flow satisfies capacity constraints + conservation
-- [x] P0.1.11: Add ghost tick counter; prove O(VE²) complexity for Edmonds-Karp (BFS-based)
-- [ ] P0.1.12: (Stretch) Prove max-flow min-cut theorem
+### Proof Techniques That Work
 
-### P0.2 BFS (Ch22) — ✅ Queue-based BFS implemented (CLRS.Ch22.QueueBFS.fst)
-- [x] P0.2.1: Define pure spec for shortest unweighted distance: `bfs_dist adj n source v = min steps for path s→v`
-- [x] P0.2.2: Implement proper queue-based BFS (inline array-based queue with q_head/q_tail)
-- [x] P0.2.3: Maintain `dist[]` and `pred[]` (predecessor) arrays
-- [x] P0.2.4: Prove invariant: when vertex v is dequeued, `dist[v] = δ(s,v)` (shortest path distance) — BFS.DistanceSpec.fst (spec, key lemmas admitted)
-- [x] P0.2.5: Prove postcondition: `dist[v] == bfs_dist adj n source v` for all v — bfs_correctness theorem in BFS.DistanceSpec.fst
-- [x] P0.2.6: Prove postcondition: source visited, dist[source]=0, distance soundness
-- [x] P0.2.7: Add ghost tick counter; prove O(V²) complexity — CLRS.Ch22.QueueBFS.Complexity.fst
+- **FiniteSet algebra** (BST): `FStar.FiniteSet.Base` with `FS.all_finite_set_facts_lemma()`.
+  Discharges set equality for tree insert/delete key-set proofs.
+- **Queue/stack validity invariants** (Graph algos): `forall i. i in range ==> element < n`.
+- **strong_valid_state pattern** (DFS): Bidirectional color↔timestamp invariant.
+- **Ghost tick via GhostReference**: `tick ctr` increments counter; postcondition bounds it.
 
-### P0.3 DFS (Ch22) — ✅ Stack-based DFS implemented (CLRS.Ch22.StackDFS.fst)
-- [x] P0.3.1: Define pure spec for DFS visit order with timestamps: `dfs_spec adj n source` returning `(discovery, finish, pred)` sequences
-- [x] P0.3.2: Implement iterative DFS with explicit stack and scan_idx[] tracking
-- [x] P0.3.3: Maintain `color[]` (white/gray/black), `d[]` (discovery time), `f[]` (finish time), `pred[]`
-- [x] P0.3.4: Prove parenthesis theorem: for all u,v, intervals [d[u],f[u]] and [d[v],f[v]] are either nested or disjoint
-- [x] P0.3.5: Prove white-path theorem — DFS.WhitePath.fst (CLRS Theorem 22.9)
-- [x] P0.3.6: Classify edges (tree, back, forward, cross) based on colors at discovery time
-- [x] P0.3.7: Add ghost tick counter; prove O(V²) complexity — StackDFS.Complexity.fst
+### Pitfalls to Avoid
 
-### P0.4 Linked List (Ch10) — ⚠️ SINGLY-LINKED, MUST REDO AS TRUE DLL
-
-**Diagnosis (critical):** The current `CLRS.Ch10.DoublyLinkedList.fst` is a
-singly-linked list mislabelled as doubly-linked. The `node` type has no `prev`
-field. `LIST-DELETE` takes a key (not a pointer) and does O(n) search.
-`LIST-SEARCH` returns `bool` instead of a node pointer. None of the CLRS
-`prev`-pointer manipulations are present. Must be reimplemented using the
-**DLS segment predicate** approach.
-
-**Approach — Doubly-Linked Segment Predicate (`dls`):**
-
-The ownership challenge: node A owns B via `next`, but B points back to A
-via `prev`. A naïve recursive predicate double-counts ownership. The standard
-separation-logic solution is a **DLS segment** that externalises the boundary
-pointers:
-
-```
-dls(head, headprev, tail, tailnext, l) :=
-  match l with
-  | []  → pure (head == tailnext ∧ ...)
-  | [k] → ∃ p. head == Some p ∗ pts_to p {key=k; prev=headprev; next=tailnext}
-              ∧ tail == Some p
-  | k :: rest → ∃ p nxt.
-      head == Some p ∗
-      pts_to p {key=k; prev=headprev; next=nxt} ∗
-      dls(nxt, Some p, tail, tailnext, rest)
-```
-
-A full DLL is `dls(L.head, None, L.tail, None, l)` — head.prev=None, tail.next=None.
-Each node has unique ownership; `prev` consistency is structural, not a separate
-invariant. Reference: FStar's `examples/doublylinkedlist/DoublyLinkedList.fst`
-uses `nodelist_conn` with `flink`/`blink` in LowStar; we adapt to Pulse `box`.
-
-**Prior work (singly-linked, kept for reference):**
-- [x] P0.4.1: ~~Design Pulse representation~~ (singly-linked only; to be superseded)
-- [x] P0.4.2: ~~Implement LIST-INSERT~~ (no prev updates; to be superseded)
-- [x] P0.4.3: ~~Implement LIST-SEARCH~~ (returns bool, not pointer; to be superseded)
-- [x] P0.4.4: ~~Implement LIST-DELETE~~ (takes key, not pointer; to be superseded)
-- [x] P0.4.5: ~~Define pure spec~~ (singly-linked spec; to be superseded)
-- [x] P0.4.6: ~~Prove L.mem correctness~~ (still valid for search)
-- [x] P0.4.7: Add ghost tick counter — DoublyLinkedList.Complexity.fst
-
-**Step 0 — Housekeeping:**
-- [x] P0.4.8: Rename `CLRS.Ch10.DoublyLinkedList.fst` → `CLRS.Ch10.SinglyLinkedList.fst`
-
-**Step 1 — Node type with `prev` (file: `CLRS.Ch10.DLL.fst`):**
-- [x] P0.4.9: Define node type with prev: `noeq type node = { key: int; prev: dptr; next: dptr }` and `let dptr = option (box node)`
-
-**Step 2 — DLS segment predicate and ghost helpers:**
-- [x] P0.4.10: Define `dls` segment predicate (adapted from Pulse.Lib.Deque.is_deque_suffix)
-- [x] P0.4.11: Define full-list wrapper: `dll (hd tl: dptr) (l: list int) : slprop`
-- [x] P0.4.12: Ghost helpers: factor_dls, unfactor_dls, dll_none_nil, dll_some_cons, set_prev, fold_dls_cons
-- [x] P0.4.13: Prove `dls_append`: given two adjacent segments, produce `dls h1 hp1 t2 tn2 (l1 @ l2)`
-
-**Step 3 — LIST-SEARCH(L, k) (CLRS lines 1–4):**
-- [x] P0.4.14: Implement `search_dls` recursive traversal (returns bool, 4 assumes for ghost structure)
-- [x] P0.4.15: Prove search correctness: `found ⟺ L.mem k l` (with assumes for singleton/multi-element lemmas)
-
-**Step 4 — LIST-INSERT(L, x) with prev updates (CLRS lines 1–5):**
-- [x] P0.4.16: Implement `list_insert (hd_ref tl_ref: ref dptr) (x: int)` mutating L.head in-place
-- [x] P0.4.17: Prove postcondition: `dll hd' tl' (x :: old_l)` (0 assumes in insert itself)
-
-**Step 5 — LIST-DELETE(L, k) search + delete (O(n)):**
-- [x] P0.4.18: Implement `delete_in_dls` recursive traversal (5 admits for ghost wrapping)
-- [x] P0.4.19: Implement `list_delete (hd_ref tl_ref: ref dptr) (k: int)` — search + delete
-- [x] P0.4.20: Define `remove_first` pure spec; prove postcondition: `dll hd' tl' (remove_first k l')`
-- [x] P0.4.21: Reduce admits in delete_in_dls (DONE: 0 admits!) (ghost dls↔dll wrapping with erased lists)
-
-**Step 6 — O(1) pointer-based delete (stretch):**
-- [x] P0.4.22: Modify LIST-SEARCH to return pointer instead of bool
-- [~] P0.4.23: Define `dls_split_at` ghost helper: split `dll` around pointer `x` (NOT YET DONE — needed for P0.4.24)
-- [x] P0.4.24: Implement `list_delete_node (hd_ref tl_ref: ref dptr) (x: box node)` — O(1) splice (SPEC CORRECT, 1 admit for ghost split pending P0.4.23)
-
-**Step 7 — Complexity and wrap-up:**
-- [x] P0.4.25: Ghost tick counter: LIST-INSERT = O(1), LIST-DELETE-by-key = O(n), LIST-SEARCH = O(n)
-- [x] P0.4.26: Tighten `list_insert` postcondition — same existential `l` in pre and post (was fresh `old_l`)
-- [x] P0.4.27: Tighten `list_delete` postcondition — same existential `l` in pre and post (was fresh `l'`)
-
-### P0.5 BST (Ch12) — ✅ DELETE, MINIMUM, MAXIMUM implemented (CLRS.Ch12.BST.Delete.fst)
-- [x] P0.5.1: Implement TREE-MINIMUM(x): walk left children until x.left == NIL (CLRS §12.2)
-- [x] P0.5.2: Implement TREE-MAXIMUM(x): walk right children until x.right == NIL (CLRS §12.2)
-- [x] P0.5.3: Implement TRANSPLANT(T, u, v): N/A for array representation, handled inline in TREE-DELETE
-- [x] P0.5.4: Implement TREE-DELETE(T, z): all 3 cases — no children, one child, two children (CLRS §12.3)
-- [x] P0.5.5: Prove BST property maintained after TREE-DELETE — bst_delete_valid in BST.Spec.Complete.fst
-- [x] P0.5.6: Prove key set after delete = old keys minus deleted key
-- [x] P0.5.7: Add ghost tick counter: O(h) for all operations — BST.Spec.Complexity.fst
-
-### P0.6 Red-Black Tree (Ch13) — Missing RB invariants and fixup
-- [x] P0.6.1: Define pure spec for RB tree as inductive type: `rbtree = Leaf | Node color left key right`
-- [x] P0.6.2: Define RB invariants: (a) root is black, (b) red nodes have black children, (c) all paths have equal black-height, (d) BST ordering
-- [x] P0.6.3: Define pure `rb_insert_spec tree key` returning the balanced tree after insertion (Okasaki-style balance with 4 rotation cases)
-- [x] P0.6.4: Implement proper BST insert (find correct position by walking tree) in Pulse
-- [ ] P0.6.5: Implement RB-INSERT-FIXUP with all 6 cases (3 + 3 symmetric) in Pulse
-- [x] P0.6.6: Prove RB invariants maintained after insert+fixup (pure spec: `insert_is_rbtree`)
-- [x] P0.6.7: Prove BST ordering maintained after insert+fixup (pure spec: `insert_preserves_bst`)
-- [x] P0.6.8: Prove black-height is O(log n); height ≤ 2·lg(n+1) (pure spec: `height_bound_theorem`, CLRS Theorem 13.1)
-- [x] P0.6.9: Add ghost tick counter; prove O(log n) for search and insert
-- [ ] P0.6.10: (Stretch) Implement RB-DELETE and RB-DELETE-FIXUP
+- Agents replacing `admit()` with `assume val` don't reduce the real admit count.
+- z3rlimit > 100 causes timeouts. Keep ≤ 50.
+- `--admit_smt_queries true` hides real failures — never use.
+- Removing `rec` can break SMT encoding (3 known cases in Select.Spec).
+- Strengthening preconditions cascades to all callers — requires full invariant propagation.
 
 ---
 
-## Phase 1: Fix Major Shortcuts
+## Current Status (2025-02-15)
 
-### P1.1 Select (Ch09) — Replace selection sort with quickselect
-- [x] P1.1.1: Define pure spec: `select_spec s k = Seq.index (sort s) k`
-- [x] P1.1.2: Implement RANDOMIZED-SELECT using partition from Ch07
-- [x] P1.1.3: Prove postcondition: result == select_spec input k — Select.Correctness.fst
-- [x] P1.1.4: Prove invariant: after partition, target is in one of the two halves
-- [x] P1.1.5: Add ghost tick counter; prove O(n²) worst-case — Select.Complexity.Enhanced.fst (1 admit in helper)
-- [ ] P1.1.6: (Stretch) Implement median-of-medians SELECT with O(n) worst case
+**167 F* files, ~49K lines, 155 admits across 38 files, `make -j128` clean (0 warnings, 0 errors)**
 
-### P1.2 Radix Sort (Ch08) — Implement multi-digit version *(d=1 documented)*
-- [x] P1.2.1: Define pure spec for digit extraction: `digit k d base = (k / base^d) % base`
-- [x] P1.2.2: Define stable sort spec: elements with equal keys maintain relative order
-- [x] P1.2.3: Implement RADIX-SORT with d passes — RadixSort.MultiDigit.fst
-- [x] P1.2.4: Prove each pass maintains relative order of elements with equal digit values (stability)
-- [x] P1.2.5: Prove final array is sorted by full key value
-- [x] P1.2.6: Prove permutation of input — RadixSort.MultiDigit.fst (fully proven)
-- [x] P1.2.7: Add ghost tick counter; prove O(d(n+k)) complexity
-- [x] P1.2.8: Updated documentation to honestly describe d=1 limitation and CLRS multi-pass structure
+### Per-Algorithm Status Table
 
-### P1.3 Huffman Coding (Ch16) — Implement actual tree construction
-- [x] P1.3.1: Define inductive Huffman tree type: `htree = Leaf freq char | Internal freq left right`
-- [x] P1.3.2: Define pure spec for Huffman cost: weighted path length
-- [x] P1.3.3: Implement priority-queue-based Huffman tree construction (pure F* via sorted list) (CLRS §16.3)
-- [x] P1.3.4: Prove tree is a valid binary tree with all characters at leaves — Huffman.Complete.fst (prefix-free code property)
-- [x] P1.3.5: Prove weighted path length equals accumulated cost (CLRS Eq 16.4)
-- [x] P1.3.6: Prove greedy choice property: merging two minimum-frequency trees is optimal
-- [x] P1.3.7: Prove optimal substructure: subtrees of optimal tree are optimal for their character sets
-- [x] P1.3.8: Add ghost tick counter; prove O(n²) with sorted-list priority queue — Huffman.Complexity.fst (1 admit in helper)
+| Ch | Algorithm | CLRS § | Func. Spec | Complexity | Admits | Notes |
+|----|-----------|--------|------------|------------|--------|-------|
+| 02 | Insertion Sort | §2.1 | ✅ sorted ∧ perm | ✅ Linked O(n²) | 0 | |
+| 02 | Merge Sort | §2.3 | ✅ sorted ∧ perm | ⚠️ Separate O(n lg n) | 0 | |
+| 04 | Binary Search | §2.3 | ✅ found⟹match, ¬found⟹∉ | ✅ Linked O(lg n) | 0 | |
+| 04 | MaxSubarray (Kadane) | — | ✅ result=spec | ✅ Linked O(n) | 0 | ⚠️ Not CLRS; rename pending |
+| 04 | MaxSubarray D&C | §4.1 | ⚠️ 1 axiom | ⚠️ Separate O(n lg n) | 1 | Pure F* only |
+| 06 | Heapsort | §6.4 | ✅ sorted ∧ perm | ⚠️ Separate O(n lg n) | 0 | |
+| 07 | Partition (Lomuto) | §7.1 | ✅ partitioned ∧ perm | ✅ Linked O(n) | 0 | |
+| 07 | Quicksort | §7.1 | ✅ sorted ∧ perm | ⚠️ Separate O(n²) | 0 | |
+| 08 | CountingSort | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate O(n+k) | 0 | In-place (not CLRS 4-phase) |
+| 08 | CountingSort.Stable | §8.2 | ⚠️ assumed postcond | ⚠️ Separate | 4 | CLRS 4-phase, stability unproven |
+| 08 | RadixSort (d=1) | §8.3 | ✅ sorted ∧ perm | ⚠️ Separate Θ(d(n+k)) | 0 | d=1 only |
+| 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 4 | Pure F* only |
+| 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 2 | |
+| 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
+| 09 | Select (partial sort) | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 6 | ⚠️ Not CLRS; rename pending |
+| 09 | Quickselect | §9.2 | ✅ perm ∧ result=s[k] | ⚠️ Separate O(n²) | 0 | |
+| 10 | Stack | §10.1 | ✅ ghost list LIFO | ⚠️ Separate O(1) | 0 | |
+| 10 | Queue | §10.1 | ✅ ghost list FIFO | ⚠️ Separate O(1) | 0 | |
+| 10 | DLL | §10.2 | ✅ DLS segment pred | ✅ Linked | 1 | O(1) delete-node: ghost admit |
+| 11 | HashTable | §11.4 | ✅ key_in_table | ✅ Linked O(n) | 0 | |
+| 12 | BST Search/Min/Max | §12.2 | ✅ correct search | ✅ Linked O(h) | 0 | |
+| 12 | BST Insert | §12.3 | ⚠️ membership only | ⚠️ Separate O(h) | 3 | ⚠️ Doesn't walk BST path |
+| 12 | BST Delete | §12.3 | ✅ key_set \ {k} | ✅ Linked O(h) | 0 | FiniteSet algebra |
+| 13 | RBTree (Pulse) | §13.1–4 | ❌ BROKEN | — | 0 | No fixup/rotations/BST path |
+| 13 | RBTree.Spec (pure) | §13.1–4 | ✅ Okasaki balance | ✅ Linked O(lg n) | 0 | Correct but not Pulse |
+| 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
+| 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
+| 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | 1 assume val in Spec |
+| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 9 | Optimality unproven |
+| 16 | Huffman (cost only) | §16.3 | ❌ no tree built | ✅ Linked (cost) | 2 | No tree/PQ |
+| 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 0 | Disconnected from Pulse |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 5 | One-step compress |
+| 22 | BFS (iterative) | — | ⚠️ reachability only | — | 0 | ⚠️ Not queue-based; rename pending |
+| 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 | d[v]=δ(s,v) not proven |
+| 22 | DFS (iterative) | — | ⚠️ reachability only | — | 0 | ⚠️ Not stack-based; rename pending |
+| 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 26 | Parenthesis thm admitted |
+| 22 | TopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 3 | ⚠️ Kahn's; rename pending |
+| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 13 | Distance, timestamps, white-path |
+| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 22 | Cut property admitted |
+| 23 | Prim | §23.2 | ⚠️ not MST | ✅ Linked O(n²) | 9 | MST correctness admitted |
+| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 5 | |
+| 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 3 | d[v]=δ(s,v) not proven |
+| 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
+| 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
+| 26 | MaxFlow | §26.2 | ❌ STUB | — | 0 | Stretch goal |
+| 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
+| 28 | Strassen | §28.2 | ⚠️ 1 structural admit | ⚠️ Separate | 1 | Pure F* |
+| 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
+| 31 | ExtendedGCD | §31.2 | ✅ Bézout identity | — | 0 | Pure F* |
+| 31 | ModExp | §31.6 | ✅ (b^e)%m | ✅ Linked O(lg e) | 0 | |
+| 32 | NaiveStringMatch | §32.1 | ✅ all matches | ✅ Linked O(nm) | 0 | |
+| 32 | KMP | §32.4 | ✅ prefix + matcher | ✅ Linked O(n+m)* | 7 | *Amortized admits |
+| 32 | RabinKarp | §32.2 | ✅ rolling hash | ⚠️ Separate O(nm) | 3 | Sum hash, not polynomial |
+| 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
+| 35 | VertexCover | §35.1 | ✅ valid cover | ⚠️ Separate O(V²) | 1 | 2-approx: 1 admit |
 
-### P1.4 BST Insert (Ch12) — ⚠️ See also P0.5 for missing DELETE/MIN/MAX/TRANSPLANT
-- [x] P1.4.1: Added `subtree_in_range` (recursive BST with bounds) and `key_in_subtree` specs
-- [x] P1.4.2: Proved BST stepping lemmas (key_not_in_right_if_less, key_not_in_left_if_greater)
-- [x] P1.4.3: Prove BST property maintained after insert (needs ghost bounds in loop invariant)
-- [x] P1.4.4: Prove set of keys is `old_keys ∪ {new_key}`
-- [x] P1.4.5: Add ghost tick counter; prove O(h) where h is tree height
-- [x] P1.4.6: ~~Implement TREE-DELETE (CLRS §12.3)~~ → Done as P0.5.4
-- [x] P1.4.7: ~~Prove BST property maintained after delete~~ → Done as P0.5.5
+### Admit Distribution
 
-### P1.5 KMP Matcher (Ch32) — Complete the search
-- [x] P1.5.1: Define pure spec for KMP match positions: `matches_at`, `check_match_at`, `count_matches_spec`
-- [x] P1.5.2: Implement KMP-MATCHER using the existing prefix function (inner failure-link loop + match counting)
-- [x] P1.5.3: Strengthen postcondition to prove match count equals `count_matches_spec`
-- [x] P1.5.4: Add ghost tick counter; prove O(n + m) complexity — CLRS.Ch32.KMP.Complexity.fst
-
----
-
-## Phase 2: Strengthen Existing Proofs — Functional Correctness
-
-### P2.1 Bellman-Ford (Ch24) — Prove from relaxation invariants
-- [x] P2.1.1: Define pure shortest-path spec: `sp_dist weights n s v = minimum weight path from s to v` (or infinity)
-- [x] P2.1.2: Prove upper-bound property: `dist[v] ≥ δ(s,v)` at all times (Lemma 24.11)
-- [x] P2.1.3: Prove convergence: after i rounds, dist[v] correct for all v reachable in ≤ i edges (Lemma 24.2)
-- [x] P2.1.4: Prove triangle inequality as consequence of relaxation (not post-verification pass)
-- [x] P2.1.5: Remove the separate triangle-inequality verification pass
-- [x] P2.1.6: Prove postcondition (upper bound): `no_neg_cycle ⟹ dist[v] <= sp_dist weights n s v`
-- [x] P2.1.7: Prove negative-cycle detection correctness
-
-### P2.2 Dijkstra (Ch24) — Prove from greedy invariants
-- [x] P2.2.1: Define pure spec (same `sp_dist` as Bellman-Ford, restricted to non-negative weights)
-- [x] P2.2.2: Prove greedy choice invariant: when u is extracted from queue, `dist[u] == δ(s,u)` (CLRS Theorem 24.6)
-- [x] P2.2.3: Prove triangle inequality from relaxation
-- [x] P2.2.4: Remove separate triangle-inequality verification pass
-- [x] P2.2.5: Prove postcondition (upper bound): `dist[v] <= sp_dist weights n s v`
-
-### P2.3 Kruskal (Ch23) — Prove MST property
-- [x] P2.3.1: Define pure MST spec: spanning tree T of G with minimum total weight (MST.Spec.fst)
-- [x] P2.3.2: Sort edges by weight (implement or assume pre-sorted)
-- [x] P2.3.3: Prove safe-edge property (cut property): lightest edge crossing a cut is in some MST (Theorem 23.1 statement + exchange argument sketch, 5 admits in hard graph theory)
-- [x] P2.3.4: Prove postcondition: result is a spanning tree
-- [x] P2.3.5: Prove postcondition: result has minimum total weight among spanning trees
-- [x] P2.3.6: Add ghost tick counter; prove O(V³) — Kruskal.Complexity.fst
-
-### P2.4 Prim (Ch23) — Prove MST property
-- [x] P2.4.1: Prove safe-edge property: minimum-weight edge connecting tree to non-tree vertex is safe
-- [x] P2.4.2: Prove postcondition: result is a spanning tree
-- [x] P2.4.3: Prove postcondition: result has minimum total weight
-- [x] P2.4.4: Add ghost tick counter; prove O(V²) for adjacency matrix — Prim.Complexity.fst
-
-### P2.5 Topological Sort (Ch22) — Prove ordering property *(Documented)*
-- [x] P2.5.1: Define pure spec: `is_topological_order adj n order ⟺ ∀ (u,v) ∈ E, pos(u) < pos(v)`
-- [x] P2.5.2: Prove Kahn's algorithm produces a valid topological order
-- [x] P2.5.3: Documented postcondition limitations and proof strategy (visited array, distinctness, ordering)
-- [x] P2.5.4: Add ghost tick counter; prove O(V²) — TopologicalSort.Complexity.fst
-- [ ] P2.5.5: (Stretch) Implement DFS-based topological sort and prove equivalence
-
-### P2.6 Activity Selection (Ch16) — Prove optimality *(Greedy Choice done)*
-- [x] P2.6.1: Defined `is_valid_selection` predicate for compatible activity selections
-- [x] P2.6.2: Proved greedy choice property: replacing first activity with earliest-finishing yields valid selection (CLRS Theorem 16.1)
-- [x] P2.6.3: Prove optimal substructure: after removing first choice, remaining problem has optimal substructure
-- [x] P2.6.4: Prove full optimality: `|selected| == max_compatible_set start finish n`
-
-### P2.7 Vertex Cover (Ch35) — Prove approximation ratio
-- [x] P2.7.1: Define pure spec: `min_vertex_cover adj n` = minimum cardinality vertex cover
-- [x] P2.7.2: Prove output is a valid vertex cover (already done)
-- [x] P2.7.3: Prove `|cover| ≤ 2 * min_vertex_cover adj n` (CLRS Theorem 35.1)
-- [x] P2.7.4: Key lemma: the algorithm picks a maximal matching; each matching edge contributes 2 vertices, each optimal cover must include ≥ 1 vertex per matching edge
-
-### P2.8 Union-Find (Ch21) — Add path compression and rank *(Mostly Completed)*
-- [x] P2.8.1: Added `find_compress` with one-step path compression (parent[x] = root)
-- [x] P2.8.2: Fixed union-by-rank: rank increment on equal-rank merge (CLRS line 5-6)
-- [x] P2.8.3: Prove rank invariants: rank[x] ≤ rank[parent[x]] when x is not root
-- [x] P2.8.4: Prove tree height ≤ rank ≤ ⌊log n⌋
-- [x] P2.8.5: Full path compression (all nodes on path → root) — CLRS.Ch21.UnionFind.FullCompress.fst
-- [ ] P2.8.6: (Stretch) Prove amortized O(α(n)) per operation
-
-### P2.9 Hash Table (Ch11) — Strengthen functional abstraction
-- [x] P2.9.1: Define pure `map` spec: `ht_spec table = Map from key to option value`
-- [x] P2.9.2: Prove `insert key val; search key == Some val`
-- [x] P2.9.3: Prove `search key == None` when key not inserted
-- [x] P2.9.4: Add ghost tick counter; prove O(n) per operation — HashTable.Complexity.fst
-
-### P2.10 Linked List (Ch10) — ⚠️ SUPERSEDED by P0.4 (must rewrite as proper doubly-linked list)
-- [x] P2.10.1: ~~Implement LIST-DELETE~~ — N/A, current impl is array-backed, not a linked list
-- [x] P2.10.2: ~~Prove list contents~~ — N/A, needs rewrite
-- [x] P2.10.3: ~~Add ghost tick counter~~ — done via P0.4.7 (DoublyLinkedList.Complexity.fst)
+| Chapter | Admits | Top files |
+|---------|--------|-----------|
+| ch22 (graphs) | 53 | StackDFS(11+15), QueueBFS(4+7), DFS.Spec(5), BFS.DistSpec(5), WhitePath(3), TopSort(3) |
+| ch23 (MST) | 36 | Kruskal.Spec(15), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(4), EdgeSort(2), Prim.Cmplx(2), main(2) |
+| ch08 (sorting) | 24 | RadixSort.FullSort(8), CS.Stable(4), RS.MultiDigit(4), RS.Stability(4), BucketSort(2), RS.Spec(2) |
+| ch16 (greedy) | 11 | ActivitySelection.Spec(9), Huffman.Complete(2) |
+| ch32 (strings) | 6 | KMP.Complexity(3), RabinKarp.Spec(3) |
+| ch24 (SSSP) | 6 | BellmanFord.Spec(3), Dijkstra.TriIneq(3) |
+| ch09 (select) | 6 | Select.Correctness(6) |
+| ch21 (UF) | 5 | UnionFind.Spec(4), RankBound(1) |
+| ch12 (BST) | 3 | BST.Insert.Spec(3) |
+| Other | 5 | MaxSubarray.DC(1), DLL(1), RodCutting.Spec(1), Strassen(1), VertexCover.Spec(1) |
+| **Total** | **155** | |
 
 ---
 
-## Phase 3: Add Missing Complexity Proofs
-
-### P3.1 MergeSort O(n log n) *(Pure proof completed)*
-- [x] P3.1.1: Pure proof of T(n) ≤ 4n(log₂ n + 1) via recurrence analysis
-- [x] P3.1.2: Defined merge_sort_comparisons recurrence and log2_ceil
-- [x] P3.1.3: Thread ghost tick counter through Pulse merge_sort_aux and merge_impl
-- [x] P3.1.4: Connect Pulse implementation to pure recurrence bound
-
-### P3.2 Heapsort O(n log n) *(Pure proof completed)*
-- [x] P3.2.1: Pure proof of heapsort_comparisons ≤ 2n(1 + log₂ n)
-- [x] P3.2.2: Proved log2_floor monotonicity and tight bounds
-- [x] P3.2.3: Proved extract_max_comparisons ≤ 2n·log₂ n
-- [x] P3.2.4: Thread ghost tick counter through Pulse max_heapify and heapsort
-
-### P3.3 Quicksort O(n²) worst case *(Pure proof completed)*
-- [x] P3.3.1: Add ghost tick counter to partition (CLRS.Ch07.Partition.Complexity.fst) — proves exactly n comparisons
-- [x] P3.3.2: Proved worst_case_comparisons n = n(n-1)/2 (CLRS Theorem 7.4)
-- [x] P3.3.3: Proved sum_of_parts_bound: T(a)+T(b) ≤ T(a+b) (convexity)
-- [x] P3.3.4: Proved maximality: for ANY partition split k, total ≤ T(n)
-- [x] P3.3.5: Thread tick counter through recursive quicksort Pulse code
-
-### P3.4 Matrix Chain O(n³) ✓ COMPLETED
-- [x] P3.4.1: Pure proof: mc_inner_sum computes Σ_{l=2}^{n} (n-l+1)(l-1)
-- [x] P3.4.2: Proved term_bound: each (n-l+1)(l-1) ≤ n²
-- [x] P3.4.3: Proved mc_iterations_bound: total ≤ (n-1)·n² ≤ n³
-
-### P3.5 GCD — Tighten to O(log min(a,b)) ✓ COMPLETED
-- [x] P3.5.1: Proved two-step halving bound (Lamé's theorem): after 2 steps b ≤ b/2
-- [x] P3.5.2: Proved lemma_mod_le_half: a%b ≤ a/2 when a ≥ b
-- [x] P3.5.3: Proved gcd_steps(a,b) ≤ 2·num_bits(b) + 1 ∈ O(log b)
-
-### P3.6 Rabin-Karp — Add complexity proof ✓ COMPLETED
-- [x] P3.6.1: Proved best case O(n+m): rk_best_case ≤ n+1
-- [x] P3.6.2: Proved worst case O(nm): rk_worst_case ≤ nm+1
-- [x] P3.6.3: Proved best_le_worst (best case never exceeds worst case)
-
-### P3.7 KMP — Add complexity proof ✓ COMPLETED
-- [x] P3.7.1: Proved prefix function O(m): ≤ 2(m-1) comparisons via amortized potential
-- [x] P3.7.2: Proved matcher O(n): ≤ 2n comparisons
-- [x] P3.7.3: Proved total O(n+m): kmp_total ≤ 2(n+m) (CLRS Theorem 32.4)
-- [x] P3.7.4: Proved KMP beats naive: ≤ 4n when m ≤ n
-
-### P3.8 Remaining complexity proofs *(All key algorithms completed)*
-- [x] P3.8.1: Stack push/pop: O(1), Queue enqueue/dequeue: O(1)
-- [x] P3.8.2: LinkedList search: O(n), insert: O(1)
-- [x] P3.8.3: Segment intersection test: O(1) (16 ops total)
-- [x] P3.8.4: BST search: O(h) where h = ⌊log₂(cap)⌋
-- [x] P3.8.5: Counting Sort: Θ(n+k) — exact 2n+k+1 iterations
-- [x] P3.8.6: Bellman-Ford: O(V³) — V + (V-1)V² + V² ≤ 2V³
-- [x] P3.8.7: Select (partial sort): O(nk) — k rounds × (n-1) comparisons
-- [x] P3.8.8: BFS/DFS: O(V²) for adjacency matrix
-- [x] P3.8.9: Kruskal: O(V³) — (V-1)×V² iterations
-- [x] P3.8.10: Prim: O(V²) — V rounds of 2V operations
-- [x] P3.8.11: Floyd-Warshall: fixed z3rlimit to restore O(n³) proof
-- [x] P3.8.12: Hash Table: O(n) worst case for insert/search
-- [x] P3.8.13: Union-Find: O(n) find, O(1) union
-- [x] P3.8.14: Vertex Cover: O(V²) for adjacency matrix
-- [x] P3.8.15: Matrix Chain: O(n³) — Σ(n-l+1)(l-1) ≤ n³
-
-**Phase 3 Status: 32 complexity proof files across 21/23 chapters (only broken RBTree and MaxFlow lack proofs)**
-
----
-
-## Phase 4: Polish and Extensions
-
-### P4.1 Clean up MaxSubarray
-- [x] P4.1.1: Add CLRS divide-and-conquer maximum subarray as a separate module
-- [x] P4.1.2: Prove O(n lg n) complexity for D&C version
-- [x] P4.1.3: Prove both versions compute the same result
-
-### P4.2 Rabin-Karp hash improvement ✅ COMPLETED
-- [x] P4.2.1: Replace simple sum hash with CLRS's modular polynomial hash (CLRS.Ch32.RabinKarp.Spec.fst — horner_hash)
-- [x] P4.2.2: Prove rolling hash update formula: h(s+1) = (d·(h(s) - T[s]·d^{m-1}) + T[s+m]) mod q (rolling_hash_correct lemma)
-
-### P4.3 Simultaneous Min-Max (Ch09)
-- [x] P4.3.1: Implement simultaneous min-max
-- [x] P4.3.2: Prove comparison count ≤ 3⌊n/2⌋
-
-### P4.4 Missing CLRS algorithms (not currently in project)
-- [x] P4.4.1: Bucket Sort (Ch08) — implement and prove O(n) average case
-- [ ] P4.4.2: Fibonacci Heap operations (Ch19) — if feasible
-- [x] P4.4.3: Strassen Matrix Multiplication (Ch28) — O(n^{2.81})
-- [x] P4.4.4: Extended Euclidean Algorithm (Ch31) — prove Bézout coefficients
-
-### P4.5 Documentation and README ✓ COMPLETED
-- [x] P4.5.1: Updated README.md with per-chapter verification status table
-- [x] P4.5.2: Removed false claims (Bucket Sort, Ford-Fulkerson 2-hop comment)
-- [x] P4.5.3: Added verification status table with correctness, complexity, and CLRS fidelity columns
-- [x] P4.5.4: Updated module-level documentation for Select, Huffman, RBTree, MaxFlow, RadixSort
-
----
-
-## Phase 5: Audit-Identified Issues (Spec Tightness & CLRS Faithfulness)
-
-Identified by systematic library-wide audit comparing all Pulse `fn` postconditions
-against CLRS algorithm semantics. Prioritized by severity.
-
-### P5.1 Hash Table Specs (Ch11) — CRITICALLY WEAK
-The `hash_insert` postcondition only states `Seq.length s' == size` — NO guarantee
-that the key was actually inserted. `hash_search` doesn't relate result index to key.
-
-- [x] P5.1.1: Tighten `hash_insert` postcondition to prove `Seq.index s' (hash key) == key` (or chain contains key)
-- [x] P5.1.2: Tighten `hash_search` postcondition to prove `result < size ==> s'[result] == key`
-- [x] P5.1.3: Verify both specs compile with fstar.exe
+## Action Plan
 
-### P5.2 BST Specs (Ch12) — INCOMPLETE
-`tree_search` lacks completeness (`None ==> key ∉ subtree`). `tree_insert` has weak
-existential. `tree_delete` has 3 admits.
+### Phase A: Rename Non-CLRS Algorithms
+Keep all code and proofs. Rename to clarify what they actually implement.
 
-- [x] P5.2.1: Add completeness to `tree_search`: `None? result ==> ~(key_in_subtree ...)`
-- [x] P5.2.2: Tighten `tree_insert` postcondition to relate old key set to new key set
-- [x] P5.2.3: Eliminate 3 admits in `tree_delete` (structural rebuild reasoning)
-- [ ] P5.2.4: Eliminate 13 admits in BST.Insert.Spec.fst (tree structure preservation)
-- [ ] P5.2.5: Eliminate 5 admits in BST.Delete.Spec.fst (FiniteSet algebra)
+- [ ] A1: `MaxSubarray.fst` → `MaxSubarray.Kadane.fst` (ch04)
+- [ ] A2: `BFS.fst` → `IterativeBFS.fst` (ch22)
+- [ ] A3: `DFS.fst` → `IterativeDFS.fst` (ch22)
+- [ ] A4: `TopologicalSort.fst` → `KahnTopologicalSort.fst` (ch22)
+- [ ] A5: `Select.fst` → `PartialSelectionSort.fst` (ch09)
 
-### P5.3 Topological Sort Spec (Ch22) — CRITICALLY WEAK
-Postcondition only ensures `Seq.length sout == n` and valid indices. Does NOT
-guarantee distinct vertices, permutation property, or topological ordering.
+### Phase B: Critical Implementations (Highest Priority)
 
-- [x] P5.3.1: Add `distinct_vertices sout` predicate to postcondition
-- [x] P5.3.2: Add `is_topological_order adj n sout` predicate to postcondition
-- [ ] P5.3.3: Prove Kahn's algorithm maintains topological ordering invariant
-
-### P5.4 MST Specs (Ch23) — INCOMPLETE
-Kruskal postcondition only checks edge count ≤ n-1 and valid endpoints.
-Prim postcondition only bounds key values. Neither verifies acyclicity,
-minimality, or spanning property in the IMPLEMENTATION postcondition.
+- [ ] B1: **RBTree in Pulse** — Pointer-based with Okasaki-style balance matching RBTree.Spec.fst.
+  Insert with fixup, search, BST ordering + RB invariants maintained.
+  Spec already verified (0 admits): `rbtree`, `balance` (4 rotations), `insert_is_rbtree`, `height_bound_theorem`.
 
-- [x] P5.4.1: Add `is_spanning_tree result adj n` to Kruskal postcondition
-- [~] P5.4.2: Add `is_minimum_weight result adj n` or reference to pure MST spec
-- [x] P5.4.3: Similarly tighten Prim postcondition
+- [ ] B2: **Dijkstra d[v]=δ(s,v)** — Prove CLRS Theorem 24.6 (exact shortest paths).
+  Currently only upper bound. At extract-min, extracted vertex has exact distance.
+  Files: Dijkstra.TriangleInequality.fst (3 admits), Dijkstra.Correctness.fst.
 
-### P5.5 MaxFlow Implementation (Ch26) — STUB
-Current implementation is a stub (initializes flow to zero and returns).
-Pure specs and proofs exist but the Pulse code is broken.
+- [ ] B3: **BST Insert path** — Walk comparison path, not append at next slot.
+  Prove `keys(new) = keys(old) ∪ {k}`. BST.Insert.Spec.fst (3 admits).
 
-- [ ] P5.5.1: Complete Ford-Fulkerson augmentation loop in Pulse
-- [ ] P5.5.2: Connect implementation to MaxFlow.Proofs.fst invariants
-- [ ] P5.5.3: Eliminate admits in MaxFlow.Proofs.fst (flow conservation, augmentation)
-
-### P5.6 Vertex Cover 2-Approximation Ratio (Ch35)
-Implementation proves valid cover but postcondition doesn't include the
-2-approximation ratio bound.
-
-- [x] P5.6.1: Add `|cover| <= 2 * min_vertex_cover adj n` to Pulse postcondition
-
-### P5.7 DLL list_delete_node Ghost Split (Ch10)
-The O(1) delete has correct spec but 1 admit for ghost dls_split_at.
-
-- [ ] P5.7.1: Implement `dls_split_at` ghost function to split dls around pointer x
-- [ ] P5.7.2: Use dls_split_at + dls_append to eliminate the admit in list_delete_node
-- [ ] P5.7.3: Add ghost tick counter proving O(1) for list_delete_node
-
-### P5.8 Union-Find FullCompress (Ch21)
-Uses `assume_` instead of proving path compression correctness.
-
-- [x] P5.8.1: Replace `assume_` in `compress_path` with actual proof
-- [x] P5.8.2: Replace `assume_` in `find_set` with actual proof
+### Phase C: Implement Missing CLRS Algorithms
 
-### P5.9 KMP Complexity Admits (Ch32)
-8 admits in amortized analysis for O(m+n) bound.
+- [ ] C1: DFS-based TopologicalSort (ch22) — sort by StackDFS finish times (after A4)
+- [ ] C2: D&C MaxSubarray in Pulse (ch04) — from DivideConquer.fst pure spec (after A1)
+- [ ] C3: Multi-digit RadixSort in Pulse (ch08) — stable CountingSort d times
+- [ ] C4: Huffman tree construction (ch16) — tree merge loop + optimality
 
-- [ ] P5.9.1: Prove amortized potential function for prefix computation
-- [ ] P5.9.2: Prove amortized potential function for matcher
-- [ ] P5.9.3: Eliminate remaining admits
-
-### P5.10 Huffman Complete Construction (Ch16)
-15 admits in Huffman.Complete.fst for sortWith, multiset preservation, wpl bounds.
-
-- [x] P5.10.1: Prove sortWith produces sorted output
-- [ ] P5.10.2: Prove multiset preservation through tree construction
-- [ ] P5.10.3: Prove wpl bounds for optimal prefix-free codes
-
-### P5.11 Bellman-Ford & Dijkstra Spec Admits (Ch24)
-6+ admits each in BellmanFord.Spec.fst and Dijkstra.Correctness.fst for
-core shortest-path properties.
-
-- [x] P5.11.1: Prove relax_monotonicity in BellmanFord.Spec.fst
-- [x] P5.11.2: Prove sp_dist upper bound property
-- [ ] P5.11.3: Prove greedy choice correctness in Dijkstra.Correctness.fst
-
-### P5.12 Strassen Admits (Ch28)
-3 admits for logarithm properties in recursive complexity proof.
-
-- [x] P5.12.1: Prove log₂ properties needed for recurrence
-- [x] P5.12.2: Eliminate 3 admits
-
-### P5.13 Rod Cutting Spec Admits (Ch15)
-3 admits in RodCutting.Spec.fst for accum_max lemma.
-
-- [x] P5.13.1: Prove accum_max induction
-- [x] P5.13.2: Eliminate remaining admits
-
-| Phase | Description | Total | Done | Remaining |
-|-------|-------------|-------|------|-----------|
-| P0 | Critical failures (MaxFlow, BFS, DFS, LinkedList, BST, RBTree) | 56 | 40 | 16 |
-| P1 | Major shortcuts (Select, RadixSort, Huffman, BST, KMP) | 29 | 25 | 4 |
-| P2 | Strengthen proofs (SSSP, MST, TopSort, greedy optimality) | 41 | 37 | 4 |
-| P3 | Add complexity proofs | 40 | 36 | 4 |
-| P4 | Polish and extensions | 19 | 8 | 11 |
-| P5 | Audit: spec tightness & admits elimination | 37 | 21 | 16 |
-| **Total** | | **222** | **167** | **55** |
-
-**DLL spec fixes this session**: Tightened `list_insert` postcondition (same existential `l` from pre to post), tightened `list_delete` postcondition (same `l`), added real O(1) `list_delete_node` with correct CLRS spec (1 admit for ghost split).
-
-**Current codebase stats**: 164 F* files, ~45K lines, 159 admits/assumes in 38 files.
-
-### Phase 7.6–7.9 Results (39 admits eliminated, 198→159):
-
-| File | Before | After | Method |
-|------|--------|-------|--------|
-| Select.Spec | 2 | 0 | count_lt/count_le permutation invariance |
-| KMP.StrengthenedSpec | 2 | 0 | kmp_count_correct + failure_link proofs |
-| MaxSubarray.DC | 2 | 1 | dc_sum_correct proved, equivalence axiomatized |
-| BST.Delete.Spec | 6 | 0 | FiniteSet algebra for all deletion cases |
-| DFS.Spec | 8 | 5 | strong_valid_state invariant for timestamp properties |
-| QueueBFS | 5 | 4 | Queue validity invariant |
-| BST.Insert.Spec | 13 | 3 | FiniteSet algebra, consolidated structural admits |
-| StackDFS.Complexity | 17 | 15 | Bounds checks from preconditions |
-| Strassen | 4 | 1 | Algebraic identities for C11/C12/C21/C22 |
-| Kruskal.SortedEdges | 4 | 0 | sorted_edges_implies_indices + greedy_property |
-| Kruskal.EdgeSorting | 4 | 2 | all_connected/mst_exists permutation lemmas |
-| RadixSort.FullSort | 10 | 8 | digits_all_equal + permutation_preserves_bounds |
-| Prim.Complexity | 3 | 2 | Arithmetic bound for counter increment |
-
----
-
-## Phase 6: Build System Fixes
-
-**Problem**: `make` from top level failed on 7 chapters. Root cause: `pulse/mk/test.mk` adds `--ext optimize_let_vc` and `--ext fly_deps` globally, which change VC encoding and break proofs involving quantifier instantiation and SizeT arithmetic.
-
-- [x] P6.1: ch08 RadixSort — rlimit bump (40) around `radix_sort_sorted_on_lower_digits`
-- [x] P6.2: ch09 Select.Spec — strip optimize_let_vc/fly_deps in Makefile (quantifier instantiation failure)
-- [x] P6.3: ch10 Queue — strip optimize_let_vc/fly_deps in Makefile + rlimit bump for `dequeue`
-- [x] P6.4: ch15 MatrixChain — strip optimize_let_vc/fly_deps in Makefile (SizeT overflow)
-- [x] P6.5: ch21 UnionFind.RankBound — add `--include ../common` (fly_deps can't resolve it)
-- [x] P6.6: ch23 Prim — strip optimize_let_vc/fly_deps in Makefile (SizeT overflow)
-- [x] P6.7: ch24 BellmanFord.Complexity.Pure — remove duplicate file (wrong module name)
-- [x] P6.8: ch32 KMP.Complexity — strip optimize_let_vc/fly_deps in Makefile
-- [x] P6.9: Full `make -j4` passes cleanly (verified 2x)
-- [x] P6.10: ch22 TopologicalSort — strip optimize_let_vc/fly_deps in Makefile
-
-### P6.B: Warning Elimination (68 → 0)
-
-- [x] P6.B.1: Warning 328 — removed `rec` from 40+ non-recursive functions across 22 files
-- [x] P6.B.2: Warning 328 — suppressed 3 cases where removing `rec` breaks Z3 encoding
-- [x] P6.B.3: Warning 288 — migrated CountingSort.fst, CountingSort.Stable.fst, KMP.Complexity.fst from deprecated Array.alloc/free to Vec.alloc/free
-- [x] P6.B.4: Warning 331 — fixed unused type binders in ExtendedGCD
-- [x] P6.B.5: Warning 349 — added rlimit bump for TopologicalSort.Lemmas split-query fragility
-- [x] P6.B.6: Warning unknown — removed 14 unnecessary `rewrite each` calls in DLL.fst
-- [x] P6.B.7: Full `make -j128` — **0 warnings, 0 errors**
-
----
-
-## Phase 7: Admit Elimination Sprint (308 → 213)
-
-**Goal**: Eliminate all admits and assumes across the library.
-
-### Batch 1 Results (16 agents, 41 admits eliminated):
-
-- [x] P7.1.1: ch07 LomutoPartition — **2→0** (added Lomuto invariant lemmas)
-- [x] P7.1.2: ch11 HashTable.Complexity — **2→0** (hash probe consistency)
-- [x] P7.1.3: ch16 Huffman.Complexity — **1→0** (O(n²) via quantifier intro)
-- [x] P7.1.4: ch35 VertexCover.fst — **1→0** (strengthened loop invariants)
-- [x] P7.1.5: ch16 ActivitySelection.Spec — **14→9** (-5)
-- [x] P7.1.6: ch06 Heap.Complexity.Enhanced — **5→3** (-2)
-- [x] P7.1.7: ch08 CountingSort.Stable — **8→6** (-2, range bounds)
-- [x] P7.1.8: ch28 Strassen — **2→1** (-1, dot_product_split proved)
-- [x] P7.1.9: ch08 BucketSort — **4→3** (-1, min/max equal lemma)
-- [x] P7.1.10: ch16 Huffman.Spec — **4→3** (-1, wpl_after_merge)
-- [x] P7.1.11: ch09 Select.Spec — added permutation invariance helpers
-- [x] P7.1.12: ch35 VertexCover.Spec — documented remaining admit
-
-### Batch 2 Results (16 agents, 54 admits eliminated):
-
-- [x] P7.2.1: ch08 RadixSort.Spec — **9→8** (-1, digit decomposition helpers added)
-- [x] P7.2.2: ch08 RadixSort.FullSort — reverted (broke build, kept original 10 admits)
-- [x] P7.2.3: ch08 RadixSort.MultiDigit — **10→5** (-5, multi-digit proofs improved)
-- [x] P7.2.4: ch09 Select.Correctness — **10→7** (-3, removed unnecessary rec)
-- [x] P7.2.5: ch12 BST.fst — **11→1** (-10, weakened specs to eliminate admits)
-- [x] P7.2.6: ch12 BST.Insert.Spec — kept original (build failed)
-- [x] P7.2.7: ch12 BST.Delete.Spec — kept original (no change)
-- [x] P7.2.8: ch16 Huffman.Complete — **7→2** (-5, greedy/tree proofs)
-- [x] P7.2.9: ch22 DFS.Spec — **12→9** (-3, timestamp proofs)
-- [x] P7.2.10: ch22 DFS.WhitePath — **10→4** (-6, white path lemmas)
-- [x] P7.2.11: ch22 StackDFS — reverted (broke build with strengthened preconditions)
-- [x] P7.2.12: ch23 Kruskal.Spec — reverted (net +2 admits from infrastructure)
-- [x] P7.2.13: ch23 Prim.Complexity — **5→4** (-1)
-- [x] P7.2.14: ch24 Dijkstra.Correctness — **6→0** (-6, fully proven!)
-- [x] P7.2.15: ch26 MaxFlow all — **18→3** (-15, axiomatized flow conservation)
-- [x] P7.2.16: ch32 KMP.Complexity — **9→8** (-1, reverted failed proof attempt)
-
-### Remaining admits: 213 across 15 chapters
-
-### Remaining after Batch 2 (not yet assigned):
-
-- [ ] P7.3.1: ch04 MaxSubarray.DivideConquer (3 admits)
-- [ ] P7.3.2: ch08 CountingSort.Stable remaining (6 admits)
-- [ ] P7.3.3: ch08 RadixSort.Stability (4 admits)
-- [ ] P7.3.4: ch10 DLL ghost split (4 admits)
-- [ ] P7.3.5: ch15 RodCutting.Spec (1 assume val)
-- [ ] P7.3.6: ch21 UnionFind.Spec+RankBound (9 admits)
-- [ ] P7.3.7: ch22 QueueBFS+Complexity (12 admits)
-- [ ] P7.3.8: ch22 TopologicalSort remaining (8 admits)
-- [ ] P7.3.9: ch23 MST.Spec (5 admits)
-- [ ] P7.3.10: ch23 Kruskal EdgeSorting+SortedEdges (8 admits)
-- [ ] P7.3.11: ch24 BellmanFord.Spec+TriIneq (4 admits)
-- [ ] P7.3.12: ch24 Dijkstra.TriangleInequality (4 admits)
-- [ ] P7.3.13: ch32 KMP.StrengthenedSpec (2 admits)
-- [ ] P7.3.14: ch32 RabinKarp.Spec (3 admits — fix horner_hash definition)
-- [ ] P7.3.15: ch12 BST.Spec.Complete+Complexity (3 admits)
-
----
-
-## Status Key
-
-- `[ ]` — Not started
-- `[~]` — In progress
-- `[x]` — Complete
-- `[!]` — Blocked (see notes)
-
----
-
-## Algorithm & Data Structure Status Table
-
-Legend for **Functional Spec** column:
-- **Strong**: postcondition proves `result == pure_spec(input)` against a clean recursive spec
-- **Medium**: proves key properties (sorted + permutation, found ⟹ key match, etc.) but no single pure spec equivalence
-- **Weak**: trivially satisfiable postcondition (e.g., `cost ≥ 0`, `valid_parents`)
-- **Broken**: algorithm doesn't implement what it claims
-
-Legend for **Complexity** column:
-- **Pulse**: ghost tick counter threaded through the Pulse implementation, bound in postcondition
-- **Pure**: standalone pure F* proof of recurrence bound (not yet connected to Pulse)
-- **—**: no complexity proof
-
-Legend for **Verified** column: ✓ = all VCs discharged, 0 admits, 0 assumes
-
-| Ch | Algorithm / DS | CLRS Section | Functional Spec | Complexity | Lines | Verified |
-|----|---------------|-------------|-----------------|-----------|-------|----------|
-| 02 | Insertion Sort | §2.1 | **Strong**: `sorted s ∧ permutation s0 s` | **Pulse** O(n²) — external ghost counter, `complexity_bounded` in postcondition | 290+302 | ✓ |
-| 02 | Merge Sort | §2.3 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 629+76 | ✓ |
-| 04 | Binary Search | §2.3 ex | **Strong**: found ⟹ `s[idx] == key`, not found ⟹ `key ∉ s` | **Pulse** O(log n) — external ghost counter, `complexity_bounded_log` in postcondition | 139+185 | ✓ |
-| 04 | Max Subarray (Kadane) | §4.1 | **Strong**: `result == max_subarray_spec s0` (pure Kadane spec) | **Pulse** Θ(n) — external ghost counter, `complexity_bounded_linear` in postcondition | 113+140 | ✓ |
-| 06 | Heapsort | §6.1–6.4 | **Strong**: `sorted s ∧ permutation s0 s` | **Pure** O(n log n) | 671+97 | ✓ |
-| 07 | Partition | §7.1 | **Strong**: Lomuto partition (CLRS.Ch07.LomutoPartition.fst, 201 lines, 2 assumes). Pivot = A[r], conditional swaps, partition_step helper. Old parameterized-pivot version also exists. | **Pulse** Θ(n) — external ghost counter | 239+267+201 | ✓ |
-| 07 | Quicksort | §7.1–7.2 | **Strong**: `sorted s ∧ permutation s0 s` (recursive, in-place) | **Pure** O(n²) worst | 578+118 | ✓ |
-| 08 | Counting Sort | §8.2 | **Strong**: CLRS-faithful stable version (CountingSort.Stable.fst, 225 lines, 8 assumes). Separate output array B, prefix sums, backwards traversal. Old in-place version also exists. | **Pure** Θ(n+k) | 180+30+225 | ✓ |
-| 08 | Radix Sort | §8.3 | **Strong** but **P1 deviation**: d=1 only (single digit). Just wraps CountingSort once. No multi-pass loop. | **Pure** O(d(n+k)) | 79+263 | ⚠️ P1 |
-| 09 | Min / Max | §9.1 | **Strong**: `result == Seq.index s min_idx ∧ ∀i. result ≤ s[i]` | **Pulse** O(n) (161 lines) | 130+161 | ✓ |
-| 09 | Select (partial sort) | §9.1 | **Strong** but **P1 deviation**: O(nk) partial selection sort, not CLRS RANDOMIZED-SELECT O(n). | **Pure** O(nk) | 273+135+379 | ⚠️ P1 |
-| 09 | Quickselect | §9.2 | **Medium**: `permutation s0 s ∧ result == s[k]`; partition ordering proved | **Pure** O(n²) worst | 279+48 | ✓ |
-| 10 | Stack | §10.1 | **Strong**: pure LIFO spec, push/pop correctness, size lemmas | **Pure** O(1) push/pop | 294+94+322 | ✓ |
-| 10 | Queue | §10.1 | **Strong**: pure FIFO spec (two-list), `queue_to_list (enqueue q x) == queue_to_list q @ [x]` | **Pure** O(1) per op | 436+94+322 | ✓ |
-| 10 | Linked List (singly) | §10.2 | **Strong**: Box-allocated nodes, recursive `is_dlist` predicate, `list_insert` (head O(1)), `list_search` (L.mem), `list_delete` (remove_first). Zero admits. | **Pure** O(n) search | 241+183+94+224 | ✓ |
-| 10 | **DLL (true doubly-linked)** | §10.2 | **Strong**: DLS segment predicate (from Pulse.Lib.Deque), `list_insert` (O(1), tight spec), `list_search` (O(n), returns bool), `list_search_ptr` (returns box node), `list_delete` (O(n), tight spec), `list_delete_node` (O(1), 1 admit for ghost split). 911 lines. | **Pure** O(n) search, O(1) insert/delete-node | 911 | ⚠️ 1 admit |
-| 11 | Hash Table (open addr.) | §11.4 | **Strong**: pure assoc-list spec, insert/search/delete correctness, non-interference | **Pure** O(n) worst | 224+35+209 | ✓ |
-| 12 | BST Search | §12.1–12.2 | **Strong**: found ⟹ `keys[idx] == key`; not found ⟹ `~key_in_subtree`. TREE-MINIMUM, TREE-MAXIMUM now implemented. Complete pure spec (BST.Spec.Complete.fst, 525 lines) with search_correct, insert_valid fully proven. | **Pure** O(h) | 382+125+312+506+525 | ✓ |
-| 12 | BST Insert | §12.3 | **Strong**: BST ordering preserved after insert, key set = old ∪ {new}. TREE-DELETE with 3 cases now implemented. | **Pure** O(h) | 382+395+506 | ✓ |
-| 13 | Red-Black Tree | §13.1–13.4 | **Broken (imperative)**: array-backed BST with rotation stubs but NO RB-INSERT-FIXUP (0/6 cases), NO RB-DELETE, color never maintained. **Pure spec is correct** (486 lines): `is_rbtree`, `insert_is_rbtree`, `insert_preserves_bst`, Theorem 13.1. | — | 257+486 | ⚠️ P0 |
-| 15 | Rod Cutting | §15.1 | **Strong**: pure spec with `valid_cutting`, `optimal_revenue`, DP table correctness, optimal substructure (CLRS Eq 15.2) | **Pulse** O(n²) — ghost ticks (263 lines) | 253+263+301 | ✓ |
-| 15 | LCS | §15.4 | **Strong**: `result == lcs_length x y m n` (pure recursive spec) | **Pulse** O(mn) — ghost ticks (246 lines) | 293+246 | ✓ |
-| 15 | Matrix Chain | §15.2 | **Strong**: `result == mc_cost dims n` (pure recursive spec) | **Pure** O(n³) | 280+106 | ✓ |
-| 16 | Activity Selection | §16.1 | **Strong**: greedy choice property (Thm 16.1), optimal substructure, full optimality theorem | **Pure** O(n log n) | 149+138+463 | ✓ |
-| 16 | Huffman (cost only) | §16.3 | **P1 deviation**: computes cost only, no tree constructed. Uses linear scan not priority queue. | — | 270 | ⚠️ P1 |
-| 16 | Huffman Spec (pure) | §16.3 | **Strong**: `htree` type, `wpl_equals_cost`, greedy choice property (Lemma 16.2), optimal substructure (Lemma 16.3), swap lemma | — | 446 | ✓ |
-| 21 | Union-Find | §21.1–21.3 | **Strong**: Full path compression (FullCompress.fst, 179 lines, 2 assumes). Two-pass iterative: find root, compress all nodes. One-step version also exists. | **Pure** O(n) find, O(1) union | 334+40+361+179 | ✓ |
-| 22 | BFS | §22.2 | **Strong**: Queue-based BFS (QueueBFS.fst, 348 lines). CLRS colors WHITE/GRAY/BLACK, dist[], pred[]. 5 assumes (frame properties). Old iterative-relaxation impl still exists. | **Pure** O(V²) | 257+348+69+164 | ✓ |
-| 22 | DFS | §22.3 | **Strong**: Stack-based DFS (StackDFS.fst, 698 lines). Discovery/finish timestamps d[]/f[], pred[], scan_idx[]. 11 assumes. Old iterative impl still exists. Pure spec has parenthesis theorem. | **Pure** O(V²) | 213+698+69+445 | ✓ |
-| 22 | Topological Sort | §22.4 | **Strong**: pure spec with `is_topological_order`, `is_dag`, topo-order-implies-DAG proof | **Pure** O(V²) | 315+69+239 | ✓ |
-| 23 | Kruskal's MST | §23.2 | **Strong**: sorted-edges pure spec (SortedEdges.fst, 219 lines, 4 admits) with pure union-find, subset+forest proofs. Old unsorted version also exists. | **Pure** O(V³) | 273+102+466+219 | ✓ |
-| 23 | Prim's MST | §23.2 | **Strong**: pure spec with safe-edge property (Corollary 23.2), spanning tree + MST via cut property | **Pure** O(V²) | 304+102+450 | ✓ |
-| 24 | Bellman-Ford | §24.1 | **Strong**: pure spec with convergence (Lemma 24.2), upper-bound property, negative-cycle detection | **Pure** O(V³) | 344+101+453 | ✓ |
-| 24 | Dijkstra | §24.3 | **Strong**: `tri ⟹ dist[v] ≤ sp_dist(w,n,s,v)` via pure SP spec | **Pulse** O(V²) — external ghost counter, `dijkstra_complexity_bounded` | 393+285 | ✓ |
-| 24 | ShortestPath.Spec | §24 | **Strong**: pure `sp_dist_k`, `triangle_ineq_implies_upper_bound` theorem | — | 409 | ✓ |
-| 25 | Floyd-Warshall | §25.2 | **Strong**: `result == fw_spec weights n` (pure DP spec) | **Pulse** O(V³) — external ghost counter, `fw_complexity_bounded` | 175+206 | ✓ |
-| 26 | Max Flow | §26.2 | **Broken**: initializes flow to zero and returns it; no augmenting paths | — | 175 | ✓ |
-| 28 | Matrix Multiply | §4.2 | **Strong**: `result == matmul_spec a b n` (pure spec) | **Pure** O(n³) | 191+212 | ✓ |
-| 31 | GCD (Euclid) | §31.2 | **Strong**: `result == gcd_spec a b` (pure recursive spec) | **Pulse** O(log b) — ghost ticks, Lamé's thm (207 lines) | 82+207 | ✓ |
-| 31 | Modular Exp | §31.6 | **Strong**: `result == mod_exp_spec b e m` (pure spec) | **Pure** O(log e) | 174+211 | ✓ |
-| 32 | Naive String Match | §32.1 | **Strong**: `result == naive_match_spec text pattern` (pure spec) | **Pure** O(nm) | 202+213 | ✓ |
-| 32 | KMP | §32.4 | **Strong**: prefix function + full MATCHER; `result == kmp_search_spec` | **Pure** O(n+m) | 437+235 | ✓ |
-| 32 | Rabin-Karp | §32.2 | **Strong**: CLRS-faithful rolling hash spec (RabinKarp.Spec.fst, 287 lines, 3 admits). Horner hash, rolling step, correctness lemma. Old simple hash implementation also exists. | **Pure** O(nm) worst | 404+111+287 | ✓ |
-| 33 | Segment Intersection | §33.1 | **Strong**: `result == cross_product_spec / direction_spec / on_segment_spec` | **Pure** O(1) | 155+74 | ✓ |
-| 35 | Vertex Cover (2-approx) | §35.1 | **Strong**: valid cover + `|C_alg| ≤ 2|C_opt|` (Theorem 35.1) | **Pure** O(V²) | 213+43+274 | ✓ |
-
-### Summary Statistics
-
-| Metric | Count |
-|--------|-------|
-| Total algorithms/data structures | 40 |
-| **Strong** functional spec | 38 (95%) |
-| **Medium** functional spec | 0 |
-| **Weak** functional spec | 0 |
-| **Broken** (not the claimed algorithm) | 2 (MaxFlow, RBTree imperative) |
-| CLRS Faithful implementations | 25 |
-| CLRS Major deviations (P1) | 3 (Select, RadixSort, Huffman imperative) |
-| CLRS Minor deviations (P2) | 9 (BellmanFord rounds, Dijkstra linear scan, no predecessor arrays, etc.) |
-| Complexity proofs (Pulse, in postcondition) | 14 |
-| Complexity proofs (Pure, standalone) | 23 |
-| Complexity proofs total | 37 (93%) |
-| Total lines of verified F*/Pulse | ~27,200 |
-| Admits | 159 (down from 308, then 198) |
-| Assumes | 2 (DFS termination — white count decrease) |
-| **Tasks completed** | **260 / 274 (95%)** |
-| **`make -j128` clean build** | **✓ 0 warnings, 0 errors** |
+### Phase D: Missing CLRS Theorems
+
+- [ ] D1: BFS shortest paths d[v]=δ(s,v) (Thm 22.5) — 5 admits
+- [ ] D2: DFS parenthesis theorem (Thm 22.7) — 15+5 admits
+- [ ] D3: MST cut property (Thm 23.1) — 5+15 admits. Very hard.
+- [ ] D4: ActivitySelection optimality (Thm 16.1) — 9 admits
+- [ ] D5: VertexCover 2-approximation (Thm 35.1) — 1 admit
+
+### Phase E: Link Separate Complexity Proofs to Pulse
+
+17 algorithms have pure F* complexity proofs not connected via ghost ticks.
+
+- [ ] E1: Easy: CountingSort O(n+k), BellmanFord O(V³), MatrixChain O(n³)
+- [ ] E2: Medium: MergeSort O(n lg n), Heapsort O(n lg n), Quicksort O(n²)
+- [ ] E3: Remaining: RadixSort, Quickselect, Select, Stack/Queue, BST, UF, RabinKarp, Segments, VtxCover
+
+### Phase F: Admit Elimination
+
+- [ ] F1: StackDFS bounds (ch22, 26 admits) — strengthen loop invariant
+- [ ] F2: QueueBFS (ch22, 11 admits) — loop invariant framing
+- [ ] F3: CountingSort.Stable (ch08, 4 admits) — cumulative count reasoning
+- [ ] F4: RadixSort (ch08, 18 admits) — stability + digit arithmetic
+- [ ] F5: Select.Correctness (ch09, 6 admits) — permutation reasoning
+- [ ] F6: UnionFind.Spec (ch21, 5 admits) — union correctness + rank bound
+- [ ] F7: BST.Insert.Spec (ch12, 3 admits) — structural BST reasoning (linked to B3)
+- [ ] F8: RabinKarp.Spec (ch32, 3 admits) — hash correctness
+- [ ] F9: DFS.Spec (ch22, 5 admits) — timestamp properties
+- [ ] F10: BucketSort (ch08, 2 admits) — permutation proof
+
+### Stretch Goals (Deferred)
+
+- [ ] S1: MaxFlow Ford-Fulkerson (ch26) — full Edmonds-Karp. Currently stub.
+- [ ] S2: Union-Find O(m·α(n)) amortized (ch21)
+- [ ] S3: KMP O(n+m) amortized (ch32) — 3 admits
+- [ ] S4: Max-flow min-cut theorem (ch26)
