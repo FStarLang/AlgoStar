@@ -272,10 +272,60 @@ let rec append_sorted_disjoint (xs ys: list int) (mid: int)
     | [x] -> ()
     | x1 :: x2 :: rest -> append_sorted_disjoint (x2 :: rest) ys mid
 
+/// Lemma: A weaker version - appending sorted lists where all elements of first <= all of second
+let rec append_sorted_with_ordering (xs ys: list int)
+  : Lemma (requires sorted xs /\ sorted ys /\
+                     (forall (x y: int). List.mem x xs /\ List.mem y ys ==> x <= y))
+          (ensures sorted (List.append xs ys))
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | [_] -> ()
+    | _ :: xs' -> append_sorted_with_ordering xs' ys
+
+/// Helper: sum of lengths
+let rec sum_lengths (buckets: list (list int)) : nat =
+  match buckets with 
+  | [] -> 0 
+  | b :: bs -> List.length b + sum_lengths bs
+
+/// Lemma: concat_all preserves total length (sum of individual lengths)
+let rec concat_all_length (buckets: list (list int))
+  : Lemma (ensures List.length (concat_all buckets) == sum_lengths buckets)
+          (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | b :: bs -> 
+      concat_all_length bs;
+      List.append_length b (concat_all bs)
+
+/// Lemma: sort_all_buckets preserves length of bucket list and each bucket
+let rec sort_all_buckets_preserves_lengths (buckets: list (list int))
+  : Lemma (ensures List.length (sort_all_buckets buckets) == List.length buckets /\
+                   (forall (i: nat). i < List.length buckets ==>
+                     List.length (List.index (sort_all_buckets buckets) i) ==
+                     List.length (List.index buckets i)))
+          (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | _ :: bs -> sort_all_buckets_preserves_lengths bs
+
+/// Lemma: sort_all_buckets produces sorted buckets
+let rec sort_all_buckets_sorted (buckets: list (list int))
+  : Lemma (ensures forall (i: nat). i < List.length (sort_all_buckets buckets) ==>
+                   sorted (List.index (sort_all_buckets buckets) i))
+          (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | b :: bs -> 
+      insertion_sort_correct b;
+      sort_all_buckets_sorted bs
+
 (* ========== Main Algorithm ========== *)
 
 /// Main Bucket Sort Algorithm
 /// Sorts input list using k buckets
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 let bucket_sort (xs: list int) (k: pos)
   : Pure (list int)
     (requires Cons? xs)
@@ -295,15 +345,21 @@ let bucket_sort (xs: list int) (k: pos)
       // Step 2: Sort each bucket
       let sorted_buckets = sort_all_buckets buckets in
       
+      // Establish key properties
+      sort_all_buckets_sorted buckets;
+      sort_all_buckets_preserves_lengths buckets;
+      concat_all_length sorted_buckets;
+      
       // Step 3: Concatenate all sorted buckets
-      // NOTE: Full correctness proof requires showing:
-      //  1. Each bucket contains only elements in its range
-      //  2. Bucket ranges are non-overlapping and ordered
-      //  3. Therefore concat_all produces sorted result (by append_sorted_disjoint)
-      //  4. Buckets partition input (permutation property)
-      admit(); // Main correctness argument about bucket properties
+      // The proof requires showing:
+      //  1. Each sorted_bucket is sorted (done by sort_all_buckets_sorted)
+      //  2. Elements in bucket i <= elements in bucket j for i < j (by bucket_index monotonicity)
+      //  3. Buckets partition the input (permutation - length preservation)
+      
+      admit(); // Remaining: show concat_all sorted_buckets is sorted and has correct length
       concat_all sorted_buckets
     )
+#pop-options
 
 (* ========== Complexity Analysis ========== *)
 

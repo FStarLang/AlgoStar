@@ -13,7 +13,7 @@
  * 3. Show strong_order_inv: every vertex in output has all predecessors earlier
  * 4. Connect strong_order_inv to is_topological_order
  *
- * Zero admits for the core correctness argument (only pigeonhole lemmas admitted).
+ * Zero admits: all correctness arguments fully proved including pigeonhole.
  *)
 module CLRS.Ch22.TopologicalSort.Verified
 
@@ -175,6 +175,80 @@ let rec lemma_count_one_means_exists_unique (s: Seq.seq int) (len: nat) (v: int)
     else if Seq.index s (len - 1) = v then ()
     else lemma_count_one_means_exists_unique s (len - 1) v
 
+// Sum of count(w) for w = 0,...,k-1
+private let rec sum_counts (s: Seq.seq int) (len k: nat) : Tot nat (decreases k) =
+  if k = 0 then 0
+  else count_occurrences s len (k - 1) + sum_counts s len (k - 1)
+
+// When last element is not in {0,...,k-1}, removing it doesn't change sum_counts
+private let rec lemma_sum_counts_same_last (s: Seq.seq int) (len: nat) (k: nat)
+  : Lemma
+    (requires len > 0 /\ len <= Seq.length s /\
+      (Seq.index s (len - 1) < 0 \/ Seq.index s (len - 1) >= k))
+    (ensures sum_counts s len k = sum_counts s (len - 1) k)
+    (decreases k)
+  = if k = 0 then ()
+    else begin
+      assert (Seq.index s (len - 1) <> k - 1);
+      lemma_sum_counts_same_last s len (k - 1)
+    end
+
+// Removing last element decreases sum by exactly 1
+private let rec lemma_sum_counts_remove_last (s: Seq.seq int) (len: nat) (k: nat)
+  : Lemma
+    (requires len > 0 /\ len <= Seq.length s /\
+      Seq.index s (len - 1) >= 0 /\ Seq.index s (len - 1) < k)
+    (ensures sum_counts s len k = 1 + sum_counts s (len - 1) k)
+    (decreases k)
+  = let w = Seq.index s (len - 1) in
+    if k = 0 then ()
+    else if w = k - 1 then
+      lemma_sum_counts_same_last s len (k - 1)
+    else
+      lemma_sum_counts_remove_last s len (k - 1)
+
+// Total count equals sequence length when all elements are in {0,...,k-1}
+private let rec lemma_sum_counts_total (s: Seq.seq int) (len k: nat)
+  : Lemma
+    (requires len <= Seq.length s /\ (forall (i:nat). i < len ==> Seq.index s i >= 0 /\ Seq.index s i < k))
+    (ensures sum_counts s len k = len)
+    (decreases len)
+  = if len = 0 then begin
+      let rec aux (m:nat) : Lemma (requires m <= k) (ensures sum_counts s 0 m = 0) (decreases m)
+        = if m = 0 then () else aux (m - 1)
+      in aux k
+    end
+    else begin
+      lemma_sum_counts_total s (len - 1) k;
+      lemma_sum_counts_remove_last s len k
+    end
+
+// Sum of counts bounded by k (each count <= 1 by distinctness)
+private let rec lemma_sum_counts_bounded_by_k (s: Seq.seq int) (len k: nat)
+  : Lemma
+    (requires len <= Seq.length s /\ all_distinct_int s)
+    (ensures sum_counts s len k <= k)
+    (decreases k)
+  = if k = 0 then ()
+    else begin
+      lemma_all_distinct_count_le_one s len (k - 1);
+      lemma_sum_counts_bounded_by_k s len (k - 1)
+    end
+
+// If count(v) = 0 for some v < k, then sum <= k - 1
+private let rec lemma_sum_counts_skip_bounded (s: Seq.seq int) (len k: nat) (v: nat)
+  : Lemma
+    (requires len <= Seq.length s /\ v < k /\ all_distinct_int s /\ count_occurrences s len v = 0)
+    (ensures sum_counts s len k <= k - 1)
+    (decreases k)
+  = if k = 0 then ()
+    else if v = k - 1 then
+      lemma_sum_counts_bounded_by_k s len (k - 1)
+    else begin
+      lemma_all_distinct_count_le_one s len (k - 1);
+      lemma_sum_counts_skip_bounded s len (k - 1) v
+    end
+
 // Pigeonhole: if sequence has n distinct elements all < n, it contains each element 0..n-1 exactly once
 let lemma_permutation_contains_all (s: Seq.seq int) (n: nat) (v: nat)
   : Lemma
@@ -185,29 +259,14 @@ let lemma_permutation_contains_all (s: Seq.seq int) (n: nat) (v: nat)
       v < n)
     (ensures exists (j: nat). j < n /\ Seq.index s j == v)
   = lemma_all_distinct_count_le_one s n v;
-    // Count of v is either 0 or 1
     if count_occurrences s n v = 1 then
-      // v appears exactly once, so it exists
       lemma_count_one_means_exists_unique s n v
     else begin
-      // count_occurrences s n v = 0, meaning v doesn't appear
       lemma_count_zero_means_not_present s n v;
-      // All n elements are in {0,...,n-1}\{v}, a set of n-1 values
-      // But they're all distinct — impossible by pigeonhole
-      // Prove: among n distinct values each in {0,...,n-1} and != v,
-      // two must have the same value (contradicting distinctness)
-      // 
-      // Actually we can use a counting argument:
-      // For each w in {0,...,n-1} with w != v: count(w) <= 1 (by distinctness)
-      // Total elements = n = sum of count(w) for w = 0..n-1
-      //                    = count(v) + sum of count(w) for w != v
-      //                    = 0 + sum of count(w) for w != v
-      //                    <= 0 + (n-1) * 1 = n-1
-      // But n <= n-1 is a contradiction!
-      //
-      // However, formalizing "sum of counts = n" requires helper infrastructure.
-      // For now, we keep the admit for this standard combinatorial fact.
-      admit()
+      // Counting argument: sum_{w=0}^{n-1} count(w) = n but <= n-1 since count(v)=0
+      lemma_sum_counts_total s n n;
+      lemma_sum_counts_skip_bounded s n n v
+      // n = sum_counts <= n-1, contradiction
     end
 
 #pop-options

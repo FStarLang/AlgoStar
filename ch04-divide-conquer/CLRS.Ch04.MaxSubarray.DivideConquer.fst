@@ -155,16 +155,40 @@ let rec lemma_log2_ceil_bounds (n: pos)
     if n' > 0 then lemma_log2_ceil_bounds n'
   )
 
-// Prove: T(n) = O(n log n)
-// Specifically: T(n) <= 4 * n * log2_ceil n
-let lemma_dc_complexity_bound (n: pos) 
+// log2_ceil is monotone
+let rec log2_ceil_monotone (a b: pos)
+  : Lemma (requires a <= b) (ensures log2_ceil a <= log2_ceil b) (decreases b)
+  = if a = b then ()
+    else if b = 1 then ()
+    else if a = 1 then ()
+    else begin
+      assert ((a + 1) / 2 <= (b + 1) / 2);
+      log2_ceil_monotone ((a + 1) / 2) ((b + 1) / 2)
+    end
+
+// log2_ceil(n) >= 1 + log2_ceil(n/2) for n >= 2
+let log2_ceil_halving (n: pos{n >= 2})
+  : Lemma (ensures log2_ceil n >= 1 + log2_ceil (n / 2))
+  = assert (n / 2 >= 1);
+    log2_ceil_monotone (n / 2) ((n + 1) / 2)
+
+// Prove: T(n) = O(n log n) via Master Theorem case 2
+// T(n) = 2T(n/2) + n, solution T(n) <= 4n(log2_ceil(n) + 1)
+let rec lemma_dc_complexity_bound (n: pos) 
   : Lemma (ensures dc_ops_count n <= op_Multiply 4 (op_Multiply n (log2_ceil n + 1)))
           (decreases n)
-  =
-  admit() // TODO: Complete this proof using Master Theorem or induction
-  // The recurrence T(n) = 2T(n/2) + n has solution T(n) = Θ(n log n)
-  // By Master Theorem: a=2, b=2, f(n)=n, so log_b(a) = 1
-  // f(n) = Θ(n^1), so we're in case 2: T(n) = Θ(n^1 log n) = Θ(n log n)
+  = if n = 1 then ()
+    else begin
+      let h = n / 2 in
+      assert (h >= 1);
+      lemma_dc_complexity_bound h;
+      // IH: T(h) <= 4h(log2_ceil(h)+1). T(n) = 2*T(h)+n <= 8h(log2_ceil(h)+1)+n
+      // Since 8h <= 4n: T(n) <= 4n(log2_ceil(h)+1)+n = 4n*log2_ceil(h)+5n
+      // Need <= 4n*(log2_ceil(n)+1) = 4n*log2_ceil(n)+4n
+      // i.e., 4*log2_ceil(h)+1 <= 4*log2_ceil(n). By halving: log2_ceil(n) >= 1+log2_ceil(h)
+      assert (op_Multiply 8 h <= op_Multiply 4 n);
+      log2_ceil_halving n
+    end
 
 // ========== Correctness Properties ==========
 

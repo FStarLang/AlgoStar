@@ -375,10 +375,22 @@ let digits_equal_implies_equal (k1 k2 bigD base: nat)
                     k2 < pow base bigD /\
                     (forall (d: nat). d < bigD ==> digit k1 d base == digit k2 d base))
           (ensures k1 == k2)
-  = // Both branches require complex digit decomposition algebra.
-    // Base case needs connecting digit/pow/modular arithmetic;
-    // Inductive case needs digit_decomposition + extensionality.
-    admit()
+  = digit_decomposition k1 bigD base;
+    digit_decomposition k2 bigD base;
+    lemma_digit_sum_extensional k1 k2 bigD base bigD
+
+// digit_sum is monotone when all digits are <=
+private let rec lemma_digit_sum_le (k1 k2 bigD base d: nat)
+  : Lemma (requires d <= bigD /\ base >= 2 /\
+    (forall (i:nat). i < d ==> digit k1 i base <= digit k2 i base))
+    (ensures digit_sum k1 bigD base d <= digit_sum k2 bigD base d)
+    (decreases d)
+  = if d = 0 || base = 0 then ()
+    else begin
+      lemma_digit_sum_le k1 k2 bigD base (d - 1);
+      pow_positive base (d - 1);
+      lemma_mult_le_right (pow base (d - 1)) (digit k1 (d - 1) base) (digit k2 (d - 1) base)
+    end
 
 // If digits are lexicographically <=, values are <=
 let lemma_digits_le_implies_value_le (x y bigD base: nat)
@@ -392,24 +404,26 @@ let lemma_digits_le_implies_value_le (x y bigD base: nat)
                       (forall (d': nat). d' < d0 ==> digit x d' base == digit y d' base)) \/
                      (forall (d: nat). d < bigD ==> digit x d base == digit y d base)))
           (ensures x <= y)
-  = // Use digit decomposition
-    digit_decomposition x bigD base;
+  = digit_decomposition x bigD base;
     digit_decomposition y bigD base;
-    
-    // x = digit_sum x bigD base bigD
-    // y = digit_sum y bigD base bigD
-    
-    // The arithmetic reasoning here is complex:
-    // - If all digits are equal, then x == y (proved by digits_equal_implies_equal)
-    // - If there exists a first differing digit d0 where digit x d0 < digit y d0,
-    //   and all lower digits are equal, then:
-    //   * digit_sum x bigD base d0 == digit_sum y bigD base d0 (lower parts equal)
-    //   * x = ... + digit x d0 base * pow base d0 + digit_sum x bigD base d0
-    //   * y = ... + digit y d0 base * pow base d0 + digit_sum y bigD base d0
-    //   * Since digit x d0 base < digit y d0 base and they're multiplied by pow base d0,
-    //     and higher digits satisfy digit x d <= digit y d, we get x < y
-    // This requires detailed arithmetic inequalities and is left as admit.
-    admit()
+    lemma_digit_sum_le x y bigD base bigD
+
+// Helper: if all adjacent pairs are ordered, the sequence is sorted
+private let rec lemma_pairwise_implies_sorted (s: seq nat)
+  : Lemma
+    (requires forall (i: nat). i + 1 < length s ==> index s i <= index s (i + 1))
+    (ensures sorted s)
+    (decreases length s)
+  = if length s <= 1 then ()
+    else begin
+      let t = tail s in
+      let aux (i: nat{i + 1 < length t}) : Lemma (index t i <= index t (i + 1))
+        = assert (index t i == index s (i + 1));
+          assert (index t (i + 1) == index s (i + 2))
+      in
+      Classical.forall_intro (Classical.move_requires aux);
+      lemma_pairwise_implies_sorted t
+    end
 
 // Sorted up to all digits implies fully sorted
 let lemma_sorted_all_digits_is_sorted
@@ -419,7 +433,17 @@ let lemma_sorted_all_digits_is_sorted
                     (forall (i: nat). i < length s ==> index s i < pow base bigD) /\
                     sorted_up_to_digit s (bigD - 1) base)
           (ensures sorted s)
-  = admit() // Uses lemma_digits_le_implies_value_le
+  = // sorted_up_to_digit gives: forall i < j. forall d <= bigD-1. digit(s[i],d) <= digit(s[j],d)
+    // For adjacent pairs i, i+1: all digits <=, so by digit_sum monotonicity, s[i] <= s[i+1]
+    let aux (i: nat{i + 1 < length s}) : Lemma (index s i <= index s (i + 1))
+      = let x = index s i in
+        let y = index s (i + 1) in
+        digit_decomposition x bigD base;
+        digit_decomposition y bigD base;
+        lemma_digit_sum_le x y bigD base bigD
+    in
+    Classical.forall_intro (Classical.move_requires aux);
+    lemma_pairwise_implies_sorted s
 
 (* ========== Final correctness statement ========== *)
 

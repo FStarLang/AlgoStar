@@ -184,16 +184,28 @@ let select_worst_case_quadratic (n: nat) (k: nat{k < n \/ n = 0})
  * - Round n-2: n-1 comparisons
  * Total: (n-1) * n comparisons, which is Θ(n²)
  *)
+// Exact cost: select_with_ticks_partial n k = k * (n-1) comparisons
+private let rec select_partial_exact (n: nat{n > 0}) (k: nat)
+  : Lemma (ensures snd (select_with_ticks_partial n k) = k * (n - 1))
+          (decreases k)
+  = if k = 0 then ()
+    else if k = 1 then ()
+    else begin
+      select_partial_exact n (k - 1);
+      assert (snd (select_with_ticks_partial n (k - 1)) = (k - 1) * (n - 1));
+      assert (snd (select_with_ticks_partial n k) = (n - 1) + (k - 1) * (n - 1))
+    end
+
 let select_bound_tight_for_max (n: nat{n > 0})
   : Lemma (ensures (
     let k = n - 1 in
     let (_, ticks) = select_with_ticks n k in
-    // For k = n-1, we do n rounds of (n-1) comparisons each
-    // Actually, for partial selection sort, we do n rounds
-    // The exact count is n*(n-1) = n² - n
-    ticks >= (n - 1) * (n - 1)  // Lower bound: at least (n-1)² comparisons
-  ))
-  = admit() // Detailed proof would require more precise model
+    ticks >= (n - 1) * (n - 1)))
+  = if n = 1 then ()
+    else begin
+      select_partial_exact n n;
+      assert (n * (n - 1) >= (n - 1) * (n - 1))
+    end
 
 (**
  * Alternative: Quickselect worst-case recurrence

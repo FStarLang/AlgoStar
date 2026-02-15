@@ -486,7 +486,8 @@ let lemma_matrix_product_sub_right
   = lemma_dot_product_sub_right a b1 b2 i j (cols a)
 
 // Helper: prove element-wise equality for a specific element
-let lemma_strassen_elem_correct 
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+let rec lemma_strassen_elem_correct 
   (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   (i:nat{i < rows a}) (j:nat{j < cols b})
   : Lemma (ensures get_elem (strassen_multiply a b) i j == get_elem (standard_multiply a b) i j)
@@ -508,21 +509,180 @@ let lemma_strassen_elem_correct
       let b21 = submatrix b half n 0 half in
       let b22 = submatrix b half n half n in
       
-      // The full proof requires:
-      // 1. Showing that standard multiply decomposes correctly into quadrant products
-      //    (using lemma_dot_product_split to split the dot product at 'half')
-      // 2. Expanding Strassen's P1..P7 formulas using distributive laws
-      // 3. Verifying the algebraic identities:
-      //    - C11 = P5 + P4 - P2 + P6 = A11*B11 + A12*B21
-      //    - C12 = P1 + P2 = A11*B12 + A12*B22
-      //    - C21 = P3 + P4 = A21*B11 + A22*B21
-      //    - C22 = P5 + P1 - P3 - P7 = A21*B12 + A22*B22
-      // 4. Using assemble_quadrants properties to show the final result matches
-      //
-      // This would require ~100+ lines of careful lemma applications
-      // For now, this remains admitted as it's a standard result in algorithms
-      admit()
+      // Extract quadrants of the result by expanding strassen_multiply definition
+      // strassen_multiply computes P1..P7 and assembles them into quadrants
+      let p1 = strassen_multiply a11 (matrix_sub b12 b22) in
+      let p2 = strassen_multiply (matrix_add a11 a12) b22 in
+      let p3 = strassen_multiply (matrix_add a21 a22) b11 in
+      let p4 = strassen_multiply a22 (matrix_sub b21 b11) in
+      let p5 = strassen_multiply (matrix_add a11 a22) (matrix_add b11 b22) in
+      let p6 = strassen_multiply (matrix_sub a12 a22) (matrix_add b21 b22) in
+      let p7 = strassen_multiply (matrix_sub a11 a21) (matrix_add b11 b12) in
+      
+      let c11 = matrix_add (matrix_sub (matrix_add p5 p4) p2) p6 in
+      let c12 = matrix_add p1 p2 in
+      let c21 = matrix_add p3 p4 in
+      let c22 = matrix_sub (matrix_sub (matrix_add p5 p1) p3) p7 in
+      
+      // strassen_multiply a b = assemble_quadrants c11 c12 c21 c22
+      // (this follows by definition reduction)
+      
+      // Use assemble lemma to determine which quadrant (i,j) is in
+      lemma_assemble_quadrants_elem c11 c12 c21 c22 i j;
+      
+      // Standard multiply also decomposes by quadrants
+      lemma_standard_multiply_correct a b i j;
+      
+      // Case analysis on which quadrant the element falls into
+      if i < half && j < half then begin
+        // Upper-left quadrant: need to show c11[i,j] = (A11*B11 + A12*B21)[i,j]
+        
+        // Apply IH: Each Pk equals the corresponding standard_multiply
+        lemma_strassen_elem_correct (matrix_add a11 a22) (matrix_add b11 b22) i j;
+        lemma_strassen_elem_correct a22 (matrix_sub b21 b11) i j;
+        lemma_strassen_elem_correct (matrix_add a11 a12) b22 i j;
+        lemma_strassen_elem_correct (matrix_sub a12 a22) (matrix_add b21 b22) i j;
+        
+        // Expand P5 = (A11 + A22) * (B11 + B22)
+        lemma_matrix_product_add_left a11 a22 (matrix_add b11 b22) i j;
+        lemma_matrix_product_add_right a11 b11 b22 i j;
+        lemma_matrix_product_add_right a22 b11 b22 i j;
+        
+        // Expand P4 = A22 * (B21 - B11)
+        lemma_matrix_product_sub_right a22 b21 b11 i j;
+        
+        // Expand P2 = (A11 + A12) * B22
+        lemma_matrix_product_add_left a11 a12 b22 i j;
+        
+        // Expand P6 = (A12 - A22) * (B21 + B22)
+        lemma_matrix_product_add_right (matrix_sub a12 a22) b21 b22 i j;
+        
+        // Element access for combinations
+        lemma_matrix_add_elem p5 p4 i j;
+        lemma_matrix_sub_elem (matrix_add p5 p4) p2 i j;
+        lemma_matrix_add_elem (matrix_sub (matrix_add p5 p4) p2) p6 i j;
+        
+        // Standard multiply results
+        lemma_standard_multiply_correct a11 b11 i j;
+        lemma_standard_multiply_correct a11 b22 i j;
+        lemma_standard_multiply_correct a12 b21 i j;
+        lemma_standard_multiply_correct a12 b22 i j;
+        lemma_standard_multiply_correct a22 b11 i j;
+        lemma_standard_multiply_correct a22 b21 i j;
+        lemma_standard_multiply_correct a22 b22 i j;
+        
+        // Submatrix relationships
+        lemma_submatrix_elem a 0 half 0 half i j;
+        lemma_submatrix_elem a 0 half half n i j;
+        lemma_submatrix_elem a half n half n i j;
+        lemma_submatrix_elem b 0 half 0 half i j;
+        lemma_submatrix_elem b 0 half half n i j;
+        lemma_submatrix_elem b half n 0 half i j;
+        lemma_submatrix_elem b half n half n i j;
+        
+        lemma_standard_multiply_correct a b i j;
+        
+        admit()
+      end
+      else if i < half && j >= half then begin
+        // Upper-right quadrant: C12 = P1 + P2 = A11*B12 + A12*B22
+        let j' = j - half in
+        
+        // Apply IH to show P1 and P2 equal standard_multiply
+        lemma_strassen_elem_correct a11 (matrix_sub b12 b22) i j';
+        lemma_strassen_elem_correct (matrix_add a11 a12) b22 i j';
+        
+        // Expand algebraically
+        lemma_matrix_product_sub_right a11 b12 b22 i j';
+        lemma_matrix_product_add_left a11 a12 b22 i j';
+        lemma_matrix_add_elem p1 p2 i j';
+        
+        // Element access
+        lemma_standard_multiply_correct a11 b12 i j';
+        lemma_standard_multiply_correct a11 b22 i j';
+        lemma_standard_multiply_correct a12 b22 i j';
+        
+        // Relate submatrices to original
+        lemma_submatrix_elem a 0 half 0 half i j';
+        lemma_submatrix_elem a 0 half half n i j';
+        lemma_submatrix_elem b 0 half half n i j';
+        lemma_submatrix_elem b half n half n i j';
+        
+        // Standard multiply decomposition  
+        lemma_standard_multiply_correct a b i j;
+        
+        admit() // Still need to connect dot products
+      end
+      else if i >= half && j < half then begin
+        // Lower-left quadrant: C21 = P3 + P4 = A21*B11 + A22*B21
+        let i' = i - half in
+        
+        lemma_strassen_elem_correct (matrix_add a21 a22) b11 i' j;
+        lemma_strassen_elem_correct a22 (matrix_sub b21 b11) i' j;
+        
+        lemma_matrix_product_add_left a21 a22 b11 i' j;
+        lemma_matrix_product_sub_right a22 b21 b11 i' j;
+        lemma_matrix_add_elem p3 p4 i' j;
+        
+        lemma_standard_multiply_correct a21 b11 i' j;
+        lemma_standard_multiply_correct a22 b11 i' j;
+        lemma_standard_multiply_correct a22 b21 i' j;
+        
+        lemma_submatrix_elem a half n 0 half i' j;
+        lemma_submatrix_elem a half n half n i' j;
+        lemma_submatrix_elem b 0 half 0 half i' j;
+        lemma_submatrix_elem b half n 0 half i' j;
+        
+        lemma_standard_multiply_correct a b i j;
+        
+        admit()
+      end
+      else begin
+        // Lower-right quadrant: C22 = P5 + P1 - P3 - P7 = A21*B12 + A22*B22
+        let i' = i - half in
+        let j' = j - half in
+        
+        lemma_strassen_elem_correct (matrix_add a11 a22) (matrix_add b11 b22) i' j';
+        lemma_strassen_elem_correct a11 (matrix_sub b12 b22) i' j';
+        lemma_strassen_elem_correct (matrix_add a21 a22) b11 i' j';
+        lemma_strassen_elem_correct (matrix_sub a11 a21) (matrix_add b11 b12) i' j';
+        
+        // Expand products
+        lemma_matrix_product_add_left a11 a22 (matrix_add b11 b22) i' j';
+        lemma_matrix_product_add_right a11 b11 b22 i' j';
+        lemma_matrix_product_add_right a22 b11 b22 i' j';
+        lemma_matrix_product_sub_right a11 b12 b22 i' j';
+        lemma_matrix_product_add_left a21 a22 b11 i' j';
+        lemma_matrix_product_add_right (matrix_sub a11 a21) b11 b12 i' j';
+        
+        // Element access
+        lemma_matrix_add_elem p5 p1 i' j';
+        lemma_matrix_sub_elem (matrix_add p5 p1) p3 i' j';
+        lemma_matrix_sub_elem (matrix_sub (matrix_add p5 p1) p3) p7 i' j';
+        
+        lemma_standard_multiply_correct a11 b11 i' j';
+        lemma_standard_multiply_correct a11 b12 i' j';
+        lemma_standard_multiply_correct a11 b22 i' j';
+        lemma_standard_multiply_correct a22 b11 i' j';
+        lemma_standard_multiply_correct a22 b22 i' j';
+        lemma_standard_multiply_correct a21 b11 i' j';
+        lemma_standard_multiply_correct a21 b12 i' j';
+        
+        lemma_submatrix_elem a 0 half 0 half i' j';
+        lemma_submatrix_elem a 0 half half n i' j';
+        lemma_submatrix_elem a half n 0 half i' j';
+        lemma_submatrix_elem a half n half n i' j';
+        lemma_submatrix_elem b 0 half 0 half i' j';
+        lemma_submatrix_elem b 0 half half n i' j';
+        lemma_submatrix_elem b half n 0 half i' j';
+        lemma_submatrix_elem b half n half n i' j';
+        
+        lemma_standard_multiply_correct a b i j;
+        
+        admit()
+      end
     end
+#pop-options
 
 let lemma_strassen_correct (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   : Lemma (ensures (forall (i:nat) (j:nat). i < rows a /\ j < cols b ==>
