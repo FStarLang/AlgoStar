@@ -92,9 +92,8 @@ let map_nonempty (#a #b: Type) (f: a -> b) (l: list a{Cons? l})
   = ()
 
 // Lemma: sortWith preserves non-emptiness
-let rec sortWith_nonempty (#a: Type) (f: a -> a -> int) (l: list a{Cons? l})
+let sortWith_nonempty (#a: Type) (f: a -> a -> int) (l: list a{Cons? l})
   : Lemma (ensures Cons? (sortWith f l))
-          (decreases (length l))
   = // sortWith is defined as:
     // | [] -> []
     // | pivot::tl -> append (sortWith f lo) (pivot::sortWith f hi)
@@ -144,10 +143,9 @@ let rec partition_by_freq_cmp (pivot: htree) (l: list htree)
         ()
 
 // Lemma: if all elements are >= pivot and the rest is sorted, prepending maintains sort
-let rec prepend_maintains_sorted (pivot: htree) (sorted_rest: list htree)
+let prepend_maintains_sorted (pivot: htree) (sorted_rest: list htree)
   : Lemma (requires is_sorted_by_freq sorted_rest /\ all_ge_pivot pivot sorted_rest)
           (ensures is_sorted_by_freq (pivot :: sorted_rest))
-          (decreases sorted_rest)
   = match sorted_rest with
     | [] -> ()
     | hd :: tl ->

@@ -293,7 +293,7 @@ let tree_height (f: uf_forest_sized) (x: nat{x < f.n}) : nat =
 // 2. Rank increases are strict
 // 3. Therefore path length is bounded by the rank
 
-let rec height_le_rank_fuel 
+let height_le_rank_fuel 
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f)})
   (x: nat{x < f.n}) 

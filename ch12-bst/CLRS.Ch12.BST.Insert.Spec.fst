@@ -177,6 +177,7 @@ let rec lemma_pure_insert_only_modifies_new_idx
 // When we insert at new_idx, we know lo < key < hi from the path taken.
 
 // Track that bounds are maintained during insert descent
+#push-options "--warn_error -328"
 let rec pure_insert_preserves_subtree_range
   (keys: seq int)
   (valid: seq bool)
@@ -284,6 +285,7 @@ and lemma_subtree_completely_unchanged
     //
     // For brevity, we admit this structural reasoning.
     admit()
+#pop-options
 
 (* ========================================================================
    Main Theorem: Insert Preserves BST Ordering Property

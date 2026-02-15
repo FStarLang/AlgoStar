@@ -75,9 +75,8 @@ let pow2_size (m:matrix{is_square m}) : prop =
   is_pow2 (rows m)
 
 // Helper lemmas about power of 2
-let rec lemma_pow2_half (n:pos{is_pow2 n /\ n > 1})
+let lemma_pow2_half (n:pos{is_pow2 n /\ n > 1})
   : Lemma (ensures is_pow2 (n / 2) /\ n / 2 > 0)
-          (decreases n)
   = ()
 
 let lemma_pow2_double (n:pos{is_pow2 n})
@@ -288,9 +287,8 @@ let rec lemma_pow2_log2_inverse (n:pos{is_pow2 n})
     end
 
 // Lemma 2: log2_floor relates to division by 2
-let rec lemma_log2_half (n:pos{is_pow2 n /\ n > 1})
+let lemma_log2_half (n:pos{is_pow2 n /\ n > 1})
   : Lemma (ensures log2_floor n == 1 + log2_floor (n / 2))
-          (decreases n)
   = ()
 
 // Lemma 3: pow7 relates to multiplication by 7
@@ -315,7 +313,7 @@ let rec lemma_strassen_mult_closed_form (n:pos{is_pow2 n})
 // ========== Correctness Proof ==========
 
 // Helper: properties of dot product
-let rec lemma_dot_product_split (a b:matrix{cols a == rows b})
+let lemma_dot_product_split (a b:matrix{cols a == rows b})
                                 (i:nat{i < rows a}) (j:nat{j < cols b})
                                 (k1 k2:nat{k1 <= k2 /\ k2 <= cols a})
   : Lemma (ensures dot_product a b i j k2 == 
@@ -391,10 +389,9 @@ let lemma_assemble_quadrants_elem (c11 c12 c21 c22:matrix{
 
 #push-options "--z3rlimit 10"
 
-let rec lemma_strassen_correct (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
+let lemma_strassen_correct (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   : Lemma (ensures (forall (i:nat) (j:nat). i < rows a /\ j < cols b ==>
                     get_elem (strassen_multiply a b) i j == get_elem (standard_multiply a b) i j))
-          (decreases rows a)
   = admit()  // Full proof requires algebraic verification of all 4 result quadrants
 
 #pop-options

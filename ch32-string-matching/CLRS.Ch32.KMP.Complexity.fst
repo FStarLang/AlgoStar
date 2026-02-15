@@ -28,6 +28,7 @@ open FStar.Mul
 #push-options "--z3rlimit 100 --ifuel 2 --fuel 2"
 
 module A = Pulse.Lib.Array
+module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
@@ -127,19 +128,19 @@ fn compute_prefix_function_complexity
   (#a: eqtype)
   (#p_pat: perm)
   (pattern: array a)
-  (pi: array SZ.t)
+  (pi: V.vec SZ.t)
   (#s_pat: Ghost.erased (Seq.seq a))
   (m: SZ.t)
   (ctr: GR.ref nat)
   (#c0: erased nat)
   requires 
     A.pts_to pattern #p_pat s_pat **
-    A.pts_to pi #1.0R (Seq.create (SZ.v m) 0sz) **
+    V.pts_to pi #1.0R (Seq.create (SZ.v m) 0sz) **
     GR.pts_to ctr c0 **
     pure (
       SZ.v m == Seq.length s_pat /\
       Seq.length s_pat <= A.length pattern /\
-      SZ.v m <= A.length pi /\
+      SZ.v m <= V.length pi /\
       SZ.v m > 0 /\
       SZ.fits (SZ.v m + 1) /\
       SZ.fits (2 * (SZ.v m - 1))
@@ -147,7 +148,7 @@ fn compute_prefix_function_complexity
   returns _: unit
   ensures exists* s_pi (cf: nat).
     A.pts_to pattern #p_pat s_pat **
-    A.pts_to pi #1.0R s_pi **
+    V.pts_to pi #1.0R s_pi **
     GR.pts_to ctr cf **
     pure (
       Seq.length s_pi == SZ.v m /\
@@ -165,7 +166,7 @@ fn compute_prefix_function_complexity
     R.pts_to q vq **
     R.pts_to k vk **
     A.pts_to pattern #p_pat s_pat **
-    A.pts_to pi #1.0R s_pi_outer **
+    V.pts_to pi #1.0R s_pi_outer **
     GR.pts_to ctr vc_outer **
     pure (
       SZ.v vq <= SZ.v m /\
@@ -192,7 +193,7 @@ fn compute_prefix_function_complexity
       R.pts_to k vk_inner **
       R.pts_to done_inner vdone **
       A.pts_to pattern #p_pat s_pat **
-      A.pts_to pi #1.0R s_pi_inner **
+      V.pts_to pi #1.0R s_pi_inner **
       GR.pts_to ctr vc_inner **
       pure (
         SZ.v vk_inner >= 0 /\
@@ -211,7 +212,7 @@ fn compute_prefix_function_complexity
       let vk = !k;
       
       let safe_pi_idx: SZ.t = (if SZ.v vk > 0 then vk -^ 1sz else 0sz);
-      let pi_prev = A.op_Array_Access pi safe_pi_idx;
+      let pi_prev = V.op_Array_Access pi safe_pi_idx;
       
       let pk = A.op_Array_Access pattern vk;
       let pq = A.op_Array_Access pattern vq;
@@ -247,7 +248,7 @@ fn compute_prefix_function_complexity
     k := new_k_final;
     
     let final_k = !k;
-    A.op_Array_Assignment pi vq final_k;
+    V.op_Array_Assignment pi vq final_k;
     
     assert pure (is_prefix_suffix s_pat (SZ.v vq) (SZ.v final_k));
     assert pure (SZ.v final_k >= 0);
@@ -277,7 +278,7 @@ fn kmp_matcher_complexity
   (#p_text #p_pat #p_pi: perm)
   (text: array int)
   (pattern: array int)
-  (pi: array SZ.t)
+  (pi: V.vec SZ.t)
   (#s_text: Ghost.erased (Seq.seq int))
   (#s_pat: Ghost.erased (Seq.seq int))
   (#s_pi: Ghost.erased (Seq.seq SZ.t))
@@ -288,14 +289,14 @@ fn kmp_matcher_complexity
   requires 
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
-    A.pts_to pi #p_pi s_pi **
+    V.pts_to pi #p_pi s_pi **
     GR.pts_to ctr c0 **
     pure (
       SZ.v n == Seq.length s_text /\
       SZ.v m == Seq.length s_pat /\
       Seq.length s_text <= A.length text /\
       Seq.length s_pat <= A.length pattern /\
-      Seq.length s_pi <= A.length pi /\
+      Seq.length s_pi <= V.length pi /\
       SZ.v m > 0 /\
       SZ.v n >= SZ.v m /\
       SZ.fits (SZ.v n + 1) /\
@@ -307,7 +308,7 @@ fn kmp_matcher_complexity
   ensures exists* (cf: nat).
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
-    A.pts_to pi #p_pi s_pi **
+    V.pts_to pi #p_pi s_pi **
     GR.pts_to ctr cf **
     pure (
       SZ.v count >= 0 /\
@@ -326,7 +327,7 @@ fn kmp_matcher_complexity
     R.pts_to count_matches vcount **
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
-    A.pts_to pi #p_pi s_pi **
+    V.pts_to pi #p_pi s_pi **
     GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
@@ -353,7 +354,7 @@ fn kmp_matcher_complexity
       R.pts_to done_follow vdone **
       A.pts_to text #p_text s_text **
       A.pts_to pattern #p_pat s_pat **
-      A.pts_to pi #p_pi s_pi **
+      V.pts_to pi #p_pi s_pi **
       GR.pts_to ctr vc_inner **
       pure (
         SZ.v vi < SZ.v n /\
@@ -379,7 +380,7 @@ fn kmp_matcher_complexity
       
       if should_follow {
         let safe_idx = vq -^ 1sz;
-        let pi_val = A.op_Array_Access pi safe_idx;
+        let pi_val = V.op_Array_Access pi safe_idx;
         q := pi_val;
         assert pure (is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v pi_val))
       } else {
@@ -409,7 +410,7 @@ fn kmp_matcher_complexity
     let new_count_val: SZ.t = (if have_match then old_count +^ 1sz else old_count);
     
     let pi_idx_for_reset = m -^ 1sz;
-    let pi_val_for_reset = A.op_Array_Access pi pi_idx_for_reset;
+    let pi_val_for_reset = V.op_Array_Access pi pi_idx_for_reset;
     let new_q_after_match: SZ.t = (if have_match then pi_val_for_reset else vq_final);
     
     let vi_next = vi +^ 1sz;
@@ -487,7 +488,7 @@ fn kmp_string_match_with_complexity
     )
 {
   // Allocate pi array
-  let pi: array SZ.t = A.alloc 0sz m;
+  let pi: V.vec SZ.t = V.alloc 0sz m;
   
   // Phase 1: Compute prefix function
   compute_prefix_function_complexity pattern pi m ctr;
@@ -499,7 +500,7 @@ fn kmp_string_match_with_complexity
   // Therefore: c2 - c0 <= 2*n + 2*(m-1) = 2*n + 2*m - 2 <= 2*n + 2*m
   admit();
   
-  A.free pi;
+  V.free pi;
   
   result
 }

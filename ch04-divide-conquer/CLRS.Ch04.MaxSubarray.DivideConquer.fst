@@ -157,7 +157,7 @@ let rec lemma_log2_ceil_bounds (n: pos)
 
 // Prove: T(n) = O(n log n)
 // Specifically: T(n) <= 4 * n * log2_ceil n
-let rec lemma_dc_complexity_bound (n: pos) 
+let lemma_dc_complexity_bound (n: pos) 
   : Lemma (ensures dc_ops_count n <= op_Multiply 4 (op_Multiply n (log2_ceil n + 1)))
           (decreases n)
   =
@@ -185,7 +185,7 @@ let lemma_dc_empty_case (s: Seq.seq int) (i: nat)
   = ()
 
 // The returned range has the claimed sum
-let rec lemma_dc_sum_correct (s: Seq.seq int) (low high: nat)
+let lemma_dc_sum_correct (s: Seq.seq int) (low high: nat)
   : Lemma
     (requires low <= high /\ high <= Seq.length s)
     (ensures (let (sum, left, right) = find_maximum_subarray_dc s low high in

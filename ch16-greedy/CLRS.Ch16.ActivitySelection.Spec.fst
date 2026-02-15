@@ -125,7 +125,7 @@ let is_optimal_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (se
      * Therefore O' is also optimal and contains activity 0
 *)
 
-let rec lemma_greedy_choice_helper
+let lemma_greedy_choice_helper
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (opt: list nat) (k: nat)
   : Lemma
     (requires
@@ -285,7 +285,7 @@ let rec is_greedy_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) 
    3. By induction, greedy produces optimal solution
 *)
 
-let rec lemma_greedy_is_optimal_helper
+let lemma_greedy_is_optimal_helper
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (greedy_sel: list nat) (fuel: nat)
   : Lemma
     (requires

@@ -95,7 +95,7 @@ let rec digit_sum (k: nat) (d: nat) (base: nat) : Tot nat (decreases d) =
 /// Key property: a number equals the sum of its digits times powers of base
 /// For k < base^bigD, we have k = sum_{i=0}^{bigD-1} digit(k,i) * base^i
 #push-options "--fuel 2 --ifuel 1"
-let rec digit_decomposition (k: nat) (bigD: nat) (base: nat)
+let digit_decomposition (k: nat) (bigD: nat) (base: nat)
   : Lemma (requires bigD > 0 /\ base >= 2 /\ k < pow base bigD)
           (ensures k == digit_sum k bigD base)
           (decreases bigD)
@@ -133,7 +133,7 @@ let rec digit_decomposition (k: nat) (bigD: nat) (base: nat)
 /// then the contribution from digit d (and all higher digits) determines the order.
 /// Since digit_x(d) < digit_y(d), we have x < y regardless of higher digits.
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
-let rec digits_lex_order_implies_numeric_order
+let digits_lex_order_implies_numeric_order
   (x y: nat) (bigD: nat) (base: nat)
   : Lemma (requires bigD > 0 /\ base >= 2 /\
                     x < pow base bigD /\ y < pow base bigD /\
@@ -193,7 +193,7 @@ let digits_all_equal_implies_equal
 /// Helper: prove sorted by induction after establishing pairwise order
 /// Note: This requires standard sequence lemmas about tail and indexing
 #push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
-let rec lemma_pairwise_le_implies_sorted (s: seq nat)
+let lemma_pairwise_le_implies_sorted (s: seq nat)
   : Lemma (requires length s > 0 /\
                     (forall (i j: nat). i < length s /\ j < length s /\ i < j ==> 
                       index s i <= index s j))

@@ -105,7 +105,7 @@ let rec relax_from_u (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
 
 (* Lemma: After relaxing all edges from u, triangle inequality holds for all edges from u *)
 #push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
-let rec relax_from_u_establishes_triangle_from_u (#n: nat) (dist: dist_vec n) 
+let relax_from_u_establishes_triangle_from_u (#n: nat) (dist: dist_vec n) 
                                                   (weights: weight_matrix n)
                                                   (u: nat{u < n}) (v_start: nat)
   : Lemma 

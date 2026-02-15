@@ -171,7 +171,6 @@ fn elim_factored_next
   with np'. _;
   rewrite each np' as np;
   rewrite each (r0 :: rs) as (L.tl l);
-  rewrite each (hd :: r0 :: rs) as l
 }
 
 // Reinsert tail dls into factored_next
@@ -189,7 +188,6 @@ fn intro_factored_next
   let rs = L.tl (L.tl l);
   rewrite each (L.tl l) as (r0 :: rs) in
     (dls np (L.tl l) (Some p) tail last_ptr);
-  rewrite each l as (hd :: r0 :: rs);
   fold (dls_factored_next p (hd :: r0 :: rs) tail last_ptr (Some np));
   rewrite each (hd :: r0 :: rs) as l
 }
@@ -379,8 +377,6 @@ fn rec dls_append
       rewrite each (r1 @ l2) as ((k1' :: r1') @ l2);
       fold_dls_cons h1 k1 ((k1' :: r1') @ l2) prev1 t2 last2 v1 np1;
       // dls h1 (k1 :: (k1' :: r1') @ l2) prev1 t2 last2
-      rewrite each (k1 :: (k1' :: r1') @ l2) as ((k1 :: k1' :: r1') @ l2);
-      rewrite each (k1 :: k1' :: r1') as l1
     }
   }
 }
@@ -449,7 +445,6 @@ fn rec search_dls
   let nd = Box.(!p);
   let nxt = nd.next;
   if (nd.key = k) {
-    rewrite each nd.next as v.next;
     fold (dls_factored p l prev_ptr tail None);
     unfactor_dls p l prev_ptr tail None;
     true
@@ -457,7 +452,6 @@ fn rec search_dls
     match nxt {
       norewrite None -> {
         // nd.next == None with last_ptr == None => singleton
-        rewrite each nd.next as v.next;
         factored_next_none_nil p;
         fold (dls_factored p l prev_ptr tail None);
         unfactor_dls p l prev_ptr tail None;
@@ -465,7 +459,6 @@ fn rec search_dls
       }
       norewrite Some np -> {
         // nd.next == Some np with last_ptr == None => multi-element
-        rewrite each nd.next as v.next;
         factored_next_some_cons p np;
         // Extract tail segment, recurse, reinsert
         elim_factored_next p np;
@@ -530,7 +523,6 @@ fn rec search_dls_ptr
   let nd = Box.(!p);
   let nxt = nd.next;
   if (nd.key = k) {
-    rewrite each nd.next as v.next;
     fold (dls_factored p l prev_ptr tail None);
     unfactor_dls p l prev_ptr tail None;
     Some p
@@ -538,7 +530,6 @@ fn rec search_dls_ptr
     match nxt {
       norewrite None -> {
         // nd.next == None with last_ptr == None => singleton
-        rewrite each nd.next as v.next;
         factored_next_none_nil p;
         fold (dls_factored p l prev_ptr tail None);
         unfactor_dls p l prev_ptr tail None;
@@ -546,7 +537,6 @@ fn rec search_dls_ptr
       }
       norewrite Some np -> {
         // nd.next == Some np with last_ptr == None => multi-element
-        rewrite each nd.next as v.next;
         factored_next_some_cons p np;
         // Extract tail segment, recurse, reinsert
         elim_factored_next p np;
@@ -735,7 +725,6 @@ fn rec delete_in_dls
     match nxt {
       norewrite None -> {
         // Singleton: free node, return empty
-        rewrite each nd.next as v.next;
         factored_next_none_nil p;
         let hd_l = hide (L.hd l);
         rewrite each l as [reveal hd_l] in (dls_factored_next p l tail_ptr None None);
@@ -748,7 +737,6 @@ fn rec delete_in_dls
       }
       norewrite Some np -> {
         // Multi: free head, return tail with updated prev
-        rewrite each nd.next as v.next;
         factored_next_some_cons p np;
         elim_factored_next p np;
         Box.free p;
@@ -765,7 +753,6 @@ fn rec delete_in_dls
     match nxt {
       norewrite None -> {
         // Singleton, key not found: return as-is
-        rewrite each nd.next as v.next;
         factored_next_none_nil p;
         fold (dls_factored p l prev_ptr tail_ptr None);
         unfactor_dls p l prev_ptr tail_ptr None;
@@ -779,7 +766,6 @@ fn rec delete_in_dls
       }
       norewrite Some np -> {
         // Multi: recurse on tail segment
-        rewrite each nd.next as v.next;
         factored_next_some_cons p np;
         elim_factored_next p np;
         // dls np (L.tl l) (Some p) tail_ptr None

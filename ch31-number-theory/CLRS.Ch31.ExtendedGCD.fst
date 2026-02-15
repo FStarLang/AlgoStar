@@ -26,7 +26,7 @@ let rec gcd (a b: nat) : Tot nat (decreases b) =
 // ========== Extended GCD Algorithm ==========
 
 // The algorithm returns (d, x, y) as a tuple
-type extended_gcd_result = (d: nat & x: int & y: int)
+type extended_gcd_result = (_: nat & _: int & int)
 
 let rec extended_gcd (a b: nat) 
   : Tot extended_gcd_result (decreases b)
@@ -108,10 +108,9 @@ let rec bezout_identity (a b: nat)
 
 // Theorem: d is the greatest common divisor
 // Any common divisor of a and b divides d
-let rec extended_gcd_is_greatest (a b: nat) (c: pos)
+let extended_gcd_is_greatest (a b: nat) (c: pos)
   : Lemma (requires divides c a /\ divides c b)
           (ensures (let (| d, _, _ |) = extended_gcd a b in divides c d))
-          (decreases b)
   = let (| d, x, y |) = extended_gcd a b in
     bezout_identity a b;
     // We have a*x + b*y = d

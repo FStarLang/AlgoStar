@@ -144,6 +144,8 @@ let count_le_empty (v: int)
   : Lemma (count_le Seq.empty v = 0)
   = ()
 
+// W328: rec needed for Z3 encoding (removing breaks insert_sorted proof)
+#push-options "--warn_error -328"
 let rec count_lt_cons (hd: int) (tl: seq int) (v: int)
   : Lemma (ensures count_lt (Seq.cons hd tl) v =
                    (if hd < v then 1 else 0) + count_lt tl v)
@@ -157,6 +159,7 @@ let rec count_le_cons (hd: int) (tl: seq int) (v: int)
   = let s = Seq.cons hd tl in
     assert (Seq.index s 0 == hd);
     assert (Seq.equal (Seq.tail s) tl)
+#pop-options
 
 let rec count_lt_append (s1 s2: seq int) (v: int)
   : Lemma (ensures count_lt (Seq.append s1 s2) v = count_lt s1 v + count_lt s2 v)

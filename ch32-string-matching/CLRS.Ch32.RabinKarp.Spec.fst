@@ -75,7 +75,7 @@ let horner_hash_slice (s: Seq.seq nat) (start: nat) (len: nat) (d: pos) (q: pos)
   else horner_hash (Seq.slice s start (start + len)) d q
 
 /// Fundamental lemma: horner_hash relates to concatenation via Seq.cons
-let rec horner_hash_unfold_lemma
+let horner_hash_unfold_lemma
     (s: Seq.seq nat{Seq.length s > 0})
     (d: pos)
     (q: pos)
@@ -132,7 +132,7 @@ let slice_snoc_lemma
 /// Core algebraic lemma: relationship between consecutive window hashes
 /// This is the heart of the rolling hash proof
 #push-options "--z3rlimit 10"
-let rec horner_hash_roll_lemma
+let horner_hash_roll_lemma
     (s: Seq.seq nat)
     (new_elem: nat)
     (d: pos)

@@ -273,7 +273,7 @@ let pure_kruskal (g: graph) : list edge =
 (*** Correctness Properties ***)
 
 // Property 1: Kruskal maintains forest invariant
-let rec lemma_kruskal_step_preserves_forest (e: edge) (forest: list edge) (n: nat)
+let lemma_kruskal_step_preserves_forest (e: edge) (forest: list edge) (n: nat)
   : Lemma (requires is_forest forest n)
           (ensures is_forest (kruskal_step e forest n) n)
   = // If edge is added, it connects different components, so no cycle created
@@ -294,7 +294,7 @@ let rec lemma_kruskal_process_preserves_forest
       lemma_kruskal_process_preserves_forest rest (kruskal_step e forest n) n
 
 // Property 2: All edges in result are from the graph
-let rec lemma_kruskal_step_edges_from_graph 
+let lemma_kruskal_step_edges_from_graph 
     (e: edge) (forest: list edge) (graph_edges: list edge) (n: nat)
   : Lemma (requires subset_edges forest graph_edges /\ mem_edge e graph_edges)
           (ensures subset_edges (kruskal_step e forest n) graph_edges)
@@ -361,7 +361,7 @@ let lemma_kruskal_step_safe_edge (g: graph) (e: edge) (forest: list edge)
     // that haven't been added yet
     // Since edges are processed in sorted order, e.w <= e'.w for any
     // edge e' that crosses this cut and isn't in forest
-    let rec lemma_edge_is_light (e: edge) (g: graph) (forest: list edge) (s: cut)
+    let lemma_edge_is_light (e: edge) (g: graph) (forest: list edge) (s: cut)
       : Lemma (requires 
                 mem_edge e g.edges /\
                 crosses_cut e s /\

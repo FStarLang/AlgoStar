@@ -167,7 +167,7 @@ let rec insert_by_digit_length
     else insert_by_digit_length x (tail s) d base
 
 /// Helper: head of insert_by_digit result
-let rec insert_by_digit_head
+let insert_by_digit_head
   (x: nat) (s: seq nat) (d: nat) (base: nat)
   : Lemma (requires length s > 0)
           (ensures (let result = insert_by_digit x s d base in

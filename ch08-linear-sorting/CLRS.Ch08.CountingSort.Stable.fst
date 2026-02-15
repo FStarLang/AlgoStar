@@ -19,6 +19,7 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 
 module A = Pulse.Lib.Array
+module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
@@ -71,7 +72,7 @@ ensures exists* sb'.
   let k_plus_1 = k_val +^ 1sz;
   
   // Allocate count array C[0..k]
-  let c : A.array int = A.alloc 0 k_plus_1;
+  let c : V.vec int = V.alloc 0 k_plus_1;
   
   // ========== Phase 1: Initialize C[0..k] = 0 ==========
   // Already done by alloc
@@ -91,7 +92,7 @@ ensures exists* sb'.
     R.pts_to j vj **
     A.pts_to a #0.5R sa **
     A.pts_to b sb **
-    A.pts_to c sc **
+    V.pts_to c sc **
     pure (
       SZ.v vj <= SZ.v len /\
       Seq.length sc == SZ.v k_val + 1
@@ -104,10 +105,10 @@ ensures exists* sb'.
     let val_j = A.op_Array_Access a vj;
     
     // Read C[val_j]
-    let count_old = A.op_Array_Access c (SZ.uint_to_t val_j);
+    let count_old = V.op_Array_Access c (SZ.uint_to_t val_j);
     
     // C[val_j] = C[val_j] + 1
-    A.op_Array_Assignment c (SZ.uint_to_t val_j) (count_old + 1);
+    V.op_Array_Assignment c (SZ.uint_to_t val_j) (count_old + 1);
     
     // j++
     j := vj +^ 1sz;
@@ -127,7 +128,7 @@ ensures exists* sb'.
     R.pts_to i vi **
     A.pts_to a #0.5R sa **
     A.pts_to b sb **
-    A.pts_to c sc **
+    V.pts_to c sc **
     pure (
       SZ.v vi >= 1 /\
       SZ.v vi <= SZ.v k_val + 1 /\
@@ -142,13 +143,13 @@ ensures exists* sb'.
     let vi_minus_1 = vi -^ 1sz;
     
     // Read C[i-1]
-    let prev_count = A.op_Array_Access c vi_minus_1;
+    let prev_count = V.op_Array_Access c vi_minus_1;
     
     // Read C[i]
-    let curr_count = A.op_Array_Access c vi;
+    let curr_count = V.op_Array_Access c vi;
     
     // C[i] = C[i] + C[i-1]
-    A.op_Array_Assignment c vi (curr_count + prev_count);
+    V.op_Array_Assignment c vi (curr_count + prev_count);
     
     // i++
     i := vi +^ 1sz;
@@ -172,7 +173,7 @@ ensures exists* sb'.
     R.pts_to j_back vj_back **
     R.pts_to done vdone **
     A.pts_to a #0.5R sa **
-    A.pts_to c sc **
+    V.pts_to c sc **
     A.pts_to b sb_curr **
     pure (
       Seq.length sc == SZ.v k_val + 1 /\
@@ -191,7 +192,7 @@ ensures exists* sb'.
     assume_ (pure (val_j >= 0 /\ val_j <= SZ.v k_val));
     
     // Read C[val_j]
-    let pos = A.op_Array_Access c (SZ.uint_to_t val_j);
+    let pos = V.op_Array_Access c (SZ.uint_to_t val_j);
     
     assume_ (pure (pos >= 1 /\ pos <= SZ.v len));
     
@@ -199,7 +200,7 @@ ensures exists* sb'.
     A.op_Array_Assignment b (SZ.uint_to_t (pos - 1)) val_j;
     
     // C[A[j]]--
-    A.op_Array_Assignment c (SZ.uint_to_t val_j) (pos - 1);
+    V.op_Array_Assignment c (SZ.uint_to_t val_j) (pos - 1);
     
     // Check if we're done (j_back == 0)
     if (vj_back = 0sz) {
@@ -211,7 +212,7 @@ ensures exists* sb'.
   };
   
   // Free count array
-  A.free c;
+  V.free c;
   
   // Capture the final state of b
   with sb_final. assert (A.pts_to b sb_final);

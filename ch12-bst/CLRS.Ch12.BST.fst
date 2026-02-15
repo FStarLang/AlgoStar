@@ -166,7 +166,7 @@ let lemma_key_not_in_left_if_greater
 
 // Lemma: If a node is in the subtree and subtree_in_range holds at root,
 // then subtree_in_range holds for that node with appropriate bounds
-let rec lemma_reachable_implies_subtree_in_range
+let lemma_reachable_implies_subtree_in_range
   (keys: Seq.seq int)
   (valid: Seq.seq bool)
   (cap: nat)
@@ -320,7 +320,7 @@ let rec lemma_insert_at_invalid_preserves_old_keys
     )
 
 // Lemma: When inserting at an invalid position, the new key is in the tree
-let rec lemma_insert_at_invalid_adds_key
+let lemma_insert_at_invalid_adds_key
   (keys_old: Seq.seq int)
   (valid_old: Seq.seq bool)
   (keys_new: Seq.seq int)

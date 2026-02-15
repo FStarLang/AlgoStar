@@ -343,14 +343,13 @@ let cut_property g a e s =
 
 // If we start with empty set and repeatedly add safe edges,
 // we eventually build an MST
-let rec generic_mst_correctness_sketch
+let generic_mst_correctness_sketch
     (g: graph)
     (a: list edge)  // Current safe edge set
     (steps: nat)    // Remaining steps
   : Lemma (requires (exists (t: list edge). is_mst g t /\ subset_edges a t) /\
                     length a < g.n - 1)
           (ensures  True) // Would ensure: can extend A to MST
-          (decreases steps)
   = if steps = 0 then ()
     else begin
       // Find a cut respecting A and a light edge e crossing it

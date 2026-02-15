@@ -92,6 +92,7 @@ let lemma_queue_preds_extend_output
 (* When a vertex w is newly enqueued (added at position qt in queue),
    and all predecessors of w are in output[0..count+1),
    the queue preds property extends *)
+#push-options "--z3rlimit 20"
 let lemma_queue_preds_enqueue
   (adj: seq int) (n: nat) (queue_old queue_new: seq FStar.SizeT.t) (qh qt: nat)
    (output: seq int) (count: nat) (w: FStar.SizeT.t)
@@ -110,6 +111,7 @@ let lemma_queue_preds_enqueue
         (exists (k: nat). k < count /\ Seq.index output k == u)))
     (ensures queue_preds_in_output_sz adj n queue_new qh (qt + 1) output count)
   = ()
+#pop-options
 
 (* When a vertex is NOT enqueued (just overwriting some position in queue
    but not advancing qt), queue_preds is preserved if the overwrite is

@@ -432,7 +432,7 @@ let wpl_merge_siblings (t: htree) (f1 f2: pos)
 
 // Lemma: Replacing siblings with merge decreases WPL by the sum of their frequencies
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
-let rec wpl_after_merge (t: htree) (f1 f2: pos) (d: nat)
+let wpl_after_merge (t: htree) (f1 f2: pos) (d: nat)
   : Lemma (requires (match replace_siblings_with_merged t f1 f2 with
                      | Some _ -> True
                      | None -> False))

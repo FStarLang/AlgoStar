@@ -200,7 +200,7 @@ let lemma_augment_edge_conservation_intermediate (flow: Seq.seq int) (cap: Seq.s
   = admit() // Complex: need to track that both in and out increase by delta
 
 (** Lemma: Augmenting one edge doesn't decrease bottleneck of later path *)
-let rec lemma_bottleneck_tail (cap: Seq.seq int) (flow flow': Seq.seq int)
+let lemma_bottleneck_tail (cap: Seq.seq int) (flow flow': Seq.seq int)
                                (n: nat{Seq.length cap == n * n /\ Seq.length flow == n * n /\ Seq.length flow' == n * n})
                                (u v: nat{u < n /\ v < n})
                                (path: list nat{Cons? path /\ (forall (w: nat). L.mem w path ==> w < n)})
@@ -307,7 +307,7 @@ let lemma_zero_flow_value (n: nat{n > 0}) (source: nat{source < n})
     lemma_zero_sum_out n source n
 
 (** Lemma: Augmenting along path strictly increases flow value (P0.1.9) *)
-let rec lemma_augment_increases_value_aux (flow: Seq.seq int) (cap: Seq.seq int)
+let lemma_augment_increases_value_aux (flow: Seq.seq int) (cap: Seq.seq int)
                                            (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
                                            (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
                                            (source: nat{source < n})

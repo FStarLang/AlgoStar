@@ -88,7 +88,7 @@ let rec digit_sum (k bigD base d: nat) : Tot nat (decreases d) =
 
 // Main decomposition theorem: k equals the sum of its digits
 // This is a key property but complex to prove - we admit the detailed algebra
-let rec digit_decomposition (k bigD base: nat)
+let digit_decomposition (k bigD base: nat)
   : Lemma (requires bigD > 0 /\ base >= 2 /\ k < pow base bigD)
           (ensures k == digit_sum k bigD base bigD)
           (decreases bigD)
@@ -173,7 +173,7 @@ let lemma_stable_sort_preserves_order
   = admit() // Core stability reasoning - requires detailed proof
 
 // Main theorem: d passes of stable digit sort yields sorted array
-let rec radix_sort_correctness
+let radix_sort_correctness
   (s0: seq nat)
   (steps: list (seq nat))
   (bigD base: nat)
@@ -199,7 +199,7 @@ let rec radix_sort_correctness
 (* ========== Digit comparison implies value comparison ========== *)
 
 // If all digits are equal, values are equal
-let rec digits_equal_implies_equal (k1 k2 bigD base: nat)
+let digits_equal_implies_equal (k1 k2 bigD base: nat)
   : Lemma (requires bigD > 0 /\
                     base >= 2 /\
                     k1 < pow base bigD /\

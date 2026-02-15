@@ -21,6 +21,7 @@ open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
+module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
@@ -29,7 +30,7 @@ module L = CLRS.Ch08.CountingSort.Lemmas
 
 // ========== Main Algorithm ==========
 
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 120 --fuel 1 --ifuel 1"
 fn counting_sort
   (a: A.array int)
   (len: SZ.t)
@@ -59,29 +60,29 @@ ensures exists* s.
   let k1 = k_val + 1sz;
 
   // Phase 1: Build count array C where C[v] = count of v in s0
-  let c_arr = A.alloc 0 k1;
+  let c_arr = V.alloc 0 k1;
   
   let mut j: SZ.t = 0sz;
   while (!j <^ n)
   invariant exists* vj sc.
     R.pts_to j vj **
-    A.pts_to c_arr sc **
+    V.pts_to c_arr sc **
     A.pts_to a s0 **
     pure (
       SZ.v vj <= SZ.v n /\
       Seq.length sc == SZ.v k1 /\
-      A.length c_arr == SZ.v k1 /\
-      is_full_array c_arr /\
+      V.length c_arr == SZ.v k1 /\
+      V.is_full_vec c_arr /\
       L.counts_match_prefix sc s0 k (SZ.v vj)
     )
   {
     let vj = !j;
-    with sc. assert (A.pts_to c_arr sc);
+    with sc. assert (V.pts_to c_arr sc);
     let val_j = a.(vj);
     let idx : SZ.t = SZ.uint_to_t val_j;
-    let old_count = c_arr.(idx);
-    c_arr.(idx) <- old_count + 1;
-    with sc'. assert (A.pts_to c_arr sc');
+    let old_count = V.op_Array_Access c_arr idx;
+    V.op_Array_Assignment c_arr idx (old_count + 1);
+    with sc'. assert (V.pts_to c_arr sc');
     L.count_phase_step s0 sc sc' (SZ.v vj) k val_j;
     j := vj + 1sz;
   };
@@ -98,7 +99,7 @@ ensures exists* s.
     R.pts_to cur_v vcv **
     R.pts_to cur_v_int vcvi **
     R.pts_to pos vpos **
-    A.pts_to c_arr sc **
+    V.pts_to c_arr sc **
     A.pts_to a sa **
     pure (
       SZ.v vcv <= SZ.v k_val + 1 /\
@@ -106,8 +107,8 @@ ensures exists* s.
       SZ.v vpos <= SZ.v n /\
       Seq.length sc == SZ.v k1 /\
       Seq.length sa == Seq.length s0 /\
-      A.length c_arr == SZ.v k1 /\
-      is_full_array c_arr /\
+      V.length c_arr == SZ.v k1 /\
+      V.is_full_vec c_arr /\
       L.phase2_inv sa s0 (SZ.v vpos) (SZ.v vcv) k /\
       L.counts_match sc s0 k
     )
@@ -115,10 +116,10 @@ ensures exists* s.
     let vcv = !cur_v;
     let vpos = !pos;
     let vcvi = !cur_v_int;
-    with sc sa. assert (A.pts_to c_arr sc ** A.pts_to a sa);
+    with sc sa. assert (V.pts_to c_arr sc ** A.pts_to a sa);
     
     // Read count for current value
-    let cnt = c_arr.(vcv);
+    let cnt = V.op_Array_Access c_arr vcv;
     // cnt = count(vcv, s0) which is >= 0 and <= n
     L.count_bounded s0 (SZ.v vcv);
     L.phase2_pos_bound sa s0 (SZ.v vpos) (SZ.v vcv) k;
@@ -134,14 +135,14 @@ ensures exists* s.
       R.pts_to cur_v_int vcvi **
       R.pts_to pos vpos **
       R.pts_to w vw **
-      A.pts_to c_arr sc **
+      V.pts_to c_arr sc **
       A.pts_to a sa_inner **
       pure (
         SZ.v vw <= SZ.v cnt_sz /\
         SZ.v vpos + SZ.v cnt_sz <= SZ.v n /\
         Seq.length sa_inner == Seq.length s0 /\
-        A.length c_arr == SZ.v k1 /\
-        is_full_array c_arr /\
+        V.length c_arr == SZ.v k1 /\
+        V.is_full_vec c_arr /\
         (forall (i:nat). SZ.v vpos <= i /\ i < SZ.v vpos + SZ.v vw ==> 
           Seq.index sa_inner i == vcvi) /\
         (forall (i:nat). i < SZ.v vpos ==> Seq.index sa_inner i == Seq.index sa i) /\
@@ -172,9 +173,9 @@ ensures exists* s.
   
   with vcv_f vpos_f vcvi_f sc_f sa_f.
     assert (R.pts_to j n ** R.pts_to cur_v vcv_f ** R.pts_to cur_v_int vcvi_f **
-            R.pts_to pos vpos_f ** A.pts_to c_arr sc_f ** A.pts_to a sa_f);
+            R.pts_to pos vpos_f ** V.pts_to c_arr sc_f ** A.pts_to a sa_f);
   L.final_perm s0 sa_f k (SZ.v vpos_f);
-  A.free c_arr;
+  V.free c_arr;
   ()
 }
 #pop-options

@@ -1,2 +1,5 @@
 PULSE_ROOT ?= ../../pulse
 include $(PULSE_ROOT)/mk/test.mk
+# Undo optimize_let_vc and fly_deps — they break proofs in
+# TopologicalSort.Verified.fst
+OTHERFLAGS := $(subst --ext optimize_let_vc,,$(subst --ext fly_deps,,$(OTHERFLAGS))) --include ../common

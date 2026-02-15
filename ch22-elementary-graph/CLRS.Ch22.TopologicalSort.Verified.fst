@@ -119,7 +119,7 @@ let rec count_occurrences (s: Seq.seq int) (len: nat) (v: int)
     else if Seq.index s (len - 1) = v then 1 + count_occurrences s (len - 1) v
     else count_occurrences s (len - 1) v
 
-let rec lemma_distinct_at_most_once (s: Seq.seq int) (len: nat) (v: int) (pos: nat)
+let lemma_distinct_at_most_once (s: Seq.seq int) (len: nat) (v: int) (pos: nat)
   : Lemma
     (requires 
       len <= Seq.length s /\
@@ -127,7 +127,6 @@ let rec lemma_distinct_at_most_once (s: Seq.seq int) (len: nat) (v: int) (pos: n
       pos < len /\
       Seq.index s pos = v)
     (ensures (forall (i: nat). i < len /\ i <> pos ==> Seq.index s i <> v))
-    (decreases len)
   = ()
 
 let rec lemma_all_distinct_count_le_one (s: Seq.seq int) (len: nat) (v: int)

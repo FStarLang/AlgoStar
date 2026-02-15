@@ -34,11 +34,11 @@ let rec all (p: int -> bool) (xs: list int) : bool =
   | x :: xs' -> p x && all p xs'
 
 // Check if all elements are less than bound
-let rec all_less (bound: int) (xs: list int) : bool =
+let all_less (bound: int) (xs: list int) : bool =
   all (fun x -> x < bound) xs
 
 // Check if all elements are greater than bound
-let rec all_greater (bound: int) (xs: list int) : bool =
+let all_greater (bound: int) (xs: list int) : bool =
   all (fun x -> x > bound) xs
 
 (* ========================================================================
@@ -380,7 +380,7 @@ let rec lemma_insert_adds_member (t: bst) (k: int)
    Lemma: after inserting k, searching for k returns true
    ------------------------------------------------------------------------ *)
 
-let rec bst_insert_member (t: bst) (k: int)
+let bst_insert_member (t: bst) (k: int)
   : Lemma
     (requires bst_valid t)
     (ensures (
@@ -575,7 +575,7 @@ let rec lemma_filter_all_greater_tree (t: bst) (m: int)
 
 
 // Lemma: bst_minimum returns the smallest element
-let rec bst_minimum_is_minimum (t: bst)
+let bst_minimum_is_minimum (t: bst)
   : Lemma
     (requires bst_valid t /\ bst_minimum t <> None)
     (ensures (match bst_minimum t with
@@ -597,7 +597,7 @@ let rec lemma_all_greater_implies_mem_greater (bound x: int) (xs: list int)
         else lemma_all_greater_implies_mem_greater bound x ys
 
 // Simpler version: minimum of right subtree is greater than all of left
-let rec bst_minimum_greater_than_left (left right: bst) (key: int)
+let bst_minimum_greater_than_left (left right: bst) (key: int)
   : Lemma
     (requires 
       bst_valid (Node left key right) /\
@@ -876,7 +876,7 @@ let rec lemma_all_less_concat_singleton (xs: list int) (bound y: int)
 
 // Helper: if all elements in ys are > bound and ys is sorted,
 // then [bound] @ ys is sorted
-let rec lemma_sorted_prepend_greater (bound: int) (ys: list int)
+let lemma_sorted_prepend_greater (bound: int) (ys: list int)
   : Lemma
     (requires all_greater bound ys /\ sorted ys)
     (ensures sorted ([bound] @ ys))
@@ -889,7 +889,7 @@ let rec lemma_sorted_prepend_greater (bound: int) (ys: list int)
 // then xs @ [bound] @ ys is sorted
 #push-options "--z3rlimit 20"
 
-let rec lemma_sorted_concat (xs: list int) (bound: int) (ys: list int)
+let lemma_sorted_concat (xs: list int) (bound: int) (ys: list int)
   : Lemma
     (requires 
       sorted xs /\ all_less bound xs /\

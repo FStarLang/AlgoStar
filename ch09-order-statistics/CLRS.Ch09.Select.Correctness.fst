@@ -122,7 +122,7 @@ let partition_property_implies_kth (s: seq int) (k: nat) (v: int)
 (*** Main Correctness Theorem ***)
 
 // Theorem: pure_quickselect_spec correctly computes select_spec
-let rec quickselect_correctness (s: seq int) (k: nat) (lo hi: nat)
+let quickselect_correctness (s: seq int) (k: nat) (lo hi: nat)
   : Lemma (requires k < Seq.length s /\ lo <= k /\ k < hi /\ hi <= Seq.length s)
           (ensures pure_quickselect_spec s k lo hi == select_spec s k)
           (decreases (hi - lo))
