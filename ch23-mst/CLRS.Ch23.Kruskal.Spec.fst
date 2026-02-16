@@ -279,15 +279,67 @@ let rec mem_append (#a: eqtype) (x: a) (l1 l2: list a)
     | [] -> ()
     | hd :: tl -> mem_append x tl l2
 
+// Helper: forall version of mem_append
+let mem_append_forall (#a: eqtype) (l1 l2: list a)
+  : Lemma (forall (x:a). mem x (l1 @ l2) <==> (mem x l1 \/ mem x l2))
+  = let aux (x:a) : Lemma (mem x (l1 @ l2) <==> (mem x l1 \/ mem x l2))
+              [SMTPat (mem x (l1 @ l2))]
+    = mem_append x l1 l2
+    in
+    ()
+
+// Helper lemma: if u is a neighbor of v and u reaches w, then v reaches w
+let neighbor_reaches (edges: list edge) (v u w: nat)
+  : Lemma (requires mem u (edge_neighbors edges v) /\ reachable edges u w)
+          (ensures reachable edges v w)
+  =
+    edge_neighbors_sound edges v u;
+    eliminate exists e. mem_edge e edges /\ ((e.u = v /\ e.v = u) \/ (e.v = v /\ e.u = u))
+    returns reachable edges v w
+    with _. (
+      edge_gives_reachability edges v u e;
+      reachability_transitive edges v u w
+    )
+
 // Key lemma: BFS soundness - every vertex in result is either in visited or reachable from frontier  
-// NOTE: This is a difficult proof. The high-level idea is correct but F*'s SMT encoding
-// makes it hard to connect exists/forall reasoning. Admitting for now to unblock other proofs.
-#push-options "--warn_error -271"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 150"
 let rec bfs_reach_list_sound (edges: list edge) (frontier: list nat) (visited: list nat) (fuel: nat) (w: nat)
   : Lemma (requires mem w (bfs_reach_list edges frontier visited fuel))
           (ensures mem w visited \/ (exists u. mem u frontier /\ reachable edges u w))
           (decreases %[fuel; List.Tot.length frontier])
-  = admit() // TODO: Complete this proof
+  = if fuel = 0 then ()  
+    else match frontier with
+    | [] -> ()  
+    | v :: rest ->
+      if mem v visited then
+        bfs_reach_list_sound edges rest visited fuel w
+      else (
+        let visited' = v :: visited in
+        let new_neighbors = edge_neighbors edges v in
+        let new_frontier = List.Tot.append rest new_neighbors in
+        
+        bfs_reach_list_sound edges new_frontier visited' (fuel - 1) w;
+        
+        // After IH: mem w visited' \/ (exists u. mem u new_frontier /\ reachable edges u w)
+        // Split new_frontier
+        mem_append_forall rest new_neighbors;
+        
+        // Case analysis
+        if w = v then (
+          same_component_reflexive edges v
+        ) else (
+          // w ≠ v
+          // For u in new_neighbors: if u reaches w, then v reaches w
+          let aux (u:nat) : Lemma 
+            (requires mem u new_neighbors /\ reachable edges u w)
+            (ensures reachable edges v w)
+            [SMTPat (mem u new_neighbors); SMTPat (reachable edges u w)]
+          =
+            neighbor_reaches edges v u w
+          in
+          ()
+        )
+      )
 #pop-options
 
 // Corollary: same_component_dec is sound
