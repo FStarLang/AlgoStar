@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, updated)
 
-**167 F* files, ~50K lines, 146 admits across 34 files**
+**167 F* files, ~50K lines, 145 admits across 34 files**
 
 ### Per-Algorithm Status Table
 
@@ -126,7 +126,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 |---------|--------|-----------|
 | ch22 (graphs) | 45 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5), BFS.DistSpec(5), WhitePath(3), KahnTopoSort(4) |
 | ch23 (MST) | 33 | Kruskal.Spec(15), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(3), EdgeSort(2), Prim.Cmplx(1), main(1) |
-| ch08 (sorting) | 22 | RadixSort.FullSort(8), RS.MultiDigit(4), RS.Stability(4), CS.Stable(3), RS.Spec(2), BucketSort(1) |
+| ch08 (sorting) | 21 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Stability(4), CS.Stable(3), RS.Spec(2), BucketSort(1) |
 | ch16 (greedy) | 11 | ActivitySelection.Spec(9), Huffman.Complete(2) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
 | ch09 (select) | 5 | PartialSelectionSort.Correctness(5) |
@@ -189,23 +189,28 @@ Keep all code and proofs. Rename to clarify what they actually implement.
 
 ### Phase F: Admit Elimination — Categorized by Approach
 
-#### Tier 1: Automatable (Z3 with hints / simple lemma calls) — 16 admits
-These can be attempted with extended reasoning chains and iterative tool use.
+#### Tier 1: Automatable (Z3 with hints / simple lemma calls) — ~~16~~ 15 admits remaining
+These were initially classified as automatable. After systematic attempts, only 1 was actually
+closeable (`radix-full-269` ✅). The other 15 are blocked due to:
+- Z3 quantifier instantiation failures (sorted_up_to_digit, is_sorted, is_permutation)
+- Pulse while-loop encoding limitations (condition truth not in body)
+- Missing upstream definitions (max_compatible_count, rank bound)
+- Complex modular arithmetic needing substantial infrastructure
 
-| File | Line(s) | Admits | What's needed |
-|------|---------|--------|---------------|
-| Prim.Complexity | 130 | 1 | Tighten loop invariant `v≤n+1` → `v≤n`; then `v≥n ∧ v≤n ⟹ v=n` is trivial. Blocked by Pulse while-loop encoding: condition truth not available in body. |
-| Kruskal.Complexity | 371, 390 | 2 | Pure polynomial arithmetic: expand `n + (vround+1)*2*n²` and `vc ≤ 4n³`. Add `assert` chain. |
-| Kruskal.Spec | 452, 378 | 2 | L452: `n` components in empty forest (trivial induction). L378: edge is light from sorted order (arithmetic comparison). |
-| RadixSort.Stability | 150, 208 | 2 | L150: quantifier monotonicity (`d'≤d` subset). L208: unfold `sorted_on_digit` to `sorted_up_to_digit` base case. |
-| RadixSort.FullSort | 269 | 1 | `Seq.index (tail s) i == Seq.index s (i+1)` + pairwise property propagation. |
-| RadixSort.FullSort | 183 | 1 | Modular arithmetic: `k == digit_sum k bigD base`. Needs `FStar.Math.Lemmas` about `div`/`mod`. |
-| PartialSelect.Correctness | 117 | 1 | Two sorted permutations of same length with same min are equal. Structural uniqueness. |
-| UnionFind.RankBound | 190 | 1 | Two disjoint subsets of `[0,n)` have sizes summing to `≤n`. FiniteSet cardinality. |
-| UnionFind.Spec | 92 | 1 | `n` steps of fuel suffice for `pure_find` under rank invariant. Path length ≤ n. |
-| Prim.Spec | 209, 270 | 2 | L209: `find_min_edge_aux` returns minimum (trace arithmetic). L270: loop adds 1 edge/iteration × (n-1) iterations. |
-| RabinKarp.Spec | 162 | 1 | Rolling hash inductive step. Complex modular arithmetic; needs `FStar.Math.Lemmas` chain. |
-| ActivitySelection.Spec | 305 | 1 | Empty optimal solution contradicts `n>0`. Direct contradiction. |
+| File | Line(s) | Admits | Status |
+|------|---------|--------|--------|
+| Prim.Complexity | 130 | 1 | ❌ Blocked: Pulse loop invariant needs `v≤n` not `v≤n+1` |
+| Kruskal.Complexity | 371, 390 | 2 | ❌ Blocked: Pulse admits + bound fails for n<3 + upstream assume_ at 333 |
+| Kruskal.Spec | 452, 378 | 2 | ❌ Blocked: Not arithmetic—needs build_components induction + cut property |
+| RadixSort.Stability | 150, 208 | 2 | ❌ Blocked: Z3 incomplete quantifiers on nested ∃/∀ in sorted_up_to_digit |
+| **RadixSort.FullSort** | **269** | **1** | **✅ DONE: proved with SeqP.index_tail + explicit quantifier trigger** |
+| RadixSort.FullSort | 183 | 1 | ❌ Blocked: Needs digit-shift + euclidean division chain |
+| PartialSelect | 117 | 1 | ❌ Blocked: Z3 can't bridge count_occ/tail/sorted quantifiers |
+| UnionFind.RankBound | 190 | 1 | ❌ Blocked: Needs FiniteSet cardinality reasoning |
+| UnionFind.Spec | 92 | 1 | ❌ Blocked: Needs rank<n from RankBound (itself admitted) |
+| Prim.Spec | 209, 270 | 2 | ❌ Blocked: Needs find_min_edge_aux trace, non-trivial helper |
+| RabinKarp.Spec | 162 | 1 | ❌ Blocked: Horner evaluation modular arithmetic |
+| ActivitySelection.Spec | 305 | 1 | ❌ Blocked: max_compatible_count (line 176) is itself admitted |
 
 #### Tier 2: Helper lemmas (provable separately, then plugged in) — 70 admits
 These need a standalone lemma proved first, then called at the admit site. Each lemma is
