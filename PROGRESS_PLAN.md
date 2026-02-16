@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, latest)
 
-**167 F* files, ~50K lines, 140 admits across 37 files**
+**167 F* files, ~50K lines, 118 admits across 30 files**
 
 (Note: Count uses proper block-comment-aware method. Previous count of 108/35 files
 used a buggy counter that missed Pulse `assume_` and caught `admit()` in block comments.)
@@ -98,7 +98,7 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 | 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
 | 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
 | 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 | Optimality properties |
-| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 3 | ✅ RankBound: 0 admits, FindTermination: 0 admits |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 | ✅ RankBound: 0, FindTermination: 0, Spec: 0 admits (1 assume for ranks_bounded) |
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 | d[v]=δ(s,v) not proven |
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
@@ -129,7 +129,7 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 |---------|--------|-----------|
 | ch22 (graphs) | 36 | DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopoSort(2) |
 | ch23 (MST) | 23 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(5), SortedEdges(1), Kruskal.Cmplx(3), EdgeSort(2), main(1) |
-| ch08 (sorting) | 16 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Spec(2), RS.Stability(2), BucketSort(1) |
+| ch08 (sorting) | 13 | RadixSort.FullSort(4), RS.MultiDigit(4), RS.Spec(2), RS.Stability(2), BucketSort(1) |
 | ch16 (greedy) | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(3) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
 | ch26 (MaxFlow) | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) |
@@ -208,7 +208,9 @@ closeable (`radix-full-269` ✅). The other 15 are blocked due to:
 | Kruskal.Spec | 452, 378 | 2 | ❌ Blocked: Not arithmetic—needs build_components induction + cut property |
 | RadixSort.Stability | 150, 208 | 2 | ❌ Blocked: Z3 incomplete quantifiers on nested ∃/∀ in sorted_up_to_digit |
 | **RadixSort.FullSort** | **269** | **1** | **✅ DONE: proved with SeqP.index_tail + explicit quantifier trigger** |
-| RadixSort.FullSort | 183 | 1 | ❌ Blocked: Needs digit-shift + euclidean division chain |
+| RadixSort.FullSort (digit_decomposition) | | | **✅ DONE: proved with pow_split + modular arithmetic** |
+| RadixSort.FullSort (digits_lex_order) | | | **✅ DONE: proved with lemma_digit_sum_msd_le_3 + StrongExcludedMiddle** |
+| RadixSort.FullSort (sorted_up_to_all_digits) | | | **✅ DONE: proved via pairwise ordering + digits_lex_order_implies_numeric_order** |
 | PartialSelect | 117 | 1 | ❌ Blocked: Z3 can't bridge count_occ/tail/sorted quantifiers |
 | UnionFind.RankBound | — | 0 | ✅ DONE: all invariants fully proven (size_correctness_invariant added as precondition) |
 | UnionFind.Spec | 92 | 1 | ❌ Blocked: Z3 can't instantiate refined quantifier from rank_invariant |
@@ -230,8 +232,7 @@ self-contained but requires careful F* proof engineering (induction, case analys
 | **QueueBFS.Complexity** | 167,324,327,384,391,403 | 6 | Mirror of QueueBFS.fst: same invariants + tick arithmetic. |
 | **RadixSort.Stability** | 179, 222 | 2 | **Stable-sort preservation**: equal-key elements maintain relative order ⟹ lower-digit ordering preserved. Needs pair-extraction from stability definition. |
 | **RadixSort.Spec** | 342 | 1 | Same as Stability.179 but at spec level. |
-| **RadixSort.FullSort** | 227 | 1 | **Digit dominance**: differing digit at position d₀ contributes ≥ base^d₀, overwhelming all lower digits. Geometric series bound. |
-| **RadixSort.FullSort** | 352,356,377,381 | 4 | **Bridge admits**: reference results from RadixSort.Stability module. Resolve by completing that module first, then import. |
+| **RadixSort.FullSort** | 496,500,521,525 | 4 | **Bridge admits**: reference results from RadixSort.Stability module. Resolve by completing that module first, then import. |
 | **Kruskal.Spec** | 156,201,207,388,454,461,483,515,540,551,557,563,571 | 13 | ✅ same_component_symmetric (l39) and same_component_transitive (l45) PROVEN via path reversal/concatenation. Remaining: decidability, component construction, forest preservation, MST optimality. |
 | **Prim.Spec** | 195, 359, 380 | 3 | Prim step verification: trace `find_min_edge_aux`, inductive safety invariant, base case. |
 | **BFS.DistanceSpec** | 219 | 1 | ✅ reachable_trans (l297) PROVEN via path concatenation + lemma_append_last. L219: visited ⟹ path exists (parent-pointer reconstruction). |
@@ -256,7 +257,7 @@ threaded through entire algorithms, or deep mathematical theorems.
 | **StackDFS.fst** | 455, 691 | 2 | Full DFS correctness postcondition: all vertices BLACK, valid discovery/finish times. Requires DFS tree formalization. |
 | **StackDFS.Complexity** | 566,581,842,859 | 4 | Final complexity postconditions depend on full DFS correctness (Tier 3 above). |
 | **CountingSort.Stable** | 282, 283 | 2 | Stability proof: backward traversal preserves relative order. Needs full loop invariant tracking position assignments. Permutation proof: each input element placed exactly once. |
-| **RadixSort.FullSort** | 296 | 1 | Chain of 3 non-trivial lemmas: sorted_up_to_digit on all digits → pairwise ≤ → sorted. |
+| **RadixSort.FullSort** (sorted_up_to_all_digits) | | | **✅ DONE** |
 | **RadixSort.Spec** | 366 | 1 | Inductive radix sort correctness: permutation composition across d stable sorts. |
 | **RadixSort.MultiDigit** | 395,416,499,535 | 4 | Full multi-digit radix sort correctness: stability reasoning + positional notation arithmetic. |
 | **PartialSelect.Correctness** | 55, 65 | 2 | Entire partition and quickselect specs admitted as axioms. Needs ground-up implementation. |
