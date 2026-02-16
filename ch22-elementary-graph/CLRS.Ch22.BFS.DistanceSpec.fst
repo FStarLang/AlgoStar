@@ -53,18 +53,38 @@ let path_from_to (n: nat) (adj: Seq.seq bool) (s: nat) (v: nat) (p: list nat) : 
 
 (*** 3. Shortest Path Distance ***)
 
+// Helper: does a path of exactly `len` edges exist from s to v?
+// Checks all possible intermediate vertices exhaustively (ghost computation)
+let rec has_path_of_length (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                            (s: nat{s < n}) (v: nat{v < n})
+                            (len: nat)
+  : GTot bool (decreases len)
+  = if len = 0 then s = v
+    else
+      let rec check_via (u: nat)
+        : GTot bool (decreases (n - u))
+        = if u >= n then false
+          else if has_edge n adj s u && has_path_of_length n adj u v (len - 1)
+          then true
+          else check_via (u + 1)
+      in
+      check_via 0
+
+// Helper: find minimum path length by trying increasing lengths
+let rec find_min_path_length (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                              (s: nat{s < n}) (v: nat{v < n})
+                              (len: nat)
+  : GTot (option nat) (decreases (n - len))
+  = if len >= n then None
+    else if has_path_of_length n adj s v len then Some len
+    else find_min_path_length n adj s v (len + 1)
+
 // Shortest path distance: minimum length among all paths from s to v
 // Returns None if v is unreachable from s
-// This is a specification-level definition (not executable)
 let shortest_path_dist (n: nat) (adj: Seq.seq bool) (s: nat) (v: nat) : GTot (option nat) =
-  if s >= n || v >= n then None
+  if n = 0 || s >= n || v >= n || Seq.length adj <> n * n then None
   else if s = v then Some 0
-  else
-    // The shortest path distance is defined as:
-    // - Some d if there exists a path of length d and no shorter path
-    // - None if no path exists
-    // This is axiomatic for now
-    admit()
+  else find_min_path_length n adj s v 1
 
 (*** 4. Pure BFS Distance Computation ***)
 
