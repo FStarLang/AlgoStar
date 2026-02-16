@@ -13,9 +13,7 @@
 
    Uses GhostReference for tick counter — fully erased at runtime.
    
-   Note: Uses 1 admit() for loop exit semantics (v_iter == n when loop exits).
-   This captures the operational semantics of while loops that is implicit in
-   Pulse's verification but hard to express as a pure logical fact.
+   NO admits. Loop invariant uses tight bound v_iter <= n.
 *)
 
 module CLRS.Ch23.Prim.Complexity
@@ -100,34 +98,12 @@ let lemma_n_squared_implies_n_plus_2_fits (n: nat)
 #pop-options
 
 // Helper lemma: when a while loop exits with condition ~(v < n),
-// and v <= n + 1, then v == n exactly (for loops that increment by 1 starting from 0).
+// and v <= n (correct invariant: loop increments from 0 to n-1, max post-increment value is n),
+// then v == n exactly.
 let lemma_loop_exit_v_iter_equals_n (v n: nat)
-  : Lemma (requires ~(v < n) /\ v <= n + 1)
+  : Lemma (requires ~(v < n) /\ v <= n)
           (ensures v == n)
-  = // From ~(v < n), we have v >= n
-    // From v <= n + 1, we have v <= n + 1
-    // Together: n <= v <= n + 1, so v ∈ {n, n+1}
-    
-    // The key insight: the loop body doesn't run when v >= n.
-    // So if the loop exited with v >= n, the last execution must have
-    // incremented v to exactly n (not n+1).
-    
-    // This is a property of while loop semantics that's hard to encode in pure logic.
-    // The standard approach would be to use a loop invariant that captures this,
-    // but that would require changing the main verification code.
-    
-    // For this lemma, we note that the only missing piece is excluding v == n+1.
-    // We have: v >= n and v <= n+1, which gives v ∈ {n, n+1}.
-    // Pure arithmetic can't distinguish these without additional facts about the loop.
-    
-    // Since F* verification of Pulse while loops already encodes the correct semantics
-    // (that the condition is checked before each iteration), and the main code uses
-    // this correctly, this lemma serves as a bridge to make that implicit knowledge
-    // explicit for the final proof.
-    
-    // We admit this as it captures a property that's already verified by Pulse's
-    // operational semantics but isn't easily expressible as a pure logical fact.
-    admit()
+  = () // Trivial: v >= n /\ v <= n ==> v == n
 
 
 
@@ -243,7 +219,7 @@ fn prim_complexity
     A.pts_to weights #p weights_seq **
     GR.pts_to ctr vc **
     pure (
-      SZ.v v_iter <= SZ.v n + 1 /\
+      SZ.v v_iter <= SZ.v n /\
       Seq.length key_seq == SZ.v n /\
       Seq.length in_mst_seq == SZ.v n /\
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
@@ -276,7 +252,7 @@ fn prim_complexity
       pure (
         SZ.v v_find_i <= SZ.v n /\
         SZ.v v_min_idx < SZ.v n /\
-        SZ.v v_iter <= SZ.v n /\
+        SZ.v v_iter < SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
         SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
@@ -340,7 +316,7 @@ fn prim_complexity
       pure (
         SZ.v v_update_i <= SZ.v n /\
         SZ.v u < SZ.v n /\
-        SZ.v v_iter <= SZ.v n /\
+        SZ.v v_iter < SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
         SZ.v u * SZ.v n < pow2 64 /\
@@ -384,21 +360,21 @@ fn prim_complexity
     // Increment iteration counter
     let v_iter = !iter;
     // Arithmetic to ensure v_iter + 1 fits
-    // We know v_iter <= n + 1 from loop invariant, and n * n < 2^64 from precondition
-    // So v_iter + 1 <= n + 2, and we can prove n + 2 fits
+    // We know v_iter <= n from loop invariant (loop condition is v_iter < n, so max post-increment is n)
+    // and n * n < 2^64 from precondition, so v_iter + 1 <= n + 1, which fits
     with v_iter_val key_seq_val in_mst_seq_val vc_val.
       assert (R.pts_to iter v_iter **
               A.pts_to key_a key_seq_val **
               A.pts_to in_mst in_mst_seq_val **
               GR.pts_to ctr vc_val);
-    // From loop invariant
-    assert (pure (SZ.v v_iter <= SZ.v n + 1));
+    // From inner loop invariant (preserved outer loop condition v_iter < n)
+    assert (pure (SZ.v v_iter < SZ.v n));
     // From precondition
     assert (pure (SZ.v n * SZ.v n < pow2 64));
-    // Use lemma to prove n + 2 fits
+    // Use lemma to prove n + 2 fits (gives us room for v_iter + 1 <= n + 1)
     lemma_n_squared_implies_n_plus_2_fits (SZ.v n);
     assert (pure (SZ.v n + 2 < pow2 64));
-    assert (pure (SZ.v v_iter + 1 <= SZ.v n + 2));
+    assert (pure (SZ.v v_iter + 1 <= SZ.v n));
     assert (pure (SZ.v v_iter + 1 < pow2 64));
     assert (pure (SZ.fits (SZ.v v_iter + 1)));
     let new_iter = v_iter +^ 1sz;
@@ -440,132 +416,11 @@ fn prim_complexity
   // The loop exited when v_iter >= n, so we have at most n * 3 * n ticks
   with v_iter_final. assert (R.pts_to iter v_iter_final);
   with vc_final. assert (GR.pts_to ctr vc_final);
-  // From loop invariant: vc_final - c0 <= v_iter_final * 3 * n
-  // Loop exited when v_iter_final >= n (since condition is v_iter < n)
+  // From loop invariant: vc_final - c0 <= v_iter_final * 3 * n, v_iter_final <= n
+  // Loop exited: ~(v_iter_final < n), so v_iter_final >= n
+  // Combined with v_iter_final <= n: v_iter_final == n
   assert (pure (vc_final - reveal c0 <= SZ.v v_iter_final * 3 * SZ.v n));
-  assert (pure (SZ.v v_iter_final <= SZ.v n + 1));
-  // The loop condition is (v_iter < n). When it becomes false, v_iter >= n.
-  // Combined with v_iter <= n + 1, we get v_iter ∈ {n, n+1}.
-  // However, the last iteration runs with v_iter = n-1, increments to n,
-  // then checks the condition which fails. So v_iter_final == n exactly.
-  // Let's prove this by contradiction: assume v_iter_final == n + 1
-  // Then the loop would have run one more time with v_iter == n, which satisfies
-  // the condition n < n (false), so it wouldn't run. Contradiction.
-  // Therefore v_iter_final == n or the loop ran with v_iter == n (which can't happen
-  // since n < n is false). So v_iter_final == n.
-  
-  // Actually, let me be more careful. The invariant holds:
-  // 1. Initially (before loop): v_iter = 0, vc = c0, invariant: vc - c0 <= 0 * 3 * n ✓
-  // 2. After iteration i: v_iter = i+1, vc - c0 <= (i+1) * 3 * n
-  // 3. Condition checked at start of iteration: v_iter < n
-  // 4. Last iteration starts with v_iter = n-1, increments to n, loop exits
-  // 5. So when loop exits: v_iter = n, vc - c0 <= n * 3 * n = 3 * n * n ✓
-  
-  // The key is that the invariant says vc - c0 <= v_iter * 3 * n where v_iter is
-  // the value at the START of checking the loop condition (which is also the value
-  // AFTER the previous iteration's increment). When the condition fails, v_iter >= n.
-  // Since the condition is v_iter < n, it fails exactly when v_iter == n (given v_iter <= n+1).
-  
-  // But wait - could v_iter == n+1? That would mean an iteration ran with v_iter == n,
-  // but the condition v_iter < n would be false (n < n is false), so no iteration runs.
-  // Therefore, when loop exits, v_iter == n exactly.
-  
-  assert (pure (SZ.v v_iter_final >= SZ.v n)); // Loop exited, so condition failed
-  assert (pure (~(SZ.v v_iter_final < SZ.v n)));
-  assert (pure (SZ.v v_iter_final >= SZ.v n /\ SZ.v v_iter_final <= SZ.v n + 1));
-  
-  // Case split: v_iter_final == n or v_iter_final == n + 1
-  // If v_iter_final == n: vc_final - c0 <= n * 3 * n = 3 * n * n ✓
-  // If v_iter_final == n + 1: This would mean the loop ran with v_iter == n,
-  //    but the loop condition (v_iter < n) evaluates to (n < n) = false,
-  //    so the loop body wouldn't execute. This contradicts v_iter becoming n+1.
-  //    Actually, wait - v_iter could be n+1 if the last iteration incremented it from n.
-  //    But that last iteration would start with v_iter == n, and the condition n < n
-  //    is false, so it wouldn't run. So v_iter stays at n.
-  
-  // Let me think about the while loop semantics in Pulse:
-  // while (condition) { body } runs as:
-  //   1. Check condition
-  //   2. If false, exit
-  //   3. If true, run body, goto 1
-  // After the last body execution, we increment v_iter to n, then check condition
-  // n < n is false, so we exit with v_iter == n.
-  
-  // For n > 0, we need to prove vc - c0 <= 3 * n * n
-  // From invariant: vc - c0 <= v_iter * 3 * n
-  // From loop exit: v_iter >= n (since ~(v_iter < n))
-  // From invariant: v_iter <= n + 1
-  
-  // So v_iter ∈ {n, n+1}
-  // Case 1: If v_iter == n, then vc - c0 <= n * 3 * n = 3 * n * n ✓
-  // Case 2: If v_iter == n+1, then vc - c0 <= (n+1) * 3 * n = 3*n*n + 3*n
-  //         We need to show 3*n*n + 3*n <= 3*n*n, which is false.
-  //         OR we need to show v_iter != n+1.
-  
-  // The loop semantics guarantee v_iter == n, but proving this to SMT is tricky.
-  // Let me try a workaround: slightly relax the bound to allow for the n+1 case.
-  // Actually, that won't work since the bound is fixed at 3*n*n.
-  
-  // Let me try yet another approach: use the tighter relationship between
-  // the tick count and iterations. Each iteration does exactly 2n ticks (n find + n update).
-  // So after k iterations: vc - c0 == 2*k*n (ignoring overhead).
-  // The invariant says vc - c0 <= k * 3 * n (with overhead factor).
-  // When k = n: vc - c0 <= 3*n*n.
-  // When k = n+1: vc - c0 <= 3*(n+1)*n = 3*n*n + 3*n.
-  
-  // But we know the loop runs exactly n times (for v_iter = 0, 1, ..., n-1).
-  // So after all iterations, v_iter = n, not n+1.
-  
-  // Let me check if there's a simpler way: maybe the invariant is too weak?
-  // Actually, looking at the invariant again, it says:
-  //   vc - c0 <= v_iter * 3 * n
-  // This is the bound after v_iter iterations have completed.
-  // When the loop exits with ~(v_iter < n), we have v_iter >= n.
-  // But the invariant was established AFTER the last increment of v_iter.
-  // So the last iteration ran with some value v_iter_old, then incremented to v_iter_final.
-  // For the loop to exit, v_iter_final >= n.
-  // For the loop to have run that last iteration, v_iter_old < n.
-  // Since we increment by 1: v_iter_final = v_iter_old + 1.
-  // So v_iter_old < n and v_iter_final = v_iter_old + 1.
-  // The maximum v_iter_old can be is n-1, so v_iter_final <= n.
-  // Combined with v_iter_final >= n, we get v_iter_final == n.
-  
-  // To prove this to SMT, I need to make the increment-by-1 relationship explicit.
-  // Let me add that to the invariant... but that would require changing the loop.
-  // Actually, maybe I can prove it here using the facts we have.
-  
-  // From the loop structure, we know that v_iter is always incremented by exactly 1.
-  // The loop starts with v_iter = 0.
-  // After k iterations, v_iter = k.
-  // The loop runs while v_iter < n, so it runs for k = 0, 1, ..., n-1.
-  // After these n iterations, v_iter = n.
-  // Then the condition n < n is false, so the loop exits.
-  // Therefore, v_iter_final = n.
-  
-  // Unfortunately, SMT doesn't automatically understand loop counting.
-  // Let me try adding a helper lemma about loop counting, or...
-  // Actually, let me just use a more direct approach:
-  
-  // We have: ~(v_iter < n), which means v_iter >= n
-  // We have: v_iter <= n + 1
-  // We want to prove: v_iter == n
-  
-  // The missing piece is that v_iter can only be n or n+1.
-  // If v_iter == n+1, then at some point the loop ran with v_iter == n.
-  // But the loop condition at that point would be n < n, which is false.
-  // So the loop body never executes with v_iter == n.
-  // The only way v_iter becomes n+1 is if we increment from n inside the loop body.
-  // But to enter the loop body, we need v_iter < n, which is false when v_iter == n.
-  // Contradiction! So v_iter != n+1, thus v_iter == n.
-  
-  // To express this to SMT, I'll use the fact that the loop condition was checked
-  // right before v_iter_final was set, and it was false.
-  
-  // Actually, let me check: maybe the loop invariant isn't strong enough?
-  // The invariant says v_iter <= n + 1, but maybe it should say v_iter <= n?
-  // No, we need the extra slack for the increment operation.
-  
-  // OK, last attempt: Let me add an explicit arithmetic lemma:
+  assert (pure (SZ.v v_iter_final <= SZ.v n));
   lemma_loop_exit_v_iter_equals_n (SZ.v v_iter_final) (SZ.v n);
   
   assert (pure (SZ.v v_iter_final == SZ.v n));
