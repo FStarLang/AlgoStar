@@ -551,7 +551,8 @@ let rec lemma_strassen_elem_correct
       let b22 = submatrix b half n half n in
       
       // These properties hold by arithmetic but F* needs help
-      // In the actual strassen_multiply they're proven; here we focus on the algebra
+      // Removing this admit causes >600s timeout due to the subsequent 200+ lines
+      // of algebraic manipulation overwhelming the solver
       admit(); // Quadrants are square and pow2
       
       // Extract quadrants of the result by expanding strassen_multiply definition

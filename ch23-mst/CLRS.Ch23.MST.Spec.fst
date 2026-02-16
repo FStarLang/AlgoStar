@@ -279,10 +279,65 @@ let lemma_edge_replacement_preserves_connectivity
           (ensures all_connected n ((e_new :: t) ))
   = () // Trivial from assumption
 
+(*** Weight Lemmas for Edge Exchange ***)
+
+// Filtering out an edge: weight decomposition
+let rec filter_weight_decomp (e_rem: edge) (t: list edge)
+  : Lemma (ensures total_weight t = 
+                   total_weight (filter (fun e -> not (edge_eq e e_rem)) t) +
+                   total_weight (filter (fun e -> edge_eq e e_rem) t))
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      filter_weight_decomp e_rem tl
+
+// All edges matching edge_eq have the same weight
+let rec filter_matching_weight (e_rem: edge) (t: list edge)
+  : Lemma (ensures (let c = length (filter (fun e -> edge_eq e e_rem) t) in
+                    total_weight (filter (fun e -> edge_eq e e_rem) t) = op_Multiply c e_rem.w))
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      filter_matching_weight e_rem tl;
+      if edge_eq hd e_rem then
+        // edge_eq checks weight equality, so hd.w = e_rem.w
+        assert (hd.w = e_rem.w)
+      else ()
+
+// If mem_edge e t, then filter keeps at least one match
+let rec filter_match_nonempty (e_rem: edge) (t: list edge)
+  : Lemma (requires mem_edge e_rem t)
+          (ensures length (filter (fun e -> edge_eq e e_rem) t) >= 1)
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq e_rem hd then ()
+      else filter_match_nonempty e_rem tl
+
+// Filter only removes: length decreases
+let rec filter_length_le (f: edge -> bool) (t: list edge)
+  : Lemma (ensures length (filter f t) <= length t)
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | _ :: tl -> filter_length_le f tl
+
+// Complementary filter lengths sum to original
+let rec filter_complement_length (f: edge -> bool) (t: list edge)
+  : Lemma (ensures length (filter f t) + length (filter (fun e -> not (f e)) t) = length t)
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | _ :: tl -> filter_complement_length f tl
+
 (*** Main Theorem: Cut Property (CLRS Theorem 23.1) ***)
 
 // If we can show that exchanging edges preserves spanning tree property
 // and doesn't increase weight, we prove the cut property
+#push-options "--z3rlimit 20"
 let lemma_exchange_preserves_mst 
     (g: graph)
     (t: list edge)      // Original MST
@@ -298,8 +353,51 @@ let lemma_exchange_preserves_mst
           (ensures is_mst g (e_add :: (filter (fun e -> not (edge_eq e e_rem)) t)) \/
                    total_weight (e_add :: (filter (fun e -> not (edge_eq e e_rem)) t)) = 
                    total_weight t)
-  = // Weight analysis
-    admit() // Need to prove: w(T') = w(T) - w(e_rem) + w(e_add) <= w(T)
+  = let t' = e_add :: filter (fun e -> not (edge_eq e e_rem)) t in
+    let filtered = filter (fun e -> not (edge_eq e e_rem)) t in
+    let matched = filter (fun e -> edge_eq e e_rem) t in
+    // Weight decomposition
+    filter_weight_decomp e_rem t;
+    // Matched edges all have weight e_rem.w
+    filter_matching_weight e_rem t;
+    filter_match_nonempty e_rem t;
+    let count = length matched in
+    assert (count >= 1);
+    assert (total_weight matched = op_Multiply count e_rem.w);
+    // Length constraint: filter complement lengths sum to original
+    filter_complement_length (fun e -> not (edge_eq e e_rem)) t;
+    // len(filter (not.not.eq)) + len(filter not.eq) = len t
+    // i.e., len(matched') + len(filtered) = len t
+    // But we need filter (fun e -> not (not (edge_eq e e_rem))) = filter (fun e -> edge_eq e e_rem)
+    // This is syntactically different, so let's use the other direction:
+    filter_complement_length (fun e -> edge_eq e e_rem) t;
+    // len(matched) + len(filtered) = len(t) 
+    assert (length matched + length filtered = length t);
+    // len(t) = n-1 (MST), len(t') = n-1 (spanning tree), len(t') = 1 + len(filtered)
+    assert (length t = g.n - 1);
+    assert (length t' = g.n - 1);
+    assert (length t' = 1 + length filtered);
+    // So: count = length matched = length t - length filtered = (n-1) - (n-2) = 1
+    assert (count = 1);
+    // total_weight t' = e_add.w + total_weight filtered
+    //                = e_add.w + total_weight t - 1 * e_rem.w
+    //                = e_add.w + total_weight t - e_rem.w
+    assert (total_weight t = total_weight filtered + e_rem.w);
+    assert (total_weight t' = e_add.w + total_weight filtered);
+    // So total_weight t' = e_add.w + total_weight t - e_rem.w <= total_weight t
+    assert (total_weight t' <= total_weight t);
+    // T is MST, T' is spanning tree, so total_weight t <= total_weight t'
+    assert (total_weight t <= total_weight t');
+    // Therefore equal
+    assert (total_weight t' = total_weight t);
+    // T' has same weight as MST and is a spanning tree
+    // Need: forall t''. is_spanning_tree g t'' ==> total_weight t' <= total_weight t''
+    // From: total_weight t' = total_weight t and is_mst g t
+    // So: total_weight t' = total_weight t <= total_weight t''
+    introduce forall (t'': list edge). is_spanning_tree g t'' ==> total_weight t' <= total_weight t''
+    with introduce _ ==> _
+    with _h. ()
+#pop-options
 
 // Main theorem: Cut Property
 // If A ⊆ MST T, and (u,v) is light edge crossing cut respecting A,
