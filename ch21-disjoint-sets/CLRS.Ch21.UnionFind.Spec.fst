@@ -350,27 +350,12 @@ let pure_union_correctness (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x 
     pure_union_preserves_rank_invariant f x y;
     admit()  // Full proof requires reasoning about paths through the forest
 
-(*** 7. Logarithmic Rank Bound (CLRS Corollary - sketch) ***)
+(*** 7. Logarithmic Rank Bound (CLRS Corollary) ***)
 
-// To prove rank[x] ≤ ⌊log₂ n⌋, we need to show that a node of rank r
-// has at least 2^r nodes in its subtree.
-//
-// Proof sketch:
-// 1. Define size[x] = number of nodes in subtree rooted at x
-// 2. Invariant: after union, size[x] ≥ 2^rank[x]
-//    - Initially: size[x] = 1, rank[x] = 0, so 1 ≥ 2^0 ✓
-//    - Union: if rank[x] < rank[y], x becomes child of y:
-//      size[y] += size[x], rank[y] unchanged, so size[y] ≥ 2^rank[y] + 2^rank[x] ≥ 2^rank[y] ✓
-//    - Union equal rank: size[x] += size[y] ≥ 2·2^rank[x] = 2^(rank[x]+1), rank[x] += 1 ✓
-// 3. Therefore: 2^rank[x] ≤ size[x] ≤ n, so rank[x] ≤ log₂ n
-//
-// This requires tracking subtree sizes, which we omit for brevity.
-
-// Admitted: logarithmic rank bound
-// (Would need to define subtree_size and prove the invariant above)
-let rank_logarithmic_bound (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x: nat{x < f.n})
-  : Lemma (ensures Seq.index f.rank x <= 64)  // Placeholder: log₂(2^64) = 64
-  = admit()
+// See CLRS.Ch21.UnionFind.RankBound for the full proof:
+//   rank_logarithmic_bound_sized: rank[x] <= log2_floor(n)
+// The proof tracks subtree sizes (size_rank_invariant: size[x] >= 2^rank[x])
+// and uses the bound size[x] <= n to conclude 2^rank[x] <= n.
 
 (*** 8. Summary Theorems ***)
 
