@@ -401,8 +401,78 @@ private let rec lemma_digit_sum_le (k1 k2 bigD base d: nat)
       lemma_mult_le_right (pow base (d - 1)) (digit k1 (d - 1) base) (digit k2 (d - 1) base)
     end
 
-// If digits are lexicographically ordered (most significant differing digit favors x),
-// then x <= y. With the MSD-first lexicographic definition, this follows from digit decomposition.
+// Upper bound: digit_sum k bigD base d < pow base d
+// Each digit is < base, so sum < base^d
+private let rec lemma_digit_sum_bound (k bigD base d: nat)
+  : Lemma (requires d <= bigD /\ base >= 2)
+          (ensures digit_sum k bigD base d < pow base d)
+          (decreases d)
+  = if d = 0 || base = 0 then (
+      pow_positive base 0;
+      ()
+    ) else (
+      lemma_digit_sum_bound k bigD base (d - 1);
+      digit_bound k (d - 1) base;
+      pow_positive base (d - 1);
+      // digit k (d-1) base < base
+      // digit k (d-1) base * pow base (d-1) <= (base - 1) * pow base (d-1)
+      lemma_mult_le_right (pow base (d - 1)) (digit k (d - 1) base) (base - 1);
+      // (base - 1) * pow base (d-1) + pow base (d-1) = base * pow base (d-1) = pow base d
+      pow_succ base (d - 1);
+      ()
+    )
+
+// digit_sum splits: digit_sum k bigD base d = digit(k,d-1)*base^(d-1) + digit_sum k bigD base (d-1)
+// (This is just the definition, but useful to state)
+
+// Key helper: if digits from d0+1 to d-1 are equal, then
+// digit_sum k1 bigD base d - digit_sum k1 bigD base (d0+1) == 
+// digit_sum k2 bigD base d - digit_sum k2 bigD base (d0+1)
+private let rec lemma_digit_sum_equal_upper (k1 k2 bigD base d d0: nat)
+  : Lemma (requires d0 < d /\ d <= bigD /\ base >= 2 /\
+                    (forall (i: nat). d0 < i /\ i < d ==> digit k1 i base == digit k2 i base))
+          (ensures digit_sum k1 bigD base d - digit_sum k1 bigD base (d0 + 1) ==
+                   digit_sum k2 bigD base d - digit_sum k2 bigD base (d0 + 1))
+          (decreases d)
+  = if d = d0 + 1 then ()
+    else (
+      // digit_sum k bigD base d = digit(k,d-1)*base^(d-1) + digit_sum k bigD base (d-1)
+      // digit(k1, d-1) == digit(k2, d-1) since d-1 > d0
+      assert (digit k1 (d - 1) base == digit k2 (d - 1) base);
+      lemma_digit_sum_equal_upper k1 k2 bigD base (d - 1) d0
+    )
+
+// Helper for the MSD proof: digit_sum ordering when exists a separating digit
+#push-options "--z3rlimit 30 --fuel 2"
+private let rec lemma_digit_sum_msd_le (x y bigD base d d0: nat)
+  : Lemma (requires base >= 2 /\ d0 < d /\ d <= bigD /\
+                    digit x d0 base < digit y d0 base /\
+                    (forall (d': nat). d0 < d' /\ d' < d ==> digit x d' base == digit y d' base))
+          (ensures digit_sum x bigD base d <= digit_sum y bigD base d)
+          (decreases d)
+  = if d = d0 + 1 then (
+      // digit_sum k bigD base (d0+1) = digit(k, d0) * base^d0 + digit_sum k bigD base d0
+      pow_positive base d0;
+      lemma_digit_sum_bound x bigD base d0;
+      // digit(x,d0) < digit(y,d0), so digit(x,d0) <= digit(y,d0) - 1
+      // digit(x,d0) * base^d0 + digit_sum x bigD base d0
+      //   <= (digit(y,d0) - 1) * base^d0 + (base^d0 - 1)
+      //   = digit(y,d0) * base^d0 - 1
+      //   <= digit(y,d0) * base^d0 + digit_sum y bigD base d0
+      lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1);
+      ()
+    ) else (
+      // d > d0 + 1, so d - 1 > d0
+      // digit_sum k bigD base d = digit(k, d-1) * base^(d-1) + digit_sum k bigD base (d-1)
+      // digit(x, d-1) == digit(y, d-1) since d-1 > d0
+      assert (digit x (d - 1) base == digit y (d - 1) base);
+      lemma_digit_sum_msd_le x y bigD base (d - 1) d0;
+      ()
+    )
+#pop-options
+
+// Main lemma: MSD lexicographic ordering implies value ordering
+#push-options "--z3rlimit 20"
 let lemma_digits_le_implies_value_le (x y bigD base: nat)
   : Lemma (requires bigD > 0 /\
                     base >= 2 /\
@@ -415,12 +485,18 @@ let lemma_digits_le_implies_value_le (x y bigD base: nat)
           (ensures x <= y)
   = digit_decomposition x bigD base;
     digit_decomposition y bigD base;
-    // In the all-equal case: all digits equal → digit sums equal → x == y
-    // In the MSD case: the most significant differing digit dominates
-    // Both cases require careful digit_sum reasoning
-    // For the MSD case: digits above d0 are equal, so their contribution cancels;
-    // at d0, x contributes less; below d0, bounded by base^d0 - 1 < base^d0
-    admit()
+    match FStar.StrongExcludedMiddle.strong_excluded_middle
+      (forall (d: nat). d < bigD ==> digit x d base == digit y d base) with
+    | true -> lemma_digit_sum_extensional x y bigD base bigD
+    | false ->
+      assert (exists (d0: nat). d0 < bigD /\ digit x d0 base < digit y d0 base /\
+              (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base));
+      eliminate exists (d0: nat).
+        d0 < bigD /\ digit x d0 base < digit y d0 base /\
+        (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base)
+      returns digit_sum x bigD base bigD <= digit_sum y bigD base bigD
+      with _. lemma_digit_sum_msd_le x y bigD base bigD d0
+#pop-options
 
 // Helper: if all adjacent pairs are ordered, the sequence is sorted
 private let rec lemma_pairwise_implies_sorted (s: seq nat)
