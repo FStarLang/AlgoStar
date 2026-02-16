@@ -156,6 +156,41 @@ let is_forest (edges: list edge) (n: nat) : prop =
 
 (*** Correctness Properties ***)
 
+// subset_edges is reflexive
+let rec subset_edges_refl (a: list edge)
+  : Lemma (ensures subset_edges a a)
+          (decreases a)
+  = match a with
+    | [] -> ()
+    | hd :: tl -> 
+      assert (mem_edge hd (hd :: tl));
+      subset_edges_refl tl;
+      subset_edges_cons_right tl hd tl
+
+// Adding an element to b preserves subset
+and subset_edges_cons_right (a: list edge) (e: edge) (b: list edge)
+  : Lemma (requires subset_edges a b)
+          (ensures subset_edges a (e :: b))
+          (decreases a)
+  = match a with
+    | [] -> ()
+    | hd :: tl ->
+      assert (mem_edge hd b);
+      // mem_edge hd b ==> mem_edge hd (e :: b) 
+      subset_edges_cons_right tl e b
+
+// process_edge result is subset when input is subset
+let process_edge_subset (e: edge) (uf: uf_state) (result: list edge) (n: nat) (full_edges: list edge)
+  : Lemma (requires subset_edges result full_edges /\ mem_edge e full_edges)
+          (ensures (let (_, result') = process_edge e uf result n in
+                    subset_edges result' full_edges))
+  = let (_, result') = process_edge e uf result n in
+    if same_component_uf uf e.src e.dst n then ()
+    else begin
+      // result' = e :: result, e is in full_edges, result subset of full_edges
+      assert (result' == e :: result)
+    end
+
 // Property 1: Result is subset of input edges
 // Helper that tracks the original full edge list
 #push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
@@ -173,10 +208,10 @@ let rec kruskal_subset_lemma_aux
     | [] -> ()
     | e :: rest ->
         let (uf', result') = process_edge e uf result n in
-        // rest is subset of edges which is subset of full_edges
-        // Axiomatize: subset is transitive and e :: result is subset when e and result are
-        assume (subset_edges rest full_edges);
-        assume (subset_edges result' full_edges);
+        // rest is subset of full_edges: from subset_edges (e :: rest) full_edges
+        assert (subset_edges rest full_edges);
+        // result' is subset of full_edges: process_edge preserves subset
+        process_edge_subset e uf result n full_edges;
         kruskal_subset_lemma_aux rest uf' result' n full_edges
         
 let kruskal_subset_lemma 
@@ -189,7 +224,7 @@ let kruskal_subset_lemma
     (ensures subset_edges (kruskal_pure edges uf result n) edges)
     (decreases edges)
   = // edges is trivially a subset of itself
-    assume (subset_edges edges edges);
+    subset_edges_refl edges;
     kruskal_subset_lemma_aux edges uf result n edges
 #pop-options
 
