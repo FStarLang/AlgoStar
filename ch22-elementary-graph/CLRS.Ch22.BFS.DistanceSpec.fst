@@ -227,8 +227,202 @@ let rec path_vertices_bounded (n: nat) (adj: Seq.seq bool) (p: list nat)
 
 (*** 6. Correctness Theorem - Easy Direction ***)
 
+// Path extension: if path ends at u and edge u -> v, can extend path
+let rec path_extend (n: nat) (adj: Seq.seq bool) (p: list nat) (v: nat)
+  : Lemma
+    (requires
+      path n adj p /\
+      v < n /\
+      L.length p > 0 /\
+      has_edge n adj (L.last p) v)
+    (ensures
+      (let p' = p @ [v] in
+       path n adj p' /\
+       path_length p' = path_length p + 1))
+    (decreases p)
+  = match p with
+    | [] -> ()
+    | [u] -> ()
+    | u :: w :: rest ->
+        path_extend n adj (w :: rest) v
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
+
+// Single vertex is a valid path
+let singleton_path (n: nat) (adj: Seq.seq bool) (v: nat{v < n})
+  : Lemma (ensures path n adj [v])
+  = ()
+
+#pop-options
+
+// Helper: if v is in the list of new vertices from expand_frontier, 
+// then v is an unvisited neighbor of some frontier vertex
+// Helper: if v is in unvisited_neighbors of u, then there's an edge from u to v
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec unvisited_neighbors_mem (n: nat) (adj: Seq.seq bool) (visited: Seq.seq bool)
+                                 (u: nat) (scan: nat{scan <= n}) (v: nat)
+  : Lemma
+    (requires Seq.length visited = n /\ L.mem v (unvisited_neighbors n adj visited u scan))
+    (ensures v < n /\ has_edge n adj u v /\ not (Seq.index visited v))
+    (decreases (n - scan))
+  = if scan >= n then ()
+    else 
+      let rest = unvisited_neighbors n adj visited u (scan + 1) in
+      // By definition: unvisited_neighbors = if has_edge n adj u scan && not (Seq.index visited scan) then scan :: rest else rest
+      if has_edge n adj u scan && not (Seq.index visited scan) then (
+        // Result is scan :: rest
+        if v = scan then ()
+        else unvisited_neighbors_mem n adj visited u (scan + 1) v
+      ) else (
+        // Result is rest
+        unvisited_neighbors_mem n adj visited u (scan + 1) v
+      )
+#pop-options
+
+// Helper: if v is in the list of new vertices from expand_frontier, 
+// then v is an unvisited neighbor of some frontier vertex  
+let rec expand_frontier_witness (n: nat) (adj: Seq.seq bool) (visited: Seq.seq bool)
+                                 (frontier: list nat) (v: nat)
+  : Ghost nat
+    (requires Seq.length visited = n /\ L.mem v (expand_frontier n adj visited frontier))
+    (ensures fun u -> L.mem u frontier /\ has_edge n adj u v /\ not (Seq.index visited v))
+    (decreases frontier)
+  = match frontier with
+    | [] -> 0  // unreachable
+    | hd :: rest ->
+        let hd_neighbors = unvisited_neighbors n adj visited hd 0 in
+        FStar.List.Tot.Properties.append_mem hd_neighbors (expand_frontier n adj visited rest) v;
+        if L.mem v hd_neighbors then (
+          unvisited_neighbors_mem n adj visited hd 0 v;
+          hd
+        ) else (
+          expand_frontier_witness n adj visited rest v
+        )
+
+let expand_frontier_mem (n: nat) (adj: Seq.seq bool) (visited: Seq.seq bool)
+                        (frontier: list nat) (v: nat)
+  : Lemma
+    (requires Seq.length visited = n /\ L.mem v (expand_frontier n adj visited frontier))
+    (ensures exists (u: nat). L.mem u frontier /\ has_edge n adj u v /\ not (Seq.index visited v))
+  = let u = expand_frontier_witness n adj visited frontier v in
+    ()
+
+// Helper: mark_visited only marks vertices from the list
+let rec mark_visited_subset (n: nat) (visited: Seq.seq bool) (vs: list nat) (v: nat{v < n})
+  : Lemma
+    (requires Seq.length visited = n)
+    (ensures 
+      Seq.index (mark_visited n visited vs) v ==>
+      Seq.index visited v \/ L.mem v vs)
+    (decreases vs)
+  = match vs with
+    | [] -> ()
+    | w :: rest ->
+        if w < n && w < Seq.length visited then
+          mark_visited_subset n (Seq.upd visited w true) rest v
+        else
+          mark_visited_subset n visited rest v
+
+// Helper: if v is marked by mark_visited and was not visited before, v is in the list
+let rec mark_visited_new (n: nat) (visited: Seq.seq bool) (vs: list nat) (v: nat{v < n})
+  : Lemma
+    (requires Seq.length visited = n)
+    (ensures 
+      (Seq.index (mark_visited n visited vs) v /\ not (Seq.index visited v)) ==>
+      L.mem v vs)
+    (decreases vs)
+  = match vs with
+    | [] -> ()
+    | w :: rest ->
+        if w < n && w < Seq.length visited then (
+          if w = v then ()
+          else mark_visited_new n (Seq.upd visited w true) rest v
+        ) else
+          mark_visited_new n visited rest v
+
+// Helper: dedup preserves membership
+let rec dedup_mem (vs: list nat) (v: nat)
+  : Lemma
+    (ensures L.mem v (dedup vs) <==> L.mem v vs)
+    (decreases vs)
+  = match vs with
+    | [] -> ()
+    | w :: rest ->
+        dedup_mem rest v;
+        if L.mem w (dedup rest) then ()
+        else ()
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+
+// Helper: mark_visited preserves existing markings
+let rec mark_visited_preserves (n: nat) (visited: Seq.seq bool) (vs: list nat) (v: nat{v < n})
+  : Lemma
+    (requires Seq.length visited = n /\ Seq.index visited v)
+    (ensures Seq.index (mark_visited n visited vs) v)
+    (decreases vs)
+  = match vs with
+    | [] -> ()
+    | w :: rest ->
+        if w < n && w < Seq.length visited then
+          mark_visited_preserves n (Seq.upd visited w true) rest v
+        else
+          mark_visited_preserves n visited rest v
+
+// Helper: if v is in the list vs, mark_visited marks it
+#push-options "--z3rlimit 40 --fuel 2"
+let rec mark_visited_marks (n: nat) (visited: Seq.seq bool) (vs: list nat) (v: nat{v < n})
+  : Lemma
+    (requires Seq.length visited = n /\ L.mem v vs)
+    (ensures Seq.index (mark_visited n visited vs) v)
+    (decreases vs)
+  = match vs with
+    | [] -> ()
+    | w :: rest ->
+        if w < n && w < Seq.length visited then (
+          if w = v then (
+            // v is being marked here
+            let visited' = Seq.upd visited v true in
+            // The rest of the list won't unmark v
+            mark_visited_preserves n visited' rest v
+          ) else (
+            mark_visited_marks n (Seq.upd visited w true) rest v
+          )
+        ) else
+          mark_visited_marks n visited rest v
+#pop-options
+
+// Lemma: vertices in the frontier are visited
+#push-options "--z3rlimit 30"
+let frontier_visited (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (k: nat) (u: nat)
+  : Lemma
+    (requires
+      k <= n /\
+      (let st = bfs_steps n adj source k in
+       L.mem u st.current_frontier))
+    (ensures
+      (let st = bfs_steps n adj source k in
+       u < n /\ Seq.index st.visited u))
+  = let st = bfs_steps n adj source k in
+    if k = 0 then (
+      // Frontier is [source], and source is visited
+      ()
+    ) else (
+      // At step k > 0, frontier consists of newly visited vertices
+      // from expand_frontier on previous frontier
+      let prev_st = bfs_steps n adj source (k - 1) in
+      let new_vertices_with_dups = expand_frontier n adj prev_st.visited prev_st.current_frontier in
+      let new_vertices = dedup new_vertices_with_dups in
+      // u is in new_vertices
+      assert (L.mem u new_vertices);
+      dedup_mem new_vertices_with_dups u;
+      expand_frontier_mem n adj prev_st.visited prev_st.current_frontier u;
+      // u was marked as visited by mark_visited
+      mark_visited_marks n prev_st.visited new_vertices u
+    )
+#pop-options
+
 // If vertex is visited at step k, there exists a path of length <= k
-let visited_implies_path_exists (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+let rec visited_implies_path_exists (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
                                      (v: nat{v < n}) (k: nat)
   : Lemma
     (requires 
@@ -236,8 +430,72 @@ let visited_implies_path_exists (n: nat) (adj: Seq.seq bool) (source: nat{source
       (let st = bfs_steps n adj source k in
        Seq.index st.visited v))
     (ensures exists (p: list nat). path_from_to n adj source v p /\ path_length p <= k)
-  = admit()  // Easy direction - existence of path at distance k
-            // Would need to track parent pointers to construct explicit path
+    (decreases k)
+  = let st = bfs_steps n adj source k in
+    if k = 0 then (
+      // Base case: only source is visited at step 0
+      let st0 = bfs_init n source in
+      assert (st == st0);
+      assert (Seq.index st.visited v);
+      // The only visited vertex at step 0 is source, so v = source
+      assert (v = source);
+      singleton_path n adj source;
+      assert (path_from_to n adj source v [source])
+    ) else (
+      // Inductive case: k > 0
+      let prev_st = bfs_steps n adj source (k - 1) in
+      if Seq.index prev_st.visited v then (
+        // v was already visited at step k-1, use IH
+        visited_implies_path_exists n adj source v (k - 1)
+      ) else (
+        // v was newly visited at step k
+        // bfs_step expands the frontier and marks new vertices
+        assert (st == bfs_step n adj prev_st);
+        
+        let new_vertices_with_dups = expand_frontier n adj prev_st.visited prev_st.current_frontier in
+        let new_vertices = dedup new_vertices_with_dups in
+        
+        // v was marked by mark_visited
+        mark_visited_new n prev_st.visited new_vertices v;
+        assert (L.mem v new_vertices);
+        
+        dedup_mem new_vertices_with_dups v;
+        assert (L.mem v new_vertices_with_dups);
+        
+        // So v is in expand_frontier result
+        expand_frontier_mem n adj prev_st.visited prev_st.current_frontier v;
+        
+        // There exists a frontier vertex u with edge u -> v
+        eliminate exists (u: nat). L.mem u prev_st.current_frontier /\ has_edge n adj u v /\ not (Seq.index prev_st.visited v)
+        returns (exists (p: list nat). path_from_to n adj source v p /\ path_length p <= k)
+        with _. (
+          // u has an edge to v, so u < n (from has_edge definition)
+          assert (u < n /\ v < n);
+          // u was in frontier at step k-1
+          // Frontier vertices are visited vertices
+          frontier_visited n adj source (k - 1) u;
+          // By IH, there's a path from source to u of length <= k-1
+          visited_implies_path_exists n adj source u (k - 1);
+          
+          eliminate exists (p: list nat). path_from_to n adj source u p /\ path_length p <= k - 1
+          returns (exists (p: list nat). path_from_to n adj source v p /\ path_length p <= k)
+          with _. (
+            // Extend path with edge u -> v
+            path_extend n adj p v;
+            let p' = p @ [v] in
+            assert (path n adj p');
+            assert (path_length p' = path_length p + 1);
+            assert (path_length p' <= k);
+            // p' goes from source to v
+            FStar.List.Tot.Properties.lemma_append_last p [v];
+            assert (L.last p' = v);
+            assert (path_from_to n adj source v p')
+          )
+        )
+      )
+    )
+
+#pop-options
 
 (*** 7. Correctness Theorem - Hard Direction (Admitted) ***)
 
@@ -290,25 +548,6 @@ let rec path_concat (n: nat) (adj: Seq.seq bool) (p1 p2: list nat)
     | u :: w :: rest ->
         path_concat n adj (w :: rest) p2
 
-// Path extension: if path ends at u and edge u -> v, can extend path
-let rec path_extend (n: nat) (adj: Seq.seq bool) (p: list nat) (v: nat)
-  : Lemma
-    (requires
-      path n adj p /\
-      v < n /\
-      L.length p > 0 /\
-      has_edge n adj (L.last p) v)
-    (ensures
-      (let p' = p @ [v] in
-       path n adj p' /\
-       path_length p' = path_length p + 1))
-    (decreases p)
-  = match p with
-    | [] -> ()
-    | [u] -> ()
-    | u :: w :: rest ->
-        path_extend n adj (w :: rest) v
-
 // Transitive reachability
 let reachable_trans (n: nat) (adj: Seq.seq bool) (s: nat) (u: nat) (v: nat)
   : Lemma
@@ -334,11 +573,6 @@ let reachable_trans (n: nat) (adj: Seq.seq bool) (s: nat) (u: nat) (v: nat)
     )
 
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
-
-// Single vertex is a valid path
-let singleton_path (n: nat) (adj: Seq.seq bool) (v: nat{v < n})
-  : Lemma (ensures path n adj [v])
-  = ()
 
 // Source is reachable from itself
 let reachable_refl (n: nat) (adj: Seq.seq bool) (s: nat{s < n})
