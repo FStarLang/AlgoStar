@@ -318,29 +318,118 @@ let pure_find_root_is_self (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (ro
           (ensures pure_find f root == root)
   = ()
 
+// Determinism: pure_find_fuel with more fuel gives the same result
+#restart-solver
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 15"
+let rec pure_find_fuel_deterministic
+  (f: uf_forest{is_valid_uf f})
+  (z: nat{z < f.n})
+  (fuel1 fuel2: nat)
+  : Lemma (requires fuel1 <= fuel2 /\ Some? (pure_find_fuel f z fuel1))
+          (ensures pure_find_fuel f z fuel1 = pure_find_fuel f z fuel2)
+          (decreases fuel1)
+  = if fuel1 = 0 then () // contradicts Some?
+    else
+      let px = Seq.index f.parent z in
+      if px = z then ()
+      else begin
+        // pure_find_fuel f z fuel1 = pure_find_fuel f px (fuel1-1), Some
+        // pure_find_fuel f z fuel2 = pure_find_fuel f px (fuel2-1)
+        // fuel1-1 <= fuel2-1
+        pure_find_fuel_deterministic f px (fuel1 - 1) (fuel2 - 1)
+      end
+#pop-options
+
+// Rank-independence: pure_find_fuel only depends on parent array, not rank
+#restart-solver
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 15"
+let rec pure_find_fuel_rank_independent
+  (f1 f2: uf_forest{is_valid_uf f1 /\ is_valid_uf f2})
+  (z: nat{z < f1.n /\ z < f2.n})
+  (fuel: nat)
+  : Lemma (requires f1.parent == f2.parent /\ f1.n == f2.n)
+          (ensures pure_find_fuel f1 z fuel == pure_find_fuel f2 z fuel)
+          (decreases fuel)
+  = if fuel = 0 then ()
+    else
+      let px = Seq.index f1.parent z in
+      if px = z then ()
+      else pure_find_fuel_rank_independent f1 f2 px (fuel - 1)
+#pop-options
+
 // Helper: Following a parent chain in modified forest
 // If we change parent[a] = b where a was a root, then:
 // - pure_find of a now finds pure_find of b
 // - other elements unaffected (if they don't go through a)
 
-// This is complex in general, but for union we only change a root's parent,
-// so we can reason about it.
-
-// The following lemma would need a more sophisticated approach with acyclicity
-// For now we admit it
-let pure_find_after_parent_update 
-  (f: uf_forest{is_valid_uf f /\ rank_invariant f}) 
-  (changed_node new_parent: nat{changed_node < f.n /\ new_parent < f.n})
+// Fuel-based helper: relate pure_find_fuel on f and f' where f' only differs at changed_node
+#restart-solver
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+let rec pure_find_fuel_after_update
+  (f: uf_forest{is_valid_uf f /\ rank_invariant f})
+  (changed_node new_parent: nat{changed_node < f.n /\ new_parent < f.n /\ changed_node <> new_parent})
   (z: nat{z < f.n})
-  : Lemma (requires is_root f changed_node /\ is_root f new_parent)
+  (fuel: nat)
+  : Lemma (requires is_root f changed_node /\ is_root f new_parent /\
+                    Some? (pure_find_fuel f z fuel))
           (ensures (let f' = { f with parent = Seq.upd f.parent changed_node new_parent } in
-                    rank_invariant f' ==>
-                    (if pure_find f z = changed_node 
-                     then pure_find f' z = new_parent
-                     else pure_find f' z = pure_find f z)))
-  = admit()  // Provable but requires reasoning about paths in the forest
+                    (match pure_find_fuel f z fuel with
+                     | Some r -> 
+                       if r = changed_node 
+                       then pure_find_fuel f' z (fuel + 1) = Some new_parent
+                       else pure_find_fuel f' z fuel = Some r
+                     | None -> True)))
+          (decreases fuel)
+  = let f' = { f with parent = Seq.upd f.parent changed_node new_parent } in
+    if fuel = 0 then () // contradicts Some? (pure_find_fuel f z fuel)
+    else
+      let px_f = Seq.index f.parent z in
+      if px_f = z then begin
+        // z is a root in f
+        // pure_find_fuel f z fuel = Some z
+        assert (pure_find_fuel f z fuel = Some z);
+        if z = changed_node then begin
+          // In f', parent[z] = new_parent, new_parent is a root (parent[new_parent] = new_parent in f, unchanged in f')
+          assert (Seq.index f'.parent z = new_parent);
+          assert (Seq.index f'.parent new_parent = Seq.index f.parent new_parent);
+          assert (Seq.index f.parent new_parent = new_parent); // new_parent is a root in f
+          assert (pure_find_fuel f' z (fuel + 1) = pure_find_fuel f' new_parent fuel);
+          assert (pure_find_fuel f' new_parent fuel = Some new_parent)
+        end
+        else begin
+          // z is a root in f and z <> changed_node, so parent_f'[z] = parent_f[z] = z
+          assert (Seq.index f'.parent z = z);
+          assert (pure_find_fuel f' z fuel = Some z)
+        end
+      end
+      else begin
+        // z is not a root in f
+        assert (z <> changed_node); // changed_node is a root in f
+        // So parent_f'[z] = parent_f[z] = px_f
+        assert (Seq.index f'.parent z = px_f);
+        // Recurse: pure_find_fuel f px_f (fuel-1) = pure_find_fuel f z fuel (Some)
+        pure_find_fuel_after_update f changed_node new_parent px_f (fuel - 1);
+        // Now use the IH result
+        match pure_find_fuel f px_f (fuel - 1) with
+        | Some r ->
+          if r = changed_node then begin
+            assert (pure_find_fuel f' px_f fuel = Some new_parent);
+            // pure_find_fuel f' z (fuel+1) = pure_find_fuel f' px_f fuel = Some new_parent
+            assert (pure_find_fuel f' z (fuel + 1) = pure_find_fuel f' px_f fuel)
+          end
+          else begin
+            assert (pure_find_fuel f' px_f (fuel - 1) = Some r);
+            // pure_find_fuel f' z fuel = pure_find_fuel f' px_f (fuel-1) = Some r
+            assert (pure_find_fuel f' z fuel = pure_find_fuel f' px_f (fuel - 1))
+          end
+        | None -> ()
+      end
+#pop-options
 
+// Now prove the main lemma using the fuel-based helper
 // Main correctness theorem for pure_union  
+#restart-solver
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
 let pure_union_correctness (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x y: nat{x < f.n /\ y < f.n})
   : Lemma (ensures (let f' = pure_union f x y in
                     is_valid_uf f' /\
@@ -348,9 +437,93 @@ let pure_union_correctness (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x 
                     pure_find f' x == pure_find f' y))
   = pure_union_valid f x y;
     pure_union_preserves_rank_invariant f x y;
-    admit()  // Full proof requires reasoning about paths through the forest
-
-(*** 7. Logarithmic Rank Bound (CLRS Corollary) ***)
+    pure_find_in_bounds f x;
+    pure_find_in_bounds f y;
+    pure_find_is_root f x;
+    pure_find_is_root f y;
+    let root_x = pure_find f x in
+    let root_y = pure_find f y in
+    if root_x = root_y then ()
+    else begin
+      let f' = pure_union f x y in
+      assert (is_valid_uf f');
+      assert (rank_invariant f');
+      pure_find_fuel_sufficient f x;
+      pure_find_fuel_sufficient f y;
+      let rank_x = Seq.index f.rank root_x in
+      let rank_y = Seq.index f.rank root_y in
+      // f_p = parent-only change (used by fuel_after_update)
+      let changed = if rank_x < rank_y then root_x 
+                    else root_y in
+      let target = if rank_x < rank_y then root_y
+                   else root_x in
+      let f_p = { f with parent = Seq.upd f.parent changed target } in
+      // f_p is valid
+      let check_fp (i: nat{i < f_p.n}) : Lemma (Seq.index f_p.parent i < f_p.n) = () in
+      FStar.Classical.forall_intro check_fp;
+      // f' has same parent as f_p
+      assert (f'.parent == f_p.parent);
+      assert (f'.n == f_p.n);
+      // Apply fuel_after_update
+      pure_find_fuel_after_update f changed target x f.n;
+      pure_find_fuel_after_update f changed target y f.n;
+      // For x: pure_find f x = root_x
+      // For y: pure_find f y = root_y
+      if rank_x < rank_y then begin
+        // changed = root_x, target = root_y
+        // x: pure_find f x = root_x = changed => pure_find_fuel f_p x (f.n+1) = Some root_y
+        assert (pure_find_fuel f_p x (f.n + 1) = Some root_y);
+        // y: pure_find f y = root_y <> root_x = changed => pure_find_fuel f_p y f.n = Some root_y
+        assert (pure_find_fuel f_p y f.n = Some root_y);
+        // Transfer to f' (same parent)
+        pure_find_fuel_rank_independent f_p f' x (f.n + 1);
+        pure_find_fuel_rank_independent f_p f' y f.n;
+        // f' has sufficient fuel
+        pure_find_fuel_sufficient f' x;
+        pure_find_fuel_sufficient f' y;
+        pure_find_fuel_deterministic f' x f.n (f.n + 1);
+        assert (pure_find_fuel f' x f.n = Some root_y);
+        assert (pure_find_fuel f' y f.n = Some root_y);
+        assert (pure_find f' x == root_y);
+        assert (pure_find f' y == root_y)
+      end
+      else if rank_x > rank_y then begin
+        // changed = root_y, target = root_x
+        // x: pure_find f x = root_x <> root_y = changed => pure_find_fuel f_p x f.n = Some root_x
+        assert (pure_find_fuel f_p x f.n = Some root_x);
+        // y: pure_find f y = root_y = changed => pure_find_fuel f_p y (f.n+1) = Some root_x
+        assert (pure_find_fuel f_p y (f.n + 1) = Some root_x);
+        // Transfer to f'
+        pure_find_fuel_rank_independent f_p f' x f.n;
+        pure_find_fuel_rank_independent f_p f' y (f.n + 1);
+        pure_find_fuel_sufficient f' x;
+        pure_find_fuel_sufficient f' y;
+        pure_find_fuel_deterministic f' y f.n (f.n + 1);
+        assert (pure_find_fuel f' x f.n = Some root_x);
+        assert (pure_find_fuel f' y f.n = Some root_x);
+        assert (pure_find f' x == root_x);
+        assert (pure_find f' y == root_x)
+      end
+      else begin
+        // Equal rank: changed = root_y, target = root_x
+        // f' also changes rank, but parent is same as f_p
+        // x: pure_find f x = root_x <> root_y = changed => pure_find_fuel f_p x f.n = Some root_x
+        assert (pure_find_fuel f_p x f.n = Some root_x);
+        // y: pure_find f y = root_y = changed => pure_find_fuel f_p y (f.n+1) = Some root_x
+        assert (pure_find_fuel f_p y (f.n + 1) = Some root_x);
+        // Transfer to f'
+        pure_find_fuel_rank_independent f_p f' x f.n;
+        pure_find_fuel_rank_independent f_p f' y (f.n + 1);
+        pure_find_fuel_sufficient f' x;
+        pure_find_fuel_sufficient f' y;
+        pure_find_fuel_deterministic f' y f.n (f.n + 1);
+        assert (pure_find_fuel f' x f.n = Some root_x);
+        assert (pure_find_fuel f' y f.n = Some root_x);
+        assert (pure_find f' x == root_x);
+        assert (pure_find f' y == root_x)
+      end
+    end
+#pop-options
 
 // See CLRS.Ch21.UnionFind.RankBound for the full proof:
 //   rank_logarithmic_bound_sized: rank[x] <= log2_floor(n)
