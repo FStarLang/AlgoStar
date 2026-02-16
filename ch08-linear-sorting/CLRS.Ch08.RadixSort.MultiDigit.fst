@@ -481,10 +481,133 @@ let rec radix_sort_sorted_on_lower_digits
     )
 #pop-options
 
+/// pow splits: base^(a+b) = base^a * base^b
+let rec pow_split (base a b: nat)
+  : Lemma (ensures pow base (a + b) == pow base a * pow base b)
+          (decreases a)
+  = if a = 0 then ()
+    else begin
+      pow_split base (a - 1) b;
+      assert (pow base (a - 1 + b) == pow base (a - 1) * pow base b);
+      assert (pow base (a + b) == base * pow base (a - 1 + b));
+      assert (pow base a == base * pow base (a - 1))
+    end
+
+/// Sum of digits: digit_sum k d base = sum_{i=0}^{d-1} digit(k, i) * base^i
+let rec digit_sum_multi (k: nat) (d: nat) (base: nat) : Tot nat (decreases d) =
+  if d = 0 || base = 0 then 0
+  else digit k (d - 1) base * pow base (d - 1) + digit_sum_multi k (d - 1) base
+
+/// If all digits match, digit sums are equal
+let rec digit_sum_equal_multi (x y: nat) (bigD: nat) (base: nat)
+  : Lemma (requires base >= 2 /\
+                    (forall (d: nat). d < bigD ==> digit x d base == digit y d base))
+          (ensures digit_sum_multi x bigD base == digit_sum_multi y bigD base)
+          (decreases bigD)
+  = if bigD = 0 || base = 0 then ()
+    else (
+      digit_sum_equal_multi x y (bigD - 1) base;
+      assert (digit x (bigD - 1) base == digit y (bigD - 1) base)
+    )
+
+/// digit_sum k d base < pow base d
+let rec digit_sum_bound_multi (k: nat) (d: nat) (base: nat)
+  : Lemma (requires base >= 2)
+          (ensures digit_sum_multi k d base < pow base d)
+          (decreases d)
+  = if d = 0 || base = 0 then (pow_positive base 0)
+    else (
+      digit_sum_bound_multi k (d - 1) base;
+      digit_bound k (d - 1) base;
+      pow_positive base (d - 1);
+      lemma_mult_le_right (pow base (d - 1)) (digit k (d - 1) base) (base - 1)
+    )
+
+/// Digit preservation: for d < bigD, digit(k, d) = digit(k % base^bigD, d)
+/// (Raw form: the d-th digit of k is the same as d-th digit of k mod base^bigD)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let digit_preserved_by_modulo_multi (k: nat) (d: nat) (bigD: nat) (base: nat)
+  : Lemma (requires base >= 2 /\ d < bigD /\ pow base d > 0 /\ pow base bigD > 0)
+          (ensures (k / pow base d) % base == ((k % pow base bigD) / pow base d) % base)
+  = pow_positive base (bigD - d);
+    pow_split base d (bigD - d);
+    assert (pow base (d + (bigD - d)) == pow base d * pow base (bigD - d));
+    assert (d + (bigD - d) == bigD);
+    modulo_division_lemma k (pow base d) (pow base (bigD - d));
+    assert ((k % pow base bigD) / pow base d == (k / pow base d) % pow base (bigD - d));
+    pow_positive base (bigD - d - 1);
+    pow_split base 1 (bigD - d - 1);
+    assert (pow base (1 + (bigD - d - 1)) == pow base 1 * pow base (bigD - d - 1));
+    assert (pow base 1 == base);
+    assert (pow base (bigD - d) == base * pow base (bigD - d - 1));
+    modulo_modulo_lemma (k / pow base d) base (pow base (bigD - d - 1))
+#pop-options
+
+/// Key: k = digit_sum k bigD base for k < pow base bigD
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec digit_decomposition_multi (k: nat) (bigD: nat) (base: nat)
+  : Lemma (requires bigD > 0 /\ base >= 2 /\ k < pow base bigD)
+          (ensures k == digit_sum_multi k bigD base)
+          (decreases bigD)
+  = if bigD = 1 then (
+      pow_positive base 0;
+      assert (pow base 0 == 1);
+      assert (k < base);
+      small_modulo_lemma_1 k base;
+      assert (k % base == k);
+      assert (digit k 0 base == k);
+      assert (digit_sum_multi k 1 base == k)
+    ) else (
+      pow_positive base (bigD - 1);
+      pow_positive base bigD;
+      lemma_div_mod k (pow base (bigD - 1));
+      let q = k / pow base (bigD - 1) in
+      let r = k % pow base (bigD - 1) in
+      assert (pow base bigD == base * pow base (bigD - 1));
+      assert (k < base * pow base (bigD - 1));
+      assert (k == q * pow base (bigD - 1) + r);
+      modulo_range_lemma k (pow base (bigD - 1));
+      assert (r < pow base (bigD - 1));
+      assert (q < base);
+      small_modulo_lemma_1 q base;
+      assert (digit k (bigD - 1) base == q);
+      digit_decomposition_multi r (bigD - 1) base;
+      assert (r == digit_sum_multi r (bigD - 1) base);
+      let aux (d: nat{d < bigD - 1}) : Lemma (digit k d base == digit r d base) =
+        pow_positive base d;
+        digit_preserved_by_modulo_multi k d (bigD - 1) base;
+        assert (digit k d base == (k / pow base d) % base);
+        assert (digit r d base == (r / pow base d) % base)
+      in
+      Classical.forall_intro aux;
+      digit_sum_equal_multi k r (bigD - 1) base
+    )
+#pop-options
+
+/// digit_sum ordering when MSD differs: if digit x d0 < digit y d0 and
+/// all higher digits (d0 < d' < d) are equal, then digit_sum x d ≤ digit_sum y d
+#push-options "--z3rlimit 30 --fuel 2"
+let rec digit_sum_msd_le_multi (x y: nat) (d d0: nat) (base: nat)
+  : Lemma (requires base >= 2 /\ d0 < d /\
+                    digit x d0 base < digit y d0 base /\
+                    (forall (d': nat). d0 < d' /\ d' < d ==> digit x d' base == digit y d' base))
+          (ensures digit_sum_multi x d base <= digit_sum_multi y d base)
+          (decreases d)
+  = if d = d0 + 1 then (
+      pow_positive base d0;
+      digit_sum_bound_multi x d0 base;
+      lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1)
+    ) else (
+      assert (digit x (d - 1) base == digit y (d - 1) base);
+      digit_sum_msd_le_multi x y (d - 1) d0 base
+    )
+#pop-options
+
 /// Helper: if all digits 0..num_digits-1 match lexicographically, values are ordered
 /// This is the fundamental property of positional notation:
-/// If x and y differ at digit d (counting from low to high), and all lower digits match,
-/// then x < y iff digit_x(d) < digit_y(d), scaled by base^d.
+/// If x and y differ at digit d (counting from low to high), and all higher digits match,
+/// then x ≤ y iff digit_x(d) ≤ digit_y(d).
+/// The key: higher digits (more significant) dominate lower ones.
 let digits_lexicographic_implies_value_le
   (x y: nat) (num_digits: nat) (base: nat)
   : Lemma (requires base >= 2 /\ num_digits > 0 /\
@@ -492,20 +615,85 @@ let digits_lexicographic_implies_value_le
                     // x and y compare lexicographically by digits
                     ((exists (d: nat). d < num_digits /\ 
                       digit x d base < digit y d base /\
-                      (forall (d': nat). d' < d ==> digit x d' base == digit y d' base)) \/
+                      (forall (d': nat). d < d' /\ d' < num_digits ==> digit x d' base == digit y d' base)) \/
                      (forall (d: nat). d < num_digits ==> digit x d base == digit y d base)))
           (ensures x <= y)
   = pow_positive base num_digits;
-    admit() // Arithmetic reasoning about positional notation
-            // Proof sketch:
-            // 1. If all digits match, then x == y by uniqueness of base representation
-            // 2. Otherwise, let d be the first digit where they differ
-            // 3. Write x = sum_{i<d} digit_x(i)*base^i + digit_x(d)*base^d + sum_{i>d} digit_x(i)*base^i
-            // 4. Write y = sum_{i<d} digit_y(i)*base^i + digit_y(d)*base^d + sum_{i>d} digit_y(i)*base^i
-            // 5. For i < d: digit_x(i) = digit_y(i), so lower sums are equal
-            // 6. digit_x(d) < digit_y(d) gives (digit_y(d) - digit_x(d)) * base^d >= base^d
-            // 7. Upper sums are bounded: sum_{i>d} digit(i)*base^i < base^(d+1) + base^(d+2) + ... < base^d * (base/(base-1))
-            // 8. For base >= 2, the difference at digit d outweighs all higher digit variations
+    digit_decomposition_multi x num_digits base;
+    digit_decomposition_multi y num_digits base;
+    // x == digit_sum x num_digits base, y == digit_sum y num_digits base
+    // Case 1: all digits equal => digit_sums equal => x == y
+    // Case 2: exists d with digit_x(d) < digit_y(d) and higher digits equal
+    //         => digit_sum x num_digits <= digit_sum y num_digits => x <= y
+    match FStar.StrongExcludedMiddle.strong_excluded_middle
+      (forall (d: nat). d < num_digits ==> digit x d base == digit y d base) with
+    | true -> digit_sum_equal_multi x y num_digits base
+    | false -> 
+      // The disjunction holds from the precondition. 
+      // In the false branch, not all digits equal, so the existential case must hold.
+      // Actually, the disjunction is from the precondition, we just dispatch each case.
+      // Use Classical to dispatch
+      let lem_exists (d: nat)
+        : Lemma (requires d < num_digits /\
+                          digit x d base < digit y d base /\
+                          (forall (d': nat). d < d' /\ d' < num_digits ==> digit x d' base == digit y d' base))
+                (ensures x <= y)
+        = digit_decomposition_multi x num_digits base;
+          digit_decomposition_multi y num_digits base;
+          digit_sum_msd_le_multi x y num_digits d base
+      in
+      let lem_equal ()
+        : Lemma (requires (forall (d: nat). d < num_digits ==> digit x d base == digit y d base))
+                (ensures x <= y)
+        = digit_decomposition_multi x num_digits base;
+          digit_decomposition_multi y num_digits base;
+          digit_sum_equal_multi x y num_digits base
+      in
+      // The precondition gives us the disjunction
+      // We just need to show x <= y in both cases
+      // F* should be able to see this with the two lemmas
+      Classical.forall_intro (Classical.move_requires lem_exists);
+      Classical.move_requires lem_equal ()
+
+/// Helper: sorted on all digits implies sorted by value
+/// If a sequence is sorted when comparing each digit position independently,
+/// then it must be sorted by the full numeric value.
+/// This follows from the lexicographic ordering property of positional notation.
+/// Helper: from ∀d<nd. digit x d ≤ digit y d, establish lexicographic ordering.
+/// Either all digits are equal, or the most significant differing digit has x<y
+/// and all higher digits are equal.
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
+  : Lemma (requires base >= 2 /\
+                    (forall (d:nat). d < nd ==> digit x d base <= digit y d base))
+          (ensures (forall (d:nat). d < nd ==> digit x d base == digit y d base) \/
+                   (exists (d:nat). d < nd /\
+                      digit x d base < digit y d base /\
+                      (forall (d':nat). d < d' /\ d' < nd ==> digit x d' base == digit y d' base)))
+          (decreases nd)
+  = if nd = 0 then ()
+    else begin
+      // Check the most significant digit (nd - 1)
+      let dx = digit x (nd - 1) base in
+      let dy = digit y (nd - 1) base in
+      // The forall gives us dx <= dy
+      assert (nd - 1 < nd);  // trigger
+      assert (dx <= dy);
+      if dx < dy then begin
+        // Found a strictly less digit at position nd-1
+        // All higher digits d' > nd-1: vacuously true (d' < nd means d' <= nd-1)
+        ()
+      end else begin
+        // dx = dy at position nd-1
+        assert (dx == dy);
+        // Apply IH for positions 0..nd-2
+        digitwise_le_implies_lex x y (nd - 1) base;
+        // IH gives us: either all digits 0..nd-2 are equal, or exists d < nd-1 with the property
+        // In either case, we can extend to nd since digit at nd-1 is equal
+        ()
+      end
+    end
+#pop-options
 
 /// Helper: sorted on all digits implies sorted by value
 /// If a sequence is sorted when comparing each digit position independently,
@@ -524,17 +712,13 @@ let rec sorted_all_digits_implies_sorted
       // Show index s 0 <= index s 1
       let x = index s 0 in
       let y = index s 1 in
-      // We know: sorted_on_digit s d base for all d < num_digits
-      // This means: digit x d <= digit y d for all d < num_digits
       pow_positive base num_digits;
-      // The critical step: being sorted on each digit means either:
-      // 1. All digits are equal, OR
-      // 2. There is a first digit where x < y (and all lower digits are equal)
-      // Either way, this satisfies the precondition of digits_lexicographic_implies_value_le
-      // However, proving this requires establishing the lexicographic property from digit-wise ≤
-      admit(); // Requires showing: ∀d. digit x d ≤ digit y d ==> lexicographic ordering
+      // From sorted_on_digit, digit x d ≤ digit y d for all d < num_digits
+      // Use digitwise_le_implies_lex to establish the lexicographic precondition
+      digitwise_le_implies_lex x y num_digits base;
+      digits_lexicographic_implies_value_le x y num_digits base;
+      assert (x <= y);
       // Now prove tail is sorted
-      // Need to show tail s satisfies the preconditions
       let t = tail s in
       assert (forall (i: nat). i < length t ==> index t i < pow base num_digits);
       // For each digit d, sorted_on_digit (tail s) d base follows from sorted_on_digit s d base
