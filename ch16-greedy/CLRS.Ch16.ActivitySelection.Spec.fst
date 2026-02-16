@@ -170,10 +170,22 @@ let rec lemma_sequential_implies_mutual
 (* This is a ghost specification-level definition *)
 [@@"opaque_to_smt"]
 let max_compatible_count (start: Seq.seq int) (finish: Seq.seq int) (n: nat) : GTot nat =
-  // Ghost definition: the supremum of sizes of all compatible sets
-  // We don't compute this; it's used only for specification
-  // The key property is: if a set has this size and is compatible, it's optimal
-  admit()
+  // The max size of any mutually compatible subset of activities {0, ..., n-1}
+  // Defined recursively: find the largest k in [0..n] such that some compatible set has size k
+  // Since any subset has size <= n, we search downward from n
+  let rec find_max (k: nat) : GTot nat (decreases k) =
+    if k = 0 then 0
+    else
+      // Check if there exists a compatible set of size k
+      // (using strong excluded middle, available in GTot)
+      if FStar.StrongExcludedMiddle.strong_excluded_middle
+           (exists (sel: list nat). L.length sel = k /\
+                                   mutually_compatible start finish sel /\
+                                   list_sorted_indices sel n)
+      then k
+      else find_max (k - 1)
+  in
+  find_max n
 
 (* An optimal selection has maximum cardinality *)
 let is_optimal_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (selected: list nat) : prop =
