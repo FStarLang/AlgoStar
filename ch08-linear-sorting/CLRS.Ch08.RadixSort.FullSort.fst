@@ -267,6 +267,50 @@ let rec digit_decomposition (k: nat) (bigD: nat) (base: nat)
 
 (* ========== Lexicographic order implies numeric order ========== *)
 
+/// Helper: digit_sum k d base < pow base d
+let rec lemma_digit_sum_bound_3 (k: nat) (d: nat) (base: nat)
+  : Lemma (requires base >= 2)
+          (ensures digit_sum k d base < pow base d)
+          (decreases d)
+  = if d = 0 || base = 0 then (pow_positive base 0)
+    else (
+      lemma_digit_sum_bound_3 k (d - 1) base;
+      digit_bound k (d - 1) base;
+      pow_positive base (d - 1);
+      // digit k (d-1) base < base
+      // digit k (d-1) base * pow base (d-1) <= (base - 1) * pow base (d-1)
+      lemma_mult_le_right (pow base (d - 1)) (digit k (d - 1) base) (base - 1);
+      // (base - 1) * pow base (d-1) + pow base (d-1) = base * pow base (d-1) = pow base d
+      ()
+    )
+
+/// Helper: digit_sum ordering when MSD differs
+#push-options "--z3rlimit 30 --fuel 2"
+let rec lemma_digit_sum_msd_le_3 (x y: nat) (d d0: nat) (base: nat)
+  : Lemma (requires base >= 2 /\ d0 < d /\
+                    digit x d0 base < digit y d0 base /\
+                    (forall (d': nat). d0 < d' /\ d' < d ==> digit x d' base == digit y d' base))
+          (ensures digit_sum x d base <= digit_sum y d base)
+          (decreases d)
+  = if d = d0 + 1 then (
+      // digit_sum k (d0+1) = digit k d0 * pow base d0 + digit_sum k d0
+      pow_positive base d0;
+      lemma_digit_sum_bound_3 x d0 base;
+      // digit(x,d0) < digit(y,d0) => digit(x,d0) <= digit(y,d0) - 1
+      // digit(x,d0) * base^d0 + digit_sum x d0 
+      //   <= (digit(y,d0) - 1) * base^d0 + (base^d0 - 1)
+      //   = digit(y,d0) * base^d0 - 1
+      //   <= digit(y,d0) * base^d0 + digit_sum y d0
+      lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1);
+      ()
+    ) else (
+      // d > d0 + 1: digit(x, d-1) == digit(y, d-1) since d-1 > d0
+      assert (digit x (d - 1) base == digit y (d - 1) base);
+      lemma_digit_sum_msd_le_3 x y (d - 1) d0 base;
+      ()
+    )
+#pop-options
+
 /// If two numbers have digits that compare lexicographically (from low to high),
 /// then the numbers themselves compare numerically.
 ///
@@ -292,11 +336,20 @@ let digits_lex_order_implies_numeric_order
     
     if bigD = 1 then ()
     else (
-      // Use digit_sum reasoning:
-      // If all digits equal: extensionality gives x == y
-      // If exists d0 with MSD ordering: digit_sum_msd_le gives x <= y
-      admit() // Uses same strategy as Spec.lemma_digits_le_implies_value_le
-              // but would need to import or duplicate the digit_sum_msd_le helper
+      // Case split: all digits equal vs exists separating digit
+      match FStar.StrongExcludedMiddle.strong_excluded_middle
+        (forall (d: nat). d < bigD ==> digit x d base == digit y d base) with
+      | true -> 
+        // All digits equal: digit_sum x = digit_sum y, so x = y
+        digit_sum_equal_helper x y bigD base
+      | false ->
+        // Exists d0 with digit x d0 < digit y d0 and higher digits equal
+        // Use eliminate exists pattern
+        eliminate exists (d0: nat).
+          d0 < bigD /\ digit x d0 base < digit y d0 base /\
+          (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base)
+        returns digit_sum x bigD base <= digit_sum y bigD base
+        with _. lemma_digit_sum_msd_le_3 x y bigD d0 base
     )
 #pop-options
 
