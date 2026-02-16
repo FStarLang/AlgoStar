@@ -57,23 +57,36 @@ was iterative:
 
 **What required human guidance:**
 
+- **Existing corpus of examples**: Having an existing library of verified
+  algorithms in F* and Pulse was crucial---insertion sort, merge sort,
+  quicksort, all existing previously and were useful templates for new
+  algorithms. 
+
 - **Proof strategy**: Choosing the right invariant structure. The AI
   often proposed invariants that were too strong (making the inductive
   step unprovable) or too weak (insufficient for the postcondition).
-  The human guided the choice of what to track in the loop invariant
-  and what to leave to SMT.
+  In this development, so far, the human has not provided any
+  explicit invariant or proof step to the AI. 
 - **Spec bug detection**: Several specifications contained subtle
   errors that made lemmas *false*, not just hard to prove. For
   example, a lexicographic ordering condition in RadixSort checked
-  the wrong direction (lower digits instead of higher digits). The
-  human identified these by inspecting counterexamples.
+  the wrong direction (lower digits instead of higher digits). This
+  was detected by the AI after trying and failing to prove key lemmas
+  for several iterations. On reporting this, the human encouraged the 
+  AI to revise the definition and complete the proofs, which it did successfully.
 - **Quantifier management**: F*'s SMT encoding struggles with
   alternating quantifiers (∃∀ patterns). The human guided the use of
   explicit witness construction, ``introduce exists`` / ``introduce
   forall`` notation, and tactics.
+- **Complexity methodology**: The human suggested to prove complexity
+  results by instrumenting the implementation with a ghost cost counter
+  and proving a bound on the counter by writing invariants.
 - **Architectural decisions**: Which algorithms to implement, how to
   structure modules, when to use pure F* vs. Pulse, and when to
   defer hard proofs as admits.
+- **Prioritization**: After some attempts, the human suggested to 
+  defer certain tasks as "stretch goals", including proofs involving
+  amortized analysis and graph theoretic properties.
 
 **Tools used:**
 
