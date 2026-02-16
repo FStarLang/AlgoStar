@@ -58,10 +58,9 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, latest)
 
-**167 F* files, ~50K lines, 117 admits across 30 files**
+**164 F* files, ~50K lines, 81 admits across 25 files**
 
-(Note: Count uses proper block-comment-aware method. Previous count of 108/35 files
-used a buggy counter that missed Pulse `assume_` and caught `admit()` in block comments.)
+(Note: Previous count of 117 was stale; accurate grep-based count is 81.)
 
 ### Per-Algorithm Status Table
 
@@ -78,7 +77,7 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 | 08 | CountingSort | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate O(n+k) | 0 | In-place (not CLRS 4-phase) |
 | 08 | CountingSort.Stable | §8.2 | ⚠️ assumed postcond | ⚠️ Separate | 3 | CLRS 4-phase, stability unproven |
 | 08 | RadixSort (d=1) | §8.3 | ✅ sorted ∧ perm | ⚠️ Separate Θ(d(n+k)) | 0 | d=1 only |
-| 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 4 | Pure F* only |
+| 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 2 | Pure F*; stability admits remain |
 | 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
 | 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 5 | ✅ Renamed (not CLRS) |
@@ -129,7 +128,7 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 |---------|--------|-----------|
 | ch22 (graphs) | 36 | DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopoSort(2) |
 | ch23 (MST) | 23 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), SortedEdges(1), Kruskal.Cmplx(3), EdgeSort(2), main(1) |
-| ch08 (sorting) | 13 | RadixSort.FullSort(4), RS.MultiDigit(4), RS.Spec(2), RS.Stability(2), BucketSort(1) |
+| ch08 (sorting) | 11 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), BucketSort(1) |
 | ch16 (greedy) | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(3) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
 | ch26 (MaxFlow) | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) |
@@ -259,7 +258,7 @@ threaded through entire algorithms, or deep mathematical theorems.
 | **CountingSort.Stable** | 282, 283 | 2 | Stability proof: backward traversal preserves relative order. Needs full loop invariant tracking position assignments. Permutation proof: each input element placed exactly once. |
 | **RadixSort.FullSort** (sorted_up_to_all_digits) | | | **✅ DONE** |
 | **RadixSort.Spec** | 366 | 1 | Inductive radix sort correctness: permutation composition across d stable sorts. |
-| **RadixSort.MultiDigit** | 395,416,499,535 | 4 | Full multi-digit radix sort correctness: stability reasoning + positional notation arithmetic. |
+| **RadixSort.MultiDigit** | 395,416 | 2 | Stability reasoning: stable_sort_preserves_order + stable_sort_preserves_sorted. Lex ordering and digit decomposition proved. |
 | **PartialSelect.Correctness** | 55, 65 | 2 | Entire partition and quickselect specs admitted as axioms. Needs ground-up implementation. |
 | **BST.Insert.Spec** | 203,227,310 | 3 | Mutually-recursive structural induction on array-based tree. SMT struggles with `subtree_in_range` unfolding. |
 | **DFS.Spec** | 590,654,685,704,721 | 5 | CLRS Theorems 22.7-22.8: parenthesis theorem, reachability, white-path theorem, cycle detection, topological sort property. Each requires induction over entire DFS execution. |
