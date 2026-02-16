@@ -92,12 +92,16 @@ doc/
 ## Task Breakdown
 
 ### Task 1: Scaffold — Build infrastructure
-- [ ] 1a. Copy conf.py, Makefile, fstar_pygments.py from PoP-in-FStar, adapt paths
-- [ ] 1b. Create index.rst with toctree
-- [ ] 1c. Test that `make html` works (even with placeholder content)
+- [x] 1a. Copy conf.py, Makefile, fstar_pygments.py from PoP-in-FStar, adapt paths
+- [x] 1b. Create index.rst with toctree
+- [x] 1c. Test that `make html` works (even with placeholder content)
 
 ### Task 2: Introduction (intro.rst)
-- [ ] 2a. Motivation section: why formalize CLRS algorithms?
+- [x] 2a. Motivation section: why formalize CLRS algorithms?
+- [x] 2b. Process section: AI-human collaboration, tools used, mode of interaction
+- [x] 2c. Results overview: summary table of all chapters with status
+- [x] 2d. Proof gaps audit section: honest accounting of what remains unproven
+- [x] 2e. Reading guide: how to use this document alongside CLRS and PoP-in-FStar
 - [ ] 2b. Process section: AI-human collaboration, tools used, mode of interaction
   - How the project was developed: iterative AI-human workflow
   - What the AI did well (boilerplate, first-pass proofs, infrastructure)
@@ -112,73 +116,57 @@ doc/
 ### Task 3: Chapter A — Sorting I (ch02_sorting.rst)
 
 #### 3a. Insertion Sort
-- [ ] 3a.1. Algorithm description (reference CLRS §2.1, do NOT reproduce)
-- [ ] 3a.2. Add SNIPPET tags to InsertionSort.fst for key code fragments:
-  - Pure functional spec (sorted, permutation)
-  - Pulse implementation with loop invariant
-  - Main correctness theorem signature
-- [ ] 3a.3. Add SNIPPET tags to InsertionSort.Complexity.fst:
-  - Cost model / counter threading
-  - Main complexity theorem signature
-- [ ] 3a.4. Write RST: code listings via literalinclude
-- [ ] 3a.5. Write RST: proof walkthrough — how the loop invariant works,
-  what SMT handles automatically, what needed manual lemmas
-- [ ] 3a.6. Write RST: complexity proof walkthrough — how the counter is
-  threaded through Pulse, how the O(n²) bound is established
+- [x] 3a.1. Algorithm description (reference CLRS §2.1, do NOT reproduce)
+- [x] 3a.2. Add SNIPPET tags to InsertionSort.fst for key code fragments:
+- [x] 3a.3. Add SNIPPET tags to InsertionSort.Complexity.fst:
+- [x] 3a.4. Write RST: code listings via literalinclude
+- [x] 3a.5. Write RST: proof walkthrough
+- [x] 3a.6. Write RST: complexity proof walkthrough
 
 #### 3b. Merge Sort
-- [ ] 3b.1. Algorithm description (reference CLRS §2.3)
-- [ ] 3b.2. Add SNIPPET tags to MergeSort.fst:
-  - Merge function spec + implementation
-  - Recursive sort with correctness
-- [ ] 3b.3. Add SNIPPET tags to MergeSort.Complexity.fst:
-  - Complexity theorem signature
-- [ ] 3b.4. Write RST: code listings + proof walkthrough
-- [ ] 3b.5. Write RST: merge correctness (sorted + permutation preservation)
-- [ ] 3b.6. Write RST: complexity — recursive cost accounting
+- [x] 3b.1. Algorithm description (reference CLRS §2.3)
+- [x] 3b.2. Add SNIPPET tags to MergeSort.fst:
+- [x] 3b.3. Add SNIPPET tags to MergeSort.Complexity.fst:
+- [x] 3b.4. Write RST: code listings + proof walkthrough
+- [x] 3b.5. Write RST: merge correctness (sorted + permutation preservation)
+- [x] 3b.6. Write RST: complexity — recursive cost accounting
 
 #### 3c. Chapter wrap-up
-- [ ] 3c.1. Proof techniques summary for this chapter
-- [ ] 3c.2. Common pitfalls encountered and workarounds
-- [ ] 3c.3. References to PoP-in-FStar for deeper coverage of techniques used
+- [x] 3c.1. Proof techniques summary for this chapter
+- [x] 3c.2. Common pitfalls encountered and workarounds
+- [x] 3c.3. References to PoP-in-FStar for deeper coverage of techniques used
 
 ### Task 4: Chapter B — Dynamic Programming (ch15_dynamic_prog.rst)
 
 #### 4a. Rod Cutting
-- [ ] 4a.1. Algorithm description (reference CLRS §15.1)
-- [ ] 4a.2. Add SNIPPET tags to RodCutting.Spec.fst:
-  - Optimal substructure definition
-  - Optimality proof
-- [ ] 4a.3. Add SNIPPET tags to RodCutting.fst + Complexity.fst:
-  - Pulse bottom-up DP implementation
-  - Correctness theorem
-  - O(n²) complexity theorem
-- [ ] 4a.4. Write RST: the key insight — proving optimal_revenue matches
-  the recursive definition, then linking to the imperative table-fill
-- [ ] 4a.5. Write RST: proof walkthrough
+- [x] 4a.1. Algorithm description (reference CLRS §15.1)
+- [x] 4a.2. Add SNIPPET tags to RodCutting.Spec.fst:
+- [x] 4a.3. Add SNIPPET tags to RodCutting.fst + Complexity.fst:
+- [x] 4a.4. Write RST: the key insight
+- [x] 4a.5. Write RST: proof walkthrough
 
 #### 4b. Longest Common Subsequence
-- [ ] 4b.1. Algorithm description (reference CLRS §15.4)
-- [ ] 4b.2. Add SNIPPET tags to LCS.fst + Complexity.fst
-- [ ] 4b.3. Write RST: 2D table-filling in Pulse, proof structure
+- [x] 4b.1. Algorithm description (reference CLRS §15.4)
+- [x] 4b.2. Add SNIPPET tags to LCS.fst + Complexity.fst
+- [x] 4b.3. Write RST: 2D table-filling in Pulse, proof structure
 
 #### 4c. Matrix Chain Multiplication
-- [ ] 4c.1. Algorithm description (reference CLRS §15.2)
-- [ ] 4c.2. Add SNIPPET tags to MatrixChain.fst + Complexity.fst
-- [ ] 4c.3. Write RST: O(n³) nested loops, optimal parenthesization proof
+- [x] 4c.1. Algorithm description (reference CLRS §15.2)
+- [x] 4c.2. Add SNIPPET tags to MatrixChain.fst + Complexity.fst
+- [x] 4c.3. Write RST: O(n³) nested loops, optimal parenthesization proof
 
 #### 4d. Chapter wrap-up
-- [ ] 4d.1. DP proof pattern summary: optimal substructure → recurrence → table-fill
-- [ ] 4d.2. Pulse patterns for 1D and 2D DP
-- [ ] 4d.3. References to PoP-in-FStar
+- [x] 4d.1. DP proof pattern summary: optimal substructure → recurrence → table-fill
+- [x] 4d.2. Pulse patterns for 1D and 2D DP
+- [x] 4d.3. References to PoP-in-FStar
 
 ### Task 5: Review & Polish
-- [ ] 5a. Verify all literalinclude references resolve correctly
-- [ ] 5b. Build HTML and check rendering
-- [ ] 5c. Review for CLRS plagiarism — ensure all algorithm descriptions
+- [x] 5a. Verify all literalinclude references resolve correctly
+- [x] 5b. Build HTML and check rendering
+- [x] 5c. Review for CLRS plagiarism — ensure all algorithm descriptions
   are original and reference-only
-- [ ] 5d. Proof-read for technical accuracy
-- [ ] 5e. Verify snippet tags don't break F* verification
+- [x] 5d. Proof-read for technical accuracy
+- [x] 5e. Verify snippet tags don't break F* verification
 
 ---
 
