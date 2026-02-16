@@ -98,7 +98,7 @@ let stable_permutation (edges1 edges2: list edge) : prop =
     edge_eq (index edges1 i2) e2 /\
     edge_eq (index edges2 j1) e1 /\
     edge_eq (index edges2 j2) e2 /\
-    e1.w <> e2.w ==>
+    e1.w == e2.w ==>
     (i1 < i2 <==> j1 < j2))
 
 // If both edge lists are sorted and are stable permutations of each other,
