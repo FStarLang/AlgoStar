@@ -73,7 +73,8 @@ let sorted_up_to_digit (s: seq nat) (max_d: nat) (base: nat) : prop =
     i < j /\ j < length s ==>
     ((exists (d0: nat). d0 <= max_d /\
        digit (index s i) d0 base < digit (index s j) d0 base /\
-       (forall (d': nat). d' < d0 ==> 
+       // All more significant digits are equal
+       (forall (d': nat). d0 < d' /\ d' <= max_d ==> 
          digit (index s i) d' base == digit (index s j) d' base)) \/
      (forall (d: nat). d <= max_d ==> 
        digit (index s i) d base == digit (index s j) d base)))
@@ -199,42 +200,25 @@ let digits_lex_order_implies_numeric_order
   (x y: nat) (bigD: nat) (base: nat)
   : Lemma (requires bigD > 0 /\ base >= 2 /\
                     x < pow base bigD /\ y < pow base bigD /\
-                    // Lexicographic comparison on digits 0..bigD-1
+                    // MSD-primary lexicographic comparison on digits 0..bigD-1
                     ((exists (d0: nat). d0 < bigD /\
                        digit x d0 base < digit y d0 base /\
-                       (forall (d': nat). d' < d0 ==> 
+                       (forall (d': nat). d0 < d' /\ d' < bigD ==> 
                          digit x d' base == digit y d' base)) \/
                      (forall (d: nat). d < bigD ==> 
                        digit x d base == digit y d base)))
           (ensures x <= y)
           (decreases bigD)
-  = // Use digit decomposition: x = digit_sum x bigD base, y = digit_sum y bigD base
-    digit_decomposition x bigD base;
+  = digit_decomposition x bigD base;
     digit_decomposition y bigD base;
     
-    if bigD = 1 then (
-      // Base case: single digit comparison
-      // If digit_x(0) < digit_y(0), then x < y (since x = digit_x(0), y = digit_y(0))
-      // If digit_x(0) = digit_y(0), then x = y
-      ()
-    ) else (
-      // Inductive case
-      // Case 1: all digits equal => x = y
-      // Case 2: digits differ at some position d0 (first difference)
-      //   - For d < d0: digits equal, so contributions equal
-      //   - At d = d0: digit_x < digit_y, so contribution_x < contribution_y
-      //   - For d > d0: bounded by base^(d+1), but difference at d0 is at least base^d0
-      //   - Since base >= 2, difference at lower digit dominates
-      
-      admit() // Requires arithmetic reasoning about:
-              // 1. Digit sums as geometric series
-              // 2. Bounds on contribution from higher digits
-              // 3. Minimum difference at first differing digit
-              // Key lemma needed:
-              //   If digit_x(d0) < digit_y(d0), then
-              //   digit_y(d0)*base^d0 - digit_x(d0)*base^d0 >= base^d0
-              //   And sum_{d>d0} (base-1)*base^d < base^(d0+1) < base*base^d0 for base >= 2
-              //   So the difference at d0 outweighs all higher digit variations
+    if bigD = 1 then ()
+    else (
+      // Use digit_sum reasoning:
+      // If all digits equal: extensionality gives x == y
+      // If exists d0 with MSD ordering: digit_sum_msd_le gives x <= y
+      admit() // Uses same strategy as Spec.lemma_digits_le_implies_value_le
+              // but would need to import or duplicate the digit_sum_msd_le helper
     )
 #pop-options
 
