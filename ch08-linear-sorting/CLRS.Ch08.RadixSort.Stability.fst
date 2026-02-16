@@ -228,6 +228,50 @@ let sorted_up_to_digit_monotonic (s: seq nat) (d d': nat) (base: nat)
 
 (* ========== Core stability theorem ========== *)
 
+/// sorted_on_digit implies digit ordering for all pairs (not just adjacent).
+/// Proof by induction: adjacent pairs are ordered, then transitivity for non-adjacent.
+let rec sorted_on_digit_at (s: seq nat) (d: nat) (base: nat) (i j: nat)
+  : Lemma (requires sorted_on_digit s d base /\ i < j /\ j < length s)
+          (ensures digit (index s i) d base <= digit (index s j) d base)
+          (decreases (length s))
+  = if length s <= 1 then ()
+    else if i = 0 then (
+      // s[0] <= s[1] from sorted_on_digit, and sorted_on_digit (tail s)
+      if j = 1 then ()
+      else (
+        // s[0] <= s[1] and s[1] <= s[j] by induction on tail
+        sorted_on_digit_at (tail s) d base 0 (j - 1);
+        assert (index (tail s) 0 == index s 1);
+        assert (index (tail s) (j - 1) == index s j)
+      )
+    ) else (
+      // Shift: sorted_on_digit s => sorted_on_digit (tail s)
+      // index (tail s) (i-1) = index s i, index (tail s) (j-1) = index s j
+      assert (sorted_on_digit (tail s) d base);
+      sorted_on_digit_at (tail s) d base (i - 1) (j - 1);
+      assert (index (tail s) (i - 1) == index s i);
+      assert (index (tail s) (j - 1) == index s j)
+    )
+
+/// Base case helper: sorted_on_digit at digit 0 implies sorted_up_to_digit at digit 0
+let sorted_on_to_up_to_base_case (s: seq nat) (base: nat)
+  : Lemma (requires base > 0 /\ sorted_on_digit s 0 base)
+          (ensures sorted_up_to_digit s 0 base)
+  = // For every pair i < j:
+    // digit(s[i], 0) <= digit(s[j], 0) by transitivity
+    // Case <: exists d0=0. digit(s[i],0) < digit(s[j],0) (vacuous forall d' < 0)
+    // Case ==: forall d <= 0. equal (just d=0)
+    let aux (i: nat) (j: nat) : Lemma
+      (requires i < j /\ j < length s)
+      (ensures (exists (d0: nat). d0 <= 0 /\
+                   digit (index s i) d0 base < digit (index s j) d0 base /\
+                   (forall (d': nat). d' < d0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
+               (forall (d: nat). d <= 0 ==> digit (index s i) d base == digit (index s j) d base))
+      [SMTPat (index s i); SMTPat (index s j)]
+      = sorted_on_digit_at s 0 base i j
+    in
+    ()
+
 /// LEMMA 1: Key insight - stability preserves existing order structure
 /// 
 /// If s_in is sorted on digits 0..d-1, and we apply a stable sort on digit d,
@@ -279,10 +323,8 @@ let lemma_stable_pass_preserves_ordering
                     (d = 0 \/ (d > 0 /\ sorted_up_to_digit s_in (d - 1) base)))
           (ensures sorted_up_to_digit s_out d base)
   = if d = 0 then (
-      // Base case: d = 0
-      // Need to show: sorted_up_to_digit s_out 0 base
-      // From: sorted_on_digit s_out 0 base
-      admit() // This should follow directly, but needs careful quantifier reasoning
+      // Base case: sorted_on_digit s_out 0 base => sorted_up_to_digit s_out 0 base
+      sorted_on_to_up_to_base_case s_out base
     ) else (
       // Inductive case: d > 0
       // Have: sorted_up_to_digit s_in (d-1) base
