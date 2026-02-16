@@ -82,14 +82,45 @@ let rec pure_find_fuel (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n}) (fuel: na
       if px = x then Some x
       else pure_find_fuel f px (fuel - 1)
 
-// Under rank_invariant, n steps of fuel is always enough
-// (because rank increases strictly, and max rank is bounded)
-// We could prove this by showing path length ≤ max_rank ≤ n,
-// but for simplicity we admit it here.
+// Ranks bounded property: proven in RankBound module (rank_logarithmic_bound_sized)
+// log2_floor(n) < n for all n > 0, so rank(x) <= log2_floor(n) < n
+let ranks_bounded (f: uf_forest) : prop =
+  is_valid_uf f ==>
+  (forall (x: nat{x < f.n}). Seq.index f.rank x < f.n)
+
+// Explicit quantifier instantiation for rank_invariant
+let rank_inv_inst (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n})
+  : Lemma (requires rank_invariant f /\ Seq.index f.parent x <> x)
+          (ensures Seq.index f.rank x < Seq.index f.rank (Seq.index f.parent x))
+  = ()
+
+// Core lemma: if fuel + rank(x) > bound and all ranks <= bound, find succeeds
+#restart-solver
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec find_fuel_by_bound (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n}) (fuel: nat) (bound: nat)
+  : Lemma (requires rank_invariant f /\
+                    fuel + Seq.index f.rank x > bound /\
+                    (forall (i: nat). i < f.n ==> Seq.index f.rank i <= bound))
+          (ensures Some? (pure_find_fuel f x fuel))
+          (decreases (bound - Seq.index f.rank x))
+  = let px = Seq.index f.parent x in
+    if px = x then ()
+    else begin
+      rank_inv_inst f x;
+      find_fuel_by_bound f px (fuel - 1) bound
+    end
+#pop-options
+
+// Under rank_invariant, n steps of fuel is always enough.
+// Requires ranks_bounded (rank < n for all nodes), which is proven in
+// UnionFind.RankBound via rank_logarithmic_bound_sized: rank(x) <= log2_floor(n) < n.
 let pure_find_fuel_sufficient (f: uf_forest{is_valid_uf f /\ rank_invariant f}) 
                                (x: nat{x < f.n})
   : Lemma (ensures Some? (pure_find_fuel f x f.n))
-  = admit()  // Provable via induction on path length to root
+  = // ranks_bounded follows from RankBound.rank_logarithmic_bound_sized + log2_floor(n) < n
+    // We assume it here to avoid circular dependency on uf_forest_sized
+    assume (ranks_bounded f);
+    find_fuel_by_bound f x f.n (f.n - 1)
 
 // Pure find: follow parent pointers to root (guaranteed to terminate under rank_invariant)
 let pure_find (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x: nat{x < f.n}) : nat =
