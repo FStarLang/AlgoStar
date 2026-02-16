@@ -419,13 +419,25 @@ let lemma_sorted_up_to_all_digits_implies_sorted
           (ensures sorted s)
   = if length s <= 1 then ()
     else (
-      // Since the pairwise comparison proof is complex (requires quantifier matching),
-      // we admit the whole conversion from sorted_up_to_digit to sorted
-      // The key steps would be:
-      // 1. Use sorted_up_to_digit to establish pairwise lexicographic order on digits
-      // 2. Apply digits_lex_order_implies_numeric_order to get pairwise value order
-      // 3. Use lemma_pairwise_le_implies_sorted to get sorted
-      admit() // Bridge from sorted_up_to_digit to sorted via lexicographic reasoning
+      // For each pair (i, j) with i < j, sorted_up_to_digit gives lex order on digits 0..bigD-1
+      let aux (i: nat{i < length s}) (j: nat{j < length s /\ i < j})
+        : Lemma (index s i <= index s j)
+        = digits_lex_order_implies_numeric_order (index s i) (index s j) bigD base
+      in
+      // Establish pairwise ordering explicitly
+      let pairwise_aux (i: nat{i < length s}) : Lemma
+        (forall (j: nat{j < length s /\ i < j}). index s i <= index s j)
+        = Classical.forall_intro (aux i)
+      in
+      // Now use the pairwise ordering to show sorted
+      // Need: forall i j. i < |s| /\ j < |s| /\ i < j ==> s[i] <= s[j]
+      // We have it for each i. Use forall_intro:
+      let top (i: nat) : Lemma 
+        (i < length s ==> (forall (j: nat{j < length s /\ i < j}). index s i <= index s j))
+        = if i < length s then pairwise_aux i else ()
+      in
+      Classical.forall_intro top;
+      lemma_pairwise_le_implies_sorted s
     )
 #pop-options
 
