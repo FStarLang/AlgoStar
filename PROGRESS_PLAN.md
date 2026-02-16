@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, latest)
 
-**167 F* files, ~50K lines, 118 admits across 30 files**
+**167 F* files, ~50K lines, 117 admits across 30 files**
 
 (Note: Count uses proper block-comment-aware method. Previous count of 108/35 files
 used a buggy counter that missed Pulse `assume_` and caught `admit()` in block comments.)
@@ -107,7 +107,7 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 10 | ✅ visited_implies_path proved |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 12 | ✅ BFS soundness, components, subset_edges proven |
 | 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 6 | ✅ Prim.Complexity: 0 admits (loop invariant fixed) |
-| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 5 | |
+| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | |
 | 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
 | 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
@@ -128,7 +128,7 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 | Chapter | Admits | Top files |
 |---------|--------|-----------|
 | ch22 (graphs) | 36 | DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopoSort(2) |
-| ch23 (MST) | 23 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(5), SortedEdges(1), Kruskal.Cmplx(3), EdgeSort(2), main(1) |
+| ch23 (MST) | 23 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), SortedEdges(1), Kruskal.Cmplx(3), EdgeSort(2), main(1) |
 | ch08 (sorting) | 13 | RadixSort.FullSort(4), RS.MultiDigit(4), RS.Spec(2), RS.Stability(2), BucketSort(1) |
 | ch16 (greedy) | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(3) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
@@ -270,7 +270,7 @@ threaded through entire algorithms, or deep mathematical theorems.
 | **Kruskal.EdgeSorting** | 138, 173 | 2 | Insertion sort stability: position tracking through swap operations. |
 | **Kruskal.fst** | 81 | 1 | Union-find cycle detection ⟹ forest acyclicity. Needs UF component invariant. |
 | **Kruskal.Complexity** | 333 | 1 | Inner loop invariant restoration with complexity tracking. |
-| **MST.Spec** | 253,270,302,340,358 | 5 | Core MST theory: cycle characterization, cut-crossing topology, MST exchange lemma (Theorem 23.1), generic MST correctness. |
+| **MST.Spec** | 247,264,432,450 | 4 | Core MST theory: cycle characterization, cut-crossing topology, generic MST correctness (exchange lemma PROVED). |
 | **Prim.Spec** | 410 | 1 | Result connects all vertices (spanning tree characterization). |
 | **BellmanFord.Spec** | 235, 405 | 2 | L235: relaxation upper bound preservation (triangle inequality algebra). L405: CLRS Lemma 24.2 (path relaxation property). |
 | **Dijkstra.TriIneq** | 288 | 1 | Triangle preservation for processed vertices: needs Dijkstra invariant coupling (processed = optimal distance). |
