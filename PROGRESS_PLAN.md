@@ -56,9 +56,9 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ---
 
-## Current Status (2025-02-15, updated)
+## Current Status (2025-02-15, latest)
 
-**167 F* files, ~50K lines, 131 admits across 34 files**
+**167 F* files, ~50K lines, 108 admits across 35 files**
 
 ### Per-Algorithm Status Table
 
@@ -92,17 +92,17 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
 | 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | 1 assume val in Spec |
-| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 6 | ✅ Greedy choice proven |
+| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
 | 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
-| 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 0 | Disconnected from Pulse |
-| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 4 | RankBound: 0 admits ✅ |
+| 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 | Optimality properties |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 4 | ✅ RankBound: 0 admits, FindTermination: 0 admits |
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 | d[v]=δ(s,v) not proven |
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 24 | Parenthesis thm admitted |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 4 | ✅ Renamed (not CLRS) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 10 | ✅ visited_implies_path proved |
-| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 15 | ✅ BFS soundness + components proven |
+| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 12 | ✅ BFS soundness, components, subset_edges proven |
 | 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 7 | ✅ Vacuous admit removed |
 | 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 5 | |
 | 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
@@ -124,17 +124,18 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Chapter | Admits | Top files |
 |---------|--------|-----------|
-| ch22 (graphs) | 40 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5), BFS.DistSpec(2), WhitePath(3), KahnTopoSort(2) |
-| ch23 (MST) | 27 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(3), EdgeSort(2), Prim.Cmplx(1), main(1) |
-| ch08 (sorting) | 19 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Stability(2), CS.Stable(3), RS.Spec(2), BucketSort(1) |
-| ch16 (greedy) | 8 | ActivitySelection.Spec(6), Huffman.Complete(2) |
+| ch22 (graphs) | 36 | DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopoSort(2) |
+| ch23 (MST) | 24 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(5), SortedEdges(1), Kruskal.Cmplx(2), EdgeSort(2), Prim.Cmplx(1), main(1) |
+| ch08 (sorting) | 17 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Spec(3), RS.Stability(2), BucketSort(1) |
+| ch16 (greedy) | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(3) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
-| ch09 (select) | 5 | PartialSelectionSort.Correctness(5) |
+| ch26 (MaxFlow) | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) |
 | ch24 (SSSP) | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
-| ch21 (UF) | 4 | UnionFind.Spec(4), RankBound(0) ✅ |
+| ch09 (select) | 5 | PartialSelectionSort.Correctness(5) |
+| ch21 (UF) | 6 | UnionFind.Spec(4), RankBound(2) |
 | ch12 (BST) | 3 | BST.Insert.Spec(3) |
-| Other | 7 | MaxSubarray.DC(1), RodCutting.Spec(1), VertexCover.Spec(1), Huffman.Complete(2), Prim.Cmplx(1), Kruskal(1) |
-| **Total** | **131** | |
+| Other | 5 | MaxSubarray.DC(1), RodCutting.Spec(1), VertexCover.Spec(1), Strassen(1) |
+| **Total** | **108** | |
 
 ---
 
