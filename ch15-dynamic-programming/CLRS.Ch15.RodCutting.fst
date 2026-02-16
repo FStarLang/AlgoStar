@@ -26,6 +26,7 @@ module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+//SNIPPET_START: rod_cutting_spec
 // ========== Pure Specification ==========
 
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
@@ -57,6 +58,7 @@ let rec build_opt (prices: Seq.seq int) (len: nat)
 // Optimal revenue for a rod of length j
 let optimal_revenue (prices: Seq.seq int) (j: nat) : int =
   Seq.index (build_opt prices j) j
+//SNIPPET_END: rod_cutting_spec
 
 // Lemma: build_opt is prefix-consistent
 let rec build_opt_prefix (prices: Seq.seq int) (len: nat) (k: nat)
@@ -151,6 +153,7 @@ let rec accum_max_nonneg (prices: Seq.seq int) (r: Seq.seq int) (j: nat) (limit:
 
 open Pulse.Lib.BoundedIntegers
 
+//SNIPPET_START: rod_cutting_sig
 fn rod_cutting
   (#p: perm)
   (prices: A.array int)
@@ -169,6 +172,7 @@ fn rod_cutting
   ensures
     A.pts_to prices #p s_prices **
     pure (result == optimal_revenue s_prices (SZ.v n))
+//SNIPPET_END: rod_cutting_sig
 {
   let n_plus_1 = n + 1sz;
   let r = V.alloc 0 n_plus_1;

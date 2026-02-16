@@ -28,6 +28,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
 
+//SNIPPET_START: ghost_tick
 // ========== Ghost tick ==========
 
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
@@ -39,6 +40,7 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 {
   GR.(ctr := incr_nat n)
 }
+//SNIPPET_END: ghost_tick
 
 // ========== Definitions ==========
 
@@ -162,11 +164,14 @@ let lemma_triangle_step (vj: nat)
 
 // ========== Main Algorithm with Complexity ==========
 
+//SNIPPET_START: complexity_bound
 // Complexity bound predicate (avoids BoundedIntegers issues in Pulse ensures)
 let complexity_bounded (cf c0: nat) (n: nat) : prop =
   cf >= c0 /\
   cf - c0 <= op_Multiply n (n - 1) / 2
+//SNIPPET_END: complexity_bound
 
+//SNIPPET_START: insertion_sort_complexity_sig
 fn insertion_sort_complexity
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -185,6 +190,7 @@ fn insertion_sort_complexity
     permutation s0 s /\
     complexity_bounded cf (reveal c0) (SZ.v len)
   )
+//SNIPPET_END: insertion_sort_complexity_sig
 {
   let mut j: SZ.t = 1sz;
   

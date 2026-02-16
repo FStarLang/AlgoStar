@@ -30,6 +30,7 @@ module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
 
+//SNIPPET_START: merge_sort_specs
 // ================================================================
 // Pure Specifications
 // ================================================================
@@ -39,6 +40,7 @@ let sorted (s: Seq.seq int)
 
 [@@"opaque_to_smt"]
 let permutation_of (s1 s2: Seq.seq int) : prop = SeqP.permutation int s1 s2
+//SNIPPET_END: merge_sort_specs
 
 // ================================================================
 // Permutation Lemmas
@@ -75,6 +77,7 @@ let append_permutations (s1 s2 s1' s2': Seq.seq int)
     reveal_opaque (`%permutation_of) (permutation_of (Seq.append s1 s2) (Seq.append s1' s2'));
     SeqP.append_permutations s1 s2 s1' s2'
 
+//SNIPPET_START: seq_merge
 // ================================================================
 // Pure Merge Function on Sequences
 // ================================================================
@@ -88,6 +91,7 @@ let rec seq_merge (s1 s2: Seq.seq int)
          if h1 <= h2 
          then Seq.cons h1 (seq_merge (Seq.tail s1) s2)
          else Seq.cons h2 (seq_merge s1 (Seq.tail s2))
+//SNIPPET_END: seq_merge
 
 // ================================================================
 // Merge Length Lemma  
@@ -406,6 +410,7 @@ fn copy_range
 // 2. Elements written are from s1 and s2 (permutation of consumed parts)
 // 3. All written elements <= all remaining elements
 
+//SNIPPET_START: merge_impl_sig
 fn merge_impl
   (a: array int) (lo mid hi: SZ.t)
   (#s1 #s2: Ghost.erased (Seq.seq int))
@@ -419,6 +424,7 @@ fn merge_impl
       sorted s_out /\ 
       permutation_of (Seq.append s1 s2) s_out
     )
+//SNIPPET_END: merge_impl_sig
 {
   pts_to_range_prop a #(SZ.v lo) #(SZ.v mid);
   pts_to_range_prop a #(SZ.v mid) #(SZ.v hi);
@@ -593,6 +599,7 @@ fn rec merge_sort_aux
 // Top-Level Entry Point
 // ================================================================
 
+//SNIPPET_START: merge_sort_sig
 fn merge_sort
   (a: A.array int)
   (len: SZ.t)
@@ -610,6 +617,7 @@ ensures exists* s.
     sorted s /\
     permutation_of s0 s
   )
+//SNIPPET_END: merge_sort_sig
 {
   if (len <=^ 1sz) {
     singl_sorted s0;

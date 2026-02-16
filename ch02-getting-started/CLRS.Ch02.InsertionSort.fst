@@ -22,6 +22,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
 
+//SNIPPET_START: definitions
 // ========== Definitions ==========
 
 let sorted (s: Seq.seq int)
@@ -33,6 +34,7 @@ let prefix_sorted (s: Seq.seq int) (k: nat) : prop =
 
 [@@"opaque_to_smt"]
 let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
+//SNIPPET_END: definitions
 
 // ========== Permutation lemmas ==========
 
@@ -140,6 +142,7 @@ let lemma_combine_sorted_regions
     (ensures prefix_sorted s (vj + 1))
   = ()
 
+//SNIPPET_START: insertion_sort_sig
 // ========== Main Algorithm ==========
 
 fn insertion_sort
@@ -157,7 +160,9 @@ fn insertion_sort
     sorted s /\
     permutation s0 s
   )
+//SNIPPET_END: insertion_sort_sig
 {
+//SNIPPET_START: outer_loop
   let mut j: SZ.t = 1sz;
   
   while (!j <^ len)
@@ -172,6 +177,7 @@ fn insertion_sort
       permutation s0 s /\
       prefix_sorted s (SZ.v vj)
     )
+//SNIPPET_END: outer_loop
   {
     let vj = !j;
     with s_outer. assert (A.pts_to a s_outer);

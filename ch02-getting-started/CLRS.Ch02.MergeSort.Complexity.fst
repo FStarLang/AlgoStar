@@ -26,11 +26,13 @@ let rec log2_ceil (n: pos) : nat =
 /// Ceiling division: ⌈n/2⌉
 let ceil_div2 (n: pos) : pos = (n + 1) / 2
 
+//SNIPPET_START: merge_sort_ops
 /// The actual recurrence for merge sort operations
 /// T(n) = 2·T(⌈n/2⌉) + n for n > 1, T(1) = 0
 let rec merge_sort_ops (n: pos) : Tot nat (decreases n)
   = if n = 1 then 0
     else 2 * merge_sort_ops (ceil_div2 n) + n
+//SNIPPET_END: merge_sort_ops
 
 /// ========== Properties of ceil_div2 and log2_ceil ==========
 
@@ -218,6 +220,7 @@ let rec merge_sort_n_log_n_bound (n: pos)
 
 /// ========== Final Theorem ==========
 
+//SNIPPET_START: merge_sort_bound
 /// The closed-form upper bound
 let merge_sort_bound (n: pos) : nat = 4 * n * log2_ceil n + 4 * n
 
@@ -225,6 +228,7 @@ let merge_sort_bound (n: pos) : nat = 4 * n * log2_ceil n + 4 * n
 let merge_sort_is_n_log_n (n: pos)
   : Lemma (ensures merge_sort_ops n <= merge_sort_bound n)
   = merge_sort_n_log_n_bound n
+//SNIPPET_END: merge_sort_bound
 
 /// ========== Asymptotic Interpretation ==========
 

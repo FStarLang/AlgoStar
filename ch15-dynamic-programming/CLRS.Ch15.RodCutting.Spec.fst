@@ -16,6 +16,7 @@ module CLRS.Ch15.RodCutting.Spec
 open FStar.List.Tot
 open FStar.Seq
 
+//SNIPPET_START: cutting_defs
 // ========== Part 1: Problem Specification ==========
 
 /// A cutting is valid if all pieces are positive and sum to n
@@ -33,6 +34,7 @@ let rec cutting_revenue (prices: seq int) (cuts: list nat) : int =
     if piece > 0 && piece - 1 < length prices
     then index prices (piece - 1) + cutting_revenue prices rest
     else 0 + cutting_revenue prices rest  // out-of-bounds piece has price 0
+//SNIPPET_END: cutting_defs
 
 // ========== Part 2: Optimal Substructure ==========
 
@@ -278,6 +280,7 @@ let optimal_revenue_nonneg (prices: seq int) (j: nat)
 
 // ========== Part 11: Optimal Substructure (with non-negativity assumption) ==========
 
+//SNIPPET_START: optimal_substructure
 /// Theorem: Optimal substructure (assuming non-negative prices)
 /// optimal_revenue prices n == max_{1 <= i <= n} (prices[i-1] + optimal_revenue prices (n-i))
 /// This follows from the definition of accum_max which considers all first-cut positions  
@@ -288,6 +291,7 @@ let optimal_substructure (prices: seq int) (n: nat{n > 0 /\ n <= length prices})
                       then index prices (i - 1) + optimal_revenue prices (n - i)
                       else 0 in
                     optimal_revenue prices n == max_over_range f n))
+//SNIPPET_END: optimal_substructure
   = let f = fun (i:nat{i > 0}) ->
       if i <= n && i - 1 < length prices
       then index prices (i - 1) + optimal_revenue prices (n - i)
