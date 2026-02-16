@@ -66,6 +66,7 @@ let rec build_opt (prices: Seq.seq nat) (len: nat)
          result
 
 // Optimal revenue for a rod of length j
+//SNIPPET_START: extended_spec
 let optimal_revenue (prices: Seq.seq nat) (j: nat) : nat =
   Seq.index (build_opt prices j) j
 
@@ -73,6 +74,7 @@ let optimal_revenue (prices: Seq.seq nat) (j: nat) : nat =
 let optimal_cut (prices: Seq.seq nat) (j: nat) : nat =
   if j = 0 || j > Seq.length prices then 0
   else accum_argmax prices (build_opt prices (j - 1)) j j
+//SNIPPET_END: extended_spec
 
 // Lemma: build_opt is prefix-consistent
 let rec build_opt_prefix (prices: Seq.seq nat) (len: nat) (k: nat)
@@ -186,6 +188,7 @@ let sc_upd_valid (sc: Seq.seq SZ.t) (v: SZ.t) (j: nat)
 
 open Pulse.Lib.BoundedIntegers
 
+//SNIPPET_START: extended_sig
 fn extended_rod_cutting
   (#p: perm)
   (prices: A.array nat)
@@ -211,13 +214,8 @@ fn extended_rod_cutting
       (forall (j: nat). j >= 1 /\ j <= SZ.v n ==>
         SZ.v (Seq.index s_cuts j) >= 1 /\
         SZ.v (Seq.index s_cuts j) <= j)
-      // ADMITTED: The argmax correctness property (s_cuts[j] achieves optimal)
-      // Property 4 would be:
-      // (forall (j: nat). j >= 1 /\ j <= SZ.v n ==>
-      //   Seq.index s_prices (SZ.v (Seq.index s_cuts j) - 1) +
-      //   optimal_revenue s_prices (j - SZ.v (Seq.index s_cuts j)) ==
-      //   optimal_revenue s_prices j)
     )
+//SNIPPET_END: extended_sig
 {
   let n_plus_1 = n + 1sz;
   let r = V.alloc (0 <: nat) n_plus_1;

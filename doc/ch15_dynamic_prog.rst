@@ -94,10 +94,6 @@ This requires:
    indices less than ``j``. If two tables agree on those positions,
    ``accum_max`` gives the same result.
 
-3. Non-negativity: With non-negative prices, all optimal revenues
-   are non-negative, so the max operation behaves correctly at the
-   base case.
-
 Imperative Implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -138,6 +134,53 @@ where ``triangle(k) = k(k+1)/2``. After the inner loop completes
 ``vj`` iterations, the identity
 ``triangle(vj - 1) + vj = triangle(vj)`` advances the outer invariant.
 This gives a tight O(n²) bound, matching CLRS's analysis.
+
+Extended Rod Cutting
+~~~~~~~~~~~~~~~~~~~~
+
+CLRS also presents EXTENDED-BOTTOM-UP-CUT-ROD, which augments the
+basic algorithm to record not just the optimal revenue but also the
+optimal first cut size for each rod length. The procedure returns a
+pair ``(r, s)`` where ``r[j]`` is the optimal revenue and ``s[j]`` is
+the optimal size of the first piece to cut when solving a subproblem
+of size ``j``.
+
+The pure specification adds ``accum_argmax``, a companion to
+``accum_max`` that tracks which index ``i`` achieves the maximum:
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: extended_spec
+   :end-before: //SNIPPET_END: extended_spec
+
+The Pulse implementation extends the basic rod cutting loop to
+maintain a second vector ``s_cuts`` alongside the revenue table
+``r``. The inner loop tracks both a running maximum ``q`` and the
+argmax ``best_i`` — the index that achieves that maximum. After
+each inner loop completes, both ``r[j]`` and ``s_cuts[j]`` are
+written.
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: extended_sig
+   :end-before: //SNIPPET_END: extended_sig
+
+The postcondition guarantees two properties: (1) the returned
+revenue equals ``optimal_revenue``, and (2) for every ``j`` in
+``1..n``, ``s_cuts[j]`` is a valid first piece size between 1 and
+``j``.
+
+**Proof notes.** The proof required two techniques beyond the basic
+rod cutting proof. First, the ``s_cuts`` validity invariant —
+a universal quantifier over all previously computed entries — had to
+be carried through the inner loop invariant, even though the inner
+loop does not write to ``s_cuts``. Pulse re-existentializes ghost
+sequences at each loop iteration, so outer invariant properties are
+lost unless explicitly restated. Second, re-establishing the
+universal after writing to ``s_cuts[j]`` required a helper lemma
+``sc_upd_valid`` that case-splits on ``k = j`` vs ``k ≠ j`` and
+calls ``Seq.lemma_index_upd1`` / ``Seq.lemma_index_upd2``
+explicitly, using ``Classical.forall_intro`` to close the quantifier.
 
 
 Longest Common Subsequence
