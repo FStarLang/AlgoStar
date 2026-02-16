@@ -511,6 +511,28 @@ let pairwise_compatible (sel: Seq.seq nat) (s f: Seq.seq int) : prop =
 let strictly_increasing (sel: Seq.seq nat) : prop =
   forall (i j: nat). i < j /\ j < Seq.length sel ==> Seq.index sel i < Seq.index sel j
 
+// Work with seq_to_list_aux directly to avoid slicing complexity
+let rec lemma_pairwise_is_sequential_aux
+  (start: Seq.seq int) (finish: Seq.seq int) (sel: Seq.seq nat) (i: nat)
+  : Lemma
+    (requires
+      i <= Seq.length sel /\
+      pairwise_compatible sel start finish /\
+      strictly_increasing sel /\
+      i < Seq.length sel)
+    (ensures
+      sequentially_compatible start finish (seq_to_list_aux sel i))
+    (decreases Seq.length sel - i)
+  = if i + 1 >= Seq.length sel then
+      // Only one element left
+      ()
+    else begin
+      // At least 2 elements from index i: sel[i] and sel[i+1]
+      // From pairwise_compatible: finish[sel[i]] <= start[sel[i+1]]
+      lemma_pairwise_is_sequential_aux start finish sel (i + 1);
+      ()
+    end
+
 let rec lemma_pairwise_is_sequential
   (start: Seq.seq int) (finish: Seq.seq int) (sel: Seq.seq nat)
   : Lemma
@@ -521,26 +543,7 @@ let rec lemma_pairwise_is_sequential
     (ensures
       sequentially_compatible start finish (seq_to_list sel))
     (decreases Seq.length sel)
-  = let lst = seq_to_list sel in
-    if Seq.length sel = 1 then
-      // seq_to_list of single element gives single element list
-      ()
-    else begin
-      // sel has at least 2 elements
-      // Show that seq_to_list preserves the pairwise compatibility structure
-      // The first element is Seq.index sel 0
-      // The second is Seq.index sel 1
-      // From pairwise_compatible: finish[sel[0]] <= start[sel[1]]
-      // This matches the sequential compatibility requirement
-      // Recursively apply to the tail
-      let sel_tail = Seq.slice sel 1 (Seq.length sel) in
-      // Establish preconditions for recursive call
-      assert (Seq.length sel_tail > 0);
-      // pairwise_compatible and strictly_increasing hold for tail
-      admit(); // TODO: prove that these properties are preserved by slicing
-      lemma_pairwise_is_sequential start finish sel_tail;
-      ()
-    end
+  = lemma_pairwise_is_sequential_aux start finish sel 0
 
 let rec lemma_implementation_is_greedy
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat)
@@ -580,6 +583,26 @@ let rec lemma_implementation_is_greedy
 *)
 
 (* Helper: convert seq properties to list properties *)
+// Work with seq_to_list_aux directly to avoid slicing complexity
+let rec lemma_seq_to_list_aux_preserves_sorted
+  (sel: Seq.seq nat) (n: nat) (i: nat)
+  : Lemma
+    (requires
+      i <= Seq.length sel /\
+      strictly_increasing sel /\
+      (forall (j:nat). j < Seq.length sel ==> Seq.index sel j < n))
+    (ensures
+      list_sorted_indices (seq_to_list_aux sel i) n)
+    (decreases Seq.length sel - i)
+  = if i >= Seq.length sel then ()
+    else if i + 1 >= Seq.length sel then ()
+    else begin
+      // sel has at least 2 elements from index i
+      // Seq.index sel i < Seq.index sel (i+1) from strictly_increasing
+      lemma_seq_to_list_aux_preserves_sorted sel n (i + 1);
+      ()
+    end
+
 let rec lemma_seq_to_list_preserves_sorted
   (sel: Seq.seq nat) (n: nat)
   : Lemma
@@ -589,17 +612,7 @@ let rec lemma_seq_to_list_preserves_sorted
     (ensures
       list_sorted_indices (seq_to_list sel) n)
     (decreases Seq.length sel)
-  = if Seq.length sel = 0 then ()
-    else if Seq.length sel = 1 then ()
-    else begin
-      // sel has at least 2 elements
-      // From strictly_increasing: sel[0] < sel[1]
-      // Recursively apply to tail
-      let sel_tail = Seq.slice sel 1 (Seq.length sel) in
-      admit(); // TODO: establish preconditions for tail
-      lemma_seq_to_list_preserves_sorted sel_tail n;
-      ()
-    end
+  = lemma_seq_to_list_aux_preserves_sorted sel n 0
 
 let theorem_implementation_optimal
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat)
