@@ -218,41 +218,31 @@ let partitioned_count_lt (s: seq int) (p: nat)
     ()
 #pop-options
 
+// Helper: if v < w, then count_le s v ≤ count_lt s w
+// Every element ≤ v is also < w
+let rec count_le_lt_monotone (s: seq int) (v w: int)
+  : Lemma (requires v < w)
+          (ensures count_le s v <= count_lt s w)
+          (decreases (Seq.length s))
+  = if Seq.length s = 0 then ()
+    else (
+      count_le_lt_monotone (Seq.tail s) v w
+    )
+
 // Lemma 4: Partition property characterizes k-th order statistic
 #push-options "--z3rlimit 40"
 let partition_property_implies_kth (s: seq int) (k: nat) (v: int)
   : Lemma (requires k < Seq.length s /\
-                     // Exactly k elements < v, and at least k+1 elements <= v
-                     count_lt s v == k /\
+                     count_lt s v <= k /\
                      count_le s v >= k + 1)
           (ensures select_spec s k == v)
-  = // By select_spec_partition_property, select_spec s k has the partition property
-    select_spec_partition_property s k;
+  = select_spec_partition_property s k;
     let result = select_spec s k in
-    
-    // We know:
-    // count_lt s result <= k and count_le s result > k (from select_spec_partition_property)
-    // count_lt s v == k and count_le s v >= k + 1 (from requires)
-    
-    // Since count_lt s result <= k and count_le s result > k,
-    // we have count_le s result >= k + 1
-    
-    // If v <> result, we derive a contradiction:
-    // Case 1: v < result
-    //   Then all occurrences of v contribute to count_lt s result
-    //   Since count_le s v >= k+1, at least one occurrence of v exists
-    //   But count_lt s v = k means exactly k elements < v in s
-    //   This would mean result is among the first k+1 smallest, contradicting count_lt s result <= k
-    
-    // Case 2: v > result
-    //   All occurrences of result contribute to count_lt s v
-    //   Since count_le s result >= k+1, at least one occurrence exists
-    //   But then count_lt s v >= k+1, contradicting count_lt s v == k
-    
-    // Therefore v == result
-    // The proof relies on the uniqueness property of the partition characterization
-    // which is mathematically sound but complex to fully mechanize in F*
-    admit()
+    if v < result then
+      count_le_lt_monotone s v result
+    else if v > result then
+      count_le_lt_monotone s result v
+    else ()
 #pop-options
 
 // Lemma 5: If k = p, then s'[p] is the k-th smallest element
@@ -265,36 +255,13 @@ let partition_pivot_is_kth (s s': seq int) (k lo p hi: nat)
                      // Full array partition
                      lo == 0 /\ hi == Seq.length s)
           (ensures Seq.index s' p == select_spec s k)
-  = // The partition property tells us:
-    // - All elements in [0, p) are <= s'[p]
-    // - All elements in (p, n) are >= s'[p]
-    // - This means count_lt s' (s'[p]) <= p and count_le s' (s'[p]) >= p + 1
-    
-    partitioned_count_lt s' p;
-    
-    // Since s and s' are permutations, the counts are the same
+  = partitioned_count_lt s' p;
     let v = Seq.index s' p in
     count_lt_permutation_invariant s' s v;
     count_le_permutation_invariant s' s v;
-    
-    // We have count_lt s v <= p = k and count_le s v >= p + 1 = k + 1
-    // We need to show count_lt s v == k
-    
-    // Key insight: In a fully partitioned array at position p:
-    // - Elements at [0..p) are all <= v (p elements)
-    // - Element at p is v
-    // - Elements at (p..n) are all >= v
-    // For count_lt s' v to be < p, some element in [0..p) would have to equal v
-    // But then count_le s' v would be > p + 1, which is only possible if
-    // there are duplicates of v
-    
-    // With duplicates, the partition property still holds:
-    // We have exactly those elements < v that are before p in the partitioned array
-    // This is a complex property requiring careful duplicate handling
-    
-    // For now, we need the stronger partition characterization
-    // that handles duplicates correctly
-    admit()
+    // count_lt s v = count_lt s' v ≤ p = k
+    // count_le s v = count_le s' v ≥ p + 1 = k + 1
+    partition_property_implies_kth s k v
 #pop-options
 
 (*** Main Correctness Theorem ***)
