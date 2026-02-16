@@ -58,9 +58,9 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, latest)
 
-**164 F* files, ~50K lines, 79 admits across 25 files**
+**164 F* files, ~50K lines, 75 admits across 24 files**
 
-(Note: Previous count of 117 was stale; accurate grep-based count is 81.)
+(Note: Comment-aware counting — excludes admits in block comments `(* *)` and line comments `//`.)
 
 ### Per-Algorithm Status Table
 
