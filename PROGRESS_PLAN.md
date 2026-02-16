@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, latest)
 
-**164 F* files, ~50K lines, 81 admits across 25 files**
+**164 F* files, ~50K lines, 79 admits across 25 files**
 
 (Note: Previous count of 117 was stale; accurate grep-based count is 81.)
 
@@ -80,7 +80,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 2 | Pure F*; stability admits remain |
 | 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
-| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 5 | ✅ Renamed (not CLRS) |
+| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 4 | ✅ Renamed; partition_property_implies_kth proved |
 | 09 | Quickselect | §9.2 | ✅ perm ∧ result=s[k] | ⚠️ Separate O(n²) | 0 | |
 | 10 | Stack | §10.1 | ✅ ghost list LIFO | ⚠️ Separate O(1) | 0 | |
 | 10 | Queue | §10.1 | ✅ ghost list FIFO | ⚠️ Separate O(1) | 0 | |
@@ -133,7 +133,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
 | ch26 (MaxFlow) | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) |
 | ch24 (SSSP) | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
-| ch09 (select) | 5 | PartialSelectionSort.Correctness(5) |
+| ch09 (select) | 4 | PartialSelectionSort.Correctness(4) |
 | ch21 (UF) | 3 | UnionFind.Spec(3), RankBound(0) |
 | ch12 (BST) | 3 | BST.Insert.Spec(3) |
 | Other | 4 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), BucketSort(1) |
