@@ -56,11 +56,17 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ---
 
-## Current Status (2025-02-15, latest)
+## Current Status (2025-02-16, latest)
 
-**164 F* files, ~50K lines, 75 admits across 24 files**
+**164 F* files, ~50K lines — 128 unproven obligations across 35 files**
 
-(Note: Comment-aware counting — excludes admits in block comments `(* *)` and line comments `//`.)
+| Type | Count | Description |
+|------|-------|-------------|
+| `admit()` | 75 | Unproven lemma/proof bodies (Pure F*) |
+| `assume(...)` | 15 | Inline assumptions (Huffman: 3, MaxFlow: 8, DFS: 2, UnionFind: 1, Kruskal: 1) |
+| `assume_` | 38 | Pulse-specific unproven invariants (StackDFS: 24, QueueBFS: 10, CountingSort: 3, Kruskal: 1) |
+
+(Note: Comment-aware counting — excludes admits/assumes in block comments `(* *)` and line comments `//`.)
 
 ### Per-Algorithm Status Table
 
@@ -75,12 +81,12 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 07 | Partition (Lomuto) | §7.1 | ✅ partitioned ∧ perm | ✅ Linked O(n) | 0 | |
 | 07 | Quicksort | §7.1 | ✅ sorted ∧ perm | ⚠️ Separate O(n²) | 0 | |
 | 08 | CountingSort | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate O(n+k) | 0 | In-place (not CLRS 4-phase) |
-| 08 | CountingSort.Stable | §8.2 | ⚠️ assumed postcond | ⚠️ Separate | 3 | CLRS 4-phase, stability unproven |
+| 08 | CountingSort.Stable | §8.2 | ⚠️ assumed postcond | ⚠️ Separate | 3 assume_ | CLRS 4-phase, stability unproven |
 | 08 | RadixSort (d=1) | §8.3 | ✅ sorted ∧ perm | ⚠️ Separate Θ(d(n+k)) | 0 | d=1 only |
 | 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 2 | Pure F*; stability admits remain |
 | 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
-| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 4 | ✅ Renamed; partition_property_implies_kth proved |
+| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 3 | ✅ Renamed; partition_property_implies_kth proved |
 | 09 | Quickselect | §9.2 | ✅ perm ∧ result=s[k] | ⚠️ Separate O(n²) | 0 | |
 | 10 | Stack | §10.1 | ✅ ghost list LIFO | ⚠️ Separate O(1) | 0 | |
 | 10 | Queue | §10.1 | ✅ ghost list FIFO | ⚠️ Separate O(1) | 0 | |
@@ -96,21 +102,21 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | ✅ 0 admits |
 | 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
 | 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
-| 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 | Optimality properties |
-| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 | ✅ RankBound: 0, FindTermination: 0, Spec: 0 admits (1 assume for ranks_bounded) |
+| 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 assume | Optimality properties |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | ✅ RankBound: 0, FindTermination: 0, Spec: 0 admits |
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
-| 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 | d[v]=δ(s,v) not proven |
+| 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 assume_ | + 6 assume_ in Complexity |
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
-| 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 24 | Parenthesis thm admitted |
-| 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 4 | ✅ Renamed (not CLRS) |
-| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 10 | ✅ visited_implies_path proved |
-| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 12 | ✅ BFS soundness, components, subset_edges proven |
+| 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 11 assume_ | + 13 assume_ in Complexity |
+| 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 2 admit + 2 assume | ✅ Renamed (not CLRS) |
+| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 5 admit + 2 assume | ✅ visited_implies_path proved |
+| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 9 admit + 1 assume + 1 assume_ | + 2 admit + 2 EdgeSort admits |
 | 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 6 | ✅ Prim.Complexity: 0 admits (loop invariant fixed) |
-| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | |
+| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | Graph theory lemmas |
 | 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
 | 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
-| 26 | MaxFlow | §26.2 | ❌ STUB | — | 0 | Stretch goal |
+| 26 | MaxFlow | §26.2 | ❌ STUB | — | 8 assume | Stretch goal |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
 | 28 | Strassen | §28.2 | ✅ quadrant algebra proven | ⚠️ Separate | 1 | Pure F*, 1 SMT scalability admit |
 | 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
@@ -122,22 +128,22 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
 | 35 | VertexCover | §35.1 | ✅ valid cover | ⚠️ Separate O(V²) | 1 | 2-approx: 1 admit |
 
-### Admit Distribution
+### Unproven Obligation Distribution (128 total: 75 admit + 15 assume + 38 assume_)
 
-| Chapter | Admits | Top files |
-|---------|--------|-----------|
-| ch22 (graphs) | 36 | DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopoSort(2) |
-| ch23 (MST) | 23 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), SortedEdges(1), Kruskal.Cmplx(3), EdgeSort(2), main(1) |
-| ch08 (sorting) | 11 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), BucketSort(1) |
-| ch16 (greedy) | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(3) |
-| ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
-| ch26 (MaxFlow) | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) |
-| ch24 (SSSP) | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
-| ch09 (select) | 4 | PartialSelectionSort.Correctness(4) |
-| ch21 (UF) | 3 | UnionFind.Spec(3), RankBound(0) |
-| ch12 (BST) | 3 | BST.Insert.Spec(3) |
-| Other | 4 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), BucketSort(1) |
-| **Total** | **108** | |
+| Chapter | admit | assume | assume_ | Total | Top files |
+|---------|-------|--------|---------|-------|-----------|
+| ch22 (graphs) | 12 | 2 | 34 | 48 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2) |
+| ch23 (MST) | 19 | 1 | 1 | 21 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), EdgeSort(2), Kruskal.Cmplx(2+1), SortedEdges(0+1) |
+| ch08 (sorting) | 9 | 0 | 3 | 12 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
+| ch32 (strings) | 10 | 0 | 0 | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
+| ch16 (greedy) | 6 | 3 | 0 | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(0+3) |
+| ch26 (MaxFlow) | 0 | 8 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
+| ch24 (SSSP) | 5 | 0 | 0 | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
+| ch09 (select) | 3 | 0 | 0 | 3 | PartialSelectionSort.Correctness(3) |
+| ch12 (BST) | 3 | 0 | 0 | 3 | BST.Insert.Spec(3) |
+| ch21 (UF) | 0 | 1 | 0 | 1 | UnionFind.Spec(0+1) |
+| Other | 8 | 0 | 0 | 8 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), Huffman.Complete(2), Huffman.Spec(3) |
+| **Total** | **75** | **15** | **38** | **128** | |
 
 ---
 
