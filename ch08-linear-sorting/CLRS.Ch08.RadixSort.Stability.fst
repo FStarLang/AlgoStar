@@ -67,7 +67,8 @@ let rec sorted_on_digit (s: seq nat) (d: nat) (base: nat) : Tot prop (decreases 
 let sorted_up_to_digit (s: seq nat) (max_d: nat) (base: nat) : prop =
   base > 0 /\
   // For every pair i < j in the sequence:
-  (forall (i j: nat). i < j /\ j < length s ==>
+  (forall (i j: nat). {:pattern (index s i); (index s j)}
+    i < j /\ j < length s ==>
     // Either lower digits differ (and determine order)
     ((exists (d0: nat). d0 <= max_d /\
        // First differing digit favors i
@@ -76,6 +77,19 @@ let sorted_up_to_digit (s: seq nat) (max_d: nat) (base: nat) : prop =
        (forall (d': nat). d' < d0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
      // Or all digits up to max_d are equal
      (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base)))
+
+/// Instantiate sorted_up_to_digit for a specific pair.
+/// With {:pattern (index s i); (index s j)} on sorted_up_to_digit, Z3 can
+/// now trigger the forall instantiation when index s i and index s j appear.
+let sorted_up_to_digit_at (s: seq nat) (max_d: nat) (base: nat) (i j: nat)
+  : Lemma (requires sorted_up_to_digit s max_d base /\ i < j /\ j < length s)
+          (ensures (exists (d0: nat). d0 <= max_d /\
+                      digit (index s i) d0 base < digit (index s j) d0 base /\
+                      (forall (d': nat). d' < d0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
+                   (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base))
+  = // The {:pattern} in sorted_up_to_digit triggers Z3 on (index s i) and (index s j)
+    assert (index s i == index s i);  // trigger pattern match
+    assert (index s j == index s j)
 
 (* ========== Position tracking for stability ========== *)
 
@@ -143,11 +157,74 @@ let sorted_up_to_digit_singleton (x: nat) (d: nat) (base: nat)
           (ensures sorted_up_to_digit (create 1 x) d base)
   = ()
 
-/// If sorted up to digit d, then sorted up to any digit d' < d
+
+/// Helper: for a single pair (i,j), sorted_up_to_digit at d implies at d' <= d
+let sorted_up_to_digit_pair_monotonic
+  (s: seq nat) (d d': nat) (base: nat) (i j: nat)
+  : Lemma (requires base > 0 /\ d' <= d /\ i < j /\ j < length s /\
+                    // The pair satisfies the sorted_up_to_digit condition at d
+                    ((exists (d0: nat). d0 <= d /\
+                       digit (index s i) d0 base < digit (index s j) d0 base /\
+                       (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
+                     (forall (dd: nat). dd <= d ==> digit (index s i) dd base == digit (index s j) dd base)))
+          (ensures ((exists (d0: nat). d0 <= d' /\
+                       digit (index s i) d0 base < digit (index s j) d0 base /\
+                       (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
+                    (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base)))
+  = // Case 1: all digits up to d are equal => all digits up to d' are equal (d' <= d)
+    // Case 2: exists d0 <= d separating them
+    //   - if d0 <= d' => same witness works for d'
+    //   - if d0 > d' => all digits below d0 are equal, and d' < d0, so all digits <= d' are equal
+    //     (pick right disjunct)
+    introduce
+      (exists (d0: nat). d0 <= d /\
+         digit (index s i) d0 base < digit (index s j) d0 base /\
+         (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base))
+      ==> ((exists (d0: nat). d0 <= d' /\
+              digit (index s i) d0 base < digit (index s j) d0 base /\
+              (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
+           (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base))
+    with _. (
+      eliminate exists (d0: nat). d0 <= d /\
+         digit (index s i) d0 base < digit (index s j) d0 base /\
+         (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)
+      returns ((exists (d0: nat). d0 <= d' /\
+                  digit (index s i) d0 base < digit (index s j) d0 base /\
+                  (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
+               (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base))
+      with _. (
+        if d0 <= d' then ()  // same witness d0 works
+        else (
+          // d0 > d', so forall d'' < d0 we have equal digits
+          // Since d' < d0, all digits dd <= d' satisfy dd < d0, hence equal
+          introduce forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base
+          with (
+            introduce dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base
+            with _. ()  // dd <= d' < d0, so the forall d'' < d0 applies
+          )
+        )
+      )
+    )
+
+/// If sorted up to digit d, then sorted up to any digit d' <= d
+#push-options "--z3rlimit 30"
 let sorted_up_to_digit_monotonic (s: seq nat) (d d': nat) (base: nat)
   : Lemma (requires base > 0 /\ d' <= d /\ sorted_up_to_digit s d base)
           (ensures sorted_up_to_digit s d' base)
-  = admit() // Follows from definition but requires quantifier reasoning
+  = // For every pair (i, j), use the helper lemmas to establish the result.
+    // The pattern on sorted_up_to_digit enables Z3 to unfold the hypothesis.
+    let aux (i: nat) (j: nat) : Lemma
+      (requires i < j /\ j < length s)
+      (ensures (exists (d0: nat). d0 <= d' /\
+                   digit (index s i) d0 base < digit (index s j) d0 base /\
+                   (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
+                (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base))
+      [SMTPat (index s i); SMTPat (index s j)]
+      = sorted_up_to_digit_at s d base i j;
+        sorted_up_to_digit_pair_monotonic s d d' base i j
+    in
+    ()
+#pop-options
 
 (* ========== Core stability theorem ========== *)
 

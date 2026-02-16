@@ -69,7 +69,8 @@ let rec sorted (s: seq nat) : Tot prop (decreases (length s)) =
 /// Sorted on digits 0..max_d (lexicographic order from low to high)
 let sorted_up_to_digit (s: seq nat) (max_d: nat) (base: nat) : prop =
   base > 0 /\
-  (forall (i j: nat). i < j /\ j < length s ==>
+  (forall (i j: nat). {:pattern (index s i); (index s j)}
+    i < j /\ j < length s ==>
     ((exists (d0: nat). d0 <= max_d /\
        digit (index s i) d0 base < digit (index s j) d0 base /\
        (forall (d': nat). d' < d0 ==> 

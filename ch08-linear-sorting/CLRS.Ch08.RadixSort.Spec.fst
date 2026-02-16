@@ -323,7 +323,8 @@ let is_stable_sort_by_digit (s_in s_out: seq nat) (d base: nat) : prop =
 // After sorting by digit d, elements are sorted on digits 0..d
 let sorted_up_to_digit (s: seq nat) (max_d base: nat) : prop =
   base > 0 /\
-  (forall (i j: nat). i < j /\ j < length s ==>
+  (forall (i j: nat). {:pattern (index s i); (index s j)}
+    i < j /\ j < length s ==>
     // Compare all digits from 0 to max_d (inclusive)
     (forall (d: nat). d <= max_d ==> digit (index s i) d base <= digit (index s j) d base) /\
     // Lexicographic: if all lower digits equal, current digit determines order
