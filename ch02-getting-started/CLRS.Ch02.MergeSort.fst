@@ -39,7 +39,7 @@ let sorted (s: Seq.seq int)
   = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
 [@@"opaque_to_smt"]
-let permutation_of (s1 s2: Seq.seq int) : prop = SeqP.permutation int s1 s2
+let permutation (s1 s2: Seq.seq int) : prop = SeqP.permutation int s1 s2
 //SNIPPET_END: merge_sort_specs
 
 // ================================================================
@@ -47,34 +47,34 @@ let permutation_of (s1 s2: Seq.seq int) : prop = SeqP.permutation int s1 s2
 // ================================================================
 
 let permutation_same_length (s1 s2 : Seq.seq int)
-  : Lemma (requires permutation_of s1 s2)
+  : Lemma (requires permutation s1 s2)
           (ensures Seq.length s1 == Seq.length s2)
-          [SMTPat (permutation_of s1 s2)]
-  = reveal_opaque (`%permutation_of) (permutation_of s1 s2);
+          [SMTPat (permutation s1 s2)]
+  = reveal_opaque (`%permutation) (permutation s1 s2);
     SeqP.perm_len s1 s2
 
 let permutation_refl (s: Seq.seq int)
-  : Lemma (ensures permutation_of s s)
-    [SMTPat (permutation_of s s)]
-  = reveal_opaque (`%permutation_of) (permutation_of s s)
+  : Lemma (ensures permutation s s)
+    [SMTPat (permutation s s)]
+  = reveal_opaque (`%permutation) (permutation s s)
 
 let compose_permutations (s1 s2 s3: Seq.seq int)
-  : Lemma (requires permutation_of s1 s2 /\ permutation_of s2 s3)
-    (ensures permutation_of s1 s3)
-    [SMTPat (permutation_of s1 s2); SMTPat (permutation_of s2 s3)]
-  = reveal_opaque (`%permutation_of) (permutation_of s1 s2);
-    reveal_opaque (`%permutation_of) (permutation_of s2 s3);
-    reveal_opaque (`%permutation_of) (permutation_of s1 s3);
+  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
+    (ensures permutation s1 s3)
+    [SMTPat (permutation s1 s2); SMTPat (permutation s2 s3)]
+  = reveal_opaque (`%permutation) (permutation s1 s2);
+    reveal_opaque (`%permutation) (permutation s2 s3);
+    reveal_opaque (`%permutation) (permutation s1 s3);
     Seq.perm_len s1 s2;
     Seq.perm_len s1 s3;
     Seq.lemma_trans_perm s1 s2 s3 0 (Seq.length s1)
 
 let append_permutations (s1 s2 s1' s2': Seq.seq int)
-  : Lemma (requires permutation_of s1 s1' /\ permutation_of s2 s2')
-          (ensures permutation_of (Seq.append s1 s2) (Seq.append s1' s2'))
-  = reveal_opaque (`%permutation_of) (permutation_of s1 s1');
-    reveal_opaque (`%permutation_of) (permutation_of s2 s2');
-    reveal_opaque (`%permutation_of) (permutation_of (Seq.append s1 s2) (Seq.append s1' s2'));
+  : Lemma (requires permutation s1 s1' /\ permutation s2 s2')
+          (ensures permutation (Seq.append s1 s2) (Seq.append s1' s2'))
+  = reveal_opaque (`%permutation) (permutation s1 s1');
+    reveal_opaque (`%permutation) (permutation s2 s2');
+    reveal_opaque (`%permutation) (permutation (Seq.append s1 s2) (Seq.append s1' s2'));
     SeqP.append_permutations s1 s2 s1' s2'
 
 //SNIPPET_START: seq_merge
@@ -145,8 +145,8 @@ let rec seq_merge_count (x: int) (s1 s2: Seq.seq int)
       )
 
 let seq_merge_permutation (s1 s2: Seq.seq int)
-  : Lemma (ensures permutation_of (Seq.append s1 s2) (seq_merge s1 s2))
-  = reveal_opaque (`%permutation_of) (permutation_of (Seq.append s1 s2) (seq_merge s1 s2));
+  : Lemma (ensures permutation (Seq.append s1 s2) (seq_merge s1 s2))
+  = reveal_opaque (`%permutation) (permutation (Seq.append s1 s2) (seq_merge s1 s2));
     SeqP.lemma_append_count s1 s2;
     Classical.forall_intro (fun x -> seq_merge_count x s1 s2)
 
@@ -422,7 +422,7 @@ fn merge_impl
     pts_to_range a (SZ.v lo) (SZ.v hi) s_out **
     pure (
       sorted s_out /\ 
-      permutation_of (Seq.append s1 s2) s_out
+      permutation (Seq.append s1 s2) s_out
     )
 //SNIPPET_END: merge_impl_sig
 {
@@ -557,7 +557,7 @@ fn rec merge_sort_aux
     pts_to_range a (SZ.v lo) (SZ.v hi) s
   ensures exists* s'.
     pts_to_range a (SZ.v lo) (SZ.v hi) s' **
-    pure (sorted s' /\ permutation_of s s')
+    pure (sorted s' /\ permutation s s')
 {
   pts_to_range_prop a;
   let len = hi -^ lo;
@@ -587,7 +587,7 @@ fn rec merge_sort_aux
     // Merge sorted halves
     merge_impl a lo mid hi;
     // Result is seq_merge s1' s2' which is sorted and 
-    // permutation_of (append s1' s2') (seq_merge s1' s2')
+    // permutation (append s1' s2') (seq_merge s1' s2')
     // Compose: s ~ s1++s2 ~ s1'++s2' ~ result
     ()
   }
@@ -615,7 +615,7 @@ ensures exists* s.
   pure (
     Seq.length s == Seq.length s0 /\
     sorted s /\
-    permutation_of s0 s
+    permutation s0 s
   )
 //SNIPPET_END: merge_sort_sig
 {
