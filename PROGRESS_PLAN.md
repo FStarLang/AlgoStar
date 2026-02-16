@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, latest)
 
-**167 F* files, ~50K lines, 141 admits across 38 files**
+**167 F* files, ~50K lines, 140 admits across 37 files**
 
 (Note: Count uses proper block-comment-aware method. Previous count of 108/35 files
 used a buggy counter that missed Pulse `assume_` and caught `admit()` in block comments.)
@@ -106,7 +106,7 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 4 | ✅ Renamed (not CLRS) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 10 | ✅ visited_implies_path proved |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 12 | ✅ BFS soundness, components, subset_edges proven |
-| 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 7 | ✅ Vacuous admit removed |
+| 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 6 | ✅ Prim.Complexity: 0 admits (loop invariant fixed) |
 | 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 5 | |
 | 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
 | 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
@@ -128,8 +128,8 @@ used a buggy counter that missed Pulse `assume_` and caught `admit()` in block c
 | Chapter | Admits | Top files |
 |---------|--------|-----------|
 | ch22 (graphs) | 36 | DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopoSort(2) |
-| ch23 (MST) | 24 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(5), SortedEdges(1), Kruskal.Cmplx(2), EdgeSort(2), Prim.Cmplx(1), main(1) |
-| ch08 (sorting) | 17 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Spec(3), RS.Stability(2), BucketSort(1) |
+| ch23 (MST) | 23 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(5), SortedEdges(1), Kruskal.Cmplx(3), EdgeSort(2), main(1) |
+| ch08 (sorting) | 16 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Spec(2), RS.Stability(2), BucketSort(1) |
 | ch16 (greedy) | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(3) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
 | ch26 (MaxFlow) | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) |
@@ -203,7 +203,7 @@ closeable (`radix-full-269` ✅). The other 15 are blocked due to:
 
 | File | Line(s) | Admits | Status |
 |------|---------|--------|--------|
-| Prim.Complexity | 130 | 1 | ❌ Blocked: Pulse loop invariant needs `v≤n` not `v≤n+1` |
+| Prim.Complexity | 130 | 0 | ✅ Fixed: loop invariant v_iter < n in inner loops, v_iter <= n in outer |
 | Kruskal.Complexity | 371, 390 | 2 | ❌ Blocked: Pulse admits + bound fails for n<3 + upstream assume_ at 333 |
 | Kruskal.Spec | 452, 378 | 2 | ❌ Blocked: Not arithmetic—needs build_components induction + cut property |
 | RadixSort.Stability | 150, 208 | 2 | ❌ Blocked: Z3 incomplete quantifiers on nested ∃/∀ in sorted_up_to_digit |
