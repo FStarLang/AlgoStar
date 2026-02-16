@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, updated)
 
-**167 F* files, ~50K lines, 140 admits across 34 files**
+**167 F* files, ~50K lines, 131 admits across 34 files**
 
 ### Per-Algorithm Status Table
 
@@ -92,17 +92,17 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
 | 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | 1 assume val in Spec |
-| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 9 | Optimality unproven |
+| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 6 | ✅ Greedy choice proven |
 | 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
 | 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 0 | Disconnected from Pulse |
-| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 5 | One-step compress |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 4 | RankBound: 0 admits ✅ |
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 | d[v]=δ(s,v) not proven |
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 24 | Parenthesis thm admitted |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 4 | ✅ Renamed (not CLRS) |
-| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 12 | Distance, timestamps, white-path |
-| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 19 | ✅ Symmetry+transitivity proven |
+| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 10 | ✅ visited_implies_path proved |
+| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 15 | ✅ BFS soundness + components proven |
 | 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 7 | ✅ Vacuous admit removed |
 | 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 5 | |
 | 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
@@ -110,7 +110,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 0 | Stretch goal |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
-| 28 | Strassen | §28.2 | ✅ quadrant algebra proven | ⚠️ Separate | 0 | Pure F* |
+| 28 | Strassen | §28.2 | ✅ quadrant algebra proven | ⚠️ Separate | 1 | Pure F*, 1 SMT scalability admit |
 | 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
 | 31 | ExtendedGCD | §31.2 | ✅ Bézout identity | — | 0 | Pure F* |
 | 31 | ModExp | §31.6 | ✅ (b^e)%m | ✅ Linked O(lg e) | 0 | |
@@ -124,17 +124,17 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Chapter | Admits | Top files |
 |---------|--------|-----------|
-| ch22 (graphs) | 43 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5), BFS.DistSpec(4), WhitePath(3), KahnTopoSort(2) |
-| ch23 (MST) | 31 | Kruskal.Spec(13), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(3), EdgeSort(2), Prim.Cmplx(1), main(1) |
-| ch08 (sorting) | 21 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Stability(4), CS.Stable(3), RS.Spec(2), BucketSort(1) |
-| ch16 (greedy) | 11 | ActivitySelection.Spec(9), Huffman.Complete(2) |
+| ch22 (graphs) | 40 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5), BFS.DistSpec(2), WhitePath(3), KahnTopoSort(2) |
+| ch23 (MST) | 27 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(3), EdgeSort(2), Prim.Cmplx(1), main(1) |
+| ch08 (sorting) | 19 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Stability(2), CS.Stable(3), RS.Spec(2), BucketSort(1) |
+| ch16 (greedy) | 8 | ActivitySelection.Spec(6), Huffman.Complete(2) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
 | ch09 (select) | 5 | PartialSelectionSort.Correctness(5) |
 | ch24 (SSSP) | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
-| ch21 (UF) | 5 | UnionFind.Spec(4), RankBound(1) |
+| ch21 (UF) | 4 | UnionFind.Spec(4), RankBound(0) ✅ |
 | ch12 (BST) | 3 | BST.Insert.Spec(3) |
 | Other | 7 | MaxSubarray.DC(1), RodCutting.Spec(1), VertexCover.Spec(1), Huffman.Complete(2), Prim.Cmplx(1), Kruskal(1) |
-| **Total** | **140** | |
+| **Total** | **131** | |
 
 ---
 
@@ -206,8 +206,8 @@ closeable (`radix-full-269` ✅). The other 15 are blocked due to:
 | **RadixSort.FullSort** | **269** | **1** | **✅ DONE: proved with SeqP.index_tail + explicit quantifier trigger** |
 | RadixSort.FullSort | 183 | 1 | ❌ Blocked: Needs digit-shift + euclidean division chain |
 | PartialSelect | 117 | 1 | ❌ Blocked: Z3 can't bridge count_occ/tail/sorted quantifiers |
-| UnionFind.RankBound | 190 | 1 | ❌ Blocked: Needs FiniteSet cardinality reasoning |
-| UnionFind.Spec | 92 | 1 | ❌ Blocked: Needs rank<n from RankBound (itself admitted) |
+| UnionFind.RankBound | 190 | 1 | ✅ DONE: rank_bounded_union fully proven |
+| UnionFind.Spec | 92 | 1 | ❌ Blocked: Z3 can't instantiate refined quantifier from rank_invariant |
 | Prim.Spec | 209, 270 | 2 | ❌ Blocked: Needs find_min_edge_aux trace, non-trivial helper |
 | RabinKarp.Spec | 162 | 1 | ❌ Blocked: Horner evaluation modular arithmetic |
 | ActivitySelection.Spec | 305 | 1 | ❌ Blocked: max_compatible_count (line 176) is itself admitted |
