@@ -58,7 +58,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, updated)
 
-**167 F* files, ~50K lines, 145 admits across 34 files**
+**167 F* files, ~50K lines, 140 admits across 34 files**
 
 ### Per-Algorithm Status Table
 
@@ -101,8 +101,8 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 24 | Parenthesis thm admitted |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 4 | ✅ Renamed (not CLRS) |
-| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 13 | Distance, timestamps, white-path |
-| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 21 | Cut property admitted |
+| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 12 | Distance, timestamps, white-path |
+| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 19 | ✅ Symmetry+transitivity proven |
 | 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 7 | ✅ Vacuous admit removed |
 | 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 5 | |
 | 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
@@ -124,8 +124,8 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 | Chapter | Admits | Top files |
 |---------|--------|-----------|
-| ch22 (graphs) | 45 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5), BFS.DistSpec(5), WhitePath(3), KahnTopoSort(4) |
-| ch23 (MST) | 33 | Kruskal.Spec(15), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(3), EdgeSort(2), Prim.Cmplx(1), main(1) |
+| ch22 (graphs) | 43 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5), BFS.DistSpec(4), WhitePath(3), KahnTopoSort(2) |
+| ch23 (MST) | 31 | Kruskal.Spec(13), Prim.Spec(6), MST.Spec(5), Kruskal.Cmplx(3), EdgeSort(2), Prim.Cmplx(1), main(1) |
 | ch08 (sorting) | 21 | RadixSort.FullSort(7), RS.MultiDigit(4), RS.Stability(4), CS.Stable(3), RS.Spec(2), BucketSort(1) |
 | ch16 (greedy) | 11 | ActivitySelection.Spec(9), Huffman.Complete(2) |
 | ch32 (strings) | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
@@ -134,7 +134,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | ch21 (UF) | 5 | UnionFind.Spec(4), RankBound(1) |
 | ch12 (BST) | 3 | BST.Insert.Spec(3) |
 | Other | 7 | MaxSubarray.DC(1), RodCutting.Spec(1), VertexCover.Spec(1), Huffman.Complete(2), Prim.Cmplx(1), Kruskal(1) |
-| **Total** | **147** | |
+| **Total** | **140** | |
 
 ---
 
@@ -228,9 +228,9 @@ self-contained but requires careful F* proof engineering (induction, case analys
 | **RadixSort.Spec** | 342 | 1 | Same as Stability.179 but at spec level. |
 | **RadixSort.FullSort** | 227 | 1 | **Digit dominance**: differing digit at position d₀ contributes ≥ base^d₀, overwhelming all lower digits. Geometric series bound. |
 | **RadixSort.FullSort** | 352,356,377,381 | 4 | **Bridge admits**: reference results from RadixSort.Stability module. Resolve by completing that module first, then import. |
-| **Kruskal.Spec** | 39,45,51,96,102,349,356,446,458,466 | 10 | Graph path lemmas: reversal, concatenation, component membership, decidability, spanning tree characterization. Each is 5-15 lines with path induction. |
+| **Kruskal.Spec** | 156,201,207,388,454,461,483,515,540,551,557,563,571 | 13 | ✅ same_component_symmetric (l39) and same_component_transitive (l45) PROVEN via path reversal/concatenation. Remaining: decidability, component construction, forest preservation, MST optimality. |
 | **Prim.Spec** | 195, 359, 380 | 3 | Prim step verification: trace `find_min_edge_aux`, inductive safety invariant, base case. |
-| **BFS.DistanceSpec** | 219, 297 | 2 | L219: visited ⟹ path exists (parent-pointer reconstruction). L297: path concatenation (reachable transitivity). |
+| **BFS.DistanceSpec** | 219 | 1 | ✅ reachable_trans (l297) PROVEN via path concatenation + lemma_append_last. L219: visited ⟹ path exists (parent-pointer reconstruction). |
 | **BellmanFord.Spec** | 452 | 1 | Negative cycle detection: post-(n-1)-round distance change ⟹ path with n+ edges ⟹ cycle. |
 | **Dijkstra.TriIneq** | 311 | 1 | Combine `relax_from_u_establishes_all_from_u` + preservation for processed set to extend triangle. |
 | **KahnTopologicalSort** | 372 | 1 | Output contains all n vertices: maintain visited-set invariant + pigeonhole. |
