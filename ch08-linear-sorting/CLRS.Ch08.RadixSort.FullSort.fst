@@ -26,6 +26,7 @@ open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Classical
 module Seq = FStar.Seq
+module SeqP = FStar.Seq.Properties
 
 (* ========== Import from Stability module ========== *)
 
@@ -254,8 +255,8 @@ let digits_all_equal_implies_equal
 
 /// Helper: prove sorted by induction after establishing pairwise order
 /// Note: This requires standard sequence lemmas about tail and indexing
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
-let lemma_pairwise_le_implies_sorted (s: seq nat)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec lemma_pairwise_le_implies_sorted (s: seq nat)
   : Lemma (requires length s > 0 /\
                     (forall (i j: nat). i < length s /\ j < length s /\ i < j ==> 
                       index s i <= index s j))
@@ -263,14 +264,29 @@ let lemma_pairwise_le_implies_sorted (s: seq nat)
           (decreases (length s))
   = if length s <= 1 then ()
     else (
-      // Need to prove: sorted s <==> index s 0 <= index s 1 /\ sorted (tail s)
-      // Both parts follow from the pairwise assumption, but require
-      // sequence index/tail lemmas that F* doesn't expose automatically
-      admit() // Standard sequence reasoning:
-              // 1. index s 0 <= index s 1 follows from assumption with i=0, j=1
-              // 2. For tail s: index (tail s) i = index s (i+1), so pairwise holds
-              // 3. Apply IH to tail s
-              // These are all straightforward but require explicit sequence lemmas
+      // sorted s = index s 0 <= index s 1 /\ sorted (tail s)
+      // Part 1: index s 0 <= index s 1 is trivially from pairwise with i=0, j=1
+      
+      // Part 2: sorted (tail s), by recursion
+      let t = tail s in
+      if length t <= 1 then ()
+      else (
+        // Need to show: forall i j. i < |t| /\ j < |t| /\ i < j ==> index t i <= index t j
+        // We know: tail s == slice s 1 (length s)
+        // So index t k == index s (k + 1) by lemma_index_slice
+        let aux (i: nat) (j: nat) : Lemma 
+          (requires i < length t /\ j < length t /\ i < j)
+          (ensures index t i <= index t j)
+          [SMTPat (index t i); SMTPat (index t j)]
+          = Seq.lemma_index_slice s 1 (length s) i;
+            Seq.lemma_index_slice s 1 (length s) j;
+            // Explicitly access s at (i+1) and (j+1) to trigger the quantifier
+            let _ = index s (i + 1) in
+            let _ = index s (j + 1) in
+            ()
+        in
+        lemma_pairwise_le_implies_sorted t
+      )
     )
 #pop-options
 
