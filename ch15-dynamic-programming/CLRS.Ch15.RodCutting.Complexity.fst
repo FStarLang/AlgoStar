@@ -43,8 +43,8 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
 
-let rec accum_max (prices: Seq.seq int) (r: Seq.seq int) (j: nat) (limit: nat)
-  : Tot int (decreases limit)
+let rec accum_max (prices: Seq.seq nat) (r: Seq.seq nat) (j: nat) (limit: nat)
+  : Tot nat (decreases limit)
   = if limit = 0 || j = 0 then 0
     else if limit > j || limit - 1 >= Seq.length prices || j - limit >= Seq.length r
     then accum_max prices r j (limit - 1)
@@ -52,8 +52,8 @@ let rec accum_max (prices: Seq.seq int) (r: Seq.seq int) (j: nat) (limit: nat)
          let candidate = Seq.index prices (limit - 1) + Seq.index r (j - limit) in
          (if candidate >= prev then candidate else prev)
 
-let rec build_opt (prices: Seq.seq int) (len: nat)
-  : Tot (s: Seq.seq int{Seq.length s == len + 1 /\ Seq.index s 0 == 0}) (decreases len)
+let rec build_opt (prices: Seq.seq nat) (len: nat)
+  : Tot (s: Seq.seq nat{Seq.length s == len + 1 /\ Seq.index s 0 == 0}) (decreases len)
   = if len = 0 then Seq.create 1 0
     else let prev = build_opt prices (len - 1) in
          let opt_len = if len > Seq.length prices then 0
@@ -63,10 +63,10 @@ let rec build_opt (prices: Seq.seq int) (len: nat)
          assert (Seq.index result 0 == Seq.index prev 0);
          result
 
-let optimal_revenue (prices: Seq.seq int) (j: nat) : int =
+let optimal_revenue (prices: Seq.seq nat) (j: nat) : nat =
   Seq.index (build_opt prices j) j
 
-let rec build_opt_prefix (prices: Seq.seq int) (len: nat) (k: nat)
+let rec build_opt_prefix (prices: Seq.seq nat) (len: nat) (k: nat)
   : Lemma (requires k <= len)
           (ensures Seq.index (build_opt prices len) k == Seq.index (build_opt prices k) k)
           (decreases (len - k))
@@ -81,12 +81,12 @@ let rec build_opt_prefix (prices: Seq.seq int) (len: nat) (k: nat)
       build_opt_prefix prices (len - 1) k
     )
 
-let optimal_revenue_consistent (prices: Seq.seq int) (j: nat) (len: nat)
+let optimal_revenue_consistent (prices: Seq.seq nat) (j: nat) (len: nat)
   : Lemma (requires j <= len)
           (ensures Seq.index (build_opt prices len) j == optimal_revenue prices j)
   = build_opt_prefix prices len j
 
-let rec accum_max_ext (prices: Seq.seq int) (r1 r2: Seq.seq int) (j: nat) (limit: nat)
+let rec accum_max_ext (prices: Seq.seq nat) (r1 r2: Seq.seq nat) (j: nat) (limit: nat)
   : Lemma (requires (forall (k:nat). k < j /\ k < Seq.length r1 /\ k < Seq.length r2 ==> Seq.index r1 k == Seq.index r2 k) /\
                      Seq.length r1 >= j /\ Seq.length r2 >= j)
           (ensures accum_max prices r1 j limit == accum_max prices r2 j limit)
@@ -102,11 +102,11 @@ let rec accum_max_ext (prices: Seq.seq int) (r1 r2: Seq.seq int) (j: nat) (limit
       assert (Seq.index r1 (j - limit) == Seq.index r2 (j - limit))
     )
 
-let dp_correct (prices: Seq.seq int) (sr: Seq.seq int) (bound: nat) : prop =
+let dp_correct (prices: Seq.seq nat) (sr: Seq.seq nat) (bound: nat) : prop =
   (forall (k: nat). k <= bound /\ k < Seq.length sr ==>
     Seq.index sr k == optimal_revenue prices k)
 
-let accum_max_dp_correct (prices: Seq.seq int) (sr: Seq.seq int) (j: nat)
+let accum_max_dp_correct (prices: Seq.seq nat) (sr: Seq.seq nat) (j: nat)
   : Lemma (requires j > 0 /\ j <= Seq.length prices /\ Seq.length sr > j /\
                      dp_correct prices sr (j - 1))
           (ensures accum_max prices sr j j == optimal_revenue prices j)
@@ -131,16 +131,6 @@ let accum_max_dp_correct (prices: Seq.seq int) (sr: Seq.seq int) (j: nat)
     apply_aux j;
     accum_max_ext prices sr prev j j
 
-let rec accum_max_nonneg (prices: Seq.seq int) (r: Seq.seq int) (j: nat) (limit: nat)
-  : Lemma (requires (forall (k:nat). k < Seq.length prices ==> Seq.index prices k >= 0) /\
-                     (forall (k:nat). k < Seq.length r ==> Seq.index r k >= 0))
-          (ensures accum_max prices r j limit >= 0)
-          (decreases limit)
-  = if limit = 0 || j = 0 then ()
-    else if limit > j || limit - 1 >= Seq.length prices || j - limit >= Seq.length r
-    then accum_max_nonneg prices r j (limit - 1)
-    else accum_max_nonneg prices r j (limit - 1)
-
 // ========== Complexity arithmetic ==========
 
 // Triangle number: 1 + 2 + ... + n = n*(n+1)/2
@@ -160,9 +150,9 @@ open Pulse.Lib.BoundedIntegers
 
 fn rod_cutting_complexity
   (#p: perm)
-  (prices: A.array int)
+  (prices: A.array nat)
   (n: SZ.t)
-  (#s_prices: erased (Seq.seq int))
+  (#s_prices: erased (Seq.seq nat))
   (ctr: GR.ref nat)
   (#c0: erased nat)
   requires
@@ -172,10 +162,9 @@ fn rod_cutting_complexity
       SZ.v n == Seq.length s_prices /\
       SZ.v n == A.length prices /\
       SZ.v n > 0 /\
-      SZ.fits (SZ.v n + 1) /\
-      (forall (i: nat). i < Seq.length s_prices ==> Seq.index s_prices i >= 0)
+      SZ.fits (SZ.v n + 1)
     )
-  returns result: int
+  returns result: nat
   ensures exists* (cf: nat).
     A.pts_to prices #p s_prices **
     GR.pts_to ctr cf **
@@ -185,7 +174,7 @@ fn rod_cutting_complexity
     )
 {
   let n_plus_1 = n + 1sz;
-  let r = V.alloc 0 n_plus_1;
+  let r = V.alloc (0 <: nat) n_plus_1;
   let mut j: SZ.t = 1sz;
 
   while (!j <=^ n)
@@ -200,14 +189,13 @@ fn rod_cutting_complexity
       Seq.length sr == SZ.v n + 1 /\
       V.length r == Seq.length sr /\
       dp_correct s_prices sr (SZ.v vj - 1) /\
-      (forall (k: nat). k < Seq.length sr ==> Seq.index sr k >= 0) /\
       // Complexity: vc == c0 + triangle(vj - 1)
       vc >= reveal c0 /\
       vc - reveal c0 == triangle (SZ.v vj - 1)
     )
   {
     let vj = !j;
-    let mut q: int = 0;
+    let mut q: nat = 0;
     let mut i: SZ.t = 1sz;
 
     while (!i <=^ vj)
@@ -225,9 +213,7 @@ fn rod_cutting_complexity
         SZ.v vi <= SZ.v vj + 1 /\
         Seq.length sr_inner == SZ.v n + 1 /\
         V.length r == Seq.length sr_inner /\
-        vq >= 0 /\
         dp_correct s_prices sr_inner (SZ.v vj - 1) /\
-        (forall (k: nat). k < Seq.length sr_inner ==> Seq.index sr_inner k >= 0) /\
         vq == accum_max s_prices sr_inner (SZ.v vj) (SZ.v vi - 1) /\
         // Complexity: inner ticks track i-1 within this j-iteration
         vc_inner >= reveal c0 /\

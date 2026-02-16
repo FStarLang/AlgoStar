@@ -27,7 +27,7 @@ let rec valid_cutting (n: nat) (cuts: list nat) : prop =
 
 /// Revenue from a cutting: sum of prices for each piece
 /// prices[i] = price for a piece of length (i+1)
-let rec cutting_revenue (prices: seq int) (cuts: list nat) : int =
+let rec cutting_revenue (prices: seq nat) (cuts: list nat) : nat =
   match cuts with
   | [] -> 0
   | piece :: rest ->
@@ -49,8 +49,8 @@ let rec cutting_revenue (prices: seq int) (cuts: list nat) : int =
 
 /// Accumulated max: max over i in [1, limit] of (prices[i-1] + r[j-i])
 /// r is a sequence of subproblem values
-let rec accum_max (prices: seq int) (r: seq int) (j: nat) (limit: nat)
-  : Tot int (decreases limit)
+let rec accum_max (prices: seq nat) (r: seq nat) (j: nat) (limit: nat)
+  : Tot nat (decreases limit)
   = if limit = 0 || j = 0 then 0
     else if limit > j || limit - 1 >= length prices || j - limit >= length r 
     then accum_max prices r j (limit - 1)
@@ -60,8 +60,8 @@ let rec accum_max (prices: seq int) (r: seq int) (j: nat) (limit: nat)
 
 /// Build the optimal revenue table bottom-up
 /// build_opt len prices = sequence of length len+1 where s[k] = optimal revenue for rod of length k
-let rec build_opt (prices: seq int) (len: nat)
-  : Tot (s: seq int{length s == len + 1 /\ index s 0 == 0}) (decreases len)
+let rec build_opt (prices: seq nat) (len: nat)
+  : Tot (s: seq nat{length s == len + 1 /\ index s 0 == 0}) (decreases len)
   = if len = 0 then create 1 0
     else let prev = build_opt prices (len - 1) in
          let opt_len = if len > length prices then 0
@@ -72,7 +72,7 @@ let rec build_opt (prices: seq int) (len: nat)
          result
 
 /// Optimal revenue for a rod of length j (DP-based definition)
-let optimal_revenue (prices: seq int) (j: nat) : int =
+let optimal_revenue (prices: seq nat) (j: nat) : nat =
   index (build_opt prices j) j
 
 /// Alias: optimal_revenue_spec for consistency with problem formulation
@@ -81,7 +81,7 @@ let optimal_revenue_spec = optimal_revenue
 // ========== Part 4: Correctness Lemmas ==========
 
 /// Lemma: build_opt is prefix-consistent
-let rec build_opt_prefix (prices: seq int) (len: nat) (k: nat)
+let rec build_opt_prefix (prices: seq nat) (len: nat) (k: nat)
   : Lemma (requires k <= len)
           (ensures index (build_opt prices len) k == index (build_opt prices k) k)
           (decreases (len - k))
@@ -97,13 +97,13 @@ let rec build_opt_prefix (prices: seq int) (len: nat) (k: nat)
     )
 
 /// Corollary: optimal_revenue is well-defined
-let optimal_revenue_consistent (prices: seq int) (j: nat) (len: nat)
+let optimal_revenue_consistent (prices: seq nat) (j: nat) (len: nat)
   : Lemma (requires j <= len)
           (ensures index (build_opt prices len) j == optimal_revenue prices j)
   = build_opt_prefix prices len j
 
 /// Lemma: accum_max is extensional with respect to sequences that agree on relevant positions
-let rec accum_max_ext (prices: seq int) (r1 r2: seq int) (j: nat) (limit: nat)
+let rec accum_max_ext (prices: seq nat) (r1 r2: seq nat) (j: nat) (limit: nat)
   : Lemma (requires (forall (k:nat). k < j /\ k < length r1 /\ k < length r2 ==> index r1 k == index r2 k) /\
                      length r1 >= j /\ length r2 >= j)
           (ensures accum_max prices r1 j limit == accum_max prices r2 j limit)
@@ -120,12 +120,12 @@ let rec accum_max_ext (prices: seq int) (r1 r2: seq int) (j: nat) (limit: nat)
     )
 
 /// DP table correctness predicate
-let dp_correct (prices: seq int) (sr: seq int) (bound: nat) : prop =
+let dp_correct (prices: seq nat) (sr: seq nat) (bound: nat) : prop =
   (forall (k: nat). k <= bound /\ k < length sr ==>
     index sr k == optimal_revenue prices k)
 
 /// Key lemma: when DP table is correct up to j-1, accum_max computes optimal_revenue for j
-let accum_max_dp_correct (prices: seq int) (sr: seq int) (j: nat)
+let accum_max_dp_correct (prices: seq nat) (sr: seq nat) (j: nat)
   : Lemma (requires j > 0 /\ j <= length prices /\ length sr > j /\
                      dp_correct prices sr (j - 1))
           (ensures accum_max prices sr j j == optimal_revenue prices j)
@@ -153,7 +153,7 @@ let accum_max_dp_correct (prices: seq int) (sr: seq int) (j: nat)
 // ========== Part 5: Optimal Substructure Theorem (CLRS Eq. 15.2) ==========
 
 /// Helper: max over range [1, n] of a function
-let rec max_over_range (f: (i:nat{i > 0} -> int)) (n: nat{n > 0}) : Tot int (decreases n) =
+let rec max_over_range (f: (i:nat{i > 0} -> nat)) (n: nat{n > 0}) : Tot nat (decreases n) =
   if n = 1 then f 1
   else
     let prev = max_over_range f (n - 1) in
@@ -166,13 +166,13 @@ let rec max_over_range (f: (i:nat{i > 0} -> int)) (n: nat{n > 0}) : Tot int (dec
 
 /// Main theorem: The DP table computed by build_opt is correct
 /// For all j <= n: build_opt(prices, n)[j] == optimal_revenue(prices, j)
-let dp_table_correct (prices: seq int) (n: nat) (j: nat)
+let dp_table_correct (prices: seq nat) (n: nat) (j: nat)
   : Lemma (requires j <= n)
           (ensures index (build_opt prices n) j == optimal_revenue prices j)
   = build_opt_prefix prices n j
 
 /// Corollary: The bottom-up computation correctly solves all subproblems
-let dp_solves_all_subproblems (prices: seq int) (n: nat)
+let dp_solves_all_subproblems (prices: seq nat) (n: nat)
   : Lemma (ensures (let table = build_opt prices n in
                     length table == n + 1 /\
                     (forall (j: nat). j <= n ==> index table j == optimal_revenue prices j)))
@@ -188,7 +188,7 @@ let dp_solves_all_subproblems (prices: seq int) (n: nat)
 /// This is implicit in the definition of accum_max
 
 /// For a specific first-cut position i
-let revenue_with_first_cut (prices: seq int) (prev_table: seq int) (j: nat) (i: nat{i > 0 /\ i <= j}) : int =
+let revenue_with_first_cut (prices: seq nat) (prev_table: seq nat) (j: nat) (i: nat{i > 0 /\ i <= j}) : nat =
   if i - 1 < length prices && j - i < length prev_table
   then index prices (i - 1) + index prev_table (j - i)
   else 0
@@ -228,101 +228,42 @@ let rec valid_cutting_sum (n: nat) (cuts: list nat)
 
 /// Pure function that computes the DP table
 /// This is exactly build_opt, renamed for clarity
-let pure_bottom_up_cut (prices: seq int) (n: nat) : seq int =
+let pure_bottom_up_cut (prices: seq nat) (n: nat) : seq nat =
   build_opt prices n
 
 /// Correctness: every entry in the table is the optimal revenue for that rod length
-let pure_bottom_up_correct (prices: seq int) (n: nat) (j: nat)
+let pure_bottom_up_correct (prices: seq nat) (n: nat) (j: nat)
   : Lemma (requires j <= n)
           (ensures index (pure_bottom_up_cut prices n) j == optimal_revenue prices j)
   = dp_table_correct prices n j
 
-// ========== Part 10: Non-negativity Properties ==========
-
-/// If all prices are non-negative, revenue is non-negative
-let rec cutting_revenue_nonneg (prices: seq int) (cuts: list nat)
-  : Lemma (requires (forall (i: nat). i < length prices ==> index prices i >= 0))
-          (ensures cutting_revenue prices cuts >= 0)
-          (decreases cuts)
-  = match cuts with
-    | [] -> ()
-    | piece :: rest -> cutting_revenue_nonneg prices rest
-
-/// accum_max produces non-negative values when inputs are non-negative
-let rec accum_max_nonneg (prices: seq int) (r: seq int) (j: nat) (limit: nat)
-  : Lemma (requires (forall (k:nat). k < length prices ==> index prices k >= 0) /\
-                     (forall (k:nat). k < length r ==> index r k >= 0))
-          (ensures accum_max prices r j limit >= 0)
-          (decreases limit)
-  = if limit = 0 || j = 0 then ()
-    else if limit > j || limit - 1 >= length prices || j - limit >= length r 
-    then accum_max_nonneg prices r j (limit - 1)
-    else accum_max_nonneg prices r j (limit - 1)
-
-/// build_opt produces non-negative values when prices are non-negative
-let rec build_opt_nonneg (prices: seq int) (len: nat)
-  : Lemma (requires (forall (i: nat). i < length prices ==> index prices i >= 0))
-          (ensures (let s = build_opt prices len in
-                    forall (k: nat). k < length s ==> index s k >= 0))
-          (decreases len)
-  = if len = 0 then ()
-    else (
-      build_opt_nonneg prices (len - 1);
-      let prev = build_opt prices (len - 1) in
-      accum_max_nonneg prices prev len len
-    )
-
-/// optimal_revenue is non-negative when prices are non-negative
-let optimal_revenue_nonneg (prices: seq int) (j: nat)
-  : Lemma (requires (forall (i: nat). i < length prices ==> index prices i >= 0))
-          (ensures optimal_revenue prices j >= 0)
-  = build_opt_nonneg prices j
-
-// ========== Part 11: Optimal Substructure (with non-negativity assumption) ==========
+// ========== Part 10: Optimal Substructure Theorem (CLRS Eq. 15.2) ==========
 
 //SNIPPET_START: optimal_substructure
-/// Theorem: Optimal substructure (assuming non-negative prices)
+/// Theorem: Optimal substructure
 /// optimal_revenue prices n == max_{1 <= i <= n} (prices[i-1] + optimal_revenue prices (n-i))
 /// This follows from the definition of accum_max which considers all first-cut positions  
-let optimal_substructure (prices: seq int) (n: nat{n > 0 /\ n <= length prices}) 
-  : Lemma (requires (forall (i: nat). i < length prices ==> index prices i >= 0))
-          (ensures (let f = fun (i:nat{i > 0}) ->
+let optimal_substructure (prices: seq nat) (n: nat{n > 0 /\ n <= length prices}) 
+  : Lemma (ensures (let f : (i:nat{i > 0} -> nat) = fun (i:nat{i > 0}) ->
                       if i <= n && i - 1 < length prices
                       then index prices (i - 1) + optimal_revenue prices (n - i)
                       else 0 in
                     optimal_revenue prices n == max_over_range f n))
 //SNIPPET_END: optimal_substructure
-  = let f = fun (i:nat{i > 0}) ->
+  = let f : (i:nat{i > 0} -> nat) = fun (i:nat{i > 0}) ->
       if i <= n && i - 1 < length prices
       then index prices (i - 1) + optimal_revenue prices (n - i)
       else 0 in
     let prev = build_opt prices (n - 1) in
-    // With non-negative prices, we can show optimal revenues are non-negative
-    build_opt_nonneg prices (n - 1);
-    // Key: when i <= n <= length prices, we have i - 1 < length prices, so f i = prices[i-1] + optimal_revenue prices (n-i)
-    // With non-negative prices and revenues, f i >= 0, so max(0, f i) = f i
     let rec equiv (limit: nat{limit > 0 /\ limit <= n})
       : Lemma (ensures accum_max prices prev n limit == max_over_range f limit)
               (decreases limit)
       = if limit = 1 then (
-          // Base case
-          build_opt_prefix prices (n - 1) (n - 1);
-          // f 1 = prices[0] + optimal_revenue prices (n-1) = prices[0] + prev[n-1]
-          // Since prices[0] >= 0 and prev[n-1] >= 0 (by build_opt_nonneg), f 1 >= 0
-          // accum_max prices prev n 1 = max(0, prices[0] + prev[n-1]) = prices[0] + prev[n-1] = f 1
-          // max_over_range f 1 = f 1
-          assert (index prices 0 >= 0);
-          assert (index prev (n - 1) >= 0);
-          assert (f 1 >= 0)
+          build_opt_prefix prices (n - 1) (n - 1)
         )
         else (
           equiv (limit - 1);
-          // IH: accum_max prices prev n (limit-1) == max_over_range f (limit-1)
           build_opt_prefix prices (n - 1) (n - limit);
-          // accum_max prices prev n limit = max(accum_max prices prev n (limit-1), prices[limit-1] + prev[n-limit])
-          // max_over_range f limit = max(max_over_range f (limit-1), f limit)
-          // f limit = prices[limit-1] + optimal_revenue prices (n-limit) = prices[limit-1] + prev[n-limit]
-          // So both compute the same thing by IH
           ()
         )
     in
