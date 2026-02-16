@@ -206,17 +206,17 @@ let component_of (edges: list edge) (v: nat) (n: nat) : list nat =
 
 // All connected components (represented as list of vertex lists)
 // Build by iterating through vertices and adding new components
+// Check if vertex v is in any component list
+let rec in_some_component (v: nat) (comps: list (list nat)) : bool =
+  match comps with
+  | [] -> false
+  | c :: rest -> mem v c || in_some_component v rest
+
 let rec build_components (edges: list edge) (n: nat) (i: nat{i <= n}) 
                          (acc: list (list nat))
   : Tot (list (list nat)) (decreases (n - i))
   = if i >= n then acc
     else begin
-      // Check if vertex i is already in some component in acc
-      let rec in_some_component (v: nat) (comps: list (list nat)) : bool =
-        match comps with
-        | [] -> false
-        | c :: rest -> mem v c || in_some_component v rest
-      in
       if in_some_component i acc then
         build_components edges n (i + 1) acc
       else
@@ -229,6 +229,15 @@ let components (edges: list edge) (n: nat) : list (list nat) =
   if n = 0 then [] else build_components edges n 0 []
 
 (*** Properties of Components ***)
+
+/// in_some_component returns false when v is not in any component
+let rec in_some_component_false (v: nat) (comps: list (list nat))
+  : Lemma (requires forall (c: list nat). mem c comps ==> ~(mem v c))
+          (ensures in_some_component v comps = false)
+          (decreases comps)
+  = match comps with
+  | [] -> ()
+  | c :: rest -> in_some_component_false v rest
 
 // If two vertices are in the same component, they satisfy same_component predicate
 let lemma_component_implies_same (edges: list edge) (u v: nat) (n: nat) (comp: list nat)
@@ -586,11 +595,112 @@ let lemma_edge_addition_reduces_components (edges: list edge) (e: edge) (n: nat)
           (ensures length (components (e :: edges) n) <= length (components edges n))
   = admit()
 
+/// Helper: bfs_reach_list with empty edges and singleton frontier returns [u]
+let bfs_reach_empty_edges (u: nat)
+  : Lemma (ensures bfs_reach_list [] [u] [] 1 == [u])
+  = assert (edge_neighbors ([] #edge) u == []);
+    List.Tot.Properties.append_nil_l ([] #nat)
+
+/// Helper: same_component_dec with no edges only returns true for equal vertices
+let same_component_dec_empty (u v: nat)
+  : Lemma (ensures same_component_dec [] u v = (u = v))
+  = if u = v then ()
+    else begin
+      bfs_reach_empty_edges u;
+      assert (bfs_reach_list [] [u] [] 1 == [u]);
+      assert (mem v [u] = (v = u))
+    end
+
+/// Helper: vertices_in_component with empty edges returns [v] when v < n
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 10"
+let rec vertices_in_component_empty (v: nat) (n: nat) (i: nat{i <= n})
+  : Lemma (requires v < n)
+          (ensures vertices_in_component [] v n i == (if i <= v && v < n then [v] else []))
+          (decreases (n - i))
+  = same_component_dec_empty v i;
+    if i >= n then ()
+    else begin
+      vertices_in_component_empty v n (i + 1);
+      if i = v then begin
+        assert (same_component_dec [] v i = true)
+      end else begin
+        assert (same_component_dec [] v i = false)
+      end
+    end
+#pop-options
+
+/// Helper: component_of with empty edges is [v] when v < n
+let component_of_empty (v: nat) (n: nat)
+  : Lemma (requires v < n)
+          (ensures component_of [] v n == [v])
+  = vertices_in_component_empty v n 0
+
+/// Helper: vertex j is not in component_of [] i n when i <> j and both < n
+let not_in_different_component_empty (i j: nat) (n: nat)
+  : Lemma (requires i < n /\ j < n /\ i <> j)
+          (ensures ~(mem j (component_of [] i n)))
+  = component_of_empty i n
+
+/// Helper: build_components with empty edges produces n singletons
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec build_components_empty_length (n: nat) (i: nat{i <= n})
+                                      (acc: list (list nat))
+  : Lemma (requires
+             length acc == i /\
+             (forall (j: nat{j < i}). mem [j] acc) /\
+             (forall (c: list nat). mem c acc ==> (exists (j: nat{j < i}). c == [j])) /\
+             (forall (c: list nat). mem c acc ==> ~(mem i c)))
+          (ensures length (build_components [] n i acc) == n)
+          (decreases (n - i))
+  = if i >= n then ()
+    else begin
+      component_of_empty i n;
+      in_some_component_false i acc;
+      assert (in_some_component i acc = false);
+      let new_comp = component_of [] i n in
+      assert (new_comp == [i]);
+      let acc' = new_comp :: acc in
+      assert (length acc' == i + 1);
+      // Part 1: forall j < i+1, [j] in acc'
+      let aux1 (j: nat{j < i + 1}) : Lemma (mem [j] acc')
+        = if j = i then () else ()
+      in
+      FStar.Classical.forall_intro aux1;
+      // Part 2: all elements of acc' are singletons for vertices < i+1
+      let aux2 (c: list nat) : Lemma (requires mem c acc') 
+                                     (ensures exists (j: nat{j < i + 1}). c == [j])
+        = if c = [i] then ()
+          else begin
+            assert (mem c acc);
+            eliminate exists (j: nat{j < i}). c == [j]
+            returns exists (j: nat{j < i + 1}). c == [j]
+            with _. ()
+          end
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux2);
+      // Part 3: i+1 is not in any component in acc'
+      if i + 1 <= n then begin
+        let aux3 (c: list nat) : Lemma (requires mem c acc')
+                                       (ensures ~(mem (i + 1) c))
+          = if c = [i] then ()
+            else begin
+              assert (mem c acc);
+              eliminate exists (j: nat{j < i}). c == [j]
+              returns ~(mem (i + 1) c)
+              with _. ()
+            end
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux3)
+      end;
+      build_components_empty_length n (i + 1) acc'
+    end
+#pop-options
+
 // Initially n components (each vertex is its own component)
 let lemma_initial_components (n: nat)
   : Lemma (requires n > 0)
           (ensures length (components [] n) = n)
-  = admit()
+  = build_components_empty_length n 0 []
 
 // Final spanning tree has 1 component
 let lemma_spanning_tree_one_component (g: graph) (t: list edge)
