@@ -166,32 +166,72 @@ let rec lemma_sequential_implies_mutual
 
 // ========== Maximum Compatible Count ==========
 
+(* Find the largest k in [0..limit] such that a compatible set of size k exists *)
+let rec find_max_compatible (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (k: nat)
+  : GTot nat (decreases k) =
+  if k = 0 then 0
+  else
+    if FStar.StrongExcludedMiddle.strong_excluded_middle
+         (exists (sel: list nat). L.length sel = k /\
+                                 mutually_compatible start finish sel /\
+                                 list_sorted_indices sel n)
+    then k
+    else find_max_compatible start finish n (k - 1)
+
 (* Maximum size of any mutually compatible subset *)
 (* This is a ghost specification-level definition *)
 [@@"opaque_to_smt"]
 let max_compatible_count (start: Seq.seq int) (finish: Seq.seq int) (n: nat) : GTot nat =
-  // The max size of any mutually compatible subset of activities {0, ..., n-1}
-  // Defined recursively: find the largest k in [0..n] such that some compatible set has size k
-  // Since any subset has size <= n, we search downward from n
-  let rec find_max (k: nat) : GTot nat (decreases k) =
-    if k = 0 then 0
-    else
-      // Check if there exists a compatible set of size k
-      // (using strong excluded middle, available in GTot)
-      if FStar.StrongExcludedMiddle.strong_excluded_middle
-           (exists (sel: list nat). L.length sel = k /\
-                                   mutually_compatible start finish sel /\
-                                   list_sorted_indices sel n)
-      then k
-      else find_max (k - 1)
-  in
-  find_max n
+  find_max_compatible start finish n n
 
 (* An optimal selection has maximum cardinality *)
 let is_optimal_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (selected: list nat) : prop =
   mutually_compatible start finish selected /\
   list_sorted_indices selected n /\
   L.length selected == max_compatible_count start finish n
+
+(* Key property: if a compatible set of size m exists, then find_max_compatible >= m *)
+let rec find_max_compatible_lower_bound
+  (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (k: nat) (m: nat)
+  (sel: list nat)
+  : Lemma (requires m <= k /\ L.length sel = m /\
+                   mutually_compatible start finish sel /\
+                   list_sorted_indices sel n)
+          (ensures find_max_compatible start finish n k >= m)
+          (decreases k)
+  = if k = 0 then ()
+    else if FStar.StrongExcludedMiddle.strong_excluded_middle
+              (exists (sel: list nat). L.length sel = k /\
+                                      mutually_compatible start finish sel /\
+                                      list_sorted_indices sel n)
+    then ()  // find_max_compatible returns k >= m
+    else begin
+      // find_max_compatible returns find_max_compatible (k-1)
+      if m <= k - 1 then
+        find_max_compatible_lower_bound start finish n (k - 1) m sel
+      else
+        // m = k, but strong_excluded_middle says no set of size k exists
+        // But sel has size m = k. Contradiction!
+        assert (L.length sel = k);
+        assert (mutually_compatible start finish sel);
+        assert (list_sorted_indices sel n)
+        // The strong_excluded_middle check for k should have returned true
+        // since sel witnesses the existential. But it returned false.
+        // This is a contradiction — Z3 should derive False.
+    end
+
+(* Corollary: max_compatible_count >= 1 when n > 0 and activities are valid *)
+let max_compatible_count_pos (start: Seq.seq int) (finish: Seq.seq int) (n: nat)
+  : Lemma (requires n > 0 /\ Seq.length start == n /\ Seq.length finish == n /\
+                   (forall (i:nat). i < n ==> valid_activity start finish i))
+          (ensures max_compatible_count start finish n >= 1)
+  = reveal_opaque (`%max_compatible_count) (max_compatible_count start finish n);
+    // [0] is a valid compatible set of size 1
+    let singleton : list nat = [0] in
+    assert (L.length singleton = 1);
+    assert (mutually_compatible start finish singleton);
+    assert (list_sorted_indices singleton n);
+    find_max_compatible_lower_bound start finish n n 1 singleton
 
 // ========== Greedy Choice Property (CLRS Theorem 16.1) ==========
 
@@ -309,12 +349,9 @@ let lemma_greedy_choice
         opt' <> [] /\
         L.hd opt' == 0))
   = if opt = [] then begin
-      // If opt is empty, then [0] must be optimal
-      // Since n > 0 and all activities are valid, [0] is a valid compatible set
       // If opt is empty and optimal, then max_compatible_count = 0
-      // But [0] has size 1, contradiction
-      // Therefore opt cannot be empty
-      admit() // This is a straightforward contradiction argument
+      // But max_compatible_count >= 1 when n > 0, contradiction
+      max_compatible_count_pos start finish n
     end
     else if L.hd opt = 0 then
       // Already contains 0
@@ -324,11 +361,11 @@ let lemma_greedy_choice
       let k = L.hd opt in
       lemma_greedy_choice_helper start finish n opt k;
       let opt' = 0 :: L.tl opt in
-      // opt' has same length, is mutually compatible
-      // Since opt is optimal with length = max_compatible_count
-      // and opt' has same length and is compatible,
+      // opt' is mutually compatible, sorted, and same length as opt
+      // Since L.length opt = max_compatible_count and L.length opt' = L.length opt,
       // opt' is also optimal
-      admit() // Classical exchange argument - since both have same size and are compatible, both are optimal
+      assert (L.length opt' == L.length opt);
+      assert (is_optimal_selection start finish n opt')
     end
 
 // ========== Optimal Substructure ==========
