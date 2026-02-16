@@ -149,11 +149,47 @@ let same_component_transitive (edges: list edge) (u v w: nat)
       )
     )
 
-// Decidable version of same_component for computational purposes
-// In specification, we need an executable version
-// This is necessarily approximate - admits in implementation
+// Helper: get maximum vertex index from edge list
+let rec max_vertex_in_edges (edges: list edge) : nat =
+  match edges with
+  | [] -> 0
+  | e :: rest ->
+    let mr = max_vertex_in_edges rest in
+    let m = if e.u > e.v then e.u else e.v in
+    if m > mr then m else mr
+
+// Helper: get all neighbors of vertex v in edge list
+let rec edge_neighbors (edges: list edge) (v: nat) : list nat =
+  match edges with
+  | [] -> []
+  | e :: rest ->
+    let ns = edge_neighbors rest v in
+    if e.u = v then e.v :: ns
+    else if e.v = v then e.u :: ns
+    else ns
+
+// BFS reachability: explore from frontier, tracking visited vertices
+let rec bfs_reach_list (edges: list edge) (frontier: list nat) (visited: list nat) (fuel: nat)
+  : Tot (list nat) (decreases %[fuel; List.Tot.length frontier])
+  = if fuel = 0 then visited
+    else match frontier with
+    | [] -> visited
+    | v :: rest ->
+      if mem v visited then
+        bfs_reach_list edges rest visited fuel
+      else
+        let visited' = v :: visited in
+        let new_neighbors = edge_neighbors edges v in
+        bfs_reach_list edges (List.Tot.append rest new_neighbors) visited' (fuel - 1)
+
+// Decidable version of same_component using BFS
+// Returns true if there exists a path from u to v using edges
 let same_component_dec (edges: list edge) (u v: nat) : bool =
-  admit() // Would need path search algorithm
+  if u = v then true
+  else
+    let n = max_vertex_in_edges edges + 1 in
+    let visited = bfs_reach_list edges [u] [] n in
+    mem v visited
 
 // Get all vertices reachable from v
 let rec vertices_in_component (edges: list edge) (v: nat) (n: nat) (i: nat{i <= n}) 
