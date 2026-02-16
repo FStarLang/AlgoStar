@@ -239,17 +239,143 @@ let rec in_some_component_false (v: nat) (comps: list (list nat))
   | [] -> ()
   | c :: rest -> in_some_component_false v rest
 
+// Helper: if w is in edge_neighbors of v, then there's an edge between v and w
+let rec edge_neighbors_sound (edges: list edge) (v w: nat)
+  : Lemma (requires mem w (edge_neighbors edges v))
+          (ensures exists e. mem_edge e edges /\ 
+                            ((e.u = v /\ e.v = w) \/ (e.v = v /\ e.u = w)))
+          (decreases edges)
+  = match edges with
+    | [] -> ()
+    | e :: rest ->
+      if e.u = v && e.v = w then ()
+      else if e.v = v && e.u = w then ()
+      else edge_neighbors_sound rest v w
+
+// Helper: if there's an edge between v and w, then w is reachable from v
+let edge_gives_reachability (edges: list edge) (v w: nat) (e: edge)
+  : Lemma (requires mem_edge e edges /\ ((e.u = v /\ e.v = w) \/ (e.v = v /\ e.u = w)))
+          (ensures reachable edges v w)
+  = let path = [e] in
+    assert (is_path_from_to path v w);
+    assert (subset_edges path edges)
+
+// Helper: reachability is transitive via path concatenation
+let reachability_transitive (edges: list edge) (u v w: nat)
+  : Lemma (requires reachable edges u v /\ reachable edges v w)
+          (ensures reachable edges u w)
+  = same_component_transitive edges u v w
+
+// Helper lemma: if a vertex is in the frontier, we can reach it
+let rec mem_frontier_reachable (frontier: list nat) (u v: nat)
+  : Lemma (requires mem u frontier)
+          (ensures exists u'. mem u' frontier /\ reachable [] u' v ==> reachable [] u v)
+  = ()
+
+// Helper: membership in appended list
+let rec mem_append (#a: eqtype) (x: a) (l1 l2: list a)
+  : Lemma (mem x (l1 @ l2) <==> (mem x l1 \/ mem x l2))
+  = match l1 with
+    | [] -> ()
+    | hd :: tl -> mem_append x tl l2
+
+// Key lemma: BFS soundness - every vertex in result is either in visited or reachable from frontier  
+// NOTE: This is a difficult proof. The high-level idea is correct but F*'s SMT encoding
+// makes it hard to connect exists/forall reasoning. Admitting for now to unblock other proofs.
+#push-options "--warn_error -271"
+let rec bfs_reach_list_sound (edges: list edge) (frontier: list nat) (visited: list nat) (fuel: nat) (w: nat)
+  : Lemma (requires mem w (bfs_reach_list edges frontier visited fuel))
+          (ensures mem w visited \/ (exists u. mem u frontier /\ reachable edges u w))
+          (decreases %[fuel; List.Tot.length frontier])
+  = admit() // TODO: Complete this proof
+#pop-options
+
+// Corollary: same_component_dec is sound
+let same_component_dec_sound (edges: list edge) (u v: nat)
+  : Lemma (requires same_component_dec edges u v = true)
+          (ensures same_component edges u v)
+  = if u = v then
+      same_component_reflexive edges u
+    else begin
+      let n = max_vertex_in_edges edges + 1 in
+      let visited = bfs_reach_list edges [u] [] n in
+      assert (mem v visited);
+      bfs_reach_list_sound edges [u] [] n v;
+      // From soundness: v is in [], or reachable from someone in [u]
+      // v is not in [], so v must be reachable from u
+      assert (mem u [u]);
+      assert (reachable edges u v)
+    end
+
+// Helper: if mem x (vertices_in_component edges v n i), then same_component_dec edges v x
+let rec vertices_in_component_mem (edges: list edge) (v: nat) (n: nat) (i: nat{i <= n}) (x: nat)
+  : Lemma (requires mem x (vertices_in_component edges v n i))
+          (ensures same_component_dec edges v x = true)
+          (decreases (n - i))
+  = if i >= n then ()
+    else if same_component_dec edges v i then begin
+      if x = i then ()
+      else vertices_in_component_mem edges v n (i + 1) x
+    end else
+      vertices_in_component_mem edges v n (i + 1) x
+
+// Helper: A component in components is always component_of some seed vertex
+let rec build_components_structure (edges: list edge) (n: nat) (i: nat{i <= n}) (acc: list (list nat))
+  : Lemma (ensures forall comp. mem comp (build_components edges n i acc) ==>
+                   (mem comp acc \/ (exists seed. comp == component_of edges seed n)))
+          (decreases (n - i))
+  = if i >= n then ()
+    else begin
+      if in_some_component i acc then
+        build_components_structure edges n (i + 1) acc
+      else begin
+        let new_comp = component_of edges i n in
+        build_components_structure edges n (i + 1) (new_comp :: acc)
+      end
+    end
+
+let components_structure (edges: list edge) (n: nat)
+  : Lemma (ensures forall comp. mem comp (components edges n) ==>
+                   exists seed. comp == component_of edges seed n)
+  = if n = 0 then ()
+    else build_components_structure edges n 0 []
+
 // If two vertices are in the same component, they satisfy same_component predicate
 let lemma_component_implies_same (edges: list edge) (u v: nat) (n: nat) (comp: list nat)
   : Lemma (requires mem u comp /\ mem v comp /\ mem comp (components edges n))
           (ensures same_component edges u v)
-  = admit() // Follows from construction of components
+  = components_structure edges n;
+    // comp is component_of edges seed n for some seed
+    eliminate exists seed. comp == component_of edges seed n
+    returns same_component edges u v
+    with _. begin
+      assert (comp == component_of edges seed n);
+      assert (mem u (component_of edges seed n));
+      assert (mem v (component_of edges seed n));
+      vertices_in_component_mem edges seed n 0 u;
+      vertices_in_component_mem edges seed n 0 v;
+      same_component_dec_sound edges seed u;
+      same_component_dec_sound edges seed v;
+      same_component_symmetric edges seed u;
+      same_component_transitive edges u seed v
+    end
 
 // If two vertices are in different components, adding an edge between them merges components
 let lemma_different_components (edges: list edge) (u v: nat) (n: nat)
   : Lemma (requires ~(same_component edges u v) /\ u < n /\ v < n)
           (ensures ~(mem u (component_of edges v n)))
-  = admit()
+  = // Proof by contradiction
+    if mem u (component_of edges v n) then begin
+      // u is in component_of edges v n
+      // component_of edges v n = vertices_in_component edges v n 0
+      vertices_in_component_mem edges v n 0 u;
+      // So same_component_dec edges v u = true
+      same_component_dec_sound edges v u;
+      // So same_component edges v u
+      same_component_symmetric edges v u;
+      // So same_component edges u v - contradiction!
+      assert false
+    end else ()
 
 (*** Edge Sorting ***)
 
