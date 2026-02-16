@@ -61,20 +61,19 @@ let rec sorted_on_digit (s: seq nat) (d: nat) (base: nat) : Tot prop (decreases 
     (digit (index s 0) d base <= digit (index s 1) d base /\ 
      sorted_on_digit (tail s) d base))
 
-/// Sorted by multiple digits 0..max_d (lexicographic order from low to high)
+/// Sorted by multiple digits 0..max_d (lexicographic order, MSD-primary)
 /// This is the key property maintained by radix sort:
-/// After d passes, the sequence is sorted on digits 0, 1, ..., d-1
+/// After sorting by digit max_d, the most significant differing digit determines order.
 let sorted_up_to_digit (s: seq nat) (max_d: nat) (base: nat) : prop =
   base > 0 /\
   // For every pair i < j in the sequence:
   (forall (i j: nat). {:pattern (index s i); (index s j)}
     i < j /\ j < length s ==>
-    // Either lower digits differ (and determine order)
+    // Either the most significant differing digit favors s[i]
     ((exists (d0: nat). d0 <= max_d /\
-       // First differing digit favors i
        digit (index s i) d0 base < digit (index s j) d0 base /\
-       // All lower digits are equal
-       (forall (d': nat). d' < d0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
+       // All more significant digits are equal
+       (forall (d': nat). d0 < d' /\ d' <= max_d ==> digit (index s i) d' base == digit (index s j) d' base)) \/
      // Or all digits up to max_d are equal
      (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base)))
 
@@ -85,7 +84,7 @@ let sorted_up_to_digit_at (s: seq nat) (max_d: nat) (base: nat) (i j: nat)
   : Lemma (requires sorted_up_to_digit s max_d base /\ i < j /\ j < length s)
           (ensures (exists (d0: nat). d0 <= max_d /\
                       digit (index s i) d0 base < digit (index s j) d0 base /\
-                      (forall (d': nat). d' < d0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
+                      (forall (d': nat). d0 < d' /\ d' <= max_d ==> digit (index s i) d' base == digit (index s j) d' base)) \/
                    (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base))
   = // The {:pattern} in sorted_up_to_digit triggers Z3 on (index s i) and (index s j)
     assert (index s i == index s i);  // trigger pattern match
@@ -158,73 +157,11 @@ let sorted_up_to_digit_singleton (x: nat) (d: nat) (base: nat)
   = ()
 
 
-/// Helper: for a single pair (i,j), sorted_up_to_digit at d implies at d' <= d
-let sorted_up_to_digit_pair_monotonic
-  (s: seq nat) (d d': nat) (base: nat) (i j: nat)
-  : Lemma (requires base > 0 /\ d' <= d /\ i < j /\ j < length s /\
-                    // The pair satisfies the sorted_up_to_digit condition at d
-                    ((exists (d0: nat). d0 <= d /\
-                       digit (index s i) d0 base < digit (index s j) d0 base /\
-                       (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
-                     (forall (dd: nat). dd <= d ==> digit (index s i) dd base == digit (index s j) dd base)))
-          (ensures ((exists (d0: nat). d0 <= d' /\
-                       digit (index s i) d0 base < digit (index s j) d0 base /\
-                       (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
-                    (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base)))
-  = // Case 1: all digits up to d are equal => all digits up to d' are equal (d' <= d)
-    // Case 2: exists d0 <= d separating them
-    //   - if d0 <= d' => same witness works for d'
-    //   - if d0 > d' => all digits below d0 are equal, and d' < d0, so all digits <= d' are equal
-    //     (pick right disjunct)
-    introduce
-      (exists (d0: nat). d0 <= d /\
-         digit (index s i) d0 base < digit (index s j) d0 base /\
-         (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base))
-      ==> ((exists (d0: nat). d0 <= d' /\
-              digit (index s i) d0 base < digit (index s j) d0 base /\
-              (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
-           (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base))
-    with _. (
-      eliminate exists (d0: nat). d0 <= d /\
-         digit (index s i) d0 base < digit (index s j) d0 base /\
-         (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)
-      returns ((exists (d0: nat). d0 <= d' /\
-                  digit (index s i) d0 base < digit (index s j) d0 base /\
-                  (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
-               (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base))
-      with _. (
-        if d0 <= d' then ()  // same witness d0 works
-        else (
-          // d0 > d', so forall d'' < d0 we have equal digits
-          // Since d' < d0, all digits dd <= d' satisfy dd < d0, hence equal
-          introduce forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base
-          with (
-            introduce dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base
-            with _. ()  // dd <= d' < d0, so the forall d'' < d0 applies
-          )
-        )
-      )
-    )
-
-/// If sorted up to digit d, then sorted up to any digit d' <= d
-#push-options "--z3rlimit 30"
-let sorted_up_to_digit_monotonic (s: seq nat) (d d': nat) (base: nat)
-  : Lemma (requires base > 0 /\ d' <= d /\ sorted_up_to_digit s d base)
-          (ensures sorted_up_to_digit s d' base)
-  = // For every pair (i, j), use the helper lemmas to establish the result.
-    // The pattern on sorted_up_to_digit enables Z3 to unfold the hypothesis.
-    let aux (i: nat) (j: nat) : Lemma
-      (requires i < j /\ j < length s)
-      (ensures (exists (d0: nat). d0 <= d' /\
-                   digit (index s i) d0 base < digit (index s j) d0 base /\
-                   (forall (d'': nat). d'' < d0 ==> digit (index s i) d'' base == digit (index s j) d'' base)) \/
-                (forall (dd: nat). dd <= d' ==> digit (index s i) dd base == digit (index s j) dd base))
-      [SMTPat (index s i); SMTPat (index s j)]
-      = sorted_up_to_digit_at s d base i j;
-        sorted_up_to_digit_pair_monotonic s d d' base i j
-    in
-    ()
-#pop-options
+// Note: monotonicity (sorted_up_to_digit s d base ==> sorted_up_to_digit s d' base for d' <= d)
+// does NOT hold for the MSD-primary formulation. This is correct behavior:
+// sorted_up_to_digit s 1 base does not imply sorted_up_to_digit s 0 base
+// because the digit-1 ordering may override digit-0 ordering.
+// Each pass of radix sort builds the property from scratch for the new max_d.
 
 (* ========== Core stability theorem ========== *)
 
@@ -259,13 +196,13 @@ let sorted_on_to_up_to_base_case (s: seq nat) (base: nat)
           (ensures sorted_up_to_digit s 0 base)
   = // For every pair i < j:
     // digit(s[i], 0) <= digit(s[j], 0) by transitivity
-    // Case <: exists d0=0. digit(s[i],0) < digit(s[j],0) (vacuous forall d' < 0)
+    // Case <: exists d0=0. digit(s[i],0) < digit(s[j],0) (vacuous forall for higher digits)
     // Case ==: forall d <= 0. equal (just d=0)
     let aux (i: nat) (j: nat) : Lemma
       (requires i < j /\ j < length s)
       (ensures (exists (d0: nat). d0 <= 0 /\
                    digit (index s i) d0 base < digit (index s j) d0 base /\
-                   (forall (d': nat). d' < d0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
+                   (forall (d': nat). d0 < d' /\ d' <= 0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
                (forall (d: nat). d <= 0 ==> digit (index s i) d base == digit (index s j) d base))
       [SMTPat (index s i); SMTPat (index s j)]
       = sorted_on_digit_at s 0 base i j
@@ -285,15 +222,14 @@ let lemma_stable_sort_preserves_lower_order
                     is_stable_sort_on_digit s_in s_out d base /\
                     sorted_up_to_digit s_in (d - 1) base)
           (ensures 
-            // For any three elements at positions i < j < k where digit d is equal:
-            // If they were ordered by lower digits in s_in, they remain so in s_out
+            // For any pair at positions i < j in output where digit d is equal:
+            // Their lower-digit order is preserved (MSD-primary on digits 0..d-1)
             (forall (i j: nat). 
                i < j /\ j < length s_out /\
                digit (index s_out i) d base == digit (index s_out j) d base ==>
-               // Then their lower-digit order is preserved from s_in
                ((exists (d0: nat). d0 < d /\
                   digit (index s_out i) d0 base < digit (index s_out j) d0 base /\
-                  (forall (d': nat). d' < d0 ==> 
+                  (forall (d': nat). d0 < d' /\ d' < d ==> 
                     digit (index s_out i) d' base == digit (index s_out j) d' base)) \/
                 (forall (d': nat). d' < d ==> 
                   digit (index s_out i) d' base == digit (index s_out j) d' base))))

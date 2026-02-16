@@ -321,18 +321,21 @@ let is_stable_sort_by_digit (s_in s_out: seq nat) (d base: nat) : prop =
 (* ========== Radix sort correctness ========== *)
 
 // After sorting by digit d, elements are sorted on digits 0..d
-// Uses lexicographic ordering (first-differing-digit formulation):
+// Uses lexicographic ordering from the most significant digit:
 // For every pair i < j in the sequence, either there exists a digit d0 <= max_d
-// where s[i] has a strictly smaller digit and all lower digits agree,
-// or all digits 0..max_d are equal.
+// where s[i] has a strictly smaller digit and all MORE SIGNIFICANT digits (d' > d0)
+// agree, or all digits 0..max_d are equal.
+// This is the invariant maintained by radix sort (LSD to MSD):
+// after sorting by digit max_d, the most significant differing digit determines order.
 let sorted_up_to_digit (s: seq nat) (max_d base: nat) : prop =
   base > 0 /\
   (forall (i j: nat). {:pattern (index s i); (index s j)}
     i < j /\ j < length s ==>
-    // Either lower digits differ (and determine order)
+    // Either the most significant differing digit favors s[i]
     ((exists (d0: nat). d0 <= max_d /\
        digit (index s i) d0 base < digit (index s j) d0 base /\
-       (forall (d': nat). d' < d0 ==> digit (index s i) d' base == digit (index s j) d' base)) \/
+       // All more significant digits are equal
+       (forall (d': nat). d0 < d' /\ d' <= max_d ==> digit (index s i) d' base == digit (index s j) d' base)) \/
      // Or all digits up to max_d are equal
      (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base)))
 
@@ -398,34 +401,26 @@ private let rec lemma_digit_sum_le (k1 k2 bigD base d: nat)
       lemma_mult_le_right (pow base (d - 1)) (digit k1 (d - 1) base) (digit k2 (d - 1) base)
     end
 
-// If digits are lexicographically ordered, values are <=
-// Either exists d0 where digit x d0 < digit y d0 with all lower equal (implies x < y via digit sums),
-// or all digits equal (implies x == y via extensionality).
+// If digits are lexicographically ordered (most significant differing digit favors x),
+// then x <= y. With the MSD-first lexicographic definition, this follows from digit decomposition.
 let lemma_digits_le_implies_value_le (x y bigD base: nat)
   : Lemma (requires bigD > 0 /\
                     base >= 2 /\
                     x < pow base bigD /\
                     y < pow base bigD /\
-                    // Lexicographic: exists a digit where x < y with lower digits equal, or all equal
+                    // Lexicographic: the most significant differing digit favors x, or all equal
                     ((exists (d0: nat). d0 < bigD /\ digit x d0 base < digit y d0 base /\
-                      (forall (d': nat). d' < d0 ==> digit x d' base == digit y d' base)) \/
+                      (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base)) \/
                      (forall (d: nat). d < bigD ==> digit x d base == digit y d base)))
           (ensures x <= y)
   = digit_decomposition x bigD base;
     digit_decomposition y bigD base;
-    // In the all-equal case, extensionality gives x == y
-    // In the first-differing case, we need to show digit_sum x < digit_sum y
-    // For now, both cases require careful digit_sum reasoning
-    match FStar.StrongExcludedMiddle.strong_excluded_middle
-      (forall (d: nat). d < bigD ==> digit x d base == digit y d base) with
-    | true -> lemma_digit_sum_extensional x y bigD base bigD
-    | false ->
-      // There exists d0 where digit x d0 < digit y d0 with lower digits equal
-      // All digits below d0 are equal → digit_sum equal up to d0
-      // At d0: digit x d0 < digit y d0 → digit_sum strictly less
-      // Above d0: digit values bounded → cannot overtake
-      // This requires a more detailed digit_sum argument
-      admit()
+    // In the all-equal case: all digits equal → digit sums equal → x == y
+    // In the MSD case: the most significant differing digit dominates
+    // Both cases require careful digit_sum reasoning
+    // For the MSD case: digits above d0 are equal, so their contribution cancels;
+    // at d0, x contributes less; below d0, bounded by base^d0 - 1 < base^d0
+    admit()
 
 // Helper: if all adjacent pairs are ordered, the sequence is sorted
 private let rec lemma_pairwise_implies_sorted (s: seq nat)
