@@ -32,17 +32,122 @@ let same_component_reflexive (edges: list edge) (u: nat)
   : Lemma (same_component edges u u)
   = assert (is_path_from_to [] u u)
 
+// Helper: appending a single edge at the end extends a path
+let rec is_path_append_edge (path: list edge) (u v w: nat) (e: edge)
+  : Lemma 
+    (requires is_path_from_to path u v /\ (e.u = v /\ w = e.v \/ e.v = v /\ w = e.u))
+    (ensures is_path_from_to (path @ [e]) u w)
+    (decreases path)
+  = match path with
+    | [] -> ()
+    | hd :: rest ->
+      if hd.u = u then 
+        is_path_append_edge rest hd.v v w e
+      else 
+        is_path_append_edge rest hd.u v w e
+
+// Helper: reversing a path reverses direction
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+let rec is_path_reverse (path: list edge) (u v: nat)
+  : Lemma 
+    (requires is_path_from_to path u v)
+    (ensures is_path_from_to (rev path) v u)
+    (decreases path)
+  = match path with
+    | [] -> ()
+    | e :: rest ->
+      if e.u = u then (
+        is_path_reverse rest e.v v;
+        assert (is_path_from_to (rev rest) v e.v);
+        is_path_append_edge (rev rest) v e.v u e;
+        assert (is_path_from_to (rev rest @ [e]) v u);
+        FStar.List.Tot.Properties.rev_append [e] rest;
+        assert (rev (e :: rest) == rev rest @ [e])
+      ) else (
+        assert (e.v = u);
+        is_path_reverse rest e.u v;
+        assert (is_path_from_to (rev rest) v e.u);
+        is_path_append_edge (rev rest) v e.u u e;
+        assert (is_path_from_to (rev rest @ [e]) v u);
+        FStar.List.Tot.Properties.rev_append [e] rest;
+        assert (rev (e :: rest) == rev rest @ [e])
+      )
+#pop-options
+
+// Helper for subset appending a single edge
+let rec subset_edges_append_single (prefix: list edge) (e: edge) (es: list edge)
+  : Lemma 
+    (requires subset_edges prefix es /\ mem_edge e es)
+    (ensures subset_edges (prefix @ [e]) es)
+    (decreases prefix)
+  = match prefix with
+    | [] -> ()
+    | hd :: rest -> subset_edges_append_single rest e es
+
+// Helper: subset preserved under reversal
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+let rec subset_edges_rev (path: list edge) (es: list edge)
+  : Lemma 
+    (requires subset_edges path es)
+    (ensures subset_edges (rev path) es)
+    (decreases path)
+  = match path with
+    | [] -> ()
+    | e :: rest ->
+      subset_edges_rev rest es;
+      subset_edges_append_single (rev rest) e es;
+      FStar.List.Tot.Properties.rev_append [e] rest
+#pop-options
+
+// Helper: path concatenation
+let rec is_path_concat (p1 p2: list edge) (u v w: nat)
+  : Lemma 
+    (requires is_path_from_to p1 u v /\ is_path_from_to p2 v w)
+    (ensures is_path_from_to (p1 @ p2) u w)
+    (decreases p1)
+  = match p1 with
+    | [] -> ()
+    | e :: rest ->
+      if e.u = u then 
+        is_path_concat rest p2 e.v v w
+      else 
+        is_path_concat rest p2 e.u v w
+
+// Helper: subset_edges distributes over append
+let rec subset_edges_concat (p1 p2: list edge) (es: list edge)
+  : Lemma 
+    (requires subset_edges p1 es /\ subset_edges p2 es)
+    (ensures subset_edges (p1 @ p2) es)
+    (decreases p1)
+  = match p1 with
+    | [] -> ()
+    | _ :: rest -> subset_edges_concat rest p2 es
+
 // Same component is symmetric
 let same_component_symmetric (edges: list edge) (u v: nat)
   : Lemma (requires same_component edges u v)
           (ensures same_component edges v u)
-  = admit() // Requires path reversal
+  = eliminate exists (path: list edge). subset_edges path edges /\ is_path_from_to path u v
+    returns same_component edges v u
+    with _. (
+      is_path_reverse path u v;
+      subset_edges_rev path edges
+    )
 
 // Same component is transitive
 let same_component_transitive (edges: list edge) (u v w: nat)
   : Lemma (requires same_component edges u v /\ same_component edges v w)
           (ensures same_component edges u w)
-  = admit() // Requires path concatenation
+  = eliminate exists (p1: list edge). subset_edges p1 edges /\ is_path_from_to p1 u v
+    returns same_component edges u w
+    with _. (
+      eliminate exists (p2: list edge). subset_edges p2 edges /\ is_path_from_to p2 v w
+      returns same_component edges u w
+      with _. (
+        is_path_concat p1 p2 u v w;
+        subset_edges_concat p1 p2 edges
+      )
+    )
 
 // Decidable version of same_component for computational purposes
 // In specification, we need an executable version
