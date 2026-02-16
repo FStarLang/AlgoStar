@@ -162,9 +162,53 @@ let digit_at_lower (k: nat) (d: nat) (base: nat)
     //                           = (k / base^d) % base
     ()
 
+/// Helper: pow splits: base^(a+b) = base^a * base^b
+let rec pow_split (base a b: nat)
+  : Lemma (ensures pow base (a + b) == pow base a * pow base b)
+          (decreases a)
+  = if a = 0 then ()
+    else begin
+      pow_split base (a - 1) b;
+      assert (pow base (a - 1 + b) == pow base (a - 1) * pow base b);
+      assert (pow base (a + b) == base * pow base (a - 1 + b));
+      assert (pow base a == base * pow base (a - 1))
+    end
+
+/// Helper: Raw form - digits below preserved by modulo  
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let digit_preserved_by_modulo_raw (k: nat) (d: nat) (bigD: nat) (base: nat)
+  : Lemma (requires base >= 2 /\ d < bigD /\ bigD > 0 /\ pow base d > 0 /\ pow base bigD > 0)
+          (ensures (k / pow base d) % base == ((k % pow base bigD) / pow base d) % base)
+  = // pow base bigD = pow base d * pow base (bigD - d)
+    pow_split base d (bigD - d);
+    assert (pow base (d + (bigD - d)) == pow base d * pow base (bigD - d));
+    assert (d + (bigD - d) == bigD);
+    pow_positive base (bigD - d);
+    // modulo_division_lemma: (a % (b * c)) / b = (a / b) % c
+    modulo_division_lemma k (pow base d) (pow base (bigD - d));
+    assert ((k % pow base bigD) / pow base d == (k / pow base d) % pow base (bigD - d));
+    // Now: ((k % pow base bigD) / pow base d) % base = ((k / pow base d) % pow base (bigD-d)) % base
+    // Since bigD - d >= 1, pow base (bigD-d) = base * pow base (bigD-d-1)
+    pow_positive base (bigD - d - 1);
+    pow_split base 1 (bigD - d - 1);
+    assert (pow base (1 + (bigD - d - 1)) == pow base 1 * pow base (bigD - d - 1));
+    assert (pow base 1 == base);
+    assert (pow base (bigD - d) == base * pow base (bigD - d - 1));
+    // modulo_modulo_lemma: (a % (b * c)) % b = a % b
+    modulo_modulo_lemma (k / pow base d) base (pow base (bigD - d - 1))
+    
+/// Wrapper that connects to digit function
+let digit_preserved_by_modulo (k: nat) (d: nat) (bigD: nat) (base: nat)
+  : Lemma (requires base >= 2 /\ d < bigD /\ bigD > 0 /\ pow base bigD > 0)
+          (ensures digit k d base == digit (k % pow base bigD) d base)
+  = pow_positive base d;
+    pow_positive base bigD;
+    digit_preserved_by_modulo_raw k d bigD base
+#pop-options
+
 /// Key property: a number equals the sum of its digits times powers of base
 /// For k < base^bigD, we have k = sum_{i=0}^{bigD-1} digit(k,i) * base^i
-#push-options "--fuel 2 --ifuel 1"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
 let rec digit_decomposition (k: nat) (bigD: nat) (base: nat)
   : Lemma (requires bigD > 0 /\ base >= 2 /\ k < pow base bigD)
           (ensures k == digit_sum k bigD base)
@@ -180,10 +224,44 @@ let rec digit_decomposition (k: nat) (bigD: nat) (base: nat)
       assert (digit k 0 base == k);
       assert (digit_sum k 1 base == k)
     ) else (
-      // Inductive case: k < base^bigD
-      // This requires complex modular arithmetic relating digit extraction
-      // across different bases and showing that the decomposition works
-      admit() // Complex modular arithmetic with division/remainder properties
+      // Inductive case: k < base^bigD where bigD > 1
+      pow_positive base (bigD - 1);
+      pow_positive base bigD;
+      assert (pow base (bigD - 1) > 0);  // Explicitly state for type checking
+      
+      // Division theorem: k = q * pow base (bigD-1) + r where r = k % pow base (bigD-1)
+      lemma_div_mod k (pow base (bigD - 1));
+      let q = k / pow base (bigD - 1) in
+      let r = k % pow base (bigD - 1) in
+      
+      // Bound on quotient: k < base * pow base (bigD-1) implies q < base
+      assert (pow base bigD == base * pow base (bigD - 1));
+      assert (k < base * pow base (bigD - 1));
+      assert (k == q * pow base (bigD - 1) + r);
+      modulo_range_lemma k (pow base (bigD - 1));
+      assert (r < pow base (bigD - 1));
+      // From k = q * c + r and k < b * c and r < c, we get q < b
+      assert (q < base);
+      
+      // The highest digit equals q
+      small_modulo_lemma_1 q base;
+      assert (digit k (bigD - 1) base == q);
+      
+      // Apply IH to remainder
+      digit_decomposition r (bigD - 1) base;
+      assert (r == digit_sum r (bigD - 1) base);
+      
+      // Show all lower digits match: digit k d == digit r d for all d < bigD-1
+      let aux (d: nat{d < bigD - 1}) : Lemma (digit k d base == digit r d base) =
+        digit_preserved_by_modulo k d (bigD - 1) base
+      in
+      Classical.forall_intro aux;
+      digit_sum_equal_helper k r (bigD - 1) base;
+      assert (digit_sum k (bigD - 1) base == digit_sum r (bigD - 1) base);
+      
+      // Combine: digit_sum k bigD = q * pow base (bigD-1) + digit_sum k (bigD-1)
+      //                            = q * pow base (bigD-1) + r = k
+      ()
     )
 #pop-options
 
