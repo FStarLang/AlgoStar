@@ -21,6 +21,7 @@ open Pulse.Lib.Array.PtsToRange
 open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
+open CLRS.Common.SortSpec
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -29,53 +30,6 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
-
-//SNIPPET_START: merge_sort_specs
-// ================================================================
-// Pure Specifications
-// ================================================================
-
-let sorted (s: Seq.seq int)
-  = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
-
-[@@"opaque_to_smt"]
-let permutation (s1 s2: Seq.seq int) : prop = SeqP.permutation int s1 s2
-//SNIPPET_END: merge_sort_specs
-
-// ================================================================
-// Permutation Lemmas
-// ================================================================
-
-let permutation_same_length (s1 s2 : Seq.seq int)
-  : Lemma (requires permutation s1 s2)
-          (ensures Seq.length s1 == Seq.length s2)
-          [SMTPat (permutation s1 s2)]
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    SeqP.perm_len s1 s2
-
-let permutation_refl (s: Seq.seq int)
-  : Lemma (ensures permutation s s)
-    [SMTPat (permutation s s)]
-  = reveal_opaque (`%permutation) (permutation s s)
-
-let compose_permutations (s1 s2 s3: Seq.seq int)
-  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
-    (ensures permutation s1 s3)
-    [SMTPat (permutation s1 s2); SMTPat (permutation s2 s3)]
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    reveal_opaque (`%permutation) (permutation s2 s3);
-    reveal_opaque (`%permutation) (permutation s1 s3);
-    Seq.perm_len s1 s2;
-    Seq.perm_len s1 s3;
-    Seq.lemma_trans_perm s1 s2 s3 0 (Seq.length s1)
-
-let append_permutations (s1 s2 s1' s2': Seq.seq int)
-  : Lemma (requires permutation s1 s1' /\ permutation s2 s2')
-          (ensures permutation (Seq.append s1 s2) (Seq.append s1' s2'))
-  = reveal_opaque (`%permutation) (permutation s1 s1');
-    reveal_opaque (`%permutation) (permutation s2 s2');
-    reveal_opaque (`%permutation) (permutation (Seq.append s1 s2) (Seq.append s1' s2'));
-    SeqP.append_permutations s1 s2 s1' s2'
 
 //SNIPPET_START: seq_merge
 // ================================================================
@@ -331,14 +285,6 @@ let suffix_gives_index (merged: Seq.seq int) (k: nat) (suffix: Seq.seq int)
   = ()
 
 #pop-options
-
-// ================================================================
-// Helper: single or empty seq is sorted
-// ================================================================
-
-let singl_sorted (s: Seq.seq int)
-  : Lemma (requires Seq.length s <= 1) (ensures sorted s)
-  = ()
 
 // ================================================================
 // Helper: copy range between arrays

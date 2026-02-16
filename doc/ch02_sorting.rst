@@ -30,7 +30,7 @@ Specification
 
 The correctness specification is expressed as two pure predicates:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.InsertionSort.fst
+.. literalinclude:: ../common/CLRS.Common.SortSpec.fst
    :language: fstar
    :start-after: //SNIPPET_START: definitions
    :end-before: //SNIPPET_END: definitions

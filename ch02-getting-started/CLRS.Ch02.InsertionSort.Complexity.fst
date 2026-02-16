@@ -20,6 +20,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
+open CLRS.Common.SortSpec
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -41,84 +42,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 //SNIPPET_END: ghost_tick
-
-// ========== Definitions ==========
-
-let sorted (s: Seq.seq int)
-  = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
-
-let prefix_sorted (s: Seq.seq int) (k: nat) : prop =
-  k <= Seq.length s /\
-  (forall (i j: nat). i <= j /\ j < k ==> Seq.index s i <= Seq.index s j)
-
-[@@"opaque_to_smt"]
-let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
-
-// ========== Permutation lemmas ==========
-
-let permutation_same_length (s1 s2 : Seq.seq int)
-  : Lemma (requires permutation s1 s2)
-          (ensures Seq.length s1 == Seq.length s2)
-          [SMTPat (permutation s1 s2)]
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    Seq.Properties.perm_len s1 s2
-
-let permutation_refl (s: Seq.seq int)
-  : Lemma (ensures permutation s s)
-    [SMTPat (permutation s s)]
-  = reveal_opaque (`%permutation) (permutation s s)
-
-let compose_permutations (s1 s2 s3: Seq.seq int)
-  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
-    (ensures permutation s1 s3)
-    [SMTPat (permutation s1 s2); SMTPat (permutation s2 s3)]
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    reveal_opaque (`%permutation) (permutation s2 s3);
-    reveal_opaque (`%permutation) (permutation s1 s3);
-    Seq.perm_len s1 s2;
-    Seq.perm_len s1 s3;
-    Seq.lemma_trans_perm s1 s2 s3 0 (Seq.length s1)
-
-// ========== Swap lemmas ==========
-
-let lemma_swap_is_two_upds (s: Seq.seq int) (i j: nat)
-  : Lemma (requires i < Seq.length s /\ j < Seq.length s /\ i <> j)
-          (ensures (let vi = Seq.index s i in
-                    let vj = Seq.index s j in
-                    let s1 = Seq.upd s i vj in
-                    let s2 = Seq.upd s1 j vi in
-                    Seq.swap s i j == s2))
-  = let vi = Seq.index s i in
-    let vj = Seq.index s j in
-    let s1 = Seq.upd s i vj in
-    let s2 = Seq.upd s1 j vi in
-    let sw = Seq.swap s i j in
-    let aux (k: nat{k < Seq.length s})
-      : Lemma (Seq.index s2 k == Seq.index sw k) = ()
-    in
-    Classical.forall_intro aux;
-    Seq.lemma_eq_elim s2 sw
-
-let swap_is_permutation (s: Seq.seq int) (i j: nat)
-  : Lemma (requires i < Seq.length s /\ j < Seq.length s)
-          (ensures (let s1 = Seq.upd s i (Seq.index s j) in
-                    let s2 = Seq.upd s1 j (Seq.index s i) in
-                    permutation s s2))
-  = let vi = Seq.index s i in
-    let vj = Seq.index s j in
-    let s1 = Seq.upd s i vj in
-    let s2 = Seq.upd s1 j vi in
-    reveal_opaque (`%permutation) (permutation s s2);
-    if i = j then (
-      Seq.lemma_index_upd1 s i vj;
-      Seq.lemma_eq_elim s1 s;
-      Seq.lemma_index_upd1 s1 j vi;
-      Seq.lemma_eq_elim s2 s1
-    ) else (
-      lemma_swap_is_two_upds s i j;
-      if i < j then Seq.Properties.lemma_swap_permutes s i j
-      else Seq.Properties.lemma_swap_permutes s j i
-    )
 
 // ========== Sortedness lemmas ==========
 

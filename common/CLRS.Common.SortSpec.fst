@@ -5,10 +5,9 @@
    and permutation (over int sequences) used across all sorting-related
    chapters: Ch02, Ch06, Ch07, Ch08, Ch09.
    
-   NOTE: Due to a limitation in Pulse's SMT encoding, #lang-pulse files
-   cannot import these definitions for use in invariants and lemma calls.
-   Pulse files must define identical local copies. This module serves as
-   the single source of truth for what those definitions should be.
+   NOTE: When using this module from #lang-pulse files that also open
+   Pulse.Lib.BoundedIntegers, ensure BoundedIntegers is opened before
+   this module so that operator overloads (<=, <, etc.) are consistent.
    
    For algorithms over `seq nat` (e.g., RadixSort), a count-based
    permutation definition is used instead (defined locally in those modules).
@@ -18,7 +17,9 @@ module CLRS.Common.SortSpec
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
-
+open Pulse.Lib.BoundedIntegers
+// 
+//SNIPPET_START: definitions
 let sorted (s: Seq.seq int) : prop
   = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
@@ -28,6 +29,7 @@ let prefix_sorted (s: Seq.seq int) (k: nat) : prop =
 
 [@@"opaque_to_smt"]
 let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
+//SNIPPET_END: definitions
 
 let permutation_same_length (s1 s2 : Seq.seq int)
   : Lemma (requires permutation s1 s2)
