@@ -294,7 +294,24 @@ let reachable_trans (n: nat) (adj: Seq.seq bool) (s: nat) (u: nat) (v: nat)
   : Lemma
     (requires reachable n adj s u /\ reachable n adj u v)
     (ensures reachable n adj s v)
-  = admit()  // Follows from path concatenation (would need to construct explicit concatenated path)
+  = eliminate exists (p1: list nat). path_from_to n adj s u p1
+    returns reachable n adj s v
+    with _. (
+      eliminate exists (p2: list nat). path_from_to n adj u v p2
+      returns reachable n adj s v
+      with _. (
+        if L.length p2 <= 1 then (
+          // p2 = [u] so u = v, p1 already goes from s to v
+          assert (path_from_to n adj s v p1)
+        ) else (
+          path_concat n adj p1 p2;
+          let p = p1 @ L.tail p2 in
+          // last of concatenation
+          FStar.List.Tot.Properties.lemma_append_last p1 (L.tail p2);
+          assert (path_from_to n adj s v p)
+        )
+      )
+    )
 
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 
