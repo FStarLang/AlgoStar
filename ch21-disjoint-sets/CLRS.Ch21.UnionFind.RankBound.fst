@@ -311,10 +311,12 @@ let union_size_bound
 #pop-options
 
 // Key lemma: pure_union_sized preserves size_rank_invariant
+#push-options "--z3rlimit 20"
 let pure_union_sized_preserves_invariant 
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f) /\ 
-                       size_rank_invariant f})
+                       size_rank_invariant f /\
+                       size_correctness_invariant f})
   (x y: nat{x < f.n /\ y < f.n})
   : Lemma (ensures size_rank_invariant (pure_union_sized f x y) /\
                    is_valid_uf_sized (pure_union_sized f x y))
@@ -424,11 +426,12 @@ let pure_union_sized_preserves_invariant
       FStar.Classical.forall_intro check_size_positive;
       
       // Sizes remain bounded by n - this is the key part
-      // To call union_size_bound, we need to establish that sizes equal counts
-      // This would require size_correctness_invariant, which isn't in scope
-      // For now, assume it (this is provable if we thread size_correctness_invariant through)
-      assume (size_x == count_with_root uf root_x);
-      assume (size_y == count_with_root uf root_y);
+      // size_correctness_invariant f tells us size[root] == count_with_root uf root
+      // for any root. Since root_x and root_y are roots, we can extract the facts.
+      assert (is_root_sized f root_x);
+      assert (is_root_sized f root_y);
+      assert (size_x == count_with_root uf root_x);
+      assert (size_y == count_with_root uf root_y);
       union_size_bound f root_x root_y size_x size_y;
       assert (size_x + size_y <= f.n);
       
@@ -478,6 +481,7 @@ let pure_union_sized_preserves_invariant
           end
       in
       ()  // check_size_bound will be auto-applied via SMTPat
+#pop-options
 
 (*** 4. Logarithmic Rank Bound (CLRS Theorem 21.5) ***)
 
