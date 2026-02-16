@@ -45,6 +45,10 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - **Queue/stack validity invariants** (Graph algos): `forall i. i in range ==> element < n`.
 - **strong_valid_state pattern** (DFS): Bidirectional color↔timestamp invariant.
 - **Ghost tick via GhostReference**: `tick ctr` increments counter; postcondition bounds it.
+- **`Classical.forall_intro` for Seq.upd reasoning** (Rod Cutting Extended): When the SMT
+  can't prove a universal `forall k. P(Seq.index (Seq.upd s j v) k)` after an update, write
+  an F* helper lemma that case-splits on `k = j` vs `k <> j`, calls `Seq.lemma_index_upd1`
+  or `Seq.lemma_index_upd2` explicitly, and concludes via `Classical.forall_intro`.
 
 ### Pitfalls to Avoid
 
@@ -53,6 +57,21 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 - `--admit_smt_queries true` hides real failures — never use.
 - Removing `rec` can break SMT encoding (3 known cases in Select.Spec).
 - Strengthening preconditions cascades to all callers — requires full invariant propagation.
+- **Pulse nested loops shadow outer invariant properties**: When a Pulse `while` loop
+  existentially binds ghost sequences (`exists* ... sr sc. V.pts_to r sr ** V.pts_to s sc **
+  pure (P sr sc)`), the property `P` is only known for the *inner* existentials.  If an outer
+  loop established `forall k. Q(Seq.index sc k)` and an inner loop re-introduces `sc` as a
+  fresh existential, the outer property is lost — even if the inner loop never writes to `s`.
+  **Fix**: repeat the outer property verbatim in the inner loop invariant.
+  (Discovered in `CLRS.Ch15.RodCutting.Extended.fst`: the `s_cuts` validity forall had to be
+  carried through the inner loop that only modifies `q` and `best_i`.)
+- **`Pulse.Lib.BoundedIntegers` operator shadowing**: This module redefines `<=`, `<`, `>=`,
+  `>`, `+`, `-`, etc.  When a spec module defines predicates using Prims operators and a Pulse
+  file opens BoundedIntegers, the SMT sees *different symbols* for `<=` in the imported
+  definition vs the local context, causing spurious failures.
+  **Fix**: Spec modules shared with Pulse code must also `open Pulse.Lib.BoundedIntegers`.
+  (Discovered in `CLRS.Common.SortSpec.fst`: cross-module `prefix_sorted` failed until the
+  spec opened BoundedIntegers.)
 
 ---
 
@@ -100,6 +119,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
 | 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | ✅ 0 admits |
+| 15 | RodCutting.Extended | §15.1 | ✅ revenue + cuts | — | 0 | ✅ EXTENDED-BOTTOM-UP-CUT-ROD, prices as nat |
 | 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
 | 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
 | 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 assume | Optimality properties |
