@@ -58,7 +58,10 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-15, latest)
 
-**167 F* files, ~50K lines, 108 admits across 35 files**
+**167 F* files, ~50K lines, 141 admits across 38 files**
+
+(Note: Count uses proper block-comment-aware method. Previous count of 108/35 files
+used a buggy counter that missed Pulse `assume_` and caught `admit()` in block comments.)
 
 ### Per-Algorithm Status Table
 
@@ -91,11 +94,11 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 13 | RBTree.Spec (pure) | §13.1–4 | ✅ Okasaki balance | ✅ Linked O(lg n) | 0 | Correct but not Pulse |
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
 | 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
-| 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | 1 assume val in Spec |
+| 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | ✅ 0 admits |
 | 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
 | 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
 | 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 | Optimality properties |
-| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 4 | ✅ RankBound: 0 admits, FindTermination: 0 admits |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 3 | ✅ RankBound: 0 admits, FindTermination: 0 admits |
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 | d[v]=δ(s,v) not proven |
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
@@ -132,9 +135,9 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | ch26 (MaxFlow) | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) |
 | ch24 (SSSP) | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
 | ch09 (select) | 5 | PartialSelectionSort.Correctness(5) |
-| ch21 (UF) | 6 | UnionFind.Spec(4), RankBound(2) |
+| ch21 (UF) | 3 | UnionFind.Spec(3), RankBound(0) |
 | ch12 (BST) | 3 | BST.Insert.Spec(3) |
-| Other | 5 | MaxSubarray.DC(1), RodCutting.Spec(1), VertexCover.Spec(1), Strassen(1) |
+| Other | 4 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), BucketSort(1) |
 | **Total** | **108** | |
 
 ---
@@ -207,7 +210,7 @@ closeable (`radix-full-269` ✅). The other 15 are blocked due to:
 | **RadixSort.FullSort** | **269** | **1** | **✅ DONE: proved with SeqP.index_tail + explicit quantifier trigger** |
 | RadixSort.FullSort | 183 | 1 | ❌ Blocked: Needs digit-shift + euclidean division chain |
 | PartialSelect | 117 | 1 | ❌ Blocked: Z3 can't bridge count_occ/tail/sorted quantifiers |
-| UnionFind.RankBound | 190 | 1 | ✅ DONE: rank_bounded_union fully proven |
+| UnionFind.RankBound | — | 0 | ✅ DONE: all invariants fully proven (size_correctness_invariant added as precondition) |
 | UnionFind.Spec | 92 | 1 | ❌ Blocked: Z3 can't instantiate refined quantifier from rank_invariant |
 | Prim.Spec | 209, 270 | 2 | ❌ Blocked: Needs find_min_edge_aux trace, non-trivial helper |
 | RabinKarp.Spec | 162 | 1 | ❌ Blocked: Horner evaluation modular arithmetic |
@@ -242,7 +245,7 @@ self-contained but requires careful F* proof engineering (induction, case analys
 | **MaxSubarray.DC** | 346 | 1 | D&C and Kadane equivalence: both compute max over all subarrays. |
 | **BucketSort** | 359 | 1 | Sorted bucket concatenation: buckets with key₁ < key₂ maintain global order when concatenated. |
 | **CountingSort.Stable** | 258 | 1 | Cumulative count bounds: after prefix sum + decrements, `1 ≤ C[v] ≤ len`. |
-| **RodCutting.Spec** | 224 | 1 | `accum_max` equivalence with explicit recursion. α-equivalent functions in different scopes; needs restructuring. |
+| **RodCutting.Spec** | — | 0 | ✅ Dead `assume val` removed (was never called). |
 
 #### Tier 3: Expert guidance required (deep structural / new invariants) — 60 admits
 These require fundamental proof architecture changes: new ghost state, new invariants
@@ -273,7 +276,6 @@ threaded through entire algorithms, or deep mathematical theorems.
 | **KMP.Complexity** | 191,265,294,301,435,474,480 | 7 | Amortized complexity: formal potential function + per-iteration progress. Stretch goal. |
 | **ActivitySelection.Spec** | 176, 420 | 2 | L176: ghost supremum definition (cardinality over predicates). L420: full greedy optimality induction. |
 | **Huffman.Complete** | 654, 824 | 2 | Multiset/permutation formalization + CLRS Theorem 16.3 (Huffman optimality). |
-| **UnionFind.Spec** | 342 | 1 | Rank logarithmic bound: needs subtree_size ≥ 2^rank invariant formalization. |
 | **VertexCover.Spec** | 506 | 1 | 2-approximation: ghost state tracking disjoint edge selection + matching lower bound. |
 
 ### Stretch Goals (Deferred)
