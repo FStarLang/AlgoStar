@@ -103,185 +103,365 @@ Results Overview
 ----------------
 
 The project currently covers algorithms from 18 chapters of CLRS,
-implemented across 164 F* source files totaling approximately 50,000
+implemented across 172 F* source files totaling approximately 52,000
 lines. The table below summarizes the status of each algorithm.
 
 **Legend:**
 
-- ✅ = fully proven (0 unproven obligations)
-- ⚠️ = partially proven (some admits/assumes remain)
-- The "Admits" column counts ``admit()``, ``assume(...)``, and
-  ``assume_`` calls outside of comments.
+- ✅ = fully proven (zero ``admit()``, ``assume()``, or ``assume_`` calls)
+- ⚠️ = partially proven (admits remain; count and summary given)
+- **Spec** = what the postcondition proves
+- **Proof** = ✅ if all proof obligations discharged, else ⚠️ with admit count
+- **Complexity** = "Linked" if ghost counters are threaded through the Pulse
+  implementation; "Pure" if proven separately in F*; "—" if none
 
 .. list-table:: Algorithm Status
    :header-rows: 1
-   :widths: 5 20 10 15 15 8
+   :widths: 4 18 6 18 18 14
 
    * - Ch
      - Algorithm
-     - CLRS §
-     - Correctness
+     - CLRS
+     - Spec
+     - Proof
      - Complexity
-     - Status
    * - 2
      - Insertion Sort
      - §2.1
-     - ✅ sorted ∧ perm
-     - ✅ Linked O(n²)
+     - sorted ∧ permutation
      - ✅
+     - ✅ Linked O(n²)
    * - 2
      - Merge Sort
      - §2.3
-     - ✅ sorted ∧ perm
-     - ✅ O(n log n)
+     - sorted ∧ permutation
      - ✅
+     - ✅ Pure O(n lg n)
    * - 4
      - Binary Search
      - §2.3
-     - ✅ found⟹match
-     - ✅ Linked O(lg n)
+     - found ⟹ index matches
      - ✅
+     - ✅ Linked O(lg n)
+   * - 4
+     - Kadane (Max Subarray)
+     - §4.1
+     - result = max contiguous sum
+     - ✅
+     - ✅ Linked O(n)
+   * - 4
+     - Divide & Conquer (Max Sub.)
+     - §4.1
+     - result = max contiguous sum
+     - ✅
+     - —
    * - 6
      - Heapsort
      - §6.4
-     - ✅ sorted ∧ perm
-     - ✅ O(n lg n)
+     - sorted ∧ permutation
      - ✅
+     - ✅ Pure O(n lg n)
+   * - 7
+     - Partition (Hoare)
+     - §7.1
+     - elements partitioned ∧ perm
+     - ✅
+     - ✅ Linked O(n)
+   * - 7
+     - Lomuto Partition
+     - §7.1
+     - elements partitioned ∧ perm
+     - ✅
+     - —
    * - 7
      - Quicksort
      - §7.1
-     - ✅ sorted ∧ perm
-     - ✅ O(n²) worst
+     - sorted ∧ permutation
      - ✅
+     - ✅ Linked O(n²)
    * - 8
      - Counting Sort
      - §8.2
-     - ✅ sorted ∧ perm
-     - ✅ O(n+k)
+     - sorted ∧ permutation
      - ✅
+     - ✅ Pure O(n+k)
+   * - 8
+     - Counting Sort (Stable)
+     - §8.2
+     - sorted ∧ stable ∧ perm
+     - ✅
+     - —
    * - 8
      - Radix Sort
      - §8.3
-     - ⚠️ partial
-     - ✅ Θ(d(n+k))
-     - ⚠️
-   * - 10
-     - Stack / Queue / DLL
-     - §10.1–2
-     - ✅ ghost list
-     - ✅ Linked O(1)
+     - sorted ∧ permutation
+     - ⚠️ 10: stability proofs
+     - ✅ Pure Θ(d(n+k))
+   * - 8
+     - Bucket Sort
+     - §8.4
+     - sorted ∧ permutation
+     - ⚠️ 2: concat sorted buckets
+     - —
+   * - 9
+     - Min / Max
+     - §9.1
+     - result ∈ array ∧ is min/max
      - ✅
-   * - 11
-     - Hash Table
-     - §11.4
-     - ✅ key lookup
      - ✅ Linked O(n)
+   * - 9
+     - Simultaneous Min-Max
+     - §9.1
+     - min ∧ max of array
      - ✅
+     - —
+   * - 9
+     - Quickselect
+     - §9.2
+     - k-th smallest at position k
+     - ✅
+     - ✅ Pure O(n²)
+   * - 9
+     - Partial Selection Sort
+     - §9.2
+     - first k sorted, k-th correct
+     - ✅
+     - ✅ Pure O(nk)
+   * - 10
+     - Stack / Queue
+     - §10.1
+     - ghost list matches contents
+     - ✅
+     - ✅ Pure O(1)
+   * - 10
+     - Linked List
+     - §10.2
+     - ghost list matches contents
+     - ✅
+     - —
+   * - 10
+     - Doubly-Linked List
+     - §10.2
+     - segment pred ∧ ghost list
+     - ✅
+     - ✅ Linked O(1)
+   * - 11
+     - Hash Table (Chaining)
+     - §11.2
+     - key ↦ value lookup
+     - ✅
+     - ✅ Linked O(n)
    * - 12
-     - BST Search/Delete
+     - BST Search / Delete
      - §12.2–3
-     - ✅ key set ops
-     - ✅ Linked O(h)
+     - key set operations
      - ✅
+     - ✅ Pure O(h)
+   * - 12
+     - BST Insert
+     - §12.3
+     - key set updated
+     - ⚠️ 3: BST preservation
+     - ✅ Pure O(h)
    * - 13
      - Red-Black Tree
      - §13.1–4
-     - ✅ Okasaki balance
-     - ✅ Linked O(lg n)
+     - Okasaki balance ∧ BST
      - ✅
+     - ✅ Pure O(lg n)
    * - 15
      - Rod Cutting
      - §15.1
-     - ✅ optimal revenue
-     - ✅ Linked O(n²)
+     - optimal revenue
      - ✅
+     - ✅ Linked O(n²)
+   * - 15
+     - Ext. Rod Cutting
+     - §15.1
+     - optimal revenue ∧ valid cuts
+     - ✅
+     - ✅ Linked O(n²)
    * - 15
      - LCS
      - §15.4
-     - ✅ lcs length
-     - ✅ Linked O(mn)
+     - LCS length
      - ✅
+     - ✅ Linked O(mn)
    * - 15
      - Matrix Chain
      - §15.2
-     - ✅ optimal cost
-     - ✅ Linked O(n³)
-     - ✅
+     - optimal parenthesization cost
+     - ⚠️ 2: sentinel bridge
+     - ✅ Pure O(n³)
+   * - 16
+     - Activity Selection
+     - §16.1
+     - greedy = optimal count
+     - ⚠️ 4: exchange argument
+     - ✅ Linked O(n)
+   * - 16
+     - Huffman Coding
+     - §16.3
+     - prefix-free tree construction
+     - ⚠️ 5: optimality proof
+     - ✅ Pure O(n lg n)
+   * - 21
+     - Union-Find
+     - §21.3
+     - find/union maintain forest
+     - ⚠️ 1: rank bound assume
+     - ✅ Pure O(α(n))
    * - 22
-     - BFS / DFS
-     - §22.2–3
-     - ⚠️ partial
+     - BFS (Queue)
+     - §22.2
+     - distances ∧ parent tree
+     - ⚠️ 2: shortest path
      - ✅ Linked O(V²)
-     - ⚠️
+   * - 22
+     - DFS (Stack)
+     - §22.3
+     - timestamps ∧ classification
+     - ⚠️ 10: DFS theorems
+     - ✅ Linked O(V²)
+   * - 22
+     - Kahn Topological Sort
+     - §22.4
+     - valid topological order
+     - ⚠️ 2: DAG correctness
+     - ⚠️ Linked (1 admit)
    * - 23
-     - Kruskal / Prim
+     - Kruskal MST
      - §23.2
-     - ⚠️ partial
-     - ✅ Linked
-     - ⚠️
-   * - 24
-     - Dijkstra / Bellman-Ford
-     - §24
-     - ⚠️ partial
+     - MST of graph
+     - ⚠️ 12: forest/cut props
+     - ⚠️ Linked (3 admits)
+   * - 23
+     - Prim MST
+     - §23.2
+     - MST of graph
+     - ⚠️ 6: light edge
      - ✅ Linked O(V²)
-     - ⚠️
+   * - 23
+     - MST Theory
+     - §23.1
+     - cut/cycle properties
+     - ⚠️ 4: cut theorem
+     - —
+   * - 24
+     - Bellman-Ford
+     - §24.1
+     - SSSP distances
+     - ⚠️ 3: upper bound
+     - ✅ Linked O(VE)
+   * - 24
+     - Dijkstra
+     - §24.3
+     - SSSP distances
+     - ⚠️ 2: triangle ineq
+     - ✅ Linked O(V²)
    * - 25
      - Floyd-Warshall
      - §25.2
-     - ✅ APSP
-     - ✅ Linked O(n³)
+     - APSP distances
      - ✅
+     - ✅ Linked O(n³)
+   * - 26
+     - Ford-Fulkerson (Max Flow)
+     - §26.2
+     - max flow ∧ valid flow
+     - ⚠️ 8: augmentation
+     - ⚠️ Pure (2 admits)
    * - 28
      - Matrix Multiply
-     - §28.1
-     - ✅ C = A·B
+     - §28 (App)
+     - C = A · B
+     - ✅
      - ✅ Linked O(n³)
-     - ✅
+   * - 28
+     - Strassen
+     - §28 (App)
+     - Strassen = standard mult
+     - ⚠️ 1: quadrant props
+     - —
    * - 31
-     - GCD / ModExp
-     - §31.2,6
-     - ✅ Bézout + modexp
-     - ✅ Linked
+     - GCD / Extended GCD
+     - §31.2
+     - gcd ∧ Bézout coefficients
      - ✅
+     - ✅ Linked O(lg n)
+   * - 31
+     - Modular Exponentiation
+     - §31.6
+     - result = b^e mod m
+     - ✅
+     - ✅ Linked O(lg e)
    * - 32
-     - String Matching
-     - §32.1,4
-     - ✅ all matches
-     - ✅ Linked O(nm)
+     - Naive String Match
+     - §32.1
+     - all match positions
      - ✅
+     - ✅ Linked O(nm)
+   * - 32
+     - KMP
+     - §32.4
+     - all match positions
+     - ✅
+     - ⚠️ Linked (7 admits)
+   * - 32
+     - Rabin-Karp
+     - §32.2
+     - all match positions
+     - ⚠️ 3: hash correctness
+     - ✅ Pure O(nm)
+   * - 33
+     - Segment Intersection
+     - §33.1
+     - correct intersection test
+     - ✅
+     - ✅ Pure O(1)
+   * - 35
+     - Vertex Cover (2-approx)
+     - §35.1
+     - cover ≤ 2 · OPT
+     - ⚠️ 1: execution trace
+     - ✅ Pure O(V+E)
 
 Proof Gaps
 ----------
 
-As of this writing, the project has **128 unproven obligations** across
-35 files:
+As of this writing, the project has **94 unproven obligations**
+(``admit()`` and ``assume()`` calls) across **31 files**.  Of the 50
+algorithms in the table, **30 have fully proven correctness** (zero
+admits) and **25 have fully proven complexity bounds**.
 
-- **75** ``admit()`` calls in pure F* lemma bodies
-- **15** ``assume(...)`` calls (inline assumptions)
-- **38** ``assume_`` calls (Pulse-specific unproven invariants)
+The remaining admits fall into a few categories:
 
-The majority of remaining admits fall into a few categories:
+1. **Graph theory** (Ch. 22–23, 35 admits): DFS parenthesis and
+   white-path theorems (10), MST cut/cycle properties and Kruskal
+   forest invariants (16+4), BFS shortest-path completeness (2),
+   Kahn DAG correctness (2), vertex cover trace (1).
 
-1. **Graph theory** (Ch. 22–23): Deep structural theorems about DFS
-   (parenthesis theorem, white-path theorem), BFS shortest paths, and
-   MST cut/cycle properties. These require substantial graph theory
-   infrastructure.
+2. **Sorting stability** (Ch. 8, 12 admits): RadixSort stability
+   proofs involve ∃∀ quantifier patterns that challenge the SMT
+   solver.  BucketSort needs concat-of-sorted-buckets (2).
 
-2. **Pulse loop invariants** (Ch. 22, 8): The imperative BFS, DFS,
-   and stable counting sort implementations have ``assume_`` calls
-   for bounds and framing properties that need careful invariant
-   strengthening.
+3. **Algorithmic correctness** (Ch. 16, 24, 26, 14 admits): Greedy
+   exchange arguments for activity selection (4) and Huffman
+   optimality (5), shortest-path upper-bound invariants for
+   Bellman-Ford (3) and Dijkstra triangle inequality (2).
 
-3. **Algorithmic correctness** (Ch. 16, 24): Greedy exchange arguments
-   for activity selection and Huffman coding, and shortest-path
-   invariants for Bellman-Ford and Dijkstra.
+4. **Complexity proofs** (Ch. 22, 23, 26, 32, 13 admits): KMP
+   amortized analysis (7), Kruskal edge-count (3), Kahn
+   topological sort (1), max-flow termination (2).
 
-4. **Stability and quantifier reasoning** (Ch. 8): RadixSort stability
-   proofs involve ∃∀ quantifier patterns that challenge the SMT solver.
+5. **Miscellaneous** (20 admits): Matrix chain sentinel bridge (2),
+   BST insert preservation (3), Union-Find rank bound (1),
+   Strassen quadrant properties (1), Rabin-Karp hash (3),
+   max-flow augmentation (8).
 
 Each chapter in this document notes any unproven obligations in its
-scope. Fully verified chapters (marked ✅ above) have zero ``admit``,
-``assume``, or ``assume_`` calls.
+scope.  Fully verified chapters have zero ``admit``, ``assume``, or
+``assume_`` calls.
 
 Reading Guide
 -------------
