@@ -171,7 +171,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 13 | RBTree (Pulse) | §13.1–4 | ❌ BROKEN | — | 0 | No fixup/rotations/BST path |
 | 13 | RBTree.Spec (pure) | §13.1–4 | ✅ Okasaki balance | ✅ Linked O(lg n) | 0 | Correct but not Pulse |
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
-| 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
+| 15 | MatrixChain | §15.2 | ✅ mc_cost recursive + dp equiv | ⚠️ Separate O(n³) | 2 | ✅ Recursive spec (CLRS Eq. 15.7), mc_inner_k≡min_splits proven |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | ✅ 0 admits |
 | 15 | RodCutting.Extended | §15.1 | ✅ revenue + cuts_are_optimal | — | 0 | ✅ EXTENDED-BOTTOM-UP-CUT-ROD, prices as nat, reconstruct_cutting_sums proven |
 | 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
