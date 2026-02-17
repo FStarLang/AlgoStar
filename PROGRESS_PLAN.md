@@ -49,6 +49,18 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
   can't prove a universal `forall k. P(Seq.index (Seq.upd s j v) k)` after an update, write
   an F* helper lemma that case-splits on `k = j` vs `k <> j`, calls `Seq.lemma_index_upd1`
   or `Seq.lemma_index_upd2` explicitly, and concludes via `Classical.forall_intro`.
+- **`is_sorted` quantifier explosion with `count_occ`** (SortedPerm): The universally
+  quantified definition `is_sorted s = forall i j. ... ==> Seq.index s i <= Seq.index s j`
+  matches on every `Seq.index` term. When `count_occ` is unfolded by fuel, it creates many
+  `Seq.index` terms, which trigger `lemma_index_slice` patterns, creating more terms, causing
+  combinatorial blowup (43,506 instances observed in profiling).
+  **Fix**: Use `--split_queries always` with `--fuel 1` to isolate each proof obligation.
+  Avoid asserting facts (e.g. `assert (min1 = min2)`) that create new `Seq.index` terms in
+  scope; let Z3 deduce equalities implicitly within each split query.  Add explicit assertions
+  like `assert (Seq.cons hd tl == s)` to bridge `count_occ_cons` results to the original
+  sequence in each split query.
+  (Discovered in `CLRS.Ch09.PartialSelectionSort.SortedPerm.fst`: the monolithic query always
+  timed out; splitting + removing the triggering assertion fixed it.)
 
 ### Pitfalls to Avoid
 
@@ -159,11 +171,11 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | ch16 (greedy) | 6 | 3 | 0 | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(0+3) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch24 (SSSP) | 5 | 0 | 0 | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
-| ch09 (select) | 3 | 0 | 0 | 3 | PartialSelectionSort.Correctness(3) |
+| ch09 (select) | 2 | 0 | 0 | 2 | PartialSelectionSort.Correctness(2) — sorted_permutation_equal proven in SortedPerm |
 | ch12 (BST) | 3 | 0 | 0 | 3 | BST.Insert.Spec(3) |
 | ch21 (UF) | 0 | 1 | 0 | 1 | UnionFind.Spec(0+1) |
 | Other | 8 | 0 | 0 | 8 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), Huffman.Complete(2), Huffman.Spec(3) |
-| **Total** | **75** | **15** | **38** | **128** | |
+| **Total** | **74** | **15** | **38** | **127** | |
 
 ---
 
