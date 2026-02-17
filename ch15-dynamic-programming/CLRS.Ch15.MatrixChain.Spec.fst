@@ -108,6 +108,53 @@ let rec min_splits_mono
       min_splits_mono p i j (start + 1) acc1' acc2'
     end
 
+/// When the result is strictly less than the accumulator, the accumulator
+/// value doesn't matter (as long as it's >= the result).
+let rec min_splits_acc_irrelevant
+  (p: seq int) (i j: nat) (start: nat{start >= i}) (acc1 acc2: int)
+  : Lemma
+      (requires
+        min_splits p i j start acc1 <= acc2 /\ acc2 <= acc1)
+      (ensures min_splits p i j start acc1 == min_splits p i j start acc2)
+      (decreases %[(j - i); 0; (j - start)])
+  = if start >= j || i >= j || length p <= j + 1 then ()
+    else begin
+      let left = mc_cost p i start in
+      let right = mc_cost p (start + 1) j in
+      let c = split_cost p i start j left right in
+      let acc1' = if c < acc1 then c else acc1 in
+      let acc2' = if c < acc2 then c else acc2 in
+      // We need to show min_splits(start+1, acc1') == min_splits(start+1, acc2')
+      // and that the precondition holds recursively
+      
+      if c < acc2 then begin
+        // c < acc2 <= acc1, so acc1' = c and acc2' = c
+        assert (acc1' == c);
+        assert (acc2' == c);
+        // Trivially equal since both are c
+        ()
+      end else if c < acc1 then begin
+        // acc2 <= c < acc1, so acc1' = c and acc2' = acc2
+        assert (acc1' == c);
+        assert (acc2' == acc2);
+        // We know: min_splits(start, acc1) = min_splits(start+1, c) <= acc2
+        // And: acc2 <= c
+        // Need: min_splits(start+1, c) <= acc2 /\ acc2 <= c
+        assert (min_splits p i j start acc1 == min_splits p i j (start + 1) c);
+        assert (min_splits p i j (start + 1) c <= acc2);
+        assert (acc2 <= c);
+        min_splits_acc_irrelevant p i j (start + 1) c acc2
+      end else begin
+        // c >= acc1, so acc1' = acc1 and acc2' = acc2
+        assert (acc1' == acc1);
+        assert (acc2' == acc2);
+        // min_splits(start, acc1) = min_splits(start+1, acc1) by definition
+        // Need: min_splits(start+1, acc1) <= acc2 /\ acc2 <= acc1 (already have acc2 <= acc1)
+        assert (min_splits p i j start acc1 == min_splits p i j (start + 1) acc1);
+        min_splits_acc_irrelevant p i j (start + 1) acc1 acc2
+      end
+    end
+
 /// mc_cost for a 2-matrix chain
 let mc_cost_pair (p: seq int) (i: nat)
   : Lemma (requires i + 2 < length p)
@@ -116,6 +163,9 @@ let mc_cost_pair (p: seq int) (i: nat)
   = ()
 
 // ========== Equivalence: DP table ↔ mc_cost ==========
+
+/// Safe array access with explicit bounds proof
+let safe_index (#a:Type) (s:seq a) (i:nat{i < length s}) : a = index s i
 
 /// Predicate: the DP table is correct for all subproblems with chain length < l.
 /// For all i ≤ j < n with j − i < l, table[i·n + j] = mc_cost(dims, i, j).
@@ -126,6 +176,11 @@ let dp_correct_upto (table: seq int) (dims: seq int) (n l: nat) : prop =
   (forall (i j: nat). i < n /\ j < n /\ i <= j /\ j - i < l ==>
     index table (i * n + j) == mc_cost dims i j)
 //SNIPPET_END: dp_correct
+
+/// Predicate: all costs for subproblems of size < max_len are bounded by bound
+let all_costs_bounded (dims: seq int) (n: nat) (max_len: nat) (bound: int) : prop =
+  forall (i j: nat). i < n /\ j < n /\ i <= j /\ j - i < max_len ==>
+    mc_cost dims i j <= bound
 
 /// When the table correctly reflects mc_cost for all strictly smaller subproblems,
 /// mc_inner_k (which reads from the table) produces the same result as min_splits
@@ -156,7 +211,7 @@ let rec lemma_mc_inner_k_eq_min_splits
 /// Bridge: mc_inner_k with sentinel 1000000000 computes mc_cost.
 /// mc_inner_k iterates k=i..j-1 with acc=1000000000.
 /// mc_cost seeds acc with first split cost, then iterates k=i+1..j-1.
-/// They agree when the first split cost ≤ 1000000000 (practical bound on problem size).
+/// They agree when mc_cost is <= 1000000000 (practical bound for finite problems).
 let lemma_mc_inner_k_computes_mc_cost
   (table: seq int) (dims: seq int) (n i j: nat)
   : Lemma
@@ -164,17 +219,47 @@ let lemma_mc_inner_k_computes_mc_cost
         i < n /\ j < n /\ i < j /\
         length table == n * n /\ length dims == n + 1 /\
         (forall (i' j': nat). i' < n /\ j' < n /\ i' <= j' /\ j' - i' < j - i ==>
-          index table (i' * n + j') == mc_cost dims i' j'))
+          index table (i' * n + j') == mc_cost dims i' j') /\
+        mc_cost dims i j <= 1000000000)  // Sentinel is large enough
       (ensures mc_inner_k table dims n i j i 1000000000 == mc_cost dims i j)
   = lemma_mc_inner_k_eq_min_splits table dims n i j i 1000000000;
     // Now: mc_inner_k == min_splits dims i j i 1000000000
-    // And: mc_cost == min_splits dims i j (i+1) first
-    //   where first = split_cost(i, i, j, 0, mc_cost(i+1,j))
-    // min_splits(i, 1000000000) unfolds to:
-    //   let c = first; acc' = min(c, 10^9); min_splits(i+1, acc')
-    // Need: min_splits(i+1, min(first, 10^9)) == min_splits(i+1, first)
-    // This holds when first <= 10^9 (practical sentinel assumption).
-    admit ()
+    // And: mc_cost dims i j = min_splits dims i j (i+1) first
+    //   where first = split_cost(dims, i, i, j, mc_cost(dims, i, i), mc_cost(dims, i+1, j))
+    //              = split_cost(dims, i, i, j, 0, mc_cost(dims, i+1, j))
+    
+    // Unfold min_splits dims i j i 1000000000 one step:
+    let left = mc_cost dims i i in
+    let right = mc_cost dims (i + 1) j in
+    let first = split_cost dims i i j left right in
+    assert (left == 0);  // by mc_cost_base
+    let acc' = if first < 1000000000 then first else 1000000000 in
+    assert (min_splits dims i j i 1000000000 == min_splits dims i j (i + 1) acc');
+    
+    // By definition of mc_cost:
+    assert (mc_cost dims i j == min_splits dims i j (i + 1) first);
+    
+    // We know: mc_cost dims i j <= 1000000000 (from precondition)
+    // And: mc_cost dims i j = min_splits dims i j (i+1) first (by definition)
+    // So: min_splits dims i j (i+1) first <= 1000000000
+    
+    min_splits_le_acc dims i j (i + 1) first;
+    // This gives: min_splits(i+1, first) <= first
+    
+    if first <= 1000000000 then begin
+      // acc' = first, so min_splits(i+1, acc') = min_splits(i+1, first) = mc_cost dims i j
+      assert (acc' == first);
+      ()
+    end else begin
+      // first > 1000000000 and acc' = 1000000000
+      // We need: min_splits(i+1, first) == min_splits(i+1, 1000000000)
+      // We know: min_splits(i+1, first) = mc_cost dims i j <= 1000000000 < first
+      // So: min_splits(i+1, first) <= 1000000000 <= first
+      // Use min_splits_acc_irrelevant
+      assert (min_splits dims i j (i + 1) first <= 1000000000);
+      assert (1000000000 <= first);
+      min_splits_acc_irrelevant dims i j (i + 1) first 1000000000
+    end
 
 // ========== 2D-index uniqueness ==========
 
@@ -192,6 +277,33 @@ let lemma_2d_index_unique (i0 j0 i j n: nat)
     end
 
 // ========== Table stability under mc_inner_i ==========
+
+/// mc_inner_i starting at start_i only writes to positions (i', j') where i' >= start_i.
+/// So positions (i0, j0) where i0 < start_i are preserved.
+let rec lemma_mc_inner_i_preserves_smaller_i
+  (table: seq int) (dims: seq int) (n l start_i i0 j0: nat)
+  : Lemma
+      (requires
+        l >= 2 /\ length table == n * n /\ length dims == n + 1 /\
+        n > 0 /\ i0 < n /\ j0 < n /\ i0 < start_i)
+      (ensures (let t' = mc_inner_i table dims n l start_i in
+                length t' == n * n /\
+                index t' (i0 * n + j0) == index table (i0 * n + j0)))
+      (decreases (n - l + 1 - start_i))
+  = lemma_mc_inner_i_len table dims n l start_i;
+    if start_i + l > n then ()
+    else begin
+      let j = start_i + l - 1 in
+      let min_cost = mc_inner_k table dims n start_i j start_i 1000000000 in
+      let table' = Seq.upd table (start_i * n + j) min_cost in
+      // start_i <> i0 (because i0 < start_i), so the write doesn't affect (i0, j0)
+      lemma_2d_index_unique i0 j0 start_i j n;
+      assert (index table' (i0 * n + j0) == index table (i0 * n + j0));
+      // Recursive call still has i0 < start_i + 1
+      if i0 < start_i + 1 then
+        lemma_mc_inner_i_preserves_smaller_i table' dims n l (start_i + 1) i0 j0
+      else ()
+    end
 
 /// mc_inner_i for chain length l only writes to positions (i', i'+l-1)
 /// where i' >= start_i. Entries with j0 - i0 + 1 ≠ l are untouched.
@@ -219,20 +331,118 @@ let rec lemma_mc_inner_i_preserves_shorter
       lemma_mc_inner_i_preserves_shorter table' dims n l (i + 1) i0 j0
     end
 
-// ========== mc_inner_i correctness ==========
+// ========== Helper: mc_inner_i fills correctly ==========
+
+/// Helper: at position i (where i+l-1 < n), mc_inner_i writes the correct value
+/// to table[i][i+l-1] and preserves it in subsequent steps.
+#push-options "--split_queries always"
+let rec lemma_mc_inner_i_fills_correctly
+  (table: seq int) (dims: seq int) (n l i0: nat) (start_i: nat)
+  : Lemma
+      (requires
+        l >= 2 /\ l <= n /\ length table == n * n /\ length dims == n + 1 /\
+        n > 0 /\ i0 < n /\ i0 + l <= n /\ start_i <= i0 /\
+        dp_correct_upto table dims n (l - 1) /\
+        all_costs_bounded dims n l 1000000000)  // Bound ensures sentinel works
+      (ensures
+        (let t' = mc_inner_i table dims n l start_i in
+         let j0 = i0 + l - 1 in
+         j0 < n /\ length t' == n * n /\
+         i0 * n + j0 < n * n /\  // Explicit bound
+         index t' (i0 * n + j0) == mc_cost dims i0 j0))
+      (decreases (i0 - start_i))
+  = lemma_mc_inner_i_len table dims n l start_i;
+    let j0 = i0 + l - 1 in
+    lemma_index_in_bounds i0 j0 n;
+    if start_i + l > n then begin
+      // mc_inner_i returns table unchanged, but this contradicts start_i <= i0 < n with i0+l <= n
+      assert (i0 + l <= n);
+      assert (start_i <= i0);
+      assert (start_i + l <= i0 + l);
+      assert (start_i + l <= n);
+      assert (False)  // contradiction
+    end else if start_i = i0 then begin
+      // This is the step that writes to (i0, j0)
+      let j = start_i + l - 1 in
+      assert (j == j0);
+      let min_cost = mc_inner_k table dims n start_i j start_i 1000000000 in
+      let table' = Seq.upd table (start_i * n + j) min_cost in
+      
+      // Show that mc_inner_k computes mc_cost correctly
+      // Need to verify preconditions of lemma_mc_inner_k_computes_mc_cost
+      assert (start_i < n /\ j < n /\ start_i < j);
+      assert (length table == n * n /\ length dims == n + 1);
+      
+      
+      // For all subproblems (i', j') with j' - i' < j - start_i = l - 1,
+      // table[i'][j'] == mc_cost dims i' j'
+      introduce forall (i':nat) (j':nat).
+        (i' < n /\ j' < n /\ i' <= j' /\ j' - i' < j - start_i) ==>
+          index table (i' * n + j') == mc_cost dims i' j'
+      with introduce _ ==> _ with _.
+        (lemma_index_in_bounds i' j' n);
+      
+      // Use the cost bound to establish the sentinel precondition
+      assert (start_i < n /\ start_i + l <= n);
+      assert (j == start_i + l - 1);
+      assert (j - start_i == l - 1);
+      assert (j - start_i < l);  // l - 1 < l
+      // By all_costs_bounded: forall i j. j - i < l ==> mc_cost dims i j <= 1000000000
+      assert (mc_cost dims start_i j <= 1000000000);
+      
+      lemma_mc_inner_k_computes_mc_cost table dims n start_i j;
+      assert (min_cost == mc_cost dims start_i j);
+      lemma_index_in_bounds start_i j n;
+      assert (index table' (start_i * n + j) == mc_cost dims i0 j0);
+      
+      // Now table' has the correct value at (i0, j0)
+      // The recursive call mc_inner_i table' dims n l (start_i + 1) will preserve it
+      // because i0 = start_i < start_i + 1, so by lemma_mc_inner_i_preserves_smaller_i:
+      let t' = mc_inner_i table' dims n l (start_i + 1) in
+      if start_i + 1 + l > n then begin
+        assert (t' == table')
+      end else begin
+        assert (i0 < start_i + 1);
+        lemma_mc_inner_i_preserves_smaller_i table' dims n l (start_i + 1) i0 j0;
+        assert (index t' (i0 * n + j0) == index table' (i0 * n + j0));
+        ()
+      end
+    end else begin
+      // start_i < i0. First iteration processes (start_i, start_i + l - 1)
+      let j = start_i + l - 1 in
+      let min_cost = mc_inner_k table dims n start_i j start_i 1000000000 in
+      let table' = Seq.upd table (start_i * n + j) min_cost in
+      
+      // (i0, j0) <> (start_i, j) because start_i < i0
+      assert (start_i <> i0);
+      lemma_2d_index_unique start_i j i0 j0 n;
+      assert (index table' (i0 * n + j0) == index table (i0 * n + j0));
+      
+      // Recurse: subsequent iterations starting from start_i + 1
+      // table' still satisfies dp_correct_upto ... (l-1) because we only wrote at chain length l-1
+      introduce forall (i':nat) (j':nat).
+        (i' < n /\ j' < n /\ i' <= j' /\ j' - i' < l - 1) ==>
+          index table' (i' * n + j') == mc_cost dims i' j'
+      with introduce _ ==> _ with _. begin
+        lemma_index_in_bounds i' j' n;
+        if i' = start_i && j' = j then
+          ()  // j - start_i = l - 1, contradiction with j' - i' < l - 1
+        else
+          lemma_2d_index_unique i' j' start_i j n
+          // So table'[i'][j'] == table[i'][j'] == mc_cost... (by dp_correct_upto)
+      end;
+      assert (dp_correct_upto table' dims n (l - 1));
+      assert (all_costs_bounded dims n l 1000000000);  // Still holds
+      assert (start_i < i0);  // Termination: i0 - (start_i + 1) < i0 - start_i
+      lemma_mc_inner_i_fills_correctly table' dims n l i0 (start_i + 1)
+    end
+#pop-options
 
 /// After mc_inner_i table dims n l 0:
 ///   - entries for chain lengths < l-1 are preserved (by preserves_shorter)
 ///   - entries for chain length l-1 are filled correctly
 /// dp_correct_upto advances from (l-1) to l.
-///
-/// Proof approach (admitted): induction over mc_inner_i steps.
-/// At step i0, mc_inner_k reads subproblem entries (chain length < l-1)
-/// from the table. These are unchanged from the initial table because
-/// previous steps only wrote at chain length l-1 (different position).
-/// lemma_mc_inner_k_computes_mc_cost then shows the written value
-/// equals mc_cost dims i0 (i0+l-1). After the write, the entry is
-/// preserved by subsequent steps (which write at different (i', j')).
+#push-options "--z3rlimit 60"
 let lemma_mc_inner_i_correct
   (table: seq int) (dims: seq int) (n l: nat)
   : Lemma
@@ -240,26 +450,32 @@ let lemma_mc_inner_i_correct
         l >= 2 /\ l <= n /\
         length table == n * n /\ length dims == n + 1 /\
         n > 0 /\
-        dp_correct_upto table dims n (l - 1))
+        dp_correct_upto table dims n (l - 1) /\
+        all_costs_bounded dims n l 1000000000)
       (ensures
         dp_correct_upto (mc_inner_i table dims n l 0) dims n l)
   = let t' = mc_inner_i table dims n l 0 in
     lemma_mc_inner_i_len table dims n l 0;
+    assert (length t' == n * n);
     let aux (i0 j0: nat)
       : Lemma (requires i0 < n /\ j0 < n /\ i0 <= j0 /\ j0 - i0 < l)
-              (ensures index t' (i0 * n + j0) == mc_cost dims i0 j0)
-      = assert (i0 * n + j0 < n * n);
-        if j0 - i0 < l - 1 then begin
-          assert (j0 - i0 + 1 <> l);
+              (ensures (lemma_index_in_bounds i0 j0 n;
+                       index t' (i0 * n + j0) == mc_cost dims i0 j0))
+      = lemma_index_in_bounds i0 j0 n;
+        if j0 - i0 + 1 = l then begin
+          assert (j0 == i0 + l - 1);
+          assert (i0 + l <= n);
+          lemma_mc_inner_i_fills_correctly table dims n l i0 0
+        end else begin
           lemma_mc_inner_i_preserves_shorter table dims n l 0 i0 j0
-        end else
-          admit ()  // j0 - i0 = l - 1: filled correctly by mc_inner_i at step i0
+        end
     in
     introduce forall (i0: nat) (j0: nat).
       (i0 < n /\ j0 < n /\ i0 <= j0 /\ j0 - i0 < l) ==>
         index t' (i0 * n + j0) == mc_cost dims i0 j0
     with introduce _ ==> _
     with _. aux i0 j0
+#pop-options
 
 // ========== mc_outer correctness ==========
 
@@ -270,12 +486,14 @@ let rec lemma_mc_outer_correct
         l >= 2 /\ l <= n + 1 /\
         length table == n * n /\ length dims == n + 1 /\
         n > 0 /\
-        dp_correct_upto table dims n (l - 1))
+        dp_correct_upto table dims n (l - 1) /\
+        all_costs_bounded dims n n 1000000000)  // Bound holds for all sizes
       (ensures
         dp_correct_upto (mc_outer table dims n l) dims n n)
       (decreases (n + 1 - l))
   = if l > n then ()
     else begin
+      assert (all_costs_bounded dims n l 1000000000);  // l <= n
       lemma_mc_inner_i_correct table dims n l;
       let table' = mc_inner_i table dims n l 0 in
       lemma_mc_inner_i_len table dims n l 0;
@@ -296,7 +514,9 @@ let lemma_initial_table_correct (dims: seq int) (n: nat)
 /// **Main theorem**: the bottom-up DP result equals the recursive optimum.
 ///   mc_result dims n == mc_cost dims 0 (n − 1)
 let mc_spec_equiv (dims: seq int) (n: nat)
-  : Lemma (requires n > 0 /\ length dims == n + 1)
+  : Lemma (requires
+            n > 0 /\ length dims == n + 1 /\
+            all_costs_bounded dims n n 1000000000)  // Costs fit in sentinel
           (ensures mc_result dims n == mc_cost dims 0 (n - 1))
   = let table = Seq.create (n * n) 0 in
     lemma_initial_table_correct dims n;
@@ -305,6 +525,7 @@ let mc_spec_equiv (dims: seq int) (n: nat)
       // dp_correct_upto table dims n 1  (from initial_table_correct)
       // mc_outer processes chain lengths 2..n
       // requires dp_correct_upto ... (l-1) = dp_correct_upto ... 1
+      assert (all_costs_bounded dims n n 1000000000);  // From precondition
       lemma_mc_outer_correct table dims n 2;
       let final_table = mc_outer table dims n 2 in
       lemma_mc_outer_len table dims n 2;
