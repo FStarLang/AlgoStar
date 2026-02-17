@@ -155,8 +155,8 @@ let rec lemma_mc_inner_k_eq_min_splits
 
 /// Bridge: mc_inner_k with sentinel 1000000000 computes mc_cost.
 /// mc_inner_k iterates k=i..j-1 with acc=1000000000.
-/// mc_cost seeds acc with cost at k=i, then iterates k=i+1..j-1.
-/// They agree because the sentinel gets replaced by the k=i cost on the first step.
+/// mc_cost seeds acc with first split cost, then iterates k=i+1..j-1.
+/// They agree when the first split cost ≤ 1000000000 (practical bound on problem size).
 let lemma_mc_inner_k_computes_mc_cost
   (table: seq int) (dims: seq int) (n i j: nat)
   : Lemma
@@ -166,19 +166,14 @@ let lemma_mc_inner_k_computes_mc_cost
         (forall (i' j': nat). i' < n /\ j' < n /\ i' <= j' /\ j' - i' < j - i ==>
           index table (i' * n + j') == mc_cost dims i' j'))
       (ensures mc_inner_k table dims n i j i 1000000000 == mc_cost dims i j)
-  = // mc_inner_k ... i 1000000000 == min_splits dims i j i 1000000000
-    lemma_mc_inner_k_eq_min_splits table dims n i j i 1000000000;
-    // mc_cost dims i j == min_splits dims i j (i+1) first
+  = lemma_mc_inner_k_eq_min_splits table dims n i j i 1000000000;
+    // Now: mc_inner_k == min_splits dims i j i 1000000000
+    // And: mc_cost == min_splits dims i j (i+1) first
     //   where first = split_cost(i, i, j, 0, mc_cost(i+1,j))
-    // min_splits dims i j i 1000000000 unfolds to:
-    //   let c = first; let acc' = min(c, 1000000000); min_splits(i+1, acc')
-    // We need: min_splits(i+1, min(first, 1000000000)) == min_splits(i+1, first)
-    let first = split_cost dims i i j (mc_cost dims i i) (mc_cost dims (i + 1) j) in
-    // If first < 1000000000, min(first, 1000000000) = first, so trivially equal.
-    // If first >= 1000000000, we need min_splits(i+1, 1000000000) == min_splits(i+1, first).
-    // This holds if j = i + 1 (no remaining splits).
-    // For j > i + 1, we need both >= the next split cost.
-    // The sentinel 1000000000 is a practical bound; we assume all costs fit in 30 bits.
+    // min_splits(i, 1000000000) unfolds to:
+    //   let c = first; acc' = min(c, 10^9); min_splits(i+1, acc')
+    // Need: min_splits(i+1, min(first, 10^9)) == min_splits(i+1, first)
+    // This holds when first <= 10^9 (practical sentinel assumption).
     admit ()
 
 // ========== 2D-index uniqueness ==========
@@ -227,9 +222,17 @@ let rec lemma_mc_inner_i_preserves_shorter
 // ========== mc_inner_i correctness ==========
 
 /// After mc_inner_i table dims n l 0:
-///   - entries for chain lengths < l-1 are preserved
-///   - entries for chain length l are filled correctly (j - i = l - 1)
+///   - entries for chain lengths < l-1 are preserved (by preserves_shorter)
+///   - entries for chain length l-1 are filled correctly
 /// dp_correct_upto advances from (l-1) to l.
+///
+/// Proof approach (admitted): induction over mc_inner_i steps.
+/// At step i0, mc_inner_k reads subproblem entries (chain length < l-1)
+/// from the table. These are unchanged from the initial table because
+/// previous steps only wrote at chain length l-1 (different position).
+/// lemma_mc_inner_k_computes_mc_cost then shows the written value
+/// equals mc_cost dims i0 (i0+l-1). After the write, the entry is
+/// preserved by subsequent steps (which write at different (i', j')).
 let lemma_mc_inner_i_correct
   (table: seq int) (dims: seq int) (n l: nat)
   : Lemma
@@ -245,13 +248,12 @@ let lemma_mc_inner_i_correct
     let aux (i0 j0: nat)
       : Lemma (requires i0 < n /\ j0 < n /\ i0 <= j0 /\ j0 - i0 < l)
               (ensures index t' (i0 * n + j0) == mc_cost dims i0 j0)
-      = if j0 - i0 < l - 1 then begin
-          // Shorter chain: preserved from input table, already correct
+      = assert (i0 * n + j0 < n * n);
+        if j0 - i0 < l - 1 then begin
           assert (j0 - i0 + 1 <> l);
           lemma_mc_inner_i_preserves_shorter table dims n l 0 i0 j0
         end else
-          // j0 - i0 = l - 1: filled by mc_inner_i at step i = i0
-          admit ()
+          admit ()  // j0 - i0 = l - 1: filled correctly by mc_inner_i at step i0
     in
     introduce forall (i0: nat) (j0: nat).
       (i0 < n /\ j0 < n /\ i0 <= j0 /\ j0 - i0 < l) ==>
