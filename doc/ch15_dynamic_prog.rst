@@ -6,8 +6,10 @@ Dynamic Programming
 
 This chapter covers three dynamic programming algorithms from CLRS
 Chapter 15: rod cutting (§15.1), longest common subsequence (§15.4),
-and matrix chain multiplication (§15.2). All three are fully verified
-with **zero admits, assumes, or assume_ calls**.
+and matrix chain multiplication (§15.2). Rod cutting and LCS are fully
+verified with **zero admits**. Matrix chain multiplication has **2
+admits** in the equivalence proof between the recursive specification
+and the DP computation.
 
 Dynamic programming algorithms share a common proof structure:
 
@@ -257,11 +259,29 @@ CLRS §15.2 covers the matrix chain multiplication problem: given a
 sequence of matrix dimensions, find the parenthesization that minimizes
 the number of scalar multiplications.
 
-Specification
-~~~~~~~~~~~~~
+Recursive Specification
+~~~~~~~~~~~~~~~~~~~~~~~
 
-The pure specification defines the optimal cost using an imperative
-mirror — pure functions that exactly trace the three nested loops:
+The recursive optimal substructure (CLRS Eq. 15.7) is defined as a
+pure, total function ``mc_cost``.  Given dimensions ``p[0..n]`` where
+matrix ``A_i`` has dimensions ``p[i] × p[i+1]``:
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: mc_cost
+   :end-before: //SNIPPET_END: mc_cost
+
+``mc_cost p i j`` returns the minimum number of scalar multiplications
+needed to compute the product ``A_i · A_{i+1} · ... · A_j``.  The
+base case is a single matrix (``i = j``), which costs 0.  The
+recursive case tries every split point ``k ∈ [i, j)`` and takes the
+minimum of ``mc_cost(i,k) + mc_cost(k+1,j) + p[i]·p[k+1]·p[j+1]``.
+
+Imperative Mirror Specification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The bottom-up DP algorithm is captured by an imperative mirror — pure
+functions that exactly trace the three nested loops:
 
 .. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.fst
    :language: fstar
@@ -271,11 +291,40 @@ mirror — pure functions that exactly trace the three nested loops:
 ``mc_inner_k`` iterates over split points for a chain from ``i`` to
 ``j``, accumulating the minimum cost.  ``mc_inner_i`` processes all
 starting positions for a given chain length ``l``.  ``mc_outer``
-iterates over increasing chain lengths from 2 to ``n``.  This
-follows CLRS Eq. 15.7: try all possible split points ``k``
-between ``i`` and ``j``, compute the cost of the left and right
-sub-chains plus the cost of the final multiplication, and take the
-minimum.
+iterates over increasing chain lengths from 2 to ``n``.
+
+DP Correctness
+~~~~~~~~~~~~~~
+
+The key predicate ``dp_correct_upto`` relates the flat DP table to the
+recursive specification:
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: dp_correct
+   :end-before: //SNIPPET_END: dp_correct
+
+The main equivalence theorem states that the bottom-up DP result
+equals the recursive optimum:
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: mc_spec_equiv
+   :end-before: //SNIPPET_END: mc_spec_equiv
+
+The proof proceeds by induction on chain length: the initial table is
+correct for single matrices (length 1), and processing chain length
+``l`` advances ``dp_correct_upto`` from ``l-1`` to ``l``.  The bridge
+lemma ``lemma_mc_inner_k_eq_min_splits`` shows that the table-reading
+inner loop computes the same result as the recursive ``min_splits``.
+
+.. note::
+
+   Two admits remain: (1) the sentinel value ``1000000000`` used in
+   ``mc_inner_k`` as the initial accumulator must be shown large
+   enough, and (2) the inductive step for ``lemma_mc_inner_i_correct``
+   requires tracking how ``mc_inner_i`` fills each entry at chain
+   length ``l``.
 
 Implementation
 ~~~~~~~~~~~~~~
