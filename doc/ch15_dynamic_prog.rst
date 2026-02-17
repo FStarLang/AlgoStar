@@ -165,10 +165,33 @@ written.
    :start-after: //SNIPPET_START: extended_sig
    :end-before: //SNIPPET_END: extended_sig
 
-The postcondition guarantees two properties: (1) the returned
-revenue equals ``optimal_revenue``, and (2) for every ``j`` in
+The postcondition guarantees three properties: (1) the returned
+revenue equals ``optimal_revenue``, (2) for every ``j`` in
 ``1..n``, ``s_cuts[j]`` is a valid first piece size between 1 and
-``j``.
+``j``, and (3) each cut achieves the optimal decomposition:
+``prices[s[j]-1] + optimal_revenue(j - s[j]) == optimal_revenue(j)``.
+
+These properties are factored into two clean predicates defined
+after the Pulse function:
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: cuts_are_optimal_def
+   :end-before: //SNIPPET_END: cuts_are_optimal_def
+
+``cuts_are_valid`` checks that each ``s[j]`` is a valid first piece
+size (between 1 and ``j``). ``cuts_are_optimal`` additionally asserts
+that each cut achieves the optimal revenue decomposition per
+CLRS Eq. 15.2.
+
+A ``reconstruct_cutting`` function follows the ``s`` array to produce
+the list of piece sizes for any rod length ``j``.
+``reconstruct_cutting_sums`` proves that the pieces sum to ``j``
+— validating that the cuts define a genuine partition of the rod.
+
+The bridge lemma ``extended_rod_cutting_optimal`` connects the raw
+postcondition of the Pulse function to the ``cuts_are_optimal``
+predicate, so that callers can work with the clean interface.
 
 **Proof notes.** The proof required two techniques beyond the basic
 rod cutting proof. First, the ``s_cuts`` validity invariant —

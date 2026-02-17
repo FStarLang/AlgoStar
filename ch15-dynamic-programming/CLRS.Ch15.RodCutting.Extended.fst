@@ -74,6 +74,8 @@ let optimal_revenue (prices: Seq.seq nat) (j: nat) : nat =
 let optimal_cut (prices: Seq.seq nat) (j: nat) : nat =
   if j = 0 || j > Seq.length prices then 0
   else accum_argmax prices (build_opt prices (j - 1)) j j
+// Note: Following CLRS, cuts[0..n] uses 1-based indexing — cuts[0] is unused,
+// and cuts[j] for j in 1..n is the optimal first piece size for a rod of length j.
 //SNIPPET_END: extended_spec
 
 // Lemma: build_opt is prefix-consistent
@@ -506,3 +508,88 @@ fn extended_rod_cutting
 }
 
 #pop-options
+
+// ========== Clean postcondition predicates ==========
+// Defined after the Pulse function to avoid Z3 context pollution during proof.
+// We close BoundedIntegers to use standard integer operators in these specs.
+
+//SNIPPET_START: cuts_are_optimal_def
+// Each cut is a valid piece size: 1 <= cuts[j] <= j
+let cuts_are_valid (cuts: Seq.seq SZ.t) (n: nat{Seq.length cuts == n + 1}) : prop =
+  forall (j: nat). j >= 1 /\ j <= n ==>
+    SZ.v (Seq.index cuts j) >= 1 /\
+    SZ.v (Seq.index cuts j) <= j
+
+// Reconstruct the actual cutting from the cuts array:
+// Starting from rod length j, take piece s[j], then solve j - s[j], etc.
+// The pieces sum to j because each step reduces by a positive amount.
+let rec reconstruct_cutting (cuts: Seq.seq SZ.t) (j: nat) 
+  : Ghost (list nat) (requires Seq.length cuts > j /\
+      (forall (k: nat). k >= 1 /\ k <= j ==> SZ.v (Seq.index cuts k) >= 1 /\ SZ.v (Seq.index cuts k) <= k))
+    (ensures fun pieces -> True)
+    (decreases j)
+  = if j = 0 then []
+    else
+      let c = SZ.v (Seq.index cuts j) in
+      c :: reconstruct_cutting cuts (Prims.op_Subtraction j c)
+
+// The reconstructed cutting sums to j (cuts are valid in the sense of summing correctly)
+let rec sum_pieces (pieces: list nat) : nat =
+  match pieces with
+  | [] -> 0
+  | p :: rest -> Prims.op_Addition p (sum_pieces rest)
+
+let rec reconstruct_cutting_sums (cuts: Seq.seq SZ.t) (j: nat)
+  : Lemma 
+    (requires Seq.length cuts > j /\
+      (forall (k: nat). k >= 1 /\ k <= j ==> SZ.v (Seq.index cuts k) >= 1 /\ SZ.v (Seq.index cuts k) <= k))
+    (ensures sum_pieces (reconstruct_cutting cuts j) == j)
+    (decreases j)
+  = if j = 0 then ()
+    else begin
+      let c = SZ.v (Seq.index cuts j) in
+      reconstruct_cutting_sums cuts (Prims.op_Subtraction j c)
+    end
+
+// Each cut achieves the optimal revenue decomposition:
+//   prices[cuts[j]-1] + optimal_revenue(j - cuts[j]) == optimal_revenue(j)
+// Note: we use Prims.op_Subtraction to avoid BoundedIntegers operator shadowing.
+let cuts_are_optimal (prices: Seq.seq nat) (cuts: Seq.seq SZ.t) 
+    (n: nat{Seq.length cuts == n + 1 /\ n <= Seq.length prices}) : prop =
+  cuts_are_valid cuts n /\
+  (forall (j: nat). {:pattern (Seq.index cuts j)}
+    j >= 1 /\ j <= n /\ SZ.v (Seq.index cuts j) >= 1 /\
+    SZ.v (Seq.index cuts j) <= j /\
+    Prims.op_Subtraction (SZ.v (Seq.index cuts j)) 1 < Seq.length prices ==>
+    Seq.index prices (Prims.op_Subtraction (SZ.v (Seq.index cuts j)) 1) +
+      optimal_revenue prices (Prims.op_Subtraction j (SZ.v (Seq.index cuts j))) ==
+      optimal_revenue prices j)
+//SNIPPET_END: cuts_are_optimal_def
+
+/// Bridge lemma: the raw postcondition of extended_rod_cutting implies cuts_are_optimal.
+/// Call this after invoking the Pulse function to obtain the clean predicate.
+let extended_rod_cutting_optimal
+  (prices: Seq.seq nat) (cuts: Seq.seq SZ.t) (n: nat)
+  : Lemma
+    (requires
+      Seq.length cuts == n + 1 /\
+      n <= Seq.length prices /\
+      // Valid cuts
+      (forall (j: nat). j >= 1 /\ j <= n ==>
+        SZ.v (Seq.index cuts j) >= 1 /\
+        SZ.v (Seq.index cuts j) <= j) /\
+      // Bounds
+      (forall (j: nat). j >= 1 /\ j <= n ==>
+        SZ.v (Seq.index cuts j) >= 1 /\
+        SZ.v (Seq.index cuts j) <= j /\
+        Prims.op_Subtraction (SZ.v (Seq.index cuts j)) 1 < Seq.length prices) /\
+      // Optimality
+      (forall (j: nat). j >= 1 /\ j <= n /\
+        SZ.v (Seq.index cuts j) >= 1 /\
+        Prims.op_Subtraction (SZ.v (Seq.index cuts j)) 1 < Seq.length prices /\
+        Prims.op_Subtraction j (SZ.v (Seq.index cuts j)) >= 0 ==>
+        Seq.index prices (Prims.op_Subtraction (SZ.v (Seq.index cuts j)) 1) +
+          optimal_revenue prices (Prims.op_Subtraction j (SZ.v (Seq.index cuts j))) ==
+          optimal_revenue prices j))
+    (ensures cuts_are_optimal prices cuts n)
+  = ()
