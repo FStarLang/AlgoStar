@@ -27,6 +27,15 @@ fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common <file.fs
 fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 ```
 
+### Documentation
+
+- **21 chapter .rst files** in `doc/`, all using `literalinclude` with SNIPPET markers (no inline `code-block`)
+- Use `:language: fstar` for pure F* specs, `:language: pulse` for Pulse code
+- SNIPPET markers are `//SNIPPET_START: name` / `//SNIPPET_END: name` comments in .fst files
+- Build docs: `cd doc && make html`
+- All admits/assumes documented honestly in each chapter
+- Index: `doc/index.rst` includes all chapters in order
+
 ### Conventions
 
 - **Functional correctness**: Imperative code proven equivalent to a pure, total, recursive spec.
