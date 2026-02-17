@@ -34,6 +34,7 @@ module Seq = FStar.Seq
 
 // Import the specification module
 open CLRS.Ch09.PartialSelectionSort.Spec
+open CLRS.Ch09.PartialSelectionSort.SortedPerm
 
 (*** Pure Quickselect - Recursive Specification ***)
 
@@ -83,44 +84,9 @@ let partition_preserves_permutation (s s': seq int) (lo hi p: nat)
           (ensures is_permutation s s')
   = ()
 
-// Key helper: sorted permutations are equal
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
-let sorted_permutation_equal (s1 s2: seq int)
-  : Lemma (requires is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
-          (ensures Seq.equal s1 s2)
-          (decreases Seq.length s1)
-  = if Seq.length s1 = 0 then ()
-    else if Seq.length s1 = 1 then (
-      // Both have length 1 and are permutations, so they're equal
-      assert (Seq.length s2 = 1);
-      let x = Seq.index s1 0 in
-      let y = Seq.index s2 0 in
-      // count_occ s1 x = count_occ s2 x, and both have length 1
-      assert (count_occ s1 x = 1);
-      assert (count_occ s2 x = 1);
-      // Since s2 has length 1 and contains x, s2[0] = x
-      ()
-    ) else (
-      // Both sorted, non-empty, and permutations
-      // Key insight: the minimum element must be the same
-      let min1 = Seq.index s1 0 in
-      let min2 = Seq.index s2 0 in
-      
-      // min1 is the minimum of s1 (sorted)
-      // Since is_permutation, min1 appears in s2
-      // Since s2 is sorted, if min1 appears in s2, it must be >= min2
-      // Similarly, min2 must be >= min1
-      // Therefore min1 = min2
-      
-      // This requires reasoning about sorted sequences and permutations
-      // which is complex in F*
-      admit();
-      
-      // If proven, the tails are also sorted permutations
-      // sorted_permutation_equal (Seq.tail s1) (Seq.tail s2)
-      ()
-    )
-#pop-options
+// sorted_permutation_equal is imported from SortedPerm module
+
+#restart-solver
 
 // Lemma 2: In a partitioned sequence, if k < p, the k-th element is in the left part
 #push-options "--z3rlimit 40"
