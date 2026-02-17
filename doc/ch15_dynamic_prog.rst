@@ -6,10 +6,8 @@ Dynamic Programming
 
 This chapter covers three dynamic programming algorithms from CLRS
 Chapter 15: rod cutting (§15.1), longest common subsequence (§15.4),
-and matrix chain multiplication (§15.2). Rod cutting and LCS are fully
-verified with **zero admits**. Matrix chain multiplication has **2
-admits** in the equivalence proof between the recursive specification
-and the DP computation.
+and matrix chain multiplication (§15.2). All three algorithms are fully
+verified with **zero admits**.
 
 Dynamic programming algorithms share a common proof structure:
 
@@ -320,11 +318,13 @@ inner loop computes the same result as the recursive ``min_splits``.
 
 .. note::
 
-   Two admits remain: (1) the sentinel value ``1000000000`` used in
-   ``mc_inner_k`` as the initial accumulator must be shown large
-   enough, and (2) the inductive step for ``lemma_mc_inner_i_correct``
-   requires tracking how ``mc_inner_i`` fills each entry at chain
-   length ``l``.
+   The equivalence proof is fully verified (zero admits). Key helper
+   lemmas: ``min_splits_acc_irrelevant`` shows that the sentinel value
+   ``1000000000`` is irrelevant when the optimal cost is bounded, and
+   ``lemma_mc_inner_i_fills_correctly`` proves by induction that each
+   table entry is correctly filled.  The main theorem requires an
+   ``all_costs_bounded`` precondition ensuring the optimal cost fits
+   within the sentinel.
 
 Implementation
 ~~~~~~~~~~~~~~
