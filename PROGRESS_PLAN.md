@@ -171,11 +171,11 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | ch16 (greedy) | 6 | 3 | 0 | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(0+3) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch24 (SSSP) | 5 | 0 | 0 | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
-| ch09 (select) | 2 | 0 | 0 | 2 | PartialSelectionSort.Correctness(2) — sorted_permutation_equal proven in SortedPerm |
+| ch09 (select) | 0 | 0 | 0 | 0 | PartialSelectionSort.Correctness fully proven (SortedPerm + dead code removed) |
 | ch12 (BST) | 3 | 0 | 0 | 3 | BST.Insert.Spec(3) |
 | ch21 (UF) | 0 | 1 | 0 | 1 | UnionFind.Spec(0+1) |
 | Other | 8 | 0 | 0 | 8 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), Huffman.Complete(2), Huffman.Spec(3) |
-| **Total** | **74** | **15** | **38** | **127** | |
+| **Total** | **72** | **15** | **38** | **125** | |
 
 ---
 
