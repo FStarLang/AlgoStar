@@ -115,10 +115,39 @@ let rec accum_max_ext (prices: Seq.seq nat) (r1 r2: Seq.seq nat) (j: nat) (limit
       assert (Seq.index r1 (j - limit) == Seq.index r2 (j - limit))
     )
 
+// Safe sequence index (returns default for out-of-bounds, avoiding subtyping issues in props)
+let seq_index_or_zero (#a:Type) (d:a) (s: Seq.seq a) (i: int) : a =
+  if 0 <= i && i < Seq.length s then Seq.index s (let n: nat = i in n) else d
+
+// Helper: check if a cut at position s achieves the DP value at k
+// Takes pre-validated indices to avoid subtyping issues
+let cut_matches (prices: Seq.seq nat) (sr: Seq.seq nat)
+                (s: nat{s >= 1}) (k: nat) : prop =
+  (s <= k /\ s - 1 < Seq.length prices /\ k - s < Seq.length sr /\ k < Seq.length sr) ==>
+  Seq.index prices (s - 1) + Seq.index sr (k - s) == Seq.index sr k
+
+// s_cuts optimality: s_cuts[j] achieves the optimal revenue
+let cuts_achieve_optimal (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t) (bound: nat) : prop =
+  (forall (k: nat) (s: nat). k >= 1 /\ k <= bound /\ k < Seq.length sc /\ k < Seq.length sr /\
+    s == SZ.v (Seq.index sc k) /\ s >= 1 ==>
+    s <= k /\ s - 1 < Seq.length prices /\ k - s < Seq.length sr /\
+    cut_matches prices sr s k)
+
 // DP table correctness
 let dp_correct (prices: Seq.seq nat) (sr: Seq.seq nat) (bound: nat) : prop =
   (forall (k: nat). k <= bound /\ k < Seq.length sr ==>
     Seq.index sr k == optimal_revenue prices k)
+
+// Lemma: extending dp_correct via Seq.upd
+let dp_correct_upd (prices: Seq.seq nat) (sr: Seq.seq nat) (j: nat) (v: nat)
+  : Lemma (requires j >= 1 /\ dp_correct prices sr (j - 1) /\ j < Seq.length sr /\ v == optimal_revenue prices j)
+          (ensures dp_correct prices (Seq.upd sr j v) j)
+  = let sr' = Seq.upd sr j v in
+    let aux (k: nat{k <= j /\ k < Seq.length sr'}) : Lemma (Seq.index sr' k == optimal_revenue prices k)
+      = if k = j then Seq.lemma_index_upd1 sr j v
+        else Seq.lemma_index_upd2 #nat sr j v k
+    in
+    Classical.forall_intro aux
 
 // Lemma: when DP table is correct for k < j, accum_max with DP table == optimal_revenue
 let accum_max_dp_correct (prices: Seq.seq nat) (sr: Seq.seq nat) (j: nat)
@@ -146,17 +175,16 @@ let accum_max_dp_correct (prices: Seq.seq nat) (sr: Seq.seq nat) (j: nat)
     apply_aux j;
     accum_max_ext prices sr prev j j
 
-// Lemma: argmax achieves the max (when max > 0, argmax is in valid range)
+// Lemma: argmax achieves the max value
 let rec accum_argmax_valid (prices: Seq.seq nat) (r: Seq.seq nat) (j: nat) (limit: nat)
   : Lemma (requires limit > 0 /\ j > 0 /\ limit <= j /\ 
                      Seq.length prices >= limit /\ Seq.length r >= j)
           (ensures (let arg = accum_argmax prices r j limit in
                     let max_val = accum_max prices r j limit in
                     arg >= 1 /\ arg <= limit /\
-                    (max_val > 0 ==> (
-                      arg - 1 < Seq.length prices /\
-                      j - arg < Seq.length r /\
-                      Seq.index prices (arg - 1) + Seq.index r (j - arg) == max_val))))
+                    arg - 1 < Seq.length prices /\
+                    j - arg < Seq.length r /\
+                    Seq.index prices (arg - 1) + Seq.index r (j - arg) == max_val))
           (decreases limit)
   = if limit = 1 then ()
     else (
@@ -184,6 +212,81 @@ let sc_upd_valid (sc: Seq.seq SZ.t) (v: SZ.t) (j: nat)
     in
     Classical.forall_intro aux
 
+// Lemma: updating s_cuts and r at position j extends cuts_achieve_optimal to j
+let cuts_upd_valid (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t) 
+                   (v: SZ.t) (q: nat) (j: nat)
+  : Lemma (requires j < Seq.length sc /\ j < Seq.length sr /\ j >= 1 /\
+                     SZ.v v >= 1 /\ SZ.v v <= j /\
+                     SZ.v v - 1 < Seq.length prices /\
+                     j - SZ.v v < Seq.length sr /\
+                     Seq.index prices (SZ.v v - 1) + Seq.index sr (j - SZ.v v) == q /\
+                     cuts_achieve_optimal prices sr sc (j - 1) /\
+                     (forall (k: nat). k >= 1 /\ k <= j - 1 /\ k < Seq.length sc ==>
+                       SZ.v (Seq.index sc k) >= 1 /\ SZ.v (Seq.index sc k) <= k))
+          (ensures (let sr' = Seq.upd sr j q in
+                    let sc' = Seq.upd sc j v in
+                    cuts_achieve_optimal prices sr' sc' j))
+  = let sr' = Seq.upd sr j q in
+    let sc' = Seq.upd sc j v in
+    let aux (k: nat) (s: nat{k >= 1 /\ k <= j /\ k < Seq.length sc' /\ k < Seq.length sr' /\
+                             s == SZ.v (Seq.index sc' k) /\ s >= 1}) : Lemma
+      (s <= k /\ s - 1 < Seq.length prices /\ k - s < Seq.length sr' /\
+       cut_matches prices sr' s k)
+      = if k = j then (
+          Seq.lemma_index_upd1 sc j v;
+          Seq.lemma_index_upd1 sr j q;
+          Seq.lemma_index_upd2 #nat sr j q (j - SZ.v v)
+        ) else (
+          Seq.lemma_index_upd2 #SZ.t sc j v k;
+          Seq.lemma_index_upd2 #nat sr j q k;
+          let s0 = SZ.v (Seq.index sc k) in
+          assert (s0 >= 1 /\ s0 <= k);
+          assert (k - s0 < j);
+          Seq.lemma_index_upd2 #nat sr j q (k - s0)
+        )
+    in
+    Classical.forall_intro_2 aux
+
+// Lemma: when dp_correct holds, cuts_achieve_optimal implies the postcondition property
+let cuts_optimal_from_dp (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t) (n: nat)
+  : Lemma (requires dp_correct prices sr n /\ 
+                     cuts_achieve_optimal prices sr sc n /\
+                     Seq.length sr >= n + 1 /\ Seq.length sc >= n + 1 /\
+                     (forall (k: nat). k >= 1 /\ k <= n ==>
+                       SZ.v (Seq.index sc k) >= 1 /\ SZ.v (Seq.index sc k) <= k))
+          (ensures (forall (j: nat). j >= 1 /\ j <= n ==>
+                     SZ.v (Seq.index sc j) >= 1 /\
+                     SZ.v (Seq.index sc j) <= j /\
+                     SZ.v (Seq.index sc j) - 1 < Seq.length prices) /\
+                   (forall (j: nat). j >= 1 /\ j <= n /\
+                     SZ.v (Seq.index sc j) >= 1 /\
+                     SZ.v (Seq.index sc j) - 1 < Seq.length prices /\
+                     j - SZ.v (Seq.index sc j) >= 0 ==>
+                     Seq.index prices (SZ.v (Seq.index sc j) - 1) +
+                       optimal_revenue prices (j - SZ.v (Seq.index sc j)) ==
+                       optimal_revenue prices j))
+  = let aux (j: nat{j >= 1 /\ j <= n}) : Lemma 
+      (SZ.v (Seq.index sc j) >= 1 /\
+       SZ.v (Seq.index sc j) <= j /\
+       SZ.v (Seq.index sc j) - 1 < Seq.length prices /\
+       (j - SZ.v (Seq.index sc j) >= 0 ==>
+        Seq.index prices (SZ.v (Seq.index sc j) - 1) +
+          optimal_revenue prices (j - SZ.v (Seq.index sc j)) ==
+          optimal_revenue prices j))
+    = let s = SZ.v (Seq.index sc j) in
+      // From cuts_achieve_optimal: cut_matches prices sr s j
+      // cut_matches: prices[s-1] + sr[j-s] == sr[j]
+      // From dp_correct: sr[j] == optimal_revenue j, sr[j-s] == optimal_revenue (j-s)
+      assert (s >= 1 /\ s <= j);
+      assert (s - 1 < Seq.length prices);
+      assert (j - s < Seq.length sr);
+      assert (cut_matches prices sr s j);
+      assert (Seq.index sr j == optimal_revenue prices j);
+      if j - s >= 0 && j - s <= n then
+        assert (Seq.index sr (j - s) == optimal_revenue prices (j - s))
+    in
+    Classical.forall_intro aux
+
 // ========== Main Implementation ==========
 
 open Pulse.Lib.BoundedIntegers
@@ -203,17 +306,30 @@ fn extended_rod_cutting
       SZ.fits (SZ.v n + 1)
     )
   returns result: (nat & V.vec SZ.t)
-  ensures exists* s_cuts.
+  ensures exists* sc.
     A.pts_to prices #p s_prices **
-    V.pts_to (snd result) s_cuts **
+    V.pts_to (snd result) sc **
     pure (
       fst result == optimal_revenue s_prices (SZ.v n) /\
-      Seq.length s_cuts == SZ.v n + 1 /\
-      V.length (snd result) == Seq.length s_cuts /\
+      Seq.length sc == SZ.v n + 1 /\
+      V.length (snd result) == Seq.length sc /\
       // For each j in 1..n, s_cuts[j] is a valid first piece size (between 1 and j)
       (forall (j: nat). j >= 1 /\ j <= SZ.v n ==>
-        SZ.v (Seq.index s_cuts j) >= 1 /\
-        SZ.v (Seq.index s_cuts j) <= j)
+        SZ.v (Seq.index sc j) >= 1 /\
+        SZ.v (Seq.index sc j) <= j) /\
+      // For each j in 1..n, s_cuts[j] achieves the optimal revenue:
+      //   prices[s_cuts[j]-1] + optimal_revenue(j - s_cuts[j]) == optimal_revenue(j)
+      (forall (j: nat). j >= 1 /\ j <= SZ.v n ==>
+        SZ.v (Seq.index sc j) >= 1 /\
+        SZ.v (Seq.index sc j) <= j /\
+        SZ.v (Seq.index sc j) - 1 < Seq.length s_prices) /\
+      (forall (j: nat). j >= 1 /\ j <= SZ.v n /\
+        SZ.v (Seq.index sc j) >= 1 /\
+        SZ.v (Seq.index sc j) - 1 < Seq.length s_prices /\
+        j - SZ.v (Seq.index sc j) >= 0 ==>
+        Seq.index s_prices (SZ.v (Seq.index sc j) - 1) +
+          optimal_revenue s_prices (j - SZ.v (Seq.index sc j)) ==
+          optimal_revenue s_prices j)
     )
 //SNIPPET_END: extended_sig
 {
@@ -240,7 +356,9 @@ fn extended_rod_cutting
       // s_cuts invariant: for all computed entries, they're valid
       (forall (k: nat). k >= 1 /\ k < SZ.v vj ==>
         SZ.v (Seq.index sc k) >= 1 /\
-        SZ.v (Seq.index sc k) <= k)
+        SZ.v (Seq.index sc k) <= k) /\
+      // s_cuts achieve optimal: prices[s[k]-1] + r[k-s[k]] == r[k]
+      cuts_achieve_optimal s_prices sr sc (SZ.v vj - 1)
     )
   {
     let vj = !j;
@@ -271,10 +389,13 @@ fn extended_rod_cutting
         V.length s_cuts == Seq.length sc_inner /\
         dp_correct s_prices sr_inner (SZ.v vj - 1) /\
         vq == accum_max s_prices sr_inner (SZ.v vj) (SZ.v vi - 1) /\
+        (SZ.v vi >= 2 ==> SZ.v v_best == accum_argmax s_prices sr_inner (SZ.v vj) (SZ.v vi - 1)) /\
         // Preserve outer s_cuts invariant through inner loop
         (forall (k: nat). k >= 1 /\ k < SZ.v vj ==>
           SZ.v (Seq.index sc_inner k) >= 1 /\
-          SZ.v (Seq.index sc_inner k) <= k)
+          SZ.v (Seq.index sc_inner k) <= k) /\
+        // Preserve outer cuts_achieve_optimal through inner loop
+        cuts_achieve_optimal s_prices sr_inner sc_inner (SZ.v vj - 1)
       )
     {
       let vi = !i;
@@ -293,12 +414,14 @@ fn extended_rod_cutting
       // The loop guard `!i <=^ vj` tells us vi <= vj inside the body
       assert (pure (SZ.v vi <= SZ.v vj));
       
-      let new_q = (if candidate > vq then candidate else vq);
-      let new_best_i = (if candidate > vq then vi else v_best);
+      let new_q = (if candidate >= vq then candidate else vq);
+      let new_best_i = (if candidate >= vq then vi else v_best);
       assert (pure (SZ.v new_best_i >= 1 /\ SZ.v new_best_i <= SZ.v vj));
       
       // Prove: new_q == accum_max s_prices sr_inner (SZ.v vj) (SZ.v vi)
       assert (pure (new_q == accum_max s_prices sr_inner (SZ.v vj) (SZ.v vi)));
+      // Prove: new_best_i tracks the argmax
+      assert (pure (SZ.v new_best_i == accum_argmax s_prices sr_inner (SZ.v vj) (SZ.v vi)));
       
       q := new_q;
       best_i := new_best_i;
@@ -312,6 +435,13 @@ fn extended_rod_cutting
     
     with sr_pre. assert (V.pts_to r sr_pre);
     accum_max_dp_correct s_prices sr_pre (SZ.v vj);
+    
+    // Use accum_argmax_valid to prove final_best_i achieves final_q
+    accum_argmax_valid s_prices sr_pre (SZ.v vj) (SZ.v vj);
+    // Now we know: SZ.v final_best_i == accum_argmax ... (SZ.v vj) (SZ.v vj)
+    // and accum_argmax_valid gives us: 
+    //   final_best_i >= 1, final_best_i <= vj
+    //   prices[final_best_i - 1] + sr_pre[vj - final_best_i] == final_q  (when final_q > 0)
     
     with sc_pre. assert (V.pts_to s_cuts sc_pre);
     
@@ -328,14 +458,7 @@ fn extended_rod_cutting
     assert (pure (sc_new == Seq.upd sc_pre (SZ.v vj) final_best_i));
     
     // dp_correct for sr_new up to vj:
-    // First establish the key facts explicitly
-    assert (pure (Seq.index sr_new (SZ.v vj) == final_q));
-    assert (pure (final_q == optimal_revenue s_prices (SZ.v vj)));
-    
-    // For k < vj, index sr_new k == index sr_pre k (SMT pattern from lemma_index_upd2)
-    // and dp_correct sr_pre (vj-1) gives us index sr_pre k == optimal_revenue for k < vj
-    // So dp_correct sr_new vj holds
-    assert (pure (dp_correct s_prices sr_new (SZ.v vj)));
+    dp_correct_upd s_prices sr_pre (SZ.v vj) final_q;
     
     // s_cuts validity for sc_new up to vj:
     // For k < vj: Seq.index sc_new k == Seq.index sc_pre k (SMT pattern)
@@ -346,8 +469,34 @@ fn extended_rod_cutting
     // For k = vj, sc_new[vj] = final_best_i with 1 <= SZ.v final_best_i <= vj
     sc_upd_valid sc_pre final_best_i (SZ.v vj);
     
+    // Prove cuts_achieve_optimal for the updated tables
+    // final_best_i achieves final_q: prices[best-1] + sr_pre[vj - best] == final_q
+    assert (pure (SZ.v final_best_i - 1 < Seq.length s_prices));
+    assert (pure (SZ.v vj - SZ.v final_best_i < Seq.length sr_pre));
+    assert (pure (Seq.index s_prices (SZ.v final_best_i - 1) + Seq.index sr_pre (SZ.v vj - SZ.v final_best_i) == final_q));
+    assert (pure (cuts_achieve_optimal s_prices sr_pre sc_pre (SZ.v vj - 1)));
+    cuts_upd_valid s_prices sr_pre sc_pre final_best_i final_q (SZ.v vj);
+    
     j := vj + 1sz;
   };
+  
+  with sr_final sc_final. assert (V.pts_to r sr_final ** V.pts_to s_cuts sc_final);
+  
+  // Bridge: convert cuts_achieve_optimal (in terms of sr) to postcondition (in terms of optimal_revenue)
+  cuts_optimal_from_dp s_prices sr_final sc_final (SZ.v n);
+  
+  // Explicitly assert the postcondition properties derived from the bridge lemma
+  assert (pure (forall (j: nat). j >= 1 /\ j <= SZ.v n ==>
+    SZ.v (Seq.index sc_final j) >= 1 /\
+    SZ.v (Seq.index sc_final j) <= j /\
+    SZ.v (Seq.index sc_final j) - 1 < Seq.length s_prices));
+  assert (pure (forall (j: nat). j >= 1 /\ j <= SZ.v n /\
+    SZ.v (Seq.index sc_final j) >= 1 /\
+    SZ.v (Seq.index sc_final j) - 1 < Seq.length s_prices /\
+    j - SZ.v (Seq.index sc_final j) >= 0 ==>
+    Seq.index s_prices (SZ.v (Seq.index sc_final j) - 1) +
+      optimal_revenue s_prices (j - SZ.v (Seq.index sc_final j)) ==
+      optimal_revenue s_prices j));
   
   let result = V.op_Array_Access r n;
   
