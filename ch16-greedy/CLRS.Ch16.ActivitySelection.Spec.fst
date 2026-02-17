@@ -26,6 +26,7 @@ module Seq = FStar.Seq
 
 // ========== Basic Definitions ==========
 
+//SNIPPET_START: activity_defs
 (* Activities are sorted by finish time *)
 let finish_sorted (f: Seq.seq int) : prop =
   forall (i j: nat). i <= j /\ j < Seq.length f ==> Seq.index f i <= Seq.index f j
@@ -51,6 +52,7 @@ let rec mutually_compatible (start: Seq.seq int) (finish: Seq.seq int) (selected
       x < Seq.length start /\ x < Seq.length finish /\
       mutually_compatible start finish xs /\
       (forall (y: nat). L.mem y xs ==> compatible start finish x y)
+//SNIPPET_END: activity_defs
 
 (* Sequential compatibility: for a sorted list, only check consecutive pairs *)
 let rec sequentially_compatible (start: Seq.seq int) (finish: Seq.seq int) (selected: list nat) : prop =
@@ -184,11 +186,13 @@ let rec find_max_compatible (start: Seq.seq int) (finish: Seq.seq int) (n: nat) 
 let max_compatible_count (start: Seq.seq int) (finish: Seq.seq int) (n: nat) : GTot nat =
   find_max_compatible start finish n n
 
+//SNIPPET_START: is_optimal_selection
 (* An optimal selection has maximum cardinality *)
 let is_optimal_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (selected: list nat) : prop =
   mutually_compatible start finish selected /\
   list_sorted_indices selected n /\
   L.length selected == max_compatible_count start finish n
+//SNIPPET_END: is_optimal_selection
 
 (* Key property: if a compatible set of size m exists, then find_max_compatible >= m *)
 let rec find_max_compatible_lower_bound
@@ -335,6 +339,7 @@ let lemma_greedy_choice_helper
           ()
     end
 
+//SNIPPET_START: lemma_greedy_choice
 let lemma_greedy_choice
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (opt: list nat)
   : Lemma
@@ -348,6 +353,7 @@ let lemma_greedy_choice
         is_optimal_selection start finish n opt' /\
         opt' <> [] /\
         L.hd opt' == 0))
+//SNIPPET_END: lemma_greedy_choice
   = if opt = [] then begin
       // If opt is empty and optimal, then max_compatible_count = 0
       // But max_compatible_count >= 1 when n > 0, contradiction
@@ -468,6 +474,7 @@ let lemma_greedy_is_optimal_helper
     (decreases fuel)
   = admit() // This follows by induction using greedy choice and optimal substructure properties
 
+//SNIPPET_START: lemma_greedy_is_optimal
 let lemma_greedy_is_optimal
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (greedy_sel: list nat)
   : Lemma
@@ -481,6 +488,7 @@ let lemma_greedy_is_optimal
     (ensures
       is_optimal_selection start finish n greedy_sel)
   = lemma_greedy_is_optimal_helper start finish n greedy_sel n
+//SNIPPET_END: lemma_greedy_is_optimal
 
 // ========== Connection to Implementation ==========
 
@@ -614,6 +622,7 @@ let rec lemma_seq_to_list_preserves_sorted
     (decreases Seq.length sel)
   = lemma_seq_to_list_aux_preserves_sorted sel n 0
 
+//SNIPPET_START: theorem_implementation_optimal
 let theorem_implementation_optimal
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat)
   : Lemma
@@ -635,6 +644,7 @@ let theorem_implementation_optimal
     lemma_sequential_implies_mutual start finish (seq_to_list sel);
     lemma_implementation_is_greedy start finish n sel;
     lemma_greedy_is_optimal start finish n (seq_to_list sel)
+//SNIPPET_END: theorem_implementation_optimal
 
 // ========== Corollaries ==========
 

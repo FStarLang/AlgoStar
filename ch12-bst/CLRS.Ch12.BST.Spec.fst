@@ -151,6 +151,7 @@ let rec pure_search
    Soundness Proof: If search returns Some idx, then keys[idx] == key
    ======================================================================== *)
 
+//SNIPPET_START: pure_search_sound
 let rec pure_search_sound
   (keys: seq int)
   (valid: seq bool)
@@ -167,6 +168,7 @@ let rec pure_search_sound
       index keys idx == key
     ))
     (decreases (if i < cap then cap - i else 0))
+//SNIPPET_END: pure_search_sound
   = // Base cases: if i >= cap or out of bounds or not valid, result is None
     // So we must be in the recursive case where index valid i
     if i >= cap || i >= length keys || i >= length valid then ()
@@ -184,6 +186,7 @@ let rec pure_search_sound
                        then key is not in the subtree
    ======================================================================== *)
 
+//SNIPPET_START: pure_search_complete
 let rec pure_search_complete
   (keys: seq int)
   (valid: seq bool)
@@ -197,6 +200,7 @@ let rec pure_search_complete
       None? (pure_search keys valid cap i key))
     (ensures ~(key_in_subtree keys valid cap i key))
     (decreases (if i < cap then cap - i else 0))
+//SNIPPET_END: pure_search_complete
   = // If pure_search returns None, we need to show key is not in the subtree
     
     // Case 1: i >= cap or out of bounds

@@ -5,9 +5,11 @@ open FStar.Math.Lib
 
 (*** Tree Definition ***)
 
+//SNIPPET_START: htree_def
 type htree =
   | Leaf : freq:pos -> htree
   | Internal : freq:pos -> left:htree -> right:htree -> htree
+//SNIPPET_END: htree_def
 
 (*** Basic Operations ***)
 
@@ -23,6 +25,7 @@ let rec depth (t: htree) : nat =
 
 (*** Weighted Path Length ***)
 
+//SNIPPET_START: weighted_path_length
 let rec weighted_path_length_aux (t: htree) (d: nat) : nat =
   match t with
   | Leaf f -> f `op_Multiply` d
@@ -32,6 +35,7 @@ let rec weighted_path_length_aux (t: htree) (d: nat) : nat =
 
 let weighted_path_length (t: htree) : nat =
   weighted_path_length_aux t 0
+//SNIPPET_END: weighted_path_length
 
 (*** Cost (sum of internal node frequencies) ***)
 
@@ -54,10 +58,12 @@ let rec wpl_cost_relation (t: htree) (d: nat)
         wpl_cost_relation l (d + 1);
         wpl_cost_relation r (d + 1)
 
+//SNIPPET_START: wpl_equals_cost
 // Main theorem: at depth 0, weighted_path_length equals cost
 let wpl_equals_cost (t: htree)
   : Lemma (ensures weighted_path_length t == cost t)
   = wpl_cost_relation t 0
+//SNIPPET_END: wpl_equals_cost
 
 (*** Huffman Tree Construction ***)
 
@@ -87,6 +93,7 @@ let insert_sorted_nonempty (t: htree) (l: list htree)
   : Lemma (ensures Cons? (insert_sorted t l))
   = insert_sorted_length t l
 
+//SNIPPET_START: huffman_from_sorted
 // Build Huffman tree from a non-empty sorted list of trees
 let rec huffman_from_sorted (l: list htree{Cons? l})
   : Tot htree (decreases length l)
@@ -99,6 +106,7 @@ let rec huffman_from_sorted (l: list htree{Cons? l})
         // So length decreases by 1
         huffman_from_sorted (insert_sorted (merge t1 t2) rest)
     | _ -> Leaf 1 // unreachable but needed for exhaustiveness
+//SNIPPET_END: huffman_from_sorted
 
 // Sort helper: compare by frequency
 let freq_cmp (t1 t2: htree) : int =
@@ -207,10 +215,12 @@ let rec leaf_freqs (t: htree) : list pos =
   | Leaf f -> [f]
   | Internal _ l r -> leaf_freqs l @ leaf_freqs r
 
+//SNIPPET_START: is_optimal
 // Definition: A tree is optimal if its WPL is minimal among all trees with the same leaf frequencies
 let is_optimal (t: htree) (freqs: list pos) : prop =
   leaf_freqs t == freqs /\
   (forall (t': htree). leaf_freqs t' == freqs ==> weighted_path_length t <= weighted_path_length t')
+//SNIPPET_END: is_optimal
 
 // Helper: find minimum frequency in a list
 let rec min_freq (l: list pos{Cons? l}) : pos =

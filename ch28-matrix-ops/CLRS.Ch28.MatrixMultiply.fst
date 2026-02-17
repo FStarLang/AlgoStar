@@ -24,6 +24,7 @@ module Seq = FStar.Seq
 
 // ========== Pure Specification ==========
 
+//SNIPPET_START: spec
 // Flat index for row-major n×n matrix
 let flat_index (n i j: nat) : nat = i * n + j
 
@@ -60,9 +61,11 @@ let mat_mul_partial_ij (sa sb sc: Seq.seq int) (n ri cj: nat) : prop =
   Seq.length sc == n * n /\
   (forall (i j: nat). (i < ri \/ (i == ri /\ j < cj)) /\ i < n /\ j < n ==> 
     Seq.index sc (flat_index n i j) == dot_product_spec sa sb n i j n)
+//SNIPPET_END: spec
 
 // ========== Pulse Implementation ==========
 
+//SNIPPET_START: matrix_multiply_sig
 // Matrix multiplication: C = A × B
 fn matrix_multiply
   (#pa #pb: perm)
@@ -89,7 +92,9 @@ fn matrix_multiply
     A.pts_to b #pb sb **
     A.pts_to c sc' **
     pure (mat_mul_correct sa sb sc' (SZ.v n))
+//SNIPPET_END: matrix_multiply_sig
 {
+  //SNIPPET_START: outer_loop
   let mut i: SZ.t = 0sz;
   
   while (!i <^ n)
@@ -103,6 +108,7 @@ fn matrix_multiply
       Seq.length sc_i == SZ.v n * SZ.v n /\
       mat_mul_partial_ij sa sb sc_i (SZ.v n) (SZ.v vi) 0
     )
+  //SNIPPET_END: outer_loop
   {
     let vi = !i;
     
@@ -133,6 +139,7 @@ fn matrix_multiply
       // Initialize C[i][j] = 0 = dot_product_spec ... 0
       A.op_Array_Assignment c idx_c 0;
       
+      //SNIPPET_START: inner_loop
       let mut k: SZ.t = 0sz;
       
       while (!k <^ n)
@@ -155,6 +162,7 @@ fn matrix_multiply
           // Previous positions unchanged
           mat_mul_partial_ij sa sb sc_ijk (SZ.v n) (SZ.v vi) (SZ.v vj)
         )
+      //SNIPPET_END: inner_loop
       {
         let vk = !k;
         

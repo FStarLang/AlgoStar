@@ -45,6 +45,7 @@ let rec gcd_spec (a b: nat) : Tot nat (decreases b) =
 
 // ========== Complexity Analysis: Pure Functions and Lemmas ==========
 
+//SNIPPET_START: gcd_steps
 // Count the number of Euclidean steps
 let rec gcd_steps (a b: nat) : Tot nat (decreases b) =
   if b = 0 then 0
@@ -54,6 +55,7 @@ let rec gcd_steps (a b: nat) : Tot nat (decreases b) =
 let rec num_bits (n: nat) : Tot nat (decreases n) =
   if n = 0 then 0
   else 1 + num_bits (n / 2)
+//SNIPPET_END: gcd_steps
 
 // num_bits is monotone
 let rec lemma_num_bits_monotone (a b: nat)
@@ -101,6 +103,7 @@ let lemma_gcd_steps_bound_step (a b r r2: nat)
     // Therefore: gcd_steps a b <= 2 * num_bits b + 1
     ()
 
+//SNIPPET_START: lemma_gcd_steps_log
 // Main theorem: Euclid's algorithm takes at most 2*log2(b) + 1 steps
 // Proof: By induction using two-step analysis. After two steps, b reduces
 // by at least half (using lemma_mod_le_half).
@@ -109,6 +112,7 @@ let rec lemma_gcd_steps_log (a b: nat)
   : Lemma (requires b > 0)
           (ensures gcd_steps a b <= op_Multiply 2 (num_bits b) + 1)
           (decreases b)
+//SNIPPET_END: lemma_gcd_steps_log
   = let r = a % b in
     if r = 0 then (
       // Base case: gcd_steps a b = 1 + gcd_steps b 0 = 1 + 0 = 1
@@ -147,16 +151,19 @@ let rec lemma_gcd_steps_log (a b: nat)
     )
 #pop-options
 
+//SNIPPET_START: gcd_complexity_bounded
 // ========== Complexity bound predicate ==========
 let gcd_complexity_bounded (cf c0: nat) (a_init b_init: nat) : prop =
   cf >= c0 /\
   cf - c0 == gcd_steps a_init b_init /\
   (b_init > 0 ==> cf - c0 <= op_Multiply 2 (num_bits b_init) + 1)
+//SNIPPET_END: gcd_complexity_bounded
 
 // ========== Pulse Implementation with Complexity ==========
 
 #set-options "--z3rlimit 10"
 
+//SNIPPET_START: gcd_complexity_sig
 fn gcd_complexity (a_init b_init: SZ.t)
   (ctr: GR.ref nat) (#c0: erased nat)
   requires GR.pts_to ctr c0 ** pure (SZ.v a_init > 0 \/ SZ.v b_init > 0)
@@ -167,6 +174,7 @@ fn gcd_complexity (a_init b_init: SZ.t)
     cf - reveal c0 == gcd_steps (SZ.v a_init) (SZ.v b_init) /\
     (SZ.v b_init > 0 ==> cf - reveal c0 <= op_Multiply 2 (num_bits (SZ.v b_init)) + 1)
   )
+//SNIPPET_END: gcd_complexity_sig
 {
   let mut a: SZ.t = a_init;
   let mut b: SZ.t = b_init;

@@ -68,6 +68,7 @@ let seq_int_to_nat (s: Seq.seq int)
 // Topological sort using Kahn's algorithm
 // Input: adjacency matrix adj (n×n represented as flat array)
 // Output: array containing topological order of vertices
+//SNIPPET_START: topological_sort_sig
 fn topological_sort 
   (adj: A.array int) 
   (n: SZ.t)
@@ -95,6 +96,7 @@ fn topological_sort
       // 3. Output is a valid topological order
       is_topological_order sadj (SZ.v n) (seq_int_to_nat sout)
     )
+//SNIPPET_END: topological_sort_sig
 {
   // Step 1: Compute in-degrees
   let in_degree_v = V.alloc 0 n;

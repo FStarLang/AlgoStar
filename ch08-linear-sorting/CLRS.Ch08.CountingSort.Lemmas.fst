@@ -12,10 +12,10 @@ module Classical = FStar.Classical
 
 // ========== Definitions ==========
 
+//SNIPPET_START: counting_sort_lemma_defs
 let sorted (s: Seq.seq int)
   = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
-// Prefix [0, n) of s is sorted  
 let sorted_prefix (s:Seq.seq int) (n:nat{n <= Seq.length s}) : prop =
   forall (i j: nat). i <= j /\ j < n ==> Seq.index s i <= Seq.index s j
 
@@ -24,6 +24,7 @@ let permutation (s1 s2: Seq.seq int) : prop = (SeqP.permutation int s1 s2)
 
 let in_range (s:Seq.seq int) (k:nat) : prop =
   forall (i:nat). i < Seq.length s ==> Seq.index s i >= 0 /\ Seq.index s i <= k
+//SNIPPET_END: counting_sort_lemma_defs
 
 // Count array matches counts of values in a prefix of input
 let counts_match_prefix (c:Seq.seq int) (input:Seq.seq int) (k:nat) (prefix_len:nat) : prop =

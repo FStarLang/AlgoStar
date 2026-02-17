@@ -241,6 +241,7 @@ fn compute_hash
 
 // ========== Main Algorithm ==========
 
+//SNIPPET_START: rabin_karp_sig
 fn rabin_karp
   (#p_text: perm)
   (#p_pat: perm)
@@ -269,6 +270,7 @@ fn rabin_karp
     A.pts_to pattern #p_pat s_pat **
     pure (result >= 0 /\ result <= SZ.v n - SZ.v m + 1 /\
           result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1))
+//SNIPPET_END: rabin_karp_sig
 {
   // Compute pattern hash
   let p_hash = compute_hash pattern #s_pat 0sz m;

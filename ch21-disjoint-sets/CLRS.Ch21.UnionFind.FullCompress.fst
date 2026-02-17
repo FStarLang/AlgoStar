@@ -146,6 +146,7 @@ fn compress_path
 // Pass 1: find root (walk to self-referencing node)
 // Pass 2: compress all nodes on path to point directly to root
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+//SNIPPET_START: find_set_sig
 fn find_set
   (parent: A.array SZ.t)
   (x: SZ.t) (n: SZ.t)
@@ -170,6 +171,7 @@ fn find_set
       // root still points to itself
       SZ.v (Seq.index sp (SZ.v root)) == SZ.v root
     )
+//SNIPPET_END: find_set_sig
 {
   // Pass 1: Find root — walk parent chain until self-loop
   let mut curr = x;

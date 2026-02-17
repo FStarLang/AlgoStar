@@ -27,6 +27,7 @@ let pairwise_compatible (sel: seq nat) (s f: seq int) : prop =
   (forall (i: nat). i + 1 < Seq.length sel ==>
     Seq.index f (Seq.index sel i) <= Seq.index s (Seq.index sel (i + 1)))
 
+//SNIPPET_START: greedy_selection_inv
 (* The full greedy selection invariant *)
 let greedy_selection_inv (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) (last_finish: int) : prop =
   // Basic properties
@@ -41,6 +42,7 @@ let greedy_selection_inv (sel: seq nat) (s f: seq int) (n: nat) (processed: nat)
   Seq.index f (Seq.index sel (Seq.length sel - 1)) == last_finish /\
   // First selected is index 0
   Seq.index sel 0 == 0
+//SNIPPET_END: greedy_selection_inv
 
 (* Lemma: extending the selection with a new compatible activity *)
 let lemma_extend_selection
@@ -139,6 +141,7 @@ let is_valid_selection (sel: seq nat) (s f: seq int) (n: nat) : prop =
   strictly_increasing sel /\
   pairwise_compatible sel s f
 
+//SNIPPET_START: lemma_greedy_choice_seq
 (* Greedy choice property (CLRS Theorem 16.1):
    Given any valid selection, we can replace its first element with 0
    (the earliest-finishing activity) and get another valid selection.
@@ -164,6 +167,7 @@ let lemma_greedy_choice (s f: seq int) (n: nat) (opt: seq nat)
     (ensures
       (let opt' = Seq.upd opt 0 0 in
        is_valid_selection opt' s f n /\ Seq.length opt' == Seq.length opt))
+//SNIPPET_END: lemma_greedy_choice_seq
   = let k = Seq.index opt 0 in
     let opt' = Seq.upd opt 0 0 in
     

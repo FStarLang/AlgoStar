@@ -47,6 +47,7 @@ module Seq = FStar.Seq
 
 // ========== Matrix Representation ==========
 
+//SNIPPET_START: matrix_type
 // Matrix as sequence of sequences (rows)
 type matrix = s:Seq.seq (Seq.seq int){
   Seq.length s > 0 /\
@@ -65,6 +66,7 @@ let is_square (m:matrix) : prop = rows m == cols m
 
 let get_elem (m:matrix) (i:nat{i < rows m}) (j:nat{j < cols m}) : int =
   Seq.index (Seq.index m i) j
+//SNIPPET_END: matrix_type
 
 // ========== Power of 2 predicate ==========
 
@@ -113,6 +115,7 @@ let matrix_sub (a b:matrix{rows a == rows b /\ cols a == cols b})
 
 // ========== Standard Matrix Multiplication (Specification) ==========
 
+//SNIPPET_START: standard_multiply
 // Dot product of row i of a and column j of b
 let rec dot_product (a b:matrix) (i:nat{i < rows a}) (j:nat{j < cols b})
                     (k:nat{k <= cols a /\ k <= rows b})
@@ -128,6 +131,7 @@ let standard_multiply (a b:matrix{cols a == rows b})
     Seq.init n (fun i ->
       Seq.init m (fun j ->
         dot_product a b i j p))
+//SNIPPET_END: standard_multiply
 
 // ========== Submatrix Extraction ==========
 
@@ -184,8 +188,10 @@ let assemble_quadrants (c11 c12 c21 c22:matrix)
 
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
 
+//SNIPPET_START: strassen_multiply
 let rec strassen_multiply (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   : Tot (m:matrix{rows m == rows a /\ cols m == cols b /\ is_square m}) (decreases rows a)
+//SNIPPET_END: strassen_multiply
   = let n = rows a in
     if n = 1 then
       // Base case: 1×1 matrix, use standard multiply
@@ -205,6 +211,7 @@ let rec strassen_multiply (a b:matrix{cols a == rows b /\ is_square a /\ is_squa
       let b21 = submatrix b half n 0 half in
       let b22 = submatrix b half n half n in
       
+//SNIPPET_START: strassen_products
       // Compute the 7 products (P1..P7) using Strassen's formulas
       // P1 = A11 * (B12 - B22)
       let p1 = strassen_multiply a11 (matrix_sub b12 b22) in
@@ -220,6 +227,7 @@ let rec strassen_multiply (a b:matrix{cols a == rows b /\ is_square a /\ is_squa
       let p6 = strassen_multiply (matrix_sub a12 a22) (matrix_add b21 b22) in
       // P7 = (A11 - A21) * (B11 + B12)
       let p7 = strassen_multiply (matrix_sub a11 a21) (matrix_add b11 b12) in
+      //SNIPPET_END: strassen_products
       
       // All products should be half × half
       assert (rows p1 == half /\ cols p1 == half);
@@ -230,6 +238,7 @@ let rec strassen_multiply (a b:matrix{cols a == rows b /\ is_square a /\ is_squa
       assert (rows p6 == half /\ cols p6 == half);
       assert (rows p7 == half /\ cols p7 == half);
       
+//SNIPPET_START: strassen_combine
       // Combine into result quadrants using Strassen's formulas
       // C11 = P5 + P4 - P2 + P6
       let c11 = matrix_add (matrix_sub (matrix_add p5 p4) p2) p6 in
@@ -239,6 +248,7 @@ let rec strassen_multiply (a b:matrix{cols a == rows b /\ is_square a /\ is_squa
       let c21 = matrix_add p3 p4 in
       // C22 = P5 + P1 - P3 - P7
       let c22 = matrix_sub (matrix_sub (matrix_add p5 p1) p3) p7 in
+      //SNIPPET_END: strassen_combine
       
       // Result quadrants are all half × half
       assert (rows c11 == half /\ cols c11 == half);
@@ -266,6 +276,7 @@ let rec pow7 (n:nat) : Tot pos (decreases n) =
   if n = 0 then 1
   else 7 * pow7 (n - 1)
 
+//SNIPPET_START: strassen_complexity
 // Number of matrix multiplications performed by Strassen
 let rec strassen_mult_count (n:pos{is_pow2 n}) : Tot nat (decreases n) =
   if n = 1 then 1
@@ -280,6 +291,7 @@ let rec lemma_strassen_better_than_cubic (n:pos{is_pow2 n /\ n > 1})
           (decreases n)
   = if n = 2 then ()
     else lemma_strassen_better_than_cubic (n / 2)
+//SNIPPET_END: strassen_complexity
 
 // T(n) = 7T(n/2) for multiplications
 // Solving: T(n) = 7^{log_2 n} = n^{log_2 7} ≈ n^{2.807}
@@ -306,6 +318,7 @@ let lemma_pow7_succ (k:nat)
   : Lemma (ensures pow7 (k + 1) == 7 * pow7 k)
   = ()
 
+//SNIPPET_START: strassen_closed_form
 // Prove the closed form
 let rec lemma_strassen_mult_closed_form (n:pos{is_pow2 n})
   : Lemma (ensures (let k = log2_floor n in
@@ -319,6 +332,7 @@ let rec lemma_strassen_mult_closed_form (n:pos{is_pow2 n})
       lemma_log2_half n;
       lemma_pow7_succ (log2_floor half)
     end
+//SNIPPET_END: strassen_closed_form
 
 // ========== Correctness Proof ==========
 
@@ -763,6 +777,7 @@ let rec lemma_strassen_elem_correct
     end
 #pop-options
 
+//SNIPPET_START: strassen_correct
 let lemma_strassen_correct (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   : Lemma (ensures (forall (i:nat) (j:nat). i < rows a /\ j < cols b ==>
                     get_elem (strassen_multiply a b) i j == get_elem (standard_multiply a b) i j))
@@ -772,6 +787,7 @@ let lemma_strassen_correct (a b:matrix{cols a == rows b /\ is_square a /\ is_squ
       = lemma_strassen_elem_correct a b i j
     in
     FStar.Classical.forall_intro_2 aux
+//SNIPPET_END: strassen_correct
 
 #pop-options
 

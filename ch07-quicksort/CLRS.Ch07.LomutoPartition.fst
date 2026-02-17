@@ -94,12 +94,13 @@ let lemma_lomuto_final_swap
        (forall (k: nat). i < k /\ k <= r ==> Seq.index s2 k > pivot)))
   = ()
 
-// Partition correctness for subarray A[p..r]
+//SNIPPET_START: is_lomuto_partitioned
 let is_lomuto_partitioned (s: Seq.seq int) (p q r: nat) (pivot: int) : prop =
   p <= q /\ q <= r /\ r < Seq.length s /\
   Seq.index s q == pivot /\
   (forall (k: nat). p <= k /\ k < q ==> Seq.index s k <= pivot) /\
   (forall (k: nat). q < k /\ k <= r ==> Seq.index s k > pivot)
+//SNIPPET_END: is_lomuto_partitioned
 
 [@@"opaque_to_smt"]
 let permutation_sub (s1 s2: Seq.seq int) (p r: nat) : prop =
@@ -170,9 +171,7 @@ fn partition_step
   }
 }
 
-// CLRS §7.1 PARTITION(A, p, r) — Lomuto scheme
-//   pivot = A[r], partition A[p..r] around pivot
-//   Returns q such that A[q] == pivot, A[p..q-1] <= pivot, A[q+1..r] > pivot
+//SNIPPET_START: lomuto_partition_sig
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn lomuto_partition
   (a: A.array int)
@@ -193,15 +192,13 @@ fn lomuto_partition
       SZ.v p <= SZ.v q /\ SZ.v q <= SZ.v r /\
       SZ.v r < Seq.length s /\
       SZ.v r < Seq.length s0 /\
-      // Pivot is at position q
       Seq.index s (SZ.v q) == Seq.index s0 (SZ.v r) /\
-      // Elements before q are <= pivot
       (forall (k: nat). SZ.v p <= k /\ k < SZ.v q ==>
         Seq.index s k <= Seq.index s0 (SZ.v r)) /\
-      // Elements after q are > pivot
       (forall (k: nat). SZ.v q < k /\ k <= SZ.v r ==>
         Seq.index s k > Seq.index s0 (SZ.v r))
     )
+//SNIPPET_END: lomuto_partition_sig
 {
   // x = A[r]  (read pivot)
   let pivot = a.(r);

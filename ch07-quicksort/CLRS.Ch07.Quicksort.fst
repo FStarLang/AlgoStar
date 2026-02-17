@@ -59,8 +59,10 @@ let smaller_than (s: Seq.seq int) (rb: int)
 let between_bounds (s: Seq.seq int) (lb rb: int)
   = larger_than s lb /\ smaller_than s rb
 
+//SNIPPET_START: sorted
 let sorted (s: Seq.seq int)
   = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
+//SNIPPET_END: sorted
 
 (** Lemma connecting min/max to between_bounds **)
 
@@ -240,6 +242,7 @@ fn swap (a: A.array int) (i j: nat) (#l:nat{l <= i /\ l <= j}) (#r:nat{i < r /\ 
 
 // For CLRS partition: all elements before i_plus_1 are <= pivot
 // all elements from i_plus_1 to j are > pivot
+//SNIPPET_START: clrs_partition_pred
 let clrs_partition_pred (s:Seq.seq int) (lo:nat) (j:nat) (i_plus_1: nat) (pivot: int)
 : prop
 = forall (k:nat). {:pattern (Seq.index s k)}
@@ -247,6 +250,7 @@ let clrs_partition_pred (s:Seq.seq int) (lo:nat) (j:nat) (i_plus_1: nat) (pivot:
     let kk = k + lo in
     (lo <= kk /\ kk < i_plus_1 ==> Seq.index s k <= pivot) /\
     (i_plus_1 <= kk /\ kk < j   ==> Seq.index s k > pivot))
+//SNIPPET_END: clrs_partition_pred
 
 (** CLRS Partition Algorithm
     
@@ -257,6 +261,7 @@ let clrs_partition_pred (s:Seq.seq int) (lo:nat) (j:nat) (i_plus_1: nat) (pivot:
     - All elements in A[p+1..hi) are > pivot
 **)
 
+//SNIPPET_START: clrs_partition_sig
 #push-options "--z3rlimit_factor 8 --retry 5"
 fn clrs_partition (a: A.array int) (lo: nat) (hi:(hi:nat{lo < hi}))
   (lb rb: erased int)
@@ -285,6 +290,7 @@ fn clrs_partition (a: A.array int) (lo: nat) (hi:(hi:nat{lo < hi}))
       /\ between_bounds s lb rb
       /\ permutation s0 s
     )
+//SNIPPET_END: clrs_partition_sig
 {
   // pivot = A[hi-1]
   let pivot = a.(SZ.uint_to_t (hi - 1));
@@ -494,6 +500,7 @@ fn quicksort_proof
     3. Recursively sort right partition
 **)
 
+//SNIPPET_START: clrs_quicksort_sig
 fn rec clrs_quicksort 
   (a: A.array int) 
   (lo: nat) 
@@ -503,6 +510,7 @@ fn rec clrs_quicksort
   requires A.pts_to_range a lo hi s0
   requires pure (pure_pre_quicksort a lo hi lb rb s0)
   ensures exists* s. (A.pts_to_range a lo hi s ** pure (pure_post_quicksort a lo hi lb rb s0 s))
+//SNIPPET_END: clrs_quicksort_sig
 {
   if (lo < hi)
   {
@@ -525,6 +533,7 @@ fn rec clrs_quicksort
 
 (** Top-level API function - sorts entire array **)
 
+//SNIPPET_START: quicksort_sig
 fn quicksort 
   (a: A.array int)
   (len: SZ.t)
@@ -532,6 +541,7 @@ fn quicksort
   requires A.pts_to a s0
   requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len /\ SZ.v len > 0)
   ensures exists* s. (A.pts_to a s ** pure (sorted s /\ permutation s0 s))
+//SNIPPET_END: quicksort_sig
 {
   if (SZ.gt len 1sz) {
     // Array has more than one element - need to sort

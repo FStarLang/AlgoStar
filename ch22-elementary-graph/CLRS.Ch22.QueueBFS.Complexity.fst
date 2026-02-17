@@ -44,9 +44,11 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 
 (* ========== Complexity arithmetic lemma ========== *)
 
+//SNIPPET_START: bfs_complexity_bound
 let lemma_bfs_complexity_bound (n k: nat)
   : Lemma (requires n >= 1 /\ k <= n)
           (ensures k * (n + 1) <= 2 * (n * n))
+//SNIPPET_END: bfs_complexity_bound
   = ML.lemma_mult_le_right (n + 1) k n;  // k * (n+1) <= n * (n+1)
     assert (k * (n + 1) <= n * (n + 1));
     assert (n * (n + 1) == n * n + n * 1);

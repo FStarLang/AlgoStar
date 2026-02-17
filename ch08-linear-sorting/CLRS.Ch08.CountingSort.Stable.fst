@@ -73,6 +73,7 @@ let lemma_valid_positions (c: Seq.seq int) (s: Seq.seq int) (k: nat) (v: nat)
 
 // ========== Main Algorithm ==========
 
+//SNIPPET_START: counting_sort_stable_sig
 ```pulse
 fn counting_sort_stable
   (a: A.array int)     // Input array (read-only)
@@ -104,6 +105,7 @@ ensures exists* sb'.
     sorted sb' /\
     permutation sb' sa
   )
+//SNIPPET_END: counting_sort_stable_sig
 {
   let k_plus_1 = k_val +^ 1sz;
   

@@ -31,6 +31,7 @@ module L = CLRS.Ch08.CountingSort.Lemmas
 // ========== Main Algorithm ==========
 
 #push-options "--z3rlimit 120 --fuel 1 --ifuel 1"
+//SNIPPET_START: counting_sort_sig
 fn counting_sort
   (a: A.array int)
   (len: SZ.t)
@@ -54,6 +55,7 @@ ensures exists* s.
     L.sorted s /\
     L.permutation s0 s
   )
+//SNIPPET_END: counting_sort_sig
 {
   let n = len;
   let k = SZ.v k_val;

@@ -11,6 +11,7 @@ module Seq = FStar.Seq
 module L = FStar.List.Tot
 
 // Queue data structure: circular buffer with head, tail, and size tracking
+//SNIPPET_START: queue_type
 noeq type queue (t:Type) = {
   data: V.vec t;
   head: B.box SZ.t;     // Front of queue (dequeue position)
@@ -19,9 +20,10 @@ noeq type queue (t:Type) = {
   capacity_sz: SZ.t;    // Runtime capacity value
   capacity: erased nat; // Ghost capacity for specification
 }
+//SNIPPET_END: queue_type
 
 // Queue invariant: relates circular buffer to logical list of elements
-// The list represents the queue contents with the head being the front
+//SNIPPET_START: queue_inv
 let queue_inv (#t:Type) (q: queue t) (contents: erased (list t)) : slprop = 
   exists* arr_seq head_v tail_v size_v.
     V.pts_to q.data arr_seq **
@@ -38,12 +40,13 @@ let queue_inv (#t:Type) (q: queue t) (contents: erased (list t)) : slprop =
       Seq.length arr_seq == reveal q.capacity /\
       reveal q.capacity > 0 /\
       // Queue elements are stored in circular fashion
-      // from head to (head + size - 1) mod capacity
       (forall (i:nat). i < SZ.v size_v ==> 
         Seq.index arr_seq ((SZ.v head_v + i) % reveal q.capacity) == 
         L.index contents i)
     )
+//SNIPPET_END: queue_inv
 
+//SNIPPET_START: queue_ops
 // Create a new empty queue with given capacity
 fn create_queue (t:Type0) (default_val: t) (capacity: SZ.t)
   requires emp
@@ -74,3 +77,4 @@ fn dequeue (#t:Type0) (q: queue t) (#contents: erased (list t))
   ensures exists* xs. 
     queue_inv q (hide xs) **
     pure (reveal contents == x :: xs)
+//SNIPPET_END: queue_ops

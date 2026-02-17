@@ -18,20 +18,19 @@ open Pulse.Lib.Box { box, (:=), (!) }
 module L = FStar.List.Tot
 
 // Node: key + prev + next pointers (doubly linked)
+//SNIPPET_START: sll_node
 noeq
 type node = {
   key:  int;
   next: option (box node);
-  // prev pointer is maintained for O(1) delete but not tracked in
-  // the recursive predicate (it would create a cycle in ownership).
-  // Instead, we track prev consistency as a pure property.
 }
 
 // A doubly-linked list is a nullable pointer to the head node
 let dlist = option (box node)
+//SNIPPET_END: sll_node
 
 // Recursive predicate: the list starting at x represents logical list l.
-// Matches on the logical list (decreasing), like Pulse.Lib.LinkedList.
+//SNIPPET_START: sll_is_dlist
 let rec is_dlist ([@@@mkey] x: dlist) (l: list int) : Tot slprop (decreases l) =
   match l with
   | [] -> pure (x == None)
@@ -40,6 +39,7 @@ let rec is_dlist ([@@@mkey] x: dlist) (l: list int) : Tot slprop (decreases l) =
       pure (x == Some p) **
       pts_to p { key = hd; next = tail } **
       is_dlist tail tl
+//SNIPPET_END: sll_is_dlist
 
 // --- Boilerplate ghost functions for fold/unfold ---
 
@@ -143,10 +143,12 @@ fn is_dlist_case_some (x: dlist) (v: box node) (#l: list int)
 // Note: We don't model prev in the predicate (see design note above),
 // so the CLRS lines updating prev are elided from the proof obligation.
 // The key structural change is: new head node → old list.
+//SNIPPET_START: sll_list_insert
 fn list_insert (x: int) (head: dlist)
   requires is_dlist head 'l
   returns new_head: dlist
   ensures is_dlist new_head (x :: 'l)
+//SNIPPET_END: sll_list_insert
 {
   // Allocate new node: key = x, next = old head
   let nd = Box.alloc #node { key = x; next = head };
@@ -160,10 +162,12 @@ fn list_insert (x: int) (head: dlist)
 //   while x != NIL and x.key != k
 //     x = x.next
 //   return x
+//SNIPPET_START: sll_list_search
 fn rec list_search (head: dlist) (k: int)
   preserves is_dlist head 'l
   returns found: bool
   ensures pure (found <==> L.mem k 'l)
+//SNIPPET_END: sll_list_search
 {
   match head {
     norewrite None -> {
@@ -195,14 +199,12 @@ let rec remove_first (k: int) (l: list int) : list int =
   | hd :: tl -> if hd = k then tl else hd :: remove_first k tl
 
 // LIST-DELETE: Remove the first occurrence of key k from the list.
-//
-// In CLRS, LIST-DELETE takes a pointer to the node to delete (O(1) splice).
-// Here we search for the key (O(n)) and splice it out.
-// The O(1) splice is the structural operation; the search is LIST-SEARCH.
+//SNIPPET_START: sll_list_delete
 fn rec list_delete (head: dlist) (k: int)
   requires is_dlist head 'l
   returns new_head: dlist
   ensures is_dlist new_head (remove_first k 'l)
+//SNIPPET_END: sll_list_delete
 {
   match head {
     norewrite None -> {

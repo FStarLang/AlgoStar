@@ -13,11 +13,14 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+//SNIPPET_START: inf
 // Sentinel value for "infinity" (no edge)
 let inf : int = 1000000
+//SNIPPET_END: inf
 
 (*** Pure imperative-mirroring specification ***)
 
+//SNIPPET_START: pure_spec
 // fw_inner_j: process columns j..n-1 for row i with intermediate vertex k
 // d_ik is cached (read once before the j-loop in the imperative code)
 let rec fw_inner_j (d: Seq.seq int) (n k i j: nat) (d_ik: int) 
@@ -43,7 +46,9 @@ let rec fw_outer (d: Seq.seq int) (n k: nat)
   : Tot (Seq.seq int) (decreases (n - k)) =
   if k >= n || Seq.length d <> n * n then d
   else fw_outer (fw_inner_i d n k 0) n (k + 1)
+//SNIPPET_END: pure_spec
 
+//SNIPPET_START: length_lemmas
 // Length preservation lemmas
 let rec lemma_fw_inner_j_len (d: Seq.seq int) (n k i j: nat) (d_ik: int)
   : Lemma (ensures Seq.length (fw_inner_j d n k i j d_ik) == Seq.length d)
@@ -74,9 +79,11 @@ let rec lemma_fw_outer_len (d: Seq.seq int) (n k: nat)
       lemma_fw_inner_i_len d n k 0;
       lemma_fw_outer_len (fw_inner_i d n k 0) n (k + 1)
     end
+//SNIPPET_END: length_lemmas
 
 open Pulse.Lib.BoundedIntegers
 
+//SNIPPET_START: floyd_warshall_sig
 fn floyd_warshall
   (dist: array int)
   (#contents: Ghost.erased (Seq.seq int))
@@ -96,9 +103,11 @@ fn floyd_warshall
       // Functional correctness: output == pure Floyd-Warshall computation
       contents' == fw_outer contents (SZ.v n) 0
     )
+//SNIPPET_END: floyd_warshall_sig
 {
   let mut k : SZ.t = 0sz;
   
+//SNIPPET_START: outer_loop
   while (!k <^ n)
   invariant exists* vk contents_k.
     R.pts_to k vk **
@@ -109,10 +118,12 @@ fn floyd_warshall
       // Remaining work: processing k..n-1 from current state = processing 0..n-1 from initial
       fw_outer contents_k (SZ.v n) (SZ.v vk) == fw_outer contents (SZ.v n) 0
     )
+//SNIPPET_END: outer_loop
   {
     let vk = !k;
     let mut i : SZ.t = 0sz;
     
+//SNIPPET_START: inner_i_loop
     while (!i <^ n)
     invariant exists* vi contents_i.
       R.pts_to i vi **
@@ -124,6 +135,7 @@ fn floyd_warshall
         fw_outer (fw_inner_i contents_i (SZ.v n) (SZ.v vk) (SZ.v vi)) (SZ.v n) (SZ.v vk + 1) 
           == fw_outer contents (SZ.v n) 0
       )
+//SNIPPET_END: inner_i_loop
     {
       let vi = !i;
       let mut j : SZ.t = 0sz;
@@ -132,6 +144,7 @@ fn floyd_warshall
       let idx_ik = vi *^ n +^ vk;
       let d_ik = A.op_Array_Access dist idx_ik;
       
+//SNIPPET_START: inner_j_loop
       while (!j <^ n)
       invariant exists* vj contents_j.
         R.pts_to j vj **
@@ -146,6 +159,7 @@ fn floyd_warshall
             (SZ.v n) (SZ.v vk + 1)
             == fw_outer contents (SZ.v n) 0
         )
+//SNIPPET_END: inner_j_loop
       {
         let vj = !j;
         

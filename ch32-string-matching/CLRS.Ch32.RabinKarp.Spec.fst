@@ -25,6 +25,7 @@ module Seq = FStar.Seq
 
 (*** Core Hash Functions ***)
 
+//SNIPPET_START: horner_hash
 /// Horner's rule polynomial hash: h(s) = (s[0] + d*(s[1] + d*(s[2] + ...))) mod q
 /// Computes hash of sequence s using radix d modulo q
 let rec horner_hash (s: Seq.seq nat) (d: pos) (q: pos) : Tot nat (decreases Seq.length s) =
@@ -52,6 +53,7 @@ let rolling_hash_step
     (h: nat)            // d^(m-1) mod q
   : nat =
   (d * ((ts + q - (old_char * h) % q) % q) + new_char) % q
+//SNIPPET_END: horner_hash
 
 (*** Correctness Lemmas ***)
 

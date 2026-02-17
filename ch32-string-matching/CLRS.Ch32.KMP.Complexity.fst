@@ -488,10 +488,12 @@ fn kmp_matcher_complexity
 
 #push-options "--z3rlimit 50 --ifuel 1 --fuel 1"
 
+//SNIPPET_START: kmp_total_complexity
 // Combined complexity bound: prefix + matching
 let kmp_total_complexity_bound (c_final c_init n m: nat) : prop =
   c_final >= c_init /\
   c_final - c_init <= 2 * n + 2 * m
+//SNIPPET_END: kmp_total_complexity
 
 fn kmp_string_match_with_complexity
   (#p_text #p_pat: perm)

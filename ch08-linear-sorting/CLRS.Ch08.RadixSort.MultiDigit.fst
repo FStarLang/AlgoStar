@@ -144,16 +144,15 @@ let stable_sort_on_digit (s: seq nat) (d: nat) (base: nat) : seq nat =
 
 (* ========== Multi-digit radix sort ========== *)
 
-/// Apply radix sort for num_digits passes, sorting by digits 0, 1, ..., num_digits-1
-/// This implements CLRS RADIX-SORT(A, d) where d = num_digits
+//SNIPPET_START: radix_sort_multi
 let rec radix_sort (s: seq nat) (num_digits: nat) (base: nat) 
   : Tot (seq nat) (decreases num_digits)
   = if num_digits = 0 then
       s
     else
-      // Sort by digit 0 first, then digit 1, ..., then digit num_digits-1
       let s' = radix_sort s (num_digits - 1) base in
       stable_sort_on_digit s' (num_digits - 1) base
+//SNIPPET_END: radix_sort_multi
 
 (* ========== Correctness lemmas ========== *)
 
@@ -763,19 +762,15 @@ let permutation_preserves_bounds (s1 s2: seq nat) (bound: nat)
     in
     Classical.forall_intro aux
 
-/// P1.2.5: Main correctness theorem: radix_sort produces a fully sorted permutation
-/// 
-/// Key insight (CLRS Lemma 8.3): If we run d passes of stable digit sort
-/// (from digit 0 to d-1), the result is sorted by the full key value,
-/// provided all keys fit within d digits.
+//SNIPPET_START: radix_sort_correct_multi
 let radix_sort_correct
   (s: seq nat) (num_digits: nat) (base: nat)
   : Lemma (requires base >= 2 /\ num_digits > 0 /\
-                    // All elements fit within num_digits digits
                     (forall (i: nat). i < length s ==> index s i < pow base num_digits))
           (ensures (let result = radix_sort s num_digits base in
                    permutation s result /\
                    sorted result))
+//SNIPPET_END: radix_sort_correct_multi
   = let result = radix_sort s num_digits base in
     // Step 1: Prove result is a permutation
     radix_sort_permutation s num_digits base;

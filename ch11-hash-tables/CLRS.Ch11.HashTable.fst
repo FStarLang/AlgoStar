@@ -14,8 +14,8 @@ module Seq = FStar.Seq
 // Hash table with open addressing using linear probing
 // Sentinel values: -1 = empty, -2 = deleted, >= 0 = valid key
 
+//SNIPPET_START: ht_hash
 // Hash function: h(k) = k % table_size
-// Precondition: k >= 0 and fits in size_t
 let hash (k: int{k >= 0 /\ SZ.fits k}) (size: SZ.t{SZ.v size > 0}) : SZ.t =
   SZ.rem (SZ.uint_to_t k) size
 
@@ -28,6 +28,7 @@ let hash_probe (k: int{k >= 0 /\ SZ.fits k}) (i: SZ.t) (size: SZ.t{SZ.v size > 0
 // Pure version of hash_probe for reasoning
 let hash_probe_nat (key: int{key >= 0}) (probe: nat) (size: nat{size > 0}) : nat =
   (key % size + probe) % size
+//SNIPPET_END: ht_hash
 
 // Lemma: hash_probe_nat is always in bounds
 let lemma_hash_probe_nat_in_bounds (key: int{key >= 0}) (probe: nat) (size: nat{size > 0})
@@ -40,11 +41,12 @@ let lemma_hash_probe_consistent (key: int{key >= 0 /\ SZ.fits key}) (i: SZ.t) (s
   = ()
 
 // Abstract specification: key is present somewhere in the probe sequence
-// Precondition: size == Seq.length s
+//SNIPPET_START: ht_key_in_table
 let key_in_table (s: Seq.seq int) (size: nat{size > 0}) (key: int{key >= 0}) : prop =
   exists (probe: nat). probe < size /\ probe < Seq.length s /\ 
     hash_probe_nat key probe size < Seq.length s /\
     Seq.index s (hash_probe_nat key probe size) == key
+//SNIPPET_END: ht_key_in_table
 
 // Helper: all probes up to i did not contain the key
 let probes_not_key (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: int{key >= 0}) (i: nat) : prop =
@@ -79,6 +81,7 @@ let insert_post (table: A.array int) (s: Seq.seq int) (size: nat{size > 0}) (key
 //   - If result == true, key_in_table holds for the final state
 //   - If result == false, the table is unchanged
 #push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+//SNIPPET_START: ht_hash_insert
 fn hash_insert
   (table: A.array int)
   (#s: erased (Seq.seq int))
@@ -94,6 +97,7 @@ fn hash_insert
       Seq.length s' == SZ.v size /\
       (if result then key_in_table s' (SZ.v size) key else s' == s)
     )
+//SNIPPET_END: ht_hash_insert
 {
   let mut i: SZ.t = 0sz;
   let mut inserted: bool = false;
@@ -166,6 +170,7 @@ let search_post (table: A.array int) (s: Seq.seq int) (size: nat{size > 0 /\ siz
 //   - If result < size: Seq.index s result == key (found at that index)
 //   - If result == size: key not in table (checked probe sequence until empty slot)
 #push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+//SNIPPET_START: ht_hash_search
 fn hash_search
   (table: A.array int)
   (#s: erased (Seq.seq int))
@@ -183,14 +188,8 @@ fn hash_search
         SZ.v result < Seq.length s /\
         Seq.index s (SZ.v result) == key
       ))
-      // Not-found case (result == size): The key was not found.
-      // Loop invariant (line 210) establishes: probes_not_key s size key (final_i)
-      // meaning all probed positions up to final_i didn't contain the key.
-      // Proving the universal quantifier about "key not at ANY probed position" 
-      // in the postcondition requires explicit quantifier instantiation which
-      // Pulse's SMT encoding doesn't handle automatically. Clients needing the
-      // stronger property can examine the loop invariant or call helper lemmas.
     )
+//SNIPPET_END: ht_hash_search
 {
   let mut i: SZ.t = 0sz;
   let mut found_idx: SZ.t = size;

@@ -75,6 +75,7 @@ let probes_not_key (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}
 
 // ========== Complexity bound predicates ==========
 
+//SNIPPET_START: ht_complexity_bounds
 // Insert complexity: at most n probes
 let hash_insert_complexity_bounded (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 <= n
@@ -82,10 +83,12 @@ let hash_insert_complexity_bounded (cf c0 n: nat) : prop =
 // Search complexity: at most n probes
 let hash_search_complexity_bounded (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 <= n
+//SNIPPET_END: ht_complexity_bounds
 
 // ========== Hash Insert with Complexity ==========
 
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+//SNIPPET_START: ht_insert_complexity
 fn hash_insert_complexity
   (table: A.array int)
   (#s: erased (Seq.seq int))
@@ -106,6 +109,7 @@ fn hash_insert_complexity
       // Complexity bound: at most size probes
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
+//SNIPPET_END: ht_insert_complexity
 {
   let mut i: SZ.t = 0sz;
   let mut inserted: bool = false;
@@ -168,6 +172,7 @@ fn hash_insert_complexity
 // ========== Hash Search with Complexity ==========
 
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+//SNIPPET_START: ht_search_complexity
 fn hash_search_complexity
   (table: A.array int)
   (#s: erased (Seq.seq int))
@@ -193,6 +198,7 @@ fn hash_search_complexity
       // Complexity bound: at most size probes
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
+//SNIPPET_END: ht_search_complexity
 {
   let mut i: SZ.t = 0sz;
   let mut found_idx: SZ.t = size;

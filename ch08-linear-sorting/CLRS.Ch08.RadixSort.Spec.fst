@@ -58,13 +58,13 @@ let rec pow_monotonic (base exp1 exp2: nat)
 
 (* ========== Digit extraction ========== *)
 
-// Extract the d-th digit of k in the given base.
-// digit k d base = (k / base^d) mod base
+//SNIPPET_START: digit_extraction
 let digit (k d base: nat) : nat =
   if base > 0 then (
     pow_positive base d;
     (k / pow base d) % base
   ) else 0
+//SNIPPET_END: digit_extraction
 
 // Digit is always less than base
 let digit_bound (k d base: nat)
@@ -297,14 +297,11 @@ let permutation (s_in s_out: seq nat) : prop =
 
 (* ========== Stable sorting ========== *)
 
-// Stable sort by key function: maintains relative order for equal keys
-// Simplified definition focusing on the key properties
+//SNIPPET_START: is_stable_sort_by
 let is_stable_sort_by (s_in s_out: seq nat) (key: nat -> nat) : prop =
   permutation s_in s_out /\
-  // Sorted by key
   (forall (i j: nat). i < j /\ j < length s_out ==> 
     key (index s_out i) <= key (index s_out j)) /\
-  // Stability: for elements with equal keys, maintain relative order
   (forall (i1 i2 j1 j2: nat).
     i1 < length s_in /\ i2 < length s_in /\
     j1 < length s_out /\ j2 < length s_out /\
@@ -313,6 +310,7 @@ let is_stable_sort_by (s_in s_out: seq nat) (key: nat -> nat) : prop =
     i1 < i2 /\
     key (index s_in i1) == key (index s_in i2) ==>
     j1 < j2)
+//SNIPPET_END: is_stable_sort_by
 
 // Stable sort by digit d
 let is_stable_sort_by_digit (s_in s_out: seq nat) (d base: nat) : prop =

@@ -38,9 +38,11 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 
 // ========== Pure helper: log₂ floor ==========
 
+//SNIPPET_START: log2f
 let rec log2f (n: int) : Tot nat (decreases (if n > 0 then n else 0)) =
   if Prims.op_LessThanOrEqual n 1 then 0
   else Prims.op_Addition 1 (log2f (Prims.op_Division n 2))
+//SNIPPET_END: log2f
 
 let rec lemma_log2f_mono (a b: int)
   : Lemma (requires a >= 1 /\ b >= 1 /\ a <= b)
@@ -68,13 +70,16 @@ let is_sorted (s: Seq.seq int) : prop =
 
 // ========== Complexity bound predicate ==========
 // (Avoids BoundedIntegers elaboration issues in Pulse ensures)
+//SNIPPET_START: complexity_bounded_log
 let complexity_bounded_log (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 <= log2f n + 1
+//SNIPPET_END: complexity_bounded_log
 
 // ========== Binary Search with Complexity Bound ==========
 
 #set-options "--z3rlimit 20"
 
+//SNIPPET_START: binary_search_complexity_sig
 fn binary_search_complexity
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -103,6 +108,7 @@ fn binary_search_complexity
       // Complexity: at most ⌊log₂ n⌋ + 1 comparisons = O(log n)
       complexity_bounded_log cf (reveal c0) (SZ.v len)
     )
+//SNIPPET_END: binary_search_complexity_sig
 {
   let mut lo: SZ.t = 0sz;
   let mut hi: SZ.t = len;

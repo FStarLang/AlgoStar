@@ -92,9 +92,10 @@ let permutation_refl (s: Seq.seq int)
 let complexity_exact_linear (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == n
 
-// Quadratic bound: cf - c0 ≤ n(n-1)/2
+//SNIPPET_START: complexity_bounded_quadratic
 let complexity_bounded_quadratic (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 <= op_Multiply n (n - 1) / 2
+//SNIPPET_END: complexity_bounded_quadratic
 
 // ========== Array access helpers ==========
 
@@ -513,7 +514,7 @@ let lemma_quicksort_complexity_bound (n n_left n_right: nat) (c_partition: nat)
 
 // ========== Quicksort with Tick Counter ==========
 
-// Recursive quicksort that tracks tick count through all recursive calls
+//SNIPPET_START: clrs_quicksort_with_ticks_sig
 fn rec clrs_quicksort_with_ticks
   (a: A.array int) 
   (lo: nat) 
@@ -531,9 +532,9 @@ fn rec clrs_quicksort_with_ticks
     GR.pts_to ctr cf **
     pure (
       pure_post_quicksort a lo hi lb rb s0 s /\
-      // Complexity bound: at most (hi-lo)*(hi-lo+1)/2 operations
       complexity_bounded_quadratic cf (reveal c0) (hi - lo)
     )
+//SNIPPET_END: clrs_quicksort_with_ticks_sig
 {
   if (lo < hi)
   {

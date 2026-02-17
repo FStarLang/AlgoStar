@@ -573,6 +573,7 @@ let rec sort_edges_sorted (edges: list edge)
 
 (*** Pure Kruskal Step ***)
 
+//SNIPPET_START: kruskal_step
 // Single step of Kruskal: try to add next edge if it connects different components
 // This is a pure specification function - the is_forest check is implicit
 let kruskal_step (e: edge) (forest: list edge) (n: nat) : list edge =
@@ -581,6 +582,7 @@ let kruskal_step (e: edge) (forest: list edge) (n: nat) : list edge =
      not (mem_edge e forest)
   then e :: forest
   else forest
+//SNIPPET_END: kruskal_step
 
 // Process all edges in order
 let rec kruskal_process (sorted_edges: list edge) (forest: list edge) (n: nat) 
@@ -593,10 +595,12 @@ let rec kruskal_process (sorted_edges: list edge) (forest: list edge) (n: nat)
 
 (*** Pure Kruskal Algorithm ***)
 
+//SNIPPET_START: pure_kruskal
 // Main Kruskal algorithm: sort edges, then greedily add safe edges
 let pure_kruskal (g: graph) : list edge =
   let sorted = sort_edges g.edges in
   kruskal_process sorted [] g.n
+//SNIPPET_END: pure_kruskal
 
 (*** Correctness Properties ***)
 
@@ -742,6 +746,7 @@ let theorem_kruskal_produces_spanning_tree (g: graph)
     // and each edge added reduces component count by 1
     
 
+//SNIPPET_START: theorem_kruskal_mst
 // Kruskal's algorithm produces a minimum spanning tree
 let theorem_kruskal_produces_mst (g: graph)
   : Lemma (requires g.n > 0 /\ 
@@ -749,6 +754,7 @@ let theorem_kruskal_produces_mst (g: graph)
                     (exists (mst: list edge). is_mst g mst))
           (ensures (let result = pure_kruskal g in
                     is_mst g result))
+//SNIPPET_END: theorem_kruskal_mst
   = theorem_kruskal_produces_spanning_tree g;
     
     // The MST property follows from:

@@ -50,6 +50,7 @@ module Classical = FStar.Classical
 
 // ========== Definitions ==========
 
+//SNIPPET_START: selection_defs
 // Permutation: make opaque for SMT performance
 [@@"opaque_to_smt"]
 let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
@@ -69,6 +70,7 @@ let prefix_leq_suffix (s: Seq.seq int) (bound: nat) : prop =
   bound <= Seq.length s /\
   (forall (i j: nat). i < bound /\ bound <= j /\ j < Seq.length s ==>
     Seq.index s i <= Seq.index s j)
+//SNIPPET_END: selection_defs
 
 
 let permutation_same_length (s1 s2 : Seq.seq int)
@@ -205,6 +207,7 @@ fn find_min_index_from
 // CLRS Chapter 9, using the simple O(n²) approach of partial selection sort.
 
 #push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
+//SNIPPET_START: select
 fn select
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -229,6 +232,7 @@ fn select
       SZ.v k > 0 /\
       result == Seq.index s_final (SZ.v k `Prims.op_Subtraction` 1)
     )
+//SNIPPET_END: select
 {
   let mut round: SZ.t = 0sz;
   

@@ -544,6 +544,7 @@ fn maybe_dfs_visit
 #pop-options
 
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+//SNIPPET_START: stack_dfs_sig
 fn stack_dfs
   (adj: A.array int)
   (n: SZ.t)
@@ -609,6 +610,7 @@ fn stack_dfs
       // Discovery time < finish time (parenthesis theorem)
       (forall (u: nat). u < SZ.v n ==> Seq.index sd' u < Seq.index sf' u)
     )
+//SNIPPET_END: stack_dfs_sig
 {
   // Step 1: Initialize all vertices
   let mut i: SZ.t = 0sz;

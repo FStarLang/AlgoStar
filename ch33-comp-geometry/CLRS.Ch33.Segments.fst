@@ -21,6 +21,7 @@ open FStar.Mul
 let max_int (x y: int) : int = if x >= y then x else y
 let min_int (x y: int) : int = if x <= y then x else y
 
+//SNIPPET_START: pure_specs
 // Cross product (p2-p1) × (p3-p1) = (x2-x1)*(y3-y1) - (x3-x1)*(y2-y1)
 // Returns:
 //   > 0 if p3 is to the left of line p1->p2 (counter-clockwise)
@@ -39,7 +40,9 @@ let direction_spec (x1 y1 x2 y2 x3 y3: int) : int =
 let on_segment_spec (x1 y1 x2 y2 x y: int) : bool =
   (x <= max_int x1 x2) && (x >= min_int x1 x2) &&
   (y <= max_int y1 y2) && (y >= min_int y1 y2)
+//SNIPPET_END: pure_specs
 
+//SNIPPET_START: segments_intersect_spec
 // Check if segments (p1, p2) and (p3, p4) intersect
 // Using the standard orientation-based algorithm from CLRS
 let segments_intersect_spec (x1 y1 x2 y2 x3 y3 x4 y4: int) : bool =
@@ -58,14 +61,16 @@ let segments_intersect_spec (x1 y1 x2 y2 x3 y3 x4 y4: int) : bool =
   else if (d3 = 0 && on_segment_spec x1 y1 x2 y2 x3 y3) then true
   else if (d4 = 0 && on_segment_spec x1 y1 x2 y2 x4 y4) then true
   else false
+//SNIPPET_END: segments_intersect_spec
 
 // ========== Pulse Implementations ==========
 
-// Compute cross product for three points
+//SNIPPET_START: cross_product_sig
 fn cross_product (x1 y1 x2 y2 x3 y3: int)
   requires emp
   returns result: int
   ensures emp ** pure (result == cross_product_spec x1 y1 x2 y2 x3 y3)
+//SNIPPET_END: cross_product_sig
 {
   // Compute (x2 - x1)
   let dx21 = x2 - x1;
@@ -87,20 +92,22 @@ fn cross_product (x1 y1 x2 y2 x3 y3: int)
   result
 }
 
-// Compute direction from p1 through p2 to p3
+//SNIPPET_START: direction_sig
 fn direction (x1 y1 x2 y2 x3 y3: int)
   requires emp
   returns result: int
   ensures emp ** pure (result == direction_spec x1 y1 x2 y2 x3 y3)
+//SNIPPET_END: direction_sig
 {
   cross_product x1 y1 x2 y2 x3 y3
 }
 
-// Check if point (x, y) is on segment from (x1, y1) to (x2, y2)
+//SNIPPET_START: on_segment_sig
 fn on_segment (x1 y1 x2 y2 x y: int)
   requires emp
   returns result: bool
   ensures emp ** pure (result == on_segment_spec x1 y1 x2 y2 x y)
+//SNIPPET_END: on_segment_sig
 {
   let max_x = (if x1 >= x2 then x1 else x2);
   let min_x = (if x1 <= x2 then x1 else x2);
@@ -113,11 +120,12 @@ fn on_segment (x1 y1 x2 y2 x y: int)
   (check_x && check_y)
 }
 
-// Check if two segments intersect
+//SNIPPET_START: segments_intersect_sig
 fn segments_intersect (x1 y1 x2 y2 x3 y3 x4 y4: int)
   requires emp
   returns result: bool
   ensures emp ** pure (result == segments_intersect_spec x1 y1 x2 y2 x3 y3 x4 y4)
+//SNIPPET_END: segments_intersect_sig
 {
   // Compute orientations
   let d1 = direction x3 y3 x4 y4 x1 y1;

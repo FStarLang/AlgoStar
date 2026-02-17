@@ -12,6 +12,7 @@ open FStar.Seq
 
 (*** Type definitions ***)
 
+//SNIPPET_START: type_defs
 type edge = nat & nat
 type cover_fn = nat -> bool
 
@@ -36,6 +37,7 @@ let is_valid_cover_for_edges (c: cover_fn) (edges: list edge) : Type0 =
 let rec count_cover (c: cover_fn) (n: nat) : Tot nat (decreases n) =
   if n = 0 then 0
   else (if c (n - 1) then 1 else 0) + count_cover c (n - 1)
+//SNIPPET_END: type_defs
 
 (*** Minimum vertex cover specification (P2.7.1) ***)
 
@@ -55,19 +57,17 @@ let is_valid_graph_cover (adj: seq int) (n: nat) (c: cover_fn) : Type0 =
   let edges = extract_edges adj n 0 1 in
   is_valid_cover_for_edges c edges
 
-// Minimum vertex cover: a cover with the smallest possible cardinality
-// This is the optimization problem that the approximation algorithm targets
+//SNIPPET_START: min_vertex_cover
 let is_minimum_vertex_cover (adj: seq int) (n: nat) (c_min: cover_fn) : Type0 =
   is_valid_graph_cover adj n c_min /\
   (forall (c': cover_fn). is_valid_graph_cover adj n c' ==>
     count_cover c_min n <= count_cover c' n)
 
-// OPT(adj, n) = the size of the minimum vertex cover
-// (as a logical proposition - existence is guaranteed for finite graphs)
 let min_vertex_cover_size (adj: seq int) (n: nat) (opt: nat) : Type0 =
   exists (c_min: cover_fn). 
     is_minimum_vertex_cover adj n c_min /\ 
     count_cover c_min n = opt
+//SNIPPET_END: min_vertex_cover
 
 (*** Counting lemmas (non-mutually-recursive) ***)
 
@@ -204,6 +204,7 @@ let rec sum_le_count (c: cover_fn) (m: list edge) (n: nat)
 
 (*** Matching lower bound ***)
 
+//SNIPPET_START: matching_lower_bound
 let matching_lower_bound (c: cover_fn) (m: list edge) (n: nat)
   : Lemma (requires
               pairwise_disjoint m /\
@@ -212,6 +213,7 @@ let matching_lower_bound (c: cover_fn) (m: list edge) (n: nat)
           (ensures count_cover c n >= List.Tot.length m)
   = sum_ge_length c m;
     sum_le_count c m n
+//SNIPPET_END: matching_lower_bound
 
 (*** Cover size lemmas (recursive on n) ***)
 
@@ -258,6 +260,7 @@ let rec matching_cover_add_two (c c_rest: cover_fn) (u v: nat) (n: nat)
 
 (*** Algorithm cover size = 2 * matching size ***)
 
+//SNIPPET_START: matching_cover_size
 let rec matching_cover_size (m: list edge) (n: nat)
   : Lemma (requires
               pairwise_disjoint m /\
@@ -266,6 +269,7 @@ let rec matching_cover_size (m: list edge) (n: nat)
               count_cover (fun (x:nat) -> existsb (fun e -> edge_uses_vertex e x) m) n ==
               2 * List.Tot.length m)
           (decreases m)
+//SNIPPET_END: matching_cover_size
   = let c : cover_fn = fun (x:nat) -> existsb (fun e -> edge_uses_vertex e x) m in
     match m with
     | [] ->
@@ -292,6 +296,7 @@ let rec matching_cover_size (m: list edge) (n: nat)
 
 (*** CLRS Theorem 35.1: 2-approximation ***)
 
+//SNIPPET_START: theorem_35_1
 let theorem_35_1 
   (m: list edge) (c_opt: cover_fn) (n: nat)
   : Lemma (requires
@@ -305,6 +310,7 @@ let theorem_35_1
               count_cover c_alg n <= 2 * count_cover c_opt n))
   = matching_cover_size m n;
     matching_lower_bound c_opt m n
+//SNIPPET_END: theorem_35_1
 
 (*** Connection to Pulse implementation (P2.7.2) ***)
 

@@ -25,6 +25,7 @@ let min_int (a b: int) : Tot int = if a <= b then a else b
 
 // ========== Helper: Sum of Range ==========
 
+//SNIPPET_START: sum_range
 // Sum of elements in range [i, j)
 let rec sum_range (s: Seq.seq int) (i j: nat) : Pure int
   (requires i <= j /\ j <= Seq.length s)
@@ -33,6 +34,7 @@ let rec sum_range (s: Seq.seq int) (i j: nat) : Pure int
   =
   if i >= j then 0
   else Seq.index s i + sum_range s (i + 1) j
+//SNIPPET_END: sum_range
 
 // Lemma: sum_range is compositional
 let rec lemma_sum_range_append (s: Seq.seq int) (i j k: nat)
@@ -95,6 +97,7 @@ let find_max_crossing_subarray (s: Seq.seq int) (low mid high: nat)
 
 // ========== Main Divide-and-Conquer Algorithm ==========
 
+//SNIPPET_START: find_maximum_subarray_dc
 // Returns (max_sum, left_index, right_index) where the max subarray is [left, right)
 let rec find_maximum_subarray_dc (s: Seq.seq int) (low high: nat) 
   : Pure (int * nat * nat)
@@ -118,6 +121,7 @@ let rec find_maximum_subarray_dc (s: Seq.seq int) (low high: nat)
     else
       (cross_sum, cross_low, cross_high)
   )
+//SNIPPET_END: find_maximum_subarray_dc
 
 // Simple interface: just return the sum
 let find_maximum_subarray_sum (s: Seq.seq int) : Tot int =
@@ -129,6 +133,7 @@ let find_maximum_subarray_sum (s: Seq.seq int) : Tot int =
 
 // ========== Complexity Analysis ==========
 
+//SNIPPET_START: dc_ops_count
 // Operation count for D&C algorithm
 // T(n) = 2T(n/2) + cn for n > 1, T(1) = c
 let rec dc_ops_count (n: nat) : Tot nat =
@@ -137,6 +142,7 @@ let rec dc_ops_count (n: nat) : Tot nat =
     let half_ops = dc_ops_count (n / 2) in
     let double_half = half_ops + half_ops in
     double_half + n
+//SNIPPET_END: dc_ops_count
 
 // log2 ceiling function for complexity bounds
 let rec log2_ceil (n: pos) : Tot nat (decreases n) =
@@ -172,11 +178,13 @@ let log2_ceil_halving (n: pos{n >= 2})
   = assert (n / 2 >= 1);
     log2_ceil_monotone (n / 2) ((n + 1) / 2)
 
+//SNIPPET_START: dc_complexity_bound
 // Prove: T(n) = O(n log n) via Master Theorem case 2
 // T(n) = 2T(n/2) + n, solution T(n) <= 4n(log2_ceil(n) + 1)
 let rec lemma_dc_complexity_bound (n: pos) 
   : Lemma (ensures dc_ops_count n <= op_Multiply 4 (op_Multiply n (log2_ceil n + 1)))
           (decreases n)
+//SNIPPET_END: dc_complexity_bound
   = if n = 1 then ()
     else begin
       let h = n / 2 in
@@ -273,6 +281,7 @@ let lemma_crossing_sum_correct (s: Seq.seq int) (low mid high: nat)
     find_max_crossing_right s mid high mid 0 (Seq.index s mid) (mid + 1) in
   lemma_sum_range_append s left_idx mid right_idx
 
+//SNIPPET_START: dc_sum_correct
 // The returned range has the claimed sum
 let rec lemma_dc_sum_correct (s: Seq.seq int) (low high: nat)
   : Lemma
@@ -281,6 +290,7 @@ let rec lemma_dc_sum_correct (s: Seq.seq int) (low high: nat)
               low <= left /\ left <= right /\ right <= high /\
               (if left = right then sum == 0 else sum == sum_range s left right)))
     (decreases high - low)
+//SNIPPET_END: dc_sum_correct
   = 
   if low >= high then ()
   else if low + 1 = high then (
@@ -321,6 +331,7 @@ let max_subarray_spec_kadane (s: Seq.seq int) : Tot int =
   if Seq.length s = 0 then 0
   else kadane_spec s 0 0 initial_min
 
+//SNIPPET_START: axiom_dc_kadane_equivalence
 // Equivalence theorem (axiomatized due to proof complexity)
 //
 // This states that the divide-and-conquer and Kadane algorithms compute
@@ -345,6 +356,7 @@ let max_subarray_spec_kadane (s: Seq.seq int) : Tot int =
 // we state the equivalence as an axiom.
 assume val axiom_dc_kadane_equivalence: s:Seq.seq int{Seq.length s > 0} ->
   Lemma (find_maximum_subarray_sum s == max_subarray_spec_kadane s)
+//SNIPPET_END: axiom_dc_kadane_equivalence
 
 let lemma_dc_equals_kadane (s: Seq.seq int)
   : Lemma

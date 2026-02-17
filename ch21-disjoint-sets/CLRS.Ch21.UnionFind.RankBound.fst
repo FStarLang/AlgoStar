@@ -66,11 +66,13 @@ let make_forest_sized_valid (n: nat{n > 0})
 
 (*** 2. Key Invariant: Size ≥ 2^Rank ***)
 
+//SNIPPET_START: size_rank_invariant
 // The fundamental invariant: every node's subtree has at least 2^rank[x] nodes
 let size_rank_invariant (f: uf_forest_sized) : prop =
   is_valid_uf_sized f ==>
   (forall (x: nat{x < f.n}). 
     Seq.index f.size x >= pow2 (Seq.index f.rank x))
+//SNIPPET_END: size_rank_invariant
 
 // Helper: pow2 facts from FStar.Math.Lemmas
 let pow2_monotone (k1 k2: nat)

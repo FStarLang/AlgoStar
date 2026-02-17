@@ -33,9 +33,11 @@ module Classical = FStar.Classical
 
 // ========== Heap index functions ==========
 
+//SNIPPET_START: heap_indices
 let parent_idx (i:nat{i > 0}) : nat = (i - 1) / 2
 let left_idx (i:nat) : nat = op_Multiply 2 i + 1
 let right_idx (i:nat) : nat = op_Multiply 2 i + 2
+//SNIPPET_END: heap_indices
 
 let parent_idx_lt (i:nat{i > 0}) : Lemma (parent_idx i < i) = ()
 
@@ -55,6 +57,7 @@ let right_idx_parent (bad:nat{bad > 0}) (i:nat)
 // ========== Max-heap predicates ==========
 // Defined over a prefix of length `len` of the sequence
 
+//SNIPPET_START: heap_predicates
 // Node i satisfies max-heap with children: s[i] >= s[children] (within heap_size)
 let heap_down_at (s:Seq.seq int) (len:nat) (i:nat{i < len /\ len <= Seq.length s}) : prop =
   (left_idx i < len ==> Seq.index s i >= Seq.index s (left_idx i)) /\
@@ -69,6 +72,7 @@ let almost_heaps_from (s:Seq.seq int) (len:nat{len <= Seq.length s})
   (k:nat) (bad:nat{bad < len}) : prop =
   bad >= k /\
   (forall (j:nat). k <= j /\ j < len /\ j <> bad ==> heap_down_at s len j)
+//SNIPPET_END: heap_predicates
 
 // heap_down_at holds for all nodes from k to len-1
 let heaps_from (s:Seq.seq int) (len:nat{len <= Seq.length s}) (k:nat) : prop =
@@ -314,6 +318,7 @@ let grandparent_after_swap_from (s:Seq.seq int) (len:nat{len <= Seq.length s})
 // ========== MAX-HEAPIFY (sift_down for max-heap) ==========
 
 #push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+//SNIPPET_START: max_heapify_sig
 fn rec max_heapify
   (a: A.array int) (idx: SZ.t) (heap_size: SZ.t) (start: Ghost.erased nat)
   (#s: erased (Seq.seq int) {
@@ -342,6 +347,7 @@ ensures exists* s'.
     permutation s s' /\
     (forall (k:nat). SZ.v heap_size <= k /\ k < Seq.length s ==> Seq.index s' k == Seq.index s k)
   )
+//SNIPPET_END: max_heapify_sig
 {
   let left = SZ.add (SZ.mul 2sz idx) 1sz;
   if (SZ.gte left heap_size) {
@@ -564,6 +570,7 @@ let perm_preserves_sorted_suffix (s1 s2:Seq.seq int) (k:nat)
 // ========== Main HeapSort ==========
 
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+//SNIPPET_START: heapsort_sig
 fn heapsort
   (a: A.array int)
   (n: SZ.t)
@@ -584,7 +591,9 @@ ensures exists* s.
     sorted s /\
     permutation s0 s
   )
+//SNIPPET_END: heapsort_sig
 {
+  //SNIPPET_START: build_max_heap_loop
   // Phase 1: BUILD-MAX-HEAP (bottom-up)
   let half = SZ.div n 2sz;
   let mut i: SZ.t = half;
@@ -601,6 +610,7 @@ ensures exists* s.
       SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
       heaps_from s_cur (SZ.v n) (SZ.v vi)
     )
+  //SNIPPET_END: build_max_heap_loop
   {
     let vi = !i;
     let idx = vi - 1sz;
@@ -615,6 +625,7 @@ ensures exists* s.
     ()
   };
   
+  //SNIPPET_START: extract_max_loop
   // Phase 2: Extract-max loop
   let mut heap_sz: SZ.t = n;
   
@@ -634,6 +645,7 @@ ensures exists* s.
       suffix_sorted s_cur (SZ.v vsz) /\
       prefix_le_suffix s_cur (SZ.v vsz)
     )
+  //SNIPPET_END: extract_max_loop
   {
     let vsz = !heap_sz;
     with s_cur. assert (A.pts_to a s_cur);

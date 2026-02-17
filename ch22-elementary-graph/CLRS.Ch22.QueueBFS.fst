@@ -178,6 +178,7 @@ fn maybe_discover
 #pop-options
 
 #push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
+//SNIPPET_START: queue_bfs_sig
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)
@@ -232,6 +233,7 @@ fn queue_bfs
       (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
         Seq.index sdist' w >= 0)
     )
+//SNIPPET_END: queue_bfs_sig
 {
   // Step 1: Initialize all vertices
   let mut i: SZ.t = 0sz;

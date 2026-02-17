@@ -94,6 +94,7 @@ let unchanged_outside (s1 s2: Seq.seq int) (lo hi: nat) : prop =
     (i < lo \/ hi <= i) ==>
     Seq.index s1 i == Seq.index s2 i)
 
+//SNIPPET_START: partition_ordered
 // Partition ordering property
 let partition_ordered (s: Seq.seq int) (lo p hi: nat) : prop =
   lo <= p /\ p < hi /\ hi <= Seq.length s /\
@@ -101,6 +102,7 @@ let partition_ordered (s: Seq.seq int) (lo p hi: nat) : prop =
     (lo <= idx /\ idx < p) ==> Seq.index s idx <= Seq.index s p) /\
   (forall (idx: nat). idx < Seq.length s ==>
     (p < idx /\ idx < hi) ==> Seq.index s idx >= Seq.index s p)
+//SNIPPET_END: partition_ordered
 
 // ========== In-place partition of a[lo..hi) using a[hi-1] as pivot ==========
 // Returns pivot position p such that:
@@ -109,6 +111,7 @@ let partition_ordered (s: Seq.seq int) (lo p hi: nat) : prop =
 //   - a[p+1..hi) all > pivot_value
 
 #push-options "--z3rlimit 120 --ifuel 2 --fuel 2"
+//SNIPPET_START: partition_in_range
 fn partition_in_range
   (a: A.array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -130,6 +133,7 @@ fn partition_in_range
       permutation s0 s1 /\
       partition_ordered s1 (SZ.v lo) (SZ.v pivot_pos) (SZ.v hi)
     )
+//SNIPPET_END: partition_in_range
 {
   // CLRS partition: use a[hi-1] as pivot
   let hi_m1 = hi -^ 1sz;
@@ -213,6 +217,7 @@ let kth_order_property (s: Seq.seq int) (k n: nat) : prop =
   (forall (i: nat). i < n ==> k < i ==> Seq.index s k <= Seq.index s i)
 
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+//SNIPPET_START: quickselect
 fn quickselect
   (a: A.array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -234,6 +239,7 @@ fn quickselect
       SZ.v k < Seq.length s_final /\
       result == Seq.index s_final (SZ.v k)
     )
+//SNIPPET_END: quickselect
 {
   let mut lo_ref: SZ.t = 0sz;
   let mut hi_ref: SZ.t = n;

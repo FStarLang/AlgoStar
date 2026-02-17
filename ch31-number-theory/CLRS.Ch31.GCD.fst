@@ -18,9 +18,11 @@ module SZ = FStar.SizeT
 
 // ========== Pure Specification ==========
 
+//SNIPPET_START: gcd_spec
 // The pure recursive GCD specification
 let rec gcd_spec (a b: nat) : Tot nat (decreases b) =
   if b = 0 then a else gcd_spec b (a % b)
+//SNIPPET_END: gcd_spec
 
 // Basic properties of GCD
 let rec gcd_spec_comm (a b: nat)
@@ -41,15 +43,18 @@ let rec gcd_spec_comm (a b: nat)
 
 // ========== Pulse Implementation ==========
 
+//SNIPPET_START: gcd_impl_sig
 // Iterative implementation using a while loop
 fn gcd_impl (a_init b_init: SZ.t)
   requires pure (SZ.v a_init > 0 \/ SZ.v b_init > 0)
   returns result: SZ.t
   ensures pure (SZ.v result == gcd_spec (SZ.v a_init) (SZ.v b_init))
+//SNIPPET_END: gcd_impl_sig
 {
   let mut a: SZ.t = a_init;
   let mut b: SZ.t = b_init;
   
+//SNIPPET_START: gcd_loop
   while (!b >^ 0sz)
   invariant exists* va vb.
     R.pts_to a va **
@@ -73,6 +78,7 @@ fn gcd_impl (a_init b_init: SZ.t)
     a := vb;
     b := temp;
   };
+//SNIPPET_END: gcd_loop
   
   // When loop exits, b = 0, so gcd(a, 0) = a
   let va = !a;

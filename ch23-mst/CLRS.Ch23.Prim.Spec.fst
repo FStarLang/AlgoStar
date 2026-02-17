@@ -384,6 +384,7 @@ let lemma_prim_result_is_safe
 
 (*** Final Specification ***)
 
+//SNIPPET_START: prim_spec
 // Specification: Prim's algorithm produces an MST
 let prim_spec 
     (adj: adj_matrix)
@@ -404,6 +405,7 @@ let prim_spec
         subset_edges result t) /\
       // Result connects all vertices (would need to prove)
       all_connected n result)
+//SNIPPET_END: prim_spec
   = let result = pure_prim adj n start in
     lemma_prim_has_n_minus_1_edges adj n start;
     lemma_prim_result_is_safe adj n start;

@@ -31,6 +31,7 @@ let has_edge (n: nat) (adj: Seq.seq (Seq.seq int)) (u v: nat) : bool =
 (*** DFS State ***)
 
 // Vertex colors: White (unvisited), Gray (discovered), Black (finished)
+//SNIPPET_START: dfs_state
 type color =
   | White
   | Gray
@@ -44,6 +45,7 @@ type dfs_state = {
   color: Seq.seq color;        // Vertex colors
   time: nat;                   // Current timestamp
 }
+//SNIPPET_END: dfs_state
 
 // Initial DFS state: all vertices white, time = 0
 let init_state (n: nat) : dfs_state = {

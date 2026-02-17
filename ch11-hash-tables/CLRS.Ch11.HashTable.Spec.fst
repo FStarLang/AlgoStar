@@ -4,6 +4,7 @@ open FStar.Classical
 
 (** Pure specification for hash tables using association lists *)
 
+//SNIPPET_START: ht_model
 (** Hash table model: association list mapping keys to values *)
 type ht_model = list (nat & int)
 
@@ -29,12 +30,14 @@ let rec ht_delete (m: ht_model) (key: nat) : ht_model =
   | (k, v) :: rest ->
     if k = key then ht_delete rest key
     else (k, v) :: ht_delete rest key
+//SNIPPET_END: ht_model
 
 (** Lemma: Searching in empty table returns None *)
 let lemma_search_empty (k: nat)
   : Lemma (ht_search ht_empty k == None)
   = ()
 
+//SNIPPET_START: ht_spec_lemmas
 (** Lemma: Insert then search same key returns the inserted value *)
 let lemma_insert_search_same (m: ht_model) (k: nat) (v: int)
   : Lemma (ht_search (ht_insert m k v) k == Some v)
@@ -74,6 +77,7 @@ let rec lemma_delete_search_other (m: ht_model) (k1: nat) (k2: nat)
     | (k, v) :: rest ->
       if k = k1 then lemma_delete_search_other rest k1 k2
       else lemma_delete_search_other rest k1 k2
+//SNIPPET_END: ht_spec_lemmas
 
 (** Lemma: Multiple inserts of same key, last one wins *)
 let lemma_insert_insert_same (m: ht_model) (k: nat) (v1: int) (v2: int)

@@ -27,6 +27,7 @@ let child_indices_fit (cap: nat) (i: nat)
   // And i < cap, so i <= cap - 1 <= 32767 - 1 = 32766  
   // Therefore: 2 * i + 2 <= 2 * 32766 + 2 = 65534 < 65536 = pow2 16
 
+//SNIPPET_START: bst_type
 // Array-based BST (simplified representation)
 // Node i has: left at 2*i+1, right at 2*i+2
 noeq
@@ -35,6 +36,7 @@ type bst = {
   valid: A.array bool;
   cap: SZ.t;
 }
+//SNIPPET_END: bst_type
 
 // BST property predicate (spec only)
 let bst_property_at (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat) (i: nat) : prop =
@@ -45,6 +47,7 @@ let bst_property_at (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat) (i: nat
       (left < cap ==> (Seq.index valid left ==> Seq.index keys left < Seq.index keys i)) /\
       (right < cap ==> (Seq.index valid right ==> Seq.index keys right > Seq.index keys i)))
 
+//SNIPPET_START: subtree_in_range
 // Stronger BST property: all keys in subtree are bounded by lo and hi
 let rec subtree_in_range 
   (keys: Seq.seq int) 
@@ -62,6 +65,7 @@ let rec subtree_in_range
       lo < k /\ k < hi /\
       subtree_in_range keys valid cap left lo k /\
       subtree_in_range keys valid cap right k hi
+//SNIPPET_END: subtree_in_range
 
 // Key membership in subtree rooted at i
 let rec key_in_subtree 
@@ -295,6 +299,7 @@ let rec lemma_insert_at_invalid_preserves_old_keys
     )
 
 // Tree search
+//SNIPPET_START: tree_search
 fn tree_search
   (#p: perm)
   (t: bst)
@@ -321,8 +326,8 @@ fn tree_search
         SZ.v (Some?.v result) < Seq.length valid_seq /\
         Seq.index valid_seq (SZ.v (Some?.v result)) == true /\
         Seq.index keys_seq (SZ.v (Some?.v result)) == key))
-      // Note: Completeness (~key_in_subtree when None) requires BST property in precondition
     )
+//SNIPPET_END: tree_search
 {
   let mut current : SZ.t = 0sz;
   let mut found = false;
@@ -399,6 +404,7 @@ fn tree_search
 }
 
 // Tree insert
+//SNIPPET_START: tree_insert
 fn tree_insert
   (t: bst)
   (#keys_seq: Ghost.erased (Seq.seq int))
@@ -421,11 +427,10 @@ fn tree_insert
     pure (
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
-      // If not successful, arrays unchanged
       (not success ==> Seq.equal keys_seq' keys_seq /\
                        Seq.equal valid_seq' valid_seq)
-      // Note: Proving key insertion and preservation requires BST property/reachability
     )
+//SNIPPET_END: tree_insert
 {
   let mut current : SZ.t = 0sz;
   let mut done = false;

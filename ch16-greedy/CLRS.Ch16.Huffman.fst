@@ -165,6 +165,7 @@ fn find_min_excluding
 // Each merge combines the two smallest frequencies, accumulating their sum into the total cost.
 // This correctly computes the weighted path length of the Huffman tree.
 
+//SNIPPET_START: huffman_cost_sig
 fn huffman_cost
   (#p: perm)
   (freqs: A.array int)
@@ -185,6 +186,7 @@ fn huffman_cost
     // Base case: single element has zero cost
     (SZ.v n == 1 ==> cost == 0)
   )
+//SNIPPET_END: huffman_cost_sig
 {
   // Create working copy using Vec
   let init_val = A.op_Array_Access freqs 0sz;

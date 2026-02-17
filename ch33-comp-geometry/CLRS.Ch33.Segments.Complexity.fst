@@ -17,35 +17,24 @@ open FStar.Mul
     - 1 subtraction (of the products)
     - Plus intermediate subtractions for coordinate differences (4 more ops)
     We count the core operations: 2 mults + 1 sub = 3 *)
+//SNIPPET_START: op_counts
 let cross_product_ops : nat = 3
 
-(** Direction test: calls cross product once, then compares result
-    - 1 cross product = 3 ops
-    - Result is immediate from cross product sign *)
 let direction_ops : nat = 3
 
-(** On-segment test: checks if point q lies on segment pr
-    - 4 coordinate comparisons: min(p.x,r.x) <= q.x <= max(p.x,r.x) 
-                                 min(p.y,r.y) <= q.y <= max(p.y,r.y) *)
 let on_segment_ops : nat = 4
 
-(** Segments-intersect test: checks if two segments p1q1 and p2q2 intersect
-    General case:
-    - 4 direction tests: d1, d2, d3, d4 = 4 * 3 = 12 ops
-    - Orientation check and logic: constant
-    
-    Collinear case:
-    - 2 on-segment checks: 2 * 4 = 8 ops (but only if collinear)
-    
-    Worst case: 4 direction tests + on-segment checks = 12 + 4 = 16 ops *)
 let segments_intersect_ops : nat = 16
+//SNIPPET_END: op_counts
 
 (***** Constant-time proof *****)
 
 (** All operations are O(1) - they perform at most a constant (30) operations *)
+//SNIPPET_START: all_constant
 let all_constant () : Lemma
   (ensures cross_product_ops + direction_ops + on_segment_ops + segments_intersect_ops <= 30)
   = ()
+//SNIPPET_END: all_constant
 
 (***** Individual operation bounds *****)
 
@@ -69,6 +58,8 @@ let segments_intersect_constant () : Lemma
 
 (** The segments-intersect operation composes at most 4 direction tests
     and 2 on-segment tests *)
+//SNIPPET_START: composition
 let segments_intersect_composition () : Lemma
   (ensures segments_intersect_ops <= 4 * direction_ops + 2 * on_segment_ops)
   = ()
+//SNIPPET_END: composition

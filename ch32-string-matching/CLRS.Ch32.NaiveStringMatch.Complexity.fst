@@ -91,8 +91,10 @@ let rec count_matches_up_to_bounded (#a: eqtype) (text: Seq.seq a) (pattern: Seq
     else count_matches_up_to_bounded text pattern (limit - 1)
 
 // ========== Complexity bound predicate ==========
+//SNIPPET_START: complexity_bound_naive
 let string_match_complexity_bounded (cf c0 n m: nat) : prop =
   cf >= c0 /\ cf - c0 <= op_Multiply (n - m + 1) m
+//SNIPPET_END: complexity_bound_naive
 
 // ========== Pulse Implementation with Complexity ==========
 

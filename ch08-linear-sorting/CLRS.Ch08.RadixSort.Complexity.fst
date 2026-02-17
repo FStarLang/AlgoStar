@@ -30,52 +30,18 @@ module CS = CLRS.Ch08.CountingSort.Complexity
 /// - d passes through the array (one per digit)
 /// - Each pass uses counting sort: 2n + k + 1 operations (from CountingSort.Complexity)
 /// Total: d * (2n + k + 1)
+//SNIPPET_START: radix_sort_ops
 let radix_sort_ops (n d k: nat) : nat =
   d * CS.counting_sort_iterations n k
+//SNIPPET_END: radix_sort_ops
 
-/// Expand the definition for clarity
-let radix_sort_ops_explicit (n d k: nat)
-  : Lemma (ensures radix_sort_ops n d k == d * (2 * n + k + 1))
-  = ()
-
-/// Upper bound: radix sort is O(d(n+k))
-/// More precisely: ops ≤ 2d(n+k) + d
-///
-/// Proof: d * (2n + k + 1) = 2dn + dk + d = 2d(n+k) + d
-let radix_sort_upper_bound (n d k: nat)
-  : Lemma (ensures radix_sort_ops n d k <= 2 * d * (n + k) + d)
-  = // The proof is straightforward algebraic expansion
-    // d * (2n + k + 1) = d*2n + d*k + d*1 = 2dn + dk + d
-    // = 2d(n+k) + d
-    FStar.Math.Lemmas.distributivity_add_left d (2 * n) (k + 1);
-    FStar.Math.Lemmas.distributivity_add_left d k 1;
-    FStar.Math.Lemmas.distributivity_add_left (2 * d) n k
-
-/// Lower bound: radix sort is Ω(d(n+k))
-/// More precisely: ops ≥ d(n+k)
-///
-/// Proof:
-/// - Each pass must examine all n elements: ≥ n operations
-/// - Each pass must handle all k+1 buckets: ≥ k+1 operations  
-/// - Each pass does at least n + k operations
-/// - d passes give d(n+k) operations
-let radix_sort_lower_bound (n d k: nat)
-  : Lemma (ensures radix_sort_ops n d k >= d * (n + k))
-  = // From CountingSort.Complexity, we know:
-    CS.counting_sort_lower_bound n k;
-    assert (CS.counting_sort_iterations n k >= n + k);
-    // Therefore:
-    assert (radix_sort_ops n d k == d * CS.counting_sort_iterations n k);
-    // Since multiplication preserves ≥ for non-negative numbers:
-    assert (radix_sort_ops n d k >= d * (n + k))
-
-/// Combined: radix sort is Θ(d(n+k))
-/// Establish both bounds simultaneously
+//SNIPPET_START: radix_sort_theta_bound
 let radix_sort_theta_bound (n d k: nat)
   : Lemma (ensures d * (n + k) <= radix_sort_ops n d k /\
                    radix_sort_ops n d k <= 2 * d * (n + k) + d)
   = radix_sort_lower_bound n d k;
     radix_sort_upper_bound n d k
+//SNIPPET_END: radix_sort_theta_bound
 
 /// For fixed d and k, radix sort is O(n)
 /// This shows that when the number of digits is constant,

@@ -42,12 +42,14 @@ let appears_before (order: Seq.seq nat) (u v: nat) : prop =
 
 (*** Topological Order ***)
 
+//SNIPPET_START: is_topological_order
 // A sequence is a topological order if:
 // For every edge (u,v) in the graph, u appears before v in the order
 let is_topological_order (adj: Seq.seq int) (n: nat) (order: Seq.seq nat) : prop =
   Seq.length order == n /\
   Seq.length adj == n * n /\
   (forall (u v: nat). has_edge n adj u v ==> appears_before order u v)
+//SNIPPET_END: is_topological_order
 
 (*** Path and Cycle Definitions ***)
 
@@ -181,11 +183,13 @@ let rec lemma_topo_order_path (adj: Seq.seq int) (n: nat) (order: Seq.seq nat) (
 #pop-options
 
 #push-options "--z3rlimit 50"
+//SNIPPET_START: topo_order_implies_dag
 // Main theorem: A topological order implies the graph is a DAG
 let lemma_topo_order_implies_dag (adj: Seq.seq int) (n: nat) (order: Seq.seq nat)
   : Lemma
     (requires is_topological_order adj n order /\ n > 0)
     (ensures is_dag adj n)
+//SNIPPET_END: topo_order_implies_dag
   = // Proof by contradiction using lemma_topo_order_path
     let aux (u: nat) (k: nat)
       : Lemma (requires u < n /\ k > 0 /\ k <= n /\ has_path adj n u u k)

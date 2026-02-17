@@ -43,9 +43,7 @@ module L = CLRS.Ch08.CountingSort.Lemmas
 
 // ========== Main Algorithm ==========
 
-// Radix sort for non-negative integers bounded by k.
-// Uses counting sort as the stable sorting subroutine.
-// For integers in [0, k], this reduces to a single pass of counting sort.
+//SNIPPET_START: radix_sort_sig
 #push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
 fn radix_sort
   (a: A.array int)
@@ -70,10 +68,8 @@ ensures exists* s.
     L.sorted s /\
     L.permutation s0 s
   )
+//SNIPPET_END: radix_sort_sig
 {
-  // For integers bounded by k, radix sort with base k+1 is a single
-  // pass of counting sort. This is the CLRS radix sort specialization
-  // where d=1 (one digit in base k+1).
   CS.counting_sort a len k_val
 }
 #pop-options

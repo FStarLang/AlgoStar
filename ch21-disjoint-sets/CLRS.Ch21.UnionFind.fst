@@ -161,6 +161,7 @@ let has_root_step (parent: Seq.seq SZ.t) (i: nat) (depth: nat)
           (ensures has_root_within parent (SZ.v (Seq.index parent i)) (depth - 1))
   = ()
 
+//SNIPPET_START: find_sig
 fn find
   (#p: perm)
   (parent: array SZ.t)
@@ -181,6 +182,7 @@ fn find
       is_root s (SZ.v root) /\
       find_root s (SZ.v x) (SZ.v n) == SZ.v root
     )
+//SNIPPET_END: find_sig
 {
   let mut current: SZ.t = x;
   let mut fuel: SZ.t = n;
@@ -266,6 +268,7 @@ let union_preserves_wf (parent: Seq.seq SZ.t) (n: nat) (root_a root_b: nat)
       (ensures well_formed (Seq.upd parent root_a (SZ.uint_to_t root_b)) n)
   = ()
 
+//SNIPPET_START: union_sig
 fn union_
   (parent: array SZ.t)
   (rank: array SZ.t)
@@ -302,6 +305,7 @@ fn union_
         (SZ.v (Seq.index sp (SZ.v (fst res))) == SZ.v (snd res) \/
          SZ.v (Seq.index sp (SZ.v (snd res))) == SZ.v (fst res)))
     )
+//SNIPPET_END: union_sig
 {
   // Find roots
   let root_x = find parent x n;

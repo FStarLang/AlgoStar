@@ -150,6 +150,7 @@ let rec scan_finds_neighbor (n: nat) (adj: Seq.seq int) (frontier: Seq.seq bool)
   = if scan = u then ()
     else scan_finds_neighbor n adj frontier v u (scan + 1)
 
+//SNIPPET_START: edge_implies_next_visited
 // If u in frontier at level k and edge(u,v), then v visited at level k+1
 let edge_implies_next_visited (n: nat) (adj: Seq.seq int) (source: nat) (k: nat) (u v: nat)
   : Lemma
@@ -161,4 +162,5 @@ let edge_implies_next_visited (n: nat) (adj: Seq.seq int) (source: nat) (k: nat)
   = let frontier = frontier_at n adj source k in
     let visited = visited_after n adj source k in
     scan_finds_neighbor n adj frontier v u 0
+//SNIPPET_END: edge_implies_next_visited
 #pop-options

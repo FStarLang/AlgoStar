@@ -259,10 +259,12 @@ let sum_height_ops_bound (n: pos) (max_h: nat)
   = // This is BUILD-MAX-HEAP O(n) theorem from CLRS Theorem 6.3
     simple_sum_bound n max_h
 
+//SNIPPET_START: build_heap_ops_linear
 /// BUILD-MAX-HEAP is O(n)
 let build_heap_ops_linear (n: pos)
   : Lemma (ensures build_heap_ops n <= 4 * n)
   = sum_height_ops_bound n (log2_floor n)
+//SNIPPET_END: build_heap_ops_linear
 
 /// ========================================================================
 /// Lemmas about extract-max complexity
@@ -292,9 +294,11 @@ let heapsort_ops_bound (n: pos)
   = build_heap_ops_linear n;
     extract_max_ops_bound n
 
+//SNIPPET_START: heapsort_ops_simplified
 /// Simplified: heapsort does at most c * n * (1 + log n) operations for c = 6
 let heapsort_ops_simplified (n: pos)
   : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 6 n) (1 + log2_floor n))
+//SNIPPET_END: heapsort_ops_simplified
   = heapsort_ops_bound n;
     // build_heap_ops n <= 4n
     // extract_max_ops n <= 2n * log2_floor n
@@ -416,10 +420,12 @@ let log_linear_bound (n: pos{n >= 16})
       ()
     end
 
+//SNIPPET_START: heapsort_better_than_quadratic
 /// For n >= 11, heapsort beats naive O(n^2) sorting
 /// We use the bound: 2n log n + 4n < n^2 (valid when 2*log2_floor n + 4 < n)
 let heapsort_better_than_quadratic (n: pos{n >= 11})
   : Lemma (ensures heapsort_ops n < op_Multiply n n)
+//SNIPPET_END: heapsort_better_than_quadratic
   = heapsort_practical_bound n;
     // From heapsort_practical_bound: heapsort_ops n <= 2n*log2_floor n + 4n
     // Need to show: 2n*log2_floor n + 4n < n^2

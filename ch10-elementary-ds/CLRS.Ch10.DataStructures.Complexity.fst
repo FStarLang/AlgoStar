@@ -7,6 +7,7 @@ open FStar.Mul
   * All bounds are asymptotic — we model operation counts for big-O analysis
   *)
 
+//SNIPPET_START: ds_complexity
 (* Stack operations are O(1) — constant number of array accesses *)
 let stack_push_ops : nat = 1
 let stack_pop_ops : nat = 1
@@ -20,6 +21,7 @@ let queue_dequeue_ops : nat = 1
 let list_insert_ops : nat = 1        // Insert at head is O(1)
 let list_search_ops (n: nat) : nat = n  // Search is O(n) in worst case
 let list_delete_ops (n: nat) : nat = n  // Delete requires search for predecessor
+//SNIPPET_END: ds_complexity
 
 (** Lemma: All stack operations are bounded by a constant **)
 let stack_constant () : Lemma

@@ -51,6 +51,7 @@ type minmax_result = {
 
 // ========== Simple linear scan version (without complexity tracking) ==========
 
+//SNIPPET_START: find_minmax
 fn find_minmax
   (#p: perm)
   (a: array int)
@@ -71,6 +72,7 @@ fn find_minmax
     (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.max_val) /\
     (forall (k:nat). k < Seq.length s0 ==> result.max_val >= Seq.index s0 k)
   )
+//SNIPPET_END: find_minmax
 {
   // Initialize from first element
   let v0 = a.(0sz);
@@ -118,10 +120,12 @@ fn find_minmax
 
 // ========== With complexity tracking: 2(n-1) comparisons ==========
 
+//SNIPPET_START: complexity_bounded_minmax
 let complexity_bounded_minmax (cf c0 n: nat) : prop =
   n >= 1 /\
   cf >= c0 /\
   cf - c0 == op_Multiply 2 (n - 1)
+//SNIPPET_END: complexity_bounded_minmax
 
 fn find_minmax_complexity
   (#p: perm)

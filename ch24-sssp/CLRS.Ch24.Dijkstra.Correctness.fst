@@ -169,6 +169,7 @@ let dist_via_settled_optimal
     true)
   = ()
 
+//SNIPPET_START: greedy_choice
 #push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
 let greedy_choice_invariant
   (dist: Seq.seq int)
@@ -215,6 +216,7 @@ let greedy_choice_invariant
   (ensures
     // The greedy choice is correct: dist[u] equals true shortest path distance
     Seq.index dist u == SP.sp_dist weights n source u)
+//SNIPPET_END: greedy_choice
   =
   let d_u = Seq.index dist u in
   let delta_u = SP.sp_dist weights n source u in

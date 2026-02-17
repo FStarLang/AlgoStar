@@ -19,11 +19,13 @@ let rec extract_max_comparisons (n: nat) : nat =
   if n <= 1 then 0
   else max_heapify_comparisons n + extract_max_comparisons (n - 1)
 
+//SNIPPET_START: heapsort_comparisons
 /// HEAPSORT total comparisons:
 /// BUILD-MAX-HEAP: at most 2n comparisons (CLRS Theorem 6.3)
 /// Extract-max loop: (n-1) calls to MAX-HEAPIFY
 let heapsort_comparisons (n: pos) : nat =
   2 * n + extract_max_comparisons n
+//SNIPPET_END: heapsort_comparisons
 
 /// Lemma 1: log2_floor is bounded by n
 let rec log2_floor_bound (n: pos)
@@ -91,7 +93,9 @@ let heapsort_comparisons_bound (n: pos)
   : Lemma (ensures heapsort_comparisons n <= op_Multiply 2 n + op_Multiply (op_Multiply 2 n) (log2_floor n))
   = extract_max_comparisons_bound n
 
+//SNIPPET_START: heapsort_simplified_bound
 /// Simplified bound: heapsort does at most 2n(1 + log2_floor n) comparisons
 let heapsort_simplified_bound (n: pos)
   : Lemma (ensures heapsort_comparisons n <= op_Multiply (op_Multiply 2 n) (1 + log2_floor n))
   = heapsort_comparisons_bound n
+//SNIPPET_END: heapsort_simplified_bound

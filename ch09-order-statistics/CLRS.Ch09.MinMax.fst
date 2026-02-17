@@ -25,6 +25,7 @@ module Seq = FStar.Seq
 
 // ========== Minimum Finding ==========
 
+//SNIPPET_START: find_minimum
 fn find_minimum
   (#p: perm)
   (a: array int)
@@ -41,6 +42,7 @@ fn find_minimum
     (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == min_val) /\
     (forall (k:nat). k < Seq.length s0 ==> min_val <= Seq.index s0 k)
   )
+//SNIPPET_END: find_minimum
 {
   // Initialize min to first element
   let min_val = a.(0sz);
@@ -78,6 +80,7 @@ fn find_minimum
 
 // ========== Maximum Finding ==========
 
+//SNIPPET_START: find_maximum
 fn find_maximum
   (#p: perm)
   (a: array int)
@@ -94,6 +97,7 @@ fn find_maximum
     (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == max_val) /\
     (forall (k:nat). k < Seq.length s0 ==> max_val >= Seq.index s0 k)
   )
+//SNIPPET_END: find_maximum
 {
   // Initialize max to first element
   let max_val = a.(0sz);

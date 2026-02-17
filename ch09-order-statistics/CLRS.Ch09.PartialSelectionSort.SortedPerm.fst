@@ -51,10 +51,12 @@ let rec sorted_head_le (s: seq int) (x: int)
 // Key lemma: sorted permutations are equal
 #restart-solver
 #push-options "--z3rlimit 80 --fuel 1 --ifuel 0 --split_queries always"
+//SNIPPET_START: sorted_permutation_equal
 let rec sorted_permutation_equal (s1 s2: seq int)
   : Lemma (requires is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
           (ensures Seq.equal s1 s2)
           (decreases Seq.length s1)
+//SNIPPET_END: sorted_permutation_equal
   = if Seq.length s1 < 2 then ()
     else begin
       let min1 = Seq.index s1 0 in

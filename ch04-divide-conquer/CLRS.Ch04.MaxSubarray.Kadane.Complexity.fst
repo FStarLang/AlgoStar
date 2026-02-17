@@ -64,11 +64,14 @@ let max_subarray_spec (s: Seq.seq int) : Tot int =
 
 // ========== Complexity bound predicate ==========
 // (Avoids BoundedIntegers elaboration issues in Pulse ensures)
+//SNIPPET_START: complexity_bounded_linear
 let complexity_bounded_linear (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == n
+//SNIPPET_END: complexity_bounded_linear
 
 // ========== Main Algorithm with Complexity ==========
 
+//SNIPPET_START: max_subarray_complexity_sig
 fn max_subarray_complexity
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -87,6 +90,7 @@ fn max_subarray_complexity
     // Complexity: exactly n operations = Θ(n)
     complexity_bounded_linear cf (reveal c0) (SZ.v len)
   )
+//SNIPPET_END: max_subarray_complexity_sig
 {
   let mut current_sum: int = 0;
   let mut best_sum: int = initial_min;

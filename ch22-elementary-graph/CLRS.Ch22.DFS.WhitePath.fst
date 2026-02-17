@@ -289,6 +289,7 @@ let descendant_implies_white_path
  * Formally:
  *   dfs_ancestor d f u v ⟺ white_path_exists adj n d u v (d[u])
  *)
+//SNIPPET_START: white_path_theorem
 let white_path_theorem
   (adj: Seq.seq (Seq.seq int))
   (n: nat)
@@ -302,6 +303,7 @@ let white_path_theorem
     (ensures 
       dfs_ancestor d f u v <==> 
       white_path_exists adj n d u v (Seq.index d u))
+//SNIPPET_END: white_path_theorem
   = // Combine both directions
     // Forward: white_path => dfs_ancestor
     Classical.move_requires (white_path_implies_descendant adj n d f u) v;

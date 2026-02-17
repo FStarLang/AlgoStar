@@ -70,9 +70,11 @@ and min_over_predecessors (weights: Seq.seq int) (n: nat) (s v: nat) (k: nat{k >
     let new_best = if candidate < best then candidate else best in
     min_over_predecessors weights n s v k new_best (u + 1)
 
+//SNIPPET_START: sp_dist
 (* Shortest path distance (unbounded number of edges) *)
 let sp_dist (weights: Seq.seq int) (n: nat) (s v: nat) : int =
   if n > 0 then sp_dist_k weights n s v (n - 1) else inf
+//SNIPPET_END: sp_dist
 
 (* Distance from a vertex to itself with 0 edges is 0 *)
 let sp_dist_k_zero (weights: Seq.seq int) (n: nat) (s: nat) 
@@ -248,6 +250,7 @@ let relax_edge_unchanged (dist weights: Seq.seq int) (n u v: nat) (w: nat)
 
 (* ===== Triangle Inequality and Upper Bound Theorem (CLRS Corollary 24.3) ===== *)
 
+//SNIPPET_START: has_triangle_inequality
 (* Triangle inequality property: dist[v] <= dist[u] + w(u,v) for all edges *)
 let has_triangle_inequality (dist weights: Seq.seq int) (n: nat) : prop =
   Seq.length dist == n /\
@@ -258,6 +261,7 @@ let has_triangle_inequality (dist weights: Seq.seq int) (n: nat) : prop =
      let d_v = Seq.index dist v in
      let w = Seq.index weights (u * n + v) in
      (d_u < inf /\ w < inf) ==> d_v <= d_u + w))
+//SNIPPET_END: has_triangle_inequality
 
 (* Main theorem: If triangle inequality holds and dist[source] = 0, 
    then dist[v] <= sp_dist_k for all v, k.
@@ -395,6 +399,7 @@ and triangle_ineq_sp_bound
     triangle_ineq_sp_bound_helper dist weights n source v k without 0
   end
 
+//SNIPPET_START: triangle_ineq_upper_bound
 (* Corollary: dist[v] <= sp_dist for all v *)
 let triangle_ineq_implies_upper_bound
   (dist weights: Seq.seq int) (n source v: nat)
@@ -407,3 +412,4 @@ let triangle_ineq_implies_upper_bound
     (ensures Seq.index dist v <= sp_dist weights n source v)
   =
   triangle_ineq_sp_bound dist weights n source v (n - 1)
+//SNIPPET_END: triangle_ineq_upper_bound

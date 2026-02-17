@@ -19,9 +19,11 @@ open FStar.List.Tot
    § 1. BST Data Structure
    ======================================================================== *)
 
+//SNIPPET_START: pure_bst_type
 type bst =
   | Leaf : bst
   | Node : left:bst -> key:int -> right:bst -> bst
+//SNIPPET_END: pure_bst_type
 
 (* ========================================================================
    § 2. Helper Functions for Bounds Checking
@@ -58,6 +60,7 @@ let rec bst_inorder (t: bst) : list int =
    and all keys in right subtree > node's key
    ======================================================================== *)
 
+//SNIPPET_START: bst_valid
 let rec bst_valid (t: bst) : bool =
   match t with
   | Leaf -> true
@@ -66,11 +69,13 @@ let rec bst_valid (t: bst) : bool =
       bst_valid right &&
       all_less key (bst_inorder left) &&
       all_greater key (bst_inorder right)
+//SNIPPET_END: bst_valid
 
 (* ========================================================================
    § 5. BST Search (CLRS §12.2 TREE-SEARCH)
    ======================================================================== *)
 
+//SNIPPET_START: bst_search
 let rec bst_search (t: bst) (k: int) : bool =
   match t with
   | Leaf -> false
@@ -78,6 +83,7 @@ let rec bst_search (t: bst) (k: int) : bool =
       if k = key then true
       else if k < key then bst_search left k
       else bst_search right k
+//SNIPPET_END: bst_search
 
 (* ========================================================================
    § 6. BST Minimum (CLRS §12.2 TREE-MINIMUM)
@@ -103,6 +109,7 @@ let rec bst_maximum (t: bst) : option int =
    § 8. BST Insert (CLRS §12.3 TREE-INSERT)
    ======================================================================== *)
 
+//SNIPPET_START: bst_insert
 let rec bst_insert (t: bst) (k: int) : bst =
   match t with
   | Leaf -> Node Leaf k Leaf
@@ -110,6 +117,7 @@ let rec bst_insert (t: bst) (k: int) : bst =
       if k < key then Node (bst_insert left k) key right
       else if k > key then Node left key (bst_insert right k)
       else t  // Key already exists, return unchanged
+//SNIPPET_END: bst_insert
 
 (* ========================================================================
    § 9. BST Delete (CLRS §12.3 TREE-DELETE)
@@ -120,6 +128,7 @@ let rec bst_insert (t: bst) (k: int) : bst =
    3. Node has two children: replace with successor (minimum of right subtree)
    ======================================================================== *)
 
+//SNIPPET_START: bst_delete
 let rec bst_delete (t: bst) (k: int) : bst =
   match t with
   | Leaf -> Leaf
@@ -136,11 +145,11 @@ let rec bst_delete (t: bst) (k: int) : bst =
         | _, Leaf -> left     // Case 2b: Only left child
         | _, _ ->    // Case 3: Two children
             // Replace with successor (minimum of right subtree)
-            // Since right is not Leaf, bst_minimum right cannot be None
             match bst_minimum right with
             | Some successor_key ->
                 Node left successor_key (bst_delete right successor_key)
             | None -> t  // Should never happen when right is not Leaf
+//SNIPPET_END: bst_delete
 
 (* ========================================================================
    § 10. Helper Lemmas for List Properties
@@ -220,10 +229,12 @@ let rec lemma_all_less_implies_not_mem (k: int) (key: int) (xs: list int)
    Lemma: bst_search is correct w.r.t. membership in inorder traversal
    ------------------------------------------------------------------------ *)
 
+//SNIPPET_START: bst_search_correct
 let rec bst_search_correct (t: bst) (k: int)
   : Lemma 
     (requires bst_valid t)
     (ensures bst_search t k <==> mem k (bst_inorder t))
+//SNIPPET_END: bst_search_correct
   = match t with
     | Leaf -> ()
     | Node left key right ->
@@ -327,10 +338,12 @@ let rec lemma_insert_preserves_all_greater (t: bst) (k: int) (bound: int)
    Lemma: bst_insert preserves validity
    ------------------------------------------------------------------------ *)
 
+//SNIPPET_START: bst_insert_valid
 let rec bst_insert_valid (t: bst) (k: int)
   : Lemma
     (requires bst_valid t)
     (ensures bst_valid (bst_insert t k))
+//SNIPPET_END: bst_insert_valid
   = match t with
     | Leaf -> ()
     | Node left key right ->
@@ -771,10 +784,12 @@ let rec lemma_delete_preserves_bounds_greater (t: bst) (k: int) (bound: int)
    Lemma: bst_delete preserves validity
    ------------------------------------------------------------------------ *)
 
+//SNIPPET_START: bst_delete_valid
 let rec bst_delete_valid (t: bst) (k: int)
   : Lemma
     (requires bst_valid t)
     (ensures bst_valid (bst_delete t k))
+//SNIPPET_END: bst_delete_valid
   = match t with
     | Leaf -> ()
     | Node left key right ->
@@ -919,11 +934,13 @@ let lemma_sorted_concat (xs: list int) (bound: int) (ys: list int)
    Lemma: inorder traversal of a valid BST is sorted
    ------------------------------------------------------------------------ *)
 
+//SNIPPET_START: bst_inorder_sorted
 // Main lemma: inorder traversal is sorted for valid BSTs
 let rec bst_inorder_sorted (t: bst)
   : Lemma
     (requires bst_valid t)
     (ensures sorted (bst_inorder t))
+//SNIPPET_END: bst_inorder_sorted
   = match t with
     | Leaf -> ()
     | Node left key right ->

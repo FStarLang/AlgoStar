@@ -177,9 +177,7 @@ let complexity_bounded_linear (cf c0 n: nat) : prop =
 
 // ========== Main Algorithm with Complexity ==========
 
-// Partition function with complexity tracking: rearranges array so all elements <= pivot
-// come before all elements > pivot. Returns the number of elements <= pivot.
-// Proves that exactly n comparisons are performed.
+//SNIPPET_START: partition_complexity_sig
 fn partition_complexity
   (a: A.array int)
   (n: SZ.t)
@@ -203,9 +201,9 @@ ensures exists* s (cf: nat).
     SZ.v result <= SZ.v n /\
     permutation s0 s /\
     is_partitioned s pivot (SZ.v result) /\
-    // Complexity: exactly n comparisons = Θ(n)
     complexity_bounded_linear cf (reveal c0) (SZ.v n)
   )
+//SNIPPET_END: partition_complexity_sig
 {
   let mut i: SZ.t = 0sz;
   let mut j: SZ.t = 0sz;

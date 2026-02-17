@@ -145,6 +145,7 @@ let compute_weight_idx = compute_weight_idx_u64
 //   - key: array of minimum edge weights to add each vertex to MST
 //   - in_mst: array indicating which vertices are in MST
 
+//SNIPPET_START: prim_sig
 fn prim
   (#p: perm)
   (weights: array SZ.t)
@@ -163,6 +164,7 @@ fn prim
     A.pts_to weights #p weights_seq **
     V.pts_to key key_seq **
     pure (prim_correct key_seq weights_seq (SZ.v n) (SZ.v source))
+//SNIPPET_END: prim_sig
 {
   // Allocate key array, initialized to infinity
   let key = V.alloc infinity n;

@@ -18,8 +18,7 @@ module Spec = CLRS.Ch35.VertexCover.Spec
 // Given an adjacency matrix for an undirected graph with n vertices,
 // returns a cover array where cover[i] = 1 if vertex i is in the cover
 
-// Cover property: every edge (u,v) with u < v is covered by the cover array
-// (at least one endpoint is in the cover)
+//SNIPPET_START: is_cover
 let is_cover (s_adj s_cover: Seq.seq int) (n: nat) (bound_u bound_v: nat) : prop =
   Seq.length s_adj == n * n /\
   Seq.length s_cover == n /\
@@ -27,6 +26,7 @@ let is_cover (s_adj s_cover: Seq.seq int) (n: nat) (bound_u bound_v: nat) : prop
     u < n ==> v < n ==> u < v ==>
     Seq.index s_adj (u * n + v) <> 0 ==>
     (Seq.index s_cover u <> 0 \/ Seq.index s_cover v <> 0))
+//SNIPPET_END: is_cover
 
 // Lemma: is_cover with bound_v <= bound_u implies is_cover at next value
 // since no edges (u,v) with u=bound_u, v < bound_v satisfy u < v when bound_v <= bound_u
@@ -113,6 +113,7 @@ let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat)
   = FStar.Classical.forall_intro 
       (FStar.Classical.move_requires (Spec.approximation_ratio_theorem s_adj s_cover n))
 
+//SNIPPET_START: approx_vertex_cover_sig
 fn approx_vertex_cover
   (#p: perm)
   (adj: array int)
@@ -122,7 +123,7 @@ fn approx_vertex_cover
     A.pts_to adj #p s_adj ** 
     pure (
       SZ.v n > 0 /\ 
-      SZ.v n < 256 /\  // Much smaller bound to ensure n*n fits
+      SZ.v n < 256 /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length s_adj == SZ.v n * SZ.v n
     )
@@ -133,12 +134,11 @@ fn approx_vertex_cover
     pure (
       Seq.length s_cover == SZ.v n /\
       is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
-      // All cover values are 0 or 1
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
-      // 2-approximation bound: cover size <= 2 * OPT
       (forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
         Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) <= 2 * opt)
     )
+//SNIPPET_END: approx_vertex_cover_sig
 {
   // Initialize cover array with all zeros
   let cover = V.alloc 0 n;
@@ -150,6 +150,7 @@ fn approx_vertex_cover
   // Outer loop: u from 0 to n-1
   let mut u: SZ.t = 0sz;
   
+//SNIPPET_START: outer_loop
   while (!u <^ n)
   invariant exists* vu s_cover.
     R.pts_to u vu **
@@ -163,6 +164,7 @@ fn approx_vertex_cover
       is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0 /\
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1))
     )
+//SNIPPET_END: outer_loop
   {
     let vu = !u;
     

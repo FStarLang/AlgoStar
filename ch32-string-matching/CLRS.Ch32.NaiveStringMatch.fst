@@ -24,11 +24,13 @@ module Seq = FStar.Seq
 
 // ========== Pure Specification ==========
 
+//SNIPPET_START: matches_at_spec
 // Does pattern match text starting at position s?
 let matches_at (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (s: nat) : prop =
   s + Seq.length pattern <= Seq.length text /\
   (forall (j: nat). j < Seq.length pattern ==> 
     Seq.index text (s + j) == Seq.index pattern j)
+//SNIPPET_END: matches_at_spec
 
 // Decidable check for matching
 let rec check_match_at (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (s: nat) (j: nat{j <= Seq.length pattern})
@@ -84,6 +86,7 @@ let rec count_matches_up_to_bounded (#a: eqtype) (text: Seq.seq a) (pattern: Seq
 
 // ========== Pulse Implementation ==========
 
+//SNIPPET_START: naive_string_match_sig
 fn naive_string_match
   (#a: eqtype)
   (#p_text: perm)
@@ -114,6 +117,7 @@ fn naive_string_match
       SZ.v result <= SZ.v n - SZ.v m + 1 /\
       SZ.v result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1)
     )
+//SNIPPET_END: naive_string_match_sig
 {
   let mut count: SZ.t = 0sz;
   let mut s: SZ.t = 0sz;  // current position in text

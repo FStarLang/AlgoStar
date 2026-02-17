@@ -18,11 +18,13 @@ module R = Pulse.Lib.Reference
 
 // ========== Pure Specification ==========
 
+//SNIPPET_START: mod_exp_spec
 let rec pow (b: int) (e: nat) : Tot int (decreases e) =
   if e = 0 then 1
   else b * pow b (e - 1)
 
 let mod_exp_spec (b: int) (e: nat) (m: pos) : int = pow b e % m
+//SNIPPET_END: mod_exp_spec
 
 // ========== Lemmas about pow ==========
 
@@ -112,6 +114,7 @@ let mod_exp_step_odd (vr vb: int) (ve: nat{ve > 0 /\ ve % 2 == 1}) (m: pos)
     // = (vr * pow vb ve) % m                [by pow_odd]
 #pop-options
 
+//SNIPPET_START: mod_exp_step
 let mod_exp_step (vr vb: int) (ve: nat) (m: pos)
   : Lemma (requires ve > 0)
           (ensures (let new_r = if ve % 2 = 1 then (vr * vb) % m else vr in
@@ -120,14 +123,17 @@ let mod_exp_step (vr vb: int) (ve: nat) (m: pos)
                     (new_r * pow new_b new_e) % m == (vr * pow vb ve) % m))
   = if ve % 2 = 0 then mod_exp_step_even vr vb ve m
     else mod_exp_step_odd vr vb ve m
+//SNIPPET_END: mod_exp_step
 
 // ========== Pulse Implementation ==========
 
+//SNIPPET_START: mod_exp_impl_sig
 #push-options "--z3rlimit 20"
 fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
   requires emp ** pure (m_init > 1)
   returns result: int
   ensures emp ** pure (result == mod_exp_spec b_init e_init m_init)
+//SNIPPET_END: mod_exp_impl_sig
 {
   pow_mod_base b_init e_init m_init;
   
@@ -135,6 +141,7 @@ fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
   let mut base: int = b_init % m_init;
   let mut exp: int = e_init;
   
+//SNIPPET_START: mod_exp_loop
   while (
     let ve = !exp;
     ve > 0
@@ -168,6 +175,7 @@ fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
     let ve2 = !exp;
     exp := ve2 / 2;
   };
+//SNIPPET_END: mod_exp_loop
   
   !result
 }

@@ -21,12 +21,13 @@ open FStar.Mul
 *)
 
 /// Number of edge examinations in vertex cover algorithm
+//SNIPPET_START: vertex_cover_ops
 let vertex_cover_iterations (v: nat) : nat = v * v
 
-/// Algorithm is quadratic in number of vertices
 let vertex_cover_quadratic (v: nat) 
   : Lemma (ensures vertex_cover_iterations v <= v * v) 
   = ()
+//SNIPPET_END: vertex_cover_ops
 
 /// Upper bound: examining all possible edges in complete graph
 let vertex_cover_complete_graph (v: nat)

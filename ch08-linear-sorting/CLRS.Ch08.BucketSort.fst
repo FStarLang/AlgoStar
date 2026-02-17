@@ -37,12 +37,13 @@ module List = FStar.List.Tot
 
 (* ========== Basic Predicates ========== *)
 
-/// Predicate: list is sorted in non-decreasing order
+//SNIPPET_START: bucket_sort_sorted
 let rec sorted (xs: list int) : prop =
   match xs with
   | [] -> True
   | [x] -> True
   | x :: y :: rest -> x <= y /\ sorted (y :: rest)
+//SNIPPET_END: bucket_sort_sorted
 
 /// Predicate: all elements in list are within [lb, ub)
 let rec in_range (xs: list int) (lb ub: int) : prop =
@@ -259,8 +260,7 @@ let rec all_equal_sorted (xs: list int) (v: int)
     | [_] -> ()
     | _ :: x2 :: rest -> all_equal_sorted (x2 :: rest) v
 
-/// Lemma: appending two sorted lists with disjoint ranges is sorted
-/// This is the KEY INSIGHT of bucket sort
+//SNIPPET_START: append_sorted_disjoint
 let rec append_sorted_disjoint (xs ys: list int) (mid: int)
   : Lemma (requires sorted xs /\ sorted ys /\
                      (forall (x: int). List.mem x xs ==> x < mid) /\
@@ -271,6 +271,7 @@ let rec append_sorted_disjoint (xs ys: list int) (mid: int)
     | [] -> ()
     | [x] -> ()
     | x1 :: x2 :: rest -> append_sorted_disjoint (x2 :: rest) ys mid
+//SNIPPET_END: append_sorted_disjoint
 
 /// Lemma: A weaker version - appending sorted lists where all elements of first <= all of second
 let rec append_sorted_with_ordering (xs ys: list int)
@@ -323,13 +324,13 @@ let rec sort_all_buckets_sorted (buckets: list (list int))
 
 (* ========== Main Algorithm ========== *)
 
-/// Main Bucket Sort Algorithm
-/// Sorts input list using k buckets
+//SNIPPET_START: bucket_sort_sig
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 let bucket_sort (xs: list int) (k: pos)
   : Pure (list int)
     (requires Cons? xs)
     (ensures fun ys -> sorted ys /\ List.length ys == List.length xs)
+//SNIPPET_END: bucket_sort_sig
   = let min_val = list_min xs in
     let max_val = list_max xs in
     
@@ -371,10 +372,11 @@ let bucket_sort_cost (n k: pos) : cost =
   op_Multiply n n / k +     // Step 2: Sort buckets (O(n²/k) average case)
   n                         // Step 3: Concatenate buckets
 
-/// Theorem: When k = n, bucket sort achieves O(n) cost
+//SNIPPET_START: bucket_sort_linear_cost
 let bucket_sort_linear_cost (n: pos)
   : Lemma (bucket_sort_cost n n <= op_Multiply 3 n)
   = ()
+//SNIPPET_END: bucket_sort_linear_cost
 
 /// Analysis:
 /// - Best/Average case (uniform distribution): Θ(n + k)

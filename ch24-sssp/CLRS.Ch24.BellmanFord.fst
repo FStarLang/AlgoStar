@@ -28,6 +28,7 @@ module SP = CLRS.Ch24.ShortestPath.Spec
    NO admits. NO assumes.
 *)
 
+//SNIPPET_START: bf_triangle_inequality
 /// Triangle inequality: for each edge (u,v), dist[v] <= dist[u] + w(u,v) when finite
 let triangle_inequality (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : prop =
   Seq.length dist == n /\
@@ -37,6 +38,7 @@ let triangle_inequality (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : pr
      let d_v = Seq.index dist v in
      let w = Seq.index weights (u * n + v) in
      (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w)
+//SNIPPET_END: bf_triangle_inequality
 
 /// All distances are either finite (< 1000000) or equal to 1000000 (unreachable)
 let valid_distances (dist: Seq.seq int) (n: nat) : prop =
@@ -108,6 +110,7 @@ let bf_sp_upper_bound_cond (dist weights: Seq.seq int) (n source: nat) (flag: bo
 #pop-options
 
 #push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
+//SNIPPET_START: bellman_ford_sig
 fn bellman_ford
   (weights: A.array int)
   (n: SZ.t)
@@ -144,6 +147,7 @@ fn bellman_ford
         (forall (v: nat). v < SZ.v n ==>
           Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
     )
+//SNIPPET_END: bellman_ford_sig
 {
   // Initialization: dist[source] = 0, all others = 1000000
   let mut init_i: SZ.t = 0sz;

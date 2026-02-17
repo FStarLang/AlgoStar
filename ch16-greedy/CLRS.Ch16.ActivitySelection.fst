@@ -54,6 +54,7 @@ let valid_activity (s f: Seq.seq int) (i: nat) : prop =
 
 // ========== Activity Selection Algorithm ==========
 
+//SNIPPET_START: activity_selection_sig
 fn activity_selection 
   (#p: perm)
   (start_times finish_times: A.array int) 
@@ -85,6 +86,7 @@ fn activity_selection
         L.pairwise_compatible sel ss sf /\
         Seq.index sel 0 == 0)
     )
+//SNIPPET_END: activity_selection_sig
 {
   // First activity (earliest finish) is always selected
   let mut count: SZ.t = 1sz;

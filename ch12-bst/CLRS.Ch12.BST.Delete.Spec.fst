@@ -86,11 +86,13 @@ let rec bst_minimum_exists (t: bst)
 
 #push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
 
+//SNIPPET_START: delete_key_set_lemma
 val delete_key_set_lemma: t:bst -> k:int ->
   Lemma (requires bst_valid t /\ bst_search t k)
         (ensures FS.equal (key_set (bst_delete t k))
                           (FS.remove k (key_set t)))
         (decreases t)
+//SNIPPET_END: delete_key_set_lemma
 
 let rec delete_key_set_lemma t k =
   FS.all_finite_set_facts_lemma ();

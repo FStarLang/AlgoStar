@@ -30,6 +30,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick ==========
 
+//SNIPPET_START: ghost_tick
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
 
 ghost
@@ -39,6 +40,7 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 {
   GR.(ctr := incr_nat n)
 }
+//SNIPPET_END: ghost_tick
 
 // ========== Pure Specification (same as FloydWarshall.fst) ==========
 
@@ -100,10 +102,13 @@ open Pulse.Lib.BoundedIntegers
 
 // ========== Main Algorithm with Complexity ==========
 
+//SNIPPET_START: complexity_bound
 // Complexity bound predicate
 let fw_complexity_bounded (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == n * n * n
+//SNIPPET_END: complexity_bound
 
+//SNIPPET_START: floyd_warshall_complexity_sig
 fn floyd_warshall_complexity
   (dist: array int)
   (#contents: Ghost.erased (Seq.seq int))
@@ -127,9 +132,11 @@ fn floyd_warshall_complexity
       contents' == fw_outer contents (SZ.v n) 0 /\
       fw_complexity_bounded cf (reveal c0) (SZ.v n)
     )
+//SNIPPET_END: floyd_warshall_complexity_sig
 {
   let mut k : SZ.t = 0sz;
 
+//SNIPPET_START: complexity_k_invariant
   while (!k <^ n)
   invariant exists* vk contents_k (vc : nat).
     R.pts_to k vk **
@@ -143,6 +150,7 @@ fn floyd_warshall_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vk * SZ.v n * SZ.v n
     )
+//SNIPPET_END: complexity_k_invariant
   {
     let vk = !k;
     let mut i : SZ.t = 0sz;

@@ -8,14 +8,16 @@ open FStar.Mul
 /// Phase 1: Count occurrences - n iterations over input array
 /// Phase 2: Write sorted output - (k+1) bucket iterations + n element writes
 /// Total: n + (k+1) + n = 2n + k + 1
+//SNIPPET_START: counting_sort_iterations
 let counting_sort_iterations (n k: nat) : nat = 
   2 * n + k + 1
+//SNIPPET_END: counting_sort_iterations
 
-/// Counting sort is O(n+k): the number of iterations is linear in n+k
-/// This corresponds to CLRS Theorem 8.2
+//SNIPPET_START: counting_sort_linear
 let counting_sort_linear (n k: nat) : Lemma
   (ensures counting_sort_iterations n k <= 2 * (n + k) + 1)
   = ()
+//SNIPPET_END: counting_sort_linear
 
 /// For fixed k, counting sort is O(n)
 /// This shows that when the range k is constant, the algorithm is linear in n

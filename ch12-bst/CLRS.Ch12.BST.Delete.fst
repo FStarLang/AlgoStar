@@ -86,6 +86,7 @@ type bst = {
  * - Returned node is valid
  * - No valid left child (it's a leftmost node)
  *)
+//SNIPPET_START: tree_minimum
 fn tree_minimum
   (#p: perm)
   (t: bst)
@@ -102,7 +103,7 @@ fn tree_minimum
       SZ.v t.cap <= A.length t.keys /\
       SZ.v t.cap < 32768 /\
       SZ.v start_idx < SZ.v t.cap /\
-      Seq.index valid_seq (SZ.v start_idx) == true  // Start at valid node
+      Seq.index valid_seq (SZ.v start_idx) == true
     )
   returns result: SZ.t
   ensures
@@ -112,11 +113,11 @@ fn tree_minimum
       SZ.v result < SZ.v t.cap /\
       SZ.v result < Seq.length valid_seq /\
       Seq.index valid_seq (SZ.v result) == true /\
-      // Result has no valid left child (it's leftmost)
       (2 * SZ.v result + 1 >= SZ.v t.cap \/ 
        (2 * SZ.v result + 1 < Seq.length valid_seq /\
         Seq.index valid_seq (2 * SZ.v result + 1) == false))
     )
+//SNIPPET_END: tree_minimum
 {
   let mut current : SZ.t = start_idx;
   
@@ -283,6 +284,7 @@ fn tree_maximum
  * We implement the key-swap approach with admits for complex proofs.
  *)
 
+//SNIPPET_START: tree_delete
 fn tree_delete
   (t: bst)
   (#keys_seq: Ghost.erased (Seq.seq int))
@@ -298,7 +300,7 @@ fn tree_delete
       SZ.v t.cap <= A.length t.keys /\
       SZ.v t.cap < 32768 /\
       SZ.v del_idx < SZ.v t.cap /\
-      Seq.index valid_seq (SZ.v del_idx) == true  // Node to delete exists
+      Seq.index valid_seq (SZ.v del_idx) == true
     )
   returns success: bool
   ensures exists* keys_seq' valid_seq'.
@@ -307,13 +309,12 @@ fn tree_delete
     pure (
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
-      // If successful, the node at del_idx is now invalid
       (success ==> (SZ.v del_idx < Seq.length valid_seq' /\
                     Seq.index valid_seq' (SZ.v del_idx) == false)) /\
-      // If not successful, arrays unchanged
       (not success ==> Seq.equal keys_seq' keys_seq /\
                        Seq.equal valid_seq' valid_seq)
     )
+//SNIPPET_END: tree_delete
 {
   // Check if node has children
   child_indices_fit (SZ.v t.cap) (SZ.v del_idx);

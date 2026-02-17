@@ -141,13 +141,16 @@ let lemma_log2f_halve_le (n: int)
   = if n > 1 then lemma_log2f_halve n
     else ()
 
+//SNIPPET_START: modexp_complexity_bounded
 // ========== Complexity bound predicate ==========
 let modexp_complexity_bounded (cf c0: nat) (e_init: nat) : prop =
   cf >= c0 /\ cf - c0 <= log2f e_init + 1
+//SNIPPET_END: modexp_complexity_bounded
 
 // ========== Pulse Implementation with Complexity ==========
 
 #push-options "--z3rlimit 20"
+//SNIPPET_START: mod_exp_complexity_sig
 fn mod_exp_complexity (b_init: int) (e_init: nat) (m_init: pos)
   (ctr: GR.ref nat) (#c0: erased nat)
   requires GR.pts_to ctr c0 ** pure (m_init > 1 /\ e_init > 0)
@@ -156,6 +159,7 @@ fn mod_exp_complexity (b_init: int) (e_init: nat) (m_init: pos)
     result == mod_exp_spec b_init e_init m_init /\
     modexp_complexity_bounded cf (reveal c0) e_init
   )
+//SNIPPET_END: mod_exp_complexity_sig
 {
   pow_mod_base b_init e_init m_init;
 

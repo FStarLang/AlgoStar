@@ -102,10 +102,12 @@ let huffman_length_decreases (t1 t2: htree) (rest: list htree)
 // Helper: square function to avoid parsing issues with `*` in ensures clauses
 let square (n: nat) : Tot nat = op_Multiply n n
 
+//SNIPPET_START: huffman_ticks_bounded
 // Key lemma: Prove ticks bounded by n²
 let rec huffman_ticks_bounded (l: list htree{Cons? l})
   : Lemma (ensures huffman_ticks l <= square (length l))
           (decreases length l)
+//SNIPPET_END: huffman_ticks_bounded
   = match l with
     | [t] -> 
         // Base case: n=1, ticks=0, bound = 1×1 = 1 ✓
@@ -124,10 +126,12 @@ let rec huffman_ticks_bounded (l: list htree{Cons? l})
         huffman_ticks_bounded new_list
         // The rest follows from induction and arithmetic
 
+//SNIPPET_START: huffman_complexity
 // Main complexity theorem: O(n²) bound
 let huffman_complexity (l: list htree{Cons? l})
   : Lemma (ensures huffman_ticks l <= square (length l))
   = huffman_ticks_bounded l
+//SNIPPET_END: huffman_complexity
 
 // Simplified bound for readability: O(n²)
 // This follows from huffman_complexity but requires forall instantiation

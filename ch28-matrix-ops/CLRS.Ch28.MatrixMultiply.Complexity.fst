@@ -31,6 +31,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick ==========
 
+//SNIPPET_START: ghost_tick
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
 
 ghost
@@ -40,6 +41,7 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 {
   GR.(ctr := incr_nat n)
 }
+//SNIPPET_END: ghost_tick
 
 // ========== Pure Specification (same as MatrixMultiply.fst) ==========
 
@@ -75,11 +77,14 @@ let mat_mul_partial_ij (sa sb sc: Seq.seq int) (n ri cj: nat) : prop =
 
 // ========== Complexity bound predicate ==========
 
+//SNIPPET_START: complexity_bound
 let complexity_bounded_cubic (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == n * n * n
+//SNIPPET_END: complexity_bound
 
 // ========== Main Algorithm with Complexity ==========
 
+//SNIPPET_START: matrix_multiply_complexity_sig
 fn matrix_multiply_complexity
   (#pa #pb: perm)
   (a: array int)
@@ -112,6 +117,7 @@ fn matrix_multiply_complexity
       mat_mul_correct sa sb sc' (SZ.v n) /\
       complexity_bounded_cubic cf (reveal c0) (SZ.v n)
     )
+//SNIPPET_END: matrix_multiply_complexity_sig
 {
   let mut i: SZ.t = 0sz;
 

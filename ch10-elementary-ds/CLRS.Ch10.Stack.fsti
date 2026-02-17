@@ -9,15 +9,16 @@ module Seq = FStar.Seq
 module L = FStar.List.Tot
 
 // Stack data structure: array-based with top pointer
+//SNIPPET_START: stack_type
 noeq type stack (t:Type) = {
   data: V.vec t;
   top: B.box SZ.t;      // Index of next free slot (0 = empty)
   capacity: erased nat;
 }
+//SNIPPET_END: stack_type
 
 // Stack invariant: relates array to logical list of elements
-// Simplified: The list represents stack from bottom to top (index order)
-// So list [a;b;c] means array has a at 0, b at 1, c at 2
+//SNIPPET_START: stack_inv
 let stack_inv (#t:Type) (s: stack t) (contents: erased (list t)) : slprop = 
   exists* arr_seq top_v.
     V.pts_to s.data arr_seq **
@@ -31,7 +32,9 @@ let stack_inv (#t:Type) (s: stack t) (contents: erased (list t)) : slprop =
       (forall (i:nat). i < L.length contents ==> 
         Seq.index arr_seq i == L.index contents i)
     )
+//SNIPPET_END: stack_inv
 
+//SNIPPET_START: stack_ops
 // Create a new empty stack with given capacity
 fn create_stack (t:Type0) (default_val: t) (capacity: SZ.t)
   requires emp ** pure (SZ.v capacity > 0 /\ SZ.fits (SZ.v capacity + 1))
@@ -69,3 +72,4 @@ fn peek (#t:Type0) (s: stack t) (#contents: erased (list t))
   returns x: t
   ensures stack_inv s contents **
           pure (exists (init:list t). L.append init [x] == reveal contents)
+//SNIPPET_END: stack_ops

@@ -41,6 +41,7 @@ let all_bounded (sdist: Seq.seq int) : prop =
   forall (i:nat). i < Seq.length sdist ==> 
     Seq.index sdist i >= 0 /\ Seq.index sdist i <= 1000000
 
+//SNIPPET_START: triangle_inequality
 // Triangle inequality: for all finite edges, dist[v] <= dist[u] + w
 let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : prop =
   Seq.length sdist == n /\
@@ -50,6 +51,7 @@ let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : 
      let dist_u = Seq.index sdist u in
      let dist_v = Seq.index sdist v in
      (w < 1000000 /\ dist_u < 1000000) ==> dist_v <= dist_u + w))
+//SNIPPET_END: triangle_inequality
 
 // Partial triangle inequality: for edges (u,v) with u < u_bound, or u == u_bound and v < v_bound
 let triangle_partial (sweights: Seq.seq int) (sdist: Seq.seq int) (n u_bound v_bound: nat) : prop =
@@ -166,6 +168,7 @@ fn find_min_unvisited
   result
 }
 
+//SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)
   (n: SZ.t)
@@ -201,6 +204,7 @@ fn dijkstra
       (vtri == true ==> (forall (v: nat). v < SZ.v n ==>
         Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
     )
+//SNIPPET_END: dijkstra_sig
 {
   // Initialization: dist[source] = 0, all others = 1000000
   let mut init_i: SZ.t = 0sz;

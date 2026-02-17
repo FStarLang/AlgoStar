@@ -21,6 +21,7 @@ open FStar.Mul
  *   - Total: O(m + (n - m + 1) * m) = O(nm) - quadratic time
  *)
 
+//SNIPPET_START: rk_complexity
 (** Best case complexity: O(n + m) when no spurious hash matches occur *)
 let rk_best_case (n m: nat) : nat =
   m + (if n >= m then n - m + 1 else 0)
@@ -28,6 +29,7 @@ let rk_best_case (n m: nat) : nat =
 (** Worst case complexity: O(nm) when all hash values match *)
 let rk_worst_case (n m: nat) : nat =
   m + (if n >= m then (n - m + 1) * m else 0)
+//SNIPPET_END: rk_complexity
 
 (** Lemma: Best case is linear in n *)
 let rk_best_linear (n m: nat) : Lemma

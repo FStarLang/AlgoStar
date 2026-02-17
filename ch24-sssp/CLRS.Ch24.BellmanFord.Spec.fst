@@ -407,6 +407,7 @@ let rec bf_correctness_inductive (#n: nat) (adj: adj_matrix n) (src: nat{src < n
 
 (* ===== Convergence Theorem ===== *)
 
+//SNIPPET_START: bf_convergence
 (* Theorem: After n-1 rounds (no negative cycles), dist[v] = sp_dist(src, v) for all v *)
 let bf_convergence (#n: nat) (adj: adj_matrix n) (src: nat{src < n})
   : Lemma
@@ -418,6 +419,7 @@ let bf_convergence (#n: nat) (adj: adj_matrix n) (src: nat{src < n})
     ))
   =
   bf_correctness_inductive adj src (n - 1)
+//SNIPPET_END: bf_convergence
   // sp_dist is defined as sp_dist_k with k = n-1
   // correctness_inv says dist[v] == sp_dist_k(k) for all v
   // Therefore dist[v] == sp_dist for all v

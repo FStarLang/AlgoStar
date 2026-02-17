@@ -29,14 +29,14 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
 
-// ========== Definitions ==========
-
+//SNIPPET_START: is_partitioned
 // Partition predicate: all elements before split are <= pivot,
 // all elements from split onwards are > pivot
 let is_partitioned (s: Seq.seq int) (pivot: int) (split: nat) : prop =
   split <= Seq.length s /\
   (forall (i: nat). i < split ==> Seq.index s i <= pivot) /\
   (forall (i: nat). split <= i /\ i < Seq.length s ==> Seq.index s i > pivot)
+//SNIPPET_END: is_partitioned
 
 // ========== Permutation ==========
 
@@ -154,8 +154,7 @@ let lemma_no_swap_preserves_partition
 
 // ========== Main Algorithm ==========
 
-// Partition function: rearranges array so all elements <= pivot come before
-// all elements > pivot. Returns the number of elements <= pivot.
+//SNIPPET_START: partition_sig
 fn partition
   (a: A.array int)
   (n: SZ.t)
@@ -177,6 +176,7 @@ ensures exists* s.
     SZ.v result <= SZ.v n /\
     permutation s0 s /\
     is_partitioned s pivot (SZ.v result)
+//SNIPPET_END: partition_sig
   )
 {
   let mut i: SZ.t = 0sz;

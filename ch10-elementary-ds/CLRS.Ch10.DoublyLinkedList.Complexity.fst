@@ -154,6 +154,7 @@ fn is_dlist_case_some (x: dlist) (v: box node) (#l: list int)
 // ========== Operations with Complexity ==========
 
 // LIST-INSERT with complexity: Insert x at head, exactly 1 tick (O(1))
+//SNIPPET_START: dll_insert_tick
 fn list_insert_tick (x: int) (head: dlist) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
@@ -161,6 +162,7 @@ fn list_insert_tick (x: int) (head: dlist) (ctr: GR.ref nat)
   ensures exists* (cf: erased nat).
     is_dlist new_head (x :: 'l) ** GR.pts_to ctr cf **
     pure (reveal cf == reveal c0 + 1)
+//SNIPPET_END: dll_insert_tick
 {
   // Allocate new node: key = x, next = old head
   let nd = Box.alloc #node { key = x; next = head };
@@ -171,6 +173,7 @@ fn list_insert_tick (x: int) (head: dlist) (ctr: GR.ref nat)
 }
 
 // LIST-SEARCH with complexity: at most |l| ticks (O(n))
+//SNIPPET_START: dll_search_tick
 fn rec list_search_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
@@ -178,6 +181,7 @@ fn rec list_search_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   ensures exists* (cf: erased nat).
     is_dlist head 'l ** GR.pts_to ctr cf **
     pure (found <==> L.mem k 'l /\ reveal cf - reveal c0 <= L.length 'l)
+//SNIPPET_END: dll_search_tick
 {
   match head {
     norewrite None -> {
@@ -210,7 +214,7 @@ let rec remove_first (k: int) (l: list int) : list int =
   | hd :: tl -> if hd = k then tl else hd :: remove_first k tl
 
 // LIST-DELETE with complexity: at most |l| ticks (O(n))
-// Each recursive call or successful match counts as one tick
+//SNIPPET_START: dll_delete_tick
 fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
@@ -222,6 +226,7 @@ fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
       (~(L.mem k 'l) ==> l' == 'l) /\
       reveal cf - reveal c0 <= L.length 'l
     )
+//SNIPPET_END: dll_delete_tick
 {
   match head {
     norewrite None -> {

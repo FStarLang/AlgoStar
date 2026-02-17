@@ -24,4 +24,23 @@ the F*/Z3 toolchain, unless explicitly marked otherwise.
 
    intro
    ch02_sorting
+   ch04_divide_conquer
+   ch06_heapsort
+   ch07_quicksort
+   ch08_linear_sorting
+   ch09_order_stats
+   ch10_elementary_ds
+   ch11_hash_tables
+   ch12_bst
    ch15_dynamic_prog
+   ch16_greedy
+   ch21_disjoint_sets
+   ch22_graphs
+   ch23_mst
+   ch24_sssp
+   ch25_apsp
+   ch28_matrix_ops
+   ch31_number_theory
+   ch32_string_match
+   ch33_comp_geometry
+   ch35_approximation

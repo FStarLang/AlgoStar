@@ -12,6 +12,7 @@ open FStar.List.Tot
 
 (*** Basic Graph Definitions ***)
 
+//SNIPPET_START: graph_defs
 // Weighted edge: two vertices and a weight
 noeq type edge = {
   u: nat;
@@ -24,6 +25,7 @@ noeq type graph = {
   n: nat;  // number of vertices
   edges: list edge;
 }
+//SNIPPET_END: graph_defs
 
 // Edge equality (ignoring direction for undirected graphs)
 let edge_eq (e1 e2: edge) : bool =
@@ -98,6 +100,7 @@ let acyclic (n: nat) (es: list edge) : prop =
 
 (*** Spanning Tree ***)
 
+//SNIPPET_START: spanning_tree_mst
 // A spanning tree: connects all vertices, acyclic, has exactly n-1 edges
 let is_spanning_tree (g: graph) (es: list edge) : prop =
   g.n > 0 /\
@@ -113,6 +116,7 @@ let is_mst (g: graph) (mst: list edge) : prop =
   is_spanning_tree g mst /\
   (forall (t: list edge). 
     is_spanning_tree g t ==> total_weight mst <= total_weight t)
+//SNIPPET_END: spanning_tree_mst
 
 (*** Cut Definitions ***)
 
@@ -132,6 +136,7 @@ let rec crossing_edges (es: list edge) (s: cut) : list edge =
     if crosses_cut e s then e :: crossing_edges rest s
     else crossing_edges rest s
 
+//SNIPPET_START: cut_defs
 // Light edge: minimum weight among edges crossing the cut
 let is_light_edge (e: edge) (s: cut) (g: graph) : prop =
   mem_edge e g.edges /\
@@ -144,6 +149,7 @@ let rec respects (a: list edge) (s: cut) : bool =
   match a with
   | [] -> true
   | e :: rest -> not (crosses_cut e s) && respects rest s
+//SNIPPET_END: cut_defs
 
 (*** Helper Lemmas ***)
 
@@ -399,6 +405,7 @@ let lemma_exchange_preserves_mst
     with _h. ()
 #pop-options
 
+//SNIPPET_START: cut_property
 // Main theorem: Cut Property
 // If A ⊆ MST T, and (u,v) is light edge crossing cut respecting A,
 // then A ∪ {(u,v)} ⊆ some MST
@@ -417,6 +424,7 @@ val cut_property:
         (ensures 
           // A ∪ {e} is contained in some MST
           (exists (t: list edge). is_mst g t /\ subset_edges (e :: a) t))
+//SNIPPET_END: cut_property
 
 let cut_property g a e s =
   // Proof sketch:

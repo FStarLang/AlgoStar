@@ -20,11 +20,14 @@ open FStar.Math.Euclid
 
 // ========== GCD Definition ==========
 
+//SNIPPET_START: gcd
 let rec gcd (a b: nat) : Tot nat (decreases b) =
   if b = 0 then a else gcd b (a % b)
+//SNIPPET_END: gcd
 
 // ========== Extended GCD Algorithm ==========
 
+//SNIPPET_START: extended_gcd
 // The algorithm returns (d, x, y) as a tuple
 type extended_gcd_result = (_: nat & _: int & int)
 
@@ -39,6 +42,7 @@ let rec extended_gcd (a b: nat)
       let x = y' in
       let y = x' - q * y' in
       (| d, x, y |)
+//SNIPPET_END: extended_gcd
 
 // ========== Correctness Proofs ==========
 
@@ -74,12 +78,14 @@ let rec extended_gcd_divides_both (a b: nat)
       ()
     )
 
+//SNIPPET_START: bezout_identity
 // Main theorem: Bézout's identity
 // This is the key result: a*x + b*y = d where d = gcd(a,b)
 let rec bezout_identity (a b: nat)
   : Lemma (ensures (let (| d, x, y |) = extended_gcd a b in
                     a * x + b * y == d))
           (decreases b)
+//SNIPPET_END: bezout_identity
   = if b = 0 then ()
     else (
       let (| d', x', y' |) = extended_gcd b (a % b) in
@@ -122,6 +128,7 @@ let extended_gcd_is_greatest (a b: nat) (c: pos)
 
 // ========== Complete Specification ==========
 
+//SNIPPET_START: extended_gcd_correctness
 // Package all properties into one theorem
 let extended_gcd_correctness (a b: nat)
   : Lemma (ensures (
@@ -135,6 +142,7 @@ let extended_gcd_correctness (a b: nat)
       // Property 4: d is the greatest (any common divisor divides d)
       (forall (c: pos). divides c a /\ divides c b ==> divides c d)
     ))
+//SNIPPET_END: extended_gcd_correctness
   = extended_gcd_computes_gcd a b;
     bezout_identity a b;
     extended_gcd_divides_both a b;

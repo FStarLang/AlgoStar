@@ -25,10 +25,12 @@ module Seq = FStar.Seq
 
 // ========== Pure Specification ==========
 
+//SNIPPET_START: is_prefix_suffix
 // Does pattern[0..k-1] == pattern[q-k+1..q]? (prefix of length k matches suffix ending at q)
 let is_prefix_suffix (#a: eqtype) (pattern: Seq.seq a) (q: nat{q < Seq.length pattern}) (k: nat) : prop =
   k <= q /\
   (forall (i: nat). i < k ==> Seq.index pattern i == Seq.index pattern (q - k + 1 + i))
+//SNIPPET_END: is_prefix_suffix
 
 // Is k a valid prefix-suffix length that could extend to position q+1?
 // If pattern[k] == pattern[q+1], then k+1 is a prefix-suffix of pattern[0..q+1]
@@ -101,15 +103,18 @@ let inner_step_preserves (#a: eqtype) (pattern: Seq.seq a)
           (ensures is_prefix_suffix pattern q (if should_update then pi_prev else k))
   = if should_update then failure_chain pattern q k pi_prev else ()
 
+//SNIPPET_START: pi_correct
 // The full spec: pi[q] is a valid prefix-suffix
 let pi_correct (#a: eqtype) (pattern: Seq.seq a) (pi: Seq.seq SZ.t) : prop =
   Seq.length pi == Seq.length pattern /\
   Seq.length pattern > 0 /\
   (forall (q: nat). q < Seq.length pattern ==> 
     is_prefix_suffix pattern q (SZ.v (Seq.index pi q)))
+//SNIPPET_END: pi_correct
 
 // ========== Pulse Implementation ==========
 
+//SNIPPET_START: compute_prefix_function_sig
 // Compute the prefix function for a pattern
 fn compute_prefix_function
   (#a: eqtype)
@@ -136,6 +141,7 @@ fn compute_prefix_function
       Seq.length s_pi == SZ.v m /\
       pi_correct s_pat s_pi
     )
+//SNIPPET_END: compute_prefix_function_sig
 {
   // π[0] = 0 (already initialized)
   // is_prefix_suffix pattern 0 0 is trivially true
@@ -285,6 +291,7 @@ let count_matches_spec (text pattern: Seq.seq int) (n m: nat{m > 0}) : nat =
 
 #push-options "--z3rlimit 50 --ifuel 1 --fuel 1"
 
+//SNIPPET_START: kmp_matcher_sig
 fn kmp_matcher
   (#p_text #p_pat #p_pi: perm)
   (text: array int)
@@ -320,6 +327,7 @@ fn kmp_matcher
       SZ.v count >= 0 /\
       SZ.v count <= SZ.v n + 1
     )
+//SNIPPET_END: kmp_matcher_sig
 {
   let mut q: SZ.t = 0sz;               // number of characters matched
   let mut count_matches: SZ.t = 0sz;  // number of matches found

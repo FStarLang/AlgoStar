@@ -56,11 +56,14 @@ let compatibility_maintained (s f: Seq.seq int) (last_finish: int) (processed: n
 
 // ========== Complexity bound predicate ==========
 
+//SNIPPET_START: complexity_bounded_linear
 let complexity_bounded_linear (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == n - 1
+//SNIPPET_END: complexity_bounded_linear
 
 // ========== Activity Selection with Complexity ==========
 
+//SNIPPET_START: activity_selection_complexity_sig
 fn activity_selection_complexity
   (#p: perm)
   (start_times finish_times: A.array int)
@@ -92,6 +95,7 @@ fn activity_selection_complexity
          compatibility_maintained ss sf last_finish (SZ.v n)) /\
       complexity_bounded_linear cf (reveal c0) (SZ.v n)
     )
+//SNIPPET_END: activity_selection_complexity_sig
 {
   let mut count: SZ.t = 1sz;
   let first_finish = finish_times.(0sz);

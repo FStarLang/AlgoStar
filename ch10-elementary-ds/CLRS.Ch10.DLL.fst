@@ -14,6 +14,7 @@ open Pulse.Lib.Box { box, (:=), (!) }
 module L = FStar.List.Tot
 open FStar.List.Tot
 
+//SNIPPET_START: dll_node
 noeq
 type node = {
   key:  int;
@@ -22,9 +23,10 @@ type node = {
 }
 
 let dptr = option (box node)
+//SNIPPET_END: dll_node
 
 // DLS segment predicate for NON-EMPTY lists.
-// Adapted from Pulse.Lib.Deque.is_deque_suffix.
+//SNIPPET_START: dll_dls
 let rec dls
   ([@@@mkey] p: box node)
   (l: list int {Cons? l})
@@ -53,6 +55,7 @@ let dll (hd tl: dptr) (l: list int) : slprop =
     exists* (hp tp: box node).
       dls hp (k :: rest) None tp None **
       pure (hd == Some hp /\ tl == Some tp)
+//SNIPPET_END: dll_dls
 
 // dll hd==None ↔ l==[]
 ghost
@@ -382,11 +385,13 @@ fn rec dls_append
 
 // --- LIST-INSERT ---
 
+//SNIPPET_START: dll_list_insert
 fn list_insert (hd_ref tl_ref: ref dptr) (x: int)
   requires exists* hd tl l.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
   ensures exists* hd' tl' l.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (x :: l)
+//SNIPPET_END: dll_list_insert
 {
   let hd = Pulse.Lib.Reference.(!hd_ref);
   let tl = Pulse.Lib.Reference.(!tl_ref);
@@ -472,10 +477,12 @@ fn rec search_dls
   }
 }
 
+//SNIPPET_START: dll_list_search
 fn list_search (hd tl: dptr) (k: int)
   preserves dll hd tl 'l
   returns found: bool
   ensures pure (found <==> L.mem k 'l)
+//SNIPPET_END: dll_list_search
 {
   match hd {
     norewrite None -> {
@@ -813,11 +820,13 @@ fn rec delete_in_dls
   }
 }
 
+//SNIPPET_START: dll_list_delete
 fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
   requires exists* hd tl l.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
   ensures exists* hd' tl' l.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_first k l)
+//SNIPPET_END: dll_list_delete
 {
   let hd = Pulse.Lib.Reference.(!hd_ref);
   let tl = Pulse.Lib.Reference.(!tl_ref);

@@ -22,6 +22,7 @@ module Seq = FStar.Seq
 
 (*** 1. Forest Model ***)
 
+//SNIPPET_START: uf_forest_def
 // Union-Find forest with parent pointers and ranks
 type uf_forest = {
   parent: Seq.seq nat;
@@ -42,6 +43,7 @@ let is_root (f: uf_forest) (i: nat) : prop =
   i < f.n /\ 
   i < Seq.length f.parent /\
   Seq.index f.parent i == i
+//SNIPPET_END: uf_forest_def
 
 // Initial forest: each element is its own parent with rank 0
 let make_forest (n: nat{n > 0}) : uf_forest =
@@ -58,12 +60,14 @@ let make_forest_valid (n: nat{n > 0})
 
 (*** 2. Rank Invariant (CLRS Lemma 21.4) ***)
 
+//SNIPPET_START: rank_invariant
 // Rank invariant: for all non-root x, rank[x] < rank[parent[x]]
 // Only meaningful when is_valid_uf holds
 let rank_invariant (f: uf_forest) : prop =
   is_valid_uf f ==>
   (forall (x: nat{x < f.n}). Seq.index f.parent x <> x ==>
     Seq.index f.rank x < Seq.index f.rank (Seq.index f.parent x))
+//SNIPPET_END: rank_invariant
 
 // Initial forest satisfies rank invariant (vacuously - all are roots)
 let make_forest_rank_invariant (n: nat{n > 0})
@@ -122,10 +126,12 @@ let pure_find_fuel_sufficient (f: uf_forest{is_valid_uf f /\ rank_invariant f})
     assume (ranks_bounded f);
     find_fuel_by_bound f x f.n (f.n - 1)
 
+//SNIPPET_START: pure_find
 // Pure find: follow parent pointers to root (guaranteed to terminate under rank_invariant)
 let pure_find (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x: nat{x < f.n}) : nat =
   pure_find_fuel_sufficient f x;
   Some?.v (pure_find_fuel f x f.n)
+//SNIPPET_END: pure_find
 
 // Lemma: pure_find result is in bounds
 let rec pure_find_in_bounds_fuel (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n}) (fuel: nat)
@@ -202,6 +208,7 @@ let rank_monotone_chain (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x: na
 
 (*** 5. Pure Union Operation ***)
 
+//SNIPPET_START: pure_union
 // Union two trees by rank (CLRS union-by-rank heuristic)
 let pure_union (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x y: nat{x < f.n /\ y < f.n}) : uf_forest =
   pure_find_in_bounds f x;
@@ -223,6 +230,7 @@ let pure_union (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x y: nat{x < f
       { f with 
         parent = Seq.upd f.parent root_y root_x;
         rank = Seq.upd f.rank root_x (rank_x + 1) }
+//SNIPPET_END: pure_union
 
 // Lemma: pure_union preserves validity
 let pure_union_valid (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x y: nat{x < f.n /\ y < f.n})
@@ -427,6 +435,7 @@ let rec pure_find_fuel_after_update
 #pop-options
 
 // Now prove the main lemma using the fuel-based helper
+//SNIPPET_START: pure_union_correctness
 // Main correctness theorem for pure_union  
 #restart-solver
 #push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
@@ -435,6 +444,7 @@ let pure_union_correctness (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x 
                     is_valid_uf f' /\
                     rank_invariant f' /\
                     pure_find f' x == pure_find f' y))
+//SNIPPET_END: pure_union_correctness
   = pure_union_valid f x y;
     pure_union_preserves_rank_invariant f x y;
     pure_find_in_bounds f x;

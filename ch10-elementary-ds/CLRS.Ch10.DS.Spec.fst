@@ -17,6 +17,7 @@ open FStar.List.Tot.Properties
 
 (*** Stack Specification (LIFO - Last In, First Out) ***)
 
+//SNIPPET_START: stack_spec
 /// Abstract stack type: simply a list where head is the top
 type stack (a: Type) = list a
 
@@ -31,6 +32,7 @@ let stack_push (#a: Type) (s: stack a) (x: a) : stack a =
 let stack_pop (#a: Type) (s: stack a{Cons? s}) : (a & stack a) =
   match s with
   | hd :: tl -> (hd, tl)
+//SNIPPET_END: stack_spec
 
 /// Check if stack is empty
 let stack_is_empty (#a: Type) (s: stack a) : bool =
@@ -44,6 +46,7 @@ let stack_size (#a: Type) (s: stack a) : nat =
 
 (** Stack Properties **)
 
+//SNIPPET_START: stack_lifo
 /// LIFO Property 1: Popping a pushed element returns that element
 let lemma_stack_lifo_pop_push (#a: Type) (s: stack a) (x: a)
   : Lemma (fst (stack_pop (stack_push s x)) == x)
@@ -53,6 +56,7 @@ let lemma_stack_lifo_pop_push (#a: Type) (s: stack a) (x: a)
 let lemma_stack_lifo_stack_preserved (#a: Type) (s: stack a) (x: a)
   : Lemma (snd (stack_pop (stack_push s x)) == s)
   = ()
+//SNIPPET_END: stack_lifo
 
 /// Push makes stack non-empty
 let lemma_stack_push_non_empty (#a: eqtype) (s: stack a) (x: a)
@@ -77,6 +81,7 @@ let lemma_stack_empty_size (#a: Type)
 
 (*** Queue Specification (FIFO - First In, First Out) ***)
 
+//SNIPPET_START: queue_spec
 /// Abstract queue type: two-list implementation for efficient operations
 /// - front: elements to dequeue from
 /// - back: elements recently enqueued (stored in reverse)
@@ -123,6 +128,7 @@ let queue_dequeue (#a: Type) (q: wf_queue a) : option (a & wf_queue a) =
        | _ -> Some (x, queue_normalize { front = []; back = q.back }))
   | x :: front_tl ->
       Some (x, { front = front_tl; back = q.back })
+//SNIPPET_END: queue_spec
 
 /// Check if queue is empty
 let queue_is_empty (#a: Type) (q: wf_queue a) : bool =
@@ -177,6 +183,7 @@ let lemma_queue_fifo_single (#a: Type) (x: a)
       queue_dequeue q == Some (x, queue_empty))
   = ()
 
+//SNIPPET_START: queue_fifo
 /// FIFO Property: dequeue returns head of queue-to-list view
 let lemma_queue_dequeue_preserves_contents (#a: Type) (q: wf_queue a{~(queue_is_empty q)})
   : Lemma (
@@ -188,6 +195,7 @@ let lemma_queue_dequeue_preserves_contents (#a: Type) (q: wf_queue a{~(queue_is_
          | [] -> ()
          | _ -> lemma_queue_normalize_preserves_contents { front = []; back = q.back })
     | x :: front_tl -> ()
+//SNIPPET_END: queue_fifo
 
 /// Size increases by one after enqueue
 let lemma_queue_enqueue_size (#a: Type) (q: wf_queue a) (x: a)
@@ -223,6 +231,7 @@ let lemma_queue_empty_size (#a: Type)
 
 (*** LinkedList Specification ***)
 
+//SNIPPET_START: list_spec
 /// Abstract linked list: just a list
 type linked_list (a: Type) = list a
 
@@ -246,6 +255,7 @@ let rec list_delete (#a: eqtype) (l: linked_list a) (x: a) : linked_list a =
   | hd :: tl -> 
       if hd = x then tl
       else hd :: list_delete tl x
+//SNIPPET_END: list_spec
 
 /// Get the length of the list
 let list_length (#a: Type) (l: linked_list a) : nat =

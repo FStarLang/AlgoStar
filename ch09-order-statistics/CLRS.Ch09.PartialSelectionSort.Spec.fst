@@ -94,10 +94,12 @@ let rec pure_sort_length (s: seq int)
 
 (*** Main Specification ***)
 
+//SNIPPET_START: select_spec
 // The k-th smallest element is the element at index k in the sorted sequence
 let select_spec (s: seq int) (k: nat{k < Seq.length s}) : int =
   pure_sort_length s;
   Seq.index (pure_sort s) k
+//SNIPPET_END: select_spec
 
 (*** Lemmas about count_occ ***)
 

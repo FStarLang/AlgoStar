@@ -127,6 +127,7 @@ fn do_union
 #pop-options
 
 #push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
+//SNIPPET_START: kruskal_sig
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
@@ -153,6 +154,7 @@ fn kruskal
     A.pts_to edge_v sedge_v' **
     R.pts_to edge_count vec **
     pure (result_is_forest sedge_u' sedge_v' (SZ.v n) (SZ.v vec))
+//SNIPPET_END: kruskal_sig
 {
   // Initialize parent[i] = i
   let parent_v = V.alloc 0sz n;

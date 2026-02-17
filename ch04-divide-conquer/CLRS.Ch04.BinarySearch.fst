@@ -22,12 +22,15 @@ module Seq = FStar.Seq
 
 // ========== Definitions ==========
 
+//SNIPPET_START: is_sorted
 // Predicate: array is sorted
 let is_sorted (s: Seq.seq int) : prop =
   forall (i j: nat). i < j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
+//SNIPPET_END: is_sorted
 
 // ========== Main Algorithm ==========
 
+//SNIPPET_START: binary_search_sig
 fn binary_search
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -51,12 +54,14 @@ fn binary_search
       forall (i:nat). i < Seq.length s0 ==> Seq.index s0 i =!= key
     ))
   )
+//SNIPPET_END: binary_search_sig
 {
   let mut lo: SZ.t = 0sz;
   let mut hi: SZ.t = len;
   let mut found: bool = false;
   let mut result_idx: SZ.t = len;
   
+  //SNIPPET_START: binary_search_loop
   // Main binary search loop - exit when found or range is empty
   while (!lo <^ !hi && not !found)
   invariant exists* vlo vhi vfound vresult.
@@ -89,6 +94,7 @@ fn binary_search
           SZ.v vlo <= i /\ i < SZ.v vhi)
       ))
     )
+  //SNIPPET_END: binary_search_loop
   {
     let vlo = !lo;
     let vhi = !hi;

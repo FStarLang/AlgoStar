@@ -30,6 +30,7 @@ let initial_min : int = -1000000000
 // Lemma: Seq.length is always non-negative
 let seq_length_nonneg (s: Seq.seq 'a) : Lemma (Seq.length s >= 0) = ()
 
+//SNIPPET_START: kadane_spec
 // Kadane's algorithm specification: iterative maximum subarray
 // We use i as decreases with the invariant that we call with i+1 < length
 let rec kadane_spec (s: Seq.seq int) (i: nat) 
@@ -50,9 +51,11 @@ let rec kadane_spec (s: Seq.seq int) (i: nat)
 let max_subarray_spec (s: Seq.seq int) : Tot int =
   if Seq.length s = 0 then 0
   else kadane_spec s 0 0 initial_min
+//SNIPPET_END: kadane_spec
 
 // ========== Main Algorithm ==========
 
+//SNIPPET_START: max_subarray_sig
 fn max_subarray
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
@@ -67,6 +70,7 @@ fn max_subarray
   ensures A.pts_to a s0 ** pure (
     result == max_subarray_spec s0
   )
+//SNIPPET_END: max_subarray_sig
 {
   let mut current_sum: int = 0;
   let mut best_sum: int = initial_min;
