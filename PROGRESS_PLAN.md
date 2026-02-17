@@ -84,12 +84,43 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
   **Fix**: Spec modules shared with Pulse code must also `open Pulse.Lib.BoundedIntegers`.
   (Discovered in `CLRS.Common.SortSpec.fst`: cross-module `prefix_sorted` failed until the
   spec opened BoundedIntegers.)
+- **Z3 context pollution from quantifier-containing definitions**: Adding definitions with
+  universal quantifiers (like `cuts_are_valid`, `cuts_are_optimal`) BEFORE a Pulse proof that
+  uses other quantifiers causes the proof to fail — even with `#restart-solver`, `--z3refresh`,
+  `irreducible`, or `[@@"opaque_to_smt"]`. This is because F*'s SMT encoding adds axioms for
+  ALL module-level definitions to each query; new quantifier axioms create matching loops with
+  existing quantifiers.
+  **Fix**: Define such predicates AFTER the proof that's sensitive to pollution (at end of
+  file), or in a separate module that is not imported by the sensitive proof.
+  (Discovered in `CLRS.Ch15.RodCutting.Extended.fst`: `cuts_are_optimal` placed before the
+  Pulse function caused `cuts_optimal_from_dp` to fail; moving it after the function fixed it.)
+- **BoundedIntegers in pure definitions within Pulse files**: After `open Pulse.Lib.BoundedIntegers`,
+  pure F* definitions using `-` or `+` on `nat`/`int` fail with Error 228 ("Could not solve
+  typeclass constraint `bounded_int ...`"). This happens because BoundedIntegers provides
+  instances for `nat`, `int`, `pos`, etc., and the typeclass resolution fails when the result
+  type is refined (e.g., an index into a sequence).
+  **Fix**: Use `Prims.op_Subtraction` and `Prims.op_Addition` explicitly in pure specs defined
+  after `open Pulse.Lib.BoundedIntegers`.
+  (Discovered in `CLRS.Ch15.RodCutting.Extended.fst`: `cuts_are_optimal` definition used `-`
+  which resolved to BoundedIntegers subtraction, failing on `Seq.index prices (c - 1)`.)
+
+### Idiomatic F* Patterns
+
+- **Inductive lemmas**: Define as a single `let rec` with the induction hypothesis built into
+  the recursive structure. Don't separate the IH as a higher-order function argument — that
+  style is unusual in F* and complicates proofs.
+  (Discovered in `SortedPerm.fst`: separating IH as `ih: (s1:... -> s2:... -> Lemma ...)` was
+  non-idiomatic and harder to prove than a single `let rec sorted_permutation_equal`.)
+- **`introduce forall ... with introduce _ ==> _ with _.`**: Use this pattern to prove
+  universally quantified implications. It gives the proof access to the bound variables and
+  the hypothesis. Avoids the pitfall of `if ... then ... else ()` inside `with (...)` which
+  can fail because the false branch returns `unit` not `squash`.
 
 ---
 
-## Current Status (2025-02-16, latest)
+## Current Status (2025-02-17, latest)
 
-**164 F* files, ~50K lines — 128 unproven obligations across 35 files**
+**164 F* files, ~50K lines — 125 unproven obligations across 34 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
@@ -117,7 +148,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 2 | Pure F*; stability admits remain |
 | 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
-| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 3 | ✅ Renamed; partition_property_implies_kth proved |
+| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 0 | ✅ Renamed; sorted_permutation_equal proven (SortedPerm module) |
 | 09 | Quickselect | §9.2 | ✅ perm ∧ result=s[k] | ⚠️ Separate O(n²) | 0 | |
 | 10 | Stack | §10.1 | ✅ ghost list LIFO | ⚠️ Separate O(1) | 0 | |
 | 10 | Queue | §10.1 | ✅ ghost list FIFO | ⚠️ Separate O(1) | 0 | |
@@ -131,7 +162,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
 | 15 | MatrixChain | §15.2 | ✅ result=spec | ⚠️ Separate O(n³) | 0 | |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | ✅ 0 admits |
-| 15 | RodCutting.Extended | §15.1 | ✅ revenue + cuts | — | 0 | ✅ EXTENDED-BOTTOM-UP-CUT-ROD, prices as nat |
+| 15 | RodCutting.Extended | §15.1 | ✅ revenue + cuts_are_optimal | — | 0 | ✅ EXTENDED-BOTTOM-UP-CUT-ROD, prices as nat, reconstruct_cutting_sums proven |
 | 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
 | 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
 | 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 assume | Optimality properties |
