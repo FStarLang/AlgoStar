@@ -216,17 +216,10 @@ Specification
 
 The pure specification defines LCS length recursively:
 
-.. code-block:: fstar
-
-   let rec lcs_length (x y: Seq.seq int) (i j: nat)
-     : Tot int (decreases i + j) =
-     if i = 0 || j = 0 then 0
-     else if Seq.index x (i-1) = Seq.index y (j-1) then
-       1 + lcs_length x y (i-1) (j-1)
-     else
-       let l1 = lcs_length x y (i-1) j in
-       let l2 = lcs_length x y i (j-1) in
-       if l1 >= l2 then l1 else l2
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: lcs_spec
+   :end-before: //SNIPPET_END: lcs_spec
 
 This follows CLRS Eq. 15.9 directly: if the last characters match,
 the LCS length is 1 plus the LCS of the prefixes; otherwise, take
@@ -239,6 +232,11 @@ The Pulse implementation fills a 2D table stored as a flattened 1D
 vector. The outer loop iterates over rows (index ``i`` into sequence
 ``x``), the inner loop over columns (index ``j`` into sequence ``y``).
 Each cell ``tbl[i * (n+1) + j]`` stores ``lcs_length x y i j``.
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: lcs_sig
+   :end-before: //SNIPPET_END: lcs_sig
 
 The loop invariant asserts that all cells in completed rows and
 the completed portion of the current row match the pure specification.
@@ -262,18 +260,19 @@ the number of scalar multiplications.
 Specification
 ~~~~~~~~~~~~~
 
-The pure specification defines the optimal cost recursively:
+The pure specification defines the optimal cost using an imperative
+mirror — pure functions that exactly trace the three nested loops:
 
-.. code-block:: fstar
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: mc_spec
+   :end-before: //SNIPPET_END: mc_spec
 
-   let rec mc_opt (p: Seq.seq int) (i j: nat)
-     : Tot int (decreases (j - i)) =
-     if j <= i then 0
-     else min_over_k (fun k ->
-       mc_opt p i k + mc_opt p (k+1) j +
-       Seq.index p i * Seq.index p (k+1) * Seq.index p (j+1)) i j
-
-This follows CLRS Eq. 15.7: try all possible split points ``k``
+``mc_inner_k`` iterates over split points for a chain from ``i`` to
+``j``, accumulating the minimum cost.  ``mc_inner_i`` processes all
+starting positions for a given chain length ``l``.  ``mc_outer``
+iterates over increasing chain lengths from 2 to ``n``.  This
+follows CLRS Eq. 15.7: try all possible split points ``k``
 between ``i`` and ``j``, compute the cost of the left and right
 sub-chains plus the cost of the final multiplication, and take the
 minimum.
@@ -285,6 +284,11 @@ The Pulse implementation fills a 2D table using the standard
 "increasing chain length" order: first all chains of length 1 (cost 0),
 then length 2, length 3, and so on. This gives an O(n³) algorithm with
 three nested loops.
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: mc_sig
+   :end-before: //SNIPPET_END: mc_sig
 
 The loop invariant asserts that all cells for chains shorter than
 the current length are correctly filled. Each cell computation reads

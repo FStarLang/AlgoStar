@@ -26,6 +26,7 @@ module Seq = FStar.Seq
 // because BoundedIntegers interferes with `decreases` clauses on nat parameters.
 
 // Pure spec: length of LCS of x[0..i-1] and y[0..j-1]
+//SNIPPET_START: lcs_spec
 let rec lcs_length (x y: Seq.seq int) (i j: nat) : Tot int (decreases i + j) =
   if i = 0 || j = 0 then 0
   else if i <= Seq.length x && j <= Seq.length y && 
@@ -35,6 +36,7 @@ let rec lcs_length (x y: Seq.seq int) (i j: nat) : Tot int (decreases i + j) =
     let l1 = lcs_length x y (i - 1) j in
     let l2 = lcs_length x y i (j - 1) in
     if l1 >= l2 then l1 else l2
+//SNIPPET_END: lcs_spec
 
 // Pure spec: build the DP table row by row
 let lcs_at (x y: Seq.seq int) (i j: nat) : int =
@@ -149,6 +151,7 @@ let lemma_table_size_positive (m n: nat)
 
 // ========== Main Implementation ==========
 
+//SNIPPET_START: lcs_sig
 fn lcs 
   (#px #py: perm)
   (x: A.array int) 
@@ -172,6 +175,7 @@ fn lcs
     A.pts_to x #px sx ** 
     A.pts_to y #py sy ** 
     pure (result == lcs_length sx sy (SZ.v m) (SZ.v n))
+//SNIPPET_END: lcs_sig
 {
   // Allocate DP table: size (m+1) * (n+1)
   let m_plus_1 = m + 1sz;

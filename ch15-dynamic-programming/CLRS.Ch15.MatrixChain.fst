@@ -31,6 +31,7 @@ module Seq = FStar.Seq
 
 // ========== Pure Specification (imperative mirror) ==========
 
+//SNIPPET_START: mc_spec
 // mc_inner_k: process split points k..j-1, accumulating min cost
 // Reads from table but doesn't modify it
 let rec mc_inner_k (table: Seq.seq int) (dims: Seq.seq int) (n i j k: nat) (min_acc: int)
@@ -63,6 +64,7 @@ let rec mc_outer (table: Seq.seq int) (dims: Seq.seq int) (n l: nat)
     else
       let table' = mc_inner_i table dims n l 0 in
       mc_outer table' dims n (l + 1)
+//SNIPPET_END: mc_spec
 
 // Length preservation lemmas
 let rec lemma_mc_inner_i_len (table: Seq.seq int) (dims: Seq.seq int) (n l i: nat)
@@ -111,6 +113,7 @@ let lemma_table_size_positive (n: nat{n > 0})
 
 open Pulse.Lib.BoundedIntegers
 
+//SNIPPET_START: mc_sig
 fn matrix_chain_order
   (#p: perm)
   (dims: A.array int)
@@ -131,6 +134,7 @@ fn matrix_chain_order
     pure (
       result == mc_result s_dims (SZ.v n)
     )
+//SNIPPET_END: mc_sig
 {
   // Allocate DP table m[0..n-1][0..n-1] as flat array of size n*n
   let table_size = n *^ n;
