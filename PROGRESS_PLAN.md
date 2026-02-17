@@ -90,19 +90,21 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
   `irreducible`, or `[@@"opaque_to_smt"]`. This is because F*'s SMT encoding adds axioms for
   ALL module-level definitions to each query; new quantifier axioms create matching loops with
   existing quantifiers.
-  **Fix**: Define such predicates AFTER the proof that's sensitive to pollution (at end of
-  file), or in a separate module that is not imported by the sensitive proof.
-  (Discovered in `CLRS.Ch15.RodCutting.Extended.fst`: `cuts_are_optimal` placed before the
-  Pulse function caused `cuts_optimal_from_dp` to fail; moving it after the function fixed it.)
+  **Fix**: Mark such predicates `[@@"opaque_to_smt"]` and define them before
+  `open Pulse.Lib.BoundedIntegers`. Use plain `nat` parameters (no refinements) so Pulse can
+  typecheck the postcondition without SMT. Call a bridge lemma with `reveal_opaque` inside
+  the function body to connect the internal invariants to the opaque predicate.
+  (Resolved in `CLRS.Ch15.RodCutting.Extended.fst`: `cuts_are_optimal` defined before
+  BoundedIntegers with `opaque_to_smt`, used directly in the Pulse postcondition.)
 - **BoundedIntegers in pure definitions within Pulse files**: After `open Pulse.Lib.BoundedIntegers`,
   pure F* definitions using `-` or `+` on `nat`/`int` fail with Error 228 ("Could not solve
   typeclass constraint `bounded_int ...`"). This happens because BoundedIntegers provides
   instances for `nat`, `int`, `pos`, etc., and the typeclass resolution fails when the result
   type is refined (e.g., an index into a sequence).
-  **Fix**: Use `Prims.op_Subtraction` and `Prims.op_Addition` explicitly in pure specs defined
-  after `open Pulse.Lib.BoundedIntegers`.
-  (Discovered in `CLRS.Ch15.RodCutting.Extended.fst`: `cuts_are_optimal` definition used `-`
-  which resolved to BoundedIntegers subtraction, failing on `Seq.index prices (c - 1)`.)
+  **Fix**: Define pure spec predicates BEFORE `open Pulse.Lib.BoundedIntegers` so that
+  standard operators are in scope. This avoids needing `Prims.op_Subtraction` workarounds.
+  (Resolved in `CLRS.Ch15.RodCutting.Extended.fst`: predicates placed before BoundedIntegers
+  open, using natural `-` and `+` operators.)
 
 ### Idiomatic F* Patterns
 
