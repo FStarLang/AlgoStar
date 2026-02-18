@@ -1158,3 +1158,21 @@ let corollary_no_larger_selection
       reveal_opaque (`%max_compatible_count) (max_compatible_count start finish n);
       find_max_compatible_lower_bound start finish n n (Seq.length other_sel) other_list
     end
+
+(* Corollary using Lemmas predicates — for direct use from Pulse code *)
+let corollary_greedy_count_is_maximum_l
+  (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat)
+  : Lemma
+    (requires
+      AL.finish_sorted finish /\
+      n == Seq.length start /\ n == Seq.length finish /\ n > 0 /\
+      (forall (i:nat). i < n ==> AL.valid_activity start finish i) /\
+      AL.pairwise_compatible sel start finish /\
+      AL.strictly_increasing sel /\
+      Seq.length sel > 0 /\
+      Seq.index sel 0 == 0 /\
+      AL.all_valid_indices sel n /\
+      AL.earliest_compatible sel start finish n n)
+    (ensures
+      Seq.length sel == max_compatible_count start finish n)
+  = corollary_greedy_count_is_maximum start finish n sel

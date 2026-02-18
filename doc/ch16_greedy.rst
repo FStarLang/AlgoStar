@@ -134,9 +134,14 @@ written:
 
 The postcondition establishes that the first ``count`` entries of
 ``out`` contain the selected activity indices (via
-``out_matches_sel``), and that the ghost selection sequence ``sel``
+``out_matches_sel``), that the ghost selection sequence ``sel``
 is pairwise compatible, strictly increasing, starts with activity 0,
-and satisfies ``earliest_compatible``. The loop invariant is captured
+satisfies ``earliest_compatible``, and — crucially — that
+``count == max_compatible_count``, i.e., no valid selection can
+contain more activities.  This optimality result is obtained by
+calling ``corollary_greedy_count_is_maximum_l`` (from ``Spec.fst``)
+after the loop, bridging the Pulse output directly to the
+exchange-argument proof.  The loop invariant is captured
 by ``greedy_selection_inv``:
 
 .. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fst

@@ -24,6 +24,13 @@
       - The returned count equals the length of the selection
       - The first selected activity is index 0
    
+   5. Optimality: count == max_compatible_count (maximum cardinality
+      of any pairwise-compatible selection). No valid selection can
+      contain more activities.
+   
+   6. Output: the first `count` entries of the output array contain
+      the selected activity indices, matching the ghost sequence.
+   
    NO admits. NO assumes.
 *)
 
@@ -41,16 +48,9 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module GR = Pulse.Lib.GhostReference
 module L = CLRS.Ch16.ActivitySelection.Lemmas
+module S = CLRS.Ch16.ActivitySelection.Spec
 
 // ========== Definitions ==========
-
-// Activities are sorted by finish time
-let finish_sorted (f: Seq.seq int) : prop =
-  forall (i j: nat). i <= j /\ j < Seq.length f ==> Seq.index f i <= Seq.index f j
-
-// Valid activity (start <= finish)
-let valid_activity (s f: Seq.seq int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i < Seq.index f i
 
 // The first `count` entries of out_seq match sel (as SZ.t values)
 let out_matches_sel (out_seq: Seq.seq SZ.t) (sel: Seq.seq nat) (count: nat) (n: nat) : prop =
@@ -80,8 +80,8 @@ fn activity_selection
       SZ.v n == A.length out /\
       SZ.v n == Seq.length sout0 /\
       SZ.v n > 0 /\
-      finish_sorted sf /\
-      (forall (i:nat). i < Seq.length ss ==> valid_activity ss sf i)
+      L.finish_sorted sf /\
+      (forall (i:nat). i < Seq.length ss ==> L.valid_activity ss sf i)
     )
   returns count: SZ.t
   ensures exists* sout.
@@ -100,7 +100,9 @@ fn activity_selection
         L.strictly_increasing sel /\
         L.pairwise_compatible sel ss sf /\
         Seq.index sel 0 == 0 /\
-        L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n))
+        L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n) /\
+        // Optimality: the selection has maximum cardinality
+        SZ.v count == S.max_compatible_count ss sf (SZ.v n))
     )
 //SNIPPET_END: activity_selection_sig
 {
@@ -143,7 +145,7 @@ fn activity_selection
     
     with vsel. assert (GR.pts_to sel_ref vsel);
     with sout_cur. assert (A.pts_to out sout_cur);
-    assert pure (finish_sorted sf);
+    assert pure (L.finish_sorted sf);
     assert pure (L.greedy_selection_inv vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish);
     assert pure (vlast_finish <= curr_finish);
     
@@ -168,6 +170,9 @@ fn activity_selection
   };
   
   with vsel_f. assert (GR.pts_to sel_ref vsel_f);
+  with sout_f. assert (A.pts_to out sout_f);
+  // Call optimality theorem: the greedy selection achieves maximum cardinality
+  S.corollary_greedy_count_is_maximum_l ss sf (SZ.v n) (Ghost.reveal vsel_f);
   GR.free sel_ref;
   
   !count
