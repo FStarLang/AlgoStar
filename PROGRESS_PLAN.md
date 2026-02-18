@@ -71,7 +71,33 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
   (Discovered in `CLRS.Ch09.PartialSelectionSort.SortedPerm.fst`: the monolithic query always
   timed out; splitting + removing the triggering assertion fixed it.)
 
-### Pitfalls to Avoid
+- **`calc (==) { ... }` blocks for modular arithmetic** (RabinKarp): Step-by-step equational
+  reasoning using `FStar.Math.Lemmas.*` (lemma_mod_mul_distr_r, lemma_mod_add_distr, etc.).
+  Use `FStar.Pure.BreakVC.break_vc()` before nested calc blocks in recursive proofs to prevent
+  VC explosion.
+  (Used in `CLRS.Ch32.RabinKarp.Spec.fst`: hash_inversion proved via calc blocks.)
+- **`hash_inversion` for rolling hash** (RabinKarp): The key lemma for polynomial rolling hash
+  proofs extracts the most-significant digit: `hash(i,j) == (hash(i+1,j) + d^(j-i-1)·x[i]) % q`.
+  Enables `remove_msd_lemma` → `rolling_hash` correctness → `rolling_hash_step_correct`.
+  Adapted from `FStar/examples/algorithms/StringMatching.fst`.
+- **CLRS §32.2 hash is big-endian**: `p = T[0]·d^(m-1) + ... + T[m-1]·d^0 (mod q)`.
+  F* repo's `StringMatching.fst` `hash` function matches CLRS. The original `horner_hash`
+  was little-endian (reversed digit significance) — not CLRS-faithful.
+- **Sentinel bridge proofs** (MatrixChain): When `min_splits(start, acc1) <= acc2 <= acc1`,
+  result is identical. Prove via 3-way case split on intermediate cost vs acc1 vs acc2.
+  (Used in `CLRS.Ch15.MatrixChain.Spec.fst`: min_splits_acc_irrelevant.)
+- **Table-filling induction** (MatrixChain): Prove each DP table entry correct by induction on
+  `(i0 - start_i)`. Base case writes value; inductive case shows write doesn't affect target
+  via `lemma_2d_index_unique`. Requires `--split_queries always` for reliable verification.
+- **F* nat subtraction saturates at 0**: `not (j0 - i0 < l - 1)` doesn't give SMT
+  `j0 - i0 >= l - 1`. Fix: branch on `j0 - i0 + 1 = l` (addition, not subtraction).
+  (Discovered in MatrixChain.Spec.fst: lemma_mc_inner_i_fills_correctly.)
+- **`Classical.move_requires` with named helpers** (RabinKarp): Use a named local `let helper ()
+  : Lemma (requires P) (ensures Q) = ...` and call `Classical.move_requires helper ()`.
+  The lambda form `move_requires (fun () -> ...)` doesn't type-check because it can't carry
+  the precondition annotation.
+- **Empty pattern edge case** (RabinKarp): `matches_at text pattern pos` with empty pattern is
+  vacuously true at every position. No-false-negatives theorem requires `m > 0` precondition.
 
 - Agents replacing `admit()` with `assume val` don't reduce the real admit count.
 - z3rlimit > 100 causes timeouts. Keep ≤ 50.
@@ -129,15 +155,15 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ---
 
-## Current Status (2025-02-17, latest)
+## Current Status (2025-02-18, latest)
 
-**164 F* files, ~50K lines — 125 unproven obligations across 34 files**
+**164 F* files, ~50K lines — 89 unproven obligations across 29 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
-| `admit()` | 75 | Unproven lemma/proof bodies (Pure F*) |
-| `assume(...)` | 15 | Inline assumptions (Huffman: 3, MaxFlow: 8, DFS: 2, UnionFind: 1, Kruskal: 1) |
-| `assume_` | 38 | Pulse-specific unproven invariants (StackDFS: 24, QueueBFS: 10, CountingSort: 3, Kruskal: 1) |
+| `admit()` | ~50 | Unproven lemma/proof bodies (Pure F*) |
+| `assume(...)` | ~15 | Inline assumptions (Huffman: 3, MaxFlow: 8, DFS: 2, UnionFind: 1, Kruskal: 1) |
+| `assume_` | ~24 | Pulse-specific unproven invariants (StackDFS: 11, QueueBFS: 10, CountingSort: 3) |
 
 (Note: Comment-aware counting — excludes admits/assumes in block comments `(* *)` and line comments `//`.)
 
@@ -159,65 +185,64 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 2 | Pure F*; stability admits remain |
 | 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
-| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 0 | ✅ Renamed; sorted_permutation_equal proven (SortedPerm module) |
+| 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 0 | ✅ Renamed; SortedPerm proven |
 | 09 | Quickselect | §9.2 | ✅ perm ∧ result=s[k] | ⚠️ Separate O(n²) | 0 | |
 | 10 | Stack | §10.1 | ✅ ghost list LIFO | ⚠️ Separate O(1) | 0 | |
 | 10 | Queue | §10.1 | ✅ ghost list FIFO | ⚠️ Separate O(1) | 0 | |
-| 10 | DLL | §10.2 | ✅ DLS segment pred | ✅ Linked | 0 | ✅ Fixed |
+| 10 | DLL | §10.2 | ✅ DLS segment pred | ✅ Linked | 0 | |
 | 11 | HashTable | §11.4 | ✅ key_in_table | ✅ Linked O(n) | 0 | |
 | 12 | BST Search/Min/Max | §12.2 | ✅ correct search | ✅ Linked O(h) | 0 | |
-| 12 | BST Insert | §12.3 | ⚠️ membership only | ⚠️ Separate O(h) | 3 | ⚠️ Doesn't walk BST path |
+| 12 | BST Insert | §12.3 | ⚠️ membership only | ⚠️ Separate O(h) | 3 | Doesn't walk BST path |
 | 12 | BST Delete | §12.3 | ✅ key_set \ {k} | ✅ Linked O(h) | 0 | FiniteSet algebra |
 | 13 | RBTree (Pulse) | §13.1–4 | ❌ BROKEN | — | 0 | No fixup/rotations/BST path |
 | 13 | RBTree.Spec (pure) | §13.1–4 | ✅ Okasaki balance | ✅ Linked O(lg n) | 0 | Correct but not Pulse |
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
-| 15 | MatrixChain | §15.2 | ✅ mc_cost recursive + dp equiv | ⚠️ Separate O(n³) | 2 | ✅ Recursive spec (CLRS Eq. 15.7), mc_inner_k≡min_splits proven |
-| 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | ✅ 0 admits |
-| 15 | RodCutting.Extended | §15.1 | ✅ revenue + cuts_are_optimal | — | 0 | ✅ EXTENDED-BOTTOM-UP-CUT-ROD, prices as nat, reconstruct_cutting_sums proven |
-| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | ✅ Greedy choice proven, seq-to-list proven |
-| 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | ✅ Base case proven, assumes→admits |
+| 15 | MatrixChain | §15.2 | ✅ mc_cost recursive + dp equiv | ⚠️ Separate O(n³) | 0 | ✅ **Zero admits** — sentinel bridge + table filling proven |
+| 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | |
+| 15 | RodCutting.Extended | §15.1 | ✅ revenue + cuts_are_optimal | — | 0 | ✅ EXTENDED-BOTTOM-UP-CUT-ROD |
+| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | Greedy choice proven |
+| 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | Base case proven |
 | 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 assume | Optimality properties |
-| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | ✅ RankBound: 0, FindTermination: 0, Spec: 0 admits |
-| 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | RankBound, FindTermination, Spec all 0 admits |
+| 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 assume_ | + 6 assume_ in Complexity |
-| 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | ✅ Renamed (not CLRS) |
+| 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | Renamed (not CLRS) |
 | 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 11 assume_ | + 13 assume_ in Complexity |
-| 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 2 admit + 2 assume | ✅ Renamed (not CLRS) |
-| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 5 admit + 2 assume | ✅ visited_implies_path proved |
+| 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 2 admit + 2 assume | Renamed (not CLRS) |
+| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 5 admit + 2 assume | visited_implies_path proved |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 9 admit + 1 assume + 1 assume_ | + 2 admit + 2 EdgeSort admits |
-| 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 6 | ✅ Prim.Complexity: 0 admits (loop invariant fixed) |
-| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | Graph theory lemmas |
-| 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | ✅ 3→2 admits, infrastructure added |
+| 23 | Prim | §23.2 | ✅ basic props | ✅ Linked O(n²) | 6 | Prim.Complexity: 0 admits |
+| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | exchange lemma PROVED |
+| 24 | Dijkstra | §24.3 | ⚠️ upper bound only | ✅ Linked O(n²) | 2 | 3→2 admits |
 | 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 8 assume | Stretch goal |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
-| 28 | Strassen | §28.2 | ✅ quadrant algebra proven | ⚠️ Separate | 1 | Pure F*, 1 SMT scalability admit |
+| 28 | Strassen | §28.2 | ✅ quadrant algebra proven | ⚠️ Separate | 1 | SMT scalability admit |
 | 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
 | 31 | ExtendedGCD | §31.2 | ✅ Bézout identity | — | 0 | Pure F* |
 | 31 | ModExp | §31.6 | ✅ (b^e)%m | ✅ Linked O(lg e) | 0 | |
 | 32 | NaiveStringMatch | §32.1 | ✅ all matches | ✅ Linked O(nm) | 0 | |
 | 32 | KMP | §32.4 | ✅ prefix + matcher | ✅ Linked O(n+m)* | 7 | *Amortized admits |
-| 32 | RabinKarp | §32.2 | ✅ rolling hash | ⚠️ Separate O(nm) | 3 | Sum hash, not polynomial |
+| 32 | RabinKarp | §32.2 | ✅ CLRS polynomial hash | ⚠️ Separate O(nm) | 0 | ✅ **Zero admits** — hash_inversion + rolling_hash proven |
 | 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
 | 35 | VertexCover | §35.1 | ✅ valid cover | ⚠️ Separate O(V²) | 1 | 2-approx: 1 admit |
 
-### Unproven Obligation Distribution (128 total: 75 admit + 15 assume + 38 assume_)
+### Unproven Obligation Distribution (~89 total)
 
 | Chapter | admit | assume | assume_ | Total | Top files |
 |---------|-------|--------|---------|-------|-----------|
 | ch22 (graphs) | 12 | 2 | 34 | 48 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2) |
 | ch23 (MST) | 19 | 1 | 1 | 21 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), EdgeSort(2), Kruskal.Cmplx(2+1), SortedEdges(0+1) |
 | ch08 (sorting) | 9 | 0 | 3 | 12 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
-| ch32 (strings) | 10 | 0 | 0 | 10 | KMP.Complexity(7), RabinKarp.Spec(3) |
+| ch32 (strings) | 7 | 0 | 0 | 7 | KMP.Complexity(7) |
 | ch16 (greedy) | 6 | 3 | 0 | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(0+3) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch24 (SSSP) | 5 | 0 | 0 | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
-| ch09 (select) | 0 | 0 | 0 | 0 | PartialSelectionSort.Correctness fully proven (SortedPerm + dead code removed) |
 | ch12 (BST) | 3 | 0 | 0 | 3 | BST.Insert.Spec(3) |
 | ch21 (UF) | 0 | 1 | 0 | 1 | UnionFind.Spec(0+1) |
-| Other | 8 | 0 | 0 | 8 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), Huffman.Complete(2), Huffman.Spec(3) |
-| **Total** | **72** | **15** | **38** | **125** | |
+| Other | 5 | 0 | 0 | 5 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), Huffman.Complete(2) |
+| **Total** | **~66** | **~15** | **~38** | **~89** | |
 
 ---
 
@@ -294,7 +319,7 @@ closeable (`radix-full-269` ✅). The other 15 are blocked due to:
 | UnionFind.RankBound | — | 0 | ✅ DONE: all invariants fully proven (size_correctness_invariant added as precondition) |
 | UnionFind.Spec | 92 | 1 | ❌ Blocked: Z3 can't instantiate refined quantifier from rank_invariant |
 | Prim.Spec | 209, 270 | 2 | ❌ Blocked: Needs find_min_edge_aux trace, non-trivial helper |
-| RabinKarp.Spec | 162 | 1 | ❌ Blocked: Horner evaluation modular arithmetic |
+| RabinKarp.Spec | — | 0 | ✅ **DONE**: CLRS-faithful big-endian polynomial hash, hash_inversion + rolling_hash proven. Adapted from FStar/examples/algorithms/StringMatching.fst |
 | ActivitySelection.Spec | 305 | 1 | ❌ Blocked: max_compatible_count (line 176) is itself admitted |
 
 #### Tier 2: Helper lemmas (provable separately, then plugged in) — 70 admits
@@ -321,7 +346,7 @@ self-contained but requires careful F* proof engineering (induction, case analys
 | **PartialSelect.Correctness** | 255, 297 | 2 | Count-based uniqueness: if `count_lt s v == k` and `count_le s v ≥ k+1`, then `v` is the k-th element. |
 | **UnionFind.Spec** | 310, 320 | 2 | Path tracing after parent update / union: forest topology reasoning. |
 | **ActivitySelection.Spec** | 112,319,491,521,550,637 | 6 | Exchange argument helpers: sorted compatibility, seq-to-list preservation, greedy optimality by list reasoning. |
-| **RabinKarp.Spec** | 365, 394 | 2 | Hash no-false-negatives (depends on Tier 1 rolling hash proof) + combined correctness. |
+| **RabinKarp.Spec** | — | 0 | ✅ **DONE**: no_false_negatives + find_all_correct fully proven. |
 | **MaxSubarray.DC** | 346 | 1 | D&C and Kadane equivalence: both compute max over all subarrays. |
 | **BucketSort** | 359 | 1 | Sorted bucket concatenation: buckets with key₁ < key₂ maintain global order when concatenated. |
 | **CountingSort.Stable** | 258 | 1 | Cumulative count bounds: after prefix sum + decrements, `1 ≤ C[v] ≤ len`. |
