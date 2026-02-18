@@ -148,6 +148,44 @@ let make_black (t: rbtree) : rbtree =
 let insert (t: rbtree) (k: int) : rbtree =
   make_black (ins t k)
 
+// ========== Balance case classifier ==========
+// Used by the Pulse implementation to determine which rotation to apply
+// without deep pattern matching on pointers.
+
+type balance_case =
+  | BC_LL   // Left-left:   Node Red (Node Red a x b) y c_, _, v, r
+  | BC_LR   // Left-right:  Node Red a x (Node Red b y c_), _, v, r
+  | BC_RL   // Right-left:  _, Node Red (Node Red b y c_) z d
+  | BC_RR   // Right-right: _, Node Red b y (Node Red c_ z d)
+  | BC_None // No fixup needed
+
+let classify_balance (c: color) (l: rbtree) (r: rbtree) : balance_case =
+  match c, l, r with
+  | Black, Node Red (Node Red _ _ _) _ _, _ -> BC_LL
+  | Black, Node Red _ _ (Node Red _ _ _), _ -> BC_LR
+  | Black, _, Node Red (Node Red _ _ _) _ _ -> BC_RL
+  | Black, _, Node Red _ _ (Node Red _ _ _) -> BC_RR
+  | _ -> BC_None
+
+// The classifier agrees with balance
+let classify_balance_lemma (c: color) (l: rbtree) (v: int) (r: rbtree)
+  : Lemma (
+    match classify_balance c l r with
+    | BC_LL -> (match l with
+               | Node Red (Node Red a x b) y c_ -> balance c l v r == Node Red (Node Black a x b) y (Node Black c_ v r)
+               | _ -> False)
+    | BC_LR -> (match l with
+               | Node Red a x (Node Red b y c_) -> balance c l v r == Node Red (Node Black a x b) y (Node Black c_ v r)
+               | _ -> False)
+    | BC_RL -> (match r with
+               | Node Red (Node Red b y c_) z d -> balance c l v r == Node Red (Node Black l v b) y (Node Black c_ z d)
+               | _ -> False)
+    | BC_RR -> (match r with
+               | Node Red b y (Node Red c_ z d) -> balance c l v r == Node Red (Node Black l v b) y (Node Black c_ z d)
+               | _ -> False)
+    | BC_None -> balance c l v r == Node c l v r)
+  = ()
+
 (*** Theorem 13.1: Height Bound ***)
 
 // Key lemma: node_count t >= pow2 (bh t) - 1
