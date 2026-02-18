@@ -14,10 +14,12 @@ exploiting structure in the keys.
 (``CLRS.Ch08.RadixSort``) are fully verified with zero admits.
 The stable CLRS-faithful counting sort (``CountingSort.Stable``) has
 **3 assume\_** calls in Phase 4 (placement bounds and final
-postcondition). The multi-digit radix sort (``RadixSort.MultiDigit``)
-has **2 admits** for the stability property. Bucket sort
-(``CLRS.Ch08.BucketSort``) has **1 admit** for the main concatenation
-step.
+postcondition). The multi-digit radix sort modules have **10 admits**
+total across ``RadixSort.FullSort`` (4), ``RadixSort.MultiDigit`` (2),
+``RadixSort.Spec`` (2), and ``RadixSort.Stability`` (2), all related
+to the stability property and its propagation through digit-by-digit
+sorting. Bucket sort (``CLRS.Ch08.BucketSort``) has **1 admit** for
+the main concatenation step.
 
 Counting Sort
 =============
@@ -158,12 +160,16 @@ value sorting via the digit decomposition theorem
 
 .. note::
 
-   ``RadixSort.MultiDigit`` contains **2 admits** for the stability
-   properties (``stable_sort_preserves_order`` and
-   ``stable_sort_preserves_sorted_on_other_digit``). These require
-   showing that insertion-sort-by-digit maintains relative order for
-   equal-key elements — a detailed but standard argument about the
-   leftmost-insertion strategy.
+   The radix sort stability proofs have **10 admits** spread across
+   four modules: ``RadixSort.Stability`` (2 — core stability
+   reasoning), ``RadixSort.Spec`` (2 — CLRS Lemma 8.3 and main
+   correctness theorem), ``RadixSort.MultiDigit`` (2 — stable sort
+   preserves order between digits), and ``RadixSort.FullSort`` (4 —
+   threading stability through the full sort chain). These all
+   involve proving that insertion-sort-by-digit maintains relative
+   order for equal-key elements — a detailed but standard argument
+   about the leftmost-insertion strategy that produces ∃∀ quantifier
+   patterns challenging for the SMT solver.
 
 Stability Theory
 ~~~~~~~~~~~~~~~~

@@ -103,7 +103,7 @@ Results Overview
 ----------------
 
 The project currently covers algorithms from 18 chapters of CLRS,
-implemented across 172 F* source files totaling approximately 52,000
+implemented across 174 F* source files totaling approximately 54,000
 lines. The table below summarizes the status of each algorithm.
 
 **Legend:**
@@ -201,7 +201,7 @@ lines. The table below summarizes the status of each algorithm.
      - Bucket Sort
      - §8.4
      - sorted ∧ permutation
-     - ⚠️ 2: concat sorted buckets
+     - ⚠️ 1: concat sorted buckets
      - —
    * - 9
      - Min / Max
@@ -297,7 +297,7 @@ lines. The table below summarizes the status of each algorithm.
      - Activity Selection
      - §16.1
      - greedy = optimal count
-     - ⚠️ 4: exchange argument
+     - ✅
      - ✅ Linked O(n)
    * - 16
      - Huffman Coding
@@ -328,12 +328,12 @@ lines. The table below summarizes the status of each algorithm.
      - §22.4
      - valid topological order
      - ⚠️ 2: DAG correctness
-     - ⚠️ Linked (1 admit)
+     - ✅ Linked O(V+E)
    * - 23
      - Kruskal MST
      - §23.2
      - MST of graph
-     - ⚠️ 12: forest/cut props
+     - ⚠️ 15: forest/cut/sort
      - ⚠️ Linked (3 admits)
    * - 23
      - Prim MST
@@ -429,35 +429,37 @@ lines. The table below summarizes the status of each algorithm.
 Proof Gaps
 ----------
 
-As of this writing, the project has **89 unproven obligations**
-(``admit()`` and ``assume()`` calls) across **29 files**.  Of the 50
-algorithms in the table, **32 have fully proven correctness** (zero
-admits) and **25 have fully proven complexity bounds**.
+As of this writing, the project has **82 unproven F\* obligations**
+(``admit()``, ``assume()``, and ``assume val``) across **29 files**,
+plus **38 Pulse** ``assume_`` **calls** in 6 implementation files.
+Of the 50 algorithms in the table, **33 have fully proven correctness**
+(zero admits) and **26 have fully proven complexity bounds**.
 
 The remaining admits fall into a few categories:
 
-1. **Graph theory** (Ch. 22–23, 35 admits): DFS parenthesis and
+1. **Graph theory** (Ch. 22–23, ~39 F\* admits): DFS parenthesis and
    white-path theorems (10), MST cut/cycle properties and Kruskal
-   forest invariants (16+4), BFS shortest-path completeness (2),
-   Kahn DAG correctness (2), vertex cover trace (1).
+   forest invariants (25), BFS shortest-path completeness (2),
+   Kahn DAG correctness (2). Plus 34 Pulse ``assume_`` in
+   StackDFS and QueueBFS loop invariants.
 
-2. **Sorting stability** (Ch. 8, 12 admits): RadixSort stability
+2. **Sorting stability** (Ch. 8, 11 admits): RadixSort stability
    proofs involve ∃∀ quantifier patterns that challenge the SMT
-   solver.  BucketSort needs concat-of-sorted-buckets (2).
+   solver (10).  BucketSort needs concat-of-sorted-buckets (1).
 
-3. **Algorithmic correctness** (Ch. 16, 24, 26, 14 admits): Greedy
-   exchange arguments for activity selection (4) and Huffman
-   optimality (5), shortest-path upper-bound invariants for
-   Bellman-Ford (3) and Dijkstra triangle inequality (2).
+3. **Algorithmic correctness** (Ch. 16, 24, 26, ~18 admits): Huffman
+   optimality: greedy-choice theorem, optimal-substructure, and
+   dependent proofs in Complete (5); shortest-path upper-bound
+   invariants for Bellman-Ford (3) and Dijkstra triangle
+   inequality (2); max-flow augmentation (8).
 
-4. **Complexity proofs** (Ch. 22, 23, 26, 32, 13 admits): KMP
-   amortized analysis (7), Kruskal edge-count (3), Kahn
-   topological sort (1), max-flow termination (2).
+4. **Complexity proofs** (Ch. 32, 7 admits): KMP
+   amortized analysis (7).
 
-5. **Miscellaneous** (15 admits):
+5. **Miscellaneous** (7 admits):
    BST insert preservation (3), Union-Find rank bound (1),
-   Strassen quadrant properties (1),
-   max-flow augmentation (8), BucketSort concat (2).
+   Strassen quadrant properties (1), Vertex Cover trace (1),
+   Divide-and-Conquer max-subarray (1 assume val).
 
 Each chapter in this document notes any unproven obligations in its
 scope.  Fully verified chapters have zero ``admit``, ``assume``, or

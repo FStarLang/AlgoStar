@@ -80,7 +80,7 @@ a ghost counter through the implementation and proves the bound:
 
 This gives an O(V²) bound for the adjacency-matrix representation
 (each vertex scans all V potential neighbors). The complexity module
-uses **7 assume_ calls** (the same framing assumptions as the
+uses **6 assume_ calls** (the same framing assumptions as the
 correctness version plus additional ones for cost invariant
 maintenance).
 
@@ -106,9 +106,13 @@ The DFS state tracks vertex colors and timestamps:
    :start-after: //SNIPPET_START: dfs_state
    :end-before: //SNIPPET_END: dfs_state
 
-The specification module (``DFS.Spec``) has **0 admits**. It defines
-the DFS state type using a color ADT (``White | Gray | Black``) and
-records discovery (``d``) and finish (``f``) timestamps.
+The specification module (``DFS.Spec``) has **7 unproven obligations**
+(5 ``admit()`` + 2 ``assume()``). The admits cover the parenthesis
+theorem (proving ``d[u] < d[v] < f[v] < f[u]`` for descendants),
+edge classification (tree, back, forward, cross edges), and
+timestamp monotonicity. The two ``assume`` calls provide termination
+measures (``count_white_vertices`` decreases) for the pure DFS
+function.
 
 White-Path Theorem
 ~~~~~~~~~~~~~~~~~~
@@ -153,7 +157,7 @@ Complexity
 
 The complexity module (``StackDFS.Complexity``) proves an O(V²)
 bound matching the adjacency-matrix representation. It uses
-**16 assume_ calls** (the same framing assumptions as the
+**13 assume_ calls** (the same framing assumptions as the
 correctness version plus additional cost-counter invariants).
 
 An alternative iterative DFS (``IterativeDFS``) uses a simpler

@@ -13,12 +13,12 @@ implemented in Pulse and specified in pure F*.
 (``CLRS.Ch23.MST.Spec``) contains **4 admits** — the cut-property
 proof and its supporting graph-theory lemmas (cycle detection,
 edge-exchange).  Kruskal's specification (``CLRS.Ch23.Kruskal.Spec``)
-has **9 admits**, plus 1 ``assume`` (acyclicity preservation) in the
-``SortedEdges`` helper and 1 ``assume val`` (forest axiom) in the
-imperative module.  Prim's specification (``CLRS.Ch23.Prim.Spec``) has
-**6 admits** (plus 1 ``admit_smt_queries`` block for an edge-count
-lemma).  The imperative ``Prim.fst`` and ``Kruskal.fst`` are otherwise
-admit-free modulo their reliance on these specification-level gaps.
+has **9 admits**; ``EdgeSorting`` has **2 admits** (sort stability);
+``SortedEdges`` has 1 ``assume`` (acyclicity preservation);
+``Kruskal.Complexity`` has **2 admits** (arithmetic bounds) + 1
+``assume_``; the imperative ``Kruskal.fst`` has 1 ``assume val``
+(forest axiom). Prim's specification (``CLRS.Ch23.Prim.Spec``) has
+**6 admits** for light-edge and spanning-tree properties.
 
 MST Specification
 =================

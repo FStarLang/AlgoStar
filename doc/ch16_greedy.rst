@@ -13,15 +13,17 @@ property and optimal substructure arguments from the textbook.
 **Verification status.** The Pulse implementations (``ActivitySelection.fst``,
 ``Huffman.fst``, ``ActivitySelection.Complexity.fst``,
 ``Huffman.Complexity.fst``) contain **zero admits and zero assumes**.
-The pure specification layer has gaps: ``ActivitySelection.Spec`` uses
-4 ``admit()`` calls in the full optimality chain (exchange argument
-for ``lemma_compat_order``, inductive optimality helper, greedy
-property for tails, and the no-larger-selection corollary);
-``Huffman.Spec`` uses 3 ``assume`` calls for the swap-reduces-WPL
-lemma, greedy-choice theorem, and optimal-substructure theorem;
-``Huffman.Complete`` uses 2 ``admit()`` calls in key optimality
-theorems. The Lemmas module (exchange-argument proof for greedy
-choice on sequences) is fully verified.
+The pure specification layer for Activity Selection is **fully proven**:
+``ActivitySelection.Spec`` and ``ActivitySelection.Lemmas`` have
+zero admits — the exchange argument, greedy optimality theorem, and
+implementation-to-spec bridge are all mechanically verified.
+
+Huffman has gaps: ``Huffman.Spec`` uses 3 ``assume`` calls
+(``greedy_choice_property``, ``optimal_substructure_property``, and
+``exists_leaf_at_max_depth``); ``Huffman.Complete`` uses 2
+``admit()`` calls dependent on those assumptions. The key supporting
+lemma ``swap_reduces_wpl`` (CLRS Lemma 16.2) and
+``exists_sibling_leaves`` are fully proven.
 
 Activity Selection
 ==================
@@ -31,6 +33,8 @@ activities with start and finish times (sorted by finish time), select
 a maximum-size subset of mutually compatible (non-overlapping)
 activities. The greedy strategy selects the earliest-finishing
 compatible activity at each step.
+
+**This algorithm is fully proven: zero admits across all files.**
 
 Specification
 ~~~~~~~~~~~~~
@@ -80,30 +84,40 @@ argument operating on sequences rather than lists:
    :start-after: //SNIPPET_START: lemma_greedy_choice_seq
    :end-before: //SNIPPET_END: lemma_greedy_choice_seq
 
-Main Optimality Theorem
-~~~~~~~~~~~~~~~~~~~~~~~
+Exchange Argument and Optimality
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The chain culminates in ``theorem_implementation_optimal``, which
-connects the Pulse implementation's invariant (pairwise-compatible,
-strictly-increasing sequence starting at 0) to the list-level
-optimality definition:
-
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: theorem_implementation_optimal
-   :end-before: //SNIPPET_END: theorem_implementation_optimal
+The exchange argument proves that the greedy selection dominates any
+other compatible selection: ``greedy[i] ≤ other[i]`` for all *i*
+(``lemma_greedy_dominates``). Combined with an exhaustiveness argument
+(``lemma_greedy_is_maximal``), this shows no compatible set can be
+larger than the greedy selection. The chain culminates in
+``lemma_greedy_is_optimal``, which proves the greedy count equals
+``max_compatible_count``.
 
 .. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: lemma_greedy_is_optimal
    :end-before: //SNIPPET_END: lemma_greedy_is_optimal
 
-.. note::
+Main Theorem
+~~~~~~~~~~~~
 
-   ``lemma_greedy_is_optimal_helper`` (called by
-   ``lemma_greedy_is_optimal``) uses ``admit()``. The inductive
-   step combining greedy choice with optimal substructure is
-   structurally clear but not yet mechanized.
+``theorem_implementation_optimal`` connects the Pulse implementation's
+invariant to the list-level optimality definition:
+
+.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: theorem_implementation_optimal
+   :end-before: //SNIPPET_END: theorem_implementation_optimal
+
+The bridge between the Pulse output (a sequence satisfying
+``pairwise_compatible``, ``strictly_increasing``, and
+``earliest_compatible``) and the greedy specification
+(``is_greedy_selection``) is established by
+``lemma_implementation_is_greedy``. The key ingredient is the
+``earliest_compatible`` property, which is maintained as part of
+the Pulse loop invariant.
 
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
@@ -118,8 +132,9 @@ maintaining a ghost sequence of selected indices:
 
 The postcondition witnesses the existence of a selection sequence
 ``sel`` that is pairwise compatible, strictly increasing, starts with
-activity 0, and has length equal to the returned count. The loop
-invariant is captured by ``greedy_selection_inv``:
+activity 0, satisfies ``earliest_compatible``, and has length equal to
+the returned count. The loop invariant is captured by
+``greedy_selection_inv``:
 
 .. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fst
    :language: fstar
@@ -127,8 +142,13 @@ invariant is captured by ``greedy_selection_inv``:
    :end-before: //SNIPPET_END: greedy_selection_inv
 
 This invariant tracks that all selected indices are valid, strictly
-increasing, pairwise compatible, and that ``last_finish`` equals the
-finish time of the most recently selected activity.
+increasing, pairwise compatible, that ``last_finish`` equals the
+finish time of the most recently selected activity, and that the
+``earliest_compatible`` property holds: for each pair of consecutive
+selected activities, all activities in between are incompatible; and
+all processed activities after the last selection are incompatible.
+This property is the key to bridging the Pulse implementation with
+the greedy specification ``is_greedy_selection``.
 
 Complexity
 ~~~~~~~~~~
@@ -215,11 +235,32 @@ the same leaf frequencies:
    :start-after: //SNIPPET_START: is_optimal
    :end-before: //SNIPPET_END: is_optimal
 
-The greedy-choice property (CLRS Lemma 16.2) and optimal-substructure
-property (CLRS Lemma 16.3) are stated and their proof outlines are
-given, but the bodies use ``assume``. The key supporting lemma
-``wpl_after_merge`` — relating the WPL before and after merging two
-sibling leaves — is fully verified.
+Three key supporting lemmas are formalized:
+
+- **``swap_reduces_wpl``** (CLRS Lemma 16.2, *proven*): Swapping a
+  high-frequency leaf at a deep position with a low-frequency leaf
+  at a shallow position does not increase the weighted path length.
+  The proof uses a position-based tree addressing scheme,
+  ``replace_leaf_wpl`` for WPL decomposition at individual positions,
+  and an arithmetic lemma establishing
+  ``(f_high − f_low) × (d_high − d_low) ≥ 0``.
+
+- **``exists_sibling_leaves``** (*proven*): Every full binary tree
+  with at least two leaves has a pair of sibling leaves. The proof
+  proceeds by structural induction on the tree, with
+  ``FStar.Classical.forall_intro_2`` to propagate existential
+  witnesses through the ``are_siblings`` predicate.
+
+- **``greedy_choice_property``** and **``optimal_substructure_property``**
+  (CLRS Lemmas 16.2–16.3, *assumed*): The full greedy-choice theorem
+  (that merging the two lowest-frequency leaves yields an optimal tree
+  for the reduced alphabet) and the optimal substructure theorem remain
+  as ``assume`` calls. Closing these requires orchestrating
+  ``swap_reduces_wpl`` across two swaps and reasoning about the
+  relationship between the original and merged trees.
+
+``Huffman.Complete`` has 2 ``admit()`` calls that depend on these
+assumptions.
 
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
