@@ -665,7 +665,10 @@ let rec exists_sibling_leaves (t: htree)
 #pop-options
 
 // Helper: There exists a position with a leaf at maximum depth
-// This follows from the well-founded structure of the tree
+// This follows from the well-founded structure of the tree.
+// The ml >= mr case is proven; the mr > ml case has a technical issue:
+// depth_of_leaf searches left-first, so a witness from r may get shadowed 
+// by a same-frequency leaf in l. A position-based formulation would fix this.
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let rec exists_leaf_at_max_depth (t: htree) (d: nat)
   : Lemma (ensures (let max_d = max_leaf_depth t d in
@@ -679,28 +682,9 @@ let rec exists_leaf_at_max_depth (t: htree) (d: nat)
         exists_leaf_at_max_depth r (d + 1);
         let ml = max_leaf_depth l (d + 1) in
         let mr = max_leaf_depth r (d + 1) in
-        if ml >= mr then begin
-          // max_leaf_depth t d == ml
-          // IH on l gives: exists f_l. depth_of_leaf l f_l (d+1) == Some ml
-          // depth_of_leaf t f_l d = match depth_of_leaf l f_l (d+1) with Some -> Some | None -> ...
-          //                       = Some ml
-          ()
-        end else begin
-          // max_leaf_depth t d == mr
-          // IH on r gives: exists f_r. depth_of_leaf r f_r (d+1) == Some mr
-          // We need: depth_of_leaf t f_r d == Some mr
-          // depth_of_leaf t f_r d = match depth_of_leaf l f_r (d+1) with 
-          //                         | Some _ -> Some _ (might not be mr!)
-          //                         | None -> depth_of_leaf r f_r (d+1) = Some mr
-          // Problem: f_r might also appear in l at some depth. In that case,
-          // depth_of_leaf l f_r (d+1) might return Some (not None), and we'd get
-          // the wrong depth.
-          // For correctness, we need the witness to be a frequency that only appears in r, not l.
-          // This is hard to guarantee in general.
-          // For now, use the simpler argument: the existential holds by structural induction.
-          assume (let max_d = max_leaf_depth t d in
-                  exists (f: pos). depth_of_leaf t f d == Some max_d)
-        end
+        if ml >= mr then ()
+        else assume (let max_d = max_leaf_depth t d in
+                     exists (f: pos). depth_of_leaf t f d == Some max_d)
 #pop-options
 
 (*** Greedy Choice Property (CLRS Lemma 16.2) ***)
