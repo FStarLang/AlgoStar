@@ -11,10 +11,9 @@ implemented in Pulse and verified against a common specification:
 count the number of positions where a pattern matches the text.
 
 The naive algorithm and Rabin-Karp are **fully verified with 0
-admits in their implementations**. KMP is also fully verified at
-the implementation level (0 admits); its amortized complexity
-analysis has 7 admits. The Rabin-Karp specification module has
-3 admits for rolling-hash correctness lemmas.
+admits** in both their implementations and specifications. KMP is
+also fully verified at the implementation level (0 admits); its
+amortized complexity analysis has 7 admits.
 
 Naive String Matching
 =====================
@@ -78,20 +77,40 @@ update, and the matching algorithm.
 Hash Specification
 ~~~~~~~~~~~~~~~~~~
 
-The hash function uses Horner's rule for polynomial evaluation,
-and the rolling hash step computes the next window's hash from the
+The hash function follows CLRS §32.2: a big-endian polynomial hash
+where the leftmost character gets the highest power of the radix.
+The rolling hash step computes the next window's hash from the
 previous one in O(1):
 
 .. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
    :language: fstar
-   :start-after: //SNIPPET_START: horner_hash
-   :end-before: //SNIPPET_END: horner_hash
+   :start-after: //SNIPPET_START: hash
+   :end-before: //SNIPPET_END: hash
 
-The specification module (``RabinKarp.Spec``) has **3 admits**: the
-inductive case of the rolling-hash correctness lemma
-(``horner_hash_roll_lemma``), and two top-level correctness
-theorems (``rabin_karp_matches_no_false_negatives`` and
-``rabin_karp_find_all_correct``).
+The key proof insight, adapted from
+``FStar/examples/algorithms/StringMatching.fst``, is the
+``hash_inversion`` lemma which extracts the most-significant digit
+from the hash.  This enables proving ``rolling_hash_step_correct``
+(that the imperative rolling hash step produces the correct hash
+for the next window) and ``hash_slice_lemma`` (that equal
+substrings produce equal hashes, for the no-false-negatives
+direction):
+
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: rolling_hash_step_correct
+   :end-before: //SNIPPET_END: rolling_hash_step_correct
+
+The main correctness theorem combines no-false-positives (every
+returned position is a valid match) and no-false-negatives (every
+valid match is returned):
+
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: correctness
+   :end-before: //SNIPPET_END: correctness
+
+The specification module has **0 admits and 0 assumes**.
 
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
@@ -237,7 +256,7 @@ Verification Status Summary
      - 0
    * - RabinKarp.Spec
      - Pure spec
-     - 3 admit()
+     - 0
    * - RabinKarp.Complexity
      - Pure proof
      - 0

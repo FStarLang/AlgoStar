@@ -411,7 +411,7 @@ lines. The table below summarizes the status of each algorithm.
      - Rabin-Karp
      - §32.2
      - all match positions
-     - ⚠️ 3: hash correctness
+     - ✅
      - ✅ Pure O(nm)
    * - 33
      - Segment Intersection
@@ -429,9 +429,9 @@ lines. The table below summarizes the status of each algorithm.
 Proof Gaps
 ----------
 
-As of this writing, the project has **92 unproven obligations**
-(``admit()`` and ``assume()`` calls) across **30 files**.  Of the 50
-algorithms in the table, **31 have fully proven correctness** (zero
+As of this writing, the project has **89 unproven obligations**
+(``admit()`` and ``assume()`` calls) across **29 files**.  Of the 50
+algorithms in the table, **32 have fully proven correctness** (zero
 admits) and **25 have fully proven complexity bounds**.
 
 The remaining admits fall into a few categories:
@@ -454,9 +454,9 @@ The remaining admits fall into a few categories:
    amortized analysis (7), Kruskal edge-count (3), Kahn
    topological sort (1), max-flow termination (2).
 
-5. **Miscellaneous** (18 admits):
+5. **Miscellaneous** (15 admits):
    BST insert preservation (3), Union-Find rank bound (1),
-   Strassen quadrant properties (1), Rabin-Karp hash (3),
+   Strassen quadrant properties (1),
    max-flow augmentation (8), BucketSort concat (2).
 
 Each chapter in this document notes any unproven obligations in its
