@@ -155,15 +155,15 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ---
 
-## Current Status (2025-02-18, latest)
+## Current Status (2025-02-19, latest)
 
-**164 F* files, ~50K lines — 89 unproven obligations across 29 files**
+**164 F* files, ~50K lines — 88 unproven obligations across 29 files** (+ 38 Pulse assume_ in 6 files)
 
 | Type | Count | Description |
 |------|-------|-------------|
-| `admit()` | ~50 | Unproven lemma/proof bodies (Pure F*) |
-| `assume(...)` | ~15 | Inline assumptions (Huffman: 3, MaxFlow: 8, DFS: 2, UnionFind: 1, Kruskal: 1) |
-| `assume_` | ~24 | Pulse-specific unproven invariants (StackDFS: 11, QueueBFS: 10, CountingSort: 3) |
+| `admit()` | 71 | Unproven lemma/proof bodies (Pure F*) |
+| `assume(...)` | 17 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 3, DFS.Spec: 2, MST/UF/Kruskal: 4) |
+| `assume_` | 38 | Pulse-specific unproven invariants (StackDFS: 11+13, QueueBFS: 4+6, CountingSort: 3, Kruskal.Cmplx: 1) |
 
 (Note: Comment-aware counting — excludes admits/assumes in block comments `(* *)` and line comments `//`.)
 
@@ -200,9 +200,9 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 15 | MatrixChain | §15.2 | ✅ mc_cost recursive + dp equiv | ⚠️ Separate O(n³) | 0 | ✅ **Zero admits** — sentinel bridge + table filling proven |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | |
 | 15 | RodCutting.Extended | §15.1 | ✅ revenue + cuts_are_optimal | — | 0 | ✅ EXTENDED-BOTTOM-UP-CUT-ROD |
-| 16 | ActivitySelection | §16.1 | ✅ greedy correct | ✅ Linked O(n) | 4 | Greedy choice proven |
-| 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 2 | Base case proven |
-| 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl | — | 3 assume | Optimality properties |
+| 16 | ActivitySelection | §16.1 | ✅ greedy optimal (exchange arg) | ✅ Linked O(n) | 1 | Greedy dominates + maximality proven; 1 impl↔spec gap |
+| 16 | Huffman.Complete | §16.3 | ⚠️ partial | ✅ Linked (cost) | 4 admit | Depends on Spec assumes |
+| 16 | Huffman.Spec (pure) | §16.3 | ✅ htree, wpl, swap_reduces_wpl | — | 3 assume | swap_reduces_wpl PROVEN; greedy_choice + opt_substructure remain |
 | 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | RankBound, FindTermination, Spec all 0 admits |
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 assume_ | + 6 assume_ in Complexity |
@@ -228,21 +228,21 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
 | 35 | VertexCover | §35.1 | ✅ valid cover | ⚠️ Separate O(V²) | 1 | 2-approx: 1 admit |
 
-### Unproven Obligation Distribution (~89 total)
+### Unproven Obligation Distribution (~88 total, + 38 assume_)
 
 | Chapter | admit | assume | assume_ | Total | Top files |
 |---------|-------|--------|---------|-------|-----------|
-| ch22 (graphs) | 12 | 2 | 34 | 48 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2) |
-| ch23 (MST) | 19 | 1 | 1 | 21 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), EdgeSort(2), Kruskal.Cmplx(2+1), SortedEdges(0+1) |
-| ch08 (sorting) | 9 | 0 | 3 | 12 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
+| ch22 (graphs) | 12 | 2 | 34 | 48 | StackDFS(11+13), QueueBFS(4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2+1) |
+| ch23 (MST) | 19 | 2 | 1 | 22 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), EdgeSort(2), Kruskal.Cmplx(3+1), SortedEdges(0+1), Kruskal(0+1) |
+| ch08 (sorting) | 10 | 0 | 3 | 13 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(2) |
 | ch32 (strings) | 7 | 0 | 0 | 7 | KMP.Complexity(7) |
-| ch16 (greedy) | 6 | 3 | 0 | 9 | ActivitySelection.Spec(4), Huffman.Complete(2), Huffman.Spec(0+3) |
+| ch16 (greedy) | 5 | 3 | 0 | 8 | ActivitySelection.Spec(1), Huffman.Complete(4), Huffman.Spec(0+3) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch24 (SSSP) | 5 | 0 | 0 | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
 | ch12 (BST) | 3 | 0 | 0 | 3 | BST.Insert.Spec(3) |
 | ch21 (UF) | 0 | 1 | 0 | 1 | UnionFind.Spec(0+1) |
-| Other | 5 | 0 | 0 | 5 | MaxSubarray.DC(1), VertexCover.Spec(1), Strassen(1), Huffman.Complete(2) |
-| **Total** | **~66** | **~15** | **~38** | **~89** | |
+| Other | 5 | 1 | 0 | 6 | MaxSubarray.DC(0+1), VertexCover.Spec(1), Strassen(1), KahnTopo.Cmplx(1) |
+| **Total** | **71** | **17** | **38** | **126** | |
 
 ---
 
