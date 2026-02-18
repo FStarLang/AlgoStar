@@ -35,6 +35,21 @@ let radix_sort_ops (n d k: nat) : nat =
   d * CS.counting_sort_iterations n k
 //SNIPPET_END: radix_sort_ops
 
+/// Explicit form: radix_sort_ops n d k = d * (2n + k + 1)
+let radix_sort_ops_explicit (n d k: nat)
+  : Lemma (ensures radix_sort_ops n d k == d * (2 * n + k + 1))
+  = ()
+
+/// Lower bound: d * (n + k) <= radix_sort_ops n d k
+let radix_sort_lower_bound (n d k: nat)
+  : Lemma (ensures d * (n + k) <= radix_sort_ops n d k)
+  = ()
+
+/// Upper bound: radix_sort_ops n d k <= 2 * d * (n + k) + d
+let radix_sort_upper_bound (n d k: nat)
+  : Lemma (ensures radix_sort_ops n d k <= 2 * d * (n + k) + d)
+  = ()
+
 //SNIPPET_START: radix_sort_theta_bound
 let radix_sort_theta_bound (n d k: nat)
   : Lemma (ensures d * (n + k) <= radix_sort_ops n d k /\
