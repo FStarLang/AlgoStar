@@ -336,6 +336,59 @@ let rec find_max_compatible_lower_bound
         // This is a contradiction — Z3 should derive False.
     end
 
+(* Upper bound: find_max_compatible <= k *)
+let rec find_max_compatible_upper_bound
+  (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (k: nat)
+  : Lemma (ensures find_max_compatible start finish n k <= k)
+          (decreases k)
+  = if k = 0 then ()
+    else if FStar.StrongExcludedMiddle.strong_excluded_middle
+              (exists (sel: list nat). L.length sel = k /\
+                                      mutually_compatible start finish sel /\
+                                      list_sorted_indices sel n)
+    then ()
+    else find_max_compatible_upper_bound start finish n (k - 1)
+
+(* If all compatible sets have size <= bound, then max_compatible_count <= bound *)
+#push-options "--fuel 2 --ifuel 1"
+let rec find_max_compatible_no_larger
+  (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (k: nat) (bound: nat)
+  : Lemma 
+    (requires
+      bound <= k /\
+      (forall (sel: list nat). 
+        mutually_compatible start finish sel /\
+        list_sorted_indices sel n ==>
+        L.length sel <= bound))
+    (ensures find_max_compatible start finish n k <= bound)
+    (decreases k)
+  = if k = 0 then ()
+    else 
+      let b = FStar.StrongExcludedMiddle.strong_excluded_middle
+                (exists (sel: list nat). L.length sel = k /\
+                                        mutually_compatible start finish sel /\
+                                        list_sorted_indices sel n) in
+      if b then begin
+        // find_max_compatible returns k
+        // The existential witness has L.length = k and is compatible/sorted
+        // The forall gives L.length <= bound, so k <= bound
+        // For Z3: the `b = true` means the existential holds, and the forall
+        // should apply to the witness. But Z3 can't connect them directly.
+        // So we need: k <= bound. If k > bound, then the witness has
+        // L.length = k > bound, but forall says L.length <= bound. Contradiction.
+        ()
+      end
+      else begin
+        // find_max_compatible recurses to k-1
+        if bound <= k - 1 then
+          find_max_compatible_no_larger start finish n (k - 1) bound
+        else
+          // bound = k but no set of size k exists
+          // find_max_compatible(k-1) <= k-1 < k = bound
+          find_max_compatible_upper_bound start finish n (k - 1)
+      end
+#pop-options
+
 (* Corollary: max_compatible_count >= 1 when n > 0 and activities are valid *)
 let max_compatible_count_pos (start: Seq.seq int) (finish: Seq.seq int) (n: nat)
   : Lemma (requires n > 0 /\ Seq.length start == n /\ Seq.length finish == n /\
@@ -547,7 +600,10 @@ let lemma_optimal_substructure
 let rec is_greedy_selection_inner (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (selected: list nat) : prop =
   match selected with
   | [] -> True
-  | [x] -> x < n /\ x < Seq.length start /\ x < Seq.length finish
+  | [x] -> x < n /\ x < Seq.length start /\ x < Seq.length finish /\
+      // x is the last selected: no compatible activities after x
+      (forall (z: nat). x < z /\ z < n /\ z < Seq.length start /\ z < Seq.length finish ==>
+        Seq.index start z < Seq.index finish x)
   | x :: y :: rest ->
       x < n /\ y < n /\
       x < Seq.length start /\ x < Seq.length finish /\
@@ -626,6 +682,28 @@ let rec lemma_list_index_mem (#a:eqtype) (l: list a) (i: nat)
     | hd :: tl ->
         if i = 0 then ()
         else lemma_list_index_mem tl (i - 1)
+
+// Extract "earliest compatible" property from is_greedy_selection_inner at position i
+// Also: extract the last-element exhaustiveness
+let rec lemma_greedy_last_exhaustive
+  (start finish: Seq.seq int) (n: nat) (greedy: list nat)
+  : Lemma
+    (requires
+      is_greedy_selection_inner start finish n greedy /\
+      list_sorted_indices greedy n /\
+      n == Seq.length start /\ n == Seq.length finish /\
+      L.length greedy >= 1)
+    (ensures (
+      let last = list_index greedy (L.length greedy - 1) in
+      last < n /\
+      (forall (z:nat). last < z /\ z < n /\ z < Seq.length start /\ z < Seq.length finish ==>
+        Seq.index start z < Seq.index finish last)))
+    (decreases greedy)
+  = lemma_list_index_bound greedy (L.length greedy - 1) n;
+    match greedy with
+    | [x] -> ()
+    | x :: y :: rest ->
+        lemma_greedy_last_exhaustive start finish n (y :: rest)
 
 // Extract "earliest compatible" property from is_greedy_selection_inner at position i
 let rec lemma_greedy_earliest_compat
@@ -711,6 +789,52 @@ let rec lemma_greedy_dominates
     end
 #pop-options
 
+// Maximality: no compatible set can be strictly larger than the greedy selection
+// Uses: lemma_greedy_dominates + last-element exhaustiveness
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+let lemma_greedy_is_maximal
+  (start finish: Seq.seq int) (n: nat)
+  (greedy other: list nat)
+  : Lemma
+    (requires
+      finish_sorted finish /\
+      n == Seq.length start /\ n == Seq.length finish /\ n > 0 /\
+      (forall (k:nat). k < n ==> valid_activity start finish k) /\
+      is_greedy_selection start finish n greedy /\
+      mutually_compatible start finish greedy /\
+      list_sorted_indices greedy n /\
+      mutually_compatible start finish other /\
+      list_sorted_indices other n /\
+      L.length greedy >= 1)
+    (ensures L.length other <= L.length greedy)
+  = if L.length other <= L.length greedy then ()
+    else begin
+      let j = L.length greedy - 1 in
+      
+      lemma_greedy_dominates start finish n greedy other j;
+      let gj = list_index greedy j in
+      let oj = list_index other j in
+      
+      lemma_list_index_bound other (j + 1) n;
+      let oj1 = list_index other (j + 1) in
+      
+      lemma_list_index_sorted other j (j + 1) n;
+      
+      lemma_list_index_mem other j;
+      lemma_list_index_mem other (j + 1);
+      lemma_compat_order start finish other oj oj1;
+      
+      lemma_list_index_bound greedy j n;
+      // finish_sorted + gj <= oj: finish[gj] <= finish[oj] <= start[oj1]
+      
+      // Last-element exhaustiveness: all z > gj have start[z] < finish[gj]
+      lemma_greedy_last_exhaustive start finish n greedy;
+      // oj1 > oj >= gj, oj1 < n, so start[oj1] < finish[gj]
+      // Contradiction: finish[gj] <= start[oj1] < finish[gj]
+      assert false
+    end
+#pop-options
+
 let lemma_greedy_is_optimal_helper
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (greedy_sel: list nat) (fuel: nat)
   : Lemma
@@ -721,11 +845,27 @@ let lemma_greedy_is_optimal_helper
       is_greedy_selection start finish n greedy_sel /\
       mutually_compatible start finish greedy_sel /\
       list_sorted_indices greedy_sel n /\
+      L.length greedy_sel >= 1 /\
       fuel >= L.length greedy_sel)
     (ensures
       is_optimal_selection start finish n greedy_sel)
     (decreases fuel)
-  = admit() // This follows by induction using greedy choice and optimal substructure properties
+  = // Strategy: show L.length greedy_sel == max_compatible_count
+    // Lower bound: greedy is a compatible set, so max_compatible_count >= L.length greedy_sel
+    reveal_opaque (`%max_compatible_count) (max_compatible_count start finish n);
+    lemma_sorted_indices_length greedy_sel n;
+    find_max_compatible_lower_bound start finish n n (L.length greedy_sel) greedy_sel;
+    // Upper bound: use lemma_greedy_is_maximal to show all compatible sets have <= L.length greedy_sel
+    let bound = L.length greedy_sel in
+    let aux (sel: list nat) 
+      : Lemma
+        (requires mutually_compatible start finish sel /\ list_sorted_indices sel n)
+        (ensures L.length sel <= bound) =
+      lemma_greedy_is_maximal start finish n greedy_sel sel
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+    find_max_compatible_no_larger start finish n n bound
+
 
 //SNIPPET_START: lemma_greedy_is_optimal
 let lemma_greedy_is_optimal
@@ -737,7 +877,8 @@ let lemma_greedy_is_optimal
       (forall (i:nat). i < n ==> valid_activity start finish i) /\
       is_greedy_selection start finish n greedy_sel /\
       mutually_compatible start finish greedy_sel /\
-      list_sorted_indices greedy_sel n)
+      list_sorted_indices greedy_sel n /\
+      L.length greedy_sel >= 1)
     (ensures
       is_optimal_selection start finish n greedy_sel)
   = lemma_sorted_indices_length greedy_sel n;
@@ -823,22 +964,11 @@ let rec lemma_implementation_is_greedy
       is_greedy_selection start finish n (seq_to_list sel))
     (decreases Seq.length sel)
   = let lst = seq_to_list sel in
-    if Seq.length sel = 1 then
-      // Single element list [0] satisfies is_greedy_selection
-      ()
-    else begin
-      // sel has at least 2 elements
-      // First element is 0 (given)
-      // Need to show the tail satisfies is_greedy_selection
-      // and that the second element is the earliest compatible with 0
-      let sel_tail = Seq.slice sel 1 (Seq.length sel) in
-      admit(); // TODO: establish preconditions for tail and prove greedy property
-      lemma_implementation_is_greedy start finish n sel_tail;
-      // The greedy property: sel[1] is earliest compatible with sel[0]
-      // This follows from the algorithm's construction
-      // For now, we establish the basic structure
-      ()
-    end
+    // This requires the "earliest compatible" / "exhaustive" property from the
+    // greedy algorithm's loop invariant, which is not captured in the current
+    // Pulse postcondition (pairwise_compatible + strictly_increasing + starts with 0).
+    // A full proof would add is_greedy_selection to the Pulse loop invariant.
+    admit()
 
 (*
    Main Theorem: The implementation produces optimal results
