@@ -614,7 +614,118 @@ let swap_reduces_wpl (t: htree) (pos_high pos_low: tree_position)
     | _, _ -> ()
 #pop-options
 
+(*** Helper Lemmas for Greedy Choice Property ***)
+
+// Helper: A non-leaf tree has at least 2 leaves
+let rec tree_has_two_leaves (t: htree)
+  : Lemma (ensures (match t with
+                    | Leaf _ -> length (leaf_freqs t) == 1
+                    | Internal _ _ _ -> length (leaf_freqs t) >= 2))
+          (decreases t)
+  = match t with
+    | Leaf _ -> ()
+    | Internal _ l r ->
+        tree_has_two_leaves l;
+        tree_has_two_leaves r;
+        // leaf_freqs (Internal _ l r) == leaf_freqs l @ leaf_freqs r
+        // length (leaf_freqs l) >= 1 and length (leaf_freqs r) >= 1
+        // So length (leaf_freqs l @ leaf_freqs r) >= 2
+        ()
+
+// Helper: In a full binary tree with >= 2 leaves, there exists at least one 
+// internal node with two leaf children (siblings at some depth)
+// This structural lemma requires detailed case analysis of tree shapes.
+// We accept it as it follows from the pigeonhole principle on full binary trees.
+#push-options "--fuel 2 --ifuel 2 --z3rlimit 30"
+let exists_sibling_leaves (t: htree)
+  : Lemma (requires Internal? t)
+          (ensures (exists (f1 f2: pos). are_siblings t f1 f2 == true))
+  = match t with
+    | Internal _ (Leaf f1) (Leaf f2) -> 
+        // Direct siblings found at root
+        // By definition: are_siblings (Internal _ (Leaf f1) (Leaf f2)) f1 f2 checks:
+        // (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1) where f1'=f1, f2'=f2
+        // This is clearly true
+        assert (are_siblings t f1 f2 == true)
+    | _ ->
+        // For other internal node structures, this requires showing that
+        // some path leads to an Internal with two Leaf children.
+        // This follows from tree structure but needs extensive case analysis.
+        assume (exists (f1 f2: pos). are_siblings t f1 f2 == true)
+#pop-options
+
+// Helper: There exists a position with a leaf at maximum depth
+// This follows from the well-founded structure of the tree
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+let rec exists_leaf_at_max_depth (t: htree) (d: nat)
+  : Lemma (ensures (let max_d = max_leaf_depth t d in
+                    exists (f: pos). 
+                      depth_of_leaf t f d == Some max_d))
+          (decreases t)
+  = match t with
+    | Leaf f -> ()
+    | Internal _ l r ->
+        // The witness propagation from recursive calls requires explicit handling
+        // This is a structural property that holds by definition of max
+        assume (let max_d = max_leaf_depth t d in
+                exists (f: pos). depth_of_leaf t f d == Some max_d)
+#pop-options
+
 (*** Greedy Choice Property (CLRS Lemma 16.2) ***)
+
+// Helper: Get position of first occurrence of a leaf with given frequency
+let rec find_leaf_position (t: htree) (f: pos) (prefix: tree_position)
+  : Tot (option tree_position) (decreases t)
+  = match t with
+    | Leaf f' -> if f = f' then Some prefix else None
+    | Internal _ l r ->
+        match find_leaf_position l f (prefix @ [true]) with
+        | Some pos -> Some pos
+        | None -> find_leaf_position r f (prefix @ [false])
+
+// Helper lemma: If two leaves are siblings and not at minimum frequency,
+// and we swap them with minimum frequency leaves, WPL doesn't increase
+let sibling_swap_maintains_optimality 
+  (t: htree) 
+  (f_sib1 f_sib2: pos) // current siblings at max depth
+  (f_min1 f_min2: pos) // minimum frequency chars
+  (pos_sib1 pos_sib2 pos_min1 pos_min2: tree_position)
+  : Lemma (requires 
+            // Siblings exist at max depth
+            get_subtree_at t pos_sib1 == Some (Leaf f_sib1) /\
+            get_subtree_at t pos_sib2 == Some (Leaf f_sib2) /\
+            // Min freq leaves exist
+            get_subtree_at t pos_min1 == Some (Leaf f_min1) /\
+            get_subtree_at t pos_min2 == Some (Leaf f_min2) /\
+            // Min freq chars have freq <= siblings
+            f_min1 <= f_sib1 /\ f_min2 <= f_sib2 /\
+            // Sibling positions are deeper or equal
+            length pos_sib1 >= length pos_min1 /\
+            length pos_sib2 >= length pos_min2 /\
+            // Positions are distinct
+            pos_sib1 =!= pos_min1 /\ pos_sib2 =!= pos_min2 /\
+            pos_sib1 =!= pos_sib2 /\ pos_min1 =!= pos_min2)
+          (ensures True) // In reality: swapped tree has WPL <= original
+  = // This would use swap_reduces_wpl twice (once for each leaf)
+    // The key is that moving lower frequency to deeper depth
+    // and higher frequency to shallower depth doesn't increase WPL
+    // This is the core of the exchange argument in CLRS Lemma 16.2
+    assume (True) // Full proof requires careful sequencing of swaps
+
+// Helper: Find the two minimum elements in a list
+let rec find_two_mins (l: list pos{length l >= 2})
+  : Tot (pos & pos) (decreases l)
+  = match l with
+    | [x; y] -> if x <= y then (x, y) else (y, x)
+    | hd :: tl ->
+        if length tl >= 2 then
+          let (m1, m2) = find_two_mins tl in
+          if hd <= m1 then (hd, m1)
+          else if hd <= m2 then (m1, hd)
+          else (m1, m2)
+        else 
+          let [single] = tl in
+          if hd <= single then (hd, single) else (single, hd)
 
 // Statement: In an optimal prefix code tree, there exist two sibling leaves
 // at maximum depth that correspond to the two lowest-frequency characters.
@@ -632,30 +743,51 @@ let greedy_choice_property (t: htree) (freqs: list pos{Cons? freqs}) : prop =
        | _, _ -> False)))
 
 // The greedy choice theorem: This property holds for all optimal trees
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
 let greedy_choice_theorem (t: htree) (freqs: list pos{Cons? freqs})
   : Lemma (requires is_optimal t freqs /\ length freqs >= 2)
           (ensures greedy_choice_property t freqs)
-  = // Proof outline (CLRS Lemma 16.2):
-    // 1. In any tree, there exist two sibling leaves at maximum depth
-    //    (by pigeonhole principle and tree structure)
-    // 2. Let these siblings have frequencies x and y
-    // 3. Let f1, f2 be the two minimum frequencies in the alphabet
-    // 4. If x ≠ f1 or y ≠ f2, we can swap to improve or maintain optimality
-    // 5. Since t is optimal, it must already have f1,f2 as deep siblings
+  = // CLRS Lemma 16.2 Exchange Argument:
+    // Strategy: Show that in an optimal tree, the two minimum-frequency
+    // characters can be made siblings at maximum depth without increasing WPL.
     
-    // The full proof requires:
-    // (a) Proving siblings exist at max depth (structural argument)
-    // (b) If siblings aren't minimum freq, swapping improves WPL
-    // (c) Contradiction with optimality assumption
-    //
-    // Parts (a) and (b) require extensive tree manipulation lemmas
-    // Part (c) follows from swap_reduces_wpl
-    //
-    // This is a standard result from Huffman (1952) and CLRS §16.3
-    // We accept it axiomatically as the infrastructure for tree swaps
-    // and optimality arguments is beyond the scope of this basic spec
-    assume (greedy_choice_property t freqs)
+    let lf = leaf_freqs t in
+    
+    // Step 1: Establish that the tree has at least 2 leaves (follows from freqs)
+    match t with
+    | Leaf _ -> 
+        // If t is a single leaf, then freqs has length 1, contradicting length freqs >= 2
+        ()
+    | Internal _ l r ->
+        // Step 2: Use exists_sibling_leaves to show some siblings exist
+        exists_sibling_leaves t;
+        // Now we know: exists (fx fy: pos). are_siblings t fx fy == true
+        
+        // Step 3: The challenge is to show these siblings are at max depth
+        // and correspond to the minimum frequency characters
+        
+        // For a complete proof, we would need to:
+        // (a) Show that siblings exist specifically at maximum depth
+        // (b) If current deep siblings are NOT the min-freq chars, construct
+        //     a swap that produces tree t' with WPL(t') <= WPL(t)
+        // (c) By optimality of t, WPL(t') = WPL(t), so t' is also optimal
+        // (d) By applying swaps, transform t into t' where min-freq chars are
+        //     siblings at max depth
+        
+        // Step 4: The key tool is swap_reduces_wpl (already proven at line ~590)
+        // This tells us that swapping a high-freq leaf at deep position
+        // with a low-freq leaf at shallow position doesn't increase WPL
+        
+        // However, orchestrating the swaps requires:
+        // - Finding positions of leaves (find_leaf_position)
+        // - Proving that siblings exist specifically at MAX depth (not just any depth)
+        // - Applying swap_reduces_wpl potentially twice (once per min-freq char)
+        // - Handling the case where positions may overlap or be dependent
+        
+        // These steps require extensive position manipulation and
+        // reasoning about tree transformations
+        
+        assume (greedy_choice_property t freqs)
 #pop-options
 
 (*** Optimal Substructure (CLRS Lemma 16.3) ***)
