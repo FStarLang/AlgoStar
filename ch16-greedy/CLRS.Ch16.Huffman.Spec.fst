@@ -280,14 +280,19 @@ let rec replace_subtree_at (t: htree) (pos: tree_position) (new_t: htree) : opti
             | Some r' -> Some (Internal f l r')
             | None -> None
 
-// Swap lemma: Swapping a high-frequency leaf at shallow depth with a low-frequency leaf
-// at greater depth decreases or maintains WPL
+// Swap lemma: Swapping a high-frequency leaf at a DEEP depth with a low-frequency leaf
+// at a SHALLOW depth decreases or maintains WPL (CLRS Lemma 16.2 exchange argument)
+// 
+// Intuition: Moving high-freq to shallower depth saves more bits than the cost of 
+// moving low-freq to deeper depth. Net change = (f_high - f_low)(d_high - d_low) >= 0
+// in favor of the swap (original WPL >= swapped WPL).
 let swap_reduces_wpl_statement (t: htree) (pos_high pos_low: tree_position) : prop =
   match get_subtree_at t pos_high, get_subtree_at t pos_low with
   | Some (Leaf f_high), Some (Leaf f_low) ->
       let depth_high = length pos_high in
       let depth_low = length pos_low in
-      if f_high > f_low && depth_high < depth_low then
+      // High-freq leaf at DEEP position, low-freq leaf at SHALLOW position (suboptimal)
+      if f_high >= f_low && depth_high >= depth_low then
         (match replace_subtree_at t pos_high (Leaf f_low), 
                replace_subtree_at t pos_low (Leaf f_high) with
          | Some t_temp, _ ->
@@ -308,7 +313,7 @@ let leaf_contribution (f: pos) (d: nat) : nat = f `op_Multiply` d
 // Helper lemma: Swapping two leaves at different depths affects WPL
 // The exact relationship depends on frequency and depth differences
 let swap_wpl_delta (f_high f_low: pos) (d_high d_low: nat)
-  : Lemma (requires f_high > f_low /\ d_high < d_low)
+  : Lemma (requires f_high >= f_low /\ d_high >= d_low)
           (ensures True) // Simplified - the full WPL relationship requires case analysis
   = ()
 
@@ -322,26 +327,290 @@ let replace_subtree_at_nil (t: htree) (new_t: htree)
   : Lemma (ensures replace_subtree_at t [] new_t == Some new_t)
   = ()
 
+// Key helper lemma: WPL contribution analysis for replace_subtree_at
+// When we replace a subtree at position pos, the WPL changes by the difference
+// in the weighted contributions of the old and new subtrees
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+let rec replace_subtree_wpl_aux (t: htree) (pos: tree_position) (new_t: htree) (d: nat)
+  : Lemma (requires Some? (get_subtree_at t pos) /\ Some? (replace_subtree_at t pos new_t))
+          (ensures (
+            let Some old_t = get_subtree_at t pos in
+            let Some t' = replace_subtree_at t pos new_t in
+            weighted_path_length_aux t d ==
+            weighted_path_length_aux t' d + 
+            weighted_path_length_aux old_t (d + length pos) -
+            weighted_path_length_aux new_t (d + length pos)
+          ))
+          (decreases pos)
+  = match pos with
+    | [] ->
+        // Base case: replacing at root
+        assert (get_subtree_at t [] == Some t);
+        assert (replace_subtree_at t [] new_t == Some new_t)
+    | hd :: tl ->
+        match t with
+        | Internal f l r ->
+            if hd then (
+              // Replace in left subtree
+              replace_subtree_wpl_aux l tl new_t (d + 1);
+              let Some old_t = get_subtree_at l tl in
+              let Some l' = replace_subtree_at l tl new_t in
+              // WPL of Internal at depth d
+              assert (weighted_path_length_aux t d ==
+                      weighted_path_length_aux l (d + 1) + weighted_path_length_aux r (d + 1));
+              assert (weighted_path_length_aux (Internal f l' r) d ==
+                      weighted_path_length_aux l' (d + 1) + weighted_path_length_aux r (d + 1));
+              // From IH: wpl_aux l (d+1) = wpl_aux l' (d+1) + wpl_aux old_t (d+1+|tl|) - wpl_aux new_t (d+1+|tl|)
+              // So: wpl_aux t d = wpl_aux (Internal f l' r) d + wpl_aux old_t (d+1+|tl|) - wpl_aux new_t (d+1+|tl|)
+              assert (d + 1 + length tl == d + length (hd :: tl))
+            ) else (
+              // Replace in right subtree
+              replace_subtree_wpl_aux r tl new_t (d + 1);
+              let Some old_t = get_subtree_at r tl in
+              let Some r' = replace_subtree_at r tl new_t in
+              assert (weighted_path_length_aux t d ==
+                      weighted_path_length_aux l (d + 1) + weighted_path_length_aux r (d + 1));
+              assert (weighted_path_length_aux (Internal f l r') d ==
+                      weighted_path_length_aux l (d + 1) + weighted_path_length_aux r' (d + 1));
+              assert (d + 1 + length tl == d + length (hd :: tl))
+            )
+        | Leaf _ -> ()
+#pop-options
+
+// Specialization for replacing a leaf: WPL change is exactly the frequency times depth difference
+#push-options "--z3rlimit 30"
+let replace_leaf_wpl (t: htree) (position: tree_position) (f_new: pos) (d: nat)
+  : Lemma (requires (match get_subtree_at t position with
+                     | Some (Leaf f_old) -> True
+                     | _ -> False))
+          (ensures (
+            let Some (Leaf f_old) = get_subtree_at t position in
+            match replace_subtree_at t position (Leaf f_new) with
+            | Some t' ->
+                weighted_path_length_aux t d + f_new `op_Multiply` (d + length position) ==
+                weighted_path_length_aux t' d + f_old `op_Multiply` (d + length position)
+            | None -> True
+          ))
+  = let Some (Leaf f_old) = get_subtree_at t position in
+    match replace_subtree_at t position (Leaf f_new) with
+    | Some t' ->
+        replace_subtree_wpl_aux t position (Leaf f_new) d;
+        // From replace_subtree_wpl_aux:
+        // wpl_aux t d = wpl_aux t' d + wpl_aux (Leaf f_old) (d + |position|) - wpl_aux (Leaf f_new) (d + |position|)
+        // wpl_aux (Leaf f_old) (d + |position|) = f_old * (d + |position|)
+        // wpl_aux (Leaf f_new) (d + |position|) = f_new * (d + |position|)
+        // So: wpl_aux t d = wpl_aux t' d + f_old * (d + |position|) - f_new * (d + |position|)
+        // Rearranging: wpl_aux t d + f_new * (d + |position|) = wpl_aux t' d + f_old * (d + |position|)
+        ()
+    | None -> ()
+#pop-options
+
+// Helper: arithmetic fact for swap
+// High-freq leaf at DEEP position (d_high), low-freq leaf at SHALLOW position (d_low)
+// After swap: high-freq moves to shallow, low-freq moves to deep → WPL decreases
+let swap_arithmetic (f_high f_low d_high d_low: nat) (wpl_orig wpl_swap: nat)
+  : Lemma (requires
+            f_high >= f_low /\
+            d_high >= d_low /\
+            wpl_orig + f_low `op_Multiply` d_high + f_high `op_Multiply` d_low ==
+            wpl_swap + f_high `op_Multiply` d_high + f_low `op_Multiply` d_low)
+          (ensures wpl_swap <= wpl_orig)
+  = // wpl_orig + f_low * d_high + f_high * d_low = wpl_swap + f_high * d_high + f_low * d_low
+    // wpl_orig - wpl_swap = (f_high * d_high + f_low * d_low) - (f_low * d_high + f_high * d_low)
+    //                     = (f_high - f_low) * d_high - (f_high - f_low) * d_low
+    //                     = (f_high - f_low) * (d_high - d_low) >= 0
+    // Since f_high >= f_low and d_high >= d_low, both factors are non-negative
+    // Therefore wpl_orig >= wpl_swap
+    ()
+
+// Helper: check if pos1 is a strict prefix of pos2
+let rec is_prefix (pos1 pos2: tree_position) : bool =
+  match pos1, pos2 with
+  | [], _ :: _ -> true
+  | hd1 :: tl1, hd2 :: tl2 -> hd1 = hd2 && is_prefix tl1 tl2
+  | _, _ -> false
+
+// Helper lemma: if positions are disjoint, replacing at one doesn't affect the other
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec disjoint_replacement_preserves_subtree (t: htree) (pos1 pos2: tree_position) (new1: htree)
+  : Lemma (requires
+            pos1 =!= pos2 /\
+            not (is_prefix pos1 pos2) /\
+            not (is_prefix pos2 pos1) /\
+            Some? (get_subtree_at t pos1) /\
+            Some? (get_subtree_at t pos2) /\
+            Some? (replace_subtree_at t pos1 new1))
+          (ensures (
+            let Some t' = replace_subtree_at t pos1 new1 in
+            get_subtree_at t' pos2 == get_subtree_at t pos2
+          ))
+          (decreases pos1)
+  = match pos1, pos2 with
+    | [], _ -> () // Contradicts not (is_prefix pos1 pos2)
+    | _, [] -> () // Contradicts not (is_prefix pos2 pos1)
+    | hd1 :: tl1, hd2 :: tl2 ->
+        match t with
+        | Internal f l r ->
+            if hd1 = hd2 then (
+              // Both go in same direction
+              if hd1 then (
+                disjoint_replacement_preserves_subtree l tl1 tl2 new1
+              ) else (
+                disjoint_replacement_preserves_subtree r tl1 tl2 new1
+              )
+            ) else (
+              // Different directions - subtrees are independent
+              ()
+            )
+        | Leaf _ -> ()
+#pop-options
+
+// Helper lemma: if positions are disjoint (neither is prefix of the other),
+// then two sequential replacements are independent
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec disjoint_replacements_commute (t: htree) (pos1 pos2: tree_position) (new1 new2: htree)
+  : Lemma (requires 
+            pos1 =!= pos2 /\
+            not (is_prefix pos1 pos2) /\
+            not (is_prefix pos2 pos1) /\
+            Some? (get_subtree_at t pos1) /\
+            Some? (get_subtree_at t pos2) /\
+            Some? (replace_subtree_at t pos1 new1) /\
+            Some? (replace_subtree_at t pos2 new2))
+          (ensures (
+            let Some t1 = replace_subtree_at t pos1 new1 in
+            let Some t2 = replace_subtree_at t pos2 new2 in
+            match replace_subtree_at t1 pos2 new2, replace_subtree_at t2 pos1 new1 with
+            | Some t12, Some t21 -> t12 == t21
+            | _, _ -> False
+          ))
+          (decreases pos1)
+  = match pos1, pos2 with
+    | [], _ -> () // pos1 = [] and pos2 != [] contradicts not (is_prefix pos1 pos2)
+    | _, [] -> () // pos2 = [] and pos1 != [] contradicts not (is_prefix pos2 pos1)
+    | hd1 :: tl1, hd2 :: tl2 ->
+        match t with
+        | Internal f l r ->
+            if hd1 = hd2 then (
+              // Both go in same direction, recurse
+              if hd1 then (
+                disjoint_replacements_commute l tl1 tl2 new1 new2
+              ) else (
+                disjoint_replacements_commute r tl1 tl2 new1 new2
+              )
+            ) else (
+              // They go in different directions - independent subtrees
+              // No need to recurse, the replacements are clearly independent
+              ()
+            )
+        | Leaf _ -> ()
+#pop-options
+
+// Key disjoint-case proof: when positions don't overlap, the swap arithmetic works
+// If get_subtree_at succeeds, replace_subtree_at also succeeds
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+let rec get_implies_replace (t: htree) (pos: tree_position) (new_t: htree)
+  : Lemma (requires Some? (get_subtree_at t pos))
+          (ensures Some? (replace_subtree_at t pos new_t))
+          (decreases pos)
+  = match pos with
+    | [] -> ()
+    | hd :: tl ->
+        match t with
+        | Internal _ l r ->
+            if hd then get_implies_replace l tl new_t
+            else get_implies_replace r tl new_t
+        | Leaf _ -> ()
+#pop-options
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+let swap_reduces_wpl_disjoint (t: htree) (pos_high pos_low: tree_position) (f_high f_low: pos)
+  : Lemma (requires
+            get_subtree_at t pos_high == Some (Leaf f_high) /\
+            get_subtree_at t pos_low == Some (Leaf f_low) /\
+            f_high >= f_low /\
+            length pos_high >= length pos_low /\
+            pos_high =!= pos_low /\
+            not (is_prefix pos_high pos_low) /\
+            not (is_prefix pos_low pos_high) /\
+            Some? (replace_subtree_at t pos_high (Leaf f_low)))
+          (ensures (
+            let Some t_temp = replace_subtree_at t pos_high (Leaf f_low) in
+            get_subtree_at t_temp pos_low == Some (Leaf f_low) /\
+            (match replace_subtree_at t_temp pos_low (Leaf f_high) with
+             | Some t_swapped ->
+                 weighted_path_length t_swapped <= weighted_path_length t
+             | None -> True)))
+  = let d_high = length pos_high in
+    let d_low = length pos_low in
+    let Some t_temp = replace_subtree_at t pos_high (Leaf f_low) in
+    
+    // Step 1: pos_low is unaffected by replacing at pos_high (disjoint)
+    disjoint_replacement_preserves_subtree t pos_high pos_low (Leaf f_low);
+    
+    // Step 2: WPL analysis
+    replace_leaf_wpl t pos_high f_low 0;
+    
+    match replace_subtree_at t_temp pos_low (Leaf f_high) with
+    | Some t_swapped ->
+        replace_leaf_wpl t_temp pos_low f_high 0;
+        
+        let wpl_t = weighted_path_length t in
+        let wpl_s = weighted_path_length t_swapped in
+        
+        assert (wpl_t + f_low `op_Multiply` d_high + f_high `op_Multiply` d_low ==
+                wpl_s + f_high `op_Multiply` d_high + f_low `op_Multiply` d_low);
+        
+        swap_arithmetic f_high f_low d_high d_low wpl_t wpl_s
+    | None -> ()
+#pop-options
+
+// If a position points to a leaf, any extension of it points to None
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+let rec leaf_position_no_extension (t: htree) (pos1 pos2: tree_position) (f: pos)
+  : Lemma (requires get_subtree_at t pos1 == Some (Leaf f) /\ is_prefix pos1 pos2)
+          (ensures get_subtree_at t pos2 == None)
+          (decreases pos1)
+  = match pos1, pos2 with
+    | [], hd2 :: tl2 ->
+        // t itself is the Leaf f, so going into it returns None
+        ()
+    | hd1 :: tl1, hd2 :: tl2 ->
+        assert (hd1 = hd2);
+        (match t with
+        | Internal _ l r ->
+            if hd1 then leaf_position_no_extension l tl1 tl2 f
+            else leaf_position_no_extension r tl1 tl2 f
+        | Leaf _ -> ())
+    | _, _ -> () // can't happen
+#pop-options
+
 // The swap reduces WPL when the conditions are met
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
+// High-freq at deep position, low-freq at shallow position → swap reduces WPL
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
 let swap_reduces_wpl (t: htree) (pos_high pos_low: tree_position)
   : Lemma (requires (match get_subtree_at t pos_high, get_subtree_at t pos_low with
                      | Some (Leaf f_high), Some (Leaf f_low) ->
-                         f_high > f_low /\ length pos_high < length pos_low /\
+                         f_high >= f_low /\ length pos_high >= length pos_low /\
                          pos_high =!= pos_low
                      | _, _ -> False))
           (ensures swap_reduces_wpl_statement t pos_high pos_low)
   = match get_subtree_at t pos_high, get_subtree_at t pos_low with
     | Some (Leaf f_high), Some (Leaf f_low) ->
-        let d_high = length pos_high in
-        let d_low = length pos_low in
-        swap_wpl_delta f_high f_low d_high d_low;
-        // The mathematical argument is:
-        // - Original WPL includes: f_high * d_high + f_low * d_low + (rest)
-        // - Swapped WPL includes: f_high * d_low + f_low * d_high + (rest)
-        // - Difference: (f_high - f_low) * (d_low - d_high) >= 0
-        // Therefore swapped WPL <= original WPL
-        assume (swap_reduces_wpl_statement t pos_high pos_low)
+        // Both positions point to leaves and pos_high =!= pos_low.
+        // Case 1: is_prefix pos_low pos_high → impossible
+        //   pos_low points to a Leaf, so any extension returns None, contradicting pos_high → Some
+        if is_prefix pos_low pos_high then
+          leaf_position_no_extension t pos_low pos_high f_low
+        // Case 2: is_prefix pos_high pos_low → impossible 
+        //   pos_high points to a Leaf, so any extension returns None, contradicting pos_low → Some
+        else if is_prefix pos_high pos_low then
+          leaf_position_no_extension t pos_high pos_low f_high
+        // Case 3: disjoint positions → use swap_reduces_wpl_disjoint
+        else (
+          get_implies_replace t pos_high (Leaf f_low);
+          swap_reduces_wpl_disjoint t pos_high pos_low f_high f_low
+        )
     | _, _ -> ()
 #pop-options
 

@@ -543,21 +543,27 @@ let lemma_optimal_substructure
 *)
 
 (* Greedy selection property: models the algorithm's choices *)
-let rec is_greedy_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (selected: list nat) : prop =
+(* The inner recursive predicate does not require head == 0 *)
+let rec is_greedy_selection_inner (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (selected: list nat) : prop =
   match selected with
   | [] -> True
-  | [x] -> x == 0 /\ x < n  // First selection is activity 0
+  | [x] -> x < n /\ x < Seq.length start /\ x < Seq.length finish
   | x :: y :: rest ->
-      x == 0 /\  // First is 0
-      x < n /\ y < n /\  // Both in bounds
+      x < n /\ y < n /\
       x < Seq.length start /\ x < Seq.length finish /\
       y < Seq.length start /\ y < Seq.length finish /\
-      Seq.index finish x <= Seq.index start y /\  // Compatible
-      x < y /\  // Sorted indices
-      is_greedy_selection start finish n (y :: rest) /\
+      Seq.index finish x <= Seq.index start y /\
+      x < y /\
+      is_greedy_selection_inner start finish n (y :: rest) /\
       // y is the earliest compatible activity after x
       (forall (z: nat). x < z /\ z < y /\ z < n /\ z < Seq.length start /\ z < Seq.length finish ==>
         Seq.index start z < Seq.index finish x)
+
+(* Top-level greedy selection: starts with activity 0 *)
+let is_greedy_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (selected: list nat) : prop =
+  match selected with
+  | [] -> True
+  | x :: _ -> x == 0 /\ is_greedy_selection_inner start finish n selected
 
 // ========== Main Optimality Theorem ==========
 
@@ -569,6 +575,141 @@ let rec is_greedy_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) 
    2. Optimal substructure: recursively apply to remaining activities
    3. By induction, greedy produces optimal solution
 *)
+
+(*
+   OPTIMALITY PROOF: Exchange argument (CLRS Theorem 16.1)
+   
+   Key lemma: The i-th greedy activity finishes no later than the i-th activity
+   in any optimal solution. This is proven by induction using the "earliest compatible"
+   property of the greedy selection.
+*)
+
+// Helper: get the i-th element of a list
+let rec list_index (#a:Type) (l: list a) (i: nat{i < L.length l}) : a =
+  match l with
+  | hd :: tl -> if i = 0 then hd else list_index tl (i - 1)
+
+// The i-th element of a sorted-indices list is a valid index
+let rec lemma_list_index_bound (l: list nat) (i: nat) (n: nat)
+  : Lemma
+    (requires list_sorted_indices l n /\ i < L.length l)
+    (ensures list_index l i < n)
+    (decreases l)
+  = match l with
+    | [_] -> ()
+    | x :: y :: rest ->
+        if i = 0 then ()
+        else lemma_list_index_bound (y :: rest) (i - 1) n
+
+// In a sorted list, list_index is strictly increasing
+let rec lemma_list_index_sorted (l: list nat) (i j: nat) (n: nat)
+  : Lemma
+    (requires list_sorted_indices l n /\ i < j /\ j < L.length l)
+    (ensures list_index l i < list_index l j)
+    (decreases l)
+  = match l with
+    | x :: y :: rest ->
+        if i = 0 then begin
+          if j = 1 then ()
+          else lemma_list_index_sorted (y :: rest) 0 (j - 1) n
+        end
+        else
+          lemma_list_index_sorted (y :: rest) (i - 1) (j - 1) n
+
+// The i-th element of a list is a member of that list
+let rec lemma_list_index_mem (#a:eqtype) (l: list a) (i: nat)
+  : Lemma
+    (requires i < L.length l)
+    (ensures L.mem (list_index l i) l)
+    (decreases l)
+  = match l with
+    | hd :: tl ->
+        if i = 0 then ()
+        else lemma_list_index_mem tl (i - 1)
+
+// Extract "earliest compatible" property from is_greedy_selection_inner at position i
+let rec lemma_greedy_earliest_compat
+  (start finish: Seq.seq int) (n: nat) (greedy: list nat) (i: nat)
+  : Lemma
+    (requires
+      is_greedy_selection_inner start finish n greedy /\
+      list_sorted_indices greedy n /\
+      n == Seq.length start /\ n == Seq.length finish /\
+      i + 1 < L.length greedy)
+    (ensures (
+      let gi = list_index greedy i in
+      let gi1 = list_index greedy (i + 1) in
+      gi < n /\ gi1 < n /\
+      gi < gi1 /\
+      Seq.index finish gi <= Seq.index start gi1 /\
+      (forall (z:nat). gi < z /\ z < gi1 /\ z < n /\ z < Seq.length start /\ z < Seq.length finish ==>
+        Seq.index start z < Seq.index finish gi)))
+    (decreases greedy)
+  = lemma_list_index_bound greedy i n;
+    lemma_list_index_bound greedy (i + 1) n;
+    match greedy with
+    | x :: y :: rest ->
+        if i = 0 then ()
+        else lemma_greedy_earliest_compat start finish n (y :: rest) (i - 1)
+
+// Key lemma: greedy[i] <= other[i] and finish[greedy[i]] <= finish[other[i]]
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec lemma_greedy_dominates
+  (start finish: Seq.seq int) (n: nat)
+  (greedy other: list nat)
+  (i: nat)
+  : Lemma
+    (requires
+      finish_sorted finish /\
+      n == Seq.length start /\ n == Seq.length finish /\ n > 0 /\
+      (forall (k:nat). k < n ==> valid_activity start finish k) /\
+      is_greedy_selection_inner start finish n greedy /\
+      mutually_compatible start finish other /\
+      list_sorted_indices other n /\
+      list_sorted_indices greedy n /\
+      i < L.length greedy /\ i < L.length other /\
+      L.hd greedy <= L.hd other)
+    (ensures
+      list_index greedy i <= list_index other i)
+    (decreases i)
+  = lemma_list_index_bound greedy i n;
+    lemma_list_index_bound other i n;
+    if i = 0 then ()
+    else begin
+      // IH at i-1
+      lemma_greedy_dominates start finish n greedy other (i - 1);
+      lemma_list_index_bound greedy (i - 1) n;
+      lemma_list_index_bound other (i - 1) n;
+      let gi_1 = list_index greedy (i - 1) in
+      let oi_1 = list_index other (i - 1) in
+      let gi = list_index greedy i in
+      let oi = list_index other i in
+      // IH: gi_1 <= oi_1
+      assert (gi_1 <= oi_1);
+      
+      // From sorted other: oi > oi_1 >= gi_1
+      lemma_list_index_sorted other (i - 1) i n;
+      assert (oi_1 < oi);
+      assert (oi > gi_1);
+      
+      // Establish membership for lemma_compat_order
+      lemma_list_index_mem other (i - 1);
+      lemma_list_index_mem other i;
+      
+      // From compatibility of other: finish[oi_1] <= start[oi]
+      lemma_compat_order start finish other oi_1 oi;
+      // From IH + finish_sorted: finish[gi_1] <= finish[oi_1]
+      assert (Seq.index finish gi_1 <= Seq.index finish oi_1);
+      // Chain: finish[gi_1] <= start[oi]
+      assert (Seq.index finish gi_1 <= Seq.index start oi);
+      
+      // From greedy earliest: for all z with gi_1 < z < gi: start[z] < finish[gi_1]
+      lemma_greedy_earliest_compat start finish n greedy (i - 1);
+      // Since start[oi] >= finish[gi_1] and oi > gi_1, oi cannot be in (gi_1, gi)
+      // So oi >= gi
+      assert (oi >= gi)
+    end
+#pop-options
 
 let lemma_greedy_is_optimal_helper
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (greedy_sel: list nat) (fuel: nat)
@@ -599,7 +740,8 @@ let lemma_greedy_is_optimal
       list_sorted_indices greedy_sel n)
     (ensures
       is_optimal_selection start finish n greedy_sel)
-  = lemma_greedy_is_optimal_helper start finish n greedy_sel n
+  = lemma_sorted_indices_length greedy_sel n;
+    lemma_greedy_is_optimal_helper start finish n greedy_sel n
 //SNIPPET_END: lemma_greedy_is_optimal
 
 // ========== Connection to Implementation ==========
@@ -735,6 +877,18 @@ let rec lemma_seq_to_list_preserves_sorted
   = lemma_seq_to_list_aux_preserves_sorted sel n 0
 
 //SNIPPET_START: theorem_implementation_optimal
+
+(* Helper lemmas for seq_to_list length *)
+let rec lemma_seq_to_list_length_aux (s: Seq.seq 'a) (i: nat{i <= Seq.length s})
+  : Lemma (ensures L.length (seq_to_list_aux s i) == Seq.length s - i)
+          (decreases Seq.length s - i)
+  = if i >= Seq.length s then ()
+    else lemma_seq_to_list_length_aux s (i + 1)
+
+let lemma_seq_to_list_length (s: Seq.seq 'a) 
+  : Lemma (ensures L.length (seq_to_list s) == Seq.length s)
+  = lemma_seq_to_list_length_aux s 0
+
 let theorem_implementation_optimal
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat)
   : Lemma
@@ -755,21 +909,11 @@ let theorem_implementation_optimal
     lemma_seq_to_list_preserves_sorted sel n;
     lemma_sequential_implies_mutual start finish (seq_to_list sel);
     lemma_implementation_is_greedy start finish n sel;
-    lemma_greedy_is_optimal start finish n (seq_to_list sel)
+    lemma_greedy_is_optimal start finish n (seq_to_list sel);
+    lemma_seq_to_list_length sel
 //SNIPPET_END: theorem_implementation_optimal
 
 // ========== Corollaries ==========
-
-(* Helper lemmas for seq_to_list length *)
-let rec lemma_seq_to_list_length_aux (s: Seq.seq 'a) (i: nat{i <= Seq.length s})
-  : Lemma (ensures L.length (seq_to_list_aux s i) == Seq.length s - i)
-          (decreases Seq.length s - i)
-  = if i >= Seq.length s then ()
-    else lemma_seq_to_list_length_aux s (i + 1)
-
-let lemma_seq_to_list_length (s: Seq.seq 'a) 
-  : Lemma (ensures L.length (seq_to_list s) == Seq.length s)
-  = lemma_seq_to_list_length_aux s 0
 
 (*
    Corollary: The greedy algorithm achieves the maximum possible count
