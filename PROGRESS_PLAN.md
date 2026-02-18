@@ -157,12 +157,13 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 
 ## Current Status (2025-02-19, latest)
 
-**164 F* files, ~50K lines — 88 unproven obligations across 29 files** (+ 38 Pulse assume_ in 6 files)
+**164 F* files, ~50K lines — 83 unproven F* obligations across 29 files** (+ 38 Pulse assume_ in 6 files)
 
 | Type | Count | Description |
 |------|-------|-------------|
-| `admit()` | 71 | Unproven lemma/proof bodies (Pure F*) |
-| `assume(...)` | 17 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 3, DFS.Spec: 2, MST/UF/Kruskal: 4) |
+| `admit()` | 66 | Unproven lemma/proof bodies (Pure F*) |
+| `assume(...)` | 15 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 3, DFS.Spec: 2, UF/Kruskal: 2) |
+| `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
 | `assume_` | 38 | Pulse-specific unproven invariants (StackDFS: 11+13, QueueBFS: 4+6, CountingSort: 3, Kruskal.Cmplx: 1) |
 
 (Note: Comment-aware counting — excludes admits/assumes in block comments `(* *)` and line comments `//`.)
