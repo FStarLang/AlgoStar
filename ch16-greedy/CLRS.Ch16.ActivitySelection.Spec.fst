@@ -32,8 +32,9 @@ let finish_sorted (f: Seq.seq int) : prop =
   forall (i j: nat). i <= j /\ j < Seq.length f ==> Seq.index f i <= Seq.index f j
 
 (* Valid activity: start <= finish *)
+// CLRS assumes s_i < f_i (strict inequality, positive-duration activities)
 let valid_activity (s: Seq.seq int) (f: Seq.seq int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i <= Seq.index f i
+  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i < Seq.index f i
 
 // ========== Compatibility Definitions ==========
 
@@ -101,17 +102,148 @@ let rec lemma_head_less_than_rest (lst: list nat) (y: nat) (z: nat) (n: nat)
         if z = hd then ()
         else lemma_head_less_than_rest tl hd z n
 
+// Helper: any member of a sorted index list is < n
+let rec lemma_mem_sorted_bound (lst: list nat) (z: nat) (n: nat)
+  : Lemma
+    (requires list_sorted_indices lst n /\ L.mem z lst)
+    (ensures z < n)
+    (decreases lst)
+  = match lst with
+    | [x] -> ()
+    | x :: y :: rest ->
+        if z = x then
+          lemma_head_less_than_rest (y :: rest) x y n
+        else
+          lemma_mem_sorted_bound (y :: rest) z n
+
+// Helper: a list with sorted indices starting >= lo and < n has length <= n - lo
+let rec lemma_sorted_indices_length_aux (lst: list nat) (n: nat) (lo: nat)
+  : Lemma
+    (requires list_sorted_indices lst n /\ 
+             lo <= n /\
+             (match lst with [] -> True | x :: _ -> x >= lo))
+    (ensures L.length lst <= n - lo)
+    (decreases lst)
+  = match lst with
+    | [] -> ()
+    | [x] -> 
+        // x >= lo and x < n (from list_sorted_indices [x] n)
+        assert (x >= lo /\ x < n);
+        assert (n - lo >= 1)
+    | x :: y :: rest ->
+        // x >= lo, x < y, so y >= x + 1 >= lo + 1
+        assert (x >= lo);
+        assert (x < y);
+        assert (y >= lo + 1);
+        lemma_sorted_indices_length_aux (y :: rest) n (lo + 1)
+        // IH gives: L.length (y :: rest) <= n - (lo + 1) = n - lo - 1
+        // So L.length (x :: y :: rest) = 1 + L.length (y :: rest) <= 1 + n - lo - 1 = n - lo
+
+// Helper: a list with sorted indices in [0,n) has length <= n
+let lemma_sorted_indices_length (lst: list nat) (n: nat)
+  : Lemma
+    (requires list_sorted_indices lst n)
+    (ensures L.length lst <= n)
+  = match lst with
+    | [] -> ()
+    | _ -> lemma_sorted_indices_length_aux lst n 0
+
 // Helper: extract the ordering from compatibility in a sorted list
-// This requires knowing more about how the activities were selected to ensure proper ordering
-let lemma_compat_order (start finish: Seq.seq int) (lst: list nat) (i j: nat)
+// With finish_sorted and strict valid_activity, compatible i j with i < j
+// implies finish[i] <= start[j] (the "natural" direction).
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
+let rec lemma_compat_order (start finish: Seq.seq int) (lst: list nat) (i j: nat)
   : Lemma 
     (requires 
+      finish_sorted finish /\
+      (forall (k:nat). k < Seq.length start ==> valid_activity start finish k) /\
+      Seq.length start == Seq.length finish /\
       list_sorted_indices lst (Seq.length start) /\
       mutually_compatible start finish lst /\
       L.mem i lst /\ L.mem j lst /\ i < j)
     (ensures Seq.index finish i <= Seq.index start j)
     (decreases lst)
-  = admit() // TODO: This needs additional preconditions about how the list was constructed
+  = // We need to extract compatible i j from mutually_compatible.
+    // By definition, mutually_compatible (x :: xs) says:
+    //   forall y in xs. compatible x y
+    //   mutually_compatible xs
+    // So if i = x, then compatible i j follows from j in xs.
+    // Otherwise, both i and j are in xs, and we recurse.
+    match lst with
+    | x :: xs ->
+        if i = x then begin
+          // i is the head, j is in the tail xs
+          // Since i < j and i = x, and L.mem j (x :: xs), j must be in xs
+          assert (L.mem j xs);
+          // From mutually_compatible: forall y in xs. compatible x y
+          // Instantiate with y = j
+          assert (compatible start finish x j);
+          // Equivalently: compatible i j
+          ()
+        end
+        else begin
+          // i is not the head, so i is in xs
+          assert (L.mem i xs);
+          // Need to show j <> x, and thus L.mem j xs
+          // From list_sorted_indices: x is strictly less than all elements of xs
+          // Since L.mem i xs, x < i (by lemma_head_less_than_rest or directly from sorted structure)
+          begin match xs with
+          | [] -> () // impossible since L.mem i xs  
+          | y :: rest' -> 
+            // From list_sorted_indices (x :: y :: rest'), x < y
+            // All elements in y :: rest' are >= y > x
+            // Since L.mem i (y :: rest'), i >= y > x. So x < i < j.
+            // If j = x, then j < i, contradicting i < j.
+            lemma_head_less_than_rest xs x i (Seq.length start);
+            assert (x < i);
+            // Now x < i < j, so j <> x
+            assert (j <> x);
+            assert (L.mem j xs);
+            assert (mutually_compatible start finish xs);
+            assert (list_sorted_indices xs (Seq.length start));
+            lemma_compat_order start finish xs i j
+          end
+        end
+#pop-options
+
+// Helper: in a sequentially compatible sorted list, finish[i] <= start[j] for i before j
+// This doesn't need finish_sorted because sequential compatibility already gives direction.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
+let rec lemma_seq_compat_finish_le_start
+  (start finish: Seq.seq int) (selected: list nat) (i j: nat)
+  : Lemma
+    (requires
+      sequentially_compatible start finish selected /\
+      list_sorted_indices selected (Seq.length start) /\
+      Seq.length start == Seq.length finish /\
+      (forall (k:nat). k < Seq.length start ==> Seq.index start k < Seq.index finish k) /\
+      L.mem i selected /\ L.mem j selected /\ i < j /\
+      i < Seq.length start /\ j < Seq.length start)
+    (ensures Seq.index finish i <= Seq.index start j)
+    (decreases selected)
+  = match selected with
+    | x :: y :: rest ->
+        if i = x && j = y then ()
+        else if i = x then begin
+          lemma_head_less_than_rest rest y j (Seq.length start);
+          lemma_mem_sorted_bound (y :: rest) y (Seq.length start);
+          lemma_mem_sorted_bound (y :: rest) j (Seq.length start);
+          lemma_seq_compat_finish_le_start start finish (y :: rest) y j
+        end
+        else begin
+          if i = y then begin
+            lemma_mem_sorted_bound (y :: rest) i (Seq.length start);
+            lemma_mem_sorted_bound (y :: rest) j (Seq.length start);
+            lemma_seq_compat_finish_le_start start finish (y :: rest) i j
+          end
+          else begin
+            lemma_head_less_than_rest (y :: rest) x i (Seq.length start);
+            lemma_mem_sorted_bound (y :: rest) i (Seq.length start);
+            lemma_mem_sorted_bound (y :: rest) j (Seq.length start);
+            lemma_seq_compat_finish_le_start start finish (y :: rest) i j
+          end
+        end
+#pop-options
 
 #push-options "--fuel 2 --ifuel 2 --z3rlimit 10"
 let rec lemma_sequential_implies_mutual 
@@ -120,7 +252,8 @@ let rec lemma_sequential_implies_mutual
     (requires 
       sequentially_compatible start finish selected /\
       list_sorted_indices selected (Seq.length start) /\
-      (forall (i:nat). i < Seq.length start ==> i < Seq.length finish /\ Seq.index start i <= Seq.index finish i))
+      Seq.length start == Seq.length finish /\
+      (forall (i:nat). i < Seq.length start ==> Seq.index start i < Seq.index finish i))
     (ensures mutually_compatible start finish selected)
     (decreases selected)
   = match selected with
@@ -128,38 +261,17 @@ let rec lemma_sequential_implies_mutual
   | [x] -> ()
   | x :: y :: rest ->
       lemma_sequential_implies_mutual start finish (y :: rest);
-      // Need to prove: forall z in (y::rest), compatible start finish x z
       let lemma_x_compat_all (z: nat) 
         : Lemma (requires L.mem z (y :: rest)) (ensures compatible start finish x z)
         = if z = y then ()
           else begin
-            // z is in rest
-            // Need to establish: finish[x] <= start[z]
-            
-            // From list_sorted_indices (x :: y :: rest):
-            // - x < y
-            // - for any z' in rest after y: y < z'
-            // Therefore, since z is in rest and z <> y, we have y < z
             assert (L.mem z rest);
-            // From mutual_compatible (y :: rest): y and z are compatible
-            assert (compatible start finish y z);
-            
-            // Need to establish y < z from list structure
             lemma_head_less_than_rest rest y z (Seq.length start);
             assert (y < z);
-            
-            // Use helper to extract ordering: since y < z, we have finish[y] <= start[z]
-            lemma_compat_order start finish (y :: rest) y z;
-            assert (Seq.index finish y <= Seq.index start z);
-            
-            // From sequential: finish[x] <= start[y]
-            assert (Seq.index finish x <= Seq.index start y);
-            
-            // From valid activities: start[y] <= finish[y]
-            assert (Seq.index start y <= Seq.index finish y);
-            
-            // Call transitivity lemma
-            lemma_transitivity_compat x y z start finish
+            assert (x < z);
+            lemma_mem_sorted_bound (x :: y :: rest) x (Seq.length start);
+            lemma_mem_sorted_bound (x :: y :: rest) z (Seq.length start);
+            lemma_seq_compat_finish_le_start start finish (x :: y :: rest) x z
           end
       in
       Classical.forall_intro (Classical.move_requires lemma_x_compat_all);
@@ -706,4 +818,36 @@ let corollary_no_larger_selection
       (forall (i:nat). i < Seq.length other_sel ==> Seq.index other_sel i < n))
     (ensures
       Seq.length other_sel <= Seq.length greedy_sel)
-  = admit() // TODO: This follows from converting other_sel to list and showing it's <= max_compatible_count
+  = // Strategy: 
+    // 1. Use corollary_greedy_count_is_maximum: Seq.length greedy_sel == max_compatible_count
+    // 2. Convert other_sel to list, show mutually_compatible
+    // 3. Use find_max_compatible_lower_bound: max_compatible_count >= L.length (list other_sel)
+    // 4. Show L.length (list other_sel) == Seq.length other_sel
+    corollary_greedy_count_is_maximum start finish n greedy_sel;
+    // Seq.length greedy_sel == max_compatible_count start finish n
+    
+    if Seq.length other_sel = 0 then ()
+    else begin
+      // Convert other_sel to list  
+      let other_list = seq_to_list other_sel in
+      lemma_seq_to_list_length other_sel;
+      assert (L.length other_list == Seq.length other_sel);
+      
+      // Show other_list is sequentially compatible
+      lemma_pairwise_is_sequential start finish other_sel;
+      
+      // Show other_list has sorted indices
+      lemma_seq_to_list_preserves_sorted other_sel n;
+      
+      // Show other_list is mutually compatible
+      lemma_sequential_implies_mutual start finish other_list;
+      
+      // Need: Seq.length other_sel <= n (from strictly increasing indices in [0,n))
+      // The last element of a strictly increasing seq of length m with values < n must be >= m-1
+      // So m-1 < n, hence m <= n
+      // Use a simpler argument: convert to list, list_sorted_indices implies length <= n
+      assert (list_sorted_indices other_list n);
+      lemma_sorted_indices_length other_list n;
+      reveal_opaque (`%max_compatible_count) (max_compatible_count start finish n);
+      find_max_compatible_lower_bound start finish n n (Seq.length other_sel) other_list
+    end

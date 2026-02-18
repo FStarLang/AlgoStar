@@ -44,7 +44,7 @@ let finish_sorted (f: Seq.seq int) : prop =
   forall (i j: nat). i <= j /\ j < Seq.length f ==> Seq.index f i <= Seq.index f j
 
 let valid_activity (s f: Seq.seq int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i <= Seq.index f i
+  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i < Seq.index f i
 
 let compatibility_maintained (s f: Seq.seq int) (last_finish: int) (processed: nat) : prop =
   processed <= Seq.length s /\

@@ -6,9 +6,9 @@ open FStar.Seq
 let finish_sorted (f: seq int) : prop =
   forall (i j: nat). i <= j /\ j < Seq.length f ==> Seq.index f i <= Seq.index f j
 
-(* Valid activity: start <= finish *)
+(* Valid activity: start < finish (CLRS assumes strict inequality) *)
 let valid_activity (s f: seq int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i <= Seq.index f i
+  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i < Seq.index f i
 
 (* Selected activities: a sequence of indices into the activity arrays *)
 

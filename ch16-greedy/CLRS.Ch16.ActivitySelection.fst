@@ -50,7 +50,7 @@ let finish_sorted (f: Seq.seq int) : prop =
 
 // Valid activity (start <= finish)
 let valid_activity (s f: Seq.seq int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i <= Seq.index f i
+  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i < Seq.index f i
 
 // ========== Activity Selection Algorithm ==========
 
