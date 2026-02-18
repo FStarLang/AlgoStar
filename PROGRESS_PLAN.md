@@ -98,6 +98,15 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
   the precondition annotation.
 - **Empty pattern edge case** (RabinKarp): `matches_at text pattern pos` with empty pattern is
   vacuously true at every position. No-false-negatives theorem requires `m > 0` precondition.
+- **Pulse option match rewrite pattern** (RBTree): After `match x { None -> }`, Pulse rewrites
+  slprops from `is_rbtree x ft` to `is_rbtree None ft`. For `is_rbtree_case_none`, pass the
+  concrete value (e.g., `rn.left`) not `None`. For `Some vl ->`, use `rewrite each (Some vl) as x`
+  before `is_rbtree_case_some`. After `intro_is_rbtree_node`, always `with t. rewrite (is_rbtree x t)
+  as (is_rbtree x target)` to connect to the postcondition.
+- **Pure classifier for deep Pulse pattern matching** (RBTree balance): When Pulse code needs to
+  match on tree structure 3+ levels deep, define a pure `classify` function + `classify_lemma` in
+  the Spec module. Implement `classify_runtime` in Pulse (read-only, preserves slprops) and dispatch
+  to per-case helper functions. Avoids combinatorial match nesting.
 
 - Agents replacing `admit()` with `assume val` don't reduce the real admit count.
 - z3rlimit > 100 causes timeouts. Keep ≤ 50.
@@ -195,8 +204,8 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 12 | BST Search/Min/Max | §12.2 | ✅ correct search | ✅ Linked O(h) | 0 | |
 | 12 | BST Insert | §12.3 | ⚠️ membership only | ⚠️ Separate O(h) | 3 | Doesn't walk BST path |
 | 12 | BST Delete | §12.3 | ✅ key_set \ {k} | ✅ Linked O(h) | 0 | FiniteSet algebra |
-| 13 | RBTree (Pulse) | §13.1–4 | ❌ BROKEN | — | 0 | No fixup/rotations/BST path |
-| 13 | RBTree.Spec (pure) | §13.1–4 | ✅ Okasaki balance | ✅ Linked O(lg n) | 0 | Correct but not Pulse |
+| 13 | RBTree (Pulse) | §13.1–4 | ✅ is_rbtree y (S.insert ft k) | ✅ Linked O(lg n) | 0 | Pointer-based with recursive slprop |
+| 13 | RBTree.Spec (pure) | §13.1–4 | ✅ Okasaki balance | ✅ Linked O(lg n) | 0 | + balance_case classifier |
 | 15 | LCS | §15.4 | ✅ result=spec | ✅ Linked O(mn) | 0 | |
 | 15 | MatrixChain | §15.2 | ✅ mc_cost recursive + dp equiv | ⚠️ Separate O(n³) | 0 | ✅ **Zero admits** — sentinel bridge + table filling proven |
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | |
@@ -259,9 +268,10 @@ Keep all code and proofs. Rename to clarify what they actually implement.
 
 ### Phase B: Critical Implementations (Highest Priority)
 
-- [ ] B1: **RBTree in Pulse** — Pointer-based with Okasaki-style balance matching RBTree.Spec.fst.
-  Insert with fixup, search, BST ordering + RB invariants maintained.
-  Spec already verified (0 admits): `rbtree`, `balance` (4 rotations), `insert_is_rbtree`, `height_bound_theorem`.
+- [x] B1: **RBTree in Pulse** — ✅ **DONE.** Pointer-based with recursive slprop `is_rbtree`,
+  runtime balance classifier, 4 rotation handlers, search/insert. All zero admits.
+  Key patterns: `classify_runtime` (read-only traversal), `balance_ll/lr/rl/rr` (pointer
+  restructuring), `with t. rewrite` for postcondition matching.
 
 - [ ] B2: **Dijkstra d[v]=δ(s,v)** — Prove CLRS Theorem 24.6 (exact shortest paths).
   Currently only upper bound. At extract-min, extracted vertex has exact distance.
