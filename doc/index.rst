@@ -32,6 +32,7 @@ the F*/Z3 toolchain, unless explicitly marked otherwise.
    ch10_elementary_ds
    ch11_hash_tables
    ch12_bst
+   ch13_rbtree
    ch15_dynamic_prog
    ch16_greedy
    ch21_disjoint_sets
