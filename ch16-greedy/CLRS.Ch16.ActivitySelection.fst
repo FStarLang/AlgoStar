@@ -84,7 +84,8 @@ fn activity_selection
         L.all_valid_indices sel (SZ.v n) /\
         L.strictly_increasing sel /\
         L.pairwise_compatible sel ss sf /\
-        Seq.index sel 0 == 0)
+        Seq.index sel 0 == 0 /\
+        L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n))
     )
 //SNIPPET_END: activity_selection_sig
 {

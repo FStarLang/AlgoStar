@@ -23,6 +23,7 @@ open FStar.Classical
 
 module L = FStar.List.Tot
 module Seq = FStar.Seq
+module AL = CLRS.Ch16.ActivitySelection.Lemmas
 
 // ========== Basic Definitions ==========
 
@@ -948,6 +949,39 @@ let rec lemma_pairwise_is_sequential
     (decreases Seq.length sel)
   = lemma_pairwise_is_sequential_aux start finish sel 0
 
+let rec lemma_implementation_is_greedy_aux
+  (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat) (i: nat)
+  : Lemma
+    (requires
+      finish_sorted finish /\
+      n == Seq.length start /\ n == Seq.length finish /\ n > 0 /\
+      (forall (k:nat). k < n ==> valid_activity start finish k) /\
+      pairwise_compatible sel start finish /\
+      strictly_increasing sel /\
+      Seq.length sel > 0 /\
+      (forall (k:nat). k < Seq.length sel ==> Seq.index sel k < n) /\
+      AL.earliest_compatible sel start finish n n /\
+      i <= Seq.length sel /\ i < Seq.length sel)
+    (ensures
+      is_greedy_selection_inner start finish n (seq_to_list_aux sel i))
+    (decreases Seq.length sel - i)
+  = if i + 1 >= Seq.length sel then begin
+      // Singleton case: [sel[i]]
+      // Need: forall z. sel[i] < z < n ==> start[z] < finish[sel[i]]
+      // From earliest_compatible "after last": sel[last] < z < n ==> start[z] < finish[sel[last]]
+      // Since i == last (i = |sel| - 1), this is exactly what we need
+      assert (i == Seq.length sel - 1);
+      ()
+    end else begin
+      // At least 2 elements: sel[i] :: sel[i+1] :: ...
+      // Need: finish[sel[i]] <= start[sel[i+1]]  (from pairwise_compatible at i)
+      //       sel[i] < sel[i+1]  (from strictly_increasing)
+      //       is_greedy_selection_inner (sel[i+1] :: ...)  (recursive call)
+      //       forall z. sel[i] < z < sel[i+1] ==> start[z] < finish[sel[i]]  (from earliest_compatible)
+      lemma_implementation_is_greedy_aux start finish n sel (i + 1);
+      ()
+    end
+
 let rec lemma_implementation_is_greedy
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat)
   : Lemma
@@ -959,16 +993,12 @@ let rec lemma_implementation_is_greedy
       strictly_increasing sel /\
       Seq.length sel > 0 /\
       Seq.index sel 0 == 0 /\
-      (forall (i:nat). i < Seq.length sel ==> Seq.index sel i < n))
+      (forall (i:nat). i < Seq.length sel ==> Seq.index sel i < n) /\
+      AL.earliest_compatible sel start finish n n)
     (ensures
       is_greedy_selection start finish n (seq_to_list sel))
     (decreases Seq.length sel)
-  = let lst = seq_to_list sel in
-    // This requires the "earliest compatible" / "exhaustive" property from the
-    // greedy algorithm's loop invariant, which is not captured in the current
-    // Pulse postcondition (pairwise_compatible + strictly_increasing + starts with 0).
-    // A full proof would add is_greedy_selection to the Pulse loop invariant.
-    admit()
+  = lemma_implementation_is_greedy_aux start finish n sel 0
 
 (*
    Main Theorem: The implementation produces optimal results
@@ -1030,7 +1060,8 @@ let theorem_implementation_optimal
       strictly_increasing sel /\
       Seq.length sel > 0 /\
       Seq.index sel 0 == 0 /\
-      (forall (i:nat). i < Seq.length sel ==> Seq.index sel i < n))
+      (forall (i:nat). i < Seq.length sel ==> Seq.index sel i < n) /\
+      AL.earliest_compatible sel start finish n n)
     (ensures
       (let sel_list = seq_to_list sel in
        is_optimal_selection start finish n sel_list /\
@@ -1059,7 +1090,8 @@ let corollary_greedy_count_is_maximum
       strictly_increasing sel /\
       Seq.length sel > 0 /\
       Seq.index sel 0 == 0 /\
-      (forall (i:nat). i < Seq.length sel ==> Seq.index sel i < n))
+      (forall (i:nat). i < Seq.length sel ==> Seq.index sel i < n) /\
+      AL.earliest_compatible sel start finish n n)
     (ensures
       Seq.length sel == max_compatible_count start finish n)
   = theorem_implementation_optimal start finish n sel;
@@ -1086,6 +1118,7 @@ let corollary_no_larger_selection
       Seq.length greedy_sel > 0 /\
       Seq.index greedy_sel 0 == 0 /\
       (forall (i:nat). i < Seq.length greedy_sel ==> Seq.index greedy_sel i < n) /\
+      AL.earliest_compatible greedy_sel start finish n n /\
       // other_sel is any other valid selection
       pairwise_compatible other_sel start finish /\
       strictly_increasing other_sel /\

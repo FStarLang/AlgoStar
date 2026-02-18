@@ -27,6 +27,21 @@ let pairwise_compatible (sel: seq nat) (s f: seq int) : prop =
   (forall (i: nat). i + 1 < Seq.length sel ==>
     Seq.index f (Seq.index sel i) <= Seq.index s (Seq.index sel (i + 1)))
 
+(* Earliest-compatible property: each selected activity is the earliest compatible one.
+   For consecutive sel[i], sel[i+1]: all z with sel[i] < z < sel[i+1] are incompatible.
+   For the last sel[last]: all z with sel[last] < z < processed are incompatible. *)
+let earliest_compatible (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) : prop =
+  Seq.length sel >= 1 /\
+  // Between consecutive selected activities, all are incompatible with the earlier one
+  (forall (i: nat). i + 1 < Seq.length sel ==>
+    (forall (z: nat). Seq.index sel i < z /\ z < Seq.index sel (i + 1) /\
+                       z < n /\ z < Seq.length s /\ z < Seq.length f ==>
+      Seq.index s z < Seq.index f (Seq.index sel i))) /\
+  // After the last selected, all processed activities are incompatible
+  (forall (z: nat). Seq.index sel (Seq.length sel - 1) < z /\ z < processed /\
+                     z < n /\ z < Seq.length s /\ z < Seq.length f ==>
+    Seq.index s z < Seq.index f (Seq.index sel (Seq.length sel - 1)))
+
 //SNIPPET_START: greedy_selection_inv
 (* The full greedy selection invariant *)
 let greedy_selection_inv (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) (last_finish: int) : prop =
@@ -41,7 +56,9 @@ let greedy_selection_inv (sel: seq nat) (s f: seq int) (n: nat) (processed: nat)
   Seq.index sel (Seq.length sel - 1) < Seq.length f /\
   Seq.index f (Seq.index sel (Seq.length sel - 1)) == last_finish /\
   // First selected is index 0
-  Seq.index sel 0 == 0
+  Seq.index sel 0 == 0 /\
+  // Greedy earliest-compatible property
+  earliest_compatible sel s f n processed
 //SNIPPET_END: greedy_selection_inv
 
 (* Lemma: extending the selection with a new compatible activity *)
@@ -51,7 +68,7 @@ let lemma_extend_selection
     (requires
       greedy_selection_inv sel s f n processed last_finish /\
       new_idx < n /\
-      new_idx >= processed /\ new_idx < Seq.length s /\ new_idx < Seq.length f /\
+      new_idx == processed /\ new_idx < Seq.length s /\ new_idx < Seq.length f /\
       Seq.index s new_idx >= last_finish /\
       n == Seq.length s /\ n == Seq.length f)
     (ensures
@@ -86,15 +103,25 @@ let lemma_extend_selection
     assert (pairwise_compatible sel' s f);
     // last element
     assert (Seq.index sel' (Seq.length sel' - 1) == new_idx);
+    // earliest_compatible for sel':
+    // 1. Between consecutive old elements (i+1 < |sel|): sel'[i] = sel[i], same as old
+    // 2. Between sel[last] and new_idx: old "after last" covers sel[last] < z < processed = new_idx
+    // 3. After new_idx: vacuously true (new_idx < z < new_idx+1 is empty)
+    assert (earliest_compatible sel' s f n (new_idx + 1));
     ()
 
 (* Lemma: when we skip an activity (not selected), the invariant is preserved *)
 let lemma_skip_activity
   (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) (last_finish: int)
   : Lemma
-    (requires greedy_selection_inv sel s f n processed last_finish /\ processed < n)
+    (requires greedy_selection_inv sel s f n processed last_finish /\ processed < n /\
+             processed < Seq.length s /\ processed < Seq.length f /\
+             // The skipped activity is incompatible (start < last_finish)
+             Seq.index s processed < last_finish)
     (ensures greedy_selection_inv sel s f n (processed + 1) last_finish)
-  = ()
+  = // earliest_compatible: "after last" part extends from processed to processed+1
+    // processed has start < last_finish = finish[sel[last]], so it's incompatible
+    ()
 
 (* Combined step lemma: handles both select and skip cases *)
 let lemma_step
@@ -104,7 +131,8 @@ let lemma_step
       greedy_selection_inv sel s f n processed last_finish /\
       processed < n /\ processed < Seq.length s /\ processed < Seq.length f /\
       n == Seq.length s /\ n == Seq.length f /\
-      (selected ==> Seq.index s processed >= last_finish))
+      (selected ==> Seq.index s processed >= last_finish) /\
+      (not selected ==> Seq.index s processed < last_finish))
     (ensures
       (if selected then
         greedy_selection_inv (Seq.snoc sel processed) s f n (processed + 1) (Seq.index f processed) /\
