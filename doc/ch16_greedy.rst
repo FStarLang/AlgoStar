@@ -123,18 +123,21 @@ Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
 
 The Pulse implementation scans the sorted activities in a single pass,
-maintaining a ghost sequence of selected indices:
+writing selected activity indices into an output array ``out`` of
+size *n*. The returned ``count`` indicates how many entries were
+written:
 
 .. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.fst
    :language: pulse
    :start-after: //SNIPPET_START: activity_selection_sig
    :end-before: //SNIPPET_END: activity_selection_sig
 
-The postcondition witnesses the existence of a selection sequence
-``sel`` that is pairwise compatible, strictly increasing, starts with
-activity 0, satisfies ``earliest_compatible``, and has length equal to
-the returned count. The loop invariant is captured by
-``greedy_selection_inv``:
+The postcondition establishes that the first ``count`` entries of
+``out`` contain the selected activity indices (via
+``out_matches_sel``), and that the ghost selection sequence ``sel``
+is pairwise compatible, strictly increasing, starts with activity 0,
+and satisfies ``earliest_compatible``. The loop invariant is captured
+by ``greedy_selection_inv``:
 
 .. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fst
    :language: fstar

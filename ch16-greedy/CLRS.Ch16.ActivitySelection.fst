@@ -52,35 +52,50 @@ let finish_sorted (f: Seq.seq int) : prop =
 let valid_activity (s f: Seq.seq int) (i: nat) : prop =
   i < Seq.length s /\ i < Seq.length f /\ Seq.index s i < Seq.index f i
 
+// The first `count` entries of out_seq match sel (as SZ.t values)
+let out_matches_sel (out_seq: Seq.seq SZ.t) (sel: Seq.seq nat) (count: nat) (n: nat) : prop =
+  count <= Seq.length out_seq /\
+  Seq.length sel == count /\
+  (forall (j: nat). j < count ==> SZ.v (Seq.index out_seq j) == Seq.index sel j /\
+                                    Seq.index sel j < n)
+
 // ========== Activity Selection Algorithm ==========
 
 //SNIPPET_START: activity_selection_sig
 fn activity_selection 
   (#p: perm)
   (start_times finish_times: A.array int) 
+  (out: A.array SZ.t)
   (n: SZ.t)
   (#ss #sf: Ghost.erased (Seq.seq int))
+  (#sout0: Ghost.erased (Seq.seq SZ.t))
   requires 
     A.pts_to start_times #p ss ** A.pts_to finish_times #p sf **
+    A.pts_to out sout0 **
     pure (
       SZ.v n == Seq.length ss /\ 
       SZ.v n == Seq.length sf /\
       SZ.v n == A.length start_times /\ 
       SZ.v n == A.length finish_times /\
+      SZ.v n == A.length out /\
+      SZ.v n == Seq.length sout0 /\
       SZ.v n > 0 /\
       finish_sorted sf /\
       (forall (i:nat). i < Seq.length ss ==> valid_activity ss sf i)
     )
   returns count: SZ.t
-  ensures 
+  ensures exists* sout.
     A.pts_to start_times #p ss ** 
     A.pts_to finish_times #p sf **
+    A.pts_to out sout **
     pure (
       SZ.v count >= 1 /\ 
       SZ.v count <= SZ.v n /\
-      // There exists a selection of activities that is pairwise non-overlapping
+      Seq.length sout == SZ.v n /\
+      // The first count entries of out are the selected activity indices
       (exists (sel: Seq.seq nat).
         Seq.length sel == SZ.v count /\
+        out_matches_sel sout sel (SZ.v count) (SZ.v n) /\
         L.all_valid_indices sel (SZ.v n) /\
         L.strictly_increasing sel /\
         L.pairwise_compatible sel ss sf /\
@@ -90,11 +105,12 @@ fn activity_selection
 //SNIPPET_END: activity_selection_sig
 {
   // First activity (earliest finish) is always selected
+  out.(0sz) <- 0sz;
   let mut count: SZ.t = 1sz;
   let first_finish = finish_times.(0sz);
   let mut last_finish: int = first_finish;
   
-  // Ghost selection sequence
+  // Ghost selection sequence (mirrors the concrete out array prefix)
   L.lemma_initial_selection ss sf (SZ.v n);
   let sel_ref = GR.alloc #(Seq.seq nat) (Seq.create 1 0);
   
@@ -102,17 +118,20 @@ fn activity_selection
   let mut i: SZ.t = 1sz;
   
   while (!i <^ n)
-  invariant exists* vi vcount vlast_finish vsel.
+  invariant exists* vi vcount vlast_finish vsel sout_cur.
     R.pts_to i vi **
     R.pts_to count vcount **
     R.pts_to last_finish vlast_finish **
     GR.pts_to sel_ref vsel **
+    A.pts_to out sout_cur **
     pure (
       SZ.v vi > 0 /\
       SZ.v vi <= SZ.v n /\
       SZ.v vcount >= 1 /\
       SZ.v vcount <= SZ.v vi /\
       Seq.length vsel == SZ.v vcount /\
+      Seq.length sout_cur == SZ.v n /\
+      out_matches_sel sout_cur vsel (SZ.v vcount) (SZ.v n) /\
       L.greedy_selection_inv vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish
     )
   {
@@ -123,6 +142,7 @@ fn activity_selection
     let vcount = !count;
     
     with vsel. assert (GR.pts_to sel_ref vsel);
+    with sout_cur. assert (A.pts_to out sout_cur);
     assert pure (finish_sorted sf);
     assert pure (L.greedy_selection_inv vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish);
     assert pure (vlast_finish <= curr_finish);
@@ -133,16 +153,18 @@ fn activity_selection
     // Call combined step lemma
     L.lemma_step vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish selected;
     
-    let new_count : SZ.t = (if selected then vcount + 1sz else vcount);
-    let new_last : int = (if selected then curr_finish else vlast_finish);
-    let new_sel : Ghost.erased (Seq.seq nat) = 
-      (if selected then Ghost.hide (Seq.snoc (Ghost.reveal vsel) (SZ.v vi)) else vsel);
-    
-    count := new_count;
-    last_finish := new_last;
-    GR.op_Colon_Equals sel_ref new_sel;
-    
-    i := vi + 1sz;
+    if selected {
+      // Write selected index to out array
+      out.(vcount) <- vi;
+      count := vcount + 1sz;
+      last_finish := curr_finish;
+      let new_sel : Ghost.erased (Seq.seq nat) = 
+        Ghost.hide (Seq.snoc (Ghost.reveal vsel) (SZ.v vi));
+      GR.op_Colon_Equals sel_ref new_sel;
+      i := vi + 1sz;
+    } else {
+      i := vi + 1sz;
+    };
   };
   
   with vsel_f. assert (GR.pts_to sel_ref vsel_f);
