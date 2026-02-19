@@ -126,241 +126,241 @@ lines. The table below summarizes the status of each algorithm.
      - Proof
      - Complexity
    * - 2
-     - Insertion Sort
+     - :ref:`Insertion Sort <Ch02_Sorting>`
      - §2.1
      - sorted ∧ permutation
      - ✅
      - ✅ Linked O(n²)
    * - 2
-     - Merge Sort
+     - :ref:`Merge Sort <Ch02_Sorting>`
      - §2.3
      - sorted ∧ permutation
      - ✅
      - ✅ Pure O(n lg n)
    * - 4
-     - Binary Search
+     - :ref:`Binary Search <Ch04_DivideConquer>`
      - §2.3
      - found ⟹ index matches
      - ✅
      - ✅ Linked O(lg n)
    * - 4
-     - Kadane (Max Subarray)
+     - :ref:`Kadane (Max Subarray) <Ch04_DivideConquer>`
      - §4.1
      - result = max contiguous sum
      - ✅
      - ✅ Linked O(n)
    * - 4
-     - Divide & Conquer (Max Sub.)
+     - :ref:`Divide & Conquer (Max Sub.) <Ch04_DivideConquer>`
      - §4.1
      - result = max contiguous sum
      - ✅
      - —
    * - 6
-     - Heapsort
+     - :ref:`Heapsort <Ch06_Heapsort>`
      - §6.4
      - sorted ∧ permutation
      - ✅
      - ✅ Pure O(n lg n)
    * - 7
-     - Partition (Hoare)
+     - :ref:`Partition (Hoare) <Ch07_Quicksort>`
      - §7.1
      - elements partitioned ∧ perm
      - ✅
      - ✅ Linked O(n)
    * - 7
-     - Lomuto Partition
+     - :ref:`Lomuto Partition <Ch07_Quicksort>`
      - §7.1
      - elements partitioned ∧ perm
      - ✅
      - —
    * - 7
-     - Quicksort
+     - :ref:`Quicksort <Ch07_Quicksort>`
      - §7.1
      - sorted ∧ permutation
      - ✅
      - ✅ Linked O(n²)
    * - 8
-     - Counting Sort
+     - :ref:`Counting Sort <Ch08_LinearSorting>`
      - §8.2
      - sorted ∧ permutation
      - ✅
      - ✅ Pure O(n+k)
    * - 8
-     - Counting Sort (Stable)
+     - :ref:`Counting Sort (Stable) <Ch08_LinearSorting>`
      - §8.2
      - sorted ∧ stable ∧ perm
      - ✅
      - —
    * - 8
-     - Radix Sort
+     - :ref:`Radix Sort <Ch08_LinearSorting>`
      - §8.3
      - sorted ∧ permutation
      - ⚠️ 10: stability proofs
      - ✅ Pure Θ(d(n+k))
    * - 8
-     - Bucket Sort
+     - :ref:`Bucket Sort <Ch08_LinearSorting>`
      - §8.4
      - sorted ∧ permutation
      - ⚠️ 1: concat sorted buckets
      - —
    * - 9
-     - Min / Max
+     - :ref:`Min / Max <Ch09_OrderStats>`
      - §9.1
      - result ∈ array ∧ is min/max
      - ✅
      - ✅ Linked O(n)
    * - 9
-     - Simultaneous Min-Max
+     - :ref:`Simultaneous Min-Max <Ch09_OrderStats>`
      - §9.1
      - min ∧ max of array
      - ✅
      - —
    * - 9
-     - Quickselect
+     - :ref:`Quickselect <Ch09_OrderStats>`
      - §9.2
      - k-th smallest at position k
      - ✅
      - ✅ Pure O(n²)
    * - 9
-     - Partial Selection Sort
+     - :ref:`Partial Selection Sort <Ch09_OrderStats>`
      - §9.2
      - first k sorted, k-th correct
      - ✅
      - ✅ Pure O(nk)
    * - 10
-     - Stack / Queue
+     - :ref:`Stack / Queue <Ch10_DataStructures>`
      - §10.1
      - ghost list matches contents
      - ✅
      - ✅ Pure O(1)
    * - 10
-     - Linked List
+     - :ref:`Linked List <Ch10_DataStructures>`
      - §10.2
      - ghost list matches contents
      - ✅
      - —
    * - 10
-     - Doubly-Linked List
+     - :ref:`Doubly-Linked List <Ch10_DataStructures>`
      - §10.2
      - segment pred ∧ ghost list
      - ✅
      - ✅ Linked O(1)
    * - 11
-     - Hash Table (Chaining)
+     - :ref:`Hash Table (Chaining) <Ch11_HashTables>`
      - §11.2
      - key ↦ value lookup
      - ✅
      - ✅ Linked O(n)
    * - 12
-     - BST Search / Delete
+     - :ref:`BST Search / Delete <Ch12_BST>`
      - §12.2–3
      - key set operations
      - ✅
      - ✅ Pure O(h)
    * - 12
-     - BST Insert
+     - :ref:`BST Insert <Ch12_BST>`
      - §12.3
      - key set updated
      - ⚠️ 3: BST preservation
      - ✅ Pure O(h)
    * - 13
-     - Red-Black Tree
+     - :ref:`Red-Black Tree <Ch13_RBTree>`
      - §13.1–4
      - Okasaki balance ∧ BST
      - ✅
      - ✅ Pure O(lg n)
    * - 15
-     - Rod Cutting
+     - :ref:`Rod Cutting <Ch15_DynamicProg>`
      - §15.1
      - optimal revenue
      - ✅
      - ✅ Linked O(n²)
    * - 15
-     - Ext. Rod Cutting
+     - :ref:`Ext. Rod Cutting <Ch15_DynamicProg>`
      - §15.1
      - optimal revenue ∧ valid cuts
      - ✅
      - ✅ Linked O(n²)
    * - 15
-     - LCS
+     - :ref:`LCS <Ch15_DynamicProg>`
      - §15.4
      - LCS length
      - ✅
      - ✅ Linked O(mn)
    * - 15
-     - Matrix Chain
+     - :ref:`Matrix Chain <Ch15_DynamicProg>`
      - §15.2
      - optimal parenthesization cost
      - ✅
      - ✅ Pure O(n³)
    * - 16
-     - Activity Selection
+     - :ref:`Activity Selection <Ch16_Greedy>`
      - §16.1
      - greedy = optimal count
      - ✅
      - ✅ Linked O(n)
    * - 16
-     - Huffman Coding
+     - :ref:`Huffman Coding <Ch16_Greedy>`
      - §16.3
      - prefix-free tree construction
      - ⚠️ 5: optimality proof
      - ✅ Pure O(n lg n)
    * - 21
-     - Union-Find
+     - :ref:`Union-Find <Ch21_DisjointSets>`
      - §21.3
      - find/union maintain forest
      - ⚠️ 1: rank bound assume
      - ✅ Pure O(α(n))
    * - 22
-     - BFS (Queue)
+     - :ref:`BFS (Queue) <Ch22_Graphs>`
      - §22.2
      - distances ∧ parent tree
      - ⚠️ 2: shortest path
      - ✅ Linked O(V²)
    * - 22
-     - DFS (Stack)
+     - :ref:`DFS (Stack) <Ch22_Graphs>`
      - §22.3
      - timestamps ∧ classification
      - ⚠️ 10: DFS theorems
      - ✅ Linked O(V²)
    * - 22
-     - Kahn Topological Sort
+     - :ref:`Kahn Topological Sort <Ch22_Graphs>`
      - §22.4
      - valid topological order
      - ⚠️ 2: DAG correctness
      - ✅ Linked O(V+E)
    * - 23
-     - Kruskal MST
+     - :ref:`Kruskal MST <Ch23_MST>`
      - §23.2
      - MST of graph
      - ⚠️ 15: forest/cut/sort
      - ⚠️ Linked (3 admits)
    * - 23
-     - Prim MST
+     - :ref:`Prim MST <Ch23_MST>`
      - §23.2
      - MST of graph
      - ⚠️ 6: light edge
      - ✅ Linked O(V²)
    * - 23
-     - MST Theory
+     - :ref:`MST Theory <Ch23_MST>`
      - §23.1
      - cut/cycle properties
      - ⚠️ 4: cut theorem
      - —
    * - 24
-     - Bellman-Ford
+     - :ref:`Bellman-Ford <Ch24_SSSP>`
      - §24.1
      - SSSP distances
      - ⚠️ 3: upper bound
      - ✅ Linked O(VE)
    * - 24
-     - Dijkstra
+     - :ref:`Dijkstra <Ch24_SSSP>`
      - §24.3
      - SSSP distances
      - ⚠️ 2: triangle ineq
      - ✅ Linked O(V²)
    * - 25
-     - Floyd-Warshall
+     - :ref:`Floyd-Warshall <Ch25_APSP>`
      - §25.2
      - APSP distances
      - ✅
@@ -372,55 +372,55 @@ lines. The table below summarizes the status of each algorithm.
      - ⚠️ 8: augmentation
      - ⚠️ Pure (2 admits)
    * - 28
-     - Matrix Multiply
+     - :ref:`Matrix Multiply <Ch28_MatrixOps>`
      - §28 (App)
      - C = A · B
      - ✅
      - ✅ Linked O(n³)
    * - 28
-     - Strassen
+     - :ref:`Strassen <Ch28_MatrixOps>`
      - §28 (App)
      - Strassen = standard mult
      - ⚠️ 1: quadrant props
      - —
    * - 31
-     - GCD / Extended GCD
+     - :ref:`GCD / Extended GCD <Ch31_NumberTheory>`
      - §31.2
      - gcd ∧ Bézout coefficients
      - ✅
      - ✅ Linked O(lg n)
    * - 31
-     - Modular Exponentiation
+     - :ref:`Modular Exponentiation <Ch31_NumberTheory>`
      - §31.6
      - result = b^e mod m
      - ✅
      - ✅ Linked O(lg e)
    * - 32
-     - Naive String Match
+     - :ref:`Naive String Match <Ch32_StringMatch>`
      - §32.1
      - all match positions
      - ✅
      - ✅ Linked O(nm)
    * - 32
-     - KMP
+     - :ref:`KMP <Ch32_StringMatch>`
      - §32.4
      - all match positions
      - ✅
      - ⚠️ Linked (7 admits)
    * - 32
-     - Rabin-Karp
+     - :ref:`Rabin-Karp <Ch32_StringMatch>`
      - §32.2
      - all match positions
      - ✅
      - ✅ Pure O(nm)
    * - 33
-     - Segment Intersection
+     - :ref:`Segment Intersection <Ch33_CompGeometry>`
      - §33.1
      - correct intersection test
      - ✅
      - ✅ Pure O(1)
    * - 35
-     - Vertex Cover (2-approx)
+     - :ref:`Vertex Cover (2-approx) <Ch35_Approximation>`
      - §35.1
      - cover ≤ 2 · OPT
      - ⚠️ 1: execution trace
