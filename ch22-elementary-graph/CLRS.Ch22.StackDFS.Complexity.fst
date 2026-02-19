@@ -13,15 +13,13 @@
    
    Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
    
-   NO admits. Only assume_ for:
-   - 3 bounds checks eliminated (in handle_scan_result) ✓
-   - 14 remaining assume_ calls for invariant framing and bounds that need:
-     * Universal quantifier instantiation from loop invariants (lines 479, 485, 487-488, 557-559)
-     * Stack bounds before push - needs graph property (lines 219, 672)
-     * Tick counter monotonicity (line 566)
-     * Final postcondition preservation after inner loop (line 581)
-     * Complexity bound maintenance (line 842)
-     * Final DFS correctness properties (line 859)
+   NO admits. Only 6 assume_ calls remaining (down from 14):
+   - L239: `SZ.v vtop < SZ.v n` in maybe_discover_dfs (graph property needed)
+   - L588: `found ==> SZ.v top < SZ.v n` (vtop < n before push in dfs_visit)
+   - L596: `vc_after >= reveal vc` (tick counter monotonicity)
+   - L695: `SZ.v vtop < SZ.v n` in maybe_dfs_visit (graph property needed)
+   - L900: complexity bound maintenance
+   - L917-920: final DFS correctness properties
 *)
 
 module CLRS.Ch22.StackDFS.Complexity
@@ -62,6 +60,18 @@ let lemma_dfs_bound_correct (outer_count inner_count n: nat)
     assert (outer_count + inner_count <= n + n * n);
     assert (n + n * n <= n * n + n * n);
     assert (n * n + n * n == 2 * (n * n))
+
+(* ========== Arithmetic helpers for SZ.fits ========== *)
+let fits_product_smaller (a b c d: nat)
+  : Lemma (requires c < a /\ d <= b /\ SZ.fits (a * b))
+          (ensures SZ.fits (c * b) /\ SZ.fits (c * b + d))
+  = assert (c * b <= a * b);
+    assert (c * b + d <= a * b)
+
+let fits_le (x y: nat)
+  : Lemma (requires x <= y /\ SZ.fits y)
+          (ensures SZ.fits x)
+  = ()
 
 (* ========== Graph specification ========== *)
 
@@ -109,7 +119,9 @@ fn discover_vertex_dfs
       Seq.length spred == SZ.v n /\
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
-      vtime >= 0
+      vtime >= 0 /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' spred' sstack' sscan' vtop' vtime' (vc': nat).
     A.pts_to color scolor' **
@@ -129,7 +141,9 @@ fn discover_vertex_dfs
       SZ.v vtop' <= SZ.v n /\
       SZ.v vtop' > SZ.v vtop /\
       vtime' >= vtime /\
-      vc' == reveal vc + 1
+      vc' == reveal vc + 1 /\
+      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
   // Tick for vertex discovery (push to stack)
@@ -190,7 +204,9 @@ fn maybe_discover_dfs
       Seq.length spred == SZ.v n /\
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
-      vtime >= 0
+      vtime >= 0 /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' spred' sstack' sscan' vtop' vtime' (vc': nat).
     A.pts_to color scolor' **
@@ -211,7 +227,9 @@ fn maybe_discover_dfs
       SZ.v vtop' >= SZ.v vtop /\
       vtime' >= vtime /\
       vc' >= reveal vc /\
-      vc' <= reveal vc + 1
+      vc' <= reveal vc + 1 /\
+      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
   if (has_edge_val <> 0 && cv = 0) {
@@ -315,7 +333,9 @@ fn handle_scan_result
       Seq.length spred == SZ.v n /\
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
-      vtime >= 0
+      vtime >= 0 /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime' (vc': nat).
     A.pts_to color scolor' **
@@ -337,7 +357,9 @@ fn handle_scan_result
       SZ.v vtop' <= SZ.v n /\
       vtime' >= vtime /\
       vc' >= reveal vc /\
-      vc' <= reveal vc + 1
+      vc' <= reveal vc + 1 /\
+      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
   if (found) {
@@ -401,7 +423,9 @@ fn dfs_visit
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
       vtime >= 0 /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime' (vc': nat).
     A.pts_to adj sadj **
@@ -421,9 +445,11 @@ fn dfs_visit
       Seq.length spred' == SZ.v n /\
       Seq.length sstack' == SZ.v n /\
       Seq.length sscan' == SZ.v n /\
-      SZ.v vtop' <= SZ.v n /\
+      SZ.v vtop' == 0 /\
       vtime' >= vtime /\
-      vc' >= reveal vc
+      vc' >= reveal vc /\
+      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
   // Discover vs (1 tick for push)
@@ -467,7 +493,11 @@ fn dfs_visit
       Seq.length sstack_w == SZ.v n /\
       Seq.length sscan_w == SZ.v n /\
       vtime_w >= 0 /\
-      vc_w >= reveal vc
+      vtime_w >= vtime /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      vc_w >= reveal vc /\
+      (forall (i:nat). i < SZ.v vtop_w ==> SZ.v (Seq.index sstack_w i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_w uu) <= SZ.v n)
     )
   {
     // u = PEEK(stack)
@@ -475,17 +505,13 @@ fn dfs_visit
     let u_idx: SZ.t = SZ.sub top 1sz;
     let u: SZ.t = A.op_Array_Access stack_data u_idx;
     
-    // ASSUME: u < n (would need: stack validity invariant with universal quantifier instantiation)
-    assume_ (pure (SZ.v u < SZ.v n));
+    assert (pure (SZ.v u < SZ.v n));
 
     // Get current scan position for u
     let scan_pos: SZ.t = A.op_Array_Access scan_idx u;
     
-    // ASSUME: scan_pos <= n (would need: scan validity invariant with universal quantifier instantiation)
-    assume_ (pure (SZ.v scan_pos <= SZ.v n));
-    // ASSUME: SZ.fits checks (would need: arithmetic from precondition SZ.fits (n * n))
-    assume_ (pure (SZ.fits (SZ.v u * SZ.v n)));
-    assume_ (pure (SZ.fits (SZ.v u * SZ.v n + SZ.v scan_pos)));
+    assert (pure (SZ.v scan_pos <= SZ.v n));
+    fits_product_smaller (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v scan_pos);
 
     // Try to find next WHITE neighbor starting from scan_pos
     let mut found_white: bool = false;
@@ -518,8 +544,12 @@ fn dfs_visit
         Seq.length sstack_scan == SZ.v n /\
         Seq.length sscan_scan == SZ.v n /\
         vtime_scan >= 0 /\
+        vtime_scan >= vtime /\
         SZ.fits (SZ.v u * SZ.v n) /\
-        SZ.fits (SZ.v u * SZ.v n + SZ.v vscan)
+        SZ.fits (SZ.v u * SZ.v n + SZ.v vscan) /\
+        (vfound ==> SZ.v vnext < SZ.v n) /\
+        (forall (i:nat). i < SZ.v top ==> SZ.v (Seq.index sstack_scan i) < SZ.v n) /\
+        (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_scan uu) <= SZ.v n)
       )
     {
       let vscan = !scan;
@@ -539,6 +569,8 @@ fn dfs_visit
         next_v := vscan
       };
 
+      fits_le (SZ.v vscan + 1) (SZ.v n * SZ.v n);
+      fits_product_smaller (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vscan + 1);
       scan := SZ.add vscan 1sz
     };
 
@@ -549,14 +581,10 @@ fn dfs_visit
     let found = !found_white;
     let vv = !next_v;
     
-    // Bounds guaranteed by inner scan loop invariant:
-    // - found ==> vv < n (tracked in inner invariant)
-    // - found ==> top < n (would need: top = vtop and vtop <= n and found implies vtop < n)
-    // - not found ==> top > 0 (would need: loop guard vtop > 0 preserved)
-    // These need careful tracking, so leave as assume_ for now
-    assume_ (pure (found ==> SZ.v vv < SZ.v n));
+    // Bounds guaranteed by inner scan loop invariant and outer while loop guard
+    assert (pure (found ==> SZ.v vv < SZ.v n));
     assume_ (pure (found ==> SZ.v top < SZ.v n));
-    assume_ (pure (not found ==> SZ.v top > 0));
+    assert (pure (not found ==> SZ.v top > 0));
     
     handle_scan_result color d f pred stack_data stack_top scan_idx time_ref ctr u top n found vv;
     
@@ -577,18 +605,8 @@ fn dfs_visit
   with vtime_after. assert (R.pts_to time_ref vtime_after);
   with vc_final. assert (GR.pts_to ctr vc_final);
   
-  // ASSUME: final postcondition preservation (array lengths, bounds, monotonicity)
-  assume_ (pure (
-    Seq.length scolor_after == SZ.v n /\
-    Seq.length sd_after == SZ.v n /\
-    Seq.length sf_after == SZ.v n /\
-    Seq.length spred_after == SZ.v n /\
-    Seq.length sstack_after == SZ.v n /\
-    Seq.length sscan_after == SZ.v n /\
-    SZ.v vtop_after <= SZ.v n /\
-    vtime_after >= vtime /\
-    vc_final >= reveal vc
-  ))
+  assert (pure (SZ.v vtop_after == 0));
+  ()
 }
 #pop-options
 
@@ -633,7 +651,7 @@ fn maybe_dfs_visit
     pure (
       SZ.v vs < SZ.v n /\
       SZ.v n > 0 /\
-      SZ.v vtop <= SZ.v n /\
+      SZ.v vtop == 0 /\
       Seq.length sadj == SZ.v n * SZ.v n /\
       Seq.length scolor == SZ.v n /\
       Seq.length sd == SZ.v n /\
@@ -642,7 +660,9 @@ fn maybe_dfs_visit
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
       vtime >= 0 /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime' (vc': nat).
     A.pts_to adj sadj **
@@ -662,9 +682,10 @@ fn maybe_dfs_visit
       Seq.length spred' == SZ.v n /\
       Seq.length sstack' == SZ.v n /\
       Seq.length sscan' == SZ.v n /\
-      SZ.v vtop' <= SZ.v n /\
+      SZ.v vtop' == 0 /\
       vtime' >= vtime /\
-      vc' >= reveal vc
+      vc' >= reveal vc /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
   if (cv = 0) {
@@ -786,6 +807,40 @@ fn stack_dfs_complexity
     i := SZ.add vi 1sz
   };
 
+  // Step 1b: Initialize scan_idx array
+  i := 0sz;
+  while (!i <^ n)
+  invariant exists* vi scolor_ib sd_ib sf_ib spred_ib sscan_ib (vc: nat).
+    R.pts_to i vi **
+    A.pts_to adj sadj **
+    A.pts_to color scolor_ib **
+    A.pts_to d sd_ib **
+    A.pts_to f sf_ib **
+    A.pts_to pred spred_ib **
+    A.pts_to stack_data sstack **
+    A.pts_to scan_idx sscan_ib **
+    GR.pts_to ctr vc **
+    pure (
+      SZ.v vi <= SZ.v n /\
+      Seq.length scolor_ib == SZ.v n /\
+      Seq.length sd_ib == SZ.v n /\
+      Seq.length sf_ib == SZ.v n /\
+      Seq.length spred_ib == SZ.v n /\
+      Seq.length sscan_ib == SZ.v n /\
+      (forall (j: nat). j < SZ.v vi ==> SZ.v (Seq.index sscan_ib j) == 0) /\
+      (forall (j: nat). j < SZ.v n ==> Seq.index scolor_ib j == 0) /\
+      (forall (j: nat). j < SZ.v n ==> Seq.index sd_ib j == (-1)) /\
+      (forall (j: nat). j < SZ.v n ==> Seq.index sf_ib j == (-1)) /\
+      (forall (j: nat). j < SZ.v n ==> Seq.index spred_ib j == (-1)) /\
+      // Initialization phase doesn't tick
+      vc == reveal c0
+    )
+  {
+    let vi = !i;
+    A.op_Array_Assignment scan_idx vi 0sz;
+    i := SZ.add vi 1sz
+  };
+
   // Step 2: Initialize time and stack
   let mut time_ref: int = 0;
   let mut stack_top: SZ.t = 0sz;
@@ -807,7 +862,7 @@ fn stack_dfs_complexity
     GR.pts_to ctr vc_s **
     pure (
       SZ.v vs <= SZ.v n /\
-      SZ.v vtop <= SZ.v n /\
+      SZ.v vtop == 0 /\
       Seq.length scolor_s == SZ.v n /\
       Seq.length sd_s == SZ.v n /\
       Seq.length sf_s == SZ.v n /\
@@ -820,7 +875,8 @@ fn stack_dfs_complexity
       // Each vertex pushed to stack at most once: at most n pushes
       // Total: vs + n + n*n ≤ n + n + n*n ≤ 2*n*n (for n >= 1)
       vc_s >= reveal c0 /\
-      vc_s - reveal c0 <= SZ.v n + SZ.v n * SZ.v n
+      vc_s - reveal c0 <= SZ.v n + SZ.v n * SZ.v n /\
+      (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_s uu) <= SZ.v n)
     )
   {
     let vs = !s;
