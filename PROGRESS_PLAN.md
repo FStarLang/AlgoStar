@@ -162,18 +162,44 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
   the hypothesis. Avoids the pitfall of `if ... then ... else ()` inside `with (...)` which
   can fail because the false branch returns `unit` not `squash`.
 
+### Pulse `with_pure` Usage Rules
+
+- **Use `with_pure (P)` in preconditions** when postcondition slprops reference erased params
+  that need bounds for well-formedness. E.g., `with_pure (SZ.v i < Seq.length s)` is needed
+  when the postcondition mentions `Seq.index s (SZ.v i)`. Pulse doesn't propagate `pure` facts
+  to postcondition well-formedness checking; `with_pure` does.
+- **Anti-pattern**: `with_pure (a /\ b) (fun _ -> pure (c /\ d))` — when the inner slprop is
+  just `pure(...)`, all facts are pure and should be a single `pure (a /\ b /\ c /\ d)`.
+- **Predicate opacity**: Facts inside opaque predicates (e.g., `top <= n` inside `stack_ok`)
+  are NOT available for postcondition well-formedness. Repeat critical bounds explicitly
+  alongside predicate calls.
+- **Postconditions**: Use flat `pure (P /\ Q /\ R)` — no need for `with_pure` in ensures.
+
+### Predicate-Based Pulse Proofs (StackDFS Pattern)
+
+When a Pulse program has repeated invariant clusters across function pre/post/loop specs:
+1. **Define named predicates** with explicit `{:pattern}` triggers on all quantifiers.
+2. **Prove isolated lemmas** relating predicates across operations (e.g., `discover_preserves_tracking`).
+3. **Call lemmas inline** in the Pulse body (e.g., before/after state-changing operations).
+4. **Assert postcondition quantifiers explicitly** after lemma calls — Z3 can prove each
+   quantifier individually but may fail when asked to prove them all at once in the final VC.
+   (Discovered in StackDFS: `final_postcondition_lemma` call succeeded but postcondition
+   discharge failed until each `forall` was asserted separately.)
+5. **Use `with_pure` in requires** to expose bounds for postcondition well-formedness.
+6. **Keep predicates transparent** (`let`, not `val`) so Z3 can unfold them when needed.
+
 ---
 
 ## Current Status (2025-02-19, latest)
 
-**164 F* files, ~50K lines — 82 unproven F* obligations across 29 files** (+ 38 Pulse assume_ in 6 files)
+**164 F* files, ~50K lines — 78 unproven F* obligations across 28 files** (+ 34 Pulse assume_ in 6 files)
 
 | Type | Count | Description |
 |------|-------|-------------|
 | `admit()` | 65 | Unproven lemma/proof bodies (Pure F*) |
 | `assume(...)` | 15 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 3, DFS.Spec: 2, UF/Kruskal: 2) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
-| `assume_` | 27 | Pulse-specific unproven invariants (StackDFS: 4+7, QueueBFS: 4+6, CountingSort: 3, Kruskal.Cmplx: 1) |
+| `assume_` | 23 | Pulse-specific unproven invariants (StackDFS: 0+7, QueueBFS: 4+6, CountingSort: 3, Kruskal.Cmplx: 1) |
 
 (Note: Comment-aware counting — excludes admits/assumes in block comments `(* *)` and line comments `//`.)
 
@@ -217,7 +243,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 assume_ | + 6 assume_ in Complexity |
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | Renamed (not CLRS) |
-| 22 | StackDFS | §22.3 | ⚠️ thms admitted | ✅ Linked O(n²) | 4 assume_ | + 7 assume_ in Complexity |
+| 22 | StackDFS | §22.3 | ✅ all BLACK, d>0, f>0, d<f | ✅ Linked O(n²) | 0 assume_ | + 7 assume_ in Complexity |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 2 admit + 2 assume | Renamed (not CLRS) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 5 admit + 2 assume | visited_implies_path proved |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 9 admit + 1 assume + 1 assume_ | + 2 admit + 2 EdgeSort admits |
@@ -238,12 +264,12 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
 | 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
 | 35 | VertexCover | §35.1 | ✅ valid cover | ⚠️ Separate O(V²) | 1 | 2-approx: 1 admit |
 
-### Unproven Obligation Distribution (82 F* + 38 assume_ = 120 total)
+### Unproven Obligation Distribution (78 F* + 34 assume_ = 112 total)
 
 | Chapter | admit | assume | assume_val | assume_ | Total | Top files |
 |---------|-------|--------|------------|---------|-------|-----------|
 | ch23 (MST) | 23 | 1 | 1 | 1 | 26 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal.Cmplx(2+1), EdgeSort(2), SortedEdges(0+1), Kruskal(0+0+1) |
-| ch22 (graphs) | 12 | 2 | 0 | 23 | 37 | StackDFS(0+4+7), QueueBFS(0+4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2) |
+| ch22 (graphs) | 12 | 2 | 0 | 19 | 33 | StackDFS(0+0+7), QueueBFS(0+4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2) |
 | ch08 (sorting) | 11 | 0 | 0 | 3 | 14 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch32 (strings) | 7 | 0 | 0 | 0 | 7 | KMP.Complexity(7) |
@@ -338,7 +364,7 @@ self-contained but requires careful F* proof engineering (induction, case analys
 
 | File | Line(s) | Admits | Helper lemma needed |
 |------|---------|--------|---------------------|
-| **StackDFS.fst** | 212,468,568 | 3 | **vtop < n before push**: needs count_gray invariant, blocked by Pulse elaboration of erased seq lemma calls. |
+| **StackDFS.fst** | — | 0 | ✅ **DONE**: All 4 assume_ eliminated via predicate-based refactoring (stack_ok, dfs_ok, gray_ok, nonwhite_below, scan_ok). |
 | **StackDFS.Complexity** | 219,558,672 | 3 | Same vtop < n issue as base file. |
 | **QueueBFS.fst** | 320 | 1 | **Queue-colored invariant**: all enqueued vertices are non-WHITE. Add to loop invariant; discover_vertex colors GRAY before enqueue. |
 | **QueueBFS.fst** | 172 | 1 | **Queue cardinality**: each vertex enqueued at most once ⟹ `vtail < n`. Needs ghost set tracking discovered vertices. |
@@ -368,7 +394,7 @@ threaded through entire algorithms, or deep mathematical theorems.
 
 | File | Line(s) | Admits | Why expert guidance is needed |
 |------|---------|--------|------------------------------|
-| **StackDFS.fst** | 753 | 1 | Full DFS correctness postcondition: all vertices BLACK, valid discovery/finish times. Needs timestamp tracking through all function specs — blocked by Pulse Seq.index refinement in postconditions. |
+| **StackDFS.fst** | — | 0 | ✅ **DONE**: Full DFS correctness postcondition proven via final_postcondition_lemma + predicate abstractions. |
 | **StackDFS.Complexity** | 566,581,842,859 | 4 | Final complexity postconditions depend on full DFS correctness (Tier 3 above) plus complexity bound. |
 | **CountingSort.Stable** | 282, 283 | 2 | Stability proof: backward traversal preserves relative order. Needs full loop invariant tracking position assignments. Permutation proof: each input element placed exactly once. |
 | **RadixSort.FullSort** (sorted_up_to_all_digits) | | | **✅ DONE** |
