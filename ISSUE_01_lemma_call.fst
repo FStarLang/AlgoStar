@@ -41,6 +41,12 @@ let rec count_ones_aux (s: Seq.seq int) (k: nat{k <= Seq.length s})
 let count_ones (s: Seq.seq int) (k: nat) : nat =
   if k <= Seq.length s then count_ones_aux s k else 0
 
+let count_ones_lemma (s:Seq.seq int)
+: Lemma 
+  (requires exists i. i < Seq.length s /\ Seq.index s i <> 1)
+  (ensures count_ones s (Seq.length s) < (Seq.length s))
+= admit()
+
 (* A helper fn whose precondition references count_ones *)
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn do_push
@@ -64,6 +70,7 @@ fn do_push
     R.pts_to top_ref vtop **
     R.pts_to time_ref vtime **
     pure (
+      True /\
       SZ.v vv < SZ.v n /\
       SZ.v u < SZ.v n /\
       SZ.v vtop < SZ.v n /\   // <-- THIS is what we need to prove at call site
@@ -72,8 +79,9 @@ fn do_push
       Seq.length spred == SZ.v n /\
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
-      vtime >= 0 /\
-      count_ones scolor (SZ.v n) == SZ.v vtop  // <-- triggers the bug
+      vtime >= 0   /\
+      count_ones scolor (SZ.v n) == SZ.v vtop /\ // <-- triggers the bug
+      True
     )
   ensures exists* scolor' sd' spred' sstack' sscan' vtop' vtime'.
     A.pts_to color scolor' **
@@ -92,7 +100,7 @@ fn do_push
       SZ.v vtop' <= SZ.v n /\
       vtime' >= vtime
     )
-{
+{ admit();
   let t = !time_ref;
   time_ref := t + 1;
   A.op_Array_Assignment d_arr vv (t + 1);
@@ -197,15 +205,25 @@ fn caller
       // We know color[0] != 1, count_ones scolor n == vtop, so vtop < n.
       // BUG: Calling do_push here, which requires count_ones == vtop in
       // its precondition, triggers the ill-typed lambda elaboration.
-
+      with scolor_w. assert A.pts_to color scolor_w;
+      count_ones_lemma scolor_w; //you need cal a lemma that proves this inductive property
+      //the smt solver cannot prove properties directly by induction
       // Use assume_ to provide vtop < n (since we can't call the lemma)
-      assume_ (pure (SZ.v top < SZ.v n));
+      // assume_ (pure (SZ.v top < SZ.v n));
+ 
+      //but you also need to prove this property, presumably an invariant of the stack_arr
+      assume_ (pure (SZ.v u < SZ.v n)); 
+      
+      //this call now typechecks
+      do_push color d_arr pred_arr stack_arr top_ref scan_arr time_ref u 0sz n;
 
-      do_push color d_arr pred_arr stack_arr top_ref scan_arr time_ref u 0sz n
+      admit()
     } else {
       // Pop
       top_ref := SZ.sub top 1sz;
-      A.op_Array_Assignment color (A.op_Array_Access stack_arr u_idx) 2
+      assume_ (pure (SZ.v u < SZ.v n));
+      A.op_Array_Assignment color (A.op_Array_Access stack_arr u_idx) 2;
+      admit()
     }
   }
 }

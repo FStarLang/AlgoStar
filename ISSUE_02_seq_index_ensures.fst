@@ -27,15 +27,15 @@ module ISSUE_02_seq_index_ensures
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
-
+open Pulse.Lib.WithPure
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-(* Workaround helper *)
-let safe_index (s: Seq.seq int) (i: nat) : int =
-  if i < Seq.length s then Seq.index s i else 0
+// (* Workaround helper *)
+// let safe_index (s: Seq.seq int) (i: nat) : int =
+//   if i < Seq.length s then Seq.index s i else 0
 
 (*
   CASE 1: Using Seq.index directly in ensures — FAILS
@@ -53,7 +53,7 @@ fn set_and_report_FAILS
   (#s: erased (Seq.seq int))
   requires
     A.pts_to arr s **
-    pure (
+    with_pure (
       SZ.v idx < SZ.v n /\
       Seq.length s == SZ.v n
     )
@@ -73,100 +73,100 @@ fn set_and_report_FAILS
 #pop-options
 
 
-(*
-  CASE 2: Using safe_index wrapper — WORKS
+// (*
+//   CASE 2: Using safe_index wrapper — WORKS
 
-  Same function but with the guarded wrapper. The wrapper avoids the
-  refinement issue because it checks length internally.
-*)
+//   Same function but with the guarded wrapper. The wrapper avoids the
+//   refinement issue because it checks length internally.
+// *)
 
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
-fn set_and_report_WORKS
-  (arr: A.array int)
-  (idx: SZ.t)
-  (value: int)
-  (n: SZ.t)
-  (#s: erased (Seq.seq int))
-  requires
-    A.pts_to arr s **
-    pure (
-      SZ.v idx < SZ.v n /\
-      Seq.length s == SZ.v n
-    )
-  ensures exists* s'.
-    A.pts_to arr s' **
-    pure (
-      Seq.length s' == SZ.v n /\
-      // Using the safe wrapper avoids the refinement issue
-      safe_index s' (SZ.v idx) == value
-    )
-{
-  A.op_Array_Assignment arr idx value
-}
-#pop-options
-
-
-(*
-  CASE 3: Seq.index in ensures with quantifier — FAILS
-
-  Common pattern: state that all other elements are unchanged.
-*)
-
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
-fn set_and_preserve_FAILS
-  (arr: A.array int)
-  (idx: SZ.t)
-  (value: int)
-  (n: SZ.t)
-  (#s: erased (Seq.seq int))
-  requires
-    A.pts_to arr s **
-    pure (
-      SZ.v idx < SZ.v n /\
-      Seq.length s == SZ.v n
-    )
-  ensures exists* s'.
-    A.pts_to arr s' **
-    pure (
-      Seq.length s' == SZ.v n /\
-      // BUG: This quantified postcondition also fails for the same reason.
-      // Seq.index s' j and Seq.index s j both need j < Seq.length s'/s,
-      // which should follow from j < SZ.v n and Seq.length == SZ.v n.
-      (forall (j:nat). j < SZ.v n /\ j <> SZ.v idx ==>
-        Seq.index s' j == Seq.index s j)
-    )
-{
-  A.op_Array_Assignment arr idx value
-}
-#pop-options
+// #push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
+// fn set_and_report_WORKS
+//   (arr: A.array int)
+//   (idx: SZ.t)
+//   (value: int)
+//   (n: SZ.t)
+//   (#s: erased (Seq.seq int))
+//   requires
+//     A.pts_to arr s **
+//     pure (
+//       SZ.v idx < SZ.v n /\
+//       Seq.length s == SZ.v n
+//     )
+//   ensures exists* s'.
+//     A.pts_to arr s' **
+//     pure (
+//       Seq.length s' == SZ.v n /\
+//       // Using the safe wrapper avoids the refinement issue
+//       safe_index s' (SZ.v idx) == value
+//     )
+// {
+//   A.op_Array_Assignment arr idx value
+// }
+// #pop-options
 
 
-(*
-  CASE 4: Same quantifier with safe_index — WORKS
-*)
+// (*
+//   CASE 3: Seq.index in ensures with quantifier — FAILS
 
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
-fn set_and_preserve_WORKS
-  (arr: A.array int)
-  (idx: SZ.t)
-  (value: int)
-  (n: SZ.t)
-  (#s: erased (Seq.seq int))
-  requires
-    A.pts_to arr s **
-    pure (
-      SZ.v idx < SZ.v n /\
-      Seq.length s == SZ.v n
-    )
-  ensures exists* s'.
-    A.pts_to arr s' **
-    pure (
-      Seq.length s' == SZ.v n /\
-      // Using safe_index avoids the refinement problem
-      (forall (j:nat). j < SZ.v n /\ j <> SZ.v idx ==>
-        safe_index s' j == safe_index s j)
-    )
-{
-  A.op_Array_Assignment arr idx value
-}
-#pop-options
+//   Common pattern: state that all other elements are unchanged.
+// *)
+
+// #push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
+// fn set_and_preserve_FAILS
+//   (arr: A.array int)
+//   (idx: SZ.t)
+//   (value: int)
+//   (n: SZ.t)
+//   (#s: erased (Seq.seq int))
+//   requires
+//     A.pts_to arr s **
+//     pure (
+//       SZ.v idx < SZ.v n /\
+//       Seq.length s == SZ.v n
+//     )
+//   ensures exists* s'.
+//     A.pts_to arr s' **
+//     pure (
+//       Seq.length s' == SZ.v n /\
+//       // BUG: This quantified postcondition also fails for the same reason.
+//       // Seq.index s' j and Seq.index s j both need j < Seq.length s'/s,
+//       // which should follow from j < SZ.v n and Seq.length == SZ.v n.
+//       (forall (j:nat). j < SZ.v n /\ j <> SZ.v idx ==>
+//         Seq.index s' j == Seq.index s j)
+//     )
+// {
+//   A.op_Array_Assignment arr idx value
+// }
+// #pop-options
+
+
+// (*
+//   CASE 4: Same quantifier with safe_index — WORKS
+// *)
+
+// #push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
+// fn set_and_preserve_WORKS
+//   (arr: A.array int)
+//   (idx: SZ.t)
+//   (value: int)
+//   (n: SZ.t)
+//   (#s: erased (Seq.seq int))
+//   requires
+//     A.pts_to arr s **
+//     pure (
+//       SZ.v idx < SZ.v n /\
+//       Seq.length s == SZ.v n
+//     )
+//   ensures exists* s'.
+//     A.pts_to arr s' **
+//     pure (
+//       Seq.length s' == SZ.v n /\
+//       // Using safe_index avoids the refinement problem
+//       (forall (j:nat). j < SZ.v n /\ j <> SZ.v idx ==>
+//         safe_index s' j == safe_index s j)
+//     )
+// {
+//   A.op_Array_Assignment arr idx value
+// }
+// #pop-options
