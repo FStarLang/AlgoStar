@@ -40,6 +40,7 @@ module CLRS.Ch22.StackDFS
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
+open Pulse.Lib.WithPure
 open FStar.SizeT
 open FStar.Mul
 
@@ -69,6 +70,77 @@ let fits_le (x y: nat)
   : Lemma (requires x <= y /\ SZ.fits y)
           (ensures SZ.fits x)
   = ()
+
+(* Count GRAY (==1) vertices in s[0..k) *)
+let rec count_ones (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Tot (r: nat{r <= k}) (decreases k)
+  = if k = 0 then 0
+    else (if Seq.index s (k - 1) = 1 then 1 else 0) + count_ones s (k - 1)
+
+(* If any element in [0..k) is not 1, count < k *)
+let rec count_ones_lt (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat)
+  : Lemma (requires j < k /\ Seq.index s j <> 1)
+          (ensures count_ones s k < k)
+          (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then ()
+    else count_ones_lt s (k - 1) j
+
+(* Updating index j to 1 when it wasn't 1: count goes up by 1 *)
+let rec count_ones_upd_to_one (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat)
+  : Lemma (requires j < k /\ Seq.index s j <> 1)
+          (ensures Seq.length (Seq.upd s j 1) == Seq.length s /\
+                   count_ones (Seq.upd s j 1) k == count_ones s k + 1)
+          (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then begin
+      let rec aux (s: Seq.seq int) (k': nat{k' <= Seq.length s}) (j: nat{j >= k' /\ j < Seq.length s})
+        : Lemma (ensures Seq.length (Seq.upd s j 1) == Seq.length s /\
+                         count_ones (Seq.upd s j 1) k' == count_ones s k')
+                (decreases k')
+        = if k' = 0 then ()
+          else (assert (Seq.index (Seq.upd s j 1) (k'-1) == Seq.index s (k'-1)); aux s (k'-1) j)
+      in aux s (k-1) j
+    end
+    else (assert (Seq.index (Seq.upd s j 1) (k-1) == Seq.index s (k-1));
+          count_ones_upd_to_one s (k-1) j)
+
+(* Updating index j from 1 to non-1: count goes down by 1 *)
+let rec count_ones_upd_from_one (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat) (v: int)
+  : Lemma (requires j < k /\ Seq.index s j = 1 /\ v <> 1)
+          (ensures Seq.length (Seq.upd s j v) == Seq.length s /\
+                   count_ones (Seq.upd s j v) k == count_ones s k - 1)
+          (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then begin
+      let rec aux (s: Seq.seq int) (k': nat{k' <= Seq.length s}) (j: nat{j >= k' /\ j < Seq.length s}) (v: int)
+        : Lemma (ensures Seq.length (Seq.upd s j v) == Seq.length s /\
+                         count_ones (Seq.upd s j v) k' == count_ones s k')
+                (decreases k')
+        = if k' = 0 then ()
+          else (assert (Seq.index (Seq.upd s j v) (k'-1) == Seq.index s (k'-1)); aux s (k'-1) j v)
+      in aux s (k-1) j v
+    end
+    else (assert (Seq.index (Seq.upd s j v) (k-1) == Seq.index s (k-1));
+          count_ones_upd_from_one s (k-1) j v)
+
+(* Updating out of range doesn't change count *)
+let rec count_ones_upd_out (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat) (v: int)
+  : Lemma (requires j >= k /\ j < Seq.length s)
+          (ensures Seq.length (Seq.upd s j v) == Seq.length s /\
+                   count_ones (Seq.upd s j v) k == count_ones s k)
+          (decreases k)
+  = if k = 0 then ()
+    else (assert (Seq.index (Seq.upd s j v) (k-1) == Seq.index s (k-1));
+          count_ones_upd_out s (k-1) j v)
+
+(* If all elements in [0..k) are 0, count_ones is 0 *)
+let rec count_ones_all_zero (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Lemma (requires forall (j:nat). j < k ==> Seq.index s j == 0)
+          (ensures count_ones s k == 0)
+          (decreases k)
+  = if k = 0 then ()
+    else count_ones_all_zero s (k - 1)
 
 (* Helper: discover a WHITE vertex v from vertex u.
    Sets d[v], color[v]=GRAY, pred[v]=u, pushes v onto stack.
@@ -106,6 +178,8 @@ fn discover_vertex_dfs
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
       vtime >= 0 /\
+      Seq.index scolor (SZ.v vv) <> 1 /\
+      count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
@@ -126,6 +200,7 @@ fn discover_vertex_dfs
       SZ.v vtop' <= SZ.v n /\
       SZ.v vtop' > SZ.v vtop /\
       vtime' == vtime + 1 /\
+      count_ones scolor' (SZ.v n) == SZ.v vtop' /\
       (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
@@ -136,6 +211,7 @@ fn discover_vertex_dfs
   // v.d = time
   A.op_Array_Assignment d vv (t + 1);
   // v.color = GRAY
+  count_ones_upd_to_one scolor (SZ.v n) (SZ.v vv);
   A.op_Array_Assignment color vv 1;
   // v.pi = u
   A.op_Array_Assignment pred vv (SZ.v u);
@@ -184,6 +260,8 @@ fn maybe_discover_dfs
       Seq.length sstack == SZ.v n /\
       Seq.length sscan == SZ.v n /\
       vtime >= 0 /\
+      cv == Seq.index scolor (SZ.v vv) /\
+      count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
@@ -204,12 +282,13 @@ fn maybe_discover_dfs
       SZ.v vtop' <= SZ.v n /\
       SZ.v vtop' >= SZ.v vtop /\
       vtime' >= vtime /\
+      count_ones scolor' (SZ.v n) == SZ.v vtop' /\
       (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
   if (has_edge_val <> 0 && cv = 0) {
-    assume_ (pure (SZ.v vtop < SZ.v n));
+    count_ones_lt scolor (SZ.v n) (SZ.v vv);
     discover_vertex_dfs color d pred stack_data stack_top scan_idx time_ref u vv n
   }
 }
@@ -221,29 +300,37 @@ fn maybe_discover_dfs
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn finish_vertex
   (color: A.array int) (f: A.array int)
+  (stack_data: A.array SZ.t)
   (stack_top: ref SZ.t)
   (time_ref: ref int)
   (u: SZ.t) (n: SZ.t)
   (#scolor: erased (Seq.seq int))
   (#sf: erased (Seq.seq int))
+  (#sstack: erased (Seq.seq SZ.t))
   (#vtop: erased SZ.t)
   (#vtime: erased int)
   requires
     A.pts_to color scolor **
     A.pts_to f sf **
+    A.pts_to stack_data sstack **
     R.pts_to stack_top vtop **
     R.pts_to time_ref vtime **
-    pure (
+    with_pure (
       SZ.v u < SZ.v n /\
       SZ.v vtop > 0 /\
       SZ.v vtop <= SZ.v n /\
       Seq.length scolor == SZ.v n /\
       Seq.length sf == SZ.v n /\
-      vtime >= 0
+      Seq.length sstack == SZ.v n /\
+      vtime >= 0 /\
+      Seq.index scolor (SZ.v u) == 1 /\
+      count_ones scolor (SZ.v n) == SZ.v vtop /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n)
     )
   ensures exists* scolor' sf' vtop' vtime'.
     A.pts_to color scolor' **
     A.pts_to f sf' **
+    A.pts_to stack_data sstack **
     R.pts_to stack_top vtop' **
     R.pts_to time_ref vtime' **
     pure (
@@ -251,10 +338,13 @@ fn finish_vertex
       Seq.length sf' == SZ.v n /\
       SZ.v vtop' < SZ.v vtop /\
       SZ.v vtop' <= SZ.v n /\
-      vtime' > vtime
+      vtime' > vtime /\
+      count_ones scolor' (SZ.v n) == SZ.v vtop' /\
+      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack i) < SZ.v n)
     )
 {
   // u.color = BLACK
+  count_ones_upd_from_one scolor (SZ.v n) (SZ.v u) 2;
   A.op_Array_Assignment color u 2;
   // time++
   let t = !time_ref;
@@ -314,6 +404,8 @@ fn dfs_visit
       Seq.length sscan == SZ.v n /\
       vtime >= 0 /\
       SZ.fits (SZ.v n * SZ.v n) /\
+      Seq.index scolor (SZ.v vs) <> 1 /\
+      count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
@@ -336,6 +428,7 @@ fn dfs_visit
       Seq.length sscan' == SZ.v n /\
       SZ.v vtop' == 0 /\
       vtime' >= vtime /\
+      count_ones scolor' (SZ.v n) == SZ.v vtop' /\
       (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
@@ -344,6 +437,7 @@ fn dfs_visit
   let t = !time_ref;
   time_ref := t + 1;
   A.op_Array_Assignment d vs (t + 1);
+  count_ones_upd_to_one scolor (SZ.v n) (SZ.v vs);
   A.op_Array_Assignment color vs 1;      // GRAY
   A.op_Array_Assignment pred vs (-1);    // NIL
   A.op_Array_Assignment scan_idx vs 0sz;
@@ -380,6 +474,7 @@ fn dfs_visit
       vtime_w >= 0 /\
       vtime_w >= vtime /\
       SZ.fits (SZ.v n * SZ.v n) /\
+      count_ones scolor_w (SZ.v n) == SZ.v vtop_w /\
       (forall (i:nat). i < SZ.v vtop_w ==> SZ.v (Seq.index sstack_w i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_w uu) <= SZ.v n)
     )
@@ -431,6 +526,8 @@ fn dfs_visit
         SZ.fits (SZ.v u * SZ.v n) /\
         SZ.fits (SZ.v u * SZ.v n + SZ.v vscan) /\
         (vfound ==> SZ.v vnext < SZ.v n) /\
+        (vfound ==> Seq.index scolor_scan (SZ.v vnext) == 0) /\
+        count_ones scolor_scan (SZ.v n) == SZ.v top /\
         (forall (i:nat). i < SZ.v top ==> SZ.v (Seq.index sstack_scan i) < SZ.v n) /\
         (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_scan uu) <= SZ.v n)
       )
@@ -464,14 +561,26 @@ fn dfs_visit
       let vv = !next_v;
       assert (pure (SZ.v vv < SZ.v n));
       
-      let top2 = !stack_top;
-      assume_ (pure (SZ.v top2 < SZ.v n));
+      // vv is WHITE (color == 0, hence <> 1), so count_ones_lt gives vtop < n
+      with scolor_now. assert (A.pts_to color scolor_now);
+      count_ones_lt scolor_now (SZ.v n) (SZ.v vv);
       
       discover_vertex_dfs color d pred stack_data stack_top scan_idx time_ref u vv n
     } else {
       // No more WHITE neighbors - finish u
       assert (pure (SZ.v top > 0));
-      finish_vertex color f stack_top time_ref u n
+      // u is on stack and was discovered as GRAY; needs stack uniqueness to prove
+      with scolor_fin. assert (A.pts_to color scolor_fin);
+      assume_ (pure (Seq.index scolor_fin (SZ.v u) == 1));
+      assert (pure (
+        SZ.v u < SZ.v n /\
+        SZ.v top > 0 /\
+        SZ.v top <= SZ.v n /\
+        Seq.length scolor_fin == SZ.v n /\
+        Seq.index scolor_fin (SZ.v u) == 1 /\
+        count_ones scolor_fin (SZ.v n) == SZ.v top
+      ));
+      finish_vertex color f stack_data stack_top time_ref u n
     }
   };
   
@@ -539,6 +648,8 @@ fn maybe_dfs_visit
       Seq.length sscan == SZ.v n /\
       vtime >= 0 /\
       SZ.fits (SZ.v n * SZ.v n) /\
+      cv == Seq.index scolor (SZ.v vs) /\
+      count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
@@ -561,11 +672,11 @@ fn maybe_dfs_visit
       Seq.length sscan' == SZ.v n /\
       SZ.v vtop' == 0 /\
       vtime' >= vtime /\
+      count_ones scolor' (SZ.v n) == SZ.v vtop' /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
   if (cv = 0) {
-    assume_ (pure (SZ.v vtop < SZ.v n));
     dfs_visit adj n vs color d f pred stack_data scan_idx stack_top time_ref
   }
 }
@@ -707,6 +818,10 @@ fn stack_dfs
   let mut time_ref: int = 0;
   let mut stack_top: SZ.t = 0sz;
 
+  // Establish count_ones == 0 (all vertices are WHITE)
+  with scolor_init. assert (A.pts_to color scolor_init);
+  count_ones_all_zero scolor_init (SZ.v n);
+
   // Step 3: Main DFS loop - for each vertex s
   let mut s: SZ.t = 0sz;
   while (!s <^ n)
@@ -731,6 +846,9 @@ fn stack_dfs
       Seq.length sstack_s == SZ.v n /\
       Seq.length sscan_s == SZ.v n /\
       vtime >= 0 /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      count_ones scolor_s (SZ.v n) == SZ.v vtop /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack_s i) < SZ.v n) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_s uu) <= SZ.v n)
     )
   {
