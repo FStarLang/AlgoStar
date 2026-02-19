@@ -1,0 +1,37 @@
+{
+    "fstar_exe": "../FStar/bin/fstar.exe",
+    "options": [
+        "--cmi",
+        "--warn_error", "-321",
+        "--warn_error", "@247"
+    ],
+    "include_dirs": [
+        "../pulse/lib/common",
+        "../pulse/build/lib.common.checked",
+        "../pulse/build/ocaml/installed/lib/pulse",
+        "../pulse/out/lib/pulse",
+        "common",
+        "ch02-getting-started",
+        "ch04-divide-conquer",
+        "ch06-heapsort",
+        "ch07-quicksort",
+        "ch08-linear-sorting",
+        "ch09-order-statistics",
+        "ch10-elementary-ds",
+        "ch11-hash-tables",
+        "ch12-bst",
+        "ch15-dynamic-programming",
+        "ch16-greedy",
+        "ch21-disjoint-sets",
+        "ch22-elementary-graph",
+        "ch23-mst",
+        "ch24-sssp",
+        "ch25-apsp",
+        "ch26-max-flow",
+        "ch28-matrix-ops",
+        "ch31-number-theory",
+        "ch32-string-matching",
+        "ch33-comp-geometry",
+        "ch35-approximation"
+    ]
+}
