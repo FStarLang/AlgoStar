@@ -66,6 +66,10 @@ let fits_product_smaller (a b c d: nat)
   = assert (c * b <= a * b);
     assert (c * b + d <= a * b)
 
+(* Safe index for int sequences - avoids refinement issues with nested Seq.index in postconditions *)
+let safe_index_int (s: Seq.seq int) (i: nat) : int =
+  if i < Seq.length s then Seq.index s i else 0
+
 let fits_le (x y: nat)
   : Lemma (requires x <= y /\ SZ.fits y)
           (ensures SZ.fits x)
@@ -181,6 +185,8 @@ fn discover_vertex_dfs
       Seq.index scolor (SZ.v vv) <> 1 /\
       count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> safe_index_int scolor (SZ.v (Seq.index sstack i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop /\ j < SZ.v vtop /\ i <> j ==> SZ.v (Seq.index sstack i) <> SZ.v (Seq.index sstack j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' spred' sstack' sscan' vtop' vtime'.
@@ -202,6 +208,8 @@ fn discover_vertex_dfs
       vtime' == vtime + 1 /\
       count_ones scolor' (SZ.v n) == SZ.v vtop' /\
       (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop' ==> safe_index_int scolor' (SZ.v (Seq.index sstack' i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop' /\ j < SZ.v vtop' /\ i <> j ==> SZ.v (Seq.index sstack' i) <> SZ.v (Seq.index sstack' j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
@@ -263,6 +271,8 @@ fn maybe_discover_dfs
       cv == Seq.index scolor (SZ.v vv) /\
       count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> safe_index_int scolor (SZ.v (Seq.index sstack i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop /\ j < SZ.v vtop /\ i <> j ==> SZ.v (Seq.index sstack i) <> SZ.v (Seq.index sstack j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' spred' sstack' sscan' vtop' vtime'.
@@ -284,6 +294,8 @@ fn maybe_discover_dfs
       vtime' >= vtime /\
       count_ones scolor' (SZ.v n) == SZ.v vtop' /\
       (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop' ==> safe_index_int scolor' (SZ.v (Seq.index sstack' i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop' /\ j < SZ.v vtop' /\ i <> j ==> SZ.v (Seq.index sstack' i) <> SZ.v (Seq.index sstack' j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
@@ -325,7 +337,10 @@ fn finish_vertex
       vtime >= 0 /\
       Seq.index scolor (SZ.v u) == 1 /\
       count_ones scolor (SZ.v n) == SZ.v vtop /\
-      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n)
+      SZ.v (Seq.index sstack (SZ.v vtop - 1)) == SZ.v u /\
+      (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> safe_index_int scolor (SZ.v (Seq.index sstack i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop /\ j < SZ.v vtop /\ i <> j ==> SZ.v (Seq.index sstack i) <> SZ.v (Seq.index sstack j))
     )
   ensures exists* scolor' sf' vtop' vtime'.
     A.pts_to color scolor' **
@@ -340,7 +355,9 @@ fn finish_vertex
       SZ.v vtop' <= SZ.v n /\
       vtime' > vtime /\
       count_ones scolor' (SZ.v n) == SZ.v vtop' /\
-      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack i) < SZ.v n)
+      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop' ==> safe_index_int scolor' (SZ.v (Seq.index sstack i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop' /\ j < SZ.v vtop' /\ i <> j ==> SZ.v (Seq.index sstack i) <> SZ.v (Seq.index sstack j))
     )
 {
   // u.color = BLACK
@@ -359,7 +376,7 @@ fn finish_vertex
 
 (* Helper: perform DFS-VISIT for a single white vertex *)
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
 fn dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -407,6 +424,8 @@ fn dfs_visit
       Seq.index scolor (SZ.v vs) <> 1 /\
       count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> safe_index_int scolor (SZ.v (Seq.index sstack i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop /\ j < SZ.v vtop /\ i <> j ==> SZ.v (Seq.index sstack i) <> SZ.v (Seq.index sstack j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime'.
@@ -430,6 +449,8 @@ fn dfs_visit
       vtime' >= vtime /\
       count_ones scolor' (SZ.v n) == SZ.v vtop' /\
       (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop' ==> safe_index_int scolor' (SZ.v (Seq.index sstack' i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop' /\ j < SZ.v vtop' /\ i <> j ==> SZ.v (Seq.index sstack' i) <> SZ.v (Seq.index sstack' j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
@@ -476,6 +497,8 @@ fn dfs_visit
       SZ.fits (SZ.v n * SZ.v n) /\
       count_ones scolor_w (SZ.v n) == SZ.v vtop_w /\
       (forall (i:nat). i < SZ.v vtop_w ==> SZ.v (Seq.index sstack_w i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop_w ==> safe_index_int scolor_w (SZ.v (Seq.index sstack_w i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop_w /\ j < SZ.v vtop_w /\ i <> j ==> SZ.v (Seq.index sstack_w i) <> SZ.v (Seq.index sstack_w j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_w uu) <= SZ.v n)
     )
   {
@@ -515,6 +538,7 @@ fn dfs_visit
         SZ.v vscan <= SZ.v n /\
         SZ.v u < SZ.v n /\
         SZ.v top <= SZ.v n /\
+        Seq.length sadj == SZ.v n * SZ.v n /\
         Seq.length scolor_scan == SZ.v n /\
         Seq.length sd_scan == SZ.v n /\
         Seq.length sf_scan == SZ.v n /\
@@ -527,8 +551,12 @@ fn dfs_visit
         SZ.fits (SZ.v u * SZ.v n + SZ.v vscan) /\
         (vfound ==> SZ.v vnext < SZ.v n) /\
         (vfound ==> Seq.index scolor_scan (SZ.v vnext) == 0) /\
+        Seq.index scolor_scan (SZ.v u) == 1 /\
+        SZ.v (Seq.index sstack_scan (SZ.v top - 1)) == SZ.v u /\
         count_ones scolor_scan (SZ.v n) == SZ.v top /\
         (forall (i:nat). i < SZ.v top ==> SZ.v (Seq.index sstack_scan i) < SZ.v n) /\
+        (forall (i:nat). i < SZ.v top ==> safe_index_int scolor_scan (SZ.v (Seq.index sstack_scan i)) == 1) /\
+        (forall (i j:nat). i < SZ.v top /\ j < SZ.v top /\ i <> j ==> SZ.v (Seq.index sstack_scan i) <> SZ.v (Seq.index sstack_scan j)) /\
         (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_scan uu) <= SZ.v n)
       )
     {
@@ -537,6 +565,7 @@ fn dfs_visit
       // Check edge (u, vscan) and color[vscan]
       let offset: SZ.t = SZ.mul u n;
       let idx: SZ.t = SZ.add offset vscan;
+      assert (pure (SZ.v u * SZ.v n + SZ.v vscan < SZ.v n * SZ.v n));
       let has_edge_val: int = A.op_Array_Access adj idx;
 
       let cvscan: int = A.op_Array_Access color vscan;
@@ -568,18 +597,8 @@ fn dfs_visit
       discover_vertex_dfs color d pred stack_data stack_top scan_idx time_ref u vv n
     } else {
       // No more WHITE neighbors - finish u
-      assert (pure (SZ.v top > 0));
-      // u is on stack and was discovered as GRAY; needs stack uniqueness to prove
-      with scolor_fin. assert (A.pts_to color scolor_fin);
-      assume_ (pure (Seq.index scolor_fin (SZ.v u) == 1));
-      assert (pure (
-        SZ.v u < SZ.v n /\
-        SZ.v top > 0 /\
-        SZ.v top <= SZ.v n /\
-        Seq.length scolor_fin == SZ.v n /\
-        Seq.index scolor_fin (SZ.v u) == 1 /\
-        count_ones scolor_fin (SZ.v n) == SZ.v top
-      ));
+      // u is on stack at position top-1 and was discovered as GRAY
+      // color[u] == 1 from inner scan loop invariant
       finish_vertex color f stack_data stack_top time_ref u n
     }
   };
@@ -651,6 +670,8 @@ fn maybe_dfs_visit
       cv == Seq.index scolor (SZ.v vs) /\
       count_ones scolor (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> safe_index_int scolor (SZ.v (Seq.index sstack i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop /\ j < SZ.v vtop /\ i <> j ==> SZ.v (Seq.index sstack i) <> SZ.v (Seq.index sstack j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan uu) <= SZ.v n)
     )
   ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime'.
@@ -673,6 +694,9 @@ fn maybe_dfs_visit
       SZ.v vtop' == 0 /\
       vtime' >= vtime /\
       count_ones scolor' (SZ.v n) == SZ.v vtop' /\
+      (forall (i:nat). i < SZ.v vtop' ==> SZ.v (Seq.index sstack' i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop' ==> safe_index_int scolor' (SZ.v (Seq.index sstack' i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop' /\ j < SZ.v vtop' /\ i <> j ==> SZ.v (Seq.index sstack' i) <> SZ.v (Seq.index sstack' j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan' uu) <= SZ.v n)
     )
 {
@@ -849,6 +873,8 @@ fn stack_dfs
       SZ.fits (SZ.v n * SZ.v n) /\
       count_ones scolor_s (SZ.v n) == SZ.v vtop /\
       (forall (i:nat). i < SZ.v vtop ==> SZ.v (Seq.index sstack_s i) < SZ.v n) /\
+      (forall (i:nat). i < SZ.v vtop ==> safe_index_int scolor_s (SZ.v (Seq.index sstack_s i)) == 1) /\
+      (forall (i j:nat). i < SZ.v vtop /\ j < SZ.v vtop /\ i <> j ==> SZ.v (Seq.index sstack_s i) <> SZ.v (Seq.index sstack_s j)) /\
       (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_s uu) <= SZ.v n)
     )
   {
