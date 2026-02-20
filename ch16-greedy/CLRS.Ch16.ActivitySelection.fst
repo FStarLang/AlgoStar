@@ -61,6 +61,7 @@ let out_matches_sel (out_seq: Seq.seq SZ.t) (sel: Seq.seq nat) (count: nat) (n: 
 
 // ========== Activity Selection Algorithm ==========
 
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 //SNIPPET_START: activity_selection_sig
 fn activity_selection 
   (#p: perm)
@@ -177,3 +178,4 @@ fn activity_selection
   
   !count
 }
+#pop-options
