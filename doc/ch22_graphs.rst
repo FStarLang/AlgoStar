@@ -62,10 +62,13 @@ The postcondition establishes that the ``color`` array correctly
 reflects BFS visitation and that ``distance`` values correspond to
 the BFS level-set membership defined in the pure specification.
 
-This implementation uses **4 assume_ calls** for invariant framing
-properties that are semantically valid but difficult to discharge
-automatically (e.g., that discovered vertices remain colored, that
-the source vertex invariant is maintained across iterations).
+This implementation is **fully verified with 0 assume_ calls**, using a
+predicate-based proof architecture parallel to StackDFS. Named predicates
+(``queue_ok``, ``dist_ok``, ``source_ok``, ``count_nonwhite``) abstract
+the BFS invariant clusters, with isolated lemmas for each state transition
+(discover, blacken, frame). A key insight: adding ``queue_ok`` directly to
+``maybe_discover``'s postcondition lets Z3 reason about exact ``Seq.upd``
+terms instead of chaining through abstract frame quantifiers.
 
 Complexity
 ~~~~~~~~~~
@@ -263,7 +266,7 @@ Verification Status Summary
      - 0
    * - QueueBFS
      - Pulse impl
-     - 4 assume\_
+     - **0** ✅
    * - QueueBFS.Complexity
      - Pulse impl
      - 6 assume\_
