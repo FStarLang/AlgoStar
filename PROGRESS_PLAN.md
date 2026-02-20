@@ -192,14 +192,14 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 
 ## Current Status (2025-02-19, latest)
 
-**164 F* files, ~50K lines — 78 unproven F* obligations across 28 files** (+ 34 Pulse assume_ in 6 files)
+**164 F* files, ~50K lines — 78 unproven F* obligations across 28 files** (+ 33 Pulse assume_ in 6 files)
 
 | Type | Count | Description |
 |------|-------|-------------|
 | `admit()` | 65 | Unproven lemma/proof bodies (Pure F*) |
 | `assume(...)` | 15 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 3, DFS.Spec: 2, UF/Kruskal: 2) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
-| `assume_` | 23 | Pulse-specific unproven invariants (StackDFS: 0+7, QueueBFS: 4+6, CountingSort: 3, Kruskal.Cmplx: 1) |
+| `assume_` | 22 | Pulse-specific unproven invariants (StackDFS: 0+6, QueueBFS: 4+6, CountingSort: 3, Kruskal.Cmplx: 1) |
 
 (Note: Comment-aware counting — excludes admits/assumes in block comments `(* *)` and line comments `//`.)
 
@@ -243,7 +243,7 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | 22 | IterativeBFS | — | ⚠️ reachability only | — | 0 | Renamed (not CLRS) |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 4 assume_ | + 6 assume_ in Complexity |
 | 22 | IterativeDFS | — | ⚠️ reachability only | — | 0 | Renamed (not CLRS) |
-| 22 | StackDFS | §22.3 | ✅ all BLACK, d>0, f>0, d<f | ✅ Linked O(n²) | 0 assume_ | + 7 assume_ in Complexity |
+| 22 | StackDFS | §22.3 | ✅ all BLACK, d>0, f>0, d<f | ✅ Linked O(n²) | 0 assume_ | + 6 assume_ in Complexity |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 2 admit + 2 assume | Renamed (not CLRS) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 5 admit + 2 assume | visited_implies_path proved |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 9 admit + 1 assume + 1 assume_ | + 2 admit + 2 EdgeSort admits |
@@ -269,7 +269,7 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | Chapter | admit | assume | assume_val | assume_ | Total | Top files |
 |---------|-------|--------|------------|---------|-------|-----------|
 | ch23 (MST) | 23 | 1 | 1 | 1 | 26 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal.Cmplx(2+1), EdgeSort(2), SortedEdges(0+1), Kruskal(0+0+1) |
-| ch22 (graphs) | 12 | 2 | 0 | 19 | 33 | StackDFS(0+0+7), QueueBFS(0+4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2) |
+| ch22 (graphs) | 12 | 2 | 0 | 18 | 32 | StackDFS(0+0+6), QueueBFS(0+4+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2), KahnTopo(2) |
 | ch08 (sorting) | 11 | 0 | 0 | 3 | 14 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch32 (strings) | 7 | 0 | 0 | 0 | 7 | KMP.Complexity(7) |
@@ -365,7 +365,7 @@ self-contained but requires careful F* proof engineering (induction, case analys
 | File | Line(s) | Admits | Helper lemma needed |
 |------|---------|--------|---------------------|
 | **StackDFS.fst** | — | 0 | ✅ **DONE**: All 4 assume_ eliminated via predicate-based refactoring (stack_ok, dfs_ok, gray_ok, nonwhite_below, scan_ok). |
-| **StackDFS.Complexity** | 219,558,672 | 3 | Same vtop < n issue as base file. |
+| **StackDFS.Complexity** | 237,586,594,693,898,915 | 6 | vtop < n (2), found ==> top < n (1), vc bound (2), final postcondition (1). Predicate approach from StackDFS.fst can be adapted. |
 | **QueueBFS.fst** | 320 | 1 | **Queue-colored invariant**: all enqueued vertices are non-WHITE. Add to loop invariant; discover_vertex colors GRAY before enqueue. |
 | **QueueBFS.fst** | 172 | 1 | **Queue cardinality**: each vertex enqueued at most once ⟹ `vtail < n`. Needs ghost set tracking discovered vertices. |
 | **QueueBFS.fst** | 372, 379 | 2 | **Loop invariant restoration**: show `maybe_discover` preserves source properties and distance soundness for non-modified vertices. Frame reasoning. |
@@ -395,7 +395,7 @@ threaded through entire algorithms, or deep mathematical theorems.
 | File | Line(s) | Admits | Why expert guidance is needed |
 |------|---------|--------|------------------------------|
 | **StackDFS.fst** | — | 0 | ✅ **DONE**: Full DFS correctness postcondition proven via final_postcondition_lemma + predicate abstractions. |
-| **StackDFS.Complexity** | 566,581,842,859 | 4 | Final complexity postconditions depend on full DFS correctness (Tier 3 above) plus complexity bound. |
+| **StackDFS.Complexity** | — | 0 (Tier 3) | ✅ Tier 3 assume_ (final postconditions) now subsumed by Tier 2 entries above. StackDFS.fst predicates can be reused. |
 | **CountingSort.Stable** | 282, 283 | 2 | Stability proof: backward traversal preserves relative order. Needs full loop invariant tracking position assignments. Permutation proof: each input element placed exactly once. |
 | **RadixSort.FullSort** (sorted_up_to_all_digits) | | | **✅ DONE** |
 | **RadixSort.Spec** | 366 | 1 | Inductive radix sort correctness: permutation composition across d stable sorts. |

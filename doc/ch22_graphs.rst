@@ -148,17 +148,22 @@ arrays reflect a valid DFS traversal: all vertices are black
 (fully explored), timestamps are consistent (``d[v] < f[v]``),
 and the parenthesis structure holds.
 
-This implementation uses **11 assume_ calls** for invariant framing
-around the inner loop that scans neighbors, stack validity after
-push/pop operations, and the final postcondition assembly.
+The proof uses a predicate-based approach with five named
+abstractions (``stack_ok``, ``dfs_ok``, ``gray_ok``,
+``nonwhite_below``, ``scan_ok``), each with explicit
+``:pattern`` triggers for quantifier instantiation. Eight
+isolated lemmas relate these predicates across discover and
+finish operations, enabling clean modular reasoning.
+
+This implementation is **fully verified with 0 assume_ calls**.
 
 Complexity
 ~~~~~~~~~~
 
 The complexity module (``StackDFS.Complexity``) proves an O(V²)
 bound matching the adjacency-matrix representation. It uses
-**13 assume_ calls** (the same framing assumptions as the
-correctness version plus additional cost-counter invariants).
+**6 assume_ calls** (stack-top bounds, cost-counter invariants,
+and the final complexity postcondition).
 
 An alternative iterative DFS (``IterativeDFS``) uses a simpler
 level-by-level approach and is **fully verified with 0 admits**,
@@ -240,7 +245,7 @@ Verification Status Summary
      - 2 admit()
    * - DFS.Spec
      - Pure spec
-     - 0
+     - 5 admit() + 2 assume()
    * - DFS.WhitePath
      - Pure spec
      - 3 admit()
@@ -261,13 +266,13 @@ Verification Status Summary
      - 4 assume\_
    * - QueueBFS.Complexity
      - Pulse impl
-     - 7 assume\_
+     - 6 assume\_
    * - StackDFS
      - Pulse impl
-     - 11 assume\_
+     - **0** ✅
    * - StackDFS.Complexity
      - Pulse impl
-     - 16 assume\_
+     - 6 assume\_
    * - KahnTopologicalSort
      - Pulse impl
      - 2 admit()
@@ -281,10 +286,11 @@ Verification Status Summary
      - Pulse impl
      - 0
 
-The ``assume_`` calls in the Pulse implementations are used for
+The ``assume_`` calls in the Pulse complexity modules are used for
 invariant framing properties — assertions that are semantically
 valid but difficult for the SMT solver to discharge automatically.
-They do not represent logical gaps in the proofs. The ``admit()``
-calls in ``BFS.DistanceSpec``, ``DFS.WhitePath``, and
-``KahnTopologicalSort`` mark genuinely unproven properties that
-remain as future work.
+The base ``StackDFS`` module demonstrates that these can be
+eliminated via predicate-based refactoring with isolated lemmas.
+The ``admit()`` calls in ``BFS.DistanceSpec``, ``DFS.Spec``,
+``DFS.WhitePath``, and ``KahnTopologicalSort`` mark genuinely
+unproven properties that remain as future work.
