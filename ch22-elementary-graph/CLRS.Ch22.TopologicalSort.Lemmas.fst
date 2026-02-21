@@ -254,3 +254,95 @@ let lemma_is_in_output_new (output: seq int) (count: nat) (u_val: int)
   = let output' = Seq.upd output count u_val in
     assert (Seq.index output' count == u_val)
 
+(* NOT is_in_output is preserved when writing beyond count *)
+let rec lemma_is_in_output_extend_neg
+  (output: seq int) (count: nat) (x: int) (pos: nat) (v: int)
+  : Lemma
+    (requires count <= Seq.length output /\ pos >= count /\ pos < Seq.length output /\
+             not (is_in_output output count x))
+    (ensures not (is_in_output (Seq.upd output pos v) count x))
+    (decreases count)
+  = if count = 0 then ()
+    else begin
+      assert (Seq.index (Seq.upd output pos v) (count - 1) == Seq.index output (count - 1));
+      if Seq.index output (count - 1) = x then ()
+      else lemma_is_in_output_extend_neg output (count - 1) x pos v
+    end
+
+(* For x != u_val: NOT is_in_output at count implies NOT at count+1 after Seq.upd *)
+let lemma_not_in_output_upd_neq
+  (output: seq int) (count: nat) (u_val: int) (x: int)
+  : Lemma
+    (requires count < Seq.length output /\ x <> u_val /\ not (is_in_output output count x))
+    (ensures not (is_in_output (Seq.upd output count u_val) (count + 1) x))
+  = let output' = Seq.upd output count u_val in
+    assert (Seq.index output' count == u_val);
+    // is_in_output output' (count+1) x checks output'[count] (= u_val <> x) then recurses
+    // Need: not (is_in_output output' count x)
+    lemma_is_in_output_extend_neg output count x count u_val
+
+(* Key transition lemma: how count_remaining_preds changes when extending output by one vertex *)
+#push-options "--z3rlimit 40 --fuel 2"
+let rec lemma_crp_extend
+  (adj: seq int) (n: nat) (output: seq int) (count: nat) (u_val: int) (v: nat) (scan: nat)
+  : Lemma
+    (requires
+      count < Seq.length output /\ scan <= n /\ v < n /\
+      Seq.length adj == n * n /\
+      u_val >= 0 /\ u_val < n /\
+      not (is_in_output output count u_val))
+    (ensures (
+      let delta = (if u_val < scan && u_val * n + v < n * n && Seq.index adj (u_val * n + v) <> 0 then 1 else 0) in
+      count_remaining_preds adj n (Seq.upd output count u_val) (count + 1) v scan ==
+        count_remaining_preds adj n output count v scan - delta))
+    (decreases scan)
+  = if scan = 0 then ()
+    else begin
+      let u = scan - 1 in
+      let output' = Seq.upd output count u_val in
+      lemma_crp_extend adj n output count u_val v (scan - 1);
+      if u = u_val then begin
+        lemma_is_in_output_new output count u_val;
+        ()
+      end else begin
+        if u < n && v < n && Seq.length adj = n * n && u * n + v < Seq.length adj &&
+           Seq.index adj (u * n + v) <> 0 && count <= Seq.length output then begin
+          if is_in_output output count u then begin
+            lemma_is_in_output_extend output count u count u_val;
+            ()
+          end else begin
+            lemma_not_in_output_upd_neq output count u_val u;
+            ()
+          end
+        end else ()
+      end
+    end
+#pop-options
+
+(* Main transition lemma: after inner loop processes all neighbors of u,
+   indeg_correct transitions from count to count+1 *)
+let lemma_indeg_transition
+  (adj: seq int) (n: nat) (in_deg_old in_deg_new: seq int)
+  (output: seq int) (count: nat) (u_val: int)
+  : Lemma
+    (requires
+      indeg_correct adj n in_deg_old output count /\
+      count < Seq.length output /\
+      Seq.length in_deg_new >= n /\
+      u_val >= 0 /\ u_val < n /\
+      not (is_in_output output count u_val) /\
+      (forall (v: nat). v < n ==>
+        Seq.index in_deg_new v ==
+          Seq.index in_deg_old v -
+            (if u_val * n + v < n * n && Seq.index adj (u_val * n + v) <> 0 then 1 else 0)))
+    (ensures
+      indeg_correct adj n in_deg_new (Seq.upd output count u_val) (count + 1))
+  = let output' = Seq.upd output count u_val in
+    let aux (v: nat)
+      : Lemma (requires v < n)
+              (ensures v < Seq.length in_deg_new /\
+                       Seq.index in_deg_new v == count_remaining_preds adj n output' (count + 1) v n)
+    = lemma_crp_extend adj n output count u_val v n
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+
