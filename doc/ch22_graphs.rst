@@ -70,6 +70,27 @@ the BFS invariant clusters, with isolated lemmas for each state transition
 ``maybe_discover``'s postcondition lets Z3 reason about exact ``Seq.upd``
 terms instead of chaining through abstract frame quantifiers.
 
+Proof Architecture
+^^^^^^^^^^^^^^^^^^
+
+The BFS proof uses four named predicates:
+
+- **count_nonwhite**: counts non-zero entries in the color array;
+  equals the queue tail, bounding enqueue operations.
+- **source_ok**: the source vertex is non-WHITE with distance 0.
+- **queue_ok**: every queue entry in ``[head, tail)`` is a valid
+  vertex index (``< n``) with non-WHITE color.
+- **dist_ok**: every non-WHITE vertex has distance ``≥ 0``.
+
+Six counting lemmas relate ``count_nonwhite`` through updates
+(``all_zero``, ``le``, ``has_white``, ``upd_white``,
+``upd_nonwhite``, ``upd_single``).  Preservation lemmas show each
+predicate is maintained by the ``discover`` and ``blacken``
+operations, and a key ``queue_ok_after_discover`` lemma uses exact
+``Seq.upd`` terms to re-establish ``queue_ok`` after enqueuing a
+new vertex—avoiding the chained-quantifier trigger problem that
+arises when reasoning through abstract frame properties.
+
 Complexity
 ~~~~~~~~~~
 
@@ -292,7 +313,7 @@ Verification Status Summary
 The ``assume_`` calls in the Pulse complexity modules are used for
 invariant framing properties — assertions that are semantically
 valid but difficult for the SMT solver to discharge automatically.
-The base ``StackDFS`` module demonstrates that these can be
+Both ``StackDFS`` and ``QueueBFS`` demonstrate that these can be
 eliminated via predicate-based refactoring with isolated lemmas.
 The ``admit()`` calls in ``BFS.DistanceSpec``, ``DFS.Spec``,
 ``DFS.WhitePath``, and ``KahnTopologicalSort`` mark genuinely
