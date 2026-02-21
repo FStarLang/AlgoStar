@@ -175,7 +175,7 @@ fstar.exe --query_stats --split_queries always --z3refresh <file.fst>
   alongside predicate calls.
 - **Postconditions**: Use flat `pure (P /\ Q /\ R)` — no need for `with_pure` in ensures.
 
-### Predicate-Based Pulse Proofs (StackDFS Pattern)
+### Predicate-Based Pulse Proofs (StackDFS/QueueBFS Pattern)
 
 When a Pulse program has repeated invariant clusters across function pre/post/loop specs:
 1. **Define named predicates** with explicit `{:pattern}` triggers on all quantifiers.
@@ -187,6 +187,13 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
    discharge failed until each `forall` was asserted separately.)
 5. **Use `with_pure` in requires** to expose bounds for postcondition well-formedness.
 6. **Keep predicates transparent** (`let`, not `val`) so Z3 can unfold them when needed.
+7. **Add target predicates to inner function postconditions** instead of deriving them from
+   abstract frame properties. When chained quantifier triggers fail (e.g., `queue_ok` through
+   frame + color frame), adding the predicate directly to the function postcondition lets Z3
+   reason about exact `Seq.upd` terms. `Classical.forall_intro` fails when `Seq.index s i`
+   appears in ensures but `i` is universally quantified beyond `Seq.length s`.
+   (Discovered in QueueBFS: `frame_extends_queue_ok` failed; adding `queue_ok` to
+   `maybe_discover`'s postcondition solved it — Z3 sees `Seq.upd` axioms directly.)
 
 ---
 
@@ -423,3 +430,28 @@ threaded through entire algorithms, or deep mathematical theorems.
 - [ ] S2: Union-Find O(m·α(n)) amortized (ch21)
 - [ ] S3: KMP O(n+m) amortized (ch32) — 3 admits
 - [ ] S4: Max-flow min-cut theorem (ch26)
+
+---
+
+## Session Log (2025-02-21)
+
+### Completed
+- **QueueBFS.fst**: Fully verified, 0 assume_ (was 4). Commit `fb5bafe`.
+  - Predicates: `queue_ok`, `dist_ok`, `source_ok`, `count_nonwhite` with `{:pattern}` triggers
+  - Lemmas: `queue_ok_after_discover`, `blacken_preserves_queue_ok`, `blacken_preserves_source_ok`,
+    `blacken_preserves_dist_ok`, `discover_preserves_dist_ok`, 6 `count_nonwhite_*` lemmas
+  - Key insight: add `queue_ok` directly to `maybe_discover` postcondition so Z3 reasons about
+    exact `Seq.upd` terms (avoids chained quantifier trigger failures through abstract frame props)
+  - Bug fix: `count_nonwhite_upd_single` was called with post-assignment state; fixed to use
+    pre-assignment state via `with scolor_zeros`
+- **ActivitySelection.fst**: Fixed flaky SMT with `--z3rlimit 20`. Commit `f65573b`.
+- **PROGRESS_PLAN.md** + **doc/ch22_graphs.rst**: Updated counts and documentation.
+
+### Next Steps (Priority Order)
+1. **QueueBFS.Complexity** (7 assume_): Apply same predicate pattern as QueueBFS.fst.
+   The Complexity file mirrors the correctness file with additional ghost tick counters.
+   Same predicates + same lemmas should apply; main new work is tick arithmetic.
+2. **StackDFS.Complexity** (7 assume_): Apply predicate pattern from StackDFS.fst.
+   Same relationship as QueueBFS→QueueBFS.Complexity.
+3. **CountingSort** (3 assume_): Separate chapter, different proof structure.
+4. **Kruskal.Cmplx** (1 assume_): Minor, likely tick arithmetic.
