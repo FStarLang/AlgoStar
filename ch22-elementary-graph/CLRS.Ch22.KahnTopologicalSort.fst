@@ -858,10 +858,11 @@ fn topological_sort
     kahn_outer_inv_intro sadj (SZ.v n) sin_deg_post squeue_post soutput_new
       (SZ.v vqh + 1) (SZ.v vtail_post) (SZ.v vout + 1);
     
-    // Structural properties: process_neighbors doesn't touch output,
-    // so soutput_new is exactly Seq.upd of original at vout with u_int.
-    // u_int == SZ.v u < n, and rest unchanged from invariant
+    // Structural properties of output after write
+    // soutput_new == soutput_post (process_neighbors doesn't touch output, by framing)
+    // soutput_post == Seq.upd soutput_pre vout u_int (by array assignment)
     assume_fact (
+      soutput_new == soutput_post /\
       (forall (k: nat). k < SZ.v vout + 1 ==> Seq.index soutput_new k < SZ.v n) /\
       (forall (k: nat). SZ.v vout + 1 <= k /\ k < SZ.v n ==> Seq.index soutput_new k == 0) /\
       (forall (k: nat). k < Seq.length soutput_new ==> Seq.index soutput_new k >= 0)
