@@ -441,3 +441,43 @@ let lemma_positive_indeg_not_in_output
       ()
     end else ()
 
+(* ================================================================
+   Initialization Lemmas: count_remaining_preds at count=0
+   At count=0, is_in_output is always false, so count_remaining_preds
+   simply counts edges (predecessors) without any output filtering.
+   ================================================================ *)
+
+(* Base case: scanning 0 predecessors yields 0 *)
+let lemma_crp_zero_base (adj: seq int) (n: nat) (output: seq int) (v: nat)
+  : Lemma (count_remaining_preds adj n output 0 v 0 == 0)
+  = ()
+
+(* Step case: count_remaining_preds at count=0 decomposes into previous scan + edge check.
+   At count=0, is_in_output is always false, simplifying the recurrence. *)
+let lemma_crp_zero_step (adj: seq int) (n: nat) (output: seq int) (v: nat) (scan: nat)
+  : Lemma
+    (requires v < n /\ scan < n /\ Seq.length adj == n * n /\ Seq.length output >= 0)
+    (ensures
+      count_remaining_preds adj n output 0 v (scan + 1) ==
+        count_remaining_preds adj n output 0 v scan +
+          (if Seq.index adj (scan * n + v) <> 0 then 1 else 0))
+  = // Unfold one step: scan+1 > 0, u = scan
+    // is_in_output output 0 scan = false (count=0)
+    // Condition simplifies to: scan < n && v < n && ... && adj[scan*n+v] <> 0
+    assert (not (is_in_output output 0 scan));
+    assert (scan * n + v < n * n)
+
+(* At count=0, count_remaining_preds is independent of the output sequence *)
+let rec lemma_crp_zero_output_independent
+  (adj: seq int) (n: nat) (output1 output2: seq int) (v: nat) (scan: nat)
+  : Lemma
+    (ensures count_remaining_preds adj n output1 0 v scan ==
+             count_remaining_preds adj n output2 0 v scan)
+    (decreases scan)
+  = if scan = 0 then ()
+    else begin
+      lemma_crp_zero_output_independent adj n output1 output2 v (scan - 1);
+      assert (not (is_in_output output1 0 (scan - 1)));
+      assert (not (is_in_output output2 0 (scan - 1)))
+    end
+

@@ -271,6 +271,112 @@ let queue_entries_valid_after_enqueue
     Classical.forall_intro (Classical.move_requires aux)
 
 (* ================================================================
+   INITIALIZATION INVARIANTS — for Step 1 (compute in-degrees)
+   ================================================================ *)
+
+(* After processing rows [0, row) fully and columns [0, col) of row `row`,
+   in_degree[j] == count_remaining_preds adj n output 0 j (row+1) for j < col,
+   in_degree[j] == count_remaining_preds adj n output 0 j row    for j >= col. *)
+[@@  "opaque_to_smt"]
+let step1_inner_inv
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg: Seq.seq int)
+  (row col: nat) : prop =
+  Seq.length adj == n * n /\ Seq.length in_deg == n /\ Seq.length output >= 0 /\
+  row < n /\ col <= n /\
+  (forall (j: nat). j < col ==>
+    Seq.index in_deg j == count_remaining_preds adj n output 0 j (row + 1)) /\
+  (forall (j: nat). col <= j /\ j < n ==>
+    Seq.index in_deg j == count_remaining_preds adj n output 0 j row)
+
+(* After processing rows [0, row) fully,
+   in_degree[j] == count_remaining_preds adj n output 0 j row for all j < n. *)
+[@@  "opaque_to_smt"]
+let step1_outer_inv
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg: Seq.seq int)
+  (row: nat) : prop =
+  Seq.length adj == n * n /\ Seq.length in_deg == n /\ Seq.length output >= 0 /\
+  row <= n /\
+  (forall (j: nat). j < n ==>
+    Seq.index in_deg j == count_remaining_preds adj n output 0 j row)
+
+(* Inner loop step: processing adj[row, col] updates in_degree[col] *)
+let lemma_step1_inner_step
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg in_deg': Seq.seq int)
+  (row col: nat)
+  : Lemma
+    (requires
+      step1_inner_inv adj n output in_deg row col /\
+      col < n /\ row < n /\
+      Seq.length adj == n * n /\
+      Seq.length in_deg == n /\
+      Seq.length in_deg' == n /\
+      SZ.fits (n * n) /\
+      // Only in_deg[col] might change
+      (forall (k: nat). {:pattern (Seq.index in_deg' k)} k < n /\ k <> col ==>
+        Seq.index in_deg' k == Seq.index in_deg k) /\
+      // in_deg'[col] = in_deg[col] + (if edge then 1 else 0)
+      Seq.index in_deg' col ==
+        Seq.index in_deg col +
+          (if Seq.index adj (row * n + col) <> 0 then 1 else 0))
+    (ensures step1_inner_inv adj n output in_deg' row (col + 1))
+  = reveal_opaque (`%step1_inner_inv) (step1_inner_inv adj n output in_deg row col);
+    reveal_opaque (`%step1_inner_inv) (step1_inner_inv adj n output in_deg' row (col + 1));
+    lemma_crp_zero_step adj n output col row
+
+(* Outer loop: inner invariant at col=0 follows from outer invariant *)
+let lemma_step1_outer_to_inner
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg: Seq.seq int)
+  (row: nat)
+  : Lemma
+    (requires step1_outer_inv adj n output in_deg row /\ row < n)
+    (ensures step1_inner_inv adj n output in_deg row 0)
+  = reveal_opaque (`%step1_outer_inv) (step1_outer_inv adj n output in_deg row);
+    reveal_opaque (`%step1_inner_inv) (step1_inner_inv adj n output in_deg row 0)
+
+(* Inner loop completes: inner invariant at col=n implies outer invariant at row+1 *)
+let lemma_step1_inner_to_outer
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg: Seq.seq int)
+  (row: nat)
+  : Lemma
+    (requires step1_inner_inv adj n output in_deg row n)
+    (ensures step1_outer_inv adj n output in_deg (row + 1))
+  = reveal_opaque (`%step1_inner_inv) (step1_inner_inv adj n output in_deg row n);
+    reveal_opaque (`%step1_outer_inv) (step1_outer_inv adj n output in_deg (row + 1))
+
+(* Initial state: all zeros == crp at row 0 (no predecessors scanned) *)
+let lemma_step1_initial
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg: Seq.seq int)
+  : Lemma
+    (requires
+      n > 0 /\
+      Seq.length adj == n * n /\ Seq.length in_deg == n /\ Seq.length output >= 0 /\
+      (forall (j: nat). j < n ==> Seq.index in_deg j == 0))
+    (ensures step1_outer_inv adj n output in_deg 0)
+  = reveal_opaque (`%step1_outer_inv) (step1_outer_inv adj n output in_deg 0);
+    let aux (j: nat) : Lemma (requires j < n)
+                              (ensures count_remaining_preds adj n output 0 j 0 == 0) =
+      lemma_crp_zero_base adj n output j
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+
+(* Step 1 complete: outer_inv at row=n gives indeg_correct at count=0 with any output *)
+let lemma_step1_to_indeg_correct
+  (adj: Seq.seq int) (n: nat) (ghost_out real_out: Seq.seq int) (in_deg: Seq.seq int)
+  : Lemma
+    (requires step1_outer_inv adj n ghost_out in_deg n /\ n > 0 /\
+              Seq.length real_out >= n)
+    (ensures indeg_correct adj n in_deg real_out 0)
+  = reveal_opaque (`%step1_outer_inv) (step1_outer_inv adj n ghost_out in_deg n);
+    // step1_outer_inv gives: in_deg[j] == crp adj n ghost_out 0 j n
+    // We need: in_deg[j] == crp adj n real_out 0 j n
+    // At count=0, crp is output-independent
+    let aux (j: nat) : Lemma (requires j < n)
+      (ensures count_remaining_preds adj n ghost_out 0 j n == count_remaining_preds adj n real_out 0 j n) =
+      lemma_crp_zero_output_independent adj n ghost_out real_out j n
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+
+(* ================================================================
    BUNDLED INVARIANT — opaque to SMT for performance
    ================================================================ *)
 
@@ -638,6 +744,12 @@ fn topological_sort
   rewrite (A.pts_to (V.vec_to_array in_degree_v) (Seq.create (SZ.v n) 0))
        as (A.pts_to in_degree (Seq.create (SZ.v n) 0));
   
+  // Ghost output placeholder for step1 invariants (output not allocated yet)
+  let ghost_output : erased (Seq.seq int) = hide (Seq.empty #int);
+  
+  // Establish initial step1_outer_inv
+  lemma_step1_initial sadj (SZ.v n) (reveal ghost_output) (Seq.create (SZ.v n) 0);
+  
   // For each vertex i
   let mut i: SZ.t = 0sz;
   while (!i <^ n)
@@ -647,10 +759,15 @@ fn topological_sort
     A.pts_to in_degree sin_degree **
     pure (
       SZ.v vi <= SZ.v n /\
-      Seq.length sin_degree == SZ.v n
+      Seq.length sin_degree == SZ.v n /\
+      step1_outer_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v vi)
     )
   {
     let vi = !i;
+    with sin_deg_outer. assert (A.pts_to in_degree sin_deg_outer);
+    
+    // Convert outer_inv to inner_inv at col=0
+    lemma_step1_outer_to_inner sadj (SZ.v n) (reveal ghost_output) sin_deg_outer (SZ.v vi);
     
     // For each vertex j, check if edge vi->j exists
     let mut j: SZ.t = 0sz;
@@ -663,10 +780,14 @@ fn topological_sort
       pure (
         SZ.v vi < SZ.v n /\
         SZ.v vj <= SZ.v n /\
-        Seq.length sin_degree == SZ.v n
+        Seq.length sin_degree == SZ.v n /\
+        Seq.length sadj == SZ.v n * SZ.v n /\
+        SZ.fits (SZ.v n * SZ.v n) /\
+        step1_inner_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v vi) (SZ.v vj)
       )
     {
       let vj = !j;
+      with sin_deg_inner. assert (A.pts_to in_degree sin_deg_inner);
       
       // Check if edge from vi to vj exists
       let idx = vi *^ n +^ vj;
@@ -677,11 +798,23 @@ fn topological_sort
       let new_deg: int = (if edge_val <> 0 then old_deg + 1 else old_deg);
       A.op_Array_Assignment in_degree vj new_deg;
       
+      // Prove step1_inner_inv advances
+      with sin_deg_new. assert (A.pts_to in_degree sin_deg_new);
+      lemma_step1_inner_step sadj (SZ.v n) (reveal ghost_output) sin_deg_inner sin_deg_new (SZ.v vi) (SZ.v vj);
+      
       j := vj +^ 1sz;
     };
     
+    // Inner loop complete: convert inner_inv at col=n to outer_inv at row+1
+    with sin_deg_after_inner. assert (A.pts_to in_degree sin_deg_after_inner);
+    lemma_step1_inner_to_outer sadj (SZ.v n) (reveal ghost_output) sin_deg_after_inner (SZ.v vi);
+    
     i := vi +^ 1sz;
   };
+  
+  // After Step 1: we have step1_outer_inv at row=n
+  // Capture in_degree state for indeg_correct conversion
+  with sin_deg_after_step1. assert (A.pts_to in_degree sin_deg_after_step1);
   
   // Step 2: Initialize queue with vertices having in-degree 0
   let queue_v = V.alloc 0sz n;
@@ -705,7 +838,9 @@ fn topological_sort
       SZ.v vqt <= SZ.v n /\
       Seq.length sin_degree == SZ.v n /\
       Seq.length squeue == SZ.v n /\
-      queue_entries_valid squeue (SZ.v vqt) (SZ.v n)
+      queue_entries_valid squeue (SZ.v vqt) (SZ.v n) /\
+      // Carry step1 result through Step 2 (in_degree is read-only here)
+      step1_outer_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v n)
     )
   {
     let vi = !i;
@@ -742,11 +877,14 @@ fn topological_sort
   partial_distinct_base soutput_init;
   // partial_valid at 0: vacuously true (forall i < 0 ...)
   // queue_fresh at count=0: vacuously true (forall k < 0 ...)
-  // These need properties of the initialization loops (Steps 1 & 2):
+  
+  // indeg_correct: Step 1 computed in-degrees; use step1_outer_inv at row=n
+  lemma_step1_to_indeg_correct sadj (SZ.v n) (reveal ghost_output) soutput_init sin_deg_init;
+  
+  // Queue predicates still need Step 2 invariant work:
   assume_fact (
     queue_distinct_sz squeue_init 0 (SZ.v vqt_init) /\
-    queue_preds_in_output_sz sadj (SZ.v n) squeue_init 0 (SZ.v vqt_init) soutput_init 0 /\
-    indeg_correct sadj (SZ.v n) sin_deg_init soutput_init 0
+    queue_preds_in_output_sz sadj (SZ.v n) squeue_init 0 (SZ.v vqt_init) soutput_init 0
   );
   // Bundle into opaque invariant
   kahn_outer_inv_intro sadj (SZ.v n) sin_deg_init squeue_init soutput_init 0 (SZ.v vqt_init) 0;
@@ -801,6 +939,7 @@ fn topological_sort
     
     // Capture post-write output state
     with soutput_post. assert (A.pts_to output soutput_post);
+    assert (pure (soutput_post == Seq.upd soutput_pre (SZ.v vout) u_int));
     
     // --- Prove strong_order_inv maintenance ---
     lemma_strong_order_extend sadj (SZ.v n) soutput_pre soutput_post (SZ.v vout) u_int;
@@ -832,6 +971,8 @@ fn topological_sort
     // After process_neighbors: in_degree and queue changed, output unchanged
     with sin_deg_post squeue_post vtail_post. _;
     with soutput_new. assert (A.pts_to output soutput_new);
+    // process_neighbors doesn't touch output — framing gives soutput_new == soutput_post
+    assert (pure (soutput_new == soutput_post));
     
     // process_neighbors doesn't touch output, so soutput_new == soutput_post (by framing)
     // Convert inner_indeg_complete for indeg_transition
@@ -850,23 +991,21 @@ fn topological_sort
     assume_fact (
       queue_preds_in_output_sz sadj (SZ.v n) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) soutput_post (SZ.v vout + 1) /\
       queue_fresh soutput_post (SZ.v vout + 1) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) /\
-      queue_distinct_sz squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) /\
-      soutput_new == soutput_post
+      queue_distinct_sz squeue_post (SZ.v vqh + 1) (SZ.v vtail_post)
     );
     
     // Bundle back into opaque invariant
     kahn_outer_inv_intro sadj (SZ.v n) sin_deg_post squeue_post soutput_new
       (SZ.v vqh + 1) (SZ.v vtail_post) (SZ.v vout + 1);
     
-    // Structural properties of output after write
-    // soutput_new == soutput_post (process_neighbors doesn't touch output, by framing)
-    // soutput_post == Seq.upd soutput_pre vout u_int (by array assignment)
-    assume_fact (
-      soutput_new == soutput_post /\
-      (forall (k: nat). k < SZ.v vout + 1 ==> Seq.index soutput_new k < SZ.v n) /\
-      (forall (k: nat). SZ.v vout + 1 <= k /\ k < SZ.v n ==> Seq.index soutput_new k == 0) /\
-      (forall (k: nat). k < Seq.length soutput_new ==> Seq.index soutput_new k >= 0)
-    )
+    // Structural properties of soutput_new = soutput_post = Seq.upd soutput_pre vout u_int
+    // u_int < n and u_int >= 0; soutput_pre satisfies the properties by loop invariant
+    // For k < vout: Seq.index soutput_new k == Seq.index soutput_pre k (by Seq.upd, k <> vout)
+    // For k == vout: Seq.index soutput_new vout == u_int < n, u_int >= 0
+    // For k > vout, k < n: Seq.index soutput_new k == Seq.index soutput_pre k == 0
+    assert (pure (soutput_new == Seq.upd soutput_pre (SZ.v vout) u_int));
+    assert (pure (Seq.length soutput_new == SZ.v n));
+    assert (pure (u_int >= 0 /\ u_int < SZ.v n))
   };
   
   // After the loop, extract the existentials
