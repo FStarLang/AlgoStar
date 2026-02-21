@@ -74,6 +74,20 @@ let queue_distinct_sz (queue: Seq.seq SZ.t) (qh qt: nat) : prop =
     i >= qh /\ i < qt /\ j >= qh /\ j < qt /\ i <> j ==>
       SZ.v (Seq.index queue i) <> SZ.v (Seq.index queue j))
 
+(* Step 2 invariant: queue entries are all < vi and have in_degree 0 *)
+[@@  "opaque_to_smt"]
+let step2_queue_inv
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue: Seq.seq SZ.t) (vqt vi: nat) : prop =
+  vqt <= vi /\ vi <= n /\
+  vqt <= Seq.length queue /\
+  Seq.length in_deg == n /\
+  queue_distinct_sz queue 0 vqt /\
+  // All entries are < vi (since we only enqueue vertices we've scanned)
+  (forall (k: nat). {:pattern (Seq.index queue k)} k < vqt ==> SZ.v (Seq.index queue k) < vi) /\
+  // All entries have in_degree 0
+  (forall (k: nat). {:pattern (Seq.index queue k)} k < vqt ==> Seq.index in_deg (SZ.v (Seq.index queue k)) == 0)
+
 (* ================================================================
    PREDICATE LEMMAS
    ================================================================ *)
@@ -373,6 +387,124 @@ let lemma_step1_to_indeg_correct
     let aux (j: nat) : Lemma (requires j < n)
       (ensures count_remaining_preds adj n ghost_out 0 j n == count_remaining_preds adj n real_out 0 j n) =
       lemma_crp_zero_output_independent adj n ghost_out real_out j n
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+
+(* ================================================================
+   STEP 2 LEMMAS — Queue initialization invariant maintenance
+   ================================================================ *)
+
+(* Initial: empty queue satisfies step2_queue_inv *)
+let lemma_step2_initial
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue: Seq.seq SZ.t)
+  : Lemma
+    (requires n > 0 /\ Seq.length in_deg == n /\ Seq.length queue == n)
+    (ensures step2_queue_inv adj n in_deg output queue 0 0)
+  = reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg output queue 0 0)
+
+(* Step 2 body: enqueue vertex vi if in_deg[vi] == 0, or skip *)
+let lemma_step2_enqueue
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue queue': Seq.seq SZ.t) (vqt vi: nat)
+  : Lemma
+    (requires
+      step2_queue_inv adj n in_deg output queue vqt vi /\
+      vi < n /\ n > 0 /\ SZ.fits n /\
+      Seq.length queue' == Seq.length queue /\
+      Seq.length in_deg == n /\
+      Seq.index in_deg vi == 0 /\
+      vqt < Seq.length queue' /\
+      Seq.index queue' vqt == SZ.uint_to_t vi /\
+      (forall (k: nat). {:pattern (Seq.index queue' k)} k < vqt ==> Seq.index queue' k == Seq.index queue k))
+    (ensures step2_queue_inv adj n in_deg output queue' (vqt + 1) (vi + 1))
+  = reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg output queue vqt vi);
+    reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg output queue' (vqt + 1) (vi + 1));
+    assert (SZ.v (Seq.index queue' vqt) == vi);
+    assert (vqt + 1 <= Seq.length queue');
+    // For the quantifiers in step2_queue_inv:
+    // 1. queue_distinct_sz queue' 0 (vqt+1): 
+    //    - Old pairs (i,j < vqt): distinct from queue_distinct_sz queue 0 vqt
+    //    - New+old pair (vqt, j<vqt): queue'[vqt]=vi, queue'[j]<vi (from step2_queue_inv invariant)
+    // 2. All entries < vi+1: entries < vqt have values < vi < vi+1, entry at vqt has value vi < vi+1
+    // 3. All entries have in_deg 0: entries < vqt from invariant, entry at vqt = vi has in_deg = 0 (given)
+    ()
+
+(* Step 2 body: skip vertex vi (in_deg != 0) *)
+let lemma_step2_skip
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue queue': Seq.seq SZ.t) (vqt vi: nat)
+  : Lemma
+    (requires step2_queue_inv adj n in_deg output queue vqt vi /\ vi < n /\
+              Seq.length queue' == Seq.length queue /\
+              vqt <= Seq.length queue' /\
+              (forall (k: nat). {:pattern (Seq.index queue' k)} k < vqt ==> Seq.index queue' k == Seq.index queue k))
+    (ensures step2_queue_inv adj n in_deg output queue' vqt (vi + 1))
+  = reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg output queue vqt vi);
+    reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg output queue' vqt (vi + 1))
+
+(* Unified Step 2 step: handles both enqueue (deg=0) and skip (deg!=0) *)
+let lemma_step2_step
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue queue': Seq.seq SZ.t) (vqt new_vqt vi: nat)
+  : Lemma
+    (requires
+      step2_queue_inv adj n in_deg output queue vqt vi /\
+      vi < n /\ n > 0 /\ SZ.fits n /\
+      Seq.length queue' == Seq.length queue /\
+      Seq.length in_deg == n /\
+      vqt < Seq.length queue' /\
+      Seq.index queue' vqt == SZ.uint_to_t vi /\
+      (forall (k: nat). {:pattern (Seq.index queue' k)} k < vqt ==> Seq.index queue' k == Seq.index queue k) /\
+      (if Seq.index in_deg vi = 0 then new_vqt = vqt + 1 else new_vqt = vqt))
+    (ensures step2_queue_inv adj n in_deg output queue' new_vqt (vi + 1))
+  = if Seq.index in_deg vi = 0
+    then lemma_step2_enqueue adj n in_deg output queue queue' vqt vi
+    else lemma_step2_skip adj n in_deg output queue queue' vqt vi
+
+(* Step 2 complete: step2_queue_inv → queue_distinct_sz *)
+let lemma_step2_to_queue_distinct
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue: Seq.seq SZ.t) (vqt: nat)
+  : Lemma
+    (requires step2_queue_inv adj n in_deg output queue vqt n)
+    (ensures queue_distinct_sz queue 0 vqt)
+  = reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg output queue vqt n)
+
+(* After Step 2 loop completes (vi=n), step2_queue_inv implies queue_entries_valid *)
+let lemma_step2_to_entries_valid
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue: Seq.seq SZ.t) (vqt: nat)
+  : Lemma
+    (requires step2_queue_inv adj n in_deg output queue vqt n)
+    (ensures queue_entries_valid queue vqt n)
+  = reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg output queue vqt n)
+
+(* Step 2 complete + indeg_correct → queue_preds_in_output_sz at count=0.
+   Each queued vertex has in_degree == 0, and at count=0 this means no predecessors.
+   The output parameter for queue_preds can differ from step2_queue_inv's output
+   since at count=0, is_in_output is always false. *)
+let lemma_step2_to_queue_preds
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (step2_out real_out: Seq.seq int)
+  (queue: Seq.seq SZ.t) (vqt: nat)
+  : Lemma
+    (requires
+      step2_queue_inv adj n in_deg step2_out queue vqt n /\
+      indeg_correct adj n in_deg real_out 0 /\
+      n > 0 /\ Seq.length real_out >= n)
+    (ensures queue_preds_in_output_sz adj n queue 0 vqt real_out 0)
+  = reveal_opaque (`%step2_queue_inv) (step2_queue_inv adj n in_deg step2_out queue vqt n);
+    // step2_queue_inv gives: forall k < vqt. Seq.index in_deg (SZ.v (Seq.index queue k)) == 0
+    // We need: for each k < vqt, all preds of queue[k] are in output[0..0)
+    // Since in_deg[v] == 0 and indeg_correct, use lemma_zero_indeg_all_preds_output
+    // which says: forall u < n. adj[u*n+v] <> 0 ==> is_in_output real_out 0 u
+    // Since is_in_output output 0 u is always false, this means NO predecessors exist
+    // Call the lemma for each vertex in queue
+    let aux (v: nat) : Lemma
+      (requires v < n /\ Seq.index in_deg v == 0)
+      (ensures forall (j: nat). j < n /\ j * n + v < n * n /\
+                Seq.index adj (j * n + v) <> 0 ==> is_in_output real_out 0 j)
+      = lemma_zero_indeg_all_preds_output adj n in_deg real_out 0 v
     in
     Classical.forall_intro (Classical.move_requires aux)
 
@@ -824,35 +956,43 @@ fn topological_sort
        as (A.pts_to queue (Seq.create (SZ.v n) 0sz));
   let mut queue_tail: SZ.t = 0sz;
   
+  // Establish step2 initial invariant
+  lemma_step2_initial sadj (SZ.v n) sin_deg_after_step1 (reveal ghost_output) (Seq.create (SZ.v n) 0sz);
+  
   let mut i: SZ.t = 0sz;
   while (!i <^ n)
-  invariant exists* vi vqt sin_degree squeue.
+  invariant exists* vi vqt squeue.
     R.pts_to i vi **
     R.pts_to queue_tail vqt **
     A.pts_to adj sadj **
-    A.pts_to in_degree sin_degree **
     A.pts_to queue squeue **
     pure (
       SZ.v vi <= SZ.v n /\
       SZ.v vqt <= SZ.v vi /\
       SZ.v vqt <= SZ.v n /\
-      Seq.length sin_degree == SZ.v n /\
       Seq.length squeue == SZ.v n /\
-      queue_entries_valid squeue (SZ.v vqt) (SZ.v n) /\
-      // Carry step1 result through Step 2 (in_degree is read-only here)
-      step1_outer_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v n)
+      // Step 2 queue invariant (includes queue_distinct, entries < vi, entries have indeg 0)
+      step2_queue_inv sadj (SZ.v n) sin_deg_after_step1 (reveal ghost_output) squeue (SZ.v vqt) (SZ.v vi)
     )
   {
     let vi = !i;
-    let deg = A.op_Array_Access in_degree vi;
     let vqt = !queue_tail;
+    with squeue_pre. assert (A.pts_to queue squeue_pre);
     
-    // Unconditionally write (might write garbage if deg != 0, but queue_tail won't advance)
+    // Read in_degree[vi] (in_degree is framed — not in invariant)
+    let deg = A.op_Array_Access in_degree vi;
+    
+    // Unconditionally write queue[vqt] = vi
     A.op_Array_Assignment queue vqt vi;
+    with squeue_post. assert (A.pts_to queue squeue_post);
     
     // Conditionally advance queue_tail
     let new_vqt: SZ.t = (if deg = 0 then vqt +^ 1sz else vqt);
     queue_tail := new_vqt;
+    
+    // Step 2 invariant maintenance — single unified lemma
+    lemma_step2_step sadj (SZ.v n) sin_deg_after_step1 (reveal ghost_output)
+      squeue_pre squeue_post (SZ.v vqt) (SZ.v new_vqt) (SZ.v vi);
     
     i := vi +^ 1sz;
   };
@@ -881,11 +1021,10 @@ fn topological_sort
   // indeg_correct: Step 1 computed in-degrees; use step1_outer_inv at row=n
   lemma_step1_to_indeg_correct sadj (SZ.v n) (reveal ghost_output) soutput_init sin_deg_init;
   
-  // Queue predicates still need Step 2 invariant work:
-  assume_fact (
-    queue_distinct_sz squeue_init 0 (SZ.v vqt_init) /\
-    queue_preds_in_output_sz sadj (SZ.v n) squeue_init 0 (SZ.v vqt_init) soutput_init 0
-  );
+  // Queue distinct + queue preds + queue entries valid from Step 2 invariant
+  lemma_step2_to_queue_distinct sadj (SZ.v n) sin_deg_init (reveal ghost_output) squeue_init (SZ.v vqt_init);
+  lemma_step2_to_entries_valid sadj (SZ.v n) sin_deg_init (reveal ghost_output) squeue_init (SZ.v vqt_init);
+  lemma_step2_to_queue_preds sadj (SZ.v n) sin_deg_init (reveal ghost_output) soutput_init squeue_init (SZ.v vqt_init);
   // Bundle into opaque invariant
   kahn_outer_inv_intro sadj (SZ.v n) sin_deg_init squeue_init soutput_init 0 (SZ.v vqt_init) 0;
   
