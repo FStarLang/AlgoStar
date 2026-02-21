@@ -737,11 +737,19 @@ fn topological_sort
   with soutput_init. assert (A.pts_to output soutput_init);
   with vqt_init. assert (R.pts_to queue_tail vqt_init);
   
-  // Initialization: all predicates hold at count=0
-  // strong_order_inv and partial_distinct are trivial; others need init loop properties
+  // Base cases: trivially true at count=0
+  lemma_strong_order_base sadj (SZ.v n) soutput_init;
+  partial_distinct_base soutput_init;
+  // partial_valid at 0: vacuously true (forall i < 0 ...)
+  // queue_fresh at count=0: vacuously true (forall k < 0 ...)
+  // These need properties of the initialization loops (Steps 1 & 2):
   assume_fact (
-    kahn_outer_inv sadj (SZ.v n) sin_deg_init squeue_init soutput_init 0 (SZ.v vqt_init) 0
+    queue_distinct_sz squeue_init 0 (SZ.v vqt_init) /\
+    queue_preds_in_output_sz sadj (SZ.v n) squeue_init 0 (SZ.v vqt_init) soutput_init 0 /\
+    indeg_correct sadj (SZ.v n) sin_deg_init soutput_init 0
   );
+  // Bundle into opaque invariant
+  kahn_outer_inv_intro sadj (SZ.v n) sin_deg_init squeue_init soutput_init 0 (SZ.v vqt_init) 0;
   
   while (!queue_head <^ !queue_tail)
   invariant exists* vqh vqt vout sin_degree squeue soutput.
@@ -772,17 +780,47 @@ fn topological_sort
   {
     let vqh = !queue_head;
     let vqt = !queue_tail;
+    let vout = !out_idx;
+    
+    // Capture ghost state from loop invariant
+    with soutput_pre. assert (A.pts_to output soutput_pre);
+    with squeue_pre. assert (A.pts_to queue squeue_pre);
+    with sin_deg_pre. assert (A.pts_to in_degree sin_deg_pre);
+    
+    // Reveal the opaque invariant to get individual predicates
+    kahn_outer_inv_elim sadj (SZ.v n) sin_deg_pre squeue_pre soutput_pre (SZ.v vqh) (SZ.v vqt) (SZ.v vout);
     
     // Dequeue vertex u
     let u = A.op_Array_Access queue vqh;
     assert (pure (SZ.v u < SZ.v n));
-    assert (pure (SZ.v u * SZ.v n < SZ.v n * SZ.v n));
-    assert (pure (SZ.fits (SZ.v u * SZ.v n)));
+    lemma_index_in_bounds (SZ.v u) 0 (SZ.v n);
     
     // Add u to output
-    let vout = !out_idx;
     let u_int = SZ.v u;
     A.op_Array_Assignment output vout u_int;
+    
+    // Capture post-write output state
+    with soutput_post. assert (A.pts_to output soutput_post);
+    
+    // --- Prove strong_order_inv maintenance ---
+    lemma_strong_order_extend sadj (SZ.v n) soutput_pre soutput_post (SZ.v vout) u_int;
+    
+    // --- Prove partial_distinct maintenance ---
+    queue_fresh_not_in_output soutput_pre (SZ.v vout) squeue_pre (SZ.v vqh) (SZ.v vqt) (SZ.v vqh);
+    partial_distinct_extend soutput_pre soutput_post (SZ.v vout) u_int;
+    
+    // --- Prove partial_valid maintenance ---
+    partial_valid_extend soutput_pre soutput_post (SZ.v vout) (SZ.v n) u_int;
+    
+    // --- Queue predicates after dequeue ---
+    lemma_queue_preds_dequeue sadj (SZ.v n) squeue_pre (SZ.v vqh) (SZ.v vqt) soutput_pre (SZ.v vout);
+    lemma_queue_preds_extend_output sadj (SZ.v n) squeue_pre (SZ.v vqh + 1) (SZ.v vqt) soutput_pre soutput_post (SZ.v vout) u_int;
+    queue_fresh_dequeue soutput_pre (SZ.v vout) squeue_pre (SZ.v vqh) (SZ.v vqt);
+    queue_distinct_dequeue squeue_pre (SZ.v vqh) (SZ.v vqt);
+    
+    // queue_fresh after extending output with u:
+    // queue_distinct before dequeue tells us u differs from remaining entries
+    queue_fresh_extend_output soutput_pre soutput_post (SZ.v vout) squeue_pre (SZ.v vqh) (SZ.v vqt) u_int;
     
     let new_vout = vout +^ 1sz;
     out_idx := new_vout;
@@ -795,11 +833,18 @@ fn topological_sort
     with sin_deg_post squeue_post vtail_post. _;
     with soutput_new. assert (A.pts_to output soutput_new);
     
-    // Maintain opaque invariant: assume for now, will be replaced with lemma calls
+    // The hard queue predicates through inner loop + indeg_correct:
     assume_fact (
-      kahn_outer_inv sadj (SZ.v n) sin_deg_post squeue_post soutput_new
-        (SZ.v vqh + 1) (SZ.v vtail_post) (SZ.v vout + 1)
+      queue_preds_in_output_sz sadj (SZ.v n) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) soutput_post (SZ.v vout + 1) /\
+      queue_fresh soutput_post (SZ.v vout + 1) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) /\
+      queue_distinct_sz squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) /\
+      indeg_correct sadj (SZ.v n) sin_deg_post soutput_post (SZ.v vout + 1) /\
+      soutput_new == soutput_post
     );
+    
+    // Bundle back into opaque invariant
+    kahn_outer_inv_intro sadj (SZ.v n) sin_deg_post squeue_post soutput_new
+      (SZ.v vqh + 1) (SZ.v vtail_post) (SZ.v vout + 1);
     
     // Structural properties: process_neighbors doesn't touch output,
     // so soutput_new is exactly Seq.upd of original at vout with u_int.

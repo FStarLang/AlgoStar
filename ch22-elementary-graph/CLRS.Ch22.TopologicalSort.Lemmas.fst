@@ -346,3 +346,90 @@ let lemma_indeg_transition
     in
     Classical.forall_intro (Classical.move_requires aux)
 
+(* ================================================================
+   OUTPUT-VERTEX IN-DEGREE ZERO LEMMA
+   ================================================================ *)
+
+(* Helper: if exists k < count. output[k] == x, then is_in_output output count x *)
+let rec lemma_exists_implies_is_in_output (output: seq int) (count: nat) (x: int) (k: nat)
+  : Lemma
+    (requires k < count /\ count <= Seq.length output /\ Seq.index output k == x)
+    (ensures is_in_output output count x)
+    (decreases count)
+  = if count = 0 then ()
+    else if Seq.index output (count - 1) = x then ()
+    else lemma_exists_implies_is_in_output output (count - 1) x k
+
+(* is_in_output is monotone: if x is in output[0..c1), it's in output[0..c2) for c2 >= c1 *)
+let rec lemma_is_in_output_monotone (output: seq int) (c1 c2: nat) (x: int)
+  : Lemma
+    (requires c1 <= c2 /\ c2 <= Seq.length output /\ is_in_output output c1 x)
+    (ensures is_in_output output c2 x)
+    (decreases c2)
+  = if c1 = c2 then ()
+    else if Seq.index output (c2 - 1) = x then ()
+    else lemma_is_in_output_monotone output c1 (c2 - 1) x
+
+(* Helper: if all predecessors of v are in output[0..count), then crp == 0 *)
+let rec lemma_crp_zero_when_all_preds_in_output
+  (adj: seq int) (n: nat) (output: seq int) (count: nat) (v: nat) (scan: nat)
+  : Lemma
+    (requires
+      v < n /\ scan <= n /\ count <= Seq.length output /\ Seq.length adj == n * n /\
+      (forall (u: nat). u < scan /\ u < n /\ u * n + v < n * n /\
+        Seq.index adj (u * n + v) <> 0 ==> is_in_output output count u))
+    (ensures count_remaining_preds adj n output count v scan == 0)
+    (decreases scan)
+  = if scan = 0 then ()
+    else lemma_crp_zero_when_all_preds_in_output adj n output count v (scan - 1)
+
+(* Main lemma: under strong_order_inv + indeg_correct, output verts have in_deg == 0 *)
+#push-options "--z3rlimit 20"
+let lemma_output_vert_zero_indeg
+  (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) (j: nat)
+  : Lemma
+    (requires
+      strong_order_inv adj n output count /\
+      indeg_correct adj n in_deg output count /\
+      j < count /\ Seq.index output j >= 0 /\ Seq.index output j < n)
+    (ensures Seq.index in_deg (Seq.index output j) == 0)
+  = let w = Seq.index output j in
+    let aux (u: nat)
+      : Lemma
+        (requires u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0)
+        (ensures is_in_output output count u)
+      = assert (exists (k: nat). k < j /\ Seq.index output k == u);
+        let aux2 (k: nat)
+          : Lemma (requires k < j /\ Seq.index output k == u)
+                  (ensures is_in_output output count u)
+          = lemma_exists_implies_is_in_output output j u k;
+            lemma_is_in_output_monotone output j count u
+        in
+        Classical.forall_intro (Classical.move_requires aux2)
+    in
+    Classical.forall_intro (Classical.move_requires aux);
+    lemma_crp_zero_when_all_preds_in_output adj n output count w n
+#pop-options
+
+(* Contrapositive: if in_deg[v] > 0 under strong_order_inv + indeg_correct,
+   then v is NOT in output[0..count). Requires output entries to be valid. *)
+let lemma_positive_indeg_not_in_output
+  (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) (v: nat)
+  : Lemma
+    (requires
+      strong_order_inv adj n output count /\
+      indeg_correct adj n in_deg output count /\
+      v < n /\ Seq.index in_deg v > 0 /\
+      (forall (k: nat). k < count ==> Seq.index output k >= 0 /\ Seq.index output k < n))
+    (ensures not (is_in_output output count v))
+  = if is_in_output output count v then begin
+      lemma_is_in_output_exists output count v;
+      let aux (k: nat)
+        : Lemma (requires k < count /\ Seq.index output k == v)
+                (ensures False)
+        = lemma_output_vert_zero_indeg adj n in_deg output count k
+      in
+      Classical.forall_intro (Classical.move_requires aux);
+      ()
+    end else ()
+
