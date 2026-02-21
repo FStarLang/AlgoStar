@@ -201,7 +201,15 @@ let rec lemma_is_in_output_exists (output: seq int) (count: nat) (x: nat)
     else if Seq.index output (count - 1) = x then ()
     else lemma_is_in_output_exists output (count - 1) x
 
-(* Combined: zero in-degree + indeg_correct ==> all preds are in output (exists form) *)
+(* Contrapositive: if no index k < count has output[k] == x, then not is_in_output *)
+let rec lemma_not_in_output_from_forall (output: seq int) (count: nat) (x: int)
+  : Lemma
+    (requires count <= Seq.length output /\
+      (forall (k: nat). k < count ==> Seq.index output k <> x))
+    (ensures not (is_in_output output count x))
+    (decreases count)
+  = if count = 0 then ()
+    else lemma_not_in_output_from_forall output (count - 1) x
 let lemma_zero_indeg_preds_exist
   (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) (v: nat)
   : Lemma

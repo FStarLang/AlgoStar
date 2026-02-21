@@ -833,12 +833,24 @@ fn topological_sort
     with sin_deg_post squeue_post vtail_post. _;
     with soutput_new. assert (A.pts_to output soutput_new);
     
-    // The hard queue predicates through inner loop + indeg_correct:
+    // process_neighbors doesn't touch output, so soutput_new == soutput_post (by framing)
+    // Convert inner_indeg_complete for indeg_transition
+    inner_indeg_complete sadj (SZ.v n) sin_deg_pre sin_deg_post (SZ.v u);
+    
+    // indeg_correct: use lemma_indeg_transition
+    // u not in output[0..vout) follows from queue_fresh
+    queue_fresh_not_in_output soutput_pre (SZ.v vout) squeue_pre (SZ.v vqh) (SZ.v vqt) (SZ.v vqh);
+    // Convert forall-based "not in output" to is_in_output form
+    lemma_not_in_output_from_forall soutput_pre (SZ.v vout) u_int;
+    lemma_indeg_transition sadj (SZ.v n) sin_deg_pre sin_deg_post soutput_pre (SZ.v vout) u_int;
+    
+    // Queue predicates through inner loop:
+    // For old queue entries [vqh+1, vqt): they were preserved by process_neighbors
+    // For new entries [vqt, vtail_post): newly enqueued vertices with in_deg == 0
     assume_fact (
       queue_preds_in_output_sz sadj (SZ.v n) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) soutput_post (SZ.v vout + 1) /\
       queue_fresh soutput_post (SZ.v vout + 1) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) /\
       queue_distinct_sz squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) /\
-      indeg_correct sadj (SZ.v n) sin_deg_post soutput_post (SZ.v vout + 1) /\
       soutput_new == soutput_post
     );
     
