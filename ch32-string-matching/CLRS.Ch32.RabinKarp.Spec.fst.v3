@@ -1,0 +1,296 @@
+(*
+   Rabin-Karp String Matching - Pure F* Specification
+   Fully proven version with zero admits
+*)
+
+module CLRS.Ch32.RabinKarp.Spec
+
+open FStar.Mul
+open FStar.Classical
+module Seq = FStar.Seq
+
+(*** Core Hash Functions ***)
+
+//SNIPPET_START: horner_hash
+let rec horner_hash (s: Seq.seq nat) (d: pos) (q: pos) : Tot nat (decreases Seq.length s) =
+  if Seq.length s = 0 then 0
+  else 
+    let first = Seq.head s in
+    let rest = Seq.tail s in
+    let rest_hash = horner_hash rest d q in
+    (first + d * rest_hash) % q
+
+let rec pow_mod (d: nat) (exp: nat) (q: pos) : Tot nat (decreases exp) =
+  if exp = 0 then 1 % q
+  else (d * pow_mod d (exp - 1) q) % q
+
+let rolling_hash_step 
+    (ts: nat) (old_char: nat) (new_char: nat) (d: nat) (q: pos) (h: nat)
+  : nat =
+  (d * ((ts + q - (old_char * h) % q) % q) + new_char) % q
+//SNIPPET_END: horner_hash
+
+(*** Proven Hash Implementation from StringMatching.fst ***)
+
+let rec pow (base m:nat) : nat =
+  if m = 0 then 1
+  else pow base (m - 1) * base
+
+let rec hash 
+    (x:Seq.seq nat) (base:nat) (prime:nat{prime <> 0}) 
+    (i:nat) (j:nat { i <= j /\ j <= Seq.length x })
+: nat
+= if i = j then 0
+  else (
+    let lsd = Seq.index x (j - 1) in 
+    let h = hash x base prime i (j - 1) in
+    (base * h + lsd) % prime
+  )
+
+let hash_mod_idem (x:Seq.seq nat) (base:nat) (prime:nat{prime <> 0}) 
+    (i:nat) (j:nat { i <= j /\ j <= Seq.length x })
+: Lemma (hash x base prime i j == hash x base prime i j % prime)
+= if i = j then ()
+  else FStar.Math.Lemmas.lemma_mod_twice (base * hash x base prime i (j - 1) + Seq.index x (j - 1)) prime
+
+let pow_lemma (base m:nat) : Lemma (base * pow base m == pow base (m + 1)) = ()
+
+let lemma_mod_add_distr_l (a:int) (b:int) (n:pos) : Lemma ((a%n + b) % n = (a + b) % n) =
+  FStar.Math.Lemmas.lemma_mod_add_distr b a n
+
+let lemma_mod_add_3 (a b c:int) (p:pos)
+: Lemma (((a + b)%p + c)%p == ((a + c)%p + b)%p)
+= lemma_mod_add_distr_l (a + b) c p;
+  lemma_mod_add_distr_l (a + c) b p
+
+#push-options "--z3rlimit_factor 10 --ifuel 0 --fuel 2 --split_queries no"
+#restart-solver
+let rec hash_inversion
+    (x:Seq.seq nat) (base:nat) (prime:nat{prime <> 0}) 
+    (i:nat) (j:nat { i < j /\ j <= Seq.length x })
+: Lemma
+  (ensures hash x base prime i j ==
+           (hash x base prime (i + 1) j + 
+            pow base (j - i - 1) * Seq.index x i) % prime)
+  (decreases j - i)
+= if j = i + 1 then ()
+  else (
+    let lsd = Seq.index x (j - 1) in
+    let h = hash x base prime i (j - 1) in
+    hash_inversion x base prime i (j - 1);
+    let h_lsd = base * hash x base prime (i + 1) (j - 1) in
+    let msd = pow base (j - i - 1) * Seq.index x i in
+    FStar.Pure.BreakVC.break_vc();
+    let aux () 
+    : Lemma (base * h % prime == (h_lsd + msd) % prime)
+    = calc(==) {
+          base * h % prime;
+        (==) { hash_inversion x base prime i (j - 1) }
+          (base * ((hash x base prime (i + 1) (j - 1) + 
+                    pow base (j - i - 2) * Seq.index x i)%prime)) % prime;
+        (==) { FStar.Math.Lemmas.lemma_mod_mul_distr_r 
+                  base 
+                  (hash x base prime (i + 1) (j - 1) + 
+                    pow base (j - i - 2) * Seq.index x i)
+                  prime }
+        (base * (hash x base prime (i + 1) (j - 1) + 
+                  pow base (j - i - 2) * Seq.index x i)) % prime;
+        (==) { 
+          FStar.Math.Lemmas.distributivity_add_right
+                   base
+                   (hash x base prime (i + 1) (j - 1))
+                   (pow base (j - i - 2) * Seq.index x i);
+                pow_lemma base (j - i - 2) }
+          (h_lsd + msd) % prime;            
+      }
+    in
+    calc (==) {
+      hash x base prime i j;
+    (==) {}
+      (base * h + lsd) % prime;
+    (==) { FStar.Math.Lemmas.lemma_mod_plus_distr_l
+              (base * h) lsd prime }
+      (base * h % prime + lsd) % prime;
+    (==) { aux () }
+    ((h_lsd + msd) % prime + lsd) % prime;
+    (==) { lemma_mod_add_3 h_lsd msd lsd prime }
+    ((h_lsd + lsd)%prime + msd)%prime;
+    }
+  )
+#pop-options
+
+let remove_msd 
+     (x:Seq.seq nat) (base:nat) (prime:nat {prime <> 0})
+     (i:nat) (j:nat { i < j /\ j < Seq.length x })
+     (h:nat) (pow_base_m: nat { pow_base_m == pow base (j - i - 1) })
+: nat = (h - Seq.index x i * pow_base_m) % prime
+
+let lemma_mod_add_sub_cancel (a b:int) (p:pos)
+: Lemma (((a + b)%p - b)%p == a%p)
+= FStar.Math.Lemmas.lemma_mod_add_distr (-b) (a + b) p
+
+let remove_msd_lemma
+     (x:Seq.seq nat) (base:nat) (prime:nat {prime <> 0})
+     (i:nat) (j:nat { i < j /\ j < Seq.length x })
+     (h:nat { h == hash x base prime i j })
+     (pow_base_m: nat { pow_base_m == pow base (j - i - 1) })
+: Lemma (ensures remove_msd x base prime i j h pow_base_m == hash x base prime (i + 1) j)
+= hash_inversion x base prime i j;
+  lemma_mod_add_sub_cancel (hash x base prime (i + 1) j) (Seq.index x i * pow_base_m) prime;
+  hash_mod_idem x base prime (i + 1) j
+
+let add_lsd 
+     (x:Seq.seq nat) (base:nat) (prime:nat {prime <> 0})
+     (i:nat) (j:nat { i <= j /\ j < Seq.length x })
+     (h:nat) (pow_base_m: nat { pow_base_m == pow base (j - i) })
+: nat = (base * h + Seq.index x j) % prime
+
+let add_lsd_lemma
+     (x:Seq.seq nat) (base:nat) (prime:nat {prime <> 0})
+     (i:nat) (j:nat { i <= j /\ j < Seq.length x })
+     (h:nat { h == hash x base prime i j })
+     (pow_base_m: nat { pow_base_m == pow base (j - i) })
+: Lemma (ensures add_lsd x base prime i j h pow_base_m == hash x base prime i (j + 1))
+= ()
+
+let rolling_hash 
+     (x:Seq.seq nat) (base:nat) (prime:nat {prime <> 0})
+     (i:nat) (j:nat { i < j /\ j < Seq.length x })
+     (h:nat { h == hash x base prime i j })
+     (pow_base_m: nat { pow_base_m == pow base (j - i - 1) })
+: h:nat { h == hash x base prime (i + 1) (j + 1) }
+= let h0 = remove_msd x base prime i j h pow_base_m in
+  remove_msd_lemma x base prime i j h pow_base_m;
+  let res = add_lsd x base prime (i + 1) j h0 pow_base_m in
+  add_lsd_lemma x base prime (i + 1) j h0 pow_base_m;
+  res
+
+let eq_sub_seq #a (x:Seq.seq a) (i j:nat) (y:Seq.seq a) (i' j':nat) : prop =
+  j - i == j' - i' /\ j <= Seq.length x /\ j' <= Seq.length y /\
+  (forall (k:nat). k < j - i ==> Seq.index x (i + k) == Seq.index y (i' + k))
+
+let rec hash_slice_lemma
+      (x y:Seq.seq nat) (base:nat) (prime:nat {prime <> 0})
+      (i:nat) (j:nat { i <= j /\ j <= Seq.length x })
+      (i':nat) (j':nat { i' <= j' /\ j' <= Seq.length y})
+: Lemma (requires eq_sub_seq x i j y i' j')
+        (ensures hash x base prime i j == hash y base prime i' j')
+        (decreases j - i)
+= if i = j then () else hash_slice_lemma x y base prime i (j - 1) i' (j' - 1)
+
+(*** Pattern Matching ***)
+
+let matches_at (text pattern: Seq.seq nat) (s: nat) : prop =
+  s + Seq.length pattern <= Seq.length text /\
+  (forall (j: nat). j < Seq.length pattern ==> Seq.index text (s + j) == Seq.index pattern j)
+
+let rec check_matches_at_aux (text pattern: Seq.seq nat) (s: nat) (j: nat{j <= Seq.length pattern})
+  : Tot bool (decreases (Seq.length pattern - j))
+  = if j >= Seq.length pattern then true
+    else if s + j >= Seq.length text then false
+    else Seq.index text (s + j) = Seq.index pattern j && check_matches_at_aux text pattern s (j + 1)
+
+let matches_at_dec (text pattern: Seq.seq nat) (s: nat) : bool =
+  s + Seq.length pattern <= Seq.length text && check_matches_at_aux text pattern s 0
+
+let rec check_matches_at_aux_correct
+    (text pattern: Seq.seq nat) (s: nat) (j: nat{j <= Seq.length pattern})
+  : Lemma (requires s + Seq.length pattern <= Seq.length text)
+          (ensures check_matches_at_aux text pattern s j <==>
+                   (forall (k: nat). j <= k /\ k < Seq.length pattern ==>
+                     Seq.index text (s + k) == Seq.index pattern k))
+          (decreases (Seq.length pattern - j))
+  = if j >= Seq.length pattern then () else check_matches_at_aux_correct text pattern s (j + 1)
+
+let matches_at_dec_correct (text pattern: Seq.seq nat) (s: nat)
+  : Lemma (requires s + Seq.length pattern <= Seq.length text)
+          (ensures matches_at_dec text pattern s <==> matches_at text pattern s)
+  = check_matches_at_aux_correct text pattern s 0
+
+(*** Rabin-Karp Algorithm ***)
+
+#push-options "--fuel 0 --ifuel 0 --z3rlimit_factor 4"
+let rabin_karp_matches
+    (text pattern: Seq.seq nat) (d: nat) (q: nat{q <> 0}) (s: nat) (current_hash: nat)
+  : Tot (list nat) (decreases (Seq.length text - s))
+  = let m = Seq.length pattern in
+    let n = Seq.length text in
+    if m = 0 || s + m > n then []
+    else (
+      let pow_base_m = pow d (m - 1) in
+      let hpat = hash pattern d q 0 m in
+      let rec loop 
+            (i:nat { s <= i /\ i <= n - m })
+            (xpat:nat { xpat == hash text d q i (i + m) })
+        : Tot (list nat) (decreases (n - m - i))
+        = let found = if xpat = hpat then matches_at_dec text pattern i else false in
+          let rest = if i = n - m then [] else loop (i + 1) (rolling_hash text d q i (i + m) xpat pow_base_m) in
+          if found then i :: rest else rest
+      in
+      if current_hash = hash text d q s (s + m) then loop s current_hash else []
+    )
+#pop-options
+
+let rabin_karp_find_all (text pattern: Seq.seq nat) (d: nat) (q: nat{q <> 0}) : list nat =
+  let m = Seq.length pattern in
+  if m = 0 || m > Seq.length text then []
+  else rabin_karp_matches text pattern d q 0 (hash text d q 0 m)
+
+(*** Correctness - Zero Admits ***)
+
+let rabin_karp_matches_no_false_positives
+    (text pattern: Seq.seq nat) (d: nat) (q: nat{q <> 0}) (s: nat) (current_hash: nat)
+  : Lemma (ensures (
+      let results = rabin_karp_matches text pattern d q s current_hash in
+      forall (pos: nat). List.Tot.mem pos results ==> (pos >= s /\ matches_at text pattern pos)
+    ))
+  = let m = Seq.length pattern in
+    if m > 0 && s + m <= Seq.length text && current_hash = hash text d q s (s + m) then
+      let rec aux (i:nat{s <= i /\ i + m <= Seq.length text})
+        : Lemma (ensures matches_at_dec text pattern i ==> matches_at text pattern i)
+                [SMTPat ()]
+        = matches_at_dec_correct text pattern i
+      in ()
+
+let hash_match_lemma (text pattern: Seq.seq nat) (d: nat) (q: nat{q <> 0}) (s: nat)
+  : Lemma (requires s + Seq.length pattern <= Seq.length text /\ matches_at text pattern s)
+          (ensures hash text d q s (s + Seq.length pattern) == hash pattern d q 0 (Seq.length pattern))
+  = let m = Seq.length pattern in
+    hash_slice_lemma text pattern d q s (s + m) 0 m
+
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 30 --split_queries no"
+let rec rabin_karp_matches_no_false_negatives
+    (text pattern: Seq.seq nat) (d: nat) (q: nat{q <> 0}) (s: nat) (current_hash: nat)
+  : Lemma (requires (let m = Seq.length pattern in
+                     m > 0 /\ s + m <= Seq.length text /\ current_hash == hash text d q s (s + m)))
+          (ensures (let results = rabin_karp_matches text pattern d q s current_hash in
+                    forall (pos: nat). s <= pos /\ pos + Seq.length pattern <= Seq.length text /\
+                                       matches_at text pattern pos ==> List.Tot.mem pos results))
+          (decreases (Seq.length text - s))
+  = let m = Seq.length pattern in
+    let n = Seq.length text in
+    if s < n - m then (
+      if matches_at text pattern s then (hash_match_lemma text pattern d q s; matches_at_dec_correct text pattern s);
+      rabin_karp_matches_no_false_negatives text pattern d q (s + 1) (rolling_hash text d q s (s + m) current_hash (pow d (m - 1)))
+    )
+#pop-options
+
+let rabin_karp_find_all_correct (text pattern: Seq.seq nat) (d: nat) (q: nat{q <> 0})
+  : Lemma (ensures (let results = rabin_karp_find_all text pattern d q in
+                    (forall (pos: nat). List.Tot.mem pos results ==> matches_at text pattern pos) /\
+                    (forall (pos: nat). pos + Seq.length pattern <= Seq.length text /\
+                                        matches_at text pattern pos ==> List.Tot.mem pos results)))
+  = let m = Seq.length pattern in
+    if m > 0 && m <= Seq.length text then (
+      rabin_karp_matches_no_false_positives text pattern d q 0 (hash text d q 0 m);
+      rabin_karp_matches_no_false_negatives text pattern d q 0 (hash text d q 0 m)
+    )
+
+(*** Example ***)
+
+let example_text : Seq.seq nat = Seq.seq_of_list [3; 1; 4; 1; 5; 9; 2; 6]
+let example_pattern : Seq.seq nat = Seq.seq_of_list [1; 4; 1]
+let example_matches : list nat = rabin_karp_find_all example_text example_pattern 10 13
+let example_correct () : Lemma (forall (pos: nat). List.Tot.mem pos example_matches ==>
+                                  matches_at example_text example_pattern pos)
+  = rabin_karp_find_all_correct example_text example_pattern 10 13

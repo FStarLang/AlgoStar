@@ -270,6 +270,46 @@ let queue_entries_valid_after_enqueue
     in
     Classical.forall_intro (Classical.move_requires aux)
 
+(* Inner loop in-degree tracking: partial progress through neighbor scan *)
+let inner_indeg_partial
+  (adj: Seq.seq int) (n: nat)
+  (in_deg_pre in_deg_cur: Seq.seq int) (u_val: int) (vv: nat) =
+  Seq.length in_deg_cur == n /\ Seq.length in_deg_pre == n /\
+  Seq.length adj == n * n /\ u_val >= 0 /\ u_val < n /\
+  (forall (v: nat). v < vv /\ v < n ==>
+    Seq.index in_deg_cur v == Seq.index in_deg_pre v -
+      (if u_val * n + v < n * n && Seq.index adj (u_val * n + v) <> 0 then 1 else 0)) /\
+  (forall (v: nat). v >= vv /\ v < n ==>
+    Seq.index in_deg_cur v == Seq.index in_deg_pre v)
+
+(* After processing vertex vv, inner_indeg_partial advances *)
+let inner_indeg_step
+  (adj: Seq.seq int) (n: nat)
+  (in_deg_pre in_deg_old in_deg_new: Seq.seq int) (u_val: int) (vv: nat)
+  : Lemma
+    (requires
+      inner_indeg_partial adj n in_deg_pre in_deg_old u_val vv /\
+      vv < n /\
+      Seq.length in_deg_new == n /\
+      (forall (k: nat). k < n /\ k <> vv ==> Seq.index in_deg_new k == Seq.index in_deg_old k) /\
+      Seq.index in_deg_new vv ==
+        Seq.index in_deg_old vv -
+          (if u_val * n + vv < n * n && Seq.index adj (u_val * n + vv) <> 0 then 1 else 0))
+    (ensures inner_indeg_partial adj n in_deg_pre in_deg_new u_val (vv + 1))
+  = ()
+
+(* At inner loop exit (vv == n), derive the full decrement property *)
+let inner_indeg_complete
+  (adj: Seq.seq int) (n: nat)
+  (in_deg_pre in_deg_final: Seq.seq int) (u_val: int)
+  : Lemma
+    (requires inner_indeg_partial adj n in_deg_pre in_deg_final u_val n)
+    (ensures
+      forall (v: nat). v < n ==>
+        Seq.index in_deg_final v == Seq.index in_deg_pre v -
+          (if u_val * n + v < n * n && Seq.index adj (u_val * n + v) <> 0 then 1 else 0))
+  = ()
+
 (* ================================================================
    HELPER: maybe_enqueue — Process edge and potentially enqueue vertex
    ================================================================ *)
@@ -318,9 +358,12 @@ fn maybe_enqueue
       (forall (k:nat). {:pattern (Seq.index sin_degree' k)}
         k < SZ.v n /\ k <> SZ.v vv ==>
           Seq.index sin_degree' k == Seq.index sin_degree k) /\
-      // In-degree at vv: either decremented or unchanged
-      (Seq.index sin_degree' (SZ.v vv) == Seq.index sin_degree (SZ.v vv) \/
-       Seq.index sin_degree' (SZ.v vv) == Seq.index sin_degree (SZ.v vv) - 1) /\
+      // In-degree at vv: precisely determined by edge
+      Seq.index sin_degree' (SZ.v vv) ==
+        Seq.index sin_degree (SZ.v vv) -
+          (if SZ.v u * SZ.v n + SZ.v vv < SZ.v n * SZ.v n &&
+              Seq.index sadj (SZ.v u * SZ.v n + SZ.v vv) <> 0
+           then 1 else 0) /\
       // Queue entries validity maintained
       queue_entries_valid squeue' (SZ.v vtail') (SZ.v n)
     )
@@ -534,6 +577,7 @@ fn topological_sort
     queue_head := vqh +^ 1sz;
     
     // For each neighbor v of u, decrement in-degree and possibly enqueue
+    // Capture in-degree state before inner loop for tracking
     let mut v: SZ.t = 0sz;
     while (!v <^ n)
     invariant exists* vv vqh_inner vqt vout_inner sin_degree squeue soutput.
@@ -559,11 +603,8 @@ fn topological_sort
         SZ.fits (SZ.v n * SZ.v n) /\
         SZ.fits (SZ.v u * SZ.v n) /\
         queue_entries_valid squeue (SZ.v vqt) (SZ.v n) /\
-        // All vertices in output (written before this loop) are valid
         (forall (k: nat). k < SZ.v vout_inner ==> Seq.index soutput k < SZ.v n) /\
-        // Unwritten positions still have value 0
         (forall (k: nat). SZ.v vout_inner <= k /\ k < SZ.v n ==> Seq.index soutput k == 0) /\
-        // All elements in output are non-negative
         (forall (k: nat). k < Seq.length soutput ==> Seq.index soutput k >= 0)
       )
     {
