@@ -663,6 +663,227 @@ let inner_indeg_complete
   = ()
 
 (* ================================================================
+   PROCESS_NEIGHBORS EXTRA INVARIANT — tracks queue predicates
+   ================================================================ *)
+
+(* Extra invariant for process_neighbors inner loop.
+   Tracks: old entries preserved, new entries info, new entries distinct.
+   Used to prove queue_fresh/distinct/preds after process_neighbors. *)
+[@@  "opaque_to_smt"]
+let pn_extra_inv
+  (sin_deg_start sin_deg_cur: Seq.seq int)
+  (squeue_start squeue_cur: Seq.seq SZ.t)
+  (vtail_start vtail_cur: nat) (n: nat) : prop =
+  vtail_start <= vtail_cur /\
+  vtail_cur <= Seq.length squeue_cur /\
+  vtail_start <= Seq.length squeue_start /\
+  Seq.length sin_deg_start == n /\
+  Seq.length sin_deg_cur == n /\
+  // Old entries preserved
+  (forall (k: nat). {:pattern (Seq.index squeue_cur k)}
+    k < vtail_start ==> Seq.index squeue_cur k == Seq.index squeue_start k) /\
+  // New entries: vertex < n, had positive in_deg before, have in_deg 0 now
+  (forall (k: nat). {:pattern (Seq.index squeue_cur k)}
+    k >= vtail_start /\ k < vtail_cur ==>
+      (let v = SZ.v (Seq.index squeue_cur k) in
+       v < n /\
+       Seq.index sin_deg_start v > 0 /\
+       Seq.index sin_deg_cur v == 0)) /\
+  // New entries pairwise distinct
+  (forall (i j: nat). {:pattern (Seq.index squeue_cur i); (Seq.index squeue_cur j)}
+    i >= vtail_start /\ i < vtail_cur /\ j >= vtail_start /\ j < vtail_cur /\ i <> j ==>
+      SZ.v (Seq.index squeue_cur i) <> SZ.v (Seq.index squeue_cur j))
+
+(* Initial: empty range, trivially true *)
+let pn_extra_inv_initial
+  (sin_deg_start: Seq.seq int) (squeue_start: Seq.seq SZ.t) (vtail_start: nat) (n: nat)
+  : Lemma
+    (requires vtail_start <= Seq.length squeue_start /\ Seq.length sin_deg_start == n)
+    (ensures pn_extra_inv sin_deg_start sin_deg_start squeue_start squeue_start vtail_start vtail_start n)
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_start sin_deg_start squeue_start squeue_start vtail_start vtail_start n)
+
+(* Maintenance: no enqueue case (vtail unchanged) *)
+let pn_extra_inv_no_enqueue
+  (sin_deg_start sin_deg_old sin_deg_new: Seq.seq int)
+  (squeue_start squeue_old squeue_new: Seq.seq SZ.t)
+  (vtail_start vtail: nat) (n: nat) (vv: nat)
+  : Lemma
+    (requires
+      pn_extra_inv sin_deg_start sin_deg_old squeue_start squeue_old vtail_start vtail n /\
+      vv < n /\
+      vtail <= Seq.length squeue_new /\
+      vtail_start <= Seq.length squeue_start /\
+      Seq.length squeue_new == Seq.length squeue_old /\
+      Seq.length sin_deg_old == n /\
+      Seq.length sin_deg_new == n /\
+      Seq.length sin_deg_start == n /\
+      (forall (k: nat). k < vtail ==> Seq.index squeue_new k == Seq.index squeue_old k) /\
+      (forall (k: nat). k < n /\ k <> vv ==> Seq.index sin_deg_new k == Seq.index sin_deg_old k) /\
+      (forall (k: nat). k >= vtail_start /\ k < vtail ==>
+        SZ.v (Seq.index squeue_old k) < vv))
+    (ensures pn_extra_inv sin_deg_start sin_deg_new squeue_start squeue_new vtail_start vtail n)
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_start sin_deg_old squeue_start squeue_old vtail_start vtail n);
+    reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_start sin_deg_new squeue_start squeue_new vtail_start vtail n)
+
+(* Maintenance: enqueue case (vtail advances by 1) *)
+let pn_extra_inv_enqueue
+  (sin_deg_start sin_deg_old sin_deg_new: Seq.seq int)
+  (squeue_start squeue_old squeue_new: Seq.seq SZ.t)
+  (vtail_start vtail: nat) (n: nat) (vv: nat)
+  : Lemma
+    (requires
+      pn_extra_inv sin_deg_start sin_deg_old squeue_start squeue_old vtail_start vtail n /\
+      vv < n /\
+      vtail < Seq.length squeue_new /\
+      vtail_start <= Seq.length squeue_start /\
+      Seq.length squeue_new == Seq.length squeue_old /\
+      Seq.length sin_deg_old == n /\
+      Seq.length sin_deg_new == n /\ Seq.length sin_deg_start == n /\
+      (forall (k: nat). k < vtail ==> Seq.index squeue_new k == Seq.index squeue_old k) /\
+      SZ.v (Seq.index squeue_new vtail) == vv /\
+      Seq.index sin_deg_start vv > 0 /\
+      Seq.index sin_deg_new vv == 0 /\
+      (forall (k: nat). k < n /\ k <> vv ==> Seq.index sin_deg_new k == Seq.index sin_deg_old k) /\
+      (forall (k: nat). k >= vtail_start /\ k < vtail ==>
+        SZ.v (Seq.index squeue_old k) < vv))
+    (ensures pn_extra_inv sin_deg_start sin_deg_new squeue_start squeue_new vtail_start (vtail + 1) n)
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_start sin_deg_old squeue_start squeue_old vtail_start vtail n);
+    // Old new entries [vtail_start, vtail): vertex < vv hence <> vv, so sin_deg_new == sin_deg_old
+    // New entry at vtail: vertex = vv, sin_deg_start vv > 0, sin_deg_new vv = 0
+    // Pairwise distinct [vtail_start, vtail+1): old entries have vertex < vv, new entry has vertex vv
+    assert (forall (k: nat). k >= vtail_start /\ k < vtail ==>
+      SZ.v (Seq.index squeue_old k) < vv /\
+      SZ.v (Seq.index squeue_old k) <> vv);
+    assert (forall (k: nat). k >= vtail_start /\ k < vtail ==>
+      Seq.index sin_deg_new (SZ.v (Seq.index squeue_old k)) ==
+      Seq.index sin_deg_old (SZ.v (Seq.index squeue_old k)));
+    reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_start sin_deg_new squeue_start squeue_new vtail_start (vtail + 1) n)
+
+(* Unified step lemma: handles both enqueue and no-enqueue after maybe_enqueue *)
+let pn_extra_inv_step
+  (sin_deg_start sin_deg_old sin_deg_new: Seq.seq int)
+  (squeue_start squeue_old squeue_new: Seq.seq SZ.t)
+  (vtail_start vtail_old vtail_new: nat) (n: nat) (vv: nat)
+  : Lemma
+    (requires
+      pn_extra_inv sin_deg_start sin_deg_old squeue_start squeue_old vtail_start vtail_old n /\
+      vv < n /\
+      vtail_new >= vtail_old /\
+      vtail_new <= vtail_old + 1 /\
+      vtail_new <= Seq.length squeue_new /\
+      vtail_start <= Seq.length squeue_start /\
+      Seq.length squeue_new == Seq.length squeue_old /\
+      Seq.length sin_deg_old == n /\
+      Seq.length sin_deg_new == n /\ Seq.length sin_deg_start == n /\
+      (forall (k: nat). k < vtail_old ==> Seq.index squeue_new k == Seq.index squeue_old k) /\
+      (forall (k: nat). k < n /\ k <> vv ==> Seq.index sin_deg_new k == Seq.index sin_deg_old k) /\
+      (forall (k: nat). k >= vtail_start /\ k < vtail_old ==>
+        SZ.v (Seq.index squeue_old k) < vv) /\
+      // If enqueue: new entry at vtail_old is vv with proper conditions
+      (vtail_new == vtail_old + 1 ==>
+        (SZ.v (Seq.index squeue_new vtail_old) == vv /\
+         Seq.index sin_deg_start vv > 0 /\
+         Seq.index sin_deg_new vv == 0)))
+    (ensures pn_extra_inv sin_deg_start sin_deg_new squeue_start squeue_new vtail_start vtail_new n)
+  = if vtail_new = vtail_old then
+      pn_extra_inv_no_enqueue sin_deg_start sin_deg_old sin_deg_new
+        squeue_start squeue_old squeue_new vtail_start vtail_old n vv
+    else (
+      pn_extra_inv_enqueue sin_deg_start sin_deg_old sin_deg_new
+        squeue_start squeue_old squeue_new vtail_start vtail_old n vv
+    )
+
+(* Opaque predicate: queue entries in [vtail_start, vtail_cur) have vertex < vv.
+   This is needed as a precondition for pn_extra_inv_step. *)
+[@@"opaque_to_smt"]
+let pn_entries_below
+  (squeue: Seq.seq SZ.t) (vtail_start vtail_cur vv: nat) : prop =
+  vtail_start <= vtail_cur /\
+  vtail_cur <= Seq.length squeue /\
+  (forall (k:nat). {:pattern (Seq.index squeue k)}
+    k >= vtail_start /\ k < vtail_cur ==> SZ.v (Seq.index squeue k) < vv)
+
+let pn_entries_below_initial
+  (squeue: Seq.seq SZ.t) (vtail_start: nat)
+  : Lemma
+    (requires vtail_start <= Seq.length squeue)
+    (ensures pn_entries_below squeue vtail_start vtail_start 0)
+  = reveal_opaque (`%pn_entries_below) (pn_entries_below squeue vtail_start vtail_start 0)
+
+let pn_entries_below_step
+  (squeue_old squeue_new: Seq.seq SZ.t)
+  (vtail_start vtail_old vtail_new vv: nat)
+  : Lemma
+    (requires
+      pn_entries_below squeue_old vtail_start vtail_old vv /\
+      vtail_new >= vtail_old /\
+      vtail_new <= vtail_old + 1 /\
+      vtail_new <= Seq.length squeue_new /\
+      Seq.length squeue_new == Seq.length squeue_old /\
+      (forall (k:nat). k < vtail_old ==> Seq.index squeue_new k == Seq.index squeue_old k) /\
+      (vtail_new == vtail_old + 1 ==> SZ.v (Seq.index squeue_new vtail_old) == vv))
+    (ensures pn_entries_below squeue_new vtail_start vtail_new (vv + 1))
+  = reveal_opaque (`%pn_entries_below) (pn_entries_below squeue_old vtail_start vtail_old vv);
+    reveal_opaque (`%pn_entries_below) (pn_entries_below squeue_new vtail_start vtail_new (vv + 1))
+
+(* Eliminate pn_entries_below to get the raw forall *)
+let pn_entries_below_elim
+  (squeue: Seq.seq SZ.t) (vtail_start vtail_cur vv: nat)
+  : Lemma
+    (requires pn_entries_below squeue vtail_start vtail_cur vv)
+    (ensures
+      vtail_start <= vtail_cur /\
+      vtail_cur <= Seq.length squeue /\
+      (forall (k:nat). k >= vtail_start /\ k < vtail_cur ==> SZ.v (Seq.index squeue k) < vv))
+  = reveal_opaque (`%pn_entries_below) (pn_entries_below squeue vtail_start vtail_cur vv)
+
+(* Combined step lemma: does inner_indeg_step + pn_entries_below_step + pn_extra_inv_step
+   in one F* lemma. This avoids Pulse VC elaboration issues with multiple lemma calls. *)
+let pn_combined_step
+  (adj: Seq.seq int) (n: nat)
+  (sin_degree sin_deg_cur sin_deg_new: Seq.seq int)
+  (squeue_start squeue_cur squeue_new: Seq.seq SZ.t)
+  (vtail_start vtail_cur vtail_new: nat) (u vv: nat)
+  : Lemma
+    (requires
+      inner_indeg_partial adj n sin_degree sin_deg_cur u vv /\
+      pn_extra_inv sin_degree sin_deg_cur squeue_start squeue_cur vtail_start vtail_cur n /\
+      pn_entries_below squeue_cur vtail_start vtail_cur vv /\
+      vv < n /\ u < n /\
+      vtail_new >= vtail_cur /\ vtail_new <= vtail_cur + 1 /\ vtail_new <= n /\
+      Seq.length adj == n * n /\
+      Seq.length sin_deg_cur == n /\ Seq.length sin_deg_new == n /\ Seq.length sin_degree == n /\
+      Seq.length squeue_cur == n /\ Seq.length squeue_new == n /\
+      vtail_start <= Seq.length squeue_start /\
+      // Queue frame
+      (forall (k:nat). k < vtail_cur ==> Seq.index squeue_new k == Seq.index squeue_cur k) /\
+      // Indeg frame
+      (forall (k:nat). {:pattern (Seq.index sin_deg_new k)}
+        k < n /\ k <> vv ==> Seq.index sin_deg_new k == Seq.index sin_deg_cur k) /\
+      // Indeg at vv
+      Seq.index sin_deg_new vv ==
+        Seq.index sin_deg_cur vv -
+          (if u * n + vv < n * n && Seq.index adj (u * n + vv) <> 0 then 1 else 0) /\
+      // Enqueue info
+      (vtail_new == vtail_cur + 1 ==>
+        (SZ.v (Seq.index squeue_new vtail_cur) == vv /\
+         Seq.index sin_deg_new vv == 0 /\
+         Seq.index sin_deg_cur vv > 0)))
+    (ensures
+      inner_indeg_partial adj n sin_degree sin_deg_new u (vv + 1) /\
+      pn_extra_inv sin_degree sin_deg_new squeue_start squeue_new vtail_start vtail_new n /\
+      pn_entries_below squeue_new vtail_start vtail_new (vv + 1))
+  = inner_indeg_step adj n sin_degree sin_deg_cur sin_deg_new u vv;
+    pn_entries_below_step squeue_cur squeue_new vtail_start vtail_cur vtail_new vv;
+    pn_entries_below_elim squeue_cur vtail_start vtail_cur vv;
+    // sin_deg_cur[vv] == sin_degree[vv] from inner_indeg_partial (vv not yet processed)
+    assert (Seq.index sin_deg_cur vv == Seq.index sin_degree vv);
+    // If enqueue: sin_deg_new[vv] == 0 means sin_deg_cur[vv] == 1, so sin_degree[vv] > 0
+    pn_extra_inv_step sin_degree sin_deg_cur sin_deg_new
+      squeue_start squeue_cur squeue_new
+      vtail_start vtail_cur vtail_new n vv
+
+(* ================================================================
    ASSUME_FACT — Ghost wrapper for admit, avoids Z3 issues with assume_
    We use this as a placeholder; every call will be eliminated.
    ================================================================ *)
@@ -724,7 +945,15 @@ fn maybe_enqueue
               Seq.index sadj (SZ.v u * SZ.v n + SZ.v vv) <> 0
            then 1 else 0) /\
       // Queue entries validity maintained
-      queue_entries_valid squeue' (SZ.v vtail') (SZ.v n)
+      queue_entries_valid squeue' (SZ.v vtail') (SZ.v n) /\
+      // Queue frame: entries below old tail preserved
+      (forall (k:nat). k < SZ.v vtail ==>
+        Seq.index squeue' k == Seq.index squeue k) /\
+      // If enqueue happened: new entry is vv and in-degree reached 0, old in-degree was positive
+      (SZ.v vtail' == SZ.v vtail + 1 ==>
+        (SZ.v (Seq.index squeue' (SZ.v vtail)) == SZ.v vv /\
+         Seq.index sin_degree' (SZ.v vv) == 0 /\
+         Seq.index sin_degree (SZ.v vv) > 0))
     )
 {
   // Compute edge index: u * n + vv
@@ -752,13 +981,85 @@ fn maybe_enqueue
 }
 #pop-options
 
+(* Ghost wrapper: performs one step of the inner loop.
+   Avoids Pulse VC closure issue with multiple with-captures in loops. *)
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+fn pn_loop_step
+  (adj: A.array int) (in_degree: A.array int)
+  (queue_data: A.array SZ.t) (queue_tail: R.ref SZ.t)
+  (u vv n vtail_start_val: SZ.t)
+  (sin_degree_init: erased (Seq.seq int))
+  (squeue_init: erased (Seq.seq SZ.t))
+  (#sadj: erased (Seq.seq int))
+  (#sin_deg_cur: erased (Seq.seq int))
+  (#squeue_cur: erased (Seq.seq SZ.t))
+  (#vtail_cur: erased SZ.t)
+  requires
+    A.pts_to adj sadj **
+    A.pts_to in_degree sin_deg_cur **
+    A.pts_to queue_data squeue_cur **
+    R.pts_to queue_tail vtail_cur **
+    pure (
+      SZ.v u < SZ.v n /\
+      SZ.v vv < SZ.v n /\
+      SZ.v vtail_cur <= SZ.v n /\
+      Seq.length sadj == SZ.v n * SZ.v n /\
+      Seq.length sin_deg_cur == SZ.v n /\
+      Seq.length squeue_cur == SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SZ.fits (SZ.v u * SZ.v n) /\
+      queue_entries_valid squeue_cur (SZ.v vtail_cur) (SZ.v n) /\
+      inner_indeg_partial sadj (SZ.v n) sin_degree_init sin_deg_cur (SZ.v u) (SZ.v vv) /\
+      pn_extra_inv sin_degree_init sin_deg_cur squeue_init squeue_cur (SZ.v vtail_start_val) (SZ.v vtail_cur) (SZ.v n) /\
+      pn_entries_below squeue_cur (SZ.v vtail_start_val) (SZ.v vtail_cur) (SZ.v vv) /\
+      SZ.v vtail_start_val <= Seq.length squeue_init /\
+      Seq.length squeue_init == SZ.v n
+    )
+  ensures exists* sin_deg_new squeue_new vtail_new.
+    A.pts_to adj sadj **
+    A.pts_to in_degree sin_deg_new **
+    A.pts_to queue_data squeue_new **
+    R.pts_to queue_tail vtail_new **
+    pure (
+      SZ.v vtail_new >= SZ.v vtail_cur /\
+      SZ.v vtail_new <= SZ.v n /\
+      Seq.length sin_deg_new == SZ.v n /\
+      Seq.length squeue_new == SZ.v n /\
+      queue_entries_valid squeue_new (SZ.v vtail_new) (SZ.v n) /\
+      inner_indeg_partial sadj (SZ.v n) sin_degree_init sin_deg_new (SZ.v u) (SZ.v vv + 1) /\
+      pn_extra_inv sin_degree_init sin_deg_new squeue_init squeue_new (SZ.v vtail_start_val) (SZ.v vtail_new) (SZ.v n) /\
+      pn_entries_below squeue_new (SZ.v vtail_start_val) (SZ.v vtail_new) (SZ.v vv + 1)
+    )
+{
+  with sin_deg_cur0. assert (A.pts_to in_degree sin_deg_cur0);
+  with squeue_cur0. assert (A.pts_to queue_data squeue_cur0);
+  let vtail_before = !queue_tail;
+  
+  maybe_enqueue adj in_degree queue_data queue_tail u vv n;
+  with sin_deg_new squeue_new vtail_new. _;
+  
+  let vtail_after = !queue_tail;
+
+  // Combined F* step: inner_indeg + entries_below + pn_extra_inv
+  pn_combined_step sadj (SZ.v n)
+    sin_degree_init sin_deg_cur0 sin_deg_new
+    squeue_init squeue_cur0 squeue_new
+    (SZ.v vtail_start_val) (SZ.v vtail_before) (SZ.v vtail_after) (SZ.v u) (SZ.v vv);
+
+  // Help postcondition: connect vtail_before/after to vtail_cur
+  assert (pure (SZ.v vtail_after >= SZ.v vtail_cur));
+  assert (pure (SZ.v vtail_after <= SZ.v n));
+  assert (pure (queue_entries_valid squeue_new (SZ.v vtail_after) (SZ.v n)))
+}
+#pop-options
+
 (* ================================================================
    HELPER: process_neighbors — Inner loop: scan all potential neighbors
    of dequeued vertex u, decrement in-degrees, enqueue zero-indegree vertices.
    Extracted to keep the outer loop VC small.
    ================================================================ *)
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 80"
 fn process_neighbors
   (adj: A.array int)
   (in_degree: A.array int)
@@ -796,10 +1097,17 @@ fn process_neighbors
       SZ.v vtail' >= SZ.v vtail /\
       SZ.v vtail' <= SZ.v n /\
       queue_entries_valid squeue' (SZ.v vtail') (SZ.v n) /\
-      // In-degree changes: inner_indeg_partial at n (complete)
-      inner_indeg_partial sadj (SZ.v n) sin_degree sin_degree' (SZ.v u) (SZ.v n)
+      inner_indeg_partial sadj (SZ.v n) sin_degree sin_degree' (SZ.v u) (SZ.v n) /\
+      pn_extra_inv sin_degree sin_degree' squeue squeue' (SZ.v vtail) (SZ.v vtail') (SZ.v n)
     )
 {
+  // Read initial vtail as concrete value for pn_loop_step
+  let vtail_init = !queue_tail;
+  
+  // Establish initial predicates
+  pn_extra_inv_initial sin_degree squeue (SZ.v vtail_init) (SZ.v n);
+  pn_entries_below_initial squeue (SZ.v vtail_init);
+  
   let mut v: SZ.t = 0sz;
   while (!v <^ n)
   invariant exists* vv sin_deg_cur squeue_cur vtail_cur.
@@ -811,7 +1119,7 @@ fn process_neighbors
     pure (
       SZ.v u < SZ.v n /\
       SZ.v vv <= SZ.v n /\
-      SZ.v vtail_cur >= SZ.v vtail /\
+      SZ.v vtail_cur >= SZ.v vtail_init /\
       SZ.v vtail_cur <= SZ.v n /\
       Seq.length sadj == SZ.v n * SZ.v n /\
       Seq.length sin_deg_cur == SZ.v n /\
@@ -819,16 +1127,17 @@ fn process_neighbors
       SZ.fits (SZ.v n * SZ.v n) /\
       SZ.fits (SZ.v u * SZ.v n) /\
       queue_entries_valid squeue_cur (SZ.v vtail_cur) (SZ.v n) /\
-      inner_indeg_partial sadj (SZ.v n) sin_degree sin_deg_cur (SZ.v u) (SZ.v vv)
+      inner_indeg_partial sadj (SZ.v n) sin_degree sin_deg_cur (SZ.v u) (SZ.v vv) /\
+      pn_extra_inv sin_degree sin_deg_cur squeue squeue_cur (SZ.v vtail_init) (SZ.v vtail_cur) (SZ.v n) /\
+      pn_entries_below squeue_cur (SZ.v vtail_init) (SZ.v vtail_cur) (SZ.v vv) /\
+      SZ.v vtail_init <= Seq.length squeue /\
+      Seq.length squeue == SZ.v n
     )
   {
     let vv = !v;
-    // Capture current in-degree state from invariant before maybe_enqueue
-    with sin_deg_cur0. assert (A.pts_to in_degree sin_deg_cur0);
-    maybe_enqueue adj in_degree queue_data queue_tail u vv n;
-    // After maybe_enqueue: in_degree updated at vv, rest unchanged
-    with sin_deg_new squeue_new vtail_new. _;
-    inner_indeg_step sadj (SZ.v n) sin_degree sin_deg_cur0 sin_deg_new (SZ.v u) (SZ.v vv);
+    
+    pn_loop_step adj in_degree queue_data queue_tail u vv n vtail_init sin_degree squeue;
+    
     v := SZ.add vv 1sz
   }
 }
