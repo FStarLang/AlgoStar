@@ -884,6 +884,346 @@ let pn_combined_step
       vtail_start vtail_cur vtail_new n vv
 
 (* ================================================================
+   BRIDGE LEMMAS: Derive queue properties from pn_extra_inv
+   After process_neighbors, we have pn_extra_inv for new entries [vqt, vtail_post)
+   and existing queue properties for old entries [qh+1, vqt).
+   These lemmas combine them into properties for the full range [qh+1, vtail_post).
+   ================================================================ *)
+
+(* Extraction lemmas: reveal pn_extra_inv in isolation to get specific facts.
+   This avoids flooding the SMT context with all pn_extra_inv quantifiers. *)
+
+let lemma_pn_extract_old_preserved
+  (sin_deg_pre sin_deg_post: Seq.seq int) (squeue_pre squeue_post: Seq.seq SZ.t)
+  (vqt vtail_post: nat) (n: nat) (qi: nat)
+  : Lemma
+    (requires pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+              qi < vqt /\ vqt <= Seq.length squeue_post /\ vqt <= Seq.length squeue_pre)
+    (ensures Seq.index squeue_post qi == Seq.index squeue_pre qi)
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n)
+
+(* Forall version: old entries preserved — reveal_opaque gives us the forall directly *)
+let lemma_pn_extract_old_forall
+  (sin_deg_pre sin_deg_post: Seq.seq int) (squeue_pre squeue_post: Seq.seq SZ.t)
+  (vqt vtail_post qh: nat) (n: nat)
+  : Lemma
+    (requires pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+              qh <= vqt /\ vqt <= Seq.length squeue_post /\ vqt <= Seq.length squeue_pre)
+    (ensures forall (qi: nat). {:pattern (Seq.index squeue_post qi)}
+      qh <= qi /\ qi < vqt ==> Seq.index squeue_post qi == Seq.index squeue_pre qi)
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n)
+
+let lemma_pn_extract_new_entry
+  (sin_deg_pre sin_deg_post: Seq.seq int) (squeue_pre squeue_post: Seq.seq SZ.t)
+  (vqt vtail_post: nat) (n: nat) (qi: nat)
+  : Lemma
+    (requires pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+              qi >= vqt /\ qi < vtail_post /\ vtail_post <= Seq.length squeue_post /\
+              Seq.length sin_deg_pre == n /\ Seq.length sin_deg_post == n)
+    (ensures (let v = SZ.v (Seq.index squeue_post qi) in
+              v < n /\ Seq.index sin_deg_pre v > 0 /\ Seq.index sin_deg_post v == 0))
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n)
+
+(* Forall version: new entries properties — reveal_opaque gives the forall directly *)
+let lemma_pn_extract_new_forall
+  (sin_deg_pre sin_deg_post: Seq.seq int) (squeue_pre squeue_post: Seq.seq SZ.t)
+  (vqt vtail_post: nat) (n: nat)
+  : Lemma
+    (requires pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+              vtail_post <= Seq.length squeue_post /\
+              Seq.length sin_deg_pre == n /\ Seq.length sin_deg_post == n)
+    (ensures forall (qi: nat). {:pattern (Seq.index squeue_post qi)}
+      vqt <= qi /\ qi < vtail_post ==>
+        (let v = SZ.v (Seq.index squeue_post qi) in
+         v < n /\ Seq.index sin_deg_pre v > 0 /\ Seq.index sin_deg_post v == 0))
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n)
+
+let lemma_pn_extract_new_distinct
+  (sin_deg_pre sin_deg_post: Seq.seq int) (squeue_pre squeue_post: Seq.seq SZ.t)
+  (vqt vtail_post: nat) (n: nat) (i j: nat)
+  : Lemma
+    (requires pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+              i >= vqt /\ i < vtail_post /\ j >= vqt /\ j < vtail_post /\ i <> j /\
+              vtail_post <= Seq.length squeue_post)
+    (ensures SZ.v (Seq.index squeue_post i) <> SZ.v (Seq.index squeue_post j))
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n)
+
+(* Forall version: new entries pairwise distinct — reveal_opaque gives the forall directly *)
+let lemma_pn_extract_new_distinct_forall
+  (sin_deg_pre sin_deg_post: Seq.seq int) (squeue_pre squeue_post: Seq.seq SZ.t)
+  (vqt vtail_post: nat) (n: nat)
+  : Lemma
+    (requires pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+              vtail_post <= Seq.length squeue_post)
+    (ensures forall (i j: nat). {:pattern (Seq.index squeue_post i); (Seq.index squeue_post j)}
+      i >= vqt /\ i < vtail_post /\ j >= vqt /\ j < vtail_post /\ i <> j ==>
+        SZ.v (Seq.index squeue_post i) <> SZ.v (Seq.index squeue_post j))
+  = reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n)
+
+(* Combined bridge: derive all three queue properties from pn_extra_inv.
+   Uses reveal_opaque + forall-lifted lemmas — no nested forall_intro with Seq.index.
+   Key insight: nested functions with Seq.index in ensures fail well-formedness checks
+   when the enclosing context has quantifiers. Solution: reveal_opaque gives us the
+   quantified facts directly, and forall-lifted lemmas chain the reasoning. *)
+
+(* Transfer-and-extend for queue_fresh: old entries via preservation, new entries via provided forall *)
+let lemma_queue_fresh_transfer_and_extend
+  (output: Seq.seq int) (count: nat)
+  (queue_old queue_new: Seq.seq SZ.t) (qh qt_old qt_new: nat)
+  : Lemma
+    (requires
+      queue_fresh output count queue_old qh qt_old /\
+      qt_old <= qt_new /\ qt_new <= Seq.length queue_new /\
+      (forall (qi: nat). {:pattern (Seq.index queue_new qi)}
+        qh <= qi /\ qi < qt_old ==> Seq.index queue_new qi == Seq.index queue_old qi) /\
+      (forall (qi: nat). {:pattern (Seq.index queue_new qi)}
+        qt_old <= qi /\ qi < qt_new ==>
+          (forall (k: nat). {:pattern (Seq.index output k)}
+            k < count ==> Seq.index output k <> SZ.v (Seq.index queue_new qi))))
+    (ensures queue_fresh output count queue_new qh qt_new)
+  = ()
+
+(* Transfer-and-extend for queue_distinct: old-old via preservation, new-new + old-new provided *)
+let lemma_queue_distinct_transfer_and_extend
+  (queue_old queue_new: Seq.seq SZ.t) (qh qt_old qt_new: nat)
+  : Lemma
+    (requires
+      queue_distinct_sz queue_old qh qt_old /\
+      qt_old <= qt_new /\ qt_new <= Seq.length queue_new /\
+      // Old entries preserved
+      (forall (qi: nat). {:pattern (Seq.index queue_new qi)}
+        qh <= qi /\ qi < qt_old ==> Seq.index queue_new qi == Seq.index queue_old qi) /\
+      // New entries pairwise distinct
+      (forall (i j: nat). {:pattern (Seq.index queue_new i); (Seq.index queue_new j)}
+        i >= qt_old /\ i < qt_new /\ j >= qt_old /\ j < qt_new /\ i <> j ==>
+          SZ.v (Seq.index queue_new i) <> SZ.v (Seq.index queue_new j)) /\
+      // Old-new cross distinct
+      (forall (i j: nat). {:pattern (Seq.index queue_new i); (Seq.index queue_new j)}
+        i >= qh /\ i < qt_old /\ j >= qt_old /\ j < qt_new ==>
+          SZ.v (Seq.index queue_new i) <> SZ.v (Seq.index queue_new j)))
+    (ensures queue_distinct_sz queue_new qh qt_new)
+  = ()
+
+(* Prove old-new cross distinct from indeg facts:
+   old entries have indeg 0, new entries have indeg > 0 → different vertices.
+   NOTE: bounds must precede foralls for Seq.index well-formedness *)
+#push-options "--z3rlimit 50"
+let lemma_old_new_cross_distinct
+  (sin_deg: Seq.seq int)
+  (queue_old queue_new: Seq.seq SZ.t)
+  (qh qt_old qt_new n: nat)
+  : Lemma
+    (requires
+      qt_old <= qt_new /\
+      qt_old <= Seq.length queue_old /\
+      qt_new <= Seq.length queue_new /\
+      Seq.length sin_deg == n /\
+      // Old entries preserved
+      (forall (qi: nat). {:pattern (Seq.index queue_new qi)}
+        qh <= qi /\ qi < qt_old ==> Seq.index queue_new qi == Seq.index queue_old qi) /\
+      // Old entries have indeg 0
+      (forall (qi: nat). {:pattern (Seq.index queue_old qi)}
+        qh <= qi /\ qi < qt_old ==>
+          SZ.v (Seq.index queue_old qi) < n /\
+          Seq.index sin_deg (SZ.v (Seq.index queue_old qi)) == 0) /\
+      // New entries have indeg > 0
+      (forall (qi: nat). {:pattern (Seq.index queue_new qi)}
+        qt_old <= qi /\ qi < qt_new ==>
+          SZ.v (Seq.index queue_new qi) < n /\
+          Seq.index sin_deg (SZ.v (Seq.index queue_new qi)) > 0))
+    (ensures
+      forall (i j: nat). {:pattern (Seq.index queue_new i); (Seq.index queue_new j)}
+        i >= qh /\ i < qt_old /\ j >= qt_old /\ j < qt_new ==>
+          SZ.v (Seq.index queue_new i) <> SZ.v (Seq.index queue_new j))
+  = ()
+#pop-options
+
+(* Bridge new entries from output_pre to output_post via Seq.upd.
+   Key: combines pn_extract_new (sin_deg > 0) + positive_indeg_implies_fresh (fresh against output_pre)
+   + Seq.upd (output_post differs only at vout) + sin_deg[u]=0 vs sin_deg[v]>0 (u <> v)
+   NOTE: bounds must precede foralls for Seq.index well-formedness *)
+#push-options "--z3rlimit 50"
+let lemma_new_entries_fresh_after_upd
+  (sin_deg: Seq.seq int) (queue: Seq.seq SZ.t)
+  (output_old output_new: Seq.seq int)
+  (qt_old qt_new vout u n: nat)
+  : Lemma
+    (requires
+      qt_new <= Seq.length queue /\
+      Seq.length sin_deg == n /\
+      (vout + 1) <= Seq.length output_new /\
+      vout <= Seq.length output_old /\
+      u < n /\
+      Seq.index sin_deg u == 0 /\
+      Seq.index output_new vout == u /\
+      (forall (k: nat). {:pattern (Seq.index output_new k)}
+        k < vout ==> Seq.index output_new k == Seq.index output_old k) /\
+      (forall (qi: nat). {:pattern (Seq.index queue qi)}
+        qt_old <= qi /\ qi < qt_new ==>
+          SZ.v (Seq.index queue qi) < n /\
+          Seq.index sin_deg (SZ.v (Seq.index queue qi)) > 0) /\
+      (forall (v: nat). {:pattern (Seq.index sin_deg v)}
+        v < n /\ Seq.index sin_deg v > 0 ==>
+          (forall (k: nat). {:pattern (Seq.index output_old k)}
+            k < vout ==> Seq.index output_old k <> v)))
+    (ensures
+      forall (qi: nat). {:pattern (Seq.index queue qi)}
+        qt_old <= qi /\ qi < qt_new ==>
+          (forall (k: nat). {:pattern (Seq.index output_new k)}
+            k < (vout + 1) ==> Seq.index output_new k <> SZ.v (Seq.index queue qi)))
+  = ()
+#pop-options
+
+(* Sub-lemma 1: queue_preds — reveal_opaque + zero_indeg_preds_exist_forall *)
+#push-options "--z3rlimit 50"
+let lemma_bridge_preds
+  (adj: Seq.seq int) (n: nat)
+  (sin_deg_pre sin_deg_post: Seq.seq int)
+  (squeue_pre squeue_post: Seq.seq SZ.t)
+  (soutput_post: Seq.seq int)
+  (qh_plus_1 vqt vtail_post vout: nat)
+  : Lemma
+    (requires
+      queue_preds_in_output_sz adj n squeue_pre qh_plus_1 vqt soutput_post (vout + 1) /\
+      pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+      indeg_correct adj n sin_deg_post soutput_post (vout + 1) /\
+      qh_plus_1 <= vqt /\ vqt <= vtail_post /\
+      vtail_post <= Seq.length squeue_post /\
+      vqt <= Seq.length squeue_pre /\
+      Seq.length sin_deg_pre == n /\ Seq.length sin_deg_post == n /\
+      Seq.length adj == n * n /\
+      (vout + 1) <= Seq.length soutput_post)
+    (ensures
+      queue_preds_in_output_sz adj n squeue_post qh_plus_1 vtail_post soutput_post (vout + 1))
+  = // Reveal pn_extra_inv → gives old-preserved + new-entry foralls
+    reveal_opaque (`%pn_extra_inv) (pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n);
+    // For new entries: indeg 0 → all preds in output
+    lemma_zero_indeg_preds_exist_forall adj n sin_deg_post soutput_post (vout + 1);
+    // SMT chains: old entries transfer from squeue_pre, new entries from indeg
+    lemma_queue_preds_transfer_and_extend adj n squeue_pre squeue_post qh_plus_1 vqt vtail_post
+      soutput_post (vout + 1)
+#pop-options
+
+(* Sub-lemma 2: queue_fresh — chain extraction + combined fresh + Seq.upd bridge + transfer *)
+#push-options "--z3rlimit 100"
+let lemma_bridge_fresh
+  (adj: Seq.seq int) (n: nat)
+  (sin_deg_pre sin_deg_post: Seq.seq int)
+  (squeue_pre squeue_post: Seq.seq SZ.t)
+  (soutput_pre soutput_post: Seq.seq int)
+  (qh_plus_1 vqt vtail_post vout: nat) (u: nat)
+  : Lemma
+    (requires
+      queue_fresh soutput_post (vout + 1) squeue_pre qh_plus_1 vqt /\
+      pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+      indeg_correct adj n sin_deg_pre soutput_pre vout /\
+      strong_order_inv adj n soutput_pre vout /\
+      partial_valid soutput_pre vout n /\
+      u < n /\ vout < Seq.length soutput_pre /\
+      soutput_post == Seq.upd soutput_pre vout u /\
+      Seq.index sin_deg_pre u == 0 /\
+      qh_plus_1 <= vqt /\ vqt <= vtail_post /\
+      vtail_post <= Seq.length squeue_post /\
+      vqt <= Seq.length squeue_pre /\
+      Seq.length sin_deg_pre == n /\ Seq.length sin_deg_post == n /\
+      (vout + 1) <= Seq.length soutput_post /\
+      Seq.length soutput_post == Seq.length soutput_pre /\
+      Seq.length adj == n * n)
+    (ensures
+      queue_fresh soutput_post (vout + 1) squeue_post qh_plus_1 vtail_post)
+  = // Step 1: old entries preserved in squeue_post
+    lemma_pn_extract_old_forall sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post qh_plus_1 n;
+    // Step 2: new entries have sin_deg_pre > 0
+    lemma_pn_extract_new_forall sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n;
+    // Step 3: positive in_deg → fresh against soutput_pre (combined, no chaining needed)
+    lemma_positive_indeg_implies_fresh_forall adj n sin_deg_pre soutput_pre vout;
+    // Step 4: bridge new entries from output_pre to output_post via Seq.upd
+    lemma_new_entries_fresh_after_upd sin_deg_pre squeue_post soutput_pre soutput_post
+      vqt vtail_post vout u n;
+    // Step 5: transfer_and_extend combines old (from precondition) + new (from step 4)
+    lemma_queue_fresh_transfer_and_extend soutput_post (vout + 1) squeue_pre squeue_post
+      qh_plus_1 vqt vtail_post
+#pop-options
+
+(* Sub-lemma 3: queue_distinct — extraction foralls + zero_indeg_forall + cross_distinct + transfer *)
+#push-options "--z3rlimit 100"
+let lemma_bridge_distinct
+  (adj: Seq.seq int) (n: nat)
+  (sin_deg_pre sin_deg_post: Seq.seq int)
+  (squeue_pre squeue_post: Seq.seq SZ.t)
+  (soutput_pre: Seq.seq int)
+  (qh_plus_1 vqt vtail_post vout: nat)
+  : Lemma
+    (requires
+      queue_distinct_sz squeue_pre qh_plus_1 vqt /\
+      pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+      queue_preds_in_output_sz adj n squeue_pre qh_plus_1 vqt soutput_pre vout /\
+      indeg_correct adj n sin_deg_pre soutput_pre vout /\
+      qh_plus_1 <= vqt /\ vqt <= vtail_post /\
+      vtail_post <= Seq.length squeue_post /\
+      vqt <= Seq.length squeue_pre /\
+      Seq.length sin_deg_pre == n /\ Seq.length sin_deg_post == n /\
+      Seq.length adj == n * n)
+    (ensures
+      queue_distinct_sz squeue_post qh_plus_1 vtail_post)
+  = // Step 1: old entries preserved
+    lemma_pn_extract_old_forall sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post qh_plus_1 n;
+    // Step 2: new entries pairwise distinct
+    lemma_pn_extract_new_distinct_forall sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n;
+    // Step 3: new entries have sin_deg_pre > 0
+    lemma_pn_extract_new_forall sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n;
+    // Step 4: old entries have sin_deg_pre == 0
+    lemma_queue_entry_zero_indeg_forall adj n sin_deg_pre squeue_pre soutput_pre vout qh_plus_1 vqt;
+    // Step 5: old-new cross distinct (old has indeg 0, new has indeg > 0)
+    lemma_old_new_cross_distinct sin_deg_pre squeue_pre squeue_post qh_plus_1 vqt vtail_post n;
+    // Step 6: transfer_and_extend combines old-old, new-new, old-new
+    lemma_queue_distinct_transfer_and_extend squeue_pre squeue_post qh_plus_1 vqt vtail_post
+#pop-options
+
+(* Combined bridge: calls all three sub-lemmas *)
+let lemma_bridge_queue_through_pn
+  (adj: Seq.seq int) (n: nat)
+  (sin_deg_pre sin_deg_post: Seq.seq int)
+  (squeue_pre squeue_post: Seq.seq SZ.t)
+  (soutput_pre soutput_post: Seq.seq int)
+  (qh_plus_1 vqt vtail_post vout: nat) (u: nat)
+  : Lemma
+    (requires
+      queue_preds_in_output_sz adj n squeue_pre qh_plus_1 vqt soutput_post (vout + 1) /\
+      queue_fresh soutput_post (vout + 1) squeue_pre qh_plus_1 vqt /\
+      queue_distinct_sz squeue_pre qh_plus_1 vqt /\
+      pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n /\
+      indeg_correct adj n sin_deg_pre soutput_pre vout /\
+      indeg_correct adj n sin_deg_post soutput_post (vout + 1) /\
+      strong_order_inv adj n soutput_pre vout /\
+      partial_valid soutput_pre vout n /\
+      u < n /\ vout < Seq.length soutput_pre /\
+      soutput_post == Seq.upd soutput_pre vout u /\
+      Seq.length sin_deg_pre == n /\
+      Seq.length sin_deg_post == n /\
+      Seq.index sin_deg_pre u == 0 /\
+      queue_preds_in_output_sz adj n squeue_pre qh_plus_1 vqt soutput_pre vout /\
+      qh_plus_1 <= vqt /\ vqt <= vtail_post /\
+      vtail_post <= Seq.length squeue_post /\
+      Seq.length squeue_post == Seq.length squeue_pre /\
+      vqt <= Seq.length squeue_pre /\
+      (vout + 1) <= Seq.length soutput_post /\
+      Seq.length soutput_post == Seq.length soutput_pre /\
+      Seq.length adj == n * n /\
+      Seq.length sin_deg_pre == n /\
+      Seq.length sin_deg_post == n)
+    (ensures
+      queue_preds_in_output_sz adj n squeue_post qh_plus_1 vtail_post soutput_post (vout + 1) /\
+      queue_fresh soutput_post (vout + 1) squeue_post qh_plus_1 vtail_post /\
+      queue_distinct_sz squeue_post qh_plus_1 vtail_post)
+  = lemma_bridge_preds adj n sin_deg_pre sin_deg_post squeue_pre squeue_post soutput_post
+      qh_plus_1 vqt vtail_post vout;
+    lemma_bridge_fresh adj n sin_deg_pre sin_deg_post squeue_pre squeue_post soutput_pre soutput_post
+      qh_plus_1 vqt vtail_post vout u;
+    lemma_bridge_distinct adj n sin_deg_pre sin_deg_post squeue_pre squeue_post soutput_pre
+      qh_plus_1 vqt vtail_post vout
+
+(* ================================================================
    ASSUME_FACT — Ghost wrapper for admit, avoids Z3 issues with assume_
    We use this as a placeholder; every call will be eliminated.
    ================================================================ *)
@@ -1143,9 +1483,7 @@ fn process_neighbors
 }
 #pop-options
 
-#push-options "--z3rlimit 80"
-
-// Topological sort using Kahn's algorithm
+#push-options "--z3rlimit 200"
 // Input: adjacency matrix adj (n×n represented as flat array)
 // Output: array containing topological order of vertices
 //SNIPPET_START: topological_sort_sig
@@ -1434,13 +1772,9 @@ fn topological_sort
     lemma_indeg_transition sadj (SZ.v n) sin_deg_pre sin_deg_post soutput_pre (SZ.v vout) u_int;
     
     // Queue predicates through inner loop:
-    // For old queue entries [vqh+1, vqt): they were preserved by process_neighbors
-    // For new entries [vqt, vtail_post): newly enqueued vertices with in_deg == 0
-    assume_fact (
-      queue_preds_in_output_sz sadj (SZ.v n) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) soutput_post (SZ.v vout + 1) /\
-      queue_fresh soutput_post (SZ.v vout + 1) squeue_post (SZ.v vqh + 1) (SZ.v vtail_post) /\
-      queue_distinct_sz squeue_post (SZ.v vqh + 1) (SZ.v vtail_post)
-    );
+    // Bridge from pre-pn to post-pn using the verified bridge lemma
+    lemma_bridge_queue_through_pn sadj (SZ.v n) sin_deg_pre sin_deg_post squeue_pre squeue_post
+      soutput_pre soutput_post (SZ.v vqh + 1) (SZ.v vqt) (SZ.v vtail_post) (SZ.v vout) u_int;
     
     // Bundle back into opaque invariant
     kahn_outer_inv_intro sadj (SZ.v n) sin_deg_post squeue_post soutput_new

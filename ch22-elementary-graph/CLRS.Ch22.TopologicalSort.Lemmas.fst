@@ -127,6 +127,27 @@ let lemma_queue_preds_no_enqueue
     (ensures queue_preds_in_output_sz adj n queue_new qh qt output count)
   = ()
 
+(* Transfer queue_preds from old queue to new queue, extending the range.
+   For qi in [qh, qt_old): uses preservation of queue entries.
+   For qi in [qt_old, qt_new): uses provided forall about new entries. *)
+let lemma_queue_preds_transfer_and_extend
+  (adj: seq int) (n: nat) (queue_old queue_new: seq FStar.SizeT.t) (qh qt_old qt_new: nat)
+   (output: seq int) (count: nat)
+  : Lemma
+    (requires
+      queue_preds_in_output_sz adj n queue_old qh qt_old output count /\
+      qt_old <= qt_new /\ qt_new <= Seq.length queue_new /\
+      (forall (qi: nat). {:pattern (Seq.index queue_new qi)}
+        qh <= qi /\ qi < qt_old ==> Seq.index queue_new qi == Seq.index queue_old qi) /\
+      (forall (qi: nat). {:pattern (Seq.index queue_new qi)}
+        qt_old <= qi /\ qi < qt_new ==>
+          (let w = FStar.SizeT.v (Seq.index queue_new qi) in
+           w >= 0 /\ w < n /\
+           (forall (u: nat). u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0 ==>
+             (exists (k: nat). k < count /\ Seq.index output k == u)))))
+    (ensures queue_preds_in_output_sz adj n queue_new qh qt_new output count)
+  = ()
+
 (* Initial queue: vertices with in-degree 0 in the original graph have no predecessors,
    so their predecessors are trivially all in output (which is empty). *)
 let initial_indeg_zero_no_preds (adj: seq int) (n: nat) (in_deg: seq int) (v: nat)
@@ -210,6 +231,92 @@ let rec lemma_not_in_output_from_forall (output: seq int) (count: nat) (x: int)
     (decreases count)
   = if count = 0 then ()
     else lemma_not_in_output_from_forall output (count - 1) x
+
+(* Reverse: not is_in_output implies forall k < count. output[k] <> x *)
+let rec lemma_not_is_in_output_implies_forall (output: seq int) (count: nat) (x: int)
+  : Lemma
+    (requires count <= Seq.length output /\ not (is_in_output output count x))
+    (ensures forall (k: nat). k < count ==> Seq.index output k <> x)
+    (decreases count)
+  = if count = 0 then ()
+    else lemma_not_is_in_output_implies_forall output (count - 1) x
+
+(* Reverse: exists k < count with output[k] == x implies is_in_output *)
+let rec lemma_exists_to_is_in_output (output: seq int) (count: nat) (x: int)
+  : Lemma
+    (requires count <= Seq.length output /\
+      (exists (k: nat). k < count /\ Seq.index output k == x))
+    (ensures is_in_output output count x)
+    (decreases count)
+  = if count = 0 then ()
+    else if Seq.index output (count - 1) = x then ()
+    else begin
+      assert (exists (k: nat). k < count - 1 /\ Seq.index output k == x);
+      lemma_exists_to_is_in_output output (count - 1) x
+    end
+
+(* If all predecessors of w are in output (as is_in_output), count_remaining_preds == 0 *)
+let rec lemma_zero_crp_from_all_preds (adj: seq int) (n: nat) (output: seq int) (count: nat)
+                                       (w: nat) (scan: nat)
+  : Lemma
+    (requires
+      w < n /\ Seq.length adj == n * n /\ count <= Seq.length output /\
+      scan <= n /\
+      (forall (u: nat). u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0 ==>
+        is_in_output output count u))
+    (ensures count_remaining_preds adj n output count w scan == 0)
+    (decreases scan)
+  = if scan = 0 then ()
+    else lemma_zero_crp_from_all_preds adj n output count w (scan - 1)
+
+(* Corollary: queue_preds + indeg_correct implies in_deg == 0 for each queue entry *)
+let lemma_queue_entry_zero_indeg
+  (adj: seq int) (n: nat) (in_deg: seq int) (queue: seq FStar.SizeT.t)
+  (output: seq int) (count: nat) (qh qt: nat) (qi: nat)
+  : Lemma
+    (requires
+      queue_preds_in_output_sz adj n queue qh qt output count /\
+      indeg_correct adj n in_deg output count /\
+      qi >= qh /\ qi < qt)
+    (ensures Seq.index in_deg (FStar.SizeT.v (Seq.index queue qi)) == 0)
+  = let w = FStar.SizeT.v (Seq.index queue qi) in
+    // Step 1: queue_preds gives exists form for all preds of w
+    // Step 2: convert exists → is_in_output for each pred
+    let aux (u: nat)
+      : Lemma
+        (requires u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0)
+        (ensures is_in_output output count u)
+      = lemma_exists_to_is_in_output output count u
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+    // Step 3: all preds in output → count_remaining_preds == 0
+    lemma_zero_crp_from_all_preds adj n output count w n
+
+(* Forall-lifted: all old queue entries have zero in-degree.
+   NOTE: ensures includes bounds conjuncts for Seq.index well-formedness *)
+let lemma_queue_entry_zero_indeg_forall
+  (adj: seq int) (n: nat) (in_deg: seq int) (queue: seq FStar.SizeT.t)
+  (output: seq int) (count: nat) (qh qt: nat)
+  : Lemma
+    (requires
+      queue_preds_in_output_sz adj n queue qh qt output count /\
+      indeg_correct adj n in_deg output count /\
+      qh <= qt /\ qt <= Seq.length queue /\
+      Seq.length in_deg == n /\ Seq.length adj == n * n)
+    (ensures forall (qi: nat).
+      qh <= qi /\ qi < qt ==>
+        qi < Seq.length queue /\
+        FStar.SizeT.v (Seq.index queue qi) < Seq.length in_deg /\
+        Seq.index in_deg (FStar.SizeT.v (Seq.index queue qi)) == 0)
+  = let aux (qi: nat)
+      : Lemma (requires qh <= qi /\ qi < qt)
+              (ensures
+                qi < Seq.length queue /\
+                FStar.SizeT.v (Seq.index queue qi) < Seq.length in_deg /\
+                Seq.index in_deg (FStar.SizeT.v (Seq.index queue qi)) == 0)
+    = lemma_queue_entry_zero_indeg adj n in_deg queue output count qh qt qi
+    in FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
 let lemma_zero_indeg_preds_exist
   (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) (v: nat)
   : Lemma
@@ -223,6 +330,22 @@ let lemma_zero_indeg_preds_exist
       = lemma_is_in_output_exists output count u
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+(* Forall-lifted version: for all v with in_deg 0, all preds are in output *)
+let lemma_zero_indeg_preds_exist_forall
+  (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat)
+  : Lemma
+    (requires indeg_correct adj n in_deg output count)
+    (ensures forall (v: nat). {:pattern (Seq.index in_deg v)}
+      v < n /\ Seq.index in_deg v == 0 ==>
+        (forall (u: nat). u < n /\ u * n + v < n * n /\ Seq.index adj (u * n + v) <> 0 ==>
+          (exists (k: nat). k < count /\ Seq.index output k == u)))
+  = let aux (v: nat)
+      : Lemma (requires v < n /\ Seq.index in_deg v == 0)
+              (ensures forall (u: nat). u < n /\ u * n + v < n * n /\ Seq.index adj (u * n + v) <> 0 ==>
+                (exists (k: nat). k < count /\ Seq.index output k == u))
+    = lemma_zero_indeg_preds_exist adj n in_deg output count v
+    in FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 
 (* Adding a vertex to output: count_remaining_preds decreases by 1 for successors,
    stays the same for non-successors *)
@@ -440,6 +563,56 @@ let lemma_positive_indeg_not_in_output
       Classical.forall_intro (Classical.move_requires aux);
       ()
     end else ()
+
+(* Forall-lifted: for all v with positive in_deg, v is not in output *)
+let lemma_positive_indeg_not_in_output_forall
+  (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat)
+  : Lemma
+    (requires
+      strong_order_inv adj n output count /\
+      indeg_correct adj n in_deg output count /\
+      (forall (k: nat). k < count ==> Seq.index output k >= 0 /\ Seq.index output k < n))
+    (ensures forall (v: nat). {:pattern (Seq.index in_deg v)}
+      v < n /\ Seq.index in_deg v > 0 ==> not (is_in_output output count v))
+  = let aux (v: nat)
+      : Lemma (requires v < n /\ Seq.index in_deg v > 0)
+              (ensures not (is_in_output output count v))
+    = lemma_positive_indeg_not_in_output adj n in_deg output count v
+    in FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+(* Forall-lifted: not in output implies forall k, output[k] <> v *)
+let lemma_not_in_output_implies_forall_all
+  (output: seq int) (count: nat)
+  : Lemma
+    (requires count <= Seq.length output)
+    (ensures forall (v: nat).
+      not (is_in_output output count v) ==>
+        (forall (k: nat). k < count ==> Seq.index output k <> v))
+  = let aux (v: nat)
+      : Lemma (requires not (is_in_output output count v))
+              (ensures forall (k: nat). k < count ==> Seq.index output k <> v)
+    = lemma_not_is_in_output_implies_forall output count v
+    in FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+(* Combined: positive in-degree → fresh against output (chains both steps) *)
+let lemma_positive_indeg_implies_fresh_forall
+  (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat)
+  : Lemma
+    (requires
+      strong_order_inv adj n output count /\
+      indeg_correct adj n in_deg output count /\
+      count <= Seq.length output /\
+      (forall (k: nat). k < count ==> Seq.index output k >= 0 /\ Seq.index output k < n))
+    (ensures forall (v: nat). {:pattern (Seq.index in_deg v)}
+      v < n /\ Seq.index in_deg v > 0 ==>
+        (forall (k: nat). {:pattern (Seq.index output k)}
+          k < count ==> Seq.index output k <> v))
+  = let aux (v: nat)
+      : Lemma (requires v < n /\ Seq.index in_deg v > 0)
+              (ensures forall (k: nat). k < count ==> Seq.index output k <> v)
+    = lemma_positive_indeg_not_in_output adj n in_deg output count v;
+      lemma_not_is_in_output_implies_forall output count v
+    in FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 
 (* ================================================================
    Initialization Lemmas: count_remaining_preds at count=0
