@@ -235,6 +235,36 @@ let triangle_inequality_from_processed (#n: nat) (dist: dist_vec n) (weights: we
    If an edge (x,v) already satisfied d_v <= d_x + w(x,v), and we make d_v smaller,
    the inequality still holds (or becomes even more satisfied). *)
 
+(* Stability precondition: Relaxation from u doesn't reduce distances of processed vertices *)
+(* This captures the Dijkstra invariant: processed vertices have optimal distances *)
+let relaxation_stable_for_processed (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                    (u: nat{u < n}) (processed: processed_set) : prop =
+  forall (x: nat). x < n /\ is_processed processed x ==>
+    (let d_u = Seq.index dist u in
+     let d_x = Seq.index dist x in
+     let w = Seq.index weights (u * n + x) in
+     not (w < inf && d_u < inf && d_u + w < d_x))
+
+(* If stability holds, relax_edge from u to a processed vertex x doesn't change dist[x] *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+let relax_edge_stable_for_processed (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                    (u: nat{u < n}) (x: nat{x < n})
+                                    (processed: processed_set)
+  : Lemma
+    (requires
+      is_processed processed x /\
+      relaxation_stable_for_processed dist weights u processed)
+    (ensures
+      Seq.index (relax_edge dist weights u x) x == Seq.index dist x)
+  =
+  let d_u = Seq.index dist u in
+  let d_x = Seq.index dist x in
+  let w = Seq.index weights (u * n + x) in
+  // By stability precondition: not (w < inf && d_u < inf && d_u + w < d_x)
+  // Therefore relax_edge returns dist unchanged at position x
+  ()
+#pop-options
+
 #push-options "--fuel 0 --ifuel 0 --z3rlimit 15"
 let relax_edge_preserves_triangle_others (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
                                           (u v: nat{u < n /\ v < n})
@@ -258,9 +288,81 @@ let relax_edge_preserves_triangle_others (#n: nat) (dist: dist_vec n) (weights: 
   ()
 #pop-options
 
+(* Helper: Stability is preserved after relax_edge *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 15"
+let relax_edge_preserves_stability (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                    (u v: nat{u < n /\ v < n})
+                                    (processed: processed_set)
+  : Lemma
+    (requires
+      all_weights_non_negative weights /\
+      not (is_processed processed u) /\
+      relaxation_stable_for_processed dist weights u processed)
+    (ensures
+      relaxation_stable_for_processed (relax_edge dist weights u v) weights u processed)
+  =
+  let dist1 = relax_edge dist weights u v in
+  
+  // For processed x: if x = v, then dist1[x] = dist[x] by stability
+  //                  if x <> v, then dist1[x] = dist[x] by definition of relax_edge
+  // In either case, dist1[x] = dist[x] for processed x
+  // Also dist1[u] = dist[u] (since u is not processed, u <> any processed vertex including v)
+  
+  // Therefore: for processed x, not (w(u,x) < inf && dist1[u] < inf && dist1[u] + w(u,x) < dist1[x])
+  //            iff not (w(u,x) < inf && dist[u] < inf && dist[u] + w(u,x) < dist[x])
+  //            which holds by precondition
+  
+  if is_processed processed v then
+    relax_edge_stable_for_processed dist weights u v processed;
+  ()
+#pop-options
+
+(* Helper: Single relax_edge step preserves triangle inequality for processed vertices *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+let relax_edge_preserves_triangle_from_processed (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                                 (u v: nat{u < n /\ v < n})
+                                                 (processed: processed_set)
+  : Lemma
+    (requires
+      triangle_inequality_from_processed dist weights processed /\
+      all_weights_non_negative weights /\
+      not (is_processed processed u) /\
+      relaxation_stable_for_processed dist weights u processed)
+    (ensures
+      triangle_inequality_from_processed (relax_edge dist weights u v) weights processed)
+  =
+  let dist1 = relax_edge dist weights u v in
+  
+  // For processed x = v: stability ensures dist1[x] = dist[x]
+  if is_processed processed v then
+    relax_edge_stable_for_processed dist weights u v processed;
+  
+  // Establish triangle inequality for all edges (x, y) where x is processed
+  let lemma_aux (x: nat{x < n}) (y: nat{y < n}) : Lemma
+    (requires is_processed processed x)
+    (ensures edge_satisfies_triangle dist1 weights x y)
+    [SMTPat (is_processed processed x); SMTPat (edge_satisfies_triangle dist1 weights x y)]
+    =
+    if x = v then begin
+      // x is processed and being relaxed to
+      // By stability: dist1[x] = dist[x]
+      // dist1[y] <= dist[y] (relaxation only decreases)
+      // Since edge_satisfies_triangle dist weights x y, we have:
+      //   (w_xy < inf /\ dist[x] < inf) ==> dist[y] <= dist[x] + w_xy
+      // Since dist1[x] = dist[x] and dist1[y] <= dist[y], we get:
+      //   (w_xy < inf /\ dist1[x] < inf) ==> dist1[y] <= dist1[x] + w_xy
+      ()
+    end else begin
+      // x <> v: use the preservation lemma
+      relax_edge_preserves_triangle_others dist weights u v x y
+    end
+  in
+  ()
+#pop-options
+
 (* Relaxing all edges from u preserves triangle inequality for edges from processed vertices *)
-(* The key insight: processed vertices != u, and != any vertex being relaxed TO *)
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+(* The key insight: processed vertices != u, and stability ensures their distances don't change *)
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 35"
 let rec relax_from_u_preserves_triangle_from_processed 
                                                (#n: nat) (dist: dist_vec n) 
                                                (weights: weight_matrix n)
@@ -270,7 +372,8 @@ let rec relax_from_u_preserves_triangle_from_processed
     (requires
       triangle_inequality_from_processed dist weights processed /\
       all_weights_non_negative weights /\
-      not (is_processed processed u)) // u is not yet processed
+      not (is_processed processed u) /\ // u is not yet processed
+      relaxation_stable_for_processed dist weights u processed) // stability for processed vertices
     (ensures
       triangle_inequality_from_processed (relax_from_u dist weights u v_start) weights processed)
     (decreases (n - v_start))
@@ -278,14 +381,15 @@ let rec relax_from_u_preserves_triangle_from_processed
   if v_start >= n then ()
   else begin
     let dist1 = relax_edge dist weights u v_start in
-    // For edges x->y where x is processed and u is not:
-    //   x <> u (since x is processed, u is not)
-    //   If x <> v_start: use relax_edge_preserves_triangle_others (x <> v)
-    //   If x = v_start: dist[x] may change, potentially breaking triangle inequality
-    //     This case requires Dijkstra invariant (processed vertices have optimal distances)
-    //     which ensures relax_edge never reduces dist[x] for processed x.
-    // TODO: Add precondition: forall x. processed(x) ==> dist[u] + w(u,x) >= dist[x]
-    admit()
+    
+    // Establish that triangle inequality holds for dist1 for all processed vertices
+    relax_edge_preserves_triangle_from_processed dist weights u v_start processed;
+    
+    // Establish that stability is preserved for dist1
+    relax_edge_preserves_stability dist weights u v_start processed;
+    
+    // Recursive call
+    relax_from_u_preserves_triangle_from_processed dist1 weights u (v_start + 1) processed
   end
 #pop-options
 
@@ -298,17 +402,32 @@ let process_vertex_extends_triangle (#n: nat) (dist: dist_vec n) (weights: weigh
   : Lemma
     (requires
       triangle_inequality_from_processed dist weights processed /\
-      all_weights_non_negative weights)
+      all_weights_non_negative weights /\
+      not (is_processed processed u) /\
+      relaxation_stable_for_processed dist weights u processed)
     (ensures (
       let dist' = relax_from_u dist weights u 0 in
       let processed' = add_to_processed processed u in
       triangle_inequality_from_processed dist' weights processed'))
   =
-  // TODO: This proof requires:
-  // 1. relax_from_u_establishes_all_from_u to show edges from u satisfy triangle inequality
-  // 2. Preservation lemmas to show existing triangle inequalities are maintained
-  // Both of these depend on Seq.upd reasoning which is challenging
-  admit()
+  let dist' = relax_from_u dist weights u 0 in
+  let processed' = add_to_processed processed u in
+  
+  // Part 1: Triangle inequality for edges from previously processed vertices is preserved
+  relax_from_u_preserves_triangle_from_processed dist weights u 0 processed;
+  assert (triangle_inequality_from_processed dist' weights processed);
+  
+  // Part 2: All edges from u satisfy triangle inequality after relaxation
+  relax_from_u_establishes_all_from_u dist weights u;
+  assert (forall (v: nat). v < n /\ u <> v ==> edge_satisfies_triangle dist' weights u v);
+  
+  // Part 3: Self-loop u->u (if exists) also satisfies triangle inequality
+  // For u->u: we need d_u' <= d_u' + w(u,u), which is always true for non-negative weights
+  assert (forall (v: nat). v < n ==> edge_satisfies_triangle dist' weights u v);
+  
+  // Combine: processed' = processed ∪ {u}
+  assert (forall (x v: nat). x < n /\ v < n /\ is_processed processed' x ==>
+    edge_satisfies_triangle dist' weights x v)
 #pop-options
 
 (* Process vertices from u_start to n-1 *)
@@ -323,6 +442,16 @@ let rec process_vertices (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
 (* All vertices in range [0, u) have been processed *)
 let all_processed_up_to (u: nat) : processed_set = fun v -> v < u
 
+(* Helper: Stability for initial_processed implies stability for all_processed_up_to 0 *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 15"
+let stability_initial_to_all_processed_up_to_0 (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) (u: nat{u < n}) : Lemma
+  (requires relaxation_stable_for_processed dist weights u initial_processed)
+  (ensures relaxation_stable_for_processed dist weights u (all_processed_up_to 0))
+  =
+  // all_processed_up_to 0 = fun v -> v < 0 = fun _ -> false = initial_processed
+  ()
+#pop-options
+
 (* After processing all vertices from 0 to n-1, triangle inequality holds for all edges *)
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let rec process_all_vertices_establishes_triangle (#n: nat) (dist: dist_vec n) 
@@ -332,7 +461,10 @@ let rec process_all_vertices_establishes_triangle (#n: nat) (dist: dist_vec n)
     (requires
       u_start <= n /\
       all_weights_non_negative weights /\
-      triangle_inequality_from_processed dist weights (all_processed_up_to u_start))
+      triangle_inequality_from_processed dist weights (all_processed_up_to u_start) /\
+      // Stability for all unprocessed vertices with respect to vertices processed so far
+      (forall (u: nat). u >= u_start /\ u < n ==>
+        relaxation_stable_for_processed dist weights u (all_processed_up_to u_start)))
     (ensures (
       let dist' = process_vertices dist weights u_start in
       triangle_inequality dist' weights))
@@ -351,9 +483,15 @@ let rec process_all_vertices_establishes_triangle (#n: nat) (dist: dist_vec n)
     // Show that processed1 = all_processed_up_to (u_start + 1)
     assert (forall (v: nat). is_processed processed1 v <==> v < u_start + 1);
     
-    // By process_vertex_extends_triangle:
+    // By process_vertex_extends_triangle with stability:
     process_vertex_extends_triangle dist weights (all_processed_up_to u_start) u_start;
     assert (triangle_inequality_from_processed dist1 weights processed1);
+    
+    // TODO: Need to prove stability is maintained for remaining unprocessed vertices
+    // This requires showing: for all u > u_start, relaxation from u doesn't reduce
+    // distances of processed vertices (including newly processed u_start)
+    // This is a deeper Dijkstra invariant that needs to be assumed for now
+    admit();
     
     // Recursively process remaining vertices
     process_all_vertices_establishes_triangle dist1 weights (u_start + 1)
@@ -369,13 +507,28 @@ let dijkstra_establishes_triangle_inequality (#n: nat) (dist_init: dist_vec n)
       all_weights_non_negative weights /\
       // Initially, only trivial edges (from no source) satisfy triangle inequality
       // This holds vacuously for processed_set = empty
-      triangle_inequality_from_processed dist_init weights initial_processed)
+      triangle_inequality_from_processed dist_init weights initial_processed /\
+      // Stability precondition: for all unprocessed vertices, relaxation doesn't reduce
+      // distances of processed vertices. Initially (no processed vertices), this holds vacuously.
+      (forall (u: nat). u < n ==>
+        relaxation_stable_for_processed dist_init weights u initial_processed))
     (ensures (
       let dist_final = process_vertices dist_init weights 0 in
       triangle_inequality dist_final weights))
   =
   // Initially no vertices processed: all_processed_up_to 0 = initial_processed
+  // Convert stability from initial_processed to all_processed_up_to 0
   assert (forall (v: nat). is_processed (all_processed_up_to 0) v <==> is_processed initial_processed v);
+  assert (triangle_inequality_from_processed dist_init weights (all_processed_up_to 0));
+  
+  // Establish stability for all_processed_up_to 0
+  let aux (u: nat{u >= 0 /\ u < n}) : Lemma
+    (requires relaxation_stable_for_processed dist_init weights u initial_processed)
+    (ensures relaxation_stable_for_processed dist_init weights u (all_processed_up_to 0))
+    = stability_initial_to_all_processed_up_to_0 dist_init weights u
+  in
+  FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+  
   process_all_vertices_establishes_triangle dist_init weights 0
 
 (* ===== Corollary for Dijkstra Implementation ===== *)
@@ -395,6 +548,20 @@ let dijkstra_init_satisfies_triangle (#n: nat) (source: nat{source < n}) : Lemma
   // So triangle_inequality_from_processed requires nothing (antecedent always false)
   ()
 
+(* Initial stability: With no processed vertices, stability holds vacuously *)
+let dijkstra_init_stability (#n: nat) (source: nat{source < n}) : Lemma
+  (requires n > 0)
+  (ensures
+    (let dist_init = Seq.create n inf in
+     let dist_init = Seq.upd dist_init source 0 in
+     forall (weights: weight_matrix n) (u: nat).
+       u < n /\ all_weights_non_negative weights ==>
+       relaxation_stable_for_processed dist_init weights u initial_processed))
+  =
+  // initial_processed = fun _ -> false
+  // So relaxation_stable_for_processed requires nothing (antecedent always false)
+  ()
+
 (* Combined: Dijkstra's algorithm automatically establishes triangle inequality *)
 let dijkstra_algorithm_establishes_triangle (#n: nat) (source: nat{source < n})
                                             (weights: weight_matrix n)
@@ -409,6 +576,7 @@ let dijkstra_algorithm_establishes_triangle (#n: nat) (source: nat{source < n})
   =
   let dist_init = Seq.upd (Seq.create n inf) source 0 in
   dijkstra_init_satisfies_triangle #n source;
+  dijkstra_init_stability #n source;
   dijkstra_establishes_triangle_inequality dist_init weights
 
 (*
