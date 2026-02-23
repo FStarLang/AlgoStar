@@ -429,8 +429,8 @@ lines. The table below summarizes the status of each algorithm.
 Proof Gaps
 ----------
 
-As of this writing, the project has **85 unproven F\* obligations**
-(``admit()``, ``assume()``, and ``assume val``) across **32 files**,
+As of this writing, the project has **82 unproven F\* obligations**
+(``admit()``, ``assume()``, and ``assume val``) across **31 files**,
 plus **12 Pulse** ``assume_`` **calls** in 3 implementation files.
 Of the 50 algorithms in the table, **35 have fully proven correctness**
 (zero admits) and **26 have fully proven complexity bounds**.
@@ -451,7 +451,7 @@ The remaining admits fall into a few categories:
    optimality: greedy-choice theorem, optimal-substructure, and
    dependent proofs in Complete (6); shortest-path upper-bound
    invariants for Bellman-Ford (3) and Dijkstra triangle
-   inequality (2); max-flow augmentation (8).
+   inequality (1); max-flow augmentation (8).
 
 4. **Complexity proofs** (Ch. 32, 7 admits): KMP
    amortized analysis (7).

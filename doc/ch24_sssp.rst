@@ -15,9 +15,9 @@ backed by pure F* specifications.
 verified end-to-end, including a runtime triangle-inequality check and
 a connection to the ``sp_dist`` upper-bound theorem.  The
 ``Dijkstra.TriangleInequality`` companion proves that relaxation
-automatically establishes the triangle inequality, though it has
-**2 admits** (preservation across ``relax_from_u`` and the composite
-``process_vertex_extends_triangle``).  The Bellman-Ford Pulse
+automatically establishes the triangle inequality, with
+**1 admit** remaining (stability maintenance when processing order
+follows Dijkstra's greedy extraction).  The Bellman-Ford Pulse
 implementation (``CLRS.Ch24.BellmanFord.fst``) also has **zero
 admits**.  The ``BellmanFord.Spec`` pure specification has **3 admits**
 (the inductive path-relaxation lemma, the ``relax_preserves_upper_bound``
@@ -122,10 +122,11 @@ inequality is a *consequence* of the relaxation process — the
 verification pass in the Pulse code is redundant.  The key result:
 after relaxing all edges from a vertex ``u``,
 ``edge_satisfies_triangle`` holds for every edge from ``u``.
-Extending this to all processed vertices requires two admits:
-preservation of already-established triangle inequalities through
-subsequent relaxations, and the composite
-``process_vertex_extends_triangle`` lemma.
+Extending this to all processed vertices required proving that
+relaxation preserves already-established triangle inequalities
+(``relaxation_stable_for_processed``).  One admit remains: showing
+stability is maintained when the processing order follows Dijkstra's
+greedy min-extraction.
 
 Bellman-Ford Algorithm
 ======================

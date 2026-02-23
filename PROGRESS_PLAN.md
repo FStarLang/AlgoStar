@@ -155,12 +155,12 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 
 ## Current Status (2025-02-23, updated)
 
-**180 F* files, ~59,500 lines — 94 unproven obligations across 31 files**
+**180 F* files, ~59,500 lines — 91 unproven obligations across 30 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
-| `admit()` | 66 | Unproven lemma/proof bodies (Pure F*) |
-| `assume(...)` | 14 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 4, UF/Kruskal: 2) |
+| `admit()` | 65 | Unproven lemma/proof bodies (Pure F*) |
+| `assume(...)` | 12 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 4) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
 | `assume_` | 12 | Pulse-specific unproven invariants (StackDFS.Cmplx: 6, QueueBFS.Cmplx: 6) |
 
