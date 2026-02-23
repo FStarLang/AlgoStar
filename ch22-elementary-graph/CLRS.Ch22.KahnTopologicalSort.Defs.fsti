@@ -1069,6 +1069,12 @@ val lemma_is_in_queue_enqueue
     (requires qh <= qt /\ qt < Seq.length queue /\ SZ.v (Seq.index queue qt) == v)
     (ensures is_in_queue_sz queue qh (qt + 1) v)
 
+val lemma_is_in_queue_weaken_start
+  (queue: Seq.seq SZ.t) (qh qh' qt: nat) (v: nat)
+  : Lemma
+    (requires qh <= qh' /\ qh' <= qt /\ qt <= Seq.length queue /\ is_in_queue_sz queue qh' qt v)
+    (ensures is_in_queue_sz queue qh qt v)
+
 val lemma_zero_indeg_accounted_after_pn
   (adj: Seq.seq int) (n: nat)
   (in_deg_pre in_deg_post: Seq.seq int) (output_post: Seq.seq int) (count_post: nat)
@@ -1079,6 +1085,9 @@ val lemma_zero_indeg_accounted_after_pn
       zero_indeg_accounted in_deg_pre n output_post count_post queue_pre qh_post vqt /\
       // pn_extra_inv: old entries preserved, new entries characterized
       pn_extra_inv in_deg_pre in_deg_post queue_pre queue_post vqt vtail_post n /\
+      // pn completeness: every v whose in_deg dropped from nonzero to 0 was enqueued
+      (forall (v: nat). v < n /\ Seq.index in_deg_pre v <> 0 /\ Seq.index in_deg_post v == 0 ==>
+        is_in_queue_sz queue_post vqt vtail_post v) /\
       // Bounds
       qh_post <= vqt /\ vqt <= vtail_post /\ vtail_post <= Seq.length queue_post /\
       vqt <= Seq.length queue_pre /\

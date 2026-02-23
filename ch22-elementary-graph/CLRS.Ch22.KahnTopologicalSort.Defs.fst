@@ -1266,6 +1266,17 @@ let lemma_is_in_queue_enqueue
       aux qh
     end
 
+(* is_in_queue monotone in start: shrinking qh expands the search range *)
+let rec lemma_is_in_queue_weaken_start
+  (queue: Seq.seq SZ.t) (qh qh' qt: nat) (v: nat)
+  : Lemma
+    (requires qh <= qh' /\ qh' <= qt /\ qt <= Seq.length queue /\ is_in_queue_sz queue qh' qt v)
+    (ensures is_in_queue_sz queue qh qt v)
+    (decreases (qh' - qh))
+  = if qh >= qh' then ()
+    else if SZ.v (Seq.index queue qh) = v then ()
+    else lemma_is_in_queue_weaken_start queue (qh + 1) qh' qt v
+
 (* Maintenance of zero_indeg_accounted after dequeue + output extend + process_neighbors.
    Key argument:
    - Vertices with in_deg_post == 0 that had in_deg_pre == 0: still in output or queue (preserved)
@@ -1281,6 +1292,9 @@ let lemma_zero_indeg_accounted_after_pn
       zero_indeg_accounted in_deg_pre n output_post count_post queue_pre qh_post vqt /\
       // pn_extra_inv: old entries preserved, new entries characterized
       pn_extra_inv in_deg_pre in_deg_post queue_pre queue_post vqt vtail_post n /\
+      // pn completeness: every v whose in_deg dropped from nonzero to 0 was enqueued
+      (forall (v: nat). v < n /\ Seq.index in_deg_pre v <> 0 /\ Seq.index in_deg_post v == 0 ==>
+        is_in_queue_sz queue_post vqt vtail_post v) /\
       // Bounds
       qh_post <= vqt /\ vqt <= vtail_post /\ vtail_post <= Seq.length queue_post /\
       vqt <= Seq.length queue_pre /\
@@ -1306,14 +1320,11 @@ let lemma_zero_indeg_accounted_after_pn
           end
         end
         else begin
-          // Case B: in_deg_pre[v] > 0, in_deg_post[v] == 0 → newly enqueued
-          // pn_extra_inv: new entries in [vqt, vtail_post) have in_deg_pre > 0 and in_deg_post == 0
-          // We need: v is among the new entries
-          // pn_extra_inv gives forward: entries[k] have in_deg_post == 0
-          // But we need reverse: v with in_deg_post == 0 and in_deg_pre > 0 is an entry
-          // This requires the completeness property of process_neighbors
-          // For now: this is the key step that needs pn completeness
-          admit ()
+          // Case B: in_deg_pre[v] <> 0, in_deg_post[v] == 0 → newly enqueued
+          // pn_completeness gives: v is in queue_post[vqt, vtail_post)
+          assert (is_in_queue_sz queue_post vqt vtail_post v);
+          // Expand search range: [vqt, vtail_post) ⊂ [qh_post, vtail_post) since qh_post <= vqt
+          lemma_is_in_queue_weaken_start queue_post qh_post vqt vtail_post v
         end
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
