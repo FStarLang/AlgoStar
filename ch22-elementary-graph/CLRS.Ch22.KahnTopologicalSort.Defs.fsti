@@ -65,6 +65,21 @@ let queue_distinct_sz (queue: Seq.seq SZ.t) (qh qt: nat) : prop =
 
 (* Step 2 invariant: queue entries are all < vi and have in_degree 0 *)
 
+let rec is_in_queue_sz (queue: Seq.seq SZ.t) (qh qt: nat) (v: nat) : Tot bool (decreases (qt - qh)) =
+  if qh >= qt then false
+  else if qh >= Seq.length queue then false
+  else if SZ.v (Seq.index queue qh) = v then true
+  else is_in_queue_sz queue (qh + 1) qt v
+
+(* zero_indeg_accounted: every vertex with in_deg == 0 is in output or active queue *)
+let zero_indeg_accounted
+  (in_deg: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat)
+  (queue: Seq.seq SZ.t) (qh qt: nat) : prop =
+  Seq.length in_deg >= n /\ count <= Seq.length output /\ qh <= qt /\ qt <= Seq.length queue /\
+  (forall (v: nat). {:pattern (Seq.index in_deg v)}
+    v < n /\ Seq.index in_deg v == 0 ==>
+      is_in_output output count v \/ is_in_queue_sz queue qh qt v)
+
 let step2_queue_inv
   (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
   (queue: Seq.seq SZ.t) (vqt vi: nat) : prop =
@@ -75,7 +90,9 @@ let step2_queue_inv
   // All entries are < vi (since we only enqueue vertices we've scanned)
   (forall (k: nat). {:pattern (Seq.index queue k)} k < vqt ==> SZ.v (Seq.index queue k) < vi) /\
   // All entries have in_degree 0
-  (forall (k: nat). {:pattern (Seq.index queue k)} k < vqt ==> Seq.index in_deg (SZ.v (Seq.index queue k)) == 0)
+  (forall (k: nat). {:pattern (Seq.index queue k)} k < vqt ==> Seq.index in_deg (SZ.v (Seq.index queue k)) == 0) /\
+  // Completeness: every zero-indeg vertex scanned so far is in the queue
+  (forall (v: nat). v < vi /\ Seq.index in_deg v == 0 ==> is_in_queue_sz queue 0 vqt v)
 
 
 (* ================================================================
@@ -342,6 +359,7 @@ val lemma_step2_skip
   (queue queue': Seq.seq SZ.t) (vqt vi: nat)
   : Lemma
     (requires step2_queue_inv adj n in_deg output queue vqt vi /\ vi < n /\
+              Seq.index in_deg vi <> 0 /\
               Seq.length queue' == Seq.length queue /\
               vqt <= Seq.length queue' /\
               (forall (k: nat). {:pattern (Seq.index queue' k)} k < vqt ==> Seq.index queue' k == Seq.index queue k))
@@ -385,6 +403,33 @@ val lemma_step2_to_queue_preds
       indeg_correct adj n in_deg real_out 0 /\
       n > 0 /\ Seq.length real_out >= n)
     (ensures queue_preds_in_output_sz adj n queue 0 vqt real_out 0)
+
+(* All queue entries [0..qt) have zero in-degree under sin_deg *)
+let queue_entries_zero_indeg
+  (sin_deg: Seq.seq int) (squeue: Seq.seq SZ.t) (qt: nat) : prop =
+  qt <= Seq.length squeue /\
+  Seq.length sin_deg > 0 /\
+  (forall (k: nat). k < qt ==>
+    SZ.v (Seq.index squeue k) < Seq.length sin_deg /\
+    Seq.index sin_deg (SZ.v (Seq.index squeue k)) == 0)
+
+val lemma_step2_to_queue_entries_zero_indeg
+  (adj: Seq.seq int) (n: nat) (in_deg: Seq.seq int) (output: Seq.seq int)
+  (queue: Seq.seq SZ.t) (vqt: nat)
+  : Lemma
+    (requires step2_queue_inv adj n in_deg output queue vqt n /\ n > 0)
+    (ensures queue_entries_zero_indeg in_deg queue vqt)
+
+val lemma_step2_to_zero_indeg_accounted
+  (in_deg: Seq.seq int) (n: nat) (output: Seq.seq int)
+  (queue: Seq.seq SZ.t) (vqt: nat)
+  : Lemma
+    (requires
+      Seq.length in_deg == n /\ n > 0 /\
+      Seq.length output >= n /\
+      vqt <= Seq.length queue /\
+      (forall (v: nat). v < n /\ Seq.index in_deg v == 0 ==> is_in_queue_sz queue 0 vqt v))
+    (ensures zero_indeg_accounted in_deg n output 0 queue 0 vqt)
 
 (* ================================================================
    BUNDLED INVARIANT — opaque to SMT for performance
@@ -690,6 +735,15 @@ val pn_enqueue_complete_step
       (vtail_new == vtail_cur /\ Seq.index sin_deg_start vv <> 0 ==> Seq.index sin_deg_new vv <> 0))
     (ensures pn_enqueue_complete sin_deg_start sin_deg_new squeue_new vtail_start vtail_new n (vv + 1))
 
+val lemma_vtail_lt_n (squeue: Seq.seq SZ.t) (vtail n vv: nat)
+  : Lemma
+    (requires vtail <= n /\ n <= Seq.length squeue /\ vv < n /\
+      (forall (i j: nat). i < vtail /\ j < vtail /\ i <> j ==>
+        SZ.v (Seq.index squeue i) <> SZ.v (Seq.index squeue j)) /\
+      (forall (k:nat). k < vtail ==> SZ.v (Seq.index squeue k) < n) /\
+      (forall (k:nat). k < vtail ==> SZ.v (Seq.index squeue k) <> vv))
+    (ensures vtail < n)
+
 val pn_combined_step
   (adj: Seq.seq int) (n: nat)
   (sin_degree sin_deg_cur sin_deg_new: Seq.seq int)
@@ -701,6 +755,10 @@ val pn_combined_step
       pn_extra_inv sin_degree sin_deg_cur squeue_start squeue_cur vtail_start vtail_cur n /\
       pn_entries_below squeue_cur vtail_start vtail_cur vv /\
       pn_enqueue_complete sin_degree sin_deg_cur squeue_cur vtail_start vtail_cur n vv /\
+      queue_entries_zero_indeg sin_degree squeue_cur vtail_start /\
+      queue_entries_valid squeue_cur vtail_cur n /\
+      queue_distinct_sz squeue_cur 0 vtail_cur /\
+      (forall (k:nat). k < n ==> Seq.index sin_degree k >= 0) /\
       vv < n /\ u < n /\
       vtail_new >= vtail_cur /\ vtail_new <= vtail_cur + 1 /\ vtail_new <= n /\
       Seq.length adj == n * n /\
@@ -721,14 +779,15 @@ val pn_combined_step
         (SZ.v (Seq.index squeue_new vtail_cur) == vv /\
          Seq.index sin_deg_new vv == 0 /\
          Seq.index sin_deg_cur vv > 0)) /\
-      // Converse: if in_deg dropped to 0, enqueue happened
-      (Seq.index sin_deg_new vv == 0 /\ Seq.index sin_deg_cur vv > 0 ==>
+      // Converse: if in_deg dropped to 0 from positive and queue not full, enqueue happened
+      (Seq.index sin_deg_new vv == 0 /\ Seq.index sin_deg_cur vv > 0 /\ vtail_cur < n ==>
         vtail_new == vtail_cur + 1))
     (ensures
       inner_indeg_partial adj n sin_degree sin_deg_new u (vv + 1) /\
       pn_extra_inv sin_degree sin_deg_new squeue_start squeue_new vtail_start vtail_new n /\
       pn_entries_below squeue_new vtail_start vtail_new (vv + 1) /\
-      pn_enqueue_complete sin_degree sin_deg_new squeue_new vtail_start vtail_new n (vv + 1))
+      pn_enqueue_complete sin_degree sin_deg_new squeue_new vtail_start vtail_new n (vv + 1) /\
+      queue_distinct_sz squeue_new 0 vtail_new)
 
 (* ================================================================
    BRIDGE LEMMAS: Derive queue properties from pn_extra_inv
@@ -1036,22 +1095,6 @@ val lemma_dag_completeness
    Every vertex with in_deg == 0 is either in output or in the active queue.
    ================================================================ *)
 
-let rec is_in_queue_sz (queue: Seq.seq SZ.t) (qh qt: nat) (v: nat) : Tot bool (decreases (qt - qh)) =
-  if qh >= qt then false
-  else if qh >= Seq.length queue then false
-  else if SZ.v (Seq.index queue qh) = v then true
-  else is_in_queue_sz queue (qh + 1) qt v
-
-(* zero_indeg_accounted: every vertex with in_deg == 0 is in output or active queue *)
-
-let zero_indeg_accounted
-  (in_deg: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat)
-  (queue: Seq.seq SZ.t) (qh qt: nat) : prop =
-  Seq.length in_deg >= n /\ count <= Seq.length output /\ qh <= qt /\ qt <= Seq.length queue /\
-  (forall (v: nat). {:pattern (Seq.index in_deg v)}
-    v < n /\ Seq.index in_deg v == 0 ==>
-      is_in_output output count v \/ is_in_queue_sz queue qh qt v)
-
 
 val zero_indeg_accounted_elim
   (in_deg: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat)
@@ -1193,3 +1236,37 @@ val lemma_post_process_neighbors
       queue_entries_valid squeue_post vtail_post n)
     (ensures
       kahn_outer_inv adj n sin_deg_post squeue_post soutput_post (vqh + 1) vtail_post (vout + 1))
+
+(* queue_entries_zero_indeg maintenance after process_neighbors.
+   Old entries [0, vqt) had sin_deg == 0. Since u not in output, u can't be a predecessor
+   of any zero-indeg vertex, so pn doesn't decrement their in-degrees.
+   New entries [vqt, vtail_post) have sin_deg_post == 0 from pn_extra_inv. *)
+val lemma_queue_entries_zero_indeg_after_pn
+  (adj: Seq.seq int) (n: nat)
+  (sin_deg_pre sin_deg_post: Seq.seq int) (output: Seq.seq int) (count: nat)
+  (squeue_pre squeue_post: Seq.seq SZ.t) (vqt vtail_post: nat) (u: nat)
+  : Lemma
+    (requires
+      n > 0 /\ u < n /\
+      Seq.length adj == n * n /\
+      Seq.length sin_deg_pre == n /\ Seq.length sin_deg_post == n /\
+      Seq.length squeue_pre == n /\ Seq.length squeue_post == n /\
+      count <= Seq.length output /\
+      vqt <= vtail_post /\ vtail_post <= n /\
+      queue_entries_zero_indeg sin_deg_pre squeue_pre vqt /\
+      indeg_correct adj n sin_deg_pre output count /\
+      not (is_in_output output count u) /\
+      inner_indeg_partial adj n sin_deg_pre sin_deg_post u n /\
+      pn_extra_inv sin_deg_pre sin_deg_post squeue_pre squeue_post vqt vtail_post n)
+    (ensures queue_entries_zero_indeg sin_deg_post squeue_post vtail_post)
+
+(* sin_deg nonneg: derivable from indeg_correct + partial_distinct + partial_valid *)
+val lemma_indeg_nonneg
+  (adj: Seq.seq int) (n: nat) (sin_deg: Seq.seq int) (output: Seq.seq int) (count: nat)
+  : Lemma
+    (requires
+      indeg_correct adj n sin_deg output count /\
+      partial_distinct output count /\
+      partial_valid output count n /\
+      n > 0)
+    (ensures forall (v: nat). v < n ==> Seq.index sin_deg v >= 0)
