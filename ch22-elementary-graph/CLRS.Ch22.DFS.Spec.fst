@@ -190,6 +190,55 @@ let discover_decreases_white_count (u: nat) (st: dfs_state)
   = let st' = discover_vertex u st in
     count_white_upd_white_decreases st.color 0 u Gray
 
+// Helper lemma: updating a non-white vertex to non-white doesn't change white count
+let rec count_white_upd_nonwhite_preserves (colors: Seq.seq color) (start idx: nat) (new_color: color)
+  : Lemma
+    (requires 
+      start <= idx /\
+      idx < Seq.length colors /\ 
+      start <= Seq.length colors /\
+      Seq.index colors idx <> White /\
+      new_color <> White)
+    (ensures 
+      count_white (Seq.upd colors idx new_color) start = count_white colors start)
+    (decreases (idx - start))
+  = if start >= Seq.length colors then ()
+    else if start = idx then (
+      // At the index being changed
+      // colors[idx] <> White, so it contributes 0
+      // new_color <> White, so it also contributes 0
+      if start + 1 <= Seq.length colors then
+        count_white_upd_after colors (start + 1) idx new_color;
+      ()
+    ) else ( // start < idx
+      assert (Seq.index (Seq.upd colors idx new_color) start = Seq.index colors start);
+      count_white_upd_nonwhite_preserves colors (start + 1) idx new_color
+    )
+
+// Finishing a vertex doesn't change white count (only changes Gray->Black)
+let finish_preserves_white_count (u: nat) (st: dfs_state)
+  : Lemma
+    (requires 
+      u < st.n /\ 
+      u < Seq.length st.color /\ 
+      Seq.index st.color u = Gray)
+    (ensures 
+      count_white_vertices (finish_vertex u st) = count_white_vertices st)
+  = let st' = finish_vertex u st in
+    count_white_upd_nonwhite_preserves st.color 0 u Black
+
+// Finishing a Black vertex also doesn't change white count
+let finish_black_preserves_white_count (u: nat) (st: dfs_state)
+  : Lemma
+    (requires 
+      u < st.n /\ 
+      u < Seq.length st.color /\ 
+      Seq.index st.color u = Black)
+    (ensures 
+      count_white_vertices (finish_vertex u st) = count_white_vertices st)
+  = let st' = finish_vertex u st in
+    count_white_upd_nonwhite_preserves st.color 0 u Black
+
 // Get neighbors of vertex u that are still white
 let rec get_white_neighbors (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (v: nat) (st: dfs_state) 
   : Tot (list nat) (decreases (if v < n then n - v else 0))
@@ -200,18 +249,56 @@ let rec get_white_neighbors (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (v: n
       then v :: rest
       else rest
 
+// All vertices in the neighbor list are < n
+let rec all_neighbors_lt_n (neighbors: list nat) (n: nat) : prop =
+  match neighbors with
+  | [] -> True
+  | v :: rest -> v < n /\ all_neighbors_lt_n rest n
+
+let rec get_white_neighbors_lt_n (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (v: nat) (st: dfs_state)
+  : Lemma
+    (ensures all_neighbors_lt_n (get_white_neighbors adj n u v st) n)
+    (decreases (if v < n then n - v else 0))
+  = if v >= n then ()
+    else (
+      get_white_neighbors_lt_n adj n u (v + 1) st;
+      // v < n from loop condition, and has_edge n adj u v also ensures v < n
+      ()
+    )
+
 // Visit all white neighbors recursively
+// Key invariants preserved:
+// - Non-white vertices in the input remain non-white (possibly change Gray->Black)
+// - Gray vertices either stay Gray or become Black
+// - Lengths and .n are preserved
 let rec visit_neighbors (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state)
-  : Tot dfs_state (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  : Pure dfs_state
+    (requires 
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n)
+    (ensures fun st' -> 
+      count_white_vertices st' <= count_white_vertices st /\
+      st'.n = st.n /\ 
+      Seq.length st'.d = Seq.length st.d /\
+      Seq.length st'.color = Seq.length st.color /\
+      Seq.length st'.f = Seq.length st.f /\
+      // Non-white vertices stay non-white
+      (forall (i: nat). i < Seq.length st.color /\ Seq.index st.color i <> White ==>
+        i < Seq.length st'.color /\ Seq.index st'.color i <> White) /\
+      // Gray vertices either stay Gray or become Black (but never White)
+      (forall (i: nat). i < Seq.length st.color /\ Seq.index st.color i = Gray ==>
+        i < Seq.length st'.color /\ (Seq.index st'.color i = Gray \/ Seq.index st'.color i = Black)))
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
   = match neighbors with
     | [] -> st
     | v :: rest ->
       // Visit v if still white (may have been visited by earlier neighbor)
       if v < Seq.length st.color && Seq.index st.color v = White then
         let st1 = dfs_visit adj n v st in
-        // dfs_visit decreases white count: discovers v (turns it Gray), visits descendants, finishes v (turns it Black)
-        // All nodes colored by dfs_visit were White before, so white count strictly decreases
-        assume (count_white_vertices st1 < count_white_vertices st);
+        // From dfs_visit postcondition: st1.n = n, lengths preserved, white count condition
+        // Since v < n (from all_neighbors_lt_n), v < Seq.length st.color, Seq.index st.color v = White,
+        // Seq.length st.d = st.n, and st.n = n, the implication fires:
+        assert (count_white_vertices st1 < count_white_vertices st);
         // Now can recurse: lexicographic order satisfied
         visit_neighbors adj n rest st1
       else
@@ -219,27 +306,80 @@ let rec visit_neighbors (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list n
         visit_neighbors adj n rest st
 
 // DFS-Visit: recursively explore from vertex u
+// Returns state with white count <= input white count
+// If u is white and arrays have correct lengths, white count strictly decreases
 and dfs_visit (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
-  : Tot dfs_state (decreases %[count_white_vertices st; 0])
+  : Pure dfs_state
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n)
+    (ensures fun st' ->
+      count_white_vertices st' <= count_white_vertices st /\
+      st'.n = st.n /\
+      Seq.length st'.d = Seq.length st.d /\
+      Seq.length st'.color = Seq.length st.color /\
+      Seq.length st'.f = Seq.length st.f /\
+      (u < n /\ u < Seq.length st.color /\ Seq.index st.color u = White ==>
+       count_white_vertices st' < count_white_vertices st) /\
+      // Non-white vertices stay non-white
+      (forall (i: nat). i < Seq.length st.color /\ Seq.index st.color i <> White ==>
+        i < Seq.length st'.color /\ Seq.index st'.color i <> White) /\
+      // Gray vertices either stay Gray or become Black
+      (forall (i: nat). i < Seq.length st.color /\ Seq.index st.color i = Gray ==>
+        i < Seq.length st'.color /\ (Seq.index st'.color i = Gray \/ Seq.index st'.color i = Black)))
+    (decreases %[count_white_vertices st; 0])
   = if u >= n then st
     else if u >= Seq.length st.color then st
     else if Seq.index st.color u <> White then st  // Already visited
-    else
+    else (
       // Discover u - this reduces white count
       let st1 = discover_vertex u st in
-      // discover_vertex turns u from White to Gray, decreasing white count by 1
-      assume (count_white_vertices st1 < count_white_vertices st);
+      discover_preserves_lengths u st;
+      // Establish preconditions for discover_decreases_white_count:
+      // u < st.n (we have u < n and st.n = n)
+      // u < Seq.length st.color (checked above)
+      // Seq.index st.color u = White (checked above)
+      // Seq.length st.d = st.n (from precondition)
+      discover_decreases_white_count u st;
+      assert (count_white_vertices st1 < count_white_vertices st);
+      // After discover, st1.color[u] = Gray
+      assert (u < Seq.length st1.color);
+      assert (Seq.index st1.color u = Gray);
       // Visit all white neighbors (white count of st1 < white count of st)
       let neighbors = get_white_neighbors adj n u 0 st1 in
+      get_white_neighbors_lt_n adj n u 0 st1;
       let st2 = visit_neighbors adj n neighbors st1 in
-      // Finish u
-      finish_vertex u st2
+      // From visit_neighbors postcondition: Gray vertices stay Gray or become Black
+      // Since st1.color[u] = Gray, we have st2.color[u] = Gray or st2.color[u] = Black
+      assert (Seq.index st1.color u = Gray);
+      assert (u < Seq.length st2.color);
+      assert (Seq.index st2.color u = Gray \/ Seq.index st2.color u = Black);
+      // st2 <= st1 < st, so st2 < st
+      // Finish u (doesn't change white count)
+      let st3 = finish_vertex u st2 in
+      finish_preserves_lengths u st2;
+      // Need to show finish doesn't increase white count
+      // Case analysis on st2.color[u]:
+      // If st2.color[u] = Gray, then finish_preserves_white_count applies
+      // If st2.color[u] = Black, then finish_black_preserves_white_count applies
+      // In both cases, white count doesn't change
+      if Seq.index st2.color u = Gray then
+        finish_preserves_white_count u st2
+      else
+        finish_black_preserves_white_count u st2;
+      st3
+    )
 
 (*** Main DFS - Visit all vertices ***)
 
 // DFS main loop: visit each unvisited vertex
 let rec dfs_loop (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
-  : Tot dfs_state (decreases (if u < n then n - u else 0))
+  : Pure dfs_state
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n)
+    (ensures fun st' ->
+      st'.n = st.n /\
+      Seq.length st'.d = Seq.length st.d /\
+      Seq.length st'.color = Seq.length st.color /\
+      Seq.length st'.f = Seq.length st.f)
+    (decreases (if u < n then n - u else 0))
   = if u >= n then st
     else
       let st1 = 
@@ -252,6 +392,7 @@ let rec dfs_loop (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
 // Main DFS entry point
 let dfs (adj: Seq.seq (Seq.seq int)) (n: nat) : dfs_state =
   let st0 = init_state n in
+  init_has_correct_lengths n;
   dfs_loop adj n 0 st0
 
 (*** Basic Properties ***)
