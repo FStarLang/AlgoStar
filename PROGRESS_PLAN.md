@@ -153,14 +153,14 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 
 ---
 
-## Current Status (2025-02-23)
+## Current Status (2025-02-23, updated)
 
-**180 F* files, ~59,500 lines — 97 unproven obligations across 32 files**
+**180 F* files, ~59,500 lines — 94 unproven obligations across 31 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
-| `admit()` | 67 | Unproven lemma/proof bodies (Pure F*) |
-| `assume(...)` | 16 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 4, DFS.Spec: 2, UF/Kruskal: 2) |
+| `admit()` | 66 | Unproven lemma/proof bodies (Pure F*) |
+| `assume(...)` | 14 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 4, UF/Kruskal: 2) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
 | `assume_` | 12 | Pulse-specific unproven invariants (StackDFS.Cmplx: 6, QueueBFS.Cmplx: 6) |
 
@@ -224,11 +224,11 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | 22 | IterativeDFS | — | ⚠️ reachability | — | 0 | Not CLRS |
 | 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+6 | Main: 0; Cmplx: 6 assume_ |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 0 | ✅ Fully verified (was 2 admits) |
-| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 10 | Distance, parenthesis, white-path |
+| 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 8 | Distance, parenthesis, white-path |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 16 | Across Spec/EdgeSort/Cmplx |
 | 23 | Prim | §23.2 | ⚠️ key bounds only | ✅ Linked O(n²) | 6 | |
 | 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | Exchange lemma proven |
-| 24 | Dijkstra | §24.3 | ⚠️ upper bound (Pulse) | ✅ Linked O(n²) | 2 | Correctness.fst: d=δ proven |
+| 24 | Dijkstra | §24.3 | ⚠️ upper bound (Pulse) | ✅ Linked O(n²) | 1 | Correctness.fst: d=δ proven |
 | 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 8 assume | Stretch goal |
@@ -248,15 +248,15 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | Chapter | admit | assume | assume_val | assume_ | Total | Top files |
 |---------|-------|--------|------------|---------|-------|-----------|
 | ch23 (MST) | 23 | 1 | 1 | 1 | 26 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal.Cmplx(2+1), EdgeSort(2), SortedEdges(0+1), Kruskal(0+0+1) |
-| ch22 (graphs) | 10 | 2 | 0 | 12 | 24 | StackDFS.Cmplx(0+0+6), QueueBFS.Cmplx(0+0+6), DFS.Spec(5+2), DFS.WhitePath(3), BFS.DistSpec(2) |
+| ch22 (graphs) | 8 | 0 | 0 | 12 | 20 | StackDFS.Cmplx(0+0+6), QueueBFS.Cmplx(0+0+6), DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2) |
 | ch08 (sorting) | 11 | 0 | 0 | 3 | 14 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch32 (strings) | 7 | 0 | 0 | 0 | 7 | KMP.Complexity(7) |
 | ch16 (greedy) | 2 | 4 | 0 | 0 | 6 | Huffman.Complete(2), Huffman.Spec(0+4) |
-| ch24 (SSSP) | 5 | 0 | 0 | 0 | 5 | BellmanFord.Spec(3), Dijkstra.TriIneq(2) |
+| ch24 (SSSP) | 4 | 0 | 0 | 0 | 4 | BellmanFord.Spec(3), Dijkstra.TriIneq(1) |
 | ch12 (BST) | 3 | 0 | 0 | 0 | 3 | BST.Insert.Spec(3) |
 | Other | 2 | 1 | 1 | 0 | 4 | MaxSubarray.DC(0+0+1), VertexCover.Spec(1), Strassen(1), UF.Spec(0+1) |
-| **Total** | **67** | **16** | **2** | **12** | **97** | |
+| **Total** | **66** | **14** | **2** | **12** | **94** | |
 
 ---
 
@@ -372,7 +372,7 @@ Good for human review in parallel with later phases.
 
 ### Phase 2: Critical Proof Gaps
 
-#### 2a: DFS.Spec Termination Assumes (2 assume in visit_neighbors + dfs_visit) — **HIGHEST PRIORITY**
+#### 2a: DFS.Spec Termination Assumes (2 assume in visit_neighbors + dfs_visit) — ✅ DONE
 **Goal**: Eliminate the 2 `assume` calls that bypass the termination proof for the mutually
 recursive `visit_neighbors`/`dfs_visit` functions in DFS.Spec.fst (lines 214 and 231).
 
@@ -416,13 +416,12 @@ or skips already-visited ones.
 type, the `assume` in `visit_neighbors` can be replaced by the refinement from the
 return type of the recursive `dfs_visit` call.
 
-#### 2b: Close Dijkstra End-to-End (2 admits in TriangleInequality)
+#### 2b: Close Dijkstra End-to-End (2 admits in TriangleInequality) — ⚠️ PARTIAL (2→1)
 **Goal**: Make Dijkstra the first SSSP algorithm with fully proven exact shortest paths.
 - Dijkstra.Correctness (zero admits) already proves d[v]=δ(s,v) given triangle inequality + upper bound.
-- TriangleInequality.fst has 2 admits: one for combining relaxation with processed-set invariant (line 288),
-  one for preservation proof (line 311).
-- **Approach**: Need "Dijkstra invariant" (processed vertices have exact distances) threaded through the main
-  loop. Then show: when u is extracted, all its predecessors on the shortest path are already processed.
+- TriangleInequality.fst ~~2~~ **1** admit remaining: stability maintenance across processing steps.
+- **Done**: Added `relaxation_stable_for_processed` predicate, proved preservation under stability.
+- **Remaining**: Proving stability is maintained when processing order follows Dijkstra's greedy extraction.
 
 #### 2c: Close Bellman-Ford Spec (3 admits)
 - Line 235: relaxation preserves upper bound — should be provable with path weight algebra

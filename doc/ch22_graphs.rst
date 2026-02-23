@@ -130,13 +130,14 @@ The DFS state tracks vertex colors and timestamps:
    :start-after: //SNIPPET_START: dfs_state
    :end-before: //SNIPPET_END: dfs_state
 
-The specification module (``DFS.Spec``) has **7 unproven obligations**
-(5 ``admit()`` + 2 ``assume()``). The admits cover the parenthesis
+The specification module (``DFS.Spec``) has **5 unproven obligations**
+(5 ``admit()``). The admits cover the parenthesis
 theorem (proving ``d[u] < d[v] < f[v] < f[u]`` for descendants),
 edge classification (tree, back, forward, cross edges), and
-timestamp monotonicity. The two ``assume`` calls provide termination
-measures (``count_white_vertices`` decreases) for the pure DFS
-function.
+timestamp monotonicity. The former 2 ``assume`` calls for termination
+measures (``count_white_vertices`` decreases) have been fully proven
+via ``discover_decreases_white_count`` and enriched return types on
+the mutually recursive ``visit_neighbors``/``dfs_visit`` functions.
 
 White-Path Theorem
 ~~~~~~~~~~~~~~~~~~
@@ -277,7 +278,7 @@ Verification Status Summary
      - 2 admit()
    * - DFS.Spec
      - Pure spec
-     - 5 admit() + 2 assume()
+     - 5 admit()
    * - DFS.WhitePath
      - Pure spec
      - 3 admit()
