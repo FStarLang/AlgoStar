@@ -654,3 +654,39 @@ let rec lemma_crp_zero_output_independent
       assert (not (is_in_output output2 0 (scan - 1)))
     end
 
+(* ================================================================
+   PREDECESSOR FINDING — Pure function for cycle construction
+   ================================================================ *)
+
+(* If count_remaining_preds > 0, find a concrete predecessor not in output *)
+let rec find_non_output_predecessor
+  (adj: seq int) (n: nat) (output: seq int) (count: nat) (v: nat) (scan: nat)
+  : Pure nat
+    (requires
+      v < n /\ scan <= n /\ count <= Seq.length output /\ Seq.length adj == n * n /\
+      count_remaining_preds adj n output count v scan > 0)
+    (ensures fun u ->
+      u < scan /\ u < n /\ u * n + v < n * n /\
+      Seq.index adj (u * n + v) <> 0 /\
+      not (is_in_output output count u))
+    (decreases scan)
+  = let u = scan - 1 in
+    if u < n && v < n && Seq.length adj = n * n && u * n + v < Seq.length adj &&
+       Seq.index adj (u * n + v) <> 0 && count <= Seq.length output &&
+       not (is_in_output output count u)
+    then u
+    else find_non_output_predecessor adj n output count v (scan - 1)
+
+(* Corollary at full scan *)
+let find_non_output_predecessor_full
+  (adj: seq int) (n: nat) (output: seq int) (count: nat) (v: nat)
+  : Pure nat
+    (requires
+      v < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\
+      count_remaining_preds adj n output count v n > 0)
+    (ensures fun u ->
+      u < n /\ u * n + v < n * n /\
+      Seq.index adj (u * n + v) <> 0 /\
+      not (is_in_output output count u))
+  = find_non_output_predecessor adj n output count v n
+

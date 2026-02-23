@@ -269,6 +269,20 @@ let lemma_permutation_contains_all (s: Seq.seq int) (n: nat) (v: nat)
       // n = sum_counts <= n-1, contradiction
     end
 
+// Pigeonhole for partial sequences: if each v < n appears in first count elements
+// but count < n, contradiction.
+let lemma_pigeonhole_count_occurrences (s: Seq.seq int) (count n: nat)
+  : Lemma
+    (requires
+      count < n /\ count <= Seq.length s /\
+      (forall (i:nat). i < count ==> Seq.index s i >= 0 /\ Seq.index s i < n) /\
+      (forall (v: nat). v < n ==> count_occurrences s count v >= 1))
+    (ensures False)
+  = lemma_sum_counts_total s count n;
+    let rec aux (k: nat) : Lemma (requires k <= n) (ensures sum_counts s count k >= k) (decreases k) =
+      if k = 0 then () else (aux (k-1); assert (count_occurrences s count (k-1) >= 1))
+    in aux n
+
 #pop-options
 
 (**
@@ -435,3 +449,154 @@ let theorem_kahns_algorithm_correct
     (ensures is_topological_order adj n (seq_int_to_nat output n))
   = lemma_strong_order_implies_topo_order_int adj n output;
     lemma_int_order_implies_nat_order adj n output
+
+(**
+ * DAG Completeness: Kahn's algorithm processes ALL vertices in a DAG.
+ *
+ * If every non-output vertex has positive remaining in-degree and the graph
+ * is a DAG, then all vertices must be in the output.
+ *
+ * Proof: build backward predecessor chain. Walk with visited set.
+ * After at most n steps we revisit a vertex, giving a directed cycle.
+ * This contradicts the DAG property.
+ *)
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+
+(* Backward chain: chain(0) = v0, chain(k+1) = predecessor of chain(k) *)
+let rec build_chain_value
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat) (k: nat)
+  : Pure nat
+    (requires
+      v0 < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
+      not (is_in_output output count v0) /\
+      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+        count_remaining_preds adj n output count w n > 0))
+    (ensures fun v -> v < n /\ not (is_in_output output count v))
+    (decreases k)
+  = if k = 0 then v0
+    else
+      let prev = build_chain_value adj n output count v0 (k - 1) in
+      find_non_output_predecessor_full adj n output count prev
+
+(* Consecutive chain values have a directed edge *)
+let lemma_chain_edge
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat) (k: nat)
+  : Lemma
+    (requires
+      v0 < n /\ k < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
+      not (is_in_output output count v0) /\
+      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+        count_remaining_preds adj n output count w n > 0))
+    (ensures has_edge n adj
+      (build_chain_value adj n output count v0 (k + 1))
+      (build_chain_value adj n output count v0 k))
+  = ()
+
+(* Chain subsequence gives has_path *)
+let rec lemma_chain_has_path
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat) (i j: nat)
+  : Lemma
+    (requires
+      v0 < n /\ i <= j /\ j <= n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
+      not (is_in_output output count v0) /\
+      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+        count_remaining_preds adj n output count w n > 0))
+    (ensures has_path adj n
+      (build_chain_value adj n output count v0 j)
+      (build_chain_value adj n output count v0 i) (j - i))
+    (decreases (j - i))
+  = if j = i then ()
+    else begin
+      lemma_chain_edge adj n output count v0 (j - 1);
+      if j - i > 1 then
+        lemma_chain_has_path adj n output count v0 i (j - 1)
+    end
+
+#pop-options
+
+(* Find duplicate in chain using boolean visited set.
+   Walk positions 0, 1, ..., marking visited. Stop when a repeat is found.
+   Terminates: count_visited increases each step until n, then pigeonhole forces repeat. *)
+
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 40"
+
+private let rec count_visited (visited: Seq.seq bool) (m: nat)
+  : Pure nat (requires m <= Seq.length visited) (ensures fun c -> c <= m) (decreases m)
+  = if m = 0 then 0
+    else (if Seq.index visited (m - 1) then 1 else 0) + count_visited visited (m - 1)
+
+private let rec lemma_count_visited_set (visited: Seq.seq bool) (m pos: nat)
+  : Lemma
+    (requires m <= Seq.length visited /\ pos < Seq.length visited /\ not (Seq.index visited pos))
+    (ensures count_visited (Seq.upd visited pos true) m ==
+      count_visited visited m + (if pos < m then 1 else 0))
+    (decreases m)
+  = if m = 0 then ()
+    else lemma_count_visited_set visited (m - 1) pos
+
+let rec find_chain_duplicate
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
+  (k: nat) (visited: Seq.seq bool)
+  : Pure (nat & nat)
+    (requires
+      v0 < n /\ k <= n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
+      not (is_in_output output count v0) /\
+      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+        count_remaining_preds adj n output count w n > 0) /\
+      Seq.length visited == n /\
+      count_visited visited n == k /\
+      (forall (v: nat). v < n /\ Seq.index visited v ==>
+        (exists (j: nat). j < k /\ build_chain_value adj n output count v0 j == v)) /\
+      (forall (j: nat). j < k ==> Seq.index visited (build_chain_value adj n output count v0 j)))
+    (ensures fun (i, j) ->
+      i <= n /\ j <= n /\ i < j /\
+      build_chain_value adj n output count v0 i ==
+      build_chain_value adj n output count v0 j)
+    (decreases (n - k))
+  = let vk = build_chain_value adj n output count v0 k in
+    if Seq.index visited vk then begin
+      // vk already visited → find the earlier occurrence
+      let rec find_earlier (p: nat)
+        : Pure nat
+          (requires p <= k /\
+            (exists (j: nat). j >= p /\ j < k /\ build_chain_value adj n output count v0 j == vk))
+          (ensures fun j -> j >= p /\ j < k /\
+            build_chain_value adj n output count v0 j == vk)
+          (decreases (k - p))
+        = if build_chain_value adj n output count v0 p = vk then p
+          else find_earlier (p + 1)
+      in
+      (find_earlier 0, k)
+    end
+    else begin
+      // k < n (visited has k true entries out of n, found a false → k < n)
+      let visited' = Seq.upd visited vk true in
+      lemma_count_visited_set visited n vk;
+      find_chain_duplicate adj n output count v0 (k + 1) visited'
+    end
+
+#pop-options
+
+(* Main cycle lemma *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+
+let lemma_non_output_implies_cycle
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
+  : Lemma
+    (requires
+      v0 < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
+      not (is_in_output output count v0) /\
+      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+        count_remaining_preds adj n output count w n > 0))
+    (ensures has_cycle adj n)
+  = let visited0 = Seq.create n false in
+    let rec aux (m: nat)
+      : Lemma (requires m <= n) (ensures count_visited (Seq.create n false) m == 0) (decreases m)
+      = if m = 0 then () else aux (m - 1)
+    in aux n;
+    let (i, j) = find_chain_duplicate adj n output count v0 0 visited0 in
+    lemma_chain_has_path adj n output count v0 i j;
+    ()
+
+#pop-options
