@@ -1532,6 +1532,55 @@ let rec lemma_is_in_output_monotone_local
     else if Seq.index output (c2 - 1) = v then ()
     else lemma_is_in_output_monotone_local output c1 (c2 - 1) v
 
+(* is_in_output preserved when entries [0,count) are the same *)
+let rec lemma_is_in_output_preserved
+  (output_old output_new: Seq.seq int) (count: nat) (v: int)
+  : Lemma
+    (requires
+      count <= Seq.length output_old /\ count <= Seq.length output_new /\
+      (forall (k:nat). k < count ==> Seq.index output_new k == Seq.index output_old k) /\
+      is_in_output output_old count v)
+    (ensures is_in_output output_new count v)
+    (decreases count)
+  = if count = 0 then ()
+    else if Seq.index output_old (count - 1) = v then ()
+    else lemma_is_in_output_preserved output_old output_new (count - 1) v
+
+(* zero_indeg_accounted after dequeue + output extend *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let lemma_zero_indeg_accounted_dequeue_extend
+  (in_deg: Seq.seq int) (n: nat)
+  (output_pre output_post: Seq.seq int) (count: nat)
+  (queue: Seq.seq SZ.t) (qh qt: nat) (u: int)
+  : Lemma
+    (requires
+      zero_indeg_accounted in_deg n output_pre count queue qh qt /\
+      qh < qt /\ qt <= Seq.length queue /\
+      count < Seq.length output_post /\ Seq.length output_post == Seq.length output_pre /\
+      output_post == Seq.upd output_pre count u /\
+      u == SZ.v (Seq.index queue qh) /\
+      n > 0)
+    (ensures
+      zero_indeg_accounted in_deg n output_post (count + 1) queue (qh + 1) qt)
+  = reveal_opaque (`%zero_indeg_accounted) (zero_indeg_accounted in_deg n output_pre count queue qh qt);
+    let aux (v: nat) : Lemma
+      (requires v < n /\ Seq.index in_deg v == 0)
+      (ensures is_in_output output_post (count + 1) v \/ is_in_queue_sz queue (qh + 1) qt v)
+      = if is_in_output output_pre count v then begin
+          // output_post[k] == output_pre[k] for k < count (since output_post = upd output_pre count u)
+          // So is_in_output output_post count v
+          assert (forall (k:nat). k < count ==> Seq.index output_post k == Seq.index output_pre k);
+          lemma_is_in_output_preserved output_pre output_post count v;
+          lemma_is_in_output_monotone_local output_post count (count + 1) v
+        end else begin
+          if SZ.v (Seq.index queue qh) = v then ()
+          else lemma_is_in_queue_dequeue queue qh qt v
+        end
+    in
+    Classical.forall_intro (Classical.move_requires aux);
+    reveal_opaque (`%zero_indeg_accounted) (zero_indeg_accounted in_deg n output_post (count + 1) queue (qh + 1) qt)
+#pop-options
+
 (* is_in_queue preserved when old entries are preserved *)
 let rec lemma_is_in_queue_preserved
   (queue_old queue_new: Seq.seq SZ.t) (qh qt: nat) (v: nat)

@@ -19,13 +19,6 @@ module Seq = FStar.Seq
 module V = Pulse.Lib.Vec
 
 (* ================================================================
-   ASSUME_FACT — Ghost wrapper for admit, avoids Z3 issues with assume_
-   We use this as a placeholder; every call will be eliminated.
-   ================================================================ *)
-
-ghost fn assume_fact (p: prop) requires emp ensures pure p { admit() }
-
-(* ================================================================
    HELPER: maybe_enqueue — Process edge and potentially enqueue vertex
    ================================================================ *)
 
@@ -88,7 +81,10 @@ fn maybe_enqueue
       (SZ.v vtail' == SZ.v vtail + 1 ==>
         (SZ.v (Seq.index squeue' (SZ.v vtail)) == SZ.v vv /\
          Seq.index sin_degree' (SZ.v vv) == 0 /\
-         Seq.index sin_degree (SZ.v vv) > 0))
+         Seq.index sin_degree (SZ.v vv) > 0)) /\
+      // Converse: if in-degree dropped to 0 from positive and queue not full, enqueue happened
+      (Seq.index sin_degree' (SZ.v vv) == 0 /\ Seq.index sin_degree (SZ.v vv) > 0 /\ SZ.v vtail < SZ.v n ==>
+        SZ.v vtail' == SZ.v vtail + 1)
     )
 {
   // Compute edge index: u * n + vv
@@ -147,6 +143,10 @@ fn pn_loop_step
       inner_indeg_partial sadj (SZ.v n) sin_degree_init sin_deg_cur (SZ.v u) (SZ.v vv) /\
       pn_extra_inv sin_degree_init sin_deg_cur squeue_init squeue_cur (SZ.v vtail_start_val) (SZ.v vtail_cur) (SZ.v n) /\
       pn_entries_below squeue_cur (SZ.v vtail_start_val) (SZ.v vtail_cur) (SZ.v vv) /\
+      pn_enqueue_complete sin_degree_init sin_deg_cur squeue_cur (SZ.v vtail_start_val) (SZ.v vtail_cur) (SZ.v n) (SZ.v vv) /\
+      queue_entries_zero_indeg sin_degree_init squeue_cur (SZ.v vtail_start_val) /\
+      queue_distinct_sz squeue_cur 0 (SZ.v vtail_cur) /\
+      (forall (k:nat). k < SZ.v n ==> Seq.index sin_degree_init k >= 0) /\
       SZ.v vtail_start_val <= Seq.length squeue_init /\
       Seq.length squeue_init == SZ.v n
     )
@@ -163,7 +163,9 @@ fn pn_loop_step
       queue_entries_valid squeue_new (SZ.v vtail_new) (SZ.v n) /\
       inner_indeg_partial sadj (SZ.v n) sin_degree_init sin_deg_new (SZ.v u) (SZ.v vv + 1) /\
       pn_extra_inv sin_degree_init sin_deg_new squeue_init squeue_new (SZ.v vtail_start_val) (SZ.v vtail_new) (SZ.v n) /\
-      pn_entries_below squeue_new (SZ.v vtail_start_val) (SZ.v vtail_new) (SZ.v vv + 1)
+      pn_entries_below squeue_new (SZ.v vtail_start_val) (SZ.v vtail_new) (SZ.v vv + 1) /\
+      pn_enqueue_complete sin_degree_init sin_deg_new squeue_new (SZ.v vtail_start_val) (SZ.v vtail_new) (SZ.v n) (SZ.v vv + 1) /\
+      queue_distinct_sz squeue_new 0 (SZ.v vtail_new)
     )
 {
   with sin_deg_cur0. assert (A.pts_to in_degree sin_deg_cur0);
@@ -219,7 +221,10 @@ fn process_neighbors
       Seq.length squeue == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       SZ.fits (SZ.v u * SZ.v n) /\
-      queue_entries_valid squeue (SZ.v vtail) (SZ.v n)
+      queue_entries_valid squeue (SZ.v vtail) (SZ.v n) /\
+      queue_entries_zero_indeg sin_degree squeue (SZ.v vtail) /\
+      queue_distinct_sz squeue 0 (SZ.v vtail) /\
+      (forall (k:nat). k < SZ.v n ==> Seq.index sin_degree k >= 0)
     )
   ensures exists* sin_degree' squeue' vtail'.
     A.pts_to adj sadj **
@@ -233,7 +238,9 @@ fn process_neighbors
       SZ.v vtail' <= SZ.v n /\
       queue_entries_valid squeue' (SZ.v vtail') (SZ.v n) /\
       inner_indeg_partial sadj (SZ.v n) sin_degree sin_degree' (SZ.v u) (SZ.v n) /\
-      pn_extra_inv sin_degree sin_degree' squeue squeue' (SZ.v vtail) (SZ.v vtail') (SZ.v n)
+      pn_extra_inv sin_degree sin_degree' squeue squeue' (SZ.v vtail) (SZ.v vtail') (SZ.v n) /\
+      pn_enqueue_complete sin_degree sin_degree' squeue' (SZ.v vtail) (SZ.v vtail') (SZ.v n) (SZ.v n) /\
+      queue_distinct_sz squeue' 0 (SZ.v vtail')
     )
 {
   // Read initial vtail as concrete value for pn_loop_step
@@ -242,6 +249,7 @@ fn process_neighbors
   // Establish initial predicates
   pn_extra_inv_initial sin_degree squeue (SZ.v vtail_init) (SZ.v n);
   pn_entries_below_initial squeue (SZ.v vtail_init);
+  pn_enqueue_complete_initial sin_degree squeue (SZ.v vtail_init) (SZ.v n);
   
   let mut v: SZ.t = 0sz;
   while (!v <^ n)
@@ -265,6 +273,10 @@ fn process_neighbors
       inner_indeg_partial sadj (SZ.v n) sin_degree sin_deg_cur (SZ.v u) (SZ.v vv) /\
       pn_extra_inv sin_degree sin_deg_cur squeue squeue_cur (SZ.v vtail_init) (SZ.v vtail_cur) (SZ.v n) /\
       pn_entries_below squeue_cur (SZ.v vtail_init) (SZ.v vtail_cur) (SZ.v vv) /\
+      pn_enqueue_complete sin_degree sin_deg_cur squeue_cur (SZ.v vtail_init) (SZ.v vtail_cur) (SZ.v n) (SZ.v vv) /\
+      queue_entries_zero_indeg sin_degree squeue_cur (SZ.v vtail_init) /\
+      queue_distinct_sz squeue_cur 0 (SZ.v vtail_cur) /\
+      (forall (k:nat). k < SZ.v n ==> Seq.index sin_degree k >= 0) /\
       SZ.v vtail_init <= Seq.length squeue /\
       Seq.length squeue == SZ.v n
     )
@@ -291,7 +303,8 @@ fn topological_sort
     pure (
       SZ.v n > 0 /\
       Seq.length sadj == SZ.v n * SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      ~(has_cycle sadj (SZ.v n))
     )
   returns output: V.vec int
   ensures exists* sout.
@@ -470,6 +483,12 @@ fn topological_sort
   // Bundle into opaque invariant
   kahn_outer_inv_intro sadj (SZ.v n) sin_deg_init squeue_init soutput_init 0 (SZ.v vqt_init) 0;
   
+  // Extra invariants for DAG completeness
+  lemma_step2_to_queue_entries_zero_indeg sadj (SZ.v n) sin_deg_init (reveal ghost_output) squeue_init (SZ.v vqt_init);
+  // zero_indeg_accounted: from step2 completeness (all zero-indeg vertices in queue)
+  // step2_queue_inv at vi=n gives: forall v < n. in_deg[v] == 0 ==> is_in_queue_sz queue 0 vqt v
+  lemma_step2_to_zero_indeg_accounted sin_deg_init (SZ.v n) soutput_init squeue_init (SZ.v vqt_init);
+  
   while (!queue_head <^ !queue_tail)
   invariant exists* vqh vqt vout sin_degree squeue soutput.
     R.pts_to queue_head vqh **
@@ -494,7 +513,12 @@ fn topological_sort
       (forall (k: nat). SZ.v vout <= k /\ k < SZ.v n ==> Seq.index soutput k == 0) /\
       (forall (k: nat). k < Seq.length soutput ==> Seq.index soutput k >= 0) /\
       // Opaque bundled correctness invariant
-      kahn_outer_inv sadj (SZ.v n) sin_degree squeue soutput (SZ.v vqh) (SZ.v vqt) (SZ.v vout)
+      kahn_outer_inv sadj (SZ.v n) sin_degree squeue soutput (SZ.v vqh) (SZ.v vqt) (SZ.v vout) /\
+      // Extra invariants for DAG completeness
+      queue_entries_zero_indeg sin_degree squeue (SZ.v vqt) /\
+      queue_distinct_sz squeue 0 (SZ.v vqt) /\
+      zero_indeg_accounted sin_degree (SZ.v n) soutput (SZ.v vout) squeue (SZ.v vqh) (SZ.v vqt) /\
+      ~(has_cycle sadj (SZ.v n))
     )
   {
     let vqh = !queue_head;
@@ -572,22 +596,59 @@ fn topological_sort
     // For k > vout, k < n: Seq.index soutput_new k == Seq.index soutput_pre k == 0
     assert (pure (soutput_new == Seq.upd soutput_pre (SZ.v vout) u_int));
     assert (pure (Seq.length soutput_new == SZ.v n));
-    assert (pure (u_int >= 0 /\ u_int < SZ.v n))
+    assert (pure (u_int >= 0 /\ u_int < SZ.v n));
+    
+    // --- Maintain extra invariants for DAG completeness ---
+    
+    // queue_entries_zero_indeg: maintained after pn
+    lemma_queue_entries_zero_indeg_after_pn sadj (SZ.v n)
+      sin_deg_pre sin_deg_post soutput_pre (SZ.v vout)
+      squeue_pre squeue_post (SZ.v vqt) (SZ.v vtail_post) u_int;
+    
+    // queue_distinct_sz squeue_post 0 vtail_post: from process_neighbors postcondition
+    // (already available)
+    
+    // zero_indeg_accounted: need intermediate + after pn
+    // Convert pn_enqueue_complete to is_in_queue_sz
+    lemma_pn_enqueue_complete_to_is_in_queue
+      sin_deg_pre sin_deg_post squeue_post (SZ.v vqt) (SZ.v vtail_post) (SZ.v n);
+    
+    // Establish intermediate zero_indeg_accounted (after dequeue+output extend, before pn)
+    // From old: zero_indeg_accounted sin_deg_pre n soutput_pre vout squeue_pre vqh vqt
+    // After: zero_indeg_accounted sin_deg_pre n soutput_post (vout+1) squeue_pre (vqh+1) vqt
+    // u moved from queue to output, others preserved
+    lemma_zero_indeg_accounted_dequeue_extend
+      sin_deg_pre (SZ.v n) soutput_pre soutput_post (SZ.v vout)
+      squeue_pre (SZ.v vqh) (SZ.v vqt) u_int;
+    
+    // Now apply lemma_zero_indeg_accounted_after_pn
+    lemma_zero_indeg_accounted_after_pn sadj (SZ.v n)
+      sin_deg_pre sin_deg_post soutput_post (SZ.v vout + 1)
+      squeue_pre squeue_post (SZ.v vqh + 1) (SZ.v vqt) (SZ.v vtail_post)
   };
   
   // After the loop, extract the existentials
   with vqh vqt vout sin_degree squeue soutput. _;
   
   // Loop exit: vqh == vqt (queue empty), vout == vqh
-  // All vertices processed: assume vout == n (follows from algorithm termination)
-  assume_fact (SZ.v vout == SZ.v n);
+  // Prove vout == n using DAG completeness
+  
+  // Reveal the opaque invariant to extract strong_order_inv, partial_distinct, etc.
+  kahn_outer_inv_elim sadj (SZ.v n) sin_degree squeue soutput (SZ.v vqh) (SZ.v vqt) (SZ.v vout);
+  
+  // zero_indeg_accounted at exit (empty queue: qh == qt)
+  // gives: all zero-indeg vertices are in output
+  zero_indeg_accounted_at_exit sin_degree (SZ.v n) soutput (SZ.v vout) squeue (SZ.v vqh);
+  
+  // lemma_dag_completeness: no cycles + all zero-indeg in output → vout >= n
+  lemma_dag_completeness sadj (SZ.v n) sin_degree soutput (SZ.v vout);
+  
+  // vout <= n (from loop invariant) + vout >= n → vout == n
+  assert (pure (SZ.v vout == SZ.v n));
   
   // Structural properties
   assert (pure (forall (i: nat). i < SZ.v n ==> Seq.index soutput i < SZ.v n));
   assert (pure (forall (i: nat). i < Seq.length soutput ==> Seq.index soutput i >= 0));
-  
-  // Reveal the opaque invariant to extract strong_order_inv, partial_distinct, etc.
-  kahn_outer_inv_elim sadj (SZ.v n) sin_degree squeue soutput (SZ.v vqh) (SZ.v vqt) (SZ.v vout);
   
   // Bridge: partial_distinct at count=n → all_distinct (seq_int_to_nat soutput)
   lemma_partial_distinct_implies_all_distinct soutput (SZ.v n);

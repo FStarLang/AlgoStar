@@ -1127,6 +1127,7 @@ val zero_indeg_accounted_at_exit
       Seq.length in_deg >= n /\
       (forall (v: nat). v < n /\ Seq.index in_deg v == 0 ==> is_in_output output count v))
 
+
 val lemma_is_in_queue_dequeue
   (queue: Seq.seq SZ.t) (qh qt: nat) (v: nat)
   : Lemma
@@ -1144,6 +1145,23 @@ val lemma_is_in_output_monotone_local
   : Lemma
     (requires c1 <= c2 /\ c2 <= Seq.length output /\ is_in_output output c1 v)
     (ensures is_in_output output c2 v)
+
+(* After dequeue u from queue and add u to output:
+   u moves from queue[qh] to output[count]. *)
+val lemma_zero_indeg_accounted_dequeue_extend
+  (in_deg: Seq.seq int) (n: nat)
+  (output_pre output_post: Seq.seq int) (count: nat)
+  (queue: Seq.seq SZ.t) (qh qt: nat) (u: int)
+  : Lemma
+    (requires
+      zero_indeg_accounted in_deg n output_pre count queue qh qt /\
+      qh < qt /\ qt <= Seq.length queue /\
+      count < Seq.length output_post /\ Seq.length output_post == Seq.length output_pre /\
+      output_post == Seq.upd output_pre count u /\
+      u == SZ.v (Seq.index queue qh) /\
+      n > 0)
+    (ensures
+      zero_indeg_accounted in_deg n output_post (count + 1) queue (qh + 1) qt)
 
 val lemma_is_in_queue_preserved
   (queue_old queue_new: Seq.seq SZ.t) (qh qt: nat) (v: nat)
