@@ -648,6 +648,48 @@ val pn_entries_below_elim
       vtail_cur <= Seq.length squeue /\
       (forall (k:nat). k >= vtail_start /\ k < vtail_cur ==> SZ.v (Seq.index squeue k) < vv))
 
+(* pn_enqueue_complete: every vertex < vv whose in_deg dropped from nonzero to 0 is enqueued *)
+let pn_enqueue_complete
+  (sin_deg_start sin_deg_cur: Seq.seq int)
+  (squeue_cur: Seq.seq SZ.t)
+  (vtail_start vtail_cur: nat) (n vv: nat) : prop =
+  vv <= n /\
+  vtail_start <= vtail_cur /\ vtail_cur <= Seq.length squeue_cur /\
+  Seq.length sin_deg_start == n /\ Seq.length sin_deg_cur == n /\
+  (forall (v: nat). v < vv /\ v < n /\ Seq.index sin_deg_start v <> 0 /\ Seq.index sin_deg_cur v == 0 ==>
+    (exists (k: nat). k >= vtail_start /\ k < vtail_cur /\ SZ.v (Seq.index squeue_cur k) == v))
+
+val pn_enqueue_complete_initial
+  (sin_deg_start: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail_start: nat) (n: nat)
+  : Lemma
+    (requires vtail_start <= Seq.length squeue /\ Seq.length sin_deg_start == n)
+    (ensures pn_enqueue_complete sin_deg_start sin_deg_start squeue vtail_start vtail_start n 0)
+
+val pn_enqueue_complete_step
+  (sin_deg_start sin_deg_cur sin_deg_new: Seq.seq int)
+  (squeue_cur squeue_new: Seq.seq SZ.t)
+  (vtail_start vtail_cur vtail_new: nat) (n vv: nat)
+  : Lemma
+    (requires
+      pn_enqueue_complete sin_deg_start sin_deg_cur squeue_cur vtail_start vtail_cur n vv /\
+      vv < n /\
+      vtail_new >= vtail_cur /\ vtail_new <= vtail_cur + 1 /\
+      vtail_new <= Seq.length squeue_new /\
+      Seq.length squeue_new == Seq.length squeue_cur /\
+      Seq.length sin_deg_new == n /\ Seq.length sin_deg_start == n /\
+      (forall (k: nat). k < vtail_cur ==> Seq.index squeue_new k == Seq.index squeue_cur k) /\
+      (forall (k: nat). k < n /\ k <> vv ==> Seq.index sin_deg_new k == Seq.index sin_deg_cur k) /\
+      // If enqueue: vv was enqueued at position vtail_cur
+      (vtail_new == vtail_cur + 1 ==>
+        (SZ.v (Seq.index squeue_new vtail_cur) == vv /\
+         Seq.index sin_deg_start vv <> 0 /\
+         Seq.index sin_deg_new vv == 0)) /\
+      // Key fact from inner_indeg_partial: vv hasn't been processed yet
+      Seq.index sin_deg_cur vv == Seq.index sin_deg_start vv /\
+      // No-enqueue + nonzero start in_deg means in_deg didn't drop to 0
+      (vtail_new == vtail_cur /\ Seq.index sin_deg_start vv <> 0 ==> Seq.index sin_deg_new vv <> 0))
+    (ensures pn_enqueue_complete sin_deg_start sin_deg_new squeue_new vtail_start vtail_new n (vv + 1))
+
 val pn_combined_step
   (adj: Seq.seq int) (n: nat)
   (sin_degree sin_deg_cur sin_deg_new: Seq.seq int)
@@ -658,6 +700,7 @@ val pn_combined_step
       inner_indeg_partial adj n sin_degree sin_deg_cur u vv /\
       pn_extra_inv sin_degree sin_deg_cur squeue_start squeue_cur vtail_start vtail_cur n /\
       pn_entries_below squeue_cur vtail_start vtail_cur vv /\
+      pn_enqueue_complete sin_degree sin_deg_cur squeue_cur vtail_start vtail_cur n vv /\
       vv < n /\ u < n /\
       vtail_new >= vtail_cur /\ vtail_new <= vtail_cur + 1 /\ vtail_new <= n /\
       Seq.length adj == n * n /\
@@ -677,11 +720,15 @@ val pn_combined_step
       (vtail_new == vtail_cur + 1 ==>
         (SZ.v (Seq.index squeue_new vtail_cur) == vv /\
          Seq.index sin_deg_new vv == 0 /\
-         Seq.index sin_deg_cur vv > 0)))
+         Seq.index sin_deg_cur vv > 0)) /\
+      // Converse: if in_deg dropped to 0, enqueue happened
+      (Seq.index sin_deg_new vv == 0 /\ Seq.index sin_deg_cur vv > 0 ==>
+        vtail_new == vtail_cur + 1))
     (ensures
       inner_indeg_partial adj n sin_degree sin_deg_new u (vv + 1) /\
       pn_extra_inv sin_degree sin_deg_new squeue_start squeue_new vtail_start vtail_new n /\
-      pn_entries_below squeue_new vtail_start vtail_new (vv + 1))
+      pn_entries_below squeue_new vtail_start vtail_new (vv + 1) /\
+      pn_enqueue_complete sin_degree sin_deg_new squeue_new vtail_start vtail_new n (vv + 1))
 
 (* ================================================================
    BRIDGE LEMMAS: Derive queue properties from pn_extra_inv
@@ -1074,6 +1121,21 @@ val lemma_is_in_queue_weaken_start
   : Lemma
     (requires qh <= qh' /\ qh' <= qt /\ qt <= Seq.length queue /\ is_in_queue_sz queue qh' qt v)
     (ensures is_in_queue_sz queue qh qt v)
+
+val lemma_is_in_queue_witness
+  (queue: Seq.seq SZ.t) (qh qt k: nat) (v: nat)
+  : Lemma
+    (requires qh <= k /\ k < qt /\ qt <= Seq.length queue /\ SZ.v (Seq.index queue k) == v)
+    (ensures is_in_queue_sz queue qh qt v)
+
+val lemma_pn_enqueue_complete_to_is_in_queue
+  (sin_deg_start sin_deg_post: Seq.seq int) (squeue_post: Seq.seq SZ.t)
+  (vtail_start vtail_post: nat) (n: nat)
+  : Lemma
+    (requires pn_enqueue_complete sin_deg_start sin_deg_post squeue_post vtail_start vtail_post n n)
+    (ensures
+      forall (v: nat). v < n /\ Seq.index sin_deg_start v <> 0 /\ Seq.index sin_deg_post v == 0 ==>
+        is_in_queue_sz squeue_post vtail_start vtail_post v)
 
 val lemma_zero_indeg_accounted_after_pn
   (adj: Seq.seq int) (n: nat)

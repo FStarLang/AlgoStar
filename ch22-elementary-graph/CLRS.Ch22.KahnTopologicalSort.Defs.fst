@@ -698,7 +698,69 @@ let pn_entries_below_elim
       (forall (k:nat). k >= vtail_start /\ k < vtail_cur ==> SZ.v (Seq.index squeue k) < vv))
   = reveal_opaque (`%pn_entries_below) (pn_entries_below squeue vtail_start vtail_cur vv)
 
-(* Combined step lemma: does inner_indeg_step + pn_entries_below_step + pn_extra_inv_step
+(* pn_enqueue_complete: initial — vacuously true at vv=0 *)
+let pn_enqueue_complete_initial
+  (sin_deg_start: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail_start: nat) (n: nat)
+  : Lemma
+    (requires vtail_start <= Seq.length squeue /\ Seq.length sin_deg_start == n)
+    (ensures pn_enqueue_complete sin_deg_start sin_deg_start squeue vtail_start vtail_start n 0)
+  = ()
+
+(* pn_enqueue_complete: step — extend from vv to vv+1 *)
+#push-options "--z3rlimit 20"
+let pn_enqueue_complete_step
+  (sin_deg_start sin_deg_cur sin_deg_new: Seq.seq int)
+  (squeue_cur squeue_new: Seq.seq SZ.t)
+  (vtail_start vtail_cur vtail_new: nat) (n vv: nat)
+  : Lemma
+    (requires
+      pn_enqueue_complete sin_deg_start sin_deg_cur squeue_cur vtail_start vtail_cur n vv /\
+      vv < n /\
+      vtail_new >= vtail_cur /\ vtail_new <= vtail_cur + 1 /\
+      vtail_new <= Seq.length squeue_new /\
+      Seq.length squeue_new == Seq.length squeue_cur /\
+      Seq.length sin_deg_new == n /\ Seq.length sin_deg_start == n /\
+      (forall (k: nat). k < vtail_cur ==> Seq.index squeue_new k == Seq.index squeue_cur k) /\
+      (forall (k: nat). k < n /\ k <> vv ==> Seq.index sin_deg_new k == Seq.index sin_deg_cur k) /\
+      // If enqueue: vv was enqueued
+      (vtail_new == vtail_cur + 1 ==>
+        (SZ.v (Seq.index squeue_new vtail_cur) == vv /\
+         Seq.index sin_deg_start vv <> 0 /\
+         Seq.index sin_deg_new vv == 0)) /\
+      // Key fact from inner_indeg_partial: vv hasn't been processed yet
+      Seq.index sin_deg_cur vv == Seq.index sin_deg_start vv /\
+      // No-enqueue + nonzero start in_deg means in_deg didn't drop to 0
+      (vtail_new == vtail_cur /\ Seq.index sin_deg_start vv <> 0 ==> Seq.index sin_deg_new vv <> 0))
+    (ensures pn_enqueue_complete sin_deg_start sin_deg_new squeue_new vtail_start vtail_new n (vv + 1))
+  = let aux (v: nat)
+      : Lemma (requires v < vv + 1 /\ v < n /\ Seq.index sin_deg_start v <> 0 /\ Seq.index sin_deg_new v == 0)
+              (ensures exists (k: nat). k >= vtail_start /\ k < vtail_new /\ SZ.v (Seq.index squeue_new k) == v)
+      = if v < vv then begin
+          // v < vv: sin_deg_new[v] == sin_deg_cur[v] (since v <> vv)
+          // By old invariant: exists k in [vtail_start, vtail_cur) with squeue_cur[k] == v
+          FStar.Classical.exists_elim
+            (exists (k: nat). k >= vtail_start /\ k < vtail_new /\ SZ.v (Seq.index squeue_new k) == v)
+            #nat
+            #(fun k -> k >= vtail_start /\ k < vtail_cur /\ SZ.v (Seq.index squeue_cur k) == v)
+            ()
+            (fun k -> assert (k < vtail_cur);
+                    assert (Seq.index squeue_new k == Seq.index squeue_cur k);
+                    assert (k < vtail_new))
+        end
+        else begin
+          // v == vv
+          if vtail_new = vtail_cur + 1 then
+            // Enqueue happened: squeue_new[vtail_cur] == vv, witness is vtail_cur
+            assert (SZ.v (Seq.index squeue_new vtail_cur) == vv)
+          else
+            // No enqueue case is unreachable (see above)
+            assert false
+        end
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+(* Combined step lemma: does inner_indeg_step + pn_entries_below_step + pn_extra_inv_step + pn_enqueue_complete_step
    in one F* lemma. This avoids Pulse VC elaboration issues with multiple lemma calls. *)
 let pn_combined_step
   (adj: Seq.seq int) (n: nat)
@@ -710,6 +772,7 @@ let pn_combined_step
       inner_indeg_partial adj n sin_degree sin_deg_cur u vv /\
       pn_extra_inv sin_degree sin_deg_cur squeue_start squeue_cur vtail_start vtail_cur n /\
       pn_entries_below squeue_cur vtail_start vtail_cur vv /\
+      pn_enqueue_complete sin_degree sin_deg_cur squeue_cur vtail_start vtail_cur n vv /\
       vv < n /\ u < n /\
       vtail_new >= vtail_cur /\ vtail_new <= vtail_cur + 1 /\ vtail_new <= n /\
       Seq.length adj == n * n /\
@@ -729,11 +792,15 @@ let pn_combined_step
       (vtail_new == vtail_cur + 1 ==>
         (SZ.v (Seq.index squeue_new vtail_cur) == vv /\
          Seq.index sin_deg_new vv == 0 /\
-         Seq.index sin_deg_cur vv > 0)))
+         Seq.index sin_deg_cur vv > 0)) /\
+      // Converse: if in_deg dropped to 0, enqueue happened
+      (Seq.index sin_deg_new vv == 0 /\ Seq.index sin_deg_cur vv > 0 ==>
+        vtail_new == vtail_cur + 1))
     (ensures
       inner_indeg_partial adj n sin_degree sin_deg_new u (vv + 1) /\
       pn_extra_inv sin_degree sin_deg_new squeue_start squeue_new vtail_start vtail_new n /\
-      pn_entries_below squeue_new vtail_start vtail_new (vv + 1))
+      pn_entries_below squeue_new vtail_start vtail_new (vv + 1) /\
+      pn_enqueue_complete sin_degree sin_deg_new squeue_new vtail_start vtail_new n (vv + 1))
   = inner_indeg_step adj n sin_degree sin_deg_cur sin_deg_new u vv;
     pn_entries_below_step squeue_cur squeue_new vtail_start vtail_cur vtail_new vv;
     pn_entries_below_elim squeue_cur vtail_start vtail_cur vv;
@@ -742,7 +809,9 @@ let pn_combined_step
     // If enqueue: sin_deg_new[vv] == 0 means sin_deg_cur[vv] == 1, so sin_degree[vv] > 0
     pn_extra_inv_step sin_degree sin_deg_cur sin_deg_new
       squeue_start squeue_cur squeue_new
-      vtail_start vtail_cur vtail_new n vv
+      vtail_start vtail_cur vtail_new n vv;
+    pn_enqueue_complete_step sin_degree sin_deg_cur sin_deg_new
+      squeue_cur squeue_new vtail_start vtail_cur vtail_new n vv
 
 (* ================================================================
    BRIDGE LEMMAS: Derive queue properties from pn_extra_inv
@@ -1276,6 +1345,41 @@ let rec lemma_is_in_queue_weaken_start
   = if qh >= qh' then ()
     else if SZ.v (Seq.index queue qh) = v then ()
     else lemma_is_in_queue_weaken_start queue (qh + 1) qh' qt v
+
+(* Witness-to-bool: if queue[k] == v for some k in [qh, qt), then is_in_queue_sz *)
+let rec lemma_is_in_queue_witness
+  (queue: Seq.seq SZ.t) (qh qt k: nat) (v: nat)
+  : Lemma
+    (requires qh <= k /\ k < qt /\ qt <= Seq.length queue /\ SZ.v (Seq.index queue k) == v)
+    (ensures is_in_queue_sz queue qh qt v)
+    (decreases (k - qh))
+  = if qh >= qt then ()
+    else if SZ.v (Seq.index queue qh) = v then ()
+    else if qh = k then ()
+    else lemma_is_in_queue_witness queue (qh + 1) qt k v
+
+(* Bridge: convert pn_enqueue_complete at vv=n to is_in_queue_sz precondition *)
+let lemma_pn_enqueue_complete_to_is_in_queue
+  (sin_deg_start sin_deg_post: Seq.seq int) (squeue_post: Seq.seq SZ.t)
+  (vtail_start vtail_post: nat) (n: nat)
+  : Lemma
+    (requires
+      pn_enqueue_complete sin_deg_start sin_deg_post squeue_post vtail_start vtail_post n n)
+    (ensures
+      forall (v: nat). v < n /\ Seq.index sin_deg_start v <> 0 /\ Seq.index sin_deg_post v == 0 ==>
+        is_in_queue_sz squeue_post vtail_start vtail_post v)
+  = let aux (v: nat)
+      : Lemma (requires v < n /\ Seq.index sin_deg_start v <> 0 /\ Seq.index sin_deg_post v == 0)
+              (ensures is_in_queue_sz squeue_post vtail_start vtail_post v)
+      = // pn_enqueue_complete gives: exists k in [vtail_start, vtail_post) with squeue_post[k] == v
+        FStar.Classical.exists_elim
+          (is_in_queue_sz squeue_post vtail_start vtail_post v)
+          #nat
+          #(fun k -> k >= vtail_start /\ k < vtail_post /\ SZ.v (Seq.index squeue_post k) == v)
+          ()
+          (fun k -> lemma_is_in_queue_witness squeue_post vtail_start vtail_post k v)
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 
 (* Maintenance of zero_indeg_accounted after dequeue + output extend + process_neighbors.
    Key argument:
