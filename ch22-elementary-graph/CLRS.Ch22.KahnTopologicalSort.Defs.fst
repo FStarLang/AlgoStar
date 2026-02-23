@@ -1088,6 +1088,31 @@ let lemma_bridge_queue_through_pn
    DAG COMPLETENESS — Proves count == n when all zero-indeg are in output
    ================================================================ *)
 
+(* is_in_output implies count_occurrences >= 1 *)
+let rec lemma_is_in_output_implies_count (output: Seq.seq int) (count: nat) (x: int)
+  : Lemma
+    (requires count <= Seq.length output /\ is_in_output output count x)
+    (ensures count_occurrences output count x >= 1)
+    (decreases count)
+  = if count = 0 then ()
+    else if Seq.index output (count - 1) = x then ()
+    else lemma_is_in_output_implies_count output (count - 1) x
+
+(* Pigeonhole for find_missing_vertex: if all n vertices are in output[0..count)
+   with count < n and output is partial_distinct, contradiction. *)
+let lemma_pigeonhole_missing (output: Seq.seq int) (count n: nat)
+  : Lemma
+    (requires
+      count < n /\ n > 0 /\ Seq.length output >= count /\
+      partial_distinct output count /\ partial_valid output count n /\
+      (forall (v: nat). v < n ==> is_in_output output count v))
+    (ensures False)
+  = let aux (v: nat) : Lemma (requires v < n) (ensures count_occurrences output count v >= 1) =
+      lemma_is_in_output_implies_count output count v
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+    lemma_pigeonhole_count_occurrences output count n
+
 (* Find vertex not in output, given count < n *)
 let rec find_missing_vertex
   (output: Seq.seq int) (count n: nat) (v: nat)
@@ -1099,13 +1124,8 @@ let rec find_missing_vertex
     (ensures fun u -> u < n /\ not (is_in_output output count u))
     (decreases (n - v))
   = if v >= n then begin
-      // All v < n in output → injective map from {0,...,n-1} to {0,...,count-1}
-      // n values in count < n positions → False by counting
-      // Each vertex v maps to a unique position k_v < count with output[k_v] == v
-      // By partial_distinct: if output[k1] == v1 and output[k2] == v2 and v1 <> v2 then k1 <> k2
-      // So n distinct positions needed, but only count < n available
-      // This is the pigeonhole: admit for now, the cycle proof provides the real contradiction
-      admit ()
+      lemma_pigeonhole_missing output count n;
+      0 (* unreachable - lemma proves False *)
     end
     else if is_in_output output count v then
       find_missing_vertex output count n (v + 1)
