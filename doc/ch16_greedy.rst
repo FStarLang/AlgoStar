@@ -18,12 +18,12 @@ The pure specification layer for Activity Selection is **fully proven**:
 zero admits — the exchange argument, greedy optimality theorem, and
 implementation-to-spec bridge are all mechanically verified.
 
-Huffman has gaps: ``Huffman.Spec`` uses 3 ``assume`` calls
-(``greedy_choice_property``, ``optimal_substructure_property``, and
-``exists_leaf_at_max_depth``); ``Huffman.Complete`` uses 2
-``admit()`` calls dependent on those assumptions. The key supporting
-lemma ``swap_reduces_wpl`` (CLRS Lemma 16.2) and
-``exists_sibling_leaves`` are fully proven.
+Huffman has gaps: ``Huffman.Spec`` uses 4 ``assume`` calls
+(``greedy_choice_property``, ``optimal_substructure_property``,
+``exists_leaf_at_max_depth``, and a sequencing placeholder);
+``Huffman.Complete`` uses 2 ``admit()`` calls dependent on those
+assumptions. The key supporting lemma ``swap_reduces_wpl`` (CLRS
+Lemma 16.2) and ``exists_sibling_leaves`` are fully proven.
 
 Activity Selection
 ==================

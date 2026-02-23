@@ -6,7 +6,7 @@ module CLRS.Ch12.BST.Delete.Spec
  * Theorem: key_set(delete(t,k)) = key_set(t) \ {k} for valid BST t where k ∈ t
  * 
  * Uses list-based BST from CLRS.Ch12.BST.Spec.Complete
- * Main lemma verified with 5 admits for FiniteSet algebra
+ * Main lemma verified with zero admits (FiniteSet algebra via all_finite_set_facts_lemma)
  *)
 
 open FStar.List.Tot

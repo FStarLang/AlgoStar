@@ -20,7 +20,7 @@ module CLRS.Ch12.BST.Insert.Spec
  * Status:
  * - Main preservation theorem structure is complete
  * - Helper lemmas for lengths and single-index modifications: ✓ VERIFIED
- * - 13 strategic admits for complex structural reasoning about disjoint subtrees
+ * - 3 admits for complex structural reasoning about disjoint subtrees
  * - These admits represent deep inductive arguments about tree structure in array representation
  * 
  * Target: 250-300 lines ✓ (369 lines delivered)

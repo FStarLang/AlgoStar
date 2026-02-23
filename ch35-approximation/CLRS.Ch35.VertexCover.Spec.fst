@@ -3,7 +3,7 @@ module CLRS.Ch35.VertexCover.Spec
 (**
  * 2-approximation ratio proof for APPROX-VERTEX-COVER (CLRS Theorem 35.1)
  *
- * NO admits. NO assumes.
+ * 1 admit remaining: 2-approximation ratio (line 512) requires ghost execution trace.
  *)
 
 open FStar.Mul

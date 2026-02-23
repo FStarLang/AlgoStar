@@ -244,12 +244,20 @@ valid vertex indices and non-negative, the output contains all
 vertices exactly once (``all_distinct``), and the output is a valid
 topological order (``is_topological_order``).
 
-This implementation has **2 admit() calls**: one for the distinctness
-property of the output sequence and one for connecting the loop
-invariant to the topological ordering property. The complexity
-module (``KahnTopologicalSort.Complexity``) has a weaker
-postcondition (omitting distinctness and topological order) and
-has **0 admits**.
+This implementation is **fully verified with 0 admits** ✅, following a
+split architecture:
+
+- **KahnTopologicalSort.Defs** (pure F*): Named predicates for the algorithm's
+  invariant clusters (``partial_distinct``, ``indeg_correct``, ``strong_order_inv``,
+  ``pn_completeness``) with explicit pattern triggers. Supporting lemmas proved in
+  isolation: ``pn_completeness_step``, ``indeg_correct_step``, ``pigeonhole`` via
+  ``count_occurrences``, ``strong_order_inv_step``.
+- **KahnTopologicalSort** (Pulse): The imperative implementation calling Defs lemmas
+  inline. The predicate-based approach (similar to StackDFS/QueueBFS) enables clean
+  invariant management across the main loop and inner scan loop.
+
+The complexity module (``KahnTopologicalSort.Complexity``) proves an O(V²) bound
+using ghost tick counters and is also **fully verified with 0 admits** ✅.
 
 Verification Status Summary
 ============================
@@ -297,12 +305,15 @@ Verification Status Summary
    * - StackDFS.Complexity
      - Pulse impl
      - 6 assume\_
+   * - KahnTopologicalSort.Defs
+     - Pure spec/lemmas
+     - **0** ✅
    * - KahnTopologicalSort
      - Pulse impl
-     - 2 admit()
+     - **0** ✅
    * - KahnTopologicalSort.Complexity
      - Pulse impl
-     - 0
+     - **0** ✅
    * - IterativeBFS
      - Pulse impl
      - 0
@@ -316,5 +327,5 @@ valid but difficult for the SMT solver to discharge automatically.
 Both ``StackDFS`` and ``QueueBFS`` demonstrate that these can be
 eliminated via predicate-based refactoring with isolated lemmas.
 The ``admit()`` calls in ``BFS.DistanceSpec``, ``DFS.Spec``,
-``DFS.WhitePath``, and ``KahnTopologicalSort`` mark genuinely
+and ``DFS.WhitePath`` mark genuinely
 unproven properties that remain as future work.

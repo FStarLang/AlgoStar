@@ -12,7 +12,7 @@
    
    Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
    
-   Uses admit() where needed for complex invariant reasoning.
+   Fully verified: zero admits.
 *)
 
 module CLRS.Ch22.KahnTopologicalSort.Complexity

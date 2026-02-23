@@ -7,7 +7,7 @@
    This file provides:
    1. ✓ Precise specification count_matches_spec (matches naive implementation)
    2. ✓ Key lemmas about KMP correctness
-   3. ✓ Strengthened postcondition with strategic admits for hardest proofs
+   3. ✓ Strengthened postcondition — zero admits
    
    Approach: The strengthened loop invariant tracks that:
    - count ==  count_matches_up_to text pattern (positions_checked_so_far)

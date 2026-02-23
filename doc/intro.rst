@@ -327,8 +327,8 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Kahn Topological Sort <Ch22_Graphs>`
      - §22.4
      - valid topological order
-     - ⚠️ 2: DAG correctness
-     - ✅ Linked O(V+E)
+     - ✅
+     - ✅ Linked O(V²)
    * - 23
      - :ref:`Kruskal MST <Ch23_MST>`
      - §23.2
@@ -429,19 +429,19 @@ lines. The table below summarizes the status of each algorithm.
 Proof Gaps
 ----------
 
-As of this writing, the project has **82 unproven F\* obligations**
-(``admit()``, ``assume()``, and ``assume val``) across **29 files**,
-plus **38 Pulse** ``assume_`` **calls** in 6 implementation files.
-Of the 50 algorithms in the table, **33 have fully proven correctness**
+As of this writing, the project has **85 unproven F\* obligations**
+(``admit()``, ``assume()``, and ``assume val``) across **32 files**,
+plus **12 Pulse** ``assume_`` **calls** in 3 implementation files.
+Of the 50 algorithms in the table, **35 have fully proven correctness**
 (zero admits) and **26 have fully proven complexity bounds**.
 
 The remaining admits fall into a few categories:
 
-1. **Graph theory** (Ch. 22–23, ~39 F\* admits): DFS parenthesis and
+1. **Graph theory** (Ch. 22–23, ~32 F\* admits): DFS parenthesis and
    white-path theorems (10), MST cut/cycle properties and Kruskal
-   forest invariants (25), BFS shortest-path completeness (2),
-   Kahn DAG correctness (2). Plus 34 Pulse ``assume_`` in
-   StackDFS and QueueBFS loop invariants.
+   forest invariants (25), BFS shortest-path completeness (2).
+   Plus 12 Pulse ``assume_`` in StackDFS.Complexity and
+   QueueBFS.Complexity loop invariants.
 
 2. **Sorting stability** (Ch. 8, 11 admits): RadixSort stability
    proofs involve ∃∀ quantifier patterns that challenge the SMT
@@ -449,17 +449,16 @@ The remaining admits fall into a few categories:
 
 3. **Algorithmic correctness** (Ch. 16, 24, 26, ~18 admits): Huffman
    optimality: greedy-choice theorem, optimal-substructure, and
-   dependent proofs in Complete (5); shortest-path upper-bound
+   dependent proofs in Complete (6); shortest-path upper-bound
    invariants for Bellman-Ford (3) and Dijkstra triangle
    inequality (2); max-flow augmentation (8).
 
 4. **Complexity proofs** (Ch. 32, 7 admits): KMP
    amortized analysis (7).
 
-5. **Miscellaneous** (7 admits):
-   BST insert preservation (3), Union-Find rank bound (1),
-   Strassen quadrant properties (1), Vertex Cover trace (1),
-   Divide-and-Conquer max-subarray (1 assume val).
+5. **Miscellaneous** (5 admits):
+   BST insert preservation (3),
+   Strassen quadrant properties (1), Vertex Cover trace (1).
 
 Each chapter in this document notes any unproven obligations in its
 scope.  Fully verified chapters have zero ``admit``, ``assume``, or

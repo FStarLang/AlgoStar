@@ -5,8 +5,9 @@ in [Pulse](https://github.com/FStarLang/pulse), a separation-logic language
 embedded in [F\*](https://github.com/FStarLang/FStar).
 
 Every algorithm is proven memory-safe and many carry full functional-correctness
-specifications — all without admits or assumes. Zero admits across ~18,000 lines
-of verified code. 32 complexity proof files cover 21 of 23 chapters.
+specifications. 148 files are fully verified with zero admits (~42,600 lines).
+32 files have 97 remaining unproven obligations (~16,900 lines).
+32 complexity proof files cover 21 of 23 chapters.
 
 ## Building
 
