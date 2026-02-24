@@ -155,14 +155,14 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 
 ## Current Status (2025-02-23, updated)
 
-**180 F* files, ~59,500 lines — 91 unproven obligations across 30 files**
+**180 F* files, ~59,500 lines — 83 unproven obligations across 29 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
 | `admit()` | 65 | Unproven lemma/proof bodies (Pure F*) |
 | `assume(...)` | 12 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 4) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
-| `assume_` | 12 | Pulse-specific unproven invariants (StackDFS.Cmplx: 6, QueueBFS.Cmplx: 6) |
+| `assume_` | 4 | Pulse-specific unproven invariants (StackDFS.Cmplx: 4) |
 
 ### Key Progress Since AUDIT_0215 (Feb 15)
 
@@ -220,9 +220,9 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | 16 | Huffman | §16.3 | ⚠️ cost only | ✅ Linked (cost) | 6 | Spec: greedy+substructure assumed |
 | 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | FullCompress available |
 | 22 | IterativeBFS | — | ⚠️ reachability | — | 0 | Not CLRS |
-| 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+6 | Main: 0; Cmplx: 6 assume_ |
+| 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
 | 22 | IterativeDFS | — | ⚠️ reachability | — | 0 | Not CLRS |
-| 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+6 | Main: 0; Cmplx: 6 assume_ |
+| 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+4 | Main: 0; Cmplx: 4 assume_ (was 6) |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 0 | ✅ Fully verified (was 2 admits) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 8 | Distance, parenthesis, white-path |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 16 | Across Spec/EdgeSort/Cmplx |
@@ -248,7 +248,7 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | Chapter | admit | assume | assume_val | assume_ | Total | Top files |
 |---------|-------|--------|------------|---------|-------|-----------|
 | ch23 (MST) | 23 | 1 | 1 | 1 | 26 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal.Cmplx(2+1), EdgeSort(2), SortedEdges(0+1), Kruskal(0+0+1) |
-| ch22 (graphs) | 8 | 0 | 0 | 12 | 20 | StackDFS.Cmplx(0+0+6), QueueBFS.Cmplx(0+0+6), DFS.Spec(5), DFS.WhitePath(3), BFS.DistSpec(2) |
+| ch22 (graphs) | 8 | 0 | 0 | 4 | 12 | StackDFS.Cmplx(4), DFS.Spec(5), DFS.WhitePath(3) |
 | ch08 (sorting) | 11 | 0 | 0 | 3 | 14 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch32 (strings) | 7 | 0 | 0 | 0 | 7 | KMP.Complexity(7) |
@@ -423,10 +423,16 @@ return type of the recursive `dfs_visit` call.
 - **Done**: Added `relaxation_stable_for_processed` predicate, proved preservation under stability.
 - **Remaining**: Proving stability is maintained when processing order follows Dijkstra's greedy extraction.
 
-#### 2c: Close Bellman-Ford Spec (3 admits)
-- Line 235: relaxation preserves upper bound — should be provable with path weight algebra
-- Line 405: inductive correctness after k rounds — needs induction on path length
-- Line 454: negative cycle detection — needs path with n+ edges implies cycle
+#### 2c: Close Bellman-Ford Spec (3 admits) — ⚠️ BLOCKED (invariants incorrect)
+- Line 235: `relax_preserves_upper_bound` — **FALSE**: relaxation can create (Some d, None)
+  violations because `upper_bound_inv` uses `sp_dist_k` with fixed edge budget `k`, but
+  relaxation chains through `dist[u]` using `k+1` edges.
+- Line 405: `bf_correctness_inductive` — **FALSE**: sequential relaxation propagates
+  within a round, so `dist[v]` can equal paths with more than `k` edges after `k` rounds.
+  `correctness_inv` (exact equality) is wrong for the imperative implementation.
+- Line 454: `bf_negative_cycle_detection` — **TRUE** but needs significant supporting lemmas.
+- **Fix needed**: Restructure invariants: use `sp_dist` (unbounded) for upper bound,
+  weaker `<=` for correctness. Convergence follows from combined bounds.
 
 #### 2d: CountingSort.Stable Postconditions (3 assume_)
 **Impact**: Unblocks the entire RadixSort stability cascade (14 admits depend on this).
@@ -462,10 +468,10 @@ verified Pulse implementations (alongside the existing correctness postcondition
 
 These use the predicate-based pattern that worked for StackDFS/QueueBFS main files.
 
-- [ ] 4a: **QueueBFS.Complexity** (6 assume_): Apply same predicates from QueueBFS.fst + tick arithmetic.
-  Expected: all 6 assume_ can be eliminated.
-- [ ] 4b: **StackDFS.Complexity** (6 assume_): Apply same predicates from StackDFS.fst + tick arithmetic.
-  Expected: all 6 assume_ can be eliminated.
+- [x] 4a: **QueueBFS.Complexity** (6 assume_ → **0**): Applied predicates from QueueBFS.fst + tick arithmetic.
+  All 6 assume_ eliminated. Fixed contradictory assume on line 389 (was assuming False).
+- [x] 4b: **StackDFS.Complexity** (6 assume_ → **4**): Eliminated trivial vtop==0<n assume and
+  added vc monotonicity tracking to scan loop invariant. Remaining 4 need count_ones + deep DFS invariants.
 - [ ] 4c: **Kruskal.Complexity** (2 admit + 1 assume_): Minor tick arithmetic. The assume_ at line 333
   may need inner loop invariant + tick bound for n<3 edge case.
 
@@ -559,9 +565,9 @@ Each needs a standalone lemma proved first, then called at the admit site.
 | File | Admits | Helper lemma needed |
 |------|--------|---------------------|
 | **StackDFS.fst** | 0 | ✅ All 4 assume_ eliminated via predicate-based refactoring |
-| **StackDFS.Complexity** | 6 | vtop < n (2), found ==> top < n (1), vc bound (2), final postcondition (1) |
+| **StackDFS.Complexity** | 4 | count_ones tracking (2), complexity bound (1), final postcondition (1) |
 | **QueueBFS.fst** | 0 | ✅ Fully verified via predicate-based proof |
-| **QueueBFS.Complexity** | 6 | Mirror of QueueBFS.fst: same invariants + tick arithmetic |
+| **QueueBFS.Complexity** | 0 | ✅ Fully verified: predicates from QueueBFS.fst + tick arithmetic |
 | **RadixSort.Stability** | 2 | Stable-sort preservation: equal-key elements maintain relative order |
 | **RadixSort.Spec** | 1 | Same as Stability but at spec level |
 | **RadixSort.FullSort** | 4 | Bridge admits: reference results from RadixSort.Stability module |

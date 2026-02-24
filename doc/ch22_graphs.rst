@@ -104,9 +104,9 @@ a ghost counter through the implementation and proves the bound:
 
 This gives an O(V²) bound for the adjacency-matrix representation
 (each vertex scans all V potential neighbors). The complexity module
-uses **6 assume_ calls** (the same framing assumptions as the
-correctness version plus additional ones for cost invariant
-maintenance).
+is **fully verified with 0 assume_ calls**, using the same predicate-based
+proof pattern from ``QueueBFS.fst`` (``queue_ok``, ``dist_ok``,
+``source_ok``, ``count_nonwhite``) combined with tick arithmetic.
 
 An alternative iterative BFS (``IterativeBFS``) computes the same
 level sets using a simple loop instead of a queue. It is **fully
@@ -187,8 +187,8 @@ Complexity
 
 The complexity module (``StackDFS.Complexity``) proves an O(V²)
 bound matching the adjacency-matrix representation. It uses
-**6 assume_ calls** (stack-top bounds, cost-counter invariants,
-and the final complexity postcondition).
+**4 assume_ calls** (count_ones tracking for stack-top bounds,
+complexity bound maintenance, and the final correctness postcondition).
 
 An alternative iterative DFS (``IterativeDFS``) uses a simpler
 level-by-level approach and is **fully verified with 0 admits**,
@@ -299,13 +299,13 @@ Verification Status Summary
      - **0** ✅
    * - QueueBFS.Complexity
      - Pulse impl
-     - 6 assume\_
+     - **0** ✅
    * - StackDFS
      - Pulse impl
      - **0** ✅
    * - StackDFS.Complexity
      - Pulse impl
-     - 6 assume\_
+     - 4 assume\_
    * - KahnTopologicalSort.Defs
      - Pure spec/lemmas
      - **0** ✅

@@ -431,7 +431,7 @@ Proof Gaps
 
 As of this writing, the project has **82 unproven F\* obligations**
 (``admit()``, ``assume()``, and ``assume val``) across **31 files**,
-plus **12 Pulse** ``assume_`` **calls** in 3 implementation files.
+plus **4 Pulse** ``assume_`` **calls** in 1 implementation file (StackDFS.Complexity).
 Of the 50 algorithms in the table, **35 have fully proven correctness**
 (zero admits) and **26 have fully proven complexity bounds**.
 
@@ -440,8 +440,8 @@ The remaining admits fall into a few categories:
 1. **Graph theory** (Ch. 22–23, ~32 F\* admits): DFS parenthesis and
    white-path theorems (10), MST cut/cycle properties and Kruskal
    forest invariants (25), BFS shortest-path completeness (2).
-   Plus 12 Pulse ``assume_`` in StackDFS.Complexity and
-   QueueBFS.Complexity loop invariants.
+   Plus 4 Pulse ``assume_`` in StackDFS.Complexity (count_ones tracking,
+   complexity bound, final correctness postcondition).
 
 2. **Sorting stability** (Ch. 8, 11 admits): RadixSort stability
    proofs involve ∃∀ quantifier patterns that challenge the SMT
