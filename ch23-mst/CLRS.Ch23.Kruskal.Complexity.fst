@@ -37,16 +37,92 @@ module V = Pulse.Lib.Vec
 
 // ========== Predicates from original Kruskal ==========
 
+[@@"opaque_to_smt"]
 let valid_parents (sparent: Seq.seq SZ.t) (n: nat) : prop =
   Seq.length sparent == n /\
   (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) < n)
 
+[@@"opaque_to_smt"]
 let valid_endpoints (seu sev: Seq.seq int) (n ec: nat) : prop =
   ec <= n /\
   Seq.length seu == n /\ Seq.length sev == n /\
   (forall (k: nat). k < ec ==>
     Seq.index seu k >= 0 /\ Seq.index seu k < n /\
     Seq.index sev k >= 0 /\ Seq.index sev k < n)
+
+// ========== Lemmas for valid_parents ==========
+
+let establish_valid_parents (sparent: Seq.seq SZ.t) (n: nat)
+  : Lemma (requires Seq.length sparent == n /\
+                    (forall (j: nat). j < n ==> SZ.v (Seq.index sparent j) < n))
+          (ensures valid_parents sparent n)
+  = reveal_opaque (`%valid_parents) (valid_parents sparent n)
+
+let valid_parents_length (sparent: Seq.seq SZ.t) (n: nat)
+  : Lemma (requires valid_parents sparent n)
+          (ensures Seq.length sparent == n)
+  = reveal_opaque (`%valid_parents) (valid_parents sparent n)
+
+let valid_parents_index (sparent: Seq.seq SZ.t) (n: nat) (i:nat{i < Seq.length sparent})
+  : Lemma (requires valid_parents sparent n /\ i < n)
+          (ensures SZ.v (Seq.index sparent i) < n)
+  = reveal_opaque (`%valid_parents) (valid_parents sparent n)
+
+let valid_parents_seq_upd (sparent: Seq.seq SZ.t) (n i: nat) (v: SZ.t)
+  : Lemma (requires valid_parents sparent n /\ i < n /\ SZ.v v < n /\ Seq.length sparent == n)
+          (ensures valid_parents (Seq.upd sparent i v) n)
+  = reveal_opaque (`%valid_parents) (valid_parents sparent n);
+    reveal_opaque (`%valid_parents) (valid_parents (Seq.upd sparent i v) n)
+
+// ========== Lemmas for valid_endpoints ==========
+
+let establish_valid_endpoints_empty (seu sev: Seq.seq int) (n: nat)
+  : Lemma (requires Seq.length seu == n /\ Seq.length sev == n)
+          (ensures valid_endpoints seu sev n 0)
+  = reveal_opaque (`%valid_endpoints) (valid_endpoints seu sev n 0)
+
+let valid_endpoints_add (seu sev: Seq.seq int) (n ec: nat) (vu vv: int)
+  : Lemma (requires valid_endpoints seu sev n ec /\ ec < n /\
+                    vu >= 0 /\ vu < n /\ vv >= 0 /\ vv < n /\
+                    Seq.length seu == n /\ Seq.length sev == n)
+          (ensures valid_endpoints (Seq.upd seu ec vu) (Seq.upd sev ec vv) n (ec + 1))
+  = reveal_opaque (`%valid_endpoints) (valid_endpoints seu sev n ec);
+    reveal_opaque (`%valid_endpoints) (valid_endpoints (Seq.upd seu ec vu) (Seq.upd sev ec vv) n (ec + 1))
+
+let valid_endpoints_noop (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma (requires valid_endpoints seu sev n ec /\ ec > 0 /\ n > 0 /\
+                    Seq.length seu == n /\ Seq.length sev == n)
+          (ensures valid_endpoints
+                     (Seq.upd seu 0 (Seq.index seu 0))
+                     (Seq.upd sev 0 (Seq.index sev 0))
+                     n ec)
+  = reveal_opaque (`%valid_endpoints) (valid_endpoints seu sev n ec);
+    reveal_opaque (`%valid_endpoints) (valid_endpoints
+      (Seq.upd seu 0 (Seq.index seu 0))
+      (Seq.upd sev 0 (Seq.index sev 0)) n ec)
+
+let valid_endpoints_len (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma (requires valid_endpoints seu sev n ec)
+          (ensures Seq.length seu == n /\ Seq.length sev == n /\ ec <= n)
+  = reveal_opaque (`%valid_endpoints) (valid_endpoints seu sev n ec)
+
+let valid_endpoints_conditional_write
+  (seu sev: Seq.seq int) (n ec: nat) (vbu vbv: nat) (should_add: bool)
+  : Lemma (requires valid_endpoints seu sev n ec /\ n > 0 /\
+                    Seq.length seu == n /\ Seq.length sev == n /\
+                    (should_add ==> (ec < n /\ vbu < n /\ vbv < n)))
+          (ensures (let pos = if should_add then ec else 0 in
+                    let vu = if should_add then vbu else Seq.index seu 0 in
+                    let vv = if should_add then vbv else Seq.index sev 0 in
+                    let new_ec = if should_add then ec + 1 else ec in
+                    valid_endpoints (Seq.upd seu pos vu) (Seq.upd sev pos vv) n new_ec))
+  = reveal_opaque (`%valid_endpoints) (valid_endpoints seu sev n ec);
+    let pos = if should_add then ec else 0 in
+    let vu = if should_add then vbu else Seq.index seu 0 in
+    let vv = if should_add then vbv else Seq.index sev 0 in
+    let new_ec = if should_add then ec + 1 else ec in
+    reveal_opaque (`%valid_endpoints)
+      (valid_endpoints (Seq.upd seu pos vu) (Seq.upd sev pos vv) n new_ec)
 
 let lemma_index_in_bounds (u v n: nat)
   : Lemma (requires u < n /\ v < n /\ n > 0 /\ SZ.fits (n * n))
@@ -55,7 +131,6 @@ let lemma_index_in_bounds (u v n: nat)
 
 module ML = FStar.Math.Lemmas
 
-#push-options "--z3rlimit 50"
 let distrib_right (a b: nat)
   : Lemma (ensures (a + 1) * b == a * b + b)
   = ()
@@ -83,7 +158,6 @@ let final_bound_lemma (n vround: nat)
       ML.distributivity_add_left (vround * 3) 3 n;
       ML.distributivity_add_left vround 1 3
     end
-#pop-options
 
 // ========== Ghost tick counter ==========
 
@@ -112,7 +186,7 @@ let complexity_bounded_kruskal (cf c0 n: nat) : prop =
 
 // ========== Find with tick counting ==========
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+#push-options "--ifuel 1 --fuel 0"
 fn find_complexity
   (#p: perm)
   (parent: A.array SZ.t)
@@ -131,6 +205,7 @@ fn find_complexity
       cf - reveal c <= SZ.v n
     )
 {
+  valid_parents_length sparent (SZ.v n);
   let mut curr: SZ.t = v;
   let mut steps: SZ.t = 0sz;
   while (!steps <^ n)
@@ -146,6 +221,7 @@ fn find_complexity
     )
   {
     let vcurr = !curr;
+    valid_parents_index sparent (SZ.v n) (SZ.v vcurr);
     let p = A.op_Array_Access parent vcurr;
     curr := p;
     let vsteps = !steps;
@@ -160,7 +236,7 @@ fn find_complexity
 
 // ========== Union with tick counting ==========
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+#push-options "--ifuel 1 --fuel 0"
 fn do_union_complexity
   (parent: A.array SZ.t)
   (#sparent: Ghost.erased (Seq.seq SZ.t))
@@ -179,6 +255,8 @@ fn do_union_complexity
       cf - reveal c <= 1
     )
 {
+  valid_parents_length sparent (SZ.v n);
+  valid_parents_seq_upd sparent (SZ.v n) (SZ.v root_u) root_v;
   A.op_Array_Assignment parent root_u root_v;
   tick ctr;
 }
@@ -186,7 +264,7 @@ fn do_union_complexity
 
 // ========== Kruskal's MST with Complexity Counting ==========
 
-#push-options "--z3rlimit 800 --ifuel 2 --fuel 2"
+#push-options "--ifuel 1 --fuel 0"
 fn kruskal_complexity
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
@@ -251,6 +329,12 @@ fn kruskal_complexity
     tick ctr;
     i := vi +^ 1sz;
   };
+  
+  // Establish valid_parents from init loop invariant
+  with sparent_init. assert (A.pts_to parent sparent_init);
+  establish_valid_parents sparent_init (SZ.v n);
+  // Establish valid_endpoints for empty edge set
+  establish_valid_endpoints_empty sedge_u sedge_v (SZ.v n);
   
   // Process n-1 rounds
   let mut round: SZ.t = 0sz;
@@ -382,12 +466,18 @@ fn kruskal_complexity
     
     let should_add: bool = (vbw > 0 && root_u <> root_v && vec <^ n);
     
-    // Write edge endpoints
+    // Write edge endpoints and prove valid_endpoints preservation
+    with seu_cur. assert (A.pts_to edge_u seu_cur);
+    with sev_cur. assert (A.pts_to edge_v sev_cur);
+    valid_endpoints_len seu_cur sev_cur (SZ.v n) (SZ.v vec);
     let old_eu0 = A.op_Array_Access edge_u 0sz;
     let old_ev0 = A.op_Array_Access edge_v 0sz;
     let write_pos: SZ.t = (if should_add then vec else 0sz);
-    A.op_Array_Assignment edge_u write_pos (if should_add then SZ.v vbu else old_eu0);
-    A.op_Array_Assignment edge_v write_pos (if should_add then SZ.v vbv else old_ev0);
+    let val_eu = (if should_add then SZ.v vbu else old_eu0);
+    let val_ev = (if should_add then SZ.v vbv else old_ev0);
+    valid_endpoints_conditional_write seu_cur sev_cur (SZ.v n) (SZ.v vec) (SZ.v vbu) (SZ.v vbv) should_add;
+    A.op_Array_Assignment edge_u write_pos val_eu;
+    A.op_Array_Assignment edge_v write_pos val_ev;
     
     edge_count := (if should_add then vec +^ 1sz else vec);
     
