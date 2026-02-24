@@ -539,32 +539,17 @@ CountingSort.Stable having proven postconditions).
 
 ---
 
-### AGENT8: Dijkstra.TriangleInequality — eliminate 1 admit (L496)
+### AGENT8: Dijkstra.TriangleInequality — eliminate 1 admit (L496) ✅ COMPLETED
 
 **File:** `ch24-sssp/CLRS.Ch24.Dijkstra.TriangleInequality.fst`
-**Reference:** `ch24-sssp/CLRS.Ch24.Dijkstra.Correctness.fst` (zero admits, proves d[v]=δ(s,v))
-**Goal:** Prove stability maintenance in `process_all_vertices_establishes_triangle`.
+**Status:** Last admit eliminated. File verifies cleanly with 0 admits (891 lines).
 
-The single admit at L496 is in the recursive function that processes vertices 0..n-1 in order.
-After processing vertex `u_start` (relaxing all edges from u_start), we have:
-- `triangle_inequality_from_processed dist1 weights processed1` (proven by `process_vertex_extends_triangle`)
-
-What's missing: showing that relaxation from u_start doesn't violate the triangle inequality
-for vertices already in `processed1`. Specifically: for all processed vertices u,v with edge
-(u,v), we need `dist1[v] <= dist1[u] + weights[u][v]` to still hold after relaxation.
-
-Key insight: Dijkstra processes vertices in non-decreasing distance order. Relaxation from
-u_start can only decrease distances of unprocessed vertices. For already-processed vertices,
-their distances are already optimal (by Dijkstra.Correctness) and can't decrease further.
-
-Approach:
-1. Define `relaxation_monotone`: relaxation from u never increases any distance
-2. Prove: if dist[v] <= dist[u] + w(u,v) before relaxation, and dist[u] doesn't decrease,
-   and dist[v] can only decrease, then dist[v] <= dist[u] + w(u,v) still holds
-3. Show processed vertices have stable distances (they're already at shortest-path values)
-
-The file already has `relaxation_stable_for_processed` predicate and partial proofs.
-Build on these to close the gap.
+**Changes made:**
+- Rewrote `process_vertices` to use Dijkstra-order (greedy min-distance) selection instead of sequential 0..n-1 processing
+- Added `find_min`/`find_min_from` with `find_min_from_basic` and `find_min_from_min` lemmas proving minimality
+- Added `relaxation_doesnt_break_triangle`: shows relaxation preserves triangle inequality for already-processed edges (distances only decrease)
+- Added `dijkstra_maintains_triangle`: main inductive invariant proof connecting greedy selection to triangle maintenance
+- Full proof chain from `process_vertices` through to `dijkstra_triangle_inequality` with zero admits
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch24-sssp --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch24-sssp/CLRS.Ch24.Dijkstra.TriangleInequality.fst`
 
