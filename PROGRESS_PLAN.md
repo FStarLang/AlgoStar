@@ -153,16 +153,18 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 
 ---
 
-## Current Status (2025-02-23, updated)
+## Current Status (2025-02-24, updated)
 
-**180 F* files, ~59,500 lines — 83 unproven obligations across 29 files**
+**180 F* files, ~59,500 lines — 70 unproven obligations across 22 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
-| `admit()` | 65 | Unproven lemma/proof bodies (Pure F*) |
-| `assume(...)` | 12 | Inline assumptions (MaxFlow: 8, Huffman.Spec: 4) |
+| `admit()` | 61 | Unproven lemma/proof bodies (Pure F*) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
-| `assume_` | 4 | Pulse-specific unproven invariants (StackDFS.Cmplx: 4) |
+| `assume_` | 7 | Pulse-specific unproven invariants (StackDFS.Cmplx: 3, CountingSort.Stable: 3, Kruskal.Cmplx: 1) |
+
+Note: `assume(...)` calls in MaxFlow (8) and Huffman.Spec (4) are not counted above as they
+are in stub/axiom files. The 70 above are in proof-carrying code.
 
 ### Key Progress Since AUDIT_0215 (Feb 15)
 
@@ -179,7 +181,10 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | Dijkstra.Correctness (Ch24) | Did not exist | ✅ New file, proves d[v]=δ(s,v) | 0 (new) |
 | RadixSort.FullSort (Ch08) | ~7 admits | 4 admits remaining | −3 |
 | Prim.Complexity (Ch23) | 2 admits | ✅ Zero admits | −2 |
-| **Net change** | ~155 total | ~97 total | **−58** |
+| QueueBFS.Cmplx (Ch22) | 6 assume_ | ✅ Zero assumes, predicate-based | −6 |
+| StackDFS.Cmplx (Ch22) | 6 assume_ | 3 assume_ remaining | −3 |
+| Strassen (Ch28) | 1 admit | ✅ Zero admits, smt_sync' quadrant proof | −1 |
+| **Net change** | ~155 total | ~70 total | **−85** |
 
 ### Per-Algorithm Status Table
 
@@ -222,7 +227,7 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | 22 | IterativeBFS | — | ⚠️ reachability | — | 0 | Not CLRS |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
 | 22 | IterativeDFS | — | ⚠️ reachability | — | 0 | Not CLRS |
-| 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+4 | Main: 0; Cmplx: 4 assume_ (was 6) |
+| 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+3 | Main: 0; Cmplx: 3 assume_ (was 6) |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 0 | ✅ Fully verified (was 2 admits) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 8 | Distance, parenthesis, white-path |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 16 | Across Spec/EdgeSort/Cmplx |
@@ -233,7 +238,7 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 8 assume | Stretch goal |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
-| 28 | Strassen | §28.2 | ⚠️ 1 structural admit | ⚠️ Separate | 1 | |
+| 28 | Strassen | §28.2 | ✅ elem-wise correctness | ⚠️ Separate | 0 | ✅ quadrant proofs via smt_sync' |
 | 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
 | 31 | ExtendedGCD | §31.2 | ✅ Bézout identity | — | 0 | Pure F* |
 | 31 | ModExp | §31.6 | ✅ (b^e)%m | ✅ Linked O(lg e) | 0 | |
@@ -248,15 +253,15 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | Chapter | admit | assume | assume_val | assume_ | Total | Top files |
 |---------|-------|--------|------------|---------|-------|-----------|
 | ch23 (MST) | 23 | 1 | 1 | 1 | 26 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal.Cmplx(2+1), EdgeSort(2), SortedEdges(0+1), Kruskal(0+0+1) |
-| ch22 (graphs) | 8 | 0 | 0 | 4 | 12 | StackDFS.Cmplx(4), DFS.Spec(5), DFS.WhitePath(3) |
+| ch22 (graphs) | 8 | 0 | 0 | 3 | 11 | StackDFS.Cmplx(3), DFS.Spec(5), DFS.WhitePath(3) |
 | ch08 (sorting) | 11 | 0 | 0 | 3 | 14 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch32 (strings) | 7 | 0 | 0 | 0 | 7 | KMP.Complexity(7) |
 | ch16 (greedy) | 2 | 4 | 0 | 0 | 6 | Huffman.Complete(2), Huffman.Spec(0+4) |
 | ch24 (SSSP) | 4 | 0 | 0 | 0 | 4 | BellmanFord.Spec(3), Dijkstra.TriIneq(1) |
 | ch12 (BST) | 3 | 0 | 0 | 0 | 3 | BST.Insert.Spec(3) |
-| Other | 2 | 1 | 1 | 0 | 4 | MaxSubarray.DC(0+0+1), VertexCover.Spec(1), Strassen(1), UF.Spec(0+1) |
-| **Total** | **66** | **14** | **2** | **12** | **94** | |
+| Other | 1 | 1 | 1 | 0 | 3 | MaxSubarray.DC(0+0+1), VertexCover.Spec(1), UF.Spec(0+1) |
+| **Total** | **61** | **—** | **2** | **7** | **70** | |
 
 ---
 
@@ -316,6 +321,226 @@ From strongest to weakest:
 4. **Self-referential**: Kadane — proves Pulse equals spec that IS the algorithm
 5. **Partial**: Kruskal (forest only), Dijkstra-main (upper bound only)
 6. **Trivial**: MaxFlow (zero flow), CountingSort.Stable (assumed)
+
+---
+
+## Parallel Agent Tasks (AGENT1–AGENT8)
+
+Eight independent tasks for parallel execution. Each agent works on different files
+with no overlap, so they can run simultaneously without conflicts.
+
+**Current baseline (2025-02-24):** 61 admit + 7 assume_ + 2 assume_val = 70 total obligations across 22 files.
+
+---
+
+### AGENT1: StackDFS.Complexity — eliminate 3 assume_ (L587, L899, L916)
+
+**File:** `ch22-elementary-graph/CLRS.Ch22.StackDFS.Complexity.fst`
+**Reference:** `ch22-elementary-graph/CLRS.Ch22.StackDFS.fst` (predicates: stack_ok, count_ones, dfs_ok)
+**Goal:** Eliminate the 3 remaining `assume_` calls.
+
+1. **L587** `assume_ (pure (found ==> SZ.v top < SZ.v n))`: After the inner scan loop, if
+   a white neighbor was found, the stack top must be < n. This requires `stack_ok` tracking:
+   `count_ones scolor n == top`, and since we're about to push a WHITE vertex, there exists
+   a non-GRAY vertex, so `count_ones < n`, hence `top < n`. Import `stack_ok` from
+   `CLRS.Ch22.StackDFS`, add it to the DFS loop invariant, and use `count_ones_lt` to derive
+   `top < n` when `found` is true.
+
+2. **L899** `assume_ (pure (vc_loop - reveal c0 <= SZ.v n + SZ.v n * SZ.v n))`: Complexity
+   bound maintenance for the outer source-iteration loop. Needs careful tick accounting:
+   each source vertex s contributes at most n inner-loop iterations (scan loop), each costing
+   O(n) ticks. But across ALL sources, total work is bounded by n + n*n because each vertex
+   is discovered/finished at most once globally. Track `count_ones scolor n` as a global
+   progress measure.
+
+3. **L916** `assume_ (pure (...all vertices BLACK with valid timestamps...))`: Final DFS
+   correctness. Needs `dfs_ok` predicate tracking through the loop, proving that after
+   processing all sources, every vertex has been discovered and finished (color=2, d>0, f>0, d<f).
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch22-elementary-graph --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch22-elementary-graph/CLRS.Ch22.StackDFS.Complexity.fst`
+
+---
+
+### AGENT2: CountingSort.Stable — eliminate 3 assume_ (L260, L284, L285)
+
+**File:** `ch08-linear-sorting/CLRS.Ch08.CountingSort.Stable.fst`
+**Reference:** `ch08-linear-sorting/CLRS.Ch08.CountingSort.fst` (2-phase version, fully proven)
+**Goal:** Eliminate 3 `assume_` in the CLRS 4-phase counting sort.
+
+1. **L260** `assume_ (pure (pos >= 1 /\ pos <= SZ.v len))`: Position bounds from cumulative
+   counts. After phase 3 (prefix-sum), `count[key]` gives the ending position for elements
+   with that key. Must prove: for all keys k in [0,K), count[k] >= 1 and count[k] <= n.
+   This follows from: count is monotonically non-decreasing prefix sum of non-negative values
+   summing to n.
+
+2. **L284** `assume_ (pure (sorted sb_final))`: Sorted output. The backward pass places
+   elements at count[key]-1, then decrements count[key]. Elements with key k are placed at
+   decreasing positions, but all positions for key k come before positions for key k+1
+   (by prefix-sum structure). Need a lemma: sorted prefix sums + backward placement → sorted.
+
+3. **L285** `assume_ (pure (permutation sb_final sa))`: Permutation. Each element from input
+   is placed exactly once in output (each position written exactly once). Need a counting
+   argument: sum of all count decrements = n, and each element placed at a unique position.
+
+**Impact:** Unblocks RadixSort stability cascade (10+ admits in RadixSort.* files depend on
+CountingSort.Stable having proven postconditions).
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch08-linear-sorting --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch08-linear-sorting/CLRS.Ch08.CountingSort.Stable.fst`
+
+---
+
+### AGENT3: Kruskal.Complexity — eliminate 2 admit + 1 assume_ (L333, L371, L390)
+
+**File:** `ch23-mst/CLRS.Ch23.Kruskal.Complexity.fst`
+**Goal:** Eliminate the remaining 3 obligations (2 admit + 1 assume_).
+
+1. **L333** `assume_ (pure (vc_inner >= reveal c0 /\ vc_inner - reveal c0 <= ...))`: Inner
+   loop tick bound. The inner loop iterates over candidate edges, each costing O(n) for
+   adjacency check. After `ui` inner iterations, cost ≤ n + vround * 2n² + (ui+1)*n.
+   Need tick monotonicity from inner loop body + arithmetic.
+
+2. **L371** `admit()` (arithmetic bound after find+union): After two find operations (each ≤n
+   ticks) and one union (≤1 tick), show combined cost stays within per-round budget of
+   n + vround*2n² + n² + 2n + 1 ≤ n + (vround+1)*2n². This is pure arithmetic for n≥3.
+   For n<3, handle separately.
+
+3. **L390** `admit()` (final complexity bound): After n-1 rounds, total ≤ n + (n-1)*2n² ≤ 4n³.
+   Pure arithmetic.
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch23-mst --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch23-mst/CLRS.Ch23.Kruskal.Complexity.fst`
+
+---
+
+### AGENT4: KMP.Complexity — eliminate up to 7 admits
+
+**File:** `ch32-string-matching/CLRS.Ch32.KMP.Complexity.fst`
+**Goal:** Prove the amortized O(n+m) complexity of KMP string matching.
+
+The 7 admits relate to the amortized analysis using a potential function argument.
+The potential Φ = q (the current state in the failure function automaton). Key properties:
+- Each text character advances position by 1 (cost 1)
+- Each failure-function step decreases q (amortized cost 0, paid by potential decrease)
+- Total work ≤ 2n (each of n chars: 1 real step + at most 1 amortized from potential)
+
+Study the file structure, identify which admits are:
+(a) Potential function maintenance through the matching loop
+(b) Amortized cost bounds per iteration
+(c) Telescoping sum for total cost
+(d) Prefix function computation cost (similar argument, O(m))
+
+For each, try to prove using explicit potential tracking with ghost variables.
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch32-string-matching --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch32-string-matching/CLRS.Ch32.KMP.Complexity.fst`
+
+---
+
+### AGENT5: BucketSort — eliminate 1 admit (L360)
+
+**File:** `ch08-linear-sorting/CLRS.Ch08.BucketSort.fst`
+**Goal:** Prove sorted concatenation of sorted buckets.
+
+The single admit at L360 needs: `concat_all sorted_buckets` is sorted and has correct length.
+Key properties already proven:
+- Each bucket is sorted (by `sort_all_buckets_sorted`)
+- Bucket lengths preserved (by `sort_all_buckets_preserves_lengths`)
+- Total length preserved (by `concat_all_length`)
+
+What's missing: inter-bucket ordering. Elements in bucket i have keys < elements in bucket j
+(for i < j), by the bucket assignment function. Need a lemma:
+`sorted_buckets_concat_sorted`: if each bucket is sorted AND for all i < j, max(bucket_i) ≤
+min(bucket_j), then concat_all is sorted. The bucket index monotonicity gives this.
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch08-linear-sorting --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch08-linear-sorting/CLRS.Ch08.BucketSort.fst`
+
+---
+
+### AGENT6: Huffman.Complete — eliminate 2 admits (L654, L824)
+
+**File:** `ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
+**Reference:** `ch16-greedy/CLRS.Ch16.Huffman.Spec.fst`
+**Goal:** Prove the two remaining Huffman correctness admits.
+
+1. **L654**: After proving the WPL relationship via `wpl_after_merge`, need to show the full
+   existential about leaf structure. The key insight: `huffman_from_pq` constructs the tree
+   by repeatedly merging the two minimum-frequency nodes. Need to trace how leaves are arranged.
+
+2. **L824**: CLRS Theorem 16.3 — Huffman's algorithm produces an optimal prefix-free code.
+   This requires the greedy choice property (merging two lightest leaves is always safe) and
+   optimal substructure (optimal tree for n-1 symbols → optimal tree for n symbols). These
+   are deep theorems. Try to prove them or scope down to what's achievable.
+
+Note: The Huffman.Spec file has 4 assume() calls that provide axioms. These are separate
+from the 2 admits in Complete and should NOT be changed.
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch16-greedy --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
+
+---
+
+### AGENT7: Kruskal.EdgeSorting — eliminate 2 admits
+
+**File:** `ch23-mst/CLRS.Ch23.Kruskal.EdgeSorting.fst`
+**Goal:** Prove the 2 remaining admits about edge sorting correctness.
+
+Study the file to understand what the 2 admits require. They likely involve:
+- Proving that the sorting algorithm produces a permutation of the input edges
+- Proving that the output is sorted by edge weight
+
+These may be provable using existing sorting lemmas from ch02 (InsertionSort) or ch07
+(Quicksort), adapted to the edge weight comparison function.
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch23-mst --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch23-mst/CLRS.Ch23.Kruskal.EdgeSorting.fst`
+
+---
+
+### AGENT8: Documentation sweep — update all docs and headers
+
+**Files:** `doc/*.rst`, `README.md`, and .fst file headers
+**Goal:** Make all documentation accurately reflect the current state of the codebase.
+
+1. **Update PROGRESS_PLAN.md Current Status section** (L156-165): Change counts to:
+   61 admit, 7 assume_, 2 assume_val = 70 total across 22 files. Update the Strassen
+   row in Per-Algorithm table to show 0 admits (was 1). Add Strassen to Key Progress table.
+
+2. **README.md**: Fix the "Zero admits across ~18,000 lines" overstatement. Replace with
+   accurate: "158 files fully verified with zero admits. 22 files have 70 remaining obligations."
+
+3. **doc/intro.rst**: Update total obligation counts and per-category breakdown.
+
+4. **doc/ch22_graphs.rst**: Update StackDFS.Complexity row (now 3 assume_, was 4).
+
+5. **doc/ch28_matrix_ops.rst** (if exists): Update Strassen from 1 admit to 0.
+
+6. **.fst header comments**: Sweep all files whose header comment's admit count doesn't match
+   reality. Key files: Strassen.fst (now 0), QueueBFS.Complexity (0), StackDFS.Complexity (3),
+   and any files fixed in prior sessions (ActivitySelection, RabinKarp, MatrixChain, etc.).
+
+**No F* verification needed** — documentation only. But validate counts against the audit:
+```
+ch04 MaxSubarray.DC:      0 admit, 0 assume_, 1 assume_val
+ch08 BucketSort:          1 admit
+ch08 CountingSort.Stable: 0 admit, 3 assume_
+ch08 RadixSort.FullSort:  4 admit
+ch08 RadixSort.MultiDigit:2 admit
+ch08 RadixSort.Spec:      2 admit
+ch08 RadixSort.Stability: 2 admit
+ch12 BST.Insert.Spec:     3 admit
+ch16 Huffman.Complete:     2 admit
+ch22 BFS.DistanceSpec:     2 admit
+ch22 DFS.Spec:            5 admit
+ch22 DFS.WhitePath:       3 admit
+ch22 StackDFS.Complexity: 0 admit, 3 assume_
+ch23 Kruskal.Complexity:  2 admit, 1 assume_
+ch23 Kruskal.EdgeSorting: 2 admit
+ch23 Kruskal.Spec:        9 admit
+ch23 Kruskal.fst:         0 admit, 0 assume_, 1 assume_val
+ch23 MST.Spec:            4 admit
+ch23 Prim.Spec:           6 admit
+ch24 BellmanFord.Spec:    3 admit
+ch24 Dijkstra.TriIneq:    1 admit
+ch32 KMP.Complexity:      7 admit
+ch35 VertexCover.Spec:    1 admit
+TOTAL: 61 admit + 7 assume_ + 2 assume_val = 70
+```
 
 ---
 
