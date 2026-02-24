@@ -326,8 +326,21 @@ From strongest to weakest:
 
 ## Parallel Agent Tasks (AGENT1–AGENT10)
 
-Ten independent tasks for parallel execution. Each agent works on different files
-with no overlap, so they can run simultaneously without conflicts.
+Ten independent tasks for parallel execution. 
+
+* Each agent MUST work on different files with no overlap, so they can run
+  simultaneously without conflicts (except for PROGRESS_PLAN.md---see below)
+
+* Agent must commit only the files they work on, repeatedly as they reach
+  meaningful checkpoints, so progress is visible and incremental, without any
+  conflicts
+
+* When an agent finishes or makes progress on their task, they should update
+  PROGRESS_PLAN.md with their update and learnings. NOTE: This means that agents
+  can race to update the file, so they should synchronize their writes to
+  PROGRESS_PLAN.md using a simple file lock (e.g., `flock` in bash) to avoid
+  conflicts, and then commit their changes.
+
 
 **Current baseline (2025-02-24):** 61 admit + 7 assume_ + 2 assume_val = 70 total obligations across 22 files.
 
@@ -492,7 +505,7 @@ These may be provable using existing sorting lemmas from ch02 (InsertionSort) or
 
 ---
 
-### AGENT9: Dijkstra.TriangleInequality — eliminate 1 admit (L496)
+### AGENT8: Dijkstra.TriangleInequality — eliminate 1 admit (L496)
 
 **File:** `ch24-sssp/CLRS.Ch24.Dijkstra.TriangleInequality.fst`
 **Reference:** `ch24-sssp/CLRS.Ch24.Dijkstra.Correctness.fst` (zero admits, proves d[v]=δ(s,v))
@@ -523,7 +536,7 @@ Build on these to close the gap.
 
 ---
 
-### AGENT10: BellmanFord.Spec — restructure invariants, fix 3 admits (L235, L405, L454)
+### AGENT9: BellmanFord.Spec — restructure invariants, fix 3 admits (L235, L405, L454)
 
 **File:** `ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst`
 **Goal:** Fix the incorrect invariants and prove all 3 admits.
@@ -566,7 +579,7 @@ The existing invariants are wrong for the imperative (sequential relaxation) imp
 
 ---
 
-### AGENT8: Documentation sweep — update all docs and headers
+### AGENT19: Documentation sweep — update all docs and headers
 
 **Files:** `doc/*.rst`, `README.md`, and .fst file headers
 **Goal:** Make all documentation accurately reflect the current state of the codebase.
