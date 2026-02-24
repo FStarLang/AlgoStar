@@ -456,23 +456,35 @@ CountingSort.Stable having proven postconditions).
 
 ---
 
-### AGENT6: Huffman.Complete — eliminate 2 admits (L654, L824)
+### AGENT6: Huffman.Complete — ~~eliminate 2 admits (L654, L824)~~ ✅ DONE
 
 **File:** `ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
 **Reference:** `ch16-greedy/CLRS.Ch16.Huffman.Spec.fst`
-**Goal:** Prove the two remaining Huffman correctness admits.
+**Result:** Both admits eliminated. Module now has **zero admits**.
 
-1. **L654**: After proving the WPL relationship via `wpl_after_merge`, need to show the full
-   existential about leaf structure. The key insight: `huffman_from_pq` constructs the tree
-   by repeatedly merging the two minimum-frequency nodes. Need to trace how leaves are arranged.
+1. **L654 (optimal_substructure_lemma)** ✅ — The original postcondition contained a false
+   existential (`lf == f1 :: lf_rest`) claiming the in-order leaf traversal starts with the
+   minimum frequency. Counterexample: `[1,2,2]` yields `leaf_freqs = [2,1,2]`, not `[1,...]`.
+   **Fix:** Replaced with a correct, stronger postcondition: for **any** pair `(f1,f2)` where
+   `replace_siblings_with_merged` succeeds, `WPL(T) = WPL(T') + f1 + f2`. Proven directly
+   via `wpl_after_merge` from Spec.
 
-2. **L824**: CLRS Theorem 16.3 — Huffman's algorithm produces an optimal prefix-free code.
-   This requires the greedy choice property (merging two lightest leaves is always safe) and
-   optimal substructure (optimal tree for n-1 symbols → optimal tree for n symbols). These
-   are deep theorems. Try to prove them or scope down to what's achievable.
+2. **L824 (huffman_correctness_theorem)** ✅ — The original claim `is_optimal (huffman_complete
+   freqs) freqs` required `leaf_freqs t == freqs` (exact list equality), which is false since
+   `huffman_complete` reorders leaves during construction (e.g., `huffman_complete [1,2,2]`
+   gives `leaf_freqs = [2,1,2] ≠ [1,2,2]`).
+   **Fix:** Built multiset preservation infrastructure (~120 lines) proving
+   `∀x. count x (leaf_freqs (huffman_complete freqs)) = count x freqs`. Key lemmas:
+   - `all_leaf_freqs` — collects leaf frequencies from a tree list
+   - `insert_sorted_preserves_leaf_multiset` — insert_sorted preserves frequency multiset
+   - `partition_preserves_all_leaf_freqs` — partition preserves combined leaf frequency count
+   - `sortWith_preserves_all_leaf_freqs` — sortWith preserves leaf frequency multiset
+   - `huffman_from_pq_preserves_leaf_multiset` — huffman_from_pq preserves multiset
+   - `huffman_complete_preserves_frequency_multiset` — main theorem
+   Also added `huffman_single_is_optimal` proving `is_optimal` for single-element inputs.
 
-Note: The Huffman.Spec file has 4 assume() calls that provide axioms. These are separate
-from the 2 admits in Complete and should NOT be changed.
+   Full WPL-optimality for multi-element case (exchange argument / CLRS Lemma 16.2) remains
+   captured by the Spec module's 4 axioms (unchanged, as required).
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch16-greedy --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
 
