@@ -342,7 +342,8 @@ Ten independent tasks for parallel execution.
   conflicts, and then commit their changes.
 
 
-**Current baseline (2025-02-24):** 61 admit + 7 assume_ + 2 assume_val = 70 total obligations across 22 files.
+**Current baseline (2025-02-24):** 58 admit + 7 assume_ + 2 assume_val = 67 total obligations across 21 files.
+(Updated: BellmanFord.Spec 3 admits eliminated by AGENT9)
 
 ---
 
@@ -551,46 +552,19 @@ Build on these to close the gap.
 
 ---
 
-### AGENT9: BellmanFord.Spec — restructure invariants, fix 3 admits (L235, L405, L454)
+### AGENT9: BellmanFord.Spec — restructure invariants, fix 3 admits (L235, L405, L454) ✅ COMPLETED
 
 **File:** `ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst`
-**Goal:** Fix the incorrect invariants and prove all 3 admits.
+**Status:** All 3 admits eliminated. File verifies cleanly with 0 admits.
 
-**CRITICAL CONTEXT — 2 of 3 admits are currently FALSE:**
-
-The existing invariants are wrong for the imperative (sequential relaxation) implementation:
-
-- `upper_bound_inv(dist, k)` uses `sp_dist_k(src, v, k)` — shortest path using at most k edges.
-  But sequential relaxation in round k can propagate through chains longer than k edges within
-  a single round. Example: edges 0→1(w=1), 1→2(w=1). After round 1, dist[2]=2 (via chain
-  0→1→2), but sp_dist_k(0,2,1)=None (no 1-edge path to vertex 2).
-
-- `correctness_inv` uses exact equality `dist[v] == sp_dist_k(src,v,k)` which is FALSE.
-
-**Required restructuring:**
-
-1. **Replace `sp_dist_k` with `sp_dist` (unbounded shortest path)** in upper_bound_inv:
-   `upper_bound_inv(dist) ≡ ∀v. dist[v] = None ∨ dist[v] >= sp_dist(src,v)`
-   This IS preserved by relaxation (relaxation only applies correct edge weights).
-
-2. **Replace exact equality with `<=` in correctness_inv:**
-   `correctness_after_k(dist, k) ≡ ∀v. sp_dist_k(src,v,k) = Some d → dist[v] <= Some d`
-   (After k rounds, dist is at least as good as k-edge-bounded shortest path.)
-
-3. **Combine for convergence:** After n-1 rounds, sp_dist_k(src,v,n-1) = sp_dist(src,v)
-   (no negative cycles), so dist[v] = sp_dist(src,v) by combining upper and lower bounds.
-
-4. **L454 (negative cycle detection):** This admit IS correct. After n-1 rounds, if any
-   relaxation still improves a distance, there must be a negative-weight cycle. Prove by
-   contradiction using the path-length pigeonhole principle.
-
-**Approach:**
-- First restructure the invariant definitions (upper_bound_inv, correctness_inv)
-- Then prove L235 (relax_preserves_upper_bound) with the corrected upper_bound_inv
-- Then prove L405 (bf_correctness_inductive) with the corrected correctness_inv
-- Finally prove L454 (bf_negative_cycle_detection)
-
-**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch24-sssp --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst`
+**Changes made:**
+- Added `no_neg_cycles` predicate (sp_dist_k(src,v,n) == sp_dist(src,v) for all v)
+- Restructured `upper_bound_inv`: removed k param, uses `sp_dist`, requires `no_neg_cycles`
+- Restructured `correctness_inv`: uses `<=` instead of `==` (sequential relaxation is at least as good as k-edge shortest paths)
+- Proved L235 (`relax_preserves_upper_bound`) via triangle inequality for sp_dist under no_neg_cycles
+- Proved L405 (`bf_correctness_inductive`) via new helper lemmas: `relax_all_monotone`, `relax_all_achieves_edge`, `bounded_by_min_over_preds`
+- Proved L454 (`bf_negative_cycle_detection`) — corrected `exists_relaxable_edge` to include (Some, None) case; proved biconditional via contrapositive
+- Updated `bf_convergence` to require `no_neg_cycles`, combining upper and lower bounds for equality
 
 ---
 
@@ -600,11 +574,12 @@ The existing invariants are wrong for the imperative (sequential relaxation) imp
 **Goal:** Make all documentation accurately reflect the current state of the codebase.
 
 1. **Update PROGRESS_PLAN.md Current Status section** (L156-165): Change counts to:
-   61 admit, 7 assume_, 2 assume_val = 70 total across 22 files. Update the Strassen
+   58 admit, 7 assume_, 2 assume_val = 67 total across 21 files. Update the Strassen
    row in Per-Algorithm table to show 0 admits (was 1). Add Strassen to Key Progress table.
+   Also update BellmanFord.Spec row to 0 admits (was 3, fixed by AGENT9).
 
 2. **README.md**: Fix the "Zero admits across ~18,000 lines" overstatement. Replace with
-   accurate: "158 files fully verified with zero admits. 22 files have 70 remaining obligations."
+   accurate: "158 files fully verified with zero admits. 21 files have 67 remaining obligations."
 
 3. **doc/intro.rst**: Update total obligation counts and per-category breakdown.
 
@@ -637,11 +612,11 @@ ch23 Kruskal.Spec:        9 admit
 ch23 Kruskal.fst:         0 admit, 0 assume_, 1 assume_val
 ch23 MST.Spec:            4 admit
 ch23 Prim.Spec:           6 admit
-ch24 BellmanFord.Spec:    3 admit
+ch24 BellmanFord.Spec:    0 admit  (was 3, fixed by AGENT9)
 ch24 Dijkstra.TriIneq:    1 admit
 ch32 KMP.Complexity:      7 admit
 ch35 VertexCover.Spec:    1 admit
-TOTAL: 61 admit + 7 assume_ + 2 assume_val = 70
+TOTAL: 58 admit + 7 assume_ + 2 assume_val = 67
 ```
 
 ---
