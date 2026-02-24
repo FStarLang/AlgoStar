@@ -410,12 +410,12 @@ CountingSort.Stable having proven postconditions).
 
 ---
 
-### AGENT3: Kruskal.Complexity — ✅ DONE — eliminated 2 admit + 1 assume_ (L333, L371, L390)
+### AGENT3: Kruskal.Complexity — ✅ DONE — eliminated 2 admit + 1 assume_ + optimized verification
 
 **File:** `ch23-mst/CLRS.Ch23.Kruskal.Complexity.fst`
-**Status:** All 3 obligations eliminated. File verifies with 0 admits/assumes.
+**Status:** All 3 obligations eliminated. Verification optimized from 10+ min → 16s.
 
-**Changes made:**
+**Phase 1 — Proof completion:**
 
 1. **L333 `assume_` → proven `assert`**: Called `distrib_right` lemma to prove `(vui+1)*n = vui*n + n`,
    converting the `assume_` to a verified `assert` after inner loop exit.
@@ -428,11 +428,20 @@ CountingSort.Stable having proven postconditions).
 3. **L390 `admit()` → proven**: Added `final_bound_lemma` proving `n + vround*3*n² ≤ 4n³`
    for `vround ≤ n-1`, using `distributivity_add_left` for nonlinear arithmetic.
 
-**Key techniques:**
-- `FStar.Math.Lemmas.distributivity_add_left` for nonlinear arithmetic: `(a+b)*c = a*c + b*c`
-- Explicit existential naming with `with sparent_new (vc: nat). assert (...)`
-- Precomputed `vround1 = vround +^ 1sz` with intermediate assertions to guide SMT
-- z3rlimit increased from 200 to 800 for the main function
+**Phase 2 — Performance optimization:**
+
+Made `valid_parents` and `valid_endpoints` predicates `[@@ "opaque_to_smt"]` to prevent
+quantifier forall bodies from leaking into all SMT queries (especially nonlinear arithmetic).
+Added explicit helper lemmas to selectively reveal opaque definitions:
+
+- `establish_valid_parents`, `valid_parents_length`, `valid_parents_index`, `valid_parents_seq_upd`
+- `establish_valid_endpoints_empty`, `valid_endpoints_add`, `valid_endpoints_noop`,
+  `valid_endpoints_len`, `valid_endpoints_conditional_write`
+
+**Performance results:**
+- Before: 514s SMT time, 2 monster queries (219s + 285s), rlimit 800, 3.1GB Z3 memory
+- After: 2.3s SMT time across 95 queries, max 113ms each, default rlimit 5
+- Total wall-clock: 16s (vs 10+ minutes) — **32x faster**
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch23-mst --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch23-mst/CLRS.Ch23.Kruskal.Complexity.fst`
 
