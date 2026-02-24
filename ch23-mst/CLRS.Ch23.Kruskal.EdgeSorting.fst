@@ -135,6 +135,7 @@ let stable_permutation (edges1 edges2: list edge) : prop =
 
 // If both edge lists are sorted and are stable permutations of each other,
 // Kruskal produces MSTs with equal weight
+#push-options "--z3rlimit 40 --split_queries always"
 let lemma_stable_permutation_equal_mst_weight
   (g1 g2: graph)
   (edges1 edges2: list edge)
@@ -208,12 +209,14 @@ let lemma_stable_permutation_equal_mst_weight
     let pk2 = pure_kruskal g2 in
     assert (is_mst g1 pk1);
     assert (is_mst g2 pk2);
-    // Transfer: pk2 is a spanning tree of g1
-    subset_equiv pk2;
-    assert (subset_edges pk2 g1.edges);
-    // Transfer: pk1 is a spanning tree of g2
-    subset_equiv pk1;
-    assert (subset_edges pk1 g2.edges)
+    // Transfer subset_edges explicitly using the membership equivalence
+    assert (subset_edges pk1 g1.edges);
+    lemma_subset_edges_transfer pk1 g1.edges g2.edges;
+    assert (subset_edges pk1 g2.edges);
+    assert (subset_edges pk2 g2.edges);
+    lemma_subset_edges_transfer pk2 g2.edges g1.edges;
+    assert (subset_edges pk2 g1.edges)
+#pop-options
 
 (*** Precondition for Kruskal ***)
 
@@ -222,6 +225,7 @@ let pure_kruskal_precondition (g: graph) : prop =
   edges_sorted_by_weight g.edges
 
 // Any graph can be transformed to satisfy this precondition
+#push-options "--z3rlimit 20"
 let make_graph_sortable (g: graph)
   : Lemma (ensures (exists (g': graph).
                      g'.n = g.n /\
@@ -230,7 +234,12 @@ let make_graph_sortable (g: graph)
   = let sorted_edges = sort_edges g.edges in
     let g' : graph = { n = g.n; edges = sorted_edges } in
     sort_edges_produces_sorted g.edges;
-    sort_edges_is_permutation g.edges
+    sort_edges_is_permutation g.edges;
+    assert (edges_sorted_by_weight g'.edges);
+    assert (pure_kruskal_precondition g');
+    assert (forall (e: edge). mem_edge e g.edges <==> mem_edge e g'.edges);
+    assert (stable_permutation g.edges g'.edges)
+#pop-options
 
 (*** Integration with Kruskal Specification ***)
 
