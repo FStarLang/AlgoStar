@@ -18,8 +18,6 @@
    the cubic complexity bound: ticks ≤ 4 × V³.
 
    Uses GhostReference for tick counter — fully erased at runtime.
-   
-   Note: Uses admit()s for arithmetic bounds and final complexity proof.
 *)
 
 module CLRS.Ch23.Kruskal.Complexity
@@ -54,6 +52,38 @@ let lemma_index_in_bounds (u v n: nat)
   : Lemma (requires u < n /\ v < n /\ n > 0 /\ SZ.fits (n * n))
           (ensures u * n + v < n * n /\ SZ.fits (u * n) /\ SZ.fits (u * n + v))
   = ()
+
+module ML = FStar.Math.Lemmas
+
+#push-options "--z3rlimit 50"
+let distrib_right (a b: nat)
+  : Lemma (ensures (a + 1) * b == a * b + b)
+  = ()
+
+let round_cost_lemma (n: nat)
+  : Lemma (requires n >= 2)
+          (ensures n * n + 2 * n + 1 <= 3 * n * n)
+  = ()
+
+// After a round: accumulated cost ≤ n + vround*3*n² + n² + 2n + 1 ≤ n + (vround+1)*3*n²
+let acc_round_bound (n vround: nat)
+  : Lemma (requires n >= 2)
+          (ensures n + vround * 3 * n * n + n * n + 2 * n + 1 <= n + (vround + 1) * 3 * n * n)
+  = round_cost_lemma n;
+    ML.distributivity_add_left vround 1 3;
+    ML.distributivity_add_left (vround * 3) 3 n;
+    ML.distributivity_add_left (vround * 3 * n) (3 * n) n
+
+// Final bound: n + (n-1)*3*n² ≤ 4n³
+let final_bound_lemma (n vround: nat)
+  : Lemma (requires n >= 1 /\ vround <= n - 1)
+          (ensures n + vround * 3 * n * n <= 4 * n * n * n)
+  = if n >= 2 then begin
+      ML.distributivity_add_left (vround * 3 * n) (3 * n) n;
+      ML.distributivity_add_left (vround * 3) 3 n;
+      ML.distributivity_add_left vround 1 3
+    end
+#pop-options
 
 // ========== Ghost tick counter ==========
 
@@ -156,7 +186,7 @@ fn do_union_complexity
 
 // ========== Kruskal's MST with Complexity Counting ==========
 
-#push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 800 --ifuel 2 --fuel 2"
 fn kruskal_complexity
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
@@ -242,9 +272,9 @@ fn kruskal_complexity
       valid_parents sparent (SZ.v n) /\
       valid_endpoints seu sev (SZ.v n) (SZ.v vec) /\
       vc >= reveal c0 /\
-      // Each round does: n + n*n + 2*n + 1 ≈ n² operations
-      // After vround rounds: at most vround * n * n * 2 operations
-      vc - reveal c0 <= SZ.v n + SZ.v vround * 2 * SZ.v n * SZ.v n
+      // Each round does: n*n + 2*n + 1 operations (scan + 2 finds + union)
+      // Per-round budget: 3*n*n (holds for n >= 2; loop doesn't run for n=1)
+      vc - reveal c0 <= SZ.v n + SZ.v vround * 3 * SZ.v n * SZ.v n
     )
   {
     let vround = !round;
@@ -278,7 +308,7 @@ fn kruskal_complexity
         SZ.v vec_s <= SZ.v vround /\
         vc >= reveal c0 /\
         // Accumulated: previous + current scan
-        vc - reveal c0 <= SZ.v n + SZ.v vround * 2 * SZ.v n * SZ.v n + SZ.v vui * SZ.v n
+        vc - reveal c0 <= SZ.v n + SZ.v vround * 3 * SZ.v n * SZ.v n + SZ.v vui * SZ.v n
       )
     {
       let vui = !ui;
@@ -308,7 +338,7 @@ fn kruskal_complexity
           SZ.v vec_i <= SZ.v vround /\
           vc >= reveal c0 /\
           // Count each comparison
-          vc - reveal c0 <= SZ.v n + SZ.v vround * 2 * SZ.v n * SZ.v n + SZ.v vui * SZ.v n + SZ.v vvi
+          vc - reveal c0 <= SZ.v n + SZ.v vround * 3 * SZ.v n * SZ.v n + SZ.v vui * SZ.v n + SZ.v vvi
         )
       {
         let vvi = !vi;
@@ -330,9 +360,12 @@ fn kruskal_complexity
         vi := vvi +^ 1sz;
       };
       with _ _ _ _ _ _ _ _ (vc_inner: nat). assert (GR.pts_to ctr vc_inner);
-      assume_ (pure (
+      // Inner loop exited with vvi <= n, so bound is vui*n + n >= vui*n + vvi
+      // Distributive law: (vui+1)*n = vui*n + n
+      distrib_right (SZ.v vui) (SZ.v n);
+      assert (pure (
         vc_inner >= reveal c0 /\
-        vc_inner - reveal c0 <= SZ.v n + SZ.v vround * 2 * SZ.v n * SZ.v n + (SZ.v vui + 1) * SZ.v n
+        vc_inner - reveal c0 <= SZ.v n + SZ.v vround * 3 * SZ.v n * SZ.v n + (SZ.v vui + 1) * SZ.v n
       ));
       ui := vui +^ 1sz;
     };
@@ -361,33 +394,38 @@ fn kruskal_complexity
     // Union: costs at most 1 tick
     do_union_complexity parent root_u root_v n ctr;
     
-    // Prove complexity bound is maintained
-    // After this round: vc - c0 <= n + vround * 2 * n * n + n * n + 2 * n + 1
-    //                         = n + vround * 2 * n * n + n * n + 2 * n + 1
-    //                         <= n + vround * 2 * n * n + 2 * n * n  (since 2*n+1 <= n*n for n>=3)
-    //                         = n + (vround + 1) * 2 * n * n
-    with vc. assert (GR.pts_to ctr vc);
-    // We admit the arithmetic reasoning
-    admit();
-    assert (pure (vc - reveal c0 <= SZ.v n + (SZ.v vround + 1) * 2 * SZ.v n * SZ.v n));
+    // Name all existentials from do_union_complexity
+    with sparent_new (vc: nat). 
+      assert (A.pts_to parent sparent_new ** GR.pts_to ctr vc);
     
-    round := vround +^ 1sz;
+    // Prove complexity bound is maintained
+    // After scan (n²) + 2 finds (2n) + union (1): cost increment = n² + 2n + 1
+    // Budget per round: 3n². Need n² + 2n + 1 ≤ 3n², i.e., 2n+1 ≤ 2n² (holds for n≥2)
+    // We're in the loop so vround < n-1, hence n ≥ 2
+    acc_round_bound (SZ.v n) (SZ.v vround);
+    
+    // Help SMT connect SZ.v (vround +^ 1sz) = SZ.v vround + 1
+    let vround1 = vround +^ 1sz;
+    assert (pure (SZ.v vround1 == SZ.v vround + 1));
+    assert (pure (SZ.v vround1 <= SZ.v n - 1));
+    assert (pure (valid_parents sparent_new (SZ.v n)));
+    assert (pure (vc >= reveal c0));
+    assert (pure (vc - reveal c0 <= SZ.v n + (SZ.v vround + 1) * 3 * SZ.v n * SZ.v n));
+    
+    round := vround1;
   };
   
   // Clean up
+  with vr. assert (R.pts_to round vr);
   with sp. assert (A.pts_to parent sp);
   rewrite (A.pts_to parent sp) as (A.pts_to (V.vec_to_array parent_v) sp);
   V.to_vec_pts_to parent_v;
   V.free parent_v;
   
   // Final complexity bound: after (n-1) rounds:
-  // ticks ≤ n + (n-1) * 2 * n * n 
-  //       = n + 2 * n * n * (n - 1)
-  //       = n + 2 * n³ - 2 * n²
-  //       ≤ 2 * n³  (for n >= 1)
-  //       ≤ 4 * n³  (with overhead factor)
+  // ticks ≤ n + (n-1) * 3 * n * n = n + 3n³ - 3n² ≤ 4n³
   with vc_final. assert (GR.pts_to ctr vc_final);
-  admit();
+  final_bound_lemma (SZ.v n) (SZ.v vr);
   assert (pure (complexity_bounded_kruskal vc_final (reveal c0) (SZ.v n)));
 }
 #pop-options

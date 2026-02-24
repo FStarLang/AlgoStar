@@ -394,23 +394,29 @@ CountingSort.Stable having proven postconditions).
 
 ---
 
-### AGENT3: Kruskal.Complexity — eliminate 2 admit + 1 assume_ (L333, L371, L390)
+### AGENT3: Kruskal.Complexity — ✅ DONE — eliminated 2 admit + 1 assume_ (L333, L371, L390)
 
 **File:** `ch23-mst/CLRS.Ch23.Kruskal.Complexity.fst`
-**Goal:** Eliminate the remaining 3 obligations (2 admit + 1 assume_).
+**Status:** All 3 obligations eliminated. File verifies with 0 admits/assumes.
 
-1. **L333** `assume_ (pure (vc_inner >= reveal c0 /\ vc_inner - reveal c0 <= ...))`: Inner
-   loop tick bound. The inner loop iterates over candidate edges, each costing O(n) for
-   adjacency check. After `ui` inner iterations, cost ≤ n + vround * 2n² + (ui+1)*n.
-   Need tick monotonicity from inner loop body + arithmetic.
+**Changes made:**
 
-2. **L371** `admit()` (arithmetic bound after find+union): After two find operations (each ≤n
-   ticks) and one union (≤1 tick), show combined cost stays within per-round budget of
-   n + vround*2n² + n² + 2n + 1 ≤ n + (vround+1)*2n². This is pure arithmetic for n≥3.
-   For n<3, handle separately.
+1. **L333 `assume_` → proven `assert`**: Called `distrib_right` lemma to prove `(vui+1)*n = vui*n + n`,
+   converting the `assume_` to a verified `assert` after inner loop exit.
 
-3. **L390** `admit()` (final complexity bound): After n-1 rounds, total ≤ n + (n-1)*2n² ≤ 4n³.
-   Pure arithmetic.
+2. **L371 `admit()` → proven**: Changed per-round budget from `2*n²` to `3*n²` (original was too
+   tight for n=2). Added `acc_round_bound` lemma using `FStar.Math.Lemmas.distributivity_add_left`
+   to prove `n² + 2n + 1 ≤ 3n²` for n≥2. Named existentials from `do_union_complexity` with
+   `with sparent_new (vc: nat).` and added step-by-step assertions to help SMT.
+
+3. **L390 `admit()` → proven**: Added `final_bound_lemma` proving `n + vround*3*n² ≤ 4n³`
+   for `vround ≤ n-1`, using `distributivity_add_left` for nonlinear arithmetic.
+
+**Key techniques:**
+- `FStar.Math.Lemmas.distributivity_add_left` for nonlinear arithmetic: `(a+b)*c = a*c + b*c`
+- Explicit existential naming with `with sparent_new (vc: nat). assert (...)`
+- Precomputed `vround1 = vround +^ 1sz` with intermediate assertions to guide SMT
+- z3rlimit increased from 200 to 800 for the main function
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch23-mst --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch23-mst/CLRS.Ch23.Kruskal.Complexity.fst`
 
