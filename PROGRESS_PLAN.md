@@ -477,6 +477,7 @@ CountingSort.Stable having proven postconditions).
 **File:** `ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
 **Reference:** `ch16-greedy/CLRS.Ch16.Huffman.Spec.fst`
 **Result:** Both admits eliminated. Module now has **zero admits**.
+Spec module reduced from **4 assumes to 1** (greedy choice axiom, now with correct statement).
 
 1. **L654 (optimal_substructure_lemma)** ✅ — The original postcondition contained a false
    existential (`lf == f1 :: lf_rest`) claiming the in-order leaf traversal starts with the
@@ -499,8 +500,24 @@ CountingSort.Stable having proven postconditions).
    - `huffman_complete_preserves_frequency_multiset` — main theorem
    Also added `huffman_single_is_optimal` proving `is_optimal` for single-element inputs.
 
-   Full WPL-optimality for multi-element case (exchange argument / CLRS Lemma 16.2) remains
-   captured by the Spec module's 4 axioms (unchanged, as required).
+3. **Huffman.Spec assumes: 4 → 1** ✅ — Fixed 3 of 4 assumes in Spec:
+   - **L729** `assume(True)` in `sibling_swap_maintains_optimality`: Removed (postcondition
+     was already `True`; the assume was vacuous nonsense).
+   - **L686** `exists_leaf_at_max_depth`: The original statement was **provably false** —
+     `depth_of_leaf` searches left-first, so duplicate frequencies across subtrees can shadow
+     witnesses (e.g., `Internal _ (Leaf 5) (Internal _ (Leaf 5) (Leaf 5))` has max depth 2
+     but `depth_of_leaf` returns 1 for the only frequency 5). **Fix:** Reformulated using
+     position-based witness (`get_subtree_at` + `max_depth_position`), fully proven.
+   - **L898** `optimal_substructure_theorem`: The original property had false existential
+     `lf == f1 :: lf_rest`. **Fix:** Reformulated as: for any tree with siblings f1,f2,
+     merging gives `WPL(T) = WPL(T') + f1 + f2`. Fully proven via `are_siblings_implies_replace`
+     + `wpl_after_merge`.
+   - **L806** `greedy_choice_theorem`: Property reformulated with correct statement using
+     `is_wpl_optimal` (multiset-based optimality) and `find_two_mins`. Still assumes the
+     exchange argument (CLRS Lemma 16.2) — the proof requires orchestrating position-based
+     swaps across the full tree. The swap infrastructure (`swap_reduces_wpl` etc.) is proven;
+     the orchestration (~100 lines of position manipulation) is left as future work.
+   - Added `is_wpl_optimal` and `same_frequency_multiset` definitions for correct optimality.
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch16-greedy --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
 
