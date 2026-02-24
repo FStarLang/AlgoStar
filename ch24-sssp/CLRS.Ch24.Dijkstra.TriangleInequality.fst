@@ -430,72 +430,370 @@ let process_vertex_extends_triangle (#n: nat) (dist: dist_vec n) (weights: weigh
     edge_satisfies_triangle dist' weights x v)
 #pop-options
 
-(* Process vertices from u_start to n-1 *)
-let rec process_vertices (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
-                        (u: nat) : Tot (dist_vec n) (decreases (n - u))
-  =
-  if u >= n then dist
-  else 
-    let dist' = relax_from_u dist weights u 0 in
-    process_vertices dist' weights (u + 1)
+(* ===== Dijkstra-Order Processing ===== *)
 
-(* All vertices in range [0, u) have been processed *)
-let all_processed_up_to (u: nat) : processed_set = fun v -> v < u
+(* Find minimum-distance unprocessed vertex, scanning from index i.
+   current_min = n means "no candidate yet". *)
+let rec find_min_from (#n: nat) (dist: dist_vec n) (processed: processed_set)
+                      (i: nat) (current_min: nat)
+  : Tot nat (decreases (n - i))
+  = if i >= n then current_min
+    else if is_processed processed i then
+      find_min_from dist processed (i + 1) current_min
+    else if current_min >= n then
+      find_min_from dist processed (i + 1) i
+    else if Seq.index dist i < Seq.index dist current_min then
+      find_min_from dist processed (i + 1) i
+    else
+      find_min_from dist processed (i + 1) current_min
 
-(* Helper: Stability for initial_processed implies stability for all_processed_up_to 0 *)
+let find_min (#n: nat) (dist: dist_vec n) (processed: processed_set) : nat =
+  find_min_from dist processed 0 n
+
+(* Spec of find_min_from: basic properties *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec find_min_from_basic (#n: nat) (dist: dist_vec n) (processed: processed_set)
+                            (i: nat) (current_min: nat)
+  : Lemma
+    (ensures (
+      let r = find_min_from dist processed i current_min in
+      (r == current_min \/ (i <= r /\ r < n /\ not (is_processed processed r))) /\
+      ((current_min < n /\ not (is_processed processed current_min)) ==> r < n) /\
+      (r < n /\ r <> current_min ==> not (is_processed processed r)) /\
+      (r < n /\ current_min < n /\ not (is_processed processed current_min) ==>
+        Seq.index dist r <= Seq.index dist current_min)))
+    (decreases (n - i))
+  = if i >= n then ()
+    else if is_processed processed i then
+      find_min_from_basic dist processed (i + 1) current_min
+    else if current_min >= n then
+      find_min_from_basic dist processed (i + 1) i
+    else if Seq.index dist i < Seq.index dist current_min then
+      find_min_from_basic dist processed (i + 1) i
+    else
+      find_min_from_basic dist processed (i + 1) current_min
+#pop-options
+
+(* Spec of find_min_from: minimality property *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 60"
+let rec find_min_from_min (#n: nat) (dist: dist_vec n) (processed: processed_set)
+                          (i: nat) (current_min: nat)
+  : Lemma
+    (requires current_min >= n \/ not (is_processed processed current_min))
+    (ensures (
+      let r = find_min_from dist processed i current_min in
+      r < n ==>
+        ((current_min < n ==> Seq.index dist r <= Seq.index dist current_min) /\
+         (forall (j: nat). j >= i /\ j < n /\ not (is_processed processed j) ==>
+          Seq.index dist r <= Seq.index dist j))))
+    (decreases (n - i))
+  = if i >= n then ()
+    else begin
+      find_min_from_basic dist processed i current_min;
+      if is_processed processed i then
+        find_min_from_min dist processed (i + 1) current_min
+      else if current_min >= n then
+        find_min_from_min dist processed (i + 1) i
+      else if Seq.index dist i < Seq.index dist current_min then
+        find_min_from_min dist processed (i + 1) i
+      else
+        find_min_from_min dist processed (i + 1) current_min
+    end
+#pop-options
+
+(* Corollary: find_min returns the global min-distance unprocessed vertex *)
 #push-options "--fuel 0 --ifuel 0 --z3rlimit 15"
-let stability_initial_to_all_processed_up_to_0 (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) (u: nat{u < n}) : Lemma
-  (requires relaxation_stable_for_processed dist weights u initial_processed)
-  (ensures relaxation_stable_for_processed dist weights u (all_processed_up_to 0))
+let find_min_spec (#n: nat) (dist: dist_vec n) (processed: processed_set)
+  : Lemma
+    (ensures (
+      let u = find_min dist processed in
+      (u < n ==> (
+        not (is_processed processed u) /\
+        (forall (v: nat). v < n /\ not (is_processed processed v) ==>
+          Seq.index dist u <= Seq.index dist v)))))
+  = find_min_from_basic dist processed 0 n;
+    find_min_from_min dist processed 0 n
+#pop-options
+
+(* Process vertices in Dijkstra order (greedy min-distance selection) *)
+let rec process_vertices (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                         (processed: processed_set) (remaining: nat)
+  : Tot (dist_vec n) (decreases remaining)
   =
-  // all_processed_up_to 0 = fun v -> v < 0 = fun _ -> false = initial_processed
+  if remaining = 0 then dist
+  else
+    let u = find_min dist processed in
+    if u >= n then dist
+    else
+      let dist' = relax_from_u dist weights u 0 in
+      process_vertices dist' weights (add_to_processed processed u) (remaining - 1)
+
+(* If there's an unprocessed vertex >= i, find_min_from returns < n *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec find_min_from_finds_unprocessed (#n: nat) (dist: dist_vec n) (processed: processed_set)
+                                        (i: nat) (current_min: nat) (v: nat)
+  : Lemma
+    (requires v >= i /\ v < n /\ not (is_processed processed v))
+    (ensures find_min_from dist processed i current_min < n)
+    (decreases (n - i))
+  = if i >= n then () // impossible since v >= i and v < n
+    else if i = v then begin
+      // i is unprocessed, so find_min_from will pick it (or a better candidate)
+      if is_processed processed i then () // impossible since i = v and v is unprocessed
+      else if current_min >= n then
+        // new current_min = i < n; basic spec says result will be < n
+        find_min_from_basic dist processed (i + 1) i
+      else if Seq.index dist i < Seq.index dist current_min then
+        find_min_from_basic dist processed (i + 1) i
+      else
+        // current_min < n already; basic spec gives result < n
+        find_min_from_basic dist processed (i + 1) current_min
+    end else begin
+      // i <> v, so v > i, which means v >= i+1
+      if is_processed processed i then
+        find_min_from_finds_unprocessed dist processed (i + 1) current_min v
+      else if current_min >= n then
+        find_min_from_finds_unprocessed dist processed (i + 1) i v
+      else if Seq.index dist i < Seq.index dist current_min then
+        find_min_from_finds_unprocessed dist processed (i + 1) i v
+      else
+        find_min_from_finds_unprocessed dist processed (i + 1) current_min v
+    end
+#pop-options
+
+(* When find_min >= n, all vertices are processed *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 15"
+let find_min_ge_n_means_all_processed (#n: nat) (dist: dist_vec n) (processed: processed_set)
+  : Lemma
+    (requires find_min dist processed >= n)
+    (ensures forall (v: nat). v < n ==> is_processed processed v)
+  =
+  // By contrapositive: if there exists v < n with not processed v, then find_min < n.
+  // Proved by find_min_from_finds_unprocessed.
+  let aux (v: nat) : Lemma (v < n ==> is_processed processed v) =
+    if v < n && not (is_processed processed v) then
+      find_min_from_finds_unprocessed dist processed 0 n v
+    else ()
+  in
+  FStar.Classical.forall_intro aux
+#pop-options
+
+(* Dijkstra ordering: all processed distances <= all unprocessed distances *)
+let processed_le_unprocessed (#n: nat) (dist: dist_vec n) (processed: processed_set) : prop =
+  forall (x u: nat). x < n /\ u < n /\ is_processed processed x /\ not (is_processed processed u) ==>
+    Seq.index dist x <= Seq.index dist u
+
+(* Dijkstra ordering implies stability *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 15"
+let ordering_implies_stability (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                               (processed: processed_set) (u: nat{u < n})
+  : Lemma
+    (requires
+      all_weights_non_negative weights /\
+      not (is_processed processed u) /\
+      processed_le_unprocessed dist processed)
+    (ensures
+      relaxation_stable_for_processed dist weights u processed)
+  =
+  // For any processed x: dist[x] <= dist[u] (ordering)
+  // w(u,x) >= 0 (non-negative weights)
+  // So dist[u] + w(u,x) >= dist[u] >= dist[x]
+  // Hence: not (w < inf /\ d_u < inf /\ d_u + w < d_x)
   ()
 #pop-options
 
-(* After processing all vertices from 0 to n-1, triangle inequality holds for all edges *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
-let rec process_all_vertices_establishes_triangle (#n: nat) (dist: dist_vec n) 
-                                                   (weights: weight_matrix n)
-                                                   (u_start: nat)
+(* Under stability, relax_from_u preserves distances of all processed vertices *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+let rec relax_from_u_preserves_processed_dist (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                               (u: nat{u < n}) (v_start: nat)
+                                               (x: nat{x < n})
+                                               (processed: processed_set)
   : Lemma
     (requires
-      u_start <= n /\
+      is_processed processed x /\
+      not (is_processed processed u) /\
       all_weights_non_negative weights /\
-      triangle_inequality_from_processed dist weights (all_processed_up_to u_start) /\
-      // Stability for all unprocessed vertices with respect to vertices processed so far
-      (forall (u: nat). u >= u_start /\ u < n ==>
-        relaxation_stable_for_processed dist weights u (all_processed_up_to u_start)))
+      relaxation_stable_for_processed dist weights u processed)
+    (ensures
+      Seq.index (relax_from_u dist weights u v_start) x == Seq.index dist x)
+    (decreases (n - v_start))
+  = if v_start >= n then ()
+    else begin
+      let dist1 = relax_edge dist weights u v_start in
+      // Show dist1[x] = dist[x]
+      if v_start = x then
+        // x is the target: by stability, no change
+        relax_edge_stable_for_processed dist weights u x processed
+      else ();
+        // x is not the target: relax_edge only changes dist[v_start]
+      // Stability preserved for dist1
+      relax_edge_preserves_stability dist weights u v_start processed;
+      // Recurse
+      relax_from_u_preserves_processed_dist dist1 weights u (v_start + 1) x processed
+    end
+#pop-options
+
+(* After relax_from_u with Dijkstra ordering, unprocessed vertices have dist >= dist[u] *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 25"
+let rec relax_from_u_unprocessed_ge_u (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                                       (u: nat{u < n}) (v_start: nat) (v: nat{v < n})
+  : Lemma
+    (requires
+      all_weights_non_negative weights /\
+      Seq.index dist v >= Seq.index dist u /\
+      v <> u)
+    (ensures
+      Seq.index (relax_from_u dist weights u v_start) v >= Seq.index dist u)
+    (decreases (n - v_start))
+  = if v_start >= n then ()
+    else begin
+      let dist1 = relax_edge dist weights u v_start in
+      // dist1[u] = dist[u] (relax_edge only changes target, and self-loop is noop)
+      // For v: if v_start = v, dist1[v] = min(dist[v], dist[u]+w) >= dist[u]
+      //        if v_start <> v, dist1[v] = dist[v]
+      // In both cases: dist1[v] >= dist[u] = dist1[u]
+      relax_from_u_unprocessed_ge_u dist1 weights u (v_start + 1) v
+    end
+#pop-options
+
+(* Dijkstra ordering is preserved after processing the minimum vertex *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+let ordering_preserved (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
+                       (processed: processed_set) (u: nat{u < n})
+  : Lemma
+    (requires
+      all_weights_non_negative weights /\
+      not (is_processed processed u) /\
+      processed_le_unprocessed dist processed /\
+      // u is minimum among unprocessed
+      (forall (v: nat). v < n /\ not (is_processed processed v) ==>
+        Seq.index dist u <= Seq.index dist v))
     (ensures (
-      let dist' = process_vertices dist weights u_start in
-      triangle_inequality dist' weights))
-    (decreases (n - u_start))
+      let dist' = relax_from_u dist weights u 0 in
+      let processed' = add_to_processed processed u in
+      processed_le_unprocessed dist' processed'))
   =
-  if u_start >= n then begin
-    // All vertices [0, n) are processed
-    // triangle_inequality_from_processed with all_processed_up_to n
-    // is exactly triangle_inequality
-    ()
+  let dist' = relax_from_u dist weights u 0 in
+  let processed' = add_to_processed processed u in
+  // Need: for all processed' x and unprocessed' v: dist'[x] <= dist'[v]
+  // processed' = processed ∪ {u}
+  // unprocessed' = unprocessed \ {u}
+  
+  // Derive stability from ordering
+  ordering_implies_stability dist weights processed u;
+  
+  let aux (x: nat) (v: nat) : Lemma
+    (requires x < n /\ v < n /\ is_processed processed' x /\ not (is_processed processed' v))
+    (ensures Seq.index dist' x <= Seq.index dist' v)
+    =
+    relax_from_u_unprocessed_ge_u dist weights u 0 v;
+    if is_processed processed x then begin
+      relax_from_u_preserves_processed_dist dist weights u 0 x processed;
+      assert (Seq.index dist x <= Seq.index dist u)
+    end else begin
+      relax_from_u_preserves_index dist weights u 0 u
+    end
+  in
+  // Instantiate aux for all x, v to establish the universal
+  let aux_imp (x: nat) (v: nat) : Lemma
+    (x < n /\ v < n /\ is_processed processed' x /\ not (is_processed processed' v) ==>
+     Seq.index dist' x <= Seq.index dist' v)
+    = if x < n && v < n && is_processed processed' x && not (is_processed processed' v) then
+        aux x v
+      else ()
+  in
+  FStar.Classical.forall_intro_2 aux_imp
+#pop-options
+
+(* Count of unprocessed vertices in [0, n) *)
+let rec count_unprocessed (#n: nat) (processed: processed_set) (i: nat)
+  : Tot nat (decreases (n - i))
+  = if i >= n then 0
+    else (if is_processed processed i then 0 else 1) + count_unprocessed #n processed (i + 1)
+
+(* Adding a vertex to processed decreases count by 1 *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+let rec count_unprocessed_add (#n: nat) (processed: processed_set) (u: nat{u < n}) (i: nat)
+  : Lemma
+    (requires not (is_processed processed u))
+    (ensures count_unprocessed #n (add_to_processed processed u) i + 
+             (if i <= u then 1 else 0) == count_unprocessed #n processed i)
+    (decreases (n - i))
+  = if i >= n then ()
+    else count_unprocessed_add #n processed u (i + 1)
+#pop-options
+
+(* If there's an unprocessed vertex, count >= 1 *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+let rec count_unprocessed_pos (#n: nat) (processed: processed_set) (i: nat) (v: nat)
+  : Lemma
+    (requires v >= i /\ v < n /\ not (is_processed processed v))
+    (ensures count_unprocessed #n processed i >= 1)
+    (decreases (n - i))
+  = if i >= n then ()
+    else if i = v then ()
+    else count_unprocessed_pos #n processed (i + 1) v
+#pop-options
+
+(* After processing all vertices in Dijkstra order, triangle inequality holds *)
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 40"
+let rec process_all_vertices_establishes_triangle (#n: nat) (dist: dist_vec n) 
+                                                   (weights: weight_matrix n)
+                                                   (processed: processed_set)
+                                                   (remaining: nat)
+  : Lemma
+    (requires
+      remaining >= count_unprocessed #n processed 0 /\
+      all_weights_non_negative weights /\
+      triangle_inequality_from_processed dist weights processed /\
+      processed_le_unprocessed dist processed)
+    (ensures (
+      let dist' = process_vertices dist weights processed remaining in
+      triangle_inequality dist' weights))
+    (decreases remaining)
+  =
+  if remaining = 0 then begin
+    // remaining >= count_unprocessed, and remaining = 0, so count_unprocessed = 0
+    // This means all vertices are processed.
+    find_min_spec dist processed;
+    let u = find_min dist processed in
+    if u >= n then
+      find_min_ge_n_means_all_processed dist processed
+    else begin
+      // u < n and not processed u => count_unprocessed >= 1 => remaining >= 1. Contradiction.
+      count_unprocessed_pos #n processed 0 u;
+      assert (false)
+    end
   end
   else begin
-    let dist1 = relax_from_u dist weights u_start 0 in
-    let processed1 = add_to_processed (all_processed_up_to u_start) u_start in
-    
-    // Show that processed1 = all_processed_up_to (u_start + 1)
-    assert (forall (v: nat). is_processed processed1 v <==> v < u_start + 1);
-    
-    // By process_vertex_extends_triangle with stability:
-    process_vertex_extends_triangle dist weights (all_processed_up_to u_start) u_start;
-    assert (triangle_inequality_from_processed dist1 weights processed1);
-    
-    // TODO: Need to prove stability is maintained for remaining unprocessed vertices
-    // This requires showing: for all u > u_start, relaxation from u doesn't reduce
-    // distances of processed vertices (including newly processed u_start)
-    // This is a deeper Dijkstra invariant that needs to be assumed for now
-    admit();
-    
-    // Recursively process remaining vertices
-    process_all_vertices_establishes_triangle dist1 weights (u_start + 1)
+    find_min_spec dist processed;
+    let u = find_min dist processed in
+    if u >= n then
+      find_min_ge_n_means_all_processed dist processed
+    else begin
+      let dist1 = relax_from_u dist weights u 0 in
+      let processed1 = add_to_processed processed u in
+      
+      ordering_implies_stability dist weights processed u;
+      process_vertex_extends_triangle dist weights processed u;
+      ordering_preserved dist weights processed u;
+      
+      // count_unprocessed decreases by 1
+      count_unprocessed_add #n processed u 0;
+      
+      process_all_vertices_establishes_triangle dist1 weights processed1 (remaining - 1)
+    end
   end
+#pop-options
+
+(* Initially all vertices are unprocessed *)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 15"
+let rec count_unprocessed_initial (#n: nat) (i: nat)
+  : Lemma
+    (ensures count_unprocessed #n initial_processed i == (if i >= n then 0 else n - i))
+    (decreases (n - i))
+  = if i >= n then ()
+    else count_unprocessed_initial #n (i + 1)
 #pop-options
 
 (* Main theorem: After running Dijkstra (processing all vertices), triangle inequality holds *)
@@ -505,31 +803,14 @@ let dijkstra_establishes_triangle_inequality (#n: nat) (dist_init: dist_vec n)
     (requires
       n > 0 /\
       all_weights_non_negative weights /\
-      // Initially, only trivial edges (from no source) satisfy triangle inequality
-      // This holds vacuously for processed_set = empty
       triangle_inequality_from_processed dist_init weights initial_processed /\
-      // Stability precondition: for all unprocessed vertices, relaxation doesn't reduce
-      // distances of processed vertices. Initially (no processed vertices), this holds vacuously.
-      (forall (u: nat). u < n ==>
-        relaxation_stable_for_processed dist_init weights u initial_processed))
+      processed_le_unprocessed dist_init initial_processed)
     (ensures (
-      let dist_final = process_vertices dist_init weights 0 in
+      let dist_final = process_vertices dist_init weights initial_processed n in
       triangle_inequality dist_final weights))
   =
-  // Initially no vertices processed: all_processed_up_to 0 = initial_processed
-  // Convert stability from initial_processed to all_processed_up_to 0
-  assert (forall (v: nat). is_processed (all_processed_up_to 0) v <==> is_processed initial_processed v);
-  assert (triangle_inequality_from_processed dist_init weights (all_processed_up_to 0));
-  
-  // Establish stability for all_processed_up_to 0
-  let aux (u: nat{u >= 0 /\ u < n}) : Lemma
-    (requires relaxation_stable_for_processed dist_init weights u initial_processed)
-    (ensures relaxation_stable_for_processed dist_init weights u (all_processed_up_to 0))
-    = stability_initial_to_all_processed_up_to_0 dist_init weights u
-  in
-  FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
-  
-  process_all_vertices_establishes_triangle dist_init weights 0
+  count_unprocessed_initial #n 0;
+  process_all_vertices_establishes_triangle dist_init weights initial_processed n
 
 (* ===== Corollary for Dijkstra Implementation ===== *)
 
@@ -544,22 +825,15 @@ let dijkstra_init_satisfies_triangle (#n: nat) (source: nat{source < n}) : Lemma
        all_weights_non_negative weights ==>
        triangle_inequality_from_processed dist_init weights initial_processed))
   =
-  // initial_processed = fun _ -> false
-  // So triangle_inequality_from_processed requires nothing (antecedent always false)
   ()
 
-(* Initial stability: With no processed vertices, stability holds vacuously *)
-let dijkstra_init_stability (#n: nat) (source: nat{source < n}) : Lemma
+(* Initial ordering: no processed vertices, so ordering holds vacuously *)
+let dijkstra_init_ordering (#n: nat) (source: nat{source < n}) : Lemma
   (requires n > 0)
   (ensures
-    (let dist_init = Seq.create n inf in
-     let dist_init = Seq.upd dist_init source 0 in
-     forall (weights: weight_matrix n) (u: nat).
-       u < n /\ all_weights_non_negative weights ==>
-       relaxation_stable_for_processed dist_init weights u initial_processed))
+    (let dist_init : dist_vec n = Seq.upd (Seq.create n inf) source 0 in
+     processed_le_unprocessed dist_init initial_processed))
   =
-  // initial_processed = fun _ -> false
-  // So relaxation_stable_for_processed requires nothing (antecedent always false)
   ()
 
 (* Combined: Dijkstra's algorithm automatically establishes triangle inequality *)
@@ -571,12 +845,12 @@ let dijkstra_algorithm_establishes_triangle (#n: nat) (source: nat{source < n})
       all_weights_non_negative weights)
     (ensures
       (let dist_init = Seq.upd (Seq.create n inf) source 0 in
-       let dist_final = process_vertices dist_init weights 0 in
+       let dist_final = process_vertices dist_init weights initial_processed n in
        triangle_inequality dist_final weights))
   =
   let dist_init = Seq.upd (Seq.create n inf) source 0 in
   dijkstra_init_satisfies_triangle #n source;
-  dijkstra_init_stability #n source;
+  dijkstra_init_ordering #n source;
   dijkstra_establishes_triangle_inequality dist_init weights
 
 (*
