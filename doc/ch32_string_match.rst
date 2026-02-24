@@ -12,8 +12,8 @@ count the number of positions where a pattern matches the text.
 
 The naive algorithm and Rabin-Karp are **fully verified with 0
 admits** in both their implementations and specifications. KMP is
-also fully verified at the implementation level (0 admits); its
-amortized complexity analysis has 7 admits.
+**fully verified with 0 admits** in both the implementation and the
+amortized O(n+m) complexity analysis ✅.
 
 Naive String Matching
 =====================
@@ -220,11 +220,14 @@ is at most 2n + 2m. This follows the standard amortized argument:
 each comparison either advances the text pointer or decreases the
 match length, and each can happen at most O(n) times.
 
-The complexity module has **7 admits**, all in the amortized
-analysis of the potential function (3 in the prefix-function
-complexity proof and 4 in the matcher complexity proof). These
-are the standard amortized-analysis steps where the potential
-decrease must compensate for the iteration cost.
+The complexity module is **fully verified with 0 admits** ✅.
+The proof restructures inner loops to only ``tick`` for actual
+failure-chain follows (not exit iterations), tightening invariants
+to exact amortized potential bounds: ``vc - c0 + k ≤ 2*(q - 1)``
+for prefix computation and ``vc - c0 + q ≤ 2*i`` for matching.
+The amortized sum (comparisons + potential) never increases during
+inner loops (tick +1, potential decrease ≥1 → net ≤ 0), making all
+obligations trivially provable by Z3.
 
 Verification Status Summary
 ============================
@@ -250,7 +253,7 @@ Verification Status Summary
      - 0
    * - KMP.Complexity
      - Pure proof
-     - 7 admit()
+     - **0** ✅
    * - RabinKarp
      - Pulse impl
      - 0
@@ -262,6 +265,5 @@ Verification Status Summary
      - 0
 
 All three string-matching implementations (naive, Rabin-Karp, KMP)
-are fully verified with 0 admits in their Pulse code. The admits
-are confined to the amortized complexity analysis of KMP (7 admits)
-and the rolling-hash correctness lemmas of Rabin-Karp (3 admits).
+are fully verified with 0 admits in their Pulse code, specifications,
+and complexity analyses ✅.

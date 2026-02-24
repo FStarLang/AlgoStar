@@ -14,14 +14,15 @@ backed by pure F* specifications.
 (``CLRS.Ch24.Dijkstra.fst``) has **zero admits** — correctness is
 verified end-to-end, including a runtime triangle-inequality check and
 a connection to the ``sp_dist`` upper-bound theorem.  The
-``Dijkstra.TriangleInequality`` companion proves that relaxation
-automatically establishes the triangle inequality, with
-**1 admit** remaining (stability maintenance when processing order
-follows Dijkstra's greedy extraction).  The Bellman-Ford Pulse
-implementation (``CLRS.Ch24.BellmanFord.fst``) also has **zero
-admits**.  The ``BellmanFord.Spec`` pure specification has **3 admits**
-(the inductive path-relaxation lemma, the ``relax_preserves_upper_bound``
-helper, and negative-cycle detection).
+``Dijkstra.TriangleInequality`` companion is now **fully verified
+with zero admits** ✅, proving that Dijkstra-order (greedy min-distance)
+processing automatically maintains the triangle inequality via
+``relaxation_doesnt_break_triangle`` and ``dijkstra_maintains_triangle``.
+The Bellman-Ford Pulse implementation (``CLRS.Ch24.BellmanFord.fst``)
+also has **zero admits**.  The ``BellmanFord.Spec`` pure specification
+is now **fully verified with zero admits** ✅ — the inductive path-relaxation
+lemma, ``relax_preserves_upper_bound``, and negative-cycle detection are
+all proven using a ``no_neg_cycles`` predicate and restructured invariants.
 ``BellmanFord.TriangleInequality`` is fully verified.
 
 Shortest-Path Specification
@@ -122,11 +123,11 @@ inequality is a *consequence* of the relaxation process — the
 verification pass in the Pulse code is redundant.  The key result:
 after relaxing all edges from a vertex ``u``,
 ``edge_satisfies_triangle`` holds for every edge from ``u``.
-Extending this to all processed vertices required proving that
-relaxation preserves already-established triangle inequalities
-(``relaxation_stable_for_processed``).  One admit remains: showing
-stability is maintained when the processing order follows Dijkstra's
-greedy min-extraction.
+This module is now **fully verified with zero admits** ✅.
+The proof uses Dijkstra-order (greedy min-distance) selection via
+``find_min``/``find_min_from`` with minimality lemmas, and
+``relaxation_doesnt_break_triangle`` showing that relaxation preserves
+triangle inequalities for already-processed edges.
 
 Bellman-Ford Algorithm
 ======================
@@ -173,12 +174,13 @@ The main correctness theorem is the *path-relaxation property*:
    :end-before: //SNIPPET_END: bf_convergence
 
 This states that after ``n − 1`` rounds, ``dist[v]`` equals
-``sp_dist(src, v)`` for every vertex.  The proof uses
-``bf_correctness_inductive``, which has an admit in the inductive case
-(showing that one round of relaxation computes the minimum over all
-predecessors).  The upper-bound invariant
-(``relax_preserves_upper_bound``) and negative-cycle detection
-(``bf_negative_cycle_detection``) are also admitted.
+``sp_dist(src, v)`` for every vertex (under the ``no_neg_cycles``
+precondition).  This module is now **fully verified with zero admits** ✅.
+The proof uses restructured invariants: ``upper_bound_inv`` uses ``sp_dist``
+directly (instead of parameterizing by ``k``), ``correctness_inv`` uses
+``<=`` (sequential relaxation is at least as good as k-edge shortest paths),
+and ``bf_negative_cycle_detection`` uses a corrected ``exists_relaxable_edge``
+predicate with a (Some, None) case for the biconditional proof.
 
 Triangle Inequality from Stability
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -207,10 +209,10 @@ Proof Techniques Summary
    simple bounds (non-negativity, boundedness), while the deep
    correctness property is verified post-hoc.
 
-3. **Specification-level admits are isolated**: The imperative code
-   is admit-free; all admits live in the pure specification modules
-   where they document well-understood but labor-intensive graph-theory
-   facts (path-relaxation induction, negative-cycle characterization).
+3. **All admits eliminated**: Both the Dijkstra and Bellman-Ford
+   specification modules are now fully verified with zero admits.
+   The imperative code was already admit-free; the pure specification
+   proofs have now been completed as well.
 
 4. **Shared ``ShortestPath.Spec``**: Both Dijkstra and Bellman-Ford
    connect to the same ``sp_dist`` oracle and the same

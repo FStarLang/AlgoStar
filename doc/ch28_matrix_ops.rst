@@ -9,10 +9,10 @@ standard triple-loop algorithm (§28.1) and Strassen's divide-and-conquer
 algorithm (§28.2). The standard algorithm is verified in Pulse with
 **zero admits** — both functional correctness and O(n³) complexity are
 fully proven. Strassen's algorithm is verified as a pure F*
-specification with **one admit** (a structural property that quadrant
-extraction preserves square/power-of-2 constraints); all algebraic
-identities and the correctness theorem equating Strassen to standard
-multiplication are fully proven.
+specification with **zero admits** ✅ — all algebraic
+identities, the quadrant structural property, and the correctness
+theorem equating Strassen to standard multiplication are fully proven
+using ``smt_sync'`` for quadrant proofs.
 
 Standard Matrix Multiply
 =========================
@@ -236,11 +236,10 @@ expansion, and the dot product split lemma
 (``lemma_dot_product_quadrant_split``) bridges the quadrant-level result
 back to the full-matrix dot product.
 
-The single admit is in ``lemma_strassen_elem_correct``: it discharges
-the structural property that submatrix quadrants of a square,
-power-of-2 matrix are themselves square and power-of-2. This is an
-arithmetic fact (not an algorithmic property) that would otherwise
-cause a solver timeout due to the large proof context.
+The quadrant structural property in ``lemma_strassen_elem_correct``
+(that submatrix quadrants of a square, power-of-2 matrix are themselves
+square and power-of-2) is **fully proven** ✅ using ``smt_sync'`` to
+discharge the arithmetic facts without solver timeout.
 
 Proof Techniques Summary
 =========================

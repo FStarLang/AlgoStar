@@ -186,9 +186,10 @@ Complexity
 ~~~~~~~~~~
 
 The complexity module (``StackDFS.Complexity``) proves an O(V²)
-bound matching the adjacency-matrix representation. It uses
-**4 assume_ calls** (count_ones tracking for stack-top bounds,
-complexity bound maintenance, and the final correctness postcondition).
+bound matching the adjacency-matrix representation. It is
+**fully verified with 0 assume\_ calls** ✅, using ``sum_scan_idx``
+tracking, ``S.count_ones_lt`` for stack-top bounds, and
+``sum_scan_idx_bound`` for the total cost bound of 2n².
 
 An alternative iterative DFS (``IterativeDFS``) uses a simpler
 level-by-level approach and is **fully verified with 0 admits**,
@@ -305,7 +306,7 @@ Verification Status Summary
      - **0** ✅
    * - StackDFS.Complexity
      - Pulse impl
-     - 4 assume\_
+     - **0** ✅
    * - KahnTopologicalSort.Defs
      - Pure spec/lemmas
      - **0** ✅
@@ -322,11 +323,6 @@ Verification Status Summary
      - Pulse impl
      - 0
 
-The ``assume_`` calls in the Pulse complexity modules are used for
-invariant framing properties — assertions that are semantically
-valid but difficult for the SMT solver to discharge automatically.
-Both ``StackDFS`` and ``QueueBFS`` demonstrate that these can be
-eliminated via predicate-based refactoring with isolated lemmas.
 The ``admit()`` calls in ``BFS.DistanceSpec``, ``DFS.Spec``,
 and ``DFS.WhitePath`` mark genuinely
 unproven properties that remain as future work.

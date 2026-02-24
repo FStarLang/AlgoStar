@@ -103,7 +103,7 @@ Results Overview
 ----------------
 
 The project currently covers algorithms from 18 chapters of CLRS,
-implemented across 174 F* source files totaling approximately 54,000
+implemented across 177 F* source files totaling approximately 59,300
 lines. The table below summarizes the status of each algorithm.
 
 **Legend:**
@@ -201,7 +201,7 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Bucket Sort <Ch08_LinearSorting>`
      - §8.4
      - sorted ∧ permutation
-     - ⚠️ 1: concat sorted buckets
+     - ✅
      - —
    * - 9
      - :ref:`Min / Max <Ch09_OrderStats>`
@@ -303,7 +303,7 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Huffman Coding <Ch16_Greedy>`
      - §16.3
      - prefix-free tree construction
-     - ⚠️ 5: optimality proof
+     - ⚠️ 4: Spec axioms (greedy-choice, optimal-substructure)
      - ✅ Pure O(n lg n)
    * - 21
      - :ref:`Union-Find <Ch21_DisjointSets>`
@@ -321,7 +321,7 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`DFS (Stack) <Ch22_Graphs>`
      - §22.3
      - timestamps ∧ classification
-     - ⚠️ 10: DFS theorems
+     - ⚠️ 8: DFS theorems
      - ✅ Linked O(V²)
    * - 22
      - :ref:`Kahn Topological Sort <Ch22_Graphs>`
@@ -351,13 +351,13 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Bellman-Ford <Ch24_SSSP>`
      - §24.1
      - SSSP distances
-     - ⚠️ 3: upper bound
+     - ✅
      - ✅ Linked O(VE)
    * - 24
      - :ref:`Dijkstra <Ch24_SSSP>`
      - §24.3
      - SSSP distances
-     - ⚠️ 2: triangle ineq
+     - ✅
      - ✅ Linked O(V²)
    * - 25
      - :ref:`Floyd-Warshall <Ch25_APSP>`
@@ -381,7 +381,7 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Strassen <Ch28_MatrixOps>`
      - §28 (App)
      - Strassen = standard mult
-     - ⚠️ 1: quadrant props
+     - ✅
      - —
    * - 31
      - :ref:`GCD / Extended GCD <Ch31_NumberTheory>`
@@ -406,7 +406,7 @@ lines. The table below summarizes the status of each algorithm.
      - §32.4
      - all match positions
      - ✅
-     - ⚠️ Linked (7 admits)
+     - ✅ Linked O(n+m)
    * - 32
      - :ref:`Rabin-Karp <Ch32_StringMatch>`
      - §32.2
@@ -429,36 +429,28 @@ lines. The table below summarizes the status of each algorithm.
 Proof Gaps
 ----------
 
-As of this writing, the project has **82 unproven F\* obligations**
-(``admit()``, ``assume()``, and ``assume val``) across **31 files**,
-plus **4 Pulse** ``assume_`` **calls** in 1 implementation file (StackDFS.Complexity).
-Of the 50 algorithms in the table, **35 have fully proven correctness**
-(zero admits) and **26 have fully proven complexity bounds**.
+As of this writing, the project has **43 unproven F\* ``admit()`` calls**
+and **2 ``assume val``** declarations across **14 files**.
+Of the 50 algorithms in the table, **39 have fully proven correctness**
+(zero admits) and **29 have fully proven complexity bounds**.
 
 The remaining admits fall into a few categories:
 
-1. **Graph theory** (Ch. 22–23, ~32 F\* admits): DFS parenthesis and
-   white-path theorems (10), MST cut/cycle properties and Kruskal
-   forest invariants (25), BFS shortest-path completeness (2).
-   Plus 4 Pulse ``assume_`` in StackDFS.Complexity (count_ones tracking,
-   complexity bound, final correctness postcondition).
+1. **Graph theory** (Ch. 22–23, ~30 admits): DFS parenthesis and
+   white-path theorems (8), MST cut/cycle properties and Kruskal
+   forest invariants (Kruskal actively being improved), BFS shortest-path completeness (2).
 
-2. **Sorting stability** (Ch. 8, 11 admits): RadixSort stability
+2. **Sorting stability** (Ch. 8, 10 admits): RadixSort multi-digit stability
    proofs involve ∃∀ quantifier patterns that challenge the SMT
-   solver (10).  BucketSort needs concat-of-sorted-buckets (1).
+   solver.
 
-3. **Algorithmic correctness** (Ch. 16, 24, 26, ~18 admits): Huffman
-   optimality: greedy-choice theorem, optimal-substructure, and
-   dependent proofs in Complete (6); shortest-path upper-bound
-   invariants for Bellman-Ford (3) and Dijkstra triangle
-   inequality (1); max-flow augmentation (8).
+3. **MST theory** (Ch. 23, ~19 admits + 1 assume val): Kruskal.Spec (9),
+   Prim.Spec (6), MST.Spec (4). Kruskal is actively being improved.
+   These require deep graph-theoretic arguments (cut property, spanning tree).
 
-4. **Complexity proofs** (Ch. 32, 7 admits): KMP
-   amortized analysis (7).
-
-5. **Miscellaneous** (5 admits):
-   BST insert preservation (3),
-   Strassen quadrant properties (1), Vertex Cover trace (1).
+4. **Miscellaneous** (4 admits + 1 assume val):
+   BST insert preservation (3), Vertex Cover trace (1),
+   MaxSubarray D&C equivalence axiom (1 assume val).
 
 Each chapter in this document notes any unproven obligations in its
 scope.  Fully verified chapters have zero ``admit``, ``assume``, or

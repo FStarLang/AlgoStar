@@ -18,11 +18,13 @@ The pure specification layer for Activity Selection is **fully proven**:
 zero admits — the exchange argument, greedy optimality theorem, and
 implementation-to-spec bridge are all mechanically verified.
 
-Huffman has gaps: ``Huffman.Spec`` uses 4 ``assume`` calls
+Huffman has partial gaps: ``Huffman.Spec`` uses 4 ``assume`` calls
 (``greedy_choice_property``, ``optimal_substructure_property``,
-``exists_leaf_at_max_depth``, and a sequencing placeholder);
-``Huffman.Complete`` uses 2 ``admit()`` calls dependent on those
-assumptions. The key supporting lemma ``swap_reduces_wpl`` (CLRS
+``exists_leaf_at_max_depth``, and a sequencing placeholder).
+``Huffman.Complete`` is now **fully verified with zero admits** ✅ —
+the optimal substructure lemma was corrected to use multiset equality
+(not list equality) and the correctness theorem uses multiset preservation
+infrastructure. The key supporting lemma ``swap_reduces_wpl`` (CLRS
 Lemma 16.2) and ``exists_sibling_leaves`` are fully proven.
 
 Activity Selection
@@ -267,8 +269,14 @@ Three key supporting lemmas are formalized:
   ``swap_reduces_wpl`` across two swaps and reasoning about the
   relationship between the original and merged trees.
 
-``Huffman.Complete`` has 2 ``admit()`` calls that depend on these
-assumptions.
+``Huffman.Complete`` is **fully verified with zero admits** ✅. The
+``optimal_substructure_lemma`` was corrected: the original existential
+claiming in-order leaf traversal starts with the minimum frequency was
+false for inputs like ``[1,2,2]``; it now proves ``WPL(T) = WPL(T') + f1 + f2``
+for any valid pair. The ``huffman_correctness_theorem`` uses multiset
+preservation (~120 lines) proving ``∀x. count x (leaf_freqs (huffman_complete
+freqs)) = count x freqs``. Full WPL-optimality for multi-element inputs
+remains captured by the 4 ``assume`` axioms in ``Huffman.Spec``.
 
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~

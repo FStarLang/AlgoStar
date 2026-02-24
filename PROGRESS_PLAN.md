@@ -155,16 +155,16 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 
 ## Current Status (2025-02-24, updated)
 
-**180 F* files, ~59,500 lines — 67 unproven obligations across 21 files**
+**177 F* files, ~59,300 lines — 45 unproven obligations across 14 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
-| `admit()` | 61 | Unproven lemma/proof bodies (Pure F*) |
+| `admit()` | 43 | Unproven lemma/proof bodies (Pure F*) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
-| `assume_` | 4 | Pulse-specific unproven invariants (StackDFS.Cmplx: 3, Kruskal.Cmplx: 1) |
+| `assume_` | 0 | All Pulse assume_ calls eliminated ✅ |
 
 Note: `assume(...)` calls in MaxFlow (8) and Huffman.Spec (4) are not counted above as they
-are in stub/axiom files. The 70 above are in proof-carrying code.
+are in stub/axiom files. The 45 above are in proof-carrying code.
 
 ### Key Progress Since AUDIT_0215 (Feb 15)
 
@@ -182,7 +182,7 @@ are in stub/axiom files. The 70 above are in proof-carrying code.
 | RadixSort.FullSort (Ch08) | ~7 admits | 4 admits remaining | −3 |
 | Prim.Complexity (Ch23) | 2 admits | ✅ Zero admits | −2 |
 | QueueBFS.Cmplx (Ch22) | 6 assume_ | ✅ Zero assumes, predicate-based | −6 |
-| StackDFS.Cmplx (Ch22) | 6 assume_ | 3 assume_ remaining | −3 |
+| StackDFS.Cmplx (Ch22) | 6 assume_ | ✅ Zero assumes, sum_scan_idx proof | −6 |
 | Strassen (Ch28) | 1 admit | ✅ Zero admits, smt_sync' quadrant proof | −1 |
 | CountingSort.Stable (Ch08) | 3 assume_ | ✅ Zero assumes, StableLemmas module | −3 |
 | **Net change** | ~155 total | ~67 total | **−88** |
@@ -203,7 +203,7 @@ are in stub/axiom files. The 70 above are in proof-carrying code.
 | 08 | CountingSort.Stable | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate | 0 | CLRS 4-phase, StableLemmas |
 | 08 | RadixSort (d=1) | §8.3 | ✅ sorted ∧ perm | ⚠️ Separate Θ(d(n+k)) | 0 | d=1 only |
 | 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 10 | Pure F*; stability admits |
-| 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
+| 08 | BucketSort | §8.4 | ✅ sorted ∧ perm | — | 0 | ✅ Fully verified |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
 | 09 | SimultaneousMinMax | §9.1 | ✅ (min,max) | ✅ Linked 2(n-1) | 0 | |
 | 09 | PartialSelectionSort | — | ✅ perm ∧ prefix sorted | ⚠️ Separate O(nk) | 0 | Not CLRS |
@@ -223,46 +223,44 @@ are in stub/axiom files. The 70 above are in proof-carrying code.
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | |
 | 15 | RodCutting.Extended | §15.1 | ✅ cuts_are_optimal | — | 0 | |
 | 16 | ActivitySelection | §16.1 | ✅ exchange argument | ✅ Linked O(n) | 0 | ✅ Full optimality |
-| 16 | Huffman | §16.3 | ⚠️ cost only | ✅ Linked (cost) | 6 | Spec: greedy+substructure assumed |
+| 16 | Huffman | §16.3 | ⚠️ cost only | ✅ Linked (cost) | 4 | Spec: 4 assume (greedy+substructure); Complete: 0 ✅ |
 | 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | FullCompress available |
 | 22 | IterativeBFS | — | ⚠️ reachability | — | 0 | Not CLRS |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
 | 22 | IterativeDFS | — | ⚠️ reachability | — | 0 | Not CLRS |
-| 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+3 | Main: 0; Cmplx: 3 assume_ (was 6) |
+| 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 0 | ✅ Fully verified (was 2 admits) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 8 | Distance, parenthesis, white-path |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 16 | Across Spec/EdgeSort/Cmplx |
 | 23 | Prim | §23.2 | ⚠️ key bounds only | ✅ Linked O(n²) | 6 | |
 | 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | Exchange lemma proven |
-| 24 | Dijkstra | §24.3 | ⚠️ upper bound (Pulse) | ✅ Linked O(n²) | 1 | Correctness.fst: d=δ proven |
-| 24 | Bellman-Ford | §24.1 | ⚠️ upper bound only | ⚠️ Separate O(V³) | 3 | |
+| 24 | Dijkstra | §24.3 | ✅ d=δ proven | ✅ Linked O(n²) | 0 | Correctness + TriIneq: ✅ 0 admits |
+| 24 | Bellman-Ford | §24.1 | ✅ dist=sp_dist | ⚠️ Separate O(V³) | 0 | ✅ BF.Spec fully verified |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 8 assume | Stretch goal |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
-| 28 | Strassen | §28.2 | ✅ elem-wise correctness | ⚠️ Separate | 0 | ✅ quadrant proofs via smt_sync' |
+| 28 | Strassen | §28.2 | ✅ elem-wise correctness | ⚠️ Separate | 0 | ✅ quadrant proofs via smt_sync', fully verified |
 | 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
 | 31 | ExtendedGCD | §31.2 | ✅ Bézout identity | — | 0 | Pure F* |
 | 31 | ModExp | §31.6 | ✅ (b^e)%m | ✅ Linked O(lg e) | 0 | |
 | 32 | NaiveStringMatch | §32.1 | ✅ all matches | ✅ Linked O(nm) | 0 | |
-| 32 | KMP | §32.4 | ⚠️ prefix correct; matcher weak | ✅ Linked O(n+m)* | 7 | *Amortized admits |
+| 32 | KMP | §32.4 | ✅ prefix correct; matcher verified | ✅ Linked O(n+m) | 0 | ✅ Amortized analysis fully proven |
 | 32 | RabinKarp | §32.2 | ✅ CLRS polynomial hash | ⚠️ Separate O(nm) | 0 | ✅ hash_inversion proven |
 | 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
 | 35 | VertexCover | §35.1 | ✅ valid cover + 2-approx | ⚠️ Separate O(V²) | 1 | |
 
-### Unproven Obligation Distribution (67 admit + 16 assume + 2 assume_val + 9 assume_ = 94 total)
+### Unproven Obligation Distribution (43 admit + 2 assume_val = 45 total in proof code)
 
-| Chapter | admit | assume | assume_val | assume_ | Total | Top files |
-|---------|-------|--------|------------|---------|-------|-----------|
-| ch23 (MST) | 23 | 1 | 1 | 1 | 26 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal.Cmplx(2+1), EdgeSort(2), SortedEdges(0+1), Kruskal(0+0+1) |
-| ch22 (graphs) | 8 | 0 | 0 | 3 | 11 | StackDFS.Cmplx(3), DFS.Spec(5), DFS.WhitePath(3) |
-| ch08 (sorting) | 11 | 0 | 0 | 0 | 11 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), BucketSort(1) |
-| ch26 (MaxFlow) | 0 | 8 | 0 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
-| ch32 (strings) | 7 | 0 | 0 | 0 | 7 | KMP.Complexity(7) |
-| ch16 (greedy) | 2 | 4 | 0 | 0 | 6 | Huffman.Complete(2), Huffman.Spec(0+4) |
-| ch24 (SSSP) | 4 | 0 | 0 | 0 | 4 | BellmanFord.Spec(3), Dijkstra.TriIneq(1) |
-| ch12 (BST) | 3 | 0 | 0 | 0 | 3 | BST.Insert.Spec(3) |
-| Other | 1 | 1 | 1 | 0 | 3 | MaxSubarray.DC(0+0+1), VertexCover.Spec(1), UF.Spec(0+1) |
-| **Total** | **61** | **—** | **2** | **4** | **67** | |
+| Chapter | admit | assume_val | Total | Top files |
+|---------|-------|------------|-------|-----------|
+| ch23 (MST) | 19 | 1 | 20 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal(0+1 assume_val) — Kruskal actively being improved |
+| ch22 (graphs) | 10 | 0 | 10 | DFS.Spec(5), DFS.WhitePath(3), BFS.DistanceSpec(2) |
+| ch08 (sorting) | 10 | 0 | 10 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2) |
+| ch12 (BST) | 3 | 0 | 3 | BST.Insert.Spec(3) |
+| Other | 1 | 1 | 2 | VertexCover.Spec(1), MaxSubarray.DC(0+1 assume_val) |
+| **Total** | **43** | **2** | **45** | |
+
+Note: MaxFlow (8 assume) and Huffman.Spec (4 assume) are stub/axiom files, not counted above.
 
 ---
 
@@ -293,17 +291,16 @@ are in stub/axiom files. The 70 above are in proof-carrying code.
 ### What's Hard
 
 1. **Graph theory proofs**: MST cut property, DFS parenthesis theorem, BFS shortest-path —
-   these require deep structural induction over graph topology. 32 of 97 admits are in ch22+ch23.
+   these require deep structural induction over graph topology. 30 of 45 admits are in ch22+ch23.
    No clear path to automation; may require fundamentally new ghost state.
 
 2. **Stability proofs for RadixSort**: The cascade CountingSort.Stable → RadixSort.Stability →
-   MultiDigit → FullSort has 14 admits. The root cause is that CountingSort.Stable's key
-   postconditions (sorted, permutation) are assumed. Proving those requires tracking position
-   assignments through the backwards pass.
+   MultiDigit → FullSort has 10 admits. CountingSort.Stable is now fully proven (StableLemmas),
+   but the downstream cascade has not yet been updated to leverage the proven postconditions.
 
-3. **Amortized complexity (KMP)**: The 7 admits in KMP.Complexity need a formal potential
-   function argument. This is intrinsically difficult in F* because the potential changes
-   non-monotonically across iterations.
+3. **Amortized complexity (KMP)**: ✅ **RESOLVED** — The 7 admits in KMP.Complexity have been
+   fully eliminated by restructuring inner loops to only tick for actual failure-chain follows
+   and tightening invariants to exact amortized potential bounds.
 
 4. **Self-referential specs**: MaxSubarray.Kadane proves `result == kadane_spec(input)` where
    the spec IS the algorithm. LCS and Floyd-Warshall prove equivalence to their recurrences
@@ -343,8 +340,8 @@ Ten independent tasks for parallel execution.
   conflicts, and then commit their changes.
 
 
-**Current baseline (2025-02-24):** 58 admit + 7 assume_ + 2 assume_val = 67 total obligations across 21 files.
-(Updated: BellmanFord.Spec 3 admits eliminated by AGENT9)
+**Current baseline (2025-02-24):** 43 admit + 0 assume_ + 2 assume_val = 45 total obligations across 14 files.
+(Updated: All parallel agent tasks completed. BucketSort, CountingSort.Stable, KMP.Complexity, Huffman.Complete, StackDFS.Complexity, Dijkstra.TriIneq, BellmanFord.Spec, Kruskal.Complexity, Kruskal.EdgeSorting all eliminated.)
 
 ---
 

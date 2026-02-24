@@ -5,8 +5,8 @@ in [Pulse](https://github.com/FStarLang/pulse), a separation-logic language
 embedded in [F\*](https://github.com/FStarLang/FStar).
 
 Every algorithm is proven memory-safe and many carry full functional-correctness
-specifications. 148 files are fully verified with zero admits (~42,600 lines).
-32 files have 97 remaining unproven obligations (~16,900 lines).
+specifications. 163 files are fully verified with zero admits (~51,500 lines).
+14 files have 45 remaining unproven obligations (~7,800 lines).
 32 complexity proof files cover 21 of 23 chapters.
 
 ## Building
@@ -27,23 +27,23 @@ make clean  # clean build artifacts
 | ch04 | Binary Search, Maximum Subarray | found ⟺ key ∈ array | O(log n), O(n) |
 | ch06 | Heapsort | sorted ∧ permutation | O(n log n) |
 | ch07 | Quicksort, Partition | sorted ∧ permutation | O(n²) worst, O(n) partition |
-| ch08 | Counting Sort, Radix Sort (d=1) | sorted ∧ permutation | Θ(n+k) |
+| ch08 | Counting Sort, Counting Sort (Stable), Radix Sort (d=1), Bucket Sort | sorted ∧ permutation | Θ(n+k) |
 | ch09 | Min/Max, Select, **Quickselect** | k-th smallest, partition ordering | O(nk), O(n²) worst |
 | ch10 | Stack, Queue, Linked List | list abstraction | O(1) push/pop, O(n) search |
 | ch11 | Hash Table (open addressing) | functional map spec | O(n) worst case |
 | ch12 | Binary Search Tree | key found ⟹ key at index | O(h) search |
-| ch13 | Red-Black Tree ⚠ | ⚠ no RB invariants | — |
+| ch13 | Red-Black Tree | Okasaki balance ∧ BST ∧ Thm 13.1 | O(lg n) |
 | ch15 | Rod Cutting, Matrix Chain, LCS | result == optimal_spec | O(n²), O(n³), O(mn) |
-| ch16 | Activity Selection, Huffman ⚠, **Huffman.Spec** | greedy choice, CLRS Eq 16.4 | O(n log n) |
+| ch16 | Activity Selection, Huffman, **Huffman.Spec** | greedy choice, CLRS Eq 16.4 | O(n log n) |
 | ch21 | Union-Find (path compression) | find returns root | O(n) find, O(1) union |
 | ch22 | BFS, DFS, Topological Sort | distance soundness, reachability | O(V²) |
 | ch23 | Kruskal, Prim | valid endpoints only | O(V³), O(V²) |
-| ch24 | Bellman-Ford, Dijkstra, **ShortestPath.Spec** | dist[v] ≤ sp_dist(s,v) | O(V³), O(V²) |
+| ch24 | Bellman-Ford, Dijkstra, **Dijkstra.Correctness** | dist[v] = δ(s,v) proven | O(V³), O(V²) |
 | ch25 | Floyd-Warshall | result == fw_spec | O(n³) with ghost ticks |
 | ch26 | Max Flow ⚠ | ⚠ returns zero flow | — |
-| ch28 | Matrix Multiply | C == A × B (dot product) | O(n³) |
+| ch28 | Matrix Multiply, Strassen | C == A × B (dot product) | O(n³) |
 | ch31 | GCD, Modular Exponentiation | gcd_spec, modexp_spec | O(log b), O(log e) |
-| ch32 | Naive, Rabin-Karp, KMP | match count == spec | O(nm), O(nm), O(n+m) |
+| ch32 | Naive, Rabin-Karp, KMP | match count == spec | O(nm), O(nm), O(n+m) amortized |
 | ch33 | Segment Intersection | cross product spec | O(1) |
 | ch35 | 2-Approximation Vertex Cover | valid cover | O(V²) |
 
@@ -51,7 +51,7 @@ make clean  # clean build artifacts
 
 ## Functional Correctness Highlights
 
-- **Sorting** (InsertionSort, MergeSort, Heapsort, Quicksort, CountingSort): `sorted ∧ permutation`
+- **Sorting** (InsertionSort, MergeSort, Heapsort, Quicksort, CountingSort, BucketSort): `sorted ∧ permutation`
 - **DP** (Rod Cutting, Matrix Chain, LCS): `result == optimal_spec(input)`
 - **Floyd-Warshall**: `result == fw_outer(input)`
 - **String Matching** (Naive, Rabin-Karp, KMP): match count equals pure spec
@@ -62,12 +62,11 @@ make clean  # clean build artifacts
 
 ## Known Limitations
 
-- **RBTree (Ch13)**: Array-backed BST without RB invariants, fixup, or correct insert position
 - **MaxFlow (Ch26)**: Initializes flow to zero; does not implement augmenting path search
-- **Huffman (Ch16)**: Imperative code computes cost only; pure spec with tree type and CLRS Eq 16.4 proof added
+- **Huffman (Ch16)**: Imperative Huffman.Complete has 0 admits; Huffman.Spec uses 4 `assume` axioms for greedy-choice/optimal-substructure (CLRS Lemma 16.2–16.3)
 - **Select (Ch09)**: New Quickselect (CLRS §9.2) with partition ordering; old O(nk) selection sort kept for comparison
-- **RadixSort (Ch08)**: Single-digit (d=1) only; wraps counting sort
-- **Bellman-Ford/Dijkstra (Ch24)**: Postcondition now includes `dist[v] ≤ sp_dist(weights, n, source, v)` via pure shortest-path spec
-- **Kruskal/Prim (Ch23)**: Prove valid endpoints only; no MST property (cut property, spanning tree)
+- **RadixSort (Ch08)**: Multi-digit radix sort has 10 admits in stability proofs; single-digit (d=1) fully verified
+- **Kruskal/Prim (Ch23)**: Kruskal is actively being worked on; Prim proves key bounds only, no full MST property
+- **DFS theorems (Ch22)**: DFS.Spec (5 admits) and DFS.WhitePath (3 admits) for parenthesis/white-path theorems remain open
 
 See `RESEARCH_DOC.md` for comprehensive audit and `PROGRESS_PLAN.md` for improvement roadmap.

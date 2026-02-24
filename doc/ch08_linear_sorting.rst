@@ -10,16 +10,15 @@ These algorithms bypass the Ω(n log n) comparison-based lower bound by
 exploiting structure in the keys.
 
 **Verification status.** The in-place counting sort
-(``CLRS.Ch08.CountingSort``) and the single-digit radix sort wrapper
-(``CLRS.Ch08.RadixSort``) are fully verified with zero admits.
-The stable CLRS-faithful counting sort (``CountingSort.Stable``) has
-**3 assume\_** calls in Phase 4 (placement bounds and final
-postcondition). The multi-digit radix sort modules have **10 admits**
+(``CLRS.Ch08.CountingSort``), the stable CLRS-faithful counting sort
+(``CountingSort.Stable``), the single-digit radix sort wrapper
+(``CLRS.Ch08.RadixSort``), and bucket sort (``CLRS.Ch08.BucketSort``)
+are all fully verified with zero admits.
+The multi-digit radix sort modules have **10 admits**
 total across ``RadixSort.FullSort`` (4), ``RadixSort.MultiDigit`` (2),
 ``RadixSort.Spec`` (2), and ``RadixSort.Stability`` (2), all related
 to the stability property and its propagation through digit-by-digit
-sorting. Bucket sort (``CLRS.Ch08.BucketSort``) has **1 admit** for
-the main concatenation step.
+sorting.
 
 Counting Sort
 =============
@@ -80,12 +79,13 @@ so it remains available as a read-only reference.
 
 .. note::
 
-   This module uses **3 assume\_** calls: one for placement-index bounds
-   in Phase 4 (``pos >= 1 /\ pos <= len``), and two for the final
-   postcondition (``sorted sb_final`` and ``permutation sb_final sa``).
-   The structural implementation is faithful to CLRS; fully closing
-   these gaps requires strengthening the Phase 3 prefix-sum invariant to
-   track cumulative counts.
+   This module is **fully verified with 0 assume\_ calls** ✅.
+   The ``CountingSort.StableLemmas`` companion module provides the key
+   proof infrastructure: ``count_le`` with monotonicity/bounded lemmas,
+   ``prefix_sum_inv`` for Phase 3, and opaque ``phase4_c_inv``/``phase4_b_inv``
+   predicates for Phase 4 (placement bounds, final sorted, final permutation).
+   Predicates are ``[@@"opaque_to_smt"]`` with explicit ``reveal_opaque``
+   to avoid Z3 context pollution from nested quantifiers.
 
 Complexity
 ~~~~~~~~~~
@@ -247,12 +247,11 @@ When *k = n*, the average-case cost is linear:
 
 .. note::
 
-   Bucket sort contains **1 admit** in the main function for the
-   concatenation step. The component lemmas (insertion sort correctness,
-   disjoint-range append, length preservation) are all proven; what
-   remains is showing that ``filter_bucket`` produces non-overlapping
-   ranges that cover all input elements — a combinatorial argument about
-   the bucket distribution function.
+   Bucket sort is **fully verified with 0 admits** ✅. The proof uses
+   recursive ``buckets_correct``/``all_sorted`` predicates to avoid
+   ``List.index`` quantifier issues, with ``bucket_index_monotone``
+   (via ``lemma_div_le``) for inter-bucket ordering and
+   ``filter_all_length`` for length preservation.
 
 Proof Techniques Summary
 =========================
