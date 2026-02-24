@@ -12,7 +12,8 @@
    
    Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
    
-   NO admits. Only assume_ for invariant framing properties.
+   Fully verified: 0 assume_, 0 admit(). Uses predicate-based proof pattern
+   from QueueBFS.fst (queue_ok, dist_ok, source_ok, count_nonwhite).
 *)
 
 module CLRS.Ch22.QueueBFS.Complexity
@@ -22,6 +23,8 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
+open Pulse.Lib.WithPure
+open CLRS.Ch22.QueueBFS
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -84,14 +87,17 @@ fn discover_vertex
     A.pts_to pred spred **
     A.pts_to queue_data squeue **
     R.pts_to q_tail vtail **
-    pure (
+    with_pure (
       SZ.v vv < SZ.v n /\
       SZ.v u < SZ.v n /\
       SZ.v vtail < SZ.v n /\
+      du >= 0 /\
       Seq.length scolor == SZ.v n /\
       Seq.length sdist == SZ.v n /\
       Seq.length spred == SZ.v n /\
-      Seq.length squeue == SZ.v n
+      Seq.length squeue == SZ.v n /\
+      Seq.index scolor (SZ.v vv) == 0 /\
+      dist_ok scolor sdist (SZ.v n)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
     A.pts_to color scolor' **
@@ -105,7 +111,11 @@ fn discover_vertex
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
       SZ.v vtail' <= SZ.v n /\
-      SZ.v vtail' >= SZ.v vtail
+      SZ.v vtail' == SZ.v vtail + 1 /\
+      scolor' == Seq.upd scolor (SZ.v vv) 1 /\
+      sdist' == Seq.upd sdist (SZ.v vv) (du + 1) /\
+      squeue' == Seq.upd squeue (SZ.v vtail) vv /\
+      dist_ok scolor' sdist' (SZ.v n)
     )
 {
   // v.color = GRAY
@@ -123,12 +133,12 @@ fn discover_vertex
 
 (* ========== Helper: conditionally discover ========== *)
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
 fn maybe_discover
   (color: A.array int) (dist: A.array int) (pred: A.array int)
   (queue_data: A.array SZ.t) (q_tail: ref SZ.t)
   (u: SZ.t) (vv: SZ.t) (du: int) (n: SZ.t)
-  (has_edge_val: int) (cv: int)
+  (head: SZ.t) (has_edge_val: int) (cv: int)
   (#scolor: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
   (#spred: erased (Seq.seq int))
@@ -140,7 +150,7 @@ fn maybe_discover
     A.pts_to pred spred **
     A.pts_to queue_data squeue **
     R.pts_to q_tail vtail **
-    pure (
+    with_pure (
       SZ.v vv < SZ.v n /\
       SZ.v u < SZ.v n /\
       SZ.v vtail <= SZ.v n /\
@@ -148,7 +158,11 @@ fn maybe_discover
       Seq.length sdist == SZ.v n /\
       Seq.length spred == SZ.v n /\
       Seq.length squeue == SZ.v n /\
-      du >= 0
+      du >= 0 /\
+      cv == Seq.index scolor (SZ.v vv) /\
+      count_nonwhite scolor (SZ.v n) == SZ.v vtail /\
+      dist_ok scolor sdist (SZ.v n) /\
+      queue_ok scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
     A.pts_to color scolor' **
@@ -162,19 +176,35 @@ fn maybe_discover
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
       SZ.v vtail' <= SZ.v n /\
-      SZ.v vtail' >= SZ.v vtail
+      SZ.v vtail' >= SZ.v vtail /\
+      count_nonwhite scolor' (SZ.v n) == SZ.v vtail' /\
+      dist_ok scolor' sdist' (SZ.v n) /\
+      queue_ok scolor' squeue' (SZ.v n) (SZ.v head) (SZ.v vtail') /\
+      (forall (w:nat). {:pattern (Seq.index scolor w)}
+        w < SZ.v n /\ Seq.index scolor w <> 0 ==>
+          Seq.index scolor' w == Seq.index scolor w) /\
+      (forall (w:nat). {:pattern (Seq.index sdist w)}
+        w < SZ.v n /\ Seq.index scolor w <> 0 ==>
+          Seq.index sdist' w == Seq.index sdist w)
     )
 {
   if (has_edge_val <> 0 && cv = 0) {
-    assume_ (pure (SZ.v vtail < SZ.v n));
-    discover_vertex color dist pred queue_data q_tail u vv du n
+    // cv == 0 means WHITE: count_nonwhite < n, so vtail < n
+    count_nonwhite_has_white scolor (SZ.v n) (SZ.v vv);
+    discover_vertex color dist pred queue_data q_tail u vv du n;
+    // Establish count_nonwhite and queue_ok for new state
+    with scolor'. assert (A.pts_to color scolor');
+    count_nonwhite_upd_white scolor (SZ.v n) (SZ.v vv) 1;
+    queue_ok_after_discover scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) vv
+  } else {
+    ()
   }
 }
 #pop-options
 
 (* ========== Main BFS with complexity tracking ========== *)
 
-#push-options "--z3rlimit 300 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
 fn queue_bfs_complexity
   (adj: A.array int)
   (n: SZ.t)
@@ -256,7 +286,6 @@ fn queue_bfs_complexity
       (forall (j: nat). j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index sdist_i j == (-1)) /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index spred_i j == (-1)) /\
-      // Complexity: initialization phase doesn't tick
       vc == reveal c0
     )
   {
@@ -267,7 +296,8 @@ fn queue_bfs_complexity
     i := SZ.add vi 1sz
   };
 
-  // Step 2: Initialize source
+  // Step 2: Initialize source — witness all-zeros state first for count_nonwhite
+  with scolor_zeros. assert (A.pts_to color scolor_zeros);
   A.op_Array_Assignment color source 1;    // s.color = GRAY
   A.op_Array_Assignment dist source 0;     // s.d = 0
   A.op_Array_Assignment pred source (-1);  // s.pi = NIL
@@ -277,6 +307,9 @@ fn queue_bfs_complexity
   let mut q_tail: SZ.t = 0sz;
   A.op_Array_Assignment queue_data 0sz source;
   q_tail := 1sz;
+
+  // Establish predicates for main loop entry
+  count_nonwhite_upd_single scolor_zeros (SZ.v n) (SZ.v source) 1;
 
   // Step 4: Main BFS loop
   while (
@@ -294,23 +327,17 @@ fn queue_bfs_complexity
     A.pts_to queue_data squeue_q **
     GR.pts_to ctr vc **
     pure (
-      SZ.v vhead <= SZ.v vtail /\
-      SZ.v vtail <= SZ.v n /\
       Seq.length scolor_q == SZ.v n /\
       Seq.length sdist_q == SZ.v n /\
       Seq.length spred_q == SZ.v n /\
       Seq.length squeue_q == SZ.v n /\
-      SZ.v source < SZ.v n /\
-      // Source invariants
-      Seq.index scolor_q (SZ.v source) <> 0 /\
-      Seq.index sdist_q (SZ.v source) == 0 /\
-      // Distance soundness
-      (forall (w: nat). w < SZ.v n /\ Seq.index scolor_q w <> 0 ==>
-        Seq.index sdist_q w >= 0) /\
-      // Complexity: we've processed vhead vertices
-      // Each vertex: 1 dequeue tick + n edge check ticks = (n+1) ticks
-      // Total: vhead * (n+1) ticks
-      // Since vhead <= n and n+1 <= 2*n (for n >= 1), we have vhead*(n+1) <= n*2*n = 2*n²
+      SZ.fits (SZ.v n * SZ.v n) /\
+      // Predicates
+      source_ok scolor_q sdist_q (SZ.v source) (SZ.v n) /\
+      dist_ok scolor_q sdist_q (SZ.v n) /\
+      queue_ok scolor_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail) /\
+      count_nonwhite scolor_q (SZ.v n) == SZ.v vtail /\
+      // Complexity: vhead * (n+1) ticks so far
       vc >= reveal c0 /\
       vc - reveal c0 <= SZ.v vhead * (SZ.v n + 1)
     )
@@ -321,12 +348,18 @@ fn queue_bfs_complexity
     // u = DEQUEUE(Q)
     let vhead = !q_head;
     let u: SZ.t = A.op_Array_Access queue_data vhead;
+
+    // By queue_ok invariant: u < n and color[u] <> 0
+    with scolor_deq. assert (A.pts_to color scolor_deq);
+    with squeue_deq. assert (A.pts_to queue_data squeue_deq);
+    assert (pure (SZ.v u < SZ.v n));
+    assert (pure (Seq.index scolor_deq (SZ.v u) <> 0));
     q_head := SZ.add vhead 1sz;
     
-    assume_ (pure (SZ.v u < SZ.v n));
-    
     let du: int = A.op_Array_Access dist u;
-    assume_ (pure (du >= 0));
+    // u is non-WHITE (from queue_ok), so by dist_ok, du >= 0
+    with sdist_deq. assert (A.pts_to dist sdist_deq);
+    assert (pure (du >= 0));
     
     // For each v in G.Adj[u]
     let mut v: SZ.t = 0sz;
@@ -351,10 +384,13 @@ fn queue_bfs_complexity
         Seq.length squeue_v == SZ.v n /\
         SZ.fits (SZ.v u * SZ.v n) /\
         SZ.fits (SZ.v u * SZ.v n + SZ.v vv) /\
-        // Inner loop complexity: 
-        // Before inner loop: vhead * (n+1) ticks (from outer invariant)
-        // Dequeue tick for current vertex: +1
-        // Edge checks so far in inner loop: vv
+        // Predicates maintained through inner loop
+        source_ok scolor_v sdist_v (SZ.v source) (SZ.v n) /\
+        dist_ok scolor_v sdist_v (SZ.v n) /\
+        count_nonwhite scolor_v (SZ.v n) == SZ.v vtail2 /\
+        Seq.index scolor_v (SZ.v u) <> 0 /\
+        queue_ok scolor_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) /\
+        // Inner loop complexity:
         vc2 >= reveal c0 /\
         vc2 - reveal c0 <= SZ.v vhead * (SZ.v n + 1) + 1 + SZ.v vv
       )
@@ -365,6 +401,7 @@ fn queue_bfs_complexity
       tick ctr;
 
       // Check if edge (u, v) exists
+      product_strict_bound (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vv);
       let offset: SZ.t = SZ.mul u n;
       let idx: SZ.t = SZ.add offset vv;
       let has_edge_val: int = A.op_Array_Access adj idx;
@@ -373,44 +410,46 @@ fn queue_bfs_complexity
       let cv: int = A.op_Array_Access color vv;
 
       // CLRS: if v.color == WHITE and edge (u,v) exists, discover v
-      maybe_discover color dist pred queue_data q_tail u vv du n has_edge_val cv;
+      maybe_discover color dist pred queue_data q_tail u vv du n (SZ.add vhead 1sz) has_edge_val cv;
+
+      // Restore source_ok and u's color from frame properties
+      with scolor_post. assert (A.pts_to color scolor_post);
+      with sdist_post. assert (A.pts_to dist sdist_post);
 
       v := SZ.add vv 1sz
     };
 
     // u.color = BLACK
+    with scolor_pre_black. assert (A.pts_to color scolor_pre_black);
+    with sdist_pre_black. assert (A.pts_to dist sdist_pre_black);
+    with squeue_pre_black. assert (A.pts_to queue_data squeue_pre_black);
+    with vtail_pre_black. assert (R.pts_to q_tail vtail_pre_black);
+
+    // Prove preservation lemmas for blackening
+    blacken_preserves_source_ok scolor_pre_black sdist_pre_black (SZ.v source) (SZ.v n) (SZ.v u);
+    blacken_preserves_dist_ok scolor_pre_black sdist_pre_black (SZ.v n) (SZ.v u);
+    blacken_preserves_queue_ok scolor_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (SZ.v u);
+    count_nonwhite_upd_nonwhite scolor_pre_black (SZ.v n) (SZ.v u) 2;
+    
     A.op_Array_Assignment color u 2;
-    with scolor_f. assert (A.pts_to color scolor_f);
-    
-    // Restore outer loop invariant
-    assume_ (pure (
-      SZ.v source < SZ.v n /\
-      Seq.index scolor_f (SZ.v source) <> 0 /\
-      Seq.index (reveal scolor_f) (SZ.v source) == 0
-    ));
-    // For dist: inner loop didn't change dist[source]
-    with sdist_f. assert (A.pts_to dist sdist_f);
-    assume_ (pure (
-      Seq.index sdist_f (SZ.v source) == 0 /\
-      (forall (w: nat). w < SZ.v n /\ Seq.index scolor_f w <> 0 ==>
-        Seq.index sdist_f w >= 0)
-    ));
-    
-    // Complexity invariant for outer loop
-    // After inner loop: vc2 - c0 <= vhead*(n+1) + 1 + n
-    // After marking vertex BLACK: still the same
-    // At end of iteration: (vhead+1) vertices processed
-    // Total: (vhead+1) * (n+1) ticks
+
+    // Complexity: after inner loop with vv == n, vc2 - c0 <= vhead*(n+1) + 1 + n
+    // = vhead*(n+1) + (n+1) = (vhead+1)*(n+1)
+    // Blackening doesn't tick, so vc_outer = vc2
     with vc_outer. assert (GR.pts_to ctr vc_outer);
-    assume_ (pure (
-      reveal vc_outer - reveal c0 <= (SZ.v vhead + 1) * (SZ.v n + 1)
-    ))
+    assert (pure (reveal vc_outer - reveal c0 <= (SZ.v vhead + 1) * (SZ.v n + 1)))
   };
   
-  // At loop exit: the outer loop invariant gives us vc - c0 <= vhead * (n+1)
-  // Since the loop exited, vhead == vtail, and vtail <= n
-  // So vc - c0 <= vhead * (n+1) <= n * (n+1)
-  // By the lemma: n * (n+1) <= 2 * n²
-  lemma_bfs_complexity_bound (SZ.v n) (SZ.v n)
+  // At loop exit: vc - c0 <= vhead * (n+1) <= n * (n+1) <= 2 * n²
+  lemma_bfs_complexity_bound (SZ.v n) (SZ.v n);
+
+  // Extract correctness from predicates
+  with scolor_final. assert (A.pts_to color scolor_final);
+  with sdist_final. assert (A.pts_to dist sdist_final);
+  assert (pure (source_ok scolor_final sdist_final (SZ.v source) (SZ.v n)));
+  assert (pure (dist_ok scolor_final sdist_final (SZ.v n)));
+  assert (pure (Seq.index scolor_final (SZ.v source) <> 0));
+  assert (pure (Seq.index sdist_final (SZ.v source) == 0));
+  assert (pure (forall (w: nat). w < SZ.v n /\ Seq.index scolor_final w <> 0 ==> Seq.index sdist_final w >= 0))
 }
 #pop-options
