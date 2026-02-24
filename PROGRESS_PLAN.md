@@ -441,21 +441,16 @@ CountingSort.Stable having proven postconditions).
 
 ---
 
-### AGENT5: BucketSort — eliminate 1 admit (L360)
+### AGENT5: BucketSort — ~~eliminate 1 admit (L360)~~ ✅ COMPLETED
 
 **File:** `ch08-linear-sorting/CLRS.Ch08.BucketSort.fst`
 **Goal:** Prove sorted concatenation of sorted buckets.
+**Status:** ✅ All 1 admit eliminated. File fully verified with 0 admits.
 
-The single admit at L360 needs: `concat_all sorted_buckets` is sorted and has correct length.
-Key properties already proven:
-- Each bucket is sorted (by `sort_all_buckets_sorted`)
-- Bucket lengths preserved (by `sort_all_buckets_preserves_lengths`)
-- Total length preserved (by `concat_all_length`)
-
-What's missing: inter-bucket ordering. Elements in bucket i have keys < elements in bucket j
-(for i < j), by the bucket assignment function. Need a lemma:
-`sorted_buckets_concat_sorted`: if each bucket is sorted AND for all i < j, max(bucket_i) ≤
-min(bucket_j), then concat_all is sorted. The bucket index monotonicity gives this.
+**What was done:** Added ~230 lines of proof lemmas in three groups:
+1. **Inter-bucket ordering:** `bucket_index_monotone` (using `lemma_div_le`), `bucket_index_strict` (contrapositive), `filter_bucket_correct`
+2. **Length preservation:** `sum_filter_lengths_cons` (adding element increases sum by 1), `filter_all_length` (total = input length), `sort_all_buckets_preserves_sum`
+3. **Sorted concatenation:** Recursive predicates `buckets_correct`/`all_sorted` to avoid `List.index` quantifier issues; `create_all_buckets_correct`, `sort_all_buckets_correct`, `concat_sorted_ordered`
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch08-linear-sorting --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch08-linear-sorting/CLRS.Ch08.BucketSort.fst`
 
@@ -598,7 +593,7 @@ The existing invariants are wrong for the imperative (sequential relaxation) imp
 **No F* verification needed** — documentation only. But validate counts against the audit:
 ```
 ch04 MaxSubarray.DC:      0 admit, 0 assume_, 1 assume_val
-ch08 BucketSort:          1 admit
+ch08 BucketSort:          0 admit  (was 1, fixed by AGENT5)
 ch08 CountingSort.Stable: 0 admit, 3 assume_
 ch08 RadixSort.FullSort:  4 admit
 ch08 RadixSort.MultiDigit:2 admit

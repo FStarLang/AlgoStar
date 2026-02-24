@@ -19,11 +19,9 @@
    - Single-element lists are sorted
    - Lists with all equal elements are sorted
    - Appending two sorted lists with disjoint ranges yields sorted list
-   
-   Partial Proof (with documented admits):
-   - Main algorithm structure is correct
-   - Component functions preserve length
-   - Concatenation strategy matches CLRS
+   - Bucket index monotonicity and inter-bucket value ordering
+   - Buckets partition the input (length preservation)
+   - Full bucket sort correctness: sorted output with same length as input
    
    Complexity: O(n + k) average case when input uniformly distributed
                O(n²) worst case when all elements in one bucket
@@ -322,6 +320,233 @@ let rec sort_all_buckets_sorted (buckets: list (list int))
       insertion_sort_correct b;
       sort_all_buckets_sorted bs
 
+(* ========== Inter-bucket Ordering ========== *)
+
+/// bucket_index always returns a value in [0, k)
+let bucket_index_bound (v min_val max_val: int) (k: pos)
+  : Lemma (ensures bucket_index v min_val max_val k < k)
+  = ()
+
+/// bucket_index is monotone: v1 <= v2 implies bucket_index v1 <= bucket_index v2
+#push-options "--z3rlimit 40"
+let bucket_index_monotone (v1 v2 min_val max_val: int) (k: pos)
+  : Lemma (requires min_val < max_val /\ min_val <= v1 /\ v1 < max_val /\
+                     min_val <= v2 /\ v2 < max_val /\ v1 <= v2)
+          (ensures bucket_index v1 min_val max_val k <= bucket_index v2 min_val max_val k)
+  = let range_size = max_val - min_val in
+    let bucket_size = if range_size / k = 0 then 1 else range_size / k in
+    lemma_div_le (v1 - min_val) (v2 - min_val) bucket_size
+#pop-options
+
+/// Contrapositive: different bucket indices imply strict value ordering
+let bucket_index_strict (v1 v2 min_val max_val: int) (k: pos)
+  : Lemma (requires min_val < max_val /\ min_val <= v1 /\ v1 < max_val /\
+                     min_val <= v2 /\ v2 < max_val /\
+                     bucket_index v1 min_val max_val k < bucket_index v2 min_val max_val k)
+          (ensures v1 < v2)
+  = if v2 <= v1 then bucket_index_monotone v2 v1 min_val max_val k else ()
+
+/// Elements in filter_bucket have correct bucket_index
+let rec filter_bucket_correct (xs: list int) (i: nat) (min_val max_val: int) (k: pos) (x: int)
+  : Lemma (requires List.mem x (filter_bucket xs i min_val max_val k))
+          (ensures min_val <= x /\ x < max_val /\ bucket_index x min_val max_val k = i)
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | h :: t ->
+      if min_val <= h && h < max_val && bucket_index h min_val max_val k = i
+      then (if h = x then () else filter_bucket_correct t i min_val max_val k x)
+      else filter_bucket_correct t i min_val max_val k x
+
+(* ========== Length Preservation ========== *)
+
+/// Sum of filter_bucket lengths from curr to k-1
+let rec sum_filter_lengths (xs: list int) (curr: nat) (k: pos) (min_val max_val: int)
+  : Pure nat (requires curr <= k) (ensures fun _ -> True) (decreases k - curr)
+  = if curr >= k then 0
+    else List.length (filter_bucket xs curr min_val max_val k) +
+         sum_filter_lengths xs (curr + 1) k min_val max_val
+
+/// sum_filter_lengths equals sum_lengths of create_all_buckets
+let rec sum_filter_eq_sum_lengths (xs: list int) (curr: nat) (k: pos) (min_val max_val: int)
+  : Lemma (requires curr <= k)
+          (ensures sum_filter_lengths xs curr k min_val max_val ==
+                   sum_lengths (create_all_buckets xs curr k min_val max_val))
+          (decreases k - curr)
+  = if curr >= k then ()
+    else sum_filter_eq_sum_lengths xs (curr + 1) k min_val max_val
+
+/// sum_filter_lengths of empty list is 0
+let rec sum_filter_lengths_nil (curr: nat) (k: pos) (min_val max_val: int)
+  : Lemma (requires curr <= k)
+          (ensures sum_filter_lengths [] curr k min_val max_val == 0)
+          (decreases k - curr)
+  = if curr >= k then ()
+    else sum_filter_lengths_nil (curr + 1) k min_val max_val
+
+/// Key lemma: adding an in-range element h increases sum by exactly 1
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec sum_filter_lengths_cons (h: int) (t: list int) (curr: nat) (k: pos) (min_val max_val: int)
+  : Lemma 
+    (requires curr <= k /\ min_val <= h /\ h < max_val /\ min_val < max_val)
+    (ensures (let j = bucket_index h min_val max_val k in
+              sum_filter_lengths (h :: t) curr k min_val max_val ==
+              sum_filter_lengths t curr k min_val max_val + (if j >= curr then 1 else 0)))
+    (decreases k - curr)
+  = if curr >= k then ()
+    else (
+      sum_filter_lengths_cons h t (curr + 1) k min_val max_val;
+      let j = bucket_index h min_val max_val k in
+      // filter_bucket (h::t) curr: if h matches curr, length increases by 1; otherwise same as for t
+      // IH gives sum from curr+1 for (h::t) = sum from curr+1 for t + (if j >= curr+1 then 1 else 0)
+      // When j = curr: filter adds 1 at curr, IH adds 0 from curr+1 onwards. Total: +1
+      // When j <> curr: filter adds 0 at curr, (j>=curr iff j>=curr+1). Total: same as IH
+      ()
+    )
+#pop-options
+
+/// Main length theorem: sum of all filter_bucket lengths = length of input
+let rec filter_all_length (xs: list int) (k: pos) (min_val max_val: int)
+  : Lemma (requires min_val < max_val /\
+                    (forall x. List.mem x xs ==> min_val <= x /\ x < max_val))
+          (ensures sum_filter_lengths xs 0 k min_val max_val == List.length xs)
+          (decreases xs)
+  = match xs with
+    | [] -> sum_filter_lengths_nil 0 k min_val max_val
+    | h :: t ->
+      filter_all_length t k min_val max_val;
+      sum_filter_lengths_cons h t 0 k min_val max_val;
+      bucket_index_bound h min_val max_val k
+
+/// sort_all_buckets preserves sum_lengths
+let rec sort_all_buckets_preserves_sum (buckets: list (list int))
+  : Lemma (ensures sum_lengths (sort_all_buckets buckets) == sum_lengths buckets)
+          (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | _ :: bs -> sort_all_buckets_preserves_sum bs
+
+(* ========== Sorted Concatenation ========== *)
+
+/// insertion_sort preserves membership
+let rec insertion_sort_mem (xs: list int) (x: int)
+  : Lemma (ensures (List.mem x (insertion_sort xs) <==> List.mem x xs))
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | _ :: t -> insertion_sort_mem t x
+
+/// sort_all_buckets preserves membership within each bucket
+let rec sort_all_buckets_mem (buckets: list (list int)) (i: nat) (x: int)
+  : Lemma (requires i < List.length buckets)
+          (ensures i < List.length (sort_all_buckets buckets) /\
+                   (List.mem x (List.index (sort_all_buckets buckets) i) <==>
+                    List.mem x (List.index buckets i)))
+          (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | b :: bs ->
+      if i = 0 then insertion_sort_mem b x
+      else sort_all_buckets_mem bs (i - 1) x
+
+/// Recursive predicate: each bucket contains elements with correct bucket_index
+let rec buckets_correct (buckets: list (list int)) (min_val max_val: int) (k: pos) (offset: nat) : prop =
+  match buckets with
+  | [] -> True
+  | b :: bs ->
+    (forall x. List.mem x b ==> min_val <= x /\ x < max_val /\ bucket_index x min_val max_val k = offset) /\
+    buckets_correct bs min_val max_val k (offset + 1)
+
+/// Recursive predicate: all buckets are sorted
+let rec all_sorted (buckets: list (list int)) : prop =
+  match buckets with
+  | [] -> True
+  | b :: bs -> sorted b /\ all_sorted bs
+
+/// create_all_buckets produces correctly-indexed buckets
+let rec create_all_buckets_correct
+  (xs: list int) (curr: nat) (k: pos) (min_val max_val: int)
+  : Lemma 
+    (requires curr <= k /\ min_val < max_val)
+    (ensures buckets_correct (create_all_buckets xs curr k min_val max_val) min_val max_val k curr)
+    (decreases k - curr)
+  = if curr >= k then ()
+    else (
+      create_all_buckets_correct xs (curr + 1) k min_val max_val;
+      let aux (x: int) 
+        : Lemma (requires List.mem x (filter_bucket xs curr min_val max_val k))
+                (ensures min_val <= x /\ x < max_val /\ bucket_index x min_val max_val k = curr)
+        = filter_bucket_correct xs curr min_val max_val k x
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+    )
+
+/// sort_all_buckets preserves the buckets_correct predicate
+let rec sort_all_buckets_correct
+  (buckets: list (list int)) (min_val max_val: int) (k: pos) (offset: nat)
+  : Lemma 
+    (requires buckets_correct buckets min_val max_val k offset)
+    (ensures buckets_correct (sort_all_buckets buckets) min_val max_val k offset)
+    (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | b :: bs ->
+      sort_all_buckets_correct bs min_val max_val k (offset + 1);
+      let aux (x: int)
+        : Lemma (requires List.mem x (insertion_sort b))
+                (ensures min_val <= x /\ x < max_val /\ bucket_index x min_val max_val k = offset)
+        = insertion_sort_mem b x
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+/// sort_all_buckets produces all_sorted buckets
+let rec sort_all_buckets_all_sorted (buckets: list (list int))
+  : Lemma (ensures all_sorted (sort_all_buckets buckets))
+          (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | b :: bs ->
+      insertion_sort_correct b;
+      sort_all_buckets_all_sorted bs
+
+/// Sortedness of concat_all when buckets have inter-bucket ordering
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec concat_sorted_ordered 
+  (buckets: list (list int)) (min_val max_val: int) (k: pos) (offset: nat)
+  : Lemma 
+    (requires 
+      min_val < max_val /\
+      all_sorted buckets /\
+      buckets_correct buckets min_val max_val k offset)
+    (ensures sorted (concat_all buckets) /\
+             (forall (x: int). List.mem x (concat_all buckets) ==>
+               min_val <= x /\ x < max_val /\ bucket_index x min_val max_val k >= offset))
+    (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | b :: bs ->
+      concat_sorted_ordered bs min_val max_val k (offset + 1);
+      // Establish ordering: every element of b <= every element of concat_all bs
+      let lemma_ord (x: int)
+        : Lemma (requires List.mem x b)
+                (ensures forall y. List.mem y (concat_all bs) ==> x <= y)
+        = let inner (y: int)
+            : Lemma (requires List.mem y (concat_all bs)) (ensures x <= y)
+            = bucket_index_strict x y min_val max_val k
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires inner)
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires lemma_ord);
+      append_sorted_with_ordering b (concat_all bs);
+      // Establish membership property for the full concat
+      let mem_lemma (x: int) 
+        : Lemma (requires List.mem x (concat_all (b :: bs)))
+                (ensures min_val <= x /\ x < max_val /\ bucket_index x min_val max_val k >= offset)
+        = List.append_mem b (concat_all bs) x
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires mem_lemma)
+#pop-options
+
 (* ========== Main Algorithm ========== *)
 
 //SNIPPET_START: bucket_sort_sig
@@ -352,12 +577,25 @@ let bucket_sort (xs: list int) (k: pos)
       concat_all_length sorted_buckets;
       
       // Step 3: Concatenate all sorted buckets
-      // The proof requires showing:
-      //  1. Each sorted_bucket is sorted (done by sort_all_buckets_sorted)
-      //  2. Elements in bucket i <= elements in bucket j for i < j (by bucket_index monotonicity)
-      //  3. Buckets partition the input (permutation - length preservation)
       
-      admit(); // Remaining: show concat_all sorted_buckets is sorted and has correct length
+      // Prove length preservation:
+      // sum_lengths sorted_buckets == sum_lengths buckets == sum_filter_lengths == length xs
+      sort_all_buckets_preserves_sum buckets;
+      sum_filter_eq_sum_lengths xs 0 k min_val (max_val + 1);
+      list_min_from_le_all (Cons?.tl xs) (Cons?.hd xs);
+      list_max_from_ge_all (Cons?.tl xs) (Cons?.hd xs);
+      filter_all_length xs k min_val (max_val + 1);
+      
+      // Prove sortedness:
+      // 1. create_all_buckets has correct bucket indices
+      create_all_buckets_correct xs 0 k min_val (max_val + 1);
+      // 2. sort_all_buckets preserves the correctness predicate
+      sort_all_buckets_correct buckets min_val (max_val + 1) k 0;
+      // 3. sort_all_buckets produces all_sorted buckets
+      sort_all_buckets_all_sorted buckets;
+      // 4. concat sorted_buckets is sorted
+      concat_sorted_ordered sorted_buckets min_val (max_val + 1) k 0;
+      
       concat_all sorted_buckets
     )
 #pop-options
@@ -395,16 +633,12 @@ let bucket_sort_linear_cost (n: pos)
    - Insertion sort correctness (sortedness + length preservation)
    - All-equal-elements case is sorted
    - Disjoint sorted sequences can be concatenated to stay sorted (key insight)
+   - Bucket index monotonicity (v1 <= v2 implies bucket_index v1 <= bucket_index v2)
+   - Inter-bucket ordering (different bucket indices imply strict value ordering)
+   - Filter bucket correctness (elements have correct bucket_index)
+   - Length preservation (sum of filter_bucket lengths = input length)
+   - Sort preserves bucket correctness and membership
+   - Concatenation of sorted, inter-bucket-ordered buckets is sorted
+   - Main bucket sort correctness: output is sorted and same length as input
    - Complexity analysis structure
-   
-   ⚠ ADMITTED (with clear proof obligation):
-   - Main bucket sort correctness requires proving:
-     1. filter_bucket only returns elements in correct range
-     2. create_all_buckets produces non-overlapping buckets
-     3. Bucket ranges are ordered (bucket i < bucket i+1)
-     4. concat_all can apply append_sorted_disjoint transitively
-     5. Buckets form a permutation of input
-   
-   The admit() represents these structural properties about buckets.
-   The core algorithmic insight (append_sorted_disjoint) is proven.
 *)
