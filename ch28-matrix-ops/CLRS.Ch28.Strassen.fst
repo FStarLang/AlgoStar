@@ -540,8 +540,135 @@ let lemma_dot_product_quadrant_split
                    dot_product a b i j half + dot_product_aux a b i j half (cols a))
   = lemma_dot_product_split a b i j half (cols a)
 
+/// When a matrix is square, pow2-sized, and has rows > 1,
+/// half = rows/2 is a valid quadrant size: positive, pow2, and n - half == half.
+/// Factored out so the simple arithmetic doesn't get combined with the
+/// large VC of the main correctness proof (which causes VC explosion / timeout).
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 0"
+let lemma_submatrix_square_pow2
+  (m:matrix{is_square m /\ pow2_size m /\ rows m > 1})
+  : Lemma (let n = rows m in
+           let half = n / 2 in
+           half > 0 /\
+           is_pow2 half /\
+           n - half == half)
+  = lemma_pow2_half (rows m)
+#pop-options
+
+/// Connection lemma 1: dot_product on "left-column" and "top-row" submatrices
+/// equals the first half of dot_product on the parent.
+///
+/// Concretely, for row offset ra and column offset cb:
+///   dot_product (submatrix a ra (ra+h) 0 h) (submatrix b 0 h cb (cb+h)) i j k
+///   == dot_product a b (ra+i) (cb+j) k
+///
+/// Proof: induction on k. At each step, submatrix element access reduces
+/// definitionally via Seq.init/index to the parent element.
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
+let rec lemma_dot_product_submatrix_first
+  (a b:matrix{cols a == rows b})
+  (half:pos{2 * half == cols a /\ 2 * half == rows b})
+  (ra:nat{ra + half <= rows a})
+  (cb:nat{cb + half <= cols b})
+  (i:nat{i < half}) (j:nat{j < half}) (k:nat{k <= half})
+  : Lemma (ensures
+      dot_product (submatrix a ra (ra + half) 0 half) (submatrix b 0 half cb (cb + half)) i j k
+      == dot_product a b (ra + i) (cb + j) k)
+    (decreases k)
+  = if k = 0 then ()
+    else begin
+      lemma_dot_product_submatrix_first a b half ra cb i j (k - 1);
+      // Inductive step: the k-1 tail matches by IH.
+      // The head terms match because:
+      //   get_elem (submatrix a ra (ra+h) 0 h) i (k-1) = get_elem a (ra+i) (0+k-1) = get_elem a (ra+i) (k-1)
+      //   get_elem (submatrix b 0 h cb (cb+h)) (k-1) j = get_elem b (0+k-1) (cb+j)  = get_elem b (k-1) (cb+j)
+      // These equalities hold by Seq.init/index reduction (no extra fuel needed).
+      ()
+    end
+#pop-options
+
+/// Connection lemma 2: dot_product_aux on the parent (from half to half+k)
+/// equals dot_product_aux on "right-column" and "bottom-row" submatrices (from 0 to k).
+///
+/// Concretely:
+///   dot_product_aux a b (ra+i) (cb+j) (half+k') (half+half)
+///   == dot_product_aux (submatrix a ra (ra+h) h 2h) (submatrix b h 2h cb (cb+h)) i j k' half
+///
+/// Proof: induction (counting up from k' to half). At each step, the head
+/// elements match via submatrix element reduction.
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
+let rec lemma_dot_product_aux_submatrix_second
+  (a b:matrix{cols a == rows b})
+  (half:pos{2 * half == cols a /\ 2 * half == rows b})
+  (ra:nat{ra + half <= rows a})
+  (cb:nat{cb + half <= cols b})
+  (i:nat{i < half}) (j:nat{j < half}) (k:nat{k <= half})
+  : Lemma (ensures
+      dot_product_aux a b (ra + i) (cb + j) (half + k) (half + half)
+      == dot_product_aux (submatrix a ra (ra + half) half (half + half))
+                         (submatrix b half (half + half) cb (cb + half))
+                         i j k half)
+    (decreases (half - k))
+  = if k = half then ()
+    else begin
+      lemma_dot_product_aux_submatrix_second a b half ra cb i j (k + 1);
+      // Inductive step: tails match by IH.
+      // Head terms match because:
+      //   get_elem a (ra+i) (half+k)  == get_elem (submatrix a ra (ra+h) h 2h) i k
+      //   get_elem b (half+k) (cb+j)  == get_elem (submatrix b h 2h cb (cb+h)) k j
+      ()
+    end
+#pop-options
+
+/// Wrapper: standard_multiply decomposes via quadrants.
+/// For element (ra+i, cb+j) of the product A*B, where both A and B are
+/// square with side 2*half:
+///
+///   (A*B)[ra+i, cb+j] = (A_left * B_top)[i,j] + (A_right * B_bottom)[i,j]
+///
+/// where A_left = submatrix a ra (ra+h) 0 h, etc.
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+let lemma_standard_multiply_quadrant_decomp
+  (a b:matrix{cols a == rows b /\ is_square a /\ is_square b})
+  (half:pos{2 * half == rows a})
+  (ra:nat{ra + half <= rows a})
+  (cb:nat{cb + half <= cols b})
+  (i:nat{i < half}) (j:nat{j < half})
+  : Lemma (ensures (
+      let a_left = submatrix a ra (ra + half) 0 half in
+      let a_right = submatrix a ra (ra + half) half (2 * half) in
+      let b_top = submatrix b 0 half cb (cb + half) in
+      let b_bottom = submatrix b half (2 * half) cb (cb + half) in
+      get_elem (standard_multiply a b) (ra + i) (cb + j) ==
+        get_elem (standard_multiply a_left b_top) i j +
+        get_elem (standard_multiply a_right b_bottom) i j))
+  = let n = 2 * half in
+    let a_left = submatrix a ra (ra + half) 0 half in
+    let a_right = submatrix a ra (ra + half) half n in
+    let b_top = submatrix b 0 half cb (cb + half) in
+    let b_bottom = submatrix b half n cb (cb + half) in
+    // (A*B)[ra+i, cb+j] = dot_product a b (ra+i) (cb+j) n
+    lemma_standard_multiply_correct a b (ra + i) (cb + j);
+    // Split: dot_product ... n = dot_product ... half + dot_product_aux ... half n
+    lemma_dot_product_quadrant_split a b (ra + i) (cb + j) half;
+    // First half: dot_product a b (ra+i) (cb+j) half = dot_product a_left b_top i j half
+    lemma_dot_product_submatrix_first a b half ra cb i j half;
+    // = standard_multiply a_left b_top [i,j]
+    lemma_standard_multiply_correct a_left b_top i j;
+    // Second half: dot_product_aux a b (ra+i) (cb+j) half n
+    //   = dot_product_aux a_right b_bottom i j 0 half  (by connection lemma 2, with k=0)
+    lemma_dot_product_aux_submatrix_second a b half ra cb i j 0;
+    //   = dot_product a_right b_bottom i j 0 + dot_product_aux a_right b_bottom i j 0 half
+    //   = 0 + dot_product_aux a_right b_bottom i j 0 half
+    //   = dot_product a_right b_bottom i j half  (by split lemma, reversed)
+    lemma_dot_product_split a_right b_bottom i j 0 half;
+    //   = standard_multiply a_right b_bottom [i,j]
+    lemma_standard_multiply_correct a_right b_bottom i j;
+    ()
+#pop-options
+
 // Helper: prove element-wise equality for a specific element
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1 --split_queries always"
 let rec lemma_strassen_elem_correct 
   (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   (i:nat{i < rows a}) (j:nat{j < cols b})
@@ -564,10 +691,31 @@ let rec lemma_strassen_elem_correct
       let b21 = submatrix b half n 0 half in
       let b22 = submatrix b half n half n in
       
-      // These properties hold by arithmetic but F* needs help
-      // Removing this admit causes >600s timeout due to the subsequent 200+ lines
-      // of algebraic manipulation overwhelming the solver
-      admit(); // Quadrants are square and pow2
+      // Quadrant dimension arithmetic (isolated from main VC via helper lemma)
+      // Core fact: n - half == half, so all quadrants are half×half
+      lemma_submatrix_square_pow2 a;
+      lemma_submatrix_square_pow2 b;
+      assert (n - half == half);
+
+      // All 8 quadrants are square (rows == cols == half) and pow2-sized
+      // The submatrix return type gives rows/cols directly; n - half == half
+      // makes the "off-diagonal" quadrants (a12, a21, etc.) square too.
+      assert (is_square a11);
+      assert (is_square a12);
+      assert (is_square a21);
+      assert (is_square a22);
+      assert (is_square b11);
+      assert (is_square b12);
+      assert (is_square b21);
+      assert (is_square b22);
+      assert (pow2_size a11);
+      assert (pow2_size a12);
+      assert (pow2_size a21);
+      assert (pow2_size a22);
+      assert (pow2_size b11);
+      assert (pow2_size b12);
+      assert (pow2_size b21);
+      assert (pow2_size b22);
       
       // Extract quadrants of the result by expanding strassen_multiply definition
       // strassen_multiply computes P1..P7 and assembles them into quadrants
@@ -597,64 +745,65 @@ let rec lemma_strassen_elem_correct
       if i < half && j < half then begin
         // Upper-left quadrant: need to show c11[i,j] = (A11*B11 + A12*B21)[i,j]
         
-        // Apply IH: Each Pk equals the corresponding standard_multiply
-        lemma_strassen_elem_correct (matrix_add a11 a22) (matrix_add b11 b22) i j;
-        lemma_strassen_elem_correct a22 (matrix_sub b21 b11) i j;
-        lemma_strassen_elem_correct (matrix_add a11 a12) b22 i j;
-        lemma_strassen_elem_correct (matrix_sub a12 a22) (matrix_add b21 b22) i j;
+        // Connect standard_multiply of quadrants to standard_multiply of parent
+        lemma_standard_multiply_quadrant_decomp a b half 0 0 i j;
         
-        // Expand P5 = (A11 + A22) * (B11 + B22)
+        // --- Build up Strassen algebra for P5 ---
+        lemma_strassen_elem_correct (matrix_add a11 a22) (matrix_add b11 b22) i j;
         lemma_matrix_product_add_left a11 a22 (matrix_add b11 b22) i j;
         lemma_matrix_product_add_right a11 b11 b22 i j;
         lemma_matrix_product_add_right a22 b11 b22 i j;
+        assert (get_elem p5 i j ==
+                get_elem (standard_multiply a11 b11) i j +
+                get_elem (standard_multiply a11 b22) i j +
+                get_elem (standard_multiply a22 b11) i j +
+                get_elem (standard_multiply a22 b22) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
         
-        // Expand P4 = A22 * (B21 - B11)
+        // --- P4 ---
+        lemma_strassen_elem_correct a22 (matrix_sub b21 b11) i j;
         lemma_matrix_product_sub_right a22 b21 b11 i j;
+        assert (get_elem p4 i j ==
+                get_elem (standard_multiply a22 b21) i j -
+                get_elem (standard_multiply a22 b11) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
         
-        // Expand P2 = (A11 + A12) * B22
+        // --- P2 ---
+        lemma_strassen_elem_correct (matrix_add a11 a12) b22 i j;
         lemma_matrix_product_add_left a11 a12 b22 i j;
+        assert (get_elem p2 i j ==
+                get_elem (standard_multiply a11 b22) i j +
+                get_elem (standard_multiply a12 b22) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
         
-        // Expand P6 = (A12 - A22) * (B21 + B22)
+        // --- P6 ---
+        lemma_strassen_elem_correct (matrix_sub a12 a22) (matrix_add b21 b22) i j;
         lemma_matrix_product_sub_left a12 a22 (matrix_add b21 b22) i j;
         lemma_matrix_product_add_right a12 b21 b22 i j;
         lemma_matrix_product_add_right a22 b21 b22 i j;
+        assert (get_elem p6 i j ==
+                get_elem (standard_multiply a12 b21) i j +
+                get_elem (standard_multiply a12 b22) i j -
+                get_elem (standard_multiply a22 b21) i j -
+                get_elem (standard_multiply a22 b22) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
         
-        // Element access for combinations
+        // --- Element access for c11 = ((p5+p4)-p2)+p6 ---
         lemma_matrix_add_elem p5 p4 i j;
         lemma_matrix_sub_elem (matrix_add p5 p4) p2 i j;
         lemma_matrix_add_elem (matrix_sub (matrix_add p5 p4) p2) p6 i j;
         
-        // Standard multiply results
-        lemma_standard_multiply_correct a11 b11 i j;
-        lemma_standard_multiply_correct a11 b22 i j;
-        lemma_standard_multiply_correct a12 b21 i j;
-        lemma_standard_multiply_correct a12 b22 i j;
-        lemma_standard_multiply_correct a22 b11 i j;
-        lemma_standard_multiply_correct a22 b21 i j;
-        lemma_standard_multiply_correct a22 b22 i j;
-        
-        // Submatrix relationships
-        lemma_submatrix_elem a 0 half 0 half i j;
-        lemma_submatrix_elem a 0 half half n i j;
-        lemma_submatrix_elem a half n half n i j;
-        lemma_submatrix_elem b 0 half 0 half i j;
-        lemma_submatrix_elem b 0 half half n i j;
-        lemma_submatrix_elem b half n 0 half i j;
-        lemma_submatrix_elem b half n half n i j;
-        
-        lemma_standard_multiply_correct a b i j;
-        lemma_dot_product_quadrant_split a b i j half;
-        
-        // Algebraic expansion:
-        // P5 = (A11+A22)*(B11+B22) = A11*B11 + A11*B22 + A22*B11 + A22*B22
-        // P4 = A22*(B21-B11) = A22*B21 - A22*B11
-        // P2 = (A11+A12)*B22 = A11*B22 + A12*B22
-        // P6 = (A12-A22)*(B21+B22) = A12*B21 + A12*B22 - A22*B21 - A22*B22
-        // C11 = P5 + P4 - P2 + P6
-        //     = (A11*B11 + A11*B22 + A22*B11 + A22*B22) + (A22*B21 - A22*B11)
-        //       - (A11*B22 + A12*B22) + (A12*B21 + A12*B22 - A22*B21 - A22*B22)
-        //     = A11*B11 + A12*B21
-        ()
+        // C11 = P5+P4-P2+P6 = A11*B11 + A12*B21 (pure linear arithmetic)
+        assert (get_elem c11 i j ==
+                get_elem (standard_multiply a11 b11) i j +
+                get_elem (standard_multiply a12 b21) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
+        // Step 1: strassen_multiply a b at (i,j) = c11 at (i,j)
+        assert (get_elem (strassen_multiply a b) i j == get_elem c11 i j)
+          by (FStar.Tactics.SMT.smt_sync' 1 1);
+        // Step 2: c11 at (i,j) = standard_multiply a b at (i,j)
+        assert (get_elem c11 i j == get_elem (standard_multiply a b) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0)
       end
       else if i < half && j >= half then begin
         // Upper-right quadrant: C12 = P1 + P2 = A11*B12 + A12*B22
@@ -684,11 +833,21 @@ let rec lemma_strassen_elem_correct
         lemma_standard_multiply_correct a b i j;
         lemma_dot_product_quadrant_split a b i j half;
         
-        // P1 = A11 * (B12 - B22) expands to A11*B12 - A11*B22
-        // P2 = (A11 + A12) * B22 expands to A11*B22 + A12*B22
-        // So P1 + P2 = A11*B12 - A11*B22 + A11*B22 + A12*B22 = A11*B12 + A12*B22
-        // This equals dot_product(a[i], b[:, j], 0..half) + dot_product(a[i], b[:, j], half..n)
-        ()
+        // Connect standard_multiply of quadrants to standard_multiply of parent
+        // (A*B)[i,j] = (A*B)[0+i, half+j'] = (A11*B12)[i,j'] + (A12*B22)[i,j']
+        lemma_standard_multiply_quadrant_decomp a b half 0 half i j';
+        
+        // Algebraic identity: P1+P2 = A11*B12 + A12*B22 at element (i,j')
+        assert (get_elem c12 i j' ==
+                get_elem (standard_multiply a11 b12) i j' +
+                get_elem (standard_multiply a12 b22) i j')
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
+        // Step 1: strassen_multiply a b at (i,j) = c12 at (i,j')
+        assert (get_elem (strassen_multiply a b) i j == get_elem c12 i j')
+          by (FStar.Tactics.SMT.smt_sync' 1 1);
+        // Step 2: c12 at (i,j') = standard_multiply a b at (i,j)
+        assert (get_elem c12 i j' == get_elem (standard_multiply a b) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0)
       end
       else if i >= half && j < half then begin
         // Lower-left quadrant: C21 = P3 + P4 = A21*B11 + A22*B21
@@ -713,66 +872,88 @@ let rec lemma_strassen_elem_correct
         lemma_standard_multiply_correct a b i j;
         lemma_dot_product_quadrant_split a b i j half;
         
-        // P3 = (A21 + A22) * B11 expands to A21*B11 + A22*B11
-        // P4 = A22 * (B21 - B11) expands to A22*B21 - A22*B11
-        // So P3 + P4 = A21*B11 + A22*B11 + A22*B21 - A22*B11 = A21*B11 + A22*B21
-        ()
+        // Connect standard_multiply of quadrants to standard_multiply of parent
+        // (A*B)[i,j] = (A*B)[half+i', 0+j] = (A21*B11)[i',j] + (A22*B21)[i',j]
+        lemma_standard_multiply_quadrant_decomp a b half half 0 i' j;
+        
+        // Algebraic identity: P3+P4 = A21*B11 + A22*B21 at element (i',j)
+        assert (get_elem c21 i' j ==
+                get_elem (standard_multiply a21 b11) i' j +
+                get_elem (standard_multiply a22 b21) i' j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
+        // Step 1: strassen_multiply a b at (i,j) = c21 at (i',j)
+        // (uses fuel 1 to unfold strassen_multiply once + assemble_quadrants_elem)
+        assert (get_elem (strassen_multiply a b) i j == get_elem c21 i' j)
+          by (FStar.Tactics.SMT.smt_sync' 1 1);
+        // Step 2: c21 at (i',j) = standard_multiply a b at (i,j)
+        // (pure arithmetic + decomp lemma, no unfolding needed)
+        assert (get_elem c21 i' j == get_elem (standard_multiply a b) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0)
       end
       else begin
         // Lower-right quadrant: C22 = P5 + P1 - P3 - P7 = A21*B12 + A22*B22
         let i' = i - half in
         let j' = j - half in
         
-        lemma_strassen_elem_correct (matrix_add a11 a22) (matrix_add b11 b22) i' j';
-        lemma_strassen_elem_correct a11 (matrix_sub b12 b22) i' j';
-        lemma_strassen_elem_correct (matrix_add a21 a22) b11 i' j';
-        lemma_strassen_elem_correct (matrix_sub a11 a21) (matrix_add b11 b12) i' j';
+        // Connect standard_multiply of quadrants to standard_multiply of parent
+        lemma_standard_multiply_quadrant_decomp a b half half half i' j';
         
-        // Expand products
+        // --- Build up Strassen algebra for P5 ---
+        lemma_strassen_elem_correct (matrix_add a11 a22) (matrix_add b11 b22) i' j';
         lemma_matrix_product_add_left a11 a22 (matrix_add b11 b22) i' j';
         lemma_matrix_product_add_right a11 b11 b22 i' j';
         lemma_matrix_product_add_right a22 b11 b22 i' j';
+        assert (get_elem p5 i' j' ==
+                get_elem (standard_multiply a11 b11) i' j' +
+                get_elem (standard_multiply a11 b22) i' j' +
+                get_elem (standard_multiply a22 b11) i' j' +
+                get_elem (standard_multiply a22 b22) i' j')
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
+        
+        // --- P1 ---
+        lemma_strassen_elem_correct a11 (matrix_sub b12 b22) i' j';
         lemma_matrix_product_sub_right a11 b12 b22 i' j';
+        assert (get_elem p1 i' j' ==
+                get_elem (standard_multiply a11 b12) i' j' -
+                get_elem (standard_multiply a11 b22) i' j')
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
+        
+        // --- P3 ---
+        lemma_strassen_elem_correct (matrix_add a21 a22) b11 i' j';
         lemma_matrix_product_add_left a21 a22 b11 i' j';
+        assert (get_elem p3 i' j' ==
+                get_elem (standard_multiply a21 b11) i' j' +
+                get_elem (standard_multiply a22 b11) i' j')
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
+        
+        // --- P7 ---
+        lemma_strassen_elem_correct (matrix_sub a11 a21) (matrix_add b11 b12) i' j';
         lemma_matrix_product_sub_left a11 a21 (matrix_add b11 b12) i' j';
         lemma_matrix_product_add_right a11 b11 b12 i' j';
         lemma_matrix_product_add_right a21 b11 b12 i' j';
+        assert (get_elem p7 i' j' ==
+                get_elem (standard_multiply a11 b11) i' j' +
+                get_elem (standard_multiply a11 b12) i' j' -
+                get_elem (standard_multiply a21 b11) i' j' -
+                get_elem (standard_multiply a21 b12) i' j')
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
         
-        // Element access
+        // --- Element access for c22 = ((p5+p1)-p3)-p7 ---
         lemma_matrix_add_elem p5 p1 i' j';
         lemma_matrix_sub_elem (matrix_add p5 p1) p3 i' j';
         lemma_matrix_sub_elem (matrix_sub (matrix_add p5 p1) p3) p7 i' j';
         
-        lemma_standard_multiply_correct a11 b11 i' j';
-        lemma_standard_multiply_correct a11 b12 i' j';
-        lemma_standard_multiply_correct a11 b22 i' j';
-        lemma_standard_multiply_correct a22 b11 i' j';
-        lemma_standard_multiply_correct a22 b22 i' j';
-        lemma_standard_multiply_correct a21 b11 i' j';
-        lemma_standard_multiply_correct a21 b12 i' j';
-        
-        lemma_submatrix_elem a 0 half 0 half i' j';
-        lemma_submatrix_elem a 0 half half n i' j';
-        lemma_submatrix_elem a half n 0 half i' j';
-        lemma_submatrix_elem a half n half n i' j';
-        lemma_submatrix_elem b 0 half 0 half i' j';
-        lemma_submatrix_elem b 0 half half n i' j';
-        lemma_submatrix_elem b half n 0 half i' j';
-        lemma_submatrix_elem b half n half n i' j';
-        
-        lemma_standard_multiply_correct a b i j;
-        lemma_dot_product_quadrant_split a b i j half;
-        
-        // Algebraic expansion:
-        // P5 = (A11+A22)*(B11+B22) = A11*B11 + A11*B22 + A22*B11 + A22*B22
-        // P1 = A11*(B12-B22) = A11*B12 - A11*B22
-        // P3 = (A21+A22)*B11 = A21*B11 + A22*B11
-        // P7 = (A11-A21)*(B11+B12) = A11*B11 + A11*B12 - A21*B11 - A21*B12
-        // C22 = P5 + P1 - P3 - P7
-        //     = (A11*B11 + A11*B22 + A22*B11 + A22*B22) + (A11*B12 - A11*B22)
-        //       - (A21*B11 + A22*B11) - (A11*B11 + A11*B12 - A21*B11 - A21*B12)
-        //     = A21*B12 + A22*B22
-        ()
+        // C22 = P5+P1-P3-P7 = A21*B12 + A22*B22 (pure linear arithmetic)
+        assert (get_elem c22 i' j' ==
+                get_elem (standard_multiply a21 b12) i' j' +
+                get_elem (standard_multiply a22 b22) i' j')
+          by (FStar.Tactics.SMT.smt_sync' 0 0);
+        // Step 1: strassen_multiply a b at (i,j) = c22 at (i',j')
+        assert (get_elem (strassen_multiply a b) i j == get_elem c22 i' j')
+          by (FStar.Tactics.SMT.smt_sync' 1 1);
+        // Step 2: c22 at (i',j') = standard_multiply a b at (i,j)
+        assert (get_elem c22 i' j' == get_elem (standard_multiply a b) i j)
+          by (FStar.Tactics.SMT.smt_sync' 0 0)
       end
     end
 #pop-options
