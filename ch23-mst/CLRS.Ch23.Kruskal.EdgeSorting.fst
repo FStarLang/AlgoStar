@@ -77,6 +77,41 @@ let can_sort_edges (edges: list edge)
     assert (subset_edges sorted edges);
     assert (subset_edges edges sorted)
 
+(*** Helper Lemmas for Permutation Proofs ***)
+
+// Helper lemma: subset_edges is preserved when edge lists have same membership
+let rec lemma_subset_edges_membership (path edges1 edges2: list edge)
+  : Lemma (requires (forall (e: edge). mem_edge e edges1 <==> mem_edge e edges2))
+          (ensures subset_edges path edges1 <==> subset_edges path edges2)
+          (decreases path)
+  = match path with
+    | [] -> ()
+    | hd :: tl -> 
+      lemma_subset_edges_membership tl edges1 edges2
+
+// Helper lemma: Transfer subset_edges through membership equivalence
+let rec lemma_subset_edges_transfer (a b c: list edge)
+  : Lemma (requires subset_edges a b /\
+                     (forall (e: edge). mem_edge e b <==> mem_edge e c))
+          (ensures subset_edges a c)
+          (decreases a)
+  = match a with
+    | [] -> ()
+    | hd :: tl ->
+      lemma_subset_edges_transfer tl b c
+
+// Helper lemma: all_connected is preserved under edge list permutation
+let lemma_all_connected_permutation (n: nat) (edges1 edges2: list edge)
+  : Lemma (requires (forall (e: edge). mem_edge e edges1 <==> mem_edge e edges2) /\
+                     all_connected n edges1)
+          (ensures all_connected n edges2)
+  = let lemma_path_membership_equiv (path: list edge)
+      : Lemma (subset_edges path edges1 <==> subset_edges path edges2)
+      = lemma_subset_edges_membership path edges1 edges2
+    in
+    Classical.forall_intro lemma_path_membership_equiv;
+    ()
+
 (*** MST Independence from Equal-Weight Edge Order ***)
 
 // Key property: If two edge lists differ only in the order of equal-weight edges,
@@ -86,20 +121,17 @@ let can_sort_edges (edges: list edge)
 // Two edges have equal weight
 let equal_weight (e1 e2: edge) : prop = e1.w = e2.w
 
-// A permutation that only reorders equal-weight edges
+// A permutation of edge lists: same multiset of edges.
+// Note: A prior version included a position-based stability condition
+// (order preservation for equal-weight edges), but that condition was
+// unsatisfiable for lists with duplicate edge_eq-equivalent edges
+// (the universal quantification over ALL position assignments fails
+// when duplicates allow contradictory assignments). Since no consumer
+// of stable_permutation requires the stability condition (only the
+// membership equivalence is used for MST weight theorems), we simplify
+// to just membership equivalence.
 let stable_permutation (edges1 edges2: list edge) : prop =
-  // Same multiset of edges
-  (forall (e: edge). mem_edge e edges1 <==> mem_edge e edges2) /\
-  // Order of edges with different weights is preserved
-  (forall (e1 e2: edge) (i1 i2 j1 j2: nat).
-    i1 < length edges1 /\ i2 < length edges1 /\
-    j1 < length edges2 /\ j2 < length edges2 /\
-    edge_eq (index edges1 i1) e1 /\
-    edge_eq (index edges1 i2) e2 /\
-    edge_eq (index edges2 j1) e1 /\
-    edge_eq (index edges2 j2) e2 /\
-    e1.w == e2.w ==>
-    (i1 < i2 <==> j1 < j2))
+  (forall (e: edge). mem_edge e edges1 <==> mem_edge e edges2)
 
 // If both edge lists are sorted and are stable permutations of each other,
 // Kruskal produces MSTs with equal weight
@@ -117,25 +149,71 @@ let lemma_stable_permutation_equal_mst_weight
       (exists (mst: list edge). is_mst g1 mst))
     (ensures
       total_weight (pure_kruskal g1) = total_weight (pure_kruskal g2))
-  = // Proof strategy:
-    // 1. Both graphs have the same edges (from stable_permutation's first conjunct)
-    // 2. Both edge lists are sorted by weight
-    // 3. stable_permutation preserves relative order of edges with different weights
-    // 4. Kruskal's greedy choice at each step depends only on:
-    //    a) The weight of the current edge
-    //    b) Whether the edge connects different components
-    // 5. For edges with equal weight, the order doesn't matter because:
-    //    - If one edge of weight w connects different components, swapping it with
-    //      another edge of equal weight doesn't change the MST weight
-    //    - The final MST weight depends only on which edges are chosen, not the order
-    // 
-    // A complete proof would require:
-    // - Formalizing Kruskal's execution state (current forest, remaining edges)
-    // - Proving that swapping equal-weight edges produces forests with same total weight
-    // - Induction over the edge processing order
-    //
-    // This is a substantial proof requiring deep analysis of Kruskal's algorithm dynamics.
-    admit()
+  = // Key insight: graphs with the same edge multiset have the same set of
+    // spanning trees, hence MSTs with equal weight.
+    
+    // Step 1: Establish membership equivalence between g1.edges and g2.edges
+    assert (forall (e: edge). mem_edge e g1.edges <==> mem_edge e g2.edges);
+    
+    // Step 2: For any es, subset_edges es g1.edges <==> subset_edges es g2.edges
+    let subset_equiv (es: list edge)
+      : Lemma (ensures subset_edges es g1.edges <==> subset_edges es g2.edges)
+      = lemma_subset_edges_membership es g1.edges g2.edges
+    in
+    Classical.forall_intro subset_equiv;
+    
+    // Step 3: Derive all_connected g1.n g1.edges from MST existence.
+    let derive_connected (mst: list edge)
+      : Lemma (requires is_mst g1 mst)
+              (ensures all_connected g1.n g1.edges)
+      = introduce forall (v: nat). v < g1.n ==> reachable g1.edges 0 v
+        with introduce _ ==> _
+        with _. (
+          assert (reachable mst 0 v);
+          eliminate exists (path: list edge).
+            subset_edges path mst /\ is_path_from_to path 0 v
+          returns reachable g1.edges 0 v
+          with _. subset_edges_transitive path mst g1.edges
+        )
+    in
+    Classical.forall_intro (Classical.move_requires derive_connected);
+    assert (all_connected g1.n g1.edges);
+    
+    // Step 4: Transfer all_connected to g2 via membership equivalence
+    lemma_all_connected_permutation g1.n g1.edges g2.edges;
+    assert (all_connected g2.n g2.edges);
+    
+    // Step 5: Transfer MST existence from g1 to g2.
+    let transfer_mst (mst: list edge)
+      : Lemma (requires is_mst g1 mst)
+              (ensures is_mst g2 mst)
+      = assert (is_spanning_tree g2 mst);
+        introduce forall (t: list edge). is_spanning_tree g2 t ==> total_weight mst <= total_weight t
+        with introduce _ ==> _
+        with _. (
+          assert (is_spanning_tree g1 t)
+        )
+    in
+    Classical.forall_intro (Classical.move_requires transfer_mst);
+    assert (exists (mst: list edge). is_mst g2 mst);
+    
+    // Step 6: Apply Kruskal correctness to both graphs
+    assert (g1.n > 0);
+    theorem_kruskal_produces_mst g1;
+    theorem_kruskal_produces_mst g2;
+    
+    // Step 7: Both MSTs are minimum over the same set of spanning trees.
+    // pure_kruskal g1 is a spanning tree of g1; transfer to g2
+    let pk1 = pure_kruskal g1 in
+    let pk2 = pure_kruskal g2 in
+    assert (is_mst g1 pk1);
+    assert (is_mst g2 pk2);
+    // Transfer: pk2 is a spanning tree of g1
+    subset_equiv pk2;
+    assert (subset_edges pk2 g1.edges);
+    // Transfer: pk1 is a spanning tree of g2
+    subset_equiv pk1;
+    assert (subset_edges pk1 g2.edges)
 
 (*** Precondition for Kruskal ***)
 
@@ -152,83 +230,9 @@ let make_graph_sortable (g: graph)
   = let sorted_edges = sort_edges g.edges in
     let g' : graph = { n = g.n; edges = sorted_edges } in
     sort_edges_produces_sorted g.edges;
-    sort_edges_is_permutation g.edges;
-    
-    // Need to show: stable_permutation g.edges (sort_edges g.edges)
-    // This requires proving that insertion sort is a stable sort algorithm.
-    //
-    // Proof strategy:
-    // 1. Show insert_edge is stable: inserting e into sorted list doesn't reorder
-    //    existing elements with weights different from e.w
-    // 2. Show sort_edges is stable by induction: if sort_edges rest is stable,
-    //    then insert_edge e (sort_edges rest) is also stable
-    //
-    // This requires defining and proving properties about:
-    // - Position preservation: if two edges with different weights appear at
-    //   positions i < j in input, they appear at positions i' < j' in output
-    // - Membership preservation (already proven via sort_edges_is_permutation)
-    //
-    // A complete proof would require ~50-100 lines of lemmas about insert_edge
-    // and position tracking in lists.
-    admit()
+    sort_edges_is_permutation g.edges
 
 (*** Integration with Kruskal Specification ***)
-
-// Helper lemma: subset_edges is preserved when edge lists have same membership
-let rec lemma_subset_edges_membership (path edges1 edges2: list edge)
-  : Lemma (requires (forall (e: edge). mem_edge e edges1 <==> mem_edge e edges2))
-          (ensures subset_edges path edges1 <==> subset_edges path edges2)
-          (decreases path)
-  = match path with
-    | [] -> ()
-    | hd :: tl -> 
-      // For the head: mem_edge hd edges1 <==> mem_edge hd edges2 (from precondition)
-      // For the tail: subset_edges tl edges1 <==> subset_edges tl edges2 (by IH)
-      // Combined: (mem_edge hd edges1 && subset_edges tl edges1) <==>
-      //           (mem_edge hd edges2 && subset_edges tl edges2)
-      lemma_subset_edges_membership tl edges1 edges2
-
-// Helper lemma: Transfer subset_edges through membership equivalence
-let rec lemma_subset_edges_transfer (a b c: list edge)
-  : Lemma (requires subset_edges a b /\
-                     (forall (e: edge). mem_edge e b <==> mem_edge e c))
-          (ensures subset_edges a c)
-          (decreases a)
-  = match a with
-    | [] -> ()
-    | hd :: tl ->
-      // We have: mem_edge hd b (from subset_edges a b)
-      // We have: mem_edge hd b <==> mem_edge hd c (from precondition)
-      // Therefore: mem_edge hd c
-      // By IH: subset_edges tl c
-      // Therefore: subset_edges (hd :: tl) c
-      lemma_subset_edges_transfer tl b c
-
-// Helper lemma: all_connected is preserved under edge list permutation
-let lemma_all_connected_permutation (n: nat) (edges1 edges2: list edge)
-  : Lemma (requires (forall (e: edge). mem_edge e edges1 <==> mem_edge e edges2) /\
-                     all_connected n edges1)
-          (ensures all_connected n edges2)
-  = // Proof strategy: For any vertex v < n reachable from 0 via edges1,
-    // there exists a path such that subset_edges path edges1 /\ is_path_from_to path 0 v.
-    // Since edges1 and edges2 have the same membership, by lemma_subset_edges_membership,
-    // subset_edges path edges2 also holds.
-    // Therefore the same path witnesses reachable edges2 0 v.
-    
-    // Make the membership equivalence explicit for all paths
-    let lemma_path_membership_equiv (path: list edge)
-      : Lemma (subset_edges path edges1 <==> subset_edges path edges2)
-      = lemma_subset_edges_membership path edges1 edges2
-    in
-    
-    // Instantiate for all paths to make it available to SMT
-    Classical.forall_intro lemma_path_membership_equiv;
-    
-    // Now attempt to let SMT figure out the existential transfer
-    // From: forall v < n. exists path. P(path, edges1, v)
-    // And: forall path. P(path, edges1, v) <==> P(path, edges2, v)
-    // To: forall v < n. exists path. P(path, edges2, v)
-    ()
 
 
 
@@ -309,7 +313,7 @@ let theorem_sorted_kruskal_produces_mst (g: graph)
 //
 // 5. We show any graph can be sorted: can_sort_edges, make_graph_sortable
 //
-// 6. We prove (modulo admits for complex lemmas) that:
+// 6. We prove that:
 //    - Kruskal with sorted edges produces an MST
 //    - The result is independent of equal-weight edge order
 //
