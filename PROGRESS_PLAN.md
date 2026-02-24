@@ -324,9 +324,9 @@ From strongest to weakest:
 
 ---
 
-## Parallel Agent Tasks (AGENT1–AGENT8)
+## Parallel Agent Tasks (AGENT1–AGENT10)
 
-Eight independent tasks for parallel execution. Each agent works on different files
+Ten independent tasks for parallel execution. Each agent works on different files
 with no overlap, so they can run simultaneously without conflicts.
 
 **Current baseline (2025-02-24):** 61 admit + 7 assume_ + 2 assume_val = 70 total obligations across 22 files.
@@ -489,6 +489,80 @@ These may be provable using existing sorting lemmas from ch02 (InsertionSort) or
 (Quicksort), adapted to the edge weight comparison function.
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch23-mst --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch23-mst/CLRS.Ch23.Kruskal.EdgeSorting.fst`
+
+---
+
+### AGENT9: Dijkstra.TriangleInequality — eliminate 1 admit (L496)
+
+**File:** `ch24-sssp/CLRS.Ch24.Dijkstra.TriangleInequality.fst`
+**Reference:** `ch24-sssp/CLRS.Ch24.Dijkstra.Correctness.fst` (zero admits, proves d[v]=δ(s,v))
+**Goal:** Prove stability maintenance in `process_all_vertices_establishes_triangle`.
+
+The single admit at L496 is in the recursive function that processes vertices 0..n-1 in order.
+After processing vertex `u_start` (relaxing all edges from u_start), we have:
+- `triangle_inequality_from_processed dist1 weights processed1` (proven by `process_vertex_extends_triangle`)
+
+What's missing: showing that relaxation from u_start doesn't violate the triangle inequality
+for vertices already in `processed1`. Specifically: for all processed vertices u,v with edge
+(u,v), we need `dist1[v] <= dist1[u] + weights[u][v]` to still hold after relaxation.
+
+Key insight: Dijkstra processes vertices in non-decreasing distance order. Relaxation from
+u_start can only decrease distances of unprocessed vertices. For already-processed vertices,
+their distances are already optimal (by Dijkstra.Correctness) and can't decrease further.
+
+Approach:
+1. Define `relaxation_monotone`: relaxation from u never increases any distance
+2. Prove: if dist[v] <= dist[u] + w(u,v) before relaxation, and dist[u] doesn't decrease,
+   and dist[v] can only decrease, then dist[v] <= dist[u] + w(u,v) still holds
+3. Show processed vertices have stable distances (they're already at shortest-path values)
+
+The file already has `relaxation_stable_for_processed` predicate and partial proofs.
+Build on these to close the gap.
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch24-sssp --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch24-sssp/CLRS.Ch24.Dijkstra.TriangleInequality.fst`
+
+---
+
+### AGENT10: BellmanFord.Spec — restructure invariants, fix 3 admits (L235, L405, L454)
+
+**File:** `ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst`
+**Goal:** Fix the incorrect invariants and prove all 3 admits.
+
+**CRITICAL CONTEXT — 2 of 3 admits are currently FALSE:**
+
+The existing invariants are wrong for the imperative (sequential relaxation) implementation:
+
+- `upper_bound_inv(dist, k)` uses `sp_dist_k(src, v, k)` — shortest path using at most k edges.
+  But sequential relaxation in round k can propagate through chains longer than k edges within
+  a single round. Example: edges 0→1(w=1), 1→2(w=1). After round 1, dist[2]=2 (via chain
+  0→1→2), but sp_dist_k(0,2,1)=None (no 1-edge path to vertex 2).
+
+- `correctness_inv` uses exact equality `dist[v] == sp_dist_k(src,v,k)` which is FALSE.
+
+**Required restructuring:**
+
+1. **Replace `sp_dist_k` with `sp_dist` (unbounded shortest path)** in upper_bound_inv:
+   `upper_bound_inv(dist) ≡ ∀v. dist[v] = None ∨ dist[v] >= sp_dist(src,v)`
+   This IS preserved by relaxation (relaxation only applies correct edge weights).
+
+2. **Replace exact equality with `<=` in correctness_inv:**
+   `correctness_after_k(dist, k) ≡ ∀v. sp_dist_k(src,v,k) = Some d → dist[v] <= Some d`
+   (After k rounds, dist is at least as good as k-edge-bounded shortest path.)
+
+3. **Combine for convergence:** After n-1 rounds, sp_dist_k(src,v,n-1) = sp_dist(src,v)
+   (no negative cycles), so dist[v] = sp_dist(src,v) by combining upper and lower bounds.
+
+4. **L454 (negative cycle detection):** This admit IS correct. After n-1 rounds, if any
+   relaxation still improves a distance, there must be a negative-weight cycle. Prove by
+   contradiction using the path-length pigeonhole principle.
+
+**Approach:**
+- First restructure the invariant definitions (upper_bound_inv, correctness_inv)
+- Then prove L235 (relax_preserves_upper_bound) with the corrected upper_bound_inv
+- Then prove L405 (bf_correctness_inductive) with the corrected correctness_inv
+- Finally prove L454 (bf_negative_cycle_detection)
+
+**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch24-sssp --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst`
 
 ---
 
