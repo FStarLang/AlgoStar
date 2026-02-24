@@ -155,13 +155,13 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 
 ## Current Status (2025-02-24, updated)
 
-**180 F* files, ~59,500 lines — 70 unproven obligations across 22 files**
+**180 F* files, ~59,500 lines — 67 unproven obligations across 21 files**
 
 | Type | Count | Description |
 |------|-------|-------------|
 | `admit()` | 61 | Unproven lemma/proof bodies (Pure F*) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
-| `assume_` | 7 | Pulse-specific unproven invariants (StackDFS.Cmplx: 3, CountingSort.Stable: 3, Kruskal.Cmplx: 1) |
+| `assume_` | 4 | Pulse-specific unproven invariants (StackDFS.Cmplx: 3, Kruskal.Cmplx: 1) |
 
 Note: `assume(...)` calls in MaxFlow (8) and Huffman.Spec (4) are not counted above as they
 are in stub/axiom files. The 70 above are in proof-carrying code.
@@ -184,7 +184,8 @@ are in stub/axiom files. The 70 above are in proof-carrying code.
 | QueueBFS.Cmplx (Ch22) | 6 assume_ | ✅ Zero assumes, predicate-based | −6 |
 | StackDFS.Cmplx (Ch22) | 6 assume_ | 3 assume_ remaining | −3 |
 | Strassen (Ch28) | 1 admit | ✅ Zero admits, smt_sync' quadrant proof | −1 |
-| **Net change** | ~155 total | ~70 total | **−85** |
+| CountingSort.Stable (Ch08) | 3 assume_ | ✅ Zero assumes, StableLemmas module | −3 |
+| **Net change** | ~155 total | ~67 total | **−88** |
 
 ### Per-Algorithm Status Table
 
@@ -199,7 +200,7 @@ are in stub/axiom files. The 70 above are in proof-carrying code.
 | 07 | Partition (Lomuto) | §7.1 | ✅ partitioned ∧ perm | ✅ Linked O(n) | 0 | |
 | 07 | Quicksort | §7.1 | ✅ sorted ∧ perm | ✅ Linked O(n²) | 0 | Enhanced file |
 | 08 | CountingSort | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate O(n+k) | 0 | 2-phase (not CLRS) |
-| 08 | CountingSort.Stable | §8.2 | ❌ assumed postconds | ⚠️ Separate | 3 assume_ | CLRS 4-phase |
+| 08 | CountingSort.Stable | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate | 0 | CLRS 4-phase, StableLemmas |
 | 08 | RadixSort (d=1) | §8.3 | ✅ sorted ∧ perm | ⚠️ Separate Θ(d(n+k)) | 0 | d=1 only |
 | 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 10 | Pure F*; stability admits |
 | 08 | BucketSort | §8.4 | ⚠️ no perm proof | — | 1 | |
@@ -248,20 +249,20 @@ are in stub/axiom files. The 70 above are in proof-carrying code.
 | 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
 | 35 | VertexCover | §35.1 | ✅ valid cover + 2-approx | ⚠️ Separate O(V²) | 1 | |
 
-### Unproven Obligation Distribution (67 admit + 16 assume + 2 assume_val + 12 assume_ = 97 total)
+### Unproven Obligation Distribution (67 admit + 16 assume + 2 assume_val + 9 assume_ = 94 total)
 
 | Chapter | admit | assume | assume_val | assume_ | Total | Top files |
 |---------|-------|--------|------------|---------|-------|-----------|
 | ch23 (MST) | 23 | 1 | 1 | 1 | 26 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(4), Kruskal.Cmplx(2+1), EdgeSort(2), SortedEdges(0+1), Kruskal(0+0+1) |
 | ch22 (graphs) | 8 | 0 | 0 | 3 | 11 | StackDFS.Cmplx(3), DFS.Spec(5), DFS.WhitePath(3) |
-| ch08 (sorting) | 11 | 0 | 0 | 3 | 14 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), CountingSort.Stable(0+3), BucketSort(1) |
+| ch08 (sorting) | 11 | 0 | 0 | 0 | 11 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2), BucketSort(1) |
 | ch26 (MaxFlow) | 0 | 8 | 0 | 0 | 8 | MaxFlow.Proofs(4), MaxFlow.Spec(2), MaxFlow.Cmplx(2) — **stretch goal** |
 | ch32 (strings) | 7 | 0 | 0 | 0 | 7 | KMP.Complexity(7) |
 | ch16 (greedy) | 2 | 4 | 0 | 0 | 6 | Huffman.Complete(2), Huffman.Spec(0+4) |
 | ch24 (SSSP) | 4 | 0 | 0 | 0 | 4 | BellmanFord.Spec(3), Dijkstra.TriIneq(1) |
 | ch12 (BST) | 3 | 0 | 0 | 0 | 3 | BST.Insert.Spec(3) |
 | Other | 1 | 1 | 1 | 0 | 3 | MaxSubarray.DC(0+0+1), VertexCover.Spec(1), UF.Spec(0+1) |
-| **Total** | **61** | **—** | **2** | **7** | **70** | |
+| **Total** | **61** | **—** | **2** | **4** | **67** | |
 
 ---
 
@@ -367,31 +368,48 @@ Ten independent tasks for parallel execution.
 
 ---
 
-### AGENT2: CountingSort.Stable — eliminate 3 assume_ (L260, L284, L285)
+### AGENT2: CountingSort.Stable — ✅ DONE — eliminated 3 assume_ (L260, L284, L285)
 
 **File:** `ch08-linear-sorting/CLRS.Ch08.CountingSort.Stable.fst`
 **Reference:** `ch08-linear-sorting/CLRS.Ch08.CountingSort.fst` (2-phase version, fully proven)
-**Goal:** Eliminate 3 `assume_` in the CLRS 4-phase counting sort.
+**Status:** All 3 obligations eliminated. File verifies with 0 admits/assumes.
 
-1. **L260** `assume_ (pure (pos >= 1 /\ pos <= SZ.v len))`: Position bounds from cumulative
-   counts. After phase 3 (prefix-sum), `count[key]` gives the ending position for elements
-   with that key. Must prove: for all keys k in [0,K), count[k] >= 1 and count[k] <= n.
-   This follows from: count is monotonically non-decreasing prefix sum of non-negative values
-   summing to n.
+**Changes made:**
 
-2. **L284** `assume_ (pure (sorted sb_final))`: Sorted output. The backward pass places
-   elements at count[key]-1, then decrements count[key]. Elements with key k are placed at
-   decreasing positions, but all positions for key k come before positions for key k+1
-   (by prefix-sum structure). Need a lemma: sorted prefix sums + backward placement → sorted.
+1. **L260 `assume_` → `SL.phase4_c_pos_bounds`**: Position bounds from tracking invariant
+   `phase4_c_inv` which tracks `sc[v] = count_le(sa, v) - count(v, processed_suffix)`.
 
-3. **L285** `assume_ (pure (permutation sb_final sa))`: Permutation. Each element from input
-   is placed exactly once in output (each position written exactly once). Need a counting
-   argument: sum of all count decrements = n, and each element placed at a unique position.
+2. **L284 `assume_` → `SL.phase4_final_sorted`**: At remaining=0, the C tracking invariant
+   shows each value v fills positions [count_le(sa,v-1), count_le(sa,v)), proving sorted.
+
+3. **L285 `assume_` → `SL.phase4_final_perm`**: Same range structure proves each count matches,
+   using `equal_counts_perm` from Lemmas.fst.
+
+**New file:** `ch08-linear-sorting/CLRS.Ch08.CountingSort.StableLemmas.fst` (~575 lines)
+- `count_le` + monotonicity/bounded/step/full lemmas
+- `prefix_sum_inv` + init/step/complete for phase 3
+- `phase4_c_inv` / `phase4_b_inv` (opaque_to_smt) for phase 4 loop
+- Step lemmas: `phase4_c_step`, `phase4_b_step`, `phase4_c_pos_bounds`
+- Final lemmas: `phase4_final_sorted`, `phase4_final_perm`
+
+**Key techniques:**
+- Predicates `phase4_c_inv` and `phase4_b_inv` MUST be `[@@"opaque_to_smt"]` with explicit
+  `reveal_opaque` in each lemma proof body, otherwise their nested forall quantifiers cause
+  Z3 context pollution that makes Pulse elaboration fail with spurious `R.pts_to_uninit` errors
+- `Classical.forall_intro (Classical.move_requires target)` for case-split proofs over refined types
+- StableLemmas needs `--z3seed 1` (default seed hits Z3 4.13.3 crash on `perm_count_blocks`)
+
+**Verification:**
+```
+fstar.exe --include /home/nswamy/workspace/everest/pulse/out/lib/pulse --include common --include ch08-linear-sorting \
+  --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps \
+  --cache_dir ch08-linear-sorting/_cache \
+  --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' \
+  ch08-linear-sorting/CLRS.Ch08.CountingSort.Stable.fst
+```
 
 **Impact:** Unblocks RadixSort stability cascade (10+ admits in RadixSort.* files depend on
 CountingSort.Stable having proven postconditions).
-
-**Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch08-linear-sorting --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch08-linear-sorting/CLRS.Ch08.CountingSort.Stable.fst`
 
 ---
 
@@ -595,7 +613,7 @@ Build on these to close the gap.
 ```
 ch04 MaxSubarray.DC:      0 admit, 0 assume_, 1 assume_val
 ch08 BucketSort:          0 admit  (was 1, fixed by AGENT5)
-ch08 CountingSort.Stable: 0 admit, 3 assume_
+ch08 CountingSort.Stable: 0 admit, 0 assume_ (DONE)
 ch08 RadixSort.FullSort:  4 admit
 ch08 RadixSort.MultiDigit:2 admit
 ch08 RadixSort.Spec:      2 admit
