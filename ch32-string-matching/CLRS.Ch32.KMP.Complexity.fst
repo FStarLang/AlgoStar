@@ -13,8 +13,9 @@
    - Total: at most 2n + 2m - 2 < 2(n + m) comparisons
    
    The proof uses amortized analysis with potential function Φ = k (or q in matcher).
-   Complex amortized invariants require 7 admits for loop invariant maintenance.
-   NO assumes.
+   Inner loops only tick for actual failure-chain follows (not exit iterations),
+   keeping the amortized sum (comparisons + potential) non-increasing.
+   NO admits, NO assumes.
 *)
 
 module CLRS.Ch32.KMP.Complexity
@@ -177,19 +178,16 @@ fn compute_prefix_function_complexity
       (forall (i: nat). i < SZ.v vq ==> 
         is_prefix_suffix s_pat i (SZ.v (Seq.index s_pi_outer i))) /\
       is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v vk) /\
-      // Outer loop: allow O(q) slack
+      // Amortized potential: (comparisons - c0) + k <= 2*(q - 1)
       vc_outer >= reveal c0 /\
-      vc_outer - reveal c0 + SZ.v vk <= 2 * SZ.v vq + 7
+      vc_outer - reveal c0 + SZ.v vk <= 2 * (SZ.v vq - 1)
     )
   {
     let vq = !q;
-    let vk_init = !k;
     
     let mut done_inner: bool = false;
     
-    // Establishing inner loop invariant from outer requires amortized analysis
-    admit();
-    
+    // Inner loop invariant follows directly from outer: same amortized bound
     while (not !done_inner)
     invariant exists* vdone vk_inner s_pi_inner (vc_inner: nat).
       R.pts_to q vq **
@@ -207,9 +205,9 @@ fn compute_prefix_function_complexity
           is_prefix_suffix s_pat i (SZ.v (Seq.index s_pi_inner i))) /\
         is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v vk_inner) /\
         (vdone ==> (SZ.v vk_inner == 0 \/ Seq.index s_pat (SZ.v vk_inner) == Seq.index s_pat (SZ.v vq))) /\
-        // Inner loop bound with sufficient slack (including for exit case)
+        // Amortized: (comparisons - c0) + k <= 2*(q - 1) — same as outer
         vc_inner >= reveal c0 /\
-        vc_inner - reveal c0 <= 2 * SZ.v vq + SZ.v vk_init + 5
+        vc_inner - reveal c0 + SZ.v vk_inner <= 2 * (SZ.v vq - 1)
       )
     {
       let vk = !k;
@@ -220,49 +218,22 @@ fn compute_prefix_function_complexity
       let pk = A.op_Array_Access pattern vk;
       let pq = A.op_Array_Access pattern vq;
       
-      // Count comparison
-      tick ctr;
-      
       let should_update: bool = (SZ.v vk > 0 && pk <> pq);
-      let new_k: SZ.t = (if should_update then pi_prev else vk);
       
-      // When should_update, pi_prev = pi[vk-1], which by pi_correct satisfies pi_prev <= vk-1
-      assert pure (should_update ==> (SZ.v vk > 0 /\ is_prefix_suffix s_pat (SZ.v vk - 1) (SZ.v pi_prev)));
-      assert pure (should_update ==> SZ.v pi_prev <= SZ.v vk - 1);
-      assert pure (should_update ==> SZ.v new_k <= SZ.v vk - 1);
-      assert pure (should_update ==> SZ.v new_k < SZ.v vk);
-      
-      inner_step_preserves s_pat (SZ.v vq - 1) (SZ.v vk) (SZ.v pi_prev) should_update;
-      
-      k := new_k;
-      done_inner := not should_update;
-      
-      // The invariant requires: (counter_after - c0) + new_k <= 2*vq + vk_init
-      // After tick, counter increased by 1
-      // When should_update: new_k decreased by at least 1, compensating for the tick
-      // When not should_update: loop exits on next iteration
-      
-      // Explicit arithmetic for SMT:
-      // Case 1: should_update true
-      //   new_k <= vk - 1  (we asserted this above)
-      //   counter_after = counter_before + 1
-      //   LHS = (counter_before + 1 - c0) + new_k 
-      //       <= (counter_before + 1 - c0) + (vk - 1)
-      //       = (counter_before - c0) + vk
-      //       <= 2*vq + vk_init  (from invariant before tick)
-      //
-      // Case 2: should_update false  
-      //   new_k = vk
-      //   counter_after = counter_before + 1
-      //   LHS = (counter_before + 1 - c0) + vk
-      //       = (counter_before - c0) + vk + 1
-      //   But this exceeds the bound! However, done_inner becomes true,
-      //   so the loop will exit and this state won't be re-checked.
-      
-      // The key insight: when done_inner = true (not should_update),
-      // the loop will exit. However, Pulse still checks the invariant.
-      // The amortized argument requires tracking the potential more carefully.
-      admit()
+      if should_update {
+        // Follow failure chain — count this comparison, k decreases
+        tick ctr;
+        
+        assert pure (SZ.v vk > 0 /\ is_prefix_suffix s_pat (SZ.v vk - 1) (SZ.v pi_prev));
+        assert pure (SZ.v pi_prev <= SZ.v vk - 1);
+        
+        inner_step_preserves s_pat (SZ.v vq - 1) (SZ.v vk) (SZ.v pi_prev) true;
+        
+        // (vc+1) - c0 + pi_prev <= (vc+1) - c0 + (vk-1) = (vc - c0 + vk) <= 2*(vq-1)
+        k := pi_prev
+      } else {
+        done_inner := true
+      }
     };
     
     let vk_after_inner = !k;
@@ -270,7 +241,7 @@ fn compute_prefix_function_complexity
     let pk_final = A.op_Array_Access pattern vk_after_inner;
     let pq_final = A.op_Array_Access pattern vq;
     
-    // Count comparison
+    // Count the extend-check comparison
     tick ctr;
     
     let chars_match = (pk_final = pq_final);
@@ -288,17 +259,14 @@ fn compute_prefix_function_complexity
     assert pure (SZ.v final_k <= SZ.v vq);
     assert pure (SZ.v final_k < SZ.v vq + 1);
     
-    q := vq +^ 1sz;
-    
-    // Amortized bound: the potential function analysis requires careful tracking
-    admit()
+    // Amortized: after inner loop, (vc_after - c0) + vk_after <= 2*(vq-1).
+    // After tick + possible k increment: sum <= 2*(vq-1) + 2 = 2*vq = 2*((vq+1) - 1).
+    q := vq +^ 1sz
   };
   
   let final_q = !q;
-  assert pure (SZ.v final_q == SZ.v m);
-  
-  // Final complexity bound requires connecting outer loop invariant to postcondition
-  admit()
+  assert pure (SZ.v final_q == SZ.v m)
+  // Postcondition: from invariant at vq=m, vc - c0 + vk <= 2*(m-1), vk >= 0
 }
 
 #pop-options
@@ -375,11 +343,11 @@ fn kmp_matcher_complexity
     )
   {
     let vi = !i;
-    let vq_init = !q;
     let vcount_outer = !count_matches;
     
     let mut done_follow: bool = false;
     
+    // Inner loop invariant follows directly from outer: same amortized bound
     while (not !done_follow)
     invariant exists* vdone vq_inner vcount_inner (vc_inner: nat).
       R.pts_to i vi **
@@ -398,48 +366,39 @@ fn kmp_matcher_complexity
         SZ.v vcount_inner >= 0 /\
         SZ.v vcount_inner <= SZ.v vi + 1 /\
         (vdone ==> (SZ.v vq_inner == 0 \/ Seq.index s_pat (SZ.v vq_inner) == Seq.index s_text (SZ.v vi))) /\
-        // Amortized invariant: (comparisons - c0) + q <= budget
-        // Budget = 2*vi (from outer loop entry) + potential vq_init
+        // Amortized: (comparisons - c0) + q <= 2*i — same as outer
         vc_inner >= reveal c0 /\
-        vc_inner - reveal c0 + SZ.v vq_inner <= 2 * SZ.v vi + SZ.v vq_init
+        vc_inner - reveal c0 + SZ.v vq_inner <= 2 * SZ.v vi
       )
     {
       let vq = !q;
       let text_char = A.op_Array_Access text vi;
       let pat_char = A.op_Array_Access pattern vq;
       
-      // Count comparison
-      tick ctr;
-      
       let should_follow: bool = (SZ.v vq > 0 && pat_char <> text_char);
       
       if should_follow {
+        // Follow failure chain — count this comparison, q decreases
+        tick ctr;
         let safe_idx = vq -^ 1sz;
         let pi_val = V.op_Array_Access pi safe_idx;
         
-        // pi_val = pi[vq-1], and by pi_correct, pi_val <= vq-1
         assert pure (is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v pi_val));
         assert pure (SZ.v pi_val <= SZ.v vq - 1);
         assert pure (SZ.v pi_val < SZ.v vq);
         
-        q := pi_val;
-        
-        // After update: q decreased, so invariant maintained
-        // (c+1-c0) + new_q <= (c-c0) + vq + 1 - decrease <= (c-c0) + vq <= 2*vi + vq_init
-        ()
+        // (vc+1) - c0 + pi_val <= (vc+1) - c0 + (vq-1) = (vc - c0 + vq) <= 2*vi
+        q := pi_val
       } else {
         done_follow := true
-      };
-      
-      // Amortized invariant requires careful potential tracking
-      admit()
+      }
     };
     
     let vq_after = !q;
     let text_char_final = A.op_Array_Access text vi;
     let pat_char_final = A.op_Array_Access pattern vq_after;
     
-    // Count comparison
+    // Count the extend-check comparison
     tick ctr;
     
     let chars_match = (pat_char_final = text_char_final);
@@ -448,7 +407,9 @@ fn kmp_matcher_complexity
     q := new_q_val;
     
     let vq_final = !q;
+    assert pure (SZ.v vq_final <= SZ.v m);
     let have_match = (vq_final = m);
+    assert pure (not have_match ==> SZ.v vq_final < SZ.v m);
     
     let old_count = !count_matches;
     let new_count_val: SZ.t = (if have_match then old_count +^ 1sz else old_count);
@@ -468,16 +429,13 @@ fn kmp_matcher_complexity
     count_matches := new_count_val;
     q := new_q_after_match;
     
-    i := vi_next;
-    
-    // Amortized bound requires careful analysis
-    admit()
+    i := vi_next
+    // Amortized: after inner loop, (vc_after - c0) + vq_after <= 2*vi.
+    // After tick + possible q increment/reset: sum <= 2*vi + 2 = 2*(vi+1) = 2*vi_next.
   };
   
   let final_count = !count_matches;
-  
-  // Final bound requires connecting loop invariant to postcondition
-  admit();
+  // Postcondition: from invariant at vi=n, vc - c0 + vq <= 2*n, vq >= 0
   
   final_count
 }

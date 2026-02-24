@@ -422,24 +422,20 @@ CountingSort.Stable having proven postconditions).
 
 ---
 
-### AGENT4: KMP.Complexity — eliminate up to 7 admits
+### AGENT4: KMP.Complexity — ~~eliminate up to 7 admits~~ ✅ DONE (7/7 eliminated)
 
 **File:** `ch32-string-matching/CLRS.Ch32.KMP.Complexity.fst`
 **Goal:** Prove the amortized O(n+m) complexity of KMP string matching.
+**Status:** ✅ **All 7 admits eliminated. Fully verified, 0 admits, 0 assumes.**
 
-The 7 admits relate to the amortized analysis using a potential function argument.
-The potential Φ = q (the current state in the failure function automaton). Key properties:
-- Each text character advances position by 1 (cost 1)
-- Each failure-function step decreases q (amortized cost 0, paid by potential decrease)
-- Total work ≤ 2n (each of n chars: 1 real step + at most 1 amortized from potential)
-
-Study the file structure, identify which admits are:
-(a) Potential function maintenance through the matching loop
-(b) Amortized cost bounds per iteration
-(c) Telescoping sum for total cost
-(d) Prefix function computation cost (similar argument, O(m))
-
-For each, try to prove using explicit potential tracking with ghost variables.
+**What was done:**
+- Restructured inner loops to only `tick` for actual failure-chain follows (not exit iterations),
+  eliminating a redundant comparison count that broke the amortized argument.
+- Tightened invariants to exact amortized potential bounds:
+  - Prefix outer/inner: `vc - c0 + k ≤ 2*(q - 1)` (was `+7`/`+5` slack)
+  - Matcher inner: `vc - c0 + q ≤ 2*i` (same as outer, was `+vq_init` slack)
+- All 7 admits become trivially provable by Z3: the amortized sum (comparisons + potential)
+  never increases during inner loops (tick +1, potential decrease ≥1 → net ≤ 0).
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch32-string-matching --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch32-string-matching/CLRS.Ch32.KMP.Complexity.fst`
 
