@@ -13,13 +13,11 @@
    
    Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
    
-   NO admits. Only 6 assume_ calls remaining (down from 14):
-   - L239: `SZ.v vtop < SZ.v n` in maybe_discover_dfs (graph property needed)
-   - L588: `found ==> SZ.v top < SZ.v n` (vtop < n before push in dfs_visit)
-   - L596: `vc_after >= reveal vc` (tick counter monotonicity)
-   - L695: `SZ.v vtop < SZ.v n` in maybe_dfs_visit (graph property needed)
-   - L900: complexity bound maintenance
-   - L917-920: final DFS correctness properties
+   4 assume_ calls remaining (down from 6):
+   - L237: `SZ.v vtop < SZ.v n` in maybe_discover_dfs (needs count_ones tracking)
+   - L587: `found ==> SZ.v top < SZ.v n` (needs count_ones tracking)
+   - L899: complexity bound maintenance (needs global tick accounting)
+   - L916-920: final DFS correctness properties (needs deep DFS invariants)
 *)
 
 module CLRS.Ch22.StackDFS.Complexity
@@ -547,6 +545,7 @@ fn dfs_visit
         vtime_scan >= vtime /\
         SZ.fits (SZ.v u * SZ.v n) /\
         SZ.fits (SZ.v u * SZ.v n + SZ.v vscan) /\
+        vc_scan >= reveal vc /\
         (vfound ==> SZ.v vnext < SZ.v n) /\
         (forall (i:nat). i < SZ.v top ==> SZ.v (Seq.index sstack_scan i) < SZ.v n) /\
         (forall (uu:nat). uu < SZ.v n ==> SZ.v (Seq.index sscan_scan uu) <= SZ.v n)
@@ -590,8 +589,8 @@ fn dfs_visit
     
     // Update outer loop invariants
     with vc_after. assert (GR.pts_to ctr vc_after);
-    // ASSUME: tick counter monotonicity (ghost reference arithmetic)
-    assume_ (pure (vc_after >= reveal vc))
+    // Tick counter monotonicity: vc_after >= vc_scan (from handle_scan_result) >= reveal vc (from scan loop invariant)
+    assert (pure (vc_after >= reveal vc))
   };
   
   // After the while loop, restore outer invariant shape
@@ -689,8 +688,8 @@ fn maybe_dfs_visit
     )
 {
   if (cv = 0) {
-    // ASSUME: vtop < n before push (would need: track that at most n-1 vertices discovered when we find a white one)
-    assume_ (pure (SZ.v vtop < SZ.v n));
+    // vtop == 0 (precondition) and n > 0 (precondition), so vtop < n
+    assert (pure (SZ.v vtop < SZ.v n));
     dfs_visit adj n vs color d f pred stack_data scan_idx stack_top time_ref ctr
   }
 }
