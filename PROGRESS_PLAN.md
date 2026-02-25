@@ -360,10 +360,13 @@ Grouped by severity.
    to the extra round, but this is not wired into the imperative postcondition.
    (BellmanFord.fst lines 134-149)
 
-5. **Dijkstra (ch24)**: Postcondition proves `dist[v] <= sp_dist[v]` (upper bound only).
-   **Missing**: lower bound `dist[v] >= sp_dist[v]` to establish equality. The `greedy_choice_invariant`
-   in Correctness.fst proves per-step equality but doesn't accumulate across the loop.
-   (Dijkstra.fst lines 193-206)
+5. **Dijkstra (ch24)**: Postcondition only proves `dist[v] <= sp_dist[v]` (upper bound),
+   conditional on a **bogus verification pass** (`vtri == true`). Dijkstra's algorithm does NOT
+   include a triangle inequality check — it's a consequence of edge relaxation, already proven
+   in `Dijkstra.TriangleInequality.fst`. The verification pass (lines 329–393) and `tri_result`
+   parameter must be removed, and `triangle_inequality` + `dist[v] == sp_dist[v]` proven
+   unconditionally from the relaxation loop.
+   (Dijkstra.fst lines 193-206, 329-393)
 
 ### Moderate: Self-referential or recurrence-only specs
 
@@ -620,20 +623,80 @@ detects the violating edge. Wire the detection into the postcondition using
 
 ---
 
-### AGENT9: Dijkstra Shortest Path Equality — strengthen upper bound to equality
+### AGENT9: Dijkstra — remove verification pass, prove triangle inequality + equality
 
-**Files:** `ch24-sssp/CLRS.Ch24.Dijkstra.fst`
-**Current state:** 0 admits, but postcondition only proves `dist[v] <= sp_dist[v]`.
+**Files:** `ch24-sssp/CLRS.Ch24.Dijkstra.fst`, using theory from
+`ch24-sssp/CLRS.Ch24.Dijkstra.TriangleInequality.fst` and
+`ch24-sssp/CLRS.Ch24.Dijkstra.Correctness.fst`
+**Current state:** 0 admits, but:
+1. The implementation has a **bogus triangle inequality verification pass** (lines 329–393)
+   that reads all edges after the main loop and checks `dist[v] <= dist[u] + w`. This is NOT
+   part of Dijkstra's algorithm — the triangle inequality is a *consequence* of edge relaxation.
+2. The postcondition is conditional on `vtri == true` (the check passing) and only proves
+   `dist[v] <= sp_dist[v]` (upper bound), not equality.
+3. There is a `tri_result` parameter that makes no algorithmic sense.
 
-**Goal:** Strengthen to `dist[v] == sp_dist[v]` for all vertices v (when `vtri == true`).
+**What's already proven (in TriangleInequality.fst):**
+- `relax_edge_establishes_triangle`: relaxing edge (u,v) ⟹ triangle inequality for that edge
+- `process_vertex_extends_triangle`: relaxing all edges from u extends triangle inequality
+- `dijkstra_algorithm_establishes_triangle`: after processing all vertices, triangle inequality
+  holds for ALL edges — **no verification pass needed**
+- `dijkstra_init_satisfies_triangle`, `dijkstra_init_ordering`: initial conditions hold
+- The file explicitly states (line 877): "The verification pass is REDUNDANT"
 
-The `greedy_choice_invariant` (Correctness.fst line 174) already proves per-step equality.
-Need to accumulate across the loop:
-1. Add loop invariant `all_settled_optimal` to the main Dijkstra loop
-2. Prove that after n iterations, all vertices are settled
-3. Combine upper bound + lower bound ⟹ equality
+**What's already proven (in Correctness.fst):**
+- `greedy_choice_invariant`: when u is extracted as min unvisited, `dist[u] == sp_dist[u]`
+  (requires `SP.has_triangle_inequality` + `all_settled_optimal` + `all_distances_upper_bounds`)
+- `relax_establishes_triangle_inequality`: relaxing all edges from settled x establishes
+  triangle inequality for edges from x
 
-**Estimated size:** ~100–200 lines.
+**Goal (3 sub-tasks):**
+
+1. **Remove the verification pass** (lines 329–393 in Dijkstra.fst). Delete the `tri_result`
+   parameter, the `tri_ok` mutable, and the two nested verification loops. The postcondition
+   should unconditionally assert `triangle_inequality` (not conditional on `vtri == true`).
+
+2. **Connect the pure model to the Pulse loop.** The main loop (lines 246–322) must maintain
+   a ghost invariant linking its state to `process_vertices` from TriangleInequality.fst:
+   - Ghost `processed_set` tracking which vertices have been settled
+   - Invariant: `triangle_inequality_from_processed dist weights processed`
+   - Invariant: `processed_le_unprocessed dist processed`
+   - After n iterations, all vertices processed ⟹ full `triangle_inequality`
+   - Call `dijkstra_algorithm_establishes_triangle` or reproduce its argument in the loop
+
+3. **Prove shortest-path equality** (`dist[v] == sp_dist[v]` for all v). The chain:
+   - Triangle inequality (from step 2) ⟹ `dist[v] <= sp_dist[v]` via `triangle_ineq_implies_upper_bound`
+   - `greedy_choice_invariant` gives `dist[u] == sp_dist[u]` at each extraction step
+   - Accumulate `all_settled_optimal` across the loop
+   - After all vertices settled: `dist[v] == sp_dist[v]` for all v
+
+**New postcondition should be:**
+```fstar
+ensures exists* sdist'.
+  A.pts_to weights sweights **
+  A.pts_to dist sdist' **
+  pure (
+    Seq.length sdist' == SZ.v n /\
+    Seq.index sdist' (SZ.v source) == 0 /\
+    all_non_negative sdist' /\
+    all_bounded sdist' /\
+    triangle_inequality sweights sdist' (SZ.v n) /\
+    (forall (v: nat). v < SZ.v n ==>
+      Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v)
+  )
+```
+
+**Approach:** The hard part is step 2 — connecting the Pulse loop to the pure model. Two options:
+- (A) Add ghost state (`processed: GR.ref processed_set`) to the Pulse loop, maintain
+  the pure invariants alongside the imperative code. Call the TriangleInequality lemmas
+  at each iteration.
+- (B) Prove a simulation lemma: the sequence of `dist` values produced by the Pulse loop
+  equals `process_vertices dist_init weights initial_processed n`. Then apply
+  `dijkstra_algorithm_establishes_triangle` once at the end.
+
+Option (A) is more direct. The loop invariant grows but each step is already proven.
+
+**Estimated size:** ~200–350 lines (mostly loop invariant strengthening + ghost state).
 
 ---
 
@@ -788,7 +851,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch04/MaxSubarray.Kadane | Self-referential | AGENT3 | result==kadane_spec, not >= all subarrays |
 | ch04/MaxSubarray.DC | Disconnected | AGENT14 | DC proven optimal but not connected to Kadane |
 | ch24/BellmanFord | One-sided | AGENT8 | no_neg_cycle=false: no negative cycle proof |
-| ch24/Dijkstra | Upper bound only | AGENT9 | dist[v]<=sp_dist, not equality |
+| ch24/Dijkstra | Bogus check + upper bound only | AGENT9 | Remove verification pass, prove equality from relaxation |
 | ch15/LCS | Recurrence only | AGENT10 | result==lcs_length, no is_subsequence definition |
 | ch32/KMP | Trivial bounds | AGENT11 | count bounds only, not == count_matches_spec |
 | ch25/FloydWarshall | Recurrence only | AGENT12 | result==fw_outer, no shortest-path proof |
