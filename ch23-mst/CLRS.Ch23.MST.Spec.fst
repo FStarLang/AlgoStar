@@ -10,28 +10,6 @@ module CLRS.Ch23.MST.Spec
 
 open FStar.List.Tot
 
-(*** Basic Graph Definitions ***)
-
-//SNIPPET_START: graph_defs
-// Weighted edge: two vertices and a weight
-noeq type edge = {
-  u: nat;
-  v: nat;
-  w: int;
-}
-
-// A graph: n vertices (0 to n-1) and a list of edges
-noeq type graph = {
-  n: nat;  // number of vertices
-  edges: list edge;
-}
-//SNIPPET_END: graph_defs
-
-// Edge equality (ignoring direction for undirected graphs)
-let edge_eq (e1 e2: edge) : bool =
-  (e1.u = e2.u && e1.v = e2.v && e1.w = e2.w) ||
-  (e1.u = e2.v && e1.v = e2.u && e1.w = e2.w)
-
 // Edge equality is reflexive
 let edge_eq_reflexive (e: edge) 
   : Lemma (edge_eq e e = true)
@@ -42,120 +20,10 @@ let edge_eq_symmetric (e1 e2: edge)
   : Lemma (edge_eq e1 e2 = edge_eq e2 e1)
   = ()
 
-// Check if edge is in edge set
-let rec mem_edge (e: edge) (es: list edge) : bool =
-  match es with
-  | [] -> false
-  | hd :: tl -> edge_eq e hd || mem_edge e tl
-
 // An edge is in a list that starts with it
 let mem_edge_hd (e: edge) (tl: list edge)
   : Lemma (mem_edge e (e :: tl) = true)
   = edge_eq_reflexive e
-
-// Edge set subset
-let rec subset_edges (a b: list edge) : bool =
-  match a with
-  | [] -> true
-  | hd :: tl -> mem_edge hd b && subset_edges tl b
-
-// Total weight of edge set
-let rec total_weight (es: list edge) : int =
-  match es with
-  | [] -> 0
-  | e :: rest -> e.w + total_weight rest
-
-(*** Path and Reachability ***)
-
-// A path is a list of edges where consecutive edges share endpoints
-let rec is_path_from_to (edges: list edge) (start: nat) (finish: nat) : bool =
-  match edges with
-  | [] -> start = finish
-  | e :: rest ->
-    if e.u = start then is_path_from_to rest e.v finish
-    else if e.v = start then is_path_from_to rest e.u finish
-    else false
-
-// Reachable via a set of edges
-let reachable (es: list edge) (u v: nat) : prop =
-  exists (path: list edge). 
-    subset_edges path es /\ is_path_from_to path u v
-
-// All vertices reachable from vertex 0
-let all_connected (n: nat) (es: list edge) : prop =
-  forall (v: nat). v < n ==> reachable es 0 v
-
-(*** Cycles and Acyclicity ***)
-
-// A cycle is a non-empty path from a vertex back to itself
-// with at least one edge
-let is_cycle (edges: list edge) (v: nat) : prop =
-  Cons? edges /\ is_path_from_to edges v v
-
-// No edge appears twice in a path (simple path/cycle)
-let rec all_edges_distinct (path: list edge) : bool =
-  match path with
-  | [] -> true
-  | hd :: tl -> not (mem_edge hd tl) && all_edges_distinct tl
-
-// Acyclic: no vertex has a simple cycle (no repeated edges)
-let acyclic (n: nat) (es: list edge) : prop =
-  forall (v: nat) (cycle: list edge).
-    v < n /\ subset_edges cycle es /\ Cons? cycle /\ all_edges_distinct cycle ==>
-    ~(is_path_from_to cycle v v)
-
-(*** Spanning Tree ***)
-
-//SNIPPET_START: spanning_tree_mst
-// A spanning tree: connects all vertices, acyclic, has exactly n-1 edges
-let is_spanning_tree (g: graph) (es: list edge) : prop =
-  g.n > 0 /\
-  subset_edges es g.edges /\
-  length es = g.n - 1 /\
-  all_connected g.n es /\
-  acyclic g.n es
-
-(*** Minimum Spanning Tree ***)
-
-// MST: spanning tree with minimum total weight
-let is_mst (g: graph) (mst: list edge) : prop =
-  is_spanning_tree g mst /\
-  (forall (t: list edge). 
-    is_spanning_tree g t ==> total_weight mst <= total_weight t)
-//SNIPPET_END: spanning_tree_mst
-
-(*** Cut Definitions ***)
-
-// A cut S partitions vertices into S and V-S
-// Represented as a predicate: vertex -> bool
-type cut = nat -> bool
-
-// An edge crosses the cut if endpoints are on different sides
-let crosses_cut (e: edge) (s: cut) : bool =
-  s e.u <> s e.v
-
-// Filter edges that cross the cut
-let rec crossing_edges (es: list edge) (s: cut) : list edge =
-  match es with
-  | [] -> []
-  | e :: rest ->
-    if crosses_cut e s then e :: crossing_edges rest s
-    else crossing_edges rest s
-
-//SNIPPET_START: cut_defs
-// Light edge: minimum weight among edges crossing the cut
-let is_light_edge (e: edge) (s: cut) (g: graph) : prop =
-  mem_edge e g.edges /\
-  crosses_cut e s /\
-  (forall (e': edge). 
-    mem_edge e' g.edges /\ crosses_cut e' s ==> e.w <= e'.w)
-
-// A cut respects edge set A: no edge in A crosses the cut
-let rec respects (a: list edge) (s: cut) : bool =
-  match a with
-  | [] -> true
-  | e :: rest -> not (crosses_cut e s) && respects rest s
-//SNIPPET_END: cut_defs
 
 (*** Helper Lemmas ***)
 
@@ -236,10 +104,6 @@ let rec subset_edges_transitive (a b c: list edge)
       // b is subset of c, so hd is in c
       mem_edge_subset hd b c;
       subset_edges_transitive tl b c
-
-(* Adding an edge to a set *)
-let add_edge (e: edge) (es: list edge) : list edge =
-  if mem_edge e es then es else e :: es
 
 let mem_edge_add (e e': edge) (es: list edge)
   : Lemma (mem_edge e' (add_edge e es) <==> (edge_eq e e' || mem_edge e' es))
@@ -797,29 +661,6 @@ let exchange_is_spanning_tree
                     mem_edge e_rem path)
           (ensures is_spanning_tree g (e_add :: filter (fun e -> not (edge_eq e e_rem)) t))
   = admit()  // Standard graph theory: exchange in spanning tree
-
-//SNIPPET_START: cut_property
-// Main theorem: Cut Property
-// If A ⊆ MST T, and (u,v) is light edge crossing cut respecting A,
-// then A ∪ {(u,v)} ⊆ some MST
-val cut_property:
-  g: graph ->
-  a: list edge ->  // Edge set A (subset of some MST)
-  e: edge ->       // Light edge crossing cut
-  s: cut ->        // The cut
-  Lemma (requires 
-          // Graph has at least one MST
-          (exists (t: list edge). is_mst g t /\ subset_edges a t) /\
-          // e is a light edge crossing the cut
-          is_light_edge e s g /\
-          // The cut respects A
-          respects a s /\
-          // Edge endpoints are valid vertices
-          e.u < g.n /\ e.v < g.n)
-        (ensures 
-          // A ∪ {e} is contained in some MST
-          (exists (t: list edge). is_mst g t /\ subset_edges (e :: a) t))
-//SNIPPET_END: cut_property
 
 #push-options "--z3rlimit 30"
 let cut_property g a e s =
