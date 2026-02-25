@@ -1388,7 +1388,69 @@ let lemma_initial_components (n: nat)
 let lemma_spanning_tree_one_component (g: graph) (t: list edge)
   : Lemma (requires is_spanning_tree g t)
           (ensures length (components t g.n) = 1)
-  = admit()
+  = // all_connected g.n t: forall v < g.n. reachable t 0 v
+    // So same_component t 0 v for all v < g.n
+    // By BFS completeness: same_component_dec t 0 v = true for all v < g.n
+    let n = g.n in
+    assert (n > 0);
+    assert (all_connected n t);
+
+    // Step 1: same_component_dec t 0 v = true for all v < n
+    let aux_dec (v: nat)
+      : Lemma (requires v < n) (ensures same_component_dec t 0 v = true)
+      = assert (reachable t 0 v);
+        same_component_dec_complete t 0 v
+    in
+
+    // Step 2: vertices_in_component t 0 n i includes all vertices from i to n-1
+    let rec all_in_component (i: nat{i <= n})
+      : Lemma (ensures forall (v: nat). i <= v /\ v < n ==>
+                        mem v (vertices_in_component t 0 n i))
+              (decreases (n - i))
+      = if i >= n then ()
+        else begin
+          aux_dec i;
+          assert (same_component_dec t 0 i = true);
+          all_in_component (i + 1);
+          // vertices_in_component t 0 n i = i :: vertices_in_component t 0 n (i+1)
+          // All v with i+1 <= v < n are in the tail (by IH)
+          // And i itself is the head
+          ()
+        end
+    in
+    all_in_component 0;
+    // component_of t 0 n contains all vertices 0..n-1
+    assert (forall (v: nat). v < n ==> mem v (component_of t 0 n));
+
+    // Step 3: in_some_component returns true for all v < n when acc = [component_of t 0 n]
+    let in_comp_of_0 (v: nat)
+      : Lemma (requires v < n)
+              (ensures in_some_component v [component_of t 0 n] = true)
+      = assert (mem v (component_of t 0 n))
+    in
+
+    // Step 4: build_components with i=0 creates exactly [component_of t 0 n]
+    // At i=0: 0 is not in acc=[]. Creates component_of t 0 n. acc = [component_of t 0 n].
+    // For i=1..n-1: i is in component_of t 0 n, so in_some_component i acc = true. Skip.
+    let rec build_one_comp (i: nat{i <= n})
+      : Lemma (requires i > 0)
+              (ensures build_components t n i [component_of t 0 n] == [component_of t 0 n])
+              (decreases (n - i))
+      = if i >= n then ()
+        else begin
+          in_comp_of_0 i;
+          assert (in_some_component i [component_of t 0 n] = true);
+          build_one_comp (i + 1)
+        end
+    in
+
+    // At i=0: 0 is not in [], creates component_of t 0 n
+    in_some_component_false 0 ([] #(list nat));
+    assert (in_some_component 0 ([] #(list nat)) = false);
+    // build_components t n 0 [] = build_components t n 1 [component_of t 0 n]
+    if n > 1 then build_one_comp 1
+    else ()
+    // Result: [component_of t 0 n], length = 1
 
 // With n vertices and 1 component, need exactly n-1 edges for tree
 let lemma_tree_edge_count (n: nat) (t: list edge)
