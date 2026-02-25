@@ -707,13 +707,8 @@ let huffman_complete_preserves_frequency_multiset (freqs: list pos{Cons? freqs})
 // 6. Since T is optimal, WPL(T') = WPL(T), so T' is also optimal
 // 7. In T', x and y are siblings at maximum depth
 let greedy_choice_lemma (freqs: list pos{length freqs >= 2})
-  : Lemma (ensures True)
-  = // The greedy choice property is formalized in the Spec module
-    // as greedy_choice_theorem, which states that in an optimal tree,
-    // the two lowest-frequency characters can be siblings at maximum depth.
-    // This lemma is a placeholder that acknowledges this property.
-    // The actual proof requires extensive tree manipulation and is in Spec.
-    ()
+  : Lemma (ensures greedy_choice_property freqs)
+  = greedy_choice_theorem freqs
 
 // Theorem: Optimal Substructure (CLRS Lemma 16.3)
 //
