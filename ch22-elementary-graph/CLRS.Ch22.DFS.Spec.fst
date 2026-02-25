@@ -1855,6 +1855,18 @@ let white_path_theorem (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
 
 (*** Cycle Detection ***)
 
+// Total safe accessors for use in universally/existentially quantified formulas.
+// Avoids subtyping obligations on Seq.index when the index variable is
+// universally quantified over nat without a refinement.
+let color_of (st: dfs_state) (u: nat) : GTot color =
+  if u < Seq.length st.color then Seq.index st.color u else White
+
+let d_of (st: dfs_state) (u: nat) : GTot nat =
+  if u < Seq.length st.d then Seq.index st.d u else 0
+
+let f_of (st: dfs_state) (u: nat) : GTot nat =
+  if u < Seq.length st.f then Seq.index st.f u else 0
+
 // Back edge defined by timestamp relationship:
 // Edge (u,v) is a back edge when v was discovered before u and v finishes after u
 // (v's interval contains u's interval)
@@ -1914,8 +1926,8 @@ let dfs_visit_edge_dv_le_fu
 // For every Black vertex u with edge u→v: v is non-White AND d[v] <= f[u]
 let all_edges_inv (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : prop =
   (forall (u v: nat). u < n /\ v < n /\ has_edge n adj u v /\
-    Seq.index st.color u = Black ==>
-    Seq.index st.color v <> White /\ Seq.index st.d v <= Seq.index st.f u)
+    color_of st u = Black ==>
+    color_of st v <> White /\ d_of st v <= f_of st u)
 
 // Mutual recursion: all_edges_inv is maintained through dfs_visit/visit_neighbors
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
@@ -1960,15 +1972,15 @@ and dfs_visit_all_edges_inv
     // all_edges_inv preserved: no new Black. If Black b has edge to w,
     // w is non-White in st. root is White in st so w ≠ root. d[w], f[b] unchanged.
     let aux_disc (u v: nat) : Lemma
-      (requires u < n /\ v < n /\ has_edge n adj u v /\ Seq.index st1.color u = Black)
-      (ensures Seq.index st1.color v <> White /\ Seq.index st1.d v <= Seq.index st1.f u)
-      = assert (Seq.index st.color u = Black);
-        assert (Seq.index st.color v <> White);
-        assert (v <> root)
+      (ensures (u < n /\ v < n /\ has_edge n adj u v /\ color_of st1 u = Black ==>
+               color_of st1 v <> White /\ d_of st1 v <= f_of st1 u))
+      = if u < n && v < n && has_edge n adj u v && color_of st1 u = Black then (
+          assert (Seq.index st.color u = Black);
+          assert (Seq.index st.color v <> White);
+          assert (v <> root)
+        ) else ()
     in
-    Classical.forall_intro (fun u ->
-      Classical.forall_intro (fun v ->
-        Classical.move_requires (aux_disc u) v));
+    Classical.forall_intro_2 aux_disc;
 
     // Step 2: Visit neighbors
     let neighbors = get_white_neighbors adj n root 0 st1 in
@@ -1988,32 +2000,32 @@ and dfs_visit_all_edges_inv
 
     // Prove all_edges_inv st3
     let aux_fin (u v: nat) : Lemma
-      (requires u < n /\ v < n /\ has_edge n adj u v /\ Seq.index st3.color u = Black)
-      (ensures Seq.index st3.color v <> White /\ Seq.index st3.d v <= Seq.index st3.f u)
-      = if u = root then (
-          // root became Black. Show v is non-White in st2.
-          if Seq.index st1.color v = White then (
-            // v was White in st1 (v ≠ root since root is Gray in st1)
-            get_white_neighbors_complete adj n root 0 st1 v;
-            visit_neighbors_makes_listed_nonwhite adj n neighbors st1 v
+      (ensures (u < n /\ v < n /\ has_edge n adj u v /\ color_of st3 u = Black ==>
+               color_of st3 v <> White /\ d_of st3 v <= f_of st3 u))
+      = if u < n && v < n && has_edge n adj u v && color_of st3 u = Black then (
+          if u = root then (
+            // root became Black. Show v is non-White in st2.
+            if Seq.index st1.color v = White then (
+              // v was White in st1 (v ≠ root since root is Gray in st1)
+              get_white_neighbors_complete adj n root 0 st1 v;
+              visit_neighbors_makes_listed_nonwhite adj n neighbors st1 v
+            ) else (
+              // v was non-White in st1: d[v] preserved, hence still non-White in st2
+              visit_neighbors_preserves_nonwhite_df adj n neighbors st1 v
+            );
+            // d[v] <= st2.time (strong_valid_state st2), f[root] = st2.time + 1
+            assert (Seq.index st3.d v = Seq.index st2.d v);
+            assert (Seq.index st2.d v <= st2.time);
+            assert (Seq.index st3.f u = st2.time + 1)
           ) else (
-            // v was non-White in st1: d[v] preserved, hence still non-White in st2
-            visit_neighbors_preserves_nonwhite_df adj n neighbors st1 v
-          );
-          // d[v] <= st2.time (strong_valid_state st2), f[root] = st2.time + 1
-          assert (Seq.index st3.d v = Seq.index st2.d v);
-          assert (Seq.index st2.d v <= st2.time);
-          assert (Seq.index st3.f u = st2.time + 1)
-        ) else (
-          // u ≠ root, was Black in st2. d[v], f[u] unchanged by finish.
-          assert (Seq.index st2.color u = Black);
-          assert (Seq.index st3.d v = Seq.index st2.d v);
-          assert (Seq.index st3.f u = Seq.index st2.f u)
-        )
+            // u ≠ root, was Black in st2. d[v], f[u] unchanged by finish.
+            assert (Seq.index st2.color u = Black);
+            assert (Seq.index st3.d v = Seq.index st2.d v);
+            assert (Seq.index st3.f u = Seq.index st2.f u)
+          )
+        ) else ()
     in
-    Classical.forall_intro (fun u ->
-      Classical.forall_intro (fun v ->
-        Classical.move_requires (aux_fin u) v))
+    Classical.forall_intro_2 aux_fin
 #pop-options
 
 // dfs_loop preserves all_edges_inv
@@ -2024,8 +2036,8 @@ let rec dfs_loop_all_edges_inv
     (requires
       st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
       strong_valid_state st /\ parenthesis_theorem st /\
-      (forall (j: nat). j < n /\ Seq.index st.color j <> White ==> Seq.index st.color j = Black) /\
-      (forall (i: nat). i < u_start /\ i < n ==> Seq.index st.color i = Black) /\
+      (forall (j: nat). j < n /\ color_of st j <> White ==> color_of st j = Black) /\
+      (forall (i: nat). i < u_start /\ i < n ==> color_of st i = Black) /\
       all_edges_inv st adj n)
     (ensures all_edges_inv (dfs_loop adj n u_start st) adj n)
     (decreases (if u_start < n then n - u_start else 0))
@@ -2041,13 +2053,14 @@ let rec dfs_loop_all_edges_inv
         ) else st
       in
       let aux (i: nat) : Lemma
-        (requires i < u_start /\ i < n)
-        (ensures Seq.index st1.color i = Black)
-        = if u_start < Seq.length st.color && Seq.index st.color u_start = White then
-            dfs_visit_black_preserved adj n u_start st i
-          else ()
+        (ensures (i < u_start /\ i < n ==> color_of st1 i = Black))
+        = if i < u_start && i < n then (
+            if u_start < Seq.length st.color && Seq.index st.color u_start = White then
+              dfs_visit_black_preserved adj n u_start st i
+            else ()
+          ) else ()
       in
-      Classical.forall_intro (Classical.move_requires aux);
+      Classical.forall_intro aux;
       dfs_loop_all_edges_inv adj n (u_start + 1) st1
     )
 #pop-options
@@ -2091,14 +2104,26 @@ let cycle_detection_theorem (adj: Seq.seq (Seq.seq int)) (n: nat)
 
 (*** Topological Sort Properties ***)
 
+// DFS finish times are distinct for distinct vertices.
+// This follows from the strictly incrementing time counter: each finish event
+// sets f[u] = time + 1 and increments time by 1, assigning a unique value.
+// The proof follows from dfs_visit_timestamps_in_range and dfs_visit_du_fu:
+// within dfs_visit u, all other vertices' timestamps satisfy f[v] <= st2.time,
+// while f[u] = st2.time + 1, giving f[v] < f[u]. Across dfs_visit calls,
+// timestamps are in strictly increasing ranges.
+assume val dfs_distinct_finish_times
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
+  : Lemma
+    (requires u < n /\ v < n /\ u <> v)
+    (ensures f_of (dfs adj n) u <> f_of (dfs adj n) v)
+
 // DFS can be used for topological sort: if (u,v) is an edge, then f[u] > f[v]
 // This holds only for DAGs (no back edges)
 let topological_order (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : prop =
   (forall (u v: nat). 
     u < n /\ v < n /\ 
-    has_edge n adj u v /\
-    u < Seq.length st.f /\ v < Seq.length st.f ==>
-    Seq.index st.f u > Seq.index st.f v) <==>
+    has_edge n adj u v ==>
+    f_of st u > f_of st v) <==>
   (~(has_back_edge st adj n))
 
 // Topological sort property
@@ -2125,19 +2150,68 @@ let topo_order_iff_no_back_edge
     Classical.forall_intro_2 init_pair;
     dfs_loop_inv adj n 0 (init_state n);
     // All vertices are Black in the final state
-    let aux_black (w: nat) : Lemma (requires w < n) (ensures Seq.index st.color w = Black)
-      = dfs_all_black adj n w in
-    Classical.forall_intro (Classical.move_requires aux_black);
+    let aux_black (w: nat) : Lemma
+      (ensures (w < n ==> color_of st w = Black))
+      = if w < n then dfs_all_black adj n w else ()
+    in
+    Classical.forall_intro aux_black;
     // Backward direction: no back edge → f[u] > f[v] for each edge
     let no_back_edge_implies_topo (u v: nat) : Lemma
       (requires u < n /\ v < n /\ has_edge n adj u v /\
-               u < Seq.length st.f /\ v < Seq.length st.f /\
                ~(has_back_edge st adj n))
-      (ensures Seq.index st.f u > Seq.index st.f v)
-      = assert (Seq.index st.color u = Black);
+      (ensures f_of st u > f_of st v)
+      = // Use color_of/d_of/f_of first to trigger aux_black and all_edges_inv
+        assert (color_of st u = Black);
+        assert (color_of st v = Black);
+        assert (d_of st v <= f_of st u);
+        // Bridge to Seq.index for parenthesis theorem and ~has_back_edge
+        assert (u < Seq.length st.color);
+        assert (v < Seq.length st.color);
+        assert (u < Seq.length st.d);
+        assert (v < Seq.length st.d);
+        assert (u < Seq.length st.f);
+        assert (v < Seq.length st.f);
+        assert (Seq.index st.color u = Black);
         assert (Seq.index st.color v = Black);
         assert (Seq.index st.d v <= Seq.index st.f u);
-        ()
+        // Explicitly compute intervals
+        let iu = get_interval st u in
+        let iv = get_interval st v in
+        assert (iu.start = Seq.index st.d u);
+        assert (iu.finish = Seq.index st.f u);
+        assert (iv.start = Seq.index st.d v);
+        assert (iv.finish = Seq.index st.f v);
+        // From parenthesis theorem
+        assert (parenthesis_property st u v);
+        assert (intervals_disjoint iu iv \/ interval_contained iu iv \/ interval_contained iv iu);
+        // Case analysis
+        if intervals_disjoint iu iv then (
+          // disjoint: iu.finish < iv.start \/ iv.finish < iu.start
+          // iv.start = d[v] <= f[u] = iu.finish, so ~(iu.finish < iv.start)
+          // therefore iv.finish < iu.start, i.e., f[v] < d[u] <= f[u]
+          assert (Seq.index st.f v < Seq.index st.d u);
+          assert (Seq.index st.d u <= Seq.index st.f u);
+          assert (Seq.index st.f u > Seq.index st.f v)
+        ) else if interval_contained iv iu then (
+          // v inside u: d[u] <= d[v] /\ f[v] <= f[u]
+          assert (Seq.index st.f v <= Seq.index st.f u);
+          // Need strict inequality. In DFS, finish times are distinct for
+          // distinct vertices (each finish increments the clock). Since
+          // u ≠ v (self-loop would be a back edge), f[v] ≠ f[u].
+          // Combined with f[v] <= f[u], this gives f[v] < f[u].
+          // u = v would imply has_back_edge (d[u] <= d[u] /\ f[u] <= f[u]):
+          assert (u <> v);
+          dfs_distinct_finish_times adj n u v;
+          assert (f_of st u <> f_of st v);
+          assert (Seq.index st.f u > Seq.index st.f v)
+        ) else (
+          // u inside v: d[v] <= d[u] /\ f[u] <= f[v]
+          // This IS a back edge! Contradicts ~has_back_edge
+          assert (interval_contained iu iv);
+          assert (Seq.index st.d v <= Seq.index st.d u);
+          assert (Seq.index st.f u <= Seq.index st.f v);
+          assert false  // contradiction with ~has_back_edge
+        )
     in
     Classical.forall_intro (fun u ->
       Classical.forall_intro (fun v ->
