@@ -1473,7 +1473,378 @@ let rec lemma_kruskal_process_mst_invariant
         lemma_kruskal_process_mst_invariant g rest forest'
       end
 
-// Kruskal's algorithm produces a spanning tree
+// ==========================================
+// Simple path extraction for main theorems
+// ==========================================
+
+// Helper: path traversal connectivity
+let rec path_edges_connected_implies_endpoints_connected
+    (path: list edge) (result: list edge) (u v: nat)
+  : Lemma (requires is_path_from_to path u v /\
+                    (forall (e: edge). mem_edge e path ==>
+                      mem_edge e result \/ same_component result e.u e.v))
+          (ensures same_component result u v)
+          (decreases path)
+  = match path with
+    | [] -> same_component_reflexive result u
+    | e :: rest ->
+      if e.u = u then begin
+        path_edges_connected_implies_endpoints_connected rest result e.v v;
+        if mem_edge e result then begin
+          edge_gives_reachability result u e.v e;
+          same_component_transitive result u e.v v
+        end else begin
+          assert (e.u = u);
+          same_component_transitive result u e.v v
+        end
+      end else begin
+        assert (e.v = u);
+        path_edges_connected_implies_endpoints_connected rest result e.u v;
+        if mem_edge e result then begin
+          edge_gives_reachability result u e.u e;
+          same_component_transitive result u e.u v
+        end else begin
+          same_component_symmetric result e.u e.v;
+          same_component_transitive result u e.u v
+        end
+      end
+
+let rec subset_edges_valid_endpoints (path: list edge) (g_edges: list edge) (n: nat)
+  : Lemma (requires subset_edges path g_edges /\
+                    (forall (e: edge). mem_edge e g_edges ==> e.u < n /\ e.v < n))
+          (ensures (forall (e: edge). mem_edge e path ==> e.u < n /\ e.v < n))
+          (decreases path)
+  = match path with
+    | [] -> ()
+    | e :: rest -> subset_edges_valid_endpoints rest g_edges n
+
+let path_next (e: edge) (current: nat) : nat =
+  if e.u = current then e.v else e.u
+
+let rec vertex_visited (path: list edge) (current target: nat) : Tot bool (decreases path)
+  = current = target ||
+    (match path with
+     | [] -> false
+     | e :: rest -> vertex_visited rest (path_next e current) target)
+
+let rec path_skip_to (path: list edge) (current target: nat) 
+  : Tot (list edge) (decreases path)
+  = if current = target then path
+    else match path with
+      | [] -> []
+      | e :: rest -> path_skip_to rest (path_next e current) target
+
+let rec path_skip_to_valid (path: list edge) (current target finish: nat)
+  : Lemma (requires is_path_from_to path current finish /\
+                    vertex_visited path current target)
+          (ensures is_path_from_to (path_skip_to path current target) target finish)
+          (decreases path)
+  = if current = target then ()
+    else match path with
+      | e :: rest -> path_skip_to_valid rest (path_next e current) target finish
+
+let rec path_skip_to_subset (path: list edge) (current target: nat) (es: list edge)
+  : Lemma (requires subset_edges path es)
+          (ensures subset_edges (path_skip_to path current target) es)
+          (decreases path)
+  = if current = target then ()
+    else match path with
+      | [] -> ()
+      | e :: rest -> path_skip_to_subset rest (path_next e current) target es
+
+let rec path_skip_to_shorter (path: list edge) (current target: nat)
+  : Lemma (requires current <> target /\ vertex_visited path current target)
+          (ensures length (path_skip_to path current target) < length path)
+          (decreases path)
+  = match path with
+    | e :: rest ->
+      let next = path_next e current in
+      if next = target then ()
+      else path_skip_to_shorter rest next target
+
+// Remove revisits to start vertex u
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec remove_start_revisit (path: list edge) (es: list edge) (u v: nat)
+  : Pure (list edge)
+         (requires is_path_from_to path u v /\ subset_edges path es /\ u <> v)
+         (ensures fun path' -> is_path_from_to path' u v /\ subset_edges path' es /\ 
+                               Cons? path' /\ length path' <= length path /\
+                               ~(vertex_visited (List.Tot.tl path') 
+                                 (path_next (List.Tot.hd path') u) u))
+         (decreases length path)
+  = let hd :: tl = path in
+    let next = path_next hd u in
+    if next = u then
+      remove_start_revisit tl es u v
+    else if vertex_visited tl next u then begin
+      path_skip_to_valid tl next u v;
+      path_skip_to_subset tl next u es;
+      path_skip_to_shorter tl next u;
+      remove_start_revisit (path_skip_to tl next u) es u v
+    end else
+      path
+#pop-options
+
+// After remove_start_revisit, all edges in tl have endpoints ≠ u
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec no_visit_means_no_u_endpoints (path: list edge) (current u finish: nat)
+  : Lemma (requires is_path_from_to path current finish /\
+                    current <> u /\ ~(vertex_visited path current u))
+          (ensures forall (e: edge). mem_edge e path ==> e.u <> u /\ e.v <> u)
+          (decreases path)
+  = match path with
+    | [] -> ()
+    | hd :: tl ->
+      let next = path_next hd current in
+      // vertex_visited (hd::tl) current u = (current = u) || vertex_visited tl next u
+      // current <> u, so ~(vertex_visited tl next u)
+      // Also: next <> u (since vertex_visited tl next u starts with next=u check)
+      assert (next <> u);
+      assert (hd.u <> u /\ hd.v <> u);
+      if Cons? tl then
+        no_visit_means_no_u_endpoints tl next u finish
+      else ()
+#pop-options
+
+// Edge with u-endpoint not mem_edge of edges without u-endpoints
+let rec edge_with_u_not_in_no_u_list (e: edge) (path: list edge) (u: nat)
+  : Lemma (requires (e.u = u \/ e.v = u) /\
+                    (forall (e': edge). mem_edge e' path ==> e'.u <> u /\ e'.v <> u))
+          (ensures ~(mem_edge e path))
+          (decreases path)
+  = match path with
+    | [] -> ()
+    | hd :: tl ->
+      // edge_eq e hd checks {e.u,e.v} = {hd.u,hd.v} (same weight)
+      // e has u endpoint, hd has no u endpoint. So can't match.
+      edge_with_u_not_in_no_u_list e tl u
+
+// mem_edge subset: if e in A and subset_edges A B then e in B
+let rec mem_edge_of_subset (e: edge) (a b: list edge)
+  : Lemma (requires mem_edge e a /\ subset_edges a b)
+          (ensures mem_edge e b)
+          (decreases a)
+  = match a with
+    | hd :: tl ->
+      if edge_eq e hd then begin
+        // mem_edge hd b (from subset_edges)
+        // edge_eq e hd => edge_eq hd e (symmetric)
+        // mem_edge hd b /\ edge_eq hd e => mem_edge e b
+        edge_eq_symmetric e hd;
+        mem_edge_eq hd e b
+      end else mem_edge_of_subset e tl b
+
+// Simple path extraction: guaranteed to produce edges from the original path
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+let rec extract_simple_path (path: list edge) (u v: nat)
+  : Lemma (requires is_path_from_to path u v /\ u <> v)
+          (ensures exists (path': list edge). is_path_from_to path' u v /\ 
+                    subset_edges path' path /\ all_edges_distinct path' /\ Cons? path')
+          (decreases length path)
+  = // Phase 1: remove revisits to u
+    subset_edges_reflexive path;
+    let path_nr = remove_start_revisit path path u v in
+    assert (is_path_from_to path_nr u v);
+    assert (subset_edges path_nr path);
+    let hd :: tl = path_nr in
+    let next = path_next hd u in
+    assert (~(vertex_visited tl next u));
+    // hd has u as endpoint
+    assert ((hd.u = u /\ next = hd.v) \/ (hd.v = u /\ next = hd.u));
+    if next = v then begin
+      // Single edge path
+      assert (is_path_from_to [hd] u v);
+      assert (all_edges_distinct [hd]);
+      assert (subset_edges [hd] path_nr);
+      subset_edges_transitive [hd] path_nr path
+    end else begin
+      // tl: path from next to v, next <> u, next <> v
+      // All edges in tl have endpoints <> u
+      no_visit_means_no_u_endpoints tl next u v;
+      // Recursively extract simple path from tl
+      assert (length tl < length path_nr);
+      assert (length path_nr <= length path);
+      extract_simple_path tl next v;
+      // IH gives: exists path_tl. simple path from next to v, subset_edges path_tl tl
+      // Since subset_edges path_tl tl and all edges in tl have endpoints <> u:
+      //   all edges in path_tl have endpoints <> u
+      // Since hd has u as endpoint: ~(mem_edge hd path_tl)
+      // So hd :: path_tl is all_edges_distinct
+      // And is_path_from_to (hd :: path_tl) u v
+      
+      // We need to work with the existential witness. Use classical logic.
+      FStar.Classical.exists_elim 
+        (exists (path': list edge). is_path_from_to path' u v /\
+          subset_edges path' path /\ all_edges_distinct path' /\ Cons? path')
+        #_
+        #(fun (path_tl: list edge) -> 
+          is_path_from_to path_tl next v /\
+          subset_edges path_tl tl /\ all_edges_distinct path_tl /\ Cons? path_tl) ()
+        (fun (path_tl: list edge{
+          is_path_from_to path_tl next v /\
+          subset_edges path_tl tl /\ all_edges_distinct path_tl /\ Cons? path_tl}) ->
+          // All edges in path_tl are from tl, hence have endpoints <> u
+          let rec path_tl_no_u (p: list edge)
+            : Lemma (requires subset_edges p tl /\
+                              (forall (e: edge). mem_edge e tl ==> e.u <> u /\ e.v <> u))
+                    (ensures forall (e: edge). mem_edge e p ==> e.u <> u /\ e.v <> u)
+                    (decreases p)
+            = match p with
+              | [] -> ()
+              | e :: rest -> path_tl_no_u rest
+          in
+          path_tl_no_u path_tl;
+          // hd has u as endpoint, path_tl has no u-endpoint edges
+          edge_with_u_not_in_no_u_list hd path_tl u;
+          assert (~(mem_edge hd path_tl));
+          // hd :: path_tl is simple
+          assert (all_edges_distinct (hd :: path_tl));
+          // hd :: path_tl is a valid path from u to v
+          assert (is_path_from_to (hd :: path_tl) u v);
+          // subset: path_tl ⊆ tl, tl ⊆ path_nr = hd :: tl ⊆ path
+          subset_edges_reflexive tl;
+          subset_edges_cons tl hd tl;
+          subset_edges_transitive path_tl tl (hd :: tl);
+          subset_edges_transitive path_tl path_nr path;
+          assert (subset_edges (hd :: path_tl) path)
+        )
+    end
+#pop-options
+
+// Now we can prove: adding edge between reachable vertices creates cycle
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+let reachable_means_not_acyclic (n: nat) (t: list edge) (e: edge)
+  : Lemma (requires acyclic n t /\ reachable t e.u e.v /\ 
+                    e.u < n /\ e.v < n /\ e.u <> e.v /\ ~(mem_edge e t))
+          (ensures ~(acyclic n (e :: t)))
+  = // Get a simple path from e.u to e.v in t
+    FStar.Classical.exists_elim
+      (~(acyclic n (e :: t)))
+      #_
+      #(fun (path: list edge) -> subset_edges path t /\ is_path_from_to path e.u e.v) ()
+      (fun (path: list edge{subset_edges path t /\ is_path_from_to path e.u e.v}) ->
+        extract_simple_path path e.u e.v;
+        FStar.Classical.exists_elim
+          (~(acyclic n (e :: t)))
+          #_
+          #(fun (sp: list edge) -> is_path_from_to sp e.u e.v /\
+              subset_edges sp path /\ all_edges_distinct sp /\ Cons? sp) ()
+          (fun (sp: list edge{is_path_from_to sp e.u e.v /\
+              subset_edges sp path /\ all_edges_distinct sp /\ Cons? sp}) ->
+            // sp: simple path from e.u to e.v, edges from path ⊆ t
+            subset_edges_transitive sp path t;
+            // Form cycle: sp @ [e] from e.u to e.u
+            is_path_append_edge sp e.u e.v e.u e;
+            // sp @ [e] subset of e :: t
+            subset_edges_cons sp e t;
+            subset_edges_append_single sp e (e :: t);
+            // all_edges_distinct (sp @ [e]): 
+            // - all_edges_distinct sp ✓
+            // - e ∉ sp (since sp ⊆ t and e ∉ t)
+            let rec e_not_in_sp (p: list edge) 
+              : Lemma (requires subset_edges p t /\ ~(mem_edge e t))
+                      (ensures ~(mem_edge e p))
+                      (decreases p)
+              = match p with
+                | [] -> ()
+                | hd :: tl -> 
+                  if edge_eq e hd then begin
+                    // edge_eq e hd and mem_edge hd t (from subset_edges)
+                    // => mem_edge e t (via edge_eq_symmetric + mem_edge_eq)
+                    edge_eq_symmetric e hd;
+                    mem_edge_eq hd e t
+                    // But ~(mem_edge e t). Contradiction.
+                  end else e_not_in_sp tl
+            in
+            e_not_in_sp sp;
+            // all_edges_distinct on append
+            let rec distinct_append_single (p: list edge) (e0: edge)
+              : Lemma (requires all_edges_distinct p /\ ~(mem_edge e0 p))
+                      (ensures all_edges_distinct (p @ [e0]))
+                      (decreases p)
+              = match p with
+                | [] -> ()
+                | hd :: tl ->
+                  distinct_append_single tl e0;
+                  // Need: ~(mem_edge hd (tl @ [e0]))
+                  mem_edge_append hd tl [e0];
+                  // mem_edge hd (tl @ [e0]) <==> mem_edge hd tl || mem_edge hd [e0]
+                  // ~(mem_edge hd tl) from all_edges_distinct (hd :: tl)
+                  // mem_edge hd [e0] = edge_eq hd e0
+                  // If edge_eq hd e0: mem_edge e0 p (since hd ∈ p). Contradicts ~(mem_edge e0 p).
+                  if edge_eq hd e0 then begin
+                    mem_edge_hd hd tl;
+                    mem_edge_eq hd e0 (hd :: tl)
+                  end else ()
+            in
+            distinct_append_single sp e;
+            // Now we have a simple cycle in e :: t
+            let cycle = sp @ [e] in
+            assert (is_path_from_to cycle e.u e.u);
+            assert (Cons? cycle);
+            assert (subset_edges cycle (e :: t));
+            assert (all_edges_distinct cycle);
+            // This contradicts acyclic n (e :: t)
+            assert (e.u < n);
+            // acyclic n (e :: t) says: for all v < n, cycle ⊆ (e::t), Cons? cycle, 
+            //   all_edges_distinct cycle ==> ~(is_path_from_to cycle v v)
+            // Instantiate with v = e.u: gives ~(is_path_from_to cycle e.u e.u)
+            // But we have is_path_from_to cycle e.u e.u. Contradiction.
+            ()
+          )
+      )
+#pop-options
+
+// Connected subset of spanning tree equals the spanning tree
+// If result ⊆ mst and result connects all vertices, then all mst edges are in result
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
+let connected_subset_of_tree_is_tree (g: graph) (result mst: list edge)
+  : Lemma (requires is_spanning_tree g mst /\
+                    subset_edges result mst /\
+                    all_connected g.n result /\
+                    acyclic g.n result /\
+                    (forall (e: edge). mem_edge e mst ==> e.u < g.n /\ e.v < g.n) /\
+                    (forall (e: edge). mem_edge e mst ==> e.u <> e.v))
+          (ensures forall (e: edge). mem_edge e mst ==> mem_edge e result)
+  = introduce forall (e: edge). mem_edge e mst ==> mem_edge e result
+    with introduce _ ==> _ with _. begin
+      // Suppose e ∈ mst. We want e ∈ result.
+      // By contradiction: suppose e ∉ result.
+      if not (mem_edge e result) then begin
+        assert (e.u < g.n /\ e.v < g.n);
+        same_component_symmetric result 0 e.u;
+        same_component_transitive result e.u 0 e.v;
+        assert (reachable result e.u e.v);
+        // result is acyclic, e has valid endpoints, e ∉ result, e.u <> e.v
+        // => ~(acyclic g.n (e :: result))
+        reachable_means_not_acyclic g.n result e;
+        // But result ⊆ mst and e ∈ mst, so e :: result ⊆ mst (up to ordering)
+        // Actually: subset_edges (e :: result) mst since e ∈ mst and result ⊆ mst
+        assert (subset_edges (e :: result) mst);
+        // And mst is acyclic (from is_spanning_tree)
+        // acyclic n mst and (e :: result) ⊆ mst
+        // Any cycle in (e :: result) is also a cycle in mst (by subset)
+        // So acyclic n mst => acyclic n (e :: result)
+        // This is the key: acyclicity is downward-closed for subsets
+        let rec acyclic_subset (a b: list edge) (n: nat)
+          : Lemma (requires acyclic n b /\ subset_edges a b)
+                  (ensures acyclic n a)
+          = introduce forall (v: nat) (cycle: list edge).
+              v < n /\ subset_edges cycle a /\ Cons? cycle /\ all_edges_distinct cycle ==>
+              ~(is_path_from_to cycle v v)
+            with introduce _ ==> _ with _. begin
+              subset_edges_transitive cycle a b
+            end
+        in
+        acyclic_subset (e :: result) mst g.n;
+        // Now: acyclic g.n (e :: result) AND ~(acyclic g.n (e :: result))
+        // Contradiction!
+        assert (acyclic g.n (e :: result));
+        assert (~(acyclic g.n (e :: result)));
+        ()
+      end else ()
+    end
+#pop-options
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
                     // Graph is connected
