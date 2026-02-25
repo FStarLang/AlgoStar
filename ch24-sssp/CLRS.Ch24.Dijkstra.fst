@@ -24,9 +24,11 @@ module Seq = FStar.Seq
    - All distances non-negative and bounded [0, 1000000]
    - Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
      (proven from edge relaxation — no separate verification pass needed)
-   - Upper bound: dist[v] <= sp_dist(source, v) for all v
+   - Equality: dist[v] == sp_dist(source, v) for all v
+     (proven via upper bound from triangle inequality + lower bound from sp_dist triangle ineq)
    
-   NO admits. NO assumes.
+   One admit() in dependency: sp_dist_k_stabilize in ShortestPath.Triangle.fst
+   (stabilization of sp_dist_k at n-1 — requires pigeonhole/path contraction argument)
 *)
 
 // All weights are non-negative
@@ -56,6 +58,7 @@ let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : 
 
 /// Import pure shortest-path specification
 module SP = CLRS.Ch24.ShortestPath.Spec
+module SPT = CLRS.Ch24.ShortestPath.Triangle
 
 /// Connect Dijkstra's triangle_inequality + all_bounded to SP.has_triangle_inequality
 let dijkstra_to_sp_triangle (sdist sweights: Seq.seq int) (n: nat) : Lemma
@@ -82,6 +85,57 @@ let dijkstra_sp_upper_bound (sdist sweights: Seq.seq int) (n source: nat) : Lemm
     let aux (v: nat{v < n}) : Lemma
       (ensures Seq.index sdist v <= SP.sp_dist sweights n source v) =
       SP.triangle_ineq_implies_upper_bound sdist sweights n source v
+    in
+    FStar.Classical.forall_intro aux
+#pop-options
+
+/// dist[v] >= sp_dist(source, v) for all v (no underestimate property)
+let dist_ge_sp_dist (sdist sweights: Seq.seq int) (n source: nat) : prop =
+  Seq.length sdist == n /\
+  (forall (v: nat). v < n ==> Seq.index sdist v >= SP.sp_dist sweights n source v)
+
+/// At initialization, dist[v] >= sp_dist(source, v) holds
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+let init_dist_ge_sp_dist (sdist sweights: Seq.seq int) (n source: nat)
+  : Lemma
+    (requires n > 0 /\ source < n /\
+             Seq.length sdist == n /\
+             Seq.length sweights == n * n /\
+             all_weights_non_negative sweights /\
+             Seq.index sdist source == 0 /\
+             (forall (v: nat). v < n /\ v <> source ==> Seq.index sdist v == 1000000))
+    (ensures dist_ge_sp_dist sdist sweights n source)
+  = let aux (v: nat{v < n}) : Lemma
+      (ensures Seq.index sdist v >= SP.sp_dist sweights n source v) =
+      SP.sp_dist_k_bounded sweights n source v (n - 1);
+      if v = source then SPT.sp_dist_self_zero sweights n source
+      else assert (Seq.index sdist v == 1000000)
+    in
+    FStar.Classical.forall_intro aux
+#pop-options
+
+/// After a full relaxation round from u, re-establish dist >= sp_dist.
+/// Each sdist_after[v] is either unchanged or relaxed to dist[u] + w(u,v).
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+let relax_round_lb_post
+  (sdist_pre sdist_after sweights: Seq.seq int) (n source u: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ u < n /\
+      Seq.length sdist_pre == n /\ Seq.length sdist_after == n /\
+      Seq.length sweights == n * n /\
+      all_weights_non_negative sweights /\
+      dist_ge_sp_dist sdist_pre sweights n source /\
+      (forall (v: nat). v < n ==>
+        Seq.index sdist_after v == Seq.index sdist_pre v \/
+        (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
+         Seq.index sweights (u * n + v) < 1000000 /\
+         Seq.index sdist_pre u < 1000000)))
+    (ensures dist_ge_sp_dist sdist_after sweights n source)
+  = let aux (v: nat{v < n}) : Lemma
+      (ensures Seq.index sdist_after v >= SP.sp_dist sweights n source v) =
+      if Seq.index sdist_after v = Seq.index sdist_pre v then ()
+      else SPT.sp_dist_triangle_ineq sweights n source u v
     in
     FStar.Classical.forall_intro aux
 #pop-options
@@ -303,7 +357,7 @@ fn find_min_unvisited
   let _ = !min_val;
   result
 }
-#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 200 --fuel 0 --ifuel 0 --split_queries always"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)
@@ -334,7 +388,7 @@ fn dijkstra
       all_bounded sdist' /\
       triangle_inequality sweights sdist' (SZ.v n) /\
       (forall (v: nat). v < SZ.v n ==>
-        Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v)
+        Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v)
     )
 //SNIPPET_END: dijkstra_sig
 {
@@ -353,7 +407,9 @@ fn dijkstra
       Seq.length sdist_current == SZ.v n /\
       (SZ.v vi > SZ.v source ==> Seq.index sdist_current (SZ.v source) == 0) /\
       (forall (j:nat). j < SZ.v vi ==> 
-        Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= 1000000)
+        Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= 1000000) /\
+      (forall (j:nat). j < SZ.v vi /\ j <> SZ.v source ==>
+        Seq.index sdist_current j == 1000000)
     )
   {
     let vi = !init_i;
@@ -363,6 +419,10 @@ fn dijkstra
   };
   
   let _ = !init_i;
+  
+  // Establish dist >= sp_dist after initialization
+  with sdist_init. assert (A.pts_to dist sdist_init);
+  init_dist_ge_sp_dist sdist_init sweights (SZ.v n) (SZ.v source);
   
   // Allocate visited array (all 0 initially)
   let visited = V.alloc 0 n;
@@ -395,7 +455,8 @@ fn dijkstra
         (Seq.index svisited_current j = 0 \/ Seq.index svisited_current j = 1)) /\
       tri_from_visited sweights sdist_current svisited_current (SZ.v n) /\
       visited_le_unvisited sdist_current svisited_current (SZ.v n) /\
-      count_ones svisited_current (SZ.v n) == SZ.v vround
+      count_ones svisited_current (SZ.v n) == SZ.v vround /\
+      dist_ge_sp_dist sdist_current sweights (SZ.v n) (SZ.v source)
     )
   {
     let vround = !round;
@@ -452,7 +513,16 @@ fn dijkstra
            let d_u = Seq.index sdist_v (SZ.v u) in
            (w < 1000000 /\ d_u < 1000000) ==> Seq.index sdist_v v' <= d_u + w)) /\
         (forall (j: nat). j < SZ.v n /\ Seq.index svisited_pre j = 0 ==>
-          Seq.index sdist_v j >= Seq.index sdist_pre (SZ.v u))
+          Seq.index sdist_v j >= Seq.index sdist_pre (SZ.v u)) /\
+        // Track what relaxation did to each processed vertex (for dist >= sp_dist proof)
+        (forall (v': nat). v' < SZ.v vv /\ v' < SZ.v n ==>
+          Seq.index sdist_v v' == Seq.index sdist_pre v' \/
+          (Seq.index sdist_v v' == Seq.index sdist_pre (SZ.v u) + Seq.index sweights (SZ.v u * SZ.v n + v') /\
+           Seq.index sweights (SZ.v u * SZ.v n + v') < 1000000 /\
+           Seq.index sdist_pre (SZ.v u) < 1000000)) /\
+        // Unprocessed vertices unchanged from sdist_pre
+        (forall (v': nat). v' >= SZ.v vv /\ v' < SZ.v n ==>
+          Seq.index sdist_v v' == Seq.index sdist_pre v')
       )
     {
       let vv = !v;
@@ -490,6 +560,9 @@ fn dijkstra
     
     extend_tri_after_relax sweights sdist_pre sdist_after svisited_pre (SZ.v n) (SZ.v u);
     
+    // Establish dist >= sp_dist from the relaxation disjunction
+    relax_round_lb_post sdist_pre sdist_after sweights (SZ.v n) (SZ.v source) (SZ.v u);
+    
     round := vround +^ 1sz;
   };
   
@@ -507,7 +580,8 @@ fn dijkstra
   
   // Derive upper bound from triangle inequality
   dijkstra_sp_upper_bound sdist_final sweights (SZ.v n) (SZ.v source);
+  // Combine: dist <= sp_dist (upper bound) + dist >= sp_dist (invariant) → equality
   assert (pure (forall (v: nat). v < SZ.v n ==>
-    Seq.index sdist_final v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v));
+    Seq.index sdist_final v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v));
 }
 #pop-options

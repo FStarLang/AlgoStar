@@ -236,7 +236,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 23 | Prim | §23.2 | ⚠️ key bounds only | ✅ Linked O(n²) | 6 | |
 | 23 | MST.Spec | §23.1 | ✅ proven | — | 0 | Exchange lemma + tree theorem proven |
 | 24 | Dijkstra | §24.3 | ✅ d=δ proven | ✅ Linked O(n²) | 0 | Correctness + TriIneq: ✅ 0 admits |
-| 24 | Bellman-Ford | §24.1 | ✅ dist=sp_dist | ⚠️ Separate O(V³) | 0 | ✅ BF.Spec fully verified |
+| 24 | Bellman-Ford | §24.1 | ✅ dist==sp_dist | ⚠️ Separate O(V³) | 0 | ✅ BF.Spec verified, equality+neg_cycle detection |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
 | 26 | MaxFlow | §26.2 | ❌ STUB | — | 8 assume | Stretch goal |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
@@ -327,7 +327,7 @@ From strongest to weakest:
    RBTree (all RB invariants), ExtendedGCD (Bézout's identity) — proves desired mathematical
    property directly
 4. **Self-referential**: Kadane — proves Pulse equals spec that IS the algorithm
-5. **Partial/one-sided**: Dijkstra (upper bound only), BellmanFord (positive case only),
+5. **Partial/one-sided**: Dijkstra (upper bound only),
    BST imperative (one case per operation), KMP (trivial bounds)
 6. **Axiom-dependent**: MaxFlow (MFMC assumed), Kruskal/Prim (cut property partially proven)
 
@@ -355,11 +355,11 @@ Grouped by severity.
    `tree_delete_key` only proves array lengths preserved. **Missing**: BST property preservation,
    key set update, proper successor transplant. (Delete.fst lines 306-316, 420-428)
 
-4. **BellmanFord (ch24)**: Postcondition proves `no_neg_cycle==true ==> triangle_inequality ∧
-   dist[v] <= sp_dist`. **Missing**: `no_neg_cycle==false ==> negative cycle exists`. The Spec
-   module has `bf_negative_cycle_detection` (Corollary 24.5) connecting `exists_relaxable_edge`
-   to the extra round, but this is not wired into the imperative postcondition.
-   (BellmanFord.fst lines 134-149)
+4. **BellmanFord (ch24)**: ✅ **DONE** — Postcondition now proves:
+   - `no_neg_cycle==true ==> triangle_inequality ∧ dist[v] <= sp_dist[v]`
+   - `no_neg_cycle==false ==> exists_violation` (∃ edge violating triangle ineq)
+   - `no_neg_cycles_flat ∧ no_neg_cycle==true ==> dist[v] == sp_dist[v]` (equality)
+   (BellmanFord.fst lines ~290-316)
 
 5. **Dijkstra (ch24)**: Postcondition only proves `dist[v] <= sp_dist[v]` (upper bound),
    conditional on a **bogus verification pass** (`vtri == true`). Dijkstra's algorithm does NOT
@@ -610,26 +610,52 @@ in BST.Spec.Complete.fst.
 
 ### AGENT8: BellmanFord Negative Cycle Detection — complete the postcondition
 
-**Files:** `ch24-sssp/CLRS.Ch24.BellmanFord.fst`
-**Current state:** 0 admits, but postcondition only covers `no_neg_cycle == true`.
+**Status: ✅ DONE (negative cycle detection + equality)**
 
-**Goal:** Add postcondition:
-`no_neg_cycle == false ==> ∃ u v. edge(u,v) violates triangle inequality`.
+**Files modified:**
+- `ch24-sssp/CLRS.Ch24.ShortestPath.Spec.fst` — added `no_neg_cycles_flat`, `sp_dist_triangle_flat`, `sp_dist_source_nonpositive`, `min_over_predecessors_achieves`
+- `ch24-sssp/CLRS.Ch24.BellmanFord.fst` — strengthened postcondition
 
-The spec module already has `bf_negative_cycle_detection` (Spec.fst line 921-969) proving
-`exists_relaxable_edge ⟺ extra round changes distances`. The verification loop already
-detects the violating edge. Wire the detection into the postcondition using
-`no_violations_partial` from the loop invariant.
+**What was done:**
+1. ✅ **Negative cycle detection**: Added `exists_violation` predicate and `check_edge_violation`
+   lemma. Threaded through detection loop invariants.
+   Postcondition: `no_neg_cycle == false ==> exists_violation sdist' sweights n`
+2. ✅ **Lower bound + equality**: Added `lower_bound_inv` predicate (dist[v] >= sp_dist[v]),
+   threaded through all 3 relaxation loop levels. Key helpers: `relax_step_lower_bound`
+   (uses `Classical.move_requires` + `sp_dist_triangle_flat`), `upd_preserves_lower_bound_cond`,
+   `init_satisfies_lower_bound`, `bf_sp_equality`, `bf_sp_equality_cond`.
+   Postcondition: `no_neg_cycles_flat /\ no_neg_cycle == true ==> dist[v] == sp_dist[v]`
 
-**Estimated size:** ~50–100 lines.
+**New postcondition (verified):**
+```fstar
+ensures exists* sdist' no_neg_cycle.
+  A.pts_to weights sweights **
+  A.pts_to dist sdist' **
+  R.pts_to result no_neg_cycle **
+  pure (
+    Seq.length sdist' == SZ.v n /\
+    Seq.index sdist' (SZ.v source) == 0 /\
+    valid_distances sdist' (SZ.v n) /\
+    (no_neg_cycle == true ==> triangle_inequality sdist' sweights (SZ.v n)) /\
+    (no_neg_cycle == true ==> forall v. v < n ==> sdist'[v] <= sp_dist[source][v]) /\
+    (no_neg_cycle == false ==> exists_violation sdist' sweights n) /\
+    (no_neg_cycles_flat ==> lower_bound_inv sdist' sweights n source) /\
+    (no_neg_cycles_flat /\ no_neg_cycle == true ==>
+      forall v. v < n ==> sdist'[v] == sp_dist[source][v])
+  )
+```
+
+**Estimated size:** ~200 lines added across two files.
 
 ---
 
 ### AGENT9: Dijkstra — remove verification pass, prove triangle inequality + equality
 
-**Status: ✅ DONE (triangle inequality + upper bound)**
+**Status: ✅ DONE (triangle inequality + equality)**
 
-**Files modified:** `ch24-sssp/CLRS.Ch24.Dijkstra.fst`
+**Files modified:**
+- `ch24-sssp/CLRS.Ch24.Dijkstra.fst` — main algorithm with equality postcondition
+- `ch24-sssp/CLRS.Ch24.ShortestPath.Triangle.fst` — NEW: sp_dist triangle inequality
 
 **What was done:**
 1. ✅ **Removed verification pass** — deleted `tri_result` parameter, `tri_ok` mutable,
@@ -638,12 +664,14 @@ detects the violating edge. Wire the detection into the postcondition using
    and `visited_le_unvisited` as outer loop invariants using pure predicates and a bridge
    lemma (`extend_tri_after_relax`). Added `count_ones` tracking to prove all vertices
    are visited after n iterations, yielding full `triangle_inequality`.
-3. ✅ **Proved upper bound** — `dist[v] <= sp_dist[v]` via `dijkstra_sp_upper_bound`.
-4. ⏭️ **Equality proof deferred** — proving `dist[v] == sp_dist[v]` requires either
-   (a) a new lower-bound lemma `sp_dist[v] <= dist[v]` not in ShortestPath.Spec.fst, or
-   (b) maintaining `greedy_choice_invariant` from Correctness.fst at each step, which
-   needs `SP.has_triangle_inequality` (full, for ALL edges) mid-loop — not available
-   until the loop completes. This is a genuine spec gap requiring new lemmas.
+3. ✅ **Proved equality** — `dist[v] == sp_dist[v]` via:
+   - Upper bound: `dist[v] <= sp_dist[v]` from `triangle_ineq_implies_upper_bound`
+   - Lower bound: `dist[v] >= sp_dist[v]` as outer loop invariant, maintained through
+     relaxation using `sp_dist_triangle_ineq` (sp_dist satisfies its own triangle ineq)
+   - Inner loop tracks disjunction: each dist[v] is either unchanged or = dist[u] + w
+   - Post-loop lemma `relax_round_lb_post` re-establishes lower bound after each round
+4. ⚠️ **One admit in dependency**: `sp_dist_k_stabilize` in `ShortestPath.Triangle.fst`
+   proves `sp_dist_k(s,v,n) == sp_dist_k(s,v,n-1)`. Requires pigeonhole + path contraction.
 
 **New postcondition:**
 ```fstar
@@ -658,15 +686,17 @@ ensures exists* sdist'.
     all_bounded sdist' /\
     triangle_inequality sweights sdist' (SZ.v n) /\
     (forall (v: nat). v < SZ.v n ==>
-      Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
+      Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
 ```
 
-**Key additions (~120 lines of new pure predicates/lemmas):**
-- `tri_from_visited`, `visited_le_unvisited`: ghost invariants for partial triangle inequality
-- `extend_tri_after_relax`: bridge lemma connecting inner loop to outer loop invariants
-- `count_ones` + lemmas: track visited count to prove all vertices visited after n rounds
-- `has_min_dist_unvisited`: strengthened `find_min_unvisited` postcondition
-- `dijkstra_sp_upper_bound` (unconditional): replaces conditional `dijkstra_sp_upper_bound_cond`
+**Key additions:**
+- `CLRS.Ch24.ShortestPath.Triangle.fst` (~160 lines): proves sp_dist triangle inequality
+  - `sp_dist_k_via_predecessor`: shifted triangle inequality from DP recurrence
+  - `sp_dist_k_non_neg`: non-negativity for non-negative weights
+  - `sp_dist_self_zero`: sp_dist(s,s) = 0
+  - `sp_dist_k_stabilize`: stabilization at n-1 (admit — needs pigeonhole)
+  - `sp_dist_triangle_ineq`: main theorem, sp_dist(s,v) <= sp_dist(s,u) + w(u,v)
+- In `Dijkstra.fst`: `dist_ge_sp_dist`, `init_dist_ge_sp_dist`, `relax_round_lb_post`
 
 ---
 
@@ -828,7 +858,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch12/BST.Delete.fst | Weak | AGENT7 | Only proves valid[idx]=false or lengths preserved |
 | ch04/MaxSubarray.Kadane | ✅ Proved | AGENT3 | theorem_kadane_optimal + theorem_kadane_witness |
 | ch04/MaxSubarray.DC | Disconnected | AGENT14 | DC proven optimal but not connected to Kadane |
-| ch24/BellmanFord | ✅ Complete | AGENT8 | Both directions: true⟹tri_ineq+upper_bound, false⟹exists_violation |
+| ch24/BellmanFord | ✅ Complete | AGENT8 | Both directions: true⟹tri_ineq+upper_bound+equality, false⟹exists_violation. Equality conditional on no_neg_cycles_flat. |
 | ch24/Dijkstra | Bogus check + upper bound only | AGENT9 | Remove verification pass, prove equality from relaxation |
 | ch15/LCS | ✅ Full optimality | AGENT10 | is_subsequence defined, lcs_length_is_longest proven |
 | ch32/KMP | Trivial bounds | AGENT11 | count bounds only, not == count_matches_spec |
