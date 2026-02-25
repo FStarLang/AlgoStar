@@ -746,7 +746,7 @@ All tasks from the previous round (AGENT1–AGENT10, AGENT19) are complete:
 
 | File | Type | Count | Agent | Description |
 |------|------|-------|-------|-------------|
-| ch04/MaxSubarray.DivideConquer | assume val | 1 | AGENT2 | DC = Kadane equivalence |
+| ch04/MaxSubarray.DivideConquer | ~~assume val~~ | ~~1~~ 0 | AGENT2 | ✅ DONE: DC = Kadane proved |
 | ch08/RadixSort.Spec | admit | 2 | AGENT3 | Stability reasoning |
 | ch08/RadixSort.Stability | admit | 2 | AGENT3 | Core stability cascade |
 | ch08/RadixSort.MultiDigit | admit | 2 | AGENT3 | Multi-pass stability |
