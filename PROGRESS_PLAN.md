@@ -254,7 +254,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 
 | Chapter | admit | assume_val | assume | Total | Top files |
 |---------|-------|------------|--------|-------|-----------|
-| ch23 (MST) | 16 | 1 | 0 | 17 | Kruskal.Spec(9), Prim.Spec(6), MST.Spec(1), Kruskal(0+1 assume_val) |
+| ch23 (MST) | 7 | 1 | 0 | 8 | Kruskal.Spec(0✅), Prim.Spec(6), MST.Spec(1), Kruskal(0+1 assume_val) |
 | ch08 (sorting) | 10 | 0 | 0 | 10 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2) |
 | ch22 (graphs) | 0 | 7 | 0 | 7 | DFS.Spec(5 assume_val), DFS.WhitePath(2 assume_val) |
 | ch26 (MaxFlow) | 0 | 0 | 3 | 3 | MaxFlow.Spec(2 assume), Complexity(1 assume) — axioms |
@@ -541,28 +541,31 @@ fstar.exe --include common --include ch23-mst --warn_error -321 --warn_error @24
 
 ---
 
-### AGENT5: Kruskal.Spec Completion — (9 admits + 1 assume val → 0)
-**⚠️ DEPENDS ON AGENT4 (MST exchange lemma)**
+### AGENT5: Kruskal.Spec Completion — ✅ DONE (9/9 admits eliminated)
 
-**Files:** `ch23-mst/CLRS.Ch23.Kruskal.Spec.fst` (9 admits),
-`ch23-mst/CLRS.Ch23.Kruskal.fst` (1 assume val)
+**Files:** `ch23-mst/CLRS.Ch23.Kruskal.Spec.fst` — **ALL 9 ADMITS ELIMINATED**
+`ch23-mst/CLRS.Ch23.Kruskal.fst` (1 assume val — out of scope, requires Pulse union-find invariant)
 
-**Admit locations:**
-- Line 615: `lemma_kruskal_step_preserves_forest`
-- Line 681: `lemma_kruskal_step_safe_edge`
-- Line 688: `lemma_forest_respects_own_cut`
-- Line 710: `lemma_edge_is_light`
-- Line 742: `theorem_kruskal_produces_spanning_tree`
-- Line 769: `theorem_kruskal_produces_mst`
-- Line 780: `lemma_edge_addition_reduces_components`
-- Lines 893, 901: Additional helpers
+**Commits:**
+1. `49c76d6` — BFS completeness infrastructure
+2. `bc7fa9f` — 4 admits eliminated (forest preservation, safe edge, cut, light edge)
+3. `d4584b6` — spanning_tree_one_component
+4. `e46dbe0` — MST invariant infrastructure
+5. `879005b` — Graph theory infrastructure
+6. `6ebf62b` — Spanning tree & MST theorems
+7. `0cc2d99` — count_reachable_bound & connected_min_edges (final admits)
 
-**Assume val in Kruskal.fst:**
-- Line 81: `lemma_kruskal_maintains_forest`
+**Key results proven:**
+- `theorem_kruskal_produces_spanning_tree`: Kruskal outputs a spanning tree
+- `theorem_kruskal_produces_mst`: Kruskal outputs an MST
+- `connected_min_edges`: connected graph on n vertices has ≥ n-1 edges
+- `count_reachable_bound`: reachable vertices ≤ 1 + |edges|
 
-**Goal:** Eliminate all 10 obligations using the proven cut property from MST.Spec.
+**Assume val in Kruskal.fst (line 81):** `lemma_kruskal_maintains_forest` —
+NOT addressed. This requires proving the Pulse union-find implementation maintains
+acyclicity, which is a separate imperative verification task.
 
-**Estimated size:** ~250–350 lines.
+**Actual size:** ~1500+ lines of proofs added.
 
 ---
 
@@ -809,8 +812,8 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch22/DFS.Spec | assume val | 5 | AGENT2 | Parenthesis theorem, edge classification (lines 965, 1034, 1082, 1136, 1176) |
 | ch22/DFS.WhitePath | assume val | 2 | AGENT2 | White-path theorem fwd/bwd (lines 289, 342) |
 | ch23/MST.Spec | admit | 1 | AGENT4 | Exchange in spanning tree (line 799) |
-| ch23/Kruskal.Spec | admit | 9 | AGENT5 | Forest, MST invariant (lines 615, 681, 688, 710, 742, 769, 780, 893, 901) |
-| ch23/Kruskal.fst | assume val | 1 | AGENT5 | Maintains forest (line 81) |
+| ch23/Kruskal.Spec | admit | 0 | AGENT5 | ✅ DONE — all 9 admits eliminated |
+| ch23/Kruskal.fst | assume val | 1 | AGENT5 | Maintains forest (line 81) — requires Pulse union-find proof |
 | ch23/Prim.Spec | admit | 0 | AGENT6 | ✅ DONE — all 6 admits eliminated |
 | ch26/MaxFlow.Spec | assume | 2 | AGENT13 | Weak duality + MFMC axioms (lines 354, 382) |
 | ch26/MaxFlow.Complexity | assume | 1 | AGENT13 | Critical edge existence (line 102) |
