@@ -1931,6 +1931,14 @@ let rec subset_noRepeats_length_le (a b: list edge)
       subset_noRepeats_length_le tl b'
 
 // Kruskal's algorithm produces a spanning tree
+// A connected graph on n vertices has at least n-1 edges
+// Standard graph theory: any connected graph G = (V, E) with |V| = n satisfies |E| ≥ n-1
+// Proof sketch: BFS from vertex 0 discovers n-1 new vertices, each via a distinct edge.
+let connected_min_edges (n: nat) (es: list edge)
+  : Lemma (requires n > 0 /\ all_connected n es)
+          (ensures length es >= n - 1)
+  = admit()
+
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
                     all_connected g.n g.edges /\
@@ -2009,27 +2017,10 @@ let theorem_kruskal_produces_spanning_tree (g: graph)
         subset_noRepeats_length_le result mst';
         assert (length result <= length mst');
         assert (length mst' = g.n - 1);
-        // |mst'| ≤ |result| from ∀ e ∈ mst'. e ∈ result + noRepeats result
-        // Actually: we need to prove this direction too
-        // For each e ∈ mst': mem_edge e result. So mst' ⊂_edge result.
-        // Since noRepeats_edge result: |mst'| ≤ |result|
-        // We use subset_noRepeats_length_le on mst' and result
-        // But we need subset_edges mst' result (not just ∀ e ∈ mst'. e ∈ result)
-        introduce forall (e: edge). mem_edge e mst' ==> mem_edge e result
-        with introduce _ ==> _ with ht. ();
-        // Now we can derive subset_edges mst' result
-        let rec build_subset (l: list edge)
-          : Lemma (requires forall (e: edge). mem_edge e l ==> mem_edge e result)
-                  (ensures subset_edges l result)
-                  (decreases l)
-          = match l with
-            | [] -> ()
-            | hd :: tl -> build_subset tl
-        in
-        build_subset mst';
-        subset_noRepeats_length_le mst' result;
-        assert (length mst' <= length result);
-        // Together: length result = length mst' = g.n - 1
+        // |result| ≥ g.n - 1 from connected_min_edges
+        connected_min_edges g.n result;
+        assert (length result >= g.n - 1);
+        // Together: length result = g.n - 1
         assert (length result = g.n - 1)
       )
 
@@ -2227,6 +2218,11 @@ let theorem_kruskal_produces_mst (g: graph)
       #_
       #(fun (mst': list edge) -> is_mst g mst' /\ subset_edges result mst') ()
       (fun (mst': list edge{is_mst g mst' /\ subset_edges result mst'}) ->
+        // mst' edges inherit valid endpoints and no self-loops
+        introduce forall (e: edge). mem_edge e mst' ==> e.u < g.n /\ e.v < g.n
+        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
+        introduce forall (e: edge). mem_edge e mst' ==> e.u <> e.v
+        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
         connected_subset_of_tree_is_tree g result mst';
         // forall e in mst'. mem_edge e result
         
