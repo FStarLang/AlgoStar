@@ -427,7 +427,7 @@ Independent (start immediately):
   AGENT8   BellmanFord neg cycle      (spec gap)
   AGENT9   Dijkstra equality          (spec gap)
   AGENT10  LCS optimality             (spec gap)
-  AGENT11  KMP completeness           (spec gap)
+  AGENT11  KMP completeness           (spec gap)              ✅ DONE
   AGENT12  Floyd-Warshall APSP        (spec gap)
   AGENT13  MaxFlow MFMC axioms        (3 assumes)
   AGENT14  Kadane ↔ DC equivalence    (spec gap)
@@ -716,18 +716,23 @@ ensures exists* sdist'.
 
 ---
 
-### AGENT11: KMP Match Completeness — prove all matches found
+### AGENT11: KMP Match Completeness — prove all matches found ✅ DONE
 
-**Files:** `ch32-string-matching/CLRS.Ch32.KMP.fst` or `KMP.StrengthenedSpec.fst`
-**Current state:** 0 admits, proves trivial bounds `0 <= count <= n+1`.
+**Files:** `ch32-string-matching/CLRS.Ch32.KMP.Spec.fst` (new, 602 lines)
+**Status:** Complete. 0 admits, 0 assumes. Verified in ~107s.
 
-**Goal:** Strengthen postcondition to `count == count_matches_spec text pat n m`.
-The StrengthenedSpec module already outlines this. Need:
-(a) KMP maintains count invariant (each match incremented)
-(b) Failure links cover all necessary positions (no matches missed)
-RabinKarp already has this proof as a template.
-
-**Estimated size:** ~100–200 lines.
+**What was done:**
+- Created pure F* spec proving KMP finds ALL pattern matches (not just some)
+- Proved `count_before_eq_spec`: KMP count == `count_matches_spec` (the naive spec)
+- Defined `pi_max` (pi gives LONGEST prefix-suffix, not just any valid PS)
+- Proved `follow_fail_valid`: failure chain returns valid result
+- Proved `follow_fail_maximal`: failure chain finds any target (key for completeness)
+- Proved `kmp_step_valid` and `kmp_step_maximal`: KMP step gives longest matched prefix
+- Proved `kmp_match_iff`: q=m iff match at position i+1-m
+- Proved `count_tracking`: count invariant preserved across KMP steps
+- Proved `count_split` + `count_before_eq_spec`: bridges count_before to count_matches_spec
+- Key proof engineering: global fuel 0, per-function fuel, --z3refresh, isolated
+  count_tracking from pi_max to prevent quantifier explosion (17K instantiations → 394ms)
 
 ---
 
@@ -861,14 +866,14 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch24/BellmanFord | ✅ Complete | AGENT8 | Both directions: true⟹tri_ineq+upper_bound+equality, false⟹exists_violation. Equality conditional on no_neg_cycles_flat. |
 | ch24/Dijkstra | Bogus check + upper bound only | AGENT9 | Remove verification pass, prove equality from relaxation |
 | ch15/LCS | ✅ Full optimality | AGENT10 | is_subsequence defined, lcs_length_is_longest proven |
-| ch32/KMP | Trivial bounds | AGENT11 | count bounds only, not == count_matches_spec |
+| ch32/KMP | ✅ Full completeness | AGENT11 | count_before_eq_spec: KMP count == count_matches_spec |
 | ch25/FloydWarshall | ✅ FW recurrence proven | AGENT12 | fw_entry defined, fw_outer_computes_entry + floyd_warshall_computes_shortest_paths proven |
 
 ### Files with 0 admits (fully verified)
 
 All other .fst files including: Huffman.Spec ✅, Huffman.Complete ✅,
 BellmanFord.Spec ✅, Dijkstra.TriIneq ✅, Dijkstra.Correctness ✅,
-KMP.Complexity ✅, BucketSort ✅, CountingSort.Stable ✅, Kruskal.EdgeSorting ✅,
+KMP.Spec ✅, KMP.Complexity ✅, BucketSort ✅, CountingSort.Stable ✅, Kruskal.EdgeSorting ✅,
 StackDFS.Complexity ✅, QueueBFS.Complexity ✅, BST.Insert.Spec ✅,
 BST.Delete.Spec ✅, BST.Spec.Complete ✅, BST.Spec.Complexity ✅,
 RBTree.Spec ✅, UnionFind.Spec ✅ (1 assume for rank bound),
