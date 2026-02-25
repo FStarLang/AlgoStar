@@ -309,10 +309,11 @@ fn tree_delete
     pure (
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
+      // Keys are never modified by delete (only valid is changed)
+      Seq.equal keys_seq' keys_seq /\
       (success ==> (SZ.v del_idx < Seq.length valid_seq' /\
                     Seq.index valid_seq' (SZ.v del_idx) == false)) /\
-      (not success ==> Seq.equal keys_seq' keys_seq /\
-                       Seq.equal valid_seq' valid_seq)
+      (not success ==> Seq.equal valid_seq' valid_seq)
     )
 //SNIPPET_END: tree_delete
 {
@@ -422,9 +423,18 @@ fn tree_delete_key
     A.pts_to t.valid valid_seq' **
     pure (
       Seq.length keys_seq' == Seq.length keys_seq /\
-      Seq.length valid_seq' == Seq.length valid_seq
-      // Ideally: if key was in tree, it's now removed
-      // Full postcondition would use key_in_subtree predicate (admit for now)
+      Seq.length valid_seq' == Seq.length valid_seq /\
+      // Keys are never modified
+      Seq.equal keys_seq' keys_seq /\
+      // If key was found and deleted, some position has the key marked invalid
+      (success ==> (exists (del_idx: nat).
+                    del_idx < SZ.v t.cap /\
+                    del_idx < Seq.length keys_seq' /\
+                    del_idx < Seq.length valid_seq' /\
+                    Seq.index valid_seq' del_idx == false /\
+                    Seq.index keys_seq' del_idx == key)) /\
+      // If not found, arrays unchanged
+      (not success ==> Seq.equal valid_seq' valid_seq)
     )
 {
   // First, search for the key
@@ -448,6 +458,9 @@ fn tree_delete_key
       pure (
         Seq.length ks == A.length t.keys /\
         Seq.length vs == A.length t.valid /\
+        // Arrays unchanged during search
+        Seq.equal ks keys_seq /\
+        Seq.equal vs valid_seq /\
         SZ.v vc <= SZ.v t.cap /\
         (vf ==> (SZ.v vfi < SZ.v t.cap /\
                  Seq.index vs (SZ.v vfi) == true /\

@@ -4,6 +4,7 @@ open Pulse.Lib.Pervasives
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module C = FStar.Classical
@@ -305,6 +306,8 @@ fn tree_search
   (t: bst)
   (#keys_seq: Ghost.erased (Seq.seq int))
   (#valid_seq: Ghost.erased (Seq.seq bool))
+  (#lo: Ghost.erased int)
+  (#hi: Ghost.erased int)
   (key: int)
   requires
     A.pts_to t.keys #p keys_seq **
@@ -314,7 +317,8 @@ fn tree_search
       Seq.length valid_seq == A.length t.valid /\
       A.length t.keys == A.length t.valid /\
       SZ.v t.cap <= A.length t.keys /\
-      SZ.v t.cap < 32768
+      SZ.v t.cap < 32768 /\
+      subtree_in_range keys_seq valid_seq (SZ.v t.cap) 0 lo hi
     )
   returns result: option SZ.t
   ensures
@@ -325,7 +329,8 @@ fn tree_search
         SZ.v (Some?.v result) < Seq.length keys_seq /\
         SZ.v (Some?.v result) < Seq.length valid_seq /\
         Seq.index valid_seq (SZ.v (Some?.v result)) == true /\
-        Seq.index keys_seq (SZ.v (Some?.v result)) == key))
+        Seq.index keys_seq (SZ.v (Some?.v result)) == key)) /\
+      (None? result ==> ~(key_in_subtree keys_seq valid_seq (SZ.v t.cap) 0 key))
     )
 //SNIPPET_END: tree_search
 {
@@ -333,28 +338,41 @@ fn tree_search
   let mut found = false;
   let mut result_idx : SZ.t = 0sz;
   
+  // Ghost references for BST bounds tracking
+  let lo_ref = GR.alloc #int (reveal lo);
+  let hi_ref = GR.alloc #int (reveal hi);
+  
   while (
     let vc = !current;
     let vf = !found;
     SZ.lt vc t.cap && not vf
   )
-  invariant exists* vc vf vr.
+  invariant exists* vc vf vr vlo vhi.
     R.pts_to current vc **
     R.pts_to found vf **
     R.pts_to result_idx vr **
+    GR.pts_to lo_ref vlo **
+    GR.pts_to hi_ref vhi **
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
     pure (
       SZ.v vc <= SZ.v t.cap /\
       (vf ==> (SZ.v vr < SZ.v t.cap /\
                Seq.index valid_seq (SZ.v vr) == true /\
-               Seq.index keys_seq (SZ.v vr) == key))
+               Seq.index keys_seq (SZ.v vr) == key)) /\
+      (~vf ==> (
+        (key_in_subtree keys_seq valid_seq (SZ.v t.cap) 0 key ==>
+         key_in_subtree keys_seq valid_seq (SZ.v t.cap) (SZ.v vc) key) /\
+        (SZ.v vc < SZ.v t.cap ==>
+          subtree_in_range keys_seq valid_seq (SZ.v t.cap) (SZ.v vc) vlo vhi)))
     )
   {
     let idx = !current;
     let is_valid = t.valid.(idx);
     
     if (not is_valid) {
+      // Node is invalid — key can't be in subtree at idx
+      lemma_invalid_node_empty keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) key;
       current := t.cap;
     } else {
       let current_key = t.keys.(idx);
@@ -366,11 +384,20 @@ fn tree_search
         child_indices_fit (SZ.v t.cap) (SZ.v idx);
         assert (pure (SZ.fits (2 * SZ.v idx + 1)));
         
+        // Preserve completeness: key in subtree at idx ⟹ key in left subtree
+        with vlo vhi. assert (GR.pts_to lo_ref vlo ** GR.pts_to hi_ref vhi);
+        lemma_search_left_preserves_completeness
+          keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) vlo vhi key;
+        
         let two_idx = SZ.mul 2sz idx;
         let left_idx = SZ.add two_idx 1sz;
         if (SZ.gte left_idx t.cap) {
+          // Left child out of bounds — key not in subtree
+          lemma_out_of_bounds_empty keys_seq valid_seq (SZ.v t.cap) (SZ.v left_idx) key;
           current := t.cap;
         } else {
+          // Narrow bounds: hi becomes current_key
+          GR.op_Colon_Equals hi_ref (hide current_key);
           current := left_idx;
         };
       } else {
@@ -378,11 +405,20 @@ fn tree_search
         child_indices_fit (SZ.v t.cap) (SZ.v idx);
         assert (pure (SZ.fits (2 * SZ.v idx + 2)));
         
+        // Preserve completeness: key in subtree at idx ⟹ key in right subtree
+        with vlo vhi. assert (GR.pts_to lo_ref vlo ** GR.pts_to hi_ref vhi);
+        lemma_search_right_preserves_completeness
+          keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) vlo vhi key;
+        
         let two_idx = SZ.mul 2sz idx;
         let right_idx = SZ.add two_idx 2sz;
         if (SZ.gte right_idx t.cap) {
+          // Right child out of bounds — key not in subtree
+          lemma_out_of_bounds_empty keys_seq valid_seq (SZ.v t.cap) (SZ.v right_idx) key;
           current := t.cap;
         } else {
+          // Narrow bounds: lo becomes current_key
+          GR.op_Colon_Equals lo_ref (hide current_key);
           current := right_idx;
         };
       };
@@ -393,12 +429,19 @@ fn tree_search
   let vr = !result_idx;
   let vc = !current;
   
+  // Free ghost references
+  with vlo_f vhi_f. assert (GR.pts_to lo_ref vlo_f ** GR.pts_to hi_ref vhi_f);
+  GR.free lo_ref;
+  GR.free hi_ref;
+  
   if vf 
   { 
     Some vr
   } 
   else 
   {
+    // vc >= cap, so key not in subtree at vc (out of bounds)
+    lemma_out_of_bounds_empty keys_seq valid_seq (SZ.v t.cap) (SZ.v vc) key;
     None #SZ.t
   }
 }
@@ -428,7 +471,12 @@ fn tree_insert
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
       (not success ==> Seq.equal keys_seq' keys_seq /\
-                       Seq.equal valid_seq' valid_seq)
+                       Seq.equal valid_seq' valid_seq) /\
+      (success ==> (exists (idx: nat). idx < SZ.v t.cap /\
+                    idx < Seq.length keys_seq' /\
+                    idx < Seq.length valid_seq' /\
+                    Seq.index keys_seq' idx == key /\
+                    Seq.index valid_seq' idx == true))
     )
 //SNIPPET_END: tree_insert
 {
@@ -448,7 +496,12 @@ fn tree_insert
     (exists* ks vs'. A.pts_to t.keys ks ** A.pts_to t.valid vs' ** 
       pure (Seq.length ks == A.length t.keys /\ Seq.length vs' == A.length t.valid /\
         // If not yet successful, arrays unchanged
-        (not vs ==> Seq.equal ks keys_seq /\ Seq.equal vs' valid_seq)
+        (not vs ==> Seq.equal ks keys_seq /\ Seq.equal vs' valid_seq) /\
+        // If successful, key is in the tree at some index
+        (vs ==> (exists (idx: nat). idx < SZ.v t.cap /\
+                 idx < Seq.length ks /\ idx < Seq.length vs' /\
+                 Seq.index ks idx == key /\
+                 Seq.index vs' idx == true))
       )) **
     pure (SZ.v vc <= SZ.v t.cap)
   {

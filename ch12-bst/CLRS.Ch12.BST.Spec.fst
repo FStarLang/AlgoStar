@@ -314,3 +314,155 @@ let pure_search_complete_at_root
       None? (pure_search keys valid cap 0 key))
     (ensures ~(key_in_subtree keys valid cap 0 key))
   = pure_search_complete keys valid cap 0 lo hi key
+
+(* ========================================================================
+   Pure BST Insert Function
+   ======================================================================== *)
+
+// Walk the BST to find the insertion point for key
+let rec pure_insert 
+  (keys: seq int) 
+  (valid: seq bool) 
+  (cap: nat) 
+  (i: nat) 
+  (key: int) 
+  : Tot (option nat) (decreases (if i < cap then cap - i else 0))
+  = if i >= cap || i >= length keys || i >= length valid then None
+    else if not (index valid i) then Some i  // found empty slot
+    else let k = index keys i in
+         if key = k then None  // already exists
+         else if key < k then pure_insert keys valid cap (2*i+1) key
+         else pure_insert keys valid cap (2*i+2) key
+
+(* ========================================================================
+   Soundness: If pure_insert returns Some idx, the slot is empty
+   ======================================================================== *)
+
+//SNIPPET_START: pure_insert_sound
+let rec pure_insert_sound
+  (keys: seq int)
+  (valid: seq bool)
+  (cap: nat)
+  (i: nat)
+  (key: int)
+  : Lemma
+    (requires Some? (pure_insert keys valid cap i key))
+    (ensures (
+      let idx = Some?.v (pure_insert keys valid cap i key) in
+      idx < cap /\
+      idx < length keys /\
+      idx < length valid /\
+      index valid idx == false
+    ))
+    (decreases (if i < cap then cap - i else 0))
+//SNIPPET_END: pure_insert_sound
+  = if i >= cap || i >= length keys || i >= length valid then ()
+    else if not (index valid i) then ()
+    else 
+      let k = index keys i in
+      if key = k then ()
+      else if key < k then 
+        pure_insert_sound keys valid cap (2*i+1) key
+      else 
+        pure_insert_sound keys valid cap (2*i+2) key
+
+(* ========================================================================
+   Completeness: Old keys are preserved after insertion
+   ======================================================================== *)
+
+//SNIPPET_START: pure_insert_complete
+let rec pure_insert_complete
+  (keys: seq int)
+  (valid: seq bool)
+  (cap: nat)
+  (i: nat)
+  (key: int)
+  (old_key: int)
+  : Lemma
+    (requires 
+      Some? (pure_insert keys valid cap i key) /\
+      key_in_subtree keys valid cap i old_key)
+    (ensures (
+      let idx = Some?.v (pure_insert keys valid cap i key) in
+      idx < length keys /\ idx < length valid /\
+      key_in_subtree (upd keys idx key) (upd valid idx true) cap i old_key
+    ))
+    (decreases (if i < cap then cap - i else 0))
+//SNIPPET_END: pure_insert_complete
+  = if i >= cap || i >= length keys || i >= length valid then ()
+    else if not (index valid i) then ()  // key_in_subtree requires valid[i], contradiction
+    else begin
+      let k = index keys i in
+      let idx = Some?.v (pure_insert keys valid cap i key) in
+      let left = 2 * i + 1 in
+      let right = 2 * i + 2 in
+      pure_insert_sound keys valid cap i key;
+      // idx is the insertion point; old key is at a different (valid) node
+      // i is valid and i != idx (since valid[idx] is false but valid[i] is true)
+      assert (index valid idx == false);
+      assert (index valid i == true);
+      assert (i <> idx);
+      // keys'[i] == keys[i] and valid'[i] == valid[i] since i != idx
+      assert (index (upd keys idx key) i == index keys i);
+      assert (index (upd valid idx true) i == index valid i);
+      if key = k then ()
+      else if key < k then begin
+        // pure_insert recurses left
+        or_elim
+          #(key_in_subtree keys valid cap left old_key)
+          #(key_in_subtree keys valid cap right old_key)
+          #(fun _ -> key_in_subtree (upd keys idx key) (upd valid idx true) cap i old_key)
+          (fun _ -> 
+            pure_insert_complete keys valid cap left key old_key)
+          (fun _ ->
+            // old_key is in right subtree, which doesn't contain idx (insert goes left)
+            // Need: key_in_subtree keys' valid' cap right old_key
+            // idx is in the left subtree path, so right subtree is unchanged
+            lemma_insert_preserves_other_subtree keys valid cap right idx key old_key)
+      end
+      else begin
+        // pure_insert recurses right
+        or_elim
+          #(key_in_subtree keys valid cap left old_key)
+          #(key_in_subtree keys valid cap right old_key)
+          #(fun _ -> key_in_subtree (upd keys idx key) (upd valid idx true) cap i old_key)
+          (fun _ -> 
+            lemma_insert_preserves_other_subtree keys valid cap left idx key old_key)
+          (fun _ ->
+            pure_insert_complete keys valid cap right key old_key)
+      end
+    end
+
+// Helper: inserting at idx preserves key_in_subtree for subtrees not containing idx
+and lemma_insert_preserves_other_subtree
+  (keys: seq int)
+  (valid: seq bool)
+  (cap: nat)
+  (root: nat)
+  (idx: nat)
+  (new_key: int)
+  (old_key: int)
+  : Lemma
+    (requires
+      idx < length keys /\ idx < length valid /\
+      index valid idx == false /\
+      key_in_subtree keys valid cap root old_key)
+    (ensures
+      key_in_subtree (upd keys idx new_key) (upd valid idx true) cap root old_key)
+    (decreases (if root < cap then cap - root else 0))
+  = if root >= cap || root >= length keys || root >= length valid then ()
+    else begin
+      // key_in_subtree requires valid[root] == true, so root != idx
+      assert (index valid root == true);
+      assert (root <> idx);
+      assert (index (upd keys idx new_key) root == index keys root);
+      assert (index (upd valid idx true) root == index valid root);
+      let left = 2 * root + 1 in
+      let right = 2 * root + 2 in
+      or_elim
+        #(key_in_subtree keys valid cap left old_key)
+        #(key_in_subtree keys valid cap right old_key)
+        #(fun _ -> key_in_subtree (upd keys idx new_key) (upd valid idx true) cap root old_key)
+        (fun _ -> lemma_insert_preserves_other_subtree keys valid cap left idx new_key old_key)
+        (fun _ -> lemma_insert_preserves_other_subtree keys valid cap right idx new_key old_key)
+    end
