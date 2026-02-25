@@ -396,11 +396,10 @@ Grouped by severity.
 
 ---
 
-## Parallel Agent Tasks (AGENT1–AGENT14)
+## Parallel Agent Tasks (AGENT1–AGENT15)
 
-Fourteen tasks for parallel execution. Tasks split into two tiers:
-- **Tier A (Admits):** Eliminate remaining admit()/assume val obligations (37 total)
-- **Tier B (Spec Gaps):** Strengthen postconditions where specs are incomplete or one-sided
+Fifteen independent tasks for parallel execution. All are independent except
+AGENT5 (Kruskal) and AGENT6 (Prim) which depend on AGENT4 (MST exchange lemma).
 
 Each agent MUST work on different files with no overlap, so they can run
 simultaneously without conflicts (except for PROGRESS_PLAN.md).
@@ -413,25 +412,24 @@ results and learnings, using `flock` to avoid conflicts.
 
 **Dependency graph:**
 ```
-Tier A — Admit elimination (start immediately):
-  AGENT1  ✅ DONE (Huffman optimality)
-  AGENT3  (RadixSort stability, 10 admits)
-  AGENT6  (DFS theorems, 7 assume vals)
-  AGENT7  ✅ MOSTLY DONE (MST cut property, 4→1 admit)
-  AGENT8  (Kruskal+Prim, 16 admits+assume vals) ← depends on AGENT7
+Independent (start immediately):
+  AGENT1   RadixSort stability        (10 admits)
+  AGENT2   DFS theorems               (7 assume vals)
+  AGENT3   MaxSubarray optimality     (spec gap)
+  AGENT7   BST imperative specs       (spec gap)
+  AGENT8   BellmanFord neg cycle      (spec gap)
+  AGENT9   Dijkstra equality          (spec gap)
+  AGENT10  LCS optimality             (spec gap)
+  AGENT11  KMP completeness           (spec gap)
+  AGENT12  Floyd-Warshall APSP        (spec gap)
+  AGENT13  MaxFlow MFMC axioms        (3 assumes)
+  AGENT14  Kadane ↔ DC equivalence    (spec gap)
+  AGENT15  Documentation update       (no F*)
 
-Tier A — Already completed:
-  AGENT4  ✅ DONE (BST Insert.Spec, 3→0)
-  AGENT5  ✅ DONE (BFS DistanceSpec, 2→0)
-  AGENT9  ✅ DONE (MaxFlow proofs, 7→0)
-  AGENT10 ✅ DONE (VertexCover, 1→0)
-
-Tier B — Spec gap closures (all independent):
-  AGENT2  (MaxSubarray true optimality)
-  AGENT11 (BST imperative postconditions)
-  AGENT12 (BellmanFord negative cycle + Dijkstra equality)
-  AGENT13 (LCS optimality + KMP completeness + FW shortest paths)
-  AGENT14 (Progress table & documentation update)
+Dependent:
+  AGENT4   MST exchange lemma         (1 admit) ← independent
+  AGENT5   Kruskal.Spec               (9 admits + 1 assume val) ← AGENT4
+  AGENT6   Prim.Spec                  (6 admits) ← AGENT4
 ```
 
 **Admit/Assume target: 37 → 0**
@@ -439,55 +437,27 @@ Tier B — Spec gap closures (all independent):
 
 ---
 
-### AGENT1: Huffman Full Optimality — prove huffman_complete is WPL-optimal
-
-✅ **DONE** (commit `ad1b189`). `huffman_complete_optimal` proven: for all non-empty frequency
-lists, `huffman_complete` produces a WPL-optimal Huffman tree (CLRS Theorem 16.4). Zero admits.
-
-**Files modified:** `ch16-greedy/CLRS.Ch16.Huffman.Complete.fst` (+817 lines)
-
-**Proof structure:**
-- Induction on PQ length via `huffman_from_pq_wpl_le`
-- Generalized exchange argument (`make_min_siblings`) — adapts greedy choice for ANY tree
-- `optimal_substructure_theorem` + IH + WPL decomposition chain inequalities
-- Classical existential elimination for the exchange witness
-- Key helpers: `find_two_mins_sorted`, `sorted_all_leaves_nondecreasing`,
-  `sortWith_preserves_all_leaves`, `sum_costs`/`huffman_from_pq_wpl_decomp`
-
----
-
-### AGENT2: MaxSubarray True Optimality Spec — prove Kadane finds actual max
-
-**Files:** `ch04-divide-conquer/CLRS.Ch04.MaxSubarray.Kadane.fst`
-**Current state:** 0 admits but spec is self-referential (`result == kadane_spec s`).
-D&C has `lemma_dc_optimal` proving true optimality, but Kadane doesn't connect to it.
-
-**Goal:** Prove `kadane_spec s >= sum_range s i j` for all contiguous subarrays `[i,j)`,
-AND `∃ i j. kadane_spec s == sum_range s i j`.
-
-**Approach:**
-- Prove `kadane_spec` at position i tracks max suffix sum ending at i. Induction on i.
-- Prove `best_sum = max over all positions of current_sum = true_max_subarray s`.
-- Connect Kadane to D&C's proven `lemma_dc_optimal` or prove independently.
-
-**Estimated size:** ~200–300 lines.
-
----
-
-### AGENT3: RadixSort Multi-Digit — prove stability cascade (10 admits → 0)
+### AGENT1: RadixSort Stability Cascade — (10 admits → 0)
 
 **Files:** `ch08-linear-sorting/CLRS.Ch08.RadixSort.Stability.fst` (primary),
 `.Spec.fst`, `.MultiDigit.fst`, `.FullSort.fst`
 **Current state:** 10 admits total: Stability(2), Spec(2), MultiDigit(2), FullSort(4).
-FullSort's 4 are references to Stability. Complexity: 0 admits ✅.
+FullSort's 4 are references to Stability.
 
 **Goal:** Eliminate all 10 admits.
 
+**Admit locations:**
+- Stability.fst line 236: `lemma_stable_sort_preserves_lower_order`
+- Stability.fst line 277: `lemma_stable_pass_preserves_ordering` (final step)
+- Spec.fst line 349: `lemma_stable_sort_preserves_order`
+- Spec.fst line 373: `radix_sort_correctness`
+- MultiDigit.fst line 394: `stable_sort_preserves_order`
+- MultiDigit.fst line 415: `stable_sort_preserves_sorted_on_other_digit`
+- FullSort.fst lines 496, 500, 521, 525: references to Stability results
+
 **Approach:** The core blocker is `lemma_stable_sort_preserves_lower_order` in Stability.fst:
-- Stable sort on digit d preserves MSD-lex order on digits 0..d-1 for elements with equal digit d.
-- Need: formalize stability as "equal-key elements maintain relative order" and compose with
-  the lexicographic ordering invariant.
-- Once Stability.fst is proven, the other 8 admits dissolve (all reference Stability results).
+stable sort on digit d preserves MSD-lex order on digits 0..d-1 for elements with equal digit d.
+Once Stability.fst is proven, the other 8 admits dissolve.
 
 **Estimated size:** ~100–150 lines (concentrated in Stability.fst).
 
@@ -500,36 +470,21 @@ fstar.exe --include common --include ch08-linear-sorting --warn_error -321 --war
 
 ---
 
-### AGENT4: BST Insert.Spec Correctness ✅ DONE (3→0 admits)
-
-Previously completed. List-based model proves `key_set(insert(t,k)) = key_set(t) ∪ {k}`.
-
----
-
-### AGENT5: BFS DistanceSpec ✅ DONE (2→0 admits)
-
-Previously completed. `bfs_correctness` proves `d_bfs == d_shortest` for all vertices.
-
----
-
-### AGENT6: DFS Parenthesis + White-Path Theorems — (7 assume vals → 0)
+### AGENT2: DFS Parenthesis + White-Path Theorems — (7 assume vals → 0)
 
 **Files:** `ch22-elementary-graph/CLRS.Ch22.DFS.Spec.fst` (5 assume vals),
 `ch22-elementary-graph/CLRS.Ch22.DFS.WhitePath.fst` (2 assume vals)
-**Current state:** 7 assume vals total.
 
 **Assume vals in DFS.Spec.fst:**
-1. `dfs_parenthesis_property` (line 965) — CLRS Theorem 22.7: DFS intervals nest or are disjoint
-2. `dfs_visit_explores_reachable` (line 1034) — DFS visits all reachable vertices
-3. `white_path_gives_containment` (line 1082) — White paths imply interval containment
-4. `cycle_iff_back_edge` (line 1136) — Cycle detection ↔ back edge
-5. `topo_order_iff_no_back_edge` (line 1176) — Topo sort ↔ no back edges
+1. `dfs_parenthesis_property` (line 965) — CLRS Theorem 22.7
+2. `dfs_visit_explores_reachable` (line 1034)
+3. `white_path_gives_containment` (line 1082)
+4. `cycle_iff_back_edge` (line 1136)
+5. `topo_order_iff_no_back_edge` (line 1176)
 
 **Assume vals in DFS.WhitePath.fst:**
-1. `white_path_implies_descendant_aux` (line 289) — Forward: white path ⟹ descendant
-2. `descendant_implies_white_path_aux` (line 342) — Backward: descendant ⟹ white path
-
-**Goal:** Eliminate all 7 assume vals.
+1. `white_path_implies_descendant_aux` (line 289)
+2. `descendant_implies_white_path_aux` (line 342)
 
 **Approach:** Structural induction on DFS execution. The parenthesis theorem is the foundation;
 edge classification and white-path theorem follow from it.
@@ -538,214 +493,267 @@ edge classification and white-path theorem follow from it.
 
 ---
 
-### AGENT7: MST Cut Property ✅ MOSTLY DONE (4→1 admit)
+### AGENT3: MaxSubarray True Optimality — prove Kadane finds actual max
 
-Previously completed. 3 of 4 admits eliminated. Remaining: `exchange_is_spanning_tree` (line 799)
-— standard graph theory fact about edge exchange preserving spanning tree property.
+**Files:** `ch04-divide-conquer/CLRS.Ch04.MaxSubarray.Kadane.fst`
+**Current state:** 0 admits but spec is self-referential (`result == kadane_spec s`).
+
+**Goal:** Prove `kadane_spec s >= sum_range s i j` for all contiguous subarrays `[i,j)`,
+AND `∃ i j. kadane_spec s == sum_range s i j`.
+
+**Approach:**
+- Prove `kadane_spec` at position i tracks max suffix sum ending at i. Induction on i.
+- Prove `best_sum = max over all positions of current_sum = true_max_subarray s`.
+
+**Estimated size:** ~200–300 lines.
 
 ---
 
-### AGENT8: Kruskal + Prim Spec Completion — (9+6+1 = 16 admits/assumes → 0)
+### AGENT4: MST Exchange Lemma — (1 admit → 0)
+
+**Files:** `ch23-mst/CLRS.Ch23.MST.Spec.fst`
+**Current state:** 1 admit at line 799: `exchange_is_spanning_tree`.
+
+**Goal:** Prove that swapping an edge on the path between two vertices in a spanning tree
+with a new edge preserves the spanning tree property.
+
+**Approach:** When edge (u,v) is removed from a spanning tree T, T splits into two components.
+Adding edge e that crosses this partition reconnects the tree. Prove:
+1. Removing an edge from a spanning tree creates exactly 2 components
+2. Adding an edge crossing the partition produces a spanning tree
+3. The new tree has n-1 edges and connects all vertices
+
+**Estimated size:** ~150–200 lines.
+
+**Verification:**
+```bash
+fstar.exe --include common --include ch23-mst --warn_error -321 --warn_error @247 \
+  --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar' \
+  ch23-mst/CLRS.Ch23.MST.Spec.fst
+```
+
+---
+
+### AGENT5: Kruskal.Spec Completion — (9 admits + 1 assume val → 0)
+**⚠️ DEPENDS ON AGENT4 (MST exchange lemma)**
 
 **Files:** `ch23-mst/CLRS.Ch23.Kruskal.Spec.fst` (9 admits),
-`ch23-mst/CLRS.Ch23.Prim.Spec.fst` (6 admits),
 `ch23-mst/CLRS.Ch23.Kruskal.fst` (1 assume val)
-**⚠️ DEPENDENCY: Uses results from AGENT7 (MST.Spec cut property).**
 
-**Kruskal.Spec admits (9):**
-- Line 615: `lemma_kruskal_step_preserves_forest` — non-reachable ⟹ adding edge preserves acyclicity
-- Line 681: `lemma_kruskal_step_safe_edge` — same_component_dec correct
-- Line 688: `lemma_forest_respects_own_cut` — forest edges don't cross component cut
-- Line 710: `lemma_edge_is_light` — sorted order ⟹ current edge is minimum crossing
-- Line 742: `theorem_kruskal_produces_spanning_tree` — n-1 edges form spanning tree
-- Line 769: `theorem_kruskal_produces_mst` — inductive MST invariant
-- Line 780: `lemma_edge_addition_reduces_components` — component count reduction
-- Lines 893, 901: Additional helper admits
+**Admit locations:**
+- Line 615: `lemma_kruskal_step_preserves_forest`
+- Line 681: `lemma_kruskal_step_safe_edge`
+- Line 688: `lemma_forest_respects_own_cut`
+- Line 710: `lemma_edge_is_light`
+- Line 742: `theorem_kruskal_produces_spanning_tree`
+- Line 769: `theorem_kruskal_produces_mst`
+- Line 780: `lemma_edge_addition_reduces_components`
+- Lines 893, 901: Additional helpers
 
-**Kruskal.fst assume val (1):**
-- Line 81: `lemma_kruskal_maintains_forest` — union-find cycle detection ensures acyclicity
+**Assume val in Kruskal.fst:**
+- Line 81: `lemma_kruskal_maintains_forest`
 
-**Prim.Spec admits (6):**
-- Line 195: Prim step crosses cut
-- Line 209: find_min_edge returns minimum
-- Line 270: Algorithm adds exactly n-1 edges
-- Lines 359, 380, 412: Prim aux safety, result safety, connectivity
+**Goal:** Eliminate all 10 obligations using the proven cut property from MST.Spec.
 
-**Goal:** Eliminate all 16 obligations using the proven cut property from MST.Spec.
-
-**Estimated size:** ~400–500 lines total.
+**Estimated size:** ~250–350 lines.
 
 ---
 
-### AGENT9: MaxFlow Proofs ✅ DONE (7→0 assumes)
+### AGENT6: Prim.Spec Completion — (6 admits → 0)
+**⚠️ DEPENDS ON AGENT4 (MST exchange lemma)**
 
-Previously completed. All assumes eliminated. MFMC theorem stated with proper postconditions.
+**Files:** `ch23-mst/CLRS.Ch23.Prim.Spec.fst`
 
-**Note (updated audit):** The current MaxFlow.Spec.fst still has 2 `assume(...)` statements
-(weak duality at line 354, MFMC at line 382) and MaxFlow.Complexity.fst has 1 `assume(...)`
-(critical edge at line 102). These are mathematical axioms for theorems beyond current scope.
-The proof module (Proofs.fst) has 0 assumes.
+**Admit locations:**
+- Line 195: `lemma_prim_step_crosses_cut`
+- Line 209: `lemma_prim_step_is_light`
+- Line 270: `lemma_prim_has_n_minus_1_edges`
+- Line 359: Prim aux safety recursion
+- Line 380: Prim result safety
+- Line 412: Prim spec final vertex connectivity
+
+**Goal:** Eliminate all 6 admits using the proven cut property from MST.Spec.
+
+**Estimated size:** ~200–300 lines.
 
 ---
 
-### AGENT10: VertexCover 2-Approximation ✅ DONE (1→0 admits)
+### AGENT7: BST Imperative Postconditions — strengthen tree_insert/search/delete
 
-Previously completed. Ghost matching + theorem_35_1 proves 2-approximation ratio.
-
----
-
-### AGENT11: BST Imperative Postconditions — strengthen tree_insert/search/delete
-
-**Files:** `ch12-bst/CLRS.Ch12.BST.fst`, `ch12-bst/CLRS.Ch12.BST.Spec.fst`
+**Files:** `ch12-bst/CLRS.Ch12.BST.fst`, `ch12-bst/CLRS.Ch12.BST.Spec.fst`,
+`ch12-bst/CLRS.Ch12.BST.Delete.fst`
 **Current state:** 0 admits but imperative postconditions are one-sided.
 
-**Goal:** Strengthen the postconditions of the three main BST operations:
-
-1. **tree_search None case** (BST.fst line 320): Add postcondition
+**Goals:**
+1. **tree_search None case** (BST.fst line 320): Add
    `None? result ==> ~(key_in_subtree keys valid cap root key)`.
-   The pure spec already has `pure_search_complete` (Spec.fst line 190). Wire it through.
+   Wire through `pure_search_complete` (Spec.fst line 190).
 
-2. **tree_insert success case** (BST.fst line 424): Add postcondition
+2. **tree_insert success case** (BST.fst line 424): Add
    `success ==> ∃ idx. idx < cap ∧ keys'[idx] == key ∧ valid'[idx] == true`.
-   Currently only the failure case (`not success ==> unchanged`) is specified.
 
 3. **tree_delete_key** (Delete.fst line 420): Add postcondition about key removal.
-   Currently only proves array lengths preserved.
 
-4. **BST.Spec.fst** (line 155): Add `pure_insert_sound` and `pure_insert_complete` lemmas
-   to match the pattern of `pure_search_sound`/`pure_search_complete`.
+4. **BST.Spec.fst**: Add `pure_insert_sound` and `pure_insert_complete` lemmas.
 
-**Approach:** The pure functional specs in BST.Spec.Complete.fst already prove all these
-properties (search completeness, insert membership, delete key set). The work is connecting
-the imperative array-based implementation to the pure functional model.
+**Approach:** Connect imperative array-based implementation to existing pure functional specs
+in BST.Spec.Complete.fst.
 
 **Estimated size:** ~150–250 lines.
 
 ---
 
-### AGENT12: BellmanFord Neg Cycle + Dijkstra Equality — complete SSSP specs
+### AGENT8: BellmanFord Negative Cycle Detection — complete the postcondition
 
-**Files:** `ch24-sssp/CLRS.Ch24.BellmanFord.fst`, `ch24-sssp/CLRS.Ch24.Dijkstra.fst`
-**Current state:** 0 admits in both, but postconditions are one-sided.
+**Files:** `ch24-sssp/CLRS.Ch24.BellmanFord.fst`
+**Current state:** 0 admits, but postcondition only covers `no_neg_cycle == true`.
 
-**Goal 1 — BellmanFord negative cycle detection (BellmanFord.fst lines 134-149):**
-Add postcondition: `no_neg_cycle == false ==> ∃ edge violating triangle inequality`.
+**Goal:** Add postcondition:
+`no_neg_cycle == false ==> ∃ u v. edge(u,v) violates triangle inequality`.
+
 The spec module already has `bf_negative_cycle_detection` (Spec.fst line 921-969) proving
-`exists_relaxable_edge ⟺ extra round changes distances`. Wire the verification loop's
-detection of a violating edge into the postcondition.
+`exists_relaxable_edge ⟺ extra round changes distances`. The verification loop already
+detects the violating edge. Wire the detection into the postcondition using
+`no_violations_partial` from the loop invariant.
 
-**Goal 2 — Dijkstra shortest path equality (Dijkstra.fst lines 193-206):**
-Strengthen `dist[v] <= sp_dist` to `dist[v] == sp_dist` for all vertices.
-The `greedy_choice_invariant` (Correctness.fst line 174) proves per-step equality.
-Need to accumulate this across the loop: add loop invariant `all_settled_optimal`
-and prove that after n iterations, all vertices are settled.
-
-**Approach:**
-- BellmanFord: The verification loop already detects the violating edge. Add the edge
-  indices to the postcondition. Use `no_violations_partial` from the loop invariant.
-- Dijkstra: Thread `all_settled_optimal` through the main loop invariant. After all
-  vertices processed, `all_settled_optimal` + `triangle_inequality` ⟹ equality for all v.
-
-**Estimated size:** ~200–300 lines total.
+**Estimated size:** ~50–100 lines.
 
 ---
 
-### AGENT13: DP/String Matching Optimality — LCS, KMP, Floyd-Warshall spec strengthening
+### AGENT9: Dijkstra Shortest Path Equality — strengthen upper bound to equality
 
-**Files:** `ch15-dynamic-programming/CLRS.Ch15.LCS.fst`,
-`ch32-string-matching/CLRS.Ch32.KMP.fst` or `KMP.StrengthenedSpec.fst`,
-`ch25-apsp/CLRS.Ch25.FloydWarshall.fst`
-**Current state:** All 0 admits but specs are recurrence-only or trivial-bounds.
+**Files:** `ch24-sssp/CLRS.Ch24.Dijkstra.fst`
+**Current state:** 0 admits, but postcondition only proves `dist[v] <= sp_dist[v]`.
 
-**Goal 1 — LCS optimality (LCS.fst):**
+**Goal:** Strengthen to `dist[v] == sp_dist[v]` for all vertices v (when `vtri == true`).
+
+The `greedy_choice_invariant` (Correctness.fst line 174) already proves per-step equality.
+Need to accumulate across the loop:
+1. Add loop invariant `all_settled_optimal` to the main Dijkstra loop
+2. Prove that after n iterations, all vertices are settled
+3. Combine upper bound + lower bound ⟹ equality
+
+**Estimated size:** ~100–200 lines.
+
+---
+
+### AGENT10: LCS Optimality — prove lcs_length is truly longest
+
+**Files:** `ch15-dynamic-programming/CLRS.Ch15.LCS.fst`
+**Current state:** 0 admits, proves `result == lcs_length sx sy m n` (recurrence only).
+
+**Goal:**
 - Define `is_subsequence (sub: seq int) (s: seq int)` and
   `is_common_subsequence sub x y = is_subsequence sub x ∧ is_subsequence sub y`.
 - Prove `lcs_length x y m n >= length sub` for all common subsequences `sub`.
 - Prove `∃ sub. is_common_subsequence sub x y ∧ length sub == lcs_length x y m n`.
-- Key: the recurrence `max(lcs(i-1,j), lcs(i,j-1))` is an upper bound on any common
-  subsequence not using the current characters. Induction on `i+j`.
+- Key: induction on `i+j`, case-split on whether current characters match.
 
-**Goal 2 — KMP completeness (KMP.fst or StrengthenedSpec.fst):**
-- Strengthen postcondition to `count == count_matches_spec text pat n m`.
-- The StrengthenedSpec module already outlines this. Need to prove:
-  (a) KMP maintains count invariant (each match incremented)
-  (b) Failure links cover all necessary positions (no matches missed)
-- RabinKarp already has this proof as a template.
-
-**Goal 3 — Floyd-Warshall shortest paths (FloydWarshall.fst):**
-- Define `shortest_path_dist n adj i j` (analogous to ShortestPath.Spec.fst's `sp_dist`).
-- Prove `fw_outer` computes actual shortest paths, not just the DP recurrence.
-- Key: the DP recurrence IS the shortest-path recurrence (CLRS Theorem 25.2).
-  Prove by induction on k that `fw_outer[k][i][j] = min over all paths from i to j
-  using intermediate vertices {0,...,k-1}`.
-
-**Estimated size:** ~300–500 lines total across all three.
+**Estimated size:** ~100–200 lines.
 
 ---
 
-### AGENT14: PROGRESS_PLAN Table & Documentation Update
+### AGENT11: KMP Match Completeness — prove all matches found
+
+**Files:** `ch32-string-matching/CLRS.Ch32.KMP.fst` or `KMP.StrengthenedSpec.fst`
+**Current state:** 0 admits, proves trivial bounds `0 <= count <= n+1`.
+
+**Goal:** Strengthen postcondition to `count == count_matches_spec text pat n m`.
+The StrengthenedSpec module already outlines this. Need:
+(a) KMP maintains count invariant (each match incremented)
+(b) Failure links cover all necessary positions (no matches missed)
+RabinKarp already has this proof as a template.
+
+**Estimated size:** ~100–200 lines.
+
+---
+
+### AGENT12: Floyd-Warshall Shortest Path Semantics — prove APSP correctness
+
+**Files:** `ch25-apsp/CLRS.Ch25.FloydWarshall.fst`
+**Current state:** 0 admits, proves `contents' == fw_outer contents n 0` (recurrence only).
+
+**Goal:** Prove `fw_outer` computes actual shortest paths.
+- Define `shortest_path_dist n adj i j` (can reuse ShortestPath.Spec.fst's `sp_dist` pattern).
+- Prove by induction on k that `fw_outer[k][i][j] = min over paths using vertices {0,...,k-1}`.
+- CLRS Theorem 25.2.
+
+**Estimated size:** ~150–250 lines.
+
+---
+
+### AGENT13: MaxFlow MFMC Axioms — prove weak duality and critical edge (3 assumes → 0)
+
+**Files:** `ch26-max-flow/CLRS.Ch26.MaxFlow.Spec.fst`, `ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst`
+**Current state:** 3 `assume(...)` statements (mathematical axioms).
+
+**Assume locations:**
+- Spec.fst line 354: Weak duality `flow_value ≤ cut_capacity`
+- Spec.fst line 382: MFMC — no augmenting path ⟹ ∃ min cut
+- Complexity.fst line 102: Each augmentation creates a critical edge
+
+**Goal:** Replace assumes with proofs.
+
+**Approach:**
+- Weak duality: decompose flow value as net flow across the cut, show each edge contributes
+  ≤ its capacity. Induction on edges crossing the cut.
+- MFMC: define the residual graph's source-reachable set as the cut S. Show flow on S→T edges
+  equals capacity (no augmenting path ⟹ residual capacity = 0). Combine with weak duality.
+- Critical edge: follows from bottleneck definition — the bottleneck edge becomes saturated.
+
+**Estimated size:** ~200–300 lines.
+
+---
+
+### AGENT14: Kadane ↔ Divide-and-Conquer Equivalence
+
+**Files:** `ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.fst`
+**Current state:** D&C has `lemma_dc_optimal` proving true optimality. Kadane has self-referential
+spec. The two algorithms aren't formally connected.
+
+**Goal:** Prove `find_maximum_subarray_sum s == kadane_spec s` (or both == true_max).
+This connects D&C's proven optimality to Kadane, giving Kadane true optimality transitively.
+Can be done independently of AGENT3 (which proves Kadane's optimality directly).
+
+**Estimated size:** ~100–200 lines.
+
+---
+
+### AGENT15: Documentation Update
 
 **Files:** `PROGRESS_PLAN.md`, `README.md`, `doc/*.rst`
 **Goal:** Make all documentation accurately reflect current state.
 
 **Tasks:**
-1. Update per-algorithm table: verify all admit counts match reality
-2. Update `README.md`: fix any overstatements about verification status
-3. Update chapter .rst files to reflect current admit status
-4. Create `doc/ch26_max_flow.rst` if missing
-5. Sweep `.fst` file headers: fix any header comments that disagree with actual admit count
+1. Update `README.md`: fix any overstatements about verification status
+2. Update chapter .rst files to reflect current admit status
+3. Create `doc/ch26_max_flow.rst` if missing
+4. Sweep `.fst` file headers: fix comments that disagree with actual admit count
    (e.g., Strassen.fst says "One admit" but has 0)
-6. Update this PROGRESS_PLAN with final census after all agents complete
+5. Update this PROGRESS_PLAN with final census after all agents complete
 
 **No F* verification needed** — documentation only.
 
-## Previous Agent Tasks (COMPLETED)
-
-All tasks from the previous round (AGENT1–AGENT10, AGENT19) are complete:
+## Previously Completed Agent Tasks
 
 | Agent | Task | Status |
 |-------|------|--------|
-| AGENT1 (old) | StackDFS.Complexity — 3 assume_ | ✅ DONE (4→0 assume_) |
-| AGENT2 (old) | CountingSort.Stable — 3 assume_ | ✅ DONE (3→0) |
-| AGENT3 (old) | Kruskal.Complexity — 2 admit + 1 assume_ | ✅ DONE |
-| AGENT4 (old) | KMP.Complexity — 7 admits | ✅ DONE (7→0) |
-| AGENT5 (old) | BucketSort — 1 admit | ✅ DONE (1→0) |
-| AGENT6 (old) | Huffman.Complete — 2 admits + Spec assumes | ✅ DONE (Spec 4→0, Complete 2→0) |
-| AGENT7 (old) | Kruskal.EdgeSorting — 2 admits | ✅ DONE (2→0) |
-| AGENT8 (old) | Dijkstra.TriangleInequality — 1 admit | ✅ DONE (1→0) |
-| AGENT9 (old) | BellmanFord.Spec — 3 admits | ✅ DONE (3→0) |
-| AGENT19 (old) | Documentation sweep | ✅ DONE |
-
-## Session Log (2025-02-23)
-
-### Completed
-- **AUDIT_0223.md**: Full audit of all 180 files, 22 chapters, 24 doc files
-- **PROGRESS_PLAN.md**: Consolidated from PROGRESS_PLAN_0223.md + old PROGRESS_PLAN.md.
-  Updated with current counts, key learnings, prioritized action plan.
-- **KahnTopologicalSort**: Confirmed fully verified (0 admits across all files including Complexity)
-  after the commit series 49f47b1..51374a7. The AUDIT_0215 said "2 admit()" — now resolved.
-- **Key findings**:
-  - 155 → ~93 admits since AUDIT_0215 (40% reduction)
-  - RBTree, ActivitySelection, RabinKarp, MatrixChain.Spec, Kahn all fully proven
-  - StackDFS/QueueBFS main fully proven (complexity files remain)
-  - Dijkstra.Correctness.fst new — proves d[v]=δ(s,v) (chain incomplete: 2 admits in TriIneq)
-  - Documentation mostly accurate; main gaps: ch26 .rst missing, README overstatement,
-    ch22 Kahn section stale
-
-## Session Log (2025-02-21)
-
-### Completed
-- **QueueBFS.fst**: Fully verified, 0 assume_ (was 4). Commit `fb5bafe`.
-  - Predicates: `queue_ok`, `dist_ok`, `source_ok`, `count_nonwhite` with `{:pattern}` triggers
-  - Lemmas: `queue_ok_after_discover`, `blacken_preserves_queue_ok`, `blacken_preserves_source_ok`,
-    `blacken_preserves_dist_ok`, `discover_preserves_dist_ok`, 6 `count_nonwhite_*` lemmas
-  - Key insight: add `queue_ok` directly to `maybe_discover` postcondition so Z3 reasons about
-    exact `Seq.upd` terms (avoids chained quantifier trigger failures through abstract frame props)
-  - Bug fix: `count_nonwhite_upd_single` was called with post-assignment state; fixed to use
-    pre-assignment state via `with scolor_zeros`
-- **ActivitySelection.fst**: Fixed flaky SMT with `--z3rlimit 20`. Commit `f65573b`.
-
----
+| Round 3: AGENT1 | Huffman Full Optimality (CLRS Thm 16.4) | ✅ DONE (commit ad1b189, +817 lines) |
+| Round 3: AGENT4 | BST Insert.Spec (3→0 admits) | ✅ DONE (list-based model) |
+| Round 3: AGENT5 | BFS DistanceSpec (2→0 admits) | ✅ DONE (bfs_correctness) |
+| Round 3: AGENT7 | MST Cut Property (4→1 admit) | ✅ MOSTLY DONE |
+| Round 3: AGENT9 | MaxFlow Proofs (7→0 assumes) | ✅ DONE (MFMC stated) |
+| Round 3: AGENT10 | VertexCover (1→0 admits) | ✅ DONE (ghost matching) |
+| Round 2: AGENT1 | StackDFS.Complexity (4→0 assume_) | ✅ DONE |
+| Round 2: AGENT2 | CountingSort.Stable (3→0) | ✅ DONE |
+| Round 2: AGENT3 | Kruskal.Complexity (2+1→0) | ✅ DONE |
+| Round 2: AGENT4 | KMP.Complexity (7→0) | ✅ DONE |
+| Round 2: AGENT5 | BucketSort (1→0) | ✅ DONE |
+| Round 2: AGENT6 | Huffman.Complete (Spec 4→0, Complete 2→0) | ✅ DONE |
+| Round 2: AGENT7 | Kruskal.EdgeSorting (2→0) | ✅ DONE |
+| Round 2: AGENT8 | Dijkstra.TriangleInequality (1→0) | ✅ DONE |
+| Round 2: AGENT9 | BellmanFord.Spec (3→0) | ✅ DONE |
+| Round 2: AGENT19 | Documentation sweep | ✅ DONE |
 
 ## Appendix: Current Per-File Admit/Assume Census (2025-02-25, updated)
 
@@ -753,18 +761,18 @@ All tasks from the previous round (AGENT1–AGENT10, AGENT19) are complete:
 
 | File | Type | Count | Agent | Description |
 |------|------|-------|-------|-------------|
-| ch08/RadixSort.Spec | admit | 2 | AGENT3 | Stability reasoning (lines 349, 373) |
-| ch08/RadixSort.Stability | admit | 2 | AGENT3 | Core stability cascade (lines 236, 277) |
-| ch08/RadixSort.MultiDigit | admit | 2 | AGENT3 | Multi-pass stability (lines 394, 415) |
-| ch08/RadixSort.FullSort | admit | 4 | AGENT3 | References to Stability (lines 496, 500, 521, 525) |
-| ch22/DFS.Spec | assume val | 5 | AGENT6 | Parenthesis theorem, edge classification (lines 965, 1034, 1082, 1136, 1176) |
-| ch22/DFS.WhitePath | assume val | 2 | AGENT6 | White-path theorem fwd/bwd (lines 289, 342) |
-| ch23/MST.Spec | admit | 1 | AGENT7 | Exchange in spanning tree (line 799) |
-| ch23/Kruskal.Spec | admit | 9 | AGENT8 | Forest, MST invariant (lines 615, 681, 688, 710, 742, 769, 780, 893, 901) |
-| ch23/Kruskal.fst | assume val | 1 | AGENT8 | Maintains forest (line 81) |
-| ch23/Prim.Spec | admit | 6 | AGENT8 | Light edge, edge count (lines 195, 209, 270, 359, 380, 412) |
-| ch26/MaxFlow.Spec | assume | 2 | — | Weak duality + MFMC axioms (lines 354, 382) |
-| ch26/MaxFlow.Complexity | assume | 1 | — | Critical edge existence (line 102) |
+| ch08/RadixSort.Spec | admit | 2 | AGENT1 | Stability reasoning (lines 349, 373) |
+| ch08/RadixSort.Stability | admit | 2 | AGENT1 | Core stability cascade (lines 236, 277) |
+| ch08/RadixSort.MultiDigit | admit | 2 | AGENT1 | Multi-pass stability (lines 394, 415) |
+| ch08/RadixSort.FullSort | admit | 4 | AGENT1 | References to Stability (lines 496, 500, 521, 525) |
+| ch22/DFS.Spec | assume val | 5 | AGENT2 | Parenthesis theorem, edge classification (lines 965, 1034, 1082, 1136, 1176) |
+| ch22/DFS.WhitePath | assume val | 2 | AGENT2 | White-path theorem fwd/bwd (lines 289, 342) |
+| ch23/MST.Spec | admit | 1 | AGENT4 | Exchange in spanning tree (line 799) |
+| ch23/Kruskal.Spec | admit | 9 | AGENT5 | Forest, MST invariant (lines 615, 681, 688, 710, 742, 769, 780, 893, 901) |
+| ch23/Kruskal.fst | assume val | 1 | AGENT5 | Maintains forest (line 81) |
+| ch23/Prim.Spec | admit | 6 | AGENT6 | Light edge, edge count (lines 195, 209, 270, 359, 380, 412) |
+| ch26/MaxFlow.Spec | assume | 2 | AGENT13 | Weak duality + MFMC axioms (lines 354, 382) |
+| ch26/MaxFlow.Complexity | assume | 1 | AGENT13 | Critical edge existence (line 102) |
 | **TOTAL (admits)** | | **26** | | |
 | **TOTAL (assume vals)** | | **8** | | |
 | **TOTAL (assumes)** | | **3** | | Mathematical axioms, beyond scope |
@@ -774,15 +782,16 @@ All tasks from the previous round (AGENT1–AGENT10, AGENT19) are complete:
 
 | File | Gap | Agent | Description |
 |------|-----|-------|-------------|
-| ch12/BST.fst tree_search | One-sided | AGENT11 | None case: no guarantee key absent |
-| ch12/BST.fst tree_insert | One-sided | AGENT11 | Success case: nothing proven about insertion |
-| ch12/BST.Delete.fst | Weak | AGENT11 | Only proves valid[idx]=false or lengths preserved |
-| ch04/MaxSubarray.Kadane | Self-referential | AGENT2 | result==kadane_spec, not >= all subarrays |
-| ch24/BellmanFord | One-sided | AGENT12 | no_neg_cycle=false: no negative cycle proof |
-| ch24/Dijkstra | Upper bound only | AGENT12 | dist[v]<=sp_dist, not equality |
-| ch15/LCS | Recurrence only | AGENT13 | result==lcs_length, no is_subsequence definition |
-| ch32/KMP | Trivial bounds | AGENT13 | count bounds only, not == count_matches_spec |
-| ch25/FloydWarshall | Recurrence only | AGENT13 | result==fw_outer, no shortest-path proof |
+| ch12/BST.fst tree_search | One-sided | AGENT7 | None case: no guarantee key absent |
+| ch12/BST.fst tree_insert | One-sided | AGENT7 | Success case: nothing proven about insertion |
+| ch12/BST.Delete.fst | Weak | AGENT7 | Only proves valid[idx]=false or lengths preserved |
+| ch04/MaxSubarray.Kadane | Self-referential | AGENT3 | result==kadane_spec, not >= all subarrays |
+| ch04/MaxSubarray.DC | Disconnected | AGENT14 | DC proven optimal but not connected to Kadane |
+| ch24/BellmanFord | One-sided | AGENT8 | no_neg_cycle=false: no negative cycle proof |
+| ch24/Dijkstra | Upper bound only | AGENT9 | dist[v]<=sp_dist, not equality |
+| ch15/LCS | Recurrence only | AGENT10 | result==lcs_length, no is_subsequence definition |
+| ch32/KMP | Trivial bounds | AGENT11 | count bounds only, not == count_matches_spec |
+| ch25/FloydWarshall | Recurrence only | AGENT12 | result==fw_outer, no shortest-path proof |
 
 ### Files with 0 admits (fully verified)
 
