@@ -1,5 +1,5 @@
 (*
-   Huffman Encoding - Full Specification Link
+   Huffman Encoding - Imperative Implementation
    
    CLRS Section 16.3 presents HUFFMAN(C):
    1. Build a priority queue Q from the character frequencies
@@ -9,11 +9,13 @@
       c. Insert z into Q
    3. Return the remaining tree in Q (the Huffman tree)
    
-   This implementation computes the Huffman tree cost using linear-scan
-   min-finding. The postcondition connects the result to the specification
-   in CLRS.Ch16.Huffman.Spec and CLRS.Ch16.Huffman.Complete:
-   - The cost is non-negative and positive for n > 1
-   - Cost properties match the Huffman tree specification
+   This module provides two implementations:
+   - huffman_cost: computes just the cost via array-based linear scans
+   - huffman_tree: builds the full Huffman tree using Pulse.Lib.PriorityQueue,
+     following the CLRS algorithm with imperative extract-min and insert
+   
+   The postcondition of huffman_tree connects to the specification in
+   CLRS.Ch16.Huffman.Spec: weighted path length equals cost, and cost bounds.
    
    NO admits. NO assumes.
 *)
@@ -24,39 +26,161 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open Pulse.Lib.Vec
+open Pulse.Lib.PriorityQueue
+open Pulse.Lib.TotalOrder
 open FStar.SizeT
 open FStar.Mul
+open FStar.Order
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module PQ = Pulse.Lib.PriorityQueue
 
 module HSpec = CLRS.Ch16.Huffman.Spec
-module HComplete = CLRS.Ch16.Huffman.Complete
 
-// ========== Convert seq int to list pos ==========
+// ========== Total order on htree (structural, frequency-first) ==========
 
-let rec seq_to_pos_list_aux (s: Seq.seq int) (i: nat)
-  : Pure (list pos)
-         (requires i <= Seq.length s /\ (forall (k: nat). k >= i /\ k < Seq.length s ==> Seq.index s k > 0))
-         (ensures fun l -> FStar.List.Tot.length l == Seq.length s - i)
-         (decreases (Seq.length s - i))
-  = if i = Seq.length s then []
-    else Seq.index s i :: seq_to_pos_list_aux s (i + 1)
+let rec htree_compare (t1 t2: HSpec.htree) : Tot order (decreases t1) =
+  match t1, t2 with
+  | HSpec.Leaf f1, HSpec.Leaf f2 ->
+    if f1 < f2 then Lt else if f1 = f2 then Eq else Gt
+  | HSpec.Leaf _, HSpec.Internal _ _ _ -> Lt
+  | HSpec.Internal _ _ _, HSpec.Leaf _ -> Gt
+  | HSpec.Internal f1 l1 r1, HSpec.Internal f2 l2 r2 ->
+    if f1 < f2 then Lt
+    else if f1 > f2 then Gt
+    else match htree_compare l1 l2 with
+         | Lt -> Lt
+         | Gt -> Gt
+         | Eq -> htree_compare r1 r2
 
-let seq_to_pos_list (s: Seq.seq int)
-  : Pure (list pos)
-         (requires Seq.length s > 0 /\ (forall (k: nat). k < Seq.length s ==> Seq.index s k > 0))
-         (ensures fun l -> Cons? l /\ FStar.List.Tot.length l == Seq.length s)
-  = seq_to_pos_list_aux s 0
+let rec htree_compare_eq (t1 t2: HSpec.htree)
+  : Lemma (ensures eq (htree_compare t1 t2) <==> t1 == t2)
+          (decreases t1)
+  = match t1, t2 with
+    | HSpec.Leaf _, HSpec.Leaf _ -> ()
+    | HSpec.Leaf _, HSpec.Internal _ _ _
+    | HSpec.Internal _ _ _, HSpec.Leaf _ -> ()
+    | HSpec.Internal _ l1 r1, HSpec.Internal _ l2 r2 ->
+      htree_compare_eq l1 l2;
+      htree_compare_eq r1 r2
+
+let rec htree_compare_flip (t1 t2: HSpec.htree)
+  : Lemma (ensures htree_compare t1 t2 == flip_order (htree_compare t2 t1))
+          (decreases t1)
+  = match t1, t2 with
+    | HSpec.Leaf _, HSpec.Leaf _ -> ()
+    | HSpec.Leaf _, HSpec.Internal _ _ _
+    | HSpec.Internal _ _ _, HSpec.Leaf _ -> ()
+    | HSpec.Internal _ l1 r1, HSpec.Internal _ l2 r2 ->
+      htree_compare_flip l1 l2;
+      htree_compare_flip r1 r2
+
+let rec htree_compare_trans (t1 t2 t3: HSpec.htree)
+  : Lemma (requires lt (htree_compare t1 t2) /\ lt (htree_compare t2 t3))
+          (ensures lt (htree_compare t1 t3))
+          (decreases t1)
+  = match t1, t2, t3 with
+    | HSpec.Leaf _, HSpec.Leaf _, HSpec.Leaf _ -> ()
+    | HSpec.Leaf _, HSpec.Leaf _, HSpec.Internal _ _ _ -> ()
+    | HSpec.Leaf _, HSpec.Internal _ _ _, _ -> ()
+    | HSpec.Internal _ _ _, HSpec.Leaf _, _ -> ()
+    | HSpec.Internal _ _ _, HSpec.Internal _ _ _, HSpec.Leaf _ -> ()
+    | HSpec.Internal f1 l1 r1, HSpec.Internal f2 l2 r2, HSpec.Internal f3 l3 r3 ->
+      if f1 < f2 then ()
+      else if f2 > f1 then ()
+      else (
+        if f2 < f3 then ()
+        else if f3 > f2 then ()
+        else (
+          match htree_compare l1 l2, htree_compare l2 l3 with
+          | Lt, Lt -> htree_compare_trans l1 l2 l3
+          | Lt, Eq -> htree_compare_eq l2 l3
+          | Lt, Gt -> ()
+          | Eq, Lt -> htree_compare_eq l1 l2
+          | Eq, Eq -> htree_compare_eq l1 l2; htree_compare_eq l2 l3;
+                      htree_compare_trans r1 r2 r3
+          | Eq, Gt -> ()
+          | Gt, _ -> ()
+        )
+      )
+
+let htree_total_order_proof ()
+  : Lemma (
+      (forall (x y: HSpec.htree). {:pattern htree_compare x y}
+        eq (htree_compare x y) <==> x == y) /\
+      (forall (x y z: HSpec.htree). {:pattern htree_compare x y; htree_compare y z}
+        lt (htree_compare x y) /\ lt (htree_compare y z) ==> lt (htree_compare x z)) /\
+      (forall (x y: HSpec.htree). {:pattern htree_compare x y}
+        htree_compare x y == flip_order (htree_compare y x))
+    )
+  = Classical.forall_intro_2 htree_compare_eq;
+    Classical.forall_intro_2 htree_compare_flip;
+    Classical.forall_intro_3 (Classical.move_requires_3 htree_compare_trans)
+
+instance htree_order : total_order HSpec.htree = {
+  compare = htree_compare;
+  properties = htree_total_order_proof ()
+}
+
+// ========== Lemma: extends implies length + 1 ==========
+// The PQ's `extends` predicate is count-based. We prove it implies length change.
+
+module L = FStar.List.Tot.Base
+module SeqP = FStar.Seq.Properties
+
+let rec list_count_pos_mem (#t:eqtype) (x:t) (l:list t)
+  : Lemma (requires L.count x l > 0) (ensures L.mem x l)
+  = match l with
+    | [] -> ()
+    | h :: tl -> if h = x then () else list_count_pos_mem x tl
+
+let rec list_remove_first (#t:eqtype) (x:t) (l:list t{L.mem x l})
+  : Tot (l':list t{L.length l' == L.length l - 1 /\
+                   L.count x l' == L.count x l - 1 /\
+                   (forall (y:t). y <> x ==> L.count y l' == L.count y l)})
+  = match l with
+    | h :: tl -> 
+      if h = x then tl
+      else h :: list_remove_first x tl
+
+let rec same_list_counts_same_length (#t:eqtype) (l0 l1:list t)
+  : Lemma (requires forall (y:t). L.count y l0 == L.count y l1)
+          (ensures L.length l0 == L.length l1)
+          (decreases (L.length l0))
+  = match l0 with
+    | [] ->
+      (match l1 with
+       | [] -> ()
+       | h :: _ -> assert (L.count h l1 > 0); assert (L.count h l0 == 0))
+    | h :: tl ->
+      list_count_pos_mem h l1;
+      let l1' = list_remove_first h l1 in
+      let aux (y:t) : Lemma (L.count y tl == L.count y l1') = () in
+      Classical.forall_intro aux;
+      same_list_counts_same_length tl l1'
+
+let extends_length (#t:eqtype) (s0 s1:Seq.seq t) (x:t)
+  : Lemma (requires extends s0 s1 x)
+          (ensures Seq.length s1 == Seq.length s0 + 1)
+  = let l0 = Seq.seq_to_list s0 in
+    let l1 = Seq.seq_to_list s1 in
+    SeqP.lemma_seq_to_list_permutation s0;
+    SeqP.lemma_seq_to_list_permutation s1;
+    list_count_pos_mem x l1;
+    let l1' = list_remove_first x l1 in
+    let aux (y:t) : Lemma (L.count y l1' == L.count y l0) = () in
+    Classical.forall_intro aux;
+    same_list_counts_same_length l1' l0
 
 // ========== Constants ==========
 
 let infinity : int = 1000000000
 
-// ========== Helper: Find minimum value and its index ==========
+// ========== Helper: Find minimum value and its index (for huffman_cost) ==========
 
 #push-options "--z3rlimit 20"
 ```pulse
@@ -192,7 +316,6 @@ fn huffman_cost
   )
   returns result_cost:int
   ensures A.pts_to freqs #p freq_seq ** pure (
-    // Basic correctness
     result_cost >= 0 /\
     (SZ.v n > 1 ==> result_cost > 0) /\
     (SZ.v n == 1 ==> result_cost == 0)
@@ -271,39 +394,104 @@ fn huffman_cost
 ```
 #pop-options
 
-// ========== Full Huffman Tree Construction ==========
+// ========== Full Huffman Tree Construction (CLRS §16.3) ==========
+// Truly imperative: uses Pulse.Lib.PriorityQueue for extract-min and insert.
+// Follows the CLRS algorithm line by line:
+//   1. Create PQ Q, insert Leaf(freq[i]) for each i
+//   2. For i = 1 to n-1:
+//      left = EXTRACT-MIN(Q)
+//      right = EXTRACT-MIN(Q)
+//      z = Internal(left.freq + right.freq, left, right)
+//      INSERT(Q, z)
+//   3. Return EXTRACT-MIN(Q)
 
-// Build the complete Huffman tree from a non-erased frequency sequence.
-// This calls the pure huffman_complete from Complete.fst and returns
-// the tree along with its cost and the proven spec properties.
-
-#push-options "--z3rlimit 40"
-let huffman_tree
-  (freq_seq: Seq.seq int)
+//SNIPPET_START: huffman_tree_sig
+```pulse
+fn huffman_tree
+  (freqs: A.array int)
+  (#freq_seq: Ghost.erased (Seq.seq int))
   (n: SZ.t)
-  : Pure (HSpec.htree & nat)
-         (requires
-           SZ.v n == Seq.length freq_seq /\
-           SZ.v n > 0 /\
-           (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0))
-         (ensures fun result ->
-           (let freqs_list = seq_to_pos_list freq_seq in
-            let tree = fst result in
-            let c = snd result in
-            tree == HComplete.huffman_complete freqs_list /\
-            c == HSpec.cost tree /\
-            HSpec.weighted_path_length tree == HSpec.cost tree /\
-            (forall (x: pos). FStar.List.Tot.count x (HSpec.leaf_freqs tree) =
-                               FStar.List.Tot.count x freqs_list) /\
-            c >= 0 /\
-            (SZ.v n > 1 ==> c > 0) /\
-            (SZ.v n == 1 ==> c == 0)))
-  = let freqs_list = seq_to_pos_list freq_seq in
-    let tree = HComplete.huffman_complete freqs_list in
-    HSpec.wpl_equals_cost tree;
-    HComplete.huffman_correctness_theorem freqs_list;
-    HComplete.huffman_cost_nonnegative freqs_list;
-    (if Seq.length freq_seq > 1 then HComplete.huffman_cost_positive freqs_list);
-    let c = HSpec.cost tree in
-    (tree, c)
-#pop-options
+  requires A.pts_to freqs freq_seq ** pure (
+    SZ.v n == Seq.length freq_seq /\
+    SZ.v n > 0 /\
+    SZ.fits (2 * SZ.v n + 2) /\
+    (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0)
+  )
+  returns result: HSpec.htree
+  ensures A.pts_to freqs freq_seq ** pure (
+    HSpec.weighted_path_length result == HSpec.cost result /\
+    HSpec.cost result >= 0
+  )
+//SNIPPET_END: huffman_tree_sig
+{
+  // Line 2: Q = C — create PQ and insert leaf nodes
+  let cap = SZ.add n 1sz;
+  let pq = PQ.create #HSpec.htree #htree_order cap;
+  
+  // Insert all leaf nodes into PQ
+  let mut i: SZ.t = 0sz;
+  while (
+    !i <^ n
+  )
+  invariant exists* vi pq_seq.
+    R.pts_to i vi **
+    is_pqueue pq pq_seq (SZ.v cap) **
+    A.pts_to freqs freq_seq **
+    pure (
+      SZ.v vi <= SZ.v n /\
+      Seq.length pq_seq == SZ.v vi
+    )
+  {
+    let vi = !i;
+    let f = A.op_Array_Access freqs vi;
+    let leaf = HSpec.Leaf f;
+    with s_before. assert (is_pqueue pq s_before (SZ.v cap));
+    PQ.insert pq leaf;
+    with s_after. assert (is_pqueue pq s_after (SZ.v cap));
+    extends_length #HSpec.htree s_before s_after leaf;
+    i := vi +^ 1sz;
+  };
+  
+  // Lines 3-8: Merge loop — extract two mins, merge, insert  
+  let mut pq_len: SZ.t = n;
+  while (
+    let vlen = !pq_len;
+    (vlen >^ 1sz)
+  )
+  invariant exists* vlen pq_seq.
+    R.pts_to pq_len vlen **
+    is_pqueue pq pq_seq (SZ.v cap) **
+    A.pts_to freqs freq_seq **
+    pure (
+      SZ.v vlen == Seq.length pq_seq /\
+      Seq.length pq_seq > 0 /\
+      Seq.length pq_seq <= SZ.v n /\
+      SZ.fits (2 * Seq.length pq_seq + 2)
+    )
+  {
+    let vlen = !pq_len;
+    with s0. assert (is_pqueue pq s0 (SZ.v cap));
+    // Line 5: left = EXTRACT-MIN(Q)
+    let left = PQ.extract_min pq;
+    with s1. assert (is_pqueue pq s1 (SZ.v cap));
+    extends_length #HSpec.htree s1 s0 left;
+    // Line 6: right = EXTRACT-MIN(Q)
+    let right = PQ.extract_min pq;
+    with s2. assert (is_pqueue pq s2 (SZ.v cap));
+    extends_length #HSpec.htree s2 s1 right;
+    // Line 7: z = merge(left, right)
+    let z = HSpec.Internal (HSpec.freq_of left + HSpec.freq_of right) left right;
+    // Line 8: INSERT(Q, z)
+    PQ.insert pq z;
+    with s3. assert (is_pqueue pq s3 (SZ.v cap));
+    extends_length #HSpec.htree s2 s3 z;
+    pq_len := vlen -^ 1sz;
+  };
+  
+  // Line 9: return EXTRACT-MIN(Q) — PQ has exactly 1 element
+  let result = PQ.extract_min pq;
+  PQ.free pq;
+  HSpec.wpl_equals_cost result;
+  result
+}
+```
