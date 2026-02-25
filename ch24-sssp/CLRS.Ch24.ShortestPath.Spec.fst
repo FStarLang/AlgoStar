@@ -413,3 +413,92 @@ let triangle_ineq_implies_upper_bound
   =
   triangle_ineq_sp_bound dist weights n source v (n - 1)
 //SNIPPET_END: triangle_ineq_upper_bound
+
+(* ===== No Negative Cycles (flat representation) ===== *)
+
+//SNIPPET_START: no_neg_cycles_flat
+(* No negative cycles reachable from source: adding an n-th edge doesn't improve sp_dist *)
+let no_neg_cycles_flat (weights: Seq.seq int) (n: nat) (source: nat) : prop =
+  n > 0 /\ source < n /\
+  Seq.length weights == n * n /\
+  (forall (v: nat). v < n ==> sp_dist_k weights n source v n == sp_dist_k weights n source v (n - 1))
+//SNIPPET_END: no_neg_cycles_flat
+
+(* Helper: min_over_predecessors achieves bound through a specific predecessor *)
+let rec min_over_predecessors_achieves
+  (weights: Seq.seq int) (n: nat) (s v: nat) (k: nat{k > 0}) (best: int)
+  (u_start u_target: nat)
+  : Lemma
+    (requires u_start <= u_target /\ u_target < n /\
+              sp_dist_k weights n s u_target (k - 1) < inf /\
+              u_target * n + v < Seq.length weights /\
+              Seq.index weights (u_target * n + v) < inf)
+    (ensures min_over_predecessors weights n s v k best u_start <=
+             sp_dist_k weights n s u_target (k - 1) + Seq.index weights (u_target * n + v))
+    (decreases (n - u_start))
+  =
+  if u_start >= n then ()
+  else if u_start = u_target then begin
+    let w = if u_target * n + v < Seq.length weights
+            then Seq.index weights (u_target * n + v) else inf in
+    let via_u = sp_dist_k weights n s u_target (k - 1) in
+    let candidate = if via_u < inf && w < inf then via_u + w else inf in
+    let new_best = if candidate < best then candidate else best in
+    // candidate = via_u + w (since both < inf)
+    // new_best <= candidate = via_u + w
+    min_over_predecessors_improves weights n s v k new_best (u_start + 1)
+  end else begin
+    let w = if u_start * n + v < Seq.length weights
+            then Seq.index weights (u_start * n + v) else inf in
+    let via_u = sp_dist_k weights n s u_start (k - 1) in
+    let candidate = if via_u < inf && w < inf then via_u + w else inf in
+    let new_best = if candidate < best then candidate else best in
+    min_over_predecessors_achieves weights n s v k new_best (u_start + 1) u_target
+  end
+
+(* sp_dist_k triangle inequality: sp_dist_k(v, k) <= sp_dist_k(u, k-1) + w(u,v) *)
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+let sp_dist_k_triangle (weights: Seq.seq int) (n: nat) (s u v: nat) (k: nat)
+  : Lemma
+    (requires k > 0 /\ u < n /\ v < n /\ s < n /\
+              Seq.length weights == n * n /\
+              sp_dist_k weights n s u (k - 1) < inf /\
+              Seq.index weights (u * n + v) < inf)
+    (ensures sp_dist_k weights n s v k <=
+             sp_dist_k weights n s u (k - 1) + Seq.index weights (u * n + v))
+  =
+  let without = sp_dist_k weights n s v (k - 1) in
+  min_over_predecessors_achieves weights n s v k without 0 u;
+  min_over_predecessors_improves weights n s v k without 0
+#pop-options
+
+//SNIPPET_START: sp_dist_triangle_flat
+(* Under no negative cycles, sp_dist satisfies triangle inequality *)
+let sp_dist_triangle_flat (weights: Seq.seq int) (n: nat) (source u v: nat)
+  : Lemma
+    (requires no_neg_cycles_flat weights n source /\
+              u < n /\ v < n /\
+              sp_dist weights n source u < inf /\
+              Seq.index weights (u * n + v) < inf)
+    (ensures sp_dist weights n source v <=
+             sp_dist weights n source u + Seq.index weights (u * n + v))
+  =
+  // sp_dist_k(v, n) <= sp_dist_k(u, n-1) + w(u,v)  [by sp_dist_k_triangle with k=n]
+  sp_dist_k_triangle weights n source u v n;
+  // no_neg_cycles_flat: sp_dist_k(v, n) == sp_dist_k(v, n-1) == sp_dist(v)
+  // and sp_dist_k(u, n-1) == sp_dist(u)
+  ()
+//SNIPPET_END: sp_dist_triangle_flat
+
+(* sp_dist for source is non-positive (0 with 0 edges, monotone decreasing) *)
+let rec sp_dist_source_nonpositive (weights: Seq.seq int) (n: nat) (s: nat) (k: nat)
+  : Lemma
+    (ensures sp_dist_k weights n s s k <= 0)
+    (decreases k)
+  =
+  if k = 0 then ()
+  else begin
+    sp_dist_source_nonpositive weights n s (k - 1);
+    sp_dist_k_monotone weights n s s (k - 1);
+    min_over_predecessors_improves weights n s s k (sp_dist_k weights n s s (k - 1)) 0
+  end

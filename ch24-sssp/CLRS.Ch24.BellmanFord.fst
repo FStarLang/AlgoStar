@@ -24,6 +24,11 @@ module SP = CLRS.Ch24.ShortestPath.Spec
      * Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
      * Upper bound: dist[v] <= sp_dist(weights, n, source, v) for all v
        (from CLRS Corollary 24.3, proved in ShortestPath.Spec)
+    - If negative cycle detected (result == false):
+      * Exists a violating edge (u,v) with dist[v] > dist[u] + w(u,v)
+        (CLRS Corollary 24.5)
+    - If no negative-weight cycles (unconditional on result):
+      * dist[v] == sp_dist(source, v) for all v (CLRS Theorem 24.4)
    
    NO admits. NO assumes.
 *)
@@ -79,6 +84,120 @@ let partial_full (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
   (ensures no_violations dist weights n)
   = ()
 
+//SNIPPET_START: exists_violation
+/// Exists a violating edge: some edge (u,v) has dist[v] > dist[u] + w(u,v)
+let exists_violation (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : prop =
+  Seq.length dist == n /\
+  Seq.length weights == n * n /\
+  (exists (u v: nat). u < n /\ v < n /\
+    (let d_u = Seq.index dist u in
+     let d_v = Seq.index dist v in
+     let w = Seq.index weights (u * n + v) in
+     w < 1000000 /\ d_u < 1000000 /\ d_v > d_u + w))
+//SNIPPET_END: exists_violation
+
+/// Check if edge (u,v) violates triangle inequality; if so, exists_violation holds
+let check_edge_violation (dist: Seq.seq int) (weights: Seq.seq int) (n u v: nat)
+    (w du dv: int) (edge_ok: bool) : Lemma
+  (requires Seq.length dist == n /\ Seq.length weights == n * n /\
+            u < n /\ v < n /\
+            w == Seq.index weights (u * n + v) /\
+            du == Seq.index dist u /\
+            dv == Seq.index dist v /\
+            edge_ok == (w >= 1000000 || du >= 1000000 || dv <= du + w))
+  (ensures (not edge_ok) ==> exists_violation dist weights n)
+  = ()
+
+/// Lower bound invariant: dist[v] >= sp_dist[v] for all v
+let lower_bound_inv (dist: Seq.seq int) (weights: Seq.seq int) (n source: nat) : prop =
+  Seq.length dist == n /\
+  (forall (v: nat). v < n ==>
+    Seq.index dist v >= SP.sp_dist weights n source v)
+
+/// Relaxation step preserves lower bound (conditional on no_neg_cycles_flat)
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+let relax_step_lower_bound
+  (weights: Seq.seq int) (n source u_idx v_idx: nat)
+  (dist_u w_uv old_dist_v new_dist_v: int) (should_update: bool) : Lemma
+  (requires
+    n > 0 /\ source < n /\ u_idx < n /\ v_idx < n /\
+    Seq.length weights == n * n /\
+    w_uv == Seq.index weights (u_idx * n + v_idx) /\
+    new_dist_v == (if should_update then dist_u + w_uv else old_dist_v) /\
+    (should_update ==> (w_uv < 1000000 /\ dist_u < 1000000 /\ dist_u + w_uv < old_dist_v)) /\
+    (SP.no_neg_cycles_flat weights n source ==>
+      (dist_u >= SP.sp_dist weights n source u_idx /\
+       old_dist_v >= SP.sp_dist weights n source v_idx)))
+  (ensures
+    SP.no_neg_cycles_flat weights n source ==>
+      new_dist_v >= SP.sp_dist weights n source v_idx)
+  =
+  let helper (_:unit) : Lemma
+    (requires SP.no_neg_cycles_flat weights n source /\
+              dist_u >= SP.sp_dist weights n source u_idx /\
+              old_dist_v >= SP.sp_dist weights n source v_idx)
+    (ensures new_dist_v >= SP.sp_dist weights n source v_idx)
+    =
+    if should_update then
+      SP.sp_dist_triangle_flat weights n source u_idx v_idx
+    else ()
+  in
+  FStar.Classical.move_requires helper ()
+#pop-options
+
+/// Seq.upd preserves lower_bound_inv (conditional)
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let upd_preserves_lower_bound_cond
+  (dist weights: Seq.seq int) (n source v_idx: nat) (new_val: int) : Lemma
+  (requires Seq.length dist == n /\ v_idx < n /\
+            (SP.no_neg_cycles_flat weights n source ==>
+              lower_bound_inv dist weights n source /\
+              new_val >= SP.sp_dist weights n source v_idx))
+  (ensures SP.no_neg_cycles_flat weights n source ==>
+    lower_bound_inv (Seq.upd dist v_idx new_val) weights n source)
+  =
+  let helper (_:unit) : Lemma
+    (requires SP.no_neg_cycles_flat weights n source /\
+              lower_bound_inv dist weights n source /\
+              new_val >= SP.sp_dist weights n source v_idx)
+    (ensures lower_bound_inv (Seq.upd dist v_idx new_val) weights n source)
+    =
+    let aux (w: nat{w < n}) : Lemma
+      (Seq.index (Seq.upd dist v_idx new_val) w >= SP.sp_dist weights n source w) =
+      if w = v_idx then () else ()
+    in
+    FStar.Classical.forall_intro aux
+  in
+  FStar.Classical.move_requires helper ()
+#pop-options
+
+/// Initialization satisfies lower bound
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let init_satisfies_lower_bound (dist weights: Seq.seq int) (n source: nat) : Lemma
+  (requires Seq.length dist == n /\ n > 0 /\ source < n /\
+            Seq.length weights == n * n /\
+            (forall (j: nat). j < n ==>
+              (if j = source then Seq.index dist j == 0
+               else Seq.index dist j == 1000000)))
+  (ensures SP.no_neg_cycles_flat weights n source ==>
+    lower_bound_inv dist weights n source)
+  =
+  let helper (_:unit) : Lemma
+    (requires SP.no_neg_cycles_flat weights n source)
+    (ensures lower_bound_inv dist weights n source)
+    =
+    let aux (v: nat{v < n}) : Lemma
+      (Seq.index dist v >= SP.sp_dist weights n source v) =
+      SP.sp_dist_k_bounded weights n source v (n - 1);
+      if v = source then
+        SP.sp_dist_source_nonpositive weights n source (n - 1)
+      else ()
+    in
+    FStar.Classical.forall_intro aux
+  in
+  FStar.Classical.move_requires helper ()
+#pop-options
+
 /// Connect BF triangle_inequality + valid_distances to SP.has_triangle_inequality
 let bf_to_sp_triangle (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
   (requires triangle_inequality dist weights n /\
@@ -107,6 +226,45 @@ let bf_sp_upper_bound_cond (dist weights: Seq.seq int) (n source: nat) (flag: bo
       in
       FStar.Classical.forall_intro aux
     end
+#pop-options
+
+/// Combine upper bound (from triangle inequality) and lower bound for equality
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let bf_sp_equality (dist weights: Seq.seq int) (n source: nat) : Lemma
+  (requires Seq.length dist == n /\
+            Seq.length weights == n * n /\
+            n > 0 /\ source < n /\
+            Seq.index dist source == 0 /\
+            valid_distances dist n /\
+            triangle_inequality dist weights n /\
+            lower_bound_inv dist weights n source)
+  (ensures forall (v: nat). v < n ==>
+    Seq.index dist v == SP.sp_dist weights n source v)
+  =
+  bf_to_sp_triangle dist weights n;
+  let aux (v: nat{v < n}) : Lemma
+    (ensures Seq.index dist v == SP.sp_dist weights n source v) =
+    SP.triangle_ineq_implies_upper_bound dist weights n source v
+  in
+  FStar.Classical.forall_intro aux
+#pop-options
+
+/// Conditional equality: when triangle_ineq AND no_neg_cycles_flat both hold
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let bf_sp_equality_cond (dist weights: Seq.seq int) (n source: nat) (flag: bool) : Lemma
+  (requires Seq.length dist == n /\
+            Seq.length weights == n * n /\
+            n > 0 /\ source < n /\
+            Seq.index dist source == 0 /\
+            valid_distances dist n /\
+            (flag == true ==> triangle_inequality dist weights n) /\
+            (SP.no_neg_cycles_flat weights n source ==>
+              lower_bound_inv dist weights n source))
+  (ensures SP.no_neg_cycles_flat weights n source /\ flag == true ==>
+    (forall (v: nat). v < n ==>
+      Seq.index dist v == SP.sp_dist weights n source v))
+  = if flag then
+      Classical.move_requires (fun () -> bf_sp_equality dist weights n source) ()
 #pop-options
 
 #push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
@@ -142,10 +300,19 @@ fn bellman_ford
       valid_distances sdist' (SZ.v n) /\
       (no_neg_cycle == true ==> triangle_inequality sdist' sweights (SZ.v n)) /\
       // Shortest-path upper bound (CLRS Corollary 24.3):
-      // When no negative cycle, dist[v] ≤ shortest-path distance for all v
       (no_neg_cycle == true ==>
         (forall (v: nat). v < SZ.v n ==>
-          Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
+          Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
+      // Negative-cycle detection (CLRS Corollary 24.5):
+      (no_neg_cycle == false ==> exists_violation sdist' sweights (SZ.v n)) /\
+      // Lower bound: dist[v] >= sp_dist[v] (under no negative cycles)
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
+        lower_bound_inv sdist' sweights (SZ.v n) (SZ.v source)) /\
+      // Shortest-path equality (CLRS Theorem 24.4):
+      // When no negative cycles and detection passed, dist[v] == sp_dist[v] for all v
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) /\ no_neg_cycle == true ==>
+        (forall (v: nat). v < SZ.v n ==>
+          Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
     )
 //SNIPPET_END: bellman_ford_sig
 {
@@ -176,6 +343,10 @@ fn bellman_ford
   
   let _ = !init_i;
   
+  // Establish lower bound after initialization
+  with sdist_init. assert (A.pts_to dist sdist_init);
+  init_satisfies_lower_bound sdist_init sweights (SZ.v n) (SZ.v source);
+  
   // Relaxation: n-1 rounds
   let mut round: SZ.t = 1sz;
   
@@ -190,7 +361,9 @@ fn bellman_ford
       SZ.v vround <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
       Seq.index sdist_current (SZ.v source) == 0 /\
-      valid_distances sdist_current (SZ.v n)
+      valid_distances sdist_current (SZ.v n) /\
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
+        lower_bound_inv sdist_current sweights (SZ.v n) (SZ.v source))
     )
   {
     let vround = !round;
@@ -208,7 +381,9 @@ fn bellman_ford
         SZ.v vu <= SZ.v n /\
         Seq.length sdist_u == SZ.v n /\
         Seq.index sdist_u (SZ.v source) == 0 /\
-        valid_distances sdist_u (SZ.v n)
+        valid_distances sdist_u (SZ.v n) /\
+        (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
+          lower_bound_inv sdist_u sweights (SZ.v n) (SZ.v source))
       )
     {
       let vu = !u;
@@ -229,10 +404,13 @@ fn bellman_ford
           SZ.v vv <= SZ.v n /\
           Seq.length sdist_v == SZ.v n /\
           Seq.index sdist_v (SZ.v source) == 0 /\
-          valid_distances sdist_v (SZ.v n)
+          valid_distances sdist_v (SZ.v n) /\
+          (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
+            lower_bound_inv sdist_v sweights (SZ.v n) (SZ.v source))
         )
       {
         let vv = !v;
+        with sdist_v. assert (A.pts_to dist sdist_v);
         
         let w_idx = vu *^ n +^ vv;
         let w_uv = A.op_Array_Access weights w_idx;
@@ -257,6 +435,12 @@ fn bellman_ford
           assert pure (old_dist_v == 0);
           assert pure (new_dist_v == 0);
         };
+        
+        // Preserve lower bound through relaxation
+        relax_step_lower_bound sweights (SZ.v n) (SZ.v source) (SZ.v vu) (SZ.v vv)
+          dist_u w_uv old_dist_v new_dist_v should_update;
+        upd_preserves_lower_bound_cond sdist_v sweights (SZ.v n) (SZ.v source) (SZ.v vv)
+          new_dist_v;
         
         A.op_Array_Assignment dist vv new_dist_v;
         
@@ -292,7 +476,10 @@ fn bellman_ford
       Seq.length sdist_check == SZ.v n /\
       Seq.index sdist_check (SZ.v source) == 0 /\
       valid_distances sdist_check (SZ.v n) /\
-      (vno == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) 0)
+      (vno == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) 0) /\
+      (vno == false ==> exists_violation sdist_check sweights (SZ.v n)) /\
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
+        lower_bound_inv sdist_check sweights (SZ.v n) (SZ.v source))
     )
   {
     let vcu = !cu;
@@ -311,7 +498,8 @@ fn bellman_ford
       A.pts_to dist sdist_check **
       pure (
         SZ.v vcv <= SZ.v n /\
-        (vno_inner == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv))
+        (vno_inner == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv)) /\
+        (vno_inner == false ==> exists_violation sdist_check sweights (SZ.v n))
       )
     {
       let vcv = !cv;
@@ -325,6 +513,8 @@ fn bellman_ford
       let edge_ok = (w >= 1000000 || d_u >= 1000000 || d_v <= d_u + w);
       
       let vno = !no_neg;
+      // Must call before the if — Pulse can't call lemmas inside if blocks
+      check_edge_violation sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv) w d_u d_v edge_ok;
       if (not edge_ok) {
         no_neg := false;
       };
@@ -342,6 +532,8 @@ fn bellman_ford
   with sdist_final. assert (A.pts_to dist sdist_final);
   // Connect triangle inequality to shortest-path upper bound
   bf_sp_upper_bound_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
+  // Connect upper + lower bound to equality (under no_neg_cycles_flat)
+  bf_sp_equality_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
   
   result := final_no_neg;
 }
