@@ -1930,14 +1930,536 @@ let rec subset_noRepeats_length_le (a b: list edge)
       prove_subset_tl tl;
       subset_noRepeats_length_le tl b'
 
-// Kruskal's algorithm produces a spanning tree
+// Helper: check if edge e is in a list using mem_edge
+let mem_edge_in_list (e: edge) (es: list edge) : bool = mem_edge e es
+
+// If both endpoints of e are reachable from root in tl, adding e doesn't create new reachability
+#push-options "--z3rlimit 30"
+let redundant_edge_reachability (tl: list edge) (e: edge) (root v: nat)
+  : Lemma (requires same_component tl root e.u /\ same_component tl root e.v /\
+                    same_component (e :: tl) root v)
+          (ensures same_component tl root v)
+  = if same_component_dec tl root v then
+      same_component_dec_sound tl root v
+    else begin
+      eliminate exists (path: list edge).
+        subset_edges path (e :: tl) /\ is_path_from_to path root v
+      returns same_component tl root v
+      with _. begin
+        if root = v then same_component_reflexive tl root
+        else begin
+          extract_simple_path path root v;
+          FStar.Classical.exists_elim 
+            (same_component tl root v)
+            #_
+            #(fun (path': list edge) -> is_path_from_to path' root v /\
+                subset_edges path' path /\ all_edges_distinct path' /\ Cons? path')
+            ()
+            (fun path' ->
+              subset_edges_transitive path' path (e :: tl);
+              if not (mem_edge_in_list e path') then begin
+                path_not_using_e_in_t path' e tl
+              end else begin
+                split_at_first_e path' e tl root v;
+                // Postcondition: (reachable tl root e.u /\ reachable tl e.v v) \/
+                //                (reachable tl root e.v /\ reachable tl e.u v)
+                // From precondition: reachable tl root e.u /\ reachable tl root e.v
+                // In either case, we can reach v from root in tl
+                assert (reachable tl root e.u);
+                assert (reachable tl root e.v);
+                // If e.v reaches v, use root->e.v->v
+                // If e.u reaches v, use root->e.u->v  
+                FStar.Classical.move_requires (reachable_transitive tl root e.v) v;
+                FStar.Classical.move_requires (reachable_transitive tl root e.u) v;
+                // Now we have: reachable tl e.v v ==> reachable tl root v
+                //              reachable tl e.u v ==> reachable tl root v
+                // One of these must hold from split_at_first_e
+                assert ((reachable tl e.v v) \/ (reachable tl e.u v))
+              end)
+        end
+      end
+    end
+#pop-options
+
+// If neither endpoint of e is reachable from root in tl, adding e doesn't help root
+let neither_endpoint_reachability (tl: list edge) (e: edge) (root v: nat)
+  : Lemma (requires ~(same_component tl root e.u) /\ ~(same_component tl root e.v) /\
+                    same_component (e :: tl) root v)
+          (ensures same_component tl root v)
+  = eliminate exists (path: list edge).
+      subset_edges path (e :: tl) /\ is_path_from_to path root v
+    returns same_component tl root v
+    with _. begin
+      if root = v then same_component_reflexive tl root
+      else begin
+        extract_simple_path path root v;
+        FStar.Classical.exists_elim 
+          (same_component tl root v)
+          #_
+          #(fun (path': list edge) -> is_path_from_to path' root v /\
+              subset_edges path' path /\ all_edges_distinct path' /\ Cons? path')
+          ()
+          (fun path' ->
+            subset_edges_transitive path' path (e :: tl);
+            if not (mem_edge_in_list e path') then
+              path_not_using_e_in_t path' e tl
+            else begin
+              split_at_first_e path' e tl root v;
+              // Either root reaches e.u in tl or root reaches e.v in tl
+              // But we assumed neither! Contradiction.
+              assert (reachable tl root e.u \/ reachable tl root e.v);
+              ()
+            end)
+      end
+    end
+
+// Bridge edge decomposition: if e.u reachable from root in tl but e.v not,
+// then v reachable from root in (e::tl) iff v reachable from root in tl OR v reachable from e.v in tl
+let bridge_edge_reachability (tl: list edge) (e: edge) (root v: nat)
+  : Lemma (requires same_component tl root e.u /\ ~(same_component tl root e.v) /\
+                    same_component (e :: tl) root v)
+          (ensures same_component tl root v \/ same_component tl e.v v)
+  = if same_component_dec tl root v then
+      same_component_dec_sound tl root v
+    else begin
+      eliminate exists (path: list edge).
+        subset_edges path (e :: tl) /\ is_path_from_to path root v
+      returns (same_component tl root v \/ same_component tl e.v v)
+      with _. begin
+        if root = v then begin same_component_reflexive tl root; () end
+        else begin
+          extract_simple_path path root v;
+          FStar.Classical.exists_elim 
+            (same_component tl root v \/ same_component tl e.v v)
+            #_
+            #(fun (path': list edge) -> is_path_from_to path' root v /\
+                subset_edges path' path /\ all_edges_distinct path' /\ Cons? path')
+            ()
+            (fun path' ->
+              subset_edges_transitive path' path (e :: tl);
+              if not (mem_edge_in_list e path') then begin
+                path_not_using_e_in_t path' e tl;
+                ()
+              end else begin
+                split_at_first_e path' e tl root v;
+                // Case 1: reachable tl root e.u /\ reachable tl e.v v → done
+                // Case 2: reachable tl root e.v /\ reachable tl e.u v
+                //   root reaches e.v in tl → contradicts hypothesis ~(same_component tl root e.v)
+                //   So case 2 leads to contradiction → done trivially
+                if same_component_dec tl root v then begin
+                  same_component_dec_sound tl root v; ()
+                end else begin
+                  // We have (reachable tl root e.u ∧ reachable tl e.v v) ∨ 
+                  //         (reachable tl root e.v ∧ reachable tl e.u v)
+                  // Case 2 gives reachable tl root e.v, contradicts hypothesis
+                  // So must be case 1: reachable tl e.v v
+                  ()
+                end
+              end)
+        end
+      end
+    end
+
+// Count vertices in [0,n) satisfying predicate
+let rec count_pred (f: nat -> bool) (n: nat) : nat =
+  if n = 0 then 0
+  else (if f (n - 1) then 1 else 0) + count_pred f (n - 1)
+
+// Count vertices in [0,m) reachable from root in es, restricted to v < n
+let count_reachable (es: list edge) (root: nat) (n m: nat) : nat =
+  count_pred (fun v -> v < n && same_component_dec es root v) m
+
+let rec count_pred_le (f: nat -> bool) (n: nat)
+  : Lemma (ensures count_pred f n <= n) (decreases n)
+  = if n = 0 then () else count_pred_le f (n - 1)
+
+// If f1 implies f2, count f1 ≤ count f2
+let rec count_pred_mono (f1 f2: (nat -> bool)) (n: nat)
+  : Lemma (requires forall (i: nat). i < n ==> f1 i ==> f2 i)
+          (ensures count_pred f1 n <= count_pred f2 n)
+          (decreases n)
+  = if n = 0 then () else count_pred_mono f1 f2 (n - 1)
+
+// If f1 and f2 are disjoint: count (f1 ∨ f2) = count f1 + count f2
+let rec count_pred_disjoint_union (f1 f2: (nat -> bool)) (n: nat)
+  : Lemma (requires forall (i: nat). i < n ==> ~(f1 i /\ f2 i))
+          (ensures count_pred (fun i -> f1 i || f2 i) n = count_pred f1 n + count_pred f2 n)
+          (decreases n)
+  = if n = 0 then () else count_pred_disjoint_union f1 f2 (n - 1)
+
+// Filter edges by predicate
+let rec filter_edges (f: edge -> bool) (es: list edge) : list edge =
+  match es with
+  | [] -> []
+  | e :: rest -> if f e then e :: filter_edges f rest else filter_edges f rest
+
+let rec filter_edges_length (f: edge -> bool) (es: list edge)
+  : Lemma (ensures length (filter_edges f es) <= length es) (decreases es)
+  = match es with | [] -> () | _ :: rest -> filter_edges_length f rest
+
+// Membership in filtered list: if e ∈ es and f e and f respects edge_eq, then e ∈ filter f es
+let rec mem_filter_edges_resp (e: edge) (f: edge -> bool) (es: list edge)
+  : Lemma (requires mem_edge e es /\ f e /\
+                    (forall (e1 e2: edge). edge_eq e1 e2 ==> f e1 = f e2))
+          (ensures mem_edge e (filter_edges f es))
+          (decreases es)
+  = match es with
+    | [] -> ()
+    | hd :: rest ->
+      if edge_eq e hd then begin
+        assert (f hd);
+        mem_edge_hd hd (filter_edges f rest)
+      end else begin
+        mem_filter_edges_resp e f rest;
+        if f hd then () else ()
+      end
+
+// Subset of filtered edges  
+let rec subset_filter_edges (f: edge -> bool) (es: list edge)
+  : Lemma (ensures subset_edges (filter_edges f es) es) (decreases es)
+  = match es with
+    | [] -> ()
+    | hd :: rest ->
+      subset_filter_edges f rest;
+      subset_edges_cons (filter_edges f rest) hd rest
+
+// Disjoint filters have total length ≤ original
+let rec disjoint_filter_sum (f1 f2: edge -> bool) (es: list edge)
+  : Lemma (requires forall (e: edge). ~(f1 e /\ f2 e))
+          (ensures length (filter_edges f1 es) + length (filter_edges f2 es) <= length es)
+          (decreases es)
+  = match es with | [] -> () | _ :: rest -> disjoint_filter_sum f1 f2 rest
+
+// Path from root stays in root's component: all edges have reachable endpoints
+let rec path_stays_in_component (es: list edge) (root: nat) (path: list edge) (u v: nat)
+  : Lemma (requires is_path_from_to path u v /\ subset_edges path es /\
+                    same_component es root u)
+          (ensures forall (pe: edge). mem_edge pe path ==>
+                    same_component es root pe.u /\ same_component es root pe.v)
+          (decreases path)
+  = match path with
+    | [] -> ()
+    | hd :: tl ->
+      assert (mem_edge hd es);
+      let next = if hd.u = u then hd.v else hd.u in
+      // hd connects u to next; hd ∈ es
+      // Paths [hd] from u to next and from next to u exist via the single edge hd in es
+      assert (is_path_from_to [hd] u next);
+      subset_edges_reflexive [hd];
+      // So u and next are in same component
+      assert (same_component es u next);
+      // root reaches u, u reaches next → root reaches next
+      reachable_transitive es root u next;
+      // root reaches hd.u: either hd.u = u (reachable from root) or hd.u = next (reachable)
+      assert (hd.u = u \/ hd.u = next);
+      (if hd.u = u then () else ());
+      reachable_transitive es root u hd.u;
+      reachable_transitive es root u hd.v;
+      // Recurse on tail
+      path_stays_in_component es root tl next v
+
+// Reachability from root using component edges = using all edges
+let reachable_uses_component_edges (es: list edge) (root v: nat)
+  : Lemma (requires same_component es root v)
+          (ensures (let g = fun (e: edge) -> same_component_dec es root e.u &&
+                                              same_component_dec es root e.v in
+                    same_component (filter_edges g es) root v))
+  = let g = fun (e: edge) -> same_component_dec es root e.u &&
+                              same_component_dec es root e.v in
+    eliminate exists (path: list edge).
+      subset_edges path es /\ is_path_from_to path root v
+    returns same_component (filter_edges g es) root v
+    with _. begin
+      same_component_reflexive es root;
+      path_stays_in_component es root path root v;
+      // All edges in path have endpoints reachable from root
+      // So they satisfy g, hence are in filter_edges g es
+      // We need: subset_edges path (filter_edges g es)
+      let rec path_in_filtered (p: list edge)
+        : Lemma (requires subset_edges p es /\
+                          (forall (pe: edge). mem_edge pe p ==>
+                            same_component es root pe.u /\ same_component es root pe.v))
+                (ensures subset_edges p (filter_edges g es))
+                (decreases p)
+        = match p with
+          | [] -> ()
+          | hd :: tl_p ->
+            assert (same_component es root hd.u);
+            assert (same_component es root hd.v);
+            same_component_dec_complete es root hd.u;
+            same_component_dec_complete es root hd.v;
+            assert (g hd);
+            // g respects edge_eq: endpoints are same set under edge_eq
+            let g_respects_eq (e1 e2: edge) 
+              : Lemma (requires edge_eq e1 e2) (ensures g e1 = g e2)
+              = edge_eq_endpoints e1 e2;
+                // e1 and e2 have same endpoint set
+                assert ((e1.u = e2.u /\ e1.v = e2.v) \/ (e1.u = e2.v /\ e1.v = e2.u))
+            in
+            FStar.Classical.forall_intro_2 (fun e1 -> 
+              FStar.Classical.move_requires (g_respects_eq e1));
+            mem_filter_edges_resp hd g es;
+            path_in_filtered tl_p
+      in
+      path_in_filtered path
+    end
+
+// The component filter respects edge_eq
+let component_filter_respects_eq (es: list edge) (root: nat) (e1 e2: edge)
+  : Lemma (requires edge_eq e1 e2)
+          (ensures (let g = fun (e: edge) -> same_component_dec es root e.u &&
+                                              same_component_dec es root e.v in
+                    g e1 = g e2))
+  = edge_eq_endpoints e1 e2
+
+// Bridge edge decomposition: symmetric version (e.v reachable, e.u not)
+let bridge_edge_reachability_sym (tl: list edge) (e: edge) (root v: nat)
+  : Lemma (requires same_component tl root e.v /\ ~(same_component tl root e.u) /\
+                    same_component (e :: tl) root v)
+          (ensures same_component tl root v \/ same_component tl e.u v)
+  = if same_component_dec tl root v then
+      same_component_dec_sound tl root v
+    else begin
+      eliminate exists (path: list edge).
+        subset_edges path (e :: tl) /\ is_path_from_to path root v
+      returns (same_component tl root v \/ same_component tl e.u v)
+      with _. begin
+        if root = v then begin same_component_reflexive tl root; () end
+        else begin
+          extract_simple_path path root v;
+          FStar.Classical.exists_elim
+            (same_component tl root v \/ same_component tl e.u v)
+            #_
+            #(fun (path': list edge) -> is_path_from_to path' root v /\
+                subset_edges path' path /\ all_edges_distinct path' /\ Cons? path')
+            ()
+            (fun path' ->
+              subset_edges_transitive path' path (e :: tl);
+              if not (mem_edge_in_list e path') then begin
+                path_not_using_e_in_t path' e tl; ()
+              end else begin
+                split_at_first_e path' e tl root v;
+                // (reachable tl root e.u /\ reachable tl e.v v) \/
+                // (reachable tl root e.v /\ reachable tl e.u v)
+                // Case 1: reachable tl root e.u → contradicts ~(same_component tl root e.u)
+                // So must be case 2: reachable tl e.u v
+                assert (reachable tl root e.u \/ reachable tl e.u v);
+                ()
+              end)
+        end
+      end
+    end
+
+// Helper: bfs_reach_list with empty edges and singleton frontier returns [u]
+let bfs_reach_empty_edges_0 (u: nat)
+  : Lemma (ensures bfs_reach_list [] [u] [] 1 == [u])
+  = assert (edge_neighbors ([] #edge) u == []);
+    List.Tot.Properties.append_nil_l ([] #nat)
+
+// Helper: same_component_dec with no edges only returns true for equal vertices
+let same_component_dec_empty_0 (u v: nat)
+  : Lemma (ensures same_component_dec [] u v = (u = v))
+  = if u = v then ()
+    else begin
+      bfs_reach_empty_edges_0 u;
+      assert (bfs_reach_list [] [u] [] 1 == [u]);
+      assert (mem v [u] = (v = u))
+    end
+
+// Key counting lemma: number of reachable vertices ≤ 1 + number of edges
+// Uses count_reachable to ensure a single lambda symbol in SMT encoding
+#push-options "--z3rlimit 50"
+let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
+  : Lemma (ensures count_reachable es root n n <= 1 + length es)
+          (decreases length es)
+  = match es with
+    | [] ->
+      let rec count_empty (m: nat)
+        : Lemma (ensures count_reachable es root n m
+                  = (if root < m && root < n then 1 else 0))
+                (decreases m)
+        = if m = 0 then ()
+          else begin
+            same_component_dec_empty_0 root (m - 1);
+            count_empty (m - 1)
+          end
+      in
+      count_empty n
+    | e :: tl ->
+      count_reachable_bound tl root n;
+      let u_reach = same_component_dec tl root e.u in
+      let v_reach = same_component_dec tl root e.v in
+      if u_reach && v_reach then begin
+        same_component_dec_sound tl root e.u;
+        same_component_dec_sound tl root e.v;
+        let rec bound_both (m: nat)
+          : Lemma (ensures count_reachable es root n m <= count_reachable tl root n m)
+                  (decreases m)
+          = if m = 0 then ()
+            else begin
+              bound_both (m - 1);
+              if (m - 1) < n && same_component_dec es root (m - 1) then begin
+                same_component_dec_sound es root (m - 1);
+                redundant_edge_reachability tl e root (m - 1);
+                same_component_dec_complete tl root (m - 1)
+              end else ()
+            end
+        in
+        bound_both n
+      end else if not u_reach && not v_reach then begin
+        FStar.Classical.move_requires (same_component_dec_complete tl root) e.u;
+        FStar.Classical.move_requires (same_component_dec_complete tl root) e.v;
+        let rec bound_neither (m: nat)
+          : Lemma (ensures count_reachable es root n m <= count_reachable tl root n m)
+                  (decreases m)
+          = if m = 0 then ()
+            else begin
+              bound_neither (m - 1);
+              if (m - 1) < n && same_component_dec es root (m - 1) then begin
+                same_component_dec_sound es root (m - 1);
+                neither_endpoint_reachability tl e root (m - 1);
+                same_component_dec_complete tl root (m - 1)
+              end else ()
+            end
+        in
+        bound_neither n
+      end else begin
+        // Bridge case: one endpoint reachable, the other not
+        let e_v = if u_reach then e.v else e.u in
+        (if u_reach then begin
+          same_component_dec_sound tl root e.u;
+          FStar.Classical.move_requires (same_component_dec_complete tl root) e.v
+        end else begin
+          same_component_dec_sound tl root e.v;
+          FStar.Classical.move_requires (same_component_dec_complete tl root) e.u
+        end);
+        assert (~(same_component tl root e_v));
+
+        let g_root = fun (ed: edge) -> same_component_dec tl root ed.u &&
+                                        same_component_dec tl root ed.v in
+        let g_ev = fun (ed: edge) -> same_component_dec tl e_v ed.u &&
+                                      same_component_dec tl e_v ed.v in
+        let es_root = filter_edges g_root tl in
+        let es_ev = filter_edges g_ev tl in
+
+        introduce forall (ed: edge). ~(g_root ed /\ g_ev ed)
+        with begin
+          if g_root ed && g_ev ed then begin
+            same_component_dec_sound tl root ed.u;
+            same_component_dec_sound tl e_v ed.u;
+            same_component_symmetric tl root ed.u;
+            same_component_symmetric tl e_v ed.u;
+            reachable_transitive tl root ed.u e_v;
+            same_component_dec_complete tl root e_v;
+            assert false
+          end else ()
+        end;
+        disjoint_filter_sum g_root g_ev tl;
+        filter_edges_length g_root tl;
+        filter_edges_length g_ev tl;
+        count_reachable_bound es_root root n;
+        count_reachable_bound es_ev e_v n;
+
+        let rec root_comp (m: nat)
+          : Lemma (ensures count_reachable tl root n m <= count_reachable es_root root n m)
+                  (decreases m)
+          = if m = 0 then ()
+            else begin
+              root_comp (m - 1);
+              if (m - 1) < n && same_component_dec tl root (m - 1) then begin
+                same_component_dec_sound tl root (m - 1);
+                reachable_uses_component_edges tl root (m - 1);
+                same_component_dec_complete es_root root (m - 1)
+              end else ()
+            end
+        in
+        root_comp n;
+
+        let rec ev_comp (m: nat)
+          : Lemma (ensures count_reachable tl e_v n m <= count_reachable es_ev e_v n m)
+                  (decreases m)
+          = if m = 0 then ()
+            else begin
+              ev_comp (m - 1);
+              if (m - 1) < n && same_component_dec tl e_v (m - 1) then begin
+                same_component_dec_sound tl e_v (m - 1);
+                reachable_uses_component_edges tl e_v (m - 1);
+                same_component_dec_complete es_ev e_v (m - 1)
+              end else ()
+            end
+        in
+        ev_comp n;
+
+        introduce forall (i: nat). i < n ==>
+          ~((same_component_dec tl root i) && (same_component_dec tl e_v i))
+        with begin
+          if i < n && same_component_dec tl root i && same_component_dec tl e_v i then begin
+            same_component_dec_sound tl root i;
+            same_component_dec_sound tl e_v i;
+            same_component_symmetric tl e_v i;
+            reachable_transitive tl root i e_v;
+            same_component_dec_complete tl root e_v;
+            assert false
+          end else ()
+        end;
+
+        introduce forall (v: nat). v < n ==>
+          (same_component_dec es root v) ==>
+          ((same_component_dec tl root v) \/ (same_component_dec tl e_v v))
+        with begin
+          if v < n && same_component_dec es root v then begin
+            same_component_dec_sound es root v;
+            if u_reach then begin
+              bridge_edge_reachability tl e root v;
+              (if same_component_dec tl root v then ()
+               else begin
+                 FStar.Classical.move_requires (same_component_dec_complete tl root) v;
+                 same_component_dec_complete tl e.v v
+               end)
+            end else begin
+              bridge_edge_reachability_sym tl e root v;
+              (if same_component_dec tl root v then ()
+               else begin
+                 FStar.Classical.move_requires (same_component_dec_complete tl root) v;
+                 same_component_dec_complete tl e.u v
+               end)
+            end
+          end
+        end;
+
+        let rec count_decomp (m: nat)
+          : Lemma (ensures count_reachable es root n m <=
+                          count_reachable tl root n m + count_reachable tl e_v n m)
+                  (decreases m)
+          = if m = 0 then ()
+            else count_decomp (m - 1)
+        in
+        count_decomp n
+      end
+#pop-options
+
 // A connected graph on n vertices has at least n-1 edges
-// Standard graph theory: any connected graph G = (V, E) with |V| = n satisfies |E| ≥ n-1
-// Proof sketch: BFS from vertex 0 discovers n-1 new vertices, each via a distinct edge.
 let connected_min_edges (n: nat) (es: list edge)
   : Lemma (requires n > 0 /\ all_connected n es)
           (ensures length es >= n - 1)
-  = admit()
+  = let rec count_all (m: nat)
+      : Lemma (requires forall (v: nat). v < n ==> same_component es 0 v)
+              (ensures count_reachable es 0 n m = min m n)
+              (decreases m)
+      = if m = 0 then ()
+        else begin
+          count_all (m - 1);
+          if m - 1 < n then begin
+            same_component_dec_complete es 0 (m - 1)
+          end else ()
+        end
+    in
+    introduce forall (v: nat). v < n ==> same_component es 0 v
+    with begin
+      if v < n then assert (reachable es 0 v)
+    end;
+    count_all n;
+    count_reachable_bound es 0 n
 
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
@@ -2251,15 +2773,6 @@ let theorem_kruskal_produces_mst (g: graph)
 
 (*** Additional Helper Properties ***)
 
-// Number of components decreases or stays same when adding edge
-let lemma_edge_addition_reduces_components (edges: list edge) (e: edge) (n: nat)
-  : Lemma (requires is_forest edges n /\ 
-                    e.u < n /\ e.v < n /\
-                    ~(same_component edges e.u e.v) /\
-                    is_forest (e :: edges) n)
-          (ensures length (components (e :: edges) n) <= length (components edges n))
-  = admit()
-
 /// Helper: bfs_reach_list with empty edges and singleton frontier returns [u]
 let bfs_reach_empty_edges (u: nat)
   : Lemma (ensures bfs_reach_list [] [u] [] 1 == [u])
@@ -2434,11 +2947,3 @@ let lemma_spanning_tree_one_component (g: graph) (t: list edge)
     if n > 1 then build_one_comp 1
     else ()
     // Result: [component_of t 0 n], length = 1
-
-// With n vertices and 1 component, need exactly n-1 edges for tree
-let lemma_tree_edge_count (n: nat) (t: list edge)
-  : Lemma (requires n > 0 /\
-                    is_forest t n /\
-                    length (components t n) = 1)
-          (ensures length t = n - 1)
-  = admit()
