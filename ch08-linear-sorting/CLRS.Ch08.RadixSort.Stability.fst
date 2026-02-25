@@ -209,6 +209,20 @@ let sorted_on_to_up_to_base_case (s: seq nat) (base: nat)
     in
     ()
 
+/// Helper: sorted_up_to_digit at witnesses gives lex ordering on values
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 50"
+let lemma_sorted_implies_lex_values (s_in: seq nat) (d: nat) (base: nat) (v w: nat) (i1 i2: nat)
+  : Lemma (requires d > 0 /\ base > 0 /\
+                    i1 < i2 /\ i2 < length s_in /\
+                    index s_in i1 == v /\ index s_in i2 == w /\
+                    sorted_up_to_digit s_in (d - 1) base)
+          (ensures (exists (d0: nat). d0 < d /\
+                      digit v d0 base < digit w d0 base /\
+                      (forall (d': nat). d0 < d' /\ d' < d ==> digit v d' base == digit w d' base)) \/
+                   (forall (d': nat). d' < d ==> digit v d' base == digit w d' base))
+  = sorted_up_to_digit_at s_in (d - 1) base i1 i2
+#pop-options
+
 /// LEMMA 1: Key insight - stability preserves existing order structure
 /// 
 /// If s_in is sorted on digits 0..d-1, and we apply a stable sort on digit d,
@@ -216,6 +230,7 @@ let sorted_on_to_up_to_base_case (s: seq nat) (base: nat)
 ///
 /// This is the crucial property that makes radix sort work: stable sorting on
 /// a new digit doesn't destroy the ordering established by previous passes.
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 50"
 let lemma_stable_sort_preserves_lower_order
   (s_in s_out: seq nat) (d: nat) (base: nat)
   : Lemma (requires base > 0 /\ d > 0 /\
@@ -233,7 +248,41 @@ let lemma_stable_sort_preserves_lower_order
                     digit (index s_out i) d' base == digit (index s_out j) d' base)) \/
                 (forall (d': nat). d' < d ==> 
                   digit (index s_out i) d' base == digit (index s_out j) d' base))))
-  = admit() // Core stability argument: stable sort + lexicographic order preservation
+  = let aux (i j: nat) : Lemma
+      (requires i < j /\ j < length s_out /\
+                digit (index s_out i) d base == digit (index s_out j) d base)
+      (ensures (exists (d0: nat). d0 < d /\
+                  digit (index s_out i) d0 base < digit (index s_out j) d0 base /\
+                  (forall (d': nat). d0 < d' /\ d' < d ==>
+                    digit (index s_out i) d' base == digit (index s_out j) d' base)) \/
+               (forall (d': nat). d' < d ==>
+                  digit (index s_out i) d' base == digit (index s_out j) d' base))
+      = if index s_out i = index s_out j then ()
+        else begin
+          // Capture stability existential BEFORE let-bindings for v, w
+          // (optimize_let_vc replaces index s_out i/j with v/w, losing the stability pattern)
+          let stab : squash (exists (i1: nat). (exists (i2: nat). 
+            i1 < i2 /\ i2 < length s_in /\ 
+            index s_in i1 == index s_out i /\ index s_in i2 == index s_out j)) = () in
+          let v = index s_out i in
+          let w = index s_out j in
+          let goal_t : prop = 
+            (exists (d0: nat). d0 < d /\
+                digit v d0 base < digit w d0 base /\
+                (forall (d': nat). d0 < d' /\ d' < d ==>
+                  digit v d' base == digit w d' base)) \/
+             (forall (d': nat). d' < d ==>
+                digit v d' base == digit w d' base) in
+          Classical.exists_elim goal_t stab
+            (fun (i1: nat) ->
+              Classical.exists_elim goal_t ()
+                (fun (i2: nat) ->
+                  Classical.move_requires (lemma_sorted_implies_lex_values s_in d base v w i1) i2))
+        end
+    in
+    Classical.forall_intro (fun (i: nat) ->
+      Classical.forall_intro (Classical.move_requires (aux i)))
+#pop-options
 
 /// MAIN THEOREM: Each pass of stable digit sort extends sorted range by one digit
 ///

@@ -404,6 +404,8 @@ Grouped by severity.
 Fifteen independent tasks for parallel execution. All are independent except
 AGENT5 (Kruskal) and AGENT6 (Prim) which depend on AGENT4 (MST exchange lemma).
 
+AGENTS MUST ALL WORK ON THE SAME BRANCH BUT WORK ON DISJOINT FILES.
+
 Each agent MUST work on different files with no overlap, so they can run
 simultaneously without conflicts (except for PROGRESS_PLAN.md).
 
@@ -412,6 +414,7 @@ meaningful checkpoints.
 
 When an agent finishes, they should update PROGRESS_PLAN.md with their
 results and learnings, using `flock` to avoid conflicts.
+
 
 **Dependency graph:**
 ```

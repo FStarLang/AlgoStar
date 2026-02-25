@@ -1845,13 +1845,98 @@ let connected_subset_of_tree_is_tree (g: graph) (result mst: list edge)
       end else ()
     end
 #pop-options
+
+// No duplicate edges in a list (using edge_eq)
+let rec noRepeats_edge (l: list edge) : bool =
+  match l with
+  | [] -> true
+  | hd :: tl -> not (mem_edge hd tl) && noRepeats_edge tl
+
+// Kruskal result has no duplicate edges
+let rec lemma_kruskal_process_no_repeats (sorted_edges: list edge) (forest: list edge) (n: nat)
+  : Lemma (requires noRepeats_edge forest)
+          (ensures noRepeats_edge (kruskal_process sorted_edges forest n))
+          (decreases sorted_edges)
+  = match sorted_edges with
+    | [] -> ()
+    | e :: rest ->
+      if e.u < n && e.v < n && not (same_component_dec forest e.u e.v) && not (mem_edge e forest) then
+        lemma_kruskal_process_no_repeats rest (e :: forest) n
+      else
+        lemma_kruskal_process_no_repeats rest forest n
+
+// Remove first occurrence of edge from list
+let rec remove_edge_first (e: edge) (l: list edge) : list edge =
+  match l with
+  | [] -> []
+  | hd :: tl -> if edge_eq e hd then tl else hd :: remove_edge_first e tl
+
+// Length decreases by 1 when removing present edge
+let rec remove_edge_first_length (e: edge) (l: list edge)
+  : Lemma (requires mem_edge e l)
+          (ensures length (remove_edge_first e l) = length l - 1)
+          (decreases l)
+  = match l with
+    | hd :: tl ->
+      if edge_eq e hd then ()
+      else remove_edge_first_length e tl
+
+// If e' ∈ l and ~(edge_eq e' e), then e' ∈ remove_edge_first e l
+let rec mem_remove_edge_first_other (e' e: edge) (l: list edge)
+  : Lemma (requires mem_edge e' l /\ ~(edge_eq e' e))
+          (ensures mem_edge e' (remove_edge_first e l))
+          (decreases l)
+  = match l with
+    | hd :: tl ->
+      if edge_eq e hd then begin
+        if edge_eq e' hd then begin
+          edge_eq_symmetric e hd;
+          assert (edge_eq e' e)
+        end else ()
+      end else begin
+        if edge_eq e' hd then ()
+        else mem_remove_edge_first_other e' e tl
+      end
+
+// noRepeats_edge a ∧ subset_edges a b ⟹ length a ≤ length b
+let rec subset_noRepeats_length_le (a b: list edge)
+  : Lemma (requires noRepeats_edge a /\ subset_edges a b)
+          (ensures length a <= length b)
+          (decreases a)
+  = match a with
+    | [] -> ()
+    | hd :: tl ->
+      assert (mem_edge hd b);
+      let b' = remove_edge_first hd b in
+      remove_edge_first_length hd b;
+      let rec prove_subset_tl (p: list edge)
+        : Lemma (requires (forall (e:edge). mem_edge e p ==> mem_edge e tl) /\
+                          noRepeats_edge (hd :: tl) /\
+                          subset_edges (hd :: tl) b)
+                (ensures subset_edges p b')
+                (decreases p)
+        = match p with
+          | [] -> ()
+          | e :: rest ->
+            assert (mem_edge e tl);
+            mem_edge_of_subset e (hd :: tl) b;
+            (if edge_eq e hd then begin
+              edge_eq_symmetric e hd;
+              mem_edge_eq hd e tl
+            end else ());
+            mem_remove_edge_first_other e hd b;
+            prove_subset_tl rest
+      in
+      prove_subset_tl tl;
+      subset_noRepeats_length_le tl b'
+
 // Kruskal's algorithm produces a spanning tree
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
-                    // Graph is connected
                     all_connected g.n g.edges /\
-                    // There exists an MST (i.e., graph is valid)
-                    (exists (mst: list edge). is_mst g mst))
+                    (exists (mst: list edge). is_mst g mst) /\
+                    (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n) /\
+                    (forall (e: edge). mem_edge e g.edges ==> e.u <> e.v))
           (ensures (let result = pure_kruskal g in
                     is_spanning_tree g result))
   = let result = pure_kruskal g in
@@ -1859,42 +1944,314 @@ let theorem_kruskal_produces_spanning_tree (g: graph)
     
     // Part 1: Result is a forest (acyclic)
     lemma_kruskal_process_preserves_forest sorted [] g.n;
+    assert (acyclic g.n result);
     
     // Part 2: All edges from graph
     sort_edges_subset g.edges;
     lemma_kruskal_process_edges_from_graph sorted [] g.edges g.n;
+    assert (subset_edges result g.edges);
     
     // Part 3: Result connects all vertices
-    // This requires showing that Kruskal adds enough edges
-    // and that these edges connect all components
-    admit() // Complex: needs to show n-1 edges added and they form spanning tree
+    lemma_kruskal_process_maximal_forest sorted sorted [] g.n;
+    introduce forall (v: nat). v < g.n ==> reachable result 0 v
+    with introduce _ ==> _ with _. begin
+      FStar.Classical.exists_elim (reachable result 0 v)
+        #_ 
+        #(fun (path: list edge) -> subset_edges path g.edges /\ is_path_from_to path 0 v) ()
+        (fun (path: list edge{subset_edges path g.edges /\ is_path_from_to path 0 v}) ->
+          introduce forall (e: edge). mem_edge e path ==> 
+            mem_edge e result \/ same_component result e.u e.v
+          with introduce _ ==> _ with _. begin
+            mem_edge_of_subset e path g.edges;
+            assert (e.u < g.n /\ e.v < g.n);
+            sort_edges_mem e g.edges
+          end;
+          path_edges_connected_implies_endpoints_connected path result 0 v
+        )
+    end;
+    assert (all_connected g.n result);
     
-    // Part 4: Result has exactly n-1 edges
-    // Follows from: algorithm stops when all vertices are in one component
-    // and each edge added reduces component count by 1
-    
+    // Part 4: Result has g.n - 1 edges
+    // Use MST invariant to show result ⊆ some MST
+    sort_edges_sorted g.edges;
+    introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' sorted) /\
+      ~(mem_edge e' ([] #edge)) ==> same_component ([] #edge) e'.u e'.v
+    with introduce _ ==> _ with _. begin
+      sort_edges_mem e' g.edges
+    end;
+    lemma_kruskal_process_mst_invariant g sorted [];
+    // Now: exists mst'. is_mst g mst' /\ subset_edges result mst'
+    FStar.Classical.exists_elim (is_spanning_tree g result)
+      #_
+      #(fun (mst': list edge) -> is_mst g mst' /\ subset_edges result mst') ()
+      (fun (mst': list edge{is_mst g mst' /\ subset_edges result mst'}) ->
+        // result ⊆ mst'
+        assert (subset_edges result mst');
+        // result is connected and acyclic
+        assert (all_connected g.n result);
+        assert (acyclic g.n result);
+        // mst' is a spanning tree
+        assert (is_spanning_tree g mst');
+        // mst' edges have valid endpoints (from g.edges)
+        assert (subset_edges mst' g.edges);
+        // mst' edges inherit valid endpoints and no self-loops from g.edges
+        introduce forall (e: edge). mem_edge e mst' ==> e.u < g.n /\ e.v < g.n
+        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
+        introduce forall (e: edge). mem_edge e mst' ==> e.u <> e.v
+        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
+        // All mst' edges are in result (connected_subset_of_tree_is_tree)
+        connected_subset_of_tree_is_tree g result mst';
+        // forall e ∈ mst'. mem_edge e result
+        // noRepeats_edge result (from kruskal_process)
+        lemma_kruskal_process_no_repeats sorted [] g.n;
+        assert (noRepeats_edge result);
+        // |result| ≤ |mst'| from subset + noRepeats
+        subset_noRepeats_length_le result mst';
+        assert (length result <= length mst');
+        assert (length mst' = g.n - 1);
+        // |mst'| ≤ |result| from ∀ e ∈ mst'. e ∈ result + noRepeats result
+        // Actually: we need to prove this direction too
+        // For each e ∈ mst': mem_edge e result. So mst' ⊂_edge result.
+        // Since noRepeats_edge result: |mst'| ≤ |result|
+        // We use subset_noRepeats_length_le on mst' and result
+        // But we need subset_edges mst' result (not just ∀ e ∈ mst'. e ∈ result)
+        introduce forall (e: edge). mem_edge e mst' ==> mem_edge e result
+        with introduce _ ==> _ with ht. ();
+        // Now we can derive subset_edges mst' result
+        let rec build_subset (l: list edge)
+          : Lemma (requires forall (e: edge). mem_edge e l ==> mem_edge e result)
+                  (ensures subset_edges l result)
+                  (decreases l)
+          = match l with
+            | [] -> ()
+            | hd :: tl -> build_subset tl
+        in
+        build_subset mst';
+        subset_noRepeats_length_le mst' result;
+        assert (length mst' <= length result);
+        // Together: length result = length mst' = g.n - 1
+        assert (length result = g.n - 1)
+      )
+
+// total_weight of remove_edge_first
+let rec total_weight_remove (e: edge) (l: list edge)
+  : Lemma (requires mem_edge e l)
+          (ensures total_weight (remove_edge_first e l) = total_weight l - e.w)
+          (decreases l)
+  = match l with
+    | hd :: tl ->
+      if edge_eq e hd then ()
+      else total_weight_remove e tl
+
+// Helper: if mem_edge e (remove_edge_first x l), then mem_edge e l
+let rec mem_remove_edge_first_mem (e x: edge) (l: list edge)
+  : Lemma (requires mem_edge e (remove_edge_first x l))
+          (ensures mem_edge e l)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq x hd then ()
+      else if edge_eq e hd then ()
+      else mem_remove_edge_first_mem e x tl
+
+// total_weight equality for mutual edge subsets with noRepeats on one side and same length
+let rec total_weight_mutual_eq (a b: list edge)
+  : Lemma (requires noRepeats_edge a /\ subset_edges a b /\
+                    (forall (e: edge). mem_edge e b ==> mem_edge e a) /\
+                    length a = length b)
+          (ensures total_weight a = total_weight b)
+          (decreases a)
+  = match a with
+    | [] -> (match b with | [] -> ())
+    | hd :: tl ->
+      assert (mem_edge hd b);
+      let b' = remove_edge_first hd b in
+      remove_edge_first_length hd b;
+      total_weight_remove hd b;
+      // total_weight b = total_weight b' + hd.w
+      // Need: noRepeats_edge tl, subset_edges tl b'
+      // Need: ∀ e ∈ b'. e ∈ tl
+      // Need: length tl = length b'
+      
+      // subset_edges tl b':
+      let rec prove_tl_subset (p: list edge)
+        : Lemma (requires (forall (e:edge). mem_edge e p ==> mem_edge e tl) /\
+                          noRepeats_edge (hd :: tl) /\
+                          subset_edges (hd :: tl) b)
+                (ensures subset_edges p b')
+                (decreases p)
+        = match p with
+          | [] -> ()
+          | e :: rest ->
+            assert (mem_edge e tl);
+            mem_edge_of_subset e (hd :: tl) b;
+            (if edge_eq e hd then begin
+              edge_eq_symmetric e hd;
+              mem_edge_eq hd e tl
+            end else ());
+            mem_remove_edge_first_other e hd b;
+            prove_tl_subset rest
+      in
+      prove_tl_subset tl;
+      
+      // ∀ e ∈ b'. e ∈ tl:
+      // Strategy: use the fact that length tl = length b' and subset_edges tl b' 
+      // and noRepeats tl. If some e ∈ b' is NOT in tl, then by pigeonhole,
+      // tl maps into b' \ {e}, which has length b' - 1, but tl has length b' edges
+      // with noRepeats — contradiction with pigeonhole.
+      // 
+      // More directly: ∀ e ∈ b'. e ∈ b (from mem_remove). e ∈ b ⟹ e ∈ (hd :: tl).
+      // So either edge_eq e hd or e ∈ tl.
+      // If edge_eq e hd for ALL such e, then all elements of b' are equivalent to hd.
+      // But tl ⊆ b' and tl has no element equivalent to hd (noRepeats).
+      // So if tl is non-empty, tl has an element not equivalent to hd in b'. Contradiction.
+      // If tl is empty, length b' = 0, so b' = []. Fine, vacuously true.
+      //
+      // Actually the simpler approach: prove it by counting.
+      // subset_noRepeats_length_le tl b' gives length tl ≤ length b'.
+      // We know length tl = length b'.
+      // Every element of b' that's in tl "uses up" one slot.
+      // If any element of b' is NOT in tl, then b' has >length tl elements 
+      // that need "distinct" matches, but... we need noRepeats on b' for that.
+      //
+      // Let me try the direct approach:
+      introduce forall (e: edge). mem_edge e b' ==> mem_edge e tl
+      with introduce _ ==> _ with _. begin
+        mem_remove_edge_first_mem e hd b;
+        assert (mem_edge e b);
+        assert (mem_edge e (hd :: tl));
+        // e ∈ (hd :: tl) means edge_eq e hd \/ e ∈ tl
+        if mem_edge e tl then ()
+        else begin
+          // e ∉ tl, so edge_eq e hd
+          assert (edge_eq e hd);
+          // e ∈ b', e is edge_eq to hd, and e ∉ tl
+          // But then: tl maps into b' via subset_edges tl b'.
+          // Each edge of tl is NOT edge_eq to hd (from noRepeats).
+          // And e IS edge_eq to hd and e ∈ b'.
+          // So tl maps into b' minus the positions holding hd-equivalents.
+          // But we need a contradiction. 
+          // 
+          // Consider: if e ∈ b' and edge_eq e hd, then there are ≥2 copies of hd in b
+          // (one was removed by remove_edge_first, one remains as e).
+          // From subset_edges tl b': length tl ≤ length b' 
+          //   (we proved this in subset_noRepeats_length_le).
+          // We know length tl = length b'.
+          // But tl has no hd-equivalents, so each edge of tl maps to a non-hd-equivalent in b'.
+          // If e (which IS hd-equivalent) is in b', then b' has at most (length b' - 1) non-hd-equivalents.
+          // So tl can have at most (length b' - 1) edges (pigeonhole into non-hd-equivalents of b').
+          // But length tl = length b'. Contradiction!
+          //
+          // This pigeonhole requires showing the injection maps tl to non-hd-equivalents only.
+          // Let me formalize using subset_noRepeats_length_le:
+          // Define b'' = remove_edge_first e b' (removing the hd-equivalent from b').
+          // Then each edge of tl is in b'' (since tl edges are in b' and not edge_eq hd).
+          // So subset_edges tl b''.
+          // subset_noRepeats_length_le tl b'' gives length tl ≤ length b''.
+          // But length b'' = length b' - 1 = length tl - 1. Contradiction!
+          let b'' = remove_edge_first e b' in
+          remove_edge_first_length e b';
+          let rec tl_subset_b'' (p: list edge)
+            : Lemma (requires (forall (x:edge). mem_edge x p ==> mem_edge x tl) /\
+                              noRepeats_edge (hd :: tl) /\
+                              subset_edges (hd :: tl) b /\
+                              mem_edge e b' /\ edge_eq e hd)
+                    (ensures subset_edges p b'')
+                    (decreases p)
+            = match p with
+              | [] -> ()
+              | x :: rest ->
+                assert (mem_edge x tl);
+                mem_edge_of_subset x (hd :: tl) b;
+                (if edge_eq x hd then begin
+                  edge_eq_symmetric x hd;
+                  mem_edge_eq hd x tl
+                end else ());
+                mem_remove_edge_first_other x hd b;
+                assert (mem_edge x b');
+                // x ∈ b' and ~(edge_eq x hd) and edge_eq e hd
+                // Need: ~(edge_eq x e)
+                (if edge_eq x e then begin
+                  // edge_eq x e and edge_eq e hd ⟹ edge_eq x hd (transitivity via SMT)
+                  edge_eq_symmetric e hd;
+                  assert (edge_eq hd e);
+                  assert (edge_eq x e);
+                  // x.u=e.u∧x.v=e.v or x.u=e.v∧x.v=e.u
+                  // e.u=hd.u∧e.v=hd.v or e.u=hd.v∧e.v=hd.u  (from edge_eq e hd)
+                  // These combine to give edge_eq x hd
+                  assert (edge_eq x hd) // should follow from SMT
+                end else ());
+                mem_remove_edge_first_other x e b';
+                tl_subset_b'' rest
+          in
+          tl_subset_b'' tl;
+          subset_noRepeats_length_le tl b'';
+          // length tl ≤ length b'' = length b' - 1 = length tl - 1. Contradiction!
+          assert false
+        end
+      end;
+      
+      total_weight_mutual_eq tl b'
 
 //SNIPPET_START: theorem_kruskal_mst
 // Kruskal's algorithm produces a minimum spanning tree
 let theorem_kruskal_produces_mst (g: graph)
   : Lemma (requires g.n > 0 /\ 
                     all_connected g.n g.edges /\
-                    (exists (mst: list edge). is_mst g mst))
+                    (exists (mst: list edge). is_mst g mst) /\
+                    (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n) /\
+                    (forall (e: edge). mem_edge e g.edges ==> e.u <> e.v))
           (ensures (let result = pure_kruskal g in
                     is_mst g result))
 //SNIPPET_END: theorem_kruskal_mst
   = theorem_kruskal_produces_spanning_tree g;
     
-    // The MST property follows from:
-    // 1. Result is a spanning tree (proven above)
-    // 2. Each edge added is safe (via cut property)
-    // 3. Safe edges maintain "subset of some MST" invariant
-    // 4. Final spanning tree that's subset of MST must be MST
-    
     let result = pure_kruskal g in
+    let sorted = sort_edges g.edges in
     
-    // Induction over edge additions showing "subset of MST" invariant
-    admit() // Would need to show: each step maintains subset_edges result some_mst
+    // result is a spanning tree
+    assert (is_spanning_tree g result);
+    
+    // MST invariant: result ⊆ some MST
+    sort_edges_sorted g.edges;
+    sort_edges_subset g.edges;
+    introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' sorted) /\
+      ~(mem_edge e' ([] #edge)) ==> same_component ([] #edge) e'.u e'.v
+    with introduce _ ==> _ with _. begin
+      sort_edges_mem e' g.edges
+    end;
+    lemma_kruskal_process_mst_invariant g sorted [];
+    // exists mst'. is_mst g mst' /\ subset_edges result mst'
+    FStar.Classical.exists_elim (is_mst g result)
+      #_
+      #(fun (mst': list edge) -> is_mst g mst' /\ subset_edges result mst') ()
+      (fun (mst': list edge{is_mst g mst' /\ subset_edges result mst'}) ->
+        connected_subset_of_tree_is_tree g result mst';
+        // forall e in mst'. mem_edge e result
+        
+        // Prove total_weight result = total_weight mst'
+        lemma_kruskal_process_no_repeats sorted [] g.n;
+        assert (noRepeats_edge result);
+        
+        // Build subset_edges mst' result from the forall
+        let rec build_subset_mst (l: list edge)
+          : Lemma (requires forall (e: edge). mem_edge e l ==> mem_edge e result)
+                  (ensures subset_edges l result)
+                  (decreases l)
+          = match l with | [] -> () | _ :: tl -> build_subset_mst tl
+        in
+        build_subset_mst mst';
+
+        assert (length result = g.n - 1);
+        assert (length mst' = g.n - 1);
+        
+        total_weight_mutual_eq result mst';
+        assert (total_weight result = total_weight mst');
+        
+        introduce forall (t: list edge). is_spanning_tree g t ==> total_weight result <= total_weight t
+        with introduce _ ==> _ with _. ()
+      )
 
 (*** Additional Helper Properties ***)
 
