@@ -234,7 +234,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 8 | Distance, parenthesis, white-path |
 | 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 16 | Across Spec/EdgeSort/Cmplx |
 | 23 | Prim | §23.2 | ⚠️ key bounds only | ✅ Linked O(n²) | 6 | |
-| 23 | MST.Spec | §23.1 | ⚠️ admitted | — | 4 | Exchange lemma proven |
+| 23 | MST.Spec | §23.1 | ✅ proven | — | 0 | Exchange lemma + tree theorem proven |
 | 24 | Dijkstra | §24.3 | ✅ d=δ proven | ✅ Linked O(n²) | 0 | Correctness + TriIneq: ✅ 0 admits |
 | 24 | Bellman-Ford | §24.1 | ✅ dist=sp_dist | ⚠️ Separate O(V³) | 0 | ✅ BF.Spec fully verified |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
@@ -254,7 +254,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 
 | Chapter | admit | assume_val | assume | Total | Top files |
 |---------|-------|------------|--------|-------|-----------|
-| ch23 (MST) | 7 | 1 | 0 | 8 | Kruskal.Spec(0✅), Prim.Spec(6), MST.Spec(1), Kruskal(0+1 assume_val) |
+| ch23 (MST) | 6 | 1 | 0 | 7 | Kruskal.Spec(0✅), Prim.Spec(6), MST.Spec(0✅), Kruskal(0+1 assume_val) |
 | ch08 (sorting) | 10 | 0 | 0 | 10 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2) |
 | ch22 (graphs) | 0 | 7 | 0 | 7 | DFS.Spec(5 assume_val), DFS.WhitePath(2 assume_val) |
 | ch26 (MaxFlow) | 0 | 0 | 3 | 3 | MaxFlow.Spec(2 assume), Complexity(1 assume) — axioms |
@@ -516,28 +516,22 @@ edge classification and white-path theorem follow from it.
 
 ---
 
-### AGENT4: MST Exchange Lemma — (1 admit → 0)
+### AGENT4: MST Exchange Lemma — ✅ DONE (1 admit → 0)
 
-**Files:** `ch23-mst/CLRS.Ch23.MST.Spec.fst`
-**Current state:** 1 admit at line 799: `exchange_is_spanning_tree`.
+**Files:** `ch23-mst/CLRS.Ch23.MST.Spec.fst`, `ch23-mst/CLRS.Ch23.MST.Spec.fsti`
+**Result:** All admits and assumes eliminated. File verifies fully.
 
-**Goal:** Prove that swapping an edge on the path between two vertices in a spanning tree
-with a new edge preserves the spanning tree property.
+**What was done:**
+- Created `.fsti` interface file for MST.Spec
+- Strengthened `exchange_is_spanning_tree` precondition (added `all_edges_distinct path`)
+- Added well-formedness precondition to `cut_property`
+- Built ~25 helper lemmas for simple paths, acyclicity, connectivity transfer
+- Built tree theorem infrastructure (~250 lines): `connected_min_edges` proves connected
+  graph on n vertices has ≥ n-1 edges, using counting argument with `StrongExcludedMiddle`
+- Proved all 5 spanning tree properties for the exchange result
+- Updated clients: Kruskal.Spec and Prim.Spec adapted for new preconditions
 
-**Approach:** When edge (u,v) is removed from a spanning tree T, T splits into two components.
-Adding edge e that crosses this partition reconnects the tree. Prove:
-1. Removing an edge from a spanning tree creates exactly 2 components
-2. Adding an edge crossing the partition produces a spanning tree
-3. The new tree has n-1 edges and connects all vertices
-
-**Estimated size:** ~150–200 lines.
-
-**Verification:**
-```bash
-fstar.exe --include common --include ch23-mst --warn_error -321 --warn_error @247 \
-  --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar' \
-  ch23-mst/CLRS.Ch23.MST.Spec.fst
-```
+**Commits:** `f0eddec` (interface), `f3e3e27` (full proof)
 
 ---
 
@@ -782,6 +776,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 |-------|------|--------|
 | Round 3: AGENT1 | Huffman Full Optimality (CLRS Thm 16.4) | ✅ DONE (commit ad1b189, +817 lines) |
 | Round 3: AGENT4 | BST Insert.Spec (3→0 admits) | ✅ DONE (list-based model) |
+| Round 4: AGENT4 | MST Exchange Lemma (1→0 admits) | ✅ DONE (tree theorem + all 5 properties) |
 | Round 3: AGENT5 | BFS DistanceSpec (2→0 admits) | ✅ DONE (bfs_correctness) |
 | Round 3: AGENT7 | MST Cut Property (4→1 admit) | ✅ MOSTLY DONE |
 | Round 3: AGENT9 | MaxFlow Proofs (7→0 assumes) | ✅ DONE (MFMC stated) |
@@ -811,16 +806,16 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch08/RadixSort.FullSort | admit | 4 | AGENT1 | References to Stability (lines 496, 500, 521, 525) |
 | ch22/DFS.Spec | assume val | 5 | AGENT2 | Parenthesis theorem, edge classification (lines 965, 1034, 1082, 1136, 1176) |
 | ch22/DFS.WhitePath | assume val | 2 | AGENT2 | White-path theorem fwd/bwd (lines 289, 342) |
-| ch23/MST.Spec | admit | 1 | AGENT4 | Exchange in spanning tree (line 799) |
+| ch23/MST.Spec | admit | 0 | AGENT4 | ✅ DONE — exchange_is_spanning_tree + cut_property proven |
 | ch23/Kruskal.Spec | admit | 0 | AGENT5 | ✅ DONE — all 9 admits eliminated |
 | ch23/Kruskal.fst | assume val | 1 | AGENT5 | Maintains forest (line 81) — requires Pulse union-find proof |
 | ch23/Prim.Spec | admit | 0 | AGENT6 | ✅ DONE — all 6 admits eliminated |
 | ch26/MaxFlow.Spec | assume | 2 | AGENT13 | Weak duality + MFMC axioms (lines 354, 382) |
 | ch26/MaxFlow.Complexity | assume | 1 | AGENT13 | Critical edge existence (line 102) |
-| **TOTAL (admits)** | | **26** | | |
+| **TOTAL (admits)** | | **25** | | |
 | **TOTAL (assume vals)** | | **8** | | |
 | **TOTAL (assumes)** | | **3** | | Mathematical axioms, beyond scope |
-| **GRAND TOTAL** | | **37** | | 34 actionable + 3 axioms |
+| **GRAND TOTAL** | | **36** | | 33 actionable + 3 axioms |
 
 ### Spec Gaps (0 admits but incomplete postconditions)
 
