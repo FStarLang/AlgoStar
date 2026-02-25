@@ -816,6 +816,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | Round 2: AGENT4 | KMP.Complexity (7→0) | ✅ DONE |
 | Round 2: AGENT5 | BucketSort (1→0) | ✅ DONE |
 | Round 2: AGENT6 | Huffman.Complete (Spec 4→0, Complete 2→0) | ✅ DONE |
+| Round 4: AGENT6 | Prim.Spec (6→0 admits + 1 admit_smt→0) | ✅ DONE |
 | Round 2: AGENT7 | Kruskal.EdgeSorting (2→0) | ✅ DONE |
 | Round 2: AGENT8 | Dijkstra.TriangleInequality (1→0) | ✅ DONE |
 | Round 2: AGENT9 | BellmanFord.Spec (3→0) | ✅ DONE |
@@ -836,7 +837,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch23/MST.Spec | admit | 1 | AGENT4 | Exchange in spanning tree (line 799) |
 | ch23/Kruskal.Spec | admit | 9 | AGENT5 | Forest, MST invariant (lines 615, 681, 688, 710, 742, 769, 780, 893, 901) |
 | ch23/Kruskal.fst | assume val | 1 | AGENT5 | Maintains forest (line 81) |
-| ch23/Prim.Spec | admit | 6 | AGENT6 | Light edge, edge count (lines 195, 209, 270, 359, 380, 412) |
+| ch23/Prim.Spec | admit | 0 | AGENT6 | ✅ DONE — all 6 admits eliminated |
 | ch26/MaxFlow.Spec | assume | 2 | AGENT13 | Weak duality + MFMC axioms (lines 354, 382) |
 | ch26/MaxFlow.Complexity | assume | 1 | AGENT13 | Critical edge existence (line 102) |
 | **TOTAL (admits)** | | **26** | | |
