@@ -1845,6 +1845,7 @@ let connected_subset_of_tree_is_tree (g: graph) (result mst: list edge)
       end else ()
     end
 #pop-options
+// Kruskal's algorithm produces a spanning tree
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
                     // Graph is connected
