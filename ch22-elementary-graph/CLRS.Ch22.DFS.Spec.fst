@@ -958,12 +958,234 @@ let parenthesis_theorem (st: dfs_state) : prop =
 //      (from timestamps_in_range + du_fu)
 //   3. All timestamps are unique (from strictly incrementing time counter)
 //
-// Completing the formal proof requires one more mutual induction pass
-// (~100 lines) tracking these properties through visit_neighbors.
+// The formal proof proceeds by mutual induction on dfs_visit/visit_neighbors,
+// maintaining the combined invariant: strong_valid_state st /\ parenthesis_theorem st.
+
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+
+// Discovering a vertex preserves parenthesis: u becomes Gray (not Black),
+// so all Black vertex pairs have unchanged intervals.
+let discover_preserves_parenthesis (u: nat) (st: dfs_state)
+  : Lemma
+    (requires strong_valid_state st /\ parenthesis_theorem st /\
+             u < st.n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+             Seq.index st.color u = White)
+    (ensures parenthesis_theorem (discover_vertex u st))
+  = let st' = discover_vertex u st in
+    let prove_pair (a b: nat) : Lemma (parenthesis_property st' a b) =
+      if a < st'.n && b < st'.n && a <> b &&
+         a < Seq.length st'.color && b < Seq.length st'.color &&
+         Seq.index st'.color a = Black && Seq.index st'.color b = Black
+      then (
+        // u is Gray in st', so neither a nor b equals u
+        assert (Seq.index st'.color u = Gray);
+        assert (a <> u /\ b <> u);
+        // Colors and timestamps unchanged for vertices other than u
+        assert (Seq.index st'.d a = Seq.index st.d a);
+        assert (Seq.index st'.f a = Seq.index st.f a);
+        assert (Seq.index st'.d b = Seq.index st.d b);
+        assert (Seq.index st'.f b = Seq.index st.f b);
+        assert (parenthesis_property st a b)
+      ) else ()
+    in
+    Classical.forall_intro_2 prove_pair
+
+// Mutual induction: visit_neighbors and dfs_visit preserve
+// strong_valid_state /\ parenthesis_theorem.
+let rec visit_neighbors_inv
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+             all_neighbors_lt_n neighbors n /\ strong_valid_state st /\ parenthesis_theorem st)
+    (ensures (let st' = visit_neighbors adj n neighbors st in
+              strong_valid_state st' /\ parenthesis_theorem st'))
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | v :: rest ->
+      if v < Seq.length st.color && Seq.index st.color v = White then (
+        dfs_visit_inv adj n v st;
+        let st1 = dfs_visit adj n v st in
+        visit_neighbors_inv adj n rest st1
+      ) else
+        visit_neighbors_inv adj n rest st
+
+and dfs_visit_inv
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+             strong_valid_state st /\ parenthesis_theorem st)
+    (ensures (let st' = dfs_visit adj n u st in
+              strong_valid_state st' /\ parenthesis_theorem st'))
+    (decreases %[count_white_vertices st; 0])
+  = if u >= n then ()
+    else if u >= Seq.length st.color then ()
+    else if Seq.index st.color u <> White then ()
+    else (
+      // Step 1: Discover u
+      let st1 = discover_vertex u st in
+      discover_preserves_lengths u st;
+      discover_decreases_white_count u st;
+      discover_preserves_strong_validity u st;
+      discover_preserves_parenthesis u st;
+
+      // Step 2: Visit neighbors — by mutual induction IH
+      let neighbors = get_white_neighbors adj n u 0 st1 in
+      get_white_neighbors_lt_n adj n u 0 st1;
+      visit_neighbors_inv adj n neighbors st1;
+      let st2 = visit_neighbors adj n neighbors st1 in
+
+      // Step 3: Show u is Gray in st2
+      // u was Gray in st1; visit_neighbors preserves non-White timestamps
+      assert (Seq.index st1.color u = Gray);
+      visit_neighbors_preserves_nonwhite_df adj n neighbors st1 u;
+      assert (Seq.index st2.f u = Seq.index st1.f u);
+      // f[u] in st = 0 (u was White), discover doesn't change f, so f[u] in st1 = 0
+      assert (st1.f == st.f);
+      assert (Seq.index st.f u = 0);
+      assert (Seq.index st2.f u = 0);
+      // If u were Black in st2, strong_valid_state would give f[u] > 0. Contradiction.
+      // So u must be Gray in st2.
+      assert (Seq.index st2.color u = Gray);
+
+      // Step 4: Finish u
+      let st3 = finish_vertex u st2 in
+      finish_preserves_lengths u st2;
+      finish_preserves_strong_validity u st2;
+
+      // Step 5: Prove parenthesis_theorem st3
+      // Pre-compute timestamps for u in st3:
+      //   d[u] = st.time + 1  (set by discover, preserved by visit_neighbors)
+      //   f[u] = st2.time + 1  (set by finish)
+      assert (Seq.index st2.d u = Seq.index st1.d u);
+      assert (Seq.index st1.d u = st.time + 1);
+      assert (Seq.index st3.d u = Seq.index st2.d u);
+      assert (Seq.index st3.d u = st.time + 1);
+      assert (Seq.index st3.f u = st2.time + 1);
+      assert (st3.time = st2.time + 1);
+
+      // Call timestamps_in_range once — its forall postcondition is then available in SMT
+      visit_neighbors_timestamps_in_range adj n neighbors st1;
+      visit_neighbors_time_mono adj n neighbors st1;
+
+      let prove_pair (a b: nat) : Lemma (parenthesis_property st3 a b) =
+        if a < st3.n && b < st3.n && a <> b &&
+           a < Seq.length st3.color && b < Seq.length st3.color &&
+           Seq.index st3.color a = Black && Seq.index st3.color b = Black
+        then (
+          if a <> u && b <> u then (
+            // Neither is u: timestamps unchanged from st2
+            assert (Seq.index st3.d a = Seq.index st2.d a);
+            assert (Seq.index st3.f a = Seq.index st2.f a);
+            assert (Seq.index st3.d b = Seq.index st2.d b);
+            assert (Seq.index st3.f b = Seq.index st2.f b);
+            assert (Seq.index st2.color a = Black);
+            assert (Seq.index st2.color b = Black);
+            assert (parenthesis_property st2 a b)
+          ) else (
+            // One of (a,b) is u. Let w be the other vertex.
+            let w = if a = u then b else a in
+            assert (w < n /\ w <> u);
+            // w is Black in st3, hence also in st2 (finish only changes u's color)
+            assert (Seq.index st2.color w = Black);
+            // w's timestamps unchanged by finish (w <> u)
+            assert (Seq.index st3.d w = Seq.index st2.d w);
+            assert (Seq.index st3.f w = Seq.index st2.f w);
+
+            if Seq.index st.color w = Black then (
+              // Case 1: w was Black in st (before the entire dfs_visit call)
+              // w <> u (u was White, w was Black)
+              // discover doesn't change d[w], f[w], color[w] for w <> u
+              assert (Seq.index st1.color w = Seq.index st.color w);
+              assert (Seq.index st1.color w <> White);
+              // visit_neighbors preserves non-White timestamps
+              visit_neighbors_preserves_nonwhite_df adj n neighbors st1 w;
+              assert (Seq.index st2.d w = Seq.index st1.d w);
+              assert (Seq.index st2.f w = Seq.index st1.f w);
+              assert (Seq.index st1.d w = Seq.index st.d w);
+              assert (Seq.index st1.f w = Seq.index st.f w);
+              // From strong_valid_state st: f[w] <= st.time
+              assert (Seq.index st.f w <= st.time);
+              // d[u] in st3 = st.time + 1 > f[w]  -->  intervals disjoint
+              assert (Seq.index st3.f w < Seq.index st3.d u)
+            ) else if Seq.index st.color w = White then (
+              // Case 2: w was White in st, became Black during visit_neighbors
+              // discover doesn't change d[w], f[w] for w <> u
+              assert (Seq.index st1.d w = Seq.index st.d w);
+              assert (Seq.index st1.f w = Seq.index st.f w);
+              // From strong_valid_state st: d[w] = 0, f[w] = 0 (w was White)
+              assert (Seq.index st.d w = 0);
+              assert (Seq.index st.f w = 0);
+              assert (Seq.index st1.d w = 0);
+              assert (Seq.index st1.f w = 0);
+              // w is Black in st2 with strong_valid_state: d[w] > 0
+              assert (w < st2.n);
+              assert (Seq.index st2.d w > 0);
+              // timestamps_in_range: d[w] changed (was 0, now > 0), so st1.time < d[w]
+              assert (Seq.index st2.d w <> Seq.index st1.d w);
+              assert (st1.time < Seq.index st2.d w);
+              // st1.time = st.time + 1 = d[u] in st3, so d[w] > d[u]
+              assert (Seq.index st3.d w > Seq.index st3.d u);
+              // Similarly for f[w]: was 0, now > 0 (Black), so f[w] changed
+              assert (Seq.index st2.f w > 0);
+              assert (Seq.index st2.f w <> Seq.index st1.f w);
+              assert (Seq.index st2.f w <= st2.time);
+              // f[u] in st3 = st2.time + 1 > f[w], so f[w] < f[u]
+              assert (Seq.index st3.f w < Seq.index st3.f u)
+              // --> interval_contained of w's interval in u's interval
+            ) else (
+              // Case 3: w was Gray in st --> impossible
+              // From strong_valid_state st: f[w] = 0 (Gray has f = 0)
+              assert (Seq.index st.color w = Gray);
+              assert (Seq.index st.f w = 0);
+              // w <> u (u was White, w was Gray), so color[w] unchanged by discover
+              assert (Seq.index st1.color w = Seq.index st.color w);
+              assert (Seq.index st1.color w <> White);
+              // visit_neighbors preserves f[w] since w is non-White
+              visit_neighbors_preserves_nonwhite_df adj n neighbors st1 w;
+              assert (Seq.index st2.f w = Seq.index st1.f w);
+              assert (Seq.index st1.f w = Seq.index st.f w);
+              assert (Seq.index st2.f w = 0);
+              // But w is Black in st2 with strong_valid_state: f[w] > d[w] > 0
+              // Contradiction with f[w] = 0
+              assert (w < st2.n);
+              assert (Seq.index st2.f w > 0)
+            )
+          )
+        ) else ()
+      in
+      Classical.forall_intro_2 prove_pair
+    )
+
+// The main DFS loop preserves strong_valid_state /\ parenthesis_theorem
+let rec dfs_loop_inv (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+             strong_valid_state st /\ parenthesis_theorem st)
+    (ensures (let st' = dfs_loop adj n u st in
+              strong_valid_state st' /\ parenthesis_theorem st'))
+    (decreases (if u < n then n - u else 0))
+  = if u >= n then ()
+    else (
+      if u < Seq.length st.color && Seq.index st.color u = White then (
+        dfs_visit_inv adj n u st;
+        let st1 = dfs_visit adj n u st in
+        dfs_loop_inv adj n (u + 1) st1
+      ) else
+        dfs_loop_inv adj n (u + 1) st
+    )
+
+#pop-options
 
 // The parenthesis theorem for the concrete DFS function
-assume val dfs_parenthesis_property (adj: Seq.seq (Seq.seq int)) (n: nat)
+let dfs_parenthesis_property (adj: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma (ensures parenthesis_theorem (dfs adj n))
+  = init_state_strong_valid n;
+    init_has_correct_lengths n;
+    // All vertices are White in init_state, so parenthesis is vacuously true
+    let init_pair (a b: nat) : Lemma (parenthesis_property (init_state n) a b) = () in
+    Classical.forall_intro_2 init_pair;
+    dfs_loop_inv adj n 0 (init_state n)
 
 let dfs_satisfies_parenthesis_theorem (adj: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma (ensures parenthesis_theorem (dfs adj n))
@@ -1021,17 +1243,86 @@ let rec has_path (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat) (steps: nat)
     else u < n /\ v < n /\ 
          (exists (w: nat). w < n /\ has_path adj n u w (steps - 1) /\ has_edge n adj w v)
 
-// === DFS completeness assumption ===
+// === DFS completeness proof ===
 //
-// DFS visits all reachable vertices: if u is visited (non-White) and there's
-// a path from u to v, then v is also visited. This requires mutual induction
-// on dfs_visit/visit_neighbors showing that dfs_visit u explores all white
-// neighbors, and each neighbor's subtree is fully explored.
+// Key insight: dfs_loop iterates over ALL vertices 0..n-1, calling dfs_visit
+// on each White vertex. Therefore, in the final state, ALL vertices are
+// non-White. The reachability conclusion follows trivially.
 //
-// Foundation: dfs_visit calls visit_neighbors on ALL white neighbors of u.
-// visit_neighbors calls dfs_visit on each white neighbor. By induction,
-// all vertices reachable via white vertices from u are visited.
-assume val dfs_visit_explores_reachable
+// Proof structure:
+// 1. dfs_visit_makes_nonwhite: after dfs_visit u (when u is White), u is non-White
+//    (dfs_visit discovers u as Gray, visits neighbors, then finishes u as Black)
+// 2. dfs_loop_visits_all: after dfs_loop from u, all vertices [u, n) are non-White,
+//    and previously non-White vertices remain non-White
+// 3. dfs_visit_explores_reachable: since v < n and all vertices are non-White
+//    after dfs, the conclusion holds regardless of reachability
+
+// Helper: dfs_visit makes the target vertex non-White when it was White.
+// Proof: by unfolding dfs_visit — discover_vertex sets u to Gray,
+// visit_neighbors preserves Gray (or turns it Black), finish_vertex sets u to Black.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let dfs_visit_makes_nonwhite (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+              u < n /\ Seq.index st.color u = White)
+    (ensures Seq.index (dfs_visit adj n u st).color u <> White)
+  = // Unfold dfs_visit: since u < n and color[u] = White, enters the main branch.
+    // discover_vertex sets color[u] = Gray; visit_neighbors preserves Gray→Gray/Black;
+    // finish_vertex sets color[u] = Black.
+    let st1 = discover_vertex u st in
+    discover_preserves_lengths u st;
+    assert (Seq.index st1.color u = Gray);
+    let neighbors = get_white_neighbors adj n u 0 st1 in
+    get_white_neighbors_lt_n adj n u 0 st1;
+    let st2 = visit_neighbors adj n neighbors st1 in
+    assert (Seq.index st2.color u = Gray \/ Seq.index st2.color u = Black);
+    let st3 = finish_vertex u st2 in
+    finish_preserves_lengths u st2;
+    assert (Seq.index st3.color u = Black)
+#pop-options
+
+// Main loop lemma: after dfs_loop from vertex u, every vertex in [u, n)
+// is non-White, and all previously non-White vertices remain non-White.
+// Proof: by induction on (n - u), following the recursive structure of dfs_loop.
+// At each step, dfs_visit (or no-op) makes u non-White, then the IH on u+1
+// handles the rest and preserves u's non-White status.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec dfs_loop_visits_all (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n)
+    (ensures (let st' = dfs_loop adj n u st in
+              (forall (i: nat). u <= i /\ i < n ==> 
+                i < Seq.length st'.color /\ Seq.index st'.color i <> White) /\
+              (forall (i: nat). i < Seq.length st.color /\ Seq.index st.color i <> White ==>
+                i < Seq.length st'.color /\ Seq.index st'.color i <> White)))
+    (decreases (if u < n then n - u else 0))
+  = if u >= n then ()
+    else (
+      // Process vertex u: call dfs_visit if White, otherwise keep state
+      let st1 = 
+        if u < Seq.length st.color && Seq.index st.color u = White
+        then (
+          dfs_visit_makes_nonwhite adj n u st;
+          dfs_visit adj n u st
+        )
+        else st
+      in
+      // After processing u: u is non-White in st1
+      assert (Seq.index st1.color u <> White);
+      // dfs_visit preserves non-White (from its postcondition)
+      assert (forall (i: nat). i < Seq.length st.color /\ Seq.index st.color i <> White ==>
+        i < Seq.length st1.color /\ Seq.index st1.color i <> White);
+      // By IH: dfs_loop from u+1 makes [u+1, n) non-White and preserves non-White
+      dfs_loop_visits_all adj n (u + 1) st1
+      // Combined: u is non-White in st1 → preserved by dfs_loop(u+1) → non-White in result
+      // And [u+1, n) are non-White from IH. So all of [u, n) are non-White.
+    )
+#pop-options
+
+// DFS completeness: in the final DFS state, if u is visited and there's a path
+// from u to v, then v is also visited. Proof: ALL vertices are non-White after
+// dfs (since dfs_loop processes every vertex 0..n-1), so v is trivially non-White.
+let dfs_visit_explores_reachable
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
   : Lemma
     (ensures (let st = dfs adj n in
@@ -1040,6 +1331,8 @@ assume val dfs_visit_explores_reachable
               Seq.index st.color u <> White /\
               (exists (k: nat). k < n /\ has_path adj n u v k) ==>
               Seq.index st.color v <> White))
+  = init_has_correct_lengths n;
+    dfs_loop_visits_all adj n 0 (init_state n)
 
 // If path from u to v exists and u is visited, then v is visited (completeness)
 let dfs_visits_reachable (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
