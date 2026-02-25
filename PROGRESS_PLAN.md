@@ -623,7 +623,7 @@ detects the violating edge. Wire the detection into the postcondition using
 
 ---
 
-### AGENT9: Dijkstra — remove verification pass, prove triangle inequality + equality
+### AGENT9: Dijkstra — remove verification pass, clean up infinity, prove equality
 
 **Files:** `ch24-sssp/CLRS.Ch24.Dijkstra.fst`, using theory from
 `ch24-sssp/CLRS.Ch24.Dijkstra.TriangleInequality.fst` and
@@ -635,6 +635,9 @@ detects the violating edge. Wire the detection into the postcondition using
 2. The postcondition is conditional on `vtri == true` (the check passing) and only proves
    `dist[v] <= sp_dist[v]` (upper bound), not equality.
 3. There is a `tri_result` parameter that makes no algorithmic sense.
+4. The code uses `1000000` as a magic constant for infinity throughout. Since Dijkstra only
+   works with non-negative edge weights, `-1` is a cleaner sentinel for "unreachable/no edge"
+   in the distance array (any negative value is impossible as a real distance).
 
 **What's already proven (in TriangleInequality.fst):**
 - `relax_edge_establishes_triangle`: relaxing edge (u,v) ⟹ triangle inequality for that edge
@@ -650,13 +653,29 @@ detects the violating edge. Wire the detection into the postcondition using
 - `relax_establishes_triangle_inequality`: relaxing all edges from settled x establishes
   triangle inequality for edges from x
 
-**Goal (3 sub-tasks):**
+**Goal (4 sub-tasks):**
 
 1. **Remove the verification pass** (lines 329–393 in Dijkstra.fst). Delete the `tri_result`
    parameter, the `tri_ok` mutable, and the two nested verification loops. The postcondition
    should unconditionally assert `triangle_inequality` (not conditional on `vtri == true`).
 
-2. **Connect the pure model to the Pulse loop.** The main loop (lines 246–322) must maintain
+2. **Clean up infinity convention.** Replace `1000000` with `-1` as the sentinel for infinity
+   in the distance array. Since all edge weights are non-negative (precondition), any real
+   shortest-path distance is ≥ 0, so `-1` is unambiguous.
+   - In Dijkstra.fst: change initialization `1000000` → `-1`, relax condition
+     `w < 1000000 && dist_u < 1000000` → `w >= 0 && dist_u >= 0` (i.e., both are real/finite),
+     remove `all_bounded`, simplify `all_non_negative` to mean "dist[v] >= 0 or dist[v] == -1".
+   - In ShortestPath.Spec.fst: change `let inf = 1000000` → `let inf = -1`. This affects
+     `sp_dist_k`, `path_weight`, etc. The spec's inf sentinel is only used for "no path" and
+     comparisons — changing it to -1 requires updating comparisons like `via_u < inf` to
+     `via_u >= 0` (i.e., finite check). **This is the main ripple.** The TriangleInequality and
+     BellmanFord spec files also define `let inf = 1000000` and must be updated in sync.
+   - **Scope warning:** This touches ShortestPath.Spec, BellmanFord.Spec, BellmanFord.fst,
+     Dijkstra.TriangleInequality, BellmanFord.TriangleInequality. Coordinate with AGENT8
+     (BellmanFord) if both agents are running. Alternative: do this cleanup AFTER AGENT8
+     finishes, or let AGENT9 handle all SSSP files.
+
+3. **Connect the pure model to the Pulse loop.** The main loop (lines 246–322) must maintain
    a ghost invariant linking its state to `process_vertices` from TriangleInequality.fst:
    - Ghost `processed_set` tracking which vertices have been settled
    - Invariant: `triangle_inequality_from_processed dist weights processed`
@@ -664,13 +683,13 @@ detects the violating edge. Wire the detection into the postcondition using
    - After n iterations, all vertices processed ⟹ full `triangle_inequality`
    - Call `dijkstra_algorithm_establishes_triangle` or reproduce its argument in the loop
 
-3. **Prove shortest-path equality** (`dist[v] == sp_dist[v]` for all v). The chain:
-   - Triangle inequality (from step 2) ⟹ `dist[v] <= sp_dist[v]` via `triangle_ineq_implies_upper_bound`
+4. **Prove shortest-path equality** (`dist[v] == sp_dist[v]` for all v). The chain:
+   - Triangle inequality (from step 3) ⟹ `dist[v] <= sp_dist[v]` via `triangle_ineq_implies_upper_bound`
    - `greedy_choice_invariant` gives `dist[u] == sp_dist[u]` at each extraction step
    - Accumulate `all_settled_optimal` across the loop
    - After all vertices settled: `dist[v] == sp_dist[v]` for all v
 
-**New postcondition should be:**
+**New postcondition should be (after cleanup):**
 ```fstar
 ensures exists* sdist'.
   A.pts_to weights sweights **
@@ -678,15 +697,12 @@ ensures exists* sdist'.
   pure (
     Seq.length sdist' == SZ.v n /\
     Seq.index sdist' (SZ.v source) == 0 /\
-    all_non_negative sdist' /\
-    all_bounded sdist' /\
-    triangle_inequality sweights sdist' (SZ.v n) /\
     (forall (v: nat). v < SZ.v n ==>
       Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v)
   )
 ```
 
-**Approach:** The hard part is step 2 — connecting the Pulse loop to the pure model. Two options:
+**Approach:** The hard part is step 3 — connecting the Pulse loop to the pure model. Two options:
 - (A) Add ghost state (`processed: GR.ref processed_set`) to the Pulse loop, maintain
   the pure invariants alongside the imperative code. Call the TriangleInequality lemmas
   at each iteration.
@@ -696,7 +712,10 @@ ensures exists* sdist'.
 
 Option (A) is more direct. The loop invariant grows but each step is already proven.
 
-**Estimated size:** ~200–350 lines (mostly loop invariant strengthening + ghost state).
+**Estimated size:** ~300–500 lines (verification pass removal + infinity cleanup + ghost state + equality proof).
+
+**Recommended ordering:** Do sub-tasks 1, 3, 4 first (remove pass, prove equality). Then do
+sub-task 2 (infinity cleanup) as a separate commit since it touches shared spec files.
 
 ---
 
