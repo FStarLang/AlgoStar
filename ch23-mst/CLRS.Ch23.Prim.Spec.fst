@@ -153,6 +153,198 @@ let lemma_add_to_tree_preserves_length (s: vertex_set) (v: nat)
   : Lemma (length (add_to_tree s v) = length s)
   = ()
 
+// Lemma: add_to_tree preserves existing membership
+let lemma_add_to_tree_preserves (s: vertex_set) (v: nat) (u: nat)
+  : Lemma (requires in_tree s u /\ u <> v)
+          (ensures in_tree (add_to_tree s v) u)
+  = if v < length s then Seq.lemma_index_upd2 s v true u else ()
+
+// Lemma: add_to_tree adds the target vertex
+let lemma_add_to_tree_adds (s: vertex_set) (v: nat)
+  : Lemma (requires v < length s)
+          (ensures in_tree (add_to_tree s v) v)
+  = Seq.lemma_index_upd1 s v true
+
+(*** Helper Predicates and Lemmas ***)
+
+// Predicate: edge is a valid crossing edge (u in tree, v not in tree)
+let valid_crossing_edge (e: edge) (its: vertex_set) : prop =
+  e.u < length its /\ e.v < length its /\
+  index its e.u = true /\ index its e.v = false
+
+// find_min_edge_from_row returns valid crossing edge
+let rec lemma_find_min_row_valid
+    (adj: adj_matrix) (n: nat) (its: vertex_set) (u: nat) (v: nat) (cm: option edge)
+  : Lemma (requires (match cm with None -> True | Some e -> valid_crossing_edge e its))
+          (ensures (match find_min_edge_from_row adj n its u v cm with
+                   | None -> True | Some e -> valid_crossing_edge e its))
+          (decreases (n - v))
+  = if v >= n then ()
+    else if u < length its && v < length its &&
+            index its u && not (index its v) && has_edge adj n u v then
+      let w = edge_weight adj u v in
+      let nm = match cm with
+        | None -> Some ({u = u; v = v; w = w})
+        | Some e -> if w < e.w then Some ({u = u; v = v; w = w}) else cm
+      in lemma_find_min_row_valid adj n its u (v + 1) nm
+    else lemma_find_min_row_valid adj n its u (v + 1) cm
+
+// find_min_edge_aux returns valid crossing edge
+let rec lemma_find_min_aux_valid
+    (adj: adj_matrix) (n: nat) (its: vertex_set) (u: nat) (cm: option edge)
+  : Lemma (requires (match cm with None -> True | Some e -> valid_crossing_edge e its))
+          (ensures (match find_min_edge_aux adj n its u cm with
+                   | None -> True | Some e -> valid_crossing_edge e its))
+          (decreases (n - u))
+  = if u >= n then ()
+    else begin
+      lemma_find_min_row_valid adj n its u 0 None;
+      let rm = find_min_edge_from_row adj n its u 0 None in
+      let nm = match cm, rm with
+        | None, None -> None | Some e, None -> Some e
+        | None, Some e -> Some e
+        | Some e1, Some e2 -> if e2.w < e1.w then Some e2 else Some e1
+      in lemma_find_min_aux_valid adj n its (u + 1) nm
+    end
+
+// Minimality: find_min_edge_from_row returns minimum weight
+let rec lemma_find_min_row_min
+    (adj: adj_matrix) (n: nat) (its: vertex_set) (u: nat) (v: nat) (cm: option edge)
+  : Lemma
+      (ensures (let result = find_min_edge_from_row adj n its u v cm in
+                (match cm, result with
+                 | Some _, None -> False | Some c, Some r -> r.w <= c.w | None, _ -> True) /\
+                (match result with
+                 | Some r ->
+                   (forall (v': nat). v <= v' /\ v' < n /\
+                     u < length its /\ v' < length its /\
+                     index its u = true /\ index its v' = false /\
+                     has_edge adj n u v' ==>
+                     r.w <= edge_weight adj u v')
+                 | None ->
+                   (forall (v': nat). v <= v' /\ v' < n ==>
+                     ~(u < length its /\ v' < length its /\
+                       index its u = true /\ index its v' = false /\
+                       has_edge adj n u v')))))
+      (decreases (n - v))
+  = if v >= n then ()
+    else if u < length its && v < length its &&
+            index its u && not (index its v) && has_edge adj n u v then
+      let w = edge_weight adj u v in
+      let nm = match cm with
+        | None -> Some ({u = u; v = v; w = w})
+        | Some e -> if w < e.w then Some ({u = u; v = v; w = w}) else cm
+      in lemma_find_min_row_min adj n its u (v + 1) nm
+    else lemma_find_min_row_min adj n its u (v + 1) cm
+
+// Minimality: find_min_edge_aux returns minimum weight
+let rec lemma_find_min_aux_min
+    (adj: adj_matrix) (n: nat) (its: vertex_set) (u_s: nat) (cm: option edge)
+  : Lemma
+      (ensures (let result = find_min_edge_aux adj n its u_s cm in
+                (match cm, result with
+                 | Some _, None -> False | Some c, Some r -> r.w <= c.w | None, _ -> True) /\
+                (match result with
+                 | Some r ->
+                   (forall (u' v': nat). u_s <= u' /\ u' < n /\ v' < n /\
+                     u' < length its /\ v' < length its /\
+                     index its u' = true /\ index its v' = false /\
+                     has_edge adj n u' v' ==>
+                     r.w <= edge_weight adj u' v')
+                 | None ->
+                   (forall (u' v': nat). u_s <= u' /\ u' < n /\ v' < n ==>
+                     ~(u' < length its /\ v' < length its /\
+                       index its u' = true /\ index its v' = false /\
+                       has_edge adj n u' v')))))
+      (decreases (n - u_s))
+  = if u_s >= n then ()
+    else begin
+      lemma_find_min_row_min adj n its u_s 0 None;
+      let rm = find_min_edge_from_row adj n its u_s 0 None in
+      let nm = match cm, rm with
+        | None, None -> None | Some e, None -> Some e
+        | None, Some e -> Some e
+        | Some e1, Some e2 -> if e2.w < e1.w then Some e2 else Some e1
+      in lemma_find_min_aux_min adj n its (u_s + 1) nm
+    end
+
+(*** Adjacency Matrix Edge Membership Lemmas ***)
+
+// Extract: every edge in adj_to_edges has valid properties
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec lemma_adj_row_extract (adj: adj_matrix) (n: nat) (u: nat) (vs: nat) (e: edge)
+  : Lemma (requires mem_edge e (adj_to_edges_row adj n u vs) /\ well_formed_adj adj n)
+          (ensures e.u < n /\ e.v < n /\ has_edge adj n e.u e.v /\
+                   e.w = edge_weight adj e.u e.v)
+          (decreases (n - vs))
+  = if vs >= n then ()
+    else if u < n && vs < n && has_edge adj n u vs && u < vs then
+      (if edge_eq e {u=u;v=vs;w=edge_weight adj u vs} then ()
+       else lemma_adj_row_extract adj n u (vs+1) e)
+    else lemma_adj_row_extract adj n u (vs+1) e
+#pop-options
+
+#push-options "--z3rlimit 20 --fuel 1"
+let rec lemma_adj_aux_extract (adj: adj_matrix) (n: nat) (us: nat) (e: edge)
+  : Lemma (requires mem_edge e (adj_to_edges_aux adj n us) /\ well_formed_adj adj n)
+          (ensures e.u < n /\ e.v < n /\ has_edge adj n e.u e.v /\
+                   e.w = edge_weight adj e.u e.v)
+          (decreases (n - us))
+  = if us >= n then ()
+    else begin
+      mem_edge_append e (adj_to_edges_row adj n us 0) (adj_to_edges_aux adj n (us+1));
+      if mem_edge e (adj_to_edges_row adj n us 0) then
+        lemma_adj_row_extract adj n us 0 e
+      else lemma_adj_aux_extract adj n (us+1) e
+    end
+#pop-options
+
+let lemma_adj_extract (adj: adj_matrix) (n: nat) (e: edge)
+  : Lemma (requires mem_edge e (adj_to_edges adj n) /\ well_formed_adj adj n)
+          (ensures e.u < n /\ e.v < n /\ has_edge adj n e.u e.v /\
+                   e.w = edge_weight adj e.u e.v)
+  = lemma_adj_aux_extract adj n 0 e
+
+// If has_edge and u < v, edge is in adj_to_edges_row
+let rec lemma_in_adj_row (adj: adj_matrix) (n: nat) (u: nat) (v: nat) (vs: nat)
+  : Lemma (requires u < n /\ v < n /\ u < v /\ has_edge adj n u v /\ vs <= v /\
+                    well_formed_adj adj n)
+          (ensures mem_edge ({u=u;v=v;w=edge_weight adj u v}) (adj_to_edges_row adj n u vs))
+          (decreases (n - vs))
+  = if vs >= n then ()
+    else if vs = v then edge_eq_reflexive ({u=u;v=v;w=edge_weight adj u v})
+    else lemma_in_adj_row adj n u v (vs+1)
+
+// Edge in adj_to_edges_row is in adj_to_edges_aux
+let rec lemma_in_adj_aux (adj: adj_matrix) (n: nat) (u: nat) (us: nat) (e: edge)
+  : Lemma (requires u < n /\ us <= u /\ mem_edge e (adj_to_edges_row adj n u 0))
+          (ensures mem_edge e (adj_to_edges_aux adj n us))
+          (decreases (n - us))
+  = if us >= n then ()
+    else if us = u then
+      mem_edge_append e (adj_to_edges_row adj n u 0) (adj_to_edges_aux adj n (u+1))
+    else begin
+      lemma_in_adj_aux adj n u (us+1) e;
+      mem_edge_append e (adj_to_edges_row adj n us 0) (adj_to_edges_aux adj n (us+1))
+    end
+
+// has_edge implies mem_edge in adj_to_edges
+#push-options "--z3rlimit 20"
+let lemma_has_edge_in_adj (adj: adj_matrix) (n: nat) (u v: nat)
+  : Lemma (requires well_formed_adj adj n /\ u < n /\ v < n /\ u <> v /\ has_edge adj n u v)
+          (ensures mem_edge ({u=u;v=v;w=edge_weight adj u v}) (adj_to_edges adj n))
+  = if u < v then begin
+      lemma_in_adj_row adj n u v 0;
+      lemma_in_adj_aux adj n u 0 ({u=u;v=v;w=edge_weight adj u v})
+    end else begin
+      let canonical = {u=v;v=u;w=edge_weight adj v u} in
+      lemma_in_adj_row adj n v u 0;
+      lemma_in_adj_aux adj n v 0 canonical;
+      assert (edge_eq ({u=u;v=v;w=edge_weight adj u v}) canonical);
+      mem_edge_eq ({u=u;v=v;w=edge_weight adj u v}) canonical (adj_to_edges adj n)
+    end
+#pop-options
+
 // Prim's algorithm: iteratively grow tree
 let rec pure_prim_aux
     (adj: adj_matrix)
@@ -192,8 +384,20 @@ let lemma_prim_step_crosses_cut
                     well_formed_adj adj n /\
                     length in_tree = n)
           (ensures crosses_cut e (vertex_set_to_cut in_tree))
-  = admit() // Need to trace through find_min_edge_aux to show
-            // e.u is in tree and e.v is not in tree
+  = lemma_find_min_aux_valid adj n in_tree 0 None
+
+// Edge returned by pure_prim_step has valid vertex indices
+let lemma_prim_step_bounds
+    (adj: adj_matrix)
+    (n: nat)
+    (in_tree: vertex_set)
+    (tree_edges: list edge)
+    (e: edge)
+  : Lemma (requires Some e == pure_prim_step adj n in_tree tree_edges /\
+                    well_formed_adj adj n /\
+                    length in_tree = n)
+          (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
+  = lemma_find_min_aux_valid adj n in_tree 0 None
 
 // Edge returned by pure_prim_step is light (minimum weight)
 let lemma_prim_step_is_light
@@ -206,8 +410,25 @@ let lemma_prim_step_is_light
                     well_formed_adj adj n /\
                     length in_tree = n)
           (ensures is_light_edge e (vertex_set_to_cut in_tree) (adj_to_graph adj n))
-  = admit() // Need to show that find_min_edge_aux returns minimum
-            // among all edges crossing the cut
+  = let s = vertex_set_to_cut in_tree in
+    let g = adj_to_graph adj n in
+    // e is valid crossing
+    lemma_find_min_aux_valid adj n in_tree 0 None;
+    // e is in adj_to_edges
+    lemma_has_edge_in_adj adj n e.u e.v;
+    // minimality
+    lemma_find_min_aux_min adj n in_tree 0 None;
+    introduce forall (e': edge). mem_edge e' g.edges /\ crosses_cut e' s ==> e.w <= e'.w
+    with introduce _ ==> _ with _h. begin
+      lemma_adj_extract adj n e';
+      if s e'.u then ()
+      else begin
+        assert (has_edge adj n e'.v e'.u);
+        assert (e.w <= edge_weight adj e'.v e'.u);
+        assert (edge_weight adj e'.v e'.u = edge_weight adj e'.u e'.v);
+        ()
+      end
+    end
 
 // The cut (tree, non-tree) respects current tree edges
 let rec lemma_cut_respects_tree_edges
@@ -227,7 +448,7 @@ let rec lemma_cut_respects_tree_edges
       lemma_cut_respects_tree_edges rest in_tree_set n
 
 // Count edges in result
-#push-options "--admit_smt_queries true"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 let rec lemma_prim_aux_edge_count
     (adj: adj_matrix)
     (n: nat)
@@ -307,6 +528,9 @@ let lemma_prim_step_preserves_safety
     lemma_prim_step_crosses_cut adj n in_tree_set tree_edges e;
     assert (crosses_cut e s);
     
+    lemma_prim_step_bounds adj n in_tree_set tree_edges e;
+    assert (e.u < g.n /\ e.v < g.n);
+    
     lemma_prim_step_is_light adj n in_tree_set tree_edges e;
     assert (is_light_edge e s g);
     
@@ -354,9 +578,37 @@ let rec lemma_prim_aux_safety
         // Recurse with e :: tree_edges
         let in_tree' = add_to_tree in_tree_set e.v in
         
-        // Need to show: all edges in (e :: tree_edges) connect tree' vertices
-        // This requires proving e.u ∈ in_tree and after adding e.v, both endpoints are in tree'
-        admit(); // Would need lemmas about add_to_tree and edge properties
+        // Show: all edges in (e :: tree_edges) connect tree' vertices
+        // e crosses the cut: e.u in tree, e.v not
+        lemma_find_min_aux_valid adj n in_tree_set 0 None;
+        assert (valid_crossing_edge e in_tree_set);
+        // e.u <> e.v
+        assert (e.u <> e.v);
+        // e.u stays in tree' (preservation), e.v is added
+        lemma_add_to_tree_preserves in_tree_set e.v e.u;
+        lemma_add_to_tree_adds in_tree_set e.v;
+        lemma_add_to_tree_preserves_length in_tree_set e.v;
+        // For edges in tree_edges: endpoints are in in_tree_set, 
+        // thus != e.v (which is not in in_tree_set), so preserved
+        introduce forall (e': edge). mem_edge e' (e :: tree_edges) ==>
+          in_tree in_tree' e'.u /\ in_tree in_tree' e'.v
+        with introduce _ ==> _ with _h. begin
+          if edge_eq e' e then begin
+            if e'.u = e.u && e'.v = e.v then ()
+            else begin
+              assert (e'.u = e.v /\ e'.v = e.u);
+              lemma_add_to_tree_adds in_tree_set e.v;
+              lemma_add_to_tree_preserves in_tree_set e.v e.u
+            end
+          end else begin
+            assert (mem_edge e' tree_edges);
+            assert (in_tree in_tree_set e'.u /\ in_tree in_tree_set e'.v);
+            assert (e'.u <> e.v);
+            assert (e'.v <> e.v);
+            lemma_add_to_tree_preserves in_tree_set e.v e'.u;
+            lemma_add_to_tree_preserves in_tree_set e.v e'.v
+          end
+        end;
         
         lemma_prim_aux_safety adj n in_tree' (e :: tree_edges) (fuel - 1)
 
@@ -365,7 +617,9 @@ let lemma_prim_result_is_safe
     (adj: adj_matrix)
     (n: nat)
     (start: nat)
-  : Lemma (requires n > 0 /\ start < n /\ well_formed_adj adj n)
+  : Lemma (requires n > 0 /\ start < n /\ well_formed_adj adj n /\
+                    // Graph has an MST (follows from connectivity, assumed here)
+                    (exists (t: list edge). is_mst (adj_to_graph adj n) t))
           (ensures (exists (t: list edge).
                      is_mst (adj_to_graph adj n) t /\
                      subset_edges (pure_prim adj n start) t))
@@ -374,11 +628,12 @@ let lemma_prim_result_is_safe
       let in_tree = upd (create n false) start true in
       
       // Base case: empty tree_edges is subset of any MST
-      subset_edges_reflexive [];
+      // subset_edges [] t = true for any t, so:
+      // We need: exists t. is_mst g t /\ subset_edges [] t
+      // From precondition, exists t. is_mst g t. And subset_edges [] t = true.
+      // So the invariant holds initially.
       
       // Apply induction
-      admit(); // Need to establish initial invariant and invoke lemma_prim_aux_safety
-      
       lemma_prim_aux_safety adj n in_tree [] n
     end
 
