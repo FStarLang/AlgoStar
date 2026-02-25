@@ -54,28 +54,30 @@ let path_from_to (n: nat) (adj: Seq.seq bool) (s: nat) (v: nat) (p: list nat) : 
 (*** 3. Shortest Path Distance ***)
 
 // Helper: does a path of exactly `len` edges exist from s to v?
-// Checks all possible intermediate vertices exhaustively (ghost computation)
+// Uses mutual recursion with check_via_scan to enable direct proof reasoning
 let rec has_path_of_length (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
                             (s: nat{s < n}) (v: nat{v < n})
                             (len: nat)
-  : GTot bool (decreases len)
+  : GTot bool (decreases %[len + 1; 0])
   = if len = 0 then s = v
-    else
-      let rec check_via (u: nat)
-        : GTot bool (decreases (n - u))
-        = if u >= n then false
-          else if has_edge n adj s u && has_path_of_length n adj u v (len - 1)
-          then true
-          else check_via (u + 1)
-      in
-      check_via 0
+    else check_via_scan n adj s v (len - 1) 0
+
+// Scan vertices [u, n) looking for an intermediate vertex on a path
+and check_via_scan (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                    (s: nat{s < n}) (v: nat{v < n})
+                    (len_tail: nat) (u: nat)
+  : GTot bool (decreases %[len_tail + 1; (if u < n then n - u + 1 else 0)])
+  = if u >= n then false
+    else if has_edge n adj s u && has_path_of_length n adj u v len_tail
+    then true
+    else check_via_scan n adj s v len_tail (u + 1)
 
 // Helper: find minimum path length by trying increasing lengths
 let rec find_min_path_length (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
                               (s: nat{s < n}) (v: nat{v < n})
                               (len: nat)
-  : GTot (option nat) (decreases (n - len))
-  = if len >= n then None
+  : GTot (option nat) (decreases (n + 1 - len))
+  = if len > n then None
     else if has_path_of_length n adj s v len then Some len
     else find_min_path_length n adj s v (len + 1)
 
@@ -497,7 +499,168 @@ let rec visited_implies_path_exists (n: nat) (adj: Seq.seq bool) (source: nat{so
 
 #pop-options
 
-(*** 7. Correctness Theorem - Hard Direction (Admitted) ***)
+(*** 7. Correctness Theorem - Hard Direction ***)
+
+// --- Visited set monotonicity ---
+
+// If v is visited at step j, then v is visited at step j+1
+let visited_monotone_step (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                          (j: nat) (v: nat{v < n})
+  : Lemma
+    (requires Seq.index (bfs_steps n adj source j).visited v)
+    (ensures Seq.index (bfs_steps n adj source (j + 1)).visited v)
+  = let st = bfs_steps n adj source j in
+    if L.length st.current_frontier = 0 then ()
+    else
+      let new_verts = dedup (expand_frontier n adj st.visited st.current_frontier) in
+      mark_visited_preserves n st.visited new_verts v
+
+// If v is visited at step j, then v is visited at step j' for all j' >= j
+let rec visited_monotone (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                         (j j': nat) (v: nat{v < n})
+  : Lemma
+    (requires j <= j' /\ Seq.index (bfs_steps n adj source j).visited v)
+    (ensures Seq.index (bfs_steps n adj source j').visited v)
+    (decreases (j' - j))
+  = if j = j' then ()
+    else begin
+      visited_monotone_step n adj source j v;
+      visited_monotone n adj source (j + 1) j' v
+    end
+
+// --- Reverse direction: if u in frontier and edge(u,v) and v unvisited, then v in expand ---
+
+// If has_edge u v and v not visited and scan <= v, then v in unvisited_neighbors
+let rec unvisited_neighbor_in_result (n: nat) (adj: Seq.seq bool) (visited: Seq.seq bool)
+                                      (u: nat) (scan: nat{scan <= n}) (v: nat)
+  : Lemma
+    (requires Seq.length visited = n /\ has_edge n adj u v /\
+              not (Seq.index visited v) /\ v < n /\ scan <= v)
+    (ensures L.mem v (unvisited_neighbors n adj visited u scan))
+    (decreases (n - scan))
+  = if scan = v then ()
+    else unvisited_neighbor_in_result n adj visited u (scan + 1) v
+
+// If u in frontier and edge(u,v) and v not visited, then v in expand_frontier
+let rec expand_frontier_in_result (n: nat) (adj: Seq.seq bool) (visited: Seq.seq bool)
+                                   (frontier: list nat) (u v: nat)
+  : Lemma
+    (requires Seq.length visited = n /\ L.mem u frontier /\
+              has_edge n adj u v /\ not (Seq.index visited v) /\ v < n)
+    (ensures L.mem v (expand_frontier n adj visited frontier))
+    (decreases frontier)
+  = match frontier with
+    | [] -> ()
+    | hd :: rest ->
+        let hd_nbrs = unvisited_neighbors n adj visited hd 0 in
+        let rest_exp = expand_frontier n adj visited rest in
+        if hd = u then begin
+          unvisited_neighbor_in_result n adj visited u 0 v;
+          FStar.List.Tot.Properties.append_mem hd_nbrs rest_exp v
+        end else begin
+          expand_frontier_in_result n adj visited rest u v;
+          FStar.List.Tot.Properties.append_mem hd_nbrs rest_exp v
+        end
+
+// --- Newly visited vertex is in the frontier ---
+
+let newly_visited_in_frontier (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                               (k: nat) (v: nat{v < n})
+  : Lemma
+    (requires
+      k > 0 /\
+      Seq.index (bfs_steps n adj source k).visited v /\
+      not (Seq.index (bfs_steps n adj source (k - 1)).visited v))
+    (ensures L.mem v (bfs_steps n adj source k).current_frontier)
+  = let prev_st = bfs_steps n adj source (k - 1) in
+    if L.length prev_st.current_frontier = 0 then ()
+    else begin
+      let new_verts = dedup (expand_frontier n adj prev_st.visited prev_st.current_frontier) in
+      mark_visited_new n prev_st.visited new_verts v
+    end
+
+// --- Frontier + edge implies next visited ---
+
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let frontier_edge_implies_next_visited (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                                        (k: nat) (u v: nat)
+  : Lemma
+    (requires
+      L.mem u (bfs_steps n adj source k).current_frontier /\
+      has_edge n adj u v /\ v < n /\ u < n)
+    (ensures Seq.index (bfs_steps n adj source (k + 1)).visited v)
+  = let st = bfs_steps n adj source k in
+    let new_verts_raw = expand_frontier n adj st.visited st.current_frontier in
+    let new_verts = dedup new_verts_raw in
+    if Seq.index st.visited v then
+      mark_visited_preserves n st.visited new_verts v
+    else begin
+      expand_frontier_in_result n adj st.visited st.current_frontier u v;
+      dedup_mem new_verts_raw v;
+      mark_visited_marks n st.visited new_verts v
+    end
+#pop-options
+
+// --- Visited + edge implies next visited ---
+
+// If u is visited at step j and edge(u,v), then v is visited at step j+1
+let rec visited_edge_implies_next_visited (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                                           (j: nat) (u: nat{u < n}) (v: nat{v < n})
+  : Lemma
+    (requires
+      Seq.index (bfs_steps n adj source j).visited u /\
+      has_edge n adj u v)
+    (ensures Seq.index (bfs_steps n adj source (j + 1)).visited v)
+    (decreases j)
+  = if j = 0 then
+      // u = source, in frontier at step 0
+      frontier_edge_implies_next_visited n adj source 0 u v
+    else
+      let prev_st = bfs_steps n adj source (j - 1) in
+      if Seq.index prev_st.visited u then begin
+        // u was already visited at step j-1, use IH
+        visited_edge_implies_next_visited n adj source (j - 1) u v;
+        visited_monotone_step n adj source j v
+      end else begin
+        // u newly visited at step j, so u is in frontier at step j
+        newly_visited_in_frontier n adj source j u;
+        frontier_edge_implies_next_visited n adj source j u v
+      end
+
+// --- Path implies visited: general version ---
+
+// If u is visited at step j, and there's a path from u to v, then v is visited
+// at step j + path_length p
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec path_visited_general (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                              (j: nat) (p: list nat)
+  : Lemma
+    (requires
+      path n adj p /\
+      L.length p > 0 /\
+      (let u = L.hd p in u < n /\ Seq.index (bfs_steps n adj source j).visited u))
+    (ensures
+      (let v = L.last p in
+       v < n /\ Seq.index (bfs_steps n adj source (j + path_length p)).visited v))
+    (decreases p)
+  = match p with
+    | [_] -> ()
+    | u :: w :: rest ->
+        // u is visited at step j, edge(u,w), path(w :: rest)
+        visited_edge_implies_next_visited n adj source j u w;
+        path_visited_general n adj source (j + 1) (w :: rest)
+#pop-options
+
+// --- Path from source implies visited ---
+
+let path_implies_visited (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                          (v: nat{v < n}) (p: list nat)
+  : Lemma
+    (requires path_from_to n adj source v p)
+    (ensures Seq.index (bfs_steps n adj source (path_length p)).visited v)
+  = path_visited_general n adj source 0 p
+
+// --- shortest_path_property: the hard direction ---
 
 // If vertex v is visited at step k (and not before), then shortest path has length k
 let shortest_path_property (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
@@ -511,7 +674,18 @@ let shortest_path_property (n: nat) (adj: Seq.seq bool) (source: nat{source < n}
                  not (Seq.index prev_st.visited v))))
     (ensures
       (forall (p: list nat). path_from_to n adj source v p ==> path_length p >= k))
-  = admit()  // This is the hard direction: no shorter path exists
+  = let aux (p: list nat)
+      : Lemma (requires path_from_to n adj source v p)
+              (ensures path_length p >= k)
+      = path_implies_visited n adj source v p;
+        if path_length p < k then begin
+          // v visited at step (path_length p), so visited at step k-1 by monotonicity
+          if k > 0 then
+            visited_monotone n adj source (path_length p) (k - 1) v
+          // contradicts: v not visited at step k-1
+        end
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 
 (*** 8. Main Correctness Theorem ***)
 
@@ -519,14 +693,367 @@ let shortest_path_property (n: nat) (adj: Seq.seq bool) (source: nat{source < n}
 let reachable (n: nat) (adj: Seq.seq bool) (s: nat) (v: nat) : prop =
   s < n /\ v < n /\ (exists (p: list nat). path_from_to n adj s v p)
 
+// --- Helpers for has_path_of_length completeness/soundness ---
+
+// Introduction: if intermediate vertex exists, check_via_scan finds it
+let rec check_via_scan_intro (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                              (s: nat{s < n}) (v: nat{v < n}) (len_tail: nat)
+                              (w: nat{w < n}) (scan: nat{scan <= w})
+  : Lemma
+    (requires has_edge n adj s w /\ has_path_of_length n adj w v len_tail)
+    (ensures check_via_scan n adj s v len_tail scan)
+    (decreases (n - scan))
+  = if scan >= n then ()
+    else if scan = w then ()
+    else if has_edge n adj s scan && has_path_of_length n adj scan v len_tail then ()
+    else check_via_scan_intro n adj s v len_tail w (scan + 1)
+
+// Elimination: if check_via_scan returns true, there's an intermediate vertex
+let rec check_via_scan_elim (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                             (s: nat{s < n}) (v: nat{v < n}) (len_tail: nat)
+                             (scan: nat)
+  : Lemma
+    (requires check_via_scan n adj s v len_tail scan)
+    (ensures exists (w: nat). w < n /\ has_edge n adj s w /\ has_path_of_length n adj w v len_tail)
+    (decreases (if scan < n then n - scan else 0))
+  = if scan >= n then ()
+    else if has_edge n adj s scan && has_path_of_length n adj scan v len_tail then ()
+    else check_via_scan_elim n adj s v len_tail (scan + 1)
+
+// has_path_of_length is complete: if a path exists, it returns true
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec has_path_complete (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                           (s: nat{s < n}) (v: nat{v < n})
+                           (p: list nat)
+  : Lemma
+    (requires path_from_to n adj s v p)
+    (ensures has_path_of_length n adj s v (path_length p))
+    (decreases p)
+  = match p with
+    | [] -> ()
+    | [_] -> () // path_length = 0, s = v
+    | _ :: w :: rest ->
+        path_vertices_bounded n adj p;
+        has_path_complete n adj w v (w :: rest);
+        check_via_scan_intro n adj s v (path_length (w :: rest)) w 0
+#pop-options
+
+// has_path_of_length is sound: if it returns true, a path exists
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec has_path_sound (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                        (s: nat{s < n}) (v: nat{v < n})
+                        (len: nat)
+  : Lemma
+    (requires has_path_of_length n adj s v len)
+    (ensures exists (p: list nat). path_from_to n adj s v p /\ path_length p = len)
+    (decreases len)
+  = if len = 0 then begin
+      assert (s = v);
+      singleton_path n adj s;
+      assert (path_from_to n adj s v [s] /\ path_length [s] = 0)
+    end else begin
+      check_via_scan_elim n adj s v (len - 1) 0;
+      eliminate exists (w: nat). w < n /\ has_edge n adj s w /\ has_path_of_length n adj w v (len - 1)
+      returns exists (p: list nat). path_from_to n adj s v p /\ path_length p = len
+      with _. begin
+        has_path_sound n adj w v (len - 1);
+        eliminate exists (p': list nat). path_from_to n adj w v p' /\ path_length p' = len - 1
+        returns exists (p: list nat). path_from_to n adj s v p /\ path_length p = len
+        with _. begin
+          let p = s :: p' in
+          assert (L.hd p = s);
+          assert (L.last p == L.last p');
+          assert (L.last p' = v);
+          assert (path_length p = L.length p - 1);
+          assert (L.length p = 1 + L.length p');
+          assert (path_length p' = L.length p' - 1);
+          assert (path_length p = len)
+        end
+      end
+    end
+#pop-options
+
+// Unfolding lemma for find_min_path_length
+let find_min_unfold (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                     (s: nat{s < n}) (v: nat{v < n}) (len: nat)
+  : Lemma (ensures find_min_path_length n adj s v len ==
+                   (if len > n then None
+                    else if has_path_of_length n adj s v len then Some len
+                    else find_min_path_length n adj s v (len + 1)))
+  = ()
+
+// --- find_min_path_length characterization ---
+
+// Helper: find_min_path_length returns values >= start
+let rec find_min_ge (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                     (s: nat{s < n}) (v: nat{v < n})
+                     (start: nat) (k: nat)
+  : Lemma
+    (requires find_min_path_length n adj s v start == Some k)
+    (ensures k >= start)
+    (decreases (n + 1 - start))
+  = find_min_unfold n adj s v start;
+    if start > n then ()
+    else if has_path_of_length n adj s v start then ()
+    else find_min_ge n adj s v (start + 1) k
+
+// If find_min_path_length returns Some k, then has_path_of_length k is true
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+let rec find_min_some (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                       (s: nat{s < n}) (v: nat{v < n})
+                       (start: nat) (k: nat)
+  : Lemma
+    (requires start <= k /\ find_min_path_length n adj s v start == Some k)
+    (ensures has_path_of_length n adj s v k /\ k <= n)
+    (decreases (n + 1 - start))
+  = find_min_unfold n adj s v start;
+    if start > n then ()
+    else if has_path_of_length n adj s v start then ()
+    else begin
+      find_min_ge n adj s v (start + 1) k;
+      find_min_some n adj s v (start + 1) k
+    end
+
+// If find_min_path_length returns None, no path exists with length in [start, n]
+let rec find_min_none (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                       (s: nat{s < n}) (v: nat{v < n})
+                       (start: nat) (len: nat)
+  : Lemma
+    (requires find_min_path_length n adj s v start == None /\ start <= len /\ len <= n)
+    (ensures not (has_path_of_length n adj s v len))
+    (decreases (n + 1 - start))
+  = find_min_unfold n adj s v start;
+    if start > n then ()
+    else if has_path_of_length n adj s v start then ()
+    else if start = len then ()
+    else find_min_none n adj s v (start + 1) len
+
+// If has_path_of_length len is true and start <= len <= n, find_min returns Some k with k <= len
+let rec find_min_finds (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                        (s: nat{s < n}) (v: nat{v < n})
+                        (start: nat) (len: nat)
+  : Lemma
+    (requires has_path_of_length n adj s v len /\ start <= len /\ len <= n)
+    (ensures Some? (find_min_path_length n adj s v start) /\
+             Some?.v (find_min_path_length n adj s v start) <= len)
+    (decreases (n + 1 - start))
+  = find_min_unfold n adj s v start;
+    if start > n then ()
+    else if has_path_of_length n adj s v start then ()
+    else find_min_finds n adj s v (start + 1) len
+#pop-options
+
+// --- find_visit_time characterization ---
+
+// Helper: find_visit_time returns values >= start
+let rec find_visit_ge (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                       (v: nat{v < n}) (start: nat{start <= n + 1}) (k: nat)
+  : Lemma
+    (requires find_visit_time n adj source v start == Some k)
+    (ensures k >= start)
+    (decreases (n + 1 - start))
+  = if start > n then ()
+    else if start = 0 then begin
+      let st = bfs_steps n adj source 0 in
+      if Seq.index st.visited v then ()
+      else find_visit_ge n adj source v 1 k
+    end else begin
+      let st = bfs_steps n adj source start in
+      let prev_st = bfs_steps n adj source (start - 1) in
+      if Seq.index st.visited v && not (Seq.index prev_st.visited v) then ()
+      else find_visit_ge n adj source v (start + 1) k
+    end
+
+// If find_visit_time returns Some k, then v is first visited at step k
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec find_visit_some (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                         (v: nat{v < n}) (start: nat{start <= n + 1}) (k: nat)
+  : Lemma
+    (requires find_visit_time n adj source v start == Some k /\ start <= k)
+    (ensures
+      k <= n /\
+      Seq.index (bfs_steps n adj source k).visited v /\
+      (k = 0 \/ not (Seq.index (bfs_steps n adj source (k - 1)).visited v)))
+    (decreases (n + 1 - start))
+  = if start > n then ()
+    else if start = 0 then begin
+      let st = bfs_steps n adj source 0 in
+      if Seq.index st.visited v then ()
+      else begin
+        find_visit_ge n adj source v 1 k;
+        find_visit_some n adj source v 1 k
+      end
+    end else begin
+      let st = bfs_steps n adj source start in
+      let prev_st = bfs_steps n adj source (start - 1) in
+      if Seq.index st.visited v && not (Seq.index prev_st.visited v) then ()
+      else begin
+        find_visit_ge n adj source v (start + 1) k;
+        find_visit_some n adj source v (start + 1) k
+      end
+    end
+#pop-options
+
+// If find_visit_time returns None, v is never visited
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec find_visit_none (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                         (v: nat{v < n}) (start: nat{start <= n + 1}) (step: nat)
+  : Lemma
+    (requires find_visit_time n adj source v start == None /\ start <= step /\ step <= n)
+    (ensures not (Seq.index (bfs_steps n adj source step).visited v) \/
+             (step > 0 /\ Seq.index (bfs_steps n adj source (step - 1)).visited v))
+    (decreases (n + 1 - start))
+  = if start > n then ()
+    else if start = 0 then begin
+      let st = bfs_steps n adj source 0 in
+      if Seq.index st.visited v then ()
+      else if step = 0 then ()
+      else find_visit_none n adj source v 1 step
+    end else begin
+      let st = bfs_steps n adj source start in
+      let prev_st = bfs_steps n adj source (start - 1) in
+      if Seq.index st.visited v && not (Seq.index prev_st.visited v) then ()
+      else if start = step then ()
+      else find_visit_none n adj source v (start + 1) step
+    end
+#pop-options
+
+// Stronger: if find_visit_time returns None (from 0), v is not visited at any step <= n
+let rec find_visit_none_not_visited (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                                     (v: nat{v < n}) (step: nat)
+  : Lemma
+    (requires find_visit_time n adj source v 0 == None /\ step <= n)
+    (ensures not (Seq.index (bfs_steps n adj source step).visited v))
+    (decreases step)
+  = if step = 0 then begin
+      find_visit_none n adj source v 0 0
+    end else begin
+      find_visit_none_not_visited n adj source v (step - 1);
+      find_visit_none n adj source v 0 step
+    end
+
+// If v is visited at step k and not before, find_visit_time returns Some k
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec find_visit_finds (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
+                          (v: nat{v < n}) (start: nat{start <= n + 1}) (k: nat)
+  : Lemma
+    (requires
+      k <= n /\ start <= k /\
+      Seq.index (bfs_steps n adj source k).visited v /\
+      (forall (j: nat). j < k /\ j >= start ==> not (Seq.index (bfs_steps n adj source j).visited v)) /\
+      (k = 0 \/ not (Seq.index (bfs_steps n adj source (k - 1)).visited v)))
+    (ensures find_visit_time n adj source v start == Some k)
+    (decreases (n + 1 - start))
+  = if start > n then ()
+    else if start = 0 then begin
+      let st = bfs_steps n adj source 0 in
+      if Seq.index st.visited v then begin
+        assert (k = 0)
+      end else
+        find_visit_finds n adj source v 1 k
+    end else begin
+      let st = bfs_steps n adj source start in
+      let prev_st = bfs_steps n adj source (start - 1) in
+      if Seq.index st.visited v && not (Seq.index prev_st.visited v) then begin
+        assert (start = k)
+      end else
+        find_visit_finds n adj source v (start + 1) k
+    end
+#pop-options
+
+// --- Path length bound: any simple path has length < n ---
+
+// For the "unreachable" case, we need: if v not visited at any step <= n,
+// then no path from source to v exists.
+// Contrapositive of path_implies_visited + path length < n for simple paths.
+// Actually: for any path p from s to v, there exists a simple path of length < n.
+// But that's complex. Instead: if path has length L, v is visited at step L.
+// If L <= n, this is direct. If L > n, we need to shorten the path.
+
+// Helper: path of length >= n can be shortened (pigeonhole)
+// This is complex, so instead we prove: shortest_path_dist returns None iff unreachable
+
+// Alternative approach for bfs_correctness: case split on whether v is reachable
+
+// --- Helper: if no has_path_of_length true in [start, n), find_min returns None ---
+
+let rec find_min_none_all (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
+                           (s: nat{s < n}) (v: nat{v < n}) (start: nat)
+  : Lemma
+    (requires forall (len: nat). start <= len /\ len <= n ==> not (has_path_of_length n adj s v len))
+    (ensures find_min_path_length n adj s v start == None)
+    (decreases (n + 1 - start))
+  = find_min_unfold n adj s v start;
+    if start > n then ()
+    else begin
+      assert (not (has_path_of_length n adj s v start));
+      find_min_none_all n adj s v (start + 1)
+    end
+
+// --- Main correctness theorem ---
+
 // Main theorem: BFS computes shortest path distances
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 let bfs_correctness (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (v: nat{v < n})
   : Lemma
+    (requires Seq.length adj = n * n)
     (ensures
       (let d_bfs = Seq.index (bfs_distances n adj source) v in
        let d_shortest = shortest_path_dist n adj source v in
        d_bfs == d_shortest))
-  = admit()  // Main theorem combining both directions
+  = // Connect bfs_distances to find_visit_time
+    assert (Seq.index (bfs_distances n adj source) v == find_visit_time n adj source v 0)
+      by (FStar.Tactics.V2.norm [delta_only [`%bfs_distances]; iota; zeta; primops];
+          FStar.Tactics.V2.smt ());
+    let d_bfs = find_visit_time n adj source v 0 in
+    if source = v then begin
+      assert (shortest_path_dist n adj source v == Some 0);
+      let st0 = bfs_steps n adj source 0 in
+      assert (Seq.index st0.visited v)
+    end else begin
+      match d_bfs with
+      | Some k ->
+        find_visit_some n adj source v 0 k;
+        visited_implies_path_exists n adj source v k;
+        shortest_path_property n adj source v k;
+        eliminate exists (p: list nat). path_from_to n adj source v p /\ path_length p <= k
+        returns d_bfs == shortest_path_dist n adj source v
+        with _. begin
+          assert (path_length p = k);
+          has_path_complete n adj source v p;
+          assert (k >= 1);
+          find_min_finds n adj source v 1 k;
+          let Some k' = find_min_path_length n adj source v 1 in
+          find_min_ge n adj source v 1 k';
+          find_min_some n adj source v 1 k';
+          has_path_sound n adj source v k';
+          eliminate exists (p': list nat). path_from_to n adj source v p' /\ path_length p' = k'
+          returns d_bfs == shortest_path_dist n adj source v
+          with _. begin
+            shortest_path_property n adj source v k;
+            assert (k' = k);
+            assert (shortest_path_dist n adj source v == Some k)
+          end
+        end
+      | None ->
+        assert (shortest_path_dist n adj source v == find_min_path_length n adj source v 1);
+        let aux (len: nat)
+          : Lemma (requires 1 <= len /\ len <= n)
+                  (ensures not (has_path_of_length n adj source v len))
+          = if has_path_of_length n adj source v len then begin
+              has_path_sound n adj source v len;
+              eliminate exists (p: list nat). path_from_to n adj source v p /\ path_length p = len
+              returns False
+              with _. begin
+                path_implies_visited n adj source v p;
+                find_visit_none_not_visited n adj source v len
+              end
+            end
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+        find_min_none_all n adj source v 1
+    end
+#pop-options
 
 (*** 9. Auxiliary Lemmas ***)
 
