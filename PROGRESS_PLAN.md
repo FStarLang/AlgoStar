@@ -224,7 +224,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | |
 | 15 | RodCutting.Extended | §15.1 | ✅ cuts_are_optimal | — | 0 | |
 | 16 | ActivitySelection | §16.1 | ✅ exchange argument | ✅ Linked O(n) | 0 | ✅ Full optimality |
-| 16 | Huffman | §16.3 | ⚠️ cost only | ✅ Linked (cost) | 0 | Spec: 0 ✅; Complete: 0 ✅ |
+| 16 | Huffman | §16.3 | ✅ full tree + cost | ✅ Linked (cost) | 0 | Spec: 0 ✅; Complete: 0 ✅; greedy_choice_lemma wired |
 | 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | FullCompress available |
 | 22 | IterativeBFS | — | ⚠️ reachability | — | 0 | Not CLRS |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
@@ -265,6 +265,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 Note: MaxFlow `assume(...)` are mathematical axioms (weak duality, MFMC), beyond scope.
 BFS.DistanceSpec fully proven (was 2 admits). VertexCover.Spec fully proven (was 1 admit).
 MaxSubarray.DC assume val eliminated. Huffman.Complete: WPL optimality fully proven.
+Huffman.fst: Added `huffman_tree` (full tree + spec connection); `greedy_choice_lemma` wired to `greedy_choice_theorem`.
 
 ---
 
@@ -789,6 +790,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | Round 2: AGENT5 | BucketSort (1→0) | ✅ DONE |
 | Round 2: AGENT6 | Huffman.Complete (Spec 4→0, Complete 2→0) | ✅ DONE |
 | Round 4: AGENT6 | Prim.Spec (6→0 admits + 1 admit_smt→0) | ✅ DONE |
+| Round 5: AGENT4 | Kruskal.EdgeSorting fix + Huffman improvements | ✅ DONE (greedy_choice_lemma wired, huffman_tree added) |
 | Round 2: AGENT7 | Kruskal.EdgeSorting (2→0) | ✅ DONE |
 | Round 2: AGENT8 | Dijkstra.TriangleInequality (1→0) | ✅ DONE |
 | Round 2: AGENT9 | BellmanFord.Spec (3→0) | ✅ DONE |
