@@ -809,6 +809,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | Round 3: AGENT7 | MST Cut Property (4→1 admit) | ✅ MOSTLY DONE |
 | Round 3: AGENT9 | MaxFlow Proofs (7→0 assumes) | ✅ DONE (MFMC stated) |
 | Round 3: AGENT10 | VertexCover (1→0 admits) | ✅ DONE (ghost matching) |
+| Round 4: AGENT10 | LCS Optimality (spec gap→0) | ✅ DONE (329 lines, 0 admits) |
 | Round 2: AGENT1 | StackDFS.Complexity (4→0 assume_) | ✅ DONE |
 | Round 2: AGENT2 | CountingSort.Stable (3→0) | ✅ DONE |
 | Round 2: AGENT3 | Kruskal.Complexity (2+1→0) | ✅ DONE |
@@ -852,9 +853,9 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch12/BST.Delete.fst | Weak | AGENT7 | Only proves valid[idx]=false or lengths preserved |
 | ch04/MaxSubarray.Kadane | Self-referential | AGENT3 | result==kadane_spec, not >= all subarrays |
 | ch04/MaxSubarray.DC | Disconnected | AGENT14 | DC proven optimal but not connected to Kadane |
-| ch24/BellmanFord | One-sided | AGENT8 | no_neg_cycle=false: no negative cycle proof |
+| ch24/BellmanFord | ✅ Complete | AGENT8 | Both directions: true⟹tri_ineq+upper_bound, false⟹exists_violation |
 | ch24/Dijkstra | Bogus check + upper bound only | AGENT9 | Remove verification pass, prove equality from relaxation |
-| ch15/LCS | Recurrence only | AGENT10 | result==lcs_length, no is_subsequence definition |
+| ch15/LCS | ✅ Full optimality | AGENT10 | is_subsequence defined, lcs_length_is_longest proven |
 | ch32/KMP | Trivial bounds | AGENT11 | count bounds only, not == count_matches_spec |
 | ch25/FloydWarshall | Recurrence only | AGENT12 | result==fw_outer, no shortest-path proof |
 
