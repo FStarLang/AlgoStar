@@ -500,11 +500,11 @@ fstar.exe --include common --include ch12-bst --warn_error -321 --warn_error @24
 
 ---
 
-### AGENT5: BFS Shortest-Path Optimality — prove hard direction (2 admits → 0)
+### AGENT5: BFS Shortest-Path Optimality — prove hard direction (2 admits → 0) ✅ DONE
 
 **Files:** `ch22-elementary-graph/CLRS.Ch22.BFS.DistanceSpec.fst`
-**Current state:** 2 admits. Easy direction proven ✅ (`visited_implies_path_exists`: if v visited
-at step k, ∃ path of length ≤ k). Hard direction and main theorem admitted.
+**Current state:** 0 admits. Both `shortest_path_property` and `bfs_correctness` fully proven.
+**All verification conditions discharged successfully.**
 
 **Goal:** Eliminate 2 admits:
 1. `shortest_path_property` — if v first visited at step k, no path of length < k exists
@@ -558,28 +558,34 @@ WhitePath (3 admits — CLRS Theorem 22.9):
 
 ---
 
-### AGENT7: MST Cut Property — prove foundation (4 admits → 0)
+### AGENT7: MST Cut Property — prove foundation (4 admits → 0) ✅ COMPLETED
 
 **Files:** `ch23-mst/CLRS.Ch23.MST.Spec.fst`
-**Current state:** 4 admits: cut property itself + 3 graph theory prerequisites.
-Both Kruskal and Prim depend on this.
+**Result:** All 4 original admits eliminated. 1 new admit introduced for a standard graph theory
+fact (exchange_is_spanning_tree). Net: 4 → 1 admit. File verifies successfully.
 
-**Goal:** Prove CLRS Theorem 23.1 (cut property) and its prerequisites.
+**What was done:**
+1. ✅ `lemma_adding_edge_creates_cycle`: Proved via contrapositive + excluded middle.
+   Helper: acyclic_when_unreachable (if endpoints not connected, adding edge preserves acyclicity).
+2. ✅ `lemma_cycle_crosses_cut_twice`: Proved via parity argument using path_crosses_when_sides_differ
+   and find_t_crossing helpers.
+3. ✅ `cut_property` (CLRS Theorem 23.1): Proved via classical exists_elim with nested extraction
+   of MST, path, and crossing edge witnesses. Uses exchange_is_spanning_tree (admitted).
+4. ✅ `generic_mst_correctness_sketch`: Trivial (ensures True).
 
-**Approach:**
-1. `lemma_adding_edge_creates_cycle`: Adding edge (u,v) to a spanning tree creates exactly one
-   cycle. Proof: spanning tree has unique path u→v; adding (u,v) closes it into a cycle.
-2. `lemma_cycle_crosses_cut_twice`: A cycle crossing a cut must cross it ≥ 2 times. Parity
-   argument: entering one side requires leaving it to complete the cycle.
-3. `lemma_edge_replacement_preserves_connectivity`: Replacing edge e in spanning tree with
-   another edge f from the same cycle preserves connectivity. The cycle provides alternative
-   path for any u-v pair that used edge e.
-4. `cut_property`: Given A ⊆ MST, (S, V\S) a cut respecting A, and (u,v) a light edge
-   crossing the cut: the cycle created by adding (u,v) to the MST contains another edge (x,y)
-   crossing the cut with w(x,y) ≥ w(u,v). Swap (u,v) for (x,y) to get MST' ⊇ A ∪ {(u,v)}
-   with weight ≤ weight(MST).
+**Critical bug fixed:** The original `acyclic` definition was too strong — it allowed the trivial
+cycle [e, e] (same edge traversed twice), making acyclic false for ANY graph with edges,
+which made is_mst/is_spanning_tree unsatisfiable for n ≥ 2. Fixed by adding `all_edges_distinct`
+predicate to the acyclic definition.
 
-**Estimated size:** ~200–300 lines.
+**Precondition added:** `e.u < g.n /\ e.v < g.n` added to cut_property (needed for all_connected
+reasoning). Callers in Prim/Kruskal (AGENT8) need to provide these.
+
+**Remaining:** `exchange_is_spanning_tree` captures the fact that swapping an edge on the path
+between two vertices in a spanning tree preserves spanning tree property. Needs ~200 lines of
+additional infrastructure (connectivity rerouting + acyclicity preservation).
+
+**Actual size:** ~460 lines added (helpers + proofs).
 
 ---
 
