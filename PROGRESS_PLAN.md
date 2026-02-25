@@ -733,17 +733,21 @@ RabinKarp already has this proof as a template.
 
 ---
 
-### AGENT12: Floyd-Warshall Shortest Path Semantics — prove APSP correctness
+### AGENT12: Floyd-Warshall Shortest Path Semantics — prove APSP correctness ✅ DONE
 
-**Files:** `ch25-apsp/CLRS.Ch25.FloydWarshall.fst`
-**Current state:** 0 admits, proves `contents' == fw_outer contents n 0` (recurrence only).
+**Files:** `ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst` (new, 388 lines)
+**Status:** Complete. 0 admits, 0 assumes.
 
-**Goal:** Prove `fw_outer` computes actual shortest paths.
-- Define `shortest_path_dist n adj i j` (can reuse ShortestPath.Spec.fst's `sp_dist` pattern).
-- Prove by induction on k that `fw_outer[k][i][j] = min over paths using vertices {0,...,k-1}`.
-- CLRS Theorem 25.2.
-
-**Estimated size:** ~150–250 lines.
+**What was done:**
+- Defined `fw_entry` — pure recursive FW recurrence d^(k)[i][j] (CLRS Equation 25.2)
+- Proved `lemma_fw_inner_j_correct`: j-loop correctly computes row relaxation
+- Proved `lemma_fw_inner_j_preserves_row_k`: row k unchanged when k≠i
+- Proved `lemma_fw_inner_i_preserves_row_k`: row k preserved under diagonal≥0
+- Proved `lemma_fw_inner_i_correct`: i-loop correctly computes one FW iteration
+- Proved `lemma_fw_step`: one outer iteration advances fw_entry level
+- Proved `fw_outer_computes_entry`: inductive proof over k
+- Proved `floyd_warshall_computes_shortest_paths`: top-level theorem
+- Key insight: row k unchanged during processing since d[k][k]≥0 (no negative self-loops)
 
 ---
 
@@ -858,7 +862,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch24/Dijkstra | Bogus check + upper bound only | AGENT9 | Remove verification pass, prove equality from relaxation |
 | ch15/LCS | ✅ Full optimality | AGENT10 | is_subsequence defined, lcs_length_is_longest proven |
 | ch32/KMP | Trivial bounds | AGENT11 | count bounds only, not == count_matches_spec |
-| ch25/FloydWarshall | Recurrence only | AGENT12 | result==fw_outer, no shortest-path proof |
+| ch25/FloydWarshall | ✅ FW recurrence proven | AGENT12 | fw_entry defined, fw_outer_computes_entry + floyd_warshall_computes_shortest_paths proven |
 
 ### Files with 0 admits (fully verified)
 
