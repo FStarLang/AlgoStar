@@ -23,7 +23,8 @@ module Seq = FStar.Seq
    - dist[source] == 0
    - All distances non-negative and bounded [0, 1000000]
    - Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
-     (verified by a read-only check pass after the main algorithm)
+     (proven from edge relaxation — no separate verification pass needed)
+   - Upper bound: dist[v] <= sp_dist(source, v) for all v
    
    NO admits. NO assumes.
 *)
@@ -53,23 +54,6 @@ let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : 
      (w < 1000000 /\ dist_u < 1000000) ==> dist_v <= dist_u + w))
 //SNIPPET_END: triangle_inequality
 
-// Partial triangle inequality: for edges (u,v) with u < u_bound, or u == u_bound and v < v_bound
-let triangle_partial (sweights: Seq.seq int) (sdist: Seq.seq int) (n u_bound v_bound: nat) : prop =
-  Seq.length sdist == n /\
-  Seq.length sweights == n * n /\
-  (forall (u v:nat). 
-    u < n /\ v < n /\
-    (u < u_bound \/ (u == u_bound /\ v < v_bound)) ==>
-    (let w = Seq.index sweights (u * n + v) in
-     let dist_u = Seq.index sdist u in
-     let dist_v = Seq.index sdist v in
-     (w < 1000000 /\ dist_u < 1000000) ==> dist_v <= dist_u + w))
-
-let partial_full_tri (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : Lemma
-  (requires triangle_partial sweights sdist n n 0)
-  (ensures triangle_inequality sweights sdist n)
-  = ()
-
 /// Import pure shortest-path specification
 module SP = CLRS.Ch24.ShortestPath.Spec
 
@@ -84,25 +68,163 @@ let dijkstra_to_sp_triangle (sdist sweights: Seq.seq int) (n: nat) : Lemma
 
 /// Helper: establish sp_dist upper bound from triangle inequality + all_bounded
 #push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
-let dijkstra_sp_upper_bound_cond (sdist sweights: Seq.seq int) (n source: nat) (flag: bool) : Lemma
+let dijkstra_sp_upper_bound (sdist sweights: Seq.seq int) (n source: nat) : Lemma
   (requires Seq.length sdist == n /\
             Seq.length sweights == n * n /\
             n > 0 /\ source < n /\
             Seq.index sdist source == 0 /\
             all_bounded sdist /\
-            (flag == true ==> triangle_inequality sweights sdist n))
-  (ensures flag == true ==>
+            triangle_inequality sweights sdist n)
+  (ensures 
     (forall (v: nat). v < n ==>
       Seq.index sdist v <= SP.sp_dist sweights n source v))
-  = if flag then begin
-      dijkstra_to_sp_triangle sdist sweights n;
-      let aux (v: nat{v < n}) : Lemma
-        (ensures Seq.index sdist v <= SP.sp_dist sweights n source v) =
-        SP.triangle_ineq_implies_upper_bound sdist sweights n source v
-      in
-      FStar.Classical.forall_intro aux
-    end
+  = dijkstra_to_sp_triangle sdist sweights n;
+    let aux (v: nat{v < n}) : Lemma
+      (ensures Seq.index sdist v <= SP.sp_dist sweights n source v) =
+      SP.triangle_ineq_implies_upper_bound sdist sweights n source v
+    in
+    FStar.Classical.forall_intro aux
 #pop-options
+
+(* ===== Ghost invariants for triangle inequality proof ===== *)
+
+// Triangle inequality restricted to edges from visited vertices
+let tri_from_visited (sweights sdist svisited: Seq.seq int) (n: nat) : prop =
+  Seq.length sdist == n /\
+  Seq.length sweights >= n * n /\
+  Seq.length svisited == n /\
+  (forall (u v: nat).
+    u < n /\ v < n /\ u * n + v < Seq.length sweights /\
+    Seq.index svisited u = 1 ==>
+    (let w = Seq.index sweights (u * n + v) in
+     let d_u = Seq.index sdist u in
+     let d_v = Seq.index sdist v in
+     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w))
+
+// Ordering: visited distances <= unvisited distances
+let visited_le_unvisited (sdist svisited: Seq.seq int) (n: nat) : prop =
+  Seq.length sdist == n /\
+  Seq.length svisited == n /\
+  (forall (x u: nat). x < n /\ u < n /\
+    Seq.index svisited x = 1 /\ Seq.index svisited u = 0 ==>
+    Seq.index sdist x <= Seq.index sdist u)
+
+// When all vertices are visited, tri_from_visited implies full triangle_inequality
+let all_visited_tri_is_full
+  (sweights sdist svisited: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      tri_from_visited sweights sdist svisited n /\
+      Seq.length sweights == n * n /\
+      (forall (u: nat). u < n ==> Seq.index svisited u = 1))
+    (ensures triangle_inequality sweights sdist n)
+  = ()
+
+// After relaxation from u: triangle inequality extends and ordering is preserved
+// Preconditions: old invariants hold, u is min unvisited, relaxation properties hold
+#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+let extend_tri_after_relax
+  (sweights sdist_old sdist_new svisited_old: Seq.seq int) (n u: nat)
+  : Lemma
+    (requires
+      // Basic sizes
+      Seq.length sdist_old == n /\ Seq.length sdist_new == n /\
+      Seq.length sweights == n * n /\ Seq.length svisited_old == n /\
+      n > 0 /\ u < n /\
+      all_weights_non_negative sweights /\
+      // Old invariants
+      tri_from_visited sweights sdist_old svisited_old n /\
+      visited_le_unvisited sdist_old svisited_old n /\
+      // u was unvisited
+      Seq.index svisited_old u = 0 /\
+      // u has minimum dist among unvisited
+      (forall (j: nat). j < n /\ Seq.index svisited_old j = 0 ==>
+        Seq.index sdist_old u <= Seq.index sdist_old j) /\
+      // Visited distances unchanged
+      (forall (x: nat). x < n /\ Seq.index svisited_old x = 1 ==>
+        Seq.index sdist_new x == Seq.index sdist_old x) /\
+      // dist[u] unchanged
+      Seq.index sdist_new u == Seq.index sdist_old u /\
+      // All distances only decrease
+      (forall (v: nat). v < n ==> Seq.index sdist_new v <= Seq.index sdist_old v) /\
+      // For unvisited v: new dist[v] >= dist[u] (relaxation can't go below dist[u])
+      (forall (v: nat). v < n /\ Seq.index svisited_old v = 0 ==>
+        Seq.index sdist_new v >= Seq.index sdist_old u) /\
+      // Triangle from u: relaxation established it
+      (forall (v: nat). v < n /\ u * n + v < Seq.length sweights ==>
+        (let w = Seq.index sweights (u * n + v) in
+         let d_u = Seq.index sdist_new u in
+         (w < 1000000 /\ d_u < 1000000) ==> Seq.index sdist_new v <= d_u + w)))
+    (ensures
+      (let svisited_new = Seq.upd svisited_old u 1 in
+       tri_from_visited sweights sdist_new svisited_new n /\
+       visited_le_unvisited sdist_new svisited_new n))
+  = ()
+#pop-options
+
+// Count of entries equal to 1 in s[0..n)
+let rec count_ones (s: Seq.seq int) (n: nat) : Tot nat (decreases n) =
+  if n = 0 || n > Seq.length s then 0
+  else (if Seq.index s (n-1) = 1 then 1 else 0) + count_ones s (n-1)
+
+let rec count_ones_all_zero (s: Seq.seq int) (n: nat)
+  : Lemma (requires n <= Seq.length s /\ (forall (j:nat). j < n ==> Seq.index s j = 0))
+          (ensures count_ones s n == 0) (decreases n)
+  = if n > 0 then count_ones_all_zero s (n-1)
+
+let rec count_ones_all_one (s: Seq.seq int) (n: nat)
+  : Lemma (requires n <= Seq.length s /\ (forall (j:nat). j < n ==> Seq.index s j = 1))
+          (ensures count_ones s n == n) (decreases n)
+  = if n > 0 then count_ones_all_one s (n-1)
+
+let rec count_ones_bound (s: Seq.seq int) (n: nat)
+  : Lemma (requires n <= Seq.length s /\
+           (forall (j:nat). j < n ==> Seq.index s j = 0 \/ Seq.index s j = 1))
+          (ensures count_ones s n <= n) (decreases n)
+  = if n > 0 then count_ones_bound s (n-1)
+
+let rec count_ones_upd_above (s: Seq.seq int) (n u: nat)
+  : Lemma (requires n <= Seq.length s /\ u >= n /\ u < Seq.length s)
+          (ensures count_ones (Seq.upd s u 1) n == count_ones s n) (decreases n)
+  = if n > 0 then count_ones_upd_above s (n-1) u
+
+let rec count_ones_mark (s: Seq.seq int) (n u: nat)
+  : Lemma (requires n <= Seq.length s /\ u < n /\ Seq.index s u = 0 /\
+           (forall (j:nat). j < n ==> Seq.index s j = 0 \/ Seq.index s j = 1))
+          (ensures count_ones (Seq.upd s u 1) n == count_ones s n + 1) (decreases n)
+  = if n - 1 > u then
+      count_ones_mark s (n-1) u
+    else if n - 1 = u then
+      count_ones_upd_above s (n-1) u
+    else () // n-1 < u, impossible since u < n
+
+let rec count_ones_full (s: Seq.seq int) (n: nat)
+  : Lemma (requires n <= Seq.length s /\ count_ones s n >= n /\
+           (forall (j:nat). j < n ==> Seq.index s j = 0 \/ Seq.index s j = 1))
+          (ensures forall (j:nat). j < n ==> Seq.index s j = 1) (decreases n)
+  = if n > 0 then begin
+      count_ones_bound s (n-1);
+      count_ones_full s (n-1)
+    end
+
+// count_ones < n implies not all visited
+let count_ones_not_all_visited (s: Seq.seq int) (n: nat)
+  : Lemma (requires n <= Seq.length s /\ count_ones s n < n /\
+           (forall (j:nat). j < n ==> Seq.index s j = 0 \/ Seq.index s j = 1))
+          (ensures ~(forall (j:nat). j < n ==> Seq.index s j = 1))
+  = Classical.move_requires (count_ones_all_one s) n
+
+// Minimum property: idx has minimum distance among unvisited vertices,
+// and is itself unvisited (or all vertices are already visited)
+let has_min_dist_unvisited (sdist svisited: Seq.seq int) (n idx: nat) : prop =
+  idx < n /\
+  Seq.length sdist == n /\
+  Seq.length svisited == n /\
+  (forall (j: nat). j < n /\ Seq.index svisited j = 0 ==>
+    Seq.index sdist idx <= Seq.index sdist j) /\
+  // idx is unvisited, or all vertices are visited
+  ((forall (j: nat). j < n ==> Seq.index svisited j = 1) \/
+   Seq.index svisited idx = 0)
 
 // Helper function to find minimum distance vertex among unvisited
 fn find_min_unvisited
@@ -117,16 +239,19 @@ fn find_min_unvisited
     pure (
       SZ.v n > 0 /\
       Seq.length sdist == SZ.v n /\
-      Seq.length svisited == SZ.v n
+      Seq.length svisited == SZ.v n /\
+      all_bounded sdist /\
+      (forall (j: nat). j < SZ.v n ==>
+        (Seq.index svisited j = 0 \/ Seq.index svisited j = 1))
     )
   returns min_idx:SZ.t
   ensures
     A.pts_to dist sdist **
     V.pts_to visited svisited **
-    pure (SZ.v min_idx < SZ.v n)
+    pure (has_min_dist_unvisited sdist svisited (SZ.v n) (SZ.v min_idx))
 {
   let mut min_idx: SZ.t = 0sz;
-  let mut min_val: int = 1000000;
+  let mut min_val: int = 1000001;
   let mut i: SZ.t = 0sz;
   
   while (
@@ -141,7 +266,18 @@ fn find_min_unvisited
     V.pts_to visited svisited **
     pure (
       SZ.v vi <= SZ.v n /\
-      SZ.v vmin_idx < SZ.v n
+      SZ.v vmin_idx < SZ.v n /\
+      // min_val tracks the minimum distance seen among unvisited vertices in [0, vi)
+      (forall (j: nat). j < SZ.v vi /\ Seq.index svisited j = 0 ==>
+        vmin_val <= Seq.index sdist j) /\
+      // If we found an unvisited vertex, min_val = dist[vmin_idx] and vmin_idx is unvisited
+      (vmin_val <= 1000000 ==>
+        Seq.index svisited (SZ.v vmin_idx) = 0 /\
+        vmin_val == Seq.index sdist (SZ.v vmin_idx)) /\
+      // If no unvisited found, all j < vi are visited
+      (vmin_val > 1000000 ==>
+        (forall (j: nat). j < SZ.v vi ==>
+          Seq.index svisited j = 1))
     )
   {
     let vi = !i;
@@ -167,21 +303,18 @@ fn find_min_unvisited
   let _ = !min_val;
   result
 }
-
+#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)
   (n: SZ.t)
   (source: SZ.t)
   (dist: A.array int)
-  (tri_result: R.ref bool)
   (#sweights: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
-  (#stri: erased bool)
   requires
     A.pts_to weights sweights **
     A.pts_to dist sdist **
-    R.pts_to tri_result stri **
     pure (
       SZ.v n > 0 /\
       SZ.v source < SZ.v n /\
@@ -190,19 +323,18 @@ fn dijkstra
       SZ.fits (SZ.v n * SZ.v n) /\
       all_weights_non_negative sweights
     )
-  ensures exists* sdist' vtri.
+  ensures exists* sdist'.
     A.pts_to weights sweights **
     A.pts_to dist sdist' **
-    R.pts_to tri_result vtri **
     pure (
       Seq.length sdist' == SZ.v n /\
       SZ.v source < Seq.length sdist' /\
       Seq.index sdist' (SZ.v source) == 0 /\
       all_non_negative sdist' /\
       all_bounded sdist' /\
-      (vtri == true ==> triangle_inequality sweights sdist' (SZ.v n)) /\
-      (vtri == true ==> (forall (v: nat). v < SZ.v n ==>
-        Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
+      triangle_inequality sweights sdist' (SZ.v n) /\
+      (forall (v: nat). v < SZ.v n ==>
+        Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v)
     )
 //SNIPPET_END: dijkstra_sig
 {
@@ -219,9 +351,7 @@ fn dijkstra
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
-      // After source is initialized, it stays 0
       (SZ.v vi > SZ.v source ==> Seq.index sdist_current (SZ.v source) == 0) /\
-      // All initialized indices are non-negative and bounded
       (forall (j:nat). j < SZ.v vi ==> 
         Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= 1000000)
     )
@@ -234,11 +364,12 @@ fn dijkstra
   
   let _ = !init_i;
   
-  // At this point, dist[source] = 0 and all others = 1000000
-  // Triangle inequality holds vacuously because 1000000 is treated as infinity
-  
-  // Allocate visited array
+  // Allocate visited array (all 0 initially)
   let visited = V.alloc 0 n;
+  
+  // Establish count_ones for initial visited array
+  with svisited_init. assert (V.pts_to visited svisited_init);
+  count_ones_all_zero svisited_init (SZ.v n);
   
   // Main loop: n iterations
   let mut round: SZ.t = 0sz;
@@ -255,10 +386,16 @@ fn dijkstra
       SZ.v vround <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
       Seq.length svisited_current == SZ.v n /\
-      // Key invariants:
       Seq.index sdist_current (SZ.v source) == 0 /\
       all_non_negative sdist_current /\
-      all_bounded sdist_current
+      all_bounded sdist_current /\
+      all_weights_non_negative sweights /\
+      Seq.length sweights == SZ.v n * SZ.v n /\
+      (forall (j: nat). j < SZ.v n ==>
+        (Seq.index svisited_current j = 0 \/ Seq.index svisited_current j = 1)) /\
+      tri_from_visited sweights sdist_current svisited_current (SZ.v n) /\
+      visited_le_unvisited sdist_current svisited_current (SZ.v n) /\
+      count_ones svisited_current (SZ.v n) == SZ.v vround
     )
   {
     let vround = !round;
@@ -266,10 +403,22 @@ fn dijkstra
     // Find minimum distance unvisited vertex
     let u = find_min_unvisited dist visited n;
     
+    // Ghost: capture state before marking
+    with sdist_pre. assert (A.pts_to dist sdist_pre);
+    with svisited_pre. assert (V.pts_to visited svisited_pre);
+    
+    // Resolve has_min_dist_unvisited disjunction: u must be unvisited
+    // count_ones svisited_pre n == vround < n, so not all visited
+    count_ones_not_all_visited svisited_pre (SZ.v n);
+    // Now SMT knows: u is unvisited
+    
     // Mark u as visited
     V.op_Array_Assignment visited u 1;
     
-    // Get dist[u]
+    // Update count_ones after marking
+    count_ones_mark svisited_pre (SZ.v n) (SZ.v u);
+    
+    // Get dist[u] — cached, won't change during relaxation
     let dist_u = A.op_Array_Access dist u;
     
     // Relax all neighbors of u
@@ -289,109 +438,76 @@ fn dijkstra
         Seq.length svisited_v == SZ.v n /\
         Seq.index sdist_v (SZ.v source) == 0 /\
         all_non_negative sdist_v /\
-        all_bounded sdist_v
+        all_bounded sdist_v /\
+        (forall (j: nat). j < SZ.v n ==>
+          (Seq.index svisited_v j = 0 \/ Seq.index svisited_v j = 1)) /\
+        svisited_v == Seq.upd svisited_pre (SZ.v u) 1 /\
+        (forall (x: nat). x < SZ.v n /\ (Seq.index svisited_pre x = 1 \/ x = SZ.v u) ==>
+          Seq.index sdist_v x == Seq.index sdist_pre x) /\
+        (forall (j: nat). j < SZ.v n ==>
+          Seq.index sdist_v j <= Seq.index sdist_pre j) /\
+        (forall (v': nat). v' < SZ.v vv /\ v' < SZ.v n /\
+          SZ.v u * SZ.v n + v' < Seq.length sweights ==>
+          (let w = Seq.index sweights (SZ.v u * SZ.v n + v') in
+           let d_u = Seq.index sdist_v (SZ.v u) in
+           (w < 1000000 /\ d_u < 1000000) ==> Seq.index sdist_v v' <= d_u + w)) /\
+        (forall (j: nat). j < SZ.v n /\ Seq.index svisited_pre j = 0 ==>
+          Seq.index sdist_v j >= Seq.index sdist_pre (SZ.v u))
       )
     {
       let vv = !v;
       
-      // Read weight[u][v] from flat array
       let w_idx = u *^ n +^ vv;
       let w = A.op_Array_Access weights w_idx;
       
-      // Read visited[v] and dist[v]
       let visited_v = V.op_Array_Access visited vv;
       let old_dist = A.op_Array_Access dist vv;
       
-      // Compute new distance: relax if unvisited and edge exists
       let can_relax = (visited_v = 0 && w < 1000000 && dist_u < 1000000);
       let sum = dist_u + w;
       let should_update = (can_relax && sum < old_dist);
       let new_dist: int = (if should_update then sum else old_dist);
       
-      // This write maintains our invariants:
-      // - dist[source] unchanged (because we only update v = vv)
-      // - non-negativity: maintained because new_dist <= old_dist, and old_dist >= 0
-      // - boundedness: maintained because new_dist <= old_dist <= 1000000
       A.op_Array_Assignment dist vv new_dist;
       
       v := vv +^ 1sz;
     };
     
     let _ = !v;
+    
+    // Apply bridge lemma to establish ghost invariants for next iteration
+    with sdist_after. assert (A.pts_to dist sdist_after);
+    
+    // Help SMT with bridge lemma preconditions
+    assert (pure (Seq.index svisited_pre (SZ.v u) = 0));
+    assert (pure (tri_from_visited sweights sdist_pre svisited_pre (SZ.v n)));
+    assert (pure (visited_le_unvisited sdist_pre svisited_pre (SZ.v n)));
+    assert (pure (forall (j: nat). j < SZ.v n /\ Seq.index svisited_pre j = 0 ==>
+      Seq.index sdist_pre (SZ.v u) <= Seq.index sdist_pre j));
+    assert (pure (forall (x: nat). x < SZ.v n /\ Seq.index svisited_pre x = 1 ==>
+      Seq.index sdist_after x == Seq.index sdist_pre x));
+    assert (pure (Seq.index sdist_after (SZ.v u) == Seq.index sdist_pre (SZ.v u)));
+    
+    extend_tri_after_relax sweights sdist_pre sdist_after svisited_pre (SZ.v n) (SZ.v u);
+    
     round := vround +^ 1sz;
   };
   
   let _ = !round;
   
+  // After main loop: all vertices visited → full triangle inequality
+  with sdist_final. assert (A.pts_to dist sdist_final);
+  with svisited_final. assert (V.pts_to visited svisited_final);
+  count_ones_full svisited_final (SZ.v n);
+  all_visited_tri_is_full sweights sdist_final svisited_final (SZ.v n);
+  assert (pure (triangle_inequality sweights sdist_final (SZ.v n)));
+  
   // Free visited array
   V.free visited;
   
-  // === Triangle inequality verification pass ===
-  // Read-only: check dist[v] <= dist[u] + w for all finite edges
-  let mut tri_ok: bool = true;
-  let mut cu: SZ.t = 0sz;
-  
-  while (
-    let vcu = !cu;
-    vcu <^ n
-  )
-  invariant exists* vcu sdist_check vtok.
-    R.pts_to cu vcu **
-    R.pts_to tri_ok vtok **
-    A.pts_to dist sdist_check **
-    pure (
-      SZ.v vcu <= SZ.v n /\
-      Seq.length sdist_check == SZ.v n /\
-      Seq.index sdist_check (SZ.v source) == 0 /\
-      all_non_negative sdist_check /\
-      all_bounded sdist_check /\
-      (vtok == true ==> triangle_partial sweights sdist_check (SZ.v n) (SZ.v vcu) 0)
-    )
-  {
-    let vcu = !cu;
-    with sdist_check. assert (A.pts_to dist sdist_check);
-    let dist_cu = A.op_Array_Access dist vcu;
-    
-    let mut cv: SZ.t = 0sz;
-    
-    while (
-      let vcv = !cv;
-      vcv <^ n
-    )
-    invariant exists* vcv vtok_inner.
-      R.pts_to cv vcv **
-      R.pts_to tri_ok vtok_inner **
-      A.pts_to dist sdist_check **
-      pure (
-        SZ.v vcv <= SZ.v n /\
-        (vtok_inner == true ==> triangle_partial sweights sdist_check (SZ.v n) (SZ.v vcu) (SZ.v vcv))
-      )
-    {
-      let vcv = !cv;
-      
-      let w_idx = vcu *^ n +^ vcv;
-      let w = A.op_Array_Access weights w_idx;
-      let d_u = dist_cu;
-      let d_v = A.op_Array_Access dist vcv;
-      
-      let edge_ok = (w >= 1000000 || d_u >= 1000000 || d_v <= d_u + w);
-      
-      let vtok = !tri_ok;
-      if (not edge_ok) {
-        tri_ok := false;
-      };
-      
-      cv := vcv +^ 1sz;
-    };
-    
-    let _ = !cv;
-    cu := vcu +^ 1sz;
-  };
-  
-  let _ = !cu;
-  let final_tri = !tri_ok;
-  with sdist_final. assert (A.pts_to dist sdist_final);
-  // Connect triangle inequality to shortest-path upper bound
-  dijkstra_sp_upper_bound_cond sdist_final sweights (SZ.v n) (SZ.v source) final_tri;
-  tri_result := final_tri;
+  // Derive upper bound from triangle inequality
+  dijkstra_sp_upper_bound sdist_final sweights (SZ.v n) (SZ.v source);
+  assert (pure (forall (v: nat). v < SZ.v n ==>
+    Seq.index sdist_final v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v));
 }
+#pop-options
