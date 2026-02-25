@@ -224,7 +224,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | |
 | 15 | RodCutting.Extended | §15.1 | ✅ cuts_are_optimal | — | 0 | |
 | 16 | ActivitySelection | §16.1 | ✅ exchange argument | ✅ Linked O(n) | 0 | ✅ Full optimality |
-| 16 | Huffman | §16.3 | ✅ full tree + cost | ✅ Linked (cost) | 0 | Spec: 0 ✅; Complete: 0 ✅; greedy_choice_lemma wired |
+| 16 | Huffman | §16.3 | ✅ full tree (PQ) + cost | ✅ Linked (cost) | 0 | Imperative PQ-based tree; Spec: 0 ✅; Complete: 0 ✅ |
 | 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | FullCompress available |
 | 22 | IterativeBFS | — | ⚠️ reachability | — | 0 | Not CLRS |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
