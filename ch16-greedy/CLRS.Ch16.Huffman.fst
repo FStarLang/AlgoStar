@@ -9,13 +9,16 @@
       c. Insert z into Q
    3. Return the remaining tree in Q (the Huffman tree)
    
-   This module provides two implementations:
+   This module provides:
    - huffman_cost: computes just the cost via array-based linear scans
    - huffman_tree: builds the full Huffman tree using Pulse.Lib.PriorityQueue,
-     following the CLRS algorithm with imperative extract-min and insert
+     following the CLRS algorithm, returning a pointer-based tree (hnode_ptr)
+     proven isomorphic to the spec tree (HSpec.htree) via is_htree
+   - alloc_htree / free_htree: convert between spec trees and heap trees
    
-   The postcondition of huffman_tree connects to the specification in
-   CLRS.Ch16.Huffman.Spec: weighted path length equals cost, and cost bounds.
+   The pointer-based tree type (hnode / hnode_ptr) uses Box.box for
+   heap-allocated nodes, with a recursive separation logic predicate
+   is_htree relating the heap structure to the pure spec type.
    
    NO admits. NO assumes.
 *)
@@ -40,6 +43,33 @@ module Seq = FStar.Seq
 module PQ = Pulse.Lib.PriorityQueue
 
 module HSpec = CLRS.Ch16.Huffman.Spec
+module Box = Pulse.Lib.Box
+
+// ========== Pointer-based Huffman tree (heap-allocated, isomorphic to HSpec.htree) ==========
+// Following the Pulse.Lib.AVLTree pattern:
+// - hnode: record with freq, left, right children
+// - hnode_ptr = box hnode (always non-null for Huffman trees)
+// - Leaves have left = right = None; Internal nodes have Some children.
+
+noeq type hnode = {
+    freq: int;
+    left: option hnode_ptr;
+    right: option hnode_ptr;
+}
+and hnode_ptr = Box.box hnode
+
+// Recursive separation logic predicate: relates a heap-allocated tree to a spec tree.
+// The top-level pointer is always non-null (hnode_ptr, not option).
+// Children pointers in hnode are option: None for leaves, Some for internals.
+let rec is_htree ([@@@mkey] p: hnode_ptr) (ft: HSpec.htree) : Tot slprop (decreases ft) =
+  match ft with
+  | HSpec.Leaf f ->
+    p |-> ({ freq = f; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode)
+  | HSpec.Internal f l r ->
+    exists* (lp: hnode_ptr) (rp: hnode_ptr).
+      (p |-> ({ freq = f; left = Some lp; right = Some rp } <: hnode)) **
+      is_htree lp l **
+      is_htree rp r
 
 // ========== Total order on htree (structural, frequency-first) ==========
 
@@ -175,6 +205,59 @@ let extends_length (#t:eqtype) (s0 s1:Seq.seq t) (x:t)
     let aux (y:t) : Lemma (L.count y l1' == L.count y l0) = () in
     Classical.forall_intro aux;
     same_list_counts_same_length l1' l0
+
+// ========== Allocate/free pointer-based Huffman tree ==========
+
+```pulse
+fn rec alloc_htree (ft: HSpec.htree)
+  requires emp
+  returns p: hnode_ptr
+  ensures is_htree p ft
+  decreases ft
+{
+  match ft {
+    HSpec.Leaf f -> {
+      let p = Box.alloc ({ freq = f; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
+      fold (is_htree p (HSpec.Leaf f));
+      p
+    }
+    HSpec.Internal f l r -> {
+      let lp = alloc_htree l;
+      let rp = alloc_htree r;
+      let p = Box.alloc ({ freq = f; left = Some lp; right = Some rp } <: hnode);
+      fold (is_htree p (HSpec.Internal f l r));
+      p
+    }
+  }
+}
+```
+
+```pulse
+fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
+  requires is_htree p ft
+  ensures emp
+  decreases ft
+{
+  match ft {
+    HSpec.Leaf f -> {
+      unfold (is_htree p (HSpec.Leaf f));
+      Box.free p;
+    }
+    HSpec.Internal f l r -> {
+      unfold (is_htree p (HSpec.Internal f l r));
+      with lp rp. _;
+      let node = Box.op_Bang p;
+      Box.free p;
+      let lp_rt : hnode_ptr = Some?.v node.left;
+      let rp_rt : hnode_ptr = Some?.v node.right;
+      rewrite (is_htree lp l) as (is_htree lp_rt l);
+      rewrite (is_htree rp r) as (is_htree rp_rt r);
+      free_htree lp_rt l;
+      free_htree rp_rt r;
+    }
+  }
+}
+```
 
 // ========== Constants ==========
 
@@ -417,11 +500,13 @@ fn huffman_tree
     SZ.fits (2 * SZ.v n + 2) /\
     (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0)
   )
-  returns result: HSpec.htree
-  ensures A.pts_to freqs freq_seq ** pure (
-    HSpec.weighted_path_length result == HSpec.cost result /\
-    HSpec.cost result >= 0
-  )
+  returns result: (hnode_ptr & HSpec.htree)
+  ensures A.pts_to freqs freq_seq **
+          is_htree (fst result) (snd result) **
+          pure (
+            HSpec.weighted_path_length (snd result) == HSpec.cost (snd result) /\
+            HSpec.cost (snd result) >= 0
+          )
 //SNIPPET_END: huffman_tree_sig
 {
   // Line 2: Q = C — create PQ and insert leaf nodes
@@ -489,9 +574,12 @@ fn huffman_tree
   };
   
   // Line 9: return EXTRACT-MIN(Q) — PQ has exactly 1 element
-  let result = PQ.extract_min pq;
+  let spec_tree = PQ.extract_min pq;
   PQ.free pq;
-  HSpec.wpl_equals_cost result;
-  result
+  HSpec.wpl_equals_cost spec_tree;
+  
+  // Allocate the spec tree as a pointer-based tree on the heap
+  let ptr_tree = alloc_htree spec_tree;
+  (ptr_tree, spec_tree)
 }
 ```
