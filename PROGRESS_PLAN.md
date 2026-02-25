@@ -421,7 +421,7 @@ results and learnings, using `flock` to avoid conflicts.
 Independent (start immediately):
   AGENT1   RadixSort stability        (10 admits)
   AGENT2   DFS theorems               (7 assume vals)
-  AGENT3   MaxSubarray optimality     (spec gap)
+  AGENT3   MaxSubarray optimality     (spec gap)              ✅ DONE
   AGENT7   BST imperative specs       (spec gap)
   AGENT8   BellmanFord neg cycle      (spec gap)
   AGENT9   Dijkstra equality          (spec gap)
@@ -499,19 +499,20 @@ edge classification and white-path theorem follow from it.
 
 ---
 
-### AGENT3: MaxSubarray True Optimality — prove Kadane finds actual max
+### AGENT3: MaxSubarray True Optimality — prove Kadane finds actual max ✅ DONE
 
 **Files:** `ch04-divide-conquer/CLRS.Ch04.MaxSubarray.Kadane.fst`
-**Current state:** 0 admits but spec is self-referential (`result == kadane_spec s`).
+**Status:** ✅ COMPLETE — 0 admits, 0 assumes. Verified successfully.
 
-**Goal:** Prove `kadane_spec s >= sum_range s i j` for all contiguous subarrays `[i,j)`,
-AND `∃ i j. kadane_spec s == sum_range s i j`.
+**What was done (112 lines added):**
+- Defined `sum_range` (sum of elements in [i,j)), `max_suffix_sum`, `max_sub_sum`
+- Proved `lemma_kadane_correct`: `kadane_spec` tracks `max_suffix_sum`/`max_sub_sum` by induction
+- `theorem_kadane_optimal`: `max_subarray_spec s >= sum_range s i j` for all valid [i,j)
+- `theorem_kadane_witness`: `∃ i j. max_subarray_spec s == sum_range s i j`
+- Precondition: `elements_bounded s` (all elements ≥ -10⁹) due to sentinel `initial_min`
+- Note: Used `Prims.op_Subtraction` to avoid `Pulse.Lib.BoundedIntegers` operator shadowing
 
-**Approach:**
-- Prove `kadane_spec` at position i tracks max suffix sum ending at i. Induction on i.
-- Prove `best_sum = max over all positions of current_sum = true_max_subarray s`.
-
-**Estimated size:** ~200–300 lines.
+**Commit:** `AGENT3: Prove Kadane's algorithm finds true maximum subarray sum`
 
 ---
 
@@ -825,7 +826,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch12/BST.fst tree_search | One-sided | AGENT7 | None case: no guarantee key absent |
 | ch12/BST.fst tree_insert | One-sided | AGENT7 | Success case: nothing proven about insertion |
 | ch12/BST.Delete.fst | Weak | AGENT7 | Only proves valid[idx]=false or lengths preserved |
-| ch04/MaxSubarray.Kadane | Self-referential | AGENT3 | result==kadane_spec, not >= all subarrays |
+| ch04/MaxSubarray.Kadane | ✅ Proved | AGENT3 | theorem_kadane_optimal + theorem_kadane_witness |
 | ch04/MaxSubarray.DC | Disconnected | AGENT14 | DC proven optimal but not connected to Kadane |
 | ch24/BellmanFord | ✅ Complete | AGENT8 | Both directions: true⟹tri_ineq+upper_bound, false⟹exists_violation |
 | ch24/Dijkstra | Bogus check + upper bound only | AGENT9 | Remove verification pass, prove equality from relaxation |
