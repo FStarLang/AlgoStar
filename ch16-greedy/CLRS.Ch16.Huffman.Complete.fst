@@ -979,8 +979,8 @@ let example_correctness
    6. huffman_correctness_theorem: multiset preservation + base-case optimality
    
    NO admits remain. The module has zero admits.
-   The Spec module has 1 assume (greedy choice axiom — CLRS Lemma 16.2)
-   with a correct statement using multiset-based optimality (is_wpl_optimal).
+   The Spec module has zero admits — greedy choice theorem (CLRS Lemma 16.2)
+   is fully proven using multiset-based optimality (is_wpl_optimal).
    
    Full WPL-optimality for the multi-element case (that no other tree with the
    same frequency multiset has lower WPL) uses the greedy choice property from

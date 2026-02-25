@@ -163,8 +163,8 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
 | `assume_` | 0 | All Pulse assume_ calls eliminated ✅ |
 
-Note: `assume(...)` calls in MaxFlow (8) and Huffman.Spec (4) are not counted above as they
-are in stub/axiom files. The 45 above are in proof-carrying code.
+Note: `assume(...)` calls in MaxFlow (8) are not counted above as they
+are in stub/axiom files. Huffman.Spec assumes have been fully eliminated. The 45 above are in proof-carrying code.
 
 ### Key Progress Since AUDIT_0215 (Feb 15)
 
@@ -223,7 +223,7 @@ are in stub/axiom files. The 45 above are in proof-carrying code.
 | 15 | RodCutting | §15.1 | ✅ optimal_revenue | ✅ Linked O(n²) | 0 | |
 | 15 | RodCutting.Extended | §15.1 | ✅ cuts_are_optimal | — | 0 | |
 | 16 | ActivitySelection | §16.1 | ✅ exchange argument | ✅ Linked O(n) | 0 | ✅ Full optimality |
-| 16 | Huffman | §16.3 | ⚠️ cost only | ✅ Linked (cost) | 4 | Spec: 4 assume (greedy+substructure); Complete: 0 ✅ |
+| 16 | Huffman | §16.3 | ⚠️ cost only | ✅ Linked (cost) | 0 | Spec: 0 ✅; Complete: 0 ✅ |
 | 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | FullCompress available |
 | 22 | IterativeBFS | — | ⚠️ reachability | — | 0 | Not CLRS |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
@@ -260,7 +260,7 @@ are in stub/axiom files. The 45 above are in proof-carrying code.
 | Other | 1 | 1 | 2 | VertexCover.Spec(1), MaxSubarray.DC(0+1 assume_val) |
 | **Total** | **43** | **2** | **45** | |
 
-Note: MaxFlow (8 assume) and Huffman.Spec (4 assume) are stub/axiom files, not counted above.
+Note: MaxFlow (8 assume) are stub/axiom files, not counted above. Huffman.Spec assumes fully eliminated.
 
 ---
 
@@ -486,7 +486,7 @@ Added explicit helper lemmas to selectively reveal opaque definitions:
 **File:** `ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
 **Reference:** `ch16-greedy/CLRS.Ch16.Huffman.Spec.fst`
 **Result:** Both admits eliminated. Module now has **zero admits**.
-Spec module reduced from **4 assumes to 1** (greedy choice axiom, now with correct statement).
+Spec module reduced from **4 assumes to 0** — all assumes eliminated, including greedy choice theorem.
 
 1. **L654 (optimal_substructure_lemma)** ✅ — The original postcondition contained a false
    existential (`lf == f1 :: lf_rest`) claiming the in-order leaf traversal starts with the
@@ -509,7 +509,7 @@ Spec module reduced from **4 assumes to 1** (greedy choice axiom, now with corre
    - `huffman_complete_preserves_frequency_multiset` — main theorem
    Also added `huffman_single_is_optimal` proving `is_optimal` for single-element inputs.
 
-3. **Huffman.Spec assumes: 4 → 1** ✅ — Fixed 3 of 4 assumes in Spec:
+3. **Huffman.Spec assumes: 4 → 0** ✅ — Fixed all 4 assumes in Spec:
    - **L729** `assume(True)` in `sibling_swap_maintains_optimality`: Removed (postcondition
      was already `True`; the assume was vacuous nonsense).
    - **L686** `exists_leaf_at_max_depth`: The original statement was **provably false** —
@@ -522,10 +522,16 @@ Spec module reduced from **4 assumes to 1** (greedy choice axiom, now with corre
      merging gives `WPL(T) = WPL(T') + f1 + f2`. Fully proven via `are_siblings_implies_replace`
      + `wpl_after_merge`.
    - **L806** `greedy_choice_theorem`: Property reformulated with correct statement using
-     `is_wpl_optimal` (multiset-based optimality) and `find_two_mins`. Still assumes the
-     exchange argument (CLRS Lemma 16.2) — the proof requires orchestrating position-based
-     swaps across the full tree. The swap infrastructure (`swap_reduces_wpl` etc.) is proven;
-     the orchestration (~100 lines of position manipulation) is left as future work.
+     `is_wpl_optimal` (multiset-based optimality) and `find_two_mins`. ✅ **FULLY PROVEN** —
+     The exchange argument (CLRS Lemma 16.2) is now complete with zero admits. Added ~180 lines
+     of infrastructure:
+     - `find_two_mins_count_ge2` — if min appears ≥2 times, both mins are equal
+     - `two_leaves_count_ge2` — two distinct leaf positions ⟹ count ≥ 2
+     - `find_leaf_pos_avoiding` + correctness — find leaf at position ≠ given avoid position
+     - `greedy_exchange` — full exchange argument handling all corner cases including f1=f2
+     Key insight: The f1=f2 corner cases (where `find_leaf_pos` returns a conflicting position)
+     are resolved by `find_leaf_pos_avoiding` which finds an alternative copy, and the
+     impossible case (tgt_b < f2) is ruled out by showing it implies count ≥ 2 ⟹ f2 = f1.
    - Added `is_wpl_optimal` and `same_frequency_multiset` definitions for correct optimality.
 
 **Verification:** `fstar.exe --include ../pulse/lib/common --include ../pulse/build/lib.common.checked --include ../pulse/build/ocaml/installed/lib/pulse --include ../pulse/out/lib/pulse --include common --include ch16-greedy --cmi --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`
