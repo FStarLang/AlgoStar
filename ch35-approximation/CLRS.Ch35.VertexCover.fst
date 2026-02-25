@@ -5,6 +5,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
+open FStar.List.Tot
 open CLRS.Ch35.VertexCover.Spec
 
 module A = Pulse.Lib.Array
@@ -13,6 +14,7 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Spec = CLRS.Ch35.VertexCover.Spec
+module GR = Pulse.Lib.GhostReference
 
 // 2-approximation vertex cover algorithm from CLRS Chapter 35
 // Given an adjacency matrix for an undirected graph with n vertices,
@@ -90,6 +92,54 @@ let is_cover_binary_step (s_cover: Seq.seq int) (n vu vv: nat)
     let s2 = Seq.upd s1 vv new_cv in
     assert (forall (i: nat). (i < n /\ i <> vu /\ i <> vv) ==> Seq.index s2 i == Seq.index s_cover i)
 
+// Matching invariant: the ghost matching explains the cover
+let matching_inv (s_adj s_cover: Seq.seq int) (n: nat) (m: list Spec.edge) : prop =
+  Seq.length s_adj = n * n /\
+  Seq.length s_cover = n /\
+  Spec.pairwise_disjoint m /\
+  (forall (e: Spec.edge). memP e m ==>
+    (let (u, v) = e in u < n /\ v < n /\ u <> v /\ u < v /\ Seq.index s_adj (u * n + v) <> 0)) /\
+  (forall (x: nat). x < n ==>
+    ((Seq.index s_cover x <> 0) == existsb (fun (e: Spec.edge) -> Spec.edge_uses_vertex e x) m))
+
+// Helper: existsb returning false means f is false for all elements
+let rec existsb_false_means_all_false (#a: Type) (f: a -> bool) (l: list a)
+  : Lemma (requires existsb f l == false)
+          (ensures forall (x: a). memP x l ==> f x == false)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | _ :: tl -> existsb_false_means_all_false f tl
+
+// Step lemma: matching_inv is maintained after processing edge (vu, vv)
+#push-options "--z3rlimit 40"
+let matching_inv_step (s_adj s_cover: Seq.seq int) (n vu vv: nat) (m: list Spec.edge)
+  (cu cv has_edge: int) (new_cu new_cv: int)
+  : Lemma
+    (requires
+      matching_inv s_adj s_cover n m /\
+      Seq.length s_adj = n * n /\
+      Seq.length s_cover = n /\
+      vu < n /\ vv < n /\ vu < vv /\
+      cu == Seq.index s_cover vu /\
+      cv == Seq.index s_cover vv /\
+      has_edge == Seq.index s_adj (vu * n + vv) /\
+      new_cu == (if has_edge <> 0 && cu = 0 && cv = 0 then 1 else cu) /\
+      new_cv == (if has_edge <> 0 && cu = 0 && cv = 0 then 1 else cv))
+    (ensures (
+      let s1 = Seq.upd s_cover vu new_cu in
+      let s2 = Seq.upd s1 vv new_cv in
+      let new_m = if has_edge <> 0 && cu = 0 && cv = 0 then (vu, vv) :: m else m in
+      matching_inv s_adj s2 n new_m))
+  = let s1 = Seq.upd s_cover vu new_cu in
+    let s2 = Seq.upd s1 vv new_cv in
+    if has_edge <> 0 && cu = 0 && cv = 0 then (
+      // vu and vv are not in any existing matching edge
+      existsb_false_means_all_false (fun (e: Spec.edge) -> Spec.edge_uses_vertex e vu) m;
+      existsb_false_means_all_false (fun (e: Spec.edge) -> Spec.edge_uses_vertex e vv) m
+    ) else ()
+#pop-options
+
 // Lemma: The algorithm only writes 0 or 1 to cover array
 // This is now proven by the loop invariants
 let cover_values_are_binary (s_adj s_cover: Seq.seq int) (n: nat)
@@ -101,17 +151,22 @@ let cover_values_are_binary (s_adj s_cover: Seq.seq int) (n: nat)
   = () // Trivial since it's in the requires
 
 // Lemma: Apply the approximation bound for all possible opt values
-let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat)
+let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat) (m: list Spec.edge)
   : Lemma (requires 
             is_cover s_adj s_cover n n 0 /\
             Seq.length s_cover = n /\
             Seq.length s_adj = n * n /\
-            (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)))
+            (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+            matching_inv s_adj s_cover n m)
           (ensures 
             forall (opt: nat). Spec.min_vertex_cover_size s_adj n opt ==>
               Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n <= 2 * opt)
-  = FStar.Classical.forall_intro 
-      (FStar.Classical.move_requires (Spec.approximation_ratio_theorem s_adj s_cover n))
+  = let bound (c_opt: Spec.cover_fn)
+      : Lemma (requires Spec.is_valid_graph_cover s_adj n c_opt)
+              (ensures Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n <= 2 * Spec.count_cover c_opt n) =
+      Spec.approximation_ratio_theorem s_adj s_cover n m c_opt
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires bound)
 
 //SNIPPET_START: approx_vertex_cover_sig
 fn approx_vertex_cover
@@ -147,22 +202,27 @@ fn approx_vertex_cover
   rewrite (A.pts_to (V.vec_to_array cover) (Seq.create (SZ.v n) 0))
        as (A.pts_to cover_a (Seq.create (SZ.v n) 0));
   
+  // Ghost matching: tracks edges selected by the algorithm
+  let matching_ref = GR.alloc #(list Spec.edge) [];
+  
   // Outer loop: u from 0 to n-1
   let mut u: SZ.t = 0sz;
   
 //SNIPPET_START: outer_loop
   while (!u <^ n)
-  invariant exists* vu s_cover.
+  invariant exists* vu s_cover vm.
     R.pts_to u vu **
     A.pts_to adj #p s_adj **
     A.pts_to cover_a s_cover **
+    GR.pts_to matching_ref vm **
     pure (
       SZ.v vu <= SZ.v n /\
       SZ.v n < 256 /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length s_cover == SZ.v n /\
       is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0 /\
-      (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1))
+      (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+      matching_inv s_adj s_cover (SZ.v n) vm
     )
 //SNIPPET_END: outer_loop
   {
@@ -176,11 +236,12 @@ fn approx_vertex_cover
     let mut v: SZ.t = vu +^ 1sz;
     
     while (!v <^ n)
-    invariant exists* vv s_cover_inner.
+    invariant exists* vv s_cover_inner vm_inner.
       R.pts_to u vu **
       R.pts_to v vv **
       A.pts_to adj #p s_adj **
       A.pts_to cover_a s_cover_inner **
+      GR.pts_to matching_ref vm_inner **
       pure (
         SZ.v vv >= SZ.v vu + 1 /\
         SZ.v vv <= SZ.v n /\
@@ -190,12 +251,14 @@ fn approx_vertex_cover
         SZ.fits (SZ.v vu * SZ.v n + SZ.v n) /\
         Seq.length s_cover_inner == SZ.v n /\
         is_cover s_adj s_cover_inner (SZ.v n) (SZ.v vu) (SZ.v vv) /\
-        (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover_inner i = 0 \/ Seq.index s_cover_inner i = 1))
+        (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover_inner i = 0 \/ Seq.index s_cover_inner i = 1)) /\
+        matching_inv s_adj s_cover_inner (SZ.v n) vm_inner
       )
     {
       let vv = !v;
       
       with s_cov_before. assert (A.pts_to cover_a s_cov_before);
+      with vm_cur. assert (GR.pts_to matching_ref vm_cur);
       
       // Calculate adjacency matrix index: u*n + v
       let u_times_n = vu *^ n;
@@ -216,9 +279,19 @@ fn approx_vertex_cover
       // Prove the binary property is preserved
       is_cover_binary_step s_cov_before (SZ.v n) (SZ.v vu) (SZ.v vv) cu cv new_cu new_cv;
       
+      // Prove the matching invariant is preserved
+      matching_inv_step s_adj s_cov_before (SZ.v n) (SZ.v vu) (SZ.v vv) vm_cur cu cv has_edge new_cu new_cv;
+      
       // Write unconditionally
       A.op_Array_Assignment cover_a vu new_cu;
       A.op_Array_Assignment cover_a vv new_cv;
+      
+      // Ghost: update matching
+      let new_vm : Ghost.erased (list Spec.edge) =
+        Ghost.hide (if has_edge <> 0 && cu = 0 && cv = 0
+                    then ((SZ.v vu, SZ.v vv) :: Ghost.reveal vm_cur)
+                    else Ghost.reveal vm_cur);
+      GR.op_Colon_Equals matching_ref new_vm;
       
       // Increment v
       v := vv +^ 1sz;
@@ -234,6 +307,7 @@ fn approx_vertex_cover
   
   // Convert back to vec for return
   with s_final. assert (A.pts_to cover_a s_final);
+  with vm_final. assert (GR.pts_to matching_ref vm_final);
   
   // Binary property is maintained by loop invariant
   assert pure (forall (i: nat). i < SZ.v n ==> (Seq.index s_final i = 0 \/ Seq.index s_final i = 1));
@@ -241,9 +315,11 @@ fn approx_vertex_cover
   // Prove that cover values are binary (0 or 1) - now trivial
   cover_values_are_binary s_adj s_final (SZ.v n);
   
-  // Apply 2-approximation theorem for all possible OPT values
-  // (relies on approximation_ratio_theorem which admits the detailed proof)
-  apply_approximation_bound s_adj s_final (SZ.v n);
+  // Apply 2-approximation theorem using ghost matching
+  apply_approximation_bound s_adj s_final (SZ.v n) vm_final;
+  
+  // Free ghost matching reference
+  GR.free matching_ref;
   
   assert pure (is_cover s_adj s_final (SZ.v n) (SZ.v n) 0);
   assert pure (Seq.length s_final == SZ.v n);
@@ -262,25 +338,19 @@ fn approx_vertex_cover
  * neither endpoint is covered (cover[u]=0, cover[v]=0), it adds BOTH
  * endpoints to the cover.
  *
- * PROVEN: 
+ * FULLY PROVEN (0 admits):
  * - The output is a valid vertex cover (is_cover).
  * - The output cover consists only of 0/1 values.
  * - The postcondition includes the 2-approximation bound:
  *     count_cover(cover) <= 2 * OPT
  *   where OPT is the size of the minimum vertex cover.
  *
- * PARTIAL PROOF (with admits):
- * The full 2-approximation proof requires:
- * 1. Extracting the implicit matching from the algorithm execution
- *    (edges where both endpoints were added)
- * 2. Proving this matching is pairwise disjoint
- * 3. Proving |cover| = 2 × |matching|
- * 4. Proving any vertex cover must include ≥ 1 endpoint of each matching edge
- * 5. Concluding: |cover| = 2|matching| ≤ 2|OPT|
- *
- * Currently, steps 1-5 are admitted in Spec.approximation_ratio_theorem.
- * The full mechanization would require:
- * - Strengthening loop invariants to track binary property (0/1 values)
- * - Ghost state to track which edges contribute to the matching
- * - Lemmas connecting the algorithmic matching to theorem_35_1
+ * PROOF TECHNIQUE:
+ * A ghost reference tracks the "matching" — the set of edges that triggered
+ * vertex additions during execution. The loop invariants ensure:
+ * 1. The matching is pairwise disjoint (no shared vertices)
+ * 2. The cover consists exactly of the matching endpoints
+ * 3. Each matching edge is a valid graph edge
+ * Then Spec.approximation_ratio_theorem applies CLRS Theorem 35.1:
+ *   |cover| = 2|matching| ≤ 2 * count(any valid cover) ≤ 2 * OPT
  *)

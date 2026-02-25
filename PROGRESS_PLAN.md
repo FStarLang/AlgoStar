@@ -642,24 +642,20 @@ Complexity.fst (1 assume → 0):
 
 ---
 
-### AGENT10: VertexCover 2-Approximation — (1 admit → 0)
+### AGENT10: VertexCover 2-Approximation — ✅ DONE (1 admit → 0)
 
-**Files:** `ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst`
-**Current state:** 1 admit in `approximation_ratio_theorem`.
+**Files:** `ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst`, `ch35-approximation/CLRS.Ch35.VertexCover.fst`
+**Result:** Fully proven, 0 admits.
 
-**Goal:** Prove CLRS Theorem 35.1: APPROX-VERTEX-COVER returns a cover of size ≤ 2 × OPT.
-
-**Approach:**
-- The algorithm greedily picks an edge (u,v), adds both u and v to the cover, removes all
-  edges incident to u or v, and repeats.
-- Key insight: The selected edges form a matching M (no two share an endpoint, since both
-  endpoints are removed after selection).
-- Any vertex cover must include ≥ 1 endpoint from each edge in M (by definition of cover).
-- So OPT ≥ |M|. The algorithm returns 2|M| vertices. Therefore 2|M| ≤ 2·OPT.
-- Need: formalize that selected edges form a matching (may require ghost state tracking
-  which edges were selected during algorithm execution, or an auxiliary predicate).
-
-**Estimated size:** ~80–120 lines.
+**What was done:**
+- Added ghost state (`Pulse.Lib.GhostReference`) to the Pulse implementation to track
+  the matching (set of edges selected by the algorithm) during execution.
+- Proved `extract_edges_contains` (completeness of edge extraction), `valid_cover_covers_matching`
+  (any valid graph cover covers matching edges), and `matching_inv_step` (invariant maintenance).
+- Reformulated `approximation_ratio_theorem` to take the matching and a valid cover `c_opt`,
+  then proved `|C_alg| ≤ 2·|c_opt|` using the existing `theorem_35_1`.
+- Updated both loop invariants to maintain `matching_inv` connecting ghost matching ↔ cover.
+- All 3 files (Spec, implementation, Complexity) verify with 0 admits.
 
 ---
 
@@ -748,11 +744,11 @@ All tasks from the previous round (AGENT1–AGENT10, AGENT19) are complete:
 | ch26/MaxFlow.Spec | ~~assume~~ | ~~2~~ 0 | AGENT9 | ✅ DONE: stubs removed, proofs in Proofs module |
 | ch26/MaxFlow.Proofs | ~~assume~~ | ~~4~~ 0 | AGENT9 | ✅ DONE: conservation, bottleneck, capacity, flow value |
 | ch26/MaxFlow.Complexity | ~~assume~~ | ~~1~~ 0 | AGENT9 | ✅ DONE: trivial (flow-independent function) |
-| ch35/VertexCover.Spec | admit | 1 | AGENT10 | 2-approximation ratio |
+| ch35/VertexCover.Spec | ~~admit~~ | ~~1~~ 0 | AGENT10 | ✅ DONE: ghost matching + theorem_35_1 |
 | **TOTAL** | | **38** | | |
 
 Files with 0 admits (fully verified): All other .fst files including Huffman.Spec ✅,
 Huffman.Complete ✅, BellmanFord.Spec ✅, Dijkstra.TriIneq ✅, KMP.Complexity ✅,
 BucketSort ✅, CountingSort.Stable ✅, Kruskal.EdgeSorting ✅, StackDFS.Complexity ✅,
 QueueBFS.Complexity ✅, BST.Insert.Spec ✅, MaxFlow.Spec ✅, MaxFlow.Proofs ✅,
-MaxFlow.Complexity ✅, and all implementation files.
+MaxFlow.Complexity ✅, VertexCover.Spec ✅, and all implementation files.
