@@ -1012,11 +1012,23 @@ let pure_kruskal (g: graph) : list edge =
 let lemma_kruskal_step_preserves_forest (e: edge) (forest: list edge) (n: nat)
   : Lemma (requires is_forest forest n)
           (ensures is_forest (kruskal_step e forest n) n)
-  = // If edge is added, it connects different components, so no cycle created
-    // kruskal_step only adds e if ~(same_component_dec forest e.u e.v)
-    // This implies ~(same_component forest e.u e.v) = ~(reachable forest e.u e.v)
-    // Adding edge between different components preserves acyclicity
-    admit() // Needs: ~(reachable forest u v) ==> acyclic n (e :: forest)
+  = // kruskal_step adds e only when conditions hold; otherwise returns forest
+    if e.u < n && e.v < n &&
+       not (same_component_dec forest e.u e.v) &&
+       not (mem_edge e forest)
+    then begin
+      // same_component_dec = false => ~(same_component forest e.u e.v)
+      // by contrapositive of same_component_dec_complete
+      let cp () : Lemma (requires same_component forest e.u e.v)
+                        (ensures same_component_dec forest e.u e.v = true)
+        = same_component_dec_complete forest e.u e.v
+      in
+      FStar.Classical.move_requires cp ();
+      assert (~(same_component forest e.u e.v));
+      assert (~(reachable forest e.u e.v));
+      // Use acyclic_when_unreachable from MST.Spec
+      acyclic_when_unreachable n forest e
+    end
 
 let rec lemma_kruskal_process_preserves_forest 
     (sorted_edges: list edge) (forest: list edge) (n: nat)
@@ -1079,43 +1091,125 @@ let lemma_kruskal_step_safe_edge (g: graph) (e: edge) (forest: list edge)
     let s : cut = fun v -> same_component_dec forest e.u v in
     
     // The edge e crosses this cut
-    // From precondition: ~(same_component forest e.u e.v)
-    // This means same_component_dec forest e.u e.v should be false
-    // and same_component_dec forest e.u e.u should be true (by reflexivity)
-    admit(); // Would need: same_component_dec correct wrt same_component
+    // same_component_dec forest e.u e.u = true (by definition, since u = u)
+    // ~(same_component forest e.u e.v) => same_component_dec forest e.u e.v = false
+    // (by contrapositive of same_component_dec_sound)
+    let cp_sound () : Lemma (requires same_component_dec forest e.u e.v = true)
+                            (ensures same_component forest e.u e.v)
+      = same_component_dec_sound forest e.u e.v
+    in
+    FStar.Classical.move_requires cp_sound ();
+    assert (same_component_dec forest e.u e.v = false);
+    assert (same_component_dec forest e.u e.u = true);
     assert (crosses_cut e s);
     
     // The cut respects forest A
-    // (because edges in forest don't connect different components)
-    let rec lemma_forest_respects_own_cut (f: list edge) (u: nat)
-      : Lemma (ensures respects f (fun v -> same_component_dec f u v))
-      = admit() // All edges in f connect vertices in same component
+    // For each edge e' in forest: e' connects two vertices that are
+    // reachable from each other via forest edges, hence in the same component.
+    // So same_component_dec forest e.u (e'.u) = same_component_dec forest e.u (e'.v)
+    // meaning e' doesn't cross the cut.
+    let rec lemma_forest_respects_own_cut (f: list edge) (forest_full: list edge) (u: nat)
+      : Lemma (requires subset_edges f forest_full)
+              (ensures respects f (fun v -> same_component_dec forest_full u v))
+              (decreases f)
+      = match f with
+        | [] -> ()
+        | hd :: tl ->
+          lemma_forest_respects_own_cut tl forest_full u;
+          // hd is in forest_full. hd connects hd.u and hd.v.
+          // So same_component forest_full hd.u hd.v (via the single edge hd)
+          assert (mem_edge hd forest_full);
+          edge_gives_reachability forest_full hd.u hd.v hd;
+          // same_component_dec forest_full u hd.u and same_component_dec forest_full u hd.v
+          // must have the same truth value (since hd.u and hd.v are connected):
+          // Case 1: both true (u reaches hd.u and hd.v)
+          // Case 2: both false (u reaches neither hd.u nor hd.v)
+          // In either case, crosses_cut hd s = false
+          if same_component_dec forest_full u hd.u then begin
+            // u reaches hd.u. hd.u reaches hd.v. So u reaches hd.v.
+            same_component_dec_sound forest_full u hd.u;
+            same_component_transitive forest_full u hd.u hd.v;
+            same_component_dec_complete forest_full u hd.v
+          end else begin
+            // u doesn't reach hd.u.
+            // If u reached hd.v, then u reaches hd.u (via hd.v -> hd.u), contradiction
+            if same_component_dec forest_full u hd.v then begin
+              same_component_dec_sound forest_full u hd.v;
+              same_component_symmetric forest_full hd.u hd.v;
+              same_component_transitive forest_full u hd.v hd.u;
+              same_component_dec_complete forest_full u hd.u
+              // Now same_component_dec forest_full u hd.u = true, contradicting the else branch
+            end
+          end
     in
-    lemma_forest_respects_own_cut forest e.u;
+    subset_edges_reflexive forest;
+    lemma_forest_respects_own_cut forest forest e.u;
     
-    // Edge e is light: it has minimum weight among edges crossing the cut
-    // that haven't been added yet
-    // Since edges are processed in sorted order, e.w <= e'.w for any
-    // edge e' that crosses this cut and isn't in forest
-    let lemma_edge_is_light (e: edge) (g: graph) (forest: list edge) (s: cut)
-      : Lemma (requires 
-                mem_edge e g.edges /\
-                crosses_cut e s /\
-                (forall (e': edge).
-                  mem_edge e' g.edges /\
-                  not (mem_edge e' forest) /\
-                  crosses_cut e' s ==>
-                  e.w <= e'.w))
-              (ensures is_light_edge e s g \/ 
-                       (exists (e': edge). 
-                         mem_edge e' forest /\ 
-                         crosses_cut e' s /\ 
-                         e'.w < e.w))
-      = admit() // Either e is light, or there's a lighter edge already in forest
-    in
-    
-    // Since cut respects forest, no edge in forest crosses the cut,
-    // so e must be light (or tied for lightest)
+    // Edge e is light: since cut respects forest, no forest edge crosses the cut.
+    // Combined with precondition that e.w <= e'.w for all non-forest edges crossing
+    // the cut, e is a light edge.
+    // is_light_edge requires: forall e'. mem_edge e' g.edges /\ crosses_cut e' s ==> e.w <= e'.w
+    // For e' in forest: ~(crosses_cut e' s) (from respects), so vacuously true
+    // For e' not in forest: e.w <= e'.w from precondition
+    //   But precondition uses ~(same_component forest e'.u e'.v), not crosses_cut e' s
+    //   Need: crosses_cut e' s => ~(same_component forest e'.u e'.v) when e' ∉ forest
+    //   Actually not exactly... the precondition says:
+    //   e.w <= e'.w when e' ∈ g.edges, e' ∉ forest, ~(same_component forest e'.u e'.v)
+    //   For light_edge we need: e.w <= e'.w when e' ∈ g.edges, crosses_cut e' s
+    //   crosses_cut e' s means same_component_dec forest e.u (e'.u) ≠ same_component_dec forest e.u (e'.v)
+    //   Case: e' in forest => doesn't cross cut, vacuous ✓
+    //   Case: e' not in forest, crosses cut:
+    //     same_component_dec forest e.u (e'.u) ≠ same_component_dec forest e.u (e'.v)
+    //     so ~(same_component forest e'.u e'.v):
+    //     If same_component forest e'.u e'.v, then 
+    //       same_component_dec_complete => same_component_dec forest e.u (e'.u) = true iff same_component_dec forest e.u (e'.v) = true
+    //       contradicting the crossing. So ~(same_component forest e'.u e'.v).
+    //     Then precondition gives e.w <= e'.w. ✓
+    introduce forall (e': edge). mem_edge e' g.edges /\ crosses_cut e' s ==> e.w <= e'.w
+    with introduce _ ==> _ with _. begin
+      if mem_edge e' forest then begin
+        // e' in forest => doesn't cross cut (from respects)
+        let rec respects_implies (f: list edge) (e': edge) (s: cut)
+          : Lemma (requires respects f s /\ mem_edge e' f)
+                  (ensures not (crosses_cut e' s))
+                  (decreases f)
+          = match f with
+            | [] -> ()
+            | hd :: tl ->
+              if edge_eq e' hd then begin
+                edge_eq_endpoints e' hd;
+                assert (not (crosses_cut hd s))
+              end else
+                respects_implies tl e' s
+        in
+        respects_implies forest e' s
+        // e' doesn't cross cut, contradicting precondition crosses_cut e' s = true
+      end else begin
+        // e' not in forest, crosses cut
+        // Need: ~(same_component forest e'.u e'.v)
+        // crosses_cut e' s => same_component_dec forest e.u e'.u ≠ same_component_dec forest e.u e'.v
+        // If same_component forest e'.u e'.v were true, by same_component_dec_complete
+        // we'd have same_component_dec forest e.u e'.u = same_component_dec forest e.u e'.v
+        // (both true or both false, since transitivity), contradicting crossing.
+        let cp ()
+          : Lemma (requires same_component forest e'.u e'.v) (ensures False)
+          = if same_component_dec forest e.u e'.u then begin
+              same_component_dec_sound forest e.u e'.u;
+              same_component_transitive forest e.u e'.u e'.v;
+              same_component_dec_complete forest e.u e'.v
+            end else begin
+              if same_component_dec forest e.u e'.v then begin
+                same_component_dec_sound forest e.u e'.v;
+                same_component_symmetric forest e'.u e'.v;
+                same_component_transitive forest e.u e'.v e'.u;
+                same_component_dec_complete forest e.u e'.u
+              end
+            end
+        in
+        FStar.Classical.move_requires cp ()
+      end
+    end;
+    assert (is_light_edge e s g);
     // Apply cut property: A ∪ {e} ⊆ some MST
     cut_property g forest e s
 
