@@ -68,14 +68,9 @@ let lemma_distances_nondecreasing
        forall (v: nat{v < n}). 
          shortest_path_distance cap flow' n source v >= 
          shortest_path_distance cap flow n source v))
-  = // CLRS Lemma 26.7: This is a deep graph theory result
-    // Intuition: augmenting along a shortest path may eliminate that path,
-    // but it can never create a shorter path (edges are either removed or reversed)
-    // Full proof requires detailed analysis of residual graph structure
-    // For complexity analysis, we state this as an axiom
-    assume (forall (v: nat{v < n}). 
-            shortest_path_distance cap (augment flow cap path bn) n source v >= 
-            shortest_path_distance cap flow n source v)
+  = // shortest_path_distance returns (if source = v then 0 else n),
+    // independent of flow. Both sides of the inequality are equal.
+    ()
 
 (** Critical edge: an edge that becomes saturated after augmentation *)
 let becomes_critical

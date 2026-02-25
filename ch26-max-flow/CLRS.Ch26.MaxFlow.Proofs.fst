@@ -15,8 +15,8 @@ module L = FStar.List.Tot
    P0.1.9: Prove termination (flow value increases each iteration)
    P0.1.10: Prove postcondition: final flow satisfies capacity + conservation
    
-   Complex proofs use assume where full formalization would require extensive
-   inductive reasoning about path structure and flow properties.
+   All proofs completed. Zero assumes for the core augmentation theorems.
+   Requires distinct_vertices (simple path) precondition for augmentation proofs.
 *)
 
 (** ========== Helper Lemmas for Sum Properties ========== *)
@@ -223,26 +223,84 @@ let lemma_augment_edge_conservation_intermediate (flow: Seq.seq int) (cap: Seq.s
     // Since they were equal initially, they remain equal
     assert (sum_flow_into flow'' n v1 n == sum_flow_out flow'' n v1 n)
 
-(** Lemma: Augmenting one edge doesn't decrease bottleneck of later path *)
-let lemma_bottleneck_tail (cap: Seq.seq int) (flow flow': Seq.seq int)
-                               (n: nat{Seq.length cap == n * n /\ Seq.length flow == n * n /\ Seq.length flow' == n * n})
-                               (u v: nat{u < n /\ v < n})
-                               (path: list nat{Cons? path /\ (forall (w: nat). L.mem w path ==> w < n)})
+(** ========== Helper: Matrix cell independence under augment_edge ========== *)
+
+(** When (a,b) ≠ (u,v), get (set m n u v x) n a b == get m n a b.
+    Relies on index injectivity: a*n+b ≠ u*n+v when (a≠u ∨ b≠v) and a,b,u,v < n. *)
+#push-options "--z3rlimit 20"
+let lemma_get_set_other (m: Seq.seq int) (n: nat{n > 0 /\ Seq.length m == n * n})
+                        (u v: nat{u < n /\ v < n}) (x: int) (a b: nat{a < n /\ b < n})
+  : Lemma (requires a <> u \/ b <> v)
+          (ensures get (set m n u v x) n a b == get m n a b)
+  = // a*n+b ≠ u*n+v follows from (a≠u ∨ b≠v) with a,b,u,v < n
+    // Then Seq.index (Seq.upd m (u*n+v) x) (a*n+b) = Seq.index m (a*n+b)
+    if a = u then () // b ≠ v so indices differ
+    else () // a ≠ u: a*n+b is in [a*n, a*n+n-1], u*n+v in [u*n, u*n+n-1], disjoint ranges
+#pop-options
+
+(** augment_edge on (u,v) preserves get at (a,b) when a ≠ u and b ≠ u *)
+let lemma_augment_edge_get_other (flow cap: Seq.seq int) 
+                                  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+                                  (u v: nat{u < n /\ v < n}) (delta: int)
+                                  (a b: nat{a < n /\ b < n})
+  : Lemma (requires a <> u /\ b <> u)
+          (ensures get (augment_edge flow cap n u v delta) n a b == get flow n a b)
+  = let flow' = augment_edge flow cap n u v delta in
+    if residual_capacity cap flow n u v > 0 then
+      // Forward: set flow n u v (get flow n u v + delta)
+      // (a,b) ≠ (u,v) since a ≠ u
+      lemma_get_set_other flow n u v (get flow n u v + delta) a b
+    else
+      // Backward: set flow n v u (get flow n v u - delta)
+      // (a,b) ≠ (v,u) since b ≠ u
+      lemma_get_set_other flow n v u (get flow n v u - delta) a b
+
+(** For the backward residual: get flow' n b a is unchanged when a ≠ u and b ≠ u *)
+let lemma_augment_edge_get_other_sym (flow cap: Seq.seq int)
+                                      (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+                                      (u v: nat{u < n /\ v < n}) (delta: int)
+                                      (a b: nat{a < n /\ b < n})
+  : Lemma (requires a <> u /\ b <> u)
+          (ensures get (augment_edge flow cap n u v delta) n b a == get flow n b a)
+  = let flow' = augment_edge flow cap n u v delta in
+    if residual_capacity cap flow n u v > 0 then
+      // Forward: set at (u,v). Need (b,a) ≠ (u,v). b ≠ u. ✓
+      lemma_get_set_other flow n u v (get flow n u v + delta) b a
+    else
+      // Backward: set at (v,u). Need (b,a) ≠ (v,u). a ≠ u. ✓
+      lemma_get_set_other flow n v u (get flow n v u - delta) b a
+
+(** Key lemma: bottleneck of tail path is unchanged after augmenting first edge,
+    when the path has distinct vertices (no repeated vertex). *)
+let rec lemma_bottleneck_unchanged
+  (cap flow: Seq.seq int) (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
+  (u: nat{u < n}) (v: nat{v < n}) (delta: int)
+  (tail: list nat{Cons? tail /\ (forall (w: nat). L.mem w tail ==> w < n)})
   : Lemma
-    (requires 
-      Cons? path /\ L.hd path = v /\
-      // flow' is flow with one edge (u,v) augmented
-      (forall (u': nat{u' < n}) (v': nat{v' < n}). 
-        (u' = u /\ v' = v) ==> get flow' n u' v' >= get flow n u' v'))
-    (ensures bottleneck cap flow' n path >= bottleneck cap flow n path \/ 
-             bottleneck cap flow' n path <= 0)
-  = // Path starts at v, so w1 = v
-    // The edge (u,v) is not on this path (path starts at v, so edges are from v onwards)
-    // Therefore, edges on this path are unaffected by the augmentation
-    // Each edge capacity on path is unchanged, so bottleneck is unchanged or increased
-    // This is a complex property about path structure - we use assume for now
-    assume (bottleneck cap flow' n path >= bottleneck cap flow n path \/ 
-            bottleneck cap flow' n path <= 0)
+    (requires not (L.mem u tail) /\ distinct_vertices tail)
+    (ensures
+      bottleneck_aux cap (augment_edge flow cap n u v delta) n tail ==
+      bottleneck_aux cap flow n tail)
+    (decreases tail)
+  = let flow' = augment_edge flow cap n u v delta in
+    match tail with
+    | [_] -> ()
+    | a :: b :: rest ->
+      // a ∈ tail, b ∈ tail, u ∉ tail. So a ≠ u and b ≠ u.
+      assert (a <> u);
+      assert (b <> u);
+      // residual_capacity uses get flow n a b, get cap n a b
+      lemma_augment_edge_get_other flow cap n u v delta a b;
+      // residual_capacity_backward uses get flow n b a
+      lemma_augment_edge_get_other_sym flow cap n u v delta a b;
+      // So edge_cap at (a,b) is the same under flow' and flow
+      assert (residual_capacity cap flow' n a b == residual_capacity cap flow n a b);
+      assert (residual_capacity_backward flow' n a b == residual_capacity_backward flow n a b);
+      // Recurse on b :: rest
+      assert (not (L.mem u (b :: rest)));
+      assert (distinct_vertices (b :: rest));
+      lemma_bottleneck_unchanged cap flow n u v delta (b :: rest)
+    | [] -> () // impossible due to Cons? precondition
 
 (** Main lemma: Path augmentation preserves valid flow (P0.1.7 + P0.1.8) *)
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
@@ -254,6 +312,7 @@ let rec lemma_augment_preserves_capacity (flow: Seq.seq int) (cap: Seq.seq int)
     (requires 
       bn > 0 /\
       bn <= bottleneck cap flow n path /\
+      distinct_vertices path /\
       (forall (u: nat{u < n}) (v: nat{v < n}). 
         0 <= get flow n u v /\ get flow n u v <= get cap n u v))
     (ensures 
@@ -264,15 +323,12 @@ let rec lemma_augment_preserves_capacity (flow: Seq.seq int) (cap: Seq.seq int)
   = match path with
     | [v] -> ()
     | u :: v :: rest ->
-      // First, establish that bn is within residual capacity
       let edge_cap = 
         if residual_capacity cap flow n u v > 0 
         then residual_capacity cap flow n u v
         else residual_capacity_backward flow n u v in
-      // bn <= bottleneck of whole path, so bn <= edge capacity
       assert (bn <= edge_cap);
       
-      // Now augment the edge
       let flow' = augment_edge flow cap n u v bn in
       assert (Seq.length flow' == n * n);
       
@@ -280,38 +336,72 @@ let rec lemma_augment_preserves_capacity (flow: Seq.seq int) (cap: Seq.seq int)
       let aux (u': nat{u' < n}) (v': nat{v' < n})
         : Lemma (0 <= get flow' n u' v' /\ get flow' n u' v' <= get cap n u' v')
         = if residual_capacity cap flow n u v > 0 then
-            // Forward edge case: flow[u][v] += bn
             if u' = u && v' = v then
-              // The modified edge
               (assert (get flow' n u v == get flow n u v + bn);
                assert (bn <= residual_capacity cap flow n u v);
                assert (get flow n u v + bn <= get cap n u v))
             else
-              // Other edges unchanged
               (assert (get flow' n u' v' == get flow n u' v'))
           else
-            // Backward edge case: flow[v][u] -= bn
             if u' = v && v' = u then
-              // The modified edge  
               (assert (get flow' n v u == get flow n v u - bn);
                assert (bn <= get flow n v u);
                assert (0 <= get flow n v u - bn))
             else
-              // Other edges unchanged
               (assert (get flow' n u' v' == get flow n u' v'))
       in
       FStar.Classical.forall_intro_2 (FStar.Classical.move_requires_2 aux);
       
-      // For the recursive call, we need bn <= bottleneck cap flow' n (v :: rest)
-      // Since bn <= bottleneck of the entire path and the bottleneck is the minimum
-      // along all edges, bn is also <= the bottleneck of any subpath.
-      // The key insight: bn was computed as min over all edges including (u,v)
-      // After augmenting (u,v), the remaining edges still have at least bn capacity
-      // because bn was the minimum. This requires detailed analysis of bottleneck_aux.
-      assume (bn <= bottleneck cap flow' n (v :: rest));
+      // distinct_vertices (u :: v :: rest) gives us: u ∉ (v :: rest), distinct_vertices (v :: rest)
+      assert (not (L.mem u (v :: rest)));
+      assert (distinct_vertices (v :: rest));
+      // By lemma_bottleneck_unchanged: bottleneck of tail is same under flow' as flow
+      (if n > 0 then
+        lemma_bottleneck_unchanged cap flow n u v bn (v :: rest)
+      else ());
+      // bn <= bottleneck(full path) = min(edge_cap, bottleneck(tail))
+      // so bn <= bottleneck(tail) under original flow = bottleneck(tail) under flow'
       
-      // Recursively augment the rest
       lemma_augment_preserves_capacity flow' cap n (v :: rest) bn
+    | [] -> ()
+#pop-options
+
+
+(** ========== Helper: augment_aux preserves sums for vertices not on path ========== *)
+
+(** For vertices not on the path, augment_aux doesn't change their flow sums *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec lemma_augment_aux_preserves_vertex_sums
+  (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
+  (bn: int) (w: nat{w < n})
+  : Lemma
+    (requires not (L.mem w path) /\ distinct_vertices path)
+    (ensures
+      sum_flow_into (augment_aux flow cap n path bn) n w n == sum_flow_into flow n w n /\
+      sum_flow_out (augment_aux flow cap n path bn) n w n == sum_flow_out flow n w n)
+    (decreases path)
+  = match path with
+    | [_] -> () // no augmentation
+    | u :: v :: rest ->
+      let flow' = augment_edge flow cap n u v bn in
+      // w ∉ (u :: v :: rest), so w ≠ u and w ≠ v
+      if residual_capacity cap flow n u v > 0 then begin
+        // Forward: set flow n u v (get flow n u v + bn)
+        lemma_sum_flow_into_update_other flow n u v (get flow n u v + bn) w n;
+        lemma_sum_flow_out_update_other flow n u v (get flow n u v + bn) w n
+      end else begin
+        // Backward: set flow n v u (get flow n v u - bn)
+        lemma_sum_flow_into_update_other flow n v u (get flow n v u - bn) w n;
+        lemma_sum_flow_out_update_other flow n v u (get flow n v u - bn) w n
+      end;
+      // After augment_edge: w's sums unchanged
+      assert (sum_flow_into flow' n w n == sum_flow_into flow n w n);
+      assert (sum_flow_out flow' n w n == sum_flow_out flow n w n);
+      // By IH: augment_aux on tail preserves w's sums (w ∉ v :: rest)
+      assert (not (L.mem w (v :: rest)));
+      assert (distinct_vertices (v :: rest));
+      lemma_augment_aux_preserves_vertex_sums flow' cap n (v :: rest) bn w
     | [] -> ()
 #pop-options
 
@@ -339,6 +429,7 @@ let lemma_zero_flow_value (n: nat{n > 0}) (source: nat{source < n})
     lemma_zero_sum_out n source n
 
 (** Lemma: Augmenting along path strictly increases flow value (P0.1.9) *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
 let lemma_augment_increases_value_aux (flow: Seq.seq int) (cap: Seq.seq int)
                                            (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
                                            (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -350,25 +441,39 @@ let lemma_augment_increases_value_aux (flow: Seq.seq int) (cap: Seq.seq int)
       bn > 0 /\
       L.hd path == source /\
       L.last path == sink /\
-      bn <= bottleneck cap flow n path)
+      bn <= bottleneck cap flow n path /\
+      distinct_vertices path /\
+      source <> sink)
     (ensures 
       (let flow' = augment_aux flow cap n path bn in
        flow_value flow' n source >= flow_value flow n source + bn))
-  = // The key idea: augmenting a path from source to sink increases the net flow
-    // out of the source by exactly bn units (the bottleneck value).
-    // 
-    // For a forward edge from source: outflow increases by bn
-    // For a backward edge from source: inflow decreases by bn (which increases flow value)
-    //
-    // All intermediate edges maintain flow conservation, so the increase
-    // in flow at the source propagates all the way to the sink.
-    //
-    // This is a fundamental property of augmenting paths in max-flow algorithms.
-    // A complete proof would require induction on the path structure and careful
-    // tracking of how each edge augmentation affects the flow value.
-    
-    assume ((let flow' = augment_aux flow cap n path bn in
-             flow_value flow' n source >= flow_value flow n source + bn))
+  = // Path = source :: v :: rest (length >= 2 since source ≠ sink)
+    match path with
+    | [_] -> () // source = sink, impossible
+    | source' :: v :: rest ->
+      // Step 1: augment_edge(source, v) changes flow_value by +bn
+      let flow_1 = augment_edge flow cap n source' v bn in
+      if residual_capacity cap flow n source' v > 0 then begin
+        // Forward: flow[source][v] += bn → out(source) += bn, in(source) unchanged
+        lemma_sum_flow_out_increase flow n source' v bn n;
+        lemma_sum_flow_into_update_other flow n source' v (get flow n source' v + bn) source' n
+      end else begin
+        // Backward: flow[v][source] -= bn → in(source) -= bn, out(source) unchanged
+        lemma_sum_flow_into_increase flow n v source' (-bn) n;
+        lemma_sum_flow_out_update_other flow n v source' (get flow n v source' - bn) source' n
+      end;
+      // After step 1: flow_value(flow_1, source) = flow_value(flow, source) + bn
+      assert (flow_value flow_1 n source' >= flow_value flow n source' + bn);
+      
+      // Step 2: augment_aux(flow_1, v :: rest) doesn't change source's sums
+      // because source ∉ (v :: rest) [distinct_vertices]
+      lemma_augment_aux_preserves_vertex_sums flow_1 cap n (v :: rest) bn source';
+      assert (sum_flow_into (augment_aux flow_1 cap n (v :: rest) bn) n source' n ==
+              sum_flow_into flow_1 n source' n);
+      assert (sum_flow_out (augment_aux flow_1 cap n (v :: rest) bn) n source' n ==
+              sum_flow_out flow_1 n source' n);
+      ()
+#pop-options
 
 
 (** ========== P0.1.10: Postcondition (Valid Flow) ========== *)
@@ -420,7 +525,106 @@ let lemma_zero_flow_valid (n: nat) (cap: Seq.seq int) (source: nat{source < n}) 
 
 (** ========== Main Theorems ========== *)
 
+(** Conservation lemma for intermediate vertices on the augmenting path.
+    For vertex w on the path (w ≠ head, w ≠ last), augmentation preserves
+    inflow = outflow because the incoming and outgoing path edges contribute
+    equal and opposite changes. *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+let rec lemma_augment_aux_conservation
+  (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
+  (bn: int) (w: nat{w < n})
+  : Lemma
+    (requires
+      distinct_vertices path /\
+      bn > 0 /\
+      bn <= bottleneck_aux cap flow n path /\
+      w <> L.hd path /\
+      w <> L.last path /\
+      sum_flow_into flow n w n == sum_flow_out flow n w n)
+    (ensures
+      sum_flow_into (augment_aux flow cap n path bn) n w n ==
+      sum_flow_out (augment_aux flow cap n path bn) n w n)
+    (decreases path)
+  = match path with
+    | [_] -> ()
+    | [u; v] ->
+      // w ≠ u (head), w ≠ v (last). w ≠ u, w ≠ v.
+      lemma_augment_edge_conservation_other flow cap n u v bn w
+    | u :: v :: rest ->
+      let flow_1 = augment_edge flow cap n u v bn in
+      if w <> v then begin
+        // w ≠ u (head) and w ≠ v: augment_edge preserves conservation at w
+        lemma_augment_edge_conservation_other flow cap n u v bn w;
+        // Apply IH to tail (v :: rest) with flow_1
+        // Need: w ≠ hd(v::rest) = v ✓, w ≠ last(v::rest) = last(path) ✓
+        // Need: bn <= bottleneck(v::rest) under flow_1
+        assert (not (L.mem u (v :: rest)));
+        assert (distinct_vertices (v :: rest));
+        lemma_bottleneck_unchanged cap flow n u v bn (v :: rest);
+        // bottleneck under flow_1 = bottleneck under flow >= bn
+        lemma_augment_aux_conservation flow_1 cap n (v :: rest) bn w
+      end else begin
+        // w = v: the second vertex on the path
+        // rest must be non-empty since v ≠ L.last path
+        // With fuel 2: L.last (u :: v :: []) = v, but w = v and w ≠ L.last path → contradiction
+        match rest with
+        | [] -> ()  // vacuously true: precondition contradicts (L.last [u;v] = v = w)
+        | w1 :: rest' ->
+          // w1 is head of rest, so L.mem w1 rest is true by unfolding
+          // and rest ⊆ path so w1 < n
+          assert (L.mem w1 (w1 :: rest'));  // trivial
+          assert (L.mem w1 (v :: w1 :: rest'));  // L.mem propagation
+          
+          let flow_2 = augment_edge flow_1 cap n v w1 bn in
+          
+          // residual_capacity at (v,w1) unchanged from flow to flow_1
+          // because v ≠ u and w1 ≠ u (from distinct_vertices)
+          lemma_augment_edge_get_other flow cap n u v bn v w1;
+          lemma_augment_edge_get_other_sym flow cap n u v bn v w1;
+          assert (residual_capacity cap flow_1 n v w1 == residual_capacity cap flow n v w1);
+          
+          // Track v's sums through both edge augmentations
+          if residual_capacity cap flow n u v > 0 then begin
+            // Edge 1 forward: in(v) += bn, out(v) unchanged
+            lemma_sum_flow_into_increase flow n u v bn n;
+            lemma_sum_flow_out_update_other flow n u v (get flow n u v + bn) v n;
+            
+            if residual_capacity cap flow_1 n v w1 > 0 then begin
+              // Edge 2 forward: in(v) unchanged, out(v) += bn
+              lemma_sum_flow_into_update_other flow_1 n v w1 (get flow_1 n v w1 + bn) v n;
+              lemma_sum_flow_out_increase flow_1 n v w1 bn n
+            end else begin
+              // Edge 2 backward: in(v) -= bn, out(v) unchanged
+              lemma_sum_flow_into_increase flow_1 n w1 v (-bn) n;
+              lemma_sum_flow_out_update_other flow_1 n w1 v (get flow_1 n w1 v - bn) v n
+            end
+          end else begin
+            // Edge 1 backward: in(v) unchanged, out(v) -= bn
+            lemma_sum_flow_into_update_other flow n v u (get flow n v u - bn) v n;
+            lemma_sum_flow_out_increase flow n v u (-bn) n;
+            
+            if residual_capacity cap flow_1 n v w1 > 0 then begin
+              lemma_sum_flow_into_update_other flow_1 n v w1 (get flow_1 n v w1 + bn) v n;
+              lemma_sum_flow_out_increase flow_1 n v w1 bn n
+            end else begin
+              lemma_sum_flow_into_increase flow_1 n w1 v (-bn) n;
+              lemma_sum_flow_out_update_other flow_1 n w1 v (get flow_1 n w1 v - bn) v n
+            end
+          end;
+          // In all 4 cases: sum_flow_into(flow_2, v) == sum_flow_out(flow_2, v)
+          assert (sum_flow_into flow_2 n v n == sum_flow_out flow_2 n v n);
+          
+          // Step 3: augment_aux(flow_2, w1 :: rest') doesn't affect v
+          // v ∉ (w1 :: rest') from distinct_vertices
+          assert (not (L.mem v (w1 :: rest')));
+          assert (distinct_vertices (w1 :: rest'));
+          lemma_augment_aux_preserves_vertex_sums flow_2 cap n (w1 :: rest') bn v
+      end
+#pop-options
+
 (** P0.1.7 + P0.1.8: Augmentation preserves valid flow *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
 let augment_preserves_valid (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
                              (source: nat{source < n}) (sink: nat{sink < n})
                              (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -428,27 +632,25 @@ let augment_preserves_valid (#n: nat) (cap: capacity_matrix n) (flow: flow_matri
   : Lemma
     (requires 
       valid_flow flow cap source sink /\
-      bn <= bottleneck cap flow n path)
+      bn <= bottleneck cap flow n path /\
+      distinct_vertices path /\
+      L.hd path == source /\
+      L.last path == sink)
     (ensures valid_flow #n (augment_aux flow cap n path bn) cap source sink)
   = lemma_augment_preserves_capacity flow cap n path bn;
-    // Conservation proof: P0.1.8
-    // For each vertex v != source, sink on the path, augmentation increases both
-    // inflow and outflow by bn (as the flow passes through)
-    // For vertices not on the path, their flows are unchanged
-    // Therefore, inflow = outflow is preserved for all intermediate vertices
-    
-    // The key insight: augmenting a path adds bn units of flow along every edge
-    // For an intermediate vertex v on the path:
-    //   - One incoming edge on path increases inflow by bn
-    //   - One outgoing edge on path increases outflow by bn
-    //   - Net change: inflow and outflow both increase by bn, so they remain equal
-    
-    // For vertices not on path: no edges are modified, so conservation trivially holds
-    
-    // This is a complex inductive argument over the path structure
-    // We use assume here as the full proof requires detailed case analysis
-    // on path structure and vertex membership
-    assume (valid_flow #n (augment_aux flow cap n path bn) cap source sink)
+    // Conservation proof via helper lemmas
+    let flow' = augment_aux flow cap n path bn in
+    let aux (w: nat{w < n /\ w <> source /\ w <> sink})
+      : Lemma (sum_flow_into flow' n w n == sum_flow_out flow' n w n)
+      = if L.mem w path then
+          // w is intermediate (w ≠ source = hd, w ≠ sink = last)
+          lemma_augment_aux_conservation flow cap n path bn w
+        else
+          // w ∉ path: sums unchanged
+          lemma_augment_aux_preserves_vertex_sums flow cap n path bn w
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
 
 (** P0.1.9: Augmentation increases flow value *)  
 let augment_increases_value (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
@@ -459,7 +661,9 @@ let augment_increases_value (#n: nat) (cap: capacity_matrix n) (flow: flow_matri
   : Lemma
     (requires 
       valid_flow flow cap source sink /\
-      bn <= bottleneck cap flow n path)
+      bn <= bottleneck cap flow n path /\
+      distinct_vertices path /\
+      source <> sink)
     (ensures 
       (let flow' = augment_aux flow cap n path bn in
        flow_value flow' n source > flow_value flow n source))
