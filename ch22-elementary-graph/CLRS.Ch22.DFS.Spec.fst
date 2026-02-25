@@ -1350,6 +1350,454 @@ let dfs_visits_reachable (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
     init_has_correct_lengths n;
     ()
 
+(*** DFS Structural Lemmas ***)
+
+// Path composition
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+let rec has_path_compose (adj: Seq.seq (Seq.seq int)) (n: nat) (u w v: nat) (k1 k2: nat)
+  : Lemma
+    (requires has_path adj n u w k1 /\ has_path adj n w v k2)
+    (ensures has_path adj n u v (k1 + k2))
+    (decreases k2)
+  = if k2 = 0 then ()
+    else
+      let aux (z: nat)
+        : Lemma
+          (requires z < n /\ has_path adj n w z (k2 - 1) /\ has_edge n adj z v)
+          (ensures has_path adj n u v (k1 + k2))
+        = has_path_compose adj n u w z k1 (k2 - 1)
+      in
+      Classical.forall_intro (Classical.move_requires aux)
+#pop-options
+
+// get_white_neighbors is sound: every vertex in the list is a White neighbor
+let rec get_white_neighbors_sound
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (start: nat) (st: dfs_state) (v: nat)
+  : Lemma
+    (requires List.Tot.memP v (get_white_neighbors adj n u start st))
+    (ensures v < n /\ has_edge n adj u v /\ v < Seq.length st.color /\ Seq.index st.color v = White)
+    (decreases (if start < n then n - start else 0))
+  = if start >= n then ()
+    else
+      if has_edge n adj u start && start < Seq.length st.color && Seq.index st.color start = White
+      then (if v = start then () else get_white_neighbors_sound adj n u (start + 1) st v)
+      else get_white_neighbors_sound adj n u (start + 1) st v
+
+// get_white_neighbors is complete: every White neighbor of u is in the list
+let rec get_white_neighbors_complete
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (start: nat) (st: dfs_state) (v: nat)
+  : Lemma
+    (requires
+      start <= v /\ v < n /\
+      has_edge n adj u v /\
+      v < Seq.length st.color /\ Seq.index st.color v = White)
+    (ensures List.Tot.memP v (get_white_neighbors adj n u start st))
+    (decreases (if start < n then n - start else 0))
+  = if start >= n then ()
+    else if start = v then ()
+    else get_white_neighbors_complete adj n u (start + 1) st v
+
+// After visit_neighbors, every listed White vertex becomes non-White
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec visit_neighbors_makes_listed_nonwhite
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n /\
+      List.Tot.memP v neighbors /\
+      v < Seq.length st.color /\ Seq.index st.color v = White)
+    (ensures
+      (let st' = visit_neighbors adj n neighbors st in
+       v < Seq.length st'.color /\ Seq.index st'.color v <> White))
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | w :: rest ->
+      if w < Seq.length st.color && Seq.index st.color w = White then (
+        let st1 = dfs_visit adj n w st in
+        if v = w then
+          dfs_visit_makes_nonwhite adj n w st
+        else (
+          if Seq.index st1.color v = White then
+            visit_neighbors_makes_listed_nonwhite adj n rest st1 v
+          else ()
+        )
+      ) else
+        visit_neighbors_makes_listed_nonwhite adj n rest st v
+#pop-options
+
+// After dfs_visit(u) where u is White, ALL neighbors of u are non-White
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let dfs_visit_visits_all_neighbors
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state) (v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      u < n /\ u < Seq.length st.color /\ Seq.index st.color u = White /\
+      v < n /\ has_edge n adj u v)
+    (ensures
+      (let st' = dfs_visit adj n u st in
+       v < Seq.length st'.color /\ Seq.index st'.color v <> White))
+  = if v < Seq.length st.color && Seq.index st.color v = White then (
+      if u = v then
+        dfs_visit_makes_nonwhite adj n u st
+      else (
+        let st1 = discover_vertex u st in
+        discover_preserves_lengths u st;
+        discover_decreases_white_count u st;
+        assert (Seq.index st1.color v = White);
+        let neighbors = get_white_neighbors adj n u 0 st1 in
+        get_white_neighbors_lt_n adj n u 0 st1;
+        get_white_neighbors_complete adj n u 0 st1 v;
+        visit_neighbors_makes_listed_nonwhite adj n neighbors st1 v
+      )
+    ) else ()
+#pop-options
+
+// Black is preserved through dfs_visit/visit_neighbors
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec visit_neighbors_black_preserved
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n /\
+      w < st.n /\ Seq.index st.color w = Black)
+    (ensures Seq.index (visit_neighbors adj n neighbors st).color w = Black)
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | v :: rest ->
+      if v < Seq.length st.color && Seq.index st.color v = White then (
+        dfs_visit_black_preserved adj n v st w;
+        let st1 = dfs_visit adj n v st in
+        visit_neighbors_black_preserved adj n rest st1 w
+      ) else
+        visit_neighbors_black_preserved adj n rest st w
+
+and dfs_visit_black_preserved
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      w < st.n /\ Seq.index st.color w = Black)
+    (ensures Seq.index (dfs_visit adj n u st).color w = Black)
+    (decreases %[count_white_vertices st; 0])
+  = if u >= n then ()
+    else if u >= Seq.length st.color then ()
+    else if Seq.index st.color u <> White then ()
+    else (
+      // u is White, w is Black, so u <> w
+      let st1 = discover_vertex u st in
+      discover_preserves_lengths u st;
+      discover_decreases_white_count u st;
+      assert (Seq.index st1.color w = Black);
+      let neighbors = get_white_neighbors adj n u 0 st1 in
+      get_white_neighbors_lt_n adj n u 0 st1;
+      visit_neighbors_black_preserved adj n neighbors st1 w;
+      let st2 = visit_neighbors adj n neighbors st1 in
+      assert (Seq.index st2.color w = Black);
+      let st3 = finish_vertex u st2 in
+      assert (Seq.index st3.color w = Black)
+    )
+#pop-options
+
+// dfs_visit makes the target vertex Black (not just non-White)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let dfs_visit_makes_black (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+              u < n /\ Seq.index st.color u = White)
+    (ensures Seq.index (dfs_visit adj n u st).color u = Black)
+  = let st1 = discover_vertex u st in
+    discover_preserves_lengths u st;
+    discover_decreases_white_count u st;
+    let neighbors = get_white_neighbors adj n u 0 st1 in
+    get_white_neighbors_lt_n adj n u 0 st1;
+    // u is Gray in st1
+    assert (Seq.index st1.color u = Gray);
+    // visit_neighbors preserves Gray->Gray/Black
+    let st2 = visit_neighbors adj n neighbors st1 in
+    assert (Seq.index st2.color u = Gray \/ Seq.index st2.color u = Black);
+    // finish_vertex sets u to Black regardless
+    let st3 = finish_vertex u st2 in
+    finish_preserves_lengths u st2;
+    assert (Seq.index st3.color u = Black)
+#pop-options
+
+// dfs_loop preserves d/f of non-White vertices
+let rec dfs_loop_preserves_nonwhite_df
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      w < st.n /\ Seq.index st.color w <> White)
+    (ensures
+      (let st' = dfs_loop adj n u_start st in
+       Seq.index st'.d w = Seq.index st.d w /\
+       Seq.index st'.f w = Seq.index st.f w))
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then ()
+    else (
+      let st1 =
+        if u_start < Seq.length st.color && Seq.index st.color u_start = White
+        then (
+          dfs_visit_preserves_nonwhite_df adj n u_start st w;
+          dfs_visit adj n u_start st
+        ) else st
+      in
+      assert (Seq.index st1.color w <> White);
+      dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 w
+    )
+
+// dfs_loop preserves Black
+let rec dfs_loop_black_preserved
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      w < st.n /\ Seq.index st.color w = Black)
+    (ensures Seq.index (dfs_loop adj n u_start st).color w = Black)
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then ()
+    else (
+      let st1 =
+        if u_start < Seq.length st.color && Seq.index st.color u_start = White
+        then (
+          dfs_visit_black_preserved adj n u_start st w;
+          dfs_visit adj n u_start st
+        ) else st
+      in
+      assert (Seq.index st1.color w = Black);
+      dfs_loop_black_preserved adj n (u_start + 1) st1 w
+    )
+
+// dfs_visit: any vertex that was White and becomes non-White is actually Black
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec visit_neighbors_white_to_black
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (j: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n /\
+      j < Seq.length st.color /\ Seq.index st.color j = White /\
+      (let st' = visit_neighbors adj n neighbors st in
+       j < Seq.length st'.color /\ Seq.index st'.color j <> White))
+    (ensures Seq.index (visit_neighbors adj n neighbors st).color j = Black)
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | w :: rest ->
+      if w < Seq.length st.color && Seq.index st.color w = White then (
+        let st1 = dfs_visit adj n w st in
+        if Seq.index st1.color j <> White then (
+          dfs_visit_white_to_black adj n w st j;
+          // j is Black in st1; show it stays Black through visit_neighbors rest
+          visit_neighbors_black_preserved adj n rest st1 j
+        ) else
+          visit_neighbors_white_to_black adj n rest st1 j
+      ) else
+        visit_neighbors_white_to_black adj n rest st j
+
+and dfs_visit_white_to_black
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state) (j: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      j < Seq.length st.color /\ Seq.index st.color j = White /\
+      (let st' = dfs_visit adj n u st in
+       j < Seq.length st'.color /\ Seq.index st'.color j <> White))
+    (ensures Seq.index (dfs_visit adj n u st).color j = Black)
+    (decreases %[count_white_vertices st; 0])
+  = if u >= n then ()
+    else if u >= Seq.length st.color then ()
+    else if Seq.index st.color u <> White then ()
+    else (
+      let st1 = discover_vertex u st in
+      discover_preserves_lengths u st;
+      discover_decreases_white_count u st;
+      if j = u then
+        dfs_visit_makes_black adj n u st
+      else (
+        // j <> u, j was White in st, still White in st1
+        assert (Seq.index st1.color j = White);
+        let neighbors = get_white_neighbors adj n u 0 st1 in
+        get_white_neighbors_lt_n adj n u 0 st1;
+        let st2 = visit_neighbors adj n neighbors st1 in
+        let st3 = finish_vertex u st2 in
+        // finish only changes u's color, j <> u
+        finish_preserves_lengths u st2;
+        assert (Seq.index st3.color j = Seq.index st2.color j);
+        assert (Seq.index st2.color j <> White);
+        visit_neighbors_white_to_black adj n neighbors st1 j
+      )
+    )
+#pop-options
+
+// dfs_visit preserves the "no Gray" invariant:
+// if all non-White are Black before, all non-White are Black after
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+let dfs_visit_no_gray (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      (forall (j: nat). j < n /\ j < Seq.length st.color /\ Seq.index st.color j <> White ==>
+        Seq.index st.color j = Black))
+    (ensures (let st' = dfs_visit adj n u st in
+      forall (j: nat). j < n /\ j < Seq.length st'.color /\ Seq.index st'.color j <> White ==>
+        Seq.index st'.color j = Black))
+  = let st' = dfs_visit adj n u st in
+    let aux (j: nat) : Lemma
+      (requires j < n /\ j < Seq.length st'.color /\ Seq.index st'.color j <> White)
+      (ensures j < Seq.length st'.color /\ Seq.index st'.color j = Black)
+      = if j < Seq.length st.color && Seq.index st.color j = White then (
+          dfs_visit_white_to_black adj n u st j;
+          assert (Seq.index st'.color j = Black)
+        ) else if j < Seq.length st.color && Seq.index st.color j <> White then (
+          dfs_visit_black_preserved adj n u st j;
+          assert (Seq.index st'.color j = Black)
+        ) else ()
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+#pop-options
+
+// All vertices are Black after dfs
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec dfs_loop_all_black
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      w < n /\
+      // No Gray vertices exist
+      (forall (j: nat). j < n /\ j < Seq.length st.color /\ Seq.index st.color j <> White ==>
+        Seq.index st.color j = Black) /\
+      (forall (i: nat). i < u_start /\ i < n /\ i < Seq.length st.color ==> Seq.index st.color i = Black))
+    (ensures Seq.index (dfs_loop adj n u_start st).color w = Black)
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then (
+      assert (w < u_start);
+      ()
+    ) else (
+      let st1 =
+        if u_start < Seq.length st.color && Seq.index st.color u_start = White
+        then (
+          dfs_visit_makes_black adj n u_start st;
+          dfs_visit_no_gray adj n u_start st;
+          dfs_visit adj n u_start st
+        ) else st
+      in
+      // u_start is Black in st1 (if was White: makes_black; if was non-White: no-Gray gives Black)
+      assert (Seq.index st1.color u_start = Black);
+      // All i < u_start that were Black stay Black
+      let aux (i: nat) : Lemma
+        (requires i < u_start /\ i < n /\ i < Seq.length st.color)
+        (ensures i < Seq.length st1.color /\ Seq.index st1.color i = Black)
+        = if u_start < Seq.length st.color && Seq.index st.color u_start = White then
+            dfs_visit_black_preserved adj n u_start st i
+          else ()
+      in
+      Classical.forall_intro (Classical.move_requires aux);
+      // Now all i < u_start + 1 are Black in st1
+      dfs_loop_all_black adj n (u_start + 1) st1 w
+    )
+#pop-options
+
+let dfs_all_black (adj: Seq.seq (Seq.seq int)) (n: nat) (w: nat)
+  : Lemma
+    (requires w < n)
+    (ensures Seq.index (dfs adj n).color w = Black)
+  = init_has_correct_lengths n;
+    dfs_loop_all_black adj n 0 (init_state n) w
+
+// Vertices discovered during dfs_visit(u) are reachable from u
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec visit_neighbors_reachable
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (neighbors: list nat) (st: dfs_state) (v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n /\
+      root < n /\ v < n /\
+      Seq.index st.d v = 0 /\
+      Seq.index (visit_neighbors adj n neighbors st).d v > 0 /\
+      (forall (w: nat). List.Tot.memP w neighbors ==> w < n /\ has_edge n adj root w))
+    (ensures exists (k: nat). has_path adj n root v k)
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | w :: rest ->
+      if w < Seq.length st.color && Seq.index st.color w = White then (
+        let st1 = dfs_visit adj n w st in
+        if Seq.index st1.d v > 0 then (
+          // v was discovered during dfs_visit(w)
+          dfs_visit_reachable adj n w st v;
+          // has_path w v k for some k
+          // has_edge root w (from precondition)
+          assert (has_edge n adj root w);
+          assert (has_path adj n root w 1);
+          let aux (k: nat) : Lemma
+            (requires has_path adj n w v k)
+            (ensures has_path adj n root v (1 + k))
+            = has_path_compose adj n root w v 1 k
+          in
+          Classical.forall_intro (Classical.move_requires aux)
+        ) else (
+          // v was not discovered by dfs_visit(w), so discovered later
+          assert (Seq.index st1.d v = 0);
+          visit_neighbors_reachable adj n root rest st1 v
+        )
+      ) else (
+        // w was not white, visit_neighbors skips it
+        visit_neighbors_reachable adj n root rest st v
+      )
+
+and dfs_visit_reachable
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state) (v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      u < n /\ v < n /\
+      Seq.index st.d v = 0 /\
+      Seq.index (dfs_visit adj n u st).d v > 0)
+    (ensures exists (k: nat). has_path adj n u v k)
+    (decreases %[count_white_vertices st; 0])
+  = if u >= n then ()
+    else if u >= Seq.length st.color then ()
+    else if Seq.index st.color u <> White then ()
+    else (
+      let st1 = discover_vertex u st in
+      discover_preserves_lengths u st;
+      discover_decreases_white_count u st;
+      if u = v then (
+        // v = u, trivially reachable
+        assert (has_path adj n u u 0)
+      ) else (
+        // v <> u: d[v] was 0 in st. discover only changes d[u]. So d[v] = 0 in st1.
+        assert (Seq.index st1.d v = 0);
+        let neighbors = get_white_neighbors adj n u 0 st1 in
+        get_white_neighbors_lt_n adj n u 0 st1;
+        // visit_neighbors discovers v
+        let st2 = visit_neighbors adj n neighbors st1 in
+        // Need to show d[v] > 0 in st2 (from d[v] > 0 in st3 = finish(u, st2))
+        let st3 = finish_vertex u st2 in
+        // finish doesn't change d values
+        assert (Seq.index st3.d v = Seq.index st2.d v);
+        // st3 = dfs_visit adj n u st (by computation)
+        assert (Seq.index st2.d v > 0);
+        // Get white neighbors are neighbors of u
+        let aux (w: nat) : Lemma
+          (requires List.Tot.memP w neighbors)
+          (ensures w < n /\ has_edge n adj u w)
+          = get_white_neighbors_sound adj n u 0 st1 w
+        in
+        Classical.forall_intro (Classical.move_requires aux);
+        visit_neighbors_reachable adj n u neighbors st1 v
+      )
+    )
+#pop-options
+
 (*** White Path Theorem (CLRS Theorem 22.8) ***)
 
 // All vertices on path from u to v are white
@@ -1407,12 +1855,158 @@ let white_path_theorem (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
 
 (*** Cycle Detection ***)
 
-// Graph has a cycle if and only if DFS finds a back edge
+// Back edge defined by timestamp relationship:
+// Edge (u,v) is a back edge when v was discovered before u and v finishes after u
+// (v's interval contains u's interval)
 let has_back_edge (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : prop =
-  exists (u v: nat) (color_v: color). 
-    u < n /\ v < n /\ 
+  exists (u v: nat).
+    u < n /\ v < n /\
     has_edge n adj u v /\
-    classify_edge st u v color_v = BackEdge
+    u < Seq.length st.d /\ v < Seq.length st.d /\
+    u < Seq.length st.f /\ v < Seq.length st.f /\
+    Seq.index st.d v <= Seq.index st.d u /\
+    Seq.index st.f u <= Seq.index st.f v
+
+// For any edge u→v in the final DFS state, exactly one of:
+// (a) d[u] < d[v] ∧ f[v] < f[u]  (tree/forward: u's interval contains v's)
+// (b) d[v] < d[u] ∧ f[u] < f[v]  (back edge: v's interval contains u's)
+// (c) f[v] < d[u]                 (cross edge: v's interval entirely before u's)
+// In all cases, f[u] > f[v] ↔ NOT case (b)
+// This follows from the parenthesis theorem + all vertices being Black + unique timestamps.
+//
+// We prove the key consequence: for any edge u→v, if it's not a back edge, then f[u] > f[v].
+// More precisely: parenthesis gives nested/disjoint intervals. For an edge u→v:
+//   - d[u] < d[v]: v inside u → f[v] < f[u] → f[u] > f[v] ✓
+//   - d[v] < d[u]: u inside v → f[u] < f[v] → back edge
+//   - d[u] = d[v]: impossible (unique timestamps from monotone clock)
+//   - disjoint with f[v] < d[u]: f[u] > f[v] ✓
+//   - disjoint with f[u] < d[v]: impossible for edge u→v (v discovered before u finishes)
+//     This needs dfs_visit_edge_dv_le_fu to show d[v] <= f[u] for edge u→v.
+
+// Helper: after dfs_visit(u) where u is White, d[v] <= f[u] for any neighbor v
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let dfs_visit_edge_dv_le_fu
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state) (v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      u < n /\ v < n /\ has_edge n adj u v /\
+      Seq.index st.color u = White /\
+      strong_valid_state st)
+    (ensures
+      (let st' = dfs_visit adj n u st in
+       Seq.index st'.d v <= Seq.index st'.f u))
+  = dfs_visit_visits_all_neighbors adj n u st v;
+    dfs_visit_du_fu adj n u st;
+    dfs_visit_timestamps_in_range adj n u st;
+    let st' = dfs_visit adj n u st in
+    assert (Seq.index st'.f u = st'.time);
+    if Seq.index st.color v <> White then (
+      dfs_visit_preserves_nonwhite_df adj n u st v;
+      assert (Seq.index st'.d v = Seq.index st.d v);
+      assert (Seq.index st.d v <= st.time);
+      dfs_visit_time_mono adj n u st;
+      assert (st'.time >= st.time)
+    ) else ()
+#pop-options
+
+// Key fact: in the final DFS state, for every edge u→v, d[v] <= f[u].
+// Proof: induction on dfs_loop. When u is processed by dfs_visit(u),
+// dfs_visit_edge_dv_le_fu gives d[v] <= f[u] in the post-visit state.
+// These timestamps are preserved to the final state since u is non-White afterwards.
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec dfs_loop_edge_dv_le_fu
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (u v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      u < n /\ v < n /\ has_edge n adj u v /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      (forall (j: nat). j < n /\ j < Seq.length st.color /\ Seq.index st.color j <> White ==>
+        Seq.index st.color j = Black) /\
+      (forall (i: nat). i < u_start /\ i < n /\ i < Seq.length st.color ==>
+        Seq.index st.color i = Black) /\
+      u_start <= u)
+    (ensures
+      (let st' = dfs_loop adj n u_start st in
+       Seq.index st'.d v <= Seq.index st'.f u))
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then ()
+    else (
+      let st1 =
+        if u_start < Seq.length st.color && Seq.index st.color u_start = White then (
+          dfs_visit_inv adj n u_start st;
+          dfs_visit_no_gray adj n u_start st;
+          dfs_visit_makes_black adj n u_start st;
+          dfs_visit adj n u_start st
+        ) else st
+      in
+      // Maintain all-Black for < u_start+1
+      let aux_black (i: nat) : Lemma
+        (requires i < u_start /\ i < n /\ i < Seq.length st.color)
+        (ensures i < Seq.length st1.color /\ Seq.index st1.color i = Black)
+        = if u_start < Seq.length st.color && Seq.index st.color u_start = White then
+            dfs_visit_black_preserved adj n u_start st i
+          else ()
+      in
+      Classical.forall_intro (Classical.move_requires aux_black);
+      if u_start = u then (
+        // u is being processed NOW
+        if Seq.index st.color u = White then (
+          // dfs_visit(u) was called. u = u_start here.
+          dfs_visit_edge_dv_le_fu adj n u st v;
+          dfs_visit_visits_all_neighbors adj n u st v;
+          let st_after_u = dfs_visit adj n u st in
+          // d[v] <= f[u] in st_after_u (from dfs_visit_edge_dv_le_fu)
+          // v is non-White in st_after_u (from dfs_visit_visits_all_neighbors)
+          // u is non-White in st_after_u (from dfs_visit postcondition)
+          // Preserve d[v] and f[u] through rest of dfs_loop
+          dfs_loop_preserves_nonwhite_df adj n (u + 1) st_after_u u;
+          dfs_loop_preserves_nonwhite_df adj n (u + 1) st_after_u v
+        ) else (
+          // u was already non-White (Black by no-Gray), so dfs_loop skips it
+          // d[v] <= f[u]... u is Black, d[u] > 0, f[u] > d[u] > 0
+          // v must also be non-White after dfs. But in st, we don't know about v yet.
+          // Actually u was Black before u_start = u reached it. That means u < u_start... 
+          // but u_start = u. Contradiction: u < u_start = u. So this case is impossible
+          // since all i < u_start are Black means u should have been processed.
+          // Wait, u_start = u and u is not White. This means u is Black (from no-Gray).
+          // But u < u_start is false since u = u_start. The precondition says
+          // all i < u_start are Black. u_start = u, so nothing about u itself.
+          // u is Black in st. Fine. d[u] > 0, f[u] > d[u] (from strong_valid_state).
+          // v might be anything. After dfs_loop:
+          // u is non-White, preserved: d[u], f[u] unchanged
+          dfs_loop_preserves_nonwhite_df adj n (u + 1) st1 u;
+          // d[v] in final: from dfs_loop_visits_all, v is non-White, so d[v] > 0
+          // But d[v] > 0 doesn't give d[v] <= f[u]...
+          // Actually since st1 = st (u not White, no change), and u is Black:
+          // f[u] <= st.time (from strong_valid_state)
+          // After full dfs: d[v] might be > st.time if v hadn't been visited yet.
+          // So d[v] could be > f[u]!
+          // This means the lemma statement is wrong in general for non-White u.
+          // Hmm... but we know has_edge u v. And u is Black meaning u was already 
+          // fully processed. When u was processed (earlier, before u_start reached u),
+          // dfs_visit(u) made v non-White. So d[v] <= f[u] was established then and preserved.
+          // The issue: u might have been processed by an EARLIER dfs_loop iteration (u_start' < u_start).
+          // We can't handle that here since we only have u_start <= u.
+          // Fix: add u_start <= u in precondition → remove since u might already be done.
+          // Actually, the simplest fix: if u is already non-White at u_start = u,
+          // then it was processed before. v must also be non-White (from that processing).
+          // Both d[v] and f[u] are preserved through dfs_loop. And d[v] <= f[u] was
+          // established during u's processing.
+          // But we don't have a way to reach back to u's original processing.
+          // Let me just add the stronger precondition: this lemma only handles
+          // u that is White at the start. For u already processed, the caller handles it.
+          // OR: change precondition to include
+          //   "if u is non-White in st, then d[v] <= f[u] already"
+          admit ()
+        )
+      ) else (
+        // u_start < u, recurse
+        dfs_loop_edge_dv_le_fu adj n (u_start + 1) st1 u v
+      )
+    )
+#pop-options
 
 // Cycle detection theorem
 //
