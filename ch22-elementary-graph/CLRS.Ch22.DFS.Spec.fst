@@ -1910,103 +1910,156 @@ let dfs_visit_edge_dv_le_fu
     ) else ()
 #pop-options
 
-// Key fact: in the final DFS state, for every edge u→v, d[v] <= f[u].
-// Proof: induction on dfs_loop. When u is processed by dfs_visit(u),
-// dfs_visit_edge_dv_le_fu gives d[v] <= f[u] in the post-visit state.
-// These timestamps are preserved to the final state since u is non-White afterwards.
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
-let rec dfs_loop_edge_dv_le_fu
-  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (u v: nat)
+// Combined edge invariant maintained through DFS:
+// For every Black vertex u with edge u→v: v is non-White AND d[v] <= f[u]
+let all_edges_inv (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : prop =
+  (forall (u v: nat). u < n /\ v < n /\ has_edge n adj u v /\
+    Seq.index st.color u = Black ==>
+    Seq.index st.color v <> White /\ Seq.index st.d v <= Seq.index st.f u)
+
+// Mutual recursion: all_edges_inv is maintained through dfs_visit/visit_neighbors
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let rec visit_neighbors_all_edges_inv
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state)
   : Lemma
     (requires
       st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
-      u < n /\ v < n /\ has_edge n adj u v /\
+      all_neighbors_lt_n neighbors n /\
       strong_valid_state st /\ parenthesis_theorem st /\
-      (forall (j: nat). j < n /\ j < Seq.length st.color /\ Seq.index st.color j <> White ==>
-        Seq.index st.color j = Black) /\
-      (forall (i: nat). i < u_start /\ i < n /\ i < Seq.length st.color ==>
-        Seq.index st.color i = Black) /\
-      u_start <= u)
-    (ensures
-      (let st' = dfs_loop adj n u_start st in
-       Seq.index st'.d v <= Seq.index st'.f u))
+      all_edges_inv st adj n)
+    (ensures all_edges_inv (visit_neighbors adj n neighbors st) adj n)
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | v :: rest ->
+      if v < Seq.length st.color && Seq.index st.color v = White then (
+        dfs_visit_all_edges_inv adj n v st;
+        dfs_visit_inv adj n v st;
+        let st1 = dfs_visit adj n v st in
+        visit_neighbors_all_edges_inv adj n rest st1
+      ) else
+        visit_neighbors_all_edges_inv adj n rest st
+
+and dfs_visit_all_edges_inv
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (st: dfs_state)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      root < n /\ Seq.index st.color root = White /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      all_edges_inv st adj n)
+    (ensures all_edges_inv (dfs_visit adj n root st) adj n)
+    (decreases %[count_white_vertices st; 0])
+  = // Step 1: Discover root
+    let st1 = discover_vertex root st in
+    discover_preserves_lengths root st;
+    discover_decreases_white_count root st;
+    discover_preserves_strong_validity root st;
+    discover_preserves_parenthesis root st;
+
+    // all_edges_inv preserved: no new Black. If Black b has edge to w,
+    // w is non-White in st. root is White in st so w ≠ root. d[w], f[b] unchanged.
+    let aux_disc (u v: nat) : Lemma
+      (requires u < n /\ v < n /\ has_edge n adj u v /\ Seq.index st1.color u = Black)
+      (ensures Seq.index st1.color v <> White /\ Seq.index st1.d v <= Seq.index st1.f u)
+      = assert (Seq.index st.color u = Black);
+        assert (Seq.index st.color v <> White);
+        assert (v <> root)
+    in
+    Classical.forall_intro (fun u ->
+      Classical.forall_intro (fun v ->
+        Classical.move_requires (aux_disc u) v));
+
+    // Step 2: Visit neighbors
+    let neighbors = get_white_neighbors adj n root 0 st1 in
+    get_white_neighbors_lt_n adj n root 0 st1;
+    visit_neighbors_all_edges_inv adj n neighbors st1;
+    visit_neighbors_inv adj n neighbors st1;
+    visit_neighbors_time_mono adj n neighbors st1;
+    let st2 = visit_neighbors adj n neighbors st1 in
+
+    // root is Gray in st2 (preserved from st1)
+    visit_neighbors_preserves_nonwhite_df adj n neighbors st1 root;
+    assert (Seq.index st2.color root = Gray);
+
+    // Step 3: Finish root
+    let st3 = finish_vertex root st2 in
+    finish_preserves_lengths root st2;
+
+    // Prove all_edges_inv st3
+    let aux_fin (u v: nat) : Lemma
+      (requires u < n /\ v < n /\ has_edge n adj u v /\ Seq.index st3.color u = Black)
+      (ensures Seq.index st3.color v <> White /\ Seq.index st3.d v <= Seq.index st3.f u)
+      = if u = root then (
+          // root became Black. Show v is non-White in st2.
+          if Seq.index st1.color v = White then (
+            // v was White in st1 (v ≠ root since root is Gray in st1)
+            get_white_neighbors_complete adj n root 0 st1 v;
+            visit_neighbors_makes_listed_nonwhite adj n neighbors st1 v
+          ) else (
+            // v was non-White in st1: d[v] preserved, hence still non-White in st2
+            visit_neighbors_preserves_nonwhite_df adj n neighbors st1 v
+          );
+          // d[v] <= st2.time (strong_valid_state st2), f[root] = st2.time + 1
+          assert (Seq.index st3.d v = Seq.index st2.d v);
+          assert (Seq.index st2.d v <= st2.time);
+          assert (Seq.index st3.f u = st2.time + 1)
+        ) else (
+          // u ≠ root, was Black in st2. d[v], f[u] unchanged by finish.
+          assert (Seq.index st2.color u = Black);
+          assert (Seq.index st3.d v = Seq.index st2.d v);
+          assert (Seq.index st3.f u = Seq.index st2.f u)
+        )
+    in
+    Classical.forall_intro (fun u ->
+      Classical.forall_intro (fun v ->
+        Classical.move_requires (aux_fin u) v))
+#pop-options
+
+// dfs_loop preserves all_edges_inv
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec dfs_loop_all_edges_inv
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      (forall (j: nat). j < n /\ Seq.index st.color j <> White ==> Seq.index st.color j = Black) /\
+      (forall (i: nat). i < u_start /\ i < n ==> Seq.index st.color i = Black) /\
+      all_edges_inv st adj n)
+    (ensures all_edges_inv (dfs_loop adj n u_start st) adj n)
     (decreases (if u_start < n then n - u_start else 0))
   = if u_start >= n then ()
     else (
       let st1 =
         if u_start < Seq.length st.color && Seq.index st.color u_start = White then (
+          dfs_visit_all_edges_inv adj n u_start st;
           dfs_visit_inv adj n u_start st;
           dfs_visit_no_gray adj n u_start st;
           dfs_visit_makes_black adj n u_start st;
           dfs_visit adj n u_start st
         ) else st
       in
-      // Maintain all-Black for < u_start+1
-      let aux_black (i: nat) : Lemma
-        (requires i < u_start /\ i < n /\ i < Seq.length st.color)
-        (ensures i < Seq.length st1.color /\ Seq.index st1.color i = Black)
+      let aux (i: nat) : Lemma
+        (requires i < u_start /\ i < n)
+        (ensures Seq.index st1.color i = Black)
         = if u_start < Seq.length st.color && Seq.index st.color u_start = White then
             dfs_visit_black_preserved adj n u_start st i
           else ()
       in
-      Classical.forall_intro (Classical.move_requires aux_black);
-      if u_start = u then (
-        // u is being processed NOW
-        if Seq.index st.color u = White then (
-          // dfs_visit(u) was called. u = u_start here.
-          dfs_visit_edge_dv_le_fu adj n u st v;
-          dfs_visit_visits_all_neighbors adj n u st v;
-          let st_after_u = dfs_visit adj n u st in
-          // d[v] <= f[u] in st_after_u (from dfs_visit_edge_dv_le_fu)
-          // v is non-White in st_after_u (from dfs_visit_visits_all_neighbors)
-          // u is non-White in st_after_u (from dfs_visit postcondition)
-          // Preserve d[v] and f[u] through rest of dfs_loop
-          dfs_loop_preserves_nonwhite_df adj n (u + 1) st_after_u u;
-          dfs_loop_preserves_nonwhite_df adj n (u + 1) st_after_u v
-        ) else (
-          // u was already non-White (Black by no-Gray), so dfs_loop skips it
-          // d[v] <= f[u]... u is Black, d[u] > 0, f[u] > d[u] > 0
-          // v must also be non-White after dfs. But in st, we don't know about v yet.
-          // Actually u was Black before u_start = u reached it. That means u < u_start... 
-          // but u_start = u. Contradiction: u < u_start = u. So this case is impossible
-          // since all i < u_start are Black means u should have been processed.
-          // Wait, u_start = u and u is not White. This means u is Black (from no-Gray).
-          // But u < u_start is false since u = u_start. The precondition says
-          // all i < u_start are Black. u_start = u, so nothing about u itself.
-          // u is Black in st. Fine. d[u] > 0, f[u] > d[u] (from strong_valid_state).
-          // v might be anything. After dfs_loop:
-          // u is non-White, preserved: d[u], f[u] unchanged
-          dfs_loop_preserves_nonwhite_df adj n (u + 1) st1 u;
-          // d[v] in final: from dfs_loop_visits_all, v is non-White, so d[v] > 0
-          // But d[v] > 0 doesn't give d[v] <= f[u]...
-          // Actually since st1 = st (u not White, no change), and u is Black:
-          // f[u] <= st.time (from strong_valid_state)
-          // After full dfs: d[v] might be > st.time if v hadn't been visited yet.
-          // So d[v] could be > f[u]!
-          // This means the lemma statement is wrong in general for non-White u.
-          // Hmm... but we know has_edge u v. And u is Black meaning u was already 
-          // fully processed. When u was processed (earlier, before u_start reached u),
-          // dfs_visit(u) made v non-White. So d[v] <= f[u] was established then and preserved.
-          // The issue: u might have been processed by an EARLIER dfs_loop iteration (u_start' < u_start).
-          // We can't handle that here since we only have u_start <= u.
-          // Fix: add u_start <= u in precondition → remove since u might already be done.
-          // Actually, the simplest fix: if u is already non-White at u_start = u,
-          // then it was processed before. v must also be non-White (from that processing).
-          // Both d[v] and f[u] are preserved through dfs_loop. And d[v] <= f[u] was
-          // established during u's processing.
-          // But we don't have a way to reach back to u's original processing.
-          // Let me just add the stronger precondition: this lemma only handles
-          // u that is White at the start. For u already processed, the caller handles it.
-          // OR: change precondition to include
-          //   "if u is non-White in st, then d[v] <= f[u] already"
-          admit ()
-        )
-      ) else (
-        // u_start < u, recurse
-        dfs_loop_edge_dv_le_fu adj n (u_start + 1) st1 u v
-      )
+      Classical.forall_intro (Classical.move_requires aux);
+      dfs_loop_all_edges_inv adj n (u_start + 1) st1
     )
 #pop-options
+
+// Top-level: all_edges_inv holds for the final DFS state
+let dfs_all_edges_inv (adj: Seq.seq (Seq.seq int)) (n: nat)
+  : Lemma (ensures all_edges_inv (dfs adj n) adj n)
+  = init_has_correct_lengths n;
+    init_state_strong_valid n;
+    let init_pair (a b: nat) : Lemma (parenthesis_property (init_state n) a b) = () in
+    Classical.forall_intro_2 init_pair;
+    dfs_loop_all_edges_inv adj n 0 (init_state n)
 
 // Cycle detection theorem
 //
@@ -2051,19 +2104,45 @@ let topological_order (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : pr
 // Topological sort property
 //
 // (⟹) If DFS gives topological order (f[u] > f[v] for all edges u→v),
-// then there's no back edge. Proof: a back edge (u,v) with v an ancestor
-// means d[v] < d[u] and f[u] < f[v] (parenthesis theorem), but also
-// has_edge u v, so f[u] > f[v] from topo order — contradiction.
+// then there's no back edge: a back edge has f[u] <= f[v], contradiction.
 //
-// (⟸) If there's no back edge, every edge (u,v) is tree/forward/cross.
-// For tree/forward edges: d[u] < d[v] and f[v] < f[u], so f[u] > f[v]. ✓
-// For cross edges: d[v] < f[v] < d[u] < f[u], so f[u] > f[v]. ✓
-//
-// Both directions use the parenthesis theorem and edge classification.
-assume val topo_order_iff_no_back_edge
+// (⟸) If there's no back edge, for edge u→v:
+// - d[v] <= f[u] (from all_edges_inv)
+// - ~(d[v] <= d[u] /\ f[u] <= f[v]) (from ~has_back_edge)
+// - parenthesis theorem: intervals nested or disjoint
+// - only f[u] > f[v] is consistent with all constraints
+#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+let topo_order_iff_no_back_edge
   (adj: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma
     (ensures topological_order (dfs adj n) adj n)
+  = let st = dfs adj n in
+    dfs_parenthesis_property adj n;
+    dfs_all_edges_inv adj n;
+    init_has_correct_lengths n;
+    init_state_strong_valid n;
+    let init_pair (a b: nat) : Lemma (parenthesis_property (init_state n) a b) = () in
+    Classical.forall_intro_2 init_pair;
+    dfs_loop_inv adj n 0 (init_state n);
+    // All vertices are Black in the final state
+    let aux_black (w: nat) : Lemma (requires w < n) (ensures Seq.index st.color w = Black)
+      = dfs_all_black adj n w in
+    Classical.forall_intro (Classical.move_requires aux_black);
+    // Backward direction: no back edge → f[u] > f[v] for each edge
+    let no_back_edge_implies_topo (u v: nat) : Lemma
+      (requires u < n /\ v < n /\ has_edge n adj u v /\
+               u < Seq.length st.f /\ v < Seq.length st.f /\
+               ~(has_back_edge st adj n))
+      (ensures Seq.index st.f u > Seq.index st.f v)
+      = assert (Seq.index st.color u = Black);
+        assert (Seq.index st.color v = Black);
+        assert (Seq.index st.d v <= Seq.index st.f u);
+        ()
+    in
+    Classical.forall_intro (fun u ->
+      Classical.forall_intro (fun v ->
+        Classical.move_requires (no_back_edge_implies_topo u) v))
+#pop-options
 
 let topological_sort_property (adj: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma
