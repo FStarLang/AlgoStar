@@ -63,6 +63,38 @@ let adj_to_edges (adj: adj_matrix) (n: nat) : list edge =
 let adj_to_graph (adj: adj_matrix) (n: nat) : graph =
   {n = n; edges = adj_to_edges adj n}
 
+// All edges produced by adj_to_edges_row have valid endpoints
+let rec adj_to_edges_row_valid (adj: adj_matrix) (n: nat) (u: nat) (v: nat) (e: edge)
+  : Lemma (requires mem_edge e (adj_to_edges_row adj n u v))
+          (ensures e.u < n /\ e.v < n)
+          (decreases (n - v))
+  = if v >= n then ()
+    else if u < n && v < n && has_edge adj n u v && u < v then
+      if edge_eq e {u = u; v = v; w = edge_weight adj u v} then
+        edge_eq_endpoints e {u = u; v = v; w = edge_weight adj u v}
+      else adj_to_edges_row_valid adj n u (v + 1) e
+    else adj_to_edges_row_valid adj n u (v + 1) e
+
+// All edges produced by adj_to_edges_aux have valid endpoints
+let rec adj_to_edges_aux_valid (adj: adj_matrix) (n: nat) (u: nat) (e: edge)
+  : Lemma (requires mem_edge e (adj_to_edges_aux adj n u))
+          (ensures e.u < n /\ e.v < n)
+          (decreases (n - u))
+  = if u >= n then ()
+    else begin
+      let row = adj_to_edges_row adj n u 0 in
+      let rest = adj_to_edges_aux adj n (u + 1) in
+      mem_edge_append e row rest;
+      if mem_edge e row then adj_to_edges_row_valid adj n u 0 e
+      else adj_to_edges_aux_valid adj n (u + 1) e
+    end
+
+// All edges in adj_to_graph have valid endpoints
+let adj_to_graph_edges_valid (adj: adj_matrix) (n: nat) (e: edge)
+  : Lemma (requires mem_edge e (adj_to_graph adj n).edges)
+          (ensures e.u < n /\ e.v < n)
+  = adj_to_edges_aux_valid adj n 0 e
+
 (*** Prim's Algorithm State ***)
 
 // Vertices are partitioned into:
@@ -830,6 +862,10 @@ let lemma_prim_step_preserves_safety
     
     lemma_cut_respects_tree_edges tree_edges in_tree_set n;
     assert (respects tree_edges s);
+    
+    // All edges in adj_to_graph have valid endpoints
+    introduce forall (e': edge). mem_edge e' g.edges ==> e'.u < g.n /\ e'.v < g.n
+    with introduce _ ==> _ with _. adj_to_graph_edges_valid adj n e';
     
     // Apply cut property (CLRS Corollary 23.2)
     cut_property g tree_edges e s;

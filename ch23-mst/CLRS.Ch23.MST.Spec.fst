@@ -611,6 +611,731 @@ let lemma_exchange_preserves_mst
     with _h. ()
 #pop-options
 
+(*** Simple Path Extraction ***)
+
+// Given a simple path (all_edges_distinct) with e in it, return the suffix
+// after the first edge matching e. The suffix starts at one of e's endpoints.
+let rec suffix_after_eq (e: edge) (path: list edge) (start finish: nat)
+  : Ghost (nat & list edge)
+          (requires is_path_from_to path start finish /\
+                    mem_edge e path /\ all_edges_distinct path /\ Cons? path)
+          (ensures fun (mid, rest) ->
+                    is_path_from_to rest mid finish /\
+                    ~(mem_edge e rest) /\
+                    (mid = e.u \/ mid = e.v) /\
+                    all_edges_distinct rest /\
+                    length rest < length path /\
+                    (forall x. mem_edge x rest ==> mem_edge x path))
+          (decreases path)
+  = let hd :: tl = path in
+    let next = if hd.u = start then hd.v else hd.u in
+    all_edges_distinct_tail hd tl;
+    if edge_eq e hd then begin
+      edge_eq_endpoints e hd;
+      mem_edge_eq_neg e hd tl;
+      (next, tl)
+    end else begin
+      edge_eq_symmetric e hd;
+      let (mid, rest) = suffix_after_eq e tl next finish in
+      (mid, rest)
+    end
+
+// Extract a simple subpath from any path (removing loops)
+let rec simplify_path (path: list edge) (a b: nat)
+  : Ghost (list edge)
+          (requires is_path_from_to path a b /\ a <> b /\ Cons? path)
+          (ensures fun path' ->
+                    is_path_from_to path' a b /\
+                    all_edges_distinct path' /\
+                    Cons? path' /\
+                    length path' <= length path /\
+                    (forall e. mem_edge e path' ==> mem_edge e path))
+          (decreases length path)
+  = let e :: tl = path in
+    let next = if e.u = a then e.v else e.u in
+    if next = b then [e]  // Direct edge from a to b
+    else begin
+      // Tail is non-empty (otherwise next = b)
+      assert (is_path_from_to tl next b);
+      assert (next <> b);
+      // Simplify the tail first
+      let tl_simple = simplify_path tl next b in
+      if not (mem_edge e tl_simple) then
+        // e doesn't appear in simplified tail -> prepend e
+        e :: tl_simple
+      else begin
+        // e appears in simplified tail -> find it and handle
+        let (mid, suffix) = suffix_after_eq e tl_simple next b in
+        // mid = e.u or e.v, suffix goes from mid to b
+        // all_edges_distinct suffix, and e not in suffix
+        if mid = a then begin
+          // suffix goes from a to b. It's shorter. Recurse.
+          assert (length suffix < length tl_simple);
+          assert (length tl_simple <= length tl);
+          assert (length tl < length path);
+          if Nil? suffix then
+            // a = b, contradiction
+            [e]  // dummy, unreachable
+          else
+            simplify_path suffix a b
+        end else begin
+          // mid = next (the other endpoint of e)
+          // e :: suffix is a simple path from a to b
+          e :: suffix
+        end
+      end
+    end
+
+// Lemma wrapper: reachable implies simple path exists
+let reachable_simple (es: list edge) (a b: nat)
+  : Lemma (requires reachable es a b /\ a <> b)
+          (ensures exists (path: list edge).
+                    subset_edges path es /\ is_path_from_to path a b /\
+                    all_edges_distinct path /\ Cons? path)
+  = // From reachable, extract any path
+    FStar.Classical.exists_elim
+      (exists (path: list edge). subset_edges path es /\ is_path_from_to path a b /\
+                                  all_edges_distinct path /\ Cons? path)
+      #(list edge)
+      #(fun path -> subset_edges path es /\ is_path_from_to path a b)
+      ()
+      (fun (path: list edge{subset_edges path es /\ is_path_from_to path a b}) ->
+        if Nil? path then () // a = b, contradiction with a <> b
+        else begin
+          let path' = simplify_path path a b in
+          // path' edges are all in path, which is in es
+          let aux (e: edge)
+            : Lemma (requires mem_edge e path')
+                    (ensures mem_edge e es) =
+            mem_edge_subset e path es
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+          subset_from_mem path' es;
+          introduce exists (p: list edge).
+            subset_edges p es /\ is_path_from_to p a b /\
+            all_edges_distinct p /\ Cons? p
+          with path' and ()
+        end
+      )
+
+(*** Tree Theorem: connected graph has >= n-1 edges ***)
+
+// Decidable reachability via strong excluded middle
+let reachable_dec (es: list edge) (u v: nat) : GTot bool =
+  FStar.StrongExcludedMiddle.strong_excluded_middle (reachable es u v)
+
+// Ghost filter: like List.Tot.filter but with a GTot predicate
+let rec ghost_filter (f: edge -> GTot bool) (es: list edge) : GTot (list edge) (decreases es) =
+  match es with
+  | [] -> []
+  | hd :: tl -> if f hd then hd :: ghost_filter f tl else ghost_filter f tl
+
+// Ghost filter doesn't increase length
+let rec ghost_filter_length (f: edge -> GTot bool) (es: list edge)
+  : Lemma (ensures length (ghost_filter f es) <= length es) (decreases es) =
+  match es with | [] -> () | _ :: tl -> ghost_filter_length f tl
+
+// Membership through ghost filter when predicate respects edge_eq
+let rec mem_edge_ghost_filter (e: edge) (f: edge -> GTot bool) (es: list edge)
+  : Lemma (requires mem_edge e es /\ f e /\
+                    (forall (e1 e2: edge). edge_eq e1 e2 ==> f e1 = f e2))
+          (ensures mem_edge e (ghost_filter f es)) (decreases es)
+  = match es with
+    | hd :: tl -> if edge_eq e hd then () else mem_edge_ghost_filter e f tl
+
+// Disjoint filters have sum of lengths <= original
+let rec ghost_disjoint_filter_sum (f1 f2: edge -> GTot bool) (es: list edge)
+  : Lemma (requires forall (e: edge). ~(f1 e /\ f2 e))
+          (ensures length (ghost_filter f1 es) + length (ghost_filter f2 es) <= length es)
+          (decreases es)
+  = match es with | [] -> () | _ :: tl -> ghost_disjoint_filter_sum f1 f2 tl
+
+// Redundant edge: both endpoints already reachable from root via tl,
+// so adding e doesn't change reachability
+let reachable_redundant (tl: list edge) (e: edge) (root w: nat)
+  : Lemma (requires reachable tl root e.u /\ reachable tl root e.v /\
+                    reachable (e :: tl) root w)
+          (ensures reachable tl root w)
+  = if root = w then begin
+      assert (is_path_from_to ([] #edge) root root);
+      assert (subset_edges ([] #edge) tl)
+    end
+    else begin
+      reachable_simple (e :: tl) root w;
+      FStar.Classical.exists_elim (reachable tl root w)
+        #(list edge)
+        #(fun path -> subset_edges path (e :: tl) /\ is_path_from_to path root w /\
+                       all_edges_distinct path /\ Cons? path) ()
+        (fun (p: list edge{subset_edges p (e :: tl) /\ is_path_from_to p root w /\
+                            all_edges_distinct p /\ Cons? p}) ->
+          if not (mem_edge e p) then
+            path_not_using_e_in_t p e tl
+          else begin
+            split_at_first_e p e tl root w;
+            FStar.Classical.or_elim
+              #(reachable tl root e.u /\ reachable tl e.v w)
+              #(reachable tl root e.v /\ reachable tl e.u w)
+              #(fun _ -> reachable tl root w)
+              (fun _ -> reachable_transitive tl root e.v w)
+              (fun _ -> reachable_transitive tl root e.u w)
+          end)
+    end
+
+// Neither endpoint reachable: adding e doesn't help reach from root
+let reachable_neither (tl: list edge) (e: edge) (root w: nat)
+  : Lemma (requires ~(reachable tl root e.u) /\ ~(reachable tl root e.v) /\
+                    reachable (e :: tl) root w)
+          (ensures reachable tl root w)
+  = if root = w then begin
+      assert (is_path_from_to ([] #edge) root root);
+      assert (subset_edges ([] #edge) tl)
+    end
+    else begin
+      reachable_simple (e :: tl) root w;
+      FStar.Classical.exists_elim (reachable tl root w)
+        #(list edge)
+        #(fun path -> subset_edges path (e :: tl) /\ is_path_from_to path root w /\
+                       all_edges_distinct path /\ Cons? path) ()
+        (fun (p: list edge{subset_edges p (e :: tl) /\ is_path_from_to p root w /\
+                            all_edges_distinct p /\ Cons? p}) ->
+          if not (mem_edge e p) then
+            path_not_using_e_in_t p e tl
+          else begin
+            split_at_first_e p e tl root w
+            // Both disjuncts give reachable tl root e.u or reachable tl root e.v,
+            // contradicting hypothesis. SMT derives False => anything.
+          end)
+    end
+
+// Bridge: one endpoint reachable, the other not. Decomposition result.
+let reachable_bridge (tl: list edge) (e: edge) (root w r nr: nat)
+  : Lemma (requires (r = e.u /\ nr = e.v \/ r = e.v /\ nr = e.u) /\
+                    reachable tl root r /\ ~(reachable tl root nr) /\
+                    reachable (e :: tl) root w)
+          (ensures reachable tl root w \/ reachable tl nr w)
+  = if root = w then begin
+      assert (is_path_from_to ([] #edge) root root);
+      assert (subset_edges ([] #edge) tl)
+    end
+    else begin
+      reachable_simple (e :: tl) root w;
+      FStar.Classical.exists_elim (reachable tl root w \/ reachable tl nr w)
+        #(list edge)
+        #(fun path -> subset_edges path (e :: tl) /\ is_path_from_to path root w /\
+                       all_edges_distinct path /\ Cons? path) ()
+        (fun (p: list edge{subset_edges p (e :: tl) /\ is_path_from_to p root w /\
+                            all_edges_distinct p /\ Cons? p}) ->
+          if not (mem_edge e p) then
+            path_not_using_e_in_t p e tl
+          else begin
+            split_at_first_e p e tl root w;
+            FStar.Classical.or_elim
+              #(reachable tl root e.u /\ reachable tl e.v w)
+              #(reachable tl root e.v /\ reachable tl e.u w)
+              #(fun _ -> reachable tl root w \/ reachable tl nr w)
+              (fun _ -> if r = e.u then () // nr=e.v, have reachable tl e.v w = reachable tl nr w
+                       else ()) // r=e.v, nr=e.u, reachable tl root e.u contradicts ~(reachable tl root nr)
+              (fun _ -> if r = e.v then () // nr=e.u, have reachable tl e.u w = reachable tl nr w
+                       else ()) // r=e.u, nr=e.v, reachable tl root e.v contradicts ~(reachable tl root nr)
+          end)
+    end
+
+// Count vertices < m (bounded by n) reachable from root via es
+let rec count_reachable (es: list edge) (root: nat) (n m: nat) : GTot nat (decreases m) =
+  if m = 0 then 0
+  else count_reachable es root n (m - 1) +
+       (if (m - 1) < n && reachable_dec es root (m - 1) then 1 else 0)
+
+// Monotonicity: if reachable in es implies reachable in es', count transfers
+let rec count_reachable_mono (es es': list edge) (root root': nat) (n m: nat)
+  : Lemma (requires forall (v: nat). v < n ==> reachable es root v ==> reachable es' root' v)
+          (ensures count_reachable es root n m <= count_reachable es' root' n m) (decreases m)
+  = if m = 0 then () else count_reachable_mono es es' root root' n (m - 1)
+
+// Disjoint cover: if reachable in es implies reachable in tl from root1 or root2 (disjoint)
+let rec count_reachable_disjoint_cover
+    (es tl: list edge) (root root1 root2: nat) (n m: nat)
+  : Lemma (requires (forall (v: nat). v < n ==> reachable es root v ==>
+                      reachable tl root1 v \/ reachable tl root2 v) /\
+                    (forall (v: nat). v < n ==> ~(reachable tl root1 v /\ reachable tl root2 v)))
+          (ensures count_reachable es root n m <=
+                   count_reachable tl root1 n m + count_reachable tl root2 n m) (decreases m)
+  = if m = 0 then () else count_reachable_disjoint_cover es tl root root1 root2 n (m - 1)
+
+// At-most-one: if reachable implies specific vertex, count <= 1
+let rec count_reachable_at_most_one (es: list edge) (root: nat) (n m w: nat)
+  : Lemma (requires forall (v: nat). v < n ==> reachable es root v ==> v = w)
+          (ensures count_reachable es root n m <= 1) (decreases m)
+  = if m = 0 then ()
+    else begin
+      count_reachable_at_most_one es root n (m - 1) w;
+      if (m - 1) < n && reachable_dec es root (m - 1) then begin
+        assert (m - 1 = w);
+        // All v < m-1 with reachable must equal w = m-1, but v < m-1, contradiction
+        // So count for m-1 is 0
+        let rec zero_below (k: nat)
+          : Lemma (requires forall (v: nat). v < n ==> reachable es root v ==> v = m - 1)
+                  (ensures count_reachable es root n k = 0 \/ k > m - 1) (decreases k)
+          = if k = 0 then ()
+            else begin
+              zero_below (k - 1);
+              if (k - 1) < n && reachable_dec es root (k - 1) then
+                assert (k - 1 = m - 1)
+            end
+        in
+        zero_below (m - 1)
+      end
+    end
+
+// Path edges have endpoints reachable from start
+let rec path_endpoints_reachable (es path: list edge) (root a b: nat)
+  : Lemma (requires subset_edges path es /\ is_path_from_to path a b /\ reachable es root a)
+          (ensures forall (e': edge). mem_edge e' path ==>
+                    reachable es root e'.u /\ reachable es root e'.v)
+          (decreases path)
+  = match path with
+    | [] -> ()
+    | hd :: tl ->
+      let next = if hd.u = a then hd.v else hd.u in
+      assert (is_path_from_to [hd] a next);
+      assert (subset_edges [hd] es);
+      reachable_transitive es root a next;
+      path_endpoints_reachable es tl root next b
+
+// Reachable in full list => reachable via component-filtered list
+#push-options "--z3rlimit 30"
+let reachable_in_component (es: list edge) (root v: nat)
+  : Lemma (requires reachable es root v)
+          (ensures (let f = fun (e: edge) -> reachable_dec es root e.u && reachable_dec es root e.v in
+                    reachable (ghost_filter f es) root v))
+  = let f = fun (e: edge) -> reachable_dec es root e.u && reachable_dec es root e.v in
+    FStar.Classical.exists_elim
+      (reachable (ghost_filter f es) root v)
+      #(list edge) #(fun path -> subset_edges path es /\ is_path_from_to path root v) ()
+      (fun (path: list edge{subset_edges path es /\ is_path_from_to path root v}) ->
+        assert (is_path_from_to ([] #edge) root root);
+        assert (subset_edges ([] #edge) es);
+        assert (reachable es root root);
+        path_endpoints_reachable es path root root v;
+        let rec path_in_filter (p: list edge)
+          : Lemma (requires subset_edges p es /\
+                            (forall (e': edge). mem_edge e' p ==>
+                              reachable es root e'.u /\ reachable es root e'.v))
+                  (ensures subset_edges p (ghost_filter f es)) (decreases p)
+          = match p with
+            | [] -> ()
+            | hd :: tl_p ->
+              assert (reachable es root hd.u /\ reachable es root hd.v);
+              assert (f hd);
+              introduce forall (e1 e2: edge). edge_eq e1 e2 ==> f e1 = f e2
+              with introduce _ ==> _ with _. edge_eq_endpoints e1 e2;
+              mem_edge_ghost_filter hd f es;
+              path_in_filter tl_p
+        in
+        path_in_filter path)
+#pop-options
+
+
+// Reachable with empty edges: only self-reachable
+let reachable_empty (root v: nat)
+  : Lemma (requires reachable ([] #edge) root v) (ensures root = v)
+  = FStar.Classical.exists_elim (root = v)
+      #(list edge) #(fun path -> subset_edges path ([] #edge) /\ is_path_from_to path root v) ()
+      (fun (p: list edge{subset_edges p ([] #edge) /\ is_path_from_to p root v}) ->
+        match p with | [] -> () | _ :: _ -> ())
+
+// Main counting bound: number of reachable vertices <= 1 + number of edges
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
+  : Lemma (ensures count_reachable es root n n <= 1 + length es)
+          (decreases length es)
+  = match es with
+    | [] ->
+      // Only root is reachable from itself with no edges
+      introduce forall (v: nat). v < n ==> reachable ([] #edge) root v ==> v = root
+      with introduce _ ==> _ with _. begin
+        introduce _ ==> _ with _. reachable_empty root v
+      end;
+      count_reachable_at_most_one ([] #edge) root n n root
+
+    | e :: tl ->
+      count_reachable_bound tl root n;
+      if reachable_dec tl root e.u && reachable_dec tl root e.v then begin
+        // Redundant edge: reachability unchanged, count doesn't increase
+        introduce forall (v: nat). v < n ==> reachable es root v ==> reachable tl root v
+        with introduce _ ==> _ with _. begin
+          introduce _ ==> _ with _. reachable_redundant tl e root v
+        end;
+        count_reachable_mono es tl root root n n
+
+      end else if not (reachable_dec tl root e.u) && not (reachable_dec tl root e.v) then begin
+        // Neither endpoint reachable: count doesn't increase
+        introduce forall (v: nat). v < n ==> reachable es root v ==> reachable tl root v
+        with introduce _ ==> _ with _. begin
+          introduce _ ==> _ with _. reachable_neither tl e root v
+        end;
+        count_reachable_mono es tl root root n n
+
+      end else begin
+        // Bridge case: one endpoint reachable, the other not
+        let r  = if reachable_dec tl root e.u then e.u else e.v in
+        let nr = if reachable_dec tl root e.u then e.v else e.u in
+
+        // Component filters
+        let fc_r  = fun (ed: edge) -> reachable_dec tl root ed.u && reachable_dec tl root ed.v in
+        let fc_nr = fun (ed: edge) -> reachable_dec tl nr   ed.u && reachable_dec tl nr   ed.v in
+        let es_r  = ghost_filter fc_r  tl in
+        let es_nr = ghost_filter fc_nr tl in
+
+        // IH on component edge lists
+        ghost_filter_length fc_r  tl;
+        ghost_filter_length fc_nr tl;
+        count_reachable_bound es_r  root n;
+        count_reachable_bound es_nr nr   n;
+
+        // Component filters are disjoint
+        introduce forall (ed: edge). ~(fc_r ed /\ fc_nr ed)
+        with begin
+          if fc_r ed && fc_nr ed then begin
+            reachable_symmetric tl nr ed.u;
+            reachable_transitive tl root ed.u nr
+          end
+        end;
+        ghost_disjoint_filter_sum fc_r fc_nr tl;
+
+        // count(tl, root) <= count(es_r, root) (from reachable_in_component)
+        introduce forall (v: nat). v < n ==> reachable tl root v ==> reachable es_r root v
+        with introduce _ ==> _ with _. begin
+          introduce _ ==> _ with _. reachable_in_component tl root v
+        end;
+        count_reachable_mono tl es_r root root n n;
+
+        // count(tl, nr) <= count(es_nr, nr) (from reachable_in_component)
+        introduce forall (v: nat). v < n ==> reachable tl nr v ==> reachable es_nr nr v
+        with introduce _ ==> _ with _. begin
+          introduce _ ==> _ with _. reachable_in_component tl nr v
+        end;
+        count_reachable_mono tl es_nr nr nr n n;
+
+        // Bridge decomposition: reachable es root v ==> reachable tl root v \/ reachable tl nr v
+        introduce forall (v: nat). v < n ==> reachable es root v ==>
+          reachable tl root v \/ reachable tl nr v
+        with introduce _ ==> _ with _. begin
+          introduce _ ==> _ with _. begin
+            if reachable_dec tl root e.u then
+              reachable_bridge tl e root v e.u e.v
+            else
+              reachable_bridge tl e root v e.v e.u
+          end
+        end;
+
+        // Disjointness
+        introduce forall (v: nat). v < n ==> ~(reachable tl root v /\ reachable tl nr v)
+        with begin
+          if v < n && reachable_dec tl root v && reachable_dec tl nr v then begin
+            reachable_symmetric tl nr v;
+            reachable_transitive tl root v nr
+          end
+        end;
+
+        count_reachable_disjoint_cover es tl root root nr n n
+      end
+#pop-options
+
+// Connected graph has >= n-1 edges
+let connected_min_edges (n: nat) (es: list edge)
+  : Lemma (requires n > 0 /\ all_connected n es)
+          (ensures length es >= n - 1)
+  = introduce forall (v: nat). v < n ==> reachable es 0 v
+    with introduce _ ==> _ with _. begin
+      assert (reachable es 0 v)
+    end;
+    let rec count_all (m: nat)
+      : Lemma (requires forall (v: nat). v < n ==> reachable es 0 v)
+              (ensures count_reachable es 0 n m = min m n) (decreases m)
+      = if m = 0 then ()
+        else begin
+          count_all (m - 1)
+        end
+    in
+    count_all n;
+    count_reachable_bound es 0 n
+
+(*** Helpers for Exchange Lemma Proof ***)
+
+// Filtering preserves subset of a superset
+let rec subset_edges_filter (t g_edges: list edge) (f: edge -> bool)
+  : Lemma (requires subset_edges t g_edges)
+          (ensures subset_edges (filter f t) g_edges)
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      subset_edges_filter tl g_edges f
+
+// Acyclicity is anti-monotone: fewer edges → still acyclic
+let acyclic_subset (n: nat) (es es': list edge)
+  : Lemma (requires acyclic n es /\ (forall (e:edge). mem_edge e es' ==> mem_edge e es))
+          (ensures acyclic n es')
+  = introduce forall (v: nat) (cycle: list edge).
+      v < n /\ subset_edges cycle es' /\ Cons? cycle /\ all_edges_distinct cycle ==>
+      ~(is_path_from_to cycle v v)
+    with introduce _ ==> _
+    with _. (
+      let aux (e: edge)
+        : Lemma (requires mem_edge e cycle)
+                (ensures mem_edge e es) =
+        mem_edge_subset e cycle es';
+        assert (mem_edge e es)
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+      subset_from_mem cycle es
+    )
+
+// If x is in filter f t, then x is in t
+let rec mem_edge_filter_implies_mem (x: edge) (t: list edge) (f: edge -> bool)
+  : Lemma (requires mem_edge x (filter f t))
+          (ensures mem_edge x t)
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      if f hd then begin
+        if edge_eq x hd then ()
+        else mem_edge_filter_implies_mem x tl f
+      end else
+        mem_edge_filter_implies_mem x tl f
+
+// Filtered tree is acyclic (since it's a subset of acyclic t)
+let acyclic_filter (n: nat) (t: list edge) (e_rem: edge)
+  : Lemma (requires acyclic n t)
+          (ensures acyclic n (filter (fun e -> not (edge_eq e e_rem)) t))
+  = let ft = filter (fun e -> not (edge_eq e e_rem)) t in
+    let aux (e: edge)
+      : Lemma (requires mem_edge e ft)
+              (ensures mem_edge e t)
+      = mem_edge_filter_implies_mem e t (fun e -> not (edge_eq e e_rem))
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+    acyclic_subset n t ft
+
+// Forward: mem_edge in t implies mem_edge in e_rem :: filtered_t
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec mem_edge_t_to_erem_ft (x e_rem: edge) (t: list edge)
+  : Lemma (requires mem_edge x t)
+          (ensures mem_edge x (e_rem :: filter (fun e -> not (edge_eq e e_rem)) t))
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq x hd then begin
+        if edge_eq hd e_rem then
+          edge_eq_transitive x hd e_rem
+        else ()
+      end else begin
+        mem_edge_t_to_erem_ft x e_rem tl;
+        // IH: mem_edge x (e_rem :: filter tl)
+        // Need: mem_edge x (e_rem :: filter (hd :: tl))
+        if edge_eq hd e_rem then ()  // filter(hd::tl) = filter(tl)
+        else ()  // filter(hd::tl) = hd :: filter(tl), so superset
+      end
+#pop-options
+
+// Reachable in t implies reachable in e_rem :: filtered_t
+#push-options "--z3rlimit 30"
+let reachable_t_iff_erem_ft (t: list edge) (e_rem: edge) (u v: nat)
+  : Lemma (requires reachable t u v)
+          (ensures reachable (e_rem :: filter (fun e -> not (edge_eq e e_rem)) t) u v)
+  = let ft = filter (fun e -> not (edge_eq e e_rem)) t in
+    let t2 = e_rem :: ft in
+    // reachable is an existential over paths
+    // We prove: if subset_edges path t, then subset_edges path t2
+    // which transfers the witness directly
+    let aux (path: list edge)
+      : Lemma (requires subset_edges path t /\ is_path_from_to path u v)
+              (ensures reachable t2 u v) =
+      let aux2 (e: edge)
+        : Lemma (requires mem_edge e path) (ensures mem_edge e t2) =
+        mem_edge_subset e path t;
+        mem_edge_t_to_erem_ft e e_rem t
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux2);
+      subset_from_mem path t2;
+      assert (subset_edges path t2);
+      assert (is_path_from_to path u v);
+      introduce exists (p: list edge). subset_edges p t2 /\ is_path_from_to p u v
+      with path and ()
+    in
+    // Now discharge the existential in the precondition
+    FStar.Classical.exists_elim
+      (reachable t2 u v)
+      #(list edge)
+      #(fun path -> subset_edges path t /\ is_path_from_to path u v)
+      ()
+      (fun path -> aux path)
+#pop-options
+
+// Reachable in e_rem :: ft implies reachable in e_add :: ft
+// (by rerouting through e_add when the path uses e_rem)
+// Key insight: if path doesn't use e_rem, it's in ft ⊆ e_add :: ft.
+// If path uses e_rem, split it and reroute via e_add.
+// This requires knowing that e_add connects the same components as e_rem.
+
+// Helper: e_add not in filtered_t (since e_add not in t and ft ⊆ t)
+let mem_edge_e_add_not_in_ft (e_add e_rem: edge) (t: list edge)
+  : Lemma (requires ~(mem_edge e_add t))
+          (ensures ~(mem_edge e_add (filter (fun e -> not (edge_eq e e_rem)) t)))
+  = if mem_edge e_add (filter (fun e -> not (edge_eq e e_rem)) t) then
+      mem_edge_filter_implies_mem e_add t (fun e -> not (edge_eq e e_rem))
+
+// Helper: e_rem not in filtered_t (by construction of filter)
+let rec mem_edge_e_rem_not_in_ft_aux (e_rem: edge) (t: list edge)
+  : Lemma (ensures ~(mem_edge e_rem (filter (fun e -> not (edge_eq e e_rem)) t)))
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      mem_edge_e_rem_not_in_ft_aux e_rem tl;
+      if not (edge_eq hd e_rem) then begin
+        // hd is kept in filter. Need to show e_rem is not edge_eq to hd.
+        edge_eq_symmetric e_rem hd;
+        if edge_eq e_rem hd then
+          edge_eq_symmetric hd e_rem  // derives edge_eq hd e_rem, contradiction
+        else ()
+      end
+
+let mem_edge_e_rem_not_in_ft (e_rem: edge) (t: list edge)
+  : Lemma (ensures ~(mem_edge e_rem (filter (fun e -> not (edge_eq e e_rem)) t)))
+  = mem_edge_e_rem_not_in_ft_aux e_rem t
+
+// Converse of acyclic_when_unreachable: if acyclic (e :: t) and acyclic t and
+// e.u ≠ e.v and e not in t, then not reachable t e.u e.v
+
+// Helper: if edge_eq a b and mem_edge b l, then mem_edge a l
+let rec mem_edge_eq_transfer (a b: edge) (l: list edge)
+  : Lemma (requires edge_eq a b /\ mem_edge b l)
+          (ensures mem_edge a l)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq b hd then
+        (edge_eq_transitive a b hd; assert (edge_eq a hd))
+      else
+        mem_edge_eq_transfer a b tl
+
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec all_edges_distinct_rev_acc (l acc: list edge)
+  : Lemma (requires all_edges_distinct l /\ all_edges_distinct acc /\
+                    (forall e. mem_edge e l ==> ~(mem_edge e acc)) /\
+                    (forall e. mem_edge e acc ==> ~(mem_edge e l)))
+          (ensures all_edges_distinct (rev_acc l acc))
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      assert (~(mem_edge hd acc));
+      assert (all_edges_distinct (hd :: acc));
+      // Prove disjointness between tl and (hd :: acc)
+      let aux1 (e: edge) : Lemma (requires mem_edge e tl) (ensures ~(mem_edge e (hd :: acc))) =
+        if mem_edge e (hd :: acc) then begin
+          if edge_eq e hd then begin
+            edge_eq_symmetric e hd;
+            mem_edge_eq_transfer hd e tl;
+            assert (mem_edge hd tl);
+            assert false
+          end else begin
+            assert (mem_edge e acc);
+            assert (mem_edge e l);
+            assert false
+          end
+        end
+      in
+      let aux2 (e: edge) : Lemma (requires mem_edge e (hd :: acc)) (ensures ~(mem_edge e tl)) =
+        if mem_edge e tl then begin
+          if edge_eq e hd then begin
+            edge_eq_symmetric e hd;
+            mem_edge_eq_transfer hd e tl;
+            assert (mem_edge hd tl);
+            assert false
+          end else begin
+            assert (mem_edge e acc);
+            assert (mem_edge e l);
+            assert false
+          end
+        end
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux1);
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux2);
+      all_edges_distinct_rev_acc tl (hd :: acc)
+#pop-options
+
+let all_edges_distinct_rev (l: list edge)
+  : Lemma (requires all_edges_distinct l)
+          (ensures all_edges_distinct (rev l))
+  = all_edges_distinct_rev_acc l []
+
+// Helper: if e not in any edge of path (via mem_edge), and path ⊂ t, and e not in t,
+// then e not in rev path
+let mem_edge_not_in_subset (e: edge) (p t: list edge)
+  : Lemma (requires ~(mem_edge e t) /\ subset_edges p t)
+          (ensures ~(mem_edge e p))
+  = let rec aux (p': list edge)
+      : Lemma (requires ~(mem_edge e t) /\ subset_edges p' t)
+              (ensures ~(mem_edge e p'))
+              (decreases p') =
+      match p' with
+      | [] -> ()
+      | hd :: tl ->
+        if edge_eq e hd then begin
+          // mem_edge hd t is true (from subset_edges p' t)
+          mem_edge_subset hd p' t;
+          // edge_eq e hd and mem_edge hd t => mem_edge e t (by transfer)
+          mem_edge_eq_transfer e hd t;
+          assert (mem_edge e t);  // contradicts ~(mem_edge e t)
+          assert false
+        end else
+          aux tl
+    in
+    aux p
+
+let acyclic_implies_unreachable (n: nat) (t: list edge) (e: edge)
+  : Lemma (requires acyclic n (e :: t) /\ acyclic n t /\
+                    e.u < n /\ e.v < n /\ e.u <> e.v /\
+                    ~(mem_edge e t))
+          (ensures ~(reachable t e.u e.v))
+  = if FStar.StrongExcludedMiddle.strong_excluded_middle (reachable t e.u e.v) then begin
+      // Extract simple path from e.u to e.v in t
+      reachable_simple t e.u e.v;
+      // Now exists simple path P. Form cycle e :: rev(P).
+      FStar.Classical.exists_elim
+        (False)
+        #(list edge)
+        #(fun path -> subset_edges path t /\ is_path_from_to path e.u e.v /\
+                       all_edges_distinct path /\ Cons? path)
+        ()
+        (fun (p: list edge{subset_edges p t /\ is_path_from_to p e.u e.v /\
+                            all_edges_distinct p /\ Cons? p}) ->
+          let rp = rev p in
+          path_reverse p e.u e.v;
+          subset_edges_rev p t;
+          subset_edges_cons rp e t;
+          // e not in p (since e not in t and p ⊂ t)
+          mem_edge_not_in_subset e p t;
+          // e not in rev p (since mem_edge preserved by rev)
+          mem_edge_rev e p;
+          assert (~(mem_edge e rp));
+          // all_edges_distinct (rev p)
+          all_edges_distinct_rev p;
+          // Therefore all_edges_distinct (e :: rev p)
+          assert (all_edges_distinct (e :: rp));
+          assert (subset_edges (e :: rp) (e :: t));
+          assert (is_path_from_to (e :: rp) e.u e.u);
+          assert (Cons? (e :: rp))
+          // The cycle (e :: rp) at vertex e.u < n contradicts acyclic n (e :: t)
+        )
+    end
+
 (*** Helpers for Cut Property Proof ***)
 
 // Filtering preserves membership for non-matching edges
@@ -644,11 +1369,86 @@ let rec subset_edges_exchange (a: list edge) (e_add e_rem: edge) (t: list edge) 
       end;
       subset_edges_exchange tl e_add e_rem t s
 
+// Reachable superset: if reachable in sub and sub ⊆ sup (via mem_edge), then reachable in sup
+let reachable_superset (sub sup: list edge) (u v: nat)
+  : Lemma (requires reachable sub u v /\ (forall e. mem_edge e sub ==> mem_edge e sup))
+          (ensures reachable sup u v)
+  = FStar.Classical.exists_elim
+      (reachable sup u v)
+      #(list edge)
+      #(fun path -> subset_edges path sub /\ is_path_from_to path u v)
+      ()
+      (fun (p: list edge{subset_edges p sub /\ is_path_from_to p u v}) ->
+        let rec transfer (p': list edge)
+          : Lemma (requires subset_edges p' sub)
+                  (ensures subset_edges p' sup)
+                  (decreases p') =
+          match p' with
+          | [] -> ()
+          | hd :: tl ->
+            mem_edge_subset hd p' sub;
+            assert (mem_edge hd sub);
+            assert (mem_edge hd sup);
+            transfer tl
+        in
+        transfer p;
+        assert (subset_edges p sup);
+        introduce exists (q: list edge). subset_edges q sup /\ is_path_from_to q u v
+        with p and ()
+      )
+
+// Connectivity transfer: if path in (e_rem :: ft) and e_rem.u↔e_rem.v reachable in (e_add :: ft),
+// then start↔finish reachable in (e_add :: ft)
+let rec reach_transfer
+    (p: list edge) (e_add e_rem: edge) (ft: list edge) (start finish: nat)
+  : Lemma (requires is_path_from_to p start finish /\
+                    subset_edges p (e_rem :: ft) /\
+                    reachable (e_add :: ft) e_rem.u e_rem.v /\
+                    reachable (e_add :: ft) e_rem.v e_rem.u)
+          (ensures reachable (e_add :: ft) start finish)
+          (decreases p)
+  = match p with
+    | [] -> ()
+    | hd :: tl ->
+      let next = if hd.u = start then hd.v else hd.u in
+      // Recurse on tail
+      reach_transfer tl e_add e_rem ft next finish;
+      // Now: reachable (e_add :: ft) next finish
+      // Need: reachable (e_add :: ft) start next (via hd)
+      if edge_eq hd e_rem then begin
+        // hd connects the same pair as e_rem
+        edge_eq_endpoints hd e_rem;
+        // {hd.u, hd.v} = {e_rem.u, e_rem.v}, start = hd.u or hd.v, next = the other
+        // So reachable (e_add :: ft) start next follows from reachable e_rem.u e_rem.v or v.v. 
+        assert (reachable (e_add :: ft) start next);
+        reachable_transitive (e_add :: ft) start next finish
+      end else begin
+        // hd is in ft (not edge_eq to e_rem)
+        assert (mem_edge hd ft);
+        assert (mem_edge hd (e_add :: ft));
+        // Single edge path: reachable (e_add :: ft) start next
+        assert (is_path_from_to [hd] start next);
+        assert (subset_edges [hd] (e_add :: ft));
+        reachable_transitive (e_add :: ft) start next finish
+      end
+
+// subset of path in t is also in (e_rem :: ft), needed for split_at_first_e
+let rec subset_edges_t_to_erem_ft (p: list edge) (e_rem: edge) (t: list edge)
+  : Lemma (requires subset_edges p t)
+          (ensures subset_edges p (e_rem :: filter (fun e -> not (edge_eq e e_rem)) t))
+          (decreases p)
+  = match p with
+    | [] -> ()
+    | hd :: tl ->
+      mem_edge_t_to_erem_ft hd e_rem t;
+      subset_edges_t_to_erem_ft tl e_rem t
+
 // Exchange preserves spanning tree (well-known graph theory fact):
 // In a spanning tree T, if e_add connects two vertices joined by a path through e_rem,
 // then T - {e_rem} + {e_add} is still a spanning tree.
 // Proof requires: (1) e_rem removal splits T into two components,
 // (2) e_add reconnects them (since it's on the path), (3) acyclicity is restored.
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
 let exchange_is_spanning_tree
     (g: graph) (t: list edge) (e_add e_rem: edge) (path: list edge)
   : Lemma (requires is_spanning_tree g t /\
@@ -656,11 +1456,200 @@ let exchange_is_spanning_tree
                     mem_edge e_rem t /\
                     ~(mem_edge e_add t) /\
                     e_add.u < g.n /\ e_add.v < g.n /\ e_add.u <> e_add.v /\
+                    e_rem.u < g.n /\ e_rem.v < g.n /\ e_rem.u <> e_rem.v /\
                     subset_edges path t /\
                     is_path_from_to path e_add.u e_add.v /\
-                    mem_edge e_rem path)
+                    mem_edge e_rem path /\
+                    all_edges_distinct path)
           (ensures is_spanning_tree g (e_add :: filter (fun e -> not (edge_eq e e_rem)) t))
-  = admit()  // Standard graph theory: exchange in spanning tree
+  =
+    let ft = filter (fun e -> not (edge_eq e e_rem)) t in
+    let t' = e_add :: ft in
+
+    // === Property 1: g.n > 0 ===
+    assert (g.n > 0);
+
+    // === Property 2: subset_edges t' g.edges ===
+    subset_edges_filter t g.edges (fun e -> not (edge_eq e e_rem));
+    assert (mem_edge e_add g.edges);
+    assert (subset_edges ft g.edges);
+    assert (subset_edges t' g.edges);
+
+    // === Key structural facts ===
+    // ft is acyclic (subset of t)
+    acyclic_filter g.n t e_rem;
+    assert (acyclic g.n ft);
+
+    // e_rem not in ft, e_add not in ft
+    mem_edge_e_rem_not_in_ft e_rem t;
+    mem_edge_e_add_not_in_ft e_add e_rem t;
+
+    // split_at_first_e on given path to decompose into ft-reachable segments
+    // First need: subset_edges path (e_rem :: ft)
+    subset_edges_t_to_erem_ft path e_rem t;
+    split_at_first_e path e_rem ft e_add.u e_add.v;
+    // Result: (reachable ft e_add.u e_rem.u ∧ reachable ft e_rem.v e_add.v) ∨
+    //         (reachable ft e_add.u e_rem.v ∧ reachable ft e_rem.u e_add.v)
+
+    // === Prove acyclic g.n (e_rem :: ft) ===
+    // Any simple cycle in (e_rem :: ft) has its edges in t (via mem_edge transfer).
+    // So acyclic g.n t implies acyclic g.n (e_rem :: ft).
+    let acyclic_erem_ft () : Lemma (acyclic g.n (e_rem :: ft)) =
+      introduce forall (v: nat) (c: list edge).
+        v < g.n /\ subset_edges c (e_rem :: ft) /\ Cons? c /\
+        all_edges_distinct c /\ is_path_from_to c v v ==> False
+      with introduce _ ==> _
+      with _h. begin
+        // Transfer: subset_edges c (e_rem :: ft) => subset_edges c t
+        let rec subset_transfer (c': list edge)
+          : Lemma (requires subset_edges c' (e_rem :: ft))
+                  (ensures subset_edges c' t)
+                  (decreases c')
+          = match c' with
+            | [] -> ()
+            | hd :: tl ->
+              if edge_eq hd e_rem then begin
+                edge_eq_symmetric hd e_rem;
+                mem_edge_eq_transfer hd e_rem t
+              end else begin
+                mem_edge_filter_implies_mem hd t (fun e -> not (edge_eq e e_rem))
+              end;
+              subset_transfer tl
+        in
+        subset_transfer c
+        // Now subset_edges c t, and acyclic g.n t says no simple cycle at v < g.n in t
+      end
+    in
+    acyclic_erem_ft ();
+
+    // === Property 5: acyclic g.n t' ===
+    // Step 1: ~(reachable ft e_rem.u e_rem.v)
+    acyclic_implies_unreachable g.n ft e_rem;
+    assert (~(reachable ft e_rem.u e_rem.v));
+
+    // Step 2: ~(reachable ft e_add.u e_add.v)
+    // By contradiction: if reachable ft e_add.u e_add.v, then by transitivity with
+    // the split_at_first_e result, we get reachable ft e_rem.u e_rem.v, contradiction.
+    FStar.Classical.or_elim
+      #(reachable ft e_add.u e_rem.u /\ reachable ft e_rem.v e_add.v)
+      #(reachable ft e_add.u e_rem.v /\ reachable ft e_rem.u e_add.v)
+      #(fun _ -> ~(reachable ft e_add.u e_add.v))
+      (fun (_: squash (reachable ft e_add.u e_rem.u /\ reachable ft e_rem.v e_add.v)) ->
+        // Case A: ft: e_add.u → e_rem.u and ft: e_rem.v → e_add.v
+        if FStar.StrongExcludedMiddle.strong_excluded_middle (reachable ft e_add.u e_add.v) then begin
+          reachable_symmetric ft e_add.u e_rem.u;
+          reachable_transitive ft e_rem.u e_add.u e_add.v;
+          reachable_symmetric ft e_rem.v e_add.v;
+          reachable_transitive ft e_rem.u e_add.v e_rem.v;
+          assert (reachable ft e_rem.u e_rem.v);
+          assert false
+        end)
+      (fun (_: squash (reachable ft e_add.u e_rem.v /\ reachable ft e_rem.u e_add.v)) ->
+        // Case B: ft: e_add.u → e_rem.v and ft: e_rem.u → e_add.v (symmetric)
+        if FStar.StrongExcludedMiddle.strong_excluded_middle (reachable ft e_add.u e_add.v) then begin
+          reachable_symmetric ft e_add.u e_rem.v;
+          reachable_transitive ft e_rem.v e_add.u e_add.v;
+          reachable_symmetric ft e_rem.u e_add.v;
+          reachable_transitive ft e_rem.v e_add.v e_rem.u;
+          reachable_symmetric ft e_rem.v e_rem.u;
+          assert (reachable ft e_rem.u e_rem.v);
+          assert false
+        end);
+    assert (~(reachable ft e_add.u e_add.v));
+
+    // Step 3: acyclic g.n t'
+    acyclic_when_unreachable g.n ft e_add;
+    assert (acyclic g.n t');
+
+    // === Property 4: all_connected g.n t' ===
+    // Key fact: ft ⊂ t' (as mem_edge), so reachable ft a b => reachable t' a b
+    let ft_sub_t' (e: edge) : Lemma (requires mem_edge e ft) (ensures mem_edge e t') = () in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires ft_sub_t');
+
+    // Build: reachable t' e_rem.u e_rem.v via detour through e_add
+    assert (is_path_from_to [e_add] e_add.u e_add.v);
+    assert (subset_edges [e_add] t');
+
+    let build_detour ()
+      : Lemma (reachable t' e_rem.u e_rem.v /\ reachable t' e_rem.v e_rem.u) =
+      FStar.Classical.or_elim
+        #(reachable ft e_add.u e_rem.u /\ reachable ft e_rem.v e_add.v)
+        #(reachable ft e_add.u e_rem.v /\ reachable ft e_rem.u e_add.v)
+        #(fun _ -> reachable t' e_rem.u e_rem.v /\ reachable t' e_rem.v e_rem.u)
+        (fun (_: squash (reachable ft e_add.u e_rem.u /\ reachable ft e_rem.v e_add.v)) ->
+          // e_rem.u →ft→ e_add.u →e_add→ e_add.v →ft→ e_rem.v
+          reachable_symmetric ft e_add.u e_rem.u;
+          reachable_superset ft t' e_rem.u e_add.u;
+          reachable_superset ft t' e_rem.v e_add.v;
+          reachable_symmetric t' e_rem.v e_add.v;
+          reachable_transitive t' e_rem.u e_add.u e_add.v;
+          reachable_transitive t' e_rem.u e_add.v e_rem.v;
+          // Symmetric direction
+          reachable_symmetric t' e_rem.u e_rem.v)
+        (fun (_: squash (reachable ft e_add.u e_rem.v /\ reachable ft e_rem.u e_add.v)) ->
+          // e_rem.u →ft→ e_add.v ... e_add connects e_add.u↔e_add.v
+          // e_rem.v →ft→ ... e_add.u →e_add→ e_add.v →ft→ e_rem.u
+          reachable_superset ft t' e_rem.u e_add.v;
+          reachable_superset ft t' e_add.u e_rem.v;
+          reachable_symmetric t' e_add.u e_rem.v;
+          reachable_transitive t' e_rem.u e_add.v e_add.u;
+          reachable_transitive t' e_rem.u e_add.u e_rem.v;
+          // Wait, e_add.v to e_add.u: need reachable t' e_add.v e_add.u
+          // e_add connects e_add.u to e_add.v, so reachable t' e_add.u e_add.v
+          // and reachable t' e_add.v e_add.u (symmetric of single edge)
+          reachable_symmetric t' e_rem.u e_rem.v)
+    in
+    build_detour ();
+
+    // Now use reach_transfer: reachable (e_rem :: ft) a b => reachable t' a b
+    // Since t has same edge set as (e_rem :: ft), reachable t 0 v => reachable (e_rem :: ft) 0 v
+    // => reachable t' 0 v
+    introduce forall (v: nat). v < g.n ==> reachable t' 0 v
+    with introduce _ ==> _
+    with _h. begin
+      // reachable t 0 v
+      assert (all_connected g.n t);
+      // Transfer: t → (e_rem :: ft) → t'
+      reachable_t_iff_erem_ft t e_rem 0 v;
+      // reachable (e_rem :: ft) 0 v
+      // Now transfer to t' using reach_transfer
+      FStar.Classical.exists_elim
+        (reachable t' 0 v)
+        #(list edge)
+        #(fun path -> subset_edges path (e_rem :: ft) /\ is_path_from_to path 0 v)
+        ()
+        (fun (p: list edge{subset_edges p (e_rem :: ft) /\ is_path_from_to p 0 v}) ->
+          reach_transfer p e_add e_rem ft 0 v)
+    end;
+    assert (all_connected g.n t');
+
+    // === Property 3: length t' = g.n - 1 ===
+    // length t' = 1 + length ft
+    // length ft = length t - k where k = length (filter (edge_eq e_rem) t)
+    // Need: k = 1, i.e., length (filter (edge_eq e_rem) t) = 1
+    filter_complement_length (fun e -> edge_eq e e_rem) t;
+    // length (filter (edge_eq e_rem) t) + length ft = length t = g.n - 1
+    filter_match_nonempty e_rem t;
+    // length (filter (edge_eq e_rem) t) >= 1
+    // === Proving count = 1 ===
+    // First establish all_connected g.n (e_rem :: ft)
+    introduce forall (v: nat). v < g.n ==> reachable (e_rem :: ft) 0 v
+    with introduce _ ==> _ with _. begin
+      reachable_t_iff_erem_ft t e_rem 0 v
+    end;
+    assert (all_connected g.n (e_rem :: ft));
+    // connected_min_edges: all_connected g.n (e_rem :: ft) ==> length (e_rem :: ft) >= g.n - 1
+    // length (e_rem :: ft) = 1 + length ft = g.n - count
+    // So g.n - count >= g.n - 1, hence count <= 1. Combined with >= 1: count = 1.
+    connected_min_edges g.n (e_rem :: ft);
+    assert (length (e_rem :: ft) >= g.n - 1);
+    let count = length (filter (fun e -> edge_eq e e_rem) t) in
+    assert (count = 1);
+    assert (length ft = g.n - 1 - count);
+    assert (length ft = g.n - 2);
+    assert (length t' = 1 + length ft);
+    assert (length t' = g.n - 1)
+#pop-options
 
 #push-options "--z3rlimit 30"
 let cut_property g a e s =
@@ -680,13 +1669,18 @@ let cut_property g a e s =
         assert (all_connected g.n t);
         reachable_symmetric t 0 e.u;
         reachable_transitive t e.u 0 e.v;
-        // Step 2: Path from e.u to e.v must cross cut (s(e.u) ≠ s(e.v))
-        // Extract path from reachable
+        // Step 1b: Extract a SIMPLE path from e.u to e.v
+        assert (e.u <> e.v);  // from crosses_cut
+        reachable_simple t e.u e.v;
+        // Step 2: Simple path from e.u to e.v must cross cut (s(e.u) ≠ s(e.v))
+        // Extract simple path from reachable_simple
         FStar.Classical.exists_elim
           goal
-          #(list edge) #(fun path -> subset_edges path t /\ is_path_from_to path e.u e.v)
+          #(list edge) #(fun path -> subset_edges path t /\ is_path_from_to path e.u e.v /\
+                                      all_edges_distinct path /\ Cons? path)
           ()
-          (fun (path: list edge{subset_edges path t /\ is_path_from_to path e.u e.v}) ->
+          (fun (path: list edge{subset_edges path t /\ is_path_from_to path e.u e.v /\
+                                 all_edges_distinct path /\ Cons? path}) ->
             // Find crossing edge in path (which is in t)
             path_crosses_when_sides_differ path t s e.u e.v;
             // Extract the crossing edge e'
@@ -700,10 +1694,16 @@ let cut_property g a e s =
                 mem_edge_subset e' t g.edges;
                 // e.w ≤ e'.w (e is light edge, e' crosses cut and is in g.edges)
                 assert (e.w <= e'.w);
-                // e.u ≠ e.v (from crosses_cut e s)
-                assert (e.u <> e.v);
+                // e'.u ≠ e'.v (from crosses_cut: different sides of cut implies different vertices)
+                assert (crosses_cut e' s);
+                assert (e'.u <> e'.v);
+                // e'.u < g.n and e'.v < g.n: from graph well-formedness precondition
+                assert (subset_edges t g.edges);
+                mem_edge_subset e' t g.edges;
+                assert (mem_edge e' g.edges);
+                assert (e'.u < g.n /\ e'.v < g.n);
                 let t' = e :: filter (fun e0 -> not (edge_eq e0 e')) t in
-                // T' is a spanning tree (exchange lemma)
+                // T' is a spanning tree (exchange lemma — path is simple)
                 exchange_is_spanning_tree g t e e' path;
                 // T' is MST (exchange preserves MST + weight argument)
                 lemma_exchange_preserves_mst g t e e';

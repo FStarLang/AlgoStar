@@ -378,6 +378,13 @@ val lemma_exchange_preserves_mst
                    total_weight (e_add :: (filter (fun e -> not (edge_eq e e_rem)) t)) = 
                    total_weight t)
 
+// Extract a simple path from any walk (for use with split_at_first_e)
+val reachable_simple (es: list edge) (a b: nat)
+  : Lemma (requires reachable es a b /\ a <> b)
+          (ensures exists (path: list edge).
+                    subset_edges path es /\ is_path_from_to path a b /\
+                    all_edges_distinct path /\ Cons? path)
+
 (*** Helpers for Cut Property Proof ***)
 
 // Filtering preserves membership for non-matching edges
@@ -398,9 +405,11 @@ val exchange_is_spanning_tree
                     mem_edge e_rem t /\
                     ~(mem_edge e_add t) /\
                     e_add.u < g.n /\ e_add.v < g.n /\ e_add.u <> e_add.v /\
+                    e_rem.u < g.n /\ e_rem.v < g.n /\ e_rem.u <> e_rem.v /\
                     subset_edges path t /\
                     is_path_from_to path e_add.u e_add.v /\
-                    mem_edge e_rem path)
+                    mem_edge e_rem path /\
+                    all_edges_distinct path)
           (ensures is_spanning_tree g (e_add :: filter (fun e -> not (edge_eq e e_rem)) t))
 
 //SNIPPET_START: cut_property
@@ -420,7 +429,9 @@ val cut_property:
           // The cut respects A
           respects a s /\
           // Edge endpoints are valid vertices
-          e.u < g.n /\ e.v < g.n)
+          e.u < g.n /\ e.v < g.n /\
+          // All graph edges have valid endpoints
+          (forall (e': edge). mem_edge e' g.edges ==> e'.u < g.n /\ e'.v < g.n))
         (ensures 
           // A ∪ {e} is contained in some MST
           (exists (t: list edge). is_mst g t /\ subset_edges (e :: a) t))

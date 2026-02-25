@@ -1081,6 +1081,8 @@ let lemma_kruskal_step_safe_edge (g: graph) (e: edge) (forest: list edge)
               not (mem_edge e' forest) /\ 
               ~(same_component forest e'.u e'.v) ==>
               e.w <= e'.w) /\
+            // All graph edges have valid endpoints
+            (forall (e': edge). mem_edge e' g.edges ==> e'.u < g.n /\ e'.v < g.n) /\
             // Forest is subset of some MST
             (exists (mst: list edge). is_mst g mst /\ subset_edges forest mst))
           (ensures 
