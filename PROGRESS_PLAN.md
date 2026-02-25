@@ -330,9 +330,8 @@ From strongest to weakest:
 
 These are issues where a module has 0 admits but the spec doesn't prove what you'd want:
 
-1. **Huffman (ch16)**: Greedy choice + optimal substructure proven, but `huffman_complete freqs`
-   is not proven to produce a WPL-optimal tree for multi-element inputs. The theorems exist
-   but aren't connected to the construction.
+1. **Huffman (ch16)**: ✅ **RESOLVED.** `huffman_complete_optimal` proven — `huffman_complete`
+   produces a WPL-optimal tree for all inputs (CLRS Theorem 16.4). Zero admits.
 
 2. **MaxSubarray (ch04)**: Both Kadane and D&C prove `result == kadane_spec s` — the result
    matches the algorithm's own recursive definition. Missing: `result >= sum_range s i j` for
@@ -383,33 +382,18 @@ Dependent:
 
 ### AGENT1: Huffman Full Optimality — prove huffman_complete is WPL-optimal
 
-**Files:** `ch16-greedy/CLRS.Ch16.Huffman.Complete.fst`, `ch16-greedy/CLRS.Ch16.Huffman.Spec.fst`
-**Current state:** 0 admits in both files. Greedy choice theorem (CLRS Lemma 16.2) and optimal
-substructure (CLRS Lemma 16.3 structural part) are fully proven. But `huffman_correctness_theorem`
-only proves multiset preservation + base-case optimality (single element). Multi-element WPL
-optimality is NOT proven.
+✅ **DONE** (commit `ad1b189`). `huffman_complete_optimal` proven: for all non-empty frequency
+lists, `huffman_complete` produces a WPL-optimal Huffman tree (CLRS Theorem 16.4). Zero admits.
 
-**Goal:** Prove `huffman_complete freqs` produces a WPL-optimal tree for all inputs with
-`length freqs >= 1`.
+**Files modified:** `ch16-greedy/CLRS.Ch16.Huffman.Complete.fst` (+817 lines)
 
-**Approach:** Induction on `length freqs`:
-1. **Base case** (length = 1): Already proven — single leaf has WPL = 0.
-2. **Inductive step** (length ≥ 2): By `greedy_choice_theorem`, for any optimal tree T, ∃ optimal
-   tree T* with `f1,f2` as siblings. By `optimal_substructure_theorem`, `WPL(T*) = WPL(T*') + f1 + f2`
-   where T*' merges the siblings. By IH, `huffman_complete (f1+f2 :: rest)` is optimal for the
-   merged problem (length decreased by 1). The construction mirrors T*, so `WPL(huffman_complete freqs)
-   = WPL(huffman_complete (f1+f2 :: rest)) + f1 + f2 = WPL(T*') + f1 + f2 = WPL(T*)`.
-3. **Key lemma needed:** `huffman_complete_optimal: freqs -> Lemma (is_wpl_optimal (huffman_complete freqs) freqs)`
-4. No Pulse priority queue needed — the pure functional construction suffices for the proof.
-
-**Estimated size:** ~150–250 lines of new proof code.
-
-**Verification:**
-```bash
-fstar.exe --include common --include ch16-greedy --warn_error -321 --warn_error @247 \
-  --ext optimize_let_vc --ext fly_deps --cache_dir _cache --already_cached 'Prims,FStar' \
-  ch16-greedy/CLRS.Ch16.Huffman.Complete.fst
-```
+**Proof structure:**
+- Induction on PQ length via `huffman_from_pq_wpl_le`
+- Generalized exchange argument (`make_min_siblings`) — adapts greedy choice for ANY tree
+- `optimal_substructure_theorem` + IH + WPL decomposition chain inequalities
+- Classical existential elimination for the exchange witness
+- Key helpers: `find_two_mins_sorted`, `sorted_all_leaves_nondecreasing`,
+  `sortWith_preserves_all_leaves`, `sum_costs`/`huffman_from_pq_wpl_decomp`
 
 ---
 
