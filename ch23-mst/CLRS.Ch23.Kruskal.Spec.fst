@@ -1215,6 +1215,264 @@ let lemma_kruskal_step_safe_edge (g: graph) (e: edge) (forest: list edge)
 
 (*** Main Correctness Theorem ***)
 
+// Helper: same_component is monotone — adding edges preserves reachability
+let same_component_mono (edges: list edge) (e: edge) (u v: nat)
+  : Lemma (requires same_component edges u v)
+          (ensures same_component (e :: edges) u v)
+  = eliminate exists (path: list edge). subset_edges path edges /\ is_path_from_to path u v
+    returns same_component (e :: edges) u v
+    with _. begin
+      subset_edges_cons path e edges
+    end
+
+// Kruskal process maintains: every graph edge with valid endpoints either is in forest
+// or has its endpoints in the same component of the forest
+let rec lemma_kruskal_process_maximal_forest
+    (sorted_edges all_sorted: list edge) (forest: list edge) (n: nat)
+  : Lemma (requires is_forest forest n /\
+                    (forall (e: edge). mem_edge e all_sorted /\ ~(mem_edge e sorted_edges) /\
+                      e.u < n /\ e.v < n ==>
+                      mem_edge e forest \/ same_component forest e.u e.v) /\
+                    (exists (prefix: list edge). all_sorted == prefix @ sorted_edges))
+          (ensures (let result = kruskal_process sorted_edges forest n in
+                    (forall (e: edge). mem_edge e all_sorted /\ e.u < n /\ e.v < n ==>
+                      mem_edge e result \/ same_component result e.u e.v)))
+          (decreases sorted_edges)
+  = match sorted_edges with
+    | [] -> ()
+    | e :: rest ->
+      let forest' = kruskal_step e forest n in
+      lemma_kruskal_step_preserves_forest e forest n;
+      
+      if e.u < n && e.v < n && 
+         not (same_component_dec forest e.u e.v) &&
+         not (mem_edge e forest) then begin
+        assert (forest' == e :: forest);
+        introduce forall (e': edge). mem_edge e' all_sorted /\ ~(mem_edge e' rest) /\
+                            e'.u < n /\ e'.v < n ==>
+                    mem_edge e' forest' \/ same_component forest' e'.u e'.v
+        with introduce _ ==> _ with _. begin
+          if edge_eq e' e then ()
+          else if mem_edge e' forest then ()
+          else begin
+            assert (~(mem_edge e' sorted_edges));
+            assert (same_component forest e'.u e'.v);
+            same_component_mono forest e e'.u e'.v
+          end
+        end;
+        
+        eliminate exists (prefix: list edge). all_sorted == prefix @ (e :: rest)
+          returns (exists (prefix': list edge). all_sorted == prefix' @ rest)
+          with _. begin
+            List.Tot.Properties.append_assoc prefix [e] rest;
+            assert (all_sorted == (prefix @ [e]) @ rest)
+          end;
+        
+        lemma_kruskal_process_maximal_forest rest all_sorted forest' n
+      end else begin
+        assert (forest' == forest);
+        introduce forall (e': edge). mem_edge e' all_sorted /\ ~(mem_edge e' rest) /\
+                            e'.u < n /\ e'.v < n ==>
+                    mem_edge e' forest' \/ same_component forest' e'.u e'.v
+        with introduce _ ==> _ with _. begin
+          if edge_eq e' e then begin
+            edge_eq_endpoints e' e;
+            if mem_edge e forest then begin
+              edge_eq_symmetric e' e;
+              mem_edge_eq e e' forest
+            end
+            else if not (e.u < n && e.v < n) then ()
+            else if same_component_dec forest e.u e.v then begin
+              same_component_dec_sound forest e.u e.v;
+              assert ((e'.u = e.u /\ e'.v = e.v) \/ (e'.u = e.v /\ e'.v = e.u));
+              if e'.u = e.u && e'.v = e.v then ()
+              else same_component_symmetric forest e.u e.v
+            end else ()
+          end else begin
+            assert (~(mem_edge e' sorted_edges));
+            ()
+          end
+        end;
+        
+        eliminate exists (prefix: list edge). all_sorted == prefix @ (e :: rest)
+          returns (exists (prefix': list edge). all_sorted == prefix' @ rest)
+          with _. begin
+            List.Tot.Properties.append_assoc prefix [e] rest;
+            assert (all_sorted == (prefix @ [e]) @ rest)
+          end;
+        
+        lemma_kruskal_process_maximal_forest rest all_sorted forest' n
+      end
+
+// MST invariant: kruskal_process maintains "forest is subset of some MST"
+// This needs the "minimum weight among unused cross-component edges" property
+// which follows from processing edges in sorted order.
+let rec lemma_kruskal_process_mst_invariant
+    (g: graph) (sorted_edges: list edge) (forest: list edge)
+  : Lemma (requires 
+            is_forest forest g.n /\
+            subset_edges forest g.edges /\
+            (exists (mst: list edge). is_mst g mst /\ subset_edges forest mst) /\
+            subset_edges sorted_edges g.edges /\
+            is_sorted_by_weight sorted_edges /\
+            // All graph edges have valid endpoints
+            (forall (e': edge). mem_edge e' g.edges ==> e'.u < g.n /\ e'.v < g.n) /\
+            // Every graph edge not in sorted_edges with valid endpoints
+            // is either in the forest or connects same-component vertices
+            (forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' sorted_edges) /\
+              ~(mem_edge e' forest) ==>
+              same_component forest e'.u e'.v))
+          (ensures (let result = kruskal_process sorted_edges forest g.n in
+            (exists (mst: list edge). is_mst g mst /\ subset_edges result mst)))
+          (decreases sorted_edges)
+  = match sorted_edges with
+    | [] -> ()
+    | e :: rest ->
+      let forest' = kruskal_step e forest g.n in
+      lemma_kruskal_step_preserves_forest e forest g.n;
+      
+      if e.u < g.n && e.v < g.n && 
+         not (same_component_dec forest e.u e.v) &&
+         not (mem_edge e forest) then begin
+        // e was added. Need to show: forest' = e :: forest is subset of some MST
+        // Use lemma_kruskal_step_safe_edge
+        
+        // Establish: e has minimum weight among unused cross-component edges
+        // For any e' in g.edges that's not in forest and crosses different components:
+        //   - If e' is in sorted_edges (i.e., in rest): e.w <= e'.w (from sorted order)
+        //   - If e' is not in sorted_edges: from precondition, same_component forest e'.u e'.v
+        //     So ~(same_component forest e'.u e'.v) is false, vacuously true.
+        introduce forall (e': edge). 
+          mem_edge e' g.edges /\ not (mem_edge e' forest) /\ ~(same_component forest e'.u e'.v) ==>
+          e.w <= e'.w
+        with introduce _ ==> _ with _. begin
+          // e' is in g.edges, not in forest, different components
+          if mem_edge e' (e :: rest) then begin
+            // e' is in sorted_edges = e :: rest
+            if edge_eq e' e then begin
+              edge_eq_endpoints e' e
+            end else begin
+              // e' is in rest. Since sorted_edges is sorted and e is the head:
+              // e.w <= rest head.w <= ... <= e'.w
+              assert (mem_edge e' rest);
+              // Need: first element of sorted list ≤ any element
+              let rec sorted_head_le_all (hd: edge) (tl: list edge) (e': edge)
+                : Lemma (requires is_sorted_by_weight (hd :: tl) /\ mem_edge e' tl)
+                        (ensures hd.w <= e'.w)
+                        (decreases tl)
+                = match tl with
+                  | [] -> ()
+                  | hd2 :: tl2 ->
+                    if edge_eq e' hd2 then edge_eq_endpoints e' hd2
+                    else begin
+                      sorted_head_le_all hd2 tl2 e';
+                      ()
+                    end
+              in
+              sorted_head_le_all e rest e'
+            end
+          end else begin
+            // e' is not in sorted_edges, not in forest, in g.edges.
+            // From precondition: same_component forest e'.u e'.v.
+            // But ~(same_component forest e'.u e'.v) from outer. Contradiction.
+            assert (same_component forest e'.u e'.v)
+          end
+        end;
+        
+        // Apply safe edge lemma
+        // Establish ~(same_component forest e.u e.v) from same_component_dec = false
+        let dec_complete_contra () 
+          : Lemma (requires same_component forest e.u e.v)
+                  (ensures same_component_dec forest e.u e.v = true)
+          = same_component_dec_complete forest e.u e.v
+        in
+        FStar.Classical.move_requires dec_complete_contra ();
+        assert (~(same_component forest e.u e.v));
+        assert (e.u < g.n /\ e.v < g.n);
+        assert (mem_edge e g.edges);
+        assert (is_forest forest g.n);
+        assert (subset_edges forest g.edges);
+        lemma_kruskal_step_safe_edge g e forest;
+        // Now: exists mst. is_mst g mst /\ subset_edges (e :: forest) mst
+        
+        // For the IH: we need the "already processed" edges to satisfy the invariant
+        // For e' not in rest, not in forest', with valid endpoints:
+        //   same_component forest' e'.u e'.v
+        // Case 1: e' not in (e :: rest) => e' not in sorted_edges =>
+        //   same_component forest e'.u e'.v (from precondition) =>
+        //   same_component forest' e'.u e'.v (monotone, forest ⊆ forest')
+        // Case 2: e' = e (edge_eq) => e is in forest' = e :: forest. So mem_edge e' forest' (via edge_eq).
+        //   But we need ~(mem_edge e' forest') to trigger the precondition, so vacuously true.
+        
+        // Establish IH precondition
+        assert (forest' == e :: forest);
+        introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' rest) /\
+          ~(mem_edge e' forest') ==>
+          same_component forest' e'.u e'.v
+        with introduce _ ==> _ with _. begin
+          // e' is not in rest and not in forest'
+          // If edge_eq e' e: then e' is in forest' (since e is head of forest'). Contradiction.
+          if edge_eq e' e then begin
+            edge_eq_symmetric e' e;
+            mem_edge_eq e e' (e :: forest);
+            assert (mem_edge e' forest')
+            // contradicts ~(mem_edge e' forest')
+          end else begin
+            // e' is not e, and e' is not in rest
+            // So e' is not in (e :: rest) = sorted_edges
+            assert (~(mem_edge e' sorted_edges));
+            // From precondition (if not in forest): same_component forest e'.u e'.v
+            if mem_edge e' forest then begin
+              // e' in forest but not in forest' = e :: forest? Impossible.
+              assert (mem_edge e' (e :: forest))
+            end else begin
+              assert (same_component forest e'.u e'.v);
+              same_component_mono forest e e'.u e'.v
+            end
+          end
+        end;
+        
+        // subset_edges
+        lemma_kruskal_step_edges_from_graph e forest g.edges g.n;
+        
+        // sorted rest
+        assert (is_sorted_by_weight rest);
+        
+        lemma_kruskal_process_mst_invariant g rest forest'
+      end else begin
+        // e was NOT added. forest' = forest. MST invariant preserved trivially.
+        
+        // For the IH: processed edges invariant
+        introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' rest) /\
+          ~(mem_edge e' forest') ==>
+          same_component forest' e'.u e'.v
+        with introduce _ ==> _ with _. begin
+          if edge_eq e' e then begin
+            edge_eq_endpoints e' e;
+            if mem_edge e forest then begin
+              edge_eq_symmetric e' e;
+              mem_edge_eq e e' forest
+            end else if not (e.u < g.n && e.v < g.n) then begin
+              // e'.u < g.n /\ e'.v < g.n (from valid endpoints precondition)
+              // but e endpoints = e' endpoints (from edge_eq). Contradiction.
+              assert (mem_edge e' g.edges);
+              assert (e'.u < g.n /\ e'.v < g.n)
+            end else if same_component_dec forest e.u e.v then begin
+              same_component_dec_sound forest e.u e.v;
+              if e'.u = e.u && e'.v = e.v then ()
+              else same_component_symmetric forest e.u e.v
+            end else ()
+          end else begin
+            assert (~(mem_edge e' sorted_edges));
+            ()
+          end
+        end;
+        
+        assert (is_sorted_by_weight rest);
+        
+        lemma_kruskal_process_mst_invariant g rest forest'
+      end
+
 // Kruskal's algorithm produces a spanning tree
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
