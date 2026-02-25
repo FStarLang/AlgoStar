@@ -359,6 +359,410 @@ let same_component_dec_sound (edges: list edge) (u v: nat)
       assert (reachable edges u v)
     end
 
+(*** BFS Completeness ***)
+
+// All vertices returned by edge_neighbors have index ≤ max_vertex_in_edges
+let rec edge_neighbors_bounded (edges: list edge) (v w: nat)
+  : Lemma (requires mem w (edge_neighbors edges v))
+          (ensures w <= max_vertex_in_edges edges)
+          (decreases edges)
+  = match edges with
+    | [] -> ()
+    | e :: rest ->
+      let ns = edge_neighbors rest v in
+      if e.u = v then
+        (if w = e.v then () else edge_neighbors_bounded rest v w)
+      else if e.v = v then
+        (if w = e.u then () else edge_neighbors_bounded rest v w)
+      else
+        edge_neighbors_bounded rest v w
+
+// All vertices returned by edge_neighbors are endpoints of edges containing v
+let edge_neighbors_are_adjacent (edges: list edge) (v w: nat)
+  : Lemma (requires mem w (edge_neighbors edges v))
+          (ensures exists (e: edge). mem_edge e edges /\
+                    ((e.u = v /\ e.v = w) \/ (e.v = v /\ e.u = w)))
+  = edge_neighbors_sound edges v w
+
+// BFS visited elements always remain in the result
+let rec bfs_visited_in_result
+    (edges: list edge) (frontier: list nat) (visited: list nat) (fuel: nat) (w: nat)
+  : Lemma (requires mem w visited)
+          (ensures mem w (bfs_reach_list edges frontier visited fuel))
+          (decreases %[fuel; List.Tot.length frontier])
+  = if fuel = 0 then ()
+    else match frontier with
+    | [] -> ()
+    | v :: rest ->
+      if mem v visited then
+        bfs_visited_in_result edges rest visited fuel w
+      else
+        bfs_visited_in_result edges (List.Tot.append rest (edge_neighbors edges v)) (v :: visited) (fuel - 1) w
+
+// Pigeonhole helper: noRepeats list with bounded elements has bounded length
+let rec noRepeats_bounded_length (l: list nat) (max: nat)
+  : Lemma (requires noRepeats l /\ (forall (v:nat). mem v l ==> v <= max))
+          (ensures length l <= max + 1)
+          (decreases max)
+  = match l with
+    | [] -> ()
+    | _ ->
+      if max = 0 then begin
+        let hd :: tl = l in
+        assert (hd = 0);
+        match tl with
+        | [] -> ()
+        | v :: _ -> assert (v <= 0); assert (v = 0); assert (mem 0 tl)
+          // contradicts noRepeats (hd :: tl) since hd = 0
+      end else if not (mem max l) then begin
+        // All elements ≤ max but none = max, so all ≤ max - 1
+        let aux (v:nat) : Lemma (requires mem v l) (ensures v <= max - 1) = () in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+        noRepeats_bounded_length l (max - 1)
+      end else begin
+        // max ∈ l. Remove first occurrence.
+        let rec remove_first_props (l: list nat) (x: nat)
+          : Lemma (requires noRepeats l /\ mem x l)
+                  (ensures (let l' = List.Tot.filter (fun v -> v <> x) l in
+                            noRepeats l' /\
+                            length l' = length l - 1 /\
+                            ~(mem x l') /\
+                            (forall (v:nat). mem v l' ==> mem v l)))
+                  (decreases l)
+          = match l with
+            | [] -> ()
+            | hd :: tl ->
+              if hd = x then begin
+                // x = hd, not (mem hd tl) from noRepeats
+                // filter removes hd, rest of filter is filter on tl
+                // but since hd ∉ tl, filter on tl doesn't remove anything more
+                assert (not (mem x tl));
+                // filter (fun v -> v <> x) (hd :: tl) = filter (fun v -> v <> x) tl
+                // Since no element of tl = x = hd, filter is identity on tl
+                let rec filter_identity (tl: list nat) (x: nat)
+                  : Lemma (requires ~(mem x tl))
+                          (ensures List.Tot.filter (fun v -> v <> x) tl == tl)
+                          (decreases tl)
+                  = match tl with
+                    | [] -> ()
+                    | h :: t -> filter_identity t x
+                in
+                filter_identity tl x;
+                assert (List.Tot.filter (fun v -> v <> x) l == tl)
+              end else begin
+                remove_first_props tl x;
+                let tl' = List.Tot.filter (fun v -> v <> x) tl in
+                assert (List.Tot.filter (fun v -> v <> x) l == hd :: tl');
+                assert (noRepeats tl');
+                // hd ∉ tl, and tl' ⊆ tl, so hd ∉ tl'
+                assert (~(mem hd tl));
+                let rec filter_mem_sub (l: list nat) (f: nat -> bool) (x: nat)
+                  : Lemma (requires mem x (List.Tot.filter f l))
+                          (ensures mem x l)
+                          (decreases l)
+                  = match l with
+                    | [] -> ()
+                    | _ :: t -> if mem x (List.Tot.filter f t) then filter_mem_sub t f x
+                in
+                let aux () : Lemma (~(mem hd tl'))
+                  = if mem hd tl' then filter_mem_sub tl (fun v -> v <> x) hd
+                in
+                aux ()
+              end
+        in
+        remove_first_props l max;
+        let l' = List.Tot.filter (fun v -> v <> max) l in
+        // l' has all elements ≤ max - 1 (they're ≤ max and ≠ max)
+        let aux (v:nat) : Lemma (requires mem v l') (ensures v <= max - 1) = () in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+        noRepeats_bounded_length l' (max - 1)
+        // length l' ≤ max, so length l = length l' + 1 ≤ max + 1 ✓
+      end
+
+// Helper: filter for inequality preserves noRepeats
+let rec filter_neq_noRepeats (l: list nat) (x: nat)
+  : Lemma (requires noRepeats l)
+          (ensures noRepeats (List.Tot.filter (fun v -> v <> x) l))
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      filter_neq_noRepeats tl x;
+      if hd <> x then begin
+        // Need: not (mem hd (filter (fun v -> v <> x) tl))
+        // From noRepeats: not (mem hd tl)
+        // filter ⊆ tl membership-wise
+        let rec filter_mem_sub2 (l: list nat) (f: nat -> bool) (y: nat)
+          : Lemma (requires mem y (List.Tot.filter f l))
+                  (ensures mem y l)
+                  (decreases l)
+          = match l with
+            | [] -> ()
+            | _ :: t -> if mem y (List.Tot.filter f t) then filter_mem_sub2 t f y
+        in
+        if mem hd (List.Tot.filter (fun v -> v <> x) tl) then
+          filter_mem_sub2 tl (fun v -> v <> x) hd
+      end
+
+// Helper: filter for inequality removes exactly one element when present with noRepeats
+let rec filter_neq_length (l: list nat) (x: nat)
+  : Lemma (requires noRepeats l /\ mem x l)
+          (ensures length (List.Tot.filter (fun v -> v <> x) l) = length l - 1)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      if hd = x then begin
+        // filter removes hd, and since hd ∉ tl, filter is identity on tl
+        let rec filter_identity_when_absent (tl: list nat) (x: nat)
+          : Lemma (requires ~(mem x tl))
+                  (ensures List.Tot.filter (fun v -> v <> x) tl == tl)
+                  (decreases tl)
+          = match tl with
+            | [] -> ()
+            | _ :: t -> filter_identity_when_absent t x
+        in
+        filter_identity_when_absent tl x
+      end else
+        filter_neq_length tl x
+
+// Helper: filter membership
+let rec filter_neq_mem (l: list nat) (x y: nat)
+  : Lemma (ensures mem y (List.Tot.filter (fun v -> v <> x) l) <==>
+                   (mem y l /\ y <> x))
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | _ :: tl -> filter_neq_mem tl x y
+
+// Pigeonhole consequence: all values in range are covered
+let rec noRepeats_covers_all (visited: list nat) (max: nat) (w: nat)
+  : Lemma (requires noRepeats visited /\ length visited > max /\
+                    (forall (v:nat). mem v visited ==> v <= max) /\
+                    w <= max)
+          (ensures mem w visited)
+          (decreases max)
+  = if max = 0 then begin
+      // w = 0. length > 0, so visited is non-empty. All elements ≤ 0 = 0.
+      let hd :: _ = visited in
+      assert (hd = 0)
+    end else begin
+      if w = max then begin
+        // Need mem max visited. Prove by contradiction.
+        if not (mem max visited) then begin
+          let aux (v:nat) : Lemma (requires mem v visited) (ensures v <= max - 1) = () in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+          noRepeats_bounded_length visited (max - 1)
+          // length visited ≤ max, but length visited > max. Contradiction.
+        end
+      end else begin
+        // w < max. 
+        assert (w <= max - 1);
+        if not (mem max visited) then begin
+          // All elements < max, so ≤ max - 1. IH applies.
+          let aux (v:nat) : Lemma (requires mem v visited) (ensures v <= max - 1) = () in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+          noRepeats_covers_all visited (max - 1) w
+        end else begin
+          // max ∈ visited. Filter it out.
+          let visited' = List.Tot.filter (fun (v:nat) -> v <> max) visited in
+          filter_neq_noRepeats visited max;
+          filter_neq_length visited max;
+          // length visited' = length visited - 1 > max - 1
+          // All elements of visited' ≤ max and ≠ max, so ≤ max - 1
+          let aux (v:nat) : Lemma (requires mem v visited') (ensures v <= max - 1) =
+            filter_neq_mem visited max v
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+          noRepeats_covers_all visited' (max - 1) w;
+          // w ∈ visited'. Since visited' ⊆ visited: w ∈ visited.
+          filter_neq_mem visited max w
+        end
+      end
+    end
+
+// BFS well-formedness: every visited vertex has its neighbors in visited ∪ frontier
+let bfs_well_formed (edges: list edge) (frontier visited: list nat) : prop =
+  forall (v: nat). mem v visited ==>
+    forall (w: nat). mem w (edge_neighbors edges v) ==>
+      mem w visited \/ mem w frontier
+
+// Main BFS completeness invariant:
+// If well-formed, noRepeats, bounded, and sufficient fuel,
+// then the result is neighbor-closed and contains all frontier + visited.
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 50"
+let rec bfs_complete_invariant
+    (edges: list edge) (frontier: list nat) (visited: list nat) (fuel: nat)
+  : Lemma
+    (requires
+      bfs_well_formed edges frontier visited /\
+      noRepeats visited /\
+      (forall (v: nat). mem v visited ==> v <= max_vertex_in_edges edges) /\
+      (forall (v: nat). mem v frontier ==> v <= max_vertex_in_edges edges) /\
+      fuel + length visited >= max_vertex_in_edges edges + 1)
+    (ensures
+      (let result = bfs_reach_list edges frontier visited fuel in
+       // Result contains all visited and frontier elements
+       (forall (v: nat). mem v visited ==> mem v result) /\
+       (forall (v: nat). mem v frontier ==> mem v result) /\
+       // Result is neighbor-closed
+       (forall (v: nat). mem v result ==>
+         forall (w: nat). mem w (edge_neighbors edges v) ==> mem w result)))
+    (decreases %[fuel; List.Tot.length frontier])
+  = if fuel = 0 then begin
+      let max = max_vertex_in_edges edges in
+      assert (length visited >= max + 1);
+      introduce forall (v: nat). mem v visited ==>
+        (forall (w: nat). mem w (edge_neighbors edges v) ==> mem w visited)
+      with introduce _ ==> _ with _. begin
+        introduce forall (w: nat). mem w (edge_neighbors edges v) ==> mem w visited
+        with introduce _ ==> _ with _. begin
+          edge_neighbors_bounded edges v w;
+          noRepeats_covers_all visited max w
+        end
+      end;
+      introduce forall (v: nat). mem v frontier ==> mem v visited
+      with introduce _ ==> _ with _.
+        noRepeats_covers_all visited max v
+    end
+    else match frontier with
+    | [] -> ()
+    | v :: rest ->
+      if mem v visited then begin
+        assert (bfs_well_formed edges rest visited);
+        bfs_complete_invariant edges rest visited fuel;
+        // v ∈ visited ⊆ result by IH. Elements of rest ⊆ result by IH.
+        // So all of (v :: rest) ⊆ result.
+        ()
+      end else begin
+        let visited' = v :: visited in
+        let new_neighbors = edge_neighbors edges v in
+        let frontier' = List.Tot.append rest new_neighbors in
+
+        assert (noRepeats visited');
+
+        let aux_bounded (u: nat)
+          : Lemma (requires mem u visited')
+                  (ensures u <= max_vertex_in_edges edges)
+          = ()
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux_bounded);
+
+        let aux_frontier (u: nat)
+          : Lemma (requires mem u frontier')
+                  (ensures u <= max_vertex_in_edges edges)
+          = mem_append u rest new_neighbors;
+            if mem u rest then ()
+            else edge_neighbors_bounded edges v u
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux_frontier);
+
+        introduce forall (u: nat). mem u visited' ==>
+          (forall (w: nat). mem w (edge_neighbors edges u) ==> (mem w visited' \/ mem w frontier'))
+        with introduce _ ==> _ with _. begin
+          introduce forall (w: nat). mem w (edge_neighbors edges u) ==> (mem w visited' \/ mem w frontier')
+          with introduce _ ==> _ with _. begin
+            if u = v then
+              mem_append w rest new_neighbors
+            else if mem w visited then ()
+            else if w = v then ()
+            else mem_append w rest new_neighbors
+          end
+        end;
+        assert (bfs_well_formed edges frontier' visited');
+
+        assert (fuel - 1 + length visited' >= max_vertex_in_edges edges + 1);
+
+        bfs_complete_invariant edges frontier' visited' (fuel - 1);
+        // By IH: visited' ⊆ result, frontier' ⊆ result, neighbor-closed
+        // v ∈ visited' ⊆ result. ✓
+        // For w ∈ rest: w ∈ frontier' ⊆ result. mem_append gives this.
+        let aux_rest (w: nat)
+          : Lemma (requires mem w rest)
+                  (ensures mem w (bfs_reach_list edges frontier' visited' (fuel - 1)))
+          = mem_append w rest new_neighbors
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux_rest)
+      end
+#pop-options
+
+// Helper: if there's an edge (x,y) in edges, then y ∈ edge_neighbors edges x
+let rec edge_neighbors_complete (edges_list: list edge) (x y: nat) (e: edge)
+  : Lemma (requires mem_edge e edges_list /\ ((e.u = x /\ e.v = y) \/ (e.v = x /\ e.u = y)))
+          (ensures mem y (edge_neighbors edges_list x))
+          (decreases edges_list)
+  = match edges_list with
+    | [] -> ()
+    | hd :: tl ->
+      if hd.u = x && hd.v = y then ()
+      else if hd.v = x && hd.u = y then ()
+      else begin
+        if edge_eq e hd then begin
+          edge_eq_endpoints e hd
+        end else
+          edge_neighbors_complete tl x y e
+      end
+
+// Path through neighbor-closed set: if x is in the set, so is y
+let rec path_in_closed_set
+    (edges: list edge) (path: list edge) (x y: nat)
+    (s: list nat)
+  : Lemma
+    (requires
+      is_path_from_to path x y /\
+      subset_edges path edges /\
+      mem x s /\
+      (forall (v: nat). mem v s ==>
+        forall (w: nat). mem w (edge_neighbors edges v) ==> mem w s))
+    (ensures mem y s)
+    (decreases path)
+  = match path with
+    | [] -> ()
+    | e :: rest ->
+      let next = if e.u = x then e.v else e.u in
+      assert (mem_edge e edges);
+      edge_neighbors_complete edges x next e;
+      assert (mem next s);
+      path_in_closed_set edges rest next y s
+
+// Helper: endpoints of edges in the list are bounded by max_vertex_in_edges
+let rec mem_edge_max_vertex (e: edge) (edges: list edge)
+  : Lemma (requires mem_edge e edges)
+          (ensures e.u <= max_vertex_in_edges edges /\ e.v <= max_vertex_in_edges edges)
+          (decreases edges)
+  = match edges with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq e hd then
+        edge_eq_endpoints e hd
+      else
+        mem_edge_max_vertex e tl
+
+// BFS completeness: reachable vertices are found
+let same_component_dec_complete (edges: list edge) (u v: nat)
+  : Lemma (requires same_component edges u v)
+          (ensures same_component_dec edges u v = true)
+  = if u = v then ()
+    else begin
+      let fuel = max_vertex_in_edges edges + 1 in
+      let result = bfs_reach_list edges [u] [] fuel in
+      eliminate exists (path: list edge). subset_edges path edges /\ is_path_from_to path u v
+        returns same_component_dec edges u v = true
+        with _. begin
+          let e :: _ = path in
+          assert (mem_edge e edges);
+          assert (e.u = u \/ e.v = u);
+          mem_edge_max_vertex e edges;
+          assert (u <= max_vertex_in_edges edges);
+          assert (bfs_well_formed edges [u] []);
+          bfs_complete_invariant edges [u] [] fuel;
+          // u ∈ frontier [u] ⊆ result
+          assert (mem u result);
+          // result is neighbor-closed, so path from u to v gives v ∈ result
+          path_in_closed_set edges path u v result
+        end
+    end
+
 // Helper: if mem x (vertices_in_component edges v n i), then same_component_dec edges v x
 let rec vertices_in_component_mem (edges: list edge) (v: nat) (n: nat) (i: nat{i <= n}) (x: nat)
   : Lemma (requires mem x (vertices_in_component edges v n i))
