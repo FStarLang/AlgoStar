@@ -135,7 +135,7 @@ let stable_permutation (edges1 edges2: list edge) : prop =
 
 // If both edge lists are sorted and are stable permutations of each other,
 // Kruskal produces MSTs with equal weight
-#push-options "--z3rlimit 40 --split_queries always"
+#push-options "--z3rlimit 80"
 let lemma_stable_permutation_equal_mst_weight
   (g1 g2: graph)
   (edges1 edges2: list edge)
@@ -147,7 +147,9 @@ let lemma_stable_permutation_equal_mst_weight
       edges_sorted_by_weight edges1 /\
       edges_sorted_by_weight edges2 /\
       stable_permutation edges1 edges2 /\
-      (exists (mst: list edge). is_mst g1 mst))
+      (exists (mst: list edge). is_mst g1 mst) /\
+      (forall (e: edge). mem_edge e g1.edges ==> e.u < g1.n /\ e.v < g1.n) /\
+      (forall (e: edge). mem_edge e g1.edges ==> e.u <> e.v))
     (ensures
       total_weight (pure_kruskal g1) = total_weight (pure_kruskal g2))
   = // Key insight: graphs with the same edge multiset have the same set of
@@ -200,6 +202,9 @@ let lemma_stable_permutation_equal_mst_weight
     
     // Step 6: Apply Kruskal correctness to both graphs
     assert (g1.n > 0);
+    // g2 inherits edge validity from g1 via membership equivalence
+    assert (forall (e: edge). mem_edge e g2.edges ==> e.u < g2.n /\ e.v < g2.n);
+    assert (forall (e: edge). mem_edge e g2.edges ==> e.u <> e.v);
     theorem_kruskal_produces_mst g1;
     theorem_kruskal_produces_mst g2;
     
@@ -212,10 +217,8 @@ let lemma_stable_permutation_equal_mst_weight
     // Transfer subset_edges explicitly using the membership equivalence
     assert (subset_edges pk1 g1.edges);
     lemma_subset_edges_transfer pk1 g1.edges g2.edges;
-    assert (subset_edges pk1 g2.edges);
     assert (subset_edges pk2 g2.edges);
-    lemma_subset_edges_transfer pk2 g2.edges g1.edges;
-    assert (subset_edges pk2 g1.edges)
+    lemma_subset_edges_transfer pk2 g2.edges g1.edges
 #pop-options
 
 (*** Precondition for Kruskal ***)
@@ -261,7 +264,9 @@ let theorem_sorted_kruskal_produces_mst (g: graph)
     (requires
       g.n > 0 /\
       all_connected g.n g.edges /\
-      (exists (mst: list edge). is_mst g mst))
+      (exists (mst: list edge). is_mst g mst) /\
+      (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n) /\
+      (forall (e: edge). mem_edge e g.edges ==> e.u <> e.v))
     (ensures
       (let sorted_g = { n = g.n; edges = sort_edges g.edges } in
        let result = pure_kruskal sorted_g in
@@ -276,6 +281,10 @@ let theorem_sorted_kruskal_produces_mst (g: graph)
     // all_connected preserves under permutation
     lemma_all_connected_permutation g.n g.edges (sort_edges g.edges);
     
+    // sorted_g inherits edge validity from g via membership equivalence
+    assert (forall (e: edge). mem_edge e sorted_g.edges ==> e.u < sorted_g.n /\ e.v < sorted_g.n);
+    assert (forall (e: edge). mem_edge e sorted_g.edges ==> e.u <> e.v);
+    
     // An MST of sorted_g is also an MST of g (same edges, different order)
     // Since edges are just permuted, the MST property transfers
     // We need to show: exists mst. is_mst sorted_g mst
@@ -289,15 +298,6 @@ let theorem_sorted_kruskal_produces_mst (g: graph)
           = lemma_subset_edges_membership t g.edges edges'
         in
         Classical.forall_intro lemma_membership_equiv;
-        
-        // The key insight: is_spanning_tree only checks subset_edges, all_connected, and acyclic.
-        // - all_connected g.n mst and acyclic g.n mst don't depend on g.edges at all
-        // - subset_edges mst g.edges <==> subset_edges mst edges' (by lemma above)
-        // - Therefore: is_spanning_tree g mst <==> is_spanning_tree g' mst (for most mst)
-        // - And: the set of spanning trees is the same for both graphs
-        // - Therefore: an MST of g is also an MST of g'
-        
-        // Let SMT figure out that the witness MST from g also works for g'
         ()
     in
     lemma_mst_exists_under_permutation g (sort_edges g.edges);
