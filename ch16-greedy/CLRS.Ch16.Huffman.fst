@@ -1780,34 +1780,45 @@ fn huffman_tree
   
   // Extract final result from PQ
   with pq_final. assert (PQ.is_pqueue pq pq_final (SZ.v n));
+  with active_final. assert (forest_own active_final);
+  
   let (result_freq, result_idx) = PQ.extract_min pq;
   with pq_empty. assert (PQ.is_pqueue pq pq_empty (SZ.v n));
   valid_pq_entries_shrink pq_final pq_empty (result_freq, result_idx) (SZ.v n);
   extends_length pq_empty pq_final (result_freq, result_idx);
+  
+  // Read tree pointer — bind nd_contents BEFORE reading (same pattern as merge loop body)
+  with nd_final. assert (V.pts_to nodes nd_final);
+  
+  // Ghost: link result_idx to forest via find_entry_by_idx_spec
+  find_entry_by_idx_spec active_final result_idx;
+  
   let result = V.op_Array_Access nodes result_idx;
   
-  // Ghost: extract final tree from forest_own
-  with active_final. assert (forest_own active_final);
-  // active_final has exactly 1 entry (L.length == 1 after n-1 merges)
-  // Take the single tree from forest_own
-  forest_own_take_at active_final 0;
-  // Now: is_htree (entry_ptr (L.index active_final 0)) (entry_tree (L.index active_final 0))
-  //  ** forest_own (list_remove_at active_final 0)
+  // Ghost: take the tree from forest_own using find_entry_by_idx position
+  // (same pattern as merge loop: use Some?.v (find_entry_by_idx ...) as the index)
+  forest_own_take_at active_final (Some?.v (find_entry_by_idx active_final result_idx));
   
-  // result == entry_ptr (L.index active_final 0) (from invariant: nodes[result_idx] == entry_ptr)
-  rewrite (is_htree (entry_ptr (L.index active_final 0)) (entry_tree (L.index active_final 0)))
+  // Rewrite is_htree to use runtime pointer (same pattern as merge loop)
+  rewrite (is_htree (entry_ptr (L.index active_final (Some?.v (find_entry_by_idx active_final result_idx))))
+                    (entry_tree (L.index active_final (Some?.v (find_entry_by_idx active_final result_idx)))))
+       as (is_htree result
+                    (entry_tree (L.index active_final (Some?.v (find_entry_by_idx active_final result_idx)))));
+  
+  // Since L.length active_final == 1 and Some?.v < 1, Some?.v == 0
+  // Rewrite to use index 0 for cleaner postcondition matching
+  rewrite (is_htree result
+                    (entry_tree (L.index active_final (Some?.v (find_entry_by_idx active_final result_idx)))))
        as (is_htree result (entry_tree (L.index active_final 0)));
   
   // Dispose of empty forest_own and clean up
   // active_final has L.length == 1 (from loop exit: n - (n-1) = 1)
-  // So list_remove_at active_final 0 == [] and forest_own [] == emp
-  list_remove_at_length active_final 0;
-  // forest_own (list_remove_at active_final 0) == forest_own [] == emp
-  rewrite (forest_own (list_remove_at active_final 0))
+  // Some?.v ... == 0, so list_remove_at at 0 gives empty list
+  list_remove_at_length active_final (Some?.v (find_entry_by_idx active_final result_idx));
+  rewrite (forest_own (list_remove_at active_final (Some?.v (find_entry_by_idx active_final result_idx))))
        as emp;
   
-  // Prove same_frequency_multiset: from invariant, forall x. count x (all_leaf_freqs active_final) == count x full_list
-  // active_final has 1 entry, so all_leaf_freqs active_final == leaf_freqs ft
+  // Prove same_frequency_multiset
   all_leaf_freqs_singleton_full active_final (seq_to_pos_list freq_seq 0);
   
   // Clean up
