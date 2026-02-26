@@ -2,6 +2,7 @@ module CLRS.Ch26.MaxFlow.Complexity
 
 open FStar.Mul
 open CLRS.Ch26.MaxFlow.Spec
+open CLRS.Ch26.MaxFlow.Proofs
 
 (*
    Edmonds-Karp Algorithm Complexity Analysis (CLRS Theorem 26.8)
@@ -72,35 +73,158 @@ let lemma_distances_nondecreasing
     // independent of flow. Both sides of the inequality are equal.
     ()
 
-(** Critical edge: an edge that becomes saturated after augmentation *)
+(** Critical edge: a forward or backward residual edge that becomes saturated after augmentation *)
 let becomes_critical
   (cap: Seq.seq int)
   (flow flow': Seq.seq int)
   (n: nat{Seq.length cap == n * n /\ Seq.length flow == n * n /\ Seq.length flow' == n * n})
-  (u v: nat{u < n /\ v < n})
+  (u v: nat)
   : prop
-  = residual_capacity cap flow n u v > 0 /\
-    residual_capacity cap flow' n u v = 0
+  = if u < n && v < n then
+      // Forward edge (u,v) saturated: residual capacity drops to 0
+      (residual_capacity cap flow n u v > 0 /\ residual_capacity cap flow' n u v <= 0) \/
+      // Backward edge (u,v) saturated: f(v,u) drops to 0
+      (residual_capacity_backward flow n u v > 0 /\ residual_capacity_backward flow' n u v <= 0)
+    else False
 
-(** Lemma: Each augmentation makes at least one edge critical *)
-let lemma_augmentation_creates_critical_edge
-  (#n: nat)
+(** Helper: augment_edge preserves flow at (a, b) when a is neither endpoint *)
+let lemma_augment_edge_get_other_row (flow cap: Seq.seq int)
+                                      (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+                                      (u v: nat{u < n /\ v < n}) (delta: int)
+                                      (a b: nat{a < n /\ b < n})
+  : Lemma (requires a <> u /\ a <> v)
+          (ensures get (augment_edge flow cap n u v delta) n a b == get flow n a b)
+  = if residual_capacity cap flow n u v > 0 then
+      lemma_get_set_other flow n u v (get flow n u v + delta) a b
+    else
+      lemma_get_set_other flow n v u (get flow n v u - delta) a b
+
+(** Helper: augment_edge preserves flow at (b, a) when a is neither endpoint *)
+let lemma_augment_edge_get_other_row_sym (flow cap: Seq.seq int)
+                                          (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+                                          (u v: nat{u < n /\ v < n}) (delta: int)
+                                          (a b: nat{a < n /\ b < n})
+  : Lemma (requires a <> u /\ a <> v)
+          (ensures get (augment_edge flow cap n u v delta) n b a == get flow n b a)
+  = if residual_capacity cap flow n u v > 0 then
+      lemma_get_set_other flow n u v (get flow n u v + delta) b a
+    else
+      lemma_get_set_other flow n v u (get flow n v u - delta) b a
+
+(** Helper: augment_aux preserves flow at (a, b) when a ∉ path *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec lemma_augment_aux_get_not_on_path
+  (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (path: list nat{Cons? path /\ (forall (w: nat). FStar.List.Tot.mem w path ==> w < n)})
+  (bn: int) (a b: nat{a < n /\ b < n})
+  : Lemma
+    (requires distinct_vertices path /\ not (FStar.List.Tot.mem a path))
+    (ensures get (augment_aux flow cap n path bn) n a b == get flow n a b)
+    (decreases path)
+  = match path with
+    | [_] -> ()
+    | u :: v :: rest ->
+      let flow_1 = augment_edge flow cap n u v bn in
+      // a ∉ path, u ∈ path → a ≠ u. v ∈ path → a ≠ v.
+      lemma_augment_edge_get_other_row flow cap n u v bn a b;
+      // IH: augment_aux on tail preserves (a, b)
+      assert (not (FStar.List.Tot.mem a (v :: rest)));
+      assert (distinct_vertices (v :: rest));
+      lemma_augment_aux_get_not_on_path flow_1 cap n (v :: rest) bn a b
+
+(** Helper: augment_aux preserves flow at (b, a) when a ∉ path *)
+let rec lemma_augment_aux_get_not_on_path_sym
+  (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (path: list nat{Cons? path /\ (forall (w: nat). FStar.List.Tot.mem w path ==> w < n)})
+  (bn: int) (a b: nat{a < n /\ b < n})
+  : Lemma
+    (requires distinct_vertices path /\ not (FStar.List.Tot.mem a path))
+    (ensures get (augment_aux flow cap n path bn) n b a == get flow n b a)
+    (decreases path)
+  = match path with
+    | [_] -> ()
+    | u :: v :: rest ->
+      let flow_1 = augment_edge flow cap n u v bn in
+      lemma_augment_edge_get_other_row_sym flow cap n u v bn a b;
+      assert (not (FStar.List.Tot.mem a (v :: rest)));
+      assert (distinct_vertices (v :: rest));
+      lemma_augment_aux_get_not_on_path_sym flow_1 cap n (v :: rest) bn a b
+#pop-options
+
+(** Lemma: Each augmentation makes at least one edge critical.
+    Requires distinct_vertices (simple path) and that the bottleneck is
+    determined by an actual edge, not the max_int 32 sentinel. *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+let rec lemma_augmentation_creates_critical_edge
+  (#n: nat{n > 0})
   (cap: capacity_matrix n)
   (flow: flow_matrix n)
   (path: list nat{Cons? path /\ (forall (v: nat). FStar.List.Tot.mem v path ==> v < n)})
   (bn: int{bn > 0})
   : Lemma
-    (requires bn = bottleneck cap flow n path)
+    (requires
+      bn = bottleneck cap flow n path /\
+      bn < FStar.Int.max_int 32 /\
+      distinct_vertices path /\
+      Cons? (FStar.List.Tot.tl path))
     (ensures
       (let flow' = augment flow cap path bn in
-       exists (u: nat{u < n}) (v: nat{v < n}).
+       exists (u: nat) (v: nat).
          becomes_critical cap flow flow' n u v))
-  = // By definition, bottleneck is the minimum residual capacity on the path
-    // When we augment by the bottleneck amount, at least one edge that achieved
-    // this minimum becomes saturated (residual capacity drops to 0)
-    // This is a direct consequence of the bottleneck definition
-    assume (exists (u: nat{u < n}) (v: nat{v < n}).
-            becomes_critical cap flow (augment flow cap path bn) n u v)
+    (decreases path)
+  = let flow' = augment flow cap path bn in
+    match path with
+    | u :: [v] ->
+      // Single edge: bn < max_int 32 ensures bn = edge_cap (not sentinel)
+      let edge_cap =
+        if residual_capacity cap flow n u v > 0
+        then residual_capacity cap flow n u v
+        else residual_capacity_backward flow n u v in
+      assert (edge_cap == bn);
+      let flow_1 = augment_edge flow cap n u v bn in
+      if residual_capacity cap flow n u v > 0 then begin
+        assert (residual_capacity cap flow_1 n u v == 0);
+        assert (becomes_critical cap flow flow_1 n u v)
+      end else begin
+        assert (residual_capacity_backward flow_1 n u v == 0);
+        assert (becomes_critical cap flow flow_1 n u v)
+      end
+    | u :: v :: rest ->
+      let edge_cap =
+        if residual_capacity cap flow n u v > 0
+        then residual_capacity cap flow n u v
+        else residual_capacity_backward flow n u v in
+      let rest_bn = bottleneck_aux cap flow n (v :: rest) in
+      let flow_1 = augment_edge flow cap n u v bn in
+      if edge_cap <= rest_bn then begin
+        // This edge is the bottleneck (edge_cap = bn)
+        if residual_capacity cap flow n u v > 0 then
+          assert (residual_capacity cap flow_1 n u v == 0)
+        else
+          assert (residual_capacity_backward flow_1 n u v == 0);
+        // augment_aux on tail doesn't change (u,v) since u ∉ tail
+        assert (not (FStar.List.Tot.mem u (v :: rest)));
+        lemma_augment_aux_get_not_on_path flow_1 cap n (v :: rest) bn u v;
+        lemma_augment_aux_get_not_on_path_sym flow_1 cap n (v :: rest) bn u v;
+        assert (get flow' n u v == get flow_1 n u v);
+        assert (get flow' n v u == get flow_1 n v u);
+        if residual_capacity cap flow n u v > 0 then
+          assert (becomes_critical cap flow flow' n u v)
+        else
+          assert (becomes_critical cap flow flow' n u v)
+      end else begin
+        // Tail has the bottleneck. By IH on (v :: rest) with flow_1, some edge
+        // in the tail becomes critical. Since u ∉ tail, flow and flow_1 agree
+        // at all tail edge positions, so the criticality transfers.
+        lemma_bottleneck_unchanged cap flow n u v bn (v :: rest);
+        lemma_augmentation_creates_critical_edge cap flow_1 (v :: rest) bn;
+        // Transfer existential from flow_1-based to flow-based becomes_critical.
+        // Proof: u ∉ tail ⇒ flow_1 agrees with flow at all tail positions
+        //   (by lemma_augment_edge_get_other), and becomes_critical only depends on
+        //   flow values at the critical edge, which is in the tail.
+        admit () // TODO: existential witness transfer (all infrastructure proven above)
+      end
+#pop-options
 
 (** Lemma 26.8 (CLRS): Each edge can become critical at most V/2 times
     

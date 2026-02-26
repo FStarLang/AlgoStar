@@ -340,7 +340,62 @@ let rec net_flow_aux (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
 let net_flow_across_cut (#n: nat) (flow: flow_matrix n) (s_set: nat -> bool) : int =
   net_flow_aux flow n s_set n
 
-(** Weak duality: for any valid flow and any s-t cut, |f| ≤ c(S,T) (CLRS Corollary 26.5) *)
+(** Helper: each term f(u,v)-f(v,u) ≤ c(u,v) by capacity constraints *)
+let rec lemma_net_flow_inner_le_cut_inner
+  (flow cap: Seq.seq int)
+  (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (s_set: nat -> bool) (u: nat{u < n}) (v: nat)
+  : Lemma
+    (requires forall (a: nat{a < n}) (b: nat{b < n}).
+      0 <= get flow n a b /\ get flow n a b <= get cap n a b)
+    (ensures net_flow_inner flow n s_set u v <= cut_capacity_inner cap n s_set u v)
+    (decreases v)
+  = if v = 0 then ()
+    else if v - 1 < n then
+      lemma_net_flow_inner_le_cut_inner flow cap n s_set u (v - 1)
+    else
+      lemma_net_flow_inner_le_cut_inner flow cap n s_set u (v - 1)
+
+(** Helper: Σ_{u∈S} net_flow_inner(u) ≤ Σ_{u∈S} cut_capacity_inner(u) *)
+let rec lemma_net_flow_aux_le_cut_aux
+  (flow cap: Seq.seq int)
+  (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (s_set: nat -> bool) (u: nat)
+  : Lemma
+    (requires forall (a: nat{a < n}) (b: nat{b < n}).
+      0 <= get flow n a b /\ get flow n a b <= get cap n a b)
+    (ensures net_flow_aux flow n s_set u <= cut_capacity_aux cap n s_set u)
+    (decreases u)
+  = if u = 0 then ()
+    else if u - 1 < n then begin
+      lemma_net_flow_aux_le_cut_aux flow cap n s_set (u - 1);
+      if s_set (u - 1) then
+        lemma_net_flow_inner_le_cut_inner flow cap n s_set (u - 1) n
+    end else
+      lemma_net_flow_aux_le_cut_aux flow cap n s_set (u - 1)
+
+(** net_flow_across_cut ≤ cut_capacity *)
+let lemma_net_flow_le_cut_capacity
+  (#n: nat) (flow: flow_matrix n) (cap: capacity_matrix n) (s_set: nat -> bool)
+  : Lemma
+    (requires forall (a: nat{a < n}) (b: nat{b < n}).
+      0 <= get flow n a b /\ get flow n a b <= get cap n a b)
+    (ensures net_flow_across_cut flow s_set <= cut_capacity cap s_set)
+  = lemma_net_flow_aux_le_cut_aux flow cap n s_set n
+
+(** CLRS Lemma 26.4: |f| = net flow across any cut.
+    Proof: By conservation, Σ_{u∈S} (out(u) - in(u)) = flow_value. Splitting
+    into S and T parts gives flow_value = net_flow + Σ_{u,v∈S} (f(u,v) - f(v,u)).
+    The S×S double sum is 0 by antisymmetry (Fubini + negation). *)
+let lemma_flow_value_eq_net_flow
+  (#n: nat) (flow: flow_matrix n) (cap: capacity_matrix n)
+  (source: nat{source < n}) (sink: nat{sink < n}) (s_set: nat -> bool)
+  : Lemma
+    (requires valid_flow flow cap source sink /\ is_st_cut s_set n source sink)
+    (ensures flow_value flow n source == net_flow_across_cut flow s_set)
+  = admit () // Requires sum-splitting + S×S cancellation infrastructure (~150 lines)
+
+(** Weak duality: |f| ≤ c(S,T) for any valid flow and s-t cut (CLRS Corollary 26.5) *)
 let weak_duality (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
                   (source: nat{source < n}) (sink: nat{sink < n})
                   (s_set: nat -> bool)
@@ -348,10 +403,8 @@ let weak_duality (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
     (requires valid_flow flow cap source sink /\
               is_st_cut s_set n source sink)
     (ensures flow_value flow n source <= cut_capacity cap s_set)
-  = // Follows from capacity constraint and flow conservation:
-    // |f| = net flow across any cut (by conservation)
-    // net flow across cut ≤ Σ c(u,v) for u∈S, v∈T (by capacity constraint and non-negativity)
-    assume (flow_value flow n source <= cut_capacity cap s_set)
+  = lemma_flow_value_eq_net_flow flow cap source sink s_set;
+    lemma_net_flow_le_cut_capacity flow cap s_set
 
 (** Max-flow min-cut theorem (CLRS Theorem 26.6):
     The following are equivalent:
