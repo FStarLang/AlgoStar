@@ -5,12 +5,13 @@ Decomposition into independent agent tasks for parallel execution.
 
 **Codebase stats**:
 - 182 F*/Pulse files, ~73,800 lines across 23 chapters + common
-- **11 total unproven obligations** (was 14; Task A eliminated 1, Task F eliminated 1, Task E eliminated 1 + improved 1) (7 `admit()`, 3 `assume()`, 1 `assume_`)
-  across 6 files in 5 chapters
-- 1 file broken (doesn't compile): `DFS.WhitePath.fst`
-- 5 files have uncommitted changes (3 RadixSort, 1 Huffman, 1 WhitePath)
+- **2 total unproven obligations** (was 14; 12 eliminated by agents, down from 97 at AUDIT_0223)
+  - `ch23/Kruskal.fst:313` — `assume_` for UF forest acyclicity (TRUE but unproven; needs ~300 lines UF soundness)
+  - `ch26/MaxFlow.Spec.fst:633` — `assume` for MFMC strong duality (needs ~500 lines graph theory)
+- 0 files broken (DFS.WhitePath.fst fixed)
+- Multiple files have uncommitted changes (RadixSort, Huffman, WhitePath, MaxFlow.Complexity)
 
-**Change since AUDIT_0223 (2025-02-23): 97 → 14 unproven obligations (−83, 86% reduction)**
+**Change since AUDIT_0223 (2025-02-23): 97 → 2 unproven obligations (−95, 98% reduction)**
 
 ---
 
@@ -18,26 +19,26 @@ Decomposition into independent agent tasks for parallel execution.
 
 | # | File | Type | Line | Description |
 |---|------|------|------|-------------|
-| 1 | `ch08/RadixSort.MultiDigit.fst` | `admit()` | 394 | `stable_sort_preserves_digit_order`: stability of counting sort preserves prior digit ordering |
-| 2 | `ch08/RadixSort.MultiDigit.fst` | `admit()` | 415 | `stable_sort_implies_sorted_up_to`: consequence of stability preservation |
-| 3 | `ch16/Huffman.fst` | `admit()` | 872 | PQ loop: prove `find_entry_by_idx remaining1 idx2 = Some _` (second tree exists in forest after removing first) |
-| 4 | `ch16/Huffman.fst` | `admit()` | 901 | Post-loop: prove `forest_own []` is emp after extracting single remaining tree |
-| 5 | `ch21/UnionFind.Spec.fst` | `assume()` | 126 | `ranks_bounded` after path compression in `find` |
-| 6 | `ch22/DFS.WhitePath.fst` | `admit()` | 671 | White-path backward: timestamp containment for visited vertex in DFS subtree |
-| 7 | `ch22/DFS.WhitePath.fst` | `admit()` | 781 | White-path backward: `d_top[u_start]` ordering when u_start is DFS root |
-| 8 | `ch22/DFS.WhitePath.fst` | `admit()` | 793 | White-path backward: relative discovery time ordering within DFS subtree |
+| ~~1~~ | ~~`ch08/RadixSort.MultiDigit.fst`~~ | ~~`admit()`~~ | ~~394~~ | ~~ELIMINATED~~ |
+| ~~2~~ | ~~`ch08/RadixSort.MultiDigit.fst`~~ | ~~`admit()`~~ | ~~415~~ | ~~ELIMINATED~~ |
+| ~~3~~ | ~~`ch16/Huffman.fst`~~ | ~~`admit()`~~ | ~~872~~ | ~~ELIMINATED~~ |
+| ~~4~~ | ~~`ch16/Huffman.fst`~~ | ~~`admit()`~~ | ~~901~~ | ~~ELIMINATED~~ |
+| ~~5~~ | ~~`ch21/UnionFind.Spec.fst`~~ | ~~`assume()`~~ | ~~126~~ | ~~ELIMINATED~~ |
+| ~~6~~ | ~~`ch22/DFS.WhitePath.fst`~~ | ~~`admit()`~~ | ~~671~~ | ~~ELIMINATED~~ |
+| ~~7~~ | ~~`ch22/DFS.WhitePath.fst`~~ | ~~`admit()`~~ | ~~781~~ | ~~ELIMINATED~~ |
+| ~~8~~ | ~~`ch22/DFS.WhitePath.fst`~~ | ~~`admit()`~~ | ~~793~~ | ~~ELIMINATED~~ |
 | 9 | `ch23/Kruskal.fst` | `assume_` | 313 | Forest acyclicity via UF soundness (TRUE but unproven; was FALSE `assume val` at line 81) |
 | ~~10~~ | ~~`ch23/Kruskal.SortedEdges.fst`~~ | ~~`assume()`~~ | ~~266~~ | ~~ELIMINATED: refactored to use Kruskal.Spec's proven `kruskal_step`~~ |
-| ~~11~~ | ~~`ch24/ShortestPath.Triangle.fst`~~ | ~~`admit()`~~ | ~~141~~ | ~~ELIMINATED: `sp_dist_k_stabilize` fully proven via chain-of-predecessors + pigeonhole~~ |
-| 12 | `ch26/MaxFlow.Spec.fst` | `assume()` | 354 | Weak duality: flow value ≤ cut capacity |
-| 13 | `ch26/MaxFlow.Spec.fst` | `assume()` | 382 | Min-cut existence for max flow |
-| 14 | `ch26/MaxFlow.Complexity.fst` | `assume()` | 102 | Augmenting path existence when flow is not maximum |
+| ~~11~~ | ~~`ch24/ShortestPath.Triangle.fst`~~ | ~~`admit()`~~ | ~~141~~ | ~~ELIMINATED: `sp_dist_k_stabilize` fully proven~~ |
+| ~~12~~ | ~~`ch26/MaxFlow.Spec.fst`~~ | ~~`assume()`~~ | ~~354~~ | ~~ELIMINATED: weak duality fully proven via `lemma_flow_value_eq_net_flow` + `lemma_net_flow_le_cut_capacity`~~ |
+| 13 | `ch26/MaxFlow.Spec.fst` | `assume()` | 633 | MFMC strong duality: when no augmenting path exists, flow = min-cut capacity |
+| ~~14~~ | ~~`ch26/MaxFlow.Complexity.fst`~~ | ~~`assume()`~~ | ~~102~~ | ~~ELIMINATED: `lemma_transfer_critical` proves existential transfer~~ |
 
 ### Broken Files
 
 | File | Error | Cause |
 |------|-------|-------|
-| `ch22/DFS.WhitePath.fst` | `Error 72: Identifier not found: get_white_neighbors_edges` (line 573) | Uncommitted WIP — references undefined function |
+| ~~`ch22/DFS.WhitePath.fst`~~ | ~~Fixed~~ | ~~Now compiles~~ |
 
 ---
 
@@ -254,23 +255,20 @@ implementation. **Low priority** — proving MFMC requires substantial graph the
 | Task | Admits | Files Touched | Priority | Difficulty | Dependencies | Status |
 |------|--------|---------------|----------|------------|--------------|--------|
 | A: sp_dist_k_stabilize | ~~1~~ 0 | ch24/ShortestPath.Triangle.fst | HIGH | Medium (~150 lines) | FStar.Fin, ShortestPath.Spec | ✅ **Done** |
-| B: Huffman forest | 2 | ch16/Huffman.fst | HIGH | Medium (~50 lines) | Huffman.Spec | **⚠️ Being worked on** |
-| C: DFS WhitePath backward | 3+err | ch22/DFS.WhitePath.fst | HIGH | Hard (~200 lines) | DFS.Spec | **⚠️ Being worked on** |
-| D: RadixSort stability | 2 | ch08/RadixSort.MultiDigit.fst | HIGH | Hard (~100 lines) | Stability, CountingSort.Stable | **⚠️ Being worked on** |
+| B: Huffman forest | ~~2~~ 0 | ch16/Huffman.fst | HIGH | Medium (~50 lines) | Huffman.Spec | ✅ **Done** |
+| C: DFS WhitePath backward | ~~3+err~~ 0 | ch22/DFS.WhitePath.fst | HIGH | Hard (~200 lines) | DFS.Spec | ✅ **Done** |
+| D: RadixSort stability | ~~2~~ 0 | ch08/RadixSort.MultiDigit.fst | HIGH | Hard (~100 lines) | Stability, CountingSort.Stable | ✅ **Done** |
 | E: Kruskal acyclicity | ~~2~~ 1 | ch23/Kruskal.fst, SortedEdges.fst | MEDIUM | Medium (~100 lines) | MST.Spec | ✅ **Partially done** (1 eliminated, 1 improved) |
 | F: UnionFind ranks | ~~1~~ 0 | ch21/UnionFind.Spec.fst | LOW | Easy (~15 lines) | None | ✅ **Done** |
-| G: MaxFlow MFMC | 3→1a+1 | ch26/MaxFlow.{Spec,Complexity}.fst | LOW | Mostly done | weak_duality proven | **Done** |
+| G: MaxFlow MFMC | ~~3~~ 1 | ch26/MaxFlow.{Spec,Complexity}.fst | LOW | Hard | weak_duality proven, Complexity admit eliminated | ✅ **Mostly done** (1 deep theorem remains) |
 
 ### Independence Matrix
 
-All tasks touch disjoint files and are fully independent of each other.
-
-- Tasks B, C, D have active uncommitted changes — new agents should start from those working copies.
-- Tasks A, E, F, G can start from HEAD.
+All tasks complete except residual hard assumptions in E and G.
 
 ---
 
-## Zero-Admit Chapters (18 of 23)
+## Zero-Admit Chapters (21 of 23)
 
 These chapters have **zero unproven obligations** across all their files:
 
@@ -280,12 +278,17 @@ These chapters have **zero unproven obligations** across all their files:
 | ch04 Divide & Conquer | 9 | 1,921 | BinarySearch, MaxSubarray — full specs |
 | ch06 Heapsort | 3 | 1,230 | sorted ∧ perm, complexity separate |
 | ch07 Quicksort | 6 | 2,065 | Partition + QSort, linked O(n²) |
+| ch08 Linear Sorting | 12 | ~4,000 | RadixSort, CountingSort — fully proven ✅ |
 | ch09 Order Statistics | 12 | 2,650 | MinMax, Quickselect — full specs |
 | ch10 Elementary DS | 16 | 3,720 | Stack, Queue, SLL, DLL — zero admits |
 | ch11 Hash Tables | 4 | 787 | Open addressing, linked O(n) |
 | ch12 BST | 8 | 3,403 | Search/Insert/Delete — zero admits |
 | ch13 Red-Black Trees | 3 | 1,432 | Pointer-based, Okasaki balance |
 | ch15 Dynamic Programming | 12 | 3,239 | LCS, RodCutting, MatrixChain — all proven |
+| ch16 Greedy | ~5 | ~2,000 | Huffman — fully proven ✅ |
+| ch21 Disjoint Sets | 6 | ~1,500 | UnionFind — fully proven ✅ |
+| ch22 Elementary Graph | ~12 | ~6,000 | DFS, BFS, WhitePath — fully proven ✅ |
+| ch24 Single-Source SP | 11 | ~3,500 | Dijkstra, Bellman-Ford — fully proven ✅ |
 | ch25 All-Pairs SP | 4 | 856 | Floyd-Warshall — exact spec, linked O(n³) |
 | ch28 Matrix Ops | 3 | 1,401 | MatMul + Strassen — zero admits |
 | ch31 Number Theory | 5 | 871 | GCD, ExtGCD, ModExp — Bézout, Lamé |
@@ -293,12 +296,9 @@ These chapters have **zero unproven obligations** across all their files:
 | ch33 Comp Geometry | 2 | 228 | Segments — full specs |
 | ch35 Approximation | 3 | 850 | VertexCover — zero admits |
 
-**Total zero-admit: 106 files, ~29,619 lines**
-
-Plus chapters with very few remaining obligations:
-- ch08 (2 admits in MultiDigit only, 10 other files clean)
-- ch21 (1 assume in Spec only, 5 other files clean)
-- ~~ch24 (1 admit in Triangle only, 10 other files clean)~~ → ch24 now ZERO admits ✅
+Chapters with remaining obligations:
+- ch23 MST (1 `assume_` in Kruskal.fst — UF soundness, all other files clean)
+- ch26 MaxFlow (1 `assume` in MaxFlow.Spec.fst — MFMC theorem, all other files clean)
 
 ---
 
@@ -306,27 +306,31 @@ Plus chapters with very few remaining obligations:
 
 | File | Compiles? | Admits | Notes |
 |------|-----------|--------|-------|
-| ch08/RadixSort.MultiDigit.fst | ✅ | 2 | Uncommitted changes, verifies |
-| ch08/RadixSort.FullSort.fst | ✅ | 0 | Uncommitted changes, verifies |
-| ch08/RadixSort.Stability.fst | ✅ | 0 | Uncommitted changes, verifies |
-| ch08/RadixSort.Spec.fst | ✅ | 0 | Uncommitted changes, verifies |
-| ch16/Huffman.fst | ✅ | 2 | Uncommitted changes, verifies |
-| ch22/DFS.WhitePath.fst | ❌ | 3 | Error 72: `get_white_neighbors_edges` not found |
-| ch24/ShortestPath.Triangle.fst | ✅ | 0 | Committed, fully proven (was 1 admit) |
+| ch08/RadixSort.MultiDigit.fst | ✅ | 0 | Uncommitted changes, fully proven |
+| ch16/Huffman.fst | ✅ | 0 | Uncommitted changes, fully proven |
+| ch22/DFS.WhitePath.fst | ✅ | 0 | Uncommitted changes, fully proven |
+| ch23/Kruskal.fst | ✅ | 1 assume_ | Committed |
+| ch23/Kruskal.SortedEdges.fst | ✅ | 0 | Committed, fully proven |
+| ch24/ShortestPath.Triangle.fst | ✅ | 0 | Committed, fully proven |
+| ch26/MaxFlow.Spec.fst | ✅ | 1 assume | MFMC theorem |
+| ch26/MaxFlow.Complexity.fst | ✅ | 0 | Uncommitted changes, fully proven |
 
 ---
 
-## Recommended Priorities
+## Remaining Work
 
-### Highest Impact (eliminate admits in verified, compilable code)
-1. ~~**TASK A** (sp_dist_k_stabilize)~~ ✅ Done — Dijkstra equality proof chain complete, zero admits.
-2. **TASK F** (UnionFind ranks) — Trivial: path compression doesn't change ranks. ~15 lines.
+Only 2 unproven obligations remain. Both are deep mathematical theorems:
 
-### Medium Impact (complete ongoing work)
-3. **TASK B** (Huffman) — 2 admits in Pulse forest management. Already close.
-4. **TASK D** (RadixSort) — 2 admits in stability. Core CLRS correctness.
-5. **TASK E** (Kruskal) — ~~2 obligations~~ 1 remaining `assume_` (TRUE). UF soundness proof needed.
+1. **Kruskal UF soundness** (`ch23/Kruskal.fst:313`): Prove that union-find-based cycle
+   detection correctly identifies connected components. Requires ~300 lines:
+   - Strengthen `find` postcondition to track component representatives
+   - Define pure UF simulation (`uf_find_seq`)
+   - Prove `find(u) ≠ find(v) ⟹ ¬(reachable edges u v)`
+   - Apply `acyclic_when_unreachable` from MST.Spec
 
-### Lower Priority
-6. **TASK C** (DFS WhitePath) — Currently broken. Hard proof (backward white-path theorem).
-7. **TASK G** (MaxFlow) — Implementation is a stub. Proving MFMC axioms without real algorithm is academic exercise.
+2. **Max-Flow Min-Cut theorem** (`ch26/MaxFlow.Spec.fst:633`): Prove that when no
+   augmenting path exists, the flow value equals some cut capacity. Requires ~500 lines:
+   - Define reachability in residual graph
+   - Construct the min-cut S = {v : reachable from source in G_f}
+   - Prove flow saturates all edges crossing (S, T)
+   - Prove c(S,T) = |f|
