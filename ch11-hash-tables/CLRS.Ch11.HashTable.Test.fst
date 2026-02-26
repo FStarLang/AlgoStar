@@ -7,6 +7,7 @@ open CLRS.Ch11.HashTable
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
@@ -21,20 +22,26 @@ fn test_hash_table ()
   let table = V.vec_to_array tv;
   rewrite (A.pts_to (V.vec_to_array tv) (Seq.create 5 (-1))) as (A.pts_to table (Seq.create 5 (-1)));
   
+  // Ghost tick counter for complexity tracking
+  let ctr = GR.alloc #nat 0;
+  
   // Insert key 10 (should go to position 10 % 5 = 0)
-  let success1 = hash_insert table 5sz 10;
+  let success1 = hash_insert table 5sz 10 ctr;
   
   // Insert key 23 (should go to position 23 % 5 = 3)
-  let success2 = hash_insert table 5sz 23;
+  let success2 = hash_insert table 5sz 23 ctr;
   
   // Search for key 10 (should find it at position 0)
-  let idx1 = hash_search table 5sz 10;
+  let idx1 = hash_search table 5sz 10 ctr;
   
   // Search for key 23 (should find it at position 3)
-  let idx2 = hash_search table 5sz 23;
+  let idx2 = hash_search table 5sz 23 ctr;
   
   // Search for key 99 (not present, should return 5)
-  let idx3 = hash_search table 5sz 99;
+  let idx3 = hash_search table 5sz 99 ctr;
+  
+  // Free the ghost counter
+  GR.free ctr;
   
   // Free the table
   with s. assert (A.pts_to table s);

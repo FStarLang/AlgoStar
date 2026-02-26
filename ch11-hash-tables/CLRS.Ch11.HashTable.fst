@@ -1,3 +1,18 @@
+(*
+   Hash Table with Open Addressing — Correctness and Complexity
+
+   CLRS §11.4: Open addressing hash table operations with linear probing.
+
+   Proves both correctness and worst-case complexity:
+   - INSERT: key_in_table when successful, unchanged when full; O(n) probes
+   - SEARCH: found index contains key; O(n) probes
+
+   Uses GhostReference.ref nat for tick counter — fully erased at runtime.
+   Each probe operation (array access + comparison) gets one ghost tick.
+
+   NO admits. NO assumes.
+*)
+
 module CLRS.Ch11.HashTable
 #lang-pulse
 open Pulse.Lib.Pervasives
@@ -8,11 +23,36 @@ open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
 // Hash table with open addressing using linear probing
 // Sentinel values: -1 = empty, -2 = deleted, >= 0 = valid key
+
+// ========== Ghost tick primitives ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+// ========== Complexity bound predicates ==========
+
+//SNIPPET_START: ht_complexity_bounds
+// Insert complexity: at most n probes
+let hash_insert_complexity_bounded (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 <= n
+
+// Search complexity: at most n probes
+let hash_search_complexity_bounded (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 <= n
+//SNIPPET_END: ht_complexity_bounds
 
 //SNIPPET_START: ht_hash
 // Hash function: h(k) = k % table_size
@@ -69,33 +109,29 @@ let lemma_probes_not_key_inst
 let seq_modified_at (s s': Seq.seq int) (idx: nat{idx < Seq.length s /\ Seq.length s' == Seq.length s}) : prop =
   forall (j: nat). j < Seq.length s /\ j =!= idx ==> Seq.index s j == Seq.index s' j
 
-// Postcondition predicate for insert
-let insert_post (table: A.array int) (s: Seq.seq int) (size: nat{size > 0}) (key: int{key >= 0}) (result: bool) : slprop =
-  exists* s'.
-    A.pts_to table s' **
-    pure (Seq.length s' == size /\
-      (result ==> key_in_table s' size key) /\
-      (not result ==> s' == s))
 // Returns true if successful, false if table is full
-// Specification (informal): 
-//   - If result == true, key_in_table holds for the final state
-//   - If result == false, the table is unchanged
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+// Proves both correctness and O(n) complexity
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_insert
 fn hash_insert
   (table: A.array int)
   (#s: erased (Seq.seq int))
   (size: SZ.t)
   (key: int)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to table s **
+    GR.pts_to ctr c0 **
     pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key)
   returns result: bool
-  ensures exists* s'.
+  ensures exists* s' cf.
     A.pts_to table s' **
+    GR.pts_to ctr cf **
     pure (
       Seq.length s' == SZ.v size /\
-      (if result then key_in_table s' (SZ.v size) key else s' == s)
+      (if result then key_in_table s' (SZ.v size) key else s' == s) /\
+      cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
 //SNIPPET_END: ht_hash_insert
 {
@@ -108,22 +144,29 @@ fn hash_insert
     let vi = !i;
     (not vdone && vi <^ size)
   )
-  invariant exists* vi vinserted vdone st.
+  invariant exists* vi vinserted vdone st vc.
     R.pts_to i vi **
     R.pts_to inserted vinserted **
     R.pts_to done vdone **
     A.pts_to table st **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v size /\
       Seq.length st == SZ.v size /\
-      // If inserted, key is in the table
+      // Correctness invariants
       (vinserted == true ==> key_in_table st (SZ.v size) key) /\
-      // If not inserted yet, table unchanged
-      (vinserted == false ==> Seq.equal st s)
+      (vinserted == false ==> Seq.equal st s) /\
+      // Complexity invariant: exactly vi probes so far
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi
     )
   {
     let vi = !i;
     let idx = hash_probe key vi size;
+    
+    // Tick: one probe operation (array access + comparisons)
+    tick ctr;
+    
     let slot = A.op_Array_Access table idx;
     
     // Check if we can insert here (empty or deleted)
@@ -152,42 +195,35 @@ fn hash_insert
 }
 #pop-options
 
-// Postcondition predicate for search
-let search_post (table: A.array int) (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: int{key >= 0}) (result: SZ.t) : slprop =
-  A.pts_to table s **
-  pure (
-    SZ.v result <= size /\
-    (SZ.v result < size ==> Seq.index s (SZ.v result) == key) /\
-    (SZ.v result == size ==> 
-      (exists (n: nat). n <= size /\ 
-        probes_not_key s size key n /\
-        (n < size ==> Seq.index s (hash_probe_nat key n size) == -1)))
-  )
-
 // Search for a key in the hash table
 // Returns the index if found, or returns size (invalid index) if not found
-// Specification (informal):
-//   - If result < size: Seq.index s result == key (found at that index)
-//   - If result == size: key not in table (checked probe sequence until empty slot)
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+// Proves both correctness and O(n) complexity
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_search
 fn hash_search
   (table: A.array int)
   (#s: erased (Seq.seq int))
   (size: SZ.t)
   (key: int)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to table s **
+    GR.pts_to ctr c0 **
     pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key)
   returns result: SZ.t
-  ensures 
+  ensures exists* cf.
     A.pts_to table s **
+    GR.pts_to ctr cf **
     pure (
       SZ.v result <= SZ.v size /\
+      // Functional correctness
       (SZ.v result < SZ.v size ==> (
         SZ.v result < Seq.length s /\
         Seq.index s (SZ.v result) == key
-      ))
+      )) /\
+      // Complexity bound: at most size probes
+      cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
 //SNIPPET_END: ht_hash_search
 {
@@ -200,26 +236,32 @@ fn hash_search
     let vi = !i;
     (not vdone && vi <^ size)
   )
-  invariant exists* vi vfound_idx vdone.
+  invariant exists* vi vfound_idx vdone vc.
     R.pts_to i vi **
     R.pts_to found_idx vfound_idx **
     R.pts_to done vdone **
     A.pts_to table s **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v size /\
       SZ.v vfound_idx <= SZ.v size /\
       Seq.length s == SZ.v size /\
-      // If found, found_idx points to the key
+      // Functional invariants
       (SZ.v vfound_idx < SZ.v size ==> Seq.index s (SZ.v vfound_idx) == key) /\
-      // If not found yet, all probes so far were not the key
       (SZ.v vfound_idx == SZ.v size ==> probes_not_key s (SZ.v size) key (SZ.v vi)) /\
-      // If done and not found, we hit an empty slot
       (vdone /\ SZ.v vfound_idx == SZ.v size ==> 
-        (exists (probe: nat). probe < SZ.v vi /\ Seq.index s (hash_probe_nat key probe (SZ.v size)) == -1))
+        (exists (probe: nat). probe < SZ.v vi /\ Seq.index s (hash_probe_nat key probe (SZ.v size)) == -1)) /\
+      // Complexity invariant: exactly vi probes so far
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi
     )
   {
     let vi = !i;
     let idx = hash_probe key vi size;
+    
+    // Tick: one probe operation (array access + comparisons)
+    tick ctr;
+    
     let slot = A.op_Array_Access table idx;
     
     // Found the key
@@ -244,3 +286,26 @@ fn hash_search
   !found_idx
 }
 #pop-options
+
+// ========== Pure complexity lemmas ==========
+
+// Worst-case number of operations for hash table insertion
+let hash_insert_worst (n: nat) : nat = n
+
+// Worst-case number of operations for hash table search
+let hash_search_worst (n: nat) : nat = n
+
+// Insert is linear in worst case
+let hash_insert_linear (n: nat) 
+  : Lemma (ensures hash_insert_worst n <= n) 
+  = ()
+
+// Search is linear in worst case
+let hash_search_linear (n: nat) 
+  : Lemma (ensures hash_search_worst n <= n) 
+  = ()
+
+// Combined lemma: both operations are O(n)
+let hash_operations_linear (n: nat)
+  : Lemma (ensures hash_insert_worst n + hash_search_worst n <= op_Multiply 2 n)
+  = ()

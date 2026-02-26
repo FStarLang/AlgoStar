@@ -144,7 +144,7 @@ The worst-case complexity of both operations is O(n) where n is the
 table capacity: in the worst case, every slot must be probed. The
 complexity bounds are defined as:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Complexity.fst
+.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.fst
    :language: fstar
    :start-after: //SNIPPET_START: ht_complexity_bounds
    :end-before: //SNIPPET_END: ht_complexity_bounds
@@ -152,10 +152,10 @@ complexity bounds are defined as:
 The instrumented insert function threads a ghost tick counter,
 calling ``tick`` once per probe:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Complexity.fst
+.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.fst
    :language: pulse
-   :start-after: //SNIPPET_START: ht_insert_complexity
-   :end-before: //SNIPPET_END: ht_insert_complexity
+   :start-after: //SNIPPET_START: ht_hash_insert
+   :end-before: //SNIPPET_END: ht_hash_insert
 
 The loop invariant maintains ``vc - c0 == vi`` (exactly one tick per
 probe), and the loop exits when ``vi == size``, giving
@@ -163,10 +163,10 @@ probe), and the loop exits when ``vi == size``, giving
 
 The instrumented search function has the same structure:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Complexity.fst
+.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.fst
    :language: pulse
-   :start-after: //SNIPPET_START: ht_search_complexity
-   :end-before: //SNIPPET_END: ht_search_complexity
+   :start-after: //SNIPPET_START: ht_hash_search
+   :end-before: //SNIPPET_END: ht_hash_search
 
 The postcondition combines functional correctness (found index
 contains the key) with the complexity bound (at most ``size`` probes).
