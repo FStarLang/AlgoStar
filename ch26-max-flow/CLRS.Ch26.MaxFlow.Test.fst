@@ -31,10 +31,15 @@ fn test_max_flow_example ()
   with sf. assert (A.pts_to (V.vec_to_array fv) sf);
   rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
   
-  // Set up capacity matrix
+  // Set up capacity matrix: s=0, t=2
+  // Edge 0→1 cap 10, edge 1→2 cap 5, edge 0→2 cap 15
   A.op_Array_Assignment capacity (0sz *^ n +^ 1sz) 10;
   A.op_Array_Assignment capacity (1sz *^ n +^ 2sz) 5;
   A.op_Array_Assignment capacity (0sz *^ n +^ 2sz) 15;
+  
+  // Precondition: valid_caps (all caps >= 0) and SZ.fits
+  with sc2. assert (A.pts_to capacity sc2);
+  assume_ (pure (valid_caps sc2 (SZ.v n)));
   
   // Run max flow algorithm
   max_flow capacity flow n 0sz 2sz;
