@@ -164,7 +164,7 @@ n − 1 extract-max iterations plus the build-heap cost of 2n.
 Enhanced Complexity Analysis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The enhanced module proves tighter results following CLRS more
+The same module also proves tighter results following CLRS more
 closely.
 
 **BUILD-MAX-HEAP is O(n)** (CLRS Theorem 6.3): the sum
@@ -174,21 +174,21 @@ bounds the floor sum using the identity
 ∑ h·2^(H−h) = 2^(H+1) − H − 2, and bounds the correction by
 h(h+1) ≤ 2·2^h ≤ 2n:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.Enhanced.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: build_heap_ops_linear
    :end-before: //SNIPPET_END: build_heap_ops_linear
 
 **Overall O(n log n)** with constant 6:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.Enhanced.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: heapsort_ops_simplified
    :end-before: //SNIPPET_END: heapsort_ops_simplified
 
 **Heapsort beats quadratic sorting** for n ≥ 11:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.Enhanced.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: heapsort_better_than_quadratic
    :end-before: //SNIPPET_END: heapsort_better_than_quadratic

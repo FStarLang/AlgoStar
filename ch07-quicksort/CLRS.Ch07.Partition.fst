@@ -5,12 +5,16 @@
    before all elements > pivot, using the two-pointer approach from CLRS.
    This is the key building block used by Quicksort.
    
+   Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
+   Each comparison (one per iteration) gets exactly one ghost tick.
+   
    Proves:
    1. Memory safety
    2. Length preservation  
    3. Return value is valid partition point (0 <= result <= n)
    4. Permutation: output is a rearrangement of input
    5. Partition correctness: elements before split <= pivot, after > pivot
+   6. Complexity: exactly n comparisons (one per element)
    
    NO admits. NO assumes.
 *)
@@ -25,9 +29,24 @@ open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
+
+// ========== Ghost tick ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+// ========== Definitions ==========
 
 //SNIPPET_START: is_partitioned
 // Partition predicate: all elements before split are <= pivot,
@@ -152,7 +171,11 @@ let lemma_no_swap_preserves_partition
       (forall (k: nat). i <= k /\ k <= j ==> Seq.index s k > pivot))
   = ()
 
-// ========== Main Algorithm ==========
+// ========== Complexity bound predicate ==========
+let complexity_bounded_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n
+
+// ========== Main Algorithm with Complexity ==========
 
 //SNIPPET_START: partition_sig
 fn partition
@@ -160,8 +183,10 @@ fn partition
   (n: SZ.t)
   (pivot: int)
   (#s0: erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
 requires
-  A.pts_to a s0 **
+  A.pts_to a s0 ** GR.pts_to ctr c0 **
   pure (
     SZ.v n <= A.length a /\
     SZ.v n == Seq.length s0 /\
@@ -169,24 +194,26 @@ requires
     (forall (i: nat). i < Seq.length s0 ==> Seq.index s0 i >= 0)
   )
 returns result:SZ.t
-ensures exists* s.
-  A.pts_to a s **
+ensures exists* s (cf: nat).
+  A.pts_to a s ** GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     SZ.v result <= SZ.v n /\
     permutation s0 s /\
-    is_partitioned s pivot (SZ.v result)
-//SNIPPET_END: partition_sig
+    is_partitioned s pivot (SZ.v result) /\
+    complexity_bounded_linear cf (reveal c0) (SZ.v n)
   )
+//SNIPPET_END: partition_sig
 {
   let mut i: SZ.t = 0sz;
   let mut j: SZ.t = 0sz;
   
   while (!j <^ n)
-  invariant exists* vi vj s_cur.
+  invariant exists* vi vj s_cur (vc: nat).
     R.pts_to i vi **
     R.pts_to j vj **
     A.pts_to a s_cur **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v vj /\
       SZ.v vj <= SZ.v n /\
@@ -195,7 +222,9 @@ ensures exists* s.
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
       (forall (k: nat). k < SZ.v vi ==> Seq.index s_cur k <= pivot) /\
-      (forall (k: nat). SZ.v vi <= k /\ k < SZ.v vj ==> Seq.index s_cur k > pivot)
+      (forall (k: nat). SZ.v vi <= k /\ k < SZ.v vj ==> Seq.index s_cur k > pivot) /\
+      // Complexity: exactly vj comparisons so far (relative to c0)
+      vc == reveal c0 + SZ.v vj
     )
   {
     let vj = !j;
@@ -210,8 +239,11 @@ ensures exists* s.
     let aj = a.(vj);
     let ai = a.(vi);
     
-    // Determine if we should swap
+    // Determine if we should swap - THIS IS THE COMPARISON
     let should_swap = (aj <= pivot);
+    
+    // Tick for the comparison
+    tick ctr;
     
     // Unconditional writes with conditional values
     let new_ai = (if should_swap then aj else ai);
@@ -235,5 +267,6 @@ ensures exists* s.
     }
   };
   
+  // At loop exit: vj == n, so cf == c0 + n
   !i
 }

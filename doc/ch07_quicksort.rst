@@ -36,16 +36,15 @@ onward are > the pivot:
 The Pulse implementation scans the array with two indices ``i`` and ``j``.
 At each step it compares ``a[j]`` to the pivot and conditionally swaps
 ``a[i]`` and ``a[j]``, advancing ``i`` when a swap occurs. The function
-signature captures the full specification:
+also proves **exactly n comparisons** via a ghost tick counter. The
+postcondition guarantees: (1) the result is a valid split point, (2)
+the output is a permutation of the input, (3) the partition predicate
+holds, and (4) the complexity bound:
 
 .. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Partition.fst
    :language: pulse
    :start-after: //SNIPPET_START: partition_sig
    :end-before: //SNIPPET_END: partition_sig
-
-The postcondition guarantees: (1) the result is a valid split point, (2)
-the output is a permutation of the input, and (3) the partition predicate
-holds.
 
 Lomuto Partition
 ~~~~~~~~~~~~~~~~
@@ -105,13 +104,13 @@ The CLRS partition function operates on a sub-range ``A[lo..hi)`` using
 Recursive Sort
 ~~~~~~~~~~~~~~
 
-The recursive quicksort signature captures both correctness and the
-bound-tracking needed to reassemble sorted sub-arrays:
+The recursive quicksort threads a ghost tick counter through all calls,
+proving both correctness and the O(n²) worst-case bound:
 
 .. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.fst
    :language: pulse
-   :start-after: //SNIPPET_START: clrs_quicksort_sig
-   :end-before: //SNIPPET_END: clrs_quicksort_sig
+   :start-after: //SNIPPET_START: clrs_quicksort_with_ticks_sig
+   :end-before: //SNIPPET_END: clrs_quicksort_with_ticks_sig
 
 After partition splits the array at pivot position ``p``, the left half
 ``A[lo..p)`` and right half ``A[p+1..hi)`` are sorted recursively. The
@@ -133,18 +132,6 @@ the recursive sort, and converts back:
 
 Complexity
 ==========
-
-Partition Complexity
-~~~~~~~~~~~~~~~~~~~~
-
-The complexity-instrumented partition threads a ``GhostReference.ref nat``
-through each comparison. The postcondition proves **exactly n comparisons**
-(one per element):
-
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Partition.Complexity.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: partition_complexity_sig
-   :end-before: //SNIPPET_END: partition_complexity_sig
 
 Worst-Case Analysis
 ~~~~~~~~~~~~~~~~~~~
@@ -170,21 +157,16 @@ worst case:
    :start-after: //SNIPPET_START: partition_split_bounded
    :end-before: //SNIPPET_END: partition_split_bounded
 
-Enhanced Complexity
-~~~~~~~~~~~~~~~~~~~
+Quadratic Bound
+~~~~~~~~~~~~~~~
 
-The ``Quicksort.Complexity.Enhanced`` module threads the tick counter through
-the full recursive quicksort, proving the O(n²) bound end-to-end:
+The ``Quicksort`` module also defines the quadratic complexity bound
+predicate used in the postcondition:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.Enhanced.fst
+.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.fst
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded_quadratic
    :end-before: //SNIPPET_END: complexity_bounded_quadratic
-
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.Enhanced.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: clrs_quicksort_with_ticks_sig
-   :end-before: //SNIPPET_END: clrs_quicksort_with_ticks_sig
 
 The postcondition says: the final counter minus the initial is at most
 ``n*(n-1)/2`` where ``n = hi - lo``. This is the standard worst-case
