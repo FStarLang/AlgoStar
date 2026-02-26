@@ -547,6 +547,181 @@ and dfs_visit_build_wp
     visit_neighbors_build_wp adj n root neighbors st1 v d_top du
 #pop-options
 
+// FIND pair: trace through dfs_visit/visit_neighbors to find where u is directly visited,
+// then call the BUILD pair. This handles the case where u_start ≠ u (u is discovered
+// inside dfs_visit(u_start) rather than being directly visited by dfs_loop).
+//
+// Key invariants (stated in terms of scope_output = visit_neighbors/dfs_visit output):
+// 1. d-preservation: scope_output.d[w] > 0 → d_top[w] = scope_output.d[w]
+// 2. undiscovered-later: scope_output.d[w] = 0 ∧ d_top[w] > 0 → d_top[w] > scope_output.time
+// Both propagate automatically through the recursion since
+// visit_neighbors(w::rest, st) = visit_neighbors(rest, dfs_visit(w, st)).
+
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let rec visit_neighbors_find_wp
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (neighbors: list nat) (st: dfs_state)
+  (u v: nat) (d_top: Seq.seq nat) (du fu: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      root < n /\ u < n /\ v < n /\ u <> v /\
+      Seq.index st.color root <> White /\
+      Seq.index st.d u = 0 /\ Seq.index st.d v = 0 /\
+      (forall (w: nat). List.Tot.memP w neighbors ==> w < n /\ has_edge n adj root w) /\
+      Seq.length d_top = n /\ du > 0 /\ fu > du /\ du = Seq.index d_top u /\
+      Seq.index d_top v > 0 /\ Seq.index d_top v < fu /\
+      du < Seq.index d_top v /\
+      (let st' = visit_neighbors adj n neighbors st in
+       Seq.index st'.d u > 0 /\ Seq.index st'.d v > 0 /\
+       // d-preservation
+       (forall (w: nat). w < n /\ Seq.index st'.d w > 0 ==> Seq.index d_top w = Seq.index st'.d w) /\
+       fu = Seq.index st'.f u /\
+       // undiscovered-later
+       (forall (w: nat). w < n /\ Seq.index st'.d w = 0 /\ Seq.index d_top w > 0 ==>
+         Seq.index d_top w > st'.time)))
+    (ensures exists (k: nat). path_all_white adj n d_top u v du k)
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | w :: rest ->
+      let st_out = visit_neighbors adj n neighbors st in
+      if w < Seq.length st.color && Seq.index st.color w = White then (
+        let st1 = dfs_visit adj n w st in
+        dfs_visit_timestamps_in_range adj n w st;
+        dfs_visit_time_mono adj n w st;
+        dfs_visit_inv adj n w st;
+        if Seq.index st1.d u > 0 then (
+          // u discovered during dfs_visit(w, st).
+          // Prove v must also be discovered:
+          // fu = st_out.f[u], u non-White in st1, preserved through rest: fu = st1.f[u]
+          // st1.f[u] ≤ st1.time (timestamps_in_range)
+          // If st1.d[v] = 0: v discovered in rest, so st_out.d[v] > st1.time ≥ fu.
+          // d_top[v] = st_out.d[v] > fu. But d_top[v] < fu. Contradiction.
+          if Seq.index st1.d v = 0 then (
+            visit_neighbors_timestamps_in_range adj n rest st1;
+            assert (Seq.index st1.color u <> White);
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 u;
+            assert (false)
+          ) else ();
+          if w = u then (
+            // Direct discovery of u! Establish white invariant and call BUILD pair.
+            // First establish that du = st.time + 1
+            dfs_visit_du_fu adj n u st;
+            assert (Seq.index st1.color u <> White);
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 u;
+            // Now: d_top[u] = st_out.d[u] = st1.d[u] = st.time + 1 = du
+            assert (du = st.time + 1);
+            assert (st1.time > du);
+            let establish_inv (w': nat) : Lemma
+              (requires w' < n /\ w' <> u /\ Seq.index st.color w' = White)
+              (ensures w' < Seq.length d_top /\ (Seq.index d_top w' = 0 \/ Seq.index d_top w' > du))
+              = assert (Seq.index st.d w' = 0);
+                if Seq.index st1.d w' > 0 then (
+                  dfs_visit_strict_d adj n u st w';
+                  assert (Seq.index st1.color w' <> White);
+                  visit_neighbors_preserves_nonwhite_df adj n rest st1 w'
+                ) else (
+                  visit_neighbors_timestamps_in_range adj n rest st1;
+                  visit_neighbors_time_mono adj n rest st1;
+                  let st_rest = visit_neighbors adj n rest st1 in
+                  if Seq.index st_rest.d w' > 0 then ()
+                  else ()
+                )
+            in
+            Classical.forall_intro (Classical.move_requires establish_inv);
+            dfs_visit_build_wp adj n u st v d_top du
+          ) else (
+            // u in w's subtree, w ≠ u. Recurse into dfs_visit(w).
+            // Establish inner d-preservation for dfs_visit(w, st):
+            let d_pres_inner (x: nat) : Lemma
+              (requires x < n /\ Seq.index st1.d x > 0)
+              (ensures x < Seq.length d_top /\ Seq.index d_top x = Seq.index st1.d x)
+              = assert (Seq.index st1.color x <> White);
+                visit_neighbors_preserves_nonwhite_df adj n rest st1 x
+            in
+            Classical.forall_intro (Classical.move_requires d_pres_inner);
+            // fu = st_out.f[u] = st1.f[u] (preserved since u non-White)
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 u;
+            // Prove w ≠ v
+            if w = v then (
+              dfs_visit_strict_d adj n w st u;
+              dfs_visit_du_fu adj n w st;
+              assert (false)
+            ) else ();
+            // Establish undiscovered-later for inner scope (st1):
+            // for w' with st1.d[w'] = 0 and d_top[w'] > 0: d_top[w'] > st1.time
+            visit_neighbors_timestamps_in_range adj n rest st1;
+            visit_neighbors_time_mono adj n rest st1;
+            let undiscovered_inner (x: nat) : Lemma
+              (requires x < n /\ Seq.index st1.d x = 0 /\ Seq.index d_top x > 0)
+              (ensures x < Seq.length d_top /\ Seq.index d_top x > st1.time)
+              = let st_rest = visit_neighbors adj n rest st1 in
+                if Seq.index st_rest.d x > 0 then ()
+                else ()
+            in
+            Classical.forall_intro (Classical.move_requires undiscovered_inner);
+            dfs_visit_find_wp adj n w st u v d_top du fu
+          )
+        ) else (
+          // u not discovered, continue with rest.
+          // Prove st1.d[v] = 0: if v discovered but u not, contradiction.
+          if Seq.index st1.d v > 0 then (
+            visit_neighbors_timestamps_in_range adj n rest st1;
+            assert (Seq.index st1.color v <> White);
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 v;
+            assert (false)
+          ) else ();
+          visit_neighbors_find_wp adj n root rest st1 u v d_top du fu
+        )
+      ) else (
+        visit_neighbors_find_wp adj n root rest st u v d_top du fu
+      )
+
+and dfs_visit_find_wp
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (st: dfs_state)
+  (u v: nat) (d_top: Seq.seq nat) (du fu: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      root < n /\ u < n /\ v < n /\ u <> v /\ root <> u /\ root <> v /\
+      Seq.index st.color root = White /\
+      Seq.index st.d u = 0 /\ Seq.index st.d v = 0 /\
+      Seq.length d_top = n /\ du > 0 /\ fu > du /\ du = Seq.index d_top u /\
+      Seq.index d_top v > 0 /\ Seq.index d_top v < fu /\
+      du < Seq.index d_top v /\
+      (let st' = dfs_visit adj n root st in
+       Seq.index st'.d u > 0 /\ Seq.index st'.d v > 0 /\
+       (forall (w: nat). w < n /\ Seq.index st'.d w > 0 ==> Seq.index d_top w = Seq.index st'.d w) /\
+       fu = Seq.index st'.f u /\
+       (forall (w: nat). w < n /\ Seq.index st'.d w = 0 /\ Seq.index d_top w > 0 ==>
+         Seq.index d_top w > st'.time)))
+    (ensures exists (k: nat). path_all_white adj n d_top u v du k)
+    (decreases %[count_white_vertices st; 0])
+  = let st1 = discover_vertex root st in
+    discover_preserves_lengths root st;
+    discover_decreases_white_count root st;
+    discover_preserves_strong_validity root st;
+    discover_preserves_parenthesis root st;
+    let neighbors = get_white_neighbors adj n root 0 st1 in
+    get_white_neighbors_lt_n adj n root 0 st1;
+    Classical.forall_intro (Classical.move_requires (get_white_neighbors_sound adj n root 0 st1));
+    // dfs_visit output = finish(root, visit_neighbors(neighbors, st1)).
+    // finish doesn't change d, so dfs_visit.d = visit_neighbors.d.
+    // u ≠ root, v ≠ root: discover doesn't change d[u]/d[v].
+    // visit_neighbors(neighbors, st1).d[u] > 0, .d[v] > 0.
+    // d-preservation: same as dfs_visit's since finish doesn't change d.
+    // undiscovered-later: finish.time = visit_neighbors.time + 1 > visit_neighbors.time.
+    //   So dfs_visit.d[w] = 0 ∧ d_top[w] > 0 → d_top[w] > dfs_visit.time ≥ visit_neighbors.time + 1
+    //   → d_top[w] > visit_neighbors.time. But we only need ≥, not >.
+    //   Actually: dfs_visit.time = finish.time = vn_output.time + 1. And dfs_visit.d = vn_output.d.
+    //   So dfs_visit.d[w] = 0 ⟺ vn_output.d[w] = 0.
+    //   And d_top[w] > dfs_visit.time = vn_output.time + 1 > vn_output.time. ✓
+    visit_neighbors_find_wp adj n root neighbors st1 u v d_top du fu
+#pop-options
+
 // dfs_loop wrapper: trace through dfs_loop to find where u is discovered,
 // establish the white-path invariant, and call the BUILD pair.
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
@@ -632,17 +807,38 @@ let rec dfs_loop_white_path
             dfs_visit_build_wp adj n u st v d_top du
           ) else (
             // CASE 2: u_start ≠ u. u is discovered within dfs_visit(u_start, st).
-            // The white path exists by the same argument as Case 1, applied at
-            // the intermediate state within visit_neighbors where dfs_visit(u, st_mid)
-            // is called. At that state, all undiscovered vertices (w ≠ u with st_mid.d[w]=0)
-            // will be discovered with d > du (via dfs_visit_strict_d for vertices in u's
-            // subtree and visit_neighbors_timestamps_in_range for vertices after u's subtree).
-            //
-            // The formal proof requires chaining preservation lemmas
-            // (visit_neighbors_preserves_nonwhite_df, dfs_loop_preserves_nonwhite_df)
-            // through the visit_neighbors structure, which the FIND pair mutual recursion
-            // would accomplish. For now we use admit() for this case.
-            admit()
+            // Use the FIND pair to trace through dfs_visit and locate where u is
+            // directly visited, then call the BUILD pair at that point.
+            let fu = Seq.index st_final.f u in
+            // Establish d-preservation: for w with st1.d[w] > 0, d_top[w] = st1.d[w]
+            let d_pres (w: nat) : Lemma
+              (requires w < n /\ Seq.index st1.d w > 0)
+              (ensures w < Seq.length d_top /\ Seq.index d_top w = Seq.index st1.d w)
+              = assert (Seq.index st1.color w <> White);
+                dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 w
+            in
+            Classical.forall_intro (Classical.move_requires d_pres);
+            // fu = st1.f[u] (preserved through dfs_loop since u non-White)
+            assert (fu = Seq.index st1.f u);
+            // Establish undiscovered-later: for w with st1.d[w] = 0 and d_top[w] > 0,
+            // d_top[w] > st1.time. Follows from dfs_loop_d_gt_time.
+            let undiscovered_later (w: nat) : Lemma
+              (requires w < n /\ Seq.index st1.d w = 0 /\ Seq.index d_top w > 0)
+              (ensures w < Seq.length d_top /\ Seq.index d_top w > st1.time)
+              = dfs_loop_d_gt_time adj n (u_start + 1) st1 w
+            in
+            Classical.forall_intro (Classical.move_requires undiscovered_later);
+            // Prove u_start ≠ v: if u_start = v, then d_top[v] = st.time + 1
+            // and d_top[u] > st.time + 1 (dfs_visit_strict_d), so du > d_top[v].
+            // But st_final.d[u] < st_final.d[v] (precondition). Contradiction.
+            if u_start = v then (
+              dfs_visit_strict_d adj n u_start st u;
+              dfs_visit_du_fu adj n u_start st;
+              assert (Seq.index d_top u > Seq.index d_top v);
+              assert (Seq.index st_final.d u < Seq.index st_final.d v);
+              assert (false)
+            ) else ();
+            dfs_visit_find_wp adj n u_start st u v d_top du fu
           )
         ) else (
           // u not discovered during dfs_visit(u_start, st).
