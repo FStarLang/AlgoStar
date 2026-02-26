@@ -976,8 +976,10 @@ fn huffman_tree
     // Ghost: find positions of idx1 and idx2 in forest and take both trees
     find_entry_by_idx_spec active0 idx1;
     find_entry_by_idx_spec active0 idx2;
-    // Assume idx1's and idx2's forest positions differ (follows from distinct PQ indices)
-    assume_ (pure (Some?.v (find_entry_by_idx active0 idx1) <> Some?.v (find_entry_by_idx active0 idx2)));
+    // idx1 <> idx2: the PQ has distinct indices (each index appears at most once)
+    // After extracting (freq1,idx1), no entry with idx1 remains; (freq2,idx2) from remaining PQ has idx2<>idx1
+    assume_ (pure (idx1 <> idx2));
+    // k1 <> k2 follows: entry_idx(active0[k1])=idx1 and entry_idx(active0[k2])=idx2, so k1=k2 => idx1=idx2
     forest_own_take_two active0
       (Some?.v (find_entry_by_idx active0 idx1))
       (Some?.v (find_entry_by_idx active0 idx2));
