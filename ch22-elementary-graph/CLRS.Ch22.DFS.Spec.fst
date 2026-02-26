@@ -2431,12 +2431,392 @@ let cycle_implies_back_edge
     )
 #pop-options
 
+// Helper: if vertex w is White in st (d[w]=0) and gets discovered in dfs_loop output,
+// then f[w] > st.time in the output. (Because discover sets d = time+1 > st.time,
+// and finish sets f = time+1 > d > st.time.)
+let rec dfs_loop_f_gt_time
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      w < n /\ Seq.index st.d w = 0 /\
+      Seq.index (dfs_loop adj n u_start st).f w > 0)
+    (ensures Seq.index (dfs_loop adj n u_start st).f w > st.time)
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then ()
+    else (
+      let st_final = dfs_loop adj n u_start st in
+      if u_start < Seq.length st.color && Seq.index st.color u_start = White then (
+        let st1 = dfs_visit adj n u_start st in
+        dfs_visit_inv adj n u_start st;
+        dfs_visit_timestamps_in_range adj n u_start st;
+        dfs_visit_time_mono adj n u_start st;
+        if Seq.index st1.d w > 0 then (
+          // w discovered during dfs_visit(u_start)
+          // w is non-White in st1 (strong_valid_state: White → d=0)
+          assert (Seq.index st1.color w <> White);
+          // f[w] in (st.time, st1.time] by timestamps_in_range
+          // w is non-White in st1, so f[w] preserved through dfs_loop
+          dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 w;
+          assert (Seq.index st_final.f w = Seq.index st1.f w);
+          assert (Seq.index st1.f w > st.time)
+        ) else (
+          // w not discovered during dfs_visit, recurse
+          assert (Seq.index st1.d w = 0);
+          // st1.time >= st.time, and f[w] > st1.time by induction ≥ st.time + 1 > st.time
+          dfs_loop_f_gt_time adj n (u_start + 1) st1 w;
+          assert (Seq.index st_final.f w > st1.time);
+          assert (st1.time >= st.time)
+        )
+      ) else (
+        dfs_loop_f_gt_time adj n (u_start + 1) st w
+      )
+    )
+
+// Similarly for d
+let rec dfs_loop_d_gt_time
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      w < n /\ Seq.index st.d w = 0 /\
+      Seq.index (dfs_loop adj n u_start st).d w > 0)
+    (ensures Seq.index (dfs_loop adj n u_start st).d w > st.time)
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then ()
+    else (
+      let st_final = dfs_loop adj n u_start st in
+      if u_start < Seq.length st.color && Seq.index st.color u_start = White then (
+        let st1 = dfs_visit adj n u_start st in
+        dfs_visit_inv adj n u_start st;
+        dfs_visit_timestamps_in_range adj n u_start st;
+        dfs_visit_time_mono adj n u_start st;
+        if Seq.index st1.d w > 0 then (
+          assert (Seq.index st1.color w <> White);
+          dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 w;
+          assert (Seq.index st_final.d w = Seq.index st1.d w);
+          assert (Seq.index st1.d w > st.time)
+        ) else (
+          assert (Seq.index st1.d w = 0);
+          dfs_loop_d_gt_time adj n (u_start + 1) st1 w;
+          assert (Seq.index st_final.d w > st1.time);
+          assert (st1.time >= st.time)
+        )
+      ) else (
+        dfs_loop_d_gt_time adj n (u_start + 1) st w
+      )
+    )
+
+// Containment implies reachability: if d[v]≤d[u] and f[u]≤f[v] with u≠v,
+// and both are discovered during dfs_visit(root), then has_path v u.
+// Key insight: if v=root, dfs_visit_reachable gives has_path root u = has_path v u.
+// If v≠root, recurse into the visit_neighbors call that discovered v.
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let rec visit_neighbors_containment_reachable
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (u v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      u < n /\ v < n /\ u <> v /\
+      Seq.index st.d v = 0 /\ Seq.index st.d u = 0 /\
+      (let st' = visit_neighbors adj n neighbors st in
+       Seq.index st'.d v > 0 /\ Seq.index st'.d u > 0 /\
+       Seq.index st'.d v <= Seq.index st'.d u /\
+       Seq.index st'.f u <= Seq.index st'.f v))
+    (ensures exists (k: nat). has_path adj n v u k)
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | w :: rest ->
+      let st_final = visit_neighbors adj n neighbors st in
+      if w < Seq.length st.color && Seq.index st.color w = White then (
+        let st1 = dfs_visit adj n w st in
+        dfs_visit_timestamps_in_range adj n w st;
+        dfs_visit_time_mono adj n w st;
+        dfs_visit_inv adj n w st;
+        if Seq.index st1.d v > 0 then (
+          // v was discovered during dfs_visit(w)
+          if Seq.index st1.d u > 0 then (
+            // u also discovered during dfs_visit(w): recurse
+            // d and f values are preserved through rest (both non-White in st1)
+            assert (Seq.index st1.color v <> White);
+            assert (Seq.index st1.color u <> White);
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 v;
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 u;
+            let st2 = visit_neighbors adj n rest st1 in
+            // d[v], d[u], f[v], f[u] are same in st1 and st_final
+            assert (Seq.index st2.d v = Seq.index st1.d v);
+            assert (Seq.index st2.d u = Seq.index st1.d u);
+            assert (Seq.index st2.f v = Seq.index st1.f v);
+            assert (Seq.index st2.f u = Seq.index st1.f u);
+            // So ordering holds in st1 = dfs_visit adj n w st
+            assert (Seq.index st1.d v <= Seq.index st1.d u);
+            assert (Seq.index st1.f u <= Seq.index st1.f v);
+            dfs_visit_containment_reachable adj n w st u v
+          ) else (
+            // u NOT discovered during dfs_visit(w) — derive contradiction
+            // f[v] ≤ st1.time (timestamps in range of dfs_visit(w))
+            assert (Seq.index st1.f v <= st1.time);
+            // u is White in st1 (d[u]=0 in st1, strong_valid_state)
+            assert (Seq.index st1.d u = 0);
+            // u gets discovered later, so d[u] > st1.time
+            visit_neighbors_timestamps_in_range adj n rest st1;
+            visit_neighbors_time_mono adj n rest st1;
+            let st2 = visit_neighbors adj n rest st1 in
+            // d[u] in st2 either = d[u] in st1 = 0 or > st1.time
+            // Since d[u] in st_final > 0 and st_final = st2, d[u] > st1.time
+            assert (Seq.index st2.d u > st1.time);
+            // Also f[v] preserved through rest (v is non-White in st1)
+            assert (Seq.index st1.color v <> White);
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 v;
+            assert (Seq.index st2.f v = Seq.index st1.f v);
+            assert (Seq.index st2.d u > Seq.index st2.f v);
+            assert (Seq.index st2.f u <= Seq.index st2.f v);
+            // u was White in st1, now has d>0 in st2, so u is Black
+            visit_neighbors_inv adj n rest st1;
+            // strong_valid_state st2: u has d>0, so u is non-White
+            assert (Seq.index st2.color u <> White);
+            visit_neighbors_white_to_black adj n rest st1 u;
+            // strong_valid_state st2: Black => f > d. So f[u] > d[u].
+            // But d[u] > f[v] >= f[u]: contradiction
+            assert false
+          )
+        ) else (
+          // v NOT discovered during dfs_visit(w)
+          assert (Seq.index st1.d v = 0);
+          // u also can't be discovered (d[v]≤d[u] and both 0 in st, if u discovered but not v,
+          // then d[u] in st1 > 0 but d[v]=0, impossible since d[v]≤d[u] in final and timestamps preserved)
+          if Seq.index st1.d u > 0 then (
+            // u discovered in dfs_visit(w) but v not — contradiction
+            // d[u] was set in (st.time, st1.time], so d[u] ≤ st1.time
+            assert (Seq.index st1.d u <= st1.time);
+            // v is discovered later in rest, so d[v] > st1.time ≥ d[u]
+            visit_neighbors_timestamps_in_range adj n rest st1;
+            let st2 = visit_neighbors adj n rest st1 in
+            assert (Seq.index st2.d v > st1.time);
+            // d[u] preserved through rest (u is non-White in st1)
+            assert (Seq.index st1.color u <> White);
+            visit_neighbors_preserves_nonwhite_df adj n rest st1 u;
+            assert (Seq.index st2.d u = Seq.index st1.d u);
+            // d[v] > st1.time >= d[u], contradicts d[v] <= d[u]
+            assert (Seq.index st2.d v > Seq.index st2.d u);
+            assert false
+          ) else (
+            // Neither discovered in dfs_visit(w), recurse on rest
+            visit_neighbors_containment_reachable adj n rest st1 u v
+          )
+        )
+      ) else (
+        // w not White, skip
+        visit_neighbors_containment_reachable adj n rest st u v
+      )
+
+and dfs_visit_containment_reachable
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (st: dfs_state) (u v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      u < n /\ v < n /\ u <> v /\
+      Seq.index st.d v = 0 /\ Seq.index st.d u = 0 /\
+      (let st' = dfs_visit adj n root st in
+       Seq.index st'.d v > 0 /\ Seq.index st'.d u > 0 /\
+       Seq.index st'.d v <= Seq.index st'.d u /\
+       Seq.index st'.f u <= Seq.index st'.f v))
+    (ensures exists (k: nat). has_path adj n v u k)
+    (decreases %[count_white_vertices st; 0])
+  = if root >= n then ()
+    else if root >= Seq.length st.color then ()
+    else if Seq.index st.color root <> White then ()
+    else (
+      let st1 = discover_vertex root st in
+      discover_preserves_lengths root st;
+      discover_decreases_white_count root st;
+      discover_preserves_strong_validity root st;
+      discover_preserves_parenthesis root st;
+      let neighbors = get_white_neighbors adj n root 0 st1 in
+      get_white_neighbors_lt_n adj n root 0 st1;
+      let st2 = visit_neighbors adj n neighbors st1 in
+      let st3 = finish_vertex root st2 in
+      finish_preserves_lengths root st2;
+      // d and f of v,u in st3 = dfs_visit result
+      assert (st3.d == st2.d); // finish doesn't change d
+      if v = root then (
+        // v is the root — dfs_visit_reachable gives has_path root u = has_path v u
+        // u ≠ root = v, so d[u]=0 in st, and d[u]>0 in dfs_visit output
+        dfs_visit_reachable adj n root st u
+      ) else if u = root then (
+        // u = root, v ≠ root. d[u] = st.time + 1 (discover sets it).
+        // All other vertices w discovered later have d[w] > st.time + 1.
+        // d[v] > st.time + 1 = d[u] (since v ≠ root, discovered after root).
+        // But d[v] ≤ d[u] (precondition). Contradiction.
+        assert (Seq.index st1.d u > 0); // d[root] = st.time + 1 > 0
+        // All timestamps in visit_neighbors are > st1.time = st.time + 1
+        visit_neighbors_timestamps_in_range adj n neighbors st1;
+        let st2 = visit_neighbors adj n neighbors st1 in
+        // d[v] was 0 in st1 (v ≠ root, discover only changes root)
+        assert (Seq.index st1.d v = 0);
+        // d[v] in st2 either = 0 or > st1.time = st.time + 1
+        // d[v] > 0 in st3 (precondition), st3.d = st2.d
+        let st3 = finish_vertex root st2 in
+        assert (Seq.index st3.d v = Seq.index st2.d v);
+        assert (Seq.index st2.d v > st1.time);
+        // d[u] = st.time + 1 = st1.time
+        assert (Seq.index st1.d u = st.time + 1);
+        // d[u] preserved through visit_neighbors and finish (u = root, non-White)
+        visit_neighbors_preserves_nonwhite_df adj n neighbors st1 u;
+        finish_preserves_lengths root st2;
+        assert (Seq.index st2.d u = Seq.index st1.d u);
+        assert (Seq.index st3.d u = Seq.index st2.d u);
+        // d[v] > st1.time = d[u] in st3. But d[v] ≤ d[u] (precondition). Contradiction.
+        assert false
+      ) else (
+        // v ≠ root. Both v and u have d=0 in st. After discover(root), d[root]>0 but d[v]=d[u]=0 in st1.
+        assert (Seq.index st1.d v = 0);
+        assert (Seq.index st1.d u = 0);
+        // Both are discovered during visit_neighbors (since d=0 in st1, d>0 in st2)
+        assert (Seq.index st2.d v > 0); // st3.d = st2.d, and d[v]>0 in st3
+        assert (Seq.index st2.d u > 0);
+        // f values: finish only sets f[root], so f[v] and f[u] are from st2
+        // f[v] in st3: if v≠root, f[v] in st3 = f[v] in st2
+        assert (Seq.index st3.f v = Seq.index st2.f v);
+        assert (Seq.index st3.f u = Seq.index st2.f u);
+        // Now d[v]≤d[u] and f[u]≤f[v] hold in st2, and both discovered during visit_neighbors
+        visit_neighbors_inv adj n neighbors st1;
+        visit_neighbors_containment_reachable adj n neighbors st1 u v
+      )
+    )
+#pop-options
+
+// Containment gives path at the dfs_loop level.
+// Requires no Gray vertices in the input state — this ensures that all discovered vertices
+// in the output are Black (f > d > 0), which is needed for the contradiction arguments.
+let no_gray (st: dfs_state) (n: nat) : prop =
+  forall (j: nat). j < n /\ j < Seq.length st.color /\ Seq.index st.color j <> White ==>
+    Seq.index st.color j = Black
+
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let rec dfs_loop_containment_gives_path
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (u v: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
+      no_gray st n /\
+      (forall (i: nat). i < u_start /\ i < n /\ i < Seq.length st.color ==> Seq.index st.color i = Black) /\
+      u < n /\ v < n /\ u <> v /\
+      Seq.index st.d v = 0 /\ Seq.index st.d u = 0 /\
+      (let st' = dfs_loop adj n u_start st in
+       Seq.index st'.d v > 0 /\ Seq.index st'.d u > 0 /\
+       Seq.index st'.d v <= Seq.index st'.d u /\
+       Seq.index st'.f u <= Seq.index st'.f v))
+    (ensures exists (k: nat). has_path adj n v u k)
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then ()
+    else (
+      let st_final = dfs_loop adj n u_start st in
+      if u_start < Seq.length st.color && Seq.index st.color u_start = White then (
+        let st1 = dfs_visit adj n u_start st in
+        dfs_visit_inv adj n u_start st;
+        dfs_visit_timestamps_in_range adj n u_start st;
+        dfs_visit_time_mono adj n u_start st;
+        if Seq.index st1.d v > 0 then (
+          // v discovered during dfs_visit(u_start)
+          if Seq.index st1.d u > 0 then (
+            // u also discovered — both in same dfs_visit
+            // Need d[v]≤d[u] and f[u]≤f[v] in st1 (= in st_final since non-White preserved)
+            assert (Seq.index st1.color v <> White);
+            assert (Seq.index st1.color u <> White);
+            dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 v;
+            dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 u;
+            // d and f values are the same in st1 and st_final
+            assert (Seq.index st_final.d v = Seq.index st1.d v);
+            assert (Seq.index st_final.d u = Seq.index st1.d u);
+            assert (Seq.index st_final.f v = Seq.index st1.f v);
+            assert (Seq.index st_final.f u = Seq.index st1.f u);
+            dfs_visit_containment_reachable adj n u_start st u v
+          ) else (
+            // v discovered but u not — derive contradiction
+            assert (Seq.index st1.d u = 0);
+            // d[u] > st1.time (from dfs_loop_d_gt_time)
+            dfs_loop_d_gt_time adj n (u_start + 1) st1 u;
+            assert (Seq.index st_final.d u > st1.time);
+            // f[v] ≤ st1.time (from timestamps_in_range of dfs_visit(u_start))
+            assert (Seq.index st1.f v <= st1.time);
+            // v is non-White in st1, so f[v] preserved through dfs_loop
+            assert (Seq.index st1.color v <> White);
+            dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 v;
+            assert (Seq.index st_final.f v = Seq.index st1.f v);
+            // u is Black in st_final (by dfs_loop_all_black)
+            dfs_visit_no_gray adj n u_start st;
+            dfs_visit_makes_black adj n u_start st;
+            let aux_blk (i: nat) : Lemma
+              (requires i < u_start + 1 /\ i < n /\ i < Seq.length st1.color)
+              (ensures color_of st1 i = Black)
+              = if i = u_start then ()
+                else dfs_visit_black_preserved adj n u_start st i
+            in
+            Classical.forall_intro (Classical.move_requires aux_blk);
+            dfs_loop_all_black adj n (u_start + 1) st1 u;
+            // u is Black in st_final. f[u] > d[u] by strong_valid_state.
+            dfs_loop_inv adj n (u_start + 1) st1;
+            // f[u] > d[u] > st1.time >= f[v] >= f[u] → contradiction
+            assert false
+          )
+        ) else (
+          // v not discovered during dfs_visit(u_start), recurse on dfs_loop
+          assert (Seq.index st1.d v = 0);
+          // u also can't be discovered (d[v]≤d[u], so if d[u]>0 and d[v]=0, contradiction)
+          if Seq.index st1.d u > 0 then (
+            // d[u] > 0 in st1, d[u] ≤ st1.time (timestamps in range)
+            assert (Seq.index st1.d u <= st1.time);
+            // d[v] = 0 in st1, discovered later, d[v] > st1.time
+            // But d[v] ≤ d[u] in final... 
+            assert (Seq.index st1.color u <> White);
+            dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 u;
+            assert (Seq.index st_final.d u = Seq.index st1.d u);
+            assert (Seq.index st_final.d u <= st1.time);
+            // d[v] set during dfs_loop(u_start+1), so d[v] > st1.time (similar argument)
+            dfs_loop_d_gt_time adj n (u_start + 1) st1 v;
+            assert (Seq.index st_final.d v > st1.time);
+            // d[v] > st1.time >= d[u] contradicts d[v] ≤ d[u]
+            assert false
+          ) else (
+            assert (Seq.index st1.d u = 0);
+            // Establish no_gray and all-Black-before for recursive call
+            dfs_visit_no_gray adj n u_start st;
+            dfs_visit_makes_black adj n u_start st;
+            let aux_blk2 (i: nat) : Lemma
+              (requires i < u_start + 1 /\ i < n /\ i < Seq.length st1.color)
+              (ensures color_of st1 i = Black)
+              = if i = u_start then ()
+                else dfs_visit_black_preserved adj n u_start st i
+            in
+            Classical.forall_intro (Classical.move_requires aux_blk2);
+            dfs_loop_containment_gives_path adj n (u_start + 1) st1 u v
+          )
+        )
+      ) else (
+        // u_start not White, skip. u_start is Black (no_gray + non-White).
+        assert (u_start < Seq.length st.color);
+        assert (Seq.index st.color u_start = Black);
+        // dfs_loop_containment_gives_path needs: all i < u_start+1 are Black
+        // Precondition gives: all i < u_start are Black. u_start is Black.
+        // The precondition of dfs_loop_containment_gives_path has the guard i < Seq.length st.color
+        // in its ==> so SMT can handle this if we just assert the u_start case.
+        dfs_loop_containment_gives_path adj n (u_start + 1) st u v
+      )
+    )
+#pop-options
+
 // Backward: back_edge → cycle
 // A back edge (u,v) has edge u→v with d[v]≤d[u], f[u]≤f[v].
-// The containment d[v]≤d[u]<f[u]≤f[v] means u is in v's DFS subtree,
-// so has_path v u. Combined with edge u→v, this gives a cycle.
-// The proof that containment implies reachability requires tracing through
-// the DFS execution. We use dfs_visit_reachable at the dfs_loop level.
+// Use dfs_loop_containment_gives_path to get has_path v u,
+// then compose with edge u→v to get cycle v→...→u→v.
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
 let back_edge_implies_cycle
   (adj: Seq.seq (Seq.seq int)) (n: nat)
@@ -2445,13 +2825,36 @@ let back_edge_implies_cycle
     (ensures exists (u v: nat) (k: nat). k > 0 /\ has_path adj n u u k)
   = let st = dfs adj n in
     init_has_correct_lengths n;
-    // Witness: given back edge (u,v) with edge u→v, we need cycle
+    init_state_strong_valid n;
+    dfs_loop_inv adj n 0 (init_state n);
     let aux (u v: nat) : Lemma
       (requires u < n /\ v < n /\ has_edge n adj u v /\
                d_of st v <= d_of st u /\
                f_of st u <= f_of st v)
       (ensures exists (w: nat) (k: nat). k > 0 /\ has_path adj n w w k)
-      = admit ()
+      = // Both u,v are Black in final state (they have d>0, f>0)
+        dfs_all_black adj n u;
+        dfs_all_black adj n v;
+        assert (Seq.index st.d u > 0 /\ Seq.index st.d v > 0);
+        assert (Seq.index st.f u > 0 /\ Seq.index st.f v > 0);
+        // u ≠ v: if u=v, back edge u→u is a self-loop = cycle of length 1
+        if u = v then (
+          assert (has_path adj n u u 1)
+        ) else (
+          // d[v] ≤ d[u] and f[u] ≤ f[v], both start with d=0 in init_state
+          // init_state has no_gray (all White) and vacuously all i < 0 are Black
+          assert (no_gray (init_state n) n);
+          // dfs_loop_containment_gives_path gives has_path v u
+          dfs_loop_containment_gives_path adj n 0 (init_state n) u v;
+          // has_path v u k for some k, plus edge u→v gives cycle
+          let compose (k: nat) : Lemma
+            (requires has_path adj n v u k)
+            (ensures has_path adj n v v (k + 1))
+            = assert (has_path adj n u v 1);
+              has_path_compose adj n v u v k 1
+          in
+          Classical.forall_intro (Classical.move_requires compose)
+        )
     in
     Classical.forall_intro (fun u ->
       Classical.forall_intro (fun v ->
