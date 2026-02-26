@@ -2077,17 +2077,207 @@ let dfs_all_edges_inv (adj: Seq.seq (Seq.seq int)) (n: nat)
 (*** Topological Sort Properties ***)
 
 // DFS finish times are distinct for distinct vertices.
-// This follows from the strictly incrementing time counter: each finish event
-// sets f[u] = time + 1 and increments time by 1, assigning a unique value.
-// The proof follows from dfs_visit_timestamps_in_range and dfs_visit_du_fu:
-// within dfs_visit u, all other vertices' timestamps satisfy f[v] <= st2.time,
-// while f[u] = st2.time + 1, giving f[v] < f[u]. Across dfs_visit calls,
-// timestamps are in strictly increasing ranges.
-assume val dfs_distinct_finish_times
+// Proof strategy: maintain invariant that all non-zero f values are distinct.
+// Key insight: finish_vertex sets f[u] = time+1, and strong_valid_state gives
+// f[v] <= time for all existing non-zero f[v], so f[u] > f[v].
+
+// Predicate: all non-zero finish times are distinct
+let all_f_distinct (st: dfs_state) : prop =
+  forall (u v: nat). u < st.n /\ v < st.n /\ u <> v /\
+    f_of st u > 0 /\ f_of st v > 0 ==>
+    f_of st u <> f_of st v
+
+// discover_vertex preserves all_f_distinct (it doesn't change f)
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+let discover_preserves_f_distinct (u: nat) (st: dfs_state)
+  : Lemma
+    (requires all_f_distinct st /\
+              u < st.n /\ Seq.length st.color = st.n /\ Seq.length st.d = st.n /\ Seq.length st.f = st.n /\
+              Seq.index st.color u = White)
+    (ensures all_f_distinct (discover_vertex u st))
+  = let st' = discover_vertex u st in
+    assert (st'.f == st.f);
+    assert (st'.n = st.n);
+    let aux (a b: nat) : Lemma
+      (a < st'.n /\ b < st'.n /\ a <> b /\
+       f_of st' a > 0 /\ f_of st' b > 0 ==>
+       f_of st' a <> f_of st' b)
+      = if a < st'.n && b < st'.n && a <> b then (
+          assert (a < Seq.length st'.f);
+          assert (b < Seq.length st'.f);
+          assert (a < Seq.length st.f);
+          assert (b < Seq.length st.f);
+          assert (Seq.index st'.f a = Seq.index st.f a);
+          assert (Seq.index st'.f b = Seq.index st.f b);
+          assert (f_of st' a = Seq.index st'.f a);
+          assert (f_of st' b = Seq.index st'.f b);
+          assert (f_of st a = Seq.index st.f a);
+          assert (f_of st b = Seq.index st.f b)
+        ) else ()
+    in
+    Classical.forall_intro_2 aux
+#pop-options
+
+// Finishing a vertex preserves all_f_distinct when strong_valid_state holds.
+// Key: f[u] = time+1 > time >= f[v] for all existing non-zero f[v].
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+let finish_preserves_f_distinct (u: nat) (st: dfs_state)
+  : Lemma
+    (requires
+      strong_valid_state st /\ all_f_distinct st /\
+      u < st.n /\ Seq.length st.f = st.n /\ Seq.length st.color = st.n /\ Seq.length st.d = st.n /\
+      Seq.index st.color u = Gray)
+    (ensures all_f_distinct (finish_vertex u st))
+  = let st' = finish_vertex u st in
+    finish_preserves_lengths u st;
+    let aux (a b: nat) : Lemma
+      (a < st'.n /\ b < st'.n /\ a <> b /\
+       f_of st' a > 0 /\ f_of st' b > 0 ==>
+       f_of st' a <> f_of st' b)
+      = if a < st'.n && b < st'.n && a <> b then (
+          assert (st'.n = st.n);
+          assert (Seq.length st'.f = st.n);
+          assert (a < Seq.length st'.f);
+          assert (b < Seq.length st'.f);
+          assert (a < Seq.length st.f);
+          assert (b < Seq.length st.f);
+          assert (f_of st' a = Seq.index st'.f a);
+          assert (f_of st' b = Seq.index st'.f b);
+          if a = u then (
+            // f[u] = time + 1, f[b] unchanged and <= time
+            assert (Seq.index st'.f u = st.time + 1);
+            assert (Seq.index st'.f b = Seq.index st.f b);
+            assert (Seq.index st.f b <= st.time);
+            assert (f_of st' a = st.time + 1);
+            assert (f_of st' b = Seq.index st.f b);
+            assert (f_of st' b <= st.time)
+          ) else if b = u then (
+            assert (Seq.index st'.f u = st.time + 1);
+            assert (Seq.index st'.f a = Seq.index st.f a);
+            assert (Seq.index st.f a <= st.time);
+            assert (f_of st' b = st.time + 1);
+            assert (f_of st' a = Seq.index st.f a);
+            assert (f_of st' a <= st.time)
+          ) else (
+            // Neither is u: f values unchanged, use all_f_distinct st
+            assert (Seq.index st'.f a = Seq.index st.f a);
+            assert (Seq.index st'.f b = Seq.index st.f b);
+            assert (f_of st a = Seq.index st.f a);
+            assert (f_of st b = Seq.index st.f b);
+            assert (f_of st' a = f_of st a);
+            assert (f_of st' b = f_of st b)
+          )
+        ) else ()
+    in
+    Classical.forall_intro_2 aux
+#pop-options
+
+// Mutual induction: visit_neighbors and dfs_visit preserve all_f_distinct.
+// Uses dfs_visit_inv/visit_neighbors_inv for strong_valid_state + parenthesis_theorem.
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+let rec visit_neighbors_f_distinct
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+             all_neighbors_lt_n neighbors n /\
+             strong_valid_state st /\ parenthesis_theorem st /\ all_f_distinct st)
+    (ensures all_f_distinct (visit_neighbors adj n neighbors st))
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | v :: rest ->
+      if v < Seq.length st.color && Seq.index st.color v = White then (
+        dfs_visit_f_distinct adj n v st;
+        dfs_visit_inv adj n v st;
+        let st1 = dfs_visit adj n v st in
+        visit_neighbors_f_distinct adj n rest st1
+      ) else
+        visit_neighbors_f_distinct adj n rest st
+
+and dfs_visit_f_distinct
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+             strong_valid_state st /\ parenthesis_theorem st /\ all_f_distinct st)
+    (ensures all_f_distinct (dfs_visit adj n u st))
+    (decreases %[count_white_vertices st; 0])
+  = if u >= n then ()
+    else if u >= Seq.length st.color then ()
+    else if Seq.index st.color u <> White then ()
+    else (
+      // Step 1: Discover u — doesn't change f
+      let st1 = discover_vertex u st in
+      discover_preserves_lengths u st;
+      discover_decreases_white_count u st;
+      discover_preserves_strong_validity u st;
+      discover_preserves_parenthesis u st;
+      discover_preserves_f_distinct u st;
+
+      // Step 2: Visit neighbors — by mutual IH
+      let neighbors = get_white_neighbors adj n u 0 st1 in
+      get_white_neighbors_lt_n adj n u 0 st1;
+      visit_neighbors_f_distinct adj n neighbors st1;
+      visit_neighbors_inv adj n neighbors st1;
+      let st2 = visit_neighbors adj n neighbors st1 in
+
+      // Step 3: Show u is Gray in st2 (for finish_preserves_f_distinct)
+      assert (Seq.index st1.color u = Gray);
+      visit_neighbors_preserves_nonwhite_df adj n neighbors st1 u;
+      assert (Seq.index st2.f u = Seq.index st1.f u);
+      assert (Seq.index st.f u = 0);
+      assert (Seq.index st2.f u = 0);
+      assert (Seq.index st2.color u = Gray);
+
+      // Step 4: Finish u — f[u] = time+1 exceeds all existing f values
+      finish_preserves_f_distinct u st2
+    )
+#pop-options
+
+// dfs_loop preserves all_f_distinct
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+let rec dfs_loop_f_distinct
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
+  : Lemma
+    (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+             strong_valid_state st /\ parenthesis_theorem st /\ all_f_distinct st)
+    (ensures all_f_distinct (dfs_loop adj n u st))
+    (decreases (if u < n then n - u else 0))
+  = if u >= n then ()
+    else (
+      let st1 =
+        if u < Seq.length st.color && Seq.index st.color u = White then (
+          dfs_visit_f_distinct adj n u st;
+          dfs_visit_inv adj n u st;
+          dfs_visit adj n u st
+        ) else st
+      in
+      dfs_loop_f_distinct adj n (u + 1) st1
+    )
+#pop-options
+
+// DFS finish times are distinct for distinct vertices.
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+let dfs_distinct_finish_times
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
   : Lemma
     (requires u < n /\ v < n /\ u <> v)
     (ensures f_of (dfs adj n) u <> f_of (dfs adj n) v)
+  = init_has_correct_lengths n;
+    init_state_strong_valid n;
+    let init_pair (a b: nat) : Lemma (parenthesis_property (init_state n) a b) = () in
+    Classical.forall_intro_2 init_pair;
+    // all_f_distinct (init_state n): all f = 0, so vacuously true
+    dfs_loop_f_distinct adj n 0 (init_state n);
+    dfs_loop_inv adj n 0 (init_state n);
+    let st = dfs adj n in
+    // All vertices are Black after DFS
+    dfs_all_black adj n u;
+    dfs_all_black adj n v;
+    // strong_valid_state: Black => f > d > 0
+    assert (Seq.index st.color u = Black);
+    assert (Seq.index st.color v = Black)
+    // all_f_distinct st with f[u] > 0 /\ f[v] > 0 gives f[u] <> f[v]
+#pop-options
 
 // DFS can be used for topological sort: if (u,v) is an edge, then f[u] > f[v]
 // This holds only for DAGs (no back edges)
