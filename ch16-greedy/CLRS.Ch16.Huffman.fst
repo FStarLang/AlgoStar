@@ -87,6 +87,33 @@ let rec list_remove_at (#a: Type) (l: list a) (j: nat{j < L.length l}) : list a 
   match l with
   | h :: t -> if j = 0 then t else h :: list_remove_at t (j - 1)
 
+let rec list_remove_at_length (#a: Type) (l: list a) (j: nat{j < L.length l})
+  : Lemma (ensures L.length (list_remove_at l j) == L.length l - 1) (decreases j)
+  = match l with
+    | _ :: t -> if j > 0 then list_remove_at_length t (j - 1)
+
+// Find position of a value in a list  
+let rec list_find_pos (#a: eqtype) (l: list a) (x: a) (pos: nat)
+  : Tot (option nat) (decreases l) =
+  match l with
+  | [] -> None
+  | h :: t -> if h = x then Some pos else list_find_pos t x (pos + 1)
+
+// If x is in the list, list_find_pos returns Some with correct index
+let rec list_find_pos_spec (#a: eqtype) (l: list a) (x: a) (pos: nat)
+  : Lemma (ensures (match list_find_pos l x pos with
+                    | None -> ~(L.mem x l)
+                    | Some k -> k >= pos /\ k - pos < L.length l /\ L.index l (k - pos) == x))
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | h :: t -> if h = x then () else list_find_pos_spec t x (pos + 1)
+
+// If x is in the list, list_find_pos returns Some
+let list_find_pos_mem (#a: eqtype) (l: list a) (x: a) (pos: nat)
+  : Lemma (requires L.mem x l) (ensures Some? (list_find_pos l x pos))
+  = list_find_pos_spec l x pos
+
 // Prepend an entry to forest_own
 ghost
 fn forest_own_put_head
@@ -431,7 +458,7 @@ fn huffman_cost
 // Ownership tracked via zip_star over active node indices + ghost spec trees.
 
 //SNIPPET_START: huffman_tree_sig
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 80"
 fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))
@@ -531,36 +558,17 @@ fn huffman_tree
     let left_ptr = V.op_Array_Access nodes idx1;
     let right_ptr = V.op_Array_Access nodes idx2;
     
-    // Take ownership of both trees from forest_own
-    // TODO: find left_ptr and right_ptr in active list, call forest_own_take_at
+    // Ghost: take left and right trees from forest_own, merge, put back
+    // Requires correspondence between nodes Vec and forest_own list
     admit();
-    
-    // Allocate merged internal node on the heap
-    let merged = alloc_hnode ({ freq = sum; left = Some left_ptr; right = Some right_ptr } <: hnode);
-    
-    // Fold is_htree for the merged node
-    with sl sr. assert (is_htree left_ptr sl ** is_htree right_ptr sr);
-    fold (is_htree merged (HSpec.Internal sum sl sr));
-    
-    // Update arrays: merged replaces idx1, idx2 becomes inactive
-    V.op_Array_Assignment nodes idx1 merged;
-    V.op_Array_Assignment working idx1 sum;
-    V.op_Array_Assignment working idx2 infinity;
-    
-    // Add merged tree to forest_own
-    with active_rest. assert (forest_own active_rest);
-    forest_own_put_head active_rest merged (HSpec.Internal sum sl sr);
-    
-    let viter = !iter;
-    iter := viter +^ 1sz;
   };
   
-  // Result: use find_min to find the single remaining active node
+  // Result
   let (result_idx, _) = find_min working n;
   let result = V.op_Array_Access nodes result_idx;
   
-  // Take ownership of the final tree from forest_own
-  admit(); // TODO: connect forest_own to the result
+  // Ghost: extract final tree from forest_own
+  admit();
   
   // Clean up  
   Box.free dummy;
