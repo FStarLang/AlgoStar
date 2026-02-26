@@ -115,16 +115,86 @@ let rec find_fuel_by_bound (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n}) (fuel
     end
 #pop-options
 
+(* Termination proof for pure_find_fuel using counting argument.
+   Key insight: the number of nodes with rank strictly above rank[x]
+   decreases each time we follow a parent pointer (by rank_invariant).
+   Since this count is bounded by f.n - 1, the chain terminates within f.n steps.
+   This avoids needing ranks_bounded (rank < n) as an assumption. *)
+
+let rec count_rank_above (f: uf_forest{is_valid_uf f}) (r: nat) (k: nat{k <= f.n})
+  : Tot nat (decreases (f.n - k))
+  = if k >= f.n then 0
+    else (if Seq.index f.rank k > r then 1 else 0) + count_rank_above f r (k + 1)
+
+#restart-solver
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+
+let rec count_rank_above_bound (f: uf_forest{is_valid_uf f}) (r: nat) (k: nat{k <= f.n})
+  : Lemma (ensures count_rank_above f r k <= f.n - k)
+          (decreases (f.n - k))
+  = if k >= f.n then () else count_rank_above_bound f r (k + 1)
+
+let rec count_rank_above_mono (f: uf_forest{is_valid_uf f}) (r1 r2: nat) (k: nat{k <= f.n})
+  : Lemma (requires r1 <= r2)
+          (ensures count_rank_above f r2 k <= count_rank_above f r1 k)
+          (decreases (f.n - k))
+  = if k >= f.n then () else count_rank_above_mono f r1 r2 (k + 1)
+
+// Node px has rank > r, so it's counted for threshold r but not for threshold rank[px]
+let rec count_rank_above_strict (f: uf_forest{is_valid_uf f}) (r: nat) 
+                                 (px: nat{px < f.n}) (k: nat{k <= f.n})
+  : Lemma (requires Seq.index f.rank px > r /\ k <= px)
+          (ensures count_rank_above f r k > count_rank_above f (Seq.index f.rank px) k)
+          (decreases (f.n - k))
+  = if k = px then count_rank_above_mono f r (Seq.index f.rank px) (k + 1)
+    else count_rank_above_strict f r px (k + 1)
+
+// Node x has rank[x] which is NOT > rank[x], so count excludes at least x
+let rec count_rank_above_lt_n (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n})
+                               (k: nat{k <= f.n})
+  : Lemma (requires k <= x)
+          (ensures count_rank_above f (Seq.index f.rank x) k < f.n - k)
+          (decreases (f.n - k))
+  = if k = x then count_rank_above_bound f (Seq.index f.rank x) (k + 1)
+    else count_rank_above_lt_n f x (k + 1)
+
+let rec find_fuel_mono (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n}) (fuel1 fuel2: nat)
+  : Lemma (requires fuel1 <= fuel2 /\ Some? (pure_find_fuel f x fuel1))
+          (ensures Some? (pure_find_fuel f x fuel2))
+          (decreases fuel1)
+  = if fuel1 = 0 then ()
+    else let px = Seq.index f.parent x in
+         if px = x then ()
+         else find_fuel_mono f px (fuel1 - 1) (fuel2 - 1)
+
+#pop-options
+
+// Core lemma: pure_find_fuel succeeds with count_rank_above(rank[x], 0) + 1 fuel
+#restart-solver
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec find_succeeds_by_count (f: uf_forest{is_valid_uf f /\ rank_invariant f}) (x: nat{x < f.n})
+  : Lemma (ensures Some? (pure_find_fuel f x (count_rank_above f (Seq.index f.rank x) 0 + 1)))
+          (decreases count_rank_above f (Seq.index f.rank x) 0)
+  = let px = Seq.index f.parent x in
+    if px = x then ()
+    else begin
+      rank_inv_inst f x;
+      count_rank_above_strict f (Seq.index f.rank x) px 0;
+      find_succeeds_by_count f px;
+      find_fuel_mono f px (count_rank_above f (Seq.index f.rank px) 0 + 1)
+                          (count_rank_above f (Seq.index f.rank x) 0)
+    end
+#pop-options
+
 // Under rank_invariant, n steps of fuel is always enough.
-// Requires ranks_bounded (rank < n for all nodes), which is proven in
-// UnionFind.RankBound via rank_logarithmic_bound_sized: rank(x) <= log2_floor(n) < n.
+// Proved via counting: nodes with rank > rank[x] strictly decrease along
+// parent chains, and this count is at most f.n - 1 (since x itself is excluded).
 let pure_find_fuel_sufficient (f: uf_forest{is_valid_uf f /\ rank_invariant f}) 
                                (x: nat{x < f.n})
   : Lemma (ensures Some? (pure_find_fuel f x f.n))
-  = // ranks_bounded follows from RankBound.rank_logarithmic_bound_sized + log2_floor(n) < n
-    // We assume it here to avoid circular dependency on uf_forest_sized
-    assume (ranks_bounded f);
-    find_fuel_by_bound f x f.n (f.n - 1)
+  = find_succeeds_by_count f x;
+    count_rank_above_lt_n f x 0;
+    find_fuel_mono f x (count_rank_above f (Seq.index f.rank x) 0 + 1) f.n
 
 //SNIPPET_START: pure_find
 // Pure find: follow parent pointers to root (guaranteed to terminate under rank_invariant)
