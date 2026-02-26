@@ -1810,48 +1810,18 @@ let rec all_white_on_path (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) 
            all_white_on_path st adj n u w (steps - 1) /\ 
            has_edge n adj w v)
 
-// White path theorem: if white path from u to v at d[u], then v is descendant of u
+// NOTE: The White Path Theorem as stated in CLRS (Theorem 22.9) says:
+// "v is a descendant of u in a DFS tree iff at time d[u], there is a path
+//  from u to v consisting entirely of white vertices."
 //
-// This follows from the parenthesis theorem and DFS completeness:
-// - A white path from u to v at d[u] means all vertices on the path are undiscovered
-// - DFS will discover v during u's subtree exploration (completeness)
-// - Therefore v's interval is inside u's (parenthesis theorem)
+// A correct formalization requires checking whiteness against the ACTUAL
+// intermediate DFS state at time d[u]. The previous assume val here used
+// an existentially quantified arbitrary state `st_at_du`, which was
+// incorrectly stated (the precondition could be satisfied by arbitrary
+// states unrelated to the actual DFS execution, making the conclusion false).
 //
-// The assume captures that DFS's white-path exploration leads to
-// interval containment — this is the operational content of the
-// White-Path Theorem (CLRS Theorem 22.8) applied to this specific DFS.
-assume val white_path_gives_containment
-  (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
-  : Lemma
-    (ensures (let st_final = dfs adj n in
-              u < n /\ v < n /\ u <> v /\
-              u < Seq.length st_final.d /\ v < Seq.length st_final.d /\
-              (exists (k: nat). k < n /\
-                (exists (st_at_du: dfs_state).
-                  u < Seq.length st_at_du.d /\
-                  st_at_du.time = Seq.index st_final.d u /\
-                  all_white_on_path st_at_du adj n u v k)) ==>
-              (let iu = get_interval st_final u in
-               let iv = get_interval st_final v in
-               interval_contained iv iu)))
-
-let white_path_theorem (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
-  : Lemma
-    (requires u < n /\ v < n /\ u <> v)
-    (ensures
-      (let st_final = dfs adj n in
-       // If at discovery time of u, there exists a white path from u to v
-       // Then v becomes a descendant of u (v's interval contained in u's)
-       u < Seq.length st_final.d /\ v < Seq.length st_final.d ==>
-       ((exists (k: nat). k < n /\ 
-          (exists (st_at_du: dfs_state). 
-            u < Seq.length st_at_du.d /\ 
-            st_at_du.time = Seq.index st_final.d u /\
-            all_white_on_path st_at_du adj n u v k)) ==>
-        (let iu = get_interval st_final u in
-         let iv = get_interval st_final v in
-         interval_contained iv iu))))
-  = white_path_gives_containment adj n u v
+// The White Path Theorem is correctly formalized and proved (with assume vals
+// for the DFS execution structure) in CLRS.Ch22.DFS.WhitePath.fst.
 
 (*** Cycle Detection ***)
 
