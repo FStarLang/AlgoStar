@@ -9,6 +9,7 @@ open FStar.Classical
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
@@ -16,11 +17,26 @@ module Seq = FStar.Seq
  * Verified implementation of standard matrix multiplication from CLRS Chapter 28.
  * 
  * Functional correctness: C[i][j] = Σ_{k=0}^{n-1} A[i][k] * B[k][j]
+ * Complexity: exactly n³ multiply-add operations.
  *
  * NO admits. NO assumes.
  *)
 
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+
+// ========== Ghost tick ==========
+
+//SNIPPET_START: ghost_tick
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+//SNIPPET_END: ghost_tick
 
 // ========== Pure Specification ==========
 
@@ -63,6 +79,13 @@ let mat_mul_partial_ij (sa sb sc: Seq.seq int) (n ri cj: nat) : prop =
     Seq.index sc (flat_index n i j) == dot_product_spec sa sb n i j n)
 //SNIPPET_END: spec
 
+// ========== Complexity bound predicate ==========
+
+//SNIPPET_START: complexity_bound
+let complexity_bounded_cubic (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n * n * n
+//SNIPPET_END: complexity_bound
+
 // ========== Pulse Implementation ==========
 
 //SNIPPET_START: matrix_multiply_sig
@@ -76,10 +99,13 @@ fn matrix_multiply
   (#sb: Ghost.erased (Seq.seq int))
   (#sc: Ghost.erased (Seq.seq int))
   (n: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to a #pa sa **
     A.pts_to b #pb sb **
     A.pts_to c sc **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       SZ.fits (SZ.v n * SZ.v n) /\
@@ -87,26 +113,33 @@ fn matrix_multiply
       Seq.length sb == SZ.v n * SZ.v n /\
       Seq.length sc == SZ.v n * SZ.v n
     )
-  ensures exists* sc'.
+  ensures exists* sc' (cf: nat).
     A.pts_to a #pa sa **
     A.pts_to b #pb sb **
     A.pts_to c sc' **
-    pure (mat_mul_correct sa sb sc' (SZ.v n))
+    GR.pts_to ctr cf **
+    pure (
+      mat_mul_correct sa sb sc' (SZ.v n) /\
+      complexity_bounded_cubic cf (reveal c0) (SZ.v n)
+    )
 //SNIPPET_END: matrix_multiply_sig
 {
   //SNIPPET_START: outer_loop
   let mut i: SZ.t = 0sz;
   
   while (!i <^ n)
-  invariant exists* vi sc_i.
+  invariant exists* vi sc_i (vc : nat).
     R.pts_to i vi **
     A.pts_to a #pa sa **
     A.pts_to b #pb sb **
     A.pts_to c sc_i **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length sc_i == SZ.v n * SZ.v n /\
-      mat_mul_partial_ij sa sb sc_i (SZ.v n) (SZ.v vi) 0
+      mat_mul_partial_ij sa sb sc_i (SZ.v n) (SZ.v vi) 0 /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi * SZ.v n * SZ.v n
     )
   //SNIPPET_END: outer_loop
   {
@@ -115,17 +148,20 @@ fn matrix_multiply
     let mut j: SZ.t = 0sz;
     
     while (!j <^ n)
-    invariant exists* vj sc_ij.
+    invariant exists* vj sc_ij (vc_ij : nat).
       R.pts_to i vi **
       R.pts_to j vj **
       A.pts_to a #pa sa **
       A.pts_to b #pb sb **
       A.pts_to c sc_ij **
+      GR.pts_to ctr vc_ij **
       pure (
         SZ.v vi < SZ.v n /\
         SZ.v vj <= SZ.v n /\
         Seq.length sc_ij == SZ.v n * SZ.v n /\
-        mat_mul_partial_ij sa sb sc_ij (SZ.v n) (SZ.v vi) (SZ.v vj)
+        mat_mul_partial_ij sa sb sc_ij (SZ.v n) (SZ.v vi) (SZ.v vj) /\
+        vc_ij >= reveal c0 /\
+        vc_ij - reveal c0 == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n
       )
     {
       let vj = !j;
@@ -143,13 +179,14 @@ fn matrix_multiply
       let mut k: SZ.t = 0sz;
       
       while (!k <^ n)
-      invariant exists* vk sc_ijk.
+      invariant exists* vk sc_ijk (vc_ijk : nat).
         R.pts_to i vi **
         R.pts_to j vj **
         R.pts_to k vk **
         A.pts_to a #pa sa **
         A.pts_to b #pb sb **
         A.pts_to c sc_ijk **
+        GR.pts_to ctr vc_ijk **
         pure (
           SZ.v vi < SZ.v n /\
           SZ.v vj < SZ.v n /\
@@ -160,7 +197,10 @@ fn matrix_multiply
           // Partial dot product correctness
           mat_mul_partial_k sa sb sc_ijk (SZ.v n) (SZ.v vi) (SZ.v vj) (SZ.v vk) /\
           // Previous positions unchanged
-          mat_mul_partial_ij sa sb sc_ijk (SZ.v n) (SZ.v vi) (SZ.v vj)
+          mat_mul_partial_ij sa sb sc_ijk (SZ.v n) (SZ.v vi) (SZ.v vj) /\
+          // Complexity: vc - c0 == vi*n*n + vj*n + vk
+          vc_ijk >= reveal c0 /\
+          vc_ijk - reveal c0 == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n + SZ.v vk
         )
       //SNIPPET_END: inner_loop
       {
@@ -183,6 +223,9 @@ fn matrix_multiply
         let new_val = c_val + a_val * b_val;
         
         A.op_Array_Assignment c idx_c new_val;
+
+        // Count the multiply-add — one ghost tick
+        tick ctr;
         
         k := vk +^ 1sz;
       };

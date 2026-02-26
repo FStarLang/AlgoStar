@@ -3,6 +3,7 @@
 
    Implements MODULAR-EXPONENTIATION from CLRS Chapter 31 using repeated squaring.
    Functional correctness: result == mod_exp_spec b e m == pow b e % m
+   Complexity bound: at most ⌊log₂(e)⌋ + 1 squarings for exponent e.
 
    NO admits. NO assumes.
 *)
@@ -15,6 +16,19 @@ open FStar.Mul
 open FStar.Math.Lemmas
 
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
+
+// ========== Ghost tick ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
 
 // ========== Pure Specification ==========
 
@@ -96,23 +110,9 @@ let mod_exp_step_odd (vr vb: int) (ve: nat{ve > 0 /\ ve % 2 == 1}) (m: pos)
            (new_r * pow new_b new_e) % m == (vr * pow vb ve) % m)
   = pow_mod_base (vb * vb) (ve / 2) m;
     pow_odd vb ve;
-    // pow vb ve == vb * pow (vb*vb) (ve/2)
-    // so vr * pow vb ve == vr * vb * pow(vb*vb)(ve/2)
-    // LHS: ((vr*vb)%m * pow((vb*vb)%m)(ve/2)) % m
-    //    = ((vr*vb) * pow((vb*vb)%m)(ve/2)) % m        [mod_mul_distr_l]
-    //    = ((vr*vb) * (pow((vb*vb)%m)(ve/2) % m)) % m  [mod_mul_distr_r]  -- not needed
-    //    Need to connect pow((vb*vb)%m)(ve/2) with pow(vb*vb)(ve/2)
-    // Actually: (a%m * b) % m = (a * b) % m
     lemma_mod_mul_distr_l (vr * vb) (pow ((vb * vb) % m) (ve / 2)) m;
-    // = (vr * vb * pow((vb*vb)%m)(ve/2)) % m
     lemma_mod_mul_distr_r (vr * vb) (pow ((vb * vb) % m) (ve / 2)) m;
-    // = (vr * vb * (pow((vb*vb)%m)(ve/2) % m)) % m
-    // By pow_mod_base: pow((vb*vb)%m)(ve/2) % m == pow(vb*vb)(ve/2) % m
     lemma_mod_mul_distr_r (vr * vb) (pow (vb * vb) (ve / 2)) m
-    // = (vr * vb * pow(vb*vb)(ve/2)) % m
-    // = (vr * (vb * pow(vb*vb)(ve/2))) % m  [by assoc, which Z3 knows]
-    // = (vr * pow vb ve) % m                [by pow_odd]
-#pop-options
 
 //SNIPPET_START: mod_exp_step
 let mod_exp_step (vr vb: int) (ve: nat) (m: pos)
@@ -124,59 +124,93 @@ let mod_exp_step (vr vb: int) (ve: nat) (m: pos)
   = if ve % 2 = 0 then mod_exp_step_even vr vb ve m
     else mod_exp_step_odd vr vb ve m
 //SNIPPET_END: mod_exp_step
+#pop-options
+
+// ========== log2f for complexity bound ==========
+
+let rec log2f (n: int) : Tot nat (decreases (if n > 0 then n else 0)) =
+  if Prims.op_LessThanOrEqual n 1 then 0
+  else Prims.op_Addition 1 (log2f (Prims.op_Division n 2))
+
+let lemma_log2f_halve (n: int)
+  : Lemma (requires n > 1)
+          (ensures log2f (Prims.op_Division n 2) + 1 == log2f n)
+  = ()
+
+let lemma_log2f_halve_le (n: int)
+  : Lemma (requires n > 0)
+          (ensures log2f (Prims.op_Division n 2) + 1 <= log2f n + 1)
+  = if n > 1 then lemma_log2f_halve n
+    else ()
+
+//SNIPPET_START: modexp_complexity_bounded
+// Complexity bound predicate
+let modexp_complexity_bounded (cf c0: nat) (e_init: nat) : prop =
+  cf >= c0 /\ cf - c0 <= log2f e_init + 1
+//SNIPPET_END: modexp_complexity_bounded
 
 // ========== Pulse Implementation ==========
 
-//SNIPPET_START: mod_exp_impl_sig
 #push-options "--z3rlimit 20"
+//SNIPPET_START: mod_exp_impl_sig
 fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
-  requires emp ** pure (m_init > 1)
+  (ctr: GR.ref nat) (#c0: erased nat)
+  requires GR.pts_to ctr c0 ** pure (m_init > 1 /\ e_init > 0)
   returns result: int
-  ensures emp ** pure (result == mod_exp_spec b_init e_init m_init)
+  ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (
+    result == mod_exp_spec b_init e_init m_init /\
+    modexp_complexity_bounded cf (reveal c0) e_init
+  )
 //SNIPPET_END: mod_exp_impl_sig
 {
   pow_mod_base b_init e_init m_init;
-  
+
   let mut result: int = 1;
   let mut base: int = b_init % m_init;
   let mut exp: int = e_init;
-  
+
 //SNIPPET_START: mod_exp_loop
   while (
     let ve = !exp;
     ve > 0
   )
-  invariant exists* vr vb ve.
+  invariant exists* vr vb ve (vc : nat).
     R.pts_to result vr **
     R.pts_to base vb **
     R.pts_to exp ve **
+    GR.pts_to ctr vc **
     pure (
       ve >= 0 /\ ve <= e_init /\
       vr >= 0 /\ vr < m_init /\
       vb >= 0 /\ vb < m_init /\
-      (vr * pow vb ve) % m_init == mod_exp_spec b_init e_init m_init
+      (vr * pow vb ve) % m_init == mod_exp_spec b_init e_init m_init /\
+      vc >= reveal c0 /\
+      vc - reveal c0 <= log2f e_init + 1 /\
+      (ve > 0 ==> (vc - reveal c0) + log2f ve <= log2f e_init)
     )
   {
     let ve = !exp;
     let vr = !result;
     let vb = !base;
-    
+
     mod_exp_step vr vb ve m_init;
-    
+    tick ctr;
+    lemma_log2f_halve_le ve;
+
     if (ve % 2 = 1) {
       result := (vr * vb) % m_init;
     } else {
       result := vr;
     };
-    
+
     let vb2 = !base;
     base := (vb2 * vb2) % m_init;
-    
+
     let ve2 = !exp;
     exp := ve2 / 2;
   };
 //SNIPPET_END: mod_exp_loop
-  
+
   !result
 }
 #pop-options

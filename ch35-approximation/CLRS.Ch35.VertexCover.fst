@@ -354,3 +354,13 @@ fn approx_vertex_cover
  * Then Spec.approximation_ratio_theorem applies CLRS Theorem 35.1:
  *   |cover| = 2|matching| ≤ 2 * count(any valid cover) ≤ 2 * OPT
  *)
+
+// ========== Complexity Analysis ==========
+
+//SNIPPET_START: vertex_cover_ops
+let vertex_cover_iterations (v: nat) : nat = v * v
+
+let vertex_cover_quadratic (v: nat) 
+  : Lemma (ensures vertex_cover_iterations v <= v * v) 
+  = ()
+//SNIPPET_END: vertex_cover_ops

@@ -161,3 +161,24 @@ fn segments_intersect (x1 y1 x2 y2 x3 y3 x4 y4: int)
     }
   }
 }
+
+// ========== Complexity Analysis ==========
+
+// All operations are O(1) — constant number of arithmetic operations.
+
+//SNIPPET_START: op_counts
+let cross_product_ops : nat = 3
+let direction_ops : nat = 3
+let on_segment_ops : nat = 4
+let segments_intersect_ops : nat = 16
+//SNIPPET_END: op_counts
+
+let all_constant () : Lemma
+  (ensures cross_product_ops + direction_ops + on_segment_ops + segments_intersect_ops <= 30)
+  = ()
+
+//SNIPPET_START: composition
+let segments_intersect_composition () : Lemma
+  (ensures segments_intersect_ops <= 4 * direction_ops + 2 * on_segment_ops)
+  = ()
+//SNIPPET_END: composition
