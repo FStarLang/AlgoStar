@@ -31,8 +31,10 @@ open Pulse.Lib.WithPure
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module ML = FStar.Math.Lemmas
 
 (* Reachability specification *)
 
@@ -254,6 +256,36 @@ let queue_ok_after_discover
 
 #pop-options
 
+(* ================================================================
+   GHOST TICK — for complexity tracking
+   ================================================================ *)
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+(* ================================================================
+   COMPLEXITY ARITHMETIC LEMMA
+   ================================================================ *)
+
+//SNIPPET_START: bfs_complexity_bound
+let lemma_bfs_complexity_bound (n k: nat)
+  : Lemma (requires n >= 1 /\ k <= n)
+          (ensures k * (n + 1) <= 2 * (n * n))
+//SNIPPET_END: bfs_complexity_bound
+  = ML.lemma_mult_le_right (n + 1) k n;  // k * (n+1) <= n * (n+1)
+    assert (k * (n + 1) <= n * (n + 1));
+    assert (n * (n + 1) == n * n + n * 1);
+    ML.distributivity_add_right n n 1;   // n * (n+1) = n*n + n
+    assert (n * n + n <= n * n + n * n); // since n <= n*n for n >= 1
+    assert (n * n + n * n == 2 * (n * n))
+
 (* Helper: discover a white vertex v from vertex u.
    Factored out to avoid Pulse unification issues with conditional branches
    that perform multiple array mutations. *)
@@ -403,17 +435,20 @@ fn queue_bfs
   (dist: A.array int)
   (pred: A.array int)
   (queue_data: A.array SZ.t)
+  (ctr: GR.ref nat)
   (#sadj: erased (Seq.seq int))
   (#scolor: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
   (#spred: erased (Seq.seq int))
   (#squeue: erased (Seq.seq SZ.t))
+  (#c0: erased nat)
   requires
     A.pts_to adj sadj **
     A.pts_to color scolor **
     A.pts_to dist sdist **
     A.pts_to pred spred **
     A.pts_to queue_data squeue **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       SZ.v source < SZ.v n /\
@@ -429,12 +464,13 @@ fn queue_bfs
       Seq.length squeue <= A.length queue_data /\
       SZ.fits (SZ.v n * SZ.v n)
     )
-  ensures exists* scolor' sdist' spred' squeue'.
+  ensures exists* scolor' sdist' spred' squeue' (cf: nat).
     A.pts_to adj sadj **
     A.pts_to color scolor' **
     A.pts_to dist sdist' **
     A.pts_to pred spred' **
     A.pts_to queue_data squeue' **
+    GR.pts_to ctr cf **
     pure (
       Seq.length scolor' == SZ.v n /\
       Seq.length sdist' == SZ.v n /\
@@ -447,20 +483,24 @@ fn queue_bfs
       Seq.index sdist' (SZ.v source) == 0 /\
       // Distance soundness: visited vertices have valid distances
       (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
-        Seq.index sdist' w >= 0)
+        Seq.index sdist' w >= 0) /\
+      // Complexity: at most 2 * n² ticks
+      cf >= reveal c0 /\
+      cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
     )
 //SNIPPET_END: queue_bfs_sig
 {
   // Step 1: Initialize all vertices
   let mut i: SZ.t = 0sz;
   while (!i <^ n)
-  invariant exists* vi scolor_i sdist_i spred_i.
+  invariant exists* vi scolor_i sdist_i spred_i (vc: nat).
     R.pts_to i vi **
     A.pts_to adj sadj **
     A.pts_to color scolor_i **
     A.pts_to dist sdist_i **
     A.pts_to pred spred_i **
     A.pts_to queue_data squeue **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length scolor_i == SZ.v n /\
@@ -468,7 +508,8 @@ fn queue_bfs
       Seq.length spred_i == SZ.v n /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index sdist_i j == (-1)) /\
-      (forall (j: nat). j < SZ.v vi ==> Seq.index spred_i j == (-1))
+      (forall (j: nat). j < SZ.v vi ==> Seq.index spred_i j == (-1)) /\
+      vc == reveal c0
     )
   {
     let vi = !i;
@@ -499,7 +540,7 @@ fn queue_bfs
     let vt = !q_tail;
     SZ.lt vh vt
   )
-  invariant exists* vhead vtail scolor_q sdist_q spred_q squeue_q.
+  invariant exists* vhead vtail scolor_q sdist_q spred_q squeue_q (vc: nat).
     R.pts_to q_head vhead **
     R.pts_to q_tail vtail **
     A.pts_to adj sadj **
@@ -507,21 +548,30 @@ fn queue_bfs
     A.pts_to dist sdist_q **
     A.pts_to pred spred_q **
     A.pts_to queue_data squeue_q **
+    GR.pts_to ctr vc **
     pure (
       Seq.length scolor_q == SZ.v n /\
       Seq.length sdist_q == SZ.v n /\
       Seq.length spred_q == SZ.v n /\
       Seq.length squeue_q == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
+      // Predicates
       source_ok scolor_q sdist_q (SZ.v source) (SZ.v n) /\
       dist_ok scolor_q sdist_q (SZ.v n) /\
       queue_ok scolor_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail) /\
-      count_nonwhite scolor_q (SZ.v n) == SZ.v vtail
+      count_nonwhite scolor_q (SZ.v n) == SZ.v vtail /\
+      // Complexity: vhead * (n+1) ticks so far
+      vc >= reveal c0 /\
+      vc - reveal c0 <= SZ.v vhead * (SZ.v n + 1)
     )
   {
+    // Tick for vertex dequeue
+    tick ctr;
+    
     // u = DEQUEUE(Q)
     let vhead = !q_head;
     let u: SZ.t = A.op_Array_Access queue_data vhead;
+
     // By queue_ok invariant: u < n and color[u] <> 0
     with scolor_deq. assert (A.pts_to color scolor_deq);
     with squeue_deq. assert (A.pts_to queue_data squeue_deq);
@@ -537,7 +587,7 @@ fn queue_bfs
     // For each v in G.Adj[u]
     let mut v: SZ.t = 0sz;
     while (!v <^ n)
-    invariant exists* vv scolor_v sdist_v spred_v squeue_v vtail2.
+    invariant exists* vv scolor_v sdist_v spred_v squeue_v vtail2 (vc2: nat).
       R.pts_to v vv **
       R.pts_to q_head (SZ.add vhead 1sz) **
       R.pts_to q_tail vtail2 **
@@ -546,6 +596,7 @@ fn queue_bfs
       A.pts_to dist sdist_v **
       A.pts_to pred spred_v **
       A.pts_to queue_data squeue_v **
+      GR.pts_to ctr vc2 **
       pure (
         SZ.v vv <= SZ.v n /\
         SZ.v u < SZ.v n /\
@@ -554,18 +605,23 @@ fn queue_bfs
         Seq.length sdist_v == SZ.v n /\
         Seq.length spred_v == SZ.v n /\
         Seq.length squeue_v == SZ.v n /\
-        SZ.fits (SZ.v n * SZ.v n) /\
+        SZ.fits (SZ.v u * SZ.v n) /\
+        SZ.fits (SZ.v u * SZ.v n + SZ.v vv) /\
         // Predicates maintained through inner loop
         source_ok scolor_v sdist_v (SZ.v source) (SZ.v n) /\
         dist_ok scolor_v sdist_v (SZ.v n) /\
         count_nonwhite scolor_v (SZ.v n) == SZ.v vtail2 /\
-        // u is still non-WHITE (needed for blackening)
         Seq.index scolor_v (SZ.v u) <> 0 /\
-        // Queue entries (after dequeue) are valid and colored
-        queue_ok scolor_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2)
+        queue_ok scolor_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) /\
+        // Inner loop complexity:
+        vc2 >= reveal c0 /\
+        vc2 - reveal c0 <= SZ.v vhead * (SZ.v n + 1) + 1 + SZ.v vv
       )
     {
       let vv = !v;
+
+      // Tick for edge check
+      tick ctr;
 
       // Check if edge (u, v) exists
       product_strict_bound (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vv);
@@ -578,6 +634,10 @@ fn queue_bfs
 
       // CLRS: if v.color == WHITE and edge (u,v) exists, discover v
       maybe_discover color dist pred queue_data q_tail u vv du n (SZ.add vhead 1sz) has_edge_val cv;
+
+      // Restore source_ok and u's color from frame properties
+      with scolor_post. assert (A.pts_to color scolor_post);
+      with sdist_post. assert (A.pts_to dist sdist_post);
 
       v := SZ.add vv 1sz
     };
@@ -594,10 +654,18 @@ fn queue_bfs
     blacken_preserves_queue_ok scolor_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (SZ.v u);
     count_nonwhite_upd_nonwhite scolor_pre_black (SZ.v n) (SZ.v u) 2;
     
-    A.op_Array_Assignment color u 2
-  };
+    A.op_Array_Assignment color u 2;
 
-  // Final postcondition: extract from source_ok and dist_ok
+    // Complexity: after inner loop with vv == n, vc2 - c0 <= vhead*(n+1) + 1 + n
+    // = vhead*(n+1) + (n+1) = (vhead+1)*(n+1)
+    with vc_outer. assert (GR.pts_to ctr vc_outer);
+    assert (pure (reveal vc_outer - reveal c0 <= (SZ.v vhead + 1) * (SZ.v n + 1)))
+  };
+  
+  // At loop exit: vc - c0 <= vhead * (n+1) <= n * (n+1) <= 2 * n²
+  lemma_bfs_complexity_bound (SZ.v n) (SZ.v n);
+
+  // Extract correctness from predicates
   with scolor_final. assert (A.pts_to color scolor_final);
   with sdist_final. assert (A.pts_to dist sdist_final);
   assert (pure (source_ok scolor_final sdist_final (SZ.v source) (SZ.v n)));
