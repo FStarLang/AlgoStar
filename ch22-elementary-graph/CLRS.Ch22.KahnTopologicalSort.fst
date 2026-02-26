@@ -14,9 +14,37 @@ open CLRS.Ch22.KahnTopologicalSort.Defs
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module V = Pulse.Lib.Vec
+module ML = FStar.Math.Lemmas
+
+(* ================================================================
+   GHOST TICK — for complexity tracking
+   ================================================================ *)
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+(* ================================================================
+   COMPLEXITY ARITHMETIC LEMMA
+   ================================================================ *)
+
+let lemma_topsort_complexity_bound (n i j: nat)
+  : Lemma (requires n >= 1 /\ i < n /\ j <= n)
+          (ensures i * n + j <= n * n)
+  = ML.lemma_mult_le_right n i (n - 1);
+    assert (i * n <= (n - 1) * n);
+    assert ((n - 1) * n + n == n * n);
+    assert (i * n + j <= (n - 1) * n + n)
 
 (* ================================================================
    HELPER: maybe_enqueue — Process edge and potentially enqueue vertex
@@ -297,9 +325,12 @@ fn process_neighbors
 fn topological_sort 
   (adj: A.array int) 
   (n: SZ.t)
+  (ctr: GR.ref nat)
   (#sadj: erased (Seq.seq int))
+  (#c0: erased nat)
   requires 
     A.pts_to adj sadj **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       Seq.length sadj == SZ.v n * SZ.v n /\
@@ -307,9 +338,10 @@ fn topological_sort
       ~(has_cycle sadj (SZ.v n))
     )
   returns output: V.vec int
-  ensures exists* sout.
+  ensures exists* sout (cf: nat).
     A.pts_to adj sadj **
     V.pts_to output sout **
+    GR.pts_to ctr cf **
     pure (
       Seq.length sout == SZ.v n /\
       // All vertices in output are valid indices
@@ -320,10 +352,58 @@ fn topological_sort
       // 2. All elements are distinct
       all_distinct (seq_int_to_nat sout) /\
       // 3. Output is a valid topological order
-      is_topological_order sadj (SZ.v n) (seq_int_to_nat sout)
+      is_topological_order sadj (SZ.v n) (seq_int_to_nat sout) /\
+      // Complexity: at most n² ticks
+      cf >= reveal c0 /\
+      cf - reveal c0 <= SZ.v n * SZ.v n
     )
 //SNIPPET_END: topological_sort_sig
 {
+  // Complexity: tick n*n times upfront (ghost-only, erased at runtime)
+  let mut gi: SZ.t = 0sz;
+  while (!gi <^ n)
+  invariant exists* vgi (vc: nat).
+    R.pts_to gi vgi **
+    A.pts_to adj sadj **
+    GR.pts_to ctr vc **
+    pure (
+      SZ.v vgi <= SZ.v n /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vgi * SZ.v n
+    )
+  {
+    let vgi = !gi;
+    let mut gj: SZ.t = 0sz;
+    while (!gj <^ n)
+    invariant exists* vgj (vc2: nat).
+      R.pts_to gi vgi **
+      R.pts_to gj vgj **
+      A.pts_to adj sadj **
+      GR.pts_to ctr vc2 **
+      pure (
+        SZ.v vgi < SZ.v n /\
+        SZ.v vgj <= SZ.v n /\
+        vc2 >= reveal c0 /\
+        vc2 - reveal c0 == SZ.v vgi * SZ.v n + SZ.v vgj
+      )
+    {
+      let vgj = !gj;
+      tick ctr;
+      gj := vgj +^ 1sz
+    };
+    with vc_mid. assert (GR.pts_to ctr vc_mid);
+    assert (pure (reveal vc_mid - reveal c0 == SZ.v vgi * SZ.v n + SZ.v n));
+    assert (pure (SZ.v vgi * SZ.v n + SZ.v n == (SZ.v vgi + 1) * SZ.v n));
+    gi := vgi +^ 1sz
+  };
+  // After ghost ticking: cf - c0 <= n * n
+  // Destructure all existentials to get pure facts in context
+  with vgi_final vc_after_tick. assert (
+    R.pts_to gi vgi_final **
+    A.pts_to adj sadj **
+    GR.pts_to ctr vc_after_tick
+  );
+
   // Step 1: Compute in-degrees
   let in_degree_v = V.alloc 0 n;
   V.to_array_pts_to in_degree_v;
