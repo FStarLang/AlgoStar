@@ -55,13 +55,35 @@ let valid_pq_entries (s: Seq.seq pq_entry) (n: nat) : prop =
 let valid_pq_entries_extends (s0 s1: Seq.seq pq_entry) (x: pq_entry) (n: nat)
   : Lemma (requires PQ.extends s0 s1 x /\ valid_pq_entries s0 n /\ SZ.v (snd x) < n)
           (ensures valid_pq_entries s1 n)
-  = admit () // TODO
+  = let aux (j: nat{j < Seq.length s1}) : Lemma (SZ.v (snd (Seq.index s1 j)) < n) =
+      let y = Seq.index s1 j in
+      if y = x then ()
+      else begin
+        assert (Seq.mem y s1);
+        assert (PQ.count y s1 == PQ.count y s0);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+      end
+    in
+    Classical.forall_intro aux
 
 // For extract_min: extends s1 s0 x means s0 = s1 + x, so valid s0 ==> valid s1
 let valid_pq_entries_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry) (n: nat)
   : Lemma (requires PQ.extends s1 s0 x /\ valid_pq_entries s0 n)
           (ensures valid_pq_entries s1 n /\ SZ.v (snd x) < n)
-  = admit () // TODO
+  = assert (FStar.Seq.Properties.count x s0 > 0);
+    FStar.Seq.Properties.mem_index x s0;
+    let aux (j: nat{j < Seq.length s1}) : Lemma (SZ.v (snd (Seq.index s1 j)) < n) =
+      let y = Seq.index s1 j in
+      if y = x then (FStar.Seq.Properties.mem_index x s0)
+      else begin
+        assert (Seq.mem y s1);
+        assert (PQ.count y s1 == PQ.count y s0);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+      end
+    in
+    Classical.forall_intro aux
 
 let pq_entry_compare (x y: pq_entry) : order =
   let (fx, ix) = x in
@@ -278,14 +300,38 @@ let pq_forest_extends (s0 s1: Seq.seq pq_entry) (x: pq_entry) (forest: list fore
                     pq_indices_in_forest s0 forest /\
                     Some? (find_entry_by_idx forest (snd x)))
           (ensures pq_indices_in_forest s1 forest)
-  = admit () // TODO
+  = let aux (j: nat{j < Seq.length s1})
+      : Lemma (Some? (find_entry_by_idx forest (snd (Seq.index s1 j)))) =
+      let y = Seq.index s1 j in
+      if y = x then ()
+      else begin
+        assert (Seq.mem y s1);
+        assert (PQ.count y s1 == PQ.count y s0);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+      end
+    in
+    Classical.forall_intro aux
 
 // pq_indices_in_forest after shrink (extract_min): remaining entries still in forest
 let pq_forest_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry) (forest: list forest_entry)
   : Lemma (requires PQ.extends s1 s0 x /\ pq_indices_in_forest s0 forest)
           (ensures pq_indices_in_forest s1 forest /\
                    Some? (find_entry_by_idx forest (snd x)))
-  = admit () // TODO
+  = assert (FStar.Seq.Properties.count x s0 > 0);
+    FStar.Seq.Properties.mem_index x s0;
+    let aux (j: nat{j < Seq.length s1})
+      : Lemma (Some? (find_entry_by_idx forest (snd (Seq.index s1 j)))) =
+      let y = Seq.index s1 j in
+      if y = x then (FStar.Seq.Properties.mem_index x s0)
+      else begin
+        assert (Seq.mem y s1);
+        assert (PQ.count y s1 == PQ.count y s0);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+      end
+    in
+    Classical.forall_intro aux
 
 // After prepending (idx, p, ft) to forest, find_entry_by_idx for idx succeeds
 let find_entry_prepend (entries: list forest_entry) (idx: SZ.t) (p: hnode_ptr) (ft: HSpec.htree)
