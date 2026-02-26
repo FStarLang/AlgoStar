@@ -46,8 +46,10 @@ open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module ML = FStar.Math.Lemmas
 
 (* Graph specification *)
 
@@ -277,6 +279,69 @@ let final_postcondition_lemma
       (forall (u:nat). {:pattern (Seq.index sd u); (Seq.index sf u)} u < n ==> Seq.index sd u < Seq.index sf u))
   = count_ones_zero_no_gray scolor n
 
+(* ================================================================
+   GHOST TICK — for complexity tracking
+   ================================================================ *)
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+(* ================================================================
+   COMPLEXITY ARITHMETIC LEMMA
+   ================================================================ *)
+
+let lemma_dfs_bound_correct (outer_count inner_count n: nat)
+  : Lemma (requires n >= 1 /\ outer_count <= n /\ inner_count <= n * n)
+          (ensures outer_count + inner_count <= 2 * (n * n))
+  = assert (outer_count <= n);
+    assert (n <= n * n);
+    assert (outer_count + inner_count <= n + n * n);
+    assert (n + n * n <= n * n + n * n);
+    assert (n * n + n * n == 2 * (n * n))
+
+(* ================================================================
+   SUM_SCAN_IDX — sum of scan_idx values for complexity accounting
+   ================================================================ *)
+
+let rec sum_scan_idx (sscan: Seq.seq SZ.t) (k: nat{k <= Seq.length sscan})
+  : Tot nat (decreases k)
+  = if k = 0 then 0
+    else SZ.v (Seq.index sscan (k - 1)) + sum_scan_idx sscan (k - 1)
+
+let rec sum_scan_idx_bound (sscan: Seq.seq SZ.t) (k: nat{k <= Seq.length sscan}) (n: nat)
+  : Lemma (requires forall (j:nat). j < k ==> SZ.v (Seq.index sscan j) <= n)
+          (ensures sum_scan_idx sscan k <= k * n)
+          (decreases k)
+  = if k = 0 then ()
+    else sum_scan_idx_bound sscan (k - 1) n
+
+let rec sum_scan_idx_upd (sscan: Seq.seq SZ.t) (k: nat{k <= Seq.length sscan}) (j: nat) (v: SZ.t)
+  : Lemma (requires j < Seq.length sscan)
+          (ensures Seq.length (Seq.upd sscan j v) == Seq.length sscan /\
+                   (j < k ==> sum_scan_idx (Seq.upd sscan j v) k == 
+                              sum_scan_idx sscan k - SZ.v (Seq.index sscan j) + SZ.v v) /\
+                   (j >= k ==> sum_scan_idx (Seq.upd sscan j v) k == sum_scan_idx sscan k))
+          (decreases k)
+  = if k = 0 then ()
+    else begin
+      assert (Seq.index (Seq.upd sscan j v) (k-1) == (if j = k-1 then v else Seq.index sscan (k-1)));
+      sum_scan_idx_upd sscan (k - 1) j v
+    end
+
+let rec sum_scan_idx_all_zero (sscan: Seq.seq SZ.t) (k: nat{k <= Seq.length sscan})
+  : Lemma (requires forall (j:nat). j < k ==> SZ.v (Seq.index sscan j) == 0)
+          (ensures sum_scan_idx sscan k == 0)
+          (decreases k)
+  = if k = 0 then ()
+    else sum_scan_idx_all_zero sscan (k - 1)
+
 (* Helper: discover a WHITE vertex v from vertex u.
    Sets d[v], color[v]=GRAY, pred[v]=u, pushes v onto stack.
    Factored out to avoid Pulse unification issues with conditional branches. *)
@@ -287,6 +352,7 @@ fn discover_vertex_dfs
   (stack_data: A.array SZ.t) (stack_top: ref SZ.t)
   (scan_idx: A.array SZ.t)
   (time_ref: ref int)
+  (ctr: GR.ref nat)
   (u: SZ.t) (vv: SZ.t) (n: SZ.t)
   (#scolor: erased (Seq.seq int))
   (#sd: erased (Seq.seq int))
@@ -295,6 +361,7 @@ fn discover_vertex_dfs
   (#sscan: erased (Seq.seq SZ.t))
   (#vtop: erased SZ.t)
   (#vtime: erased int)
+  (#vc: erased nat)
   requires
     A.pts_to color scolor **
     A.pts_to d sd **
@@ -303,6 +370,7 @@ fn discover_vertex_dfs
     A.pts_to scan_idx sscan **
     R.pts_to stack_top vtop **
     R.pts_to time_ref vtime **
+    GR.pts_to ctr vc **
     with_pure (
       SZ.v vv < SZ.v n /\
       SZ.v u < SZ.v n /\
@@ -314,6 +382,7 @@ fn discover_vertex_dfs
       Seq.length sscan == SZ.v n /\
       vtime >= 0 /\
       Seq.index scolor (SZ.v vv) == 0 /\
+      SZ.v (Seq.index sscan (SZ.v vv)) == 0 /\
       stack_ok scolor sstack (SZ.v n) (SZ.v vtop) /\
       scan_ok sscan (SZ.v n)
     )
@@ -325,6 +394,7 @@ fn discover_vertex_dfs
     A.pts_to scan_idx sscan' **
     R.pts_to stack_top vtop' **
     R.pts_to time_ref vtime' **
+    GR.pts_to ctr vc **
     pure (
       Seq.length scolor' == SZ.v n /\
       Seq.length sd' == SZ.v n /\
@@ -337,7 +407,8 @@ fn discover_vertex_dfs
       scolor' == Seq.upd scolor (SZ.v vv) 1 /\
       sd' == Seq.upd sd (SZ.v vv) (vtime + 1) /\
       stack_ok scolor' sstack' (SZ.v n) (SZ.v vtop') /\
-      scan_ok sscan' (SZ.v n)
+      scan_ok sscan' (SZ.v n) /\
+      sum_scan_idx sscan' (SZ.v n) == sum_scan_idx sscan (SZ.v n)
     )
 {
   // time++
@@ -350,7 +421,8 @@ fn discover_vertex_dfs
   A.op_Array_Assignment color vv 1;
   // v.pi = u
   A.op_Array_Assignment pred vv (SZ.v u);
-  // Initialize scan_idx[v] = 0
+  // scan_idx[vv] = 0 (already 0 by white_scan_zero precondition)
+  sum_scan_idx_upd sscan (SZ.v n) (SZ.v vv) 0sz;
   A.op_Array_Assignment scan_idx vv 0sz;
   // PUSH(stack, v)
   let top = !stack_top;
@@ -438,6 +510,7 @@ fn dfs_visit
   (scan_idx: A.array SZ.t)
   (stack_top: ref SZ.t)
   (time_ref: ref int)
+  (ctr: GR.ref nat)
   (#sadj: erased (Seq.seq int))
   (#scolor: erased (Seq.seq int))
   (#sd: erased (Seq.seq int))
@@ -447,6 +520,7 @@ fn dfs_visit
   (#sscan: erased (Seq.seq SZ.t))
   (#vtop: erased SZ.t)
   (#vtime: erased int)
+  (#vc: erased nat)
   requires
     A.pts_to adj sadj **
     A.pts_to color scolor **
@@ -457,6 +531,7 @@ fn dfs_visit
     A.pts_to scan_idx sscan **
     R.pts_to stack_top vtop **
     R.pts_to time_ref vtime **
+    GR.pts_to ctr vc **
     with_pure (
       SZ.v vs < SZ.v n /\ SZ.v n > 0 /\ SZ.v vtop < SZ.v n /\
       Seq.length sadj == SZ.v n * SZ.v n /\
@@ -469,9 +544,11 @@ fn dfs_visit
       scan_ok sscan (SZ.v n) /\
       dfs_ok scolor sd sf (SZ.v n) /\
       gray_ok scolor sd (SZ.v n) vtime /\
-      nonwhite_below scolor (SZ.v vs)
+      nonwhite_below scolor (SZ.v vs) /\
+      (* WHITE vertices have scan_idx == 0 *)
+      (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
-  ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime'.
+  ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime' (vc': nat).
     A.pts_to adj sadj **
     A.pts_to color scolor' **
     A.pts_to d sd' **
@@ -481,6 +558,7 @@ fn dfs_visit
     A.pts_to scan_idx sscan' **
     R.pts_to stack_top vtop' **
     R.pts_to time_ref vtime' **
+    GR.pts_to ctr vc' **
     pure (
       Seq.length scolor' == SZ.v n /\ Seq.length sd' == SZ.v n /\
       Seq.length sf' == SZ.v n /\ Seq.length spred' == SZ.v n /\
@@ -489,16 +567,22 @@ fn dfs_visit
       stack_ok scolor' sstack' (SZ.v n) (SZ.v vtop') /\
       scan_ok sscan' (SZ.v n) /\
       dfs_ok scolor' sd' sf' (SZ.v n) /\
-      nonwhite_below scolor' (SZ.v vs + 1)
+      nonwhite_below scolor' (SZ.v vs + 1) /\
+      (* Complexity: ticks == scan work done *)
+      vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
+      (* WHITE vertices still have scan_idx == 0 *)
+      (forall (j:nat). j < SZ.v n ==> (Seq.index scolor' j == 0 ==> SZ.v (Seq.index sscan' j) == 0))
     )
 {
-  // Discover vs
+  // Discover vs (no tick -- scan ticks suffice for complexity bound)
   let t = !time_ref;
   time_ref := t + 1;
   A.op_Array_Assignment d vs (t + 1);
   count_ones_upd_to_one scolor (SZ.v n) (SZ.v vs);
   A.op_Array_Assignment color vs 1;      // GRAY
   A.op_Array_Assignment pred vs (-1);    // NIL
+  // scan_idx[vs] = 0 (already 0 since vs is WHITE, by white_scan_zero)
+  sum_scan_idx_upd sscan (SZ.v n) (SZ.v vs) 0sz;
   A.op_Array_Assignment scan_idx vs 0sz;
   
   // PUSH(stack, vs)
@@ -515,7 +599,7 @@ fn dfs_visit
     let vtop = !stack_top;
     SZ.gt vtop 0sz
   )
-  invariant exists* vtop_w vtime_w scolor_w sd_w sf_w spred_w sstack_w sscan_w.
+  invariant exists* vtop_w vtime_w scolor_w sd_w sf_w spred_w sstack_w sscan_w (vc_w: nat).
     R.pts_to stack_top vtop_w **
     R.pts_to time_ref vtime_w **
     A.pts_to adj sadj **
@@ -525,6 +609,7 @@ fn dfs_visit
     A.pts_to pred spred_w **
     A.pts_to stack_data sstack_w **
     A.pts_to scan_idx sscan_w **
+    GR.pts_to ctr vc_w **
     pure (
       SZ.v vs < SZ.v n /\
       Seq.length scolor_w == SZ.v n /\ Seq.length sd_w == SZ.v n /\
@@ -537,7 +622,11 @@ fn dfs_visit
       dfs_ok scolor_w sd_w sf_w (SZ.v n) /\
       gray_ok scolor_w sd_w (SZ.v n) vtime_w /\
       Seq.index scolor_w (SZ.v vs) <> 0 /\
-      nonwhite_below scolor_w (SZ.v vs)
+      nonwhite_below scolor_w (SZ.v vs) /\
+      (* Complexity tracking *)
+      vc_w + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan_w (SZ.v n) /\
+      (* WHITE vertices have scan_idx == 0 *)
+      (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_w j == 0 ==> SZ.v (Seq.index sscan_w j) == 0))
     )
   {
     // u = PEEK(stack)
@@ -559,7 +648,7 @@ fn dfs_visit
 
     let mut scan: SZ.t = scan_pos;
     while (!scan <^ n && !found_white)
-    invariant exists* vscan vfound vnext vtime_scan scolor_scan sd_scan sf_scan spred_scan sstack_scan sscan_scan.
+    invariant exists* vscan vfound vnext vtime_scan scolor_scan sd_scan sf_scan spred_scan sstack_scan sscan_scan (vc_scan: nat).
       R.pts_to stack_top top **
       R.pts_to time_ref vtime_scan **
       R.pts_to scan vscan **
@@ -572,6 +661,7 @@ fn dfs_visit
       A.pts_to pred spred_scan **
       A.pts_to stack_data sstack_scan **
       A.pts_to scan_idx sscan_scan **
+      GR.pts_to ctr vc_scan **
       pure (
         SZ.v vscan <= SZ.v n /\
         SZ.v u < SZ.v n /\ SZ.v top <= SZ.v n /\
@@ -591,10 +681,19 @@ fn dfs_visit
         dfs_ok scolor_scan sd_scan sf_scan (SZ.v n) /\
         gray_ok scolor_scan sd_scan (SZ.v n) vtime_scan /\
         Seq.index scolor_scan (SZ.v vs) <> 0 /\
-        nonwhite_below scolor_scan (SZ.v vs)
+        nonwhite_below scolor_scan (SZ.v vs) /\
+        (* Complexity: scan ticks == scan position advancement *)
+        vc_scan + sum_scan_idx sscan (SZ.v n) + SZ.v scan_pos ==
+          reveal vc + sum_scan_idx sscan_scan (SZ.v n) + SZ.v vscan /\
+        SZ.v (Seq.index sscan_scan (SZ.v u)) == SZ.v scan_pos /\
+        (* WHITE scan zero preserved *)
+        (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_scan j == 0 ==> SZ.v (Seq.index sscan_scan j) == 0))
       )
     {
       let vscan = !scan;
+
+      // Tick for edge check
+      tick ctr;
 
       // Check edge (u, vscan) and color[vscan]
       let offset: SZ.t = SZ.mul u n;
@@ -616,11 +715,15 @@ fn dfs_visit
 
     // Update scan_idx[u] to where we stopped
     let final_scan = !scan;
+    // Record old sum for complexity accounting
+    with sscan_before_upd. assert (A.pts_to scan_idx sscan_before_upd);
+    with vc_after_scan. assert (GR.pts_to ctr vc_after_scan);
+    sum_scan_idx_upd sscan_before_upd (SZ.v n) (SZ.v u) final_scan;
     A.op_Array_Assignment scan_idx u final_scan;
 
     let found = !found_white;
     if (found) {
-      // Found WHITE neighbor - discover it
+      // Found WHITE neighbor - discover it (inlined to preserve complexity facts)
       let vv = !next_v;
       assert (pure (SZ.v vv < SZ.v n));
       
@@ -628,19 +731,41 @@ fn dfs_visit
       with sd_now. assert (A.pts_to d sd_now);
       with sf_now. assert (A.pts_to f sf_now);
       with vtime_now. assert (R.pts_to time_ref vtime_now);
+      // count_ones == top, and scolor_now[vv] == 0 (WHITE, not GRAY)
+      // so count_ones < n, hence top < n
       count_ones_lt scolor_now (SZ.v n) (SZ.v vv);
       
-      discover_vertex_dfs color d pred stack_data stack_top scan_idx time_ref u vv n;
+      // Inline discover_vertex_dfs
+      let td = !time_ref;
+      time_ref := td + 1;
+      A.op_Array_Assignment d vv (td + 1);
+      count_ones_upd_to_one scolor_now (SZ.v n) (SZ.v vv);
+      A.op_Array_Assignment color vv 1;
+      A.op_Array_Assignment pred vv (SZ.v u);
+      // scan_idx[vv] = 0 (already 0 by white_scan_zero)
+      with sscan_pre_disc. assert (A.pts_to scan_idx sscan_pre_disc);
+      sum_scan_idx_upd sscan_pre_disc (SZ.v n) (SZ.v vv) 0sz;
+      A.op_Array_Assignment scan_idx vv 0sz;
+      let topd = !stack_top;
+      A.op_Array_Assignment stack_data topd vv;
+      stack_top := SZ.add topd 1sz;
       // Reestablish DFS tracking
       discover_preserves_tracking scolor_now sd_now sf_now (SZ.v n) (SZ.v vv) vtime_now;
       discover_preserves_nonwhite scolor_now (SZ.v vv) (SZ.v vs)
     } else {
-      // No more WHITE neighbors - finish u
+      // No more WHITE neighbors - finish u (inlined)
       with scolor_now. assert (A.pts_to color scolor_now);
       with sd_now. assert (A.pts_to d sd_now);
       with sf_now. assert (A.pts_to f sf_now);
       with vtime_now. assert (R.pts_to time_ref vtime_now);
-      finish_vertex color f stack_data stack_top time_ref u n;
+      // Inline finish_vertex
+      count_ones_upd_from_one scolor_now (SZ.v n) (SZ.v u) 2;
+      A.op_Array_Assignment color u 2;
+      let tf = !time_ref;
+      time_ref := tf + 1;
+      A.op_Array_Assignment f u (tf + 1);
+      let topf = !stack_top;
+      stack_top := SZ.sub topf 1sz;
       // Reestablish DFS tracking
       finish_preserves_tracking scolor_now sd_now sf_now (SZ.v n) (SZ.v u) vtime_now;
       finish_preserves_nonwhite scolor_now (SZ.v u) (SZ.v vs)
@@ -656,6 +781,7 @@ fn dfs_visit
   with sscan_after. assert (A.pts_to scan_idx sscan_after);
   with vtop_after. assert (R.pts_to stack_top vtop_after);
   with vtime_after. assert (R.pts_to time_ref vtime_after);
+  with vc_final. assert (GR.pts_to ctr vc_final);
   
   assert (pure (SZ.v vtop_after == 0));
   ()
@@ -679,6 +805,7 @@ fn maybe_dfs_visit
   (scan_idx: A.array SZ.t)
   (stack_top: ref SZ.t)
   (time_ref: ref int)
+  (ctr: GR.ref nat)
   (#sadj: erased (Seq.seq int))
   (#scolor: erased (Seq.seq int))
   (#sd: erased (Seq.seq int))
@@ -688,6 +815,7 @@ fn maybe_dfs_visit
   (#sscan: erased (Seq.seq SZ.t))
   (#vtop: erased SZ.t)
   (#vtime: erased int)
+  (#vc: erased nat)
   requires
     A.pts_to adj sadj **
     A.pts_to color scolor **
@@ -698,6 +826,7 @@ fn maybe_dfs_visit
     A.pts_to scan_idx sscan **
     R.pts_to stack_top vtop **
     R.pts_to time_ref vtime **
+    GR.pts_to ctr vc **
     with_pure (
       SZ.v vs < SZ.v n /\ SZ.v n > 0 /\ SZ.v vtop == 0 /\
       Seq.length sadj == SZ.v n * SZ.v n /\
@@ -709,9 +838,11 @@ fn maybe_dfs_visit
       stack_ok scolor sstack (SZ.v n) (SZ.v vtop) /\
       scan_ok sscan (SZ.v n) /\
       dfs_ok scolor sd sf (SZ.v n) /\
-      nonwhite_below scolor (SZ.v vs)
+      nonwhite_below scolor (SZ.v vs) /\
+      (* WHITE vertices have scan_idx == 0 *)
+      (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
-  ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime'.
+  ensures exists* scolor' sd' sf' spred' sstack' sscan' vtop' vtime' (vc': nat).
     A.pts_to adj sadj **
     A.pts_to color scolor' **
     A.pts_to d sd' **
@@ -721,6 +852,7 @@ fn maybe_dfs_visit
     A.pts_to scan_idx sscan' **
     R.pts_to stack_top vtop' **
     R.pts_to time_ref vtime' **
+    GR.pts_to ctr vc' **
     pure (
       Seq.length scolor' == SZ.v n /\ Seq.length sd' == SZ.v n /\
       Seq.length sf' == SZ.v n /\ Seq.length spred' == SZ.v n /\
@@ -729,16 +861,24 @@ fn maybe_dfs_visit
       stack_ok scolor' sstack' (SZ.v n) (SZ.v vtop') /\
       scan_ok sscan' (SZ.v n) /\
       dfs_ok scolor' sd' sf' (SZ.v n) /\
-      nonwhite_below scolor' (SZ.v vs + 1)
+      nonwhite_below scolor' (SZ.v vs + 1) /\
+      (* Complexity: ticks == scan work *)
+      vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
+      (* WHITE scan zero preserved *)
+      (forall (j:nat). j < SZ.v n ==> (Seq.index scolor' j == 0 ==> SZ.v (Seq.index sscan' j) == 0))
     )
 {
   if (cv = 0) {
     // vtop == 0 ⟹ count_ones == 0 ⟹ no GRAY vertices ⟹ gray_ok vacuously
     no_gray_implies_gray_ok scolor sd (SZ.v n) vtime;
-    dfs_visit adj n vs color d f pred stack_data scan_idx stack_top time_ref
+    dfs_visit adj n vs color d f pred stack_data scan_idx stack_top time_ref ctr
   }
 }
 #pop-options
+
+(* ================================================================
+   Main stack-based DFS — proves both correctness and complexity
+   ================================================================ *)
 
 #push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
 //SNIPPET_START: stack_dfs_sig
@@ -751,6 +891,7 @@ fn stack_dfs
   (pred: A.array int)
   (stack_data: A.array SZ.t)
   (scan_idx: A.array SZ.t)
+  (ctr: GR.ref nat)
   (#sadj: erased (Seq.seq int))
   (#scolor: erased (Seq.seq int))
   (#sd: erased (Seq.seq int))
@@ -758,6 +899,7 @@ fn stack_dfs
   (#spred: erased (Seq.seq int))
   (#sstack: erased (Seq.seq SZ.t))
   (#sscan: erased (Seq.seq SZ.t))
+  (#c0: erased nat)
   requires
     A.pts_to adj sadj **
     A.pts_to color scolor **
@@ -766,6 +908,7 @@ fn stack_dfs
     A.pts_to pred spred **
     A.pts_to stack_data sstack **
     A.pts_to scan_idx sscan **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       Seq.length sadj == SZ.v n * SZ.v n /\
@@ -784,7 +927,7 @@ fn stack_dfs
       Seq.length sscan <= A.length scan_idx /\
       SZ.fits (SZ.v n * SZ.v n)
     )
-  ensures exists* scolor' sd' sf' spred' sstack' sscan'.
+  ensures exists* scolor' sd' sf' spred' sstack' sscan' (cf: nat).
     A.pts_to adj sadj **
     A.pts_to color scolor' **
     A.pts_to d sd' **
@@ -792,6 +935,7 @@ fn stack_dfs
     A.pts_to pred spred' **
     A.pts_to stack_data sstack' **
     A.pts_to scan_idx sscan' **
+    GR.pts_to ctr cf **
     pure (
       Seq.length scolor' == SZ.v n /\
       Seq.length sd' == SZ.v n /\
@@ -805,14 +949,17 @@ fn stack_dfs
       (forall (u: nat). u < SZ.v n ==> Seq.index sd' u > 0) /\
       (forall (u: nat). u < SZ.v n ==> Seq.index sf' u > 0) /\
       // Discovery time < finish time (parenthesis theorem)
-      (forall (u: nat). u < SZ.v n ==> Seq.index sd' u < Seq.index sf' u)
+      (forall (u: nat). u < SZ.v n ==> Seq.index sd' u < Seq.index sf' u) /\
+      // Complexity: at most 2 * n² ticks
+      cf >= reveal c0 /\
+      cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
     )
 //SNIPPET_END: stack_dfs_sig
 {
   // Step 1: Initialize all vertices
   let mut i: SZ.t = 0sz;
   while (!i <^ n)
-  invariant exists* vi scolor_i sd_i sf_i spred_i.
+  invariant exists* vi scolor_i sd_i sf_i spred_i (vc: nat).
     R.pts_to i vi **
     A.pts_to adj sadj **
     A.pts_to color scolor_i **
@@ -821,6 +968,7 @@ fn stack_dfs
     A.pts_to pred spred_i **
     A.pts_to stack_data sstack **
     A.pts_to scan_idx sscan **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length scolor_i == SZ.v n /\
@@ -830,7 +978,8 @@ fn stack_dfs
       (forall (j: nat). j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index sd_i j == (-1)) /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index sf_i j == (-1)) /\
-      (forall (j: nat). j < SZ.v vi ==> Seq.index spred_i j == (-1))
+      (forall (j: nat). j < SZ.v vi ==> Seq.index spred_i j == (-1)) /\
+      vc == reveal c0
     )
   {
     let vi = !i;
@@ -844,7 +993,7 @@ fn stack_dfs
   // Step 1b: Initialize scan_idx array
   i := 0sz;
   while (!i <^ n)
-  invariant exists* vi scolor_ib sd_ib sf_ib spred_ib sscan_ib.
+  invariant exists* vi scolor_ib sd_ib sf_ib spred_ib sscan_ib (vc: nat).
     R.pts_to i vi **
     A.pts_to adj sadj **
     A.pts_to color scolor_ib **
@@ -853,6 +1002,7 @@ fn stack_dfs
     A.pts_to pred spred_ib **
     A.pts_to stack_data sstack **
     A.pts_to scan_idx sscan_ib **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length scolor_ib == SZ.v n /\
@@ -864,7 +1014,8 @@ fn stack_dfs
       (forall (j: nat). j < SZ.v n ==> Seq.index scolor_ib j == 0) /\
       (forall (j: nat). j < SZ.v n ==> Seq.index sd_ib j == (-1)) /\
       (forall (j: nat). j < SZ.v n ==> Seq.index sf_ib j == (-1)) /\
-      (forall (j: nat). j < SZ.v n ==> Seq.index spred_ib j == (-1))
+      (forall (j: nat). j < SZ.v n ==> Seq.index spred_ib j == (-1)) /\
+      vc == reveal c0
     )
   {
     let vi = !i;
@@ -876,14 +1027,16 @@ fn stack_dfs
   let mut time_ref: int = 0;
   let mut stack_top: SZ.t = 0sz;
 
-  // Establish count_ones == 0 (all vertices are WHITE)
+  // Establish count_ones == 0 (all vertices are WHITE) and sum_scan_idx == 0
   with scolor_init. assert (A.pts_to color scolor_init);
+  with sscan_init. assert (A.pts_to scan_idx sscan_init);
   count_ones_all_zero scolor_init (SZ.v n);
+  sum_scan_idx_all_zero sscan_init (SZ.v n);
 
   // Step 3: Main DFS loop - for each vertex s
   let mut s: SZ.t = 0sz;
   while (!s <^ n)
-  invariant exists* vs vtop vtime scolor_s sd_s sf_s spred_s sstack_s sscan_s.
+  invariant exists* vs vtop vtime scolor_s sd_s sf_s spred_s sstack_s sscan_s (vc_s: nat).
     R.pts_to s vs **
     R.pts_to stack_top vtop **
     R.pts_to time_ref vtime **
@@ -894,6 +1047,7 @@ fn stack_dfs
     A.pts_to pred spred_s **
     A.pts_to stack_data sstack_s **
     A.pts_to scan_idx sscan_s **
+    GR.pts_to ctr vc_s **
     pure (
       SZ.v vs <= SZ.v n /\ SZ.v vtop == 0 /\
       Seq.length scolor_s == SZ.v n /\ Seq.length sd_s == SZ.v n /\
@@ -903,16 +1057,23 @@ fn stack_dfs
       stack_ok scolor_s sstack_s (SZ.v n) (SZ.v vtop) /\
       scan_ok sscan_s (SZ.v n) /\
       dfs_ok scolor_s sd_s sf_s (SZ.v n) /\
-      nonwhite_below scolor_s (SZ.v vs)
+      nonwhite_below scolor_s (SZ.v vs) /\
+      (* Complexity: vc_s == c0 + vs + sum_scan_idx *)
+      vc_s == reveal c0 + SZ.v vs + sum_scan_idx sscan_s (SZ.v n) /\
+      (* WHITE vertices have scan_idx == 0 *)
+      (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_s j == 0 ==> SZ.v (Seq.index sscan_s j) == 0))
     )
   {
     let vs = !s;
+
+    // Tick for outer loop iteration (checking color)
+    tick ctr;
 
     // Check if s is WHITE
     let cs: int = A.op_Array_Access color vs;
     
     // Conditionally perform DFS-VISIT
-    maybe_dfs_visit adj n vs cs color d f pred stack_data scan_idx stack_top time_ref;
+    maybe_dfs_visit adj n vs cs color d f pred stack_data scan_idx stack_top time_ref ctr;
 
     s := SZ.add vs 1sz
   };
@@ -921,13 +1082,27 @@ fn stack_dfs
   with scolor_final. assert (A.pts_to color scolor_final);
   with sd_final. assert (A.pts_to d sd_final);
   with sf_final. assert (A.pts_to f sf_final);
+  with sscan_final. assert (A.pts_to scan_idx sscan_final);
+  with sstack_final. assert (A.pts_to stack_data sstack_final);
+  with vc_final. assert (GR.pts_to ctr vc_final);
+  
+  // From loop invariant: vc_final == c0 + n + sum_scan_idx sscan_final n
+  // and sum_scan_idx sscan_final n <= n * n (since each scan_idx <= n, by scan_ok)
+  sum_scan_idx_bound sscan_final (SZ.v n) (SZ.v n);
+  // So vc_final - c0 = n + sum_scan_idx <= n + n*n
+  // And n + n*n <= 2*n*n (since n >= 1)
+  lemma_dfs_bound_correct (SZ.v n) (SZ.v n * SZ.v n) (SZ.v n);
+  
+  // Assert complexity bound
+  assert (pure (vc_final >= reveal c0));
+  assert (pure (vc_final - reveal c0 <= 2 * (SZ.v n * SZ.v n)));
   
   // Extract facts from loop invariant for final_postcondition_lemma
+  // stack_ok with top==0 gives count_ones == 0
   assert (pure (count_ones scolor_final (SZ.v n) == 0));
   assert (pure (nonwhite_below scolor_final (SZ.v n)));
   assert (pure (dfs_ok scolor_final sd_final sf_final (SZ.v n)));
   final_postcondition_lemma scolor_final sd_final sf_final (SZ.v n);
-
   // Assert each postcondition quantifier explicitly
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index scolor_final u == 2));
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u > 0));
