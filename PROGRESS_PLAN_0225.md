@@ -5,7 +5,7 @@ Decomposition into independent agent tasks for parallel execution.
 
 **Codebase stats**:
 - 182 F*/Pulse files, ~73,800 lines across 23 chapters + common
-- **13 total unproven obligations** (was 14, Task F eliminated 1) (8 `admit()`, 5 `assume()`, 1 `assume val`)
+- **12 total unproven obligations** (was 14; Task F eliminated 1, Task E eliminated 1 + improved 1) (8 `admit()`, 4 `assume()`, 1 `assume_`)
   across 7 files in 6 chapters
 - 1 file broken (doesn't compile): `DFS.WhitePath.fst`
 - 5 files have uncommitted changes (3 RadixSort, 1 Huffman, 1 WhitePath)
@@ -26,8 +26,8 @@ Decomposition into independent agent tasks for parallel execution.
 | 6 | `ch22/DFS.WhitePath.fst` | `admit()` | 671 | White-path backward: timestamp containment for visited vertex in DFS subtree |
 | 7 | `ch22/DFS.WhitePath.fst` | `admit()` | 781 | White-path backward: `d_top[u_start]` ordering when u_start is DFS root |
 | 8 | `ch22/DFS.WhitePath.fst` | `admit()` | 793 | White-path backward: relative discovery time ordering within DFS subtree |
-| 9 | `ch23/Kruskal.fst` | `assume val` | 81 | `lemma_kruskal_maintains_forest`: union-find forest acyclicity preservation |
-| 10 | `ch23/Kruskal.SortedEdges.fst` | `assume()` | 266 | `acyclic result' n`: output of edge insertion remains acyclic |
+| 9 | `ch23/Kruskal.fst` | `assume_` | 313 | Forest acyclicity via UF soundness (TRUE but unproven; was FALSE `assume val` at line 81) |
+| ~~10~~ | ~~`ch23/Kruskal.SortedEdges.fst`~~ | ~~`assume()`~~ | ~~266~~ | ~~ELIMINATED: refactored to use Kruskal.Spec's proven `kruskal_step`~~ |
 | 11 | `ch24/ShortestPath.Triangle.fst` | `admit()` | 141 | `sp_dist_k_stabilize`: `sp_dist_k(s,v,n) == sp_dist_k(s,v,n-1)` (pigeonhole + cycle removal) |
 | 12 | `ch26/MaxFlow.Spec.fst` | `assume()` | 354 | Weak duality: flow value ≤ cut capacity |
 | 13 | `ch26/MaxFlow.Spec.fst` | `assume()` | 382 | Min-cut existence for max flow |
@@ -56,6 +56,7 @@ Decomposition into independent agent tasks for parallel execution.
 | (untracked) | Prim.Spec admits | ✅ Done | 6 → 0 |
 | (untracked) | BFS.DistanceSpec admits | ✅ Done | 2 → 0 |
 | TASK_F | UnionFind ranks_bounded | ✅ Done | 1 assume → 0 (counting argument, no ranks_bounded needed) |
+| TASK_G | MaxFlow weak_duality + critical_edge | ✅ Partial | 3 assumes → 2 admits + 1 assume (capacity bound proven, critical edge mostly proven) |
 
 ---
 
@@ -193,28 +194,32 @@ fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --includ
 
 ---
 
-### TASK E: Kruskal forest acyclicity — 1 assume val + 1 assume
+### TASK E: Kruskal forest acyclicity — ~~1 assume val + 1 assume~~ PARTIALLY DONE
 
 **Files:** `ch23-mst/CLRS.Ch23.Kruskal.fst` (line 81), `ch23-mst/CLRS.Ch23.Kruskal.SortedEdges.fst` (line 266)
 
-**What to prove:**
-1. `lemma_kruskal_maintains_forest` (assume val, line 81): When we add an edge (u,v) to a forest
-   and u,v are in different components (union-find `find(u) ≠ find(v)`), the result is still
-   a forest (acyclic). This is the fundamental correctness argument for Kruskal's algorithm.
-2. `acyclic result' n` (assume, line 266): In sorted edge insertion, the accumulated edge set
-   remains acyclic. Same underlying property.
+**Status:** 1 of 2 obligations eliminated, 1 improved from FALSE `assume val` to TRUE `assume_`.
 
-**Strategy:** Both reduce to: "adding an edge between two different connected components of a
-forest cannot create a cycle." This is a graph theory fact provable from the definition of
-acyclicity in `CLRS.Ch23.MST.Spec.fst`.
+**What was done:**
+1. **SortedEdges.fst** (ELIMINATED): Refactored to use `MST.Spec` edge type and `Kruskal.Spec`'s
+   proven `kruskal_step` + `lemma_kruskal_step_preserves_forest`. The old `acyclic` definition
+   was broken (didn't require `all_edges_distinct`, making it vacuously false). Now uses the
+   correct MST.Spec definitions. `assume (acyclic result' n)` → fully proven. ✅
+2. **Kruskal.fst** (IMPROVED): The `assume val lemma_kruskal_maintains_forest` was FALSE
+   (`valid_endpoints + ec <= n-1` does NOT imply forest — counterexample: triangle in 4-vertex
+   graph). Replaced with:
+   - A proven `lemma_kruskal_maintains_forest` that takes `is_forest` as precondition
+   - An `assume_` after the main loop that introduces `is_forest` (TRUE: follows from UF
+     soundness + `acyclic_when_unreachable` from MST.Spec, but proving requires ~300 lines
+     of UF component tracking invariant)
+   - z3rlimit increased from 200 to 600 (fixes pre-existing compilation issue)
 
-**Dependencies:** `CLRS.Ch23.MST.Spec` (4 remaining assumes in general MST theory — independent)
-**Build command:**
-```bash
-fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch23-mst \
-  --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps \
-  --cache_dir _cache ch23-mst/CLRS.Ch23.Kruskal.fst
-```
+**Remaining work to fully prove Kruskal.fst `assume_`:**
+- Strengthen `find` postcondition: `root` is the canonical representative of `v`'s component
+- Define `uf_find_seq` (pure simulation of imperative `find`)
+- Prove UF soundness: `find(u) ≠ find(v)` ⟹ `¬(reachable edges u v)`
+- Apply `acyclic_when_unreachable` from MST.Spec
+- Estimated: ~300 lines, high difficulty
 
 ---
 
@@ -262,9 +267,9 @@ implementation. **Low priority** — proving MFMC requires substantial graph the
 | B: Huffman forest | 2 | ch16/Huffman.fst | HIGH | Medium (~50 lines) | Huffman.Spec | **⚠️ Being worked on** |
 | C: DFS WhitePath backward | 3+err | ch22/DFS.WhitePath.fst | HIGH | Hard (~200 lines) | DFS.Spec | **⚠️ Being worked on** |
 | D: RadixSort stability | 2 | ch08/RadixSort.MultiDigit.fst | HIGH | Hard (~100 lines) | Stability, CountingSort.Stable | **⚠️ Being worked on** |
-| E: Kruskal acyclicity | 2 | ch23/Kruskal.fst, SortedEdges.fst | MEDIUM | Medium (~100 lines) | MST.Spec | **Available** |
+| E: Kruskal acyclicity | ~~2~~ 1 | ch23/Kruskal.fst, SortedEdges.fst | MEDIUM | Medium (~100 lines) | MST.Spec | ✅ **Partially done** (1 eliminated, 1 improved) |
 | F: UnionFind ranks | ~~1~~ 0 | ch21/UnionFind.Spec.fst | LOW | Easy (~15 lines) | None | ✅ **Done** |
-| G: MaxFlow MFMC | 3 | ch26/MaxFlow.{Spec,Complexity}.fst | LOW | Very Hard (~500 lines) | New infrastructure | **Available** (deprioritize) |
+| G: MaxFlow MFMC | 3→2a+1 | ch26/MaxFlow.{Spec,Complexity}.fst | LOW | Partial done | Capacity bound proven | **In progress** |
 
 ### Independence Matrix
 
@@ -330,7 +335,7 @@ Plus chapters with very few remaining obligations:
 ### Medium Impact (complete ongoing work)
 3. **TASK B** (Huffman) — 2 admits in Pulse forest management. Already close.
 4. **TASK D** (RadixSort) — 2 admits in stability. Core CLRS correctness.
-5. **TASK E** (Kruskal) — 2 obligations. Graph acyclicity reasoning.
+5. **TASK E** (Kruskal) — ~~2 obligations~~ 1 remaining `assume_` (TRUE). UF soundness proof needed.
 
 ### Lower Priority
 6. **TASK C** (DFS WhitePath) — Currently broken. Hard proof (backward white-path theorem).
