@@ -900,8 +900,118 @@ let rec lemma_path_implies_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (
 #pop-options
 
 (** Path shortening: any path can be shortened to ≤ n vertices
-    (by removing cycles via pigeonhole principle).
-    Proof obligation: standard graph theory cycle removal. *)
+    (by removing cycles via pigeonhole principle). *)
+
+(** Take first k elements of a list *)
+let rec take (#a: Type) (k: nat) (l: list a{k <= L.length l})
+  : Tot (r: list a{L.length r = k}) (decreases k)
+  = if k = 0 then []
+    else L.hd l :: take (k - 1) (L.tl l)
+
+(** Drop first k elements of a list *)
+let rec drop (#a: Type) (k: nat) (l: list a{k <= L.length l})
+  : Tot (r: list a{L.length r = L.length l - k}) (decreases k)
+  = if k = 0 then l
+    else drop (k - 1) (L.tl l)
+
+(** take preserves traversability *)
+let rec lemma_take_traversable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (k: nat{k > 0}) (p: list nat{k <= L.length p})
+  : Lemma
+    (requires (forall (w: nat). L.mem w p ==> w < n) /\ all_edges_traversable cap flow p)
+    (ensures all_edges_traversable cap flow (take k p) /\
+             (forall (w: nat). L.mem w (take k p) ==> w < n))
+    (decreases k)
+  = if k = 1 then ()
+    else match p with
+    | u :: v :: rest -> lemma_take_traversable cap flow (k - 1) (v :: rest)
+
+(** drop preserves traversability *)
+let rec lemma_drop_traversable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (k: nat) (p: list nat{k <= L.length p})
+  : Lemma
+    (requires (forall (w: nat). L.mem w p ==> w < n) /\ all_edges_traversable cap flow p)
+    (ensures all_edges_traversable cap flow (drop k p) /\
+             (forall (w: nat). L.mem w (drop k p) ==> w < n))
+    (decreases k)
+  = if k = 0 then ()
+    else match p with | u :: rest -> lemma_drop_traversable cap flow (k - 1) rest
+
+(** take k has last element = index k-1 *)
+let rec lemma_take_last (k: nat{k > 0}) (l: list nat{k <= L.length l})
+  : Lemma (ensures L.last (take k l) = L.index l (k - 1)) (decreases k)
+  = if k = 1 then () else lemma_take_last (k - 1) (L.tl l)
+
+(** drop k has head = index k *)
+let rec lemma_drop_hd (k: nat) (l: list nat{k < L.length l})
+  : Lemma (ensures L.hd (drop k l) = L.index l k) (decreases k)
+  = if k = 0 then () else lemma_drop_hd (k - 1) (L.tl l)
+
+(** drop preserves last *)
+let rec lemma_drop_last (k: nat) (l: list nat{k < L.length l})
+  : Lemma (ensures L.last (drop k l) = L.last l) (decreases k)
+  = if k = 0 then () else lemma_drop_last (k - 1) (L.tl l)
+
+(** Concatenation of traversable paths at shared junction vertex *)
+let rec lemma_concat_traversable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (p1 p2: list nat)
+  : Lemma
+    (requires Cons? p1 /\ Cons? p2 /\
+              (forall (w: nat). L.mem w p1 ==> w < n) /\
+              (forall (w: nat). L.mem w p2 ==> w < n) /\
+              all_edges_traversable cap flow p1 /\
+              all_edges_traversable cap flow p2 /\
+              L.last p1 = L.hd p2)
+    (ensures all_edges_traversable cap flow (L.append (L.init p1) p2) /\
+             (forall (w: nat). L.mem w (L.append (L.init p1) p2) ==> w < n))
+    (decreases p1)
+  = match p1 with
+    | [u] -> ()
+    | [u; v] -> assert (L.init [u; v] == [u]); assert (L.append [u] p2 == u :: p2)
+    | u :: v :: w :: rest -> lemma_concat_traversable cap flow (v :: w :: rest) p2
+
+(** Cycle removal: given a path with repeated vertex at positions i < j,
+    remove the cycle p[i+1..j] to get a shorter valid path *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
+let lemma_cycle_remove (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (v: nat{v < n})
+  (p: list nat) (i j: nat)
+  : Lemma
+    (requires Cons? p /\ L.hd p = source /\ L.last p = v /\
+              (forall (w: nat). L.mem w p ==> w < n) /\
+              all_edges_traversable cap flow p /\
+              i < j /\ j < L.length p /\ L.index p i = L.index p j)
+    (ensures exists (p': list nat).
+        Cons? p' /\ L.hd p' = source /\ L.last p' = v /\
+        (forall (w: nat). L.mem w p' ==> w < n) /\
+        all_edges_traversable cap flow p' /\
+        L.length p' < L.length p)
+  = let prefix = take (i + 1) p in
+    let suffix = drop j p in
+    lemma_take_traversable cap flow (i + 1) p;
+    lemma_drop_traversable cap flow j p;
+    lemma_take_last (i + 1) p;
+    lemma_drop_hd j p;
+    assert (L.last prefix = L.hd suffix);
+    lemma_concat_traversable cap flow prefix suffix;
+    let p' = L.append (L.init prefix) suffix in
+    lemma_drop_last j p;
+    if i = 0 then begin
+      assert (p' == suffix);
+      assert (L.hd p' = L.index p j);
+      assert (L.index p j = L.index p 0);
+      assert (L.index p 0 = source)
+    end else begin
+      L.append_l_cons (L.hd (L.init prefix)) (L.tl (L.init prefix)) suffix;
+      assert (L.hd (L.init prefix) = L.hd prefix);
+      L.lemma_append_last (L.init prefix) suffix
+    end;
+    lemma_init_length prefix;
+    L.append_length (L.init prefix) suffix;
+    assert (L.length p' = i + (L.length p - j));
+    assert (L.length p' < L.length p)
+#pop-options
+
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
 let rec lemma_shorten_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (source: nat{source < n}) (v: nat{v < n})
@@ -923,15 +1033,8 @@ let rec lemma_shorten_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow
         FStar.Seq.init (L.length p) (fun (i: nat{i < L.length p}) ->
           L.lemma_index_memP p i; (L.index p i <: FStar.Fin.under n)) in
       let (i, j) = FStar.Fin.pigeonhole #n seq_p in
-      // i < j, L.index p i = L.index p j
-      // Remove cycle p[i+1..j] to get shorter path.
-      // The shortened path p[0..i] ++ p[j..end] is valid because p[i] = p[j].
-      // Proof obligation: cycle removal preserves path validity.
-      assume (exists (p': list nat).
-               Cons? p' /\ L.hd p' = source /\ L.last p' = v /\
-               (forall (w: nat). L.mem w p' ==> w < n) /\
-               all_edges_traversable cap flow p' /\
-               L.length p' < L.length p);
+      // i < j, L.index p i = L.index p j — remove cycle
+      lemma_cycle_remove cap flow source v p i j;
       let p' = FStar.IndefiniteDescription.indefinite_description_ghost
         (list nat) (fun p' ->
           Cons? p' /\ L.hd p' = source /\ L.last p' = v /\

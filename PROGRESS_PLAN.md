@@ -161,10 +161,10 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 |------|-------|-------------|
 | `admit()` | 39 | Unproven lemma/proof bodies (Pure F*) |
 | `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
-| `assume(...)` | 5 | MaxFlow Spec(1)/Complexity(0), other(4) |
+| `assume(...)` | 4 | Other (MaxFlow: ALL eliminated ✅) |
 | `assume_` | 0 | All Pulse assume_ calls eliminated ✅ |
 
-Note: MaxFlow `assume(...)` calls (1) remaining — cycle removal in MFMC. Was 7, now 1 after proving weak duality, MFMC core, and critical edge.
+Note: MaxFlow `assume(...)` calls: ALL ELIMINATED ✅ (was 7). Weak duality, MFMC, and critical edge fully proven.
 Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 
 ### Key Progress Since AUDIT_0215 (Feb 15)
@@ -239,7 +239,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 24 | Dijkstra | §24.3 | ✅ d=δ proven | ✅ Linked O(n²) | 0 | Correctness + TriIneq: ✅ 0 admits |
 | 24 | Bellman-Ford | §24.1 | ✅ dist==sp_dist | ⚠️ Separate O(V³) | 0 | ✅ BF.Spec verified, equality+neg_cycle detection |
 | 25 | Floyd-Warshall | §25.2 | ✅ result=spec | ✅ Linked O(n³) | 0 | |
-| 26 | MaxFlow | §26.2 | ✅ MFMC proven | — | 1 assume | Weak duality ✅, MFMC ✅ (1 cycle removal assume), Critical edge ✅ |
+| 26 | MaxFlow | §26.2 | ✅ MFMC proven, 0 assumes | — | 0 | Weak duality ✅, MFMC ✅, Critical edge ✅ |
 | 28 | MatrixMultiply | §28.1 | ✅ C=A·B | ✅ Linked O(n³) | 0 | |
 | 28 | Strassen | §28.2 | ✅ elem-wise correctness | ⚠️ Separate | 0 | ✅ quadrant proofs via smt_sync', fully verified |
 | 31 | GCD | §31.2 | ✅ result=gcd(a,b) | ✅ Linked O(lg b) | 0 | |
@@ -258,12 +258,12 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | ch23 (MST) | 6 | 1 | 0 | 7 | Kruskal.Spec(0✅), Prim.Spec(6), MST.Spec(0✅), Kruskal(0+1 assume_val) |
 | ch08 (sorting) | 0 | 0 | 0 | 0 | ✅ All RadixSort files fully verified |
 | ch22 (graphs) | 0 | 7 | 0 | 7 | DFS.Spec(5 assume_val), DFS.WhitePath(2 assume_val) |
-| ch26 (MaxFlow) | 0 | 0 | 1 | 1 | MaxFlow.Spec(1 assume — cycle removal in MFMC) |
+| ch26 (MaxFlow) | 0 | 0 | 0 | 0 | ✅ All MaxFlow.Spec assumes proven (weak duality, MFMC, critical edge) |
 | ch12 (BST) | 0 | 0 | 0 | 0 | ✅ Fully verified (spec gaps in Tier B) |
 | Other | 0 | 0 | 0 | 0 | ✅ All resolved |
-| **Total** | **16** | **8** | **1** | **25** | |
+| **Total** | **16** | **8** | **0** | **24** | |
 
-Note: MaxFlow `assume(...)`: 1 remaining (cycle removal in MFMC path shortening — pigeonhole identifies the cycle, but list splicing proof is pending). Weak duality ✅ proven. Critical edge ✅ proven. MFMC core ✅ proven (S={reachable}, source∈S, sink∉S, cross-cut saturation, net_flow=cut_capacity).
+Note: MaxFlow `assume(...)`: ALL ELIMINATED ✅. Weak duality ✅, MFMC ✅ (cycle removal proven via pigeonhole), Critical edge ✅.
 BFS.DistanceSpec fully proven (was 2 admits). VertexCover.Spec fully proven (was 1 admit).
 MaxSubarray.DC assume val eliminated. Huffman.Complete: WPL optimality fully proven.
 Huffman.fst: Added `huffman_tree` (full tree + spec connection); `greedy_choice_lemma` wired to `greedy_choice_theorem`.
@@ -330,7 +330,7 @@ From strongest to weakest:
 4. **Self-referential**: Kadane — proves Pulse equals spec that IS the algorithm
 5. **Partial/one-sided**: Dijkstra (upper bound only),
    BST imperative (one case per operation), KMP (trivial bounds)
-6. **Axiom-dependent**: MaxFlow (1 cycle removal assume), Kruskal/Prim (cut property partially proven)
+6. **Axiom-dependent**: MaxFlow (✅ all proven), Kruskal/Prim (cut property partially proven)
 
 ---
 
@@ -394,7 +394,7 @@ Grouped by severity.
 
 10. **Huffman (ch16)**: ✅ `huffman_complete_optimal` proven (CLRS Theorem 16.4). Zero admits.
 11. **BST Insert.Spec (ch12)**: ✅ `key_set(insert(t,k)) = key_set(t) ∪ {k}`. Zero admits.
-12. **MaxFlow (ch26)**: MFMC theorem proven: weak duality ✅, critical edge ✅, MFMC core ✅ (1 cycle removal assume remaining).
+12. **MaxFlow (ch26)**: MFMC theorem FULLY PROVEN: weak duality ✅, critical edge ✅, MFMC ✅ (0 assumes).
     Spec has 2 assumes for weak duality + max-flow min-cut theorem (see admits table).
 13. **BFS DistanceSpec (ch22)**: ✅ Actually fully proven — `bfs_correctness` proves
     `d_bfs == d_shortest` for all vertices. Zero admits.
@@ -430,7 +430,7 @@ Independent (start immediately):
   AGENT10  LCS optimality             (spec gap)
   AGENT11  KMP completeness           (spec gap)              ✅ DONE
   AGENT12  Floyd-Warshall APSP        (spec gap)
-  AGENT13  MaxFlow MFMC axioms        ✅ DONE (3→1 assumes, cycle removal remaining)
+  AGENT13  MaxFlow MFMC axioms        ✅ DONE (3→0 assumes, ALL proven)
   AGENT14  Kadane ↔ DC equivalence    (spec gap)
   AGENT15  Documentation update       (no F*)
 
@@ -762,10 +762,10 @@ ensures exists* sdist'.
 
 ---
 
-### AGENT13: MaxFlow MFMC Axioms — ~~prove weak duality and critical edge (3 assumes → 0)~~ ✅ DONE (3→1 assumes)
+### AGENT13: MaxFlow MFMC Axioms — ~~prove weak duality and critical edge (3 assumes → 0)~~ ✅ DONE (3→0 assumes)
 
 **Files:** `ch26-max-flow/CLRS.Ch26.MaxFlow.Spec.fst`, `ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst`
-**Final state:** 1 `assume(...)` statement remaining (cycle removal in MFMC path shortening).
+**Final state:** 0 `assume(...)` statements. All 3 original assumes fully proven.
 
 **What was proven:**
 - ✅ **Weak duality** (CLRS Corollary 26.5): `flow_value ≤ cut_capacity` for any flow and cut.
@@ -779,9 +779,8 @@ ensures exists* sdist'.
   - Proved `net_flow_across_cut = cut_capacity` (via `lemma_saturated_aux`).
   - Combined with `lemma_flow_value_eq_net_flow` to conclude `flow_value = cut_capacity`.
 
-**Remaining assume (1):** `lemma_shorten_path` — if a path has > n vertices (all < n),
-remove a cycle to get a shorter valid path. Pigeonhole identifies repeated vertex;
-the assume covers splicing the list (removing the cycle segment). Standard graph theory.
+**Remaining assume (0):** All eliminated. Cycle removal proven via `take`/`drop` list ops,
+`FStar.Fin.pigeonhole` for repeated vertex detection, and `lemma_concat_traversable` for splicing.
 
 ---
 
@@ -855,7 +854,7 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch23/Kruskal.Spec | admit | 0 | AGENT5 | ✅ DONE — all 9 admits eliminated |
 | ch23/Kruskal.fst | assume val | 1 | AGENT5 | Maintains forest (line 81) — requires Pulse union-find proof |
 | ch23/Prim.Spec | admit | 0 | AGENT6 | ✅ DONE — all 6 admits eliminated |
-| ch26/MaxFlow.Spec | assume | 1 | AGENT13 ✅ | Cycle removal in MFMC path shortening (line ~930) |
+| ch26/MaxFlow.Spec | assume | 0 | AGENT13 ✅ | ALL proven (weak duality, MFMC, cycle removal) |
 | ch26/MaxFlow.Complexity | assume | 0 | AGENT13 ✅ | Critical edge proven |
 | **TOTAL (admits)** | | **25** | | |
 | **TOTAL (assume vals)** | | **8** | | |
