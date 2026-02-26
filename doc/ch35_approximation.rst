@@ -9,10 +9,10 @@ CLRS Chapter 35, Section 35.1 (APPROX-VERTEX-COVER). The
 formalization proves that the greedy matching-based algorithm always
 produces a valid vertex cover and that its size is at most twice the
 optimum. The core approximation-ratio proof (CLRS Theorem 35.1) is
-fully verified with zero admits. The final connection from the Pulse
-implementation to the pure theorem contains **one admit** in the
-module ``CLRS.Ch35.VertexCover.Spec``, bridging the algorithmic
-execution trace to the matching structure.
+fully verified with zero admits. The connection from the Pulse
+implementation to the pure theorem is also **fully verified with
+zero admits**, including the bridge from the algorithmic execution
+trace to the matching structure in ``CLRS.Ch35.VertexCover.Spec``.
 
 Graph and Cover Definitions
 ============================
@@ -166,13 +166,9 @@ cost of a single pass over the adjacency matrix.
 Proof Status
 =============
 
-- **Fully verified** (zero admits): ``theorem_35_1`` and all
-  supporting lemmas in ``CLRS.Ch35.VertexCover.Spec``, the Pulse
-  loop invariants and cover-validity proof, and the complexity
-  analysis.
-
-- **One admit**: ``approximation_ratio_theorem`` in
-  ``CLRS.Ch35.VertexCover.Spec`` admits the step that connects the
-  Pulse algorithm's output to the matching structure required by
-  ``theorem_35_1``. A complete proof would require ghost state
-  tracking which edges triggered vertex additions during execution.
+This chapter is **fully verified with zero admits**. All proofs are
+complete, including ``theorem_35_1``, all supporting lemmas in
+``CLRS.Ch35.VertexCover.Spec``, the Pulse loop invariants and
+cover-validity proof, the complexity analysis, and the
+``approximation_ratio_theorem`` connecting the Pulse algorithm's
+output to the matching structure.

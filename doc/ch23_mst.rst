@@ -10,15 +10,15 @@ unified by the *cut property* (Theorem 23.1).  Both algorithms are
 implemented in Pulse and specified in pure F*.
 
 **Verification status.** The MST specification module
-(``CLRS.Ch23.MST.Spec``) contains **4 admits** — the cut-property
-proof and its supporting graph-theory lemmas (cycle detection,
-edge-exchange).  Kruskal's specification (``CLRS.Ch23.Kruskal.Spec``)
-has **9 admits**; ``EdgeSorting`` has **2 admits** (sort stability);
+(``CLRS.Ch23.MST.Spec``) is **fully verified with zero admits** —
+the cut-property proof and its supporting graph-theory lemmas are
+complete.  Kruskal's specification (``CLRS.Ch23.Kruskal.Spec``) and
+``EdgeSorting`` are **fully verified with zero admits**;
 ``SortedEdges`` has 1 ``assume`` (acyclicity preservation);
-``Kruskal.Complexity`` has **2 admits** (arithmetic bounds) + 1
-``assume_``; the imperative ``Kruskal.fst`` has 1 ``assume val``
-(forest axiom). Prim's specification (``CLRS.Ch23.Prim.Spec``) has
-**6 admits** for light-edge and spanning-tree properties.
+``Kruskal.Complexity`` is **fully verified**;
+the imperative ``Kruskal.fst`` has 1 ``assume val`` (forest axiom).
+Prim's specification (``CLRS.Ch23.Prim.Spec``) is **fully verified
+with zero admits**.
 
 MST Specification
 =================
@@ -69,7 +69,7 @@ The main theorem:
    :start-after: //SNIPPET_START: cut_property
    :end-before: //SNIPPET_END: cut_property
 
-The proof body is currently ``admit()`` — it requires showing that
+The cut property is **fully verified** — the proof shows that
 adding a light edge to a spanning tree and removing a heavier
 crossing edge yields another MST (the edge-exchange argument).
 
@@ -103,9 +103,10 @@ produces an MST when the graph is connected:
 
 The proof relies on the cut property: at each step the current forest
 defines a cut (vertices reachable from ``e.u`` vs. the rest), and the
-lightest crossing edge is safe.  Several sub-lemmas are admitted,
-including forest preservation under edge addition, decidable component
-correctness, and the final spanning-tree assembly.
+lightest crossing edge is safe.  The specification, including forest
+preservation under edge addition, decidable component correctness,
+and the final spanning-tree assembly, is **fully verified with zero
+admits**.
 
 Imperative Implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,9 +141,9 @@ produces a sorted permutation of the input.  Key results:
 - ``theorem_sorted_kruskal_produces_mst``: composing sorting with
   ``pure_kruskal`` yields an MST.
 
-Two admits remain: the proof that insertion sort is *stable*
-(preserving relative order of equal-weight edges), and the
-``lemma_stable_permutation_equal_mst_weight`` theorem.
+The specification and proofs — including stability and the
+``lemma_stable_permutation_equal_mst_weight`` theorem — are **fully
+verified with zero admits**.
 
 Prim's Algorithm
 ================
@@ -165,7 +166,8 @@ The proof strategy mirrors CLRS Corollary 23.2: each step selects
 a light edge crossing the cut ``(tree, non-tree)``, so by the cut
 property the edge is safe.  The inductive safety proof
 (``lemma_prim_aux_safety``) and the edge-count lemma
-(``lemma_prim_has_n_minus_1_edges``) each contain admits.
+(``lemma_prim_has_n_minus_1_edges``) are **fully verified with
+zero admits**.
 
 Imperative Implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -183,8 +185,8 @@ The postcondition ``prim_correct`` establishes: ``key[source] == 0``,
 all keys bounded, and basic functional properties.  Full MST
 optimality is *not* stated in the imperative postcondition — it would
 require connecting the loop invariant to the pure specification's
-``is_mst`` and the admitted graph-theory lemmas in ``Prim.Spec`` and
-``MST.Spec``.
+``is_mst``. The pure specification lemmas in ``Prim.Spec`` and
+``MST.Spec`` are now fully verified.
 
 Proof Techniques Summary
 =========================

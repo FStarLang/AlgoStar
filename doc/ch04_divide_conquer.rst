@@ -9,8 +9,9 @@ Chapter 4: binary search and the maximum subarray problem (§4.1).
 Binary search is fully verified with **zero admits** in both its
 correctness and O(log n) complexity proofs. The maximum subarray
 problem is treated with two algorithms — Kadane's linear-time scan
-(zero admits) and the classic divide-and-conquer approach — with
-**one admit** for the axiomatized equivalence between the two.
+(zero admits) and the classic divide-and-conquer approach — both
+**fully verified with zero admits**, including a proven equivalence
+between the two.
 
 Binary Search
 =============
@@ -232,23 +233,22 @@ The bound ``T(n) ≤ 4n(⌈log₂ n⌉ + 1)`` is proved by induction:
    :start-after: //SNIPPET_START: dc_complexity_bound
    :end-before: //SNIPPET_END: dc_complexity_bound
 
-Equivalence (Axiomatized)
+Equivalence (Proven)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The equivalence between the divide-and-conquer result and Kadane's
-specification is stated as an axiom — a full formal proof would
-require showing both algorithms compute the unique maximum over
-all contiguous subarrays:
+specification is fully proven — both algorithms compute the unique
+maximum over all contiguous subarrays:
 
 .. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.fst
    :language: fstar
-   :start-after: //SNIPPET_START: axiom_dc_kadane_equivalence
-   :end-before: //SNIPPET_END: axiom_dc_kadane_equivalence
+   :start-after: //SNIPPET_START: dc_kadane_equivalence
+   :end-before: //SNIPPET_END: dc_kadane_equivalence
 
-This is the sole admit in the chapter. The remaining proofs —
-binary search correctness and complexity, Kadane's correctness
-and complexity, and D&C structural correctness and complexity —
-are all fully verified.
+All proofs in this chapter — binary search correctness and complexity,
+Kadane's correctness and complexity, D&C structural correctness and
+complexity, and the equivalence theorem — are fully verified with
+**zero admits**.
 
 Proof Techniques Summary
 =========================

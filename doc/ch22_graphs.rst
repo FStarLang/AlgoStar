@@ -42,10 +42,10 @@ unvisited vertex, that neighbor will be visited at level *k+1*:
 The specification module (``BFS.Spec``) has **0 admits**.
 
 A separate module (``BFS.DistanceSpec``) formalizes the relationship
-between BFS level sets and shortest-path distances. Two properties
-remain admitted: the proof that no shorter path exists
-(``shortest_path_property``) and the main correctness theorem
-(``bfs_correctness``). That module has **2 admits**.
+between BFS level sets and shortest-path distances. Both the proof
+that no shorter path exists (``shortest_path_property``) and the
+main correctness theorem (``bfs_correctness``) are now
+**fully verified with 0 admits**.
 
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
@@ -130,14 +130,14 @@ The DFS state tracks vertex colors and timestamps:
    :start-after: //SNIPPET_START: dfs_state
    :end-before: //SNIPPET_END: dfs_state
 
-The specification module (``DFS.Spec``) has **5 unproven obligations**
-(5 ``admit()``). The admits cover the parenthesis
-theorem (proving ``d[u] < d[v] < f[v] < f[u]`` for descendants),
-edge classification (tree, back, forward, cross edges), and
-timestamp monotonicity. The former 2 ``assume`` calls for termination
-measures (``count_white_vertices`` decreases) have been fully proven
-via ``discover_decreases_white_count`` and enriched return types on
-the mutually recursive ``visit_neighbors``/``dfs_visit`` functions.
+The specification module (``DFS.Spec``) is **fully verified with
+zero admits**. The parenthesis theorem
+(``d[u] < d[v] < f[v] < f[u]`` for descendants), edge classification
+(tree, back, forward, cross edges), and timestamp monotonicity are all
+proven. The termination measures (``count_white_vertices`` decreases)
+are verified via ``discover_decreases_white_count`` and enriched
+return types on the mutually recursive
+``visit_neighbors``/``dfs_visit`` functions.
 
 White-Path Theorem
 ~~~~~~~~~~~~~~~~~~
@@ -152,10 +152,9 @@ to *v* consisting entirely of white vertices:
    :start-after: //SNIPPET_START: white_path_theorem
    :end-before: //SNIPPET_END: white_path_theorem
 
-This module has **3 admits**: ``white_path_transitive`` (composing
-white paths), ``white_path_implies_descendant`` (the hard direction),
-and ``descendant_implies_white_path`` (extracting a white path from
-DFS ancestry).
+This module has **1 admit**: the backward direction
+``white_path_implies_descendant`` (proving that a white path from *u*
+to *v* at discovery time implies *v* is a DFS descendant of *u*).
 
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
@@ -323,6 +322,5 @@ Verification Status Summary
      - Pulse impl
      - 0
 
-The ``admit()`` calls in ``BFS.DistanceSpec``, ``DFS.Spec``,
-and ``DFS.WhitePath`` mark genuinely
-unproven properties that remain as future work.
+The single remaining ``admit()`` in ``DFS.WhitePath``
+(the backward direction of the white-path theorem) is future work.

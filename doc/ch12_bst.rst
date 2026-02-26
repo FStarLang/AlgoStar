@@ -18,10 +18,11 @@ formalization has two layers:
   right child at 2i + 2. Search and delete are verified;
   insert has a weaker postcondition.
 
-The ``Insert.Spec`` module (array-based insert preservation) contains
-**3 admits** for structural reasoning about disjoint subtree indices
-in the array representation. The ``Delete.Spec`` module
-(``delete_key_set_lemma``) is **fully verified with zero admits**.
+The ``Insert.Spec`` module (array-based insert preservation) is
+**fully verified with zero admits** — structural reasoning about
+disjoint subtree indices in the array representation is now complete.
+The ``Delete.Spec`` module (``delete_key_set_lemma``) is also
+**fully verified with zero admits**.
 
 Pure Specification
 ==================
@@ -172,10 +173,8 @@ Tree Insert
 
 The postcondition guarantees length preservation and that a failed
 insert leaves arrays unchanged. The stronger property — that the
-BST ordering is preserved — is stated in ``Insert.Spec`` but its
-proof has **3 remaining admits**: two for structural reasoning about
-disjoint subtrees in the array layout, and one for key-set membership
-after insertion.
+BST ordering is preserved — is stated and fully proven in
+``Insert.Spec`` with **zero admits**.
 
 Tree Minimum & Delete
 ~~~~~~~~~~~~~~~~~~~~~
@@ -200,24 +199,12 @@ The postcondition guarantees that a successful delete marks the target
 node invalid and preserves array lengths. Both ``tree_minimum`` and
 ``tree_delete`` are **zero admits**.
 
-Remaining Admits
-================
+Verification Status
+===================
 
-The only admits in this chapter are in ``BST.Insert.Spec``, the
-array-based insert preservation proof:
-
-1. ``pure_insert_preserves_subtree_range``: BST ordering is maintained
-   after insertion. Requires induction over the array-based tree
-   structure with disjoint subtree reasoning.
-
-2. ``lemma_subtree_completely_unchanged``: a subtree not containing
-   the insertion index is unmodified. Requires proving that array
-   indices in one subtree are disjoint from those in a sibling subtree.
-
-3. ``lemma_insert_adds_to_keys_set``: the inserted key appears in
-   the key set after insertion. Structurally similar to (1).
-
-All three represent the same fundamental difficulty: reasoning about
-disjoint index ranges in an implicit (array-based) tree layout. The
-pure functional specification avoids this issue entirely and is fully
-verified.
+All proofs in this chapter are **fully verified with zero admits**,
+including the array-based insert preservation that previously required
+admits for disjoint subtree reasoning. The pure functional
+specification avoids index-range issues entirely, while the imperative
+implementation now has complete proofs for both insert and delete
+preservation.

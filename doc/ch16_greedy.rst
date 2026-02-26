@@ -18,10 +18,11 @@ The pure specification layer for Activity Selection is **fully proven**:
 zero admits — the exchange argument, greedy optimality theorem, and
 implementation-to-spec bridge are all mechanically verified.
 
-Huffman has partial gaps: ``Huffman.Spec`` uses 4 ``assume`` calls
-(``greedy_choice_property``, ``optimal_substructure_property``,
-``exists_leaf_at_max_depth``, and a sequencing placeholder).
-``Huffman.Complete`` is now **fully verified with zero admits** ✅ —
+Huffman's specification layer is now **fully verified**: ``Huffman.Spec``
+has **zero admits and zero assumes** — the greedy-choice and optimal-substructure
+properties are proven. The Pulse implementation (``Huffman.fst``) has **3
+``assume_`` calls** for priority-queue distinctness invariants in the PQ
+extraction loop. ``Huffman.Complete`` is **fully verified with zero admits** ✅ —
 the optimal substructure lemma was corrected to use multiset equality
 (not list equality) and the correctness theorem uses multiset preservation
 infrastructure. The key supporting lemma ``swap_reduces_wpl`` (CLRS
@@ -262,12 +263,8 @@ Three key supporting lemmas are formalized:
   witnesses through the ``are_siblings`` predicate.
 
 - **``greedy_choice_property``** and **``optimal_substructure_property``**
-  (CLRS Lemmas 16.2–16.3, *assumed*): The full greedy-choice theorem
-  (that merging the two lowest-frequency leaves yields an optimal tree
-  for the reduced alphabet) and the optimal substructure theorem remain
-  as ``assume`` calls. Closing these requires orchestrating
-  ``swap_reduces_wpl`` across two swaps and reasoning about the
-  relationship between the original and merged trees.
+  (CLRS Lemmas 16.2–16.3, *proven*): The full greedy-choice theorem
+  and the optimal substructure theorem are now fully verified.
 
 ``Huffman.Complete`` is **fully verified with zero admits** ✅. The
 ``optimal_substructure_lemma`` was corrected: the original existential
@@ -275,8 +272,7 @@ claiming in-order leaf traversal starts with the minimum frequency was
 false for inputs like ``[1,2,2]``; it now proves ``WPL(T) = WPL(T') + f1 + f2``
 for any valid pair. The ``huffman_correctness_theorem`` uses multiset
 preservation (~120 lines) proving ``∀x. count x (leaf_freqs (huffman_complete
-freqs)) = count x freqs``. Full WPL-optimality for multi-element inputs
-remains captured by the 4 ``assume`` axioms in ``Huffman.Spec``.
+freqs)) = count x freqs``.
 
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
@@ -292,7 +288,8 @@ elements, accumulating the merge cost:
 
 The postcondition proves the cost is non-negative, strictly positive
 when *n* > 1, and zero for a single element. This implementation
-has **zero admits and zero assumes**.
+has **zero admits** but **3 ``assume_`` calls** for priority-queue
+distinctness invariants.
 
 Complexity
 ~~~~~~~~~~

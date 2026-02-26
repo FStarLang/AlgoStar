@@ -103,7 +103,7 @@ Results Overview
 ----------------
 
 The project currently covers algorithms from 18 chapters of CLRS,
-implemented across 177 F* source files totaling approximately 59,300
+implemented across 186 F* source files totaling approximately 74,600
 lines. The table below summarizes the status of each algorithm.
 
 **Legend:**
@@ -195,7 +195,7 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Radix Sort <Ch08_LinearSorting>`
      - §8.3
      - sorted ∧ permutation
-     - ⚠️ 10: stability proofs
+     - ⚠️ 3: stability proofs
      - ✅ Pure Θ(d(n+k))
    * - 8
      - :ref:`Bucket Sort <Ch08_LinearSorting>`
@@ -261,7 +261,7 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`BST Insert <Ch12_BST>`
      - §12.3
      - key set updated
-     - ⚠️ 3: BST preservation
+     - ✅
      - ✅ Pure O(h)
    * - 13
      - :ref:`Red-Black Tree <Ch13_RBTree>`
@@ -303,7 +303,7 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Huffman Coding <Ch16_Greedy>`
      - §16.3
      - prefix-free tree construction
-     - ⚠️ 4: Spec axioms (greedy-choice, optimal-substructure)
+     - ⚠️ 3: assume_ (PQ distinctness)
      - ✅ Pure O(n lg n)
    * - 21
      - :ref:`Union-Find <Ch21_DisjointSets>`
@@ -315,13 +315,13 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`BFS (Queue) <Ch22_Graphs>`
      - §22.2
      - distances ∧ parent tree
-     - ⚠️ 2: shortest path
+     - ✅
      - ✅ Linked O(V²)
    * - 22
      - :ref:`DFS (Stack) <Ch22_Graphs>`
      - §22.3
      - timestamps ∧ classification
-     - ⚠️ 8: DFS theorems
+     - ⚠️ 1: white-path backward
      - ✅ Linked O(V²)
    * - 22
      - :ref:`Kahn Topological Sort <Ch22_Graphs>`
@@ -333,19 +333,19 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Kruskal MST <Ch23_MST>`
      - §23.2
      - MST of graph
-     - ⚠️ 15: forest/cut/sort
-     - ⚠️ Linked (3 admits)
+     - ⚠️ 2: forest axiom + acyclicity
+     - ✅ Linked O(V·E)
    * - 23
      - :ref:`Prim MST <Ch23_MST>`
      - §23.2
      - MST of graph
-     - ⚠️ 6: light edge
+     - ✅
      - ✅ Linked O(V²)
    * - 23
      - :ref:`MST Theory <Ch23_MST>`
      - §23.1
      - cut/cycle properties
-     - ⚠️ 4: cut theorem
+     - ✅
      - —
    * - 24
      - :ref:`Bellman-Ford <Ch24_SSSP>`
@@ -369,8 +369,8 @@ lines. The table below summarizes the status of each algorithm.
      - Ford-Fulkerson (Max Flow)
      - §26.2
      - max flow ∧ valid flow
-     - ⚠️ 8: augmentation
-     - ⚠️ Pure (2 admits)
+     - ⚠️ 2: duality/min-cut
+     - ✅
    * - 28
      - :ref:`Matrix Multiply <Ch28_MatrixOps>`
      - §28 (App)
@@ -423,34 +423,40 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Vertex Cover (2-approx) <Ch35_Approximation>`
      - §35.1
      - cover ≤ 2 · OPT
-     - ⚠️ 1: execution trace
+     - ✅
      - ✅ Pure O(V+E)
 
 Proof Gaps
 ----------
 
-As of this writing, the project has **43 unproven F\* ``admit()`` calls**
-and **2 ``assume val``** declarations across **14 files**.
-Of the 50 algorithms in the table, **39 have fully proven correctness**
-(zero admits) and **29 have fully proven complexity bounds**.
+As of this writing, the project has **5 unproven ``admit()`` calls**,
+**3 ``assume_()``**, **4 ``assume()``**, and **1 ``assume val``**
+across **8 files** (total: 13 unproven obligations).
+Of the 50 algorithms in the table, **44 have fully proven correctness**
+(zero admits) and **42 have fully proven complexity bounds**.
 
-The remaining admits fall into a few categories:
+The remaining unproven obligations fall into a few categories:
 
-1. **Graph theory** (Ch. 22–23, ~30 admits): DFS parenthesis and
-   white-path theorems (8), MST cut/cycle properties and Kruskal
-   forest invariants (Kruskal actively being improved), BFS shortest-path completeness (2).
+1. **Sorting stability** (Ch. 8, 3 admits): RadixSort multi-digit stability
+   proofs involve ∃∀ quantifier patterns that challenge the SMT solver.
 
-2. **Sorting stability** (Ch. 8, 10 admits): RadixSort multi-digit stability
-   proofs involve ∃∀ quantifier patterns that challenge the SMT
-   solver.
+2. **Graph algorithms** (Ch. 22, 1 admit): The backward direction of the
+   DFS white-path theorem in ``WhitePath.fst``.
 
-3. **MST theory** (Ch. 23, ~19 admits + 1 assume val): Kruskal.Spec (9),
-   Prim.Spec (6), MST.Spec (4). Kruskal is actively being improved.
-   These require deep graph-theoretic arguments (cut property, spanning tree).
+3. **Greedy algorithms** (Ch. 16, 3 assume\_): Huffman priority queue
+   distinctness invariants in the PQ extraction loop.
 
-4. **Miscellaneous** (4 admits + 1 assume val):
-   BST insert preservation (3), Vertex Cover trace (1),
-   MaxSubarray D&C equivalence axiom (1 assume val).
+4. **MST** (Ch. 23, 1 assume val + 1 assume): Kruskal forest axiom and
+   sorted-edges acyclicity preservation.
+
+5. **Shortest paths** (Ch. 24, 1 admit): The ``sp_dist_k_stabilize``
+   lemma in ``ShortestPath.Triangle.fst`` (pigeonhole + cycle removal).
+
+6. **Network flow** (Ch. 26, 2 assume): Max-flow min-cut
+   weak duality and min-cut existence.
+
+7. **Disjoint sets** (Ch. 21, 1 assume): Rank bound preservation
+   after path compression in ``UnionFind.Spec``.
 
 Each chapter in this document notes any unproven obligations in its
 scope.  Fully verified chapters have zero ``admit``, ``assume``, or

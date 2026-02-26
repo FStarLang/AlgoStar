@@ -150,7 +150,8 @@ CLRS §32.4 presents KMP as a linear-time string-matching algorithm
 that avoids redundant comparisons by precomputing a *prefix
 function*. Our formalization verifies both the prefix-function
 computation and the matcher, with 0 admits in the implementations.
-The amortized complexity analysis has 7 admits.
+The amortized complexity analysis is also **fully verified with 0
+admits**.
 
 Prefix Function Specification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

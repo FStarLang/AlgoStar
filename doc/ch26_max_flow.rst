@@ -21,8 +21,7 @@ the Ford-Fulkerson method (§26.2) and the Edmonds-Karp algorithm
    currently only initializes the flow to zero (a valid flow). The
    augmenting-path search (BFS on the residual graph) and the full
    Ford-Fulkerson loop are specified in pure F* but not yet implemented
-   in Pulse. Eight ``assume()`` calls remain in the proof and complexity
-   modules.
+   in Pulse. Two ``assume()`` calls remain in the specification module.
 
 Flow Network Specification
 ==========================
@@ -42,9 +41,11 @@ Key definitions include ``flow_value`` (|f| = net flow out of source,
 CLRS page 710), ``residual_capacity`` (forward and backward), and
 ``ford_fulkerson_step`` / ``ford_fulkerson`` (the iterative framework).
 
-This module has **2 assume()** calls: ``augment_preserves_valid``
-(augmentation maintains valid flow) and ``augment_increases_value``
-(augmentation strictly increases flow value).
+This module has **2 assume()** calls: weak duality
+(``flow_value flow n source <= cut_capacity cap s_set``) and the
+max-flow min-cut theorem (existence of a min cut achieving the bound).
+The augmentation proofs (``augment_preserves_valid`` and
+``augment_increases_value``) are now proven in the ``Proofs`` module.
 
 Proof Module
 ============
@@ -61,9 +62,9 @@ augmentation operation:
 - Zero-flow validity: ``lemma_zero_flow_valid`` proves the zero flow
   satisfies all constraints.
 
-This module has **4 assume()** calls for the most complex graph-theoretic
-properties (bottleneck path reasoning, capacity preservation across full
-augmentation, and flow value increase).
+This module is now **fully verified with zero assumes** ✅. All helper
+lemmas for capacity preservation, conservation, and bottleneck reasoning
+are complete.
 
 Complexity Analysis
 ===================
@@ -80,8 +81,7 @@ analysis from CLRS §26.2:
 - Corollaries for dense graphs (O(V⁵)) and sparse graphs (O(V³)).
 
 The ghost-tick framework (``edmonds_karp_state`` with tick counter) is
-set up but the augmentation step uses ``assume()`` for the key lemmas.
-This module has **2 assume()** calls.
+set up. This module is now **fully verified with 0 assumes** ✅.
 
 Pulse Implementation
 ====================
@@ -123,7 +123,7 @@ Verification Status Summary
      - Test
      - 0
 
-**Total: 8 assume()** across 4 files (~1,380 lines). All unproven
-obligations are ``assume()`` calls marking complex graph-theoretic
-properties. Completing these proofs requires formalizing residual-graph
-shortest-path properties and the augmentation–conservation interaction.
+**Total: 2 assume()** in 1 file (MaxFlow.Spec). The remaining
+unproven obligations are the weak-duality lemma and the max-flow
+min-cut theorem. The augmentation proofs, complexity analysis, and
+Pulse implementation are all fully verified.
