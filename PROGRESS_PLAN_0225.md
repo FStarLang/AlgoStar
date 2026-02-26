@@ -5,8 +5,8 @@ Decomposition into independent agent tasks for parallel execution.
 
 **Codebase stats**:
 - 182 F*/Pulse files, ~73,800 lines across 23 chapters + common
-- **12 total unproven obligations** (was 14; Task F eliminated 1, Task E eliminated 1 + improved 1) (8 `admit()`, 4 `assume()`, 1 `assume_`)
-  across 7 files in 6 chapters
+- **11 total unproven obligations** (was 14; Task A eliminated 1, Task F eliminated 1, Task E eliminated 1 + improved 1) (7 `admit()`, 3 `assume()`, 1 `assume_`)
+  across 6 files in 5 chapters
 - 1 file broken (doesn't compile): `DFS.WhitePath.fst`
 - 5 files have uncommitted changes (3 RadixSort, 1 Huffman, 1 WhitePath)
 
@@ -28,7 +28,7 @@ Decomposition into independent agent tasks for parallel execution.
 | 8 | `ch22/DFS.WhitePath.fst` | `admit()` | 793 | White-path backward: relative discovery time ordering within DFS subtree |
 | 9 | `ch23/Kruskal.fst` | `assume_` | 313 | Forest acyclicity via UF soundness (TRUE but unproven; was FALSE `assume val` at line 81) |
 | ~~10~~ | ~~`ch23/Kruskal.SortedEdges.fst`~~ | ~~`assume()`~~ | ~~266~~ | ~~ELIMINATED: refactored to use Kruskal.Spec's proven `kruskal_step`~~ |
-| 11 | `ch24/ShortestPath.Triangle.fst` | `admit()` | 141 | `sp_dist_k_stabilize`: `sp_dist_k(s,v,n) == sp_dist_k(s,v,n-1)` (pigeonhole + cycle removal) |
+| ~~11~~ | ~~`ch24/ShortestPath.Triangle.fst`~~ | ~~`admit()`~~ | ~~141~~ | ~~ELIMINATED: `sp_dist_k_stabilize` fully proven via chain-of-predecessors + pigeonhole~~ |
 | 12 | `ch26/MaxFlow.Spec.fst` | `assume()` | 354 | Weak duality: flow value ≤ cut capacity |
 | 13 | `ch26/MaxFlow.Spec.fst` | `assume()` | 382 | Min-cut existence for max flow |
 | 14 | `ch26/MaxFlow.Complexity.fst` | `assume()` | 102 | Augmenting path existence when flow is not maximum |
@@ -57,6 +57,7 @@ Decomposition into independent agent tasks for parallel execution.
 | (untracked) | BFS.DistanceSpec admits | ✅ Done | 2 → 0 |
 | TASK_F | UnionFind ranks_bounded | ✅ Done | 1 assume → 0 (counting argument, no ranks_bounded needed) |
 | TASK_G | MaxFlow weak_duality + critical_edge | ✅ Done | 3 assumes → 1 admit + 1 assume (weak_duality FULLY PROVEN, critical_edge 1 admit, MFMC 1 assume) |
+| TASK_A | sp_dist_k_stabilize (pigeonhole) | ✅ Done | 1 admit → 0 (chain-of-predecessors + FStar.Fin.pigeonhole, ~160 lines) |
 
 ---
 
@@ -74,37 +75,26 @@ When an agent finishes, they should update this file with their
 results and learnings, using `flock` to avoid conflicts.
 
 
-### TASK A: sp_dist_k_stabilize (Dijkstra dependency) — 1 admit
+### TASK A: sp_dist_k_stabilize (Dijkstra dependency) — ~~1 admit~~ ✅ DONE
 
 **File:** `ch24-sssp/CLRS.Ch24.ShortestPath.Triangle.fst` (line 141)
-**Currently assigned to:** Was AGENT9 scope, not yet done.
+**Completed by:** TASK_A agent, 2026-02-26.
 
-**What to prove:** `sp_dist_k(s,v,n) == sp_dist_k(s,v,n-1)` for non-negative weights.
+**What was proved:** `sp_dist_k(s,v,n) == sp_dist_k(s,v,n-1)` for non-negative weights.
 
-**Strategy:**
-- Already have `<=` direction (monotonicity, proven)
-- Need `>=` direction: any path with n edges has n+1 vertices in a graph with n vertices
-- By `FStar.Fin.pigeonhole`: a sequence of n+1 values in `[0,n)` has two equal indices
-- This means the path has a cycle; for non-negative weights, removing it gives a shorter-or-equal
-  path with fewer edges
-- Therefore `sp_dist_k(s,v,n-1) <= sp_dist_k(s,v,n)`
+**Proof approach (chain-of-predecessors + pigeonhole, ~160 lines):**
+1. `find_improving_predecessor` — extracts a witness predecessor when `min_over_predecessors` improves
+2. `chain_vertex` — recursively builds chain of n+1 vertices with strict improvement at each level
+3. `chain_B_property` — proves the edge inequality between consecutive chain vertices
+4. `chain_telescoping` — proves `sp_dist_k(s, chain[i], n-i) ≥ sp_dist_k(s, chain[j], n-j)` for `i < j`
+5. `sp_dist_k_stabilize` — builds chain as Seq, applies `FStar.Fin.pigeonhole`, derives contradiction
+   via telescoping + monotonicity (squeezed equality vs strict improvement)
 
-**Proof outline (~150-200 lines):**
-1. Define path as `Seq.seq (under n)` of length ≥ 2 with valid edges
-2. `path_has_cycle`: path with > n edges has a repeated vertex (via `FStar.Fin.pigeonhole`)
-3. `remove_cycle`: given repeated vertex at indices i < j, take `path[0..i] @ path[j..]`;
-   weight decreases for non-negative weights
-4. `contract_path`: repeatedly remove cycles until path has ≤ n-1 edges
-5. Connect to `sp_dist_k`: `sp_dist_k` is minimum over all paths with ≤ k edges;
-   path contraction shows any n-edge path has a ≤ (n-1)-edge path with ≤ weight
+**Key technique:** Made `find_improving_predecessor` `[@@"opaque_to_smt"]` to prevent excessive
+unfolding in the SMT solver — the ensures clause is sufficient for downstream proofs.
 
-**Dependencies:** `FStar.Fin` (pigeonhole), `CLRS.Ch24.ShortestPath.Spec` (sp_dist_k definition)
-**Build command:**
-```bash
-fstar.exe --include $(realpath ../pulse)/out/lib/pulse --include common --include ch24-sssp \
-  --warn_error -321 --warn_error @247 --ext optimize_let_vc --ext fly_deps \
-  --cache_dir _cache ch24-sssp/CLRS.Ch24.ShortestPath.Triangle.fst
-```
+This also completes the `sp_dist_triangle_ineq` proof (which depended on stabilization),
+completing the Dijkstra proof chain with zero admits.
 
 ---
 
@@ -263,7 +253,7 @@ implementation. **Low priority** — proving MFMC requires substantial graph the
 
 | Task | Admits | Files Touched | Priority | Difficulty | Dependencies | Status |
 |------|--------|---------------|----------|------------|--------------|--------|
-| A: sp_dist_k_stabilize | 1 | ch24/ShortestPath.Triangle.fst | HIGH | Medium (~150 lines) | FStar.Fin, ShortestPath.Spec | **Available** |
+| A: sp_dist_k_stabilize | ~~1~~ 0 | ch24/ShortestPath.Triangle.fst | HIGH | Medium (~150 lines) | FStar.Fin, ShortestPath.Spec | ✅ **Done** |
 | B: Huffman forest | 2 | ch16/Huffman.fst | HIGH | Medium (~50 lines) | Huffman.Spec | **⚠️ Being worked on** |
 | C: DFS WhitePath backward | 3+err | ch22/DFS.WhitePath.fst | HIGH | Hard (~200 lines) | DFS.Spec | **⚠️ Being worked on** |
 | D: RadixSort stability | 2 | ch08/RadixSort.MultiDigit.fst | HIGH | Hard (~100 lines) | Stability, CountingSort.Stable | **⚠️ Being worked on** |
@@ -308,7 +298,7 @@ These chapters have **zero unproven obligations** across all their files:
 Plus chapters with very few remaining obligations:
 - ch08 (2 admits in MultiDigit only, 10 other files clean)
 - ch21 (1 assume in Spec only, 5 other files clean)
-- ch24 (1 admit in Triangle only, 10 other files clean)
+- ~~ch24 (1 admit in Triangle only, 10 other files clean)~~ → ch24 now ZERO admits ✅
 
 ---
 
@@ -322,14 +312,14 @@ Plus chapters with very few remaining obligations:
 | ch08/RadixSort.Spec.fst | ✅ | 0 | Uncommitted changes, verifies |
 | ch16/Huffman.fst | ✅ | 2 | Uncommitted changes, verifies |
 | ch22/DFS.WhitePath.fst | ❌ | 3 | Error 72: `get_white_neighbors_edges` not found |
-| ch24/ShortestPath.Triangle.fst | ✅ | 1 | Committed, verifies |
+| ch24/ShortestPath.Triangle.fst | ✅ | 0 | Committed, fully proven (was 1 admit) |
 
 ---
 
 ## Recommended Priorities
 
 ### Highest Impact (eliminate admits in verified, compilable code)
-1. **TASK A** (sp_dist_k_stabilize) — Completes Dijkstra equality proof chain. 1 admit, medium difficulty, uses FStar.Fin.pigeonhole which is available. **Best ROI.**
+1. ~~**TASK A** (sp_dist_k_stabilize)~~ ✅ Done — Dijkstra equality proof chain complete, zero admits.
 2. **TASK F** (UnionFind ranks) — Trivial: path compression doesn't change ranks. ~15 lines.
 
 ### Medium Impact (complete ongoing work)
