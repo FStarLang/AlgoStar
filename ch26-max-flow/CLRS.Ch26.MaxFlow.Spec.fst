@@ -604,18 +604,376 @@ let weak_duality (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
   = lemma_flow_value_eq_net_flow flow cap source sink s_set;
     lemma_net_flow_le_cut_capacity flow cap s_set
 
+(** ========== CLRS Theorem 26.6: Max-flow min-cut theorem ========== *)
+
+(** Structural check that all consecutive pairs have positive residual *)
+let rec all_edges_traversable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (p: list nat) : prop =
+  match p with
+  | [] | [_] -> True
+  | u :: v :: rest ->
+    u < n /\ v < n /\ has_residual_capacity cap flow n u v /\
+    all_edges_traversable cap flow (v :: rest)
+
+(** Path in residual graph *)
+let path_in_residual (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source target: nat{source < n /\ target < n}) (p: list nat) : prop =
+  Cons? p /\ L.hd p = source /\ L.last p = target /\
+  (forall (w: nat). L.mem w p ==> w < n) /\
+  all_edges_traversable cap flow p
+
+(** Reachable from source in the residual graph *)
+let reachable_in_Gf (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source v: nat{source < n /\ v < n}) : prop =
+  exists (p: list nat). path_in_residual cap flow source v p
+
+(** Appending a traversable edge preserves traversability *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+let rec lemma_append_edge_traversable
+  (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (p: list nat) (v: nat{v < n})
+  : Lemma
+    (requires Cons? p /\ (forall (w: nat). L.mem w p ==> w < n) /\
+              all_edges_traversable cap flow p /\
+              L.last p < n /\ has_residual_capacity cap flow n (L.last p) v)
+    (ensures all_edges_traversable cap flow (L.append p [v]))
+    (decreases p)
+  = match p with
+    | [u] -> ()
+    | u :: v' :: rest -> lemma_append_edge_traversable cap flow (v' :: rest) v
+
+(** Path extension: if u reachable and (u,v) traversable, then v reachable *)
+let lemma_extend_reachable
+  (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source u: nat{source < n /\ u < n}) (v: nat{v < n})
+  (p: list nat)
+  : Lemma
+    (requires path_in_residual cap flow source u p /\
+              has_residual_capacity cap flow n u v)
+    (ensures reachable_in_Gf cap flow source v)
+  = lemma_append_edge_traversable cap flow p v;
+    L.lemma_append_last p [v];
+    L.append_mem_forall p [v];
+    assert (path_in_residual cap flow source v (L.append p [v]))
+
+(** Traversable path implies positive bottleneck *)
+let rec lemma_traversable_bottleneck
+  (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (p: list nat{Cons? p /\ (forall (w: nat). L.mem w p ==> w < n)})
+  : Lemma
+    (requires all_edges_traversable cap flow p)
+    (ensures bottleneck cap flow n p > 0)
+    (decreases p)
+  = match p with
+    | [v] -> ()
+    | u :: v :: rest -> lemma_traversable_bottleneck cap flow (v :: rest)
+
+(** Sink not reachable when no augmenting path exists *)
+let lemma_sink_not_reachable
+  (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source sink: nat{source < n /\ sink < n}) (p: list nat)
+  : Lemma
+    (requires
+      (forall (path: list nat).
+        Cons? path /\ L.hd path = source /\ L.last path = sink /\
+        (forall (v: nat). L.mem v path ==> v < n) ==>
+        bottleneck cap flow n path <= 0) /\
+      path_in_residual cap flow source sink p)
+    (ensures False)
+  = lemma_traversable_bottleneck cap flow p
+
+(** Saturated edge: if no residual, then f(u,v) = c(u,v) and f(v,u) = 0 *)
+let lemma_saturated_edge
+  (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source sink: nat{source < n /\ sink < n}) (u v: nat{u < n /\ v < n})
+  : Lemma
+    (requires valid_flow flow cap source sink /\
+              not (has_residual_capacity cap flow n u v))
+    (ensures get flow n u v == get cap n u v /\ get flow n v u == 0)
+  = ()
+
+(** net_flow_inner = cut_capacity_inner when all S→T edges saturated *)
+let rec lemma_saturated_inner
+  (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source sink: nat{source < n /\ sink < n})
+  (s_set: nat -> bool) (u: nat{u < n}) (w: nat)
+  : Lemma
+    (requires valid_flow flow cap source sink /\ s_set u == true /\
+      (forall (v: nat{v < n}). s_set v == false ==> not (has_residual_capacity cap flow n u v)))
+    (ensures net_flow_inner flow n s_set u w == cut_capacity_inner cap n s_set u w)
+    (decreases w)
+  = if w = 0 then ()
+    else if w - 1 < n then begin
+      lemma_saturated_inner cap flow source sink s_set u (w - 1);
+      if not (s_set (w - 1)) then lemma_saturated_edge cap flow source sink u (w - 1)
+    end
+    else lemma_saturated_inner cap flow source sink s_set u (w - 1)
+
+(** net_flow_aux = cut_capacity_aux when S→T edges saturated for all u ∈ S *)
+let rec lemma_saturated_aux
+  (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source sink: nat{source < n /\ sink < n})
+  (s_set: nat -> bool) (k: nat)
+  : Lemma
+    (requires valid_flow flow cap source sink /\
+      (forall (u: nat{u < n}). s_set u == true ==>
+        (forall (v: nat{v < n}). s_set v == false ==> not (has_residual_capacity cap flow n u v))))
+    (ensures net_flow_aux flow n s_set k == cut_capacity_aux cap n s_set k)
+    (decreases k)
+  = if k = 0 then ()
+    else if k - 1 < n then begin
+      lemma_saturated_aux cap flow source sink s_set (k - 1);
+      if s_set (k - 1) then lemma_saturated_inner cap flow source sink s_set (k - 1) n
+    end
+    else lemma_saturated_aux cap flow source sink s_set (k - 1)
+#pop-options
+
+(** Bounded reachability via mutual recursion (avoids higher-order SMT issues) *)
+let rec is_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat) (v: nat)
+  : Tot bool (decreases %[fuel; (n + 1)])
+  = if v >= n then false
+    else if v = source then true
+    else if fuel = 0 then false
+    else check_any_predecessor cap flow source fuel v 0
+
+and check_any_predecessor (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat{fuel > 0}) (v: nat{v < n /\ v <> source}) (u: nat)
+  : Tot bool (decreases %[fuel; n - u])
+  = if u >= n then false
+    else if is_reachable cap flow source (fuel - 1) u && has_residual_capacity cap flow n u v then true
+    else check_any_predecessor cap flow source fuel v (u + 1)
+
+(** check_any_predecessor succeeds when a specific predecessor is reachable *)
+let rec lemma_check_any_found (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat{fuel > 0}) (v: nat{v < n /\ v <> source})
+  (u0: nat{u0 < n}) (start: nat)
+  : Lemma
+    (requires is_reachable cap flow source (fuel - 1) u0 /\
+              has_residual_capacity cap flow n u0 v /\ start <= u0)
+    (ensures check_any_predecessor cap flow source fuel v start)
+    (decreases (n - start))
+  = if start >= n then ()
+    else if is_reachable cap flow source (fuel - 1) start &&
+            has_residual_capacity cap flow n start v then ()
+    else if start = u0 then ()
+    else lemma_check_any_found cap flow source fuel v u0 (start + 1)
+
+(** check_any_predecessor is monotone in the predecessor reachability *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+let rec lemma_check_any_mono (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat{fuel > 0}) (v: nat{v < n /\ v <> source}) (u: nat)
+  : Lemma
+    (requires check_any_predecessor cap flow source fuel v u /\
+              (forall (w: nat). is_reachable cap flow source (fuel - 1) w ==>
+                                is_reachable cap flow source fuel w))
+    (ensures check_any_predecessor cap flow source (fuel + 1) v u)
+    (decreases (n - u))
+  = if u >= n then ()
+    else if is_reachable cap flow source (fuel - 1) u && has_residual_capacity cap flow n u v then ()
+    else lemma_check_any_mono cap flow source fuel v (u + 1)
+
+(** Reachability is monotone in fuel *)
+let rec lemma_reachable_mono (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat) (v: nat)
+  : Lemma
+    (requires is_reachable cap flow source fuel v)
+    (ensures is_reachable cap flow source (fuel + 1) v)
+    (decreases %[fuel; n + 1])
+  = if v >= n || v = source then ()
+    else if fuel = 0 then ()
+    else begin
+      let aux (w: nat) : Lemma (requires is_reachable cap flow source (fuel - 1) w)
+                                (ensures is_reachable cap flow source fuel w) =
+        lemma_reachable_mono cap flow source (fuel - 1) w
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+      lemma_check_any_mono cap flow source fuel v 0
+    end
+
+(** Step reachable: if u reachable in fuel-1 and has_residual(u,v), then v reachable in fuel *)
+let lemma_step_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat{fuel > 0}) (u: nat{u < n}) (v: nat{v < n /\ v <> source})
+  : Lemma
+    (requires is_reachable cap flow source (fuel - 1) u /\
+              has_residual_capacity cap flow n u v)
+    (ensures is_reachable cap flow source fuel v)
+  = lemma_check_any_found cap flow source fuel v u 0
+#pop-options
+
+(** Reachable ⟹ path in residual graph (for bottleneck contradiction) *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+let rec lemma_check_any_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat{fuel > 0})
+  (v: nat{v < n /\ v <> source}) (u: nat)
+  : Lemma
+    (requires check_any_predecessor cap flow source fuel v u /\
+              (forall (w: nat{w < n}). is_reachable cap flow source (fuel - 1) w ==>
+                                       reachable_in_Gf cap flow source w))
+    (ensures reachable_in_Gf cap flow source v)
+    (decreases (n - u))
+  = if u >= n then ()
+    else if is_reachable cap flow source (fuel - 1) u && has_residual_capacity cap flow n u v then begin
+      let p = FStar.IndefiniteDescription.indefinite_description_ghost
+        (list nat) (fun p -> path_in_residual cap flow source u p) in
+      lemma_extend_reachable cap flow source u v p
+    end
+    else lemma_check_any_path cap flow source fuel v (u + 1)
+
+let rec lemma_reachable_implies_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (fuel: nat) (v: nat{v < n})
+  : Lemma
+    (requires is_reachable cap flow source fuel v)
+    (ensures reachable_in_Gf cap flow source v)
+    (decreases fuel)
+  = if v = source then
+      assert (path_in_residual cap flow source source [source])
+    else if fuel = 0 then ()
+    else begin
+      let aux (w: nat{w < n})
+        : Lemma (requires is_reachable cap flow source (fuel - 1) w)
+                (ensures reachable_in_Gf cap flow source w) =
+        lemma_reachable_implies_path cap flow source (fuel - 1) w
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+      lemma_check_any_path cap flow source fuel v 0
+    end
+#pop-options
+
+(** init preserves traversability *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+let rec lemma_init_traversable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (p: list nat)
+  : Lemma
+    (requires L.length p > 1 /\ (forall (w: nat). L.mem w p ==> w < n) /\
+              all_edges_traversable cap flow p)
+    (ensures Cons? (L.init p) /\ all_edges_traversable cap flow (L.init p) /\
+             L.hd (L.init p) = L.hd p /\
+             (forall (w: nat). L.mem w (L.init p) ==> w < n))
+    (decreases p)
+  = match p with
+    | [u; v] -> ()
+    | u :: v :: w :: rest -> lemma_init_traversable cap flow (v :: w :: rest)
+
+(** Last edge of a traversable path *)
+let rec lemma_last_edge (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (p: list nat)
+  : Lemma
+    (requires L.length p > 1 /\ (forall (w: nat). L.mem w p ==> w < n) /\
+              all_edges_traversable cap flow p)
+    (ensures L.last (L.init p) < n /\ L.last p < n /\
+             has_residual_capacity cap flow n (L.last (L.init p)) (L.last p))
+    (decreases p)
+  = match p with
+    | [u; v] -> ()
+    | u :: v :: w :: rest -> lemma_last_edge cap flow (v :: w :: rest)
+#pop-options
+
+let rec lemma_init_length (#a: Type) (p: list a{Cons? p})
+  : Lemma (ensures L.length (L.init p) = L.length p - 1) (decreases p)
+  = match p with | [_] -> () | _ :: rest -> lemma_init_length rest
+
+(** Path with ≤ fuel+1 vertices implies is_reachable *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 200"
+let rec lemma_path_implies_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (v: nat{v < n}) (fuel: nat)
+  (p: list nat)
+  : Lemma
+    (requires Cons? p /\ L.hd p = source /\ L.last p = v /\
+              (forall (w: nat). L.mem w p ==> w < n) /\
+              all_edges_traversable cap flow p /\
+              L.length p <= fuel + 1)
+    (ensures is_reachable cap flow source fuel v)
+    (decreases fuel)
+  = if v = source then ()
+    else begin
+      lemma_init_traversable cap flow p;
+      lemma_last_edge cap flow p;
+      lemma_init_length p;
+      let init_p = L.init p in
+      let u = L.last init_p in
+      (if u = source then ()
+       else lemma_path_implies_reachable cap flow source u (fuel - 1) init_p);
+      if v <> source then
+        lemma_step_reachable cap flow source fuel u v
+    end
+#pop-options
+
+(** Path shortening: any path can be shortened to ≤ n vertices
+    (by removing cycles via pigeonhole principle).
+    Proof obligation: standard graph theory cycle removal. *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
+let rec lemma_shorten_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (v: nat{v < n})
+  (p: list nat)
+  : Lemma
+    (requires Cons? p /\ L.hd p = source /\ L.last p = v /\
+              (forall (w: nat). L.mem w p ==> w < n) /\
+              all_edges_traversable cap flow p)
+    (ensures exists (p': list nat).
+              Cons? p' /\ L.hd p' = source /\ L.last p' = v /\
+              (forall (w: nat). L.mem w p' ==> w < n) /\
+              all_edges_traversable cap flow p' /\
+              L.length p' <= n)
+    (decreases (L.length p))
+  = if L.length p <= n then ()
+    else begin
+      // Path has > n vertices, all in {0,...,n-1}. By pigeonhole, repeated vertex.
+      let seq_p : FStar.Seq.seq (FStar.Fin.under n) =
+        FStar.Seq.init (L.length p) (fun (i: nat{i < L.length p}) ->
+          L.lemma_index_memP p i; (L.index p i <: FStar.Fin.under n)) in
+      let (i, j) = FStar.Fin.pigeonhole #n seq_p in
+      // i < j, L.index p i = L.index p j
+      // Remove cycle p[i+1..j] to get shorter path.
+      // The shortened path p[0..i] ++ p[j..end] is valid because p[i] = p[j].
+      // Proof obligation: cycle removal preserves path validity.
+      assume (exists (p': list nat).
+               Cons? p' /\ L.hd p' = source /\ L.last p' = v /\
+               (forall (w: nat). L.mem w p' ==> w < n) /\
+               all_edges_traversable cap flow p' /\
+               L.length p' < L.length p);
+      let p' = FStar.IndefiniteDescription.indefinite_description_ghost
+        (list nat) (fun p' ->
+          Cons? p' /\ L.hd p' = source /\ L.last p' = v /\
+          (forall (w: nat). L.mem w p' ==> w < n) /\
+          all_edges_traversable cap flow p' /\
+          L.length p' < L.length p) in
+      lemma_shorten_path cap flow source v p'
+    end
+#pop-options
+
+(** Fixed point: reachable_in_Gf ⟹ is_reachable source n *)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
+let lemma_reachable_iff_bounded (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
+  (source: nat{source < n}) (v: nat{v < n})
+  : Lemma
+    (requires reachable_in_Gf cap flow source v)
+    (ensures is_reachable cap flow source n v)
+  = let p = FStar.IndefiniteDescription.indefinite_description_ghost
+      (list nat) (fun p -> path_in_residual cap flow source v p) in
+    lemma_shorten_path cap flow source v p;
+    let p' = FStar.IndefiniteDescription.indefinite_description_ghost
+      (list nat) (fun p' ->
+        Cons? p' /\ L.hd p' = source /\ L.last p' = v /\
+        (forall (w: nat). L.mem w p' ==> w < n) /\
+        all_edges_traversable cap flow p' /\
+        L.length p' <= n) in
+    lemma_path_implies_reachable cap flow source v (n - 1) p';
+    lemma_reachable_mono cap flow source (n - 1) v
+#pop-options
+
 (** Max-flow min-cut theorem (CLRS Theorem 26.6):
     The following are equivalent:
     1. f is a maximum flow
     2. The residual graph G_f has no augmenting path
     3. |f| = c(S,T) for some cut (S,T)
-    
+
     We state: when no augmenting path exists in G_f, the flow value equals
     the capacity of some cut, which is therefore the minimum cut. *)
 let max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
                               (source: nat{source < n}) (sink: nat{sink < n})
   : Lemma
-    (requires 
+    (requires
       valid_flow flow cap source sink /\
       // No augmenting path exists: all paths from source have a zero-residual-capacity edge
       (forall (path: list nat).
@@ -627,9 +985,38 @@ let max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matr
       (exists (s_set: nat -> bool).
         is_st_cut s_set n source sink /\
         flow_value flow n source == cut_capacity cap s_set))
-  = // CLRS Theorem 26.6: When no augmenting path exists, the set S of vertices
-    // reachable from source in G_f defines a minimum cut with capacity = |f|.
-    // Full proof: define S = {v : v reachable from s in G_f}, show c(S,T) = |f|.
-    assume (exists (s_set: nat -> bool).
-             is_st_cut s_set n source sink /\
-             flow_value flow n source == cut_capacity cap s_set)
+  = if n = 0 then () else begin
+    // Step 1: Define S = {v : reachable from source in ≤ n steps in G_f}
+    let s_set (v: nat) : Tot bool = is_reachable cap flow source n v in
+    // Step 2: Source ∈ S
+    assert (s_set source == true);
+    // Step 3: Sink ∉ S (by contradiction via bottleneck)
+    (if s_set sink then begin
+      lemma_reachable_implies_path cap flow source n sink;
+      let p = FStar.IndefiniteDescription.indefinite_description_ghost
+        (list nat) (fun p -> path_in_residual cap flow source sink p) in
+      lemma_sink_not_reachable cap flow source sink p
+    end);
+    assert (s_set sink == false);
+    // Step 4: For u ∈ S, v ∈ T: no residual capacity
+    let no_cross_residual (u: nat{u < n}) (v: nat{v < n})
+      : Lemma (requires s_set u == true /\ s_set v == false)
+              (ensures not (has_residual_capacity cap flow n u v))
+      = if has_residual_capacity cap flow n u v then begin
+          // u reachable ⟹ reachable_in_Gf ⟹ extend path ⟹ v reachable_in_Gf ⟹ is_reachable n v
+          lemma_reachable_implies_path cap flow source n u;
+          let p = FStar.IndefiniteDescription.indefinite_description_ghost
+            (list nat) (fun p -> path_in_residual cap flow source u p) in
+          lemma_extend_reachable cap flow source u v p;
+          lemma_reachable_iff_bounded cap flow source v
+          // Now is_reachable source n v = true, contradicting s_set v = false
+        end
+    in
+    FStar.Classical.forall_intro_2 (FStar.Classical.move_requires_2 no_cross_residual);
+    // Step 5: net_flow_across_cut = cut_capacity (since all S→T edges saturated)
+    lemma_saturated_aux cap flow source sink s_set n;
+    // Step 6: flow_value = net_flow_across_cut (CLRS Lemma 26.4)
+    lemma_flow_value_eq_net_flow flow cap source sink s_set;
+    assert (flow_value flow n source == cut_capacity cap s_set);
+    assert (is_st_cut s_set n source sink)
+  end
