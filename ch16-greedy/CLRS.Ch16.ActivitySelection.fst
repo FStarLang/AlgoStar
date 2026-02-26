@@ -1,36 +1,23 @@
 (*
-   Activity Selection - Verified Greedy implementation in Pulse
-   
+   Activity Selection — Verified Greedy implementation in Pulse
+
    Implements the greedy activity selection algorithm to find
    the maximum number of non-overlapping activities.
-   
-   FUNCTIONAL CORRECTNESS PROPERTIES PROVEN:
-   
+
+   Proves BOTH functional correctness AND O(n) complexity:
+
+   CORRECTNESS:
    1. Termination: The algorithm always terminates
-   
-   2. Basic correctness:
-      - At least one activity is selected (count >= 1)
-      - At most n activities are selected (count <= n)
-   
-   3. Greedy selection property:
-      - The first activity (with earliest finish time) is always selected
-      - An activity is selected only if its start time >= the finish time of 
-        the last selected activity
-   
-   4. Pairwise non-overlapping (via ghost selection sequence):
-      - A ghost sequence sel tracks the indices of selected activities
-      - All selected indices are valid (< n) and strictly increasing
-      - For consecutive selections i, j: finish[sel[i]] <= start[sel[j]]
-      - The returned count equals the length of the selection
-      - The first selected activity is index 0
-   
-   5. Optimality: count == max_compatible_count (maximum cardinality
-      of any pairwise-compatible selection). No valid selection can
-      contain more activities.
-   
-   6. Output: the first `count` entries of the output array contain
-      the selected activity indices, matching the ghost sequence.
-   
+   2. Basic correctness: 1 <= count <= n
+   3. Greedy selection: first activity always selected; each subsequent
+      activity is compatible with the previous selection
+   4. Pairwise non-overlapping (via ghost selection sequence)
+   5. Optimality: count == max_compatible_count
+   6. Output: first `count` entries of out contain selected indices
+
+   COMPLEXITY:
+   - Exactly (n - 1) comparisons (one per candidate activity)
+
    NO admits. NO assumes.
 *)
 
@@ -52,6 +39,22 @@ module S = CLRS.Ch16.ActivitySelection.Spec
 
 // ========== Definitions ==========
 
+// Ghost tick infrastructure
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+//SNIPPET_START: complexity_bounded_linear
+let complexity_bounded_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n - 1
+//SNIPPET_END: complexity_bounded_linear
+
 // The first `count` entries of out_seq match sel (as SZ.t values)
 let out_matches_sel (out_seq: Seq.seq SZ.t) (sel: Seq.seq nat) (count: nat) (n: nat) : prop =
   count <= Seq.length out_seq /\
@@ -70,9 +73,12 @@ fn activity_selection
   (n: SZ.t)
   (#ss #sf: Ghost.erased (Seq.seq int))
   (#sout0: Ghost.erased (Seq.seq SZ.t))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires 
     A.pts_to start_times #p ss ** A.pts_to finish_times #p sf **
     A.pts_to out sout0 **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n == Seq.length ss /\ 
       SZ.v n == Seq.length sf /\
@@ -85,14 +91,16 @@ fn activity_selection
       (forall (i:nat). i < Seq.length ss ==> L.valid_activity ss sf i)
     )
   returns count: SZ.t
-  ensures exists* sout.
+  ensures exists* sout (cf: nat).
     A.pts_to start_times #p ss ** 
     A.pts_to finish_times #p sf **
     A.pts_to out sout **
+    GR.pts_to ctr cf **
     pure (
       SZ.v count >= 1 /\ 
       SZ.v count <= SZ.v n /\
       Seq.length sout == SZ.v n /\
+      complexity_bounded_linear cf (reveal c0) (SZ.v n) /\
       // The first count entries of out are the selected activity indices
       (exists (sel: Seq.seq nat).
         Seq.length sel == SZ.v count /\
@@ -121,11 +129,12 @@ fn activity_selection
   let mut i: SZ.t = 1sz;
   
   while (!i <^ n)
-  invariant exists* vi vcount vlast_finish vsel sout_cur.
+  invariant exists* vi vcount vlast_finish vsel sout_cur (vc : nat).
     R.pts_to i vi **
     R.pts_to count vcount **
     R.pts_to last_finish vlast_finish **
     GR.pts_to sel_ref vsel **
+    GR.pts_to ctr vc **
     A.pts_to out sout_cur **
     pure (
       SZ.v vi > 0 /\
@@ -135,7 +144,10 @@ fn activity_selection
       Seq.length vsel == SZ.v vcount /\
       Seq.length sout_cur == SZ.v n /\
       out_matches_sel sout_cur vsel (SZ.v vcount) (SZ.v n) /\
-      L.greedy_selection_inv vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish
+      L.greedy_selection_inv vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish /\
+      // Complexity: exactly (i - 1) comparisons so far
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi - 1
     )
   {
     let vi = !i;
@@ -152,6 +164,9 @@ fn activity_selection
     
     // Compute both possible next selections
     let selected = (curr_start >= vlast_finish);
+    
+    // Count the comparison — one ghost tick
+    tick ctr;
     
     // Call combined step lemma
     L.lemma_step vsel ss sf (SZ.v n) (SZ.v vi) vlast_finish selected;

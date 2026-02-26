@@ -14,6 +14,7 @@ open CLRS.Ch15.RodCutting
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
@@ -40,7 +41,9 @@ fn test_rod_cutting_example ()
   A.op_Array_Assignment prices_arr 9sz (30 <: nat);
   
   // Compute maximum revenue for rod of length 10
-  let revenue = rod_cutting prices_arr 10sz;
+  let ctr = GR.alloc #nat 0;
+  let revenue = rod_cutting prices_arr 10sz ctr;
+  GR.free ctr;
   
   // Free the array
   with s. assert (A.pts_to prices_arr s);
