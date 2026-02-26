@@ -310,8 +310,9 @@ fn kruskal
   // soundness + acyclic_when_unreachable from MST.Spec.
   // TODO: Prove by establishing formal UF component tracking invariant.
   with seu sev vec. assert (A.pts_to edge_u seu ** A.pts_to edge_v sev ** R.pts_to edge_count vec);
+  // Non-negativity follows from valid_endpoints in the loop invariant.
+  // Only the forest property requires the assume_:
   assume_ (pure (
-    (forall (k:nat). k < SZ.v vec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
     KSpec.is_forest (edges_from_arrays seu sev (SZ.v vec) 0) (SZ.v n)));
   lemma_kruskal_maintains_forest seu sev (SZ.v n) (SZ.v vec);
   
