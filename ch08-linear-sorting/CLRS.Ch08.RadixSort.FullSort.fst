@@ -25,21 +25,15 @@ open FStar.Seq
 open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Classical
+open CLRS.Ch08.RadixSort.Stability
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 
-(* ========== Import from Stability module ========== *)
+(* ========== FullSort-specific definitions ========== *)
 
-let rec pow (base: nat) (exp: nat) : nat =
-  if exp = 0 then 1
-  else base * pow base (exp - 1)
-
-let rec pow_positive (base: nat) (exp: nat)
-  : Lemma (requires base > 0)
-          (ensures pow base exp > 0)
-          (decreases exp)
-  = if exp = 0 then ()
-    else pow_positive base (exp - 1)
+/// A sequence is sorted if each element is <= the next
+let rec sorted (s: seq nat) : Tot prop (decreases (length s)) =
+  length s <= 1 \/ (index s 0 <= index s 1 /\ sorted (tail s))
 
 let rec pow_monotonic (base exp1 exp2: nat)
   : Lemma (requires base >= 2 /\ exp1 <= exp2)
@@ -48,45 +42,6 @@ let rec pow_monotonic (base exp1 exp2: nat)
   = if exp1 = exp2 then ()
     else if exp1 = 0 then pow_positive base exp2
     else pow_monotonic base exp1 (exp2 - 1)
-
-/// Extract the d-th digit of k in the given base
-let digit (k: nat) (d: nat) (base: nat) : nat =
-  if base > 0 then (
-    pow_positive base d;
-    (k / pow base d) % base
-  ) else 0
-
-let digit_bound (k d base: nat)
-  : Lemma (requires base > 0)
-          (ensures digit k d base < base)
-  = pow_positive base d;
-    lemma_mod_lt (k / pow base d) base
-
-/// A sequence is sorted if each element is <= the next
-let rec sorted (s: seq nat) : Tot prop (decreases (length s)) =
-  length s <= 1 \/ (index s 0 <= index s 1 /\ sorted (tail s))
-
-/// Sorted on digits 0..max_d (lexicographic order from low to high)
-let sorted_up_to_digit (s: seq nat) (max_d: nat) (base: nat) : prop =
-  base > 0 /\
-  (forall (i j: nat). {:pattern (index s i); (index s j)}
-    i < j /\ j < length s ==>
-    ((exists (d0: nat). d0 <= max_d /\
-       digit (index s i) d0 base < digit (index s j) d0 base /\
-       // All more significant digits are equal
-       (forall (d': nat). d0 < d' /\ d' <= max_d ==> 
-         digit (index s i) d' base == digit (index s j) d' base)) \/
-     (forall (d: nat). d <= max_d ==> 
-       digit (index s i) d base == digit (index s j) d base)))
-
-/// Count occurrences for permutation
-let rec count (s: seq nat) (x: nat) : Tot nat (decreases (length s)) =
-  if length s = 0 then 0
-  else (if index s 0 = x then 1 else 0) + count (tail s) x
-
-let permutation (s_in s_out: seq nat) : prop =
-  length s_in == length s_out /\
-  (forall (x: nat). count s_in x == count s_out x)
 
 /// Helper: if count > 0, the element appears somewhere in the sequence
 let rec count_positive_means_appears (s: seq nat) (v: nat)
@@ -111,17 +66,11 @@ let permutation_preserves_bounds (s_in s_out: seq nat) (bound: nat)
           (ensures (forall (i: nat). i < length s_out ==> index s_out i < bound))
   = let aux (i: nat{i < length s_out}) : Lemma (index s_out i < bound) =
       let v = index s_out i in
-      // v appears in s_out at position i, so count s_out v >= 1
       element_appears_means_count_positive s_out i;
       assert (count s_out v > 0);
-      // By permutation: count s_in v == count s_out v
       assert (count s_in v == count s_out v);
-      // So count s_in v > 0, meaning v appears in s_in at some position j
       assert (count s_in v > 0);
       count_positive_means_appears s_in v;
-      // Therefore there exists j such that index s_in j == v
-      // and by assumption, index s_in j < bound
-      // So v < bound
       ()
     in
     Classical.forall_intro aux
@@ -422,7 +371,8 @@ let lemma_sorted_up_to_all_digits_implies_sorted
       // For each pair (i, j) with i < j, sorted_up_to_digit gives lex order on digits 0..bigD-1
       let aux (i: nat{i < length s}) (j: nat{j < length s /\ i < j})
         : Lemma (index s i <= index s j)
-        = digits_lex_order_implies_numeric_order (index s i) (index s j) bigD base
+        = sorted_up_to_digit_at s (bigD - 1) base i j;
+          digits_lex_order_implies_numeric_order (index s i) (index s j) bigD base
       in
       // Establish pairwise ordering explicitly
       let pairwise_aux (i: nat{i < length s}) : Lemma
@@ -441,89 +391,10 @@ let lemma_sorted_up_to_all_digits_implies_sorted
     )
 #pop-options
 
-(* ========== Stable sort on single digit (abstract) ========== *)
-
-/// Sorted on a single digit position
-let rec sorted_on_digit (s: seq nat) (d: nat) (base: nat) : Tot prop (decreases (length s)) =
-  base > 0 /\ (
-    length s <= 1 \/ 
-    (digit (index s 0) d base <= digit (index s 1) d base /\ 
-     sorted_on_digit (tail s) d base))
-
-/// Find first occurrence (for stability definition)
-let rec first_occurrence_from (s: seq nat) (v: nat) (start: nat) : Tot (option nat) (decreases (length s - start)) =
-  if start >= length s then None
-  else if index s start = v then Some start
-  else first_occurrence_from s v (start + 1)
-
-let first_occurrence (s: seq nat) (v: nat) : option nat =
-  first_occurrence_from s v 0
-
-/// Stable sort maintains relative order for equal keys
-let is_stable_sort_on_digit (s_in s_out: seq nat) (d: nat) (base: nat) : prop =
-  base > 0 /\
-  permutation s_in s_out /\
-  sorted_on_digit s_out d base /\
-  (forall (i1 i2: nat).
-    i1 < length s_in /\ i2 < length s_in /\ i1 < i2 /\
-    digit (index s_in i1) d base == digit (index s_in i2) d base ==>
-    (match (first_occurrence s_out (index s_in i1), 
-            first_occurrence s_out (index s_in i2)) with
-     | Some j1, Some j2 -> j1 <= j2
-     | _, _ -> True))
-
-(* ========== Import stability result from P1.2.4 ========== *)
-
-/// From CLRS.Ch08.RadixSort.Stability: after d passes, sorted on digits 0..d-1
-let rec radix_sort_invariant
-  (s0: seq nat)
-  (steps: list (seq nat))
-  (d: nat)
-  (base: nat)
-  : Lemma (requires
-            base > 0 /\
-            d <= List.Tot.length steps /\
-            (forall (step_num: nat). step_num < d ==>
-              (let s_in = (if step_num = 0 then s0 
-                          else List.Tot.index steps (step_num - 1)) in
-               let s_out = List.Tot.index steps step_num in
-               is_stable_sort_on_digit s_in s_out step_num base)))
-          (ensures d = 0 \/ 
-                   (d > 0 /\ sorted_up_to_digit (List.Tot.index steps (d - 1)) (d - 1) base))
-          (decreases d)
-  = if d = 0 then ()
-    else if d = 1 then
-      admit() // Proven in CLRS.Ch08.RadixSort.Stability
-    else (
-      // Use IH on d-1 to establish the base, then apply stability for step d-1
-      radix_sort_invariant s0 steps (d - 1) base;
-      admit() // Rest proven in CLRS.Ch08.RadixSort.Stability
-    )
-
-/// Permutation preservation through stable sort chain
-let rec stable_sort_chain_permutation
-  (s0: seq nat)
-  (steps: list (seq nat))
-  (d: nat)
-  (base: nat)
-  : Lemma (requires
-            base > 0 /\
-            d <= List.Tot.length steps /\
-            (forall (step_num: nat). step_num < d ==>
-              (let s_in = (if step_num = 0 then s0 
-                          else List.Tot.index steps (step_num - 1)) in
-               let s_out = List.Tot.index steps step_num in
-               is_stable_sort_on_digit s_in s_out step_num base)))
-          (ensures d = 0 \/ permutation s0 (List.Tot.index steps (d - 1)))
-          (decreases d)
-  = if d <= 0 then ()
-    else if d = 1 then
-      admit() // Proven in CLRS.Ch08.RadixSort.Stability
-    else (
-      // Use IH on d-1, then extend by one step
-      stable_sort_chain_permutation s0 steps (d - 1) base;
-      admit() // Proven in CLRS.Ch08.RadixSort.Stability
-    )
+(* ========== Stability is imported from CLRS.Ch08.RadixSort.Stability ========== *)
+(* is_stable_sort_on_digit, radix_sort_invariant, stable_sort_chain_permutation,  *)
+(* sorted_on_digit, sorted_up_to_digit, permutation, count, etc. are all         *)
+(* imported via open CLRS.Ch08.RadixSort.Stability above.                         *)
 
 (* ========== Main correctness theorem ========== *)
 

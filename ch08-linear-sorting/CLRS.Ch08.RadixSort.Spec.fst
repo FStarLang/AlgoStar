@@ -20,6 +20,7 @@ open FStar.Seq
 open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Classical
+open FStar.IndefiniteDescription
 module Seq = FStar.Seq
 
 (* ========== Power function ========== *)
@@ -295,6 +296,24 @@ let permutation (s_in s_out: seq nat) : prop =
   length s_in == length s_out /\
   (forall (x: nat). count s_in x == count s_out x)
 
+(* ========== Count helpers for permutation reasoning ========== *)
+
+/// If count > 0, the element appears somewhere in the sequence
+let rec count_positive_means_appears (s: seq nat) (v: nat)
+  : Lemma (requires count s v > 0)
+          (ensures (exists (i: nat). i < length s /\ index s i == v))
+          (decreases (length s))
+  = if length s = 0 then ()
+    else if index s 0 = v then ()
+    else count_positive_means_appears (tail s) v
+
+/// If an element appears in a sequence, its count is positive
+let rec element_appears_means_count_positive (s: seq nat) (i: nat{i < length s})
+  : Lemma (ensures count s (index s i) > 0)
+          (decreases (length s))
+  = if i = 0 then ()
+    else element_appears_means_count_positive (tail s) (i - 1)
+
 (* ========== Stable sorting ========== *)
 
 //SNIPPET_START: is_stable_sort_by
@@ -312,9 +331,49 @@ let is_stable_sort_by (s_in s_out: seq nat) (key: nat -> nat) : prop =
     j1 < j2)
 //SNIPPET_END: is_stable_sort_by
 
-// Stable sort by digit d
+// Stable sort by digit d — inlined to avoid lambda beta-reduction issues in SMT
+[@@"opaque_to_smt"]
 let is_stable_sort_by_digit (s_in s_out: seq nat) (d base: nat) : prop =
-  base > 0 /\ is_stable_sort_by s_in s_out (fun k -> digit k d base)
+  base > 0 /\
+  permutation s_in s_out /\
+  (forall (i j: nat). {:pattern (index s_out i); (index s_out j)}
+    i < j /\ j < length s_out ==> 
+    digit (index s_out i) d base <= digit (index s_out j) d base) /\
+  (forall (i1 i2 j1 j2: nat). {:pattern (index s_in i1); (index s_in i2); (index s_out j1); (index s_out j2)}
+    i1 < length s_in /\ i2 < length s_in /\
+    j1 < length s_out /\ j2 < length s_out /\
+    index s_in i1 == index s_out j1 /\
+    index s_in i2 == index s_out j2 /\
+    i1 < i2 /\
+    index s_in i1 <> index s_in i2 /\
+    digit (index s_in i1) d base == digit (index s_in i2) d base ==>
+    j1 < j2)
+
+// Helper: unpack sorted property from is_stable_sort_by_digit
+let unpack_sorted (s_in s_out: seq nat) (d base: nat) (i j: nat)
+  : Lemma (requires is_stable_sort_by_digit s_in s_out d base /\
+                    i < j /\ j < length s_out)
+          (ensures digit (index s_out i) d base <= digit (index s_out j) d base)
+  = reveal_opaque (`%is_stable_sort_by_digit) (is_stable_sort_by_digit s_in s_out d base)
+
+// Helper: unpack stability from is_stable_sort_by_digit
+let unpack_stability (s_in s_out: seq nat) (d base: nat) (i1 i2 j1 j2: nat)
+  : Lemma (requires is_stable_sort_by_digit s_in s_out d base /\
+                    i1 < length s_in /\ i2 < length s_in /\
+                    j1 < length s_out /\ j2 < length s_out /\
+                    index s_in i1 == index s_out j1 /\
+                    index s_in i2 == index s_out j2 /\
+                    i1 < i2 /\
+                    index s_in i1 <> index s_in i2 /\
+                    digit (index s_in i1) d base == digit (index s_in i2) d base)
+          (ensures j1 < j2)
+  = reveal_opaque (`%is_stable_sort_by_digit) (is_stable_sort_by_digit s_in s_out d base)
+
+// Helper: unpack permutation from is_stable_sort_by_digit
+let unpack_perm (s_in s_out: seq nat) (d base: nat)
+  : Lemma (requires is_stable_sort_by_digit s_in s_out d base)
+          (ensures permutation s_in s_out)
+  = reveal_opaque (`%is_stable_sort_by_digit) (is_stable_sort_by_digit s_in s_out d base)
 
 (* ========== Radix sort correctness ========== *)
 
@@ -325,6 +384,7 @@ let is_stable_sort_by_digit (s_in s_out: seq nat) (d base: nat) : prop =
 // agree, or all digits 0..max_d are equal.
 // This is the invariant maintained by radix sort (LSD to MSD):
 // after sorting by digit max_d, the most significant differing digit determines order.
+[@@"opaque_to_smt"]
 let sorted_up_to_digit (s: seq nat) (max_d base: nat) : prop =
   base > 0 /\
   (forall (i j: nat). {:pattern (index s i); (index s j)}
@@ -337,8 +397,116 @@ let sorted_up_to_digit (s: seq nat) (max_d base: nat) : prop =
      // Or all digits up to max_d are equal
      (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base)))
 
+// Helper: given concrete witness positions, prove a < b from stability
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
+let order_witnesses (s_in s_out: seq nat) (d base: nat) (a b i j: nat)
+  : Lemma 
+    (requires is_stable_sort_by_digit s_in s_out d base /\
+              a < length s_in /\ b < length s_in /\
+              i < j /\ j < length s_out /\
+              index s_in a == index s_out i /\ index s_in b == index s_out j /\
+              digit (index s_out i) d base == digit (index s_out j) d base /\
+              index s_out i <> index s_out j)
+    (ensures a < b)
+  = reveal_opaque (`%is_stable_sort_by_digit) (is_stable_sort_by_digit s_in s_out d base)
+#pop-options
+
+// Helper: find ordered input witnesses for distinct output elements with same digit.
+// Uses order_witnesses to keep reveal_opaque isolated from count_pos skolemization.
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 100"
+let find_input_witnesses (s_in s_out: seq nat) (d base: nat) (i j: nat)
+  : Lemma 
+    (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
+              i < j /\ j < length s_out /\
+              digit (index s_out i) d base == digit (index s_out j) d base /\
+              index s_out i <> index s_out j)
+    (ensures exists (a b: nat). a < b /\ b < length s_in /\
+              index s_in a == index s_out i /\ index s_in b == index s_out j)
+  = let v = index s_out i in
+    let w = index s_out j in
+    unpack_perm s_in s_out d base;
+    element_appears_means_count_positive s_out i;
+    count_positive_means_appears s_in v;
+    let a = indefinite_description_ghost nat (fun a -> a < length s_in /\ index s_in a == v) in
+    element_appears_means_count_positive s_out j;
+    count_positive_means_appears s_in w;
+    let b = indefinite_description_ghost nat (fun b -> b < length s_in /\ index s_in b == w) in
+    order_witnesses s_in s_out d base a b i j
+#pop-options
+
+// Extract ordering for VALUES from sorted_up_to_digit (no index terms in postcondition)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
+let sorted_up_to_values (s: seq nat) (max_d base: nat) (v w: nat) (a b: nat)
+  : Lemma 
+    (requires sorted_up_to_digit s max_d base /\
+              a < b /\ b < length s /\ index s a == v /\ index s b == w)
+    (ensures ((exists (d0: nat). d0 <= max_d /\
+                digit v d0 base < digit w d0 base /\
+                (forall (d': nat). d0 < d' /\ d' <= max_d ==> digit v d' base == digit w d' base)) \/
+              (forall (d: nat). d <= max_d ==> digit v d base == digit w d base)))
+  = reveal_opaque (`%sorted_up_to_digit) (sorted_up_to_digit s max_d base)
+#pop-options
+
+// Establish sorted_up_to_digit from universally quantified property
+let sorted_up_to_intro (s: seq nat) (max_d base: nat)
+  : Lemma 
+    (requires base > 0 /\
+              (forall (i j: nat). {:pattern (index s i); (index s j)}
+                i < j /\ j < length s ==>
+                ((exists (d0: nat). d0 <= max_d /\
+                    digit (index s i) d0 base < digit (index s j) d0 base /\
+                    (forall (d': nat). d0 < d' /\ d' <= max_d ==>
+                      digit (index s i) d' base == digit (index s j) d' base)) \/
+                 (forall (d: nat). d <= max_d ==>
+                    digit (index s i) d base == digit (index s j) d base))))
+    (ensures sorted_up_to_digit s max_d base)
+  = reveal_opaque (`%sorted_up_to_digit) (sorted_up_to_digit s max_d base)
+
+// Combine find_input_witnesses + sorted_up_to_values + extend ordering from d-1 to d
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 100"
+let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
+  : Lemma 
+    (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
+              d > 0 /\ sorted_up_to_digit s_in (d - 1) base /\
+              i < j /\ j < length s_out /\
+              digit (index s_out i) d base == digit (index s_out j) d base /\
+              index s_out i <> index s_out j)
+    (ensures (exists (d0: nat). d0 <= d /\
+                digit (index s_out i) d0 base < digit (index s_out j) d0 base /\
+                (forall (d': nat). d0 < d' /\ d' <= d ==>
+                  digit (index s_out i) d' base == digit (index s_out j) d' base)) \/
+             (forall (dd: nat). dd <= d ==>
+                digit (index s_out i) dd base == digit (index s_out j) dd base))
+  = let v = index s_out i in
+    let w = index s_out j in
+    find_input_witnesses s_in s_out d base i j;
+    let a = indefinite_description_ghost nat
+      (fun a -> exists (b: nat). a < b /\ b < length s_in /\
+        index s_in a == v /\ index s_in b == w) in
+    let b = indefinite_description_ghost nat
+      (fun b -> a < b /\ b < length s_in /\
+        index s_in a == v /\ index s_in b == w) in
+    sorted_up_to_values s_in (d - 1) base v w a b;
+    match FStar.StrongExcludedMiddle.strong_excluded_middle
+      (exists (d0: nat). d0 <= d - 1 /\
+        digit v d0 base < digit w d0 base /\
+        (forall (d': nat). d0 < d' /\ d' <= d - 1 ==> digit v d' base == digit w d' base)) with
+    | true ->
+      let d0 = indefinite_description_ghost nat
+        (fun d0 -> d0 <= d - 1 /\ digit v d0 base < digit w d0 base /\
+          (forall (d': nat). d0 < d' /\ d' <= d - 1 ==> digit v d' base == digit w d' base)) in
+      let aux (d': nat) : Lemma (requires d0 < d' /\ d' <= d) (ensures digit v d' base == digit w d' base) =
+        if d' = d then () else ()
+      in forall_intro (move_requires aux)
+    | false ->
+      let aux (dd: nat) : Lemma (requires dd <= d) (ensures digit v dd base == digit w dd base) =
+        if dd = d then () else ()
+      in forall_intro (move_requires aux)
+#pop-options
+
 // Key lemma: stability preserves sorted_up_to_digit property
 // This is the heart of CLRS Lemma 8.3
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 200"
 let lemma_stable_sort_preserves_order
   (s_in s_out: seq nat)
   (d base: nat)
@@ -346,31 +514,116 @@ let lemma_stable_sort_preserves_order
                     is_stable_sort_by_digit s_in s_out d base /\
                     (d == 0 \/ (d > 0 /\ sorted_up_to_digit s_in (d - 1) base)))
           (ensures sorted_up_to_digit s_out d base)
-  = admit() // Core stability reasoning - requires detailed proof
+  = let aux (i j: nat) : Lemma
+      (requires i < j /\ j < length s_out)
+      (ensures (exists (d0: nat). d0 <= d /\
+                  digit (index s_out i) d0 base < digit (index s_out j) d0 base /\
+                  (forall (d': nat). d0 < d' /\ d' <= d ==>
+                    digit (index s_out i) d' base == digit (index s_out j) d' base)) \/
+               (forall (dd: nat). dd <= d ==>
+                  digit (index s_out i) dd base == digit (index s_out j) dd base))
+      [SMTPat (index s_out i); SMTPat (index s_out j)]
+      = let v = index s_out i in
+        let w = index s_out j in
+        unpack_sorted s_in s_out d base i j;
+        if digit v d base < digit w d base then ()
+        else if v = w then (
+          let aux2 (dd: nat) : Lemma (requires dd <= d) (ensures digit v dd base == digit w dd base) = ()
+          in forall_intro (move_requires aux2)
+        ) else (
+          assert (digit v d base == digit w d base);
+          if d = 0 then (
+            let aux2 (dd: nat) : Lemma (requires dd <= 0) (ensures digit v dd base == digit w dd base) = ()
+            in forall_intro (move_requires aux2)
+          ) else
+            get_lower_ordering s_in s_out d base i j
+        )
+    in
+    sorted_up_to_intro s_out d base
+#pop-options
 
-// Main theorem: d passes of stable digit sort yields sorted array
-let radix_sort_correctness
-  (s0: seq nat)
-  (steps: list (seq nat))
-  (bigD base: nat)
-  : Lemma (requires 
-            bigD > 0 /\
+// Helper: extract the stable sort property for a specific step
+let extract_step_property
+  (s0: seq nat) (steps: list (seq nat)) (step_num bigD base: nat)
+  : Lemma (requires
+            step_num < bigD /\
+            bigD <= List.Tot.length steps /\
+            (forall (i: nat). i < bigD ==>
+              (let s_in = (if i = 0 then s0 else List.Tot.index steps (i - 1)) in
+               let s_out = List.Tot.index steps i in
+               is_stable_sort_by_digit s_in s_out i base)))
+          (ensures
+            (let s_in = (if step_num = 0 then s0 else List.Tot.index steps (step_num - 1)) in
+             let s_out = List.Tot.index steps step_num in
+             is_stable_sort_by_digit s_in s_out step_num base))
+  = ()
+
+// Permutation is transitive (via count)
+let permutation_transitive (s1 s2 s3: seq nat)
+  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
+          (ensures permutation s1 s3)
+  = ()
+
+// Helper: permutation preserves bounds
+let permutation_preserves_bounds_spec (s_in s_out: seq nat) (bound: nat)
+  : Lemma (requires permutation s_in s_out /\
+                    (forall (i: nat). i < length s_in ==> index s_in i < bound))
+          (ensures (forall (i: nat). i < length s_out ==> index s_out i < bound))
+  = let aux (i: nat{i < length s_out}) : Lemma (index s_out i < bound) =
+      element_appears_means_count_positive s_out i;
+      count_positive_means_appears s_in (index s_out i)
+    in
+    Classical.forall_intro aux
+
+// Inductive invariant: after d passes, sorted_up_to_digit on digits 0..d-1
+let rec radix_invariant
+  (s0: seq nat) (steps: list (seq nat)) (d bigD base: nat)
+  : Lemma (requires
             base >= 2 /\
-            // Initial sequence has values bounded by base^bigD
-            (forall (i: nat). i < length s0 ==> index s0 i < pow base bigD) /\
-            // We have bigD intermediate sequences
-            List.Tot.length steps == bigD /\
-            // Each step is a stable sort by the corresponding digit
+            d <= bigD /\
+            bigD <= List.Tot.length steps /\
             (forall (step_num: nat). step_num < bigD ==>
               (let s_in = (if step_num = 0 then s0 else List.Tot.index steps (step_num - 1)) in
                let s_out = List.Tot.index steps step_num in
                is_stable_sort_by_digit s_in s_out step_num base)))
-          (ensures 
-            (let final = List.Tot.index steps (bigD - 1) in
-             permutation s0 final /\
-             sorted final))
-          (decreases bigD)
-  = admit() // Induction on bigD using lemma_stable_sort_preserves_order
+          (ensures d = 0 \/
+                   (d > 0 /\ sorted_up_to_digit (List.Tot.index steps (d - 1)) (d - 1) base))
+          (decreases d)
+  = if d = 0 then ()
+    else if d = 1 then (
+      extract_step_property s0 steps 0 bigD base;
+      lemma_stable_sort_preserves_order s0 (List.Tot.index steps 0) 0 base
+    ) else (
+      radix_invariant s0 steps (d - 1) bigD base;
+      extract_step_property s0 steps (d - 1) bigD base;
+      lemma_stable_sort_preserves_order
+        (List.Tot.index steps (d - 2)) (List.Tot.index steps (d - 1)) (d - 1) base
+    )
+
+// Permutation chain: after d passes, result is a permutation of input
+let rec perm_chain
+  (s0: seq nat) (steps: list (seq nat)) (d bigD base: nat)
+  : Lemma (requires
+            base >= 2 /\
+            d <= bigD /\
+            bigD <= List.Tot.length steps /\
+            (forall (step_num: nat). step_num < bigD ==>
+              (let s_in = (if step_num = 0 then s0 else List.Tot.index steps (step_num - 1)) in
+               let s_out = List.Tot.index steps step_num in
+               is_stable_sort_by_digit s_in s_out step_num base)))
+          (ensures d = 0 \/ permutation s0 (List.Tot.index steps (d - 1)))
+          (decreases d)
+  = if d = 0 then ()
+    else if d = 1 then (
+      extract_step_property s0 steps 0 bigD base;
+      unpack_perm s0 (List.Tot.index steps 0) 0 base
+    ) else (
+      perm_chain s0 steps (d - 1) bigD base;
+      extract_step_property s0 steps (d - 1) bigD base;
+      unpack_perm (List.Tot.index steps (d - 2)) (List.Tot.index steps (d - 1)) (d - 1) base;
+      permutation_transitive s0 (List.Tot.index steps (d - 2)) (List.Tot.index steps (d - 1))
+    )
+
 
 (* ========== Digit comparison implies value comparison ========== *)
 
@@ -521,22 +774,41 @@ let lemma_sorted_all_digits_is_sorted
                     (forall (i: nat). i < length s ==> index s i < pow base bigD) /\
                     sorted_up_to_digit s (bigD - 1) base)
           (ensures sorted s)
-  = // sorted_up_to_digit gives: for every pair i < j, either
-    //   (a) exists d0 where digit(s[i], d0) < digit(s[j], d0) with lower digits equal, or
-    //   (b) all digits equal
-    // In both cases, lemma_digits_le_implies_value_le gives s[i] <= s[j]
-    let aux (i: nat{i + 1 < length s}) : Lemma (index s i <= index s (i + 1))
-      = let x = index s i in
-        let y = index s (i + 1) in
-        // sorted_up_to_digit s (bigD-1) base gives the disjunction for pair (i, i+1)
-        assert (index s i == x);  // trigger pattern
-        assert (index s (i + 1) == y);  // trigger pattern
-        lemma_digits_le_implies_value_le x y bigD base
+  = let aux (i: nat{i + 1 < length s}) : Lemma (index s i <= index s (i + 1))
+      = reveal_opaque (`%sorted_up_to_digit) (sorted_up_to_digit s (bigD - 1) base);
+        lemma_digits_le_implies_value_le (index s i) (index s (i + 1)) bigD base
     in
     Classical.forall_intro (Classical.move_requires aux);
     lemma_pairwise_implies_sorted s
 
 (* ========== Final correctness statement ========== *)
+
+// Main theorem: d passes of stable digit sort yields sorted array
+let radix_sort_correctness
+  (s0: seq nat)
+  (steps: list (seq nat))
+  (bigD base: nat)
+  : Lemma (requires 
+            bigD > 0 /\
+            base >= 2 /\
+            (forall (i: nat). i < length s0 ==> index s0 i < pow base bigD) /\
+            List.Tot.length steps == bigD /\
+            (forall (step_num: nat). step_num < bigD ==>
+              (let s_in = (if step_num = 0 then s0 else List.Tot.index steps (step_num - 1)) in
+               let s_out = List.Tot.index steps step_num in
+               is_stable_sort_by_digit s_in s_out step_num base)))
+          (ensures 
+            (let final = List.Tot.index steps (bigD - 1) in
+             permutation s0 final /\
+             sorted final))
+          (decreases bigD)
+  = let final = List.Tot.index steps (bigD - 1) in
+    radix_invariant s0 steps bigD bigD base;
+    assert (sorted_up_to_digit final (bigD - 1) base);
+    perm_chain s0 steps bigD bigD base;
+    assert (permutation s0 final);
+    permutation_preserves_bounds_spec s0 final (pow base bigD);
+    lemma_sorted_all_digits_is_sorted final bigD base
 
 // Complete radix sort correctness: combines all the pieces
 let radix_sort_correct

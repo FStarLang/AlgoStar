@@ -180,7 +180,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | UnionFind.RankBound (Ch21) | 1 admit | ✅ Zero admits | −1 |
 | RodCutting.Spec (Ch15) | 1 assume val | ✅ Removed (dead code) | −1 |
 | Dijkstra.Correctness (Ch24) | Did not exist | ✅ New file, proves d[v]=δ(s,v) | 0 (new) |
-| RadixSort.FullSort (Ch08) | ~7 admits | 4 admits remaining | −3 |
+| RadixSort.FullSort (Ch08) | ~7 admits | ✅ Zero admits | −7 |
 | Prim.Complexity (Ch23) | 2 admits | ✅ Zero admits | −2 |
 | QueueBFS.Cmplx (Ch22) | 6 assume_ | ✅ Zero assumes, predicate-based | −6 |
 | StackDFS.Cmplx (Ch22) | 6 assume_ | ✅ Zero assumes, sum_scan_idx proof | −6 |
@@ -203,7 +203,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 08 | CountingSort | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate O(n+k) | 0 | 2-phase (not CLRS) |
 | 08 | CountingSort.Stable | §8.2 | ✅ sorted ∧ perm | ⚠️ Separate | 0 | CLRS 4-phase, StableLemmas |
 | 08 | RadixSort (d=1) | §8.3 | ✅ sorted ∧ perm | ⚠️ Separate Θ(d(n+k)) | 0 | d=1 only |
-| 08 | RadixSort.MultiDigit | §8.3 | ⚠️ partial | — | 10 | Pure F*; stability admits |
+| 08 | RadixSort.MultiDigit | §8.3 | ✅ sorted ∧ perm | — | 0 | ✅ Fully verified; lex_le_r stability |
 | 08 | BucketSort | §8.4 | ✅ sorted ∧ perm | — | 0 | ✅ Fully verified |
 | 09 | MinMax | §9.1 | ✅ correct min/max | ✅ Linked O(n) | 0 | |
 | 09 | SimultaneousMinMax | §9.1 | ✅ (min,max) | ✅ Linked 2(n-1) | 0 | |
@@ -255,12 +255,12 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | Chapter | admit | assume_val | assume | Total | Top files |
 |---------|-------|------------|--------|-------|-----------|
 | ch23 (MST) | 6 | 1 | 0 | 7 | Kruskal.Spec(0✅), Prim.Spec(6), MST.Spec(0✅), Kruskal(0+1 assume_val) |
-| ch08 (sorting) | 10 | 0 | 0 | 10 | RadixSort.FullSort(4), RS.MultiDigit(2), RS.Spec(2), RS.Stability(2) |
+| ch08 (sorting) | 0 | 0 | 0 | 0 | ✅ All RadixSort files fully verified |
 | ch22 (graphs) | 0 | 7 | 0 | 7 | DFS.Spec(5 assume_val), DFS.WhitePath(2 assume_val) |
 | ch26 (MaxFlow) | 0 | 0 | 3 | 3 | MaxFlow.Spec(2 assume), Complexity(1 assume) — axioms |
 | ch12 (BST) | 0 | 0 | 0 | 0 | ✅ Fully verified (spec gaps in Tier B) |
 | Other | 0 | 0 | 0 | 0 | ✅ All resolved |
-| **Total** | **26** | **8** | **3** | **37** | |
+| **Total** | **16** | **8** | **3** | **27** | |
 
 Note: MaxFlow `assume(...)` are mathematical axioms (weak duality, MFMC), beyond scope.
 BFS.DistanceSpec fully proven (was 2 admits). VertexCover.Spec fully proven (was 1 admit).
@@ -420,7 +420,7 @@ results and learnings, using `flock` to avoid conflicts.
 **Dependency graph:**
 ```
 Independent (start immediately):
-  AGENT1   RadixSort stability        (10 admits)
+  AGENT1   RadixSort stability        (10 admits)   ✅ DONE — all 10 eliminated
   AGENT2   DFS theorems               (7 assume vals)          ✅ DONE
   AGENT3   MaxSubarray optimality     (spec gap)              ✅ DONE
   AGENT7   BST imperative specs       (spec gap)
@@ -444,29 +444,23 @@ Dependent:
 
 ---
 
-### AGENT1: RadixSort Stability Cascade — (10 admits → 0)
+### AGENT1: RadixSort Stability Cascade — (10 admits → 0) ✅ DONE
 
 **Files:** `ch08-linear-sorting/CLRS.Ch08.RadixSort.Stability.fst` (primary),
 `.Spec.fst`, `.MultiDigit.fst`, `.FullSort.fst`
-**Current state:** 10 admits total: Stability(2), Spec(2), MultiDigit(2), FullSort(4).
-FullSort's 4 are references to Stability.
+**Final state:** All 10 admits eliminated. All 4 files verified with 0 admits.
 
-**Goal:** Eliminate all 10 admits.
+**What was done:**
+- Stability.fst: Replaced `first_occurrence`-based stability with "no inversion" existential form. Made key definitions opaque with `[@@"opaque_to_smt"]`. Separated `order_witnesses` to prevent skolemized term explosion.
+- Spec.fst: Fixed stability proofs using position-tracking approach.
+- FullSort.fst: Updated stability definition to match Stability.fst.
+- MultiDigit.fst: Replaced FALSE lemma `stable_sort_preserves_sorted_on_other_digit` (counterexample: [21,12]) with correct lexicographic invariant using recursive `lex_le_r` and `sorted_up_to_digit` definitions. The forall-based definition had Z3 quantifier trigger instability (inner forall lacked `:pattern` in SMT encoding); recursive definitions eliminate this issue completely.
 
-**Admit locations:**
-- Stability.fst line 236: `lemma_stable_sort_preserves_lower_order`
-- Stability.fst line 277: `lemma_stable_pass_preserves_ordering` (final step)
-- Spec.fst line 349: `lemma_stable_sort_preserves_order`
-- Spec.fst line 373: `radix_sort_correctness`
-- MultiDigit.fst line 394: `stable_sort_preserves_order`
-- MultiDigit.fst line 415: `stable_sort_preserves_sorted_on_other_digit`
-- FullSort.fst lines 496, 500, 521, 525: references to Stability results
-
-**Approach:** The core blocker is `lemma_stable_sort_preserves_lower_order` in Stability.fst:
-stable sort on digit d preserves MSD-lex order on digits 0..d-1 for elements with equal digit d.
-Once Stability.fst is proven, the other 8 admits dissolve.
-
-**Estimated size:** ~100–150 lines (concentrated in Stability.fst).
+**Key techniques:**
+- Recursive `lex_le_r` + consecutive-pair `sorted_up_to_digit` (no inner foralls → no trigger issues)
+- Callback-style lemmas (e.g., `sorted_up_to_digit_intro`) instead of `forall_intro_2`
+- VC splitting via helper functions (`backward_stability_with_order`, `radix_sort_invariant_step`)
+- Explicit length assertions for subtyping checks
 
 **Verification:**
 ```bash
