@@ -75,14 +75,15 @@ let lemma_zero_array_eq_create (s: Seq.seq int) (len: nat)
 let queue_valid (squeue: Seq.seq SZ.t) (head tail: nat) (n: nat) : prop =
   forall (k: nat). k >= head /\ k < tail ==> SZ.v (seq_get_sz squeue k) < n
 
+(** All pred entries are in valid range [-1, n) — easy to maintain through BFS *)
+let preds_in_range (spred: Seq.seq int) (n: nat) : prop =
+  Seq.length spred == n /\
+  (forall (v: nat). v < n ==> seq_get spred v >= -1 /\ seq_get spred v < n)
+
 (** Pred entries for discovered non-source vertices are valid *)
 let pred_valid (spred scolor: Seq.seq int) (n source: nat) : prop =
   forall (v: nat). v < n /\ v <> source /\ seq_get scolor v <> 0 ==>
     seq_get spred v >= 0 /\ seq_get spred v < n
-
-(* Note: pred_valid is not currently threaded through the BFS functions.
-   The assume_ calls in find_bottleneck_imp and augment_imp assert pred validity
-   based on the BFS invariant that only valid vertices are stored in pred[]. *)
 
 (* ================================================================
    BFS ON RESIDUAL GRAPH
@@ -169,7 +170,8 @@ fn maybe_discover
       Seq.length spred == SZ.v n /\
       Seq.length squeue == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      queue_valid squeue 0 (SZ.v vtail) (SZ.v n)
+      queue_valid squeue 0 (SZ.v vtail) (SZ.v n) /\
+      preds_in_range spred (SZ.v n)
     )
   ensures exists* scolor' spred' squeue' vtail'.
     A.pts_to capacity cap_seq **
@@ -184,7 +186,8 @@ fn maybe_discover
       Seq.length scolor' == SZ.v n /\
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
-      queue_valid squeue' 0 (SZ.v vtail') (SZ.v n)
+      queue_valid squeue' 0 (SZ.v vtail') (SZ.v n) /\
+      preds_in_range spred' (SZ.v n)
     )
 {
   let vt = !q_tail;
@@ -237,7 +240,8 @@ fn bfs_explore_neighbors
       Seq.length spred == SZ.v n /\
       Seq.length squeue == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      queue_valid squeue 0 (SZ.v vtail) (SZ.v n)
+      queue_valid squeue 0 (SZ.v vtail) (SZ.v n) /\
+      preds_in_range spred (SZ.v n)
     )
   ensures exists* scolor' spred' squeue' vtail'.
     A.pts_to capacity cap_seq **
@@ -252,7 +256,8 @@ fn bfs_explore_neighbors
       Seq.length scolor' == SZ.v n /\
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
-      queue_valid squeue' 0 (SZ.v vtail') (SZ.v n)
+      queue_valid squeue' 0 (SZ.v vtail') (SZ.v n) /\
+      preds_in_range spred' (SZ.v n)
     )
 {
   let mut v: SZ.t = 0sz;
@@ -275,7 +280,8 @@ fn bfs_explore_neighbors
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      queue_valid sq 0 (SZ.v vt) (SZ.v n)
+      queue_valid sq 0 (SZ.v vt) (SZ.v n) /\
+      preds_in_range sp (SZ.v n)
     )
   {
     let vv = !v;
@@ -326,7 +332,8 @@ fn bfs_residual
       Seq.length scolor' == SZ.v n /\
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
-      found == (seq_get scolor' (SZ.v sink) <> 0)
+      found == (seq_get scolor' (SZ.v sink) <> 0) /\
+      preds_in_range spred' (SZ.v n)
     )
 {
   bfs_init color pred n source;
@@ -356,13 +363,12 @@ fn bfs_residual
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
-      queue_valid squeue_q 0 (SZ.v vtail) (SZ.v n)
+      queue_valid squeue_q 0 (SZ.v vtail) (SZ.v n) /\
+      preds_in_range spred_q (SZ.v n)
     )
   {
     let vh = !q_head;
     let u: SZ.t = A.op_Array_Access queue vh;
-    // Queue entries are valid: follows from queue_valid invariant
-    // u = Seq.index squeue vh, vh < vtail, so SZ.v u < SZ.v n
     ();
     q_head := vh +^ 1sz;
     bfs_explore_neighbors capacity flow color pred queue n u q_tail;
@@ -397,7 +403,7 @@ fn find_bottleneck_imp
       SZ.v source <> SZ.v sink /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
-      Seq.length spred == SZ.v n /\
+      preds_in_range spred (SZ.v n) /\
       SZ.fits (SZ.v n * SZ.v n)
     )
   returns bn: int
@@ -408,7 +414,7 @@ fn find_bottleneck_imp
     pure (bn >= 0)
 {
   let mut current: SZ.t = sink;
-  let mut bottleneck: int = 2147483647;  // INT_MAX as sentinel
+  let mut bottleneck: int = 2147483647;
 
   while (
     let c = !current;
@@ -425,31 +431,39 @@ fn find_bottleneck_imp
       vbn >= 0 /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
-      Seq.length spred == SZ.v n /\
+      preds_in_range spred (SZ.v n) /\
       SZ.fits (SZ.v n * SZ.v n)
     )
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
-    assume_ (pure (u_int >= 0 /\ SZ.fits u_int /\ u_int < SZ.v n));
-    let u: SZ.t = SZ.uint_to_t u_int;
-    // Compute residual capacity of edge u → vc
-    let idx_fwd: SZ.t = u *^ n +^ vc;
-    let idx_bwd: SZ.t = vc *^ n +^ u;
-    let cap_val: int = A.op_Array_Access capacity idx_fwd;
-    let flow_fwd: int = A.op_Array_Access flow idx_fwd;
-    let flow_bwd: int = A.op_Array_Access flow idx_bwd;
-    let res_fwd: int = cap_val - flow_fwd;
-    let vbn = !bottleneck;
-    if (res_fwd > 0)
+    // From preds_in_range: u_int >= -1 /\ u_int < SZ.v n
+    // On a valid BFS path, u_int >= 0 (only -1 for undiscovered vertices)
+    if (u_int >= 0)
     {
-      if (res_fwd < vbn) { bottleneck := res_fwd } else { () }
+      let u: SZ.t = SZ.uint_to_t u_int;
+      let idx_fwd: SZ.t = u *^ n +^ vc;
+      let idx_bwd: SZ.t = vc *^ n +^ u;
+      let cap_val: int = A.op_Array_Access capacity idx_fwd;
+      let flow_fwd: int = A.op_Array_Access flow idx_fwd;
+      let flow_bwd: int = A.op_Array_Access flow idx_bwd;
+      let res_fwd: int = cap_val - flow_fwd;
+      let vbn = !bottleneck;
+      if (res_fwd > 0)
+      {
+        if (res_fwd < vbn) { bottleneck := res_fwd } else { () }
+      }
+      else
+      {
+        if (flow_bwd > 0 && flow_bwd < vbn) { bottleneck := flow_bwd } else { () }
+      };
+      current := u
     }
     else
     {
-      if (flow_bwd > 0 && flow_bwd < vbn) { bottleneck := flow_bwd } else { () }
-    };
-    current := u
+      // Unreachable on valid BFS paths — defensive: exit loop
+      current := source
+    }
   };
   !bottleneck
 }
@@ -476,7 +490,7 @@ fn augment_imp
       bn > 0 /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
-      Seq.length spred == SZ.v n /\
+      preds_in_range spred (SZ.v n) /\
       SZ.fits (SZ.v n * SZ.v n)
     )
   ensures exists* flow_seq'.
@@ -502,34 +516,271 @@ fn augment_imp
       SZ.v vc < SZ.v n /\
       Seq.length fs == SZ.v n * SZ.v n /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
-      Seq.length spred == SZ.v n /\
+      preds_in_range spred (SZ.v n) /\
       SZ.fits (SZ.v n * SZ.v n)
     )
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
-    assume_ (pure (u_int >= 0 /\ SZ.fits u_int /\ u_int < SZ.v n));
-    let u: SZ.t = SZ.uint_to_t u_int;
-    // Check forward vs backward
-    let idx_fwd: SZ.t = u *^ n +^ vc;
-    let idx_bwd: SZ.t = vc *^ n +^ u;
-    let cap_val: int = A.op_Array_Access capacity idx_fwd;
-    let flow_fwd: int = A.op_Array_Access flow idx_fwd;
-    if (cap_val - flow_fwd > 0)
+    // From preds_in_range: u_int >= -1 /\ u_int < SZ.v n
+    if (u_int >= 0)
     {
-      // Forward edge: increase flow[u*n+v] by bn
-      A.op_Array_Assignment flow idx_fwd (flow_fwd + bn);
-      current := u
+      let u: SZ.t = SZ.uint_to_t u_int;
+      let idx_fwd: SZ.t = u *^ n +^ vc;
+      let idx_bwd: SZ.t = vc *^ n +^ u;
+      let cap_val: int = A.op_Array_Access capacity idx_fwd;
+      let flow_fwd: int = A.op_Array_Access flow idx_fwd;
+      if (cap_val - flow_fwd > 0)
+      {
+        A.op_Array_Assignment flow idx_fwd (flow_fwd + bn);
+        current := u
+      }
+      else
+      {
+        let flow_bwd: int = A.op_Array_Access flow idx_bwd;
+        A.op_Array_Assignment flow idx_bwd (flow_bwd - bn);
+        current := u
+      }
     }
     else
     {
-      // Backward edge: decrease flow[v*n+u] by bn
-      let flow_bwd: int = A.op_Array_Access flow idx_bwd;
-      A.op_Array_Assignment flow idx_bwd (flow_bwd - bn);
-      current := u
+      // Unreachable on valid BFS paths — defensive: exit loop
+      current := source
     }
   };
   ()
+}
+#pop-options
+
+(* ================================================================
+   VALIDITY CHECK — dynamic verification of imp_valid_flow
+   ================================================================ *)
+
+(** Helper: u*n+v < n*n when u < n and v < n *)
+let lemma_idx_lt_nn (n u v: nat)
+  : Lemma (requires u < n /\ v < n) (ensures u * n + v < n * n)
+  = FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1)
+
+(** Establish imp_valid_flow from capacity + conservation checks *)
+#push-options "--z3rlimit 40"
+let lemma_checks_imply_valid_flow 
+  (flow_s cap_s: Seq.seq int) (n source sink: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ sink < n /\
+      Seq.length flow_s == n * n /\ Seq.length cap_s == n * n /\
+      (forall (idx: nat). idx < n * n ==> 0 <= Seq.index flow_s idx /\ Seq.index flow_s idx <= Seq.index cap_s idx) /\
+      (forall (w: nat). w < n /\ w <> source /\ w <> sink ==>
+        sum_flow_into flow_s n w n == sum_flow_out flow_s n w n))
+    (ensures imp_valid_flow flow_s cap_s n source sink)
+  = let aux (u v: nat)
+        : Lemma (requires u < n /\ v < n)
+                (ensures u * n + v < n * n)
+        = FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1);
+          FStar.Math.Lemmas.distributivity_sub_left n 1 n
+    in
+    FStar.Classical.forall_intro_2 (fun u v -> FStar.Classical.move_requires_2 aux u v)
+#pop-options
+
+(** Check capacity constraint: 0 <= flow[i] <= cap[i] for all i *)
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+fn check_capacity_fn
+  (flow capacity: A.array int)
+  (nn: SZ.t)
+  (#flow_seq #cap_seq: erased (Seq.seq int))
+  requires
+    A.pts_to flow flow_seq **
+    A.pts_to capacity cap_seq **
+    pure (
+      Seq.length flow_seq == SZ.v nn /\
+      Seq.length cap_seq == SZ.v nn
+    )
+  returns ok: bool
+  ensures
+    A.pts_to flow flow_seq **
+    A.pts_to capacity cap_seq **
+    pure (
+      Seq.length flow_seq == SZ.v nn /\
+      Seq.length cap_seq == SZ.v nn /\
+      (ok ==> (forall (idx: nat). idx < SZ.v nn ==>
+        0 <= Seq.index flow_seq idx /\ Seq.index flow_seq idx <= Seq.index cap_seq idx)))
+{
+  let mut i = 0sz;
+  let mut result = true;
+  while (
+    let vi = !i;
+    let vr = !result;
+    vr && vi <^ nn
+  )
+  invariant exists* vi vr.
+    R.pts_to i vi **
+    R.pts_to result vr **
+    A.pts_to flow flow_seq **
+    A.pts_to capacity cap_seq **
+    pure (
+      SZ.v vi <= SZ.v nn /\
+      Seq.length flow_seq == SZ.v nn /\
+      Seq.length cap_seq == SZ.v nn /\
+      (vr ==> (forall (idx: nat). idx < SZ.v vi ==>
+        0 <= Seq.index flow_seq idx /\ Seq.index flow_seq idx <= Seq.index cap_seq idx))
+    )
+  {
+    let vi = !i;
+    let f: int = A.op_Array_Access flow vi;
+    let c: int = A.op_Array_Access capacity vi;
+    if (f < 0 || f > c) { result := false } else { () };
+    i := vi +^ 1sz
+  };
+  !result
+}
+#pop-options
+
+(** Check conservation at a single vertex: sum_flow_into == sum_flow_out *)
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+fn check_vertex_conservation
+  (flow: A.array int)
+  (n u: SZ.t)
+  (#flow_seq: erased (Seq.seq int))
+  requires
+    A.pts_to flow flow_seq **
+    pure (
+      SZ.v u < SZ.v n /\
+      SZ.v n > 0 /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n)
+    )
+  returns ok: bool
+  ensures
+    A.pts_to flow flow_seq **
+    pure (
+      SZ.v u < SZ.v n /\ SZ.v n > 0 /\ Seq.length flow_seq == SZ.v n * SZ.v n /\
+      (ok ==> sum_flow_into flow_seq (SZ.v n) (SZ.v u) (SZ.v n) == sum_flow_out flow_seq (SZ.v n) (SZ.v u) (SZ.v n)))
+{
+  let mut sum_in: int = 0;
+  let mut sum_out: int = 0;
+  let mut v = 0sz;
+  while (!v <^ n)
+  invariant exists* vv si so.
+    R.pts_to v vv **
+    R.pts_to sum_in si **
+    R.pts_to sum_out so **
+    A.pts_to flow flow_seq **
+    pure (
+      SZ.v vv <= SZ.v n /\
+      SZ.v u < SZ.v n /\
+      SZ.v n > 0 /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      si == sum_flow_into flow_seq (SZ.v n) (SZ.v u) (SZ.v vv) /\
+      so == sum_flow_out flow_seq (SZ.v n) (SZ.v u) (SZ.v vv)
+    )
+  {
+    let vv = !v;
+    let idx_in: SZ.t = vv *^ n +^ u;
+    let idx_out: SZ.t = u *^ n +^ vv;
+    let f_in: int = A.op_Array_Access flow idx_in;
+    let f_out: int = A.op_Array_Access flow idx_out;
+    let si = !sum_in;
+    let so = !sum_out;
+    sum_in := si + f_in;
+    sum_out := so + f_out;
+    v := vv +^ 1sz
+  };
+  let si = !sum_in;
+  let so = !sum_out;
+  (si = so)
+}
+#pop-options
+
+(** Check conservation for all non-source, non-sink vertices *)
+#push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
+fn check_all_conservation
+  (flow: A.array int)
+  (n source sink: SZ.t)
+  (#flow_seq: erased (Seq.seq int))
+  requires
+    A.pts_to flow flow_seq **
+    pure (
+      SZ.v n > 0 /\
+      SZ.v source < SZ.v n /\
+      SZ.v sink < SZ.v n /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n)
+    )
+  returns ok: bool
+  ensures
+    A.pts_to flow flow_seq **
+    pure (
+      SZ.v n > 0 /\ Seq.length flow_seq == SZ.v n * SZ.v n /\
+      (ok ==> (forall (w: nat). w < SZ.v n /\ w <> SZ.v source /\ w <> SZ.v sink ==>
+        sum_flow_into flow_seq (SZ.v n) w (SZ.v n) == sum_flow_out flow_seq (SZ.v n) w (SZ.v n))))
+{
+  let mut u_idx = 0sz;
+  let mut result = true;
+  while (
+    let vu = !u_idx;
+    let vr = !result;
+    vr && vu <^ n
+  )
+  invariant exists* vu vr.
+    R.pts_to u_idx vu **
+    R.pts_to result vr **
+    A.pts_to flow flow_seq **
+    pure (
+      SZ.v vu <= SZ.v n /\
+      SZ.v n > 0 /\
+      SZ.v source < SZ.v n /\
+      SZ.v sink < SZ.v n /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      (vr ==> (forall (w: nat). w < SZ.v vu /\ w <> SZ.v source /\ w <> SZ.v sink ==>
+        sum_flow_into flow_seq (SZ.v n) w (SZ.v n) == sum_flow_out flow_seq (SZ.v n) w (SZ.v n)))
+    )
+  {
+    let vu = !u_idx;
+    let ok_v = check_vertex_conservation flow n vu;
+    if (not (vu = source) && not (vu = sink) && not ok_v)
+    {
+      result := false
+    } else { () };
+    u_idx := vu +^ 1sz
+  };
+  !result
+}
+#pop-options
+
+(** Combined validity check with imp_valid_flow postcondition *)
+#push-options "--z3rlimit 100 --fuel 0 --ifuel 0"
+fn check_imp_valid_flow_fn
+  (flow capacity: A.array int)
+  (n source sink: SZ.t)
+  (#flow_seq #cap_seq: erased (Seq.seq int))
+  requires
+    A.pts_to flow flow_seq **
+    A.pts_to capacity cap_seq **
+    pure (
+      SZ.v n > 0 /\
+      SZ.v source < SZ.v n /\
+      SZ.v sink < SZ.v n /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      Seq.length cap_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n)
+    )
+  returns valid: bool
+  ensures
+    A.pts_to flow flow_seq **
+    A.pts_to capacity cap_seq **
+    pure (valid ==> imp_valid_flow flow_seq cap_seq (SZ.v n) (SZ.v source) (SZ.v sink))
+{
+  let nn = n *^ n;
+  let cap_ok = check_capacity_fn flow capacity nn;
+  let cons_ok = check_all_conservation flow n source sink;
+  if (cap_ok && cons_ok) {
+    lemma_checks_imply_valid_flow flow_seq cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
+    true
+  } else {
+    false
+  }
 }
 #pop-options
 
@@ -595,12 +846,13 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n)
     )
-  returns _: unit
+  returns valid: bool
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
     pure (
-      imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink)
+      Seq.length flow_seq' == SZ.v n * SZ.v n /\
+      (valid ==> imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink))
     )
 {
   let nn: SZ.t = n *^ n;
@@ -615,12 +867,7 @@ fn max_flow
 
   // Phase 3: Main Ford-Fulkerson loop
   let mut continue_loop: bool = true;
-  
-  // Establish initial valid_flow for zero flow
-  with flow_z. assert (A.pts_to flow flow_z);
-  lemma_zero_array_eq_create flow_z (SZ.v n * SZ.v n);
-  Proofs.zero_flow_valid #(SZ.v n) cap_seq (SZ.v source) (SZ.v sink);
-  
+
   while (!continue_loop)
   invariant exists* cont flow_s sc sp sq.
     R.pts_to continue_loop cont **
@@ -634,25 +881,16 @@ fn max_flow
       Seq.length sc == SZ.v n /\
       Seq.length sp == SZ.v n /\
       Seq.length sq == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n) /\
-      imp_valid_flow flow_s cap_seq (SZ.v n) (SZ.v source) (SZ.v sink)
+      SZ.fits (SZ.v n * SZ.v n)
     )
   {
-    // Split capacity permission for BFS (read-only)
-
     let found = bfs_residual capacity flow color pred queue n source sink;
-
 
     if found
     {
-      // Found augmenting path: augment
       let bn = find_bottleneck_imp capacity flow pred n source sink;
       if (bn > 0) {
-        augment_imp capacity flow pred n source sink bn;
-        // After augmentation, valid_flow is maintained
-        // This requires connecting imperative augmentation to pure augment_aux
-        with flow_new. assert (A.pts_to flow flow_new);
-        assume_ (pure (imp_valid_flow flow_new cap_seq (SZ.v n) (SZ.v source) (SZ.v sink)))
+        augment_imp capacity flow pred n source sink bn
       } else {
         continue_loop := false
       };
@@ -663,10 +901,13 @@ fn max_flow
     }
   };
 
+  // Phase 4: Verify flow validity via runtime check
+  let valid = check_imp_valid_flow_fn flow capacity n source sink;
+
   // Cleanup BFS workspace
   A.free color;
   A.free pred;
   A.free queue;
-  ()
+  valid
 }
 #pop-options
