@@ -340,6 +340,202 @@ let rec net_flow_aux (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
 let net_flow_across_cut (#n: nat) (flow: flow_matrix n) (s_set: nat -> bool) : int =
   net_flow_aux flow n s_set n
 
+(** ========== CLRS Lemma 26.4: flow_value = net_flow_across_cut ========== *)
+
+(** S-filtered inner sum: Σ_{v<w, v∈S} (f(u,v) - f(v,u)) *)
+let rec ss_inner (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                 (s_set: nat -> bool) (u: nat{u < n}) (w: nat)
+  : Tot int (decreases w)
+  = if w = 0 then 0
+    else if w - 1 < n then
+      (if s_set (w - 1) then get flow n u (w - 1) - get flow n (w - 1) u else 0)
+      + ss_inner flow n s_set u (w - 1)
+    else ss_inner flow n s_set u (w - 1)
+
+(** Splitting: sum_out - sum_in = net_flow_inner + ss_inner *)
+let rec lemma_splitting_inner
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (s_set: nat -> bool) (u: nat{u < n}) (w: nat)
+  : Lemma
+    (ensures sum_flow_out flow n u w - sum_flow_into flow n u w ==
+             net_flow_inner flow n s_set u w + ss_inner flow n s_set u w)
+    (decreases w)
+  = if w = 0 then ()
+    else if w - 1 < n then lemma_splitting_inner flow n s_set u (w - 1)
+    else lemma_splitting_inner flow n s_set u (w - 1)
+
+(** Sum of (out - in) over S vertices *)
+let rec sum_excess_S (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                     (s_set: nat -> bool) (k: nat)
+  : Tot int (decreases k)
+  = if k = 0 then 0
+    else if k - 1 < n && s_set (k - 1) then
+      (sum_flow_out flow n (k - 1) n - sum_flow_into flow n (k - 1) n)
+      + sum_excess_S flow n s_set (k - 1)
+    else sum_excess_S flow n s_set (k - 1)
+
+(** Sum of ss_inner over S vertices *)
+let rec ss_outer (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                 (s_set: nat -> bool) (k: nat)
+  : Tot int (decreases k)
+  = if k = 0 then 0
+    else if k - 1 < n && s_set (k - 1) then
+      ss_inner flow n s_set (k - 1) n + ss_outer flow n s_set (k - 1)
+    else ss_outer flow n s_set (k - 1)
+
+(** Aggregation: sum_excess_S = net_flow_aux + ss_outer *)
+let rec lemma_aggregation
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (s_set: nat -> bool) (k: nat)
+  : Lemma
+    (ensures sum_excess_S flow n s_set k ==
+             net_flow_aux flow n s_set k + ss_outer flow n s_set k)
+    (decreases k)
+  = if k = 0 then ()
+    else if k - 1 < n && s_set (k - 1) then begin
+      lemma_aggregation flow n s_set (k - 1);
+      lemma_splitting_inner flow n s_set (k - 1) n
+    end else
+      lemma_aggregation flow n s_set (k - 1)
+
+(** Conservation collapse: sum_excess_S(n) = flow_value *)
+#push-options "--z3rlimit 30"
+let rec lemma_conservation_collapse
+  (flow cap: Seq.seq int) (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (source: nat{source < n}) (sink: nat{sink < n}) (s_set: nat -> bool) (k: nat)
+  : Lemma
+    (requires valid_flow #n flow cap source sink /\ is_st_cut s_set n source sink)
+    (ensures sum_excess_S flow n s_set k ==
+             (if source < k then sum_flow_out flow n source n - sum_flow_into flow n source n else 0))
+    (decreases k)
+  = if k = 0 then ()
+    else begin
+      lemma_conservation_collapse flow cap n source sink s_set (k - 1);
+      if k - 1 < n && s_set (k - 1) && k - 1 <> source then
+        assert (k - 1 <> sink)
+    end
+#pop-options
+
+(** ---- S×S cancellation ---- *)
+
+(** Count elements in S below k *)
+let rec count_S (s_set: nat -> bool) (k: nat) : Tot nat (decreases k)
+  = if k = 0 then 0
+    else (if s_set (k - 1) then 1 else 0) + count_S s_set (k - 1)
+
+(** Finding an element in S *)
+let rec find_S (s_set: nat -> bool) (k: nat{count_S s_set k > 0})
+  : Tot (a:nat{a < k /\ s_set a}) (decreases k)
+  = if s_set (k - 1) then k - 1
+    else find_S s_set (k - 1)
+
+(** count_S is positive when an element exists *)
+let rec lemma_count_S_pos (s_set: nat -> bool) (a: nat) (k: nat)
+  : Lemma (requires a < k /\ s_set a)
+          (ensures count_S s_set k > 0)
+          (decreases k)
+  = if k - 1 = a then () else lemma_count_S_pos s_set a (k - 1)
+
+(** Removing element decreases count *)
+let rec lemma_count_S_remove (s_set: nat -> bool) (a: nat{s_set a}) (k: nat)
+  : Lemma (ensures count_S (fun v -> s_set v && v <> a) k ==
+                   count_S s_set k - (if a < k then 1 else 0))
+          (decreases k)
+  = if k = 0 then ()
+    else lemma_count_S_remove s_set a (k - 1)
+
+(** Extract element a from ss_inner: ss_inner(u,w,S) = ss_inner(u,w,S\{a}) + contribution of a *)
+let rec lemma_extract_from_ss_inner
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (s_set: nat -> bool) (a: nat{a < n /\ s_set a}) (u: nat{u < n}) (w: nat)
+  : Lemma
+    (ensures ss_inner flow n s_set u w ==
+             ss_inner flow n (fun v -> s_set v && v <> a) u w +
+             (if a < w then get flow n u a - get flow n a u else 0))
+    (decreases w)
+  = if w = 0 then ()
+    else if w - 1 < n then
+      lemma_extract_from_ss_inner flow n s_set a u (w - 1)
+    else
+      lemma_extract_from_ss_inner flow n s_set a u (w - 1)
+
+(** Column-sum of differences: Σ_{u<k, u∈S'} (f(u,a) - f(a,u)) *)
+let rec col_diff (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                 (s_set: nat -> bool) (a: nat{a < n}) (k: nat)
+  : Tot int (decreases k)
+  = if k = 0 then 0
+    else if k - 1 < n && s_set (k - 1) then
+      (get flow n (k - 1) a - get flow n a (k - 1)) + col_diff flow n s_set a (k - 1)
+    else col_diff flow n s_set a (k - 1)
+
+(** ss_inner(a, w, S') = -(col_diff S' a w) — antisymmetric cancellation *)
+let rec lemma_ss_inner_neg_col_diff
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (s_set: nat -> bool) (a: nat{a < n}) (w: nat)
+  : Lemma (ensures ss_inner flow n s_set a w == -(col_diff flow n s_set a w))
+          (decreases w)
+  = if w = 0 then ()
+    else if w - 1 < n then lemma_ss_inner_neg_col_diff flow n s_set a (w - 1)
+    else lemma_ss_inner_neg_col_diff flow n s_set a (w - 1)
+
+(** Decomposition: ss_outer(n,S) = ss_outer(n,S') + ss_inner(a,n,S') + col_diff(S',a,n) *)
+#push-options "--z3rlimit 40"
+let rec lemma_ss_outer_decompose
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (s_set: nat -> bool) (a: nat{a < n /\ s_set a}) (k: nat)
+  : Lemma
+    (ensures (let s' = (fun v -> s_set v && v <> a) in
+              ss_outer flow n s_set k ==
+              ss_outer flow n s' k +
+              (if a < k then ss_inner flow n s' a n else 0) +
+              col_diff flow n s' a k))
+    (decreases k)
+  = let s' = (fun v -> s_set v && v <> a) in
+    if k = 0 then ()
+    else begin
+      lemma_ss_outer_decompose flow n s_set a (k - 1);
+      if k - 1 < n && s_set (k - 1) then begin
+        lemma_extract_from_ss_inner flow n s_set a (k - 1) n;
+        if k - 1 = a then
+          // u = a: ss_inner(a,n,S) = ss_inner(a,n,S') + (f(a,a)-f(a,a)) = ss_inner(a,n,S')
+          ()
+        else
+          // u ≠ a, u ∈ S: ss_inner(u,n,S) = ss_inner(u,n,S') + (f(u,a)-f(a,u))
+          ()
+      end
+    end
+#pop-options
+
+(** Main cancellation: ss_outer(n) = 0 by induction on |S| *)
+#push-options "--z3rlimit 40"
+let rec lemma_ss_outer_zero
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (s_set: nat -> bool)
+  : Lemma (ensures ss_outer flow n s_set n == 0)
+          (decreases (count_S s_set n))
+  = if count_S s_set n = 0 then begin
+      // S is empty: no terms in outer sum
+      let rec aux (j: nat) : Lemma (ensures ss_outer flow n s_set j == 0) (decreases j)
+        = if j = 0 then ()
+          else begin
+            aux (j - 1);
+            if j - 1 < n && s_set (j - 1) then
+              lemma_count_S_pos s_set (j - 1) n
+          end
+      in aux n
+    end else begin
+      let a = find_S s_set n in
+      let s' = (fun v -> s_set v && v <> a) in
+      lemma_count_S_remove s_set a n;
+      // IH: ss_outer(n, S') = 0
+      lemma_ss_outer_zero flow n s';
+      // Decompose: ss_outer(n,S) = ss_outer(n,S') + ss_inner(a,n,S') + col_diff(S',a,n)
+      lemma_ss_outer_decompose flow n s_set a n;
+      // ss_inner(a,n,S') = -col_diff(S',a,n)
+      lemma_ss_inner_neg_col_diff flow n s' a n
+    end
+#pop-options
+
 (** Helper: each term f(u,v)-f(v,u) ≤ c(u,v) by capacity constraints *)
 let rec lemma_net_flow_inner_le_cut_inner
   (flow cap: Seq.seq int)
@@ -383,17 +579,19 @@ let lemma_net_flow_le_cut_capacity
     (ensures net_flow_across_cut flow s_set <= cut_capacity cap s_set)
   = lemma_net_flow_aux_le_cut_aux flow cap n s_set n
 
-(** CLRS Lemma 26.4: |f| = net flow across any cut.
-    Proof: By conservation, Σ_{u∈S} (out(u) - in(u)) = flow_value. Splitting
-    into S and T parts gives flow_value = net_flow + Σ_{u,v∈S} (f(u,v) - f(v,u)).
-    The S×S double sum is 0 by antisymmetry (Fubini + negation). *)
+(** CLRS Lemma 26.4: |f| = net flow across any cut *)
 let lemma_flow_value_eq_net_flow
   (#n: nat) (flow: flow_matrix n) (cap: capacity_matrix n)
   (source: nat{source < n}) (sink: nat{sink < n}) (s_set: nat -> bool)
   : Lemma
     (requires valid_flow flow cap source sink /\ is_st_cut s_set n source sink)
     (ensures flow_value flow n source == net_flow_across_cut flow s_set)
-  = admit () // Requires sum-splitting + S×S cancellation infrastructure (~150 lines)
+  = // flow_value = sum_excess_S(n) by conservation
+    lemma_conservation_collapse flow cap n source sink s_set n;
+    // sum_excess_S(n) = net_flow_aux(n) + ss_outer(n) by aggregation
+    lemma_aggregation flow n s_set n;
+    // ss_outer(n) = 0 by S×S cancellation
+    lemma_ss_outer_zero flow n s_set
 
 (** Weak duality: |f| ≤ c(S,T) for any valid flow and s-t cut (CLRS Corollary 26.5) *)
 let weak_duality (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
