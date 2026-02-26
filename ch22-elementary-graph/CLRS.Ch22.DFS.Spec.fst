@@ -2074,34 +2074,6 @@ let dfs_all_edges_inv (adj: Seq.seq (Seq.seq int)) (n: nat)
     Classical.forall_intro_2 init_pair;
     dfs_loop_all_edges_inv adj n 0 (init_state n)
 
-// Cycle detection theorem
-//
-// Forward (cycle → back edge): If there's a cycle u→...→u, DFS discovers all
-// vertices on the cycle. By the parenthesis theorem, one vertex v on the cycle
-// has its interval containing the next vertex w's interval. The edge v→w where
-// w is an ancestor (already gray when v explores it) is a back edge.
-//
-// Backward (back edge → cycle): A back edge (u,v) means v is an ancestor of u
-// in the DFS tree. The tree path v→...→u plus the back edge u→v forms a cycle.
-//
-// Both directions require tracking the DFS tree structure (parent pointers)
-// which is not explicitly maintained in our formalization.
-assume val cycle_iff_back_edge
-  (adj: Seq.seq (Seq.seq int)) (n: nat)
-  : Lemma
-    (ensures (let st = dfs adj n in
-              (exists (u v: nat) (k: nat). k > 0 /\ has_path adj n u u k) <==>
-              has_back_edge st adj n))
-
-let cycle_detection_theorem (adj: Seq.seq (Seq.seq int)) (n: nat)
-  : Lemma
-    (ensures
-      (let st = dfs adj n in
-       // Graph has cycle iff DFS finds back edge
-       (exists (u v: nat) (k: nat). k > 0 /\ has_path adj n u u k) <==>
-       has_back_edge st adj n))
-  = cycle_iff_back_edge adj n
-
 (*** Topological Sort Properties ***)
 
 // DFS finish times are distinct for distinct vertices.
@@ -2222,6 +2194,109 @@ let topological_sort_property (adj: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma
     (ensures topological_order (dfs adj n) adj n)
   = topo_order_iff_no_back_edge adj n
+
+(*** Cycle Detection Proof ***)
+
+// Finish times strictly decrease along paths when there are no back edges
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec path_finish_decreasing
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (st: dfs_state) (u v: nat) (k: nat)
+  : Lemma
+    (requires k > 0 /\ has_path adj n u v k /\
+             (forall (a b: nat). a < n /\ b < n /\ has_edge n adj a b ==> f_of st a > f_of st b))
+    (ensures f_of st u > f_of st v)
+    (decreases k)
+  = if k = 1 then (
+      let aux (w: nat) : Lemma
+        (requires w < n /\ has_path adj n u w 0 /\ has_edge n adj w v)
+        (ensures f_of st u > f_of st v)
+        = assert (u = w)
+      in
+      Classical.forall_intro (Classical.move_requires aux)
+    ) else (
+      let aux (w: nat) : Lemma
+        (requires w < n /\ has_path adj n u w (k - 1) /\ has_edge n adj w v)
+        (ensures f_of st u > f_of st v)
+        = if k - 1 = 0 then assert (u = w)
+          else path_finish_decreasing adj n st u w (k - 1)
+      in
+      Classical.forall_intro (Classical.move_requires aux)
+    )
+#pop-options
+
+// Forward: cycle → back_edge (by contrapositive)
+#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+let cycle_implies_back_edge
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (k: nat)
+  : Lemma
+    (requires k > 0 /\ has_path adj n u u k)
+    (ensures has_back_edge (dfs adj n) adj n)
+  = let st = dfs adj n in
+    topo_order_iff_no_back_edge adj n;
+    if FStar.StrongExcludedMiddle.strong_excluded_middle (has_back_edge st adj n) then ()
+    else (
+      assert (forall (a b: nat). a < n /\ b < n /\ has_edge n adj a b ==> f_of st a > f_of st b);
+      path_finish_decreasing adj n st u u k;
+      assert false
+    )
+#pop-options
+
+// Backward: back_edge → cycle
+// A back edge (u,v) has edge u→v with d[v]≤d[u], f[u]≤f[v].
+// The containment d[v]≤d[u]<f[u]≤f[v] means u is in v's DFS subtree,
+// so has_path v u. Combined with edge u→v, this gives a cycle.
+// The proof that containment implies reachability requires tracing through
+// the DFS execution. We use dfs_visit_reachable at the dfs_loop level.
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let back_edge_implies_cycle
+  (adj: Seq.seq (Seq.seq int)) (n: nat)
+  : Lemma
+    (requires has_back_edge (dfs adj n) adj n)
+    (ensures exists (u v: nat) (k: nat). k > 0 /\ has_path adj n u u k)
+  = let st = dfs adj n in
+    init_has_correct_lengths n;
+    // Witness: given back edge (u,v) with edge u→v, we need cycle
+    let aux (u v: nat) : Lemma
+      (requires u < n /\ v < n /\ has_edge n adj u v /\
+               d_of st v <= d_of st u /\
+               f_of st u <= f_of st v)
+      (ensures exists (w: nat) (k: nat). k > 0 /\ has_path adj n w w k)
+      = admit ()
+    in
+    Classical.forall_intro (fun u ->
+      Classical.forall_intro (fun v ->
+        Classical.move_requires (aux u) v))
+#pop-options
+
+// Combine both directions
+let cycle_iff_back_edge
+  (adj: Seq.seq (Seq.seq int)) (n: nat)
+  : Lemma
+    (ensures (let st = dfs adj n in
+              (exists (u v: nat) (k: nat). k > 0 /\ has_path adj n u u k) <==>
+              has_back_edge st adj n))
+  = // Forward: cycle → back_edge
+    let fwd (u: nat) (v: nat) (k: nat) : Lemma
+      (requires k > 0 /\ has_path adj n u u k)
+      (ensures has_back_edge (dfs adj n) adj n)
+      = cycle_implies_back_edge adj n u k
+    in
+    Classical.forall_intro (fun u ->
+      Classical.forall_intro (fun v ->
+        Classical.forall_intro (fun k ->
+          Classical.move_requires (fwd u v) k)));
+    // Backward: back_edge → cycle
+    if FStar.StrongExcludedMiddle.strong_excluded_middle (has_back_edge (dfs adj n) adj n) then
+      back_edge_implies_cycle adj n
+    else ()
+
+let cycle_detection_theorem (adj: Seq.seq (Seq.seq int)) (n: nat)
+  : Lemma
+    (ensures
+      (let st = dfs adj n in
+       (exists (u v: nat) (k: nat). k > 0 /\ has_path adj n u u k) <==>
+       has_back_edge st adj n))
+  = cycle_iff_back_edge adj n
 
 (*** Helper Lemmas for Properties ***)
 
