@@ -7,44 +7,23 @@
    
    Proves:
    - Algorithm structure follows CLRS exactly
-   - Complexity: O(n lg n) via T(n) = 2T(n/2) + Θ(n) recurrence
+   - Complexity: O(n lg n) via T(n) = 2T(n/2) + Theta(n) recurrence
    - Correctness for base cases and recursive structure
+   - Equivalence with Kadane's algorithm (proved)
    
-   This is a pure F* implementation (not Pulse).
+   This is a pure implementation (not Pulse).
 *)
 
 module CLRS.Ch04.MaxSubarray.DivideConquer
 open FStar.Seq
 open FStar.Math.Lemmas
+open CLRS.Ch04.MaxSubarray.Spec
 module Seq = FStar.Seq
+module Spec = CLRS.Ch04.MaxSubarray.Spec
 
-// ========== Common Definitions ==========
+// ========== Local Definitions ==========
 
-let max_int (a b: int) : Tot int = if a >= b then a else b
 let min_int (a b: int) : Tot int = if a <= b then a else b
-
-// ========== Helper: Sum of Range ==========
-
-//SNIPPET_START: sum_range
-// Sum of elements in range [i, j)
-let rec sum_range (s: Seq.seq int) (i j: nat) : Pure int
-  (requires i <= j /\ j <= Seq.length s)
-  (ensures fun _ -> True)
-  (decreases j - i)
-  =
-  if i >= j then 0
-  else Seq.index s i + sum_range s (i + 1) j
-//SNIPPET_END: sum_range
-
-// Lemma: sum_range is compositional
-let rec lemma_sum_range_append (s: Seq.seq int) (i j k: nat)
-  : Lemma
-    (requires i <= j /\ j <= k /\ k <= Seq.length s)
-    (ensures sum_range s i k == sum_range s i j + sum_range s j k)
-    (decreases j - i)
-  =
-  if i >= j then ()
-  else lemma_sum_range_append s (i + 1) j k
 
 // ========== Find Maximum Crossing Subarray ==========
 
@@ -309,104 +288,7 @@ let rec lemma_dc_sum_correct (s: Seq.seq int) (low high: nat)
 
 // ========== Equivalence with Kadane (Proved) ==========
 
-// Kadane's algorithm specification (from MaxSubarray.fst)
-let rec kadane_spec (s: Seq.seq int) (i: nat) 
-  (current_sum: int) (best_sum: int) : Pure int
-  (requires i <= Seq.length s)
-  (ensures fun _ -> True)
-  (decreases (if i <= Seq.length s then Seq.length s - i else 0))
-  =
-  let initial_min = -1000000000 in
-  let max_int' a b = if a >= b then a else b in
-  if i >= Seq.length s then best_sum
-  else (
-    let elem = Seq.index s i in
-    let new_current = max_int' elem (current_sum + elem) in
-    let new_best = max_int' best_sum new_current in
-    kadane_spec s (i + 1) new_current new_best
-  )
-
-let max_subarray_spec_kadane (s: Seq.seq int) : Tot int =
-  let initial_min = -1000000000 in
-  if Seq.length s = 0 then 0
-  else kadane_spec s 0 0 initial_min
-
-// ========== True Maximum Subarray Definitions ==========
-
-let kadane_initial_min : int = -1000000000
-
-// Kadane uses initial_min as a sentinel; equivalence requires elements >= it
-let elements_bounded (s: Seq.seq int) : prop =
-  forall (k:nat). k < Seq.length s ==> Seq.index s k >= kadane_initial_min
-
-// Max non-empty subarray sum ending at position i
-let rec max_suffix_sum (s: Seq.seq int) (i: nat) : Pure int
-  (requires i < Seq.length s) (ensures fun _ -> True) (decreases i) =
-  if i = 0 then Seq.index s 0
-  else max_int (Seq.index s i) (max_suffix_sum s (i - 1) + Seq.index s i)
-
-// Global max non-empty subarray sum in s[0..i+1)
-let rec max_sub_sum (s: Seq.seq int) (i: nat) : Pure int
-  (requires i < Seq.length s) (ensures fun _ -> True) (decreases i) =
-  if i = 0 then Seq.index s 0
-  else max_int (max_sub_sum s (i - 1)) (max_suffix_sum s i)
-
-// ========== max_suffix_sum properties ==========
-
-// max_suffix_sum i >= sum_range s j (i+1) for any j
-let rec lemma_max_suffix_ge (s: Seq.seq int) (i j: nat)
-  : Lemma (requires i < Seq.length s /\ j <= i)
-          (ensures max_suffix_sum s i >= sum_range s j (i + 1))
-          (decreases i) =
-  if j = i then ()
-  else (
-    lemma_sum_range_append s j i (i + 1);
-    lemma_max_suffix_ge s (i - 1) j
-  )
-
-// Witness: max_suffix_sum equals some sum_range
-let rec max_suffix_witness (s: Seq.seq int) (i: nat) : Pure nat
-  (requires i < Seq.length s)
-  (ensures fun j -> j <= i /\ max_suffix_sum s i == sum_range s j (i + 1))
-  (decreases i) =
-  if i = 0 then 0
-  else
-    let pj = max_suffix_witness s (i - 1) in
-    if Seq.index s i >= max_suffix_sum s (i - 1) + Seq.index s i then i
-    else (lemma_sum_range_append s pj i (i + 1); pj)
-
-// ========== max_sub_sum properties ==========
-
-// max_sub_sum i >= any subarray sum in [0, i+1)
-let rec lemma_max_sub_ge (s: Seq.seq int) (i j k: nat)
-  : Lemma (requires i < Seq.length s /\ j < k /\ k <= i + 1)
-          (ensures max_sub_sum s i >= sum_range s j k)
-          (decreases i) =
-  if k - 1 = i then lemma_max_suffix_ge s i j
-  else lemma_max_sub_ge s (i - 1) j k
-
-// Witness: max_sub_sum equals some sum_range
-let rec max_sub_witness (s: Seq.seq int) (i: nat) : Pure (nat * nat)
-  (requires i < Seq.length s)
-  (ensures fun (j, k) -> j < k /\ k <= i + 1 /\ max_sub_sum s i == sum_range s j k)
-  (decreases i) =
-  if i = 0 then (0, 1)
-  else
-    let (pj, pk) = max_sub_witness s (i - 1) in
-    if max_sub_sum s (i - 1) >= max_suffix_sum s i then (pj, pk)
-    else let sj = max_suffix_witness s i in (sj, i + 1)
-
-// ========== Kadane correctness ==========
-
-let rec lemma_kadane_correct (s: Seq.seq int) (i: nat) (cur best: int)
-  : Lemma
-    (requires i <= Seq.length s /\ Seq.length s > 0 /\ elements_bounded s /\
-              (i = 0 ==> cur == 0 /\ best == kadane_initial_min) /\
-              (i > 0 ==> cur == max_suffix_sum s (i - 1) /\ best == max_sub_sum s (i - 1)))
-    (ensures kadane_spec s i cur best == max_sub_sum s (Seq.length s - 1))
-    (decreases Seq.length s - i) =
-  if i >= Seq.length s then ()
-  else lemma_kadane_correct s (i + 1) (max_suffix_sum s i) (max_sub_sum s i)
+// Use shared spec definitions from CLRS.Ch04.MaxSubarray.Spec
 
 // ========== D&C crossing optimality ==========
 
@@ -477,10 +359,10 @@ let rec lemma_dc_optimal (s: Seq.seq int) (low high qi qj: nat)
 // does not interfere with the result.
 let dc_kadane_equivalence (s: Seq.seq int)
   : Lemma (requires Seq.length s > 0 /\ elements_bounded s)
-          (ensures find_maximum_subarray_sum s == max_subarray_spec_kadane s) =
+          (ensures find_maximum_subarray_sum s == max_subarray_spec s) =
   let n = Seq.length s in
   // Kadane = max_sub_sum
-  lemma_kadane_correct s 0 0 kadane_initial_min;
+  lemma_kadane_correct s 0 0 initial_min;
   // DC returns a valid subarray sum
   lemma_dc_sum_correct s 0 n;
   lemma_dc_nonempty s 0 n;
@@ -495,7 +377,7 @@ let dc_kadane_equivalence (s: Seq.seq int)
 let lemma_dc_equals_kadane (s: Seq.seq int)
   : Lemma
     (requires Seq.length s > 0 /\ elements_bounded s)
-    (ensures find_maximum_subarray_sum s == max_subarray_spec_kadane s)
+    (ensures find_maximum_subarray_sum s == max_subarray_spec s)
   =
   dc_kadane_equivalence s
 

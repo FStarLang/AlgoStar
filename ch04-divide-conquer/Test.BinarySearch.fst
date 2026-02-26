@@ -11,6 +11,7 @@ open CLRS.Ch04.BinarySearch
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
@@ -31,7 +32,10 @@ fn test_binary_search_found ()
   arr.(4sz) <- 5;
   
   // Search for 3 - should find it at index 2
-  let result = binary_search arr 5sz 3;
+  let ctr = GR.alloc #nat 0;
+  let result = binary_search arr 5sz 3 ctr;
+  with cf. assert (GR.pts_to ctr cf);
+  GR.free ctr;
   
   // Clean up
   with s. assert (A.pts_to arr s);
@@ -58,7 +62,10 @@ fn test_binary_search_not_found ()
   arr.(4sz) <- 50;
   
   // Search for 25 - should not find it (return 5)
-  let result = binary_search arr 5sz 25;
+  let ctr = GR.alloc #nat 0;
+  let result = binary_search arr 5sz 25 ctr;
+  with cf. assert (GR.pts_to ctr cf);
+  GR.free ctr;
   
   // Clean up
   with s. assert (A.pts_to arr s);

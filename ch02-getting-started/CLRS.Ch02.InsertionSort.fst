@@ -1,10 +1,13 @@
 (*
    Insertion Sort - Verified implementation in Pulse
-   
+
    Proves:
    1. The result is sorted
    2. The result is a permutation of the input
-   
+   3. O(n^2) comparison complexity: at most n*(n-1)/2 comparisons
+
+   Uses GhostReference.ref nat for the tick counter -- fully erased at runtime.
+
    NO admits. NO assumes.
 *)
 
@@ -19,15 +22,25 @@ open CLRS.Common.SortSpec
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
 
+// ========== Ghost tick ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
 // ========== Sortedness lemmas ==========
 
-// Derive that all prefix elements are <= key from exit condition + prefix sortedness
-// When vi > 0: exit says s[vi-1] <= key. Since prefix_sorted s vi, s[k] <= s[vi-1] for k < vi.
-// When vi = 0: vacuous.
 let lemma_prefix_le_key
   (s s_outer: Seq.seq int) (vi vj: nat) (key: int)
   : Lemma
@@ -36,9 +49,6 @@ let lemma_prefix_le_key
       prefix_sorted s_outer vj /\
       prefix_sorted s vi /\
       (forall (k: nat). k < vi ==> Seq.index s k == Seq.index s_outer k) /\
-      // exit condition: vi = 0 or (vi > 0 /\ s_outer[vi-1] <= key)
-      // Note: s[vi-1] = s_outer[vi-1] since vi-1 < vi
-      // We encode this as: forall k. k + 1 = vi ==> s_outer[k] <= key
       (forall (k: nat). k + 1 == vi ==> Seq.index s_outer k <= key))
     (ensures forall (k: nat). k < vi ==> Seq.index s k <= key)
   = if vi = 0 then ()
@@ -63,42 +73,60 @@ let lemma_combine_sorted_regions
     (ensures prefix_sorted s (vj + 1))
   = ()
 
-//SNIPPET_START: insertion_sort_sig
-// ========== Main Algorithm ==========
+// ========== Complexity arithmetic helper ==========
 
+// vj*(vj-1)/2 + vj = (vj+1)*vj/2
+let lemma_triangle_step (vj: nat)
+  : Lemma (requires vj >= 1)
+          (ensures op_Multiply vj (vj - 1) / 2 + vj == op_Multiply (vj + 1) vj / 2)
+  = assert (op_Multiply vj (vj - 1) + op_Multiply 2 vj == op_Multiply vj (vj + 1))
+
+// ========== Main Algorithm with Complexity ==========
+
+// Complexity bound predicate (avoids BoundedIntegers issues in Pulse ensures)
+let complexity_bounded (cf c0: nat) (n: nat) : prop =
+  cf >= c0 /\
+  cf - c0 <= op_Multiply n (n - 1) / 2
+
+//SNIPPET_START: insertion_sort_sig
 fn insertion_sort
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
-  requires A.pts_to a s0
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0
   requires pure (
     SZ.v len == Seq.length s0 /\
     Seq.length s0 <= A.length a /\
     SZ.v len > 0
   )
-  ensures exists* s. A.pts_to a s ** pure (
+  ensures exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf ** pure (
     Seq.length s == Seq.length s0 /\
     sorted s /\
-    permutation s0 s
+    permutation s0 s /\
+    complexity_bounded cf (reveal c0) (SZ.v len)
   )
 //SNIPPET_END: insertion_sort_sig
 {
-//SNIPPET_START: outer_loop
   let mut j: SZ.t = 1sz;
   
   while (!j <^ len)
-  invariant exists* vj s.
+  invariant exists* vj s (vc : nat).
     R.pts_to j vj **
     A.pts_to a s **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vj > 0 /\
       SZ.v vj <= SZ.v len /\
       Seq.length s == Seq.length s0 /\
       Seq.length s <= A.length a /\
       permutation s0 s /\
-      prefix_sorted s (SZ.v vj)
+      prefix_sorted s (SZ.v vj) /\
+      // Complexity: comparisons so far <= vj*(vj-1)/2
+      vc >= reveal c0 /\
+      vc <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2
     )
-//SNIPPET_END: outer_loop
   {
     let vj = !j;
     with s_outer. assert (A.pts_to a s_outer);
@@ -107,22 +135,23 @@ fn insertion_sort
     let mut i: SZ.t = vj;
     let mut continue: bool = true;
     
+    // Initial comparison: tick for the first comparison
     if (vj >^ 0sz) {
       let prev = a.(vj - 1sz);
       continue := (prev > key);
+      tick ctr;
     } else {
       continue := false;
     };
     
-    // Inner loop: swap key backwards until it finds its position
-    // Invariant tracks three regions: [0..vi) sorted prefix, [vi] = key, (vi..vj] shifted & sorted & > key
-    // Additional: prefix elements <= shifted elements (cross-region ordering)
+    // Inner loop: each iteration swaps, decrements i, and makes a comparison (with tick).
     while (!continue)
-    invariant exists* vi vcont s_inner.
+    invariant exists* vi vcont s_inner (vc_inner : nat).
       R.pts_to i vi **
       R.pts_to continue vcont **
       R.pts_to j vj **
       A.pts_to a s_inner **
+      GR.pts_to ctr vc_inner **
       pure (
         SZ.v vi <= SZ.v vj /\
         SZ.v vj < SZ.v len /\
@@ -137,9 +166,12 @@ fn insertion_sort
         (forall (k: nat). SZ.v vi < k /\ k <= SZ.v vj ==> Seq.index s_inner k > key) /\
         (forall (k1 k2: nat). SZ.v vi < k1 /\ k1 <= k2 /\ k2 <= SZ.v vj ==>
           Seq.index s_inner k1 <= Seq.index s_inner k2) /\
-        // Cross-region: all prefix elements <= all shifted elements
         (forall (k1 k2: nat). k1 < SZ.v vi /\ SZ.v vi < k2 /\ k2 <= SZ.v vj ==>
-          Seq.index s_inner k1 <= Seq.index s_inner k2)
+          Seq.index s_inner k1 <= Seq.index s_inner k2) /\
+        // Complexity: vc + vi bounded
+        vc_inner >= reveal c0 /\
+        vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj + 1 - SZ.v vi /\
+        (not vcont ==> vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj)
       )
     {
       let vi = !i;
@@ -160,32 +192,12 @@ fn insertion_sort
       if (new_i >^ 0sz) {
         let new_prev = a.(new_i - 1sz);
         continue := (new_prev > key);
+        // Tick for inner comparison
+        tick ctr;
       } else {
         continue := false;
       };
       
-      // Need to prove the invariant with vi replaced by vi-1.
-      // s_post = Seq.upd (Seq.upd s_pre (vi-1) key) vi val_prev
-      // 1. s_post[vi-1] = key ✓ (by upd)
-      // 2. prefix_sorted s_post (vi-1): positions < vi-1 unchanged, s_pre was prefix_sorted vi ✓
-      // 3. forall k < vi-1: s_post[k] = s_outer[k]: positions < vi-1 unchanged ✓
-      // 4. forall k in (vi-1..vj]: s_post[k] > key:
-      //      k=vi: s_post[vi] = val_prev > key (from loop condition) ✓
-      //      k>vi: s_post[k] = s_pre[k] > key (from pre-invariant) ✓
-      // 5. sorted (vi-1..vj]:
-      //      For k1=vi, k2>vi: need val_prev <= s_pre[k2].
-      //        val_prev = s_pre[vi-1] = s_outer[vi-1].
-      //        For k2 > vi: s_pre[k2] = s_inner[k2] from pre-invariant.
-      //        From cross-region: s_outer[vi-1] = s_pre[vi-1], and vi-1 < vi < k2,
-      //        so s_pre[vi-1] <= s_pre[k2] by the cross-region invariant. ✓
-      //      For k1>vi, k2>vi: s_post[k1] = s_pre[k1], s_post[k2] = s_pre[k2], sorted by pre-inv ✓
-      // 6. cross-region for (vi-1):
-      //      For k1 < vi-1, k2 > vi-1 with k2 <= vj:
-      //        If k2 = vi: s_post[k1] = s_pre[k1] = s_outer[k1], s_post[vi] = val_prev = s_outer[vi-1].
-      //          Need s_outer[k1] <= s_outer[vi-1]. Since s_outer prefix_sorted(vj+1) and k1 < vi-1, ✓
-      //        If k2 > vi: s_post[k1] = s_outer[k1], s_post[k2] = s_pre[k2].
-      //          From cross-region pre-inv: s_pre[k1] <= s_pre[k2] since k1 < vi < k2. 
-      //          And s_pre[k1] = s_outer[k1] = s_post[k1]. ✓
       ()
     };
     
@@ -193,20 +205,13 @@ fn insertion_sort
     with s_after. assert (A.pts_to a s_after);
     let vi_final = !i;
     
-    // The exit condition (vcont = false) gives us:
-    // if vi_final > 0 then s_after[vi_final - 1] <= key
-    // Since s_after[k] = s_outer[k] for k < vi_final, and vi_final - 1 < vi_final,
-    // this means s_outer[vi_final - 1] <= key.
-    // Encoded as: forall k. k + 1 == vi_final ==> s_outer[k] <= key
-    // This is what lemma_prefix_le_key needs.
-    
-    // Help SMT: the exit condition in the invariant uses s_inner[vi - 1], 
-    // but s_inner[vi-1] = s_outer[vi-1] from the unchanged-prefix invariant.
-    // So the exit condition implies the precondition of lemma_prefix_le_key.
     assert (pure (forall (k: nat). k + 1 == SZ.v vi_final ==> Seq.index s_outer k <= key));
     
     lemma_prefix_le_key s_after s_outer (SZ.v vi_final) (SZ.v vj) key;
     lemma_combine_sorted_regions s_after (SZ.v vi_final) (SZ.v vj) key;
+    
+    // Complexity: vc <= vj*(vj-1)/2 + vj = (vj+1)*vj/2
+    lemma_triangle_step (SZ.v vj);
     
     j := vj + 1sz;
   };
