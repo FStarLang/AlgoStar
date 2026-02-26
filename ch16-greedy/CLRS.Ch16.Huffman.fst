@@ -1322,6 +1322,177 @@ let node_ptr_correspondence_init_step
     in
     Classical.forall_intro aux
 
+// ========== Leaf frequency multiset tracking ==========
+
+// Convert a sequence of positive ints to a list of pos, starting from index k
+// Elements <= 0 are clamped to 1 (shouldn't happen with valid input)
+let rec seq_to_pos_list (s: Seq.seq int) (k: nat)
+  : Tot (list pos) (decreases Seq.length s - k)
+  = if k >= Seq.length s then []
+    else
+      let v : pos = if Seq.index s k > 0 then Seq.index s k else 1 in
+      v :: seq_to_pos_list s (k + 1)
+
+let rec seq_to_pos_list_length (s: Seq.seq int) (k: nat)
+  : Lemma (ensures L.length (seq_to_pos_list s k) == (if k >= Seq.length s then 0 else Seq.length s - k))
+          (decreases Seq.length s - k)
+  = if k >= Seq.length s then ()
+    else seq_to_pos_list_length s (k + 1)
+
+// When all elements are positive, seq_to_pos_list index k is Seq.index s k
+let seq_to_pos_list_index (s: Seq.seq int) (k: nat)
+  : Lemma (requires k < Seq.length s /\ Seq.index s k > 0)
+          (ensures Cons? (seq_to_pos_list s k) /\
+                   L.hd (seq_to_pos_list s k) == Seq.index s k /\
+                   L.tl (seq_to_pos_list s k) == seq_to_pos_list s (k + 1))
+  = ()
+
+// All leaf frequencies across the forest
+let rec all_leaf_freqs (entries: list forest_entry) : list pos =
+  match entries with
+  | [] -> []
+  | e :: rest -> HSpec.leaf_freqs (entry_tree e) @ all_leaf_freqs rest
+
+// count distributes over all_leaf_freqs cons
+let all_leaf_freqs_cons (e: forest_entry) (rest: list forest_entry) (x: pos)
+  : Lemma (L.count x (all_leaf_freqs (e :: rest)) ==
+           L.count x (HSpec.leaf_freqs (entry_tree e)) + L.count x (all_leaf_freqs rest))
+  = LP.append_count (HSpec.leaf_freqs (entry_tree e)) (all_leaf_freqs rest) x
+
+// all_leaf_freqs of a single Leaf entry
+let all_leaf_freqs_single_leaf (idx: SZ.t) (p: hnode_ptr) (f: pos) (x: pos)
+  : Lemma (L.count x (all_leaf_freqs [(idx, p, HSpec.Leaf f)]) ==
+           (if x = f then 1 else 0))
+  = ()
+
+// Splitting all_leaf_freqs at position j
+let rec all_leaf_freqs_remove_at (entries: list forest_entry) (j: nat) (x: pos)
+  : Lemma (requires j < L.length entries)
+          (ensures L.count x (all_leaf_freqs entries) ==
+                   L.count x (HSpec.leaf_freqs (entry_tree (L.index entries j))) +
+                   L.count x (all_leaf_freqs (list_remove_at entries j)))
+          (decreases j)
+  = match entries with
+    | e :: rest ->
+      all_leaf_freqs_cons e rest x;
+      if j = 0 then ()
+      else begin
+        list_remove_at_length entries j;
+        all_leaf_freqs_remove_at rest (j - 1) x;
+        all_leaf_freqs_cons e (list_remove_at rest (j - 1)) x
+      end
+
+// Splitting all_leaf_freqs removing two positions
+let all_leaf_freqs_remove_two (entries: list forest_entry) (j1 j2: nat) (x: pos)
+  : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2)
+          (ensures L.count x (all_leaf_freqs entries) ==
+                   L.count x (HSpec.leaf_freqs (entry_tree (L.index entries j1))) +
+                   L.count x (HSpec.leaf_freqs (entry_tree (L.index entries j2))) +
+                   L.count x (all_leaf_freqs (list_remove_two entries j1 j2)))
+  = all_leaf_freqs_remove_at entries j1 x;
+    let rem1 = list_remove_at entries j1 in
+    list_remove_at_length entries j1;
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    all_leaf_freqs_remove_at rem1 j2' x;
+    list_remove_at_index entries j1 j2';
+    let orig2 = if j2' < j1 then j2' else j2' + 1 in
+    assert (orig2 == j2)
+
+// Merge preserves leaf frequency multiset
+let all_leaf_freqs_merge_step
+  (entries: list forest_entry) (j1 j2: nat) 
+  (idx: SZ.t) (p: hnode_ptr) (f: pos) (x: pos)
+  : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2)
+          (ensures (
+            let t1 = entry_tree (L.index entries j1) in
+            let t2 = entry_tree (L.index entries j2) in
+            let merged = HSpec.Internal f t1 t2 in
+            let new_entries = (idx, p, merged) :: list_remove_two entries j1 j2 in
+            L.count x (all_leaf_freqs new_entries) ==
+            L.count x (all_leaf_freqs entries)))
+  = let t1 = entry_tree (L.index entries j1) in
+    let t2 = entry_tree (L.index entries j2) in
+    let merged = HSpec.Internal f t1 t2 in
+    let rem = list_remove_two entries j1 j2 in
+    let new_entries = (idx, p, merged) :: rem in
+    all_leaf_freqs_cons (idx, p, merged) rem x;
+    assert (HSpec.leaf_freqs merged == HSpec.leaf_freqs t1 @ HSpec.leaf_freqs t2);
+    LP.append_count (HSpec.leaf_freqs t1) (HSpec.leaf_freqs t2) x;
+    all_leaf_freqs_remove_two entries j1 j2 x
+
+// Prepend Leaf preserves counts with extension
+let all_leaf_freqs_prepend_leaf
+  (entries: list forest_entry) (idx: SZ.t) (p: hnode_ptr) (f: pos) (x: pos)
+  : Lemma (L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf f) :: entries)) ==
+           L.count x (all_leaf_freqs entries) + (if x = f then 1 else 0))
+  = all_leaf_freqs_cons (idx, p, HSpec.Leaf f) entries x
+
+// seq_to_pos_list extension: adding one more element
+let seq_to_pos_list_snoc (s: Seq.seq int) (k: nat) (x: pos)
+  : Lemma (requires k < Seq.length s /\ Seq.index s k > 0)
+          (ensures (L.count x (seq_to_pos_list s k) ==
+                    (if x = Seq.index s k then 1 else 0) + L.count x (seq_to_pos_list s (k + 1))))
+  = ()
+
+// When forest has exactly one entry, all_leaf_freqs = leaf_freqs of that tree
+let all_leaf_freqs_singleton (e: forest_entry) (x: pos)
+  : Lemma (L.count x (all_leaf_freqs [e]) == L.count x (HSpec.leaf_freqs (entry_tree e)))
+  = all_leaf_freqs_cons e [] x
+
+// Init step: prepending Leaf f to forest + consuming from seq_to_pos_list preserves multiset
+let all_leaf_freqs_init_step
+  (entries: list forest_entry) (idx: SZ.t) (p: hnode_ptr) (f: pos)
+  (s: Seq.seq int) (k: nat)
+  : Lemma (requires k < Seq.length s /\
+                    Seq.index s k > 0 /\
+                    Seq.index s k == f /\
+                    (forall (x: pos). L.count x (all_leaf_freqs entries) + L.count x (seq_to_pos_list s k) ==
+                                      L.count x (seq_to_pos_list s 0)))
+          (ensures (forall (x: pos). 
+                    L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf f) :: entries)) +
+                    L.count x (seq_to_pos_list s (k + 1)) ==
+                    L.count x (seq_to_pos_list s 0)))
+  = let aux (x: pos)
+      : Lemma (L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf f) :: entries)) +
+               L.count x (seq_to_pos_list s (k + 1)) ==
+               L.count x (seq_to_pos_list s 0))
+      = all_leaf_freqs_prepend_leaf entries idx p f x;
+        seq_to_pos_list_snoc s k x
+    in
+    Classical.forall_intro aux
+
+// Merge step: merging two trees in the forest preserves the full leaf multiset
+let all_leaf_freqs_merge_step_full
+  (entries: list forest_entry) (j1 j2: nat)
+  (idx: SZ.t) (p: hnode_ptr) (f: pos) (freqs: list pos)
+  : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2 /\
+                    (forall (x: pos). L.count x (all_leaf_freqs entries) == L.count x freqs))
+          (ensures (
+            let t1 = entry_tree (L.index entries j1) in
+            let t2 = entry_tree (L.index entries j2) in
+            let merged = HSpec.Internal f t1 t2 in
+            let new_entries = (idx, p, merged) :: list_remove_two entries j1 j2 in
+            forall (x: pos). L.count x (all_leaf_freqs new_entries) == L.count x freqs))
+  = let aux (x: pos)
+      : Lemma (L.count x (all_leaf_freqs
+                ((idx, p, HSpec.Internal f (entry_tree (L.index entries j1)) (entry_tree (L.index entries j2)))
+                 :: list_remove_two entries j1 j2)) ==
+               L.count x freqs)
+      = all_leaf_freqs_merge_step entries j1 j2 idx p f x
+    in
+    Classical.forall_intro aux
+
+// Singleton forest has same leaf multiset as the single tree
+let all_leaf_freqs_singleton_full (entries: list forest_entry) (freqs: list pos)
+  : Lemma (requires L.length entries == 1 /\
+                    (forall (x: pos). L.count x (all_leaf_freqs entries) == L.count x freqs))
+          (ensures HSpec.same_frequency_multiset (entry_tree (L.index entries 0)) freqs)
+  = let aux (x: pos)
+      : Lemma (L.count x (HSpec.leaf_freqs (entry_tree (L.index entries 0))) == L.count x freqs)
+      = all_leaf_freqs_singleton (L.index entries 0) x
+    in
+    Classical.forall_intro aux
+
 // ========== Full Huffman Tree Construction (CLRS §16.3) ==========
 // Truly imperative: allocates hnode_ptr nodes on the heap.
 // Uses a min-heap priority queue (Pulse.Lib.PriorityQueue) storing
@@ -1344,7 +1515,8 @@ fn huffman_tree
   returns result: hnode_ptr
   ensures A.pts_to freqs freq_seq **
           (exists* ft. is_htree result ft **
-                  pure (HSpec.cost ft >= 0))
+                  pure (HSpec.cost ft >= 0 /\
+                        HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0)))
 //SNIPPET_END: huffman_tree_sig
 {
   // Allocate node pointer array and PQ
@@ -1380,7 +1552,9 @@ fn huffman_tree
       pq_indices_in_forest pq_contents active /\
       (forall (k: nat). k < L.length active ==>
         SZ.v (entry_idx (L.index active k)) < SZ.v vi /\
-        Seq.index nd_contents (SZ.v (entry_idx (L.index active k))) == entry_ptr (L.index active k))
+        Seq.index nd_contents (SZ.v (entry_idx (L.index active k))) == entry_ptr (L.index active k)) /\
+      (forall (x: pos). L.count x (all_leaf_freqs active) + L.count x (seq_to_pos_list freq_seq (SZ.v vi)) ==
+                         L.count x (seq_to_pos_list freq_seq 0))
     )
   {
     let vi = !i;
@@ -1424,6 +1598,9 @@ fn huffman_tree
     // Maintain node-ptr correspondence through Seq.upd
     node_ptr_correspondence_init_step active_old vi leaf (HSpec.Leaf freq_val) nd_old n;
     
+    // Maintain leaf frequency multiset invariant
+    all_leaf_freqs_init_step active_old vi leaf freq_val freq_seq (SZ.v vi);
+    
     i := vi +^ 1sz;
   };
   
@@ -1460,7 +1637,8 @@ fn huffman_tree
       forest_distinct_indices active /\
       (forall (k: nat). k < L.length active ==>
         SZ.v (entry_idx (L.index active k)) < SZ.v n /\
-        Seq.index nd_contents (SZ.v (entry_idx (L.index active k))) == entry_ptr (L.index active k))
+        Seq.index nd_contents (SZ.v (entry_idx (L.index active k))) == entry_ptr (L.index active k)) /\
+      (forall (x: pos). L.count x (all_leaf_freqs active) == L.count x (seq_to_pos_list freq_seq 0))
     )
   {
     // Extract two minimums from PQ
@@ -1589,6 +1767,13 @@ fn huffman_tree
         (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
       nd_contents0 n;
     
+    // Maintain leaf frequency multiset through merge
+    all_leaf_freqs_merge_step_full active0
+      (Some?.v (find_entry_by_idx active0 idx1))
+      (Some?.v (find_entry_by_idx active0 idx2))
+      idx1 merged (sum_freq <: pos)
+      (seq_to_pos_list freq_seq 0);
+    
     let viter = !iter;
     iter := viter +^ 1sz;
   };
@@ -1620,6 +1805,10 @@ fn huffman_tree
   // forest_own (list_remove_at active_final 0) == forest_own [] == emp
   rewrite (forest_own (list_remove_at active_final 0))
        as emp;
+  
+  // Prove same_frequency_multiset: from invariant, forall x. count x (all_leaf_freqs active_final) == count x full_list
+  // active_final has 1 entry, so all_leaf_freqs active_final == leaf_freqs ft
+  all_leaf_freqs_singleton_full active_final (seq_to_pos_list freq_seq 0);
   
   // Clean up
   PQ.free pq;
