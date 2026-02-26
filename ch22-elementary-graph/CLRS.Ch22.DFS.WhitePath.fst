@@ -260,115 +260,448 @@ let descendant_discovered_later
       Seq.index d v > Seq.index d u)
   = ()
 
-(*** Main Theorem: White-Path Theorem ***)
 
-(**
- * White-Path Theorem (CLRS Theorem 22.9) - Forward Direction
- *
- * If there is a white path from u to v at the time d[u] when u is discovered,
- * then v becomes a descendant of u in the DFS tree.
- *
- * Proof intuition:
- * - When u is discovered, all vertices on the white path are unvisited
- * - DFS explores from u, so it will discover all reachable vertices
- * - Since v is reachable via white vertices, v will be discovered during
- *   the exploration from u (before u finishes)
- * - Therefore, d[u] < d[v] < f[v] < f[u], making v a descendant of u
- *)
-// White-Path Theorem Forward Direction (CLRS Theorem 22.9)
-//
-// This theorem requires that d and f come from a valid DFS execution on adj.
-// The proof needs:
-//   1. DFS completeness: all vertices reachable via white vertices from u
-//      get discovered before u finishes
-//   2. Parenthesis property: vertex v discovered during u's subtree gets
-//      d[u] < d[v] < f[v] < f[u]
-//
-// These are properties of the concrete DFS execution that cannot be proved
-// for arbitrary d/f sequences. The assume captures the DFS execution structure.
-assume val white_path_implies_descendant_aux
-  (adj: Seq.seq (Seq.seq int))
-  (n: nat)
-  (d f: Seq.seq nat)
+(*** Forward Direction: white path implies ancestor ***)
+
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+let contained_strict
+  (adj: Seq.seq (Seq.seq int)) (n: nat)
   (u v: nat)
   : Lemma
-    (requires 
+    (requires (
+      let st = dfs adj n in
       u < n /\ v < n /\ u <> v /\
-      Seq.length d = n /\ Seq.length f = n /\
-      u < Seq.length d /\ 
-      Seq.index d u > 0 /\
-      white_path_exists adj n d u v (Seq.index d u))
-    (ensures dfs_ancestor d f u v)
+      Seq.length st.d = n /\ Seq.length st.f = n /\ Seq.length st.color = n /\
+      Seq.index st.color u = Black /\ Seq.index st.color v = Black /\
+      d_of st u > 0 /\
+      d_of st u < d_of st v /\
+      d_of st v <= f_of st u))
+    (ensures (
+      let st = dfs adj n in
+      d_of st u < d_of st v /\ d_of st v < f_of st v /\ f_of st v < f_of st u))
+  = let st = dfs adj n in
+    dfs_satisfies_parenthesis_theorem adj n;
+    dfs_distinct_finish_times adj n u v;
+    init_has_correct_lengths n;
+    // parenthesis_theorem: intervals are disjoint, or one contains the other
+    assert (parenthesis_property st u v);
+    let iu = get_interval st u in
+    let iv = get_interval st v in
+    // d[u] < d[v] rules out: interval_contained iu iv (would need d[u] >= d[v])
+    // d[v] <= f[u] rules out: intervals_disjoint with f[u] < d[v]
+    // d[v] < f[v] (Black, strong_valid_state) rules out: f[v] < d[u] (since d[u] < d[v] < f[v])
+    // So interval_contained iv iu: d[v] >= d[u] and f[v] <= f[u]
+    // With distinct finish: f[v] <> f[u] → f[v] < f[u]
+    dfs_loop_inv adj n 0 (init_state n);
+    init_state_strong_valid n;
+    let init_pair (a b: nat) : Lemma (parenthesis_property (init_state n) a b) = () in
+    Classical.forall_intro_2 init_pair;
+    ()
+#pop-options
 
+// Inductive proof: path_all_white from x to v at d[u] implies v is within u's interval
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
+let rec white_path_within_interval
+  (adj: Seq.seq (Seq.seq int)) (n: nat)
+  (u x v: nat) (k: nat)
+  : Lemma
+    (requires (
+      let st = dfs adj n in
+      u < n /\ x < n /\ v < n /\ u <> v /\
+      Seq.length st.d = n /\ Seq.length st.f = n /\ Seq.length st.color = n /\
+      d_of st u > 0 /\
+      // x is either u or strictly within u's interval
+      (x = u \/ (d_of st u < d_of st x /\ f_of st x < f_of st u)) /\
+      // white path from x to v at time d[u]
+      path_all_white adj n st.d x v (Seq.index st.d u) k /\
+      k >= 1))
+    (ensures (
+      let st = dfs adj n in
+      d_of st u < d_of st v /\ d_of st v < f_of st v /\ f_of st v < f_of st u))
+    (decreases k)
+  = let st = dfs adj n in
+    let du = Seq.index st.d u in
+    dfs_all_edges_inv adj n;
+    if k = 1 then (
+      // Base: edge x → v, v is white at d[u]
+      // white_at_time means d[v] = 0 \/ d[u] < d[v]
+      // v is Black: d[v] > 0, so d[u] < d[v]
+      dfs_all_black adj n v;
+      dfs_all_black adj n x;
+      dfs_all_black adj n u;
+      init_has_correct_lengths n;
+      dfs_loop_inv adj n 0 (init_state n);
+      init_state_strong_valid n;
+      let init_pair (a b: nat) : Lemma (parenthesis_property (init_state n) a b) = () in
+      Classical.forall_intro_2 init_pair;
+      // all_edges_inv: x Black, edge x→v → d[v] ≤ f[x]
+      assert (color_of st x = Black);
+      assert (has_edge n adj x v);
+      assert (d_of st v <= f_of st u);
+      // Now use contained_strict
+      if x = u then (
+        // d[v] ≤ f[u] directly from all_edges_inv
+        contained_strict adj n u v
+      ) else (
+        // d[v] ≤ f[x] < f[u]
+        assert (d_of st v <= f_of st x);
+        assert (f_of st x < f_of st u);
+        assert (d_of st v <= f_of st u);
+        contained_strict adj n u v
+      )
+    ) else (
+      // Inductive: edge x → w, w white at d[u], path from w to v with k-1 steps
+      // path_all_white with k > 1: exists w with edge x→w, w white, path w→v k-1 steps
+      dfs_all_black adj n x;
+      dfs_all_black adj n u;
+      init_has_correct_lengths n;
+      dfs_loop_inv adj n 0 (init_state n);
+      init_state_strong_valid n;
+      let init_pair (a b: nat) : Lemma (parenthesis_property (init_state n) a b) = () in
+      Classical.forall_intro_2 init_pair;
+      // We need to extract the witness w from the existential
+      let aux (w: nat) : Lemma
+        (requires w < n /\ has_edge n adj x w /\
+                  white_at_time st.d w du /\
+                  path_all_white adj n st.d w v du (k - 1))
+        (ensures d_of st u < d_of st v /\ d_of st v < f_of st v /\ f_of st v < f_of st u)
+        = // w is Black, white_at_time means d[u] < d[w]
+          dfs_all_black adj n w;
+          assert (d_of st w > 0);
+          assert (du < d_of st w);
+          // all_edges_inv: x Black, edge x→w → d[w] ≤ f[x]
+          if x = u then (
+            assert (d_of st w <= f_of st u);
+            contained_strict adj n u w;
+            // w is within u's interval
+            assert (d_of st u < d_of st w /\ f_of st w < f_of st u);
+            // Recurse with w
+            white_path_within_interval adj n u w v (k - 1)
+          ) else (
+            assert (d_of st w <= f_of st x);
+            assert (f_of st x < f_of st u);
+            assert (d_of st w <= f_of st u);
+            contained_strict adj n u w;
+            assert (d_of st u < d_of st w /\ f_of st w < f_of st u);
+            white_path_within_interval adj n u w v (k - 1)
+          )
+      in
+      Classical.forall_intro (Classical.move_requires aux)
+    )
+#pop-options
+
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 0"
 let white_path_implies_descendant
   (adj: Seq.seq (Seq.seq int))
   (n: nat)
   (d f: Seq.seq nat)
   (u v: nat)
   : Lemma
-    (requires 
+    (requires (
+      let st = dfs adj n in
       u < n /\ v < n /\ u <> v /\
       Seq.length d = n /\ Seq.length f = n /\
+      d == st.d /\ f == st.f /\
       u < Seq.length d /\ 
-      Seq.index d u > 0 /\  // u has been discovered
-      white_path_exists adj n d u v (Seq.index d u))
+      Seq.index d u > 0 /\
+      white_path_exists adj n d u v (Seq.index d u)))
     (ensures dfs_ancestor d f u v)
-  = white_path_implies_descendant_aux adj n d f u v
+  = let st = dfs adj n in
+    let du = Seq.index d u in
+    // white_path_exists gives: exists steps. path_all_white ... steps
+    // steps >= 1 since u <> v (path_all_white 0 requires u = v)
+    let aux (steps: nat) : Lemma
+      (requires path_all_white adj n d u v du steps)
+      (ensures dfs_ancestor d f u v)
+      = if steps = 0 then (
+          // path_all_white 0: u = v, contradiction with u <> v
+          ()
+        ) else (
+          white_path_within_interval adj n u u v steps;
+          ()
+        )
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+#pop-options
 
-(**
- * White-Path Theorem (CLRS Theorem 22.9) - Backward Direction
- *
- * If v is a descendant of u in the DFS tree, then at the time d[u]
- * when u was discovered, there was a white path from u to v.
- *
- * Proof intuition:
- * - If v is a descendant, then d[u] < d[v] (v discovered after u)
- * - This means at time d[u], vertex v was still white (unvisited)
- * - Since v was discovered during u's exploration, there must be a path
- *   from u to v through the DFS tree
- * - All vertices on this tree path were white at time d[u] because they
- *   were all discovered after u (tree edges go from earlier to later)
- * - Therefore, there exists a white path from u to v at time d[u]
- *)
-// White-Path Theorem Backward Direction (CLRS Theorem 22.9)
-//
-// If v is a descendant of u (d[u] < d[v] < f[v] < f[u]), then at time d[u]
-// there was a white path from u to v. The proof needs:
-//   1. DFS tree structure: there exists a path of tree edges from u to v
-//   2. All vertices on this tree path were white at d[u] (discovered after u)
-//
-// This requires knowledge of the DFS tree (parent pointers), which is not
-// explicitly tracked in our formalization. The assume captures this.
-assume val descendant_implies_white_path_aux
-  (adj: Seq.seq (Seq.seq int))
-  (n: nat)
-  (d f: Seq.seq nat)
+
+(*** Backward Direction: ancestor implies white path ***)
+
+// Helper: if path is white at time t2, it's also white at earlier time t1 ≤ t2
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+let rec path_all_white_earlier_time
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (d: Seq.seq nat)
+  (u v: nat) (t1 t2: nat) (k: nat)
+  : Lemma
+    (requires t1 <= t2 /\ path_all_white adj n d u v t2 k)
+    (ensures path_all_white adj n d u v t1 k)
+    (decreases k)
+  = if k <= 1 then ()
+    else
+      let aux (w: nat) : Lemma
+        (requires w < n /\ has_edge n adj u w /\ white_at_time d w t2 /\
+                  path_all_white adj n d w v t2 (k - 1))
+        (ensures w < n /\ has_edge n adj u w /\ white_at_time d w t1 /\
+                 path_all_white adj n d w v t1 (k - 1))
+        = path_all_white_earlier_time adj n d w v t1 t2 (k - 1)
+      in
+      Classical.forall_intro (Classical.move_requires aux)
+#pop-options
+
+// Helper: vertices discovered during dfs_visit(root), other than root, have d > root's d.
+// root's d = st.time + 1. Other vertices' d comes from visit_neighbors after discover,
+// where time = st.time + 1, so d > st.time + 1 by visit_neighbors_timestamps_in_range.
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 0"
+let dfs_visit_strict_d
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (st: dfs_state) (w: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      root < n /\ w < n /\ w <> root /\
+      Seq.index st.color root = White /\
+      Seq.index st.d w = 0 /\
+      Seq.index (dfs_visit adj n root st).d w > 0)
+    (ensures Seq.index (dfs_visit adj n root st).d w > st.time + 1)
+  = let st1 = discover_vertex root st in
+    discover_preserves_lengths root st;
+    let neighbors = get_white_neighbors adj n root 0 st1 in
+    get_white_neighbors_lt_n adj n root 0 st1;
+    visit_neighbors_timestamps_in_range adj n neighbors st1;
+    let st2 = visit_neighbors adj n neighbors st1 in
+    finish_preserves_lengths root st2
+#pop-options
+
+// BUILD pair: given dfs_visit(root, st) discovers v, construct white path root→v at time du.
+// Invariant: every undiscovered vertex (st.d[w] = 0) has d_top[w] > du,
+// hence is white at time du.
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let rec visit_neighbors_build_wp
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (neighbors: list nat) (st: dfs_state)
+  (v: nat) (d_top: Seq.seq nat) (du: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      all_neighbors_lt_n neighbors n /\
+      root < n /\ v < n /\ root <> v /\
+      Seq.index st.d v = 0 /\
+      Seq.index (visit_neighbors adj n neighbors st).d v > 0 /\
+      (forall (w: nat). List.Tot.memP w neighbors ==> w < n /\ has_edge n adj root w) /\
+      Seq.length d_top = n /\
+      // Invariant: every White vertex has d_top > du (so is white at time du)
+      (forall (w: nat). w < n /\ Seq.index st.color w = White ==>
+        (Seq.index d_top w = 0 \/ Seq.index d_top w > du)))
+    (ensures exists (k: nat). path_all_white adj n d_top root v du k)
+    (decreases %[count_white_vertices st; List.Tot.length neighbors])
+  = match neighbors with
+    | [] -> ()
+    | w :: rest ->
+      if w < Seq.length st.color && Seq.index st.color w = White then (
+        let st1 = dfs_visit adj n w st in
+        dfs_visit_timestamps_in_range adj n w st;
+        if Seq.index st1.d v > 0 then (
+          if v = w then (
+            // Direct edge root → v. v was White so d_top[v] > du → white at du.
+            assert (has_edge n adj root v);
+            assert (white_at_time d_top v du);
+            assert (path_all_white adj n d_top root v du 1)
+          ) else (
+            // v in w's subtree: recursive BUILD on dfs_visit(w, st)
+            dfs_visit_build_wp adj n w st v d_top du;
+            // w was White (st.d[w] = 0) so d_top[w] > du → white at du
+            let aux (k: nat) : Lemma
+              (requires path_all_white adj n d_top w v du k)
+              (ensures path_all_white adj n d_top root v du (1 + k))
+              = assert (has_edge n adj root w);
+                assert (white_at_time d_top w du)
+            in
+            Classical.forall_intro (Classical.move_requires aux)
+          )
+        ) else (
+          visit_neighbors_build_wp adj n root rest st1 v d_top du
+        )
+      ) else (
+        visit_neighbors_build_wp adj n root rest st v d_top du
+      )
+
+and dfs_visit_build_wp
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (st: dfs_state)
+  (v: nat) (d_top: Seq.seq nat) (du: nat)
+  : Lemma
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      root < n /\ v < n /\ root <> v /\
+      Seq.index st.color root = White /\
+      Seq.index st.d v = 0 /\
+      Seq.index (dfs_visit adj n root st).d v > 0 /\
+      Seq.length d_top = n /\
+      (forall (w: nat). w < n /\ w <> root /\ Seq.index st.color w = White ==>
+        (Seq.index d_top w = 0 \/ Seq.index d_top w > du)))
+    (ensures exists (k: nat). path_all_white adj n d_top root v du k)
+    (decreases %[count_white_vertices st; 0])
+  = let st1 = discover_vertex root st in
+    discover_preserves_lengths root st;
+    discover_decreases_white_count root st;
+    let neighbors = get_white_neighbors adj n root 0 st1 in
+    get_white_neighbors_lt_n adj n root 0 st1;
+    Classical.forall_intro (Classical.move_requires (get_white_neighbors_sound adj n root 0 st1));
+    visit_neighbors_build_wp adj n root neighbors st1 v d_top du
+#pop-options
+
+// dfs_loop wrapper: trace through dfs_loop to find where u is discovered,
+// establish the white-path invariant, and call the BUILD pair.
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let rec dfs_loop_white_path
+  (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state)
   (u v: nat)
   : Lemma
-    (requires 
+    (requires
+      st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
+      strong_valid_state st /\ parenthesis_theorem st /\
       u < n /\ v < n /\ u <> v /\
-      Seq.length d = n /\ Seq.length f = n /\
-      dfs_ancestor d f u v)
-    (ensures 
-      u < Seq.length d /\
-      Seq.index d u > 0 /\
-      white_path_exists adj n d u v (Seq.index d u))
+      Seq.index st.d u = 0 /\ Seq.index st.d v = 0 /\
+      (let st' = dfs_loop adj n u_start st in
+       Seq.index st'.d u > 0 /\ Seq.index st'.d v > 0 /\
+       Seq.index st'.d u < Seq.index st'.d v /\
+       Seq.index st'.d v < Seq.index st'.f v /\
+       Seq.index st'.f v < Seq.index st'.f u))
+    (ensures (
+      let st' = dfs_loop adj n u_start st in
+      let du = Seq.index st'.d u in
+      white_path_exists adj n st'.d u v du))
+    (decreases (if u_start < n then n - u_start else 0))
+  = if u_start >= n then ()
+    else (
+      let st_final = dfs_loop adj n u_start st in
+      if u_start < Seq.length st.color && Seq.index st.color u_start = White then (
+        let st1 = dfs_visit adj n u_start st in
+        dfs_visit_timestamps_in_range adj n u_start st;
+        dfs_visit_time_mono adj n u_start st;
+        dfs_visit_inv adj n u_start st;
+        if Seq.index st1.d u > 0 then (
+          // u discovered during dfs_visit(u_start, st)
+          let d_top = st_final.d in
+          let du = Seq.index d_top u in
+          // d_top[u] = st1.d[u] (preserved since u is non-White in st1)
+          assert (Seq.index st1.color u <> White);
+          dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 u;
 
+          // Prove v is also discovered during dfs_visit(u_start, st).
+          // If not: d[v] > st1.time ≥ f[u] → d[v] ≥ f[u], contradicting f[v] < f[u].
+          if Seq.index st1.d v = 0 then (
+            dfs_loop_d_gt_time adj n (u_start + 1) st1 v;
+            // st_final.d[v] > st1.time
+            // st_final.f[u] = st1.f[u] (u non-White, preserved)
+            // st1.f[u] ≤ st1.time (from timestamps_in_range)
+            // So st_final.d[v] > st1.time ≥ st1.f[u] = st_final.f[u]
+            // But st_final.f[v] < st_final.f[u] and st_final.d[v] < st_final.f[v]
+            // → st_final.d[v] < st_final.f[u]. Contradiction.
+            dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 u;
+            assert (Seq.index st_final.f u = Seq.index st1.f u);
+            assert (Seq.index st1.f u <= st1.time);
+            assert (Seq.index (dfs_loop adj n (u_start + 1) st1).d v > st1.time);
+            assert (Seq.index st_final.d v > st1.time);
+            assert (Seq.index st_final.d v > Seq.index st_final.f u);
+            // But we need d[v] < f[v] < f[u], so d[v] < f[u]. Contradiction.
+            assert (false)
+          ) else ();
+
+          if u_start = u then (
+            // CASE 1: u_start = u. Invariant fully provable.
+            // For w ≠ u with st.d[w] = 0:
+            //   If discovered during dfs_visit(u, st): dfs_visit_strict_d gives d > du.
+            //     Preserved by dfs_loop → d_top > du. ✓
+            //   If not: dfs_loop_d_gt_time gives d_top > st1.time ≥ du + 1 > du. ✓
+            let establish_inv (w: nat) : Lemma
+              (requires w < n /\ w <> u /\ Seq.index st.color w = White)
+              (ensures w < Seq.length d_top /\ (Seq.index d_top w = 0 \/ Seq.index d_top w > du))
+              = // strong_valid_state: White → d = 0
+                assert (Seq.index st.d w = 0);
+                if Seq.index st1.d w > 0 then (
+                  dfs_visit_strict_d adj n u st w;
+                  dfs_visit_du_fu adj n u st;
+                  assert (Seq.index st1.color w <> White);
+                  dfs_loop_preserves_nonwhite_df adj n (u + 1) st1 w
+                ) else (
+                  if Seq.index (dfs_loop adj n (u + 1) st1).d w > 0 then (
+                    dfs_loop_d_gt_time adj n (u + 1) st1 w;
+                    dfs_visit_du_fu adj n u st
+                  ) else ()
+                )
+            in
+            Classical.forall_intro (Classical.move_requires establish_inv);
+            dfs_visit_build_wp adj n u st v d_top du
+          ) else (
+            // CASE 2: u_start ≠ u. u is discovered within dfs_visit(u_start, st).
+            // The white path exists by the same argument as Case 1, applied at
+            // the intermediate state within visit_neighbors where dfs_visit(u, st_mid)
+            // is called. At that state, all undiscovered vertices (w ≠ u with st_mid.d[w]=0)
+            // will be discovered with d > du (via dfs_visit_strict_d for vertices in u's
+            // subtree and visit_neighbors_timestamps_in_range for vertices after u's subtree).
+            //
+            // The formal proof requires chaining preservation lemmas
+            // (visit_neighbors_preserves_nonwhite_df, dfs_loop_preserves_nonwhite_df)
+            // through the visit_neighbors structure, which the FIND pair mutual recursion
+            // would accomplish. For now we use admit() for this case.
+            admit()
+          )
+        ) else (
+          // u not discovered during dfs_visit(u_start, st).
+          // Need st1.d[v] = 0 for recursive call.
+          if Seq.index st1.d v > 0 then (
+            // v discovered but u not → contradiction:
+            // dfs_loop_d_gt_time: st_final.d[u] > st1.time
+            // timestamps_in_range: st1.d[v] ≤ st1.time
+            // preserves: st_final.d[v] = st1.d[v]
+            // So st_final.d[u] > st1.time ≥ st1.d[v] = st_final.d[v]
+            // But precondition says st_final.d[u] < st_final.d[v]. Contradiction.
+            dfs_loop_d_gt_time adj n (u_start + 1) st1 u;
+            dfs_loop_preserves_nonwhite_df adj n (u_start + 1) st1 v;
+            assert (false)
+          ) else ();
+          dfs_loop_white_path adj n (u_start + 1) st1 u v
+        )
+      ) else (
+        dfs_loop_white_path adj n (u_start + 1) st u v
+      )
+    )
+#pop-options
+
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
 let descendant_implies_white_path
   (adj: Seq.seq (Seq.seq int))
   (n: nat)
   (d f: Seq.seq nat)
   (u v: nat)
   : Lemma
-    (requires 
+    (requires (
+      let st = dfs adj n in
       u < n /\ v < n /\ u <> v /\
       Seq.length d = n /\ Seq.length f = n /\
-      dfs_ancestor d f u v)
+      d == st.d /\ f == st.f /\
+      dfs_ancestor d f u v))
     (ensures 
       u < Seq.length d /\
       Seq.index d u > 0 /\
       white_path_exists adj n d u v (Seq.index d u))
-  = descendant_implies_white_path_aux adj n d f u v
+  = let st_final = dfs adj n in
+    let st0 = init_state n in
+    init_has_correct_lengths n;
+    init_state_strong_valid n;
+    // init_state has all d = 0
+    assert (Seq.index st0.d u = 0);
+    assert (Seq.index st0.d v = 0);
+    // dfs adj n = dfs_loop adj n 0 (init_state n)
+    assert (st_final == dfs_loop adj n 0 st0);
+    // strong_valid_state of final DFS: Black → f > d > 0
+    let init_pair (a b: nat) : Lemma (parenthesis_property st0 a b) = () in
+    Classical.forall_intro_2 init_pair;
+    dfs_loop_inv adj n 0 st0;
+    // All vertices are Black in final state
+    dfs_all_black adj n u;
+    dfs_all_black adj n v;
+    // So d[u] > 0 and d[v] > 0
+    dfs_loop_white_path adj n 0 st0 u v
+#pop-options
 
 (**
  * Main Theorem: White-Path Theorem (Both Directions)
@@ -387,10 +720,12 @@ let white_path_theorem
   (d f: Seq.seq nat)
   (u v: nat)
   : Lemma
-    (requires 
+    (requires (
+      let st = dfs adj n in
       u < n /\ v < n /\ u <> v /\
       Seq.length d = n /\ Seq.length f = n /\
-      u < Seq.length d /\ Seq.index d u > 0)
+      d == st.d /\ f == st.f /\
+      u < Seq.length d /\ Seq.index d u > 0))
     (ensures 
       dfs_ancestor d f u v <==> 
       white_path_exists adj n d u v (Seq.index d u))
@@ -442,12 +777,14 @@ let non_descendant_no_white_path
   (d f: Seq.seq nat)
   (u v: nat)
   : Lemma
-    (requires
+    (requires (
+      let st = dfs adj n in
       u < n /\ v < n /\ u <> v /\
       Seq.length d = n /\ Seq.length f = n /\
+      d == st.d /\ f == st.f /\
       u < Seq.length d /\ v < Seq.length d /\
       Seq.index d u > 0 /\ Seq.index d v > 0 /\
-      ~(dfs_ancestor d f u v))
+      ~(dfs_ancestor d f u v)))
     (ensures ~(white_path_exists adj n d u v (Seq.index d u)))
   = // This is the contrapositive of white_path_implies_descendant
     Classical.move_requires (white_path_implies_descendant adj n d f u) v
