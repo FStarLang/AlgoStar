@@ -108,16 +108,58 @@ fn forest_own_take_head
   unfold (forest_own (hd :: tl));
 }
 
+open Pulse.Lib.Core
+
+// Prove: forest_own pairs == is_htree(pairs[j]) ** forest_own(remove pairs j)
+// Uses star commutativity + associativity from PulseCore
+let rec forest_own_split_lemma
+  (pairs: list (hnode_ptr & HSpec.htree))
+  (j: nat{j < L.length pairs})
+  : Lemma (ensures forest_own pairs ==
+             is_htree (fst (L.index pairs j)) (snd (L.index pairs j)) **
+             forest_own (list_remove_at pairs j))
+          (decreases j)
+  = match pairs with
+    | hd :: tl ->
+      if j = 0 then () // forest_own (hd :: tl) = is_htree (fst hd) (snd hd) ** forest_own tl by def
+      else begin
+        forest_own_split_lemma tl (j - 1);
+        // IH: forest_own tl == is_htree (fst (L.index tl (j-1))) ... ** forest_own (list_remove_at tl (j-1))
+        // Goal: is_htree (fst hd) (snd hd) ** forest_own tl
+        //     == is_htree (fst (L.index pairs j)) ... ** forest_own (list_remove_at pairs j)
+        // Note: L.index pairs j == L.index tl (j-1) and
+        //       list_remove_at pairs j == hd :: list_remove_at tl (j-1)
+        let p0 = is_htree (fst hd) (snd hd) in
+        let pj = is_htree (fst (L.index tl (j-1))) (snd (L.index tl (j-1))) in
+        let rest = forest_own (list_remove_at tl (j-1)) in
+        // Chain: p0 ** (pj ** rest) → (p0 ** pj) ** rest → (pj ** p0) ** rest → pj ** (p0 ** rest)
+        let step1 : slprop_equiv (p0 ** (pj ** rest)) ((p0 ** pj) ** rest) =
+          slprop_equiv_sym _ _ (slprop_equiv_assoc p0 pj rest) in
+        let step2 : slprop_equiv ((p0 ** pj) ** rest) ((pj ** p0) ** rest) =
+          slprop_equiv_cong (p0 ** pj) rest (pj ** p0) rest
+            (slprop_equiv_comm p0 pj)
+            (slprop_equiv_refl rest) in
+        let step3 : slprop_equiv ((pj ** p0) ** rest) (pj ** (p0 ** rest)) =
+          slprop_equiv_assoc pj p0 rest in
+        elim_slprop_equiv (slprop_equiv_trans _ _ _
+          step1
+          (slprop_equiv_trans _ _ _ step2 step3))
+      end
+
 // Extract element at list position j from forest_own
+ghost
 fn forest_own_take_at
   (pairs: list (hnode_ptr & HSpec.htree))
   (j: nat{j < L.length pairs})
   requires forest_own pairs
-  returns _r: unit
   ensures is_htree (fst (L.index pairs j)) (snd (L.index pairs j)) **
           forest_own (list_remove_at pairs j)
 {
-  admit() // TODO: implement using forest_own_take_head recursively
+  forest_own_split_lemma pairs j;
+  // Now: forest_own pairs == is_htree ... ** forest_own (list_remove_at pairs j)
+  rewrite (forest_own pairs)
+       as (is_htree (fst (L.index pairs j)) (snd (L.index pairs j)) **
+           forest_own (list_remove_at pairs j));
 }
 
 // ========== Allocate/free pointer-based Huffman tree ==========
