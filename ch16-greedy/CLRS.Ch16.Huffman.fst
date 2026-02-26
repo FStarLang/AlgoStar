@@ -113,6 +113,34 @@ let rec list_remove_at_length (#a: Type) (l: list a) (j: nat{j < L.length l})
   = match l with
     | _ :: t -> if j > 0 then list_remove_at_length t (j - 1)
 
+// Index into list_remove_at: elements before j stay, elements after j shift down
+let rec list_remove_at_index (#a: Type) (l: list a) (j: nat{j < L.length l}) (k: nat)
+  : Lemma (requires k < L.length l - 1)
+          (ensures L.length (list_remove_at l j) == L.length l - 1 /\
+                   L.index (list_remove_at l j) k == (if k < j then L.index l k else L.index l (k + 1)))
+          (decreases l)
+  = list_remove_at_length l j;
+    match l with
+    | h :: t ->
+      if j = 0 then ()
+      else if k = 0 then ()
+      else begin list_remove_at_length t (j - 1); list_remove_at_index t (j - 1) (k - 1) end
+
+// Remove two elements from a list (remove j1 first, then adjust j2)
+let list_remove_two (#a: Type) (l: list a) (j1 j2: nat)
+  : Pure (list a) (requires j1 < L.length l /\ j2 < L.length l /\ j1 <> j2)
+         (ensures fun _ -> True)
+  = list_remove_at_length l j1;
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    list_remove_at (list_remove_at l j1) j2'
+
+let list_remove_two_length (#a: Type) (l: list a) (j1 j2: nat)
+  : Lemma (requires j1 < L.length l /\ j2 < L.length l /\ j1 <> j2)
+          (ensures L.length (list_remove_two l j1 j2) == L.length l - 2)
+  = list_remove_at_length l j1;
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    list_remove_at_length (list_remove_at l j1) j2'
+
 // Removing element at position j changes count of that element by -1
 let rec list_remove_at_count (#a: eqtype) (l: list a) (j: nat{j < L.length l}) (y: a)
   : Lemma (ensures L.count y (list_remove_at l j) == 
@@ -356,6 +384,46 @@ let pq_forest_prepend (pq: Seq.seq pq_entry) (forest: list forest_entry) (e: for
       find_entry_prepend_other forest e (snd (Seq.index pq j))
     in
     Classical.forall_intro (Classical.move_requires aux)
+
+// Removing entry at position j preserves find_entry_by_idx for other indices
+let rec find_entry_remove_other (entries: list forest_entry) (j: nat{j < L.length entries}) (idx: SZ.t)
+  : Lemma (requires entry_idx (L.index entries j) =!= idx /\
+                    Some? (find_entry_by_idx entries idx))
+          (ensures Some? (find_entry_by_idx (list_remove_at entries j) idx))
+          (decreases entries)
+  = match entries with
+    | hd :: tl ->
+      if j = 0 then begin
+        // Removing head, idx must be in tl since head has different index
+        if entry_idx hd = idx then () // impossible, but F* should see this
+        else begin
+          match find_entry_by_idx tl idx with
+          | Some _ -> ()
+          | None -> find_entry_by_idx_spec tl idx
+        end
+      end
+      else begin
+        // j > 0: removing from tail
+        if entry_idx hd = idx then ()  // hd has idx, so result is hd :: remove(tl, j-1), still has hd
+        else begin
+          find_entry_by_idx_spec tl idx;
+          find_entry_remove_other tl (j - 1) idx;
+          find_entry_by_idx_spec (list_remove_at tl (j - 1)) idx
+        end
+      end
+
+// pq_indices_in_forest after removing entry j (if all PQ entries have index ≠ entry_idx(entries[j]))
+let pq_forest_remove (pq: Seq.seq pq_entry) (forest: list forest_entry) (j: nat{j < L.length forest})
+  : Lemma (requires pq_indices_in_forest pq forest /\
+                    (forall (k: nat). k < Seq.length pq ==> snd (Seq.index pq k) =!= entry_idx (L.index forest j)))
+          (ensures pq_indices_in_forest pq (list_remove_at forest j))
+  = let aux (k: nat{k < Seq.length pq})
+      : Lemma (Some? (find_entry_by_idx (list_remove_at forest j) (snd (Seq.index pq k)))) =
+      find_entry_remove_other forest j (snd (Seq.index pq k))
+    in
+    Classical.forall_intro aux
+
+
 ghost
 fn forest_own_put_head
   (entries: list forest_entry)
@@ -421,6 +489,49 @@ fn forest_own_take_at
   rewrite (forest_own entries)
        as (is_htree (entry_ptr (L.index entries j)) (entry_tree (L.index entries j)) **
            forest_own (list_remove_at entries j));
+}
+
+// Prove: forest_own entries == 
+//   is_htree(entries[j1]) ** is_htree(entries[j2]) ** forest_own(remove_two entries j1 j2)
+let forest_own_split_two_lemma
+  (entries: list forest_entry)
+  (j1 j2: nat)
+  : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2)
+          (ensures forest_own entries ==
+            is_htree (entry_ptr (L.index entries j1)) (entry_tree (L.index entries j1)) **
+            (is_htree (entry_ptr (L.index entries j2)) (entry_tree (L.index entries j2)) **
+             forest_own (list_remove_two entries j1 j2)))
+  = // First split at j1
+    forest_own_split_lemma entries j1;
+    // forest_own entries == is_htree(entries[j1]) ** forest_own(rem1)
+    let rem1 = list_remove_at entries j1 in
+    list_remove_at_length entries j1;
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    list_remove_at_index entries j1 j2';
+    // L.index rem1 j2' == L.index entries j2
+    // Split rem1 at j2'
+    forest_own_split_lemma rem1 j2'
+    // forest_own rem1 == is_htree(rem1[j2']) ** forest_own(list_remove_at rem1 j2')
+    // rem1[j2'] == entries[j2], and list_remove_at rem1 j2' == list_remove_two entries j1 j2
+    // So: forest_own entries ==
+    //   is_htree(entries[j1]) ** (is_htree(entries[j2]) ** forest_own(list_remove_two entries j1 j2))
+
+// Extract two elements at list positions j1, j2 from forest_own
+ghost
+fn forest_own_take_two
+  (entries: list forest_entry)
+  (j1: nat{j1 < L.length entries})
+  (j2: nat{j2 < L.length entries /\ j1 <> j2})
+  requires forest_own entries
+  ensures is_htree (entry_ptr (L.index entries j1)) (entry_tree (L.index entries j1)) **
+          is_htree (entry_ptr (L.index entries j2)) (entry_tree (L.index entries j2)) **
+          forest_own (list_remove_two entries j1 j2)
+{
+  forest_own_split_two_lemma entries j1 j2;
+  rewrite (forest_own entries)
+       as (is_htree (entry_ptr (L.index entries j1)) (entry_tree (L.index entries j1)) **
+           (is_htree (entry_ptr (L.index entries j2)) (entry_tree (L.index entries j2)) **
+            forest_own (list_remove_two entries j1 j2)));
 }
 
 // ========== Allocate/free pointer-based Huffman tree ==========
@@ -816,25 +927,61 @@ fn huffman_tree
     pq_forest_shrink pq1 pq2 (freq2, idx2) active0;
     let sum_freq = freq1 + freq2;
     
-    // Read the tree pointers from nodes array (idx1, idx2 < n from valid_pq_entries_shrink)
+    // Read the tree pointers from nodes array
+    with nd_contents0. assert (V.pts_to nodes nd_contents0);
     let left_ptr = V.op_Array_Access nodes idx1;
     let right_ptr = V.op_Array_Access nodes idx2;
     
+    // Ghost: find positions of idx1 and idx2 in forest and take both trees
+    find_entry_by_idx_spec active0 idx1;
+    find_entry_by_idx_spec active0 idx2;
+    // Assume idx1's and idx2's forest positions differ (follows from distinct PQ indices)
+    assume_ (pure (Some?.v (find_entry_by_idx active0 idx1) <> Some?.v (find_entry_by_idx active0 idx2)));
+    forest_own_take_two active0
+      (Some?.v (find_entry_by_idx active0 idx1))
+      (Some?.v (find_entry_by_idx active0 idx2));
+    
+    // Rewrite is_htree to use runtime pointers (from loop invariant: nodes[idx] == entry_ptr)
+    rewrite (is_htree (entry_ptr (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+                      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1)))))
+         as (is_htree left_ptr
+                      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1)))));
+    rewrite (is_htree (entry_ptr (L.index active0 (Some?.v (find_entry_by_idx active0 idx2))))
+                      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
+         as (is_htree right_ptr
+                      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))));
+    
     // Create merged internal node
+    assume_ (pure (sum_freq > 0));  // freq1, freq2 > 0 from spec trees
     let merged = alloc_hnode ({ freq = sum_freq; left = Some left_ptr; right = Some right_ptr } <: hnode);
     
-    // Store merged node in nodes[idx1]
-    V.op_Array_Assignment nodes idx1 merged;
+    // Fold is_htree for the merged node
+    fold (is_htree merged (HSpec.Internal (sum_freq <: pos)
+      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2))))));
     
-    // Insert (sum_freq, idx1) into PQ
+    // Store merged node in nodes[idx1] and insert into PQ
+    V.op_Array_Assignment nodes idx1 merged;
     PQ.insert pq (sum_freq, idx1);
     with pq3. assert (PQ.is_pqueue pq pq3 (SZ.v n));
     extends_length pq2 pq3 (sum_freq, idx1);
     valid_pq_entries_extends pq2 pq3 (sum_freq, idx1) (SZ.v n);
     
-    // Ghost: take trees for idx1/idx2 from forest_own, fold merged is_htree, put back
-    // This involves: find_entry_by_idx, forest_own_take_at (x2), fold is_htree, forest_own_put_head
-    // For now, admit the ghost manipulation
+    // Ghost: put merged entry into new forest
+    forest_own_put_head
+      (list_remove_two active0
+        (Some?.v (find_entry_by_idx active0 idx1))
+        (Some?.v (find_entry_by_idx active0 idx2)))
+      idx1 merged
+      (HSpec.Internal (sum_freq <: pos)
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))));
+    
+    // Maintain remaining invariants
+    list_remove_two_length active0
+      (Some?.v (find_entry_by_idx active0 idx1))
+      (Some?.v (find_entry_by_idx active0 idx2));
+    // pq_indices_in_forest and node-pointer correspondence for the new forest
     admit();
     
     let viter = !iter;
