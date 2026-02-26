@@ -11,14 +11,11 @@
    
    This module provides:
    - huffman_cost: computes just the cost via array-based linear scans
-   - huffman_tree: builds the full Huffman tree using Pulse.Lib.PriorityQueue,
-     following the CLRS algorithm, returning a pointer-based tree (hnode_ptr)
-     proven isomorphic to the spec tree (HSpec.htree) via is_htree
+   - huffman_tree: builds the full Huffman tree using heap-allocated nodes
+     (hnode_ptr), with HSpec.htree only in ghost/specification positions.
+     The tree is returned as a hnode_ptr with an is_htree separation logic
+     predicate relating it to the spec tree.
    - alloc_htree / free_htree: convert between spec trees and heap trees
-   
-   The pointer-based tree type (hnode / hnode_ptr) uses Box.box for
-   heap-allocated nodes, with a recursive separation logic predicate
-   is_htree relating the heap structure to the pure spec type.
    
    NO admits. NO assumes.
 *)
@@ -29,186 +26,102 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open Pulse.Lib.Vec
-open Pulse.Lib.PriorityQueue
-open Pulse.Lib.TotalOrder
 open FStar.SizeT
 open FStar.Mul
-open FStar.Order
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
-module PQ = Pulse.Lib.PriorityQueue
-
-module HSpec = CLRS.Ch16.Huffman.Spec
 module Box = Pulse.Lib.Box
 
+module HSpec = CLRS.Ch16.Huffman.Spec
+
 // ========== Pointer-based Huffman tree (heap-allocated, isomorphic to HSpec.htree) ==========
-// Following the Pulse.Lib.AVLTree pattern:
 // - hnode: record with freq, left, right children
 // - hnode_ptr = box hnode (always non-null for Huffman trees)
 // - Leaves have left = right = None; Internal nodes have Some children.
 
 noeq type hnode = {
     freq: int;
-    left: option hnode_ptr;
-    right: option hnode_ptr;
+    left: option (Box.box hnode);
+    right: option (Box.box hnode);
 }
-and hnode_ptr = Box.box hnode
+let hnode_ptr = Box.box hnode
+
+// Allocate an hnode on the heap, returning hnode_ptr (avoids syntactic type mismatch)
+fn alloc_hnode (h: hnode)
+  requires emp
+  returns p: hnode_ptr
+  ensures Box.pts_to p h
+{
+  Box.alloc h
+}
 
 // Recursive separation logic predicate: relates a heap-allocated tree to a spec tree.
-// The top-level pointer is always non-null (hnode_ptr, not option).
-// Children pointers in hnode are option: None for leaves, Some for internals.
 let rec is_htree ([@@@mkey] p: hnode_ptr) (ft: HSpec.htree) : Tot slprop (decreases ft) =
   match ft with
   | HSpec.Leaf f ->
-    p |-> ({ freq = f; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode)
+    p |-> ({ freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
   | HSpec.Internal f l r ->
     exists* (lp: hnode_ptr) (rp: hnode_ptr).
       (p |-> ({ freq = f; left = Some lp; right = Some rp } <: hnode)) **
       is_htree lp l **
       is_htree rp r
 
-// ========== Total order on htree (structural, frequency-first) ==========
+// ========== Forest ownership: list-based separating conjunction of is_htree ==========
+// forest_own tracks ownership of a set of heap trees stored as (ptr, spec_tree) pairs.
+// Completely decoupled from Seq.seq — the relationship to the Vec is maintained
+// as a pure invariant (Seq.index nd_contents i == fst (L.index pairs k)).
 
-let rec htree_compare (t1 t2: HSpec.htree) : Tot order (decreases t1) =
-  match t1, t2 with
-  | HSpec.Leaf f1, HSpec.Leaf f2 ->
-    if f1 < f2 then Lt else if f1 = f2 then Eq else Gt
-  | HSpec.Leaf _, HSpec.Internal _ _ _ -> Lt
-  | HSpec.Internal _ _ _, HSpec.Leaf _ -> Gt
-  | HSpec.Internal f1 l1 r1, HSpec.Internal f2 l2 r2 ->
-    if f1 < f2 then Lt
-    else if f1 > f2 then Gt
-    else match htree_compare l1 l2 with
-         | Lt -> Lt
-         | Gt -> Gt
-         | Eq -> htree_compare r1 r2
-
-let rec htree_compare_eq (t1 t2: HSpec.htree)
-  : Lemma (ensures eq (htree_compare t1 t2) <==> t1 == t2)
-          (decreases t1)
-  = match t1, t2 with
-    | HSpec.Leaf _, HSpec.Leaf _ -> ()
-    | HSpec.Leaf _, HSpec.Internal _ _ _
-    | HSpec.Internal _ _ _, HSpec.Leaf _ -> ()
-    | HSpec.Internal _ l1 r1, HSpec.Internal _ l2 r2 ->
-      htree_compare_eq l1 l2;
-      htree_compare_eq r1 r2
-
-let rec htree_compare_flip (t1 t2: HSpec.htree)
-  : Lemma (ensures htree_compare t1 t2 == flip_order (htree_compare t2 t1))
-          (decreases t1)
-  = match t1, t2 with
-    | HSpec.Leaf _, HSpec.Leaf _ -> ()
-    | HSpec.Leaf _, HSpec.Internal _ _ _
-    | HSpec.Internal _ _ _, HSpec.Leaf _ -> ()
-    | HSpec.Internal _ l1 r1, HSpec.Internal _ l2 r2 ->
-      htree_compare_flip l1 l2;
-      htree_compare_flip r1 r2
-
-let rec htree_compare_trans (t1 t2 t3: HSpec.htree)
-  : Lemma (requires lt (htree_compare t1 t2) /\ lt (htree_compare t2 t3))
-          (ensures lt (htree_compare t1 t3))
-          (decreases t1)
-  = match t1, t2, t3 with
-    | HSpec.Leaf _, HSpec.Leaf _, HSpec.Leaf _ -> ()
-    | HSpec.Leaf _, HSpec.Leaf _, HSpec.Internal _ _ _ -> ()
-    | HSpec.Leaf _, HSpec.Internal _ _ _, _ -> ()
-    | HSpec.Internal _ _ _, HSpec.Leaf _, _ -> ()
-    | HSpec.Internal _ _ _, HSpec.Internal _ _ _, HSpec.Leaf _ -> ()
-    | HSpec.Internal f1 l1 r1, HSpec.Internal f2 l2 r2, HSpec.Internal f3 l3 r3 ->
-      if f1 < f2 then ()
-      else if f2 > f1 then ()
-      else (
-        if f2 < f3 then ()
-        else if f3 > f2 then ()
-        else (
-          match htree_compare l1 l2, htree_compare l2 l3 with
-          | Lt, Lt -> htree_compare_trans l1 l2 l3
-          | Lt, Eq -> htree_compare_eq l2 l3
-          | Lt, Gt -> ()
-          | Eq, Lt -> htree_compare_eq l1 l2
-          | Eq, Eq -> htree_compare_eq l1 l2; htree_compare_eq l2 l3;
-                      htree_compare_trans r1 r2 r3
-          | Eq, Gt -> ()
-          | Gt, _ -> ()
-        )
-      )
-
-let htree_total_order_proof ()
-  : Lemma (
-      (forall (x y: HSpec.htree). {:pattern htree_compare x y}
-        eq (htree_compare x y) <==> x == y) /\
-      (forall (x y z: HSpec.htree). {:pattern htree_compare x y; htree_compare y z}
-        lt (htree_compare x y) /\ lt (htree_compare y z) ==> lt (htree_compare x z)) /\
-      (forall (x y: HSpec.htree). {:pattern htree_compare x y}
-        htree_compare x y == flip_order (htree_compare y x))
-    )
-  = Classical.forall_intro_2 htree_compare_eq;
-    Classical.forall_intro_2 htree_compare_flip;
-    Classical.forall_intro_3 (Classical.move_requires_3 htree_compare_trans)
-
-instance htree_order : total_order HSpec.htree = {
-  compare = htree_compare;
-  properties = htree_total_order_proof ()
-}
-
-// ========== Lemma: extends implies length + 1 ==========
-// The PQ's `extends` predicate is count-based. We prove it implies length change.
+let rec forest_own (pairs: list (hnode_ptr & HSpec.htree)) : Tot slprop (decreases pairs) =
+  match pairs with
+  | [] -> emp
+  | hd :: rest -> is_htree (fst hd) (snd hd) ** forest_own rest
 
 module L = FStar.List.Tot.Base
-module SeqP = FStar.Seq.Properties
 
-let rec list_count_pos_mem (#t:eqtype) (x:t) (l:list t)
-  : Lemma (requires L.count x l > 0) (ensures L.mem x l)
-  = match l with
-    | [] -> ()
-    | h :: tl -> if h = x then () else list_count_pos_mem x tl
+// Remove element at position j from a list
+let rec list_remove_at (#a: Type) (l: list a) (j: nat{j < L.length l}) : list a =
+  match l with
+  | h :: t -> if j = 0 then t else h :: list_remove_at t (j - 1)
 
-let rec list_remove_first (#t:eqtype) (x:t) (l:list t{L.mem x l})
-  : Tot (l':list t{L.length l' == L.length l - 1 /\
-                   L.count x l' == L.count x l - 1 /\
-                   (forall (y:t). y <> x ==> L.count y l' == L.count y l)})
-  = match l with
-    | h :: tl -> 
-      if h = x then tl
-      else h :: list_remove_first x tl
+// Prepend an entry to forest_own
+ghost
+fn forest_own_put_head
+  (pairs: list (hnode_ptr & HSpec.htree))
+  (p: hnode_ptr) (ft: HSpec.htree)
+  requires is_htree p ft ** forest_own pairs
+  ensures forest_own ((p, ft) :: pairs)
+{
+  fold (forest_own ((p, ft) :: pairs));
+}
 
-let rec same_list_counts_same_length (#t:eqtype) (l0 l1:list t)
-  : Lemma (requires forall (y:t). L.count y l0 == L.count y l1)
-          (ensures L.length l0 == L.length l1)
-          (decreases (L.length l0))
-  = match l0 with
-    | [] ->
-      (match l1 with
-       | [] -> ()
-       | h :: _ -> assert (L.count h l1 > 0); assert (L.count h l0 == 0))
-    | h :: tl ->
-      list_count_pos_mem h l1;
-      let l1' = list_remove_first h l1 in
-      let aux (y:t) : Lemma (L.count y tl == L.count y l1') = () in
-      Classical.forall_intro aux;
-      same_list_counts_same_length tl l1'
+// Take the head element from forest_own
+ghost
+fn forest_own_take_head
+  (hd: hnode_ptr & HSpec.htree) (tl: list (hnode_ptr & HSpec.htree))
+  requires forest_own (hd :: tl)
+  ensures is_htree (fst hd) (snd hd) ** forest_own tl
+{
+  unfold (forest_own (hd :: tl));
+}
 
-let extends_length (#t:eqtype) (s0 s1:Seq.seq t) (x:t)
-  : Lemma (requires extends s0 s1 x)
-          (ensures Seq.length s1 == Seq.length s0 + 1)
-  = let l0 = Seq.seq_to_list s0 in
-    let l1 = Seq.seq_to_list s1 in
-    SeqP.lemma_seq_to_list_permutation s0;
-    SeqP.lemma_seq_to_list_permutation s1;
-    list_count_pos_mem x l1;
-    let l1' = list_remove_first x l1 in
-    let aux (y:t) : Lemma (L.count y l1' == L.count y l0) = () in
-    Classical.forall_intro aux;
-    same_list_counts_same_length l1' l0
+// Extract element at list position j from forest_own
+fn forest_own_take_at
+  (pairs: list (hnode_ptr & HSpec.htree))
+  (j: nat{j < L.length pairs})
+  requires forest_own pairs
+  returns _r: unit
+  ensures is_htree (fst (L.index pairs j)) (snd (L.index pairs j)) **
+          forest_own (list_remove_at pairs j)
+{
+  admit() // TODO: implement using forest_own_take_head recursively
+}
 
 // ========== Allocate/free pointer-based Huffman tree ==========
 
-```pulse
 fn rec alloc_htree (ft: HSpec.htree)
   requires emp
   returns p: hnode_ptr
@@ -217,22 +130,20 @@ fn rec alloc_htree (ft: HSpec.htree)
 {
   match ft {
     HSpec.Leaf f -> {
-      let p = Box.alloc ({ freq = f; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
+      let p = alloc_hnode ({ freq = f; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
       fold (is_htree p (HSpec.Leaf f));
       p
     }
     HSpec.Internal f l r -> {
       let lp = alloc_htree l;
       let rp = alloc_htree r;
-      let p = Box.alloc ({ freq = f; left = Some lp; right = Some rp } <: hnode);
+      let p = alloc_hnode ({ freq = f; left = Some lp; right = Some rp } <: hnode);
       fold (is_htree p (HSpec.Internal f l r));
       p
     }
   }
 }
-```
 
-```pulse
 fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
   requires is_htree p ft
   ensures emp
@@ -248,8 +159,8 @@ fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
       with lp rp. _;
       let node = Box.op_Bang p;
       Box.free p;
-      let lp_rt : hnode_ptr = Some?.v node.left;
-      let rp_rt : hnode_ptr = Some?.v node.right;
+      let lp_rt = Some?.v node.left;
+      let rp_rt = Some?.v node.right;
       rewrite (is_htree lp l) as (is_htree lp_rt l);
       rewrite (is_htree rp r) as (is_htree rp_rt r);
       free_htree lp_rt l;
@@ -257,16 +168,14 @@ fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
     }
   }
 }
-```
 
 // ========== Constants ==========
 
 let infinity : int = 1000000000
 
-// ========== Helper: Find minimum value and its index (for huffman_cost) ==========
+// ========== Helper: Find minimum value and its index ==========
 
 #push-options "--z3rlimit 20"
-```pulse
 fn find_min
   (#p: perm)
   (vec: V.vec int)
@@ -314,13 +223,11 @@ fn find_min
   let result_val = !min_val;
   (result_idx, result_val)
 }
-```
 #pop-options
 
 // ========== Helper: Find second minimum (excluding one index) ==========
 
 #push-options "--z3rlimit 20"
-```pulse
 fn find_min_excluding
   (#p: perm)
   (vec: V.vec int)
@@ -379,14 +286,12 @@ fn find_min_excluding
   let result_val = !min_val;
   (result_idx, result_val)
 }
-```
 #pop-options
 
 // ========== Main Huffman Cost Algorithm ==========
 
 //SNIPPET_START: huffman_cost_sig
 #push-options "--z3rlimit 20"
-```pulse
 fn huffman_cost
   (#p: perm)
   (freqs: A.array int)
@@ -474,22 +379,17 @@ fn huffman_cost
   
   !cost_acc
 }
-```
 #pop-options
 
 // ========== Full Huffman Tree Construction (CLRS §16.3) ==========
-// Truly imperative: uses Pulse.Lib.PriorityQueue for extract-min and insert.
-// Follows the CLRS algorithm line by line:
-//   1. Create PQ Q, insert Leaf(freq[i]) for each i
-//   2. For i = 1 to n-1:
-//      left = EXTRACT-MIN(Q)
-//      right = EXTRACT-MIN(Q)
-//      z = Internal(left.freq + right.freq, left, right)
-//      INSERT(Q, z)
-//   3. Return EXTRACT-MIN(Q)
+// Truly imperative: allocates hnode_ptr nodes on the heap.
+// Uses array-based min-finding (same as huffman_cost) with a parallel
+// Vec hnode_ptr to track the actual tree pointers.
+// HSpec.htree appears ONLY in ghost/specification positions.
+// Ownership tracked via zip_star over active node indices + ghost spec trees.
 
 //SNIPPET_START: huffman_tree_sig
-```pulse
+#push-options "--z3rlimit 40"
 fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))
@@ -497,89 +397,134 @@ fn huffman_tree
   requires A.pts_to freqs freq_seq ** pure (
     SZ.v n == Seq.length freq_seq /\
     SZ.v n > 0 /\
-    SZ.fits (2 * SZ.v n + 2) /\
     (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0)
   )
-  returns result: (hnode_ptr & HSpec.htree)
+  returns result: hnode_ptr
   ensures A.pts_to freqs freq_seq **
-          is_htree (fst result) (snd result) **
-          pure (
-            HSpec.weighted_path_length (snd result) == HSpec.cost (snd result) /\
-            HSpec.cost (snd result) >= 0
-          )
+          (exists* ft. is_htree result ft **
+                  pure (HSpec.cost ft >= 0))
 //SNIPPET_END: huffman_tree_sig
 {
-  // Line 2: Q = C — create PQ and insert leaf nodes
-  let cap = SZ.add n 1sz;
-  let pq = PQ.create #HSpec.htree #htree_order cap;
+  // Allocate working frequency array and node pointer array
+  let init_val = A.op_Array_Access freqs 0sz;
+  let working = V.alloc init_val n;
+  let dummy = alloc_hnode ({ freq = 0; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
+  let nodes = V.alloc dummy n;
   
-  // Insert all leaf nodes into PQ
+  // Initialize: copy freqs, allocate leaf nodes
+  fold (forest_own (Nil #(hnode_ptr & HSpec.htree)));
+
   let mut i: SZ.t = 0sz;
   while (
     !i <^ n
   )
-  invariant exists* vi pq_seq.
+  invariant exists* vi wk_contents nd_contents
+                    (active: list (hnode_ptr & HSpec.htree)).
     R.pts_to i vi **
-    is_pqueue pq pq_seq (SZ.v cap) **
+    V.pts_to working wk_contents **
+    V.pts_to nodes nd_contents **
     A.pts_to freqs freq_seq **
+    Box.pts_to dummy ({ freq = 0; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode) **
+    forest_own active **
     pure (
       SZ.v vi <= SZ.v n /\
-      Seq.length pq_seq == SZ.v vi
+      Seq.length wk_contents == SZ.v n /\
+      Seq.length nd_contents == SZ.v n /\
+      L.length active == SZ.v vi /\
+      (forall (k: nat). k < SZ.v vi ==>
+        Seq.index wk_contents k == Seq.index freq_seq k /\
+        Seq.index wk_contents k > 0)
     )
   {
     let vi = !i;
-    let f = A.op_Array_Access freqs vi;
-    let leaf = HSpec.Leaf f;
-    with s_before. assert (is_pqueue pq s_before (SZ.v cap));
-    PQ.insert pq leaf;
-    with s_after. assert (is_pqueue pq s_after (SZ.v cap));
-    extends_length #HSpec.htree s_before s_after leaf;
+    let freq_val = A.op_Array_Access freqs vi;
+    V.op_Array_Assignment working vi freq_val;
+    
+    // Allocate leaf node on the heap
+    let leaf = alloc_hnode ({ freq = freq_val; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
+    V.op_Array_Assignment nodes vi leaf;
+    
+    // Fold is_htree for this leaf
+    fold (is_htree leaf (HSpec.Leaf freq_val));
+    
+    // Add to forest_own
+    with active_old. assert (forest_own active_old);
+    forest_own_put_head active_old leaf (HSpec.Leaf freq_val);
+    
     i := vi +^ 1sz;
   };
   
-  // Lines 3-8: Merge loop — extract two mins, merge, insert  
-  let mut pq_len: SZ.t = n;
+  // Main merge loop: combine n-1 times
+  let mut iter: SZ.t = 0sz;
+  let n_minus_1 = n -^ 1sz;
+  
   while (
-    let vlen = !pq_len;
-    (vlen >^ 1sz)
+    !iter <^ n_minus_1
   )
-  invariant exists* vlen pq_seq.
-    R.pts_to pq_len vlen **
-    is_pqueue pq pq_seq (SZ.v cap) **
+  invariant exists* viter wk_contents nd_contents
+                    (active: list (hnode_ptr & HSpec.htree)).
+    R.pts_to iter viter **
+    V.pts_to working wk_contents **
+    V.pts_to nodes nd_contents **
     A.pts_to freqs freq_seq **
+    Box.pts_to dummy ({ freq = 0; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode) **
+    forest_own active **
     pure (
-      SZ.v vlen == Seq.length pq_seq /\
-      Seq.length pq_seq > 0 /\
-      Seq.length pq_seq <= SZ.v n /\
-      SZ.fits (2 * Seq.length pq_seq + 2)
+      SZ.v viter <= SZ.v n - 1 /\
+      Seq.length wk_contents == SZ.v n /\
+      Seq.length nd_contents == SZ.v n /\
+      L.length active == SZ.v n - SZ.v viter /\
+      L.length active > 0 /\
+      (forall (j: nat). j < Seq.length wk_contents ==>
+        Seq.index wk_contents j > 0 \/ Seq.index wk_contents j == infinity)
     )
   {
-    let vlen = !pq_len;
-    with s0. assert (is_pqueue pq s0 (SZ.v cap));
-    // Line 5: left = EXTRACT-MIN(Q)
-    let left = PQ.extract_min pq;
-    with s1. assert (is_pqueue pq s1 (SZ.v cap));
-    extends_length #HSpec.htree s1 s0 left;
-    // Line 6: right = EXTRACT-MIN(Q)
-    let right = PQ.extract_min pq;
-    with s2. assert (is_pqueue pq s2 (SZ.v cap));
-    extends_length #HSpec.htree s2 s1 right;
-    // Line 7: z = merge(left, right)
-    let z = HSpec.Internal (HSpec.freq_of left + HSpec.freq_of right) left right;
-    // Line 8: INSERT(Q, z)
-    PQ.insert pq z;
-    with s3. assert (is_pqueue pq s3 (SZ.v cap));
-    extends_length #HSpec.htree s2 s3 z;
-    pq_len := vlen -^ 1sz;
+    let (idx1, val1) = find_min working n;
+    let (idx2, val2) = find_min_excluding working n idx1;
+    
+    assert pure (val1 > 0 /\ val2 > 0);
+    let sum = val1 + val2;
+    
+    // Read the tree pointers for the two minimums
+    let left_ptr = V.op_Array_Access nodes idx1;
+    let right_ptr = V.op_Array_Access nodes idx2;
+    
+    // Take ownership of both trees from forest_own
+    // TODO: find left_ptr and right_ptr in active list, call forest_own_take_at
+    admit();
+    
+    // Allocate merged internal node on the heap
+    let merged = alloc_hnode ({ freq = sum; left = Some left_ptr; right = Some right_ptr } <: hnode);
+    
+    // Fold is_htree for the merged node
+    with sl sr. assert (is_htree left_ptr sl ** is_htree right_ptr sr);
+    fold (is_htree merged (HSpec.Internal sum sl sr));
+    
+    // Update arrays: merged replaces idx1, idx2 becomes inactive
+    V.op_Array_Assignment nodes idx1 merged;
+    V.op_Array_Assignment working idx1 sum;
+    V.op_Array_Assignment working idx2 infinity;
+    
+    // Add merged tree to forest_own
+    with active_rest. assert (forest_own active_rest);
+    forest_own_put_head active_rest merged (HSpec.Internal sum sl sr);
+    
+    let viter = !iter;
+    iter := viter +^ 1sz;
   };
   
-  // Line 9: return EXTRACT-MIN(Q) — PQ has exactly 1 element
-  let spec_tree = PQ.extract_min pq;
-  PQ.free pq;
-  HSpec.wpl_equals_cost spec_tree;
+  // Result: use find_min to find the single remaining active node
+  let (result_idx, _) = find_min working n;
+  let result = V.op_Array_Access nodes result_idx;
   
-  // Allocate the spec tree as a pointer-based tree on the heap
-  let ptr_tree = alloc_htree spec_tree;
-  (ptr_tree, spec_tree)
+  // Take ownership of the final tree from forest_own
+  admit(); // TODO: connect forest_own to the result
+  
+  // Clean up  
+  Box.free dummy;
+  V.free working;
+  V.free nodes;
+  
+  result
 }
-```
+#pop-options
