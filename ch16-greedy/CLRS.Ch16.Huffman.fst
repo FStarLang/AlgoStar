@@ -85,6 +85,42 @@ let valid_pq_entries_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry) (n: nat)
     in
     Classical.forall_intro aux
 
+// All PQ entries have positive frequencies
+let pq_freqs_positive (pq: Seq.seq pq_entry) : prop =
+  forall (j: nat). j < Seq.length pq ==> fst (Seq.index pq j) > 0
+
+let pq_freqs_positive_extends (s0 s1: Seq.seq pq_entry) (x: pq_entry)
+  : Lemma (requires PQ.extends s0 s1 x /\ pq_freqs_positive s0 /\ fst x > 0)
+          (ensures pq_freqs_positive s1)
+  = let aux (j: nat{j < Seq.length s1}) : Lemma (fst (Seq.index s1 j) > 0) =
+      let y = Seq.index s1 j in
+      if y = x then ()
+      else begin
+        assert (Seq.mem y s1);
+        assert (PQ.count y s1 == PQ.count y s0);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+      end
+    in
+    Classical.forall_intro aux
+
+let pq_freqs_positive_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry)
+  : Lemma (requires PQ.extends s1 s0 x /\ pq_freqs_positive s0)
+          (ensures pq_freqs_positive s1 /\ fst x > 0)
+  = assert (FStar.Seq.Properties.count x s0 > 0);
+    FStar.Seq.Properties.mem_index x s0;
+    let aux (j: nat{j < Seq.length s1}) : Lemma (fst (Seq.index s1 j) > 0) =
+      let y = Seq.index s1 j in
+      if y = x then (FStar.Seq.Properties.mem_index x s0)
+      else begin
+        assert (Seq.mem y s1);
+        assert (PQ.count y s1 == PQ.count y s0);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+      end
+    in
+    Classical.forall_intro aux
+
 let pq_entry_compare (x y: pq_entry) : order =
   let (fx, ix) = x in
   let (fy, iy) = y in
@@ -847,6 +883,7 @@ fn huffman_tree
       L.length active == SZ.v vi /\
       SZ.fits (2 * SZ.v n + 2) /\
       valid_pq_entries pq_contents (SZ.v n) /\
+      pq_freqs_positive pq_contents /\
       pq_indices_in_forest pq_contents active /\
       (forall (k: nat). k < L.length active ==>
         SZ.v (entry_idx (L.index active k)) < SZ.v vi /\
@@ -866,6 +903,7 @@ fn huffman_tree
     with pq_new. assert (PQ.is_pqueue pq pq_new (SZ.v n));
     extends_length pq_old pq_new (freq_val, vi);
     valid_pq_entries_extends pq_old pq_new (freq_val, vi) (SZ.v n);
+    pq_freqs_positive_extends pq_old pq_new (freq_val, vi);
     
     // Fold is_htree for this leaf and add to forest_own
     fold (is_htree leaf (HSpec.Leaf freq_val));
@@ -905,6 +943,7 @@ fn huffman_tree
       L.length active > 0 /\
       SZ.fits (2 * Seq.length pq_contents + 2) /\
       valid_pq_entries pq_contents (SZ.v n) /\
+      pq_freqs_positive pq_contents /\
       pq_indices_in_forest pq_contents active /\
       (forall (k: nat). k < L.length active ==>
         SZ.v (entry_idx (L.index active k)) < SZ.v n /\
@@ -918,12 +957,14 @@ fn huffman_tree
     with pq1. assert (PQ.is_pqueue pq pq1 (SZ.v n));
     extends_length pq1 pq0 (freq1, idx1);
     valid_pq_entries_shrink pq0 pq1 (freq1, idx1) (SZ.v n);
+    pq_freqs_positive_shrink pq0 pq1 (freq1, idx1);
     pq_forest_shrink pq0 pq1 (freq1, idx1) active0;
     
     let (freq2, idx2) = PQ.extract_min pq;
     with pq2. assert (PQ.is_pqueue pq pq2 (SZ.v n));
     extends_length pq2 pq1 (freq2, idx2);
     valid_pq_entries_shrink pq1 pq2 (freq2, idx2) (SZ.v n);
+    pq_freqs_positive_shrink pq1 pq2 (freq2, idx2);
     pq_forest_shrink pq1 pq2 (freq2, idx2) active0;
     let sum_freq = freq1 + freq2;
     
@@ -951,8 +992,7 @@ fn huffman_tree
          as (is_htree right_ptr
                       (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))));
     
-    // Create merged internal node
-    assume_ (pure (sum_freq > 0));  // freq1, freq2 > 0 from spec trees
+    // Create merged internal node (freq1 > 0, freq2 > 0 from pq_freqs_positive_shrink)
     let merged = alloc_hnode ({ freq = sum_freq; left = Some left_ptr; right = Some right_ptr } <: hnode);
     
     // Fold is_htree for the merged node
@@ -966,6 +1006,7 @@ fn huffman_tree
     with pq3. assert (PQ.is_pqueue pq pq3 (SZ.v n));
     extends_length pq2 pq3 (sum_freq, idx1);
     valid_pq_entries_extends pq2 pq3 (sum_freq, idx1) (SZ.v n);
+    pq_freqs_positive_extends pq2 pq3 (sum_freq, idx1);
     
     // Ghost: put merged entry into new forest
     forest_own_put_head
