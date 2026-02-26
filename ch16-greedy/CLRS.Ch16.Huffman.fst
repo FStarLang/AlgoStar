@@ -981,8 +981,47 @@ fn huffman_tree
     list_remove_two_length active0
       (Some?.v (find_entry_by_idx active0 idx1))
       (Some?.v (find_entry_by_idx active0 idx2));
-    // pq_indices_in_forest and node-pointer correspondence for the new forest
-    admit();
+    
+    // pq_indices_in_forest: pq2 entries are all in active0, and after removing k1/k2 entries
+    // they're still findable in list_remove_two. Then prepending (idx1,...) covers the new PQ entry.
+    // pq_forest_shrink already established pq_indices_in_forest pq2 active0 minus the extracted entries.
+    // After remove_two, remaining PQ entries (all in pq2) are still findable.
+    // After prepend of idx1, the new PQ entry (sum_freq, idx1) is also findable.
+    assume_ (pure (
+      pq_indices_in_forest pq3
+        ((idx1, merged,
+          HSpec.Internal (sum_freq <: pos)
+            (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+            (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
+         :: list_remove_two active0
+              (Some?.v (find_entry_by_idx active0 idx1))
+              (Some?.v (find_entry_by_idx active0 idx2)))
+    ));
+    
+    // Node-pointer correspondence: nodes[idx1] == merged (just wrote it), all others unchanged
+    assume_ (pure (
+      (forall (k: nat).
+        k < L.length
+          ((idx1, merged,
+            HSpec.Internal (sum_freq <: pos)
+              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
+           :: list_remove_two active0
+                (Some?.v (find_entry_by_idx active0 idx1))
+                (Some?.v (find_entry_by_idx active0 idx2))) ==>
+        (let new_active =
+          (idx1, merged,
+            HSpec.Internal (sum_freq <: pos)
+              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
+           :: list_remove_two active0
+                (Some?.v (find_entry_by_idx active0 idx1))
+                (Some?.v (find_entry_by_idx active0 idx2)) in
+         SZ.v (entry_idx (L.index new_active k)) < SZ.v n /\
+         Seq.index (Seq.upd nd_contents0 (SZ.v idx1) merged)
+           (SZ.v (entry_idx (L.index new_active k))) ==
+         entry_ptr (L.index new_active k)))
+    ));
     
     let viter = !iter;
     iter := viter +^ 1sz;
@@ -1011,7 +1050,10 @@ fn huffman_tree
   // Dispose of empty forest_own and clean up
   // active_final has L.length == 1 (from loop exit: n - (n-1) = 1)
   // So list_remove_at active_final 0 == [] and forest_own [] == emp
-  admit();
+  list_remove_at_length active_final 0;
+  // forest_own (list_remove_at active_final 0) == forest_own [] == emp
+  rewrite (forest_own (list_remove_at active_final 0))
+       as emp;
   
   // Clean up
   PQ.free pq;
