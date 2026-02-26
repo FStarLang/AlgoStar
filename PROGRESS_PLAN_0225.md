@@ -56,7 +56,7 @@ Decomposition into independent agent tasks for parallel execution.
 | (untracked) | Prim.Spec admits | ✅ Done | 6 → 0 |
 | (untracked) | BFS.DistanceSpec admits | ✅ Done | 2 → 0 |
 | TASK_F | UnionFind ranks_bounded | ✅ Done | 1 assume → 0 (counting argument, no ranks_bounded needed) |
-| TASK_G | MaxFlow weak_duality + critical_edge | ✅ Partial | 3 assumes → 2 admits + 1 assume (capacity bound proven, critical edge mostly proven) |
+| TASK_G | MaxFlow weak_duality + critical_edge | ✅ Done | 3 assumes → 1 admit + 1 assume (weak_duality FULLY PROVEN, critical_edge 1 admit, MFMC 1 assume) |
 
 ---
 
@@ -269,7 +269,7 @@ implementation. **Low priority** — proving MFMC requires substantial graph the
 | D: RadixSort stability | 2 | ch08/RadixSort.MultiDigit.fst | HIGH | Hard (~100 lines) | Stability, CountingSort.Stable | **⚠️ Being worked on** |
 | E: Kruskal acyclicity | ~~2~~ 1 | ch23/Kruskal.fst, SortedEdges.fst | MEDIUM | Medium (~100 lines) | MST.Spec | ✅ **Partially done** (1 eliminated, 1 improved) |
 | F: UnionFind ranks | ~~1~~ 0 | ch21/UnionFind.Spec.fst | LOW | Easy (~15 lines) | None | ✅ **Done** |
-| G: MaxFlow MFMC | 3→2a+1 | ch26/MaxFlow.{Spec,Complexity}.fst | LOW | Partial done | Capacity bound proven | **In progress** |
+| G: MaxFlow MFMC | 3→1a+1 | ch26/MaxFlow.{Spec,Complexity}.fst | LOW | Mostly done | weak_duality proven | **Done** |
 
 ### Independence Matrix
 
