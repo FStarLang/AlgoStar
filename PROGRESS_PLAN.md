@@ -186,7 +186,8 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | StackDFS.Cmplx (Ch22) | 6 assume_ | ✅ Zero assumes, sum_scan_idx proof | −6 |
 | Strassen (Ch28) | 1 admit | ✅ Zero admits, smt_sync' quadrant proof | −1 |
 | CountingSort.Stable (Ch08) | 3 assume_ | ✅ Zero assumes, StableLemmas module | −3 |
-| **Net change** | ~155 total | ~67 total | **−88** |
+| UnionFind.Spec (Ch21) | 1 assume | ✅ Zero assumes, counting argument proof | −1 |
+| **Net change** | ~155 total | ~66 total | **−89** |
 
 ### Per-Algorithm Status Table
 
@@ -225,7 +226,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 15 | RodCutting.Extended | §15.1 | ✅ cuts_are_optimal | — | 0 | |
 | 16 | ActivitySelection | §16.1 | ✅ exchange argument | ✅ Linked O(n) | 0 | ✅ Full optimality |
 | 16 | Huffman | §16.3 | ✅ full tree (PQ) + cost | ✅ Linked (cost) | 0 | Imperative PQ-based tree; Spec: 0 ✅; Complete: 0 ✅ |
-| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 1 assume | FullCompress available |
+| 21 | Union-Find | §21.3 | ✅ find=root, union | ⚠️ Separate O(mn) | 0 | ✅ ranks_bounded proven via counting argument |
 | 22 | IterativeBFS | — | ⚠️ reachability | — | 0 | Not CLRS |
 | 22 | QueueBFS | §22.2 | ⚠️ no shortest path | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
 | 22 | IterativeDFS | — | ⚠️ reachability | — | 0 | Not CLRS |
@@ -883,7 +884,7 @@ BellmanFord.Spec ✅, Dijkstra.TriIneq ✅, Dijkstra.Correctness ✅,
 KMP.Spec ✅, KMP.Complexity ✅, BucketSort ✅, CountingSort.Stable ✅, Kruskal.EdgeSorting ✅,
 StackDFS.Complexity ✅, QueueBFS.Complexity ✅, BST.Insert.Spec ✅,
 BST.Delete.Spec ✅, BST.Spec.Complete ✅, BST.Spec.Complexity ✅,
-RBTree.Spec ✅, UnionFind.Spec ✅ (1 assume for rank bound),
+RBTree.Spec ✅, UnionFind.Spec ✅ (0 assumes, ranks_bounded proven),
 ActivitySelection.Spec ✅, RabinKarp.Spec ✅, MatrixChain.Spec ✅,
 RodCutting.Spec ✅, GCD ✅, ExtendedGCD ✅, ModExp ✅,
 BFS.DistanceSpec ✅, TopologicalSort.Verified ✅, Strassen ✅,
