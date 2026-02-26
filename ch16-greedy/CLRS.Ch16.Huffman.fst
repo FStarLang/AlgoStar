@@ -121,6 +121,246 @@ let pq_freqs_positive_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry)
     in
     Classical.forall_intro aux
 
+// PQ index uniqueness: no two entries share the same snd (index) component
+let pq_idx_unique (s: Seq.seq pq_entry) : prop =
+  forall (i j: nat). i < Seq.length s /\ j < Seq.length s /\ i <> j ==>
+    snd (Seq.index s i) <> snd (Seq.index s j)
+
+// If no element of s equals x, count x s = 0
+let rec count_zero (#a: eqtype) (x: a) (s: Seq.seq a)
+  : Lemma (requires forall (k: nat). k < Seq.length s ==> Seq.index s k <> x)
+          (ensures FStar.Seq.Properties.count x s = 0)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else begin
+      assert (Seq.head s == Seq.index s 0);
+      let tl = Seq.tail s in
+      let aux (k: nat{k < Seq.length tl}) : Lemma (Seq.index tl k <> x) =
+        assert (Seq.index tl k == Seq.index s (k + 1))
+      in
+      Classical.forall_intro aux;
+      count_zero x tl
+    end
+
+// If count x s = 1, then i and j both indexing x implies i = j
+let rec count_one_unique (#a: eqtype) (x: a) (s: Seq.seq a) (i j: nat)
+  : Lemma (requires FStar.Seq.Properties.count x s = 1 /\
+                    i < Seq.length s /\ j < Seq.length s /\
+                    Seq.index s i = x /\ Seq.index s j = x)
+          (ensures i = j)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else if Seq.head s = x then begin
+      // count x (tail s) = 0
+      assert (FStar.Seq.Properties.count x (Seq.tail s) = 0);
+      // So i = 0 and j = 0
+      if i > 0 then begin
+        assert (Seq.index (Seq.tail s) (i - 1) == Seq.index s i);
+        FStar.Seq.Properties.mem_index x (Seq.tail s)
+      end;
+      if j > 0 then begin
+        assert (Seq.index (Seq.tail s) (j - 1) == Seq.index s j);
+        FStar.Seq.Properties.mem_index x (Seq.tail s)
+      end
+    end
+    else begin
+      // head <> x, so count x (tail s) = 1
+      assert (FStar.Seq.Properties.count x (Seq.tail s) = 1);
+      // i > 0 and j > 0
+      assert (i > 0);
+      assert (j > 0);
+      assert (Seq.index (Seq.tail s) (i - 1) == Seq.index s i);
+      assert (Seq.index (Seq.tail s) (j - 1) == Seq.index s j);
+      count_one_unique x (Seq.tail s) (i - 1) (j - 1)
+    end
+
+// pq_idx_unique implies all entries are pairwise distinct, so count <= 1 for any element
+let rec pq_idx_unique_count_le_1 (s: Seq.seq pq_entry) (x: pq_entry)
+  : Lemma (requires pq_idx_unique s)
+          (ensures FStar.Seq.Properties.count x s <= 1)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else begin
+      let hd = Seq.head s in
+      let tl = Seq.tail s in
+      if hd = x then begin
+        // count x s = 1 + count x tl; show count x tl = 0
+        let aux2 (k: nat{k < Seq.length tl}) : Lemma (Seq.index tl k <> x) =
+          assert (Seq.index tl k == Seq.index s (k + 1));
+          assert (snd (Seq.index s (k + 1)) <> snd (Seq.index s 0))
+        in
+        Classical.forall_intro aux2;
+        count_zero x tl
+      end
+      else begin
+        // hd <> x, count x s = count x tl; need pq_idx_unique tl
+        assert (forall (i: nat) (j: nat). i < Seq.length tl /\ j < Seq.length tl /\ i <> j ==>
+          Seq.index tl i == Seq.index s (i + 1) /\ Seq.index tl j == Seq.index s (j + 1));
+        pq_idx_unique_count_le_1 tl x
+      end
+    end
+
+// After insert: pq_idx_unique extends (new entry's index is fresh)
+#push-options "--z3rlimit 120"
+let pq_idx_unique_extends (s0 s1: Seq.seq pq_entry) (x: pq_entry)
+  : Lemma (requires PQ.extends s0 s1 x /\ pq_idx_unique s0 /\
+                    (forall (j: nat). j < Seq.length s0 ==> snd (Seq.index s0 j) <> snd x))
+          (ensures pq_idx_unique s1)
+  = let aux (i j: nat)
+      : Lemma (requires i < Seq.length s1 /\ j < Seq.length s1 /\ i <> j)
+              (ensures snd (Seq.index s1 i) <> snd (Seq.index s1 j)) =
+      let yi = Seq.index s1 i in
+      let yj = Seq.index s1 j in
+      if yi = x && yj = x then begin
+        let aux2 (k: nat{k < Seq.length s0}) : Lemma (Seq.index s0 k <> x) =
+          assert (snd (Seq.index s0 k) <> snd x)
+        in
+        Classical.forall_intro aux2;
+        count_zero x s0;
+        assert (PQ.count x s1 == 1);
+        count_one_unique x s1 i j
+      end
+      else if yi = x then begin
+        FStar.Seq.Properties.seq_mem_k s1 j;
+        assert (yj =!= x);
+        assert (PQ.count yj s1 == PQ.count yj s0);
+        assert (Seq.mem yj s0);
+        FStar.Seq.Properties.mem_index yj s0
+      end
+      else if yj = x then begin
+        FStar.Seq.Properties.seq_mem_k s1 i;
+        assert (yi =!= x);
+        assert (PQ.count yi s1 == PQ.count yi s0);
+        assert (Seq.mem yi s0);
+        FStar.Seq.Properties.mem_index yi s0
+      end
+      else begin
+        // Neither is x: yi <> x and yj <> x
+        assert (yi =!= x);
+        assert (yj =!= x);
+        FStar.Seq.Properties.seq_mem_k s1 i;
+        FStar.Seq.Properties.seq_mem_k s1 j;
+        assert (PQ.count yi s1 == PQ.count yi s0);
+        assert (PQ.count yj s1 == PQ.count yj s0);
+        FStar.Seq.Properties.mem_index yi s0;
+        FStar.Seq.Properties.mem_index yj s0;
+        pq_idx_unique_count_le_1 s0 yi;
+        if yi = yj then
+          count_one_unique yi s1 i j;
+        let ii = FStar.Seq.Properties.index_mem yi s0 in
+        let jj = FStar.Seq.Properties.index_mem yj s0 in
+        assert (ii <> jj)
+      end
+    in
+    let aux' (i j: nat) : Lemma
+      (i < Seq.length s1 /\ j < Seq.length s1 /\ i <> j ==>
+       snd (Seq.index s1 i) <> snd (Seq.index s1 j))
+    = if i < Seq.length s1 && j < Seq.length s1 && i <> j then aux i j
+    in
+    Classical.forall_intro_2 aux'
+#pop-options
+
+// After extract_min: pq_idx_unique shrinks
+let pq_idx_unique_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry)
+  : Lemma (requires PQ.extends s1 s0 x /\ pq_idx_unique s0)
+          (ensures pq_idx_unique s1 /\
+                   (forall (j: nat). j < Seq.length s1 ==> snd (Seq.index s1 j) <> snd x))
+  = let aux (i j: nat)
+      : Lemma (requires i < Seq.length s1 /\ j < Seq.length s1 /\ i <> j)
+              (ensures snd (Seq.index s1 i) <> snd (Seq.index s1 j)) =
+      let yi = Seq.index s1 i in
+      let yj = Seq.index s1 j in
+      FStar.Seq.Properties.seq_mem_k s1 i;
+      FStar.Seq.Properties.seq_mem_k s1 j;
+      // yi is in s0
+      if yi = x then begin
+        assert (PQ.count yi s0 == PQ.count yi s1 + 1);
+        assert (Seq.mem yi s0)
+      end else begin
+        assert (yi =!= x);
+        assert (PQ.count yi s0 == PQ.count yi s1);
+        assert (Seq.mem yi s0)
+      end;
+      FStar.Seq.Properties.mem_index yi s0;
+      pq_idx_unique_count_le_1 s0 yi;
+      if yi = yj then
+        count_one_unique yi s1 i j;
+      // yj is in s0
+      if yj = x then begin
+        assert (PQ.count yj s0 == PQ.count yj s1 + 1);
+        assert (Seq.mem yj s0)
+      end else begin
+        assert (yj =!= x);
+        assert (PQ.count yj s0 == PQ.count yj s1);
+        assert (Seq.mem yj s0)
+      end;
+      FStar.Seq.Properties.mem_index yj s0;
+      let ii = FStar.Seq.Properties.index_mem yi s0 in
+      let jj = FStar.Seq.Properties.index_mem yj s0 in
+      assert (ii <> jj)
+    in
+    let aux' (i j: nat) : Lemma
+      (i < Seq.length s1 /\ j < Seq.length s1 /\ i <> j ==>
+       snd (Seq.index s1 i) <> snd (Seq.index s1 j))
+    = if i < Seq.length s1 && j < Seq.length s1 && i <> j then aux i j
+    in
+    Classical.forall_intro_2 aux';
+    // Also: no entry in s1 has index = snd x
+    let aux2 (j: nat{j < Seq.length s1})
+      : Lemma (snd (Seq.index s1 j) <> snd x) =
+      let y = Seq.index s1 j in
+      FStar.Seq.Properties.seq_mem_k s1 j;
+      if snd y = snd x then begin
+        // y is in s0
+        if y = x then begin
+          assert (PQ.count y s0 == PQ.count y s1 + 1);
+          assert (Seq.mem y s0)
+        end else begin
+          assert (y =!= x);
+          assert (PQ.count y s0 == PQ.count y s1);
+          assert (Seq.mem y s0)
+        end;
+        FStar.Seq.Properties.mem_index y s0;
+        let k = FStar.Seq.Properties.index_mem y s0 in
+        assert (PQ.count x s0 > 0);
+        FStar.Seq.Properties.mem_index x s0;
+        let kx = FStar.Seq.Properties.index_mem x s0 in
+        if k = kx then begin
+          assert (y = x);
+          pq_idx_unique_count_le_1 s0 x;
+          assert (PQ.count x s0 == 1);
+          assert (PQ.count x s1 == 0)
+        end
+        else begin
+          assert (snd (Seq.index s0 k) = snd x);
+          assert (snd (Seq.index s0 kx) = snd x);
+          assert (k <> kx)
+        end
+      end
+    in
+    Classical.forall_intro aux2
+
+// After shrinking (removing x), if all entries in s0 had snd <> some_idx, entries in s1 also have snd <> some_idx
+let pq_no_idx_preserved (s0 s1: Seq.seq pq_entry) (x: pq_entry) (some_idx: SZ.t)
+  : Lemma (requires PQ.extends s1 s0 x /\
+                    (forall (j: nat). j < Seq.length s0 ==> snd (Seq.index s0 j) <> some_idx))
+          (ensures (forall (j: nat). j < Seq.length s1 ==> snd (Seq.index s1 j) <> some_idx))
+  = let aux (j: nat{j < Seq.length s1})
+      : Lemma (snd (Seq.index s1 j) <> some_idx) =
+      let y = Seq.index s1 j in
+      FStar.Seq.Properties.seq_mem_k s1 j;
+      if y = x then begin
+        assert (PQ.count x s0 > 0);
+        FStar.Seq.Properties.mem_index x s0
+      end else begin
+        assert (y =!= x);
+        assert (PQ.count y s0 == PQ.count y s1);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+      end
+    in
+    Classical.forall_intro aux
+
 let pq_entry_compare (x y: pq_entry) : order =
   let (fx, ix) = x in
   let (fy, iy) = y in
@@ -300,6 +540,16 @@ let entry_idx  (e: forest_entry) : SZ.t = let (i, _, _) = e in i
 let entry_ptr  (e: forest_entry) : hnode_ptr = let (_, p, _) = e in p
 let entry_tree (e: forest_entry) : HSpec.htree = let (_, _, t) = e in t
 
+// Forest distinct indices: no two entries share the same index
+let forest_distinct_indices (entries: list forest_entry) : prop =
+  forall (i j: nat). i < L.length entries /\ j < L.length entries /\ i <> j ==>
+    entry_idx (L.index entries i) <> entry_idx (L.index entries j)
+
+let forest_distinct_indices_elim (entries: list forest_entry) (i j: nat)
+  : Lemma (requires forest_distinct_indices entries /\ i < L.length entries /\ j < L.length entries /\ i <> j)
+          (ensures entry_idx (L.index entries i) <> entry_idx (L.index entries j))
+  = ()
+
 let rec forest_own (entries: list forest_entry) : Tot slprop (decreases entries) =
   match entries with
   | [] -> emp
@@ -357,6 +607,21 @@ let rec find_entry_by_idx_spec (entries: list forest_entry) (idx: SZ.t)
 let pq_indices_in_forest (pq: Seq.seq pq_entry) (forest: list forest_entry) : prop =
   forall (j: nat). j < Seq.length pq ==>
     Some? (find_entry_by_idx forest (snd (Seq.index pq j)))
+
+// If all forest entries have idx < bound, and pq_indices_in_forest, then all PQ snd < bound
+let pq_idx_lt_bound (pq: Seq.seq pq_entry) (forest: list forest_entry) (bound: SZ.t)
+  : Lemma (requires pq_indices_in_forest pq forest /\
+                    (forall (k: nat). k < L.length forest ==> SZ.v (entry_idx (L.index forest k)) < SZ.v bound))
+          (ensures forall (j: nat). j < Seq.length pq ==> snd (Seq.index pq j) <> bound)
+  = let aux (j: nat{j < Seq.length pq})
+      : Lemma (snd (Seq.index pq j) <> bound) =
+      let idx = snd (Seq.index pq j) in
+      find_entry_by_idx_spec forest idx;
+      let k = Some?.v (find_entry_by_idx forest idx) in
+      assert (entry_idx (L.index forest k) == idx);
+      assert (SZ.v idx < SZ.v bound)
+    in
+    Classical.forall_intro aux
 
 // pq_indices_in_forest is preserved by extends (insert)
 let pq_forest_extends (s0 s1: Seq.seq pq_entry) (x: pq_entry) (forest: list forest_entry)
@@ -456,6 +721,198 @@ let pq_forest_remove (pq: Seq.seq pq_entry) (forest: list forest_entry) (j: nat{
   = let aux (k: nat{k < Seq.length pq})
       : Lemma (Some? (find_entry_by_idx (list_remove_at forest j) (snd (Seq.index pq k)))) =
       find_entry_remove_other forest j (snd (Seq.index pq k))
+    in
+    Classical.forall_intro aux
+
+// pq_indices_in_forest after removing two entries (if no PQ entry has either removed index)
+let pq_forest_remove_two (pq: Seq.seq pq_entry) (forest: list forest_entry)
+  (j1 j2: nat)
+  : Lemma (requires j1 < L.length forest /\ j2 < L.length forest /\ j1 <> j2 /\
+                    pq_indices_in_forest pq forest /\
+                    (forall (k: nat). k < Seq.length pq ==>
+                      snd (Seq.index pq k) =!= entry_idx (L.index forest j1) /\
+                      snd (Seq.index pq k) =!= entry_idx (L.index forest j2)))
+          (ensures pq_indices_in_forest pq (list_remove_two forest j1 j2))
+  = pq_forest_remove pq forest j1;
+    list_remove_at_length forest j1;
+    let rem1 = list_remove_at forest j1 in
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    list_remove_at_index forest j1 j2';
+    pq_forest_remove pq rem1 j2'
+
+// forest_distinct_indices is preserved by list_remove_at
+let forest_distinct_indices_remove_at (entries: list forest_entry) (j: nat)
+  : Lemma (requires forest_distinct_indices entries /\ j < L.length entries)
+          (ensures forest_distinct_indices (list_remove_at entries j))
+  = let rem = list_remove_at entries j in
+    list_remove_at_length entries j;
+    let aux (i1 i2: nat)
+      : Lemma (ensures (i1 < L.length rem /\ i2 < L.length rem /\ i1 <> i2) ==>
+                       entry_idx (L.index rem i1) <> entry_idx (L.index rem i2))
+      = if i1 < L.length rem && i2 < L.length rem && i1 <> i2 then begin
+          list_remove_at_index entries j i1;
+          list_remove_at_index entries j i2
+        end
+    in
+    Classical.forall_intro_2 aux
+
+// forest_distinct_indices is preserved by list_remove_two
+let forest_distinct_indices_remove_two (entries: list forest_entry) (j1 j2: nat)
+  : Lemma (requires forest_distinct_indices entries /\ j1 < L.length entries /\
+                    j2 < L.length entries /\ j1 <> j2)
+          (ensures forest_distinct_indices (list_remove_two entries j1 j2))
+  = forest_distinct_indices_remove_at entries j1;
+    list_remove_at_length entries j1;
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    forest_distinct_indices_remove_at (list_remove_at entries j1) j2'
+
+// Entry at position j has index idx implies no other entry in list_remove_at has that index
+let list_remove_at_no_idx (entries: list forest_entry) (j: nat) (idx: SZ.t)
+  : Lemma (requires forest_distinct_indices entries /\ j < L.length entries /\
+                    entry_idx (L.index entries j) == idx)
+          (ensures forall (k: nat). k < L.length (list_remove_at entries j) ==>
+                    entry_idx (L.index (list_remove_at entries j) k) <> idx)
+  = list_remove_at_length entries j;
+    let aux (k: nat)
+      : Lemma (ensures (k < L.length entries - 1) ==>
+                       entry_idx (L.index (list_remove_at entries j) k) <> idx)
+      = if k < L.length entries - 1 then begin
+          list_remove_at_index entries j k;
+          // list_remove_at_index gives:
+          //   L.index (list_remove_at entries j) k == 
+          //     if k < j then L.index entries k else L.index entries (k+1)
+          if k < j then
+            forest_distinct_indices_elim entries k j
+          else
+            forest_distinct_indices_elim entries (k + 1) j
+        end
+    in
+    Classical.forall_intro aux
+
+// No entry in list_remove_two has the index of the first removed entry
+let list_remove_two_no_idx (entries: list forest_entry) (j1 j2: nat) (idx: SZ.t)
+  : Lemma (requires forest_distinct_indices entries /\ j1 < L.length entries /\
+                    j2 < L.length entries /\ j1 <> j2 /\
+                    entry_idx (L.index entries j1) == idx)
+          (ensures forall (k: nat). k < L.length (list_remove_two entries j1 j2) ==>
+                    entry_idx (L.index (list_remove_two entries j1 j2) k) <> idx)
+  = list_remove_at_no_idx entries j1 idx;
+    list_remove_at_length entries j1;
+    let rem1 = list_remove_at entries j1 in
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    list_remove_at_length rem1 j2';
+    let aux (k: nat)
+      : Lemma (ensures (k < L.length (list_remove_two entries j1 j2)) ==>
+                       entry_idx (L.index (list_remove_two entries j1 j2) k) <> idx)
+      = if k < L.length rem1 - 1 then begin
+          list_remove_at_index rem1 j2' k;
+          // gives: L.index (list_remove_at rem1 j2') k == 
+          //        if k < j2' then L.index rem1 k else L.index rem1 (k+1)
+          // All entries in rem1 have entry_idx <> idx (from list_remove_at_no_idx)
+          ()
+        end
+    in
+    Classical.forall_intro aux
+
+// forest_distinct_indices is preserved by prepend if head index is fresh
+let forest_distinct_indices_prepend (entries: list forest_entry) (e: forest_entry)
+  : Lemma (requires forest_distinct_indices entries /\
+                    (forall (k: nat). k < L.length entries ==>
+                      entry_idx (L.index entries k) <> entry_idx e))
+          (ensures forest_distinct_indices (e :: entries))
+  = let l' = e :: entries in
+    let aux (i j: nat)
+      : Lemma (ensures (i < L.length l' /\ j < L.length l' /\ i <> j) ==>
+                       entry_idx (L.index l' i) <> entry_idx (L.index l' j))
+      = ()
+    in
+    Classical.forall_intro_2 aux
+
+// Prove forest_distinct_indices for new_active after merge
+let forest_distinct_indices_after_merge
+  (active0: list forest_entry) (j1 j2: nat) (idx: SZ.t)
+  (merged: hnode_ptr) (tree: HSpec.htree)
+  : Lemma (requires forest_distinct_indices active0 /\
+                    j1 < L.length active0 /\ j2 < L.length active0 /\ j1 <> j2 /\
+                    entry_idx (L.index active0 j1) == idx)
+          (ensures forest_distinct_indices
+                    ((idx, merged, tree) :: list_remove_two active0 j1 j2))
+  = forest_distinct_indices_remove_two active0 j1 j2;
+    list_remove_two_no_idx active0 j1 j2 idx;
+    forest_distinct_indices_prepend (list_remove_two active0 j1 j2) (idx, merged, tree)
+
+// Node-pointer correspondence after Seq.upd at idx1
+#push-options "--split_queries always --z3rlimit 40"
+let node_ptr_correspondence_upd_tail
+  (active0: list forest_entry) (j1 j2: nat)
+  (idx1: SZ.t) (merged: hnode_ptr) (tree: HSpec.htree)
+  (nd_contents: Seq.seq hnode_ptr) (n: SZ.t)
+  (k: nat)
+  : Lemma (requires
+      forest_distinct_indices active0 /\
+      j1 < L.length active0 /\ j2 < L.length active0 /\ j1 <> j2 /\
+      entry_idx (L.index active0 j1) == idx1 /\
+      SZ.v idx1 < Seq.length nd_contents /\
+      Seq.length nd_contents == SZ.v n /\
+      k < L.length (list_remove_two active0 j1 j2) /\
+      (forall (k: nat). k < L.length active0 ==>
+        SZ.v (entry_idx (L.index active0 k)) < SZ.v n /\
+        Seq.index nd_contents (SZ.v (entry_idx (L.index active0 k))) == entry_ptr (L.index active0 k)))
+    (ensures (
+      let rem = list_remove_two active0 j1 j2 in
+      let nd' = Seq.upd nd_contents (SZ.v idx1) merged in
+      SZ.v (entry_idx (L.index rem k)) < SZ.v n /\
+      Seq.index nd' (SZ.v (entry_idx (L.index rem k))) ==
+      entry_ptr (L.index rem k)))
+  = list_remove_at_length active0 j1;
+    let rem1 = list_remove_at active0 j1 in
+    let j2' = if j2 < j1 then j2 else j2 - 1 in
+    list_remove_at_length rem1 j2';
+    list_remove_at_index rem1 j2' k;
+    let p1 = if k < j2' then k else k + 1 in
+    list_remove_at_index active0 j1 p1;
+    let orig = if p1 < j1 then p1 else p1 + 1 in
+    assert (orig < L.length active0);
+    assert (orig <> j1);
+    forest_distinct_indices_elim active0 orig j1;
+    Seq.lemma_index_upd2 nd_contents (SZ.v idx1) merged
+      (SZ.v (entry_idx (L.index active0 orig)))
+#pop-options
+
+let node_ptr_correspondence_upd
+  (active0: list forest_entry) (j1 j2: nat)
+  (idx1: SZ.t) (merged: hnode_ptr) (tree: HSpec.htree)
+  (nd_contents: Seq.seq hnode_ptr) (n: SZ.t)
+  : Lemma (requires
+      forest_distinct_indices active0 /\
+      j1 < L.length active0 /\ j2 < L.length active0 /\ j1 <> j2 /\
+      entry_idx (L.index active0 j1) == idx1 /\
+      SZ.v idx1 < Seq.length nd_contents /\
+      Seq.length nd_contents == SZ.v n /\
+      (forall (k: nat). k < L.length active0 ==>
+        SZ.v (entry_idx (L.index active0 k)) < SZ.v n /\
+        Seq.index nd_contents (SZ.v (entry_idx (L.index active0 k))) == entry_ptr (L.index active0 k)))
+    (ensures (
+      let new_active = (idx1, merged, tree) :: list_remove_two active0 j1 j2 in
+      let nd' = Seq.upd nd_contents (SZ.v idx1) merged in
+      forall (k: nat). k < L.length new_active ==>
+        SZ.v (entry_idx (L.index new_active k)) < SZ.v n /\
+        Seq.index nd' (SZ.v (entry_idx (L.index new_active k))) ==
+        entry_ptr (L.index new_active k)))
+  = let new_active = (idx1, merged, tree) :: list_remove_two active0 j1 j2 in
+    let nd' = Seq.upd nd_contents (SZ.v idx1) merged in
+    list_remove_two_length active0 j1 j2;
+    let aux (k: nat)
+      : Lemma (ensures (k < L.length new_active) ==>
+               (SZ.v (entry_idx (L.index new_active k)) < SZ.v n /\
+                Seq.index nd' (SZ.v (entry_idx (L.index new_active k))) ==
+                entry_ptr (L.index new_active k)))
+      = if k < L.length new_active then begin
+          if k = 0 then
+            Seq.lemma_index_upd1 nd_contents (SZ.v idx1) merged
+          else
+            node_ptr_correspondence_upd_tail active0 j1 j2 idx1 merged tree nd_contents n (k - 1)
+        end
     in
     Classical.forall_intro aux
 
@@ -831,6 +1288,40 @@ fn huffman_cost
 }
 #pop-options
 
+// Forest idx bound: all entries have SZ.v (entry_idx ...) < SZ.v bound implies entry_idx <> bound
+let forest_idx_fresh (entries: list forest_entry) (bound: SZ.t)
+  : Lemma (requires forall (k: nat). k < L.length entries ==> SZ.v (entry_idx (L.index entries k)) < SZ.v bound)
+          (ensures forall (k: nat). k < L.length entries ==> entry_idx (L.index entries k) <> bound)
+  = ()
+
+// Node-ptr correspondence after prepending a new entry and doing Seq.upd at its index
+let node_ptr_correspondence_init_step
+  (active_old: list forest_entry) (vi: SZ.t) (leaf: hnode_ptr) (tree: HSpec.htree)
+  (nd_old: Seq.seq hnode_ptr) (n: SZ.t)
+  : Lemma (requires
+      SZ.v vi < SZ.v n /\
+      Seq.length nd_old == SZ.v n /\
+      (forall (k: nat). k < L.length active_old ==>
+        SZ.v (entry_idx (L.index active_old k)) < SZ.v vi /\
+        Seq.index nd_old (SZ.v (entry_idx (L.index active_old k))) == entry_ptr (L.index active_old k)))
+    (ensures (
+      let new_active = (vi, leaf, tree) :: active_old in
+      let nd' = Seq.upd nd_old (SZ.v vi) leaf in
+      forall (k: nat). k < L.length new_active ==>
+        SZ.v (entry_idx (L.index new_active k)) < SZ.v vi + 1 /\
+        Seq.index nd' (SZ.v (entry_idx (L.index new_active k))) == entry_ptr (L.index new_active k)))
+  = let nd' = Seq.upd nd_old (SZ.v vi) leaf in
+    Seq.lemma_index_upd1 nd_old (SZ.v vi) leaf;
+    let aux (k: nat)
+      : Lemma (ensures (k < L.length active_old) ==>
+               (Seq.index nd' (SZ.v (entry_idx (L.index active_old k))) ==
+                entry_ptr (L.index active_old k)))
+      = if k < L.length active_old then
+          Seq.lemma_index_upd2 nd_old (SZ.v vi) leaf
+            (SZ.v (entry_idx (L.index active_old k)))
+    in
+    Classical.forall_intro aux
+
 // ========== Full Huffman Tree Construction (CLRS §16.3) ==========
 // Truly imperative: allocates hnode_ptr nodes on the heap.
 // Uses a min-heap priority queue (Pulse.Lib.PriorityQueue) storing
@@ -884,6 +1375,8 @@ fn huffman_tree
       SZ.fits (2 * SZ.v n + 2) /\
       valid_pq_entries pq_contents (SZ.v n) /\
       pq_freqs_positive pq_contents /\
+      pq_idx_unique pq_contents /\
+      forest_distinct_indices active /\
       pq_indices_in_forest pq_contents active /\
       (forall (k: nat). k < L.length active ==>
         SZ.v (entry_idx (L.index active k)) < SZ.v vi /\
@@ -892,6 +1385,10 @@ fn huffman_tree
   {
     let vi = !i;
     let freq_val = A.op_Array_Access freqs vi;
+    
+    // Grab old state before mutations
+    with active_old. assert (forest_own active_old);
+    with nd_old. assert (V.pts_to nodes nd_old);
     
     // Allocate leaf node on the heap
     let leaf = alloc_hnode ({ freq = freq_val; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
@@ -905,10 +1402,17 @@ fn huffman_tree
     valid_pq_entries_extends pq_old pq_new (freq_val, vi) (SZ.v n);
     pq_freqs_positive_extends pq_old pq_new (freq_val, vi);
     
+    // Maintain pq_idx_unique: all existing entries have idx < vi, so vi is fresh
+    pq_idx_lt_bound pq_old active_old vi;
+    pq_idx_unique_extends pq_old pq_new (freq_val, vi);
+    
     // Fold is_htree for this leaf and add to forest_own
     fold (is_htree leaf (HSpec.Leaf freq_val));
-    with active_old. assert (forest_own active_old);
     forest_own_put_head active_old vi leaf (HSpec.Leaf freq_val);
+    
+    // Maintain forest_distinct_indices: all existing entries have idx < vi, so vi is fresh
+    forest_idx_fresh active_old vi;
+    forest_distinct_indices_prepend active_old (vi, leaf, HSpec.Leaf freq_val);
     
     // Maintain pq_indices_in_forest: old PQ entries are in old forest, which is subset of new forest
     // New PQ entry (freq_val, vi) is at position 0 of new forest
@@ -917,8 +1421,15 @@ fn huffman_tree
     find_entry_prepend active_old vi leaf (HSpec.Leaf freq_val);
     pq_forest_extends pq_old pq_new (freq_val, vi) (new_entry :: active_old);
     
+    // Maintain node-ptr correspondence through Seq.upd
+    node_ptr_correspondence_init_step active_old vi leaf (HSpec.Leaf freq_val) nd_old n;
+    
     i := vi +^ 1sz;
   };
+  
+  // Between init and merge: pq_idx_unique and forest_distinct_indices are now in init loop invariant
+  with pq_init. assert (PQ.is_pqueue pq pq_init (SZ.v n));
+  with active_init. assert (forest_own active_init);
   
   // Main merge loop: extract two minimums, merge, insert back (n-1 times)
   let mut iter: SZ.t = 0sz;
@@ -944,7 +1455,9 @@ fn huffman_tree
       SZ.fits (2 * Seq.length pq_contents + 2) /\
       valid_pq_entries pq_contents (SZ.v n) /\
       pq_freqs_positive pq_contents /\
+      pq_idx_unique pq_contents /\
       pq_indices_in_forest pq_contents active /\
+      forest_distinct_indices active /\
       (forall (k: nat). k < L.length active ==>
         SZ.v (entry_idx (L.index active k)) < SZ.v n /\
         Seq.index nd_contents (SZ.v (entry_idx (L.index active k))) == entry_ptr (L.index active k))
@@ -958,6 +1471,7 @@ fn huffman_tree
     extends_length pq1 pq0 (freq1, idx1);
     valid_pq_entries_shrink pq0 pq1 (freq1, idx1) (SZ.v n);
     pq_freqs_positive_shrink pq0 pq1 (freq1, idx1);
+    pq_idx_unique_shrink pq0 pq1 (freq1, idx1);
     pq_forest_shrink pq0 pq1 (freq1, idx1) active0;
     
     let (freq2, idx2) = PQ.extract_min pq;
@@ -965,6 +1479,8 @@ fn huffman_tree
     extends_length pq2 pq1 (freq2, idx2);
     valid_pq_entries_shrink pq1 pq2 (freq2, idx2) (SZ.v n);
     pq_freqs_positive_shrink pq1 pq2 (freq2, idx2);
+    pq_idx_unique_shrink pq1 pq2 (freq2, idx2);
+    pq_no_idx_preserved pq1 pq2 (freq2, idx2) idx1;
     pq_forest_shrink pq1 pq2 (freq2, idx2) active0;
     let sum_freq = freq1 + freq2;
     
@@ -976,9 +1492,9 @@ fn huffman_tree
     // Ghost: find positions of idx1 and idx2 in forest and take both trees
     find_entry_by_idx_spec active0 idx1;
     find_entry_by_idx_spec active0 idx2;
-    // idx1 <> idx2: the PQ has distinct indices (each index appears at most once)
-    // After extracting (freq1,idx1), no entry with idx1 remains; (freq2,idx2) from remaining PQ has idx2<>idx1
-    assume_ (pure (idx1 <> idx2));
+    // idx1 <> idx2: pq_idx_unique_shrink pq0 pq1 gives forall j. snd(pq1[j]) <> idx1
+    // (freq2, idx2) was in pq1 (from extends), so idx2 <> idx1
+    FStar.Seq.Properties.mem_index (freq2, idx2) pq1;
     // k1 <> k2 follows: entry_idx(active0[k1])=idx1 and entry_idx(active0[k2])=idx2, so k1=k2 => idx1=idx2
     forest_own_take_two active0
       (Some?.v (find_entry_by_idx active0 idx1))
@@ -1009,6 +1525,7 @@ fn huffman_tree
     extends_length pq2 pq3 (sum_freq, idx1);
     valid_pq_entries_extends pq2 pq3 (sum_freq, idx1) (SZ.v n);
     pq_freqs_positive_extends pq2 pq3 (sum_freq, idx1);
+    pq_idx_unique_extends pq2 pq3 (sum_freq, idx1);
     
     // Ghost: put merged entry into new forest
     forest_own_put_head
@@ -1025,46 +1542,52 @@ fn huffman_tree
       (Some?.v (find_entry_by_idx active0 idx1))
       (Some?.v (find_entry_by_idx active0 idx2));
     
-    // pq_indices_in_forest: pq2 entries are all in active0, and after removing k1/k2 entries
-    // they're still findable in list_remove_two. Then prepending (idx1,...) covers the new PQ entry.
-    // pq_forest_shrink already established pq_indices_in_forest pq2 active0 minus the extracted entries.
-    // After remove_two, remaining PQ entries (all in pq2) are still findable.
-    // After prepend of idx1, the new PQ entry (sum_freq, idx1) is also findable.
-    assume_ (pure (
-      pq_indices_in_forest pq3
-        ((idx1, merged,
-          HSpec.Internal (sum_freq <: pos)
-            (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
-            (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
-         :: list_remove_two active0
-              (Some?.v (find_entry_by_idx active0 idx1))
-              (Some?.v (find_entry_by_idx active0 idx2)))
-    ));
+    // pq_indices_in_forest: Use pq_forest_remove_two (pq2 entries have idx <> idx1 and <> idx2)
+    // then prepend (idx1, merged, ...) and use pq_forest_extends
+    pq_forest_remove_two pq2 active0
+      (Some?.v (find_entry_by_idx active0 idx1))
+      (Some?.v (find_entry_by_idx active0 idx2));
+    pq_forest_prepend pq2
+      (list_remove_two active0
+        (Some?.v (find_entry_by_idx active0 idx1))
+        (Some?.v (find_entry_by_idx active0 idx2)))
+      (idx1, merged,
+        HSpec.Internal (sum_freq <: pos)
+          (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+          (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))));
+    find_entry_prepend
+      (list_remove_two active0
+        (Some?.v (find_entry_by_idx active0 idx1))
+        (Some?.v (find_entry_by_idx active0 idx2)))
+      idx1 merged
+      (HSpec.Internal (sum_freq <: pos)
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))));
+    pq_forest_extends pq2 pq3 (sum_freq, idx1)
+      ((idx1, merged,
+        HSpec.Internal (sum_freq <: pos)
+          (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+          (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
+       :: list_remove_two active0
+            (Some?.v (find_entry_by_idx active0 idx1))
+            (Some?.v (find_entry_by_idx active0 idx2)));
     
-    // Node-pointer correspondence: nodes[idx1] == merged (just wrote it), all others unchanged
-    assume_ (pure (
-      (forall (k: nat).
-        k < L.length
-          ((idx1, merged,
-            HSpec.Internal (sum_freq <: pos)
-              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
-              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
-           :: list_remove_two active0
-                (Some?.v (find_entry_by_idx active0 idx1))
-                (Some?.v (find_entry_by_idx active0 idx2))) ==>
-        (let new_active =
-          (idx1, merged,
-            HSpec.Internal (sum_freq <: pos)
-              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
-              (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
-           :: list_remove_two active0
-                (Some?.v (find_entry_by_idx active0 idx1))
-                (Some?.v (find_entry_by_idx active0 idx2)) in
-         SZ.v (entry_idx (L.index new_active k)) < SZ.v n /\
-         Seq.index (Seq.upd nd_contents0 (SZ.v idx1) merged)
-           (SZ.v (entry_idx (L.index new_active k))) ==
-         entry_ptr (L.index new_active k)))
-    ));
+    // Node-pointer correspondence and forest_distinct_indices for new_active
+    forest_distinct_indices_after_merge active0
+      (Some?.v (find_entry_by_idx active0 idx1))
+      (Some?.v (find_entry_by_idx active0 idx2))
+      idx1 merged
+      (HSpec.Internal (sum_freq <: pos)
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))));
+    node_ptr_correspondence_upd active0
+      (Some?.v (find_entry_by_idx active0 idx1))
+      (Some?.v (find_entry_by_idx active0 idx2))
+      idx1 merged
+      (HSpec.Internal (sum_freq <: pos)
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
+      nd_contents0 n;
     
     let viter = !iter;
     iter := viter +^ 1sz;
