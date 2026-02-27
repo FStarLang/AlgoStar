@@ -32,6 +32,7 @@ module Seq = FStar.Seq
 module V = Pulse.Lib.Vec
 module MSTSpec = CLRS.Ch23.MST.Spec
 module KSpec = CLRS.Ch23.Kruskal.Spec
+module UF = CLRS.Ch23.Kruskal.UF
 
 let valid_parents (sparent: Seq.seq SZ.t) (n: nat) : prop =
   Seq.length sparent == n /\
@@ -92,7 +93,9 @@ fn find
   requires A.pts_to parent #p sparent **
     pure (SZ.v v < SZ.v n /\ SZ.v n > 0 /\ valid_parents sparent (SZ.v n))
   returns root: SZ.t
-  ensures A.pts_to parent #p sparent ** pure (SZ.v root < SZ.v n)
+  ensures A.pts_to parent #p sparent **
+    pure (SZ.v root < SZ.v n /\
+          SZ.v root = UF.find_pure sparent (SZ.v v) (SZ.v n) (SZ.v n))
 {
   let mut curr: SZ.t = v;
   let mut steps: SZ.t = 0sz;
@@ -100,7 +103,9 @@ fn find
   invariant exists* vcurr vsteps.
     R.pts_to curr vcurr ** R.pts_to steps vsteps **
     A.pts_to parent #p sparent **
-    pure (SZ.v vcurr < SZ.v n /\ SZ.v vsteps <= SZ.v n /\ valid_parents sparent (SZ.v n))
+    pure (SZ.v vcurr < SZ.v n /\ SZ.v vsteps <= SZ.v n /\ valid_parents sparent (SZ.v n) /\
+          UF.find_pure sparent (SZ.v vcurr) (SZ.v n - SZ.v vsteps) (SZ.v n) =
+          UF.find_pure sparent (SZ.v v) (SZ.v n) (SZ.v n))
   {
     let vcurr = !curr;
     let p = A.op_Array_Access parent vcurr;
