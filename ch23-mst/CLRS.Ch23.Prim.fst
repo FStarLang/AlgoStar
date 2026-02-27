@@ -19,7 +19,18 @@ module U64 = FStar.UInt64
 
 // Use a large value for infinity that fits in SizeT (max is typically 2^16-1 or 2^32-1)
 // For MST algorithm, any value larger than max possible path weight works
+// NOTE: Edge weights must be < infinity for correct behavior; weights >= infinity
+// are treated as "no edge" in the imperative code.
 let infinity : SZ.t = 65535sz
+
+// All real edge weights must be strictly less than infinity.
+// Weights of 0 represent self-loops or zero-weight edges;
+// weights >= infinity are treated as absent.
+let valid_weights (weights_seq: Seq.seq SZ.t) (n: nat) : prop =
+  Seq.length weights_seq == n * n /\
+  (forall (i: nat). i < n * n ==>
+    SZ.v (Seq.index weights_seq i) = 0 \/
+    (SZ.v (Seq.index weights_seq i) > 0 /\ SZ.v (Seq.index weights_seq i) < SZ.v infinity))
 
 // Predicate: all elements in sequence are <= infinity
 let all_keys_bounded (s: Seq.seq SZ.t) : prop =
@@ -47,6 +58,22 @@ let weights_to_adj_matrix (weights_seq: Seq.seq SZ.t) (n: nat)
         if w >= sizet_to_int infinity then Prim.Spec.infinity else w
       )
     )
+
+// Bridging lemma: under valid_weights, the conversion preserves edge weights faithfully.
+// If a weight is positive and < infinity (65535), it appears unchanged in the adj matrix.
+// If a weight is 0 or >= infinity, it maps to the spec's infinity (10^9) or 0 respectively.
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let weights_to_adj_preserves (weights_seq: Seq.seq SZ.t) (n: nat) (u v: nat)
+  : Lemma (requires valid_weights weights_seq n /\ n > 0 /\ u < n /\ v < n /\
+                    u * n + v < n * n)
+          (ensures (let adj = weights_to_adj_matrix weights_seq n in
+                    let w_imp = SZ.v (Seq.index weights_seq (u * n + v)) in
+                    let w_spec = Seq.index (Seq.index adj u) v in
+                    (w_imp > 0 /\ w_imp < SZ.v infinity ==> w_spec = w_imp) /\
+                    (w_imp = 0 ==> w_spec = 0) /\
+                    (w_imp >= SZ.v infinity ==> w_spec = Prim.Spec.infinity)))
+  = ()
+#pop-options
 
 // Predicate for full correctness of Prim's output
 // Basic functional correctness properties that the implementation maintains
