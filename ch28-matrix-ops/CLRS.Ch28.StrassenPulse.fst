@@ -25,10 +25,12 @@ module MM = CLRS.Ch28.MatrixMultiply
  *
  * Status:
  *   Verified (zero admits): flat_vec_add, flat_vec_sub, extract_quadrant,
- *     write_quadrant, strassen_pulse base case, quad_idx_bound lemma
- *   Admitted: add_to_quadrant, sub_from_quadrant (loop invariant
- *     injectivity), strassen_pulse recursive case (Strassen algebra
- *     for flat arrays), bridging lemma (correspondence to functional)
+ *     write_quadrant, strassen_pulse base case, quad_idx_bound lemma,
+ *     quad_idx_inj lemma, si_upd_eq/si_upd_neq SMTPat helpers
+ *   Admitted (4): add_to_quadrant, sub_from_quadrant (SMT cannot
+ *     automate row-major index injectivity for Seq.upd preservation),
+ *     strassen_pulse recursive case (Strassen algebra for flat arrays),
+ *     bridging lemma (correspondence to functional Strassen)
  *)
 
 // ========== Safe index (no refinement needed) ==========
@@ -94,6 +96,32 @@ let quad_idx_bound (n half ro co i j: nat)
     SZ.fits_lte ((ro + i) * n) (n * n);
     SZ.fits_lte (ro + i) (n * n);
     SZ.fits_lte (co + j) (n * n)
+
+// Injectivity: distinct (i,j) in a quadrant → distinct flat indices in big matrix
+let quad_idx_inj (n: pos) (ro co i1 j1 i2 j2: nat)
+  : Lemma
+    (requires i1 < n /\ j1 < n /\ i2 < n /\ j2 < n /\
+              (ro + i1) * n + (co + j1) == (ro + i2) * n + (co + j2))
+    (ensures i1 == i2 /\ j1 == j2)
+  = // (ro+i1)*n + (co+j1) == (ro+i2)*n + (co+j2)
+    // → i1*n + j1 == i2*n + j2
+    // → (i1-i2)*n == j2-j1
+    // |j2-j1| < n while |(i1-i2)*n| >= n when i1<>i2 → contradiction
+    // So i1==i2, hence j1==j2
+    assert (i1 * n + j1 == i2 * n + j2)
+
+// SMTPat lemmas for si with Seq.upd (helps loop invariant proofs)
+let si_upd_eq (s: Seq.seq int) (k: nat{k < Seq.length s}) (v: int)
+  : Lemma (ensures si (Seq.upd s k v) k == v)
+          [SMTPat (si (Seq.upd s k v) k)]
+  = ()
+
+let si_upd_neq (s: Seq.seq int) (k: nat{k < Seq.length s}) (v: int) (k': nat)
+  : Lemma (requires k' <> k)
+          (ensures si (Seq.upd s k v) k' == si s k')
+          [SMTPat (si (Seq.upd s k v) k')]
+  = if k' < Seq.length s then ()
+    else ()
 
 // ========== Pulse helpers ==========
 
