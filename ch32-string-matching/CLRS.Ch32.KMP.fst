@@ -6,10 +6,10 @@
    where π[i] is the length of the longest proper prefix of P[0..i] 
    that is also a suffix of P[0..i].
 
-   Proves memory safety, prefix function correctness (pi is a valid prefix-suffix),
-   O(n + m) comparison complexity, and functional correctness:
-   the returned count equals the total number of pattern occurrences in the text,
-   as defined by Spec.count_matches_spec.
+      Proves memory safety, prefix function maximality (pi is the LONGEST
+   prefix-suffix at each position), O(n + m) comparison complexity, and
+   full functional correctness: the returned count equals the total number
+   of pattern occurrences in the text (count == count_matches_spec).
    Key insight from CLRS §32.4:
    - Prefix function computation: at most 2(m-1) comparisons
    - Matching phase: at most 2n comparisons

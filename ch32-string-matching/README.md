@@ -13,14 +13,16 @@ This directory contains verified implementations of string matching algorithms f
 - **CLRS.Ch32.RabinKarp.Complexity.fst**: Pure F* complexity analysis: O(n+m) best case, O(nm) worst case.
 
 ### KMP (§32.4)
-- **CLRS.Ch32.KMP.fst**: Pulse implementation of COMPUTE-PREFIX-FUNCTION and KMP-MATCHER. Proves memory safety, prefix function correctness (`pi_correct`), and O(n+m) complexity via amortized analysis. **Note**: the postcondition only proves count bounds, not `count == spec`. No admits.
-- **CLRS.Ch32.KMP.Spec.fst**: Pure F* completeness proof that KMP finds all matches. Proves `kmp_step_maximal`, `kmp_match_iff`, `kmp_count_step`, and `count_before_eq_spec`. Requires `pi_max` (not yet connected to Pulse impl). No admits.
+- **CLRS.Ch32.KMP.PureDefs.fst**: Shared pure definitions (`is_prefix_suffix`, `pi_correct`, complexity bounds).
+- **CLRS.Ch32.KMP.fst**: Pulse implementation of COMPUTE-PREFIX-FUNCTION and KMP-MATCHER. Proves memory safety, prefix function maximality (`pi_max_sz` — pi is the LONGEST prefix-suffix), full functional correctness (`count == count_matches_spec`), and O(n+m) complexity via amortized analysis. No admits.
+- **CLRS.Ch32.KMP.Bridge.fst**: Bridging lemmas connecting Pulse `pi_max_sz` (SZ.t sequences) to Spec's `pi_max` (int sequences). Incremental proof helpers for the maximality invariant. No admits.
+- **CLRS.Ch32.KMP.Spec.fst**: Pure F* completeness proof that KMP finds all matches. Proves `kmp_step_maximal`, `kmp_match_iff`, `kmp_count_step`, and `count_before_eq_spec`. No admits.
 - **CLRS.Ch32.KMP.StrengthenedSpec.fst**: Design document / specification sketch. Contains definitions (`matches_at`, `count_matches_spec`) and conceptual lemma outlines, but all postconditions are `ensures True`. Not a proof.
-- **CLRS.Ch32.KMP.Test.fst**: Pulse test cases for `compute_prefix_function` (patterns "aba" and "ababaca").
+- **CLRS.Ch32.KMP.Test.fst**: Pulse test cases for `compute_prefix_function` and `kmp_string_match`.
 
 ### Reference
-- **reference.fst**: Port of `FStar/examples/algorithms/StringMatching.fst`. Contains verified naive matcher and Rabin-Karp with CLRS polynomial hash. Returns `option nat` (first match only).
-- **test_without_lemma.fst**: 9-line smoke test for `RabinKarp.Spec.rabin_karp_find_all`.
+- **reference/reference.fst**: Port of `FStar/examples/algorithms/StringMatching.fst`. Contains verified naive matcher and Rabin-Karp with CLRS polynomial hash. Returns `option nat` (first match only).
+- **reference/test_without_lemma.fst**: 9-line smoke test for `RabinKarp.Spec.rabin_karp_find_all`.
 
 ## Verification Status
 
@@ -29,10 +31,10 @@ This directory contains verified implementations of string matching algorithms f
 | Naive (Pulse) | count == spec | O((n-m+1)*m) | None |
 | Rabin-Karp (Pulse) | count == spec | (pure analysis only) | None |
 | Rabin-Karp (Spec) | bidirectional | N/A (pure) | None |
-| KMP (Pulse) | bounds only | O(n+m) | None |
+| KMP (Pulse) | count == spec | O(n+m) | None |
 | KMP (Spec, pure) | count == spec | N/A (pure) | None |
 
-**Key gap**: The KMP Pulse implementation does not yet prove `count == count_matches_spec`. The pure `KMP.Spec.fst` has the full proof but it is not connected to the Pulse code.
+All three algorithms now have **complete functional correctness proofs** (`count == count_matches_spec`) with **zero admits**.
 
 ## Building
 
