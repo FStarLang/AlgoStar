@@ -11,7 +11,7 @@ Defined formal specification of the minimum vertex cover optimization problem:
 - `is_minimum_vertex_cover`: Specification of optimal solution
 - `min_vertex_cover_size`: Proposition about OPT value
 
-**Location**: `CLRS.Ch35.VertexCover.Spec.fst` (lines 40-70)
+**Location**: `CLRS.Ch35.VertexCover.Spec.fst` (lines 42–70)
 
 ### ✅ P2.7.2: Valid Vertex Cover Proof
 Proved that the algorithm output is always a valid vertex cover:
@@ -20,8 +20,8 @@ Proved that the algorithm output is always a valid vertex cover:
 - All edges guaranteed to be covered upon completion
 
 **Locations**: 
-- Pulse proof: `CLRS.Ch35.VertexCover.fst` (lines 21-91)
-- Connection: `CLRS.Ch35.VertexCover.Spec.fst` (lines 311-370)
+- Pulse proof: `CLRS.Ch35.VertexCover.fst` (lines 27–97)
+- Connection: `CLRS.Ch35.VertexCover.Spec.fst` (lines 315–380)
 
 ### ✅ Already Proven: 2-Approximation Guarantee
 Complete mechanized proof of CLRS Theorem 35.1:
@@ -50,11 +50,6 @@ The implementation uses:
 
 - **CLRS.Ch35.VertexCover.fst** - Pulse implementation with correctness proof
 - **CLRS.Ch35.VertexCover.Spec.fst** - Pure F* specification and 2-approximation proof
-- **CLRS.Ch35.VertexCover.Complexity.fst** - Time/space complexity analysis
-- **CLRS.Ch35.VertexCover.Test.fst** - Example graphs and test cases
-- **P2.7_SUMMARY.md** - High-level task summary
-- **P2.7_API.md** - API documentation and usage examples
-- **P2.7_COMPLETE.md** - Complete technical documentation
 
 ## Verification
 
@@ -76,20 +71,11 @@ fstar.exe --include ch35-approximation CLRS.Ch35.VertexCover.Spec.fst
 fstar.exe --ext pulse --include $(realpath ../pulse)/out/lib/pulse \
   --include common --include ch35-approximation \
   CLRS.Ch35.VertexCover.fst
-
-# Verify complexity analysis
-fstar.exe --include ch35-approximation CLRS.Ch35.VertexCover.Complexity.fst
-
-# Verify test examples
-fstar.exe --include ch35-approximation CLRS.Ch35.VertexCover.Test.fst
-
-# Or verify all at once
-./verify_all.sh
 ```
 
 ### Constraints
 
-- Graph size limited to n < 256 vertices to ensure n² fits in size_t
+- Graph size limited by `n * n` fitting in `SizeT` (i.e., `SZ.fits (n * n)`)
 - Uses `A.alloc` (marked as deprecated but acceptable for model implementations)
 
 ## Building

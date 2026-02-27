@@ -19,6 +19,10 @@ module GR = Pulse.Lib.GhostReference
 // 2-approximation vertex cover algorithm from CLRS Chapter 35
 // Given an adjacency matrix for an undirected graph with n vertices,
 // returns a cover array where cover[i] = 1 if vertex i is in the cover
+//
+// NOTE: The algorithm scans only upper-triangular entries (u < v),
+// which is correct for undirected graphs where adj[u*n+v] = adj[v*n+u].
+// For directed graphs, edges (v,u) with v > u would be silently ignored.
 
 //SNIPPET_START: is_cover
 let is_cover (s_adj s_cover: Seq.seq int) (n: nat) (bound_u bound_v: nat) : prop =
@@ -140,16 +144,6 @@ let matching_inv_step (s_adj s_cover: Seq.seq int) (n vu vv: nat) (m: list Spec.
     ) else ()
 #pop-options
 
-// Lemma: The algorithm only writes 0 or 1 to cover array
-// This is now proven by the loop invariants
-let cover_values_are_binary (s_adj s_cover: Seq.seq int) (n: nat)
-  : Lemma (requires 
-            is_cover s_adj s_cover n n 0 /\
-            Seq.length s_cover = n /\
-            (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)))
-          (ensures forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1))
-  = () // Trivial since it's in the requires
-
 // Lemma: Apply the approximation bound for all possible opt values
 let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat) (m: list Spec.edge)
   : Lemma (requires 
@@ -178,7 +172,6 @@ fn approx_vertex_cover
     A.pts_to adj #p s_adj ** 
     pure (
       SZ.v n > 0 /\ 
-      SZ.v n < 256 /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length s_adj == SZ.v n * SZ.v n
     )
@@ -217,7 +210,6 @@ fn approx_vertex_cover
     GR.pts_to matching_ref vm **
     pure (
       SZ.v vu <= SZ.v n /\
-      SZ.v n < 256 /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length s_cover == SZ.v n /\
       is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0 /\
@@ -246,7 +238,6 @@ fn approx_vertex_cover
         SZ.v vv >= SZ.v vu + 1 /\
         SZ.v vv <= SZ.v n /\
         SZ.v vu < SZ.v n /\
-        SZ.v n < 256 /\
         SZ.fits (SZ.v vu * SZ.v n) /\
         SZ.fits (SZ.v vu * SZ.v n + SZ.v n) /\
         Seq.length s_cover_inner == SZ.v n /\
@@ -312,9 +303,6 @@ fn approx_vertex_cover
   // Binary property is maintained by loop invariant
   assert pure (forall (i: nat). i < SZ.v n ==> (Seq.index s_final i = 0 \/ Seq.index s_final i = 1));
   
-  // Prove that cover values are binary (0 or 1) - now trivial
-  cover_values_are_binary s_adj s_final (SZ.v n);
-  
   // Apply 2-approximation theorem using ghost matching
   apply_approximation_bound s_adj s_final (SZ.v n) vm_final;
   
@@ -354,13 +342,3 @@ fn approx_vertex_cover
  * Then Spec.approximation_ratio_theorem applies CLRS Theorem 35.1:
  *   |cover| = 2|matching| ≤ 2 * count(any valid cover) ≤ 2 * OPT
  *)
-
-// ========== Complexity Analysis ==========
-
-//SNIPPET_START: vertex_cover_ops
-let vertex_cover_iterations (v: nat) : nat = v * v
-
-let vertex_cover_quadratic (v: nat) 
-  : Lemma (ensures vertex_cover_iterations v <= v * v) 
-  = ()
-//SNIPPET_END: vertex_cover_ops
