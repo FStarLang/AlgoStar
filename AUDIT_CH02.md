@@ -366,8 +366,8 @@ The highest rlimit is 80 (MergeSort merge loop, line 340). This is moderately hi
 
 ### High Priority
 
-- `[ ] CH02-01: Bridge merge sort complexity to imperative code (Priority: High)`
-  Add ghost tick counter to `merge_impl` and `merge_sort_aux`/`merge_sort` to prove that the imperative merge sort performs at most `merge_sort_ops(n)` comparisons. This closes the main spec gap — the O(n log n) bound is proved for the recurrence but not linked to the actual code.
+- `[x] CH02-01: Bridge merge sort complexity to imperative code (Priority: High)`
+  Added ghost tick counter to `merge`, `merge_sort_aux`, and `merge_sort`. Proved the imperative merge sort performs at most `merge_sort_ops(n)` comparisons. The O(n log n) bound from `MergeSort.Complexity.fst` is now fully linked to the imperative code. Added monotonicity and split lemmas for `merge_sort_ops`.
 
 - `[x] CH02-02: Fix README signature mismatches (Priority: High)`
   Update `ch02-getting-started/README.md`:

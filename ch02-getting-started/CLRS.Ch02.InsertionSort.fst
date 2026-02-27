@@ -25,7 +25,6 @@ module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
-module Classical = FStar.Classical
 
 // ========== Ghost tick ==========
 
@@ -180,6 +179,9 @@ fn insertion_sort
       let val_prev = a.(vi - 1sz);
       let val_curr = a.(vi);
       
+      // Swap-based insertion: CLRS shifts elements right and inserts key once,
+      // but this variant swaps adjacent elements to bubble key leftward.
+      // Comparison count is identical; write count is 2x CLRS's shift variant.
       a.(vi - 1sz) <- val_curr;
       a.(vi) <- val_prev;
       

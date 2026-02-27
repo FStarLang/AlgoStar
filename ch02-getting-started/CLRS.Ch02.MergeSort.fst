@@ -26,10 +26,13 @@ open CLRS.Common.SortSpec
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module V = Pulse.Lib.Vec
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
+
+open CLRS.Ch02.MergeSort.Complexity
 
 //SNIPPET_START: seq_merge
 // ================================================================
@@ -334,10 +337,38 @@ fn copy_range
 #pop-options
 
 // ================================================================
+// Ghost tick counter for complexity tracking
+// ================================================================
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+// Comparison cost bound: 0 for trivial inputs, merge_sort_ops for n >= 1
+let ms_cost (len: int) : nat = if len <= 0 then 0 else merge_sort_ops len
+
+let ms_cost_split (n: int{n >= 2})
+  : Lemma (ensures ms_cost (n / 2) + ms_cost (n - n / 2) + n <= ms_cost n)
+  = merge_sort_ops_split n
+
+// Complexity bound predicates (avoids BoundedIntegers issues in Pulse ensures)
+let merge_complexity_bounded (cf c0: nat) (lo hi: nat) : prop =
+  lo <= hi /\ cf >= c0 /\ cf - c0 <= hi - lo
+
+let sort_complexity_bounded (cf c0: nat) (lo hi: nat) : prop =
+  lo <= hi /\ cf >= c0 /\ cf - c0 <= ms_cost (hi - lo)
+
+// ================================================================
 // Merge Implementation
 // ================================================================
 
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
 
 // Key lemma: seq_merge (slice s1 0 (i+1)) (slice s2 0 j)
 // when s1[i] <= all remaining s2[j..], equals
@@ -356,21 +387,26 @@ fn copy_range
 // 2. Elements written are from s1 and s2 (permutation of consumed parts)
 // 3. All written elements <= all remaining elements
 
-//SNIPPET_START: merge_impl_sig
-fn merge_impl
+//SNIPPET_START: merge_sig
+fn merge
   (a: array int) (lo mid hi: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   (#s1 #s2: Ghost.erased (Seq.seq int))
   requires 
     pts_to_range a (SZ.v lo) (SZ.v mid) s1 **
     pts_to_range a (SZ.v mid) (SZ.v hi) s2 **
+    GR.pts_to ctr c0 **
     pure (SZ.v lo <= SZ.v mid /\ SZ.v mid <= SZ.v hi /\ sorted s1 /\ sorted s2)
-  ensures exists* s_out.
+  ensures exists* s_out (cf: nat).
     pts_to_range a (SZ.v lo) (SZ.v hi) s_out **
+    GR.pts_to ctr cf **
     pure (
       sorted s_out /\ 
-      permutation (Seq.append s1 s2) s_out
+      permutation (Seq.append s1 s2) s_out /\
+      merge_complexity_bounded cf (reveal c0) (SZ.v lo) (SZ.v hi)
     )
-//SNIPPET_END: merge_impl_sig
+//SNIPPET_END: merge_sig
 {
   pts_to_range_prop a #(SZ.v lo) #(SZ.v mid);
   pts_to_range_prop a #(SZ.v mid) #(SZ.v hi);
@@ -413,13 +449,14 @@ fn merge_impl
   let mut k = 0sz;  // write position (offset from lo)
   
   while (!i <^ l1 || !j <^ l2)
-  invariant exists* vi vj vk s_cur.
+  invariant exists* vi vj vk s_cur (vc: nat).
     R.pts_to i vi **
     R.pts_to j vj **
     R.pts_to k vk **
     A.pts_to tmp1 (reveal s1) **
     A.pts_to tmp2 (reveal s2) **
     pts_to_range a (SZ.v lo) (SZ.v hi) s_cur **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v l1 /\
       SZ.v vj <= SZ.v l2 /\
@@ -430,7 +467,9 @@ fn merge_impl
         Seq.index s_cur p == Seq.index ghost_merged p) /\
       // The remaining elements to merge are the suffixes
       Seq.equal (Seq.slice ghost_merged (SZ.v vk) (Seq.length ghost_merged))
-               (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1)) (Seq.slice s2 (SZ.v vj) (SZ.v l2)))
+               (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1)) (Seq.slice s2 (SZ.v vj) (SZ.v l2))) /\
+      // Complexity: comparisons so far <= elements written
+      merge_complexity_bounded vc (reveal c0) 0 (SZ.v vk)
     )
   {
     let vi = !i;
@@ -455,6 +494,7 @@ fn merge_impl
      } else {
       let v1 = tmp1.(vi);
       let v2 = tmp2.(vj);
+      tick ctr;  // one comparison
       if (v1 <= v2) {
         suffix_step_left s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
         pts_to_range_upd a (lo +^ vk) v1;
@@ -493,17 +533,22 @@ fn merge_impl
 // Recursive Merge Sort
 // ================================================================
 
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
 
 fn rec merge_sort_aux
   (a: array int)
   (lo hi: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   (#s: Ghost.erased (Seq.seq int))
   requires 
-    pts_to_range a (SZ.v lo) (SZ.v hi) s
-  ensures exists* s'.
+    pts_to_range a (SZ.v lo) (SZ.v hi) s **
+    GR.pts_to ctr c0
+  ensures exists* s' (cf: nat).
     pts_to_range a (SZ.v lo) (SZ.v hi) s' **
-    pure (sorted s' /\ permutation s s')
+    GR.pts_to ctr cf **
+    pure (sorted s' /\ permutation s s' /\
+          sort_complexity_bounded cf (reveal c0) (SZ.v lo) (SZ.v hi))
 {
   pts_to_range_prop a;
   let len = hi -^ lo;
@@ -519,11 +564,11 @@ fn rec merge_sort_aux
     with s2. assert (pts_to_range a (SZ.v mid) (SZ.v hi) s2);
     
     // Sort left half
-    merge_sort_aux a lo mid;
+    merge_sort_aux a lo mid ctr;
     with s1'. assert (pts_to_range a (SZ.v lo) (SZ.v mid) s1');
     
     // Sort right half
-    merge_sort_aux a mid hi;
+    merge_sort_aux a mid hi ctr;
     with s2'. assert (pts_to_range a (SZ.v mid) (SZ.v hi) s2');
     
     // s = s1 ++ s2, s1 ~ s1', s2 ~ s2'
@@ -531,10 +576,13 @@ fn rec merge_sort_aux
     append_permutations s1 s2 s1' s2';
     
     // Merge sorted halves
-    merge_impl a lo mid hi;
+    merge a lo mid hi ctr;
     // Result is seq_merge s1' s2' which is sorted and 
     // permutation (append s1' s2') (seq_merge s1' s2')
     // Compose: s ~ s1++s2 ~ s1'++s2' ~ result
+    
+    // Complexity: left + right + merge <= ms_cost(len)
+    ms_cost_split (SZ.v hi - SZ.v lo);
     ()
   }
 }
@@ -549,19 +597,24 @@ fn rec merge_sort_aux
 fn merge_sort
   (a: A.array int)
   (len: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   (#s0: erased (Seq.seq int))
 requires
   A.pts_to a s0 **
+  GR.pts_to ctr c0 **
   pure (
     SZ.v len == Seq.length s0 /\ 
     SZ.v len == A.length a
   )
-ensures exists* s.
+ensures exists* s (cf: nat).
   A.pts_to a s **
+  GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     sorted s /\
-    permutation s0 s
+    permutation s0 s /\
+    sort_complexity_bounded cf (reveal c0) 0 (SZ.v len)
   )
 //SNIPPET_END: merge_sort_sig
 {
@@ -572,7 +625,7 @@ ensures exists* s.
   } else {
     pts_to_range_intro a 1.0R (reveal s0);
     
-    merge_sort_aux a 0sz len;
+    merge_sort_aux a 0sz len ctr;
     
     with s'. assert (pts_to_range a 0 (SZ.v len) s');
     rewrite (pts_to_range a 0 (SZ.v len) s')

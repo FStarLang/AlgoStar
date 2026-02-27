@@ -26,9 +26,24 @@ for j = 1 to n-1:
 
 **Signature:**
 ```pulse
-fn insertion_sort (a: A.array int) (len: SZ.t) (#s0: erased (Seq.seq int))
-  requires A.pts_to a s0 ** pure (SZ.v len == Seq.length s0)
-  ensures exists* s. A.pts_to a s ** pure (sorted s /\ is_permutation s0 s)
+fn insertion_sort
+  (a: A.array int)
+  (#s0: Ghost.erased (Seq.seq int))
+  (len: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0
+  requires pure (
+    SZ.v len == Seq.length s0 /\
+    Seq.length s0 <= A.length a /\
+    SZ.v len > 0
+  )
+  ensures exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf ** pure (
+    Seq.length s == Seq.length s0 /\
+    sorted s /\
+    permutation s0 s /\
+    complexity_bounded cf (reveal c0) (SZ.v len)
+  )
 ```
 
 ### MergeSort (`CLRS.Ch02.MergeSort.fst`)
@@ -49,18 +64,28 @@ merge_sort(A, p, r):
 - Output sequence is sorted
 - Output is permutation of input
 - Temporary arrays properly allocated and freed
+- O(n log n) comparison complexity (ghost tick counter linked to `merge_sort_ops` recurrence)
 
 **Signature:**
 ```pulse
-fn merge_sort (a: A.array int) (n: SZ.t) (#s0: erased (Seq.seq int))
-  requires A.pts_to a s0 ** pure (SZ.v n == Seq.length s0)
-  ensures exists* s. A.pts_to a s ** pure (sorted s /\ is_permutation s0 s)
+fn merge_sort
+  (a: A.array int)
+  (len: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  (#s0: erased (Seq.seq int))
+  requires A.pts_to a s0 ** GR.pts_to ctr c0 **
+    pure (SZ.v len == Seq.length s0 /\ SZ.v len == A.length a)
+  ensures exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf **
+    pure (
+      Seq.length s == Seq.length s0 /\ sorted s /\ permutation s0 s /\
+      sort_complexity_bounded cf (reveal c0) 0 (SZ.v len))
 ```
 
 ## Building
 
 ```bash
-cd /home/nswamy/workspace/clrs/ch02-getting-started
+cd ch02-getting-started
 make
 ```
 

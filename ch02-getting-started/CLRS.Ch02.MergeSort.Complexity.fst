@@ -230,6 +230,27 @@ let merge_sort_is_n_log_n (n: pos)
   = merge_sort_n_log_n_bound n
 //SNIPPET_END: merge_sort_bound
 
+/// ========== Monotonicity and Split ==========
+
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+
+/// merge_sort_ops is monotone: larger inputs have larger costs
+let rec merge_sort_ops_monotone (m n: pos)
+  : Lemma (requires m <= n)
+          (ensures merge_sort_ops m <= merge_sort_ops n)
+          (decreases n)
+  = if m = n then ()
+    else if m = 1 then ()
+    else merge_sort_ops_monotone (ceil_div2 m) (ceil_div2 n)
+
+/// The split used in the implementation: floor(n/2) + ceil(n/2)
+/// Proves: T(floor(n/2)) + T(ceil(n/2)) + n <= T(n) = 2*T(ceil(n/2)) + n
+let merge_sort_ops_split (n: pos{n > 1})
+  : Lemma (ensures merge_sort_ops (n / 2) + merge_sort_ops (n - n / 2) + n <= merge_sort_ops n)
+  = merge_sort_ops_monotone (n / 2) (n - n / 2)
+
+#pop-options
+
 /// ========== Asymptotic Interpretation ==========
 
 /// The bound 4n⌈log₂ n⌉ + 4n is Θ(n log n):
