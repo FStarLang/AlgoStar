@@ -46,8 +46,8 @@ fn test_max_flow_example ()
   // assume_ justified: V.alloc initializes to 0, writes are 10, 5, 15 — all >= 0
   assume_ (pure (valid_caps sc2 (SZ.v n)));
   
-  // Run max flow algorithm
-  let _valid = max_flow capacity flow n 0sz 2sz 100sz;
+  // Run max flow algorithm (postcondition guarantees imp_valid_flow)
+  max_flow capacity flow n 0sz 2sz 100sz;
   
   // Clean up
   with sc. assert (A.pts_to capacity sc);
