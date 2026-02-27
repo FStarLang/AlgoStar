@@ -127,16 +127,4 @@ let kruskal_result_is_forest (edges: list edge) (n: nat)
   : Lemma (KSpec.is_forest (kruskal_spec edges n) n)
   = kruskal_acyclic_lemma edges [] n
 
-(*** Additional properties ***)
 
-// Sorted input preservation: if input is sorted, algorithm processes in order
-let sorted_input_property (edges: list edge)
-  : Lemma (requires sorted_edges edges)
-          (ensures True)
-  = ()
-
-// Greedy property: always takes minimum weight edge when possible
-let greedy_property (edges: list edge) (n: nat)
-  : Lemma (requires sorted_edges edges)
-          (ensures True)
-  = ()
