@@ -1,15 +1,12 @@
 {
-    "fstar_exe": "../FStar/bin/fstar.exe",
+    "fstar_exe": "fstar.exe",
     "options": [
         "--cmi",
         "--warn_error", "-321",
         "--warn_error", "@247"
     ],
     "include_dirs": [
-        "../pulse/lib/common",
-        "../pulse/build/lib.common.checked",
-        "../pulse/build/ocaml/installed/lib/pulse",
-        "../pulse/out/lib/pulse",
+        "${PULSE_HOME}/lib/pulse",
         "common",
         "ch02-getting-started",
         "ch04-divide-conquer",

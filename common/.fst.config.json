@@ -1,6 +1,6 @@
 {
     "include_dirs": [
-        "/home/nswamy/workspace/everest/pulse/out/lib/pulse",
+        "${PULSE_HOME}/lib/pulse",
         "."
     ],
     "options": [
