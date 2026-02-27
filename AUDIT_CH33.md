@@ -171,16 +171,11 @@ No `#set-options` for rlimit or fuel/ifuel adjustments appear in the file. The p
 | 2 | GRAHAM-SCAN | §33.3 | Medium | Requires sorting by polar angle (uses cross product), stack operations |
 | 3 | Jarvis's march | §33.3 | Medium | Requires polar-angle minimum finding (uses cross product) |
 | 4 | Closest pair of points | §33.4 | Hard | Requires divide-and-conquer, sorting, merge-strip logic |
-
-### Priority 2: Enhanced Specifications
-
-| # | Enhancement | Description |
-|---|---|---|
 | 5 | Geometric soundness of cross product | Prove cross_product_spec > 0 ↔ CCW orientation (relative to a formal definition) |
 | 6 | Intersection correctness | Prove `segments_intersect_spec` ↔ geometric intersection (∃ point on both segments) |
 | 7 | Point type abstraction | Introduce `type point = { x: int; y: int }` to reduce parameter count |
 
-### Priority 3: Exercises
+### Defer
 
 CLRS §33.1 includes 8 exercises (33.1-1 through 33.1-8) covering:
 - Cross-product orientation proof (33.1-1)

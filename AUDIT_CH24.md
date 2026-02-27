@@ -417,26 +417,18 @@ Both `BellmanFord.fst` and `Dijkstra.fst` use `//SNIPPET_START:` / `//SNIPPET_EN
 | 1.1 | **Fix stale "One admit()" comment** | Dijkstra.fst:30 | Misleads readers into thinking the proof has a gap |
 | 1.2 | **Unify `sp_dist` definitions** | ShortestPath.Spec.fst, BellmanFord.Spec.fst | Two independent `sp_dist_k` / `sp_dist` definitions (flat-weights vs. adj_matrix) are never formally connected; this leaves BellmanFord.Spec's theorems disconnected from the Pulse implementation's spec |
 | 1.3 | **Remove dead-code lemmas with `ensures true`** | Dijkstra.Correctness.fst:169,375 | `dist_via_settled_optimal` and `subpath_weight_monotone` prove nothing; remove or complete |
-
-### Priority 2 (Medium) — Code Quality
-
-| # | Task | File(s) | Rationale |
-|---|------|---------|-----------|
 | 2.1 | **Deduplicate definitions** between BellmanFord.fst and BellmanFord.Complexity.Instrumented.fst | Both | `triangle_inequality`, `valid_distances`, `no_violations`, etc. are copy-pasted; instrumented file should import from main |
 | 2.2 | **Clean up commented-out code** | Dijkstra.Correctness.fst | ~100 lines of abandoned proof attempts |
 | 2.3 | **Factor `count_ones` utilities** | Dijkstra.fst → common/ | General-purpose lemmas about counting 1s in a seq |
 | 2.4 | **Fix stale line-number references** | Dijkstra.TriangleInequality.fst:857,860,877 | References to "lines 325-393" in Dijkstra.fst don't correspond to current code |
-| 2.5 | **Monitor Dijkstra.fst z3rlimit 200** | Dijkstra.fst:360 | High rlimit + `split_queries always` suggests proof fragility |
-
-### Priority 3 (Low) — Documentation / Enhancements
-
-| # | Task | File(s) | Rationale |
-|---|------|---------|-----------|
+| 2.5 | **Monitor Dijkstra.fst z3rlimit 200** | Dijkstra.fst:360 | High rlimit + `split_queries always` suggests proof fragility. Use SMTProfiling skill to stabilize |
 | 3.1 | **Update README.md** | README.md | Should cover all 11 files, both algorithms, complexity proofs, and the full postcondition |
 | 3.2 | **Add predecessor (π) tracking** | BellmanFord.fst, Dijkstra.fst | CLRS algorithms compute π for path reconstruction; currently omitted |
 | 3.3 | **Document sentinel constraint** | BellmanFord.fst, Dijkstra.fst | Edge weights must satisfy `w(u,v) < 1000000` and shortest paths must be `< 1000000`; not documented |
-| 3.4 | **Add adjacency-list variant** | New files | Current O(V³) BF and O(V²) Dijkstra are for dense graphs; adjacency-list would achieve O(VE) and O((V+E)lg V) |
 | 3.5 | **Add module doc to ShortestPath.Spec/Triangle** | Both files | These are the mathematical foundation; deserve comprehensive headers |
+
+## Defer
+| 3.4 | **Add adjacency-list variant** | New files | Current O(V³) BF and O(V²) Dijkstra are for dense graphs; adjacency-list would achieve O(VE) and O((V+E)lg V) |
 
 ---
 

@@ -369,25 +369,29 @@ The highest rlimit is 80 (MergeSort merge loop, line 340). This is moderately hi
 - `[ ] CH02-01: Bridge merge sort complexity to imperative code (Priority: High)`
   Add ghost tick counter to `merge_impl` and `merge_sort_aux`/`merge_sort` to prove that the imperative merge sort performs at most `merge_sort_ops(n)` comparisons. This closes the main spec gap — the O(n log n) bound is proved for the recurrence but not linked to the actual code.
 
-- `[ ] CH02-02: Fix README signature mismatches (Priority: High)`
+- `[x] CH02-02: Fix README signature mismatches (Priority: High)`
   Update `ch02-getting-started/README.md`:
   - Line 31/57: Change `is_permutation` → `permutation`
   - Line 29: Add `ctr` and `#c0` parameters to InsertionSort signature
   - Line 55: Change `n: SZ.t` → `len: SZ.t`
   - Line 62: Fix build path from `/home/nswamy/workspace/clrs/` to correct path
 
-- `[ ] CH02-03: Unify tick counter approach (Priority: High)`
+- `[x] CH02-03: Unify tick counter approach (Priority: High)`
   `CLRS.Common.Complexity.fst` uses `R.ref nat` (runtime cost); `InsertionSort.fst` uses `GR.ref nat` (ghost, erased). Standardize on `GR.ref nat` in the common module since the counter should be ghost/erased. Update all downstream consumers.
 
-### Medium Priority
-
-- `[ ] CH02-04: Remove unused import in InsertionSort (Priority: Medium)`
+- `[x] CH02-04: Remove unused import in InsertionSort (Priority: Medium)`
   `CLRS.Ch02.InsertionSort.fst` line 28: `module Classical = FStar.Classical` is unused. Remove it.
 
-- `[ ] CH02-05: Resolve Predicates.fst/fsti dead code (Priority: Medium)`
-  `common/Predicates.fst` and `common/Predicates.fsti` define generic `sorted`, `is_permutation`, and heap predicates. These are not imported by any chapter. Either:
-  (a) Migrate other chapters to use them (replacing per-chapter definitions), or
-  (b) Remove them if `CLRS.Common.SortSpec.fst` is the canonical spec module.
+- `[x] CH02-05: Resolve Predicates.fst/fsti dead code (Priority: Medium)`
+  `common/Predicates.fst` and `common/Predicates.fsti` are NOT dead code — they are used by ch08, ch09, ch12, ch22, ch23. The audit's claim was incorrect. No action needed for ch02.
+
+- `[x] CH02-09: Rename merge_impl to merge (Priority: Medium)`
+  `merge_impl` (line 360) should be renamed to `merge` for consistency with CLRS naming. The `_impl` suffix suggests there's a spec-only version, but `seq_merge` already fills that role and has a different name.
+
+- `[x] CH02-10: Document swap-vs-shift deviation (Priority: Low)`
+  Add a comment in `CLRS.Ch02.InsertionSort.fst` near lines 180-184 noting that the implementation uses adjacent swaps instead of CLRS's shift-then-insert. Mention that comparison count is identical but write count differs.
+
+### Defer
 
 - `[ ] CH02-06: Support empty arrays in InsertionSort (Priority: Medium)`
   The precondition `SZ.v len > 0` (line 102) rejects empty arrays. CLRS handles empty arrays trivially. Add an `if len = 0` early return to remove this restriction.
@@ -397,14 +401,6 @@ The highest rlimit is 80 (MergeSort merge loop, line 340). This is moderately hi
 
 - `[ ] CH02-08: Reduce fuel 3 in seq_merge_count (Priority: Medium)`
   `CLRS.Ch02.MergeSort.fst` line 67: `--fuel 3 --ifuel 2` is high. The `seq_merge_count` proof (lines 79-99) may benefit from more explicit `Seq.head`/`Seq.tail` assertions to reduce fuel dependency.
-
-- `[ ] CH02-09: Rename merge_impl to merge (Priority: Medium)`
-  `merge_impl` (line 360) should be renamed to `merge` for consistency with CLRS naming. The `_impl` suffix suggests there's a spec-only version, but `seq_merge` already fills that role and has a different name.
-
-### Low Priority
-
-- `[ ] CH02-10: Document swap-vs-shift deviation (Priority: Low)`
-  Add a comment in `CLRS.Ch02.InsertionSort.fst` near lines 180-184 noting that the implementation uses adjacent swaps instead of CLRS's shift-then-insert. Mention that comparison count is identical but write count differs.
 
 - `[ ] CH02-11: Add SNIPPET markers to InsertionSort inner loop (Priority: Low)`
   InsertionSort has `SNIPPET_START/END` for the signature (lines 91, 110) but not for the inner loop. Add markers around the inner loop (lines 148-202) for documentation/extraction purposes.

@@ -225,31 +225,16 @@ Prim uses `65535sz` as infinity in the imperative code but `1000000000` in the p
 |----|------|---------|--------|
 | **T1** | **Close Kruskal `assume_` at line 315**: Prove `is_forest (edges_from_arrays ...)` by connecting the UF component invariant (soundness: different roots ⟹ unreachable; completeness: reachable ⟹ same root) to `acyclic_when_unreachable` from MST.Spec. This requires maintaining a ghost edge-list in the imperative loop and proving that UF-find correctly tracks connected components. | `Kruskal.fst`, `Kruskal.UF.fst` | **Large** (2–4 days) |
 | **T2** | **Close UF `admit()` at line 360**: Add precondition `e.u < n ∧ e.v < n` to the enclosing lemma, or prove the `find_pure` identity property for out-of-range vertices. The latter is straightforward: `find_pure` returns `v` when `v ≥ n`. | `Kruskal.UF.fst` | **Small** (1–2 hours) |
-
-### Priority 2 (Specification Gap)
-
-| ID | Task | File(s) | Effort |
-|----|------|---------|--------|
 | **T3** | **Connect Prim Pulse to pure spec**: Currently `prim_correct` only asserts `source key = 0 ∧ keys bounded`. Add a ghost `tree_edges` accumulator or post-hoc extraction and prove the result matches `pure_prim`, inheriting MST correctness from `prim_spec`. | `Prim.fst`, `Prim.Spec.fst` | **Large** (3–5 days) |
 | **T4** | **Connect Kruskal Pulse to pure spec**: Similarly, bridge imperative output to `pure_kruskal` and inherit `theorem_kruskal_produces_mst`. Depends on T1. | `Kruskal.fst`, `Kruskal.Spec.fst` | **Large** (3–5 days) |
 | **T5** | **Prove MST existence from connectivity**: Derive `∃ t. is_mst g t` from `all_connected g.n g.edges` to remove the assumed precondition in both `theorem_kruskal_produces_mst` and `prim_spec`. This requires showing that connected graphs have spanning trees and that the weight function has a minimum. | `MST.Spec.fst` | **Medium** (1–2 days) |
-
-### Priority 3 (Fidelity & Performance)
-
-| ID | Task | File(s) | Effort |
-|----|------|---------|--------|
 | **T6** | **Implement edge-sorted Kruskal in Pulse**: Replace V²-scan-per-round with edge-array-scan (sort edges, iterate once). This would give O(E lg E + E·α(V)) matching CLRS. | New file or refactor `Kruskal.fst` | **Large** |
 | **T7** | **Add union-by-rank / path compression to UF**: Current `do_union` just sets `parent[root_u] = root_v`. Adding rank-based union + path compression gives inverse-Ackermann amortized find, matching CLRS §21.3. | `Kruskal.fst`, `Kruskal.UF.fst` | **Medium** |
 | **T8** | **Add π (parent) array to Prim Pulse**: Current implementation only returns keys, not the MST edges. Adding parent tracking matches CLRS and enables materializing the MST. | `Prim.fst` | **Small** (half day) |
-
-### Priority 4 (Code Quality)
-
-| ID | Task | File(s) | Effort |
-|----|------|---------|--------|
-| **T9** | **Fix README**: Update line counts, admit counts, file list; remove the incorrect "No admits" claim. | `README.md` | **Trivial** |
 | **T10** | **Remove dead code**: `sorted_input_property` and `greedy_property` in SortedEdges.fst (lines 133–142) have `ensures True` — either give them real postconditions or delete them. | `Kruskal.SortedEdges.fst` | **Trivial** |
 | **T11** | **Reconcile infinity values**: Prim Pulse uses 65535, Prim.Spec uses 10⁹. Add a bridging lemma or parameterize. | `Prim.fst`, `Prim.Spec.fst` | **Small** |
 | **T12** | **Split Kruskal.Spec.fst**: Factor BFS/component logic, edge sorting, and the main theorem into separate modules. The file is ~3K lines. | `Kruskal.Spec.fst` | **Medium** |
+| **T9** | **Fix README**: Update line counts, admit counts, file list; remove the incorrect "No admits" claim. | `README.md` | **Trivial** |
 
 ---
 

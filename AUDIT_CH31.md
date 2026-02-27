@@ -247,30 +247,20 @@ particularly readable.
 |---|------|------|--------|
 | 1.1 | **Document ModExp variant.** Add a comment noting this is the right-to-left (Exercise 31.6-2) variant, not the primary left-to-right CLRS algorithm. | `ModExp.fst` line 4 | Trivial |
 | 1.2 | **Link GCD spec to divisibility.** Add a lemma `gcd_spec_divides: a:nat → b:nat → Lemma (divides (gcd_spec a b) a ∧ divides (gcd_spec a b) b)` to connect `gcd_spec` to the mathematical GCD definition, or import the result from `ExtendedGCD`. | `GCD.fst` | Small |
-
-### Priority 2 — Completeness
-
-| # | Task | File | Effort |
-|---|------|------|--------|
 | 2.1 | **Add complexity proof for Extended GCD.** The recursion is identical to GCD; the step count and O(log b) bound carry over directly. Could be a Pulse wrapper or a pure step-counting function. | `ExtendedGCD.fst` | Medium |
 | 2.2 | **Handle edge cases in ModExp.** Relax preconditions to allow `e_init = 0` (return 1 % m) and `m_init = 1` (return 0), matching CLRS fully. | `ModExp.fst` line 158 | Small |
 | 2.3 | **Update README** to list Extended GCD in the ch31 row. | `README.md` | Trivial |
-
-### Priority 3 — Code Quality
-
-| # | Task | File | Effort |
-|---|------|------|--------|
-| 3.1 | **Factor out ghost tick infrastructure** (`incr_nat`, `tick`) into a shared module (e.g., `common/GhostTick.fst`) to eliminate duplication across GCD, ModExp, and other chapters. | `common/` | Small |
 | 3.2 | **Unify GCD definitions.** Either have `ExtendedGCD.fst` import `gcd_spec` from `GCD.fst`, or create a shared `GCD.Spec` module. The two identical definitions (`gcd_spec` and `gcd`) should not coexist independently. | Both GCD files | Small |
 | 3.3 | **Fix Lamé's theorem documentation.** Line 8 of GCD says "Complexity analysis uses Lamé's theorem" but the proof uses a direct mod-halving argument, not the Fibonacci-based Lamé bound. Either clarify the comment or add the Fibonacci connection. | `GCD.fst` line 8 | Trivial |
-
-### Priority 4 — Enhancements (Optional)
-
-| # | Task | File | Effort |
-|---|------|------|--------|
 | 4.1 | **Add left-to-right ModExp** implementing the primary CLRS algorithm for completeness, keeping the current right-to-left version as an alternative. | New file | Medium |
-| 4.2 | **Add concrete test cases for GCD and ModExp** (like the CLRS examples: `gcd(30,21)=3`, `7^560 mod 561 = 1`). ExtendedGCD already has tests. | `GCD.fst`, `ModExp.fst` | Trivial |
 | 4.3 | **Prove GCD commutativity implies O(log min(a,b)).** The current bound is O(log b); combining with `gcd_spec_comm` gives O(log min(a,b)), but this isn't stated as a standalone lemma. | `GCD.fst` | Trivial |
+
+
+## Defer
+
+| 4.2 | **Add concrete test cases for GCD and ModExp** (like the CLRS examples: `gcd(30,21)=3`, `7^560 mod 561 = 1`). ExtendedGCD already has tests. | `GCD.fst`, `ModExp.fst` | Trivial |
+
+| 3.1 | **Factor out ghost tick infrastructure** (`incr_nat`, `tick`) into a shared module (e.g., `common/GhostTick.fst`) to eliminate duplication across GCD, ModExp, and other chapters. | `common/` | Small |
 
 ---
 

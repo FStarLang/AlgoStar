@@ -287,36 +287,26 @@ These are clean and idiomatic. The ghost helpers are well-factored and reusable.
 
 | # | Task | Rationale |
 |---|------|-----------|
-| 1 | **Implement RB-DELETE** (§13.4) | CLRS Ch13 is incomplete without deletion. This is the most complex operation and the main gap. Requires `RB-TRANSPLANT`, `TREE-MINIMUM`, `RB-DELETE-FIXUP`. |
-
-### Priority: High (P1)
-
-| # | Task | Rationale |
-|---|------|-----------|
 | 2 | **Add `delete` to Spec** with Okasaki-style functional delete | Must precede Pulse implementation. Consider Kahrs/Germane-Might style functional delete. |
 | 3 | **Prove `delete` preserves RB + BST invariants** | Core correctness obligation |
+| 1 | **Implement RB-DELETE** (§13.4) | CLRS Ch13 is incomplete without deletion. This is the most complex operation and the main gap. Requires `RB-TRANSPLANT`, `TREE-MINIMUM`, `RB-DELETE-FIXUP`. |
 | 4 | **Implement `delete` in Pulse** | Pointer-level verified implementation |
 | 5 | **Add delete complexity analysis** | O(log n) delete ticks |
-
-### Priority: Medium (P2)
-
-| # | Task | Rationale |
-|---|------|-----------|
 | 6 | **Add `minimum` / `maximum` operations** | Useful standalone + needed for delete |
 | 7 | **Reduce Z3 resource usage** for `balance_restores_no_red_red_*` (fuel 8, rlimit 200) and `balance_is_bst` (fuel 4, rlimit 200) | Proof stability under Z3 version changes |
 | 8 | **Add `free_rbtree` operation** in Pulse to deallocate an entire tree | Memory management completeness |
 | 9 | **Prove `insert` preserves node count** (size increases by 0 or 1) | Set-theoretic completeness |
 | 10 | **Update module header** to note that §13.4 (delete) is not yet covered | Documentation accuracy |
+| 11 | **Add Okasaki citation** to Spec file header | Academic completeness |
+| 15 | **Embed tick counters into Pulse operations** | Tie complexity proof directly to compiled code |
+| 12 | **Refactor `classify_runtime`** — extract per-case helpers to reduce nesting | Maintainability |
+| 14 | **Add successor / predecessor** | CLRS §12.2 completeness |
 
-### Priority: Low (P3)
+### DEFER
 
 | # | Task | Rationale |
 |---|------|-----------|
-| 11 | **Add Okasaki citation** to Spec file header | Academic completeness |
-| 12 | **Refactor `classify_runtime`** — extract per-case helpers to reduce nesting | Maintainability |
 | 13 | **Add iterator / in-order traversal** | Practical utility |
-| 14 | **Add successor / predecessor** | CLRS §12.2 completeness |
-| 15 | **Embed tick counters into Pulse operations** | Tie complexity proof directly to compiled code |
 
 ---
 

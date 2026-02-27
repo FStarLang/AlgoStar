@@ -329,22 +329,24 @@ This file only prints a description string. It does **not** call `max_subarray` 
 
 ### Priority 1 — High (Correctness / Completeness)
 
-- [ ] **T1: Add executable test for Kadane.** `Test.MaxSubarray.fst` currently only prints strings. Add a Pulse test that allocates an array (e.g., `[-2, 1, -3, 4, -1, 2, 1, -5, 4]`), calls `max_subarray`, and asserts the result equals 6.
-- [ ] **T2: Add executable test for D&C.** Either in `Test.MaxSubarray.fst` or a new file, call `find_maximum_subarray_sum` on the same example and check the result.
-- [ ] **T3: Document `elements_bounded` constraint.** The `-10^9` sentinel is an implicit precondition on all optimality theorems. Add a prominent note in `Spec.fst` header explaining the valid input range and when this could bite users.
+- [ ] **T9: Consider generalizing `initial_min`.** The hard-coded `-10^9` sentinel limits the algorithm to inputs ≥ -10⁹. An alternative design could use `Option int`
 
-### Priority 2 — Medium (Code Quality)
+- [ ] **T3: Remove `elements_bounded` constraint.** The `-10^9` sentinel is an implicit precondition on all optimality theorems.
 
-- [ ] **T4: Eliminate `incr_nat`/`tick` duplication.** Extract a `CLRS.Common.GhostComplexity` module with ghost-tick versions of `incr_nat`, `tick`, and the complexity-bound predicates. Update `BinarySearch.fst` and `Kadane.fst` to import it.
 - [ ] **T5: Remove dead code.** Delete `min_int` (DivideConquer.fst:26) and either `dc_kadane_equivalence` or `lemma_dc_equals_kadane` (keep one, remove the duplicate wrapper).
-- [ ] **T6: Support empty arrays in Binary Search.** Add an `if len = 0 then return 0sz` guard (or document why it is intentionally excluded).
 
-### Priority 3 — Low (Polish)
+- [ ] **T10: Align D&C complexity proof with implementation.** Currently the complexity bound is on the recurrence model `dc_ops_count`, not on actual operations in `find_maximum_subarray_dc`. Consider adding a ghost parameter or operational cost annotation for tighter integration.
+
+### Defer
 
 - [ ] **T7: Add more Binary Search test cases.** Test: single element found, single element not-found, duplicate keys, key at boundaries (first/last element).
 - [ ] **T8: Add negative-test for MaxSubarray.** Test all-negative array (e.g., `[-3, -5, -1]`) — expected result should be `-1`.
-- [ ] **T9: Consider generalizing `initial_min`.** The hard-coded `-10^9` sentinel limits the algorithm to inputs ≥ -10⁹. An alternative design could use `Option int` or parameterize the sentinel, making the spec unconditional.
-- [ ] **T10: Align D&C complexity proof with implementation.** Currently the complexity bound is on the recurrence model `dc_ops_count`, not on actual operations in `find_maximum_subarray_dc`. Consider adding a ghost parameter or operational cost annotation for tighter integration.
+
+
+- [ ] **T1: Add executable test for Kadane.** `Test.MaxSubarray.fst` currently only prints strings. Add a Pulse test that allocates an array (e.g., `[-2, 1, -3, 4, -1, 2, 1, -5, 4]`), calls `max_subarray`, and asserts the result equals 6.
+- [ ] **T2: Add executable test for D&C.** Either in `Test.MaxSubarray.fst` or a new file, call `find_maximum_subarray_sum` on the same example and check the result.
+- [ ] **T4: Eliminate `incr_nat`/`tick` duplication.** Extract a `CLRS.Common.GhostComplexity` module with ghost-tick versions of `incr_nat`, `tick`, and the complexity-bound predicates. Update `BinarySearch.fst` and `Kadane.fst` to import it.
+- [ ] **T6: Support empty arrays in Binary Search.** Add an `if len = 0 then return 0sz` guard (or document why it is intentionally excluded).
 
 ---
 

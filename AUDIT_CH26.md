@@ -291,32 +291,20 @@ The README is **significantly outdated**. It describes a different (earlier) ver
 | ID | Task | Rationale |
 |----|------|-----------|
 | P0.1 | **Rewrite README.md** | README describes a completely different algorithm than what's implemented. Must document: BFS-based Edmonds-Karp, 5-file structure, MFMC theorem, 3321 LOC. |
-
-### Priority 1 (High)
-
-| ID | Task | Rationale |
-|----|------|-----------|
 | P1.1 | **Strengthen main loop invariant** | The `max_flow` while-loop invariant should carry `imp_valid_flow` (or a weaker precursor) so the postcondition doesn't depend on the runtime check. This would upgrade the imperative correctness from "runtime-verified" to "statically proven". |
 | P1.2 | **Prove or properly axiomatize shortest-path distance monotonicity** | `shortest_path_distance` (Complexity.fst:40) is a constant — replace with a proper BFS distance abstraction and prove Lemma 26.7 non-vacuously. |
 | P1.3 | **Prove edge criticality bound** | `lemma_edge_critical_bound` (Complexity.fst:299) has postcondition `True`. State and prove the actual bound: each edge becomes critical ≤ V/2 times. |
 | P1.4 | **Add termination proof for main loop** | The `max_flow` while-loop needs a decreasing measure. Natural candidate: `max_flow_value - current_flow_value` (bounded by sum of capacities, decreases by ≥1 per iteration for integer capacities). |
-
-### Priority 2 (Medium)
-
-| ID | Task | Rationale |
-|----|------|-----------|
 | P2.1 | **Establish imperative-spec refinement** | Connect the Pulse `augment_imp` to the spec-level `augment_edge` with a simulation lemma, so each loop iteration provably corresponds to a spec-level `ford_fulkerson_step`. |
-| P2.2 | **Strengthen test** | The test uses `assume_` for `valid_caps`. Either prove it from the array writes or add multiple test cases with varied topologies. |
 | P2.3 | **Named constant for INT_MAX** | Replace `2147483647` in `find_bottleneck_imp` with a named constant. |
 | P2.4 | **Derive augmentation bound from criticality** | In Complexity.fst, derive `max_augmentations = V * E` from `lemma_augmentation_creates_critical_edge` + `lemma_edge_critical_bound`, rather than defining it directly. |
-
-### Priority 3 (Low)
-
-| ID | Task | Rationale |
-|----|------|-----------|
 | P3.1 | **Prove BFS correctness** | BFS in `bfs_residual` lacks a postcondition relating the pred array to an actual shortest path in the residual graph. Adding this would close the gap between the BFS implementation and the Edmonds-Karp spec. |
-| P3.2 | **Add adjacency-list variant** | The n×n matrix representation means BFS is O(V²) per iteration instead of O(V+E). An adjacency-list variant would achieve true O(VE²). |
 | P3.3 | **Prove anti-symmetry of forward/backward augmentation** | Show that the BFS discovery condition and the augmentation condition agree — i.e., if BFS discovered `v` from `u` via forward residual, then `augment_imp` will take the forward branch. |
+| P2.2 | **Strengthen test** | The test uses `assume_` for `valid_caps`. Either prove it from the array writes or add multiple test cases with varied topologies. |
+
+### Defer
+
+| P3.2 | **Add adjacency-list variant** | The n×n matrix representation means BFS is O(V²) per iteration instead of O(V+E). An adjacency-list variant would achieve true O(VE²). |
 
 ---
 

@@ -248,14 +248,9 @@ Missing: No cross-reference to CLRS Theorem 12.2 (O(h) for queries) or Theorem 1
 - [ ] **Fix Pulse `tree_delete` two-children case** (`Delete.fst:364–389`): Currently marks node invalid, orphaning both children. Must implement successor-swap approach: (1) call `tree_minimum` on right subtree, (2) copy successor key to `del_idx`, (3) recursively delete successor position. This is the most critical gap in Ch12.
 - [ ] **Fix Pulse `tree_delete` one-child cases** (`Delete.fst:348–363`): Cases 2 and 3 mark the node invalid but do not promote the child. For the array representation, the child subtree remains at its position — consider either moving the subtree up or switching to a different in-place approach.
 - [ ] **Fix stale comment** (`Spec.Complexity.fst:254`): Says "we admit this lemma" but code is fully proven. Change to "This lemma is proven by induction with bst_valid."
-
-### P1 — High (Specification Gaps)
-
 - [ ] **Add BST invariant to Pulse `tree_insert` postcondition** (`BST.fst:467–480`): Currently only proves key exists at some index. Should additionally prove `subtree_in_range keys' valid' cap 0 lo' hi'` is maintained.
 - [ ] **Connect pure spec to Pulse via refinement** : Prove that the Pulse `tree_search` / `tree_insert` operations refine the pure `bst_search` / `bst_insert` on the abstract inductive tree extracted from the array. This would close the gap between the strong pure proofs and the Pulse implementations.
 - [ ] **Add Pulse `tree_delete` postcondition for BST preservation**: Once delete is fixed, the postcondition should guarantee the BST invariant, not just `valid'[del_idx] == false`.
-
-### P2 — Medium (Code Quality)
 
 - [ ] **Eliminate duplication of `child_indices_fit`** : Extract to a shared module used by `BST.fst`, `Spec.fst`, and `Delete.fst`.
 - [ ] **Eliminate duplication of `list_to_set` / `key_set` / helpers** : Create `CLRS.Ch12.BST.KeySet.fst` shared by `Insert.Spec.fst` and `Delete.Spec.fst` (~30 lines duplicated).
@@ -263,16 +258,17 @@ Missing: No cross-reference to CLRS Theorem 12.2 (O(h) for queries) or Theorem 1
 - [ ] **Remove dead code `bst_property_at`** (`BST.fst:43–49`): Unused local BST predicate superseded by `subtree_in_range`.
 - [ ] **Deduplicate search logic in `tree_delete_key`** (`Delete.fst:440–514`): Reuse `tree_search` from `BST.fst` instead of reimplementing the search loop.
 - [ ] **Remove duplicate `bst` type definition** (`Delete.fst:59–64`): Import from `BST.fst` instead.
-
-### P3 — Low (Completeness / Polish)
-
-- [ ] **Implement TREE-SUCCESSOR** : CLRS §12.2 defines this; it requires parent pointers (or the array parent formula `(i-1)/2`). Consider implementing for the array representation.
-- [ ] **Implement TREE-PREDECESSOR** : Symmetric to SUCCESSOR.
-- [ ] **Implement INORDER-TREE-WALK for Pulse** : The array representation has no imperative inorder walk.
 - [ ] **Add ghost ticks to Pulse loops** : Currently complexity is only proven on the pure side. Adding a ghost tick counter to `tree_search`'s while loop would mechanically connect the O(h) bound to the imperative code.
 - [ ] **Fix misleading comment in `Delete.fst:36`** : "TREE-DELETE: Uses admits for complex structural proofs" — there are no admits; the issue is semantic incorrectness, not proof gaps.
 - [ ] **Add CLRS theorem cross-references** : Cite Theorem 12.2 and 12.3 in the complexity modules.
+
+
+### DEFER
+
 - [ ] **Consider tighter delete bound** : The `4h + 1` bound in `Spec.Complexity.fst:304` could potentially be tightened to `3h + 1` by observing that finding the successor and deleting it share the same right-subtree path.
+- [ ] **Implement TREE-SUCCESSOR** : CLRS §12.2 defines this; it requires parent pointers (or the array parent formula `(i-1)/2`). Consider implementing for the array representation.
+- [ ] **Implement TREE-PREDECESSOR** : Symmetric to SUCCESSOR.
+- [ ] **Implement INORDER-TREE-WALK for Pulse** : The array representation has no imperative inorder walk.
 
 ---
 

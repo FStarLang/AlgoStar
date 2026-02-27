@@ -220,25 +220,15 @@ Ghost tick counting in MinMax is clean and correct — `GhostReference.ref nat` 
 
 - [ ] **P0-3: Wire correctness into quickselect.** After P0-1 and P0-2, add `assert (result == select_spec s0 (SZ.v k))` to quickselect's postcondition, using `pulse_correctness_hint`.
 
-### High (P1) — CLRS Fidelity
-
 - [ ] **P1-1: Implement CLRS pair-processing SimultaneousMinMax.** Add a second function using the 3⌊n/2⌋-comparison algorithm (process elements in pairs, compare pair first, then compare smaller/larger vs running min/max). Keep the current simple version as a baseline.
 
-- [ ] **P1-2: Add randomized pivot to quickselect** (or rename to `deterministic_select` and document that O(n) expected does not apply). At minimum, fix the misleading comment on line 7.
-
-### Medium (P2) — Code Quality & Complexity
-
-- [ ] **P2-1: Extract shared permutation infrastructure** into `CLRS.Common.Permutation.fst`. Both `Quickselect.fst` and `PartialSelectionSort.fst` copy ~65 lines of identical code.
-
-- [ ] **P2-2: Unify ghost tick infrastructure.** `MinMax.fst` and `SimultaneousMinMax.fst` duplicate `incr_nat`/`tick` using `GhostReference`. Merge with `CLRS.Common.Complexity`'s `tick` (which uses `Reference`), or create a ghost variant in Common.
+- [ ] **P1-2: Rename to deterministic_select** (or rename to `deterministic_select` and document that O(n) expected does not apply). At minimum, fix the misleading comment on line 7.
 
 - [ ] **P2-3: Add ghost tick counter to Pulse quickselect.** Connect the pure `qs_cost` model to the actual implementation to prove the O(n²) worst-case bound operationally.
 
 - [ ] **P2-4: Add ghost tick counter to Pulse `select`.** The `Complexity.fst` model says `k*(n−1)` but the Pulse code has no counter to verify this.
 
 - [ ] **P2-5: Tighten PartialSelectionSort complexity model.** The model uses `n−1` comparisons per round, but the actual code uses `n−i−1` in round `i`. The exact sum is `k*n − k(k+1)/2`, which is strictly better than `k*(n−1)`.
-
-### Low (P3) — Cleanup
 
 - [ ] **P3-1: Remove dead code.** Delete `kth_order_property` (Quickselect.fst:214–217), `unchanged_outside` (Quickselect.fst:90–95), `partition_preserves_permutation` (Correctness.fst:42–46), and `select_partition_spec` (Correctness.fst:226–227).
 
@@ -248,9 +238,18 @@ Ghost tick counting in MinMax is clean and correct — `GhostReference.ref nat` 
 
 - [ ] **P3-4: Rename Correctness/Spec modules** or at least document that they contain quickselect-related lemmas despite the `PartialSelectionSort` prefix.
 
+- [ ] **P3-6: Reduce `--z3rlimit 200` in PartialSelectionSort.fst:209.** Try breaking the `select` proof into helper lemmas to reduce the required rlimit.
+
+### DEFER
+
+- [ ] **P2-1: Extract shared permutation infrastructure** into `CLRS.Common.Permutation.fst`. Both `Quickselect.fst` and `PartialSelectionSort.fst` copy ~65 lines of identical code.
+
+- [ ] **P2-2: Unify ghost tick infrastructure.** `MinMax.fst` and `SimultaneousMinMax.fst` duplicate `incr_nat`/`tick` using `GhostReference`. Merge with `CLRS.Common.Complexity`'s `tick` (which uses `Reference`), or create a ghost variant in Common.
+
+
+
 - [ ] **P3-5: Fix D1 comment accuracy.** Either add randomization or change comment from "O(n) expected" to "O(n²) worst case; O(n) expected requires randomized pivot (not implemented)".
 
-- [ ] **P3-6: Reduce `--z3rlimit 200` in PartialSelectionSort.fst:209.** Try breaking the `select` proof into helper lemmas to reduce the required rlimit.
 
 ---
 

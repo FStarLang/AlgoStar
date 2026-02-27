@@ -252,7 +252,7 @@ CLRS Chapter 35 contains **5 sections**:
 | **Documentation** | ★★★☆☆ | In-code docs excellent; README has 6 phantom file/script references |
 | **Ch35 Coverage** | ★★☆☆☆ | 1 of 5 sections implemented (APPROX-VERTEX-COVER only) |
 
-### Recommendations
+### Task list
 
 1. **Fix README.md**: Remove references to 5 nonexistent files and `verify_all.sh`.
 2. **Delete dead lemma**: `cover_values_are_binary` (line 145) has its conclusion in its precondition.
@@ -260,4 +260,7 @@ CLRS Chapter 35 contains **5 sections**:
 4. **Add graph symmetry precondition**: Explicitly require `adj[u*n+v] = adj[v*n+u]` for undirected graphs, or document the upper-triangular convention.
 5. **Relax n < 256**: The constraint could be `n*n < SZ.bound` to support larger graphs.
 6. **Clean stale cache**: Remove `_cache/CLRS.Ch35.VertexCover.Complexity.fst.checked` (source file deleted).
+
+
+## Defer
 7. **Implement remaining Ch35 algorithms**: Prioritise GREEDY-SET-COVER (medium difficulty, high pedagogical value) and APPROX-TSP-TOUR (leverages existing Ch23 MST work).

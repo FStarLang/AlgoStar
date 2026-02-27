@@ -244,23 +244,16 @@ This comment is **outdated/incorrect**. The property is fully proven via `lemma_
 | 1 | Remove stale "One admit" comment — the property is fully proven | `CLRS.Ch28.Strassen.fst` | 34 | 1 min |
 | 2 | Fix `.rst` references to nonexistent `CLRS.Ch28.MatrixMultiply.Complexity.fst` — point to `CLRS.Ch28.MatrixMultiply.fst` instead | `doc/ch28_matrix_ops.rst` | 100–115 | 5 min |
 | 3 | Fix CLRS section references: "§28.1"/"§28.2" → "§4.2" | `doc/ch28_matrix_ops.rst` | 9, 20, 128 | 2 min |
-
-### Priority 2 (Medium) — Documentation Improvements
-
-| # | Task | File | Line(s) | Effort |
-|---|------|------|---------|--------|
 | 4 | Update README line count "170 lines" → "~240 lines" | `README.md` | 21 | 1 min |
 | 5 | Add Strassen description to README (currently only mentions MatrixMultiply) | `README.md` | — | 10 min |
 | 6 | Note that Strassen complexity counts multiplications only, not additions | `doc/ch28_matrix_ops.rst` | ~190 | 2 min |
-
-### Priority 3 (Low) — Enhancements
-
-| # | Task | File | Effort |
-|---|------|------|--------|
 | 7 | Add an imperative (Pulse) Strassen implementation for extractable code | New file | Large |
+| 10 | Reconcile the two dot product definitions (`dot_product_spec` in MatrixMultiply vs `dot_product` in Strassen) — they are equivalent but defined independently | Both files | Small |
+
+## Defer
+
 | 8 | Prove Strassen for non-power-of-2 matrices (CLRS Exercise 4.2-3) | `CLRS.Ch28.Strassen.fst` | Medium |
 | 9 | Add `matrix_extensional_equality` lemma (two matrices equal iff all elements equal) to strengthen the correctness theorem from pointwise to structural equality | `CLRS.Ch28.Strassen.fst` | Small |
-| 10 | Reconcile the two dot product definitions (`dot_product_spec` in MatrixMultiply vs `dot_product` in Strassen) — they are equivalent but defined independently | Both files | Small |
 
 ---
 

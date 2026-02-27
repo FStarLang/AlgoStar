@@ -337,25 +337,20 @@ Generally good within the Pulse code. The proof comments in `CountingSort.Lemmas
 | T1 | **Add stability to CountingSort.Stable postcondition.** The ensures should state that elements with equal keys maintain their input order. The backward-pass implementation already guarantees this; the proof needs to track input positions through Phase 4. | `CountingSort.Stable.fst`, `CountingSort.StableLemmas.fst` | High (2–3 days) |
 | T2 | **Prove permutation for BucketSort.** Add `(forall x. List.mem x ys <==> List.mem x xs)` or a proper count-based permutation to the postcondition. Most infrastructure (`filter_bucket_correct`, `insertion_sort_mem`) already exists. | `BucketSort.fst` | Medium (1–2 days) |
 | T3 | **Remove `distinct` requirement from RadixSort.MultiDigit.** The `backward_stability` lemma (line 631) and `radix_sort_invariant` (line 778) both require `distinct s`. Generalize to handle duplicate values, matching CLRS. | `RadixSort.MultiDigit.fst` | High (2–4 days) |
-
-### P1 — Important (CLRS fidelity / architecture)
-
-| ID | Task | File(s) | Effort |
-|----|------|---------|--------|
 | T4 | **Implement multi-digit Pulse radix sort (d>1).** Currently `RadixSort.fst` delegates to single-pass counting sort. Implement the CLRS loop calling `CountingSort.Stable` per digit. | `RadixSort.fst`, new files | High (3–5 days) |
 | T5 | **Connect Pulse counting sort to abstract stability spec.** Prove that `CountingSort.Stable` satisfies `is_stable_sort_on_digit` from `RadixSort.Stability`. This would bridge Tracks A and B. | New adapter module | Medium (1–2 days) |
 | T6 | **Extract common RadixSort foundations.** Create `RadixSort.Base.fst` with shared definitions: `pow`, `digit`, `digit_bound`, `count`, `permutation`, `sorted_on_digit`, etc. All three tracks should import from it. | New `RadixSort.Base.fst` | Medium (1–2 days) |
 | T7 | **Consolidate radix sort proof tracks.** After T6, consider whether Spec and MultiDigit can be merged, or whether one can be deprecated. Currently three independent proofs of CLRS Lemma 8.3 is excessive. | `RadixSort.Spec.fst`, `RadixSort.MultiDigit.fst` | Medium (1–2 days) |
+| T8 | **Add ghost ticks to Pulse counting sort.** Instrument the loops in `CountingSort.fst` and `CountingSort.Stable.fst` to count iterations and connect to `CountingSort.Complexity.fst`. | `CountingSort.fst`, `CountingSort.Stable.fst` | Medium (1 day) |
+| T9 | **Fix stale documentation.** Remove false "admits" claims in `FullSort.fst:19` and `Spec.fst:13-14`. Update or delete `BUCKET_SORT_PROOF_STATUS.md`. | `RadixSort.FullSort.fst`, `RadixSort.Spec.fst`, `BUCKET_SORT_PROOF_STATUS.md` | Low (30 min) |
+| T12 | **Add CLRS section references in postconditions.** Each main function should reference the CLRS theorem or lemma it corresponds to (e.g., "CLRS Lemma 8.3" in radix sort invariant). | All files | Low (1 hour) |
 
-### P2 — Nice to have (quality / documentation)
+### Defer
 
 | ID | Task | File(s) | Effort |
 |----|------|---------|--------|
-| T8 | **Add ghost ticks to Pulse counting sort.** Instrument the loops in `CountingSort.fst` and `CountingSort.Stable.fst` to count iterations and connect to `CountingSort.Complexity.fst`. | `CountingSort.fst`, `CountingSort.Stable.fst` | Medium (1 day) |
-| T9 | **Fix stale documentation.** Remove false "admits" claims in `FullSort.fst:19` and `Spec.fst:13-14`. Update or delete `BUCKET_SORT_PROOF_STATUS.md`. | `RadixSort.FullSort.fst`, `RadixSort.Spec.fst`, `BUCKET_SORT_PROOF_STATUS.md` | Low (30 min) |
 | T10 | **Formalize uniform distribution for bucket sort.** Add a probabilistic specification or at minimum an assumption predicate `uniform_distribution` that bucket sort's O(n) expected time depends on. | `BucketSort.fst` | Low priority (research) |
 | T11 | **Rename for consistency.** Standardize on `sorted_on_digit` (not `sorted_by_digit`) and `is_stable_sort_on_digit` (not `is_stable_sort_by_digit`) across all files. | Multiple files | Low (1 hour) |
-| T12 | **Add CLRS section references in postconditions.** Each main function should reference the CLRS theorem or lemma it corresponds to (e.g., "CLRS Lemma 8.3" in radix sort invariant). | All files | Low (1 hour) |
 
 ---
 

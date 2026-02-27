@@ -216,33 +216,23 @@ Generally accurate and helpful. The extensive proof strategy comment in `RankBou
 | 1.1 | **Prove `union_` preserves `is_forest`** — add `is_forest sp n` to `union_` postcondition. Requires showing that attaching one root under another preserves `has_root_within` for all nodes. | `UnionFind.fst:293` | Medium |
 | 1.2 | **Prove `find_compress` preserves `is_forest`** — the one-step compression `parent[x]=root` preserves reachability for all nodes. | `UnionFind.fst:240–252` | Medium |
 | 1.3 | **Wire full compression into `union_`** or provide a `find_compress_full` that calls `find_set` and proves `is_forest` preservation. Currently `union_` uses non-compressing `find`. | `UnionFind.fst`, `FullCompress.fst` | Medium-High |
-
-### Priority 2 (Medium) — Completing Proofs
-
-| # | Task | File | Effort |
-|---|---|---|---|
 | 2.1 | **Uncomment rank bound proof** — add `open CLRS.Common.Complexity` (line 18) and uncomment lines 490–633. The proof should verify as-is since `log2_floor` and `lemma_log2_floor_bound` exist in `common/`. | `RankBound.fst` | Low |
 | 2.2 | **Prove tight height ≤ rank[root] ≤ log₂(n)** — the current commented proof only achieves `height ≤ n`. Proving `path_length ≤ rank[root]` requires an inductive argument that each parent step increases rank. | `RankBound.fst:559–595` | Medium |
 | 2.3 | **Strengthen `uf_invariant_maintained`** — replace `ensures True` with an actual inductive proof over operation sequences, or remove the placeholder. | `Spec.fst:618–621` | Medium |
 | 2.4 | **Prove `find_set` preserves `is_forest`** — `compress_path` and `find_set` only guarantee `well_formed` in postcondition. | `FullCompress.fst:77–84, 163–173` | Medium |
-
-### Priority 3 (Low) — Code Quality
-
-| # | Task | File | Effort |
-|---|---|---|---|
 | 3.1 | **Extract shared types to a common module** — `uf_forest`, `is_valid_uf`, `rank_invariant`, `pure_find_fuel` are duplicated in Spec, FindTermination, and RankBound. Create `CLRS.Ch21.UnionFind.Types.fst`. | Multiple | Low-Medium |
 | 3.2 | **Fix section numbering** in `Spec.fst` — jumps from §5 to §8. | `Spec.fst` | Trivial |
 | 3.3 | **Fix documentation claim** — change "admitted here for brevity" to "proof commented out pending module integration" in `Spec.fst` header (line 13) and update `RankBound.fst` header to note the commented-out status. | `Spec.fst:13`, `RankBound.fst:1–10` | Trivial |
 | 3.4 | **Unify `well_formed` definitions** across `UnionFind.fst` and `FullCompress.fst` — ensure both include `n > 0` and use the same syntactic form. | `FullCompress.fst:35–37` | Trivial |
 | 3.5 | **Remove defensive rank overflow guard** — since `rank ≤ log₂(n) < n-1` is provable, the `if rank_x < n-1` guard on line 332 is dead code. Once task 2.1 is done, this can be replaced with a proof that `rank_x + 1` fits in `SZ.t`. | `UnionFind.fst:332` | Low |
 | 3.6 | **Add chapter README** documenting the module structure, which find variant to use, and CLRS section mapping. | New file | Low |
+| 4.2 | **Link imperative and pure specs** — prove that the imperative `union_` + `find` sequence produces the same partition as `pure_union` + `pure_find`. This is a refinement proof connecting the Pulse code to the pure F* model. | New module | High |
 
-### Priority 4 (Aspirational) — Advanced
+### Defer
 
 | # | Task | File | Effort |
 |---|---|---|---|
 | 4.1 | **Formalize amortized O(α(n)) bound** — CLRS §21.4 potential-function analysis. Would require defining Ackermann function, inverse Ackermann, and potential function. | New module | Very High |
-| 4.2 | **Link imperative and pure specs** — prove that the imperative `union_` + `find` sequence produces the same partition as `pure_union` + `pure_find`. This is a refinement proof connecting the Pulse code to the pure F* model. | New module | High |
 
 ---
 

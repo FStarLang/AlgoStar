@@ -244,20 +244,10 @@ This file documents an abandoned attempt to prove stronger timestamp invariants 
 | 1.1 | **Prove BFS shortest-path optimality (CLRS Thm 22.5)** — the hard direction in BFS.DistanceSpec. The infrastructure (1,116 lines) is already built; the key missing lemma is "if v visited at step k, no shorter path exists". | Core BFS correctness | High |
 | 1.2 | **Add reachability postcondition to QueueBFS** — currently only proves "visited ⟹ dist ≥ 0", not "reachable ⟹ visited". IterativeBFS proves the stronger property. | Spec completeness | Medium |
 | 1.3 | **Add DFS-based topological sort** — CLRS §22.4 describes TOPOLOGICAL-SORT via finish-time ordering, not Kahn's. The finish-time machinery is already in DFS.Spec; just need to connect it to TopologicalSort.Spec. | CLRS fidelity | Medium |
-
-### Priority 2 (Medium) — Code Quality
-
-| # | Task | Impact | Effort |
-|---|------|--------|--------|
 | 2.1 | **Extract common definitions** — `has_edge`, `reachable_in`, `tick`, `product_strict_bound` into `Graph.Common.fst`. 5 redundant copies of `has_edge` with incompatible signatures is a maintenance hazard. | Maintainability | Medium |
-| 2.2 | **Rename IterativeDFS → IterativeReachability** — the module name is misleading. The header already clarifies but the name in the module system persists. | Clarity | Low |
+| 2.2 | **Delete IterativeDFS** — the module name is misleading and it is superseded by the true DFS implementation. | Clarity | Low |
 | 2.3 | **Unify graph representation** — `DFS.Spec` uses `Seq.seq (Seq.seq int)` (2D) while all Pulse files use flat `Seq.seq int`. This prevents direct linkage between the spec-level DFS and the imperative StackDFS. | Architecture | High |
 | 2.4 | **Delete `DFS.WhitePath.fst.bak`** — backup file in the directory. | Hygiene | Trivial |
-
-### Priority 3 (Low) — Documentation
-
-| # | Task | Impact | Effort |
-|---|------|--------|--------|
 | 3.1 | **Fix stale comment in TopologicalSort.Verified:431** — says "we admit two standard lemmas" but both are now proved. | Accuracy | Trivial |
 | 3.2 | **Fix stale comment in DFS.WhitePath:1099** — references "assume val predicates" that no longer exist. | Accuracy | Trivial |
 | 3.3 | **Add cross-reference between DFS.Spec and StackDFS** — spec uses 2D adjacency list, imperative uses flat matrix; document the relationship. | Clarity | Low |

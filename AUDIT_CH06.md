@@ -308,24 +308,19 @@ All limits are **moderate** (max 50). No extreme values. The higher limits (50) 
 |---|------|------|-------|-------|
 | H1 | **Add ghost-tick instrumentation** to connect Pulse implementation with complexity bounds | Heap.fst | — | Currently complexity analysis is disconnected from the implementation. Add ghost counters to `max_heapify` and `heapsort` loops, and prove they match `heapsort_ops`. Follow patterns from `ch25-apsp` or `ch28-matrix-ops`. |
 | H2 | **Extract BUILD-MAX-HEAP as a standalone function** | Heap.fst | 596–626 | Enables reuse for priority queue operations (CLRS §6.5). Also improves CLRS fidelity. |
-
-### Priority: Medium
-
-| # | Task | File | Lines | Notes |
-|---|------|------|-------|-------|
 | M1 | **Remove duplicate simple analysis** in Complexity file | Complexity.fst | 471–515 | `heapsort_comparisons`, `extract_max_comparisons`, `heapsort_simplified_bound` duplicate the enhanced analysis with weaker bounds. Keep only the enhanced version. |
 | M2 | **Document the `start` parameter** in `max_heapify` | Heap.fst | 323 | Add a comment explaining why this ghost parameter is needed and how it differs from the CLRS interface. |
 | M3 | **Document the `SZ.fits` precondition** | Heap.fst | 329, 585 | Explain that `fits(2*n+2)` prevents overflow when computing `right_idx`. |
 | M4 | **Fix inaccurate comment** about Pulse.Lib.PriorityQueue | Heap.fst | 10 | Either remove or clarify the reference to PriorityQueue adaptation. |
+| L4 | **Add CLRS section references** as comments on each major definition | Complexity.fst | — | e.g., mark `nodes_at_height` with "CLRS §6.3, Exercise 6.3-3" |
 
-### Priority: Low
+### Defer
 
 | # | Task | File | Lines | Notes |
 |---|------|------|-------|-------|
 | L1 | **Add `n = 0` support to heapsort** | Heap.fst | 584 | Currently requires `SZ.v n > 0`. Empty arrays are trivially sorted. |
 | L2 | **Rename `bad` parameter** in `bad_is_child_of_parent` | Heap.fst | 44 | Use a more descriptive name like `child`. |
 | L3 | **Consider reducing z3rlimit 50 on `heapsort`** | Heap.fst | 572 | Try if a lower limit (e.g., 30) suffices after splitting the proof. |
-| L4 | **Add CLRS section references** as comments on each major definition | Complexity.fst | — | e.g., mark `nodes_at_height` with "CLRS §6.3, Exercise 6.3-3" |
 
 ---
 

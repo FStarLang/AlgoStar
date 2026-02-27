@@ -292,21 +292,15 @@ Well-placed `//SNIPPET_START`/`//SNIPPET_END` markers for documentation extracti
 
 ### Priority 1 — Critical (naming/duplication)
 
+- [ ] **Delete LinkedList.fst/fsti.** This is not a pointer-based linked list, but an array-based sequential list. The current name is misleading. [F-3]
+
 - [ ] **T-1: Fix misleading module names.** Rename `DoublyLinkedList.Complexity.fst` → `SinglyLinkedList.Complexity.fst` and `DoublyLinkedList.Complexity.Enhanced.fst` → `SinglyLinkedList.Complexity.Enhanced.fst`. These files use a singly-linked `node` type (no `prev` field). [F-10]
 
 - [ ] **T-2: Extract shared SLL definitions.** Create `CLRS.Ch10.SinglyLinkedList.Base.fsti` containing: `node`, `dlist`, `is_dlist`, `is_dlist_cases`, `elim_is_dlist_nil`, `intro_is_dlist_nil`, `intro_is_dlist_cons`, `cases_of_is_dlist`, `is_dlist_case_none`, `is_dlist_case_some`, `remove_first`. Have `SinglyLinkedList.fst`, `SinglyLinkedList.Complexity.fst`, and `SinglyLinkedList.Complexity.Enhanced.fst` import it. Saves ~240 lines. [F-9]
 
-### Priority 2 — Medium (correctness/fidelity)
-
 - [ ] **T-3: Update README.md.** Fix all stale content: correct types (`V.vec`/`B.box`), correct invariant description (same-order, not reverse), correct push/pop specs, remove "Admitted Proofs" section, remove deprecated API warning. [F-11]
 
-- [ ] **T-4: Rename or document `LinkedList.fst`.** Either rename to `ArrayBasedList.fst` or add prominent module-level comment explaining this is an array-based simplification, not the pointer-based linked list of CLRS §10.2. [F-3]
-
-- [ ] **T-5: Add `list_delete` to `LinkedList.fst`.** The array-based list has insert and search but no delete. Either add it or document why it's omitted. [F-3]
-
 - [ ] **T-6: Implement true O(1) pointer-based LIST-DELETE for DLL.** CLRS LIST-DELETE takes a pointer to the node and performs O(1) pointer surgery. The current `list_delete` does key-based search. The DLL `dls` predicate machinery (factor/unfactor) could support this with a `split_at_node` ghost operation. [F-6]
-
-### Priority 3 — Low (polish/uniformity)
 
 - [ ] **T-7: Add refinement lemma connecting imperative and pure stack specs.** Show that the imperative `L.append contents [x]` push convention is equivalent to the pure `x :: s` convention (via list reversal). [F-1]
 
@@ -316,11 +310,13 @@ Well-placed `//SNIPPET_START`/`//SNIPPET_END` markers for documentation extracti
 
 - [ ] **T-10: Clean up SinglyLinkedList.fst header comment.** Remove "originally mislabelled" note, since the name is now correct. [F-4]
 
-- [ ] **T-11: Consider sentinel DLL.** Implement CLRS §10.2 sentinel variant (circular DLL with `L.nil`) as an optional extension. [F-5]
-
 - [ ] **T-12: Add ghost-tick complexity for Stack/Queue.** For uniformity with linked-list complexity proofs, add instrumented versions. [F-7]
 
 - [ ] **T-13: Evaluate `DataStructures.Complexity.fst`.** The 11 lemmas prove trivially true statements (`1 = 1`, `n <= n`). Consider either removing or connecting to actual implementation cost bounds. [F-8]
+
+## Defer
+
+- [ ] **T-11: Consider sentinel DLL.** Implement CLRS §10.2 sentinel variant (circular DLL with `L.nil`) as an optional extension. [F-5]
 
 - [ ] **T-14: Add test for SinglyLinkedList and DLL.** Currently only `Stack.Test`, `Queue.Test`, and `LinkedList.Test` exist. The SLL and DLL implementations have no test files. [Testing Gap]
 

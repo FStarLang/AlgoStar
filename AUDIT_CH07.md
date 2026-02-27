@@ -340,25 +340,25 @@ Generally good. The CLRS mapping comments (e.g., `// x = A[r]`, `// i = p - 1`, 
 
 | # | Priority | Task | File(s) | Details |
 |---|---|---|---|---|
+| 0 | **P0** | Why have LomutoPartition.fst and Partition.fst? | `Partition.fst`, `LomutoPartition.fst` | Both implement Lomuto-style partitions. Partition is not CLRS-faithful and is not used by Quicksort. Whereas the partition used by Quicksort really does seem to be closer to Lomuto. Remove the redundant partitions | 
 | 1 | **P1** | Fix comment: `n(n+1)/2` → `n(n-1)/2` | `Quicksort.fst:12` | Comment says `T(n) ≤ n(n+1)/2` but code proves `n(n-1)/2`. |
 | 2 | **P1** | Fix comment: `T(n) = T(n-1) + n` → `T(n) = T(n-1) + (n-1)` | `Quicksort.fst:11` | Partition cost is n-1, not n. |
 | 3 | **P1** | Fix comment: "exactly n comparisons" → "exactly n-1" | `Quicksort.fst:10,244` | Partition compares n-1 elements (excluding pivot). |
-| 4 | **P1** | Add permutation proof to `LomutoPartition.fst` | `LomutoPartition.fst` | The `permutation_sub` predicate is defined but not proved as a postcondition. Without it, can't prove output is a rearrangement. |
 | 5 | **P1** | Update README: remove stale admit claims | `README.md:111,123` | No admits exist in current code. |
-| 6 | **P2** | Remove or archive `Partition.fst` | `Partition.fst` | Orphaned module — not used by Quicksort. If kept, rename to `CLRS.Ch07.ExternalPivotPartition.fst` and document it as a standalone utility. |
 | 7 | **P2** | Deduplicate: use `CLRS.Common.SortSpec` | `Quicksort.fst`, `Partition.fst` | Remove local copies of `sorted`, `permutation`, `permutation_refl`, `compose_permutations`, `swap_is_permutation`, etc. Import from `common/CLRS.Common.SortSpec.fst`. |
 | 8 | **P2** | Deduplicate: merge complexity into `Quicksort.Complexity.fst` | `Quicksort.fst:526-572`, `Quicksort.Complexity.fst` | `worst_case_ticks` and `lemma_worst_case_formula` are defined in both files. Move canonical versions to `Complexity.fst` and import. |
-| 9 | **P2** | Extract `tick`/`incr_nat` to a shared ghost-tick module | `Partition.fst:39-47`, `Quicksort.fst:38-47` | Identical code in both files. These will be needed by other chapters too. |
-| 10 | **P2** | Remove dead code: `maybe_swap`, `partition_step` | `LomutoPartition.fst:129-172` | `maybe_swap` is never called. `partition_step` is never called. |
-| 11 | **P2** | Remove unused `permutation_sub` or use it | `LomutoPartition.fst:106-112` | Defined but never appears in any postcondition. Either prove it or remove it. |
 | 12 | **P2** | Reduce `--retry 5` proof instability | `Quicksort.fst` | 4 of 5 push-options use `--retry 5`. Investigate adding intermediate assertions or splitting lemmas to stabilize. |
-| 13 | **P2** | Remove nonneg precondition from `Partition.fst` | `Partition.fst:194` | `forall i. Seq.index s0 i >= 0` is unnecessary for Lomuto partition. |
+| 16 | **P3** | Fix README path | `README.md:93` | `cd /home/nswamy/workspace/clrs/ch07-quicksort` → use relative path `cd ch07-quicksort`. |
+| 19 | **P3** | Expose complexity bound through top-level `quicksort` | `Quicksort.fst:665-688` | The ghost counter is created/freed internally. Consider adding a version that exposes the bound. |
+
+
+
+## Defer
+
 | 14 | **P3** | Implement RANDOMIZED-PARTITION (§7.3) | New file | CLRS §7.3 is a core section. Would require a random-number source (could use a ghost/erased random oracle). |
 | 15 | **P3** | Prove O(n lg n) expected-case bound (§7.4.2) | New file | Theorem 7.4 is the crown jewel of Ch7. Would be a significant proof effort (probability + indicator random variables). |
-| 16 | **P3** | Fix README path | `README.md:93` | `cd /home/nswamy/workspace/clrs/ch07-quicksort` → use relative path `cd ch07-quicksort`. |
 | 17 | **P3** | Update README to document all 4 source files | `README.md` | Currently only describes `Quicksort.fst`. Should mention `Partition.fst`, `LomutoPartition.fst`, `Quicksort.Complexity.fst`. |
 | 18 | **P3** | Add `quicksort_bounded` to README/docs | `Quicksort.fst:690-709` | Useful sub-range API not mentioned in any documentation. |
-| 19 | **P3** | Expose complexity bound through top-level `quicksort` | `Quicksort.fst:665-688` | The ghost counter is created/freed internally. Consider adding a version that exposes the bound. |
 
 ---
 

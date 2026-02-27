@@ -281,25 +281,18 @@ All rlimits are reasonable (≤80). No extreme settings. `--split_queries always
 | 1 | **Factor out shared Rod Cutting spec** into a single module. `accum_max`, `build_opt`, `optimal_revenue`, `build_opt_prefix`, `optimal_revenue_consistent`, `accum_max_ext`, `dp_correct`, `accum_max_dp_correct` are copy-pasted in 3 files. | `RodCutting.fst`, `Spec.fst`, `Extended.fst` | Medium |
 | 2 | **Prove `optimal_revenue` = max over `valid_cutting`**: Bridge the DP recurrence to the enumerative definition. This would close the main specification gap. | `RodCutting.Spec.fst` | Hard |
 | 3 | **Prove `mc_cost` = min over all parenthesizations**: Define an explicit parenthesization type and prove equivalence. | `MatrixChain.Spec.fst` | Hard |
-
-### Priority 2 (Medium) — Robustness & Completeness
-
-| # | Task | File | Effort |
-|---|---|---|---|
 | 4 | **Eliminate sentinel assumption**: Either prove `all_costs_bounded` from dimension bounds, or restructure to use `option int` / unbounded comparison. | `MatrixChain.Spec.fst` | Medium |
 | 5 | **Add `s` table to Matrix Chain** (parenthesization reconstruction, like CLRS). | `MatrixChain.fst` | Medium |
 | 6 | **Add ghost ticks to Matrix Chain Pulse code**: Currently complexity is proven only on the pure model, not in the implementation. | `MatrixChain.fst` | Low |
 | 7 | **Add `b` table to LCS** (backtracking arrows, like CLRS) or document that `build_lcs` in Spec serves this role. | `LCS.fst` | Low |
-
-### Priority 3 (Low) — Polish
-
-| # | Task | File | Effort |
-|---|---|---|---|
 | 8 | **Remove dead code** `seq_index_or_zero` | `Extended.fst:123` | Trivial |
-| 9 | **Name the sentinel constant** `1000000000` → `sentinel` | `MatrixChain.fst`, `Spec.fst` | Trivial |
+| 9 | **Name the sentinel constant** `1000000000` → `sentinel`, better use an option type | `MatrixChain.fst`, `Spec.fst` | Trivial |
+| 12 | **Exact MC complexity**: Prove `mc_iterations n == (n³-n)/6` (mentioned but unproven in `Complexity.fst:106`) | `Complexity.fst` | Low |
+
+### Defer
+
 | 10 | **Add assertions to test files** (e.g., `assert (revenue == 30)` for rod cutting) | `Test.fst` files | Low |
 | 11 | **Consider `nat` return for LCS** instead of `int` | `LCS.fst` | Low |
-| 12 | **Exact MC complexity**: Prove `mc_iterations n == (n³-n)/6` (mentioned but unproven in `Complexity.fst:106`) | `Complexity.fst` | Low |
 
 ---
 

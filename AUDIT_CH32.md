@@ -372,31 +372,20 @@ These are effectively "semantic admits" — lemmas that claim to prove something
 | P0.1 | **Strengthen KMP matcher postcondition** to `count == count_matches_spec`. Currently only proves bounds. The pure `KMP.Spec.fst` has all the ingredients (`kmp_count_step`, `count_before_eq_spec`); they need to be wired into the Pulse loop invariant. | KMP's raison d'être as a verified algorithm is incomplete without this. |
 | P0.2 | **Prove `pi_max`** (maximality) in the Pulse `compute_prefix_function`, or connect `pi_correct` to `pi_max` via a bridging lemma. Currently the Pulse impl only proves π is **a** valid prefix-suffix, not the **longest**. `KMP.Spec.fst` requires `pi_max` as a precondition. | Blocks formal connection between Pulse impl and pure correctness proof. |
 | P0.3 | **Verify `KMP.Spec.fst` references are resolved**: Clean-rebuild to confirm `check_match_at`, `count_matches_up_to` (5-arg), and `count_matches_spec` are actually in scope. If the `.checked` file is stale, fix imports. | May invalidate the completeness proof. |
-
-### P1 — High (CLRS fidelity)
-
-| ID | Task | Impact |
-|----|------|--------|
 | P1.1 | **Unify Rabin-Karp**: Replace `RabinKarp.fst`'s sum-hash with the CLRS polynomial hash from `RabinKarp.Spec.fst`, or create a new Pulse implementation using the correct hash. | CLRS fidelity; the sum-hash is not the Rabin-Karp algorithm. |
 | P1.2 | **Fix `KMP.StrengthenedSpec.fst`**: Either complete the proofs (replace `ensures True` with actual postconditions) or demote the file to a design document with clear naming (e.g., `KMP.SpecSketch.fst`). | Misleading proof claims. |
-
-### P2 — Medium (code quality)
-
-| ID | Task | Impact |
-|----|------|--------|
 | P2.1 | **Extract shared spec module**: Create `CLRS.Ch32.StringMatchSpec.fst` with generic `matches_at`, `count_matches_up_to`, etc. parameterized by `#a: eqtype`. | Eliminates ~5 copies of identical definitions. |
 | P2.2 | **Unify element types**: Make KMP work on `eqtype` (like Naive) instead of `int`. | Consistency and reusability. |
 | P2.3 | **Delete backup files**: Remove `RabinKarp.Spec.fst.backup`, `.v2`, `.v3`. | Repo hygiene. |
 | P2.4 | **Add complexity to RabinKarp Pulse**: Add ghost tick counter to `RabinKarp.fst` and prove the O((n−m+1)·m) worst-case bound inline. | Parity with Naive and KMP. |
-
-### P3 — Low (documentation / tests)
-
-| ID | Task | Impact |
-|----|------|--------|
 | P3.1 | **Update README.md**: Document all 10 files, add RabinKarp section, fix build instructions. | Discoverability. |
 | P3.2 | **Fix misleading header comments**: Remove "functional correctness" claim from KMP.fst:9 (or prove it); clarify KMP.StrengthenedSpec.fst's status. | Accuracy. |
-| P3.3 | **Add KMP matcher tests**: `KMP.Test.fst` only tests `compute_prefix_function`. Add tests for `kmp_matcher` / `kmp_string_match` with known texts and patterns. | Test coverage. |
 | P3.4 | **Decide fate of `reference.fst`**: Either integrate its proofs (e.g., bridge to Pulse impls) or move to a `reference/` directory. | Clarity of purpose. |
+
+
+### Defer
+
+| P3.3 | **Add KMP matcher tests**: `KMP.Test.fst` only tests `compute_prefix_function`. Add tests for `kmp_matcher` / `kmp_string_match` with known texts and patterns. | Test coverage. |
 | P3.5 | **Decide fate of `test_without_lemma.fst`**: Either expand into a real test suite or remove. | 9 lines of dead code. |
 
 ---

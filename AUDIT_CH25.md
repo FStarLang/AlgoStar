@@ -242,22 +242,17 @@ All limits are modest. No `--z3seed` hacks or excessive fuel/ifuel settings.
 | P1-1 | **Connect fw_entry to graph-theoretic δ(i,j)**: Define path/walk types over the adjacency matrix, define `shortest_path_weight`, and prove `fw_entry adj n i j n == shortest_path_weight adj n i j` under the no-negative-cycle assumption. | Without this, the "shortest paths" claim is only about the recurrence, not the actual graph property. |
 | P1-2 | **Guard the infinity sentinel**: Either (a) add a precondition bounding all edge weights so that path sums cannot reach `inf`, or (b) replace `inf` with an option type / extended-integer type. | Current code silently produces wrong results if weights are large. |
 | P1-3 | **Add runtime assertions or preconditions for no-negative-cycle**: The Spec file assumes `fw_entry adj n v v k >= 0` for all k,v. The imperative code has no such check. At minimum, add a post-loop diagonal check, or strengthen the Floyd-Warshall precondition to require non-negative diagonal in the input. | Caller could pass a graph with negative cycles and get silently wrong results. |
-
-### Priority 2 — Code Quality
-
-| # | Task | Rationale |
-|---|------|-----------|
 | P2-1 | **Eliminate code duplication in Complexity.fst**: Import `fw_inner_j`, `fw_inner_i`, `fw_outer`, `inf`, and length lemmas from `CLRS.Ch25.FloydWarshall` instead of re-declaring them. | ~50 lines of exact duplication. Divergence risk if one copy is updated. |
 | P2-2 | **Add output assertions to Test.fst**: After `floyd_warshall dist n`, read back entries and assert expected values (e.g., `d[0][2] == 20`, `d[1][0] == 45`). | Current test only checks that the code compiles and runs without crashing. |
-| P2-3 | **Implement predecessor matrix (Π)**: Add optional path-reconstruction support per CLRS §25.2. | Needed for complete CLRS coverage. |
-
-### Priority 3 — Documentation
-
-| # | Task | Rationale |
-|---|------|-----------|
 | P3-1 | **Fix README statistics**: Update rlimit values (20/40, not 5), remove stale timing numbers, fix the build path. | Currently misleading. |
 | P3-2 | **Fix Spec.fst header**: Change "CLRS Theorem 25.2" → "CLRS Equation 25.5, §25.2". Remove claim about connecting to true shortest-path distances (line 10) until P1-1 is done. | Overstatement. |
 | P3-3 | **Update README postcondition snippet**: Show the full postcondition including `contents' == fw_outer contents (SZ.v n) 0`. | README currently omits the functional-correctness ensures clause. |
+
+### Defer
+
+| # | Task | Rationale |
+|---|------|-----------|
+| P2-3 | **Implement predecessor matrix (Π)**: Add optional path-reconstruction support per CLRS §25.2. | Needed for complete CLRS coverage. |
 
 ---
 
