@@ -122,6 +122,53 @@ let find_next_spec_bounded (xs ys: Seq.seq int) (current: nat)
           (ensures find_next_spec xs ys current < Seq.length xs) =
   find_next_aux_bounded xs ys current current 0
 
+//SNIPPET_START: jarvis_march_spec
+// Jarvis march outer loop: count hull vertices starting from p0.
+// fuel bounds iterations (at most n-1 after the start vertex).
+let rec jarvis_loop_count (xs ys: Seq.seq int) (start current: nat) (fuel: nat)
+  : Tot nat (decreases fuel) =
+  if fuel = 0 then 0
+  else
+    let next = find_next_spec xs ys current in
+    if next = start then 0
+    else 1 + jarvis_loop_count xs ys start next (fuel - 1)
+
+// Full Jarvis march: returns number of hull vertices.
+let jarvis_march_spec (xs ys: Seq.seq int) : nat =
+  let n = Seq.length xs in
+  if n <= 1 then n
+  else
+    let p0 = find_leftmost_spec xs ys in
+    1 + jarvis_loop_count xs ys p0 p0 (n - 1)
+//SNIPPET_END: jarvis_march_spec
+
+// Bounds lemma: loop count is bounded by fuel
+let rec jarvis_loop_count_bounded (xs ys: Seq.seq int) (start current: nat) (fuel: nat)
+  : Lemma (ensures jarvis_loop_count xs ys start current fuel <= fuel)
+          (decreases fuel) =
+  if fuel = 0 then ()
+  else
+    let next = find_next_spec xs ys current in
+    if next = start then ()
+    else jarvis_loop_count_bounded xs ys start next (fuel - 1)
+
+// Bounds lemma: march result is at most n and at least 1
+let jarvis_march_spec_bounded (xs ys: Seq.seq int)
+  : Lemma (requires Seq.length ys == Seq.length xs /\ Seq.length xs > 1)
+          (ensures jarvis_march_spec xs ys <= Seq.length xs /\
+                   jarvis_march_spec xs ys >= 1) =
+  let n = Seq.length xs in
+  let p0 = find_leftmost_spec xs ys in
+  jarvis_loop_count_bounded xs ys p0 p0 (n - 1)
+
+// Step lemma: unfolding one iteration when next ≠ start
+let jarvis_loop_step (xs ys: Seq.seq int) (start current: nat) (fuel: nat)
+  : Lemma (requires fuel > 0 /\ find_next_spec xs ys current <> start)
+          (ensures jarvis_loop_count xs ys start current fuel ==
+                   1 + jarvis_loop_count xs ys start
+                       (find_next_spec xs ys current) (fuel - 1) /\
+                   jarvis_loop_count xs ys start current fuel >= 1) = ()
+
 // ========== Pulse Implementations ==========
 
 open Pulse.Lib.Array
@@ -251,6 +298,85 @@ fn find_next (#p: perm) (xs ys: array int)
 
   !next
 }
+
+//SNIPPET_START: jarvis_march_sig
+#push-options "--fuel 2 --ifuel 0"
+fn jarvis_march (#p: perm) (xs ys: array int)
+  (#sxs: Ghost.erased (Seq.seq int))
+  (#sys: Ghost.erased (Seq.seq int))
+  (len: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    pure (
+      SZ.v len == Seq.length sxs /\
+      Seq.length sxs == Seq.length sys /\
+      SZ.v len > 1 /\
+      SZ.v len == A.length xs /\
+      SZ.v len == A.length ys
+    )
+  returns h: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    pure (
+      SZ.v h == jarvis_march_spec sxs sys /\
+      SZ.v h >= 1 /\
+      SZ.v h <= SZ.v len
+    )
+//SNIPPET_END: jarvis_march_sig
+{
+  jarvis_march_spec_bounded sxs sys;
+  let p0 = find_leftmost xs ys len;
+  let first_next = find_next xs ys len p0;
+
+  if (first_next = p0) {
+    1sz
+  } else {
+    let mut h: SZ.t = 2sz;
+    let mut current: SZ.t = first_next;
+    let mut running: bool = true;
+
+    while (!running)
+    invariant exists* vrunning vcurrent vh.
+      R.pts_to running vrunning **
+      R.pts_to current vcurrent **
+      R.pts_to h vh **
+      A.pts_to xs #p sxs **
+      A.pts_to ys #p sys **
+      pure (
+        SZ.v vh >= 2 /\
+        SZ.v vh <= SZ.v len /\
+        SZ.v vcurrent < SZ.v len /\
+        SZ.v len == Seq.length sxs /\
+        Seq.length sxs == Seq.length sys /\
+        SZ.v len > 1 /\
+        SZ.v len == A.length xs /\
+        SZ.v len == A.length ys /\
+        jarvis_march_spec sxs sys <= SZ.v len /\
+        jarvis_march_spec sxs sys >= 1 /\
+        (vrunning ==>
+          SZ.v vh + jarvis_loop_count sxs sys (SZ.v p0) (SZ.v vcurrent)
+            (SZ.v len - SZ.v vh)
+          == jarvis_march_spec sxs sys) /\
+        (not vrunning ==>
+          SZ.v vh == jarvis_march_spec sxs sys)
+      )
+    {
+      let vc = !current;
+      let next = find_next xs ys len vc;
+      let vh = !h;
+      // Continue only if next ≠ start AND fuel remains (vh < len)
+      let go = not (next = p0) && (vh <^ len);
+
+      if go {
+        h := SZ.add vh 1sz;
+        current := next
+      } else {
+        running := false
+      }
+    };
+
+    !h
+  }
+}
+#pop-options
 
 // ========== Complexity Analysis ==========
 

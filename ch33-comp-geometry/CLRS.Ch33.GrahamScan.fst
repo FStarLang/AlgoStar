@@ -141,6 +141,45 @@ let graham_scan_sorted (xs ys: Seq.seq int) (sorted: Seq.seq nat) : nat =
     top
 //SNIPPET_END: scan_specs
 
+//SNIPPET_START: pop_while_spec
+// Pop non-left turns from the hull stack.
+// SZ.t version for direct Pulse array compatibility.
+let rec pop_while_spec (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: nat)
+  : Tot nat (decreases top) =
+  if top < 2 || top > Seq.length hull then top
+  else
+    let t1 = SZ.v (Seq.index hull (top - 1)) in
+    let t2 = SZ.v (Seq.index hull (top - 2)) in
+    if t1 >= Seq.length xs || t2 >= Seq.length xs || p_idx >= Seq.length xs ||
+       Seq.length ys <> Seq.length xs
+    then top
+    else
+      let cp = cross_prod
+        (Seq.index xs t2) (Seq.index ys t2)
+        (Seq.index xs t1) (Seq.index ys t1)
+        (Seq.index xs p_idx) (Seq.index ys p_idx) in
+      if cp <= 0 then pop_while_spec xs ys hull (top - 1) p_idx
+      else top
+
+let rec pop_while_spec_bounded (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: nat)
+  : Lemma (ensures pop_while_spec xs ys hull top p_idx <= top)
+          (decreases top) =
+  if top < 2 || top > Seq.length hull then ()
+  else
+    let t1 = SZ.v (Seq.index hull (top - 1)) in
+    let t2 = SZ.v (Seq.index hull (top - 2)) in
+    if t1 >= Seq.length xs || t2 >= Seq.length xs || p_idx >= Seq.length xs ||
+       Seq.length ys <> Seq.length xs
+    then ()
+    else
+      let cp = cross_prod
+        (Seq.index xs t2) (Seq.index ys t2)
+        (Seq.index xs t1) (Seq.index ys t1)
+        (Seq.index xs p_idx) (Seq.index ys p_idx) in
+      if cp <= 0 then pop_while_spec_bounded xs ys hull (top - 1) p_idx
+      else ()
+//SNIPPET_END: pop_while_spec
+
 // ========== Pulse Implementations ==========
 
 open Pulse.Lib.Array
@@ -233,6 +272,88 @@ fn polar_cmp (#p: perm) (xs ys: array int)
   (ax - px) * (b_y - py) - (bx - px) * (ay - py)
 }
 
+//SNIPPET_START: pop_while_sig
+#push-options "--fuel 2 --ifuel 0"
+fn pop_while (#p: perm) (xs ys: array int)
+  (#sxs: Ghost.erased (Seq.seq int))
+  (#sys: Ghost.erased (Seq.seq int))
+  (#ph: perm) (hull: array SZ.t)
+  (#shull: Ghost.erased (Seq.seq SZ.t))
+  (top_in: SZ.t) (p_idx: SZ.t) (len: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    A.pts_to hull #ph shull **
+    pure (
+      SZ.v top_in >= 2 /\
+      SZ.v top_in <= Seq.length shull /\
+      SZ.v p_idx < SZ.v len /\
+      SZ.v len == Seq.length sxs /\
+      Seq.length sxs == Seq.length sys /\
+      SZ.v len == A.length xs /\
+      SZ.v len == A.length ys /\
+      Seq.length shull == A.length hull /\
+      (forall (i: nat). i < SZ.v top_in ==> SZ.v (Seq.index shull i) < SZ.v len)
+    )
+  returns result: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    A.pts_to hull #ph shull **
+    pure (
+      SZ.v result == pop_while_spec sxs sys shull (SZ.v top_in) (SZ.v p_idx) /\
+      SZ.v result <= SZ.v top_in
+    )
+//SNIPPET_END: pop_while_sig
+{
+  pop_while_spec_bounded sxs sys shull (SZ.v top_in) (SZ.v p_idx);
+  let mut t: SZ.t = top_in;
+  let mut keep_going: bool = true;
+
+  while (!keep_going)
+  invariant exists* vt vkg.
+    R.pts_to t vt **
+    R.pts_to keep_going vkg **
+    A.pts_to xs #p sxs **
+    A.pts_to ys #p sys **
+    A.pts_to hull #ph shull **
+    pure (
+      SZ.v vt <= SZ.v top_in /\
+      SZ.v top_in <= Seq.length shull /\
+      Seq.length shull == A.length hull /\
+      SZ.v p_idx < SZ.v len /\
+      SZ.v len == Seq.length sxs /\
+      Seq.length sxs == Seq.length sys /\
+      SZ.v len == A.length xs /\
+      SZ.v len == A.length ys /\
+      (forall (i: nat). i < SZ.v top_in ==> SZ.v (Seq.index shull i) < SZ.v len) /\
+      (vkg ==>
+        pop_while_spec sxs sys shull (SZ.v vt) (SZ.v p_idx)
+        == pop_while_spec sxs sys shull (SZ.v top_in) (SZ.v p_idx)) /\
+      (not vkg ==>
+        SZ.v vt == pop_while_spec sxs sys shull (SZ.v top_in) (SZ.v p_idx))
+    )
+  {
+    let vt = !t;
+    if (vt <^ 2sz) {
+      keep_going := false
+    } else {
+      let t1_idx = hull.(SZ.sub vt 1sz);
+      let t2_idx = hull.(SZ.sub vt 2sz);
+      let t1x = xs.(t1_idx);
+      let t1y = ys.(t1_idx);
+      let t2x = xs.(t2_idx);
+      let t2y = ys.(t2_idx);
+      let px = xs.(p_idx);
+      let py = ys.(p_idx);
+      let cp = (t1x - t2x) * (py - t2y) - (px - t2x) * (t1y - t2y);
+      if (cp <= 0) {
+        t := SZ.sub vt 1sz
+      } else {
+        keep_going := false
+      }
+    }
+  };
+  !t
+}
+#pop-options
+
 // ========== Complexity Analysis ==========
 
 //SNIPPET_START: op_counts
@@ -241,6 +362,9 @@ let find_bottom_ops (n: nat) : nat = if n > 0 then n - 1 else 0
 
 // polar_cmp: O(1) — 5 subtractions, 2 multiplications, 1 subtraction
 let polar_cmp_ops : nat = 8
+
+// pop_while: O(top) worst case — each iteration does 1 cross product (7 ops) + 1 comparison
+let pop_while_ops (top: nat) : nat = top * 8
 
 // Sorting by polar angle: O(n^2) with insertion sort, O(n lg n) with merge sort
 let polar_sort_ops_insertion (n: nat) : nat = n * n

@@ -63,6 +63,44 @@ let segments_intersect_spec (x1 y1 x2 y2 x3 y3 x4 y4: int) : bool =
   else false
 //SNIPPET_END: segments_intersect_spec
 
+// ========== Geometric Properties ==========
+
+//SNIPPET_START: orientation
+type orientation = | CCW | CW | Collinear
+
+let orient (x1 y1 x2 y2 x3 y3: int) : orientation =
+  let cp = cross_product_spec x1 y1 x2 y2 x3 y3 in
+  if cp > 0 then CCW
+  else if cp < 0 then CW
+  else Collinear
+//SNIPPET_END: orientation
+
+//SNIPPET_START: cross_product_properties
+// Antisymmetry: swapping p2 ↔ p3 negates the cross product
+let cross_product_antisymmetric (x1 y1 x2 y2 x3 y3: int) : Lemma
+  (ensures cross_product_spec x1 y1 x3 y3 x2 y2 ==
+           -(cross_product_spec x1 y1 x2 y2 x3 y3)) = ()
+
+// Swapping p2 ↔ p3 reverses the turn direction
+let orient_antisymmetric (x1 y1 x2 y2 x3 y3: int) : Lemma
+  (ensures orient x1 y1 x3 y3 x2 y2 ==
+    (match orient x1 y1 x2 y2 x3 y3 with
+     | CCW -> CW | CW -> CCW | Collinear -> Collinear)) = ()
+
+// Translation invariance: shifting all points preserves orientation
+let cross_product_translation (x1 y1 x2 y2 x3 y3 dx dy: int) : Lemma
+  (ensures cross_product_spec (x1+dx) (y1+dy) (x2+dx) (y2+dy) (x3+dx) (y3+dy)
+        == cross_product_spec x1 y1 x2 y2 x3 y3) = ()
+
+// Degenerate: p2 = p1 implies collinear
+let cross_product_degenerate_p2 (x1 y1 x3 y3: int) : Lemma
+  (ensures cross_product_spec x1 y1 x1 y1 x3 y3 == 0) = ()
+
+// Degenerate: p3 = p1 implies collinear
+let cross_product_degenerate_p3 (x1 y1 x2 y2: int) : Lemma
+  (ensures cross_product_spec x1 y1 x2 y2 x1 y1 == 0) = ()
+//SNIPPET_END: cross_product_properties
+
 // ========== Pulse Implementations ==========
 
 //SNIPPET_START: cross_product_sig
@@ -167,18 +205,24 @@ fn segments_intersect (x1 y1 x2 y2 x3 y3 x4 y4: int)
 // All operations are O(1) — constant number of arithmetic operations.
 
 //SNIPPET_START: op_counts
-let cross_product_ops : nat = 3
-let direction_ops : nat = 3
-let on_segment_ops : nat = 4
-let segments_intersect_ops : nat = 16
+// cross_product: 4 subtractions + 2 multiplications + 1 subtraction = 7 ops
+let cross_product_ops : nat = 7
+// direction: delegates to cross_product
+let direction_ops : nat = 7
+// on_segment: 4 min/max comparisons + 4 bounds comparisons = 8 ops
+let on_segment_ops : nat = 8
+// segments_intersect (worst case): 4 directions + 8 straddle comparisons
+//   + 4 equality checks + up to 4 on_segment calls = 28 + 8 + 4 + 32 = 72
+let segments_intersect_ops : nat = 72
 //SNIPPET_END: op_counts
 
 let all_constant () : Lemma
-  (ensures cross_product_ops + direction_ops + on_segment_ops + segments_intersect_ops <= 30)
+  (ensures cross_product_ops + direction_ops + on_segment_ops + segments_intersect_ops <= 100)
   = ()
 
 //SNIPPET_START: composition
+// segments_intersect decomposes into direction + on_segment calls plus comparisons
 let segments_intersect_composition () : Lemma
-  (ensures segments_intersect_ops <= 4 * direction_ops + 2 * on_segment_ops)
+  (ensures segments_intersect_ops <= 4 * direction_ops + 4 * on_segment_ops + 12)
   = ()
 //SNIPPET_END: composition

@@ -1,197 +1,123 @@
 # CLRS Chapter 33: Computational Geometry
 
-This directory contains verified Pulse implementations of computational geometry primitives from CLRS Chapter 33.
+This directory contains verified Pulse implementations of computational geometry
+algorithms from CLRS Chapter 33, covering §33.1 segment primitives and §33.3
+convex hull algorithms.
 
 ## Module: CLRS.Ch33.Segments
 
-Implements line segment properties and intersection tests using the orientation-based algorithm from CLRS Section 33.1.
+Implements line segment properties, intersection tests, and geometric orientation
+lemmas from CLRS Section 33.1.
 
 ### Functions
 
 #### 1. Cross Product (`cross_product`)
 Computes the cross product (p2-p1) × (p3-p1) for three points.
 
-**Signature:**
-```fstar
-fn cross_product (x1 y1 x2 y2 x3 y3: int)
-  requires emp
-  returns result: int
-  ensures emp ** pure (result == cross_product_spec x1 y1 x2 y2 x3 y3)
-```
-
-**Specification:**
-- Returns positive if p3 is counter-clockwise from line p1→p2
-- Returns negative if p3 is clockwise from line p1→p2
-- Returns 0 if points are collinear
-
 **Formula:** `(x2-x1)*(y3-y1) - (x3-x1)*(y2-y1)`
 
 #### 2. Direction Test (`direction`)
 Wrapper around `cross_product` to determine orientation of three points.
 
-**Signature:**
-```fstar
-fn direction (x1 y1 x2 y2 x3 y3: int)
-  requires emp
-  returns result: int
-  ensures emp ** pure (result == direction_spec x1 y1 x2 y2 x3 y3)
-```
-
 #### 3. Point on Segment (`on_segment`)
-Checks if a point (x,y) lies on the segment from (x1,y1) to (x2,y2).
-Assumes the three points are collinear.
-
-**Signature:**
-```fstar
-fn on_segment (x1 y1 x2 y2 x y: int)
-  requires emp
-  returns result: bool
-  ensures emp ** pure (result == on_segment_spec x1 y1 x2 y2 x y)
-```
+Checks if a point lies on a segment (assumes collinearity).
 
 #### 4. Segment Intersection (`segments_intersect`)
-Determines if two line segments intersect using orientation tests.
+Determines if two line segments intersect using orientation tests (CLRS p.1017).
 
-**Signature:**
-```fstar
-fn segments_intersect (x1 y1 x2 y2 x3 y3 x4 y4: int)
-  requires emp
-  returns result: bool
-  ensures emp ** pure (result == segments_intersect_spec x1 y1 x2 y2 x3 y3 x4 y4)
-```
+### Geometric Properties
 
-**Algorithm:**
-1. Compute orientations of all four endpoint combinations
-2. General case: Segments straddle each other (opposite orientations)
-3. Special cases: Handle collinear points where one endpoint lies on the other segment
+The module proves several properties of the cross product:
+- **Antisymmetry**: swapping p2 ↔ p3 negates the result
+- **Orientation reversal**: swapping p2 ↔ p3 reverses CCW↔CW
+- **Translation invariance**: shifting all points preserves orientation
+- **Degenerate cases**: p2=p1 or p3=p1 gives collinear
 
-**Parameters:**
-- Segment 1: from (x1,y1) to (x2,y2)
-- Segment 2: from (x3,y3) to (x4,y4)
+A formal `orientation` type (`CCW | CW | Collinear`) connects the cross product
+sign to geometric meaning.
 
 ### Verification
-
-All implementations are fully verified with:
-- ✅ NO admits
-- ✅ NO assumes
-- ✅ All rlimits < 0.1 (well under recommended ≤10)
-- ✅ All queries succeed in < 100ms
-
-To verify:
-```bash
-make verify
-```
-
-To check proof robustness:
-```bash
-fstar.exe --include ../../pulse/out/lib/pulse --query_stats CLRS.Ch33.Segments.fst
-```
-
-### Properties
-
-Each imperative Pulse function (`fn`) is proven equivalent to a pure specification function:
-- `cross_product` ≡ `cross_product_spec`
-- `direction` ≡ `direction_spec`
-- `on_segment` ≡ `on_segment_spec`
-- `segments_intersect` ≡ `segments_intersect_spec`
-
-The specifications are pure mathematical functions that can be used in proofs and verified correct by construction.
-
-### References
-
-- CLRS 3rd Edition, Chapter 33: Computational Geometry
-- Section 33.1: Line-segment properties
-- Algorithm: SEGMENTS-INTERSECT (page 1017)
+- ✅ NO admits, NO assumes
+- ✅ All proofs automatic (no manual lemma invocations in Pulse)
+- ✅ Op counts: `cross_product_ops=7`, `direction_ops=7`, `on_segment_ops=8`, `segments_intersect_ops=72`
 
 ---
 
 ## Module: CLRS.Ch33.JarvisMarch
 
-Implements Jarvis's March (gift-wrapping) convex hull algorithm from CLRS Section 33.3.
+Implements Jarvis's March (gift-wrapping) convex hull algorithm from CLRS §33.3.
 
-### Functions
+### Pulse Functions
 
-#### 1. Find Leftmost Point (`find_leftmost`)
-Finds the point with minimum x-coordinate (breaking ties by minimum y).
-
-**Signature:**
-```fstar
-fn find_leftmost (#p: perm) (xs ys: array int) (len: SZ.t)
-  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
-  returns result: SZ.t
-  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
-    pure (SZ.v result == find_leftmost_spec sxs sys /\ SZ.v result < SZ.v len)
-```
-
-#### 2. Find Next Hull Vertex (`find_next`)
-From a current hull vertex, finds the next vertex by selecting the point that makes the most clockwise turn (all other points lie to the left).
-
-**Signature:**
-```fstar
-fn find_next (#p: perm) (xs ys: array int) (len: SZ.t) (current: SZ.t)
-  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
-  returns result: SZ.t
-  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
-    pure (SZ.v result == find_next_spec sxs sys (SZ.v current) /\ SZ.v result < SZ.v len)
-```
+| Function | Spec | Description |
+|---|---|---|
+| `find_leftmost` | `find_leftmost_spec` | Find leftmost point (min x, then min y) |
+| `find_next` | `find_next_spec` | Find next hull vertex (most clockwise turn) |
+| `jarvis_march` | `jarvis_march_spec` | Complete convex hull computation |
 
 ### Algorithm
-The Jarvis March constructs the convex hull by gift-wrapping:
 1. Start from the leftmost point (guaranteed on the hull)
-2. At each step, find the point that makes the smallest counterclockwise angle
+2. At each step, find the point making the most clockwise turn
 3. Repeat until returning to the start
 
-**Complexity:** O(nh) where n = input points, h = hull vertices.
+### Proved Properties
+- `jarvis_march` returns the exact number of hull vertices
+- Result is bounded: `1 <= h <= n`
+- Bounds lemmas: `jarvis_march_spec_bounded`, `jarvis_loop_count_bounded`
+- Step lemma: `jarvis_loop_step` (single-step unfolding)
+
+**Complexity:** O(nh) where n = input points, h = hull vertices. Proven: `jarvis_march_ops n h <= n * n`.
 
 ### Verification
 - ✅ NO admits, NO assumes
-- ✅ All rlimits < 0.1
-- ✅ Pure spec equivalence proven for both functions
-- ✅ Bounds proven: result indices are always valid
+- ✅ Complete Pulse implementation (outer loop + building blocks)
+- ✅ `jarvis_march` proven equivalent to `jarvis_march_spec`
 
 ---
 
 ## Module: CLRS.Ch33.GrahamScan
 
-Implements Graham's Scan convex hull algorithm building blocks from CLRS Section 33.3.
+Implements Graham's Scan convex hull algorithm from CLRS §33.3.
 
-### Functions
+### Pulse Functions
 
-#### 1. Find Bottom Point (`find_bottom`)
-Finds the point with minimum y-coordinate (breaking ties by minimum x). This is the starting point for Graham Scan.
-
-**Signature:**
-```fstar
-fn find_bottom (#p: perm) (xs ys: array int) (len: SZ.t)
-  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
-  returns result: SZ.t
-  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
-    pure (SZ.v result == find_bottom_spec sxs sys /\ SZ.v result < SZ.v len)
-```
-
-#### 2. Polar Angle Comparison (`polar_cmp`)
-Compares polar angles of two points w.r.t. a pivot using the cross product. Returns positive if `a` has a smaller angle than `b` (CCW order).
-
-**Signature:**
-```fstar
-fn polar_cmp (#p: perm) (xs ys: array int) (len: SZ.t) (p0 a b: SZ.t)
-  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
-  returns result: int
-  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
-    pure (result == polar_cmp_spec sxs sys (SZ.v p0) (SZ.v a) (SZ.v b))
-```
+| Function | Spec | Description |
+|---|---|---|
+| `find_bottom` | `find_bottom_spec` | Find bottom-most point (min y, then min x) |
+| `polar_cmp` | `polar_cmp_spec` | Compare polar angles of two points w.r.t. pivot |
+| `pop_while` | `pop_while_spec` | Pop hull stack while non-left turn |
 
 ### Pure Specifications
 
-The module also provides complete pure specifications for the full Graham Scan algorithm:
+Complete pure specs for the full algorithm:
 - `pop_non_left`: Pop stack while top elements don't make a left turn
 - `scan_step`: One step of the scan (pop then push)
 - `graham_loop`: Full scan loop over sorted points
 - `graham_scan_sorted`: Complete algorithm given pre-sorted indices
 
-**Complexity:** O(n lg n) dominated by sorting; the scan loop is O(n) amortized.
+### Algorithm
+1. Find bottom-most point as pivot
+2. Sort remaining points by polar angle w.r.t. pivot
+3. Process sorted points: for each, pop non-left turns from stack, then push
+
+**Complexity:** O(n lg n) dominated by sorting; scan loop is O(n) amortized.
 
 ### Verification
 - ✅ NO admits, NO assumes
-- ✅ All rlimits < 0.1
-- ✅ Pure spec equivalence proven for find_bottom and polar_cmp
+- ✅ Pulse: `find_bottom`, `polar_cmp`, `pop_while` proven equivalent to specs
+- ✅ Pure specs: complete algorithm specified and type-checked
+- ⏳ Full Pulse scan loop and polar insertion sort: deferred (pure specs complete)
+
+---
+
+## Summary
+
+| CLRS Algorithm | Section | Status |
+|---|---|---|
+| Cross product / Direction / On-segment | §33.1 | ✅ Fully verified |
+| SEGMENTS-INTERSECT | §33.1 | ✅ Fully verified |
+| Geometric orientation lemmas | §33.1 | ✅ Proved |
+| Jarvis's March (gift wrapping) | §33.3 | ✅ Fully verified (complete Pulse) |
+| Graham Scan | §33.3 | ✅ Specs + building blocks verified |
+| ANY-SEGMENTS-INTERSECT | §33.2 | ❌ Requires balanced BST |
+| Closest pair of points | §33.4 | ❌ Requires divide-and-conquer |
