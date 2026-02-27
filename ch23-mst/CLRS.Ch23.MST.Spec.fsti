@@ -436,3 +436,23 @@ val cut_property:
           // A ∪ {e} is contained in some MST
           (exists (t: list edge). is_mst g t /\ subset_edges (e :: a) t))
 //SNIPPET_END: cut_property
+
+(*** MST Existence Infrastructure ***)
+
+// If endpoints of e are reachable in t, then e :: t is not acyclic
+val reachable_implies_not_acyclic (n: nat) (t: list edge) (e: edge)
+  : Lemma (requires acyclic n t /\ reachable t e.u e.v /\
+                    e.u < n /\ e.v < n /\ e.u <> e.v /\ ~(mem_edge e t))
+          (ensures ~(acyclic n (e :: t)))
+
+// Acyclic(e :: t) implies endpoints of e are NOT reachable in t
+val acyclic_edge_disconnects (n: nat) (e: edge) (tl: list edge)
+  : Lemma (requires acyclic n (e :: tl) /\ e.u < n /\ e.v < n /\ e.u <> e.v /\
+                    ~(mem_edge e tl))
+          (ensures ~(reachable tl e.u e.v))
+
+// Acyclic + connected ⟹ exactly n-1 edges
+val acyclic_connected_length (n: nat) (es: list edge)
+  : Lemma (requires n > 0 /\ all_connected n es /\ acyclic n es /\
+                    (forall (e: edge). mem_edge e es ==> e.u < n /\ e.v < n /\ e.u <> e.v))
+          (ensures length es >= n - 1 /\ length es <= n - 1)

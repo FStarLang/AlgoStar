@@ -1743,3 +1743,139 @@ let generic_mst_correctness_sketch
 // Final note: This formalization captures the essence of CLRS Theorem 23.1
 // A complete proof would require substantial graph theory infrastructure
 // particularly for reasoning about paths, cycles, and connectivity
+
+(*** MST Existence: acyclic + connected → n-1 edges ***)
+
+// Helper: e ∉ subset of set not containing e
+let rec not_mem_of_subset (e: edge) (p t: list edge)
+  : Lemma (requires subset_edges p t /\ ~(mem_edge e t))
+          (ensures ~(mem_edge e p))
+          (decreases p)
+  = match p with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq e hd then begin
+        edge_eq_symmetric e hd;
+        mem_edge_eq hd e t
+      end else not_mem_of_subset e tl t
+
+// Helper: all_edges_distinct preserved by snoc when e ∉ p
+let rec all_edges_distinct_snoc (p: list edge) (e0: edge)
+  : Lemma (requires all_edges_distinct p /\ ~(mem_edge e0 p))
+          (ensures all_edges_distinct (p @ [e0]))
+          (decreases p)
+  = match p with
+    | [] -> ()
+    | hd :: tl ->
+      all_edges_distinct_snoc tl e0;
+      mem_edge_append hd tl [e0];
+      if edge_eq hd e0 then begin
+        mem_edge_hd hd tl;
+        mem_edge_eq hd e0 (hd :: tl)
+      end else ()
+
+// If endpoints of e are reachable from each other in t, then e :: t has a cycle.
+// (Converse of acyclic_when_unreachable)
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let reachable_implies_not_acyclic (n: nat) (t: list edge) (e: edge)
+  : Lemma (requires acyclic n t /\ reachable t e.u e.v /\
+                    e.u < n /\ e.v < n /\ e.u <> e.v /\ ~(mem_edge e t))
+          (ensures ~(acyclic n (e :: t)))
+  = reachable_simple t e.u e.v;
+    FStar.Classical.exists_elim
+      (~(acyclic n (e :: t)))
+      #_
+      #(fun (sp: list edge) ->
+          subset_edges sp t /\ is_path_from_to sp e.u e.v /\
+          all_edges_distinct sp /\ Cons? sp) ()
+      (fun (sp: list edge{subset_edges sp t /\ is_path_from_to sp e.u e.v /\
+                           all_edges_distinct sp /\ Cons? sp}) ->
+        // Form cycle sp @ [e] from e.u back to e.u
+        path_concat sp [e] e.u e.v e.u;
+        let cycle = sp @ [e] in
+        // subset_edges cycle (e :: t)
+        subset_edges_cons sp e t;
+        subset_edges_snoc sp e (e :: t);
+        // all_edges_distinct cycle
+        not_mem_of_subset e sp t;
+        all_edges_distinct_snoc sp e;
+        // cycle is a simple cycle in e :: t — contradicts acyclicity
+        assert (e.u < n)
+      )
+#pop-options
+
+// Corollary: acyclic(e :: t) ⟹ ¬reachable(t, e.u, e.v)
+let acyclic_edge_disconnects (n: nat) (e: edge) (tl: list edge)
+  : Lemma (requires acyclic n (e :: tl) /\ e.u < n /\ e.v < n /\ e.u <> e.v /\
+                    ~(mem_edge e tl))
+          (ensures ~(reachable tl e.u e.v))
+  = let aux_sub (ed: edge) : Lemma (requires mem_edge ed tl)
+                                    (ensures mem_edge ed (e :: tl)) = () in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux_sub);
+    acyclic_subset n (e :: tl) tl;
+    let aux () : Lemma (requires reachable tl e.u e.v) (ensures False) =
+      reachable_implies_not_acyclic n tl e
+    in
+    FStar.Classical.move_requires aux ()
+
+// Redundant edge impossible for acyclic graph:
+// If both endpoints reachable from root in tl, then e :: tl has a cycle.
+let acyclic_no_redundant (n: nat) (e: edge) (tl: list edge) (root: nat)
+  : Lemma (requires acyclic n (e :: tl) /\ e.u < n /\ e.v < n /\ e.u <> e.v /\
+                    ~(mem_edge e tl) /\
+                    reachable tl root e.u /\ reachable tl root e.v)
+          (ensures False)
+  = reachable_symmetric tl root e.u;
+    reachable_transitive tl e.u root e.v;
+    let aux_sub (ed: edge) : Lemma (requires mem_edge ed tl)
+                                    (ensures mem_edge ed (e :: tl)) = () in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux_sub);
+    acyclic_subset n (e :: tl) tl;
+    reachable_implies_not_acyclic n tl e
+
+// For acyclic graph: count_reachable ≥ 1 + |component edges|
+// The key strengthening of count_reachable_bound for acyclic case.
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+let rec acyclic_count_lower_bound
+    (es: list edge) (root: nat) (n: nat)
+  : Lemma (requires acyclic n es /\
+                    (forall (e: edge). mem_edge e es ==> e.u < n /\ e.v < n /\ e.u <> e.v) /\
+                    root < n)
+          (ensures count_reachable es root n n >=
+                   1 + length (ghost_filter (fun e -> reachable_dec es root e.u &&
+                                                      reachable_dec es root e.v) es))
+          (decreases length es)
+  = admit () // T5: complex induction over edge list structure
+#pop-options
+
+// Acyclic + connected ⟹ exactly n-1 edges
+let acyclic_connected_length (n: nat) (es: list edge)
+  : Lemma (requires n > 0 /\ all_connected n es /\ acyclic n es /\
+                    (forall (e: edge). mem_edge e es ==> e.u < n /\ e.v < n /\ e.u <> e.v))
+          (ensures length es >= n - 1 /\ length es <= n - 1)
+  = // ≥ from connected_min_edges
+    connected_min_edges n es;
+    // ≤ from acyclic_count_lower_bound
+    acyclic_count_lower_bound es 0 n;
+    let f = fun (e: edge) -> reachable_dec es 0 e.u && reachable_dec es 0 e.v in
+    // For connected: count = n
+    let rec count_all (m: nat)
+      : Lemma (requires forall (v: nat). v < n ==> reachable es 0 v)
+              (ensures count_reachable es 0 n m = min m n) (decreases m)
+      = if m = 0 then () else count_all (m - 1)
+    in
+    introduce forall (v: nat). v < n ==> reachable es 0 v
+    with introduce _ ==> _ with _. assert (reachable es 0 v);
+    count_all n;
+    // For connected: all edges in component (all endpoints reachable from 0)
+    let rec all_in_comp (l: list edge)
+      : Lemma (requires (forall (e: edge). mem_edge e l ==> e.u < n /\ e.v < n) /\
+                        (forall (v: nat). v < n ==> reachable es 0 v))
+              (ensures length (ghost_filter f l) = length l)
+              (decreases l)
+      = match l with
+        | [] -> ()
+        | hd :: tl -> all_in_comp tl
+    in
+    all_in_comp es
+
