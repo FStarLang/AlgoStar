@@ -12,6 +12,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
 // Test: Create a small hash table, insert some values, and search for them
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
 fn test_hash_table ()
   requires emp
   ensures emp
@@ -53,6 +54,7 @@ fn test_hash_table ()
   rewrite (A.pts_to table s) as (A.pts_to (V.vec_to_array tv) s);
   hash_table_free tv;
 }
+#pop-options
 
 // Test: Create a size-3 table, fill it, then verify 4th insert fails
 fn test_insert_full ()

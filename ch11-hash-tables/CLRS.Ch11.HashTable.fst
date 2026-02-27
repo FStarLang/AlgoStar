@@ -140,12 +140,118 @@ let lemma_probes_not_key_full
 let seq_modified_at (s s': Seq.seq int) (idx: nat{idx < Seq.length s /\ Seq.length s' == Seq.length s}) : prop =
   forall (j: nat). j < Seq.length s /\ j =!= idx ==> Seq.index s j == Seq.index s' j
 
+// ========== Table well-formedness invariant ==========
+//
+// CLRS's correctness argument for HASH-SEARCH relies on the fact that no
+// operation ever turns a slot into NIL (-1).  INSERT fills NIL/DELETED slots
+// with keys; DELETE turns key slots into DELETED (-2).  Therefore, if we
+// encounter a NIL slot at probe position j, no key can exist beyond j in
+// the probe sequence — it would have been placed at or before j by INSERT.
+//
+// valid_ht captures this: for EVERY occurrence of a valid key at some probe
+// position, no NIL (-1) slot appears at any earlier probe position.
+
+//SNIPPET_START: ht_valid_ht
+let valid_ht (s: Seq.seq int) (size: nat) : prop =
+  size > 0 /\ size == Seq.length s /\
+  (forall (k: int) (probe: nat). {:pattern (Seq.index s (hash_probe_nat k probe size))}
+    k >= 0 /\ probe < size /\ Seq.index s (hash_probe_nat k probe size) == k ==>
+    (forall (p: nat). {:pattern (hash_probe_nat k p size)}
+      p < probe ==> Seq.index s (hash_probe_nat k p size) =!= -1))
+//SNIPPET_END: ht_valid_ht
+
+// Key lemma: under valid_ht, an empty slot in the probe sequence proves
+// the key is absent from the entire table.
+let lemma_valid_ht_search_not_found
+  (s: Seq.seq int) (size: nat)
+  (key: int{key >= 0}) (j: nat)
+  : Lemma
+    (requires valid_ht s size /\
+              j < size /\
+              Seq.index s (hash_probe_nat key j size) == -1 /\
+              probes_not_key s size key (j + 1))
+    (ensures ~(key_in_table s size key))
+  = // key_in_table gives exists probe < size with s[hash_probe_nat key probe size] == key
+    // probes_not_key for j+1 means probe > j.
+    // valid_ht gives: forall p < probe. s[hash_probe_nat key p size] != -1
+    // Since j < probe: s[hash_probe_nat key j size] != -1. Contradicts == -1.
+    ()
+
+// valid_ht holds for a fresh table (all -1): vacuously true, no key >= 0 present
+let lemma_valid_ht_create (size: nat{size > 0})
+  : Lemma (valid_ht (Seq.create size (-1)) size)
+  = ()
+
+// valid_ht is preserved by delete (replacing a key with -2)
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+let lemma_valid_ht_delete
+  (s: Seq.seq int) (size: nat)
+  (idx: nat{idx < size})
+  : Lemma
+    (requires valid_ht s size /\ Seq.index s idx >= 0)
+    (ensures valid_ht (Seq.upd s idx (-2)) size)
+  = let s' = Seq.upd s idx (-2) in
+    // For any k >= 0 at probe p in s': s'[hash_probe_nat k p size] == k >= 0 != -2
+    // so hash_probe_nat k p size != idx, hence s[same] == k.
+    // By valid_ht(s): forall q < p. s[hash_probe_nat k q size] != -1
+    // In s': if hash_probe_nat k q size == idx then s'[idx] == -2 != -1, else s'[...] == s[...]
+    introduce forall (k: int) (probe: nat).
+      k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
+      (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
+    with introduce _ ==> _
+    with _. (
+      introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
+      with introduce _ ==> _
+      with _. ()
+    )
+#pop-options
+
+// valid_ht is preserved by insert (replacing -1 or -2 with a key >= 0)
+// when the insertion point is the first empty/deleted slot in the probe sequence
+#push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
+let lemma_valid_ht_insert
+  (s: Seq.seq int) (size: nat)
+  (key: int{key >= 0}) (probe_i: nat{probe_i < size})
+  : Lemma
+    (requires valid_ht s size /\
+              (Seq.index s (hash_probe_nat key probe_i size) == -1 \/
+               Seq.index s (hash_probe_nat key probe_i size) == -2) /\
+              (forall (q: nat). {:pattern (hash_probe_nat key q size)}
+                q < probe_i ==>
+                  Seq.index s (hash_probe_nat key q size) =!= -1 /\
+                  Seq.index s (hash_probe_nat key q size) =!= -2))
+    (ensures valid_ht (Seq.upd s (hash_probe_nat key probe_i size) key) size)
+  = let idx = hash_probe_nat key probe_i size in
+    let s' = Seq.upd s idx key in
+    introduce forall (k: int) (probe: nat).
+      k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
+      (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
+    with introduce _ ==> _
+    with _. (
+      introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
+      with introduce _ ==> _
+      with _. (
+        // Case 1: hash_probe_nat k probe size != idx
+        //   s[same] == k, valid_ht(s) gives s[hash_probe_nat k p size] != -1
+        //   In s': if hash_probe_nat k p size == idx then s'[idx] == key >= 0 != -1
+        //   else s'[...] == s[...] != -1
+        // Case 2: hash_probe_nat k probe size == idx
+        //   s'[idx] == key, so k == key. probe == probe_i (unique for linear probing).
+        //   For p < probe_i: hash_probe_nat key p size != idx (injectivity),
+        //   so s'[...] == s[...]. By the precondition, s[hash_probe_nat key p size] >= 0 != -1.
+        ()
+      )
+    )
+#pop-options
+
 //SNIPPET_START: ht_helpers
 fn hash_table_create (size: SZ.t)
   requires pure (SZ.v size > 0)
   returns tv: V.vec int
-  ensures A.pts_to (V.vec_to_array tv) (Seq.create (SZ.v size) (-1)) ** pure (V.is_full_vec tv)
+  ensures A.pts_to (V.vec_to_array tv) (Seq.create (SZ.v size) (-1)) **
+          pure (V.is_full_vec tv /\ valid_ht (Seq.create (SZ.v size) (-1)) (SZ.v size))
 {
+  lemma_valid_ht_create (SZ.v size);
   let tv = V.alloc (-1) size;
   V.to_array_pts_to tv;
   tv
@@ -174,7 +280,8 @@ fn hash_insert
   requires
     A.pts_to table s **
     GR.pts_to ctr c0 **
-    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key)
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key /\
+          valid_ht s (SZ.v size))
   returns result: bool
   ensures exists* s' cf.
     A.pts_to table s' **
@@ -182,6 +289,7 @@ fn hash_insert
     pure (
       Seq.length s' == SZ.v size /\
       Seq.length s' == Seq.length s /\
+      valid_ht s' (SZ.v size) /\
       (if result
        then (key_in_table s' (SZ.v size) key /\
              key_findable s' (SZ.v size) key /\
@@ -212,6 +320,7 @@ fn hash_insert
     pure (
       SZ.v vi <= SZ.v size /\
       Seq.length st == SZ.v size /\
+      valid_ht st (SZ.v size) /\
       // Correctness invariants
       (vinserted == true ==> vdone == true) /\
       (vinserted == true ==>
@@ -281,7 +390,8 @@ fn hash_search
   requires
     A.pts_to table s **
     GR.pts_to ctr c0 **
-    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key)
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key /\
+          valid_ht s (SZ.v size))
   returns result: SZ.t
   ensures exists* cf.
     A.pts_to table s **
@@ -296,12 +406,8 @@ fn hash_search
         SZ.v result < Seq.length s /\
         Seq.index s (SZ.v result) == key
       )) /\
-      // Functional correctness: not found — key is absent or empty slot reached
-      (SZ.v result == SZ.v size ==>
-        ~(key_in_table s (SZ.v size) key) \/
-        (exists (j: nat). j < SZ.v size /\
-          Seq.index s (hash_probe_nat key j (SZ.v size)) == -1 /\
-          probes_not_key s (SZ.v size) key (j + 1))) /\
+      // Functional correctness: not found — key is absent from the table
+      (SZ.v result == SZ.v size ==> ~(key_in_table s (SZ.v size) key)) /\
       // Complexity bound: at most size probes
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
@@ -329,10 +435,7 @@ fn hash_search
       // Functional invariants
       (SZ.v vfound_idx < SZ.v size ==> Seq.index s (SZ.v vfound_idx) == key) /\
       (SZ.v vfound_idx == SZ.v size ==> probes_not_key s (SZ.v size) key (SZ.v vi)) /\
-      (vdone /\ SZ.v vfound_idx == SZ.v size ==> 
-        (exists (j: nat). j < SZ.v size /\
-          Seq.index s (hash_probe_nat key j (SZ.v size)) == -1 /\
-          probes_not_key s (SZ.v size) key (j + 1))) /\
+      (vdone /\ SZ.v vfound_idx == SZ.v size ==> ~(key_in_table s (SZ.v size) key)) /\
       // Complexity invariant: exactly vi probes so far
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi
@@ -351,6 +454,15 @@ fn hash_search
     
     // Hit an empty slot, stop searching
     let is_empty = (slot = -1);
+    
+    // When we hit an empty slot with no key found, valid_ht proves key is absent
+    assert pure (lemma_hash_probe_consistent key vi size;
+                 SZ.v idx == hash_probe_nat key (SZ.v vi) (SZ.v size));
+    assert pure (
+      if is_empty
+      then (lemma_valid_ht_search_not_found s (SZ.v size) key (SZ.v vi); true)
+      else true
+    );
     
     // Update found_idx if we found the key
     let vfound_idx_inner = !found_idx;
@@ -384,7 +496,8 @@ fn hash_delete
   requires
     A.pts_to table s **
     GR.pts_to ctr c0 **
-    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key)
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key /\
+          valid_ht s (SZ.v size))
   returns result: bool
   ensures exists* s' cf.
     A.pts_to table s' **
@@ -392,6 +505,7 @@ fn hash_delete
     pure (
       Seq.length s' == SZ.v size /\
       Seq.length s' == Seq.length s /\
+      valid_ht s' (SZ.v size) /\
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size /\
       (if result
        then (exists (idx: nat).
@@ -422,6 +536,7 @@ fn hash_delete
       SZ.v vi <= SZ.v size /\
       SZ.v vdel <= SZ.v size /\
       Seq.length st == SZ.v size /\
+      valid_ht st (SZ.v size) /\
       // Link deletion and done flag: once deleted, done is set
       (SZ.v vdel < SZ.v size ==> vdone == true) /\
       // When key was found and deleted
@@ -454,6 +569,13 @@ fn hash_delete
     // Compute new value: -2 (DELETED) if found, otherwise keep slot unchanged
     let new_val = (if is_found then -2 else slot);
     A.op_Array_Assignment table idx new_val;
+    
+    // Preserve valid_ht when deleting
+    assert pure (
+      if is_found
+      then (lemma_valid_ht_delete s (SZ.v size) (SZ.v idx); true)
+      else true
+    );
     
     // Update deleted_at if we found the key
     let vdel = !deleted_at;
