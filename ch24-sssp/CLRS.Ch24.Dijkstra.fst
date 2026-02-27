@@ -366,7 +366,7 @@ fn find_min_unvisited
   let _ = !min_val;
   result
 }
-#push-options "--z3rlimit 200 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --split_queries always"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)
