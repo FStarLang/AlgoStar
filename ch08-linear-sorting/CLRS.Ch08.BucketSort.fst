@@ -21,7 +21,7 @@
    - Appending two sorted lists with disjoint ranges yields sorted list
    - Bucket index monotonicity and inter-bucket value ordering
    - Buckets partition the input (length preservation)
-   - Full bucket sort correctness: sorted output with same length as input
+   - Full bucket sort correctness: sorted output, permutation of input, same length
    
    Complexity: O(n + k) average case when input uniformly distributed
                O(n²) worst case when all elements in one bucket
@@ -83,6 +83,14 @@ let rec insert (x: int) (xs: list int{sorted xs})
       )
 #pop-options
 
+/// insert preserves element counts
+let rec insert_count (x: int) (xs: list int{sorted xs}) (y: int)
+  : Lemma (ensures List.count y (insert x xs) == List.count y (x :: xs))
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | h :: t -> if x <= h then () else insert_count x t y
+
 /// Insertion sort: sort list by repeated insertion
 let rec insertion_sort (xs: list int)
   : Tot (ys:list int{sorted ys /\ List.length ys == List.length xs})
@@ -90,6 +98,16 @@ let rec insertion_sort (xs: list int)
   = match xs with
     | [] -> []
     | h :: t -> insert h (insertion_sort t)
+
+/// insertion_sort preserves all element counts
+let rec insertion_sort_count (xs: list int) (y: int)
+  : Lemma (ensures List.count y (insertion_sort xs) == List.count y xs)
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | h :: t -> 
+      insertion_sort_count t y;
+      insert_count h (insertion_sort t) y
 
 (* ========== Bucket Distribution Functions ========== *)
 
@@ -547,6 +565,56 @@ let rec concat_sorted_ordered
       FStar.Classical.forall_intro (FStar.Classical.move_requires mem_lemma)
 #pop-options
 
+(* ========== Permutation Proof ========== *)
+
+/// Permutation: same count of every element
+let is_permutation (xs ys: list int) : prop =
+  forall x. List.count x xs == List.count x ys
+
+/// filter_bucket preserves count for matching elements, gives 0 for non-matching
+let rec filter_bucket_count (xs: list int) (i: nat) (min_val max_val: int) (k: pos) (x: int)
+  : Lemma (ensures List.count x (filter_bucket xs i min_val max_val k) ==
+           (if min_val <= x && x < max_val && bucket_index x min_val max_val k = i 
+            then List.count x xs else 0))
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | _ :: t -> filter_bucket_count t i min_val max_val k x
+
+/// sort_all_buckets preserves element counts in concatenation
+let rec sort_all_buckets_count (buckets: list (list int)) (x: int)
+  : Lemma (ensures List.count x (concat_all (sort_all_buckets buckets)) == 
+           List.count x (concat_all buckets))
+          (decreases buckets)
+  = match buckets with
+    | [] -> ()
+    | b :: bs ->
+      sort_all_buckets_count bs x;
+      insertion_sort_count b x;
+      List.append_count b (concat_all bs) x;
+      List.append_count (insertion_sort b) (concat_all (sort_all_buckets bs)) x
+
+/// Buckets partition the input: count in concat_all(create_all_buckets) = count in xs
+#push-options "--z3rlimit 40"
+let rec create_all_buckets_perm 
+  (xs: list int) (curr: nat) (k: pos) (min_val max_val: int) (x: int)
+  : Lemma 
+    (requires curr <= k /\ min_val < max_val /\
+             (forall y. List.mem y xs ==> min_val <= y /\ y < max_val))
+    (ensures List.count x (concat_all (create_all_buckets xs curr k min_val max_val)) ==
+             (if min_val <= x && x < max_val && bucket_index x min_val max_val k >= curr 
+              then List.count x xs else 0))
+    (decreases k - curr)
+  = if curr >= k then ()
+    else (
+      create_all_buckets_perm xs (curr + 1) k min_val max_val x;
+      filter_bucket_count xs curr min_val max_val k x;
+      List.append_count 
+        (filter_bucket xs curr min_val max_val k) 
+        (concat_all (create_all_buckets xs (curr + 1) k min_val max_val)) x
+    )
+#pop-options
+
 (* ========== Main Algorithm ========== *)
 
 //SNIPPET_START: bucket_sort_sig
@@ -554,7 +622,7 @@ let rec concat_sorted_ordered
 let bucket_sort (xs: list int) (k: pos)
   : Pure (list int)
     (requires Cons? xs)
-    (ensures fun ys -> sorted ys /\ List.length ys == List.length xs)
+    (ensures fun ys -> sorted ys /\ List.length ys == List.length xs /\ is_permutation xs ys)
 //SNIPPET_END: bucket_sort_sig
   = let min_val = list_min xs in
     let max_val = list_max xs in
@@ -595,6 +663,16 @@ let bucket_sort (xs: list int) (k: pos)
       sort_all_buckets_all_sorted buckets;
       // 4. concat sorted_buckets is sorted
       concat_sorted_ordered sorted_buckets min_val (max_val + 1) k 0;
+      
+      // Prove permutation:
+      let perm_aux (y: int) : Lemma (List.count y (concat_all sorted_buckets) == List.count y xs) =
+        create_all_buckets_perm xs 0 k min_val (max_val + 1) y;
+        sort_all_buckets_count buckets y;
+        if not (min_val <= y && y < max_val + 1) then
+          List.mem_count xs y
+        else ()
+      in
+      FStar.Classical.forall_intro perm_aux;
       
       concat_all sorted_buckets
     )
@@ -639,6 +717,6 @@ let bucket_sort_linear_cost (n: pos)
    - Length preservation (sum of filter_bucket lengths = input length)
    - Sort preserves bucket correctness and membership
    - Concatenation of sorted, inter-bucket-ordered buckets is sorted
-   - Main bucket sort correctness: output is sorted and same length as input
+   - Main bucket sort correctness: output is sorted, a permutation, and same length as input
    - Complexity analysis structure
 *)
