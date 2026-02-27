@@ -4,13 +4,18 @@
    Finds the k-th smallest element using partition-based selection.
    Algorithm: pick last element as pivot, partition, recurse on relevant half.
 
-   Complexity: O(n²) worst case, O(n) expected (same as CLRS RANDOMIZED-SELECT).
-   This replaces the O(nk) selection sort approach in Select.fst.
+   Complexity: O(n²) worst case (deterministic pivot; O(n) expected requires
+   randomized pivot, which is not implemented here).
+   This replaces the O(nk) selection sort approach in PartialSelectionSort.fst.
 
    Verification:
    - NO admits, NO assumes
    - Permutation: output array is a rearrangement of input
-   - Correctness: elements [0,k) ≤ a[k] and elements (k,n) ≥ a[k]
+   - Partition ordering: elements [0,k) ≤ a[k] and elements (k,n) ≥ a[k]
+   - Correctness: result == select_spec s0 k (the k-th order statistic)
+     Uses bridge lemmas in Helpers.fst to connect Seq.Properties.permutation
+     to count_occ-based is_permutation, then applies pulse_correctness_hint
+     from Correctness.fst
 *)
 
 module CLRS.Ch09.Quickselect
@@ -27,6 +32,9 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
+module Helpers = CLRS.Ch09.Quickselect.Helpers
+module Correctness = CLRS.Ch09.PartialSelectionSort.Correctness
+module Spec = CLRS.Ch09.PartialSelectionSort.Spec
 
 // ========== Permutation infrastructure ==========
 
@@ -131,7 +139,8 @@ fn partition_in_range
       SZ.v lo <= SZ.v pivot_pos /\
       SZ.v pivot_pos < SZ.v hi /\
       permutation s0 s1 /\
-      partition_ordered s1 (SZ.v lo) (SZ.v pivot_pos) (SZ.v hi)
+      partition_ordered s1 (SZ.v lo) (SZ.v pivot_pos) (SZ.v hi) /\
+      unchanged_outside s0 s1 (SZ.v lo) (SZ.v hi)
     )
 //SNIPPET_END: partition_in_range
 {
@@ -162,7 +171,9 @@ fn partition_in_range
         (SZ.v lo <= idx /\ idx < SZ.v vi) ==> Seq.index s_cur idx <= pivot) /\
       // [vi, vj) all > pivot
       (forall (idx: nat). idx < Seq.length s_cur ==>
-        (SZ.v vi <= idx /\ idx < SZ.v vj) ==> Seq.index s_cur idx > pivot)
+        (SZ.v vi <= idx /\ idx < SZ.v vj) ==> Seq.index s_cur idx > pivot) /\
+      // Elements outside [lo, hi) are unchanged from s0
+      unchanged_outside s0 s_cur (SZ.v lo) (SZ.v hi)
     )
   {
     let vj = !j_ref;
@@ -210,13 +221,52 @@ fn partition_in_range
 
 // ========== Main quickselect algorithm (iterative) ==========
 
-// The k-th order statistic property
-let kth_order_property (s: Seq.seq int) (k n: nat) : prop =
-  k < n /\ n == Seq.length s /\
-  (forall (i: nat). i < n ==> i < k ==> Seq.index s i <= Seq.index s k) /\
-  (forall (i: nat). i < n ==> k < i ==> Seq.index s k <= Seq.index s i)
+// Wrappers for helper lemmas that reveal opaque permutation
+#push-options "--z3rlimit 40"
+let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
+  : Lemma
+    (requires lo <= hi /\ hi <= Seq.length s_pre /\
+              Seq.length s_pre == Seq.length s1 /\
+              permutation s_pre s1 /\
+              (forall (idx: nat). idx < Seq.length s1 ==>
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx))
+    (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
+              (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
+              v <= Seq.index s1 j)
+  = reveal_opaque (`%permutation) (permutation s_pre s1);
+    assert (Seq.Properties.permutation int s_pre s1);
+    Helpers.perm_unchanged_lower_bound_forall s_pre s1 lo hi
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
+  : Lemma
+    (requires lo <= hi /\ hi <= Seq.length s_pre /\
+              Seq.length s_pre == Seq.length s1 /\
+              permutation s_pre s1 /\
+              (forall (idx: nat). idx < Seq.length s1 ==>
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx))
+    (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
+              (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
+              Seq.index s1 j <= v)
+  = reveal_opaque (`%permutation) (permutation s_pre s1);
+    assert (Seq.Properties.permutation int s_pre s1);
+    Helpers.perm_unchanged_upper_bound_forall s_pre s1 lo hi
+#pop-options
+
+// Bridge from opaque permutation + partition ordering to select_spec
+let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
+  : Lemma
+    (requires k < Seq.length s0 /\
+              Seq.length s_final == Seq.length s0 /\
+              permutation s0 s_final /\
+              (forall (i: nat). i < k ==> Seq.index s_final i <= Seq.index s_final k) /\
+              (forall (i: nat). k < i /\ i < Seq.length s_final ==>
+                Seq.index s_final k <= Seq.index s_final i))
+    (ensures Seq.index s_final k == Spec.select_spec s0 k)
+  = reveal_opaque (`%permutation) (permutation s0 s_final);
+    Helpers.seq_perm_implies_is_perm s0 s_final;
+    Correctness.pulse_correctness_hint s0 s_final k
+
+#push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
 //SNIPPET_START: quickselect
 fn quickselect
   (a: A.array int)
@@ -237,7 +287,14 @@ fn quickselect
       Seq.length s_final == Seq.length s0 /\
       permutation s0 s_final /\
       SZ.v k < Seq.length s_final /\
-      result == Seq.index s_final (SZ.v k)
+      result == Seq.index s_final (SZ.v k) /\
+      // Partition ordering: result is the k-th order statistic
+      (forall (i: nat). i < SZ.v k /\ i < Seq.length s_final ==>
+        Seq.index s_final i <= result) /\
+      (forall (i: nat). SZ.v k < i /\ i < Seq.length s_final ==>
+        result <= Seq.index s_final i) /\
+      // Correctness: result is the k-th order statistic
+      result == Spec.select_spec s0 (SZ.v k)
     )
 //SNIPPET_END: quickselect
 {
@@ -258,13 +315,29 @@ fn quickselect
       SZ.v k < SZ.v vhi /\
       SZ.v vhi <= SZ.v n /\
       Seq.length s_cur == Seq.length s0 /\
-      permutation s0 s_cur
+      permutation s0 s_cur /\
+      // Elements before vlo are <= all elements in [vlo, vhi)
+      (forall (i j: nat). i < Seq.length s_cur /\ j < Seq.length s_cur /\
+        i < SZ.v vlo /\ SZ.v vlo <= j /\ j < SZ.v vhi ==>
+        Seq.index s_cur i <= Seq.index s_cur j) /\
+      // Elements at or after vhi are >= all elements in [vlo, vhi)
+      (forall (i j: nat). i < Seq.length s_cur /\ j < Seq.length s_cur /\
+        SZ.v vlo <= i /\ i < SZ.v vhi /\ SZ.v vhi <= j ==>
+        Seq.index s_cur i <= Seq.index s_cur j)
     )
   {
     let vlo = !lo_ref;
     let vhi = !hi_ref;
 
+    with s_pre. assert (A.pts_to a s_pre);
+
     let p = partition_in_range a vlo vhi;
+
+    with s_after. assert (A.pts_to a s_after);
+
+    // Helper lemma calls: values rearranged within [vlo, vhi) preserve bounds
+    perm_lower_bound_forall s_pre s_after (SZ.v vlo) (SZ.v vhi);
+    perm_upper_bound_forall s_pre s_after (SZ.v vlo) (SZ.v vhi);
 
     if (k <^ p) {
       hi_ref := p;
@@ -280,6 +353,8 @@ fn quickselect
   };
 
   let result = A.op_Array_Access a k;
+  with s_final. assert (A.pts_to a s_final);
+  quickselect_correctness s0 s_final (SZ.v k);
   result
 }
 #pop-options

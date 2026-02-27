@@ -133,3 +133,46 @@ let select_complexity_class (n k: nat) : Lemma
   (ensures select_comparisons n k <= k * n)
   =
   select_bound n k
+
+(**
+ * Tighter model: actual comparison count per round is n-i-1 (not n-1).
+ *
+ * In round i (0-indexed), the algorithm scans from position i to n-1,
+ * making (n - 1 - i) comparisons. The exact count is:
+ *   Σ_{i=0}^{k-1} (n - 1 - i) = k*(n-1) - k*(k-1)/2
+ *
+ * This is strictly better than k*(n-1) when k > 1.
+ *)
+
+// Tighter model: round i costs (n - 1 - i) comparisons
+let rec select_comparisons_tight (n k: nat) : Tot nat (decreases k) =
+  if k = 0 || n <= 1 then 0
+  else
+    let round_cost = if n > k then n - k else 0 in
+    round_cost + select_comparisons_tight n (k - 1)
+
+// Closed form (multiplication by 2 to avoid integer division):
+// 2 * select_comparisons_tight n k == k * (2*n - k - 1)
+#push-options "--z3rlimit 20"
+let rec select_tight_closed_form (n k: nat)
+  : Lemma (requires k <= n /\ n > 0)
+          (ensures 2 * select_comparisons_tight n k == k * (2 * n - k - 1))
+          (decreases k)
+  = if k = 0 then ()
+    else begin
+      select_tight_closed_form n (k - 1)
+    end
+#pop-options
+
+// The tight model is strictly better when k > 1
+let select_tight_strictly_better (n k: nat)
+  : Lemma (requires k > 1 /\ k <= n /\ n > 0)
+          (ensures select_comparisons_tight n k < select_comparisons n k)
+  = select_tight_closed_form n k;
+    select_comparisons_exact n k
+
+// Upper bound for the tight model
+let select_tight_bound (n k: nat)
+  : Lemma (requires k <= n /\ n > 0)
+          (ensures select_comparisons_tight n k <= k * n)
+  = select_tight_closed_form n k

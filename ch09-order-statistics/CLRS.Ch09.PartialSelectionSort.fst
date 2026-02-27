@@ -206,7 +206,7 @@ fn find_min_index_from
 // The algorithm is a verified implementation of the selection algorithm from
 // CLRS Chapter 9, using the simple O(n²) approach of partial selection sort.
 
-#push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 10 --ifuel 2 --fuel 2"
 //SNIPPET_START: select
 fn select
   (a: array int)
