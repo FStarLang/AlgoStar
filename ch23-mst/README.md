@@ -7,7 +7,7 @@ This directory contains verified implementations and specifications for MST algo
 | File | Lines | Language | Role |
 |------|------:|---------|------|
 | `CLRS.Ch23.MST.Spec.fsti` | 458 | F* | Cut-property interface + MST existence vals |
-| `CLRS.Ch23.MST.Spec.fst` | 1 881 | F* | Full proofs including cut property (Theorem 23.1), MST existence (partial) |
+| `CLRS.Ch23.MST.Spec.fst` | 2 212 | F* | Full proofs including cut property (Theorem 23.1), MST existence |
 | `CLRS.Ch23.MST.Complexity.fst` | 102 | F* | Arithmetic O(V³) Kruskal / O(V²) Prim bounds |
 | `CLRS.Ch23.Kruskal.Spec.fst` | 2 951 | F* | Pure Kruskal: BFS components, insertion sort, `pure_kruskal`, MST theorem |
 | `CLRS.Ch23.Kruskal.fst` | 340 | Pulse | Imperative Kruskal (adj-matrix, union-find) |
@@ -20,13 +20,13 @@ This directory contains verified implementations and specifications for MST algo
 | `CLRS.Ch23.Prim.Spec.fst` | 1 036 | F* | Pure Prim: adj-matrix, `pure_prim`, connectivity, safety via cut property |
 | `CLRS.Ch23.Prim.Complexity.fst` | 433 | Pulse | Ghost-tick instrumented Prim, proves ticks ≤ 3·V² |
 
-**Total**: ~9 500 lines across 13 source files.
+**Total**: ~9 800 lines across 13 source files.
 
 ## Verification Status
 
 | Module | Admits | Status |
 |--------|------:|--------|
-| MST.Spec (.fst + .fsti) | 1 | ⚠️ `acyclic_count_lower_bound` admit (T5 counting lemma) |
+| MST.Spec (.fst + .fsti) | 0 | ✅ Fully proven (acyclic_count_lower_bound closed) |
 | Kruskal.Spec.fst | 0 | ✅ Fully proven |
 | Kruskal.fst (Pulse) | 1 `assume_` | ⚠️ Forest property assumed (line 315) |
 | Kruskal.EdgeSorting.fst | 0 | ✅ |
@@ -39,7 +39,7 @@ This directory contains verified implementations and specifications for MST algo
 | Prim.Complexity.fst | 0 | ✅ |
 | MST.Complexity.fst | 0 | ✅ |
 
-**2 admits** across ~9 500 lines. The `assume_` in Kruskal.fst (line ~320) assumes the imperative output forms a forest. The `admit()` in MST.Spec.fst is the counting induction for `acyclic_count_lower_bound`, needed to derive `acyclic + connected → n-1 edges`.
+**1 admit** across ~9 800 lines. The `assume_` in Kruskal.fst (line ~320) assumes the imperative output forms a forest.
 
 ## Key Results
 
@@ -47,7 +47,7 @@ This directory contains verified implementations and specifications for MST algo
 - **Kruskal MST correctness**: Proven in pure spec (`theorem_kruskal_produces_mst`)
 - **Prim MST correctness**: Proven in pure spec (`prim_spec`)
 - **Complexity**: Prim O(V²) matches CLRS adj-matrix variant; Kruskal O(V³) reflects V²-scan variant
-- **MST Existence (partial)**: `reachable_implies_not_acyclic` and `acyclic_edge_disconnects` proven; `acyclic_connected_length` structure proven (1 admit in counting lemma)
+- **MST Existence**: `acyclic + connected → n-1 edges` fully proven (`acyclic_connected_length`). Key lemmas: `reachable_implies_not_acyclic`, `acyclic_edge_disconnects`, `acyclic_count_lower_bound`
 
 ## Building
 
