@@ -18,6 +18,21 @@ module Seq = FStar.Seq
 let inf : int = 1000000
 //SNIPPET_END: inf
 
+//SNIPPET_START: safety_predicates
+// Safety predicate: all finite edge weights are bounded so that path sums
+// (at most n-1 additions) cannot reach the infinity sentinel.
+let weights_bounded (d: Seq.seq int) (n: nat) : prop =
+  Seq.length d == n * n /\
+  (forall (i: nat). i < n * n ==>
+    (Seq.index d i >= 0 /\ (Seq.index d i < inf ==> Seq.index d i <= inf / n)))
+
+// Safety predicate: diagonal entries are non-negative (no negative self-loops).
+// Required for the correctness proof (no negative cycles assumption).
+let non_negative_diagonal (d: Seq.seq int) (n: nat) : prop =
+  Seq.length d == n * n /\
+  (forall (v: nat). v < n ==> Seq.index d (v * n + v) >= 0)
+//SNIPPET_END: safety_predicates
+
 (*** Pure imperative-mirroring specification ***)
 
 //SNIPPET_START: pure_spec

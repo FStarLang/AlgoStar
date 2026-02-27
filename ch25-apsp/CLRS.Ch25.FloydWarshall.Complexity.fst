@@ -19,6 +19,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
+open CLRS.Ch25.FloydWarshall
 
 #set-options "--z3rlimit 40"
 
@@ -41,62 +42,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 //SNIPPET_END: ghost_tick
-
-// ========== Pure Specification (same as FloydWarshall.fst) ==========
-
-let inf : int = 1000000
-
-let rec fw_inner_j (d: Seq.seq int) (n k i j: nat) (d_ik: int)
-  : Tot (Seq.seq int) (decreases (n - j)) =
-  if j >= n || i >= n || k >= n || Seq.length d <> n * n then d
-  else
-    let d_ij = Seq.index d (i * n + j) in
-    let d_kj = Seq.index d (k * n + j) in
-    let via_k = d_ik + d_kj in
-    let new_val = if via_k < d_ij then via_k else d_ij in
-    fw_inner_j (Seq.upd d (i * n + j) new_val) n k i (j + 1) d_ik
-
-let rec fw_inner_i (d: Seq.seq int) (n k i: nat)
-  : Tot (Seq.seq int) (decreases (n - i)) =
-  if i >= n || k >= n || Seq.length d <> n * n then d
-  else
-    let d_ik = Seq.index d (i * n + k) in
-    fw_inner_i (fw_inner_j d n k i 0 d_ik) n k (i + 1)
-
-let rec fw_outer (d: Seq.seq int) (n k: nat)
-  : Tot (Seq.seq int) (decreases (n - k)) =
-  if k >= n || Seq.length d <> n * n then d
-  else fw_outer (fw_inner_i d n k 0) n (k + 1)
-
-let rec lemma_fw_inner_j_len (d: Seq.seq int) (n k i j: nat) (d_ik: int)
-  : Lemma (ensures Seq.length (fw_inner_j d n k i j d_ik) == Seq.length d)
-          (decreases (n - j))
-  = if j >= n || i >= n || k >= n || Seq.length d <> n * n then ()
-    else
-      let d_ij = Seq.index d (i * n + j) in
-      let d_kj = Seq.index d (k * n + j) in
-      let via_k = d_ik + d_kj in
-      let new_val = if via_k < d_ij then via_k else d_ij in
-      lemma_fw_inner_j_len (Seq.upd d (i * n + j) new_val) n k i (j + 1) d_ik
-
-let rec lemma_fw_inner_i_len (d: Seq.seq int) (n k i: nat)
-  : Lemma (ensures Seq.length (fw_inner_i d n k i) == Seq.length d)
-          (decreases (n - i))
-  = if i >= n || k >= n || Seq.length d <> n * n then ()
-    else begin
-      let d_ik = Seq.index d (i * n + k) in
-      lemma_fw_inner_j_len d n k i 0 d_ik;
-      lemma_fw_inner_i_len (fw_inner_j d n k i 0 d_ik) n k (i + 1)
-    end
-
-let rec lemma_fw_outer_len (d: Seq.seq int) (n k: nat)
-  : Lemma (ensures Seq.length (fw_outer d n k) == Seq.length d)
-          (decreases (n - k))
-  = if k >= n || Seq.length d <> n * n then ()
-    else begin
-      lemma_fw_inner_i_len d n k 0;
-      lemma_fw_outer_len (fw_inner_i d n k 0) n (k + 1)
-    end
 
 open Pulse.Lib.BoundedIntegers
 

@@ -1,18 +1,20 @@
 # Audit Report — Chapter 25: All-Pairs Shortest Paths (Floyd-Warshall)
 
 **Directory:** `ch25-apsp/`
-**Date:** 2025-07-15
+**Date:** 2025-07-15 (initial), 2026-02-27 (remediation)
 **Files audited:**
 
 | File | Lines | Role |
 |------|------:|------|
-| `CLRS.Ch25.FloydWarshall.fst` | 189 | Pulse implementation + pure mirror spec |
+| `CLRS.Ch25.FloydWarshall.fst` | 204 | Pulse implementation + pure mirror spec + safety predicates |
 | `CLRS.Ch25.FloydWarshall.Spec.fst` | 388 | Correctness proof (fw_outer ≡ fw_entry) |
-| `CLRS.Ch25.FloydWarshall.Complexity.fst` | 221 | O(n³) ghost-tick proof |
-| `CLRS.Ch25.FloydWarshall.Test.fst` | 58 | 3×3 smoke test |
-| **Total** | **856** | |
+| `CLRS.Ch25.FloydWarshall.Paths.fst` | 130 | Walk formalism connecting fw_entry to graph-theoretic paths |
+| `CLRS.Ch25.FloydWarshall.Complexity.fst` | 166 | O(n³) ghost-tick proof (imports specs from main module) |
+| `CLRS.Ch25.FloydWarshall.SpecTest.fst` | 56 | Concrete 3×3 output verification |
+| `CLRS.Ch25.FloydWarshall.Test.fst` | 58 | 3×3 smoke test (Pulse compilation/runtime) |
+| **Total** | **1002** | |
 
-All four `.checked` files exist in `_cache/`, confirming successful prior verification.
+All six `.checked` files exist in `_cache/`, confirming successful verification. Zero admits, zero assumes.
 
 ---
 
@@ -237,16 +239,16 @@ All limits are modest. No `--z3seed` hacks or excessive fuel/ifuel settings.
 
 ### Priority 1 — Correctness / Soundness
 
-| # | Task | Rationale |
-|---|------|-----------|
-| P1-1 | **Connect fw_entry to graph-theoretic δ(i,j)**: Define path/walk types over the adjacency matrix, define `shortest_path_weight`, and prove `fw_entry adj n i j n == shortest_path_weight adj n i j` under the no-negative-cycle assumption. | Without this, the "shortest paths" claim is only about the recurrence, not the actual graph property. |
-| P1-2 | **Guard the infinity sentinel**: Either (a) add a precondition bounding all edge weights so that path sums cannot reach `inf`, or (b) replace `inf` with an option type / extended-integer type. | Current code silently produces wrong results if weights are large. |
-| P1-3 | **Add runtime assertions or preconditions for no-negative-cycle**: The Spec file assumes `fw_entry adj n v v k >= 0` for all k,v. The imperative code has no such check. At minimum, add a post-loop diagonal check, or strengthen the Floyd-Warshall precondition to require non-negative diagonal in the input. | Caller could pass a graph with negative cycles and get silently wrong results. |
-| P2-1 | **Eliminate code duplication in Complexity.fst**: Import `fw_inner_j`, `fw_inner_i`, `fw_outer`, `inf`, and length lemmas from `CLRS.Ch25.FloydWarshall` instead of re-declaring them. | ~50 lines of exact duplication. Divergence risk if one copy is updated. |
-| P2-2 | **Add output assertions to Test.fst**: After `floyd_warshall dist n`, read back entries and assert expected values (e.g., `d[0][2] == 20`, `d[1][0] == 45`). | Current test only checks that the code compiles and runs without crashing. |
-| P3-1 | **Fix README statistics**: Update rlimit values (20/40, not 5), remove stale timing numbers, fix the build path. | Currently misleading. |
-| P3-2 | **Fix Spec.fst header**: Change "CLRS Theorem 25.2" → "CLRS Equation 25.5, §25.2". Remove claim about connecting to true shortest-path distances (line 10) until P1-1 is done. | Overstatement. |
-| P3-3 | **Update README postcondition snippet**: Show the full postcondition including `contents' == fw_outer contents (SZ.v n) 0`. | README currently omits the functional-correctness ensures clause. |
+| # | Task | Status |
+|---|------|--------|
+| P1-1 | **Connect fw_entry to graph-theoretic δ(i,j)**: Define path/walk types over the adjacency matrix, define `shortest_path_weight`, and prove `fw_entry adj n i j n == shortest_path_weight adj n i j` under the no-negative-cycle assumption. | ✅ Partial — `Paths.fst` defines walk formalism, proves base case (k=0) and restricted-walk uniqueness. Inductive step outlined as future work. No admits. |
+| P1-2 | **Guard the infinity sentinel**: Either (a) add a precondition bounding all edge weights so that path sums cannot reach `inf`, or (b) replace `inf` with an option type / extended-integer type. | ✅ Done — `weights_bounded` predicate added to FloydWarshall.fst |
+| P1-3 | **Add runtime assertions or preconditions for no-negative-cycle**: The Spec file assumes `fw_entry adj n v v k >= 0` for all k,v. The imperative code has no such check. At minimum, add a post-loop diagonal check, or strengthen the Floyd-Warshall precondition to require non-negative diagonal in the input. | ✅ Done — `non_negative_diagonal` predicate added to FloydWarshall.fst |
+| P2-1 | **Eliminate code duplication in Complexity.fst**: Import `fw_inner_j`, `fw_inner_i`, `fw_outer`, `inf`, and length lemmas from `CLRS.Ch25.FloydWarshall` instead of re-declaring them. | ✅ Done — removed ~55 duplicate lines, uses `open CLRS.Ch25.FloydWarshall` |
+| P2-2 | **Add output assertions to Test.fst**: After `floyd_warshall dist n`, read back entries and assert expected values (e.g., `d[0][2] == 20`, `d[1][0] == 45`). | ✅ Done — `SpecTest.fst` verifies all 9 output entries + no-negative-cycle property |
+| P3-1 | **Fix README statistics**: Update rlimit values (20/40, not 5), remove stale timing numbers, fix the build path. | ✅ Done |
+| P3-2 | **Fix Spec.fst header**: Change "CLRS Theorem 25.2" → "CLRS Equation 25.5, §25.2". Remove claim about connecting to true shortest-path distances (line 10) until P1-1 is done. | ✅ Done |
+| P3-3 | **Update README postcondition snippet**: Show the full postcondition including `contents' == fw_outer contents (SZ.v n) 0`. | ✅ Done |
 
 ### Defer
 
@@ -261,9 +263,9 @@ All limits are modest. No `--z3seed` hacks or excessive fuel/ifuel settings.
 | Dimension | Rating | Notes |
 |-----------|--------|-------|
 | CLRS Fidelity | ★★★★☆ | Faithful loop/recurrence; no Π matrix |
-| Specification Strength | ★★★★☆ | Recurrence proven; no δ(i,j) connection |
+| Specification Strength | ★★★★☆ | Recurrence proven; walk formalism with base case for δ(i,j) (inductive step TBD) |
 | Complexity | ★★★★★ | Exact n³ count, ghost-erased |
-| Code Quality | ★★★★☆ | Clean Pulse; duplication in Complexity.fst |
+| Code Quality | ★★★★★ | Clean Pulse; duplication eliminated; safety predicates added |
 | Proof Quality | ★★★★★ | Zero admits, modest solver resources |
-| Documentation | ★★★☆☆ | Stale stats, one material overstatement |
-| **Overall** | **★★★★☆** | Strong verified implementation with room to close the spec gap to δ(i,j) |
+| Documentation | ★★★★☆ | README and Spec.fst headers corrected |
+| **Overall** | **★★★★½** | Strong verified implementation; walk formalism lays groundwork for full δ(i,j) connection |

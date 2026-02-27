@@ -42,7 +42,10 @@ fn floyd_warshall
   returns _:unit
   ensures exists* contents'. 
     A.pts_to dist contents' **
-    pure (Seq.length contents' == SZ.v n * SZ.v n)
+    pure (
+      Seq.length contents' == SZ.v n * SZ.v n /\
+      contents' == fw_outer contents (SZ.v n) 0
+    )
 ```
 
 ### Key Features
@@ -50,8 +53,11 @@ fn floyd_warshall
 ✅ **NO admits** - All proofs are complete  
 ✅ **NO assumes** - All preconditions established  
 ✅ **Memory safe** - All array accesses proven in bounds  
-✅ **Low rlimit** - All queries succeed with rlimit 5 (used ≤0.134)  
-✅ **Minimal invariants** - Simple loop invariants tracking array ownership and length
+✅ **Low rlimit** - All queries succeed with rlimit ≤40  
+✅ **Minimal invariants** - Simple loop invariants tracking array ownership and length  
+✅ **Correctness spec** - `contents' == fw_outer` proves output matches the recurrence (Spec.fst)  
+✅ **Concrete tests** - SpecTest.fst verifies all 9 output entries of a 3×3 graph  
+✅ **Walk formalism** - Paths.fst defines walks, proves base case, outlines path to δ(i,j) (no admits)
 
 ### Implementation Patterns
 
@@ -65,20 +71,30 @@ The implementation follows critical Pulse patterns for robust verification:
 ## Verification
 
 ```bash
-cd /home/nswamy/workspace/clrs/ch25-apsp
-make verify
+cd ch25-apsp
+make
 ```
 
 ## Example Usage
 
 See `CLRS.Ch25.FloydWarshall.Test.fst` for a complete example with a 3×3 graph.
 
+## Files
+
+| File | Purpose |
+|------|---------|
+| `CLRS.Ch25.FloydWarshall.fst` | Main Pulse implementation + safety predicates |
+| `CLRS.Ch25.FloydWarshall.Spec.fst` | Pure spec (fw_entry/fw_outer) and correctness proof |
+| `CLRS.Ch25.FloydWarshall.Paths.fst` | Walk formalism connecting fw_entry to graph-theoretic paths |
+| `CLRS.Ch25.FloydWarshall.Complexity.fst` | O(n³) ghost-tick complexity proof |
+| `CLRS.Ch25.FloydWarshall.SpecTest.fst` | Concrete 3×3 test verification (all 9 entries + no-neg-cycle) |
+| `CLRS.Ch25.FloydWarshall.Test.fst` | Pulse compilation/runtime test |
+
 ## Verification Statistics
 
 All queries succeed quickly:
 - Total queries: ~20
-- Max time: 40 milliseconds
-- Max rlimit used: 0.134 (out of 5)
+- Max rlimit used: 40
 - All proofs stable and fast
 
 ## References
