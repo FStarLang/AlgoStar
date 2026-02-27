@@ -160,7 +160,7 @@ When a Pulse program has repeated invariant clusters across function pre/post/lo
 | Type | Count | Description |
 |------|-------|-------------|
 | `admit()` | 39 | Unproven lemma/proof bodies (Pure F*) |
-| `assume val` | 2 | Axiomatized declarations (MaxSubarray.DC: 1, Kruskal: 1) |
+| `assume val` | 1 | Axiomatized declarations (MaxSubarray.DC: 1) |
 | `assume(...)` | 4 | Other (MaxFlow: ALL eliminated ✅) |
 | `assume_` | 0 | All Pulse assume_ calls eliminated ✅ |
 
@@ -233,7 +233,7 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 22 | StackDFS | §22.3 | ⚠️ d<f, no full nesting | ✅ Linked O(n²) | 0+0 | Main: 0; Cmplx: ✅ 0 assume_ |
 | 22 | KahnTopologicalSort | — | ✅ topo order ∧ distinct | ✅ Linked O(n²) | 0 | ✅ Fully verified (was 2 admits) |
 | 22 | BFS/DFS specs | §22 | ⚠️ partial | — | 8 | Distance, parenthesis, white-path |
-| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 16 | Across Spec/EdgeSort/Cmplx |
+| 23 | Kruskal | §23.2 | ⚠️ forest, not MST | ✅ Linked O(n³) | 15 | Across Spec/EdgeSort/Cmplx; Kruskal.fst ✅ 0 |
 | 23 | Prim | §23.2 | ⚠️ key bounds only | ✅ Linked O(n²) | 6 | |
 | 23 | MST.Spec | §23.1 | ✅ proven | — | 0 | Exchange lemma + tree theorem proven |
 | 24 | Dijkstra | §24.3 | ✅ d=δ proven | ✅ Linked O(n²) | 0 | Correctness + TriIneq: ✅ 0 admits |
@@ -251,11 +251,11 @@ Huffman.Spec and Huffman.Complete: all admits/assumes fully eliminated ✅.
 | 33 | Segments | §33.1 | ✅ intersection | ⚠️ Separate O(1) | 0 | |
 | 35 | VertexCover | §35.1 | ✅ valid cover + 2-approx | ⚠️ Separate O(V²) | 1 | |
 
-### Unproven Obligation Distribution (46 total: 39 admit + 2 assume_val + 5 assume → now 25 total: 16 admit + 8 assume_val + 1 assume)
+### Unproven Obligation Distribution (46 total: 39 admit + 2 assume_val + 5 assume → now 24 total: 16 admit + 7 assume_val + 1 assume)
 
 | Chapter | admit | assume_val | assume | Total | Top files |
 |---------|-------|------------|--------|-------|-----------|
-| ch23 (MST) | 6 | 1 | 0 | 7 | Kruskal.Spec(0✅), Prim.Spec(6), MST.Spec(0✅), Kruskal(0+1 assume_val) |
+| ch23 (MST) | 6 | 0 | 0 | 6 | Kruskal.Spec(0✅), Prim.Spec(6), MST.Spec(0✅), Kruskal(0✅) |
 | ch08 (sorting) | 0 | 0 | 0 | 0 | ✅ All RadixSort files fully verified |
 | ch22 (graphs) | 0 | 7 | 0 | 7 | DFS.Spec(5 assume_val), DFS.WhitePath(2 assume_val) |
 | ch26 (MaxFlow) | 0 | 0 | 0 | 0 | ✅ All MaxFlow.Spec assumes proven (weak duality, MFMC, critical edge) |
@@ -565,8 +565,10 @@ fstar.exe --include common --include ch08-linear-sorting --warn_error -321 --war
 - `count_reachable_bound`: reachable vertices ≤ 1 + |edges|
 
 **Assume val in Kruskal.fst (line 81):** `lemma_kruskal_maintains_forest` —
-NOT addressed. This requires proving the Pulse union-find implementation maintains
-acyclicity, which is a separate imperative verification task.
+✅ FULLY PROVEN. Built UF correctness module (`CLRS.Ch23.Kruskal.UF.fst`) with
+`find_pure` simulation and 6-conjunct `uf_inv` invariant. Proved `uf_inv_union`
+(union maintains invariant), `uf_inv_unreachable` (find(u)≠find(v) ⟹ unreachable),
+and integrated into Pulse outer loop invariant via `kruskal_step_maintains_inv`.
 
 **Actual size:** ~1500+ lines of proofs added.
 
@@ -852,14 +854,14 @@ Can be done independently of AGENT3 (which proves Kadane's optimality directly).
 | ch22/DFS.WhitePath | assume val | 2→0 | AGENT2 | ✅ DONE — White-path theorem fully proved |
 | ch23/MST.Spec | admit | 0 | AGENT4 | ✅ DONE — exchange_is_spanning_tree + cut_property proven |
 | ch23/Kruskal.Spec | admit | 0 | AGENT5 | ✅ DONE — all 9 admits eliminated |
-| ch23/Kruskal.fst | assume val | 1 | AGENT5 | Maintains forest (line 81) — requires Pulse union-find proof |
+| ch23/Kruskal.fst | assume val | 0 | AGENT5 | ✅ DONE — Forest property proven via UF invariant module |
 | ch23/Prim.Spec | admit | 0 | AGENT6 | ✅ DONE — all 6 admits eliminated |
 | ch26/MaxFlow.Spec | assume | 0 | AGENT13 ✅ | ALL proven (weak duality, MFMC, cycle removal) |
 | ch26/MaxFlow.Complexity | assume | 0 | AGENT13 ✅ | Critical edge proven |
 | **TOTAL (admits)** | | **25** | | |
-| **TOTAL (assume vals)** | | **8** | | |
+| **TOTAL (assume vals)** | | **7** | | |
 | **TOTAL (assumes)** | | **3** | | Mathematical axioms, beyond scope |
-| **GRAND TOTAL** | | **36** | | 33 actionable + 3 axioms |
+| **GRAND TOTAL** | | **35** | | 32 actionable + 3 axioms |
 
 ### Spec Gaps (0 admits but incomplete postconditions)
 
