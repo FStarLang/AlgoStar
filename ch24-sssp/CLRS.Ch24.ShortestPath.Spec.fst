@@ -1,5 +1,28 @@
 module CLRS.Ch24.ShortestPath.Spec
 
+(*
+   Pure Specification of Shortest-Path Distances — CLRS Chapter 24
+
+   Defines the mathematical oracle for shortest-path distances using
+   Bellman-Ford-style dynamic programming over path length:
+
+     sp_dist_k weights n s v k  — min-weight path from s to v using ≤ k edges
+     sp_dist weights n s v      — sp_dist_k with k = n−1
+
+   Key properties proven:
+   - sp_dist_k_monotone: more edges allowed ⟹ distance cannot increase
+   - sp_dist_k_bounded: sp_dist_k ≤ inf (1000000)
+   - sp_dist_source_nonpositive: sp_dist(s, s) ≤ 0
+   - sp_dist_k_triangle: sp_dist_k(v, k) ≤ sp_dist_k(u, k−1) + w(u, v)
+   - has_triangle_inequality: predicate on concrete distance arrays
+   - triangle_ineq_implies_upper_bound (CLRS Cor 24.3):
+       if dist satisfies triangle inequality and dist[s]=0,
+       then dist[v] ≤ sp_dist(s, v) for all v — proven by induction on k
+
+   This module provides the shared mathematical foundation used by both
+   BellmanFord and Dijkstra correctness proofs.
+*)
+
 open FStar.Mul
 open FStar.List.Tot
 

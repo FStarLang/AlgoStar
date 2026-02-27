@@ -43,6 +43,7 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module SP = CLRS.Ch24.ShortestPath.Spec
+module BF = CLRS.Ch24.BellmanFord
 
 // ========== Ghost tick ==========
 
@@ -56,78 +57,16 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-// ========== Definitions (from BellmanFord.fst) ==========
+// ========== Definitions (imported from BellmanFord.fst) ==========
 
-let triangle_inequality (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : prop =
-  Seq.length dist == n /\
-  forall (u v: nat). u < n /\ v < n /\
-    (u * n + v) < Seq.length weights ==>
-    (let d_u = Seq.index dist u in
-     let d_v = Seq.index dist v in
-     let w = Seq.index weights (u * n + v) in
-     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w)
-
-let valid_distances (dist: Seq.seq int) (n: nat) : prop =
-  Seq.length dist == n /\
-  forall (v: nat). v < n ==> 
-    (let d = Seq.index dist v in d < 1000000 \/ d == 1000000)
-
-let no_violations (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : prop =
-  Seq.length dist == n /\
-  Seq.length weights == n * n /\
-  (forall (u v: nat). u < n /\ v < n ==>
-    (let d_u = Seq.index dist u in
-     let d_v = Seq.index dist v in
-     let w = Seq.index weights (u * n + v) in
-     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w))
-
-let no_violations_partial (dist: Seq.seq int) (weights: Seq.seq int) (n u_bound v_bound: nat) : prop =
-  Seq.length dist == n /\
-  Seq.length weights == n * n /\
-  (forall (u v: nat). u < n /\ v < n /\
-    (u < u_bound \/ (u == u_bound /\ v < v_bound)) ==>
-    (let d_u = Seq.index dist u in
-     let d_v = Seq.index dist v in
-     let w = Seq.index weights (u * n + v) in
-     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w))
-
-let no_violations_implies_triangle (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
-  (requires no_violations dist weights n)
-  (ensures triangle_inequality dist weights n)
-  = ()
-
-let partial_full (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
-  (requires no_violations_partial dist weights n n 0)
-  (ensures no_violations dist weights n)
-  = ()
-
-let bf_to_sp_triangle (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
-  (requires triangle_inequality dist weights n /\
-            valid_distances dist n /\
-            Seq.length weights == n * n)
-  (ensures SP.has_triangle_inequality dist weights n)
-  = ()
-
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
-let bf_sp_upper_bound_cond (dist weights: Seq.seq int) (n source: nat) (flag: bool) : Lemma
-  (requires Seq.length dist == n /\
-            Seq.length weights == n * n /\
-            n > 0 /\ source < n /\
-            Seq.index dist source == 0 /\
-            valid_distances dist n /\
-            (flag == true ==> triangle_inequality dist weights n))
-  (ensures flag == true ==>
-    (forall (v: nat). v < n ==>
-      Seq.index dist v <= SP.sp_dist weights n source v))
-  = if flag then begin
-      bf_to_sp_triangle dist weights n;
-      let aux (v: nat{v < n}) : Lemma 
-        (ensures Seq.index dist v <= SP.sp_dist weights n source v) =
-        SP.triangle_ineq_implies_upper_bound dist weights n source v
-      in
-      FStar.Classical.forall_intro aux
-    end
-#pop-options
+let triangle_inequality = BF.triangle_inequality
+let valid_distances = BF.valid_distances
+let no_violations = BF.no_violations
+let no_violations_partial = BF.no_violations_partial
+let no_violations_implies_triangle = BF.no_violations_implies_triangle
+let partial_full = BF.partial_full
+let bf_to_sp_triangle = BF.bf_to_sp_triangle
+let bf_sp_upper_bound_cond = BF.bf_sp_upper_bound_cond
 
 // ========== Pure Complexity Bounds ==========
 

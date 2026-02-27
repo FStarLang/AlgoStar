@@ -1,7 +1,24 @@
 module CLRS.Ch24.ShortestPath.Triangle
 
-/// Proves sp_dist(s, v) <= sp_dist(s, u) + w(u, v) for non-negative weights.
-/// Key lemma for Dijkstra's "no underestimate" property.
+(*
+   Stabilization of sp_dist_k and Triangle Inequality for Non-Negative Weights
+
+   Main results:
+   1. sp_dist_k_stabilize:
+        For non-negative weights, sp_dist_k(v, n) == sp_dist_k(v, n−1).
+        Proof by pigeonhole: if the n-th iteration still improves a distance,
+        there exists a chain of n+1 predecessor vertices; pigeonhole gives a
+        repeated vertex; the resulting cycle has non-negative weight and can
+        be contracted — contradiction.
+
+   2. sp_dist_triangle_ineq:
+        For non-negative weights, sp_dist(s, v) ≤ sp_dist(s, u) + w(u, v).
+        This is the triangle inequality on the shortest-path metric, which is
+        the key lemma enabling Dijkstra's "no underestimate" property.
+
+   Uses FStar.Fin.pigeonhole and builds auxiliary chain_vertex / chain_seq
+   constructions for the contraction argument.
+*)
 
 open FStar.Mul
 open FStar.List.Tot

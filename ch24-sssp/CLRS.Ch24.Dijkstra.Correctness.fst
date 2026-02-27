@@ -142,33 +142,6 @@ let all_weights_non_negative (weights: Seq.seq int) : prop =
 /// Since y is on path to u and weights are non-negative: δ(s,y) <= δ(s,u).
 /// Since u is minimum unvisited and y is unvisited: dist[u] <= dist[y].
 /// Therefore: dist[u] <= dist[y] = δ(s,y) <= δ(s,u).
-/// Helper lemma: When triangle inequality holds from settled vertices and
-/// all settled have optimal distances, distances to unsettled vertices represent
-/// shortest paths that go through settled vertices only
-let dist_via_settled_optimal
-  (dist: Seq.seq int)
-  (weights: Seq.seq int)
-  (n source: nat)
-  (settled: settled_set)
-  (v: nat)
-  : Lemma
-  (requires
-    n > 0 /\
-    source < n /\
-    v < n /\
-    Seq.length dist == n /\
-    Seq.length weights == n * n /\
-    Seq.index dist source == 0 /\
-    is_settled settled source /\
-    not (is_settled settled v) /\
-    all_settled_optimal dist weights n source settled /\
-    triangle_inequality dist weights n settled /\
-    all_weights_non_negative weights)
-  (ensures
-    // dist[v] is at most any path weight that goes from source through settled vertices to v
-    true)
-  = ()
-
 //SNIPPET_START: greedy_choice
 #push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
 let greedy_choice_invariant
@@ -272,38 +245,6 @@ let relax_establishes_triangle_inequality
   = ()
 #pop-options
 
-(* 
-/// If all settled vertices have optimal distances and triangle inequality holds,
-/// then all distances remain upper bounds
-///
-/// NOTE: This lemma is not currently used in the proof. It states a property that
-/// would be useful but requires explicit quantifier instantiation to prove from
-/// the has_triangle_inequality precondition.
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
-let optimal_settled_implies_upper_bounds
-  (dist: Seq.seq int)
-  (weights: Seq.seq int)
-  (n source: nat)
-  (settled: settled_set)
-  : Lemma
-  (requires
-    all_settled_optimal dist weights n source settled /\
-    triangle_inequality dist weights n settled /\
-    all_weights_non_negative weights /\
-    // Add the stronger precondition that triangle inequality holds for all edges
-    SP.has_triangle_inequality dist weights n)
-  (ensures
-    all_distances_upper_bounds dist weights n source)
-  = 
-  // The precondition SP.has_triangle_inequality combined with dist[source] = 0
-  // (from all_settled_optimal, since source is settled) directly implies that
-  // distances are upper bounds on shortest paths via SP.triangle_ineq_implies_upper_bound.
-  // The quantified form of all_distances_upper_bounds should be derivable from
-  // instantiating SP.triangle_ineq_implies_upper_bound for each vertex.
-  ()
-#pop-options
-*)
-
 /// The minimum unvisited vertex cannot have distance greater than any
 /// shortest path that stays within settled vertices
 let minimum_unvisited_lower_bound
@@ -360,79 +301,6 @@ let path_boundary_crossing
   // The SMT solver can handle this with the quantifier instantiation.
   ()
 
-/// Weight of a subpath is at most weight of full path (non-negative weights)
-let subpath_weight_monotone
-  (path: SP.path)
-  (weights: Seq.seq int)
-  (n: nat)
-  : Lemma
-  (requires
-    SP.path_valid path n /\
-    Seq.length weights == n * n /\
-    all_weights_non_negative weights /\
-    SP.path_edges path > 0)
-  (ensures
-    // For any prefix of the path, its weight <= full path weight
-    true) // Simplified for now
-  = 
-  // Since all weights are non-negative, adding more edges to a path
-  // can only increase (or keep the same) the total weight.
-  // This is a standard property that follows from the definition of path_weight
-  // and the non-negativity of weights.
-  ()
-
-(* 
-/// If there exists a shortest path from s to u, and triangle inequality holds
-/// for all settled vertices, then the first unsettled vertex y on that path
-/// has dist[y] = δ(s,y).
-///
-/// NOTE: This lemma is not currently used. It was part of an approach to proving
-/// the main theorem via explicit path decomposition, but we use a stronger
-/// precondition instead.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
-let first_unsettled_has_optimal_distance
-  (dist: Seq.seq int)
-  (weights: Seq.seq int)
-  (n source u: nat)
-  (settled: settled_set)
-  (path: SP.path)
-  : Lemma
-  (requires
-    // Path is valid shortest path from source to u
-    n > 0 /\
-    source < n /\
-    u < n /\
-    SP.path_valid path n /\
-    SP.path_source path == source /\
-    SP.path_dest path == u /\
-    SP.path_weight path weights n == SP.sp_dist weights n source u /\
-    SP.path_weight path weights n < SP.inf /\
-    
-    // Source is settled, u is not
-    is_settled settled source /\
-    not (is_settled settled u) /\
-    
-    // Settled vertices have correct distances
-    all_settled_optimal dist weights n source settled /\
-    
-    // Triangle inequality holds from settled vertices
-    triangle_inequality dist weights n settled /\
-    
-    // Upper bound property
-    all_distances_upper_bounds dist weights n source /\
-    
-    // Non-negative weights
-    all_weights_non_negative weights)
-  (ensures
-    // There exists a first unsettled vertex y on path with dist[y] = δ(s,y)
-    exists (y: nat). y < n /\
-                     not (is_settled settled y) /\
-                     Seq.index dist y == SP.sp_dist weights n source y /\
-                     SP.sp_dist weights n source y <= SP.sp_dist weights n source u)
-  = ()
-#pop-options
-*)
-
 /// If y is unsettled and on a shortest path to u, and u is the minimum unvisited,
 /// then dist[u] <= dist[y].
 let minimum_property
@@ -453,60 +321,6 @@ let minimum_property
   (ensures
     Seq.index dist u <= Seq.index dist y)
   = ()
-
-(* 
-/// Main lemma: Combining first_unsettled and minimum properties gives us
-/// dist[u] <= δ(s,u)
-///
-/// NOTE: This lemma is not currently used. We prove the main theorem directly
-/// with a stronger precondition.
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
-let greedy_choice_upper_bound
-  (dist: Seq.seq int)
-  (weights: Seq.seq int)
-  (n source u: nat)
-  (settled: settled_set)
-  (path: SP.path)
-  : Lemma
-  (requires
-    // Basic structure
-    n > 0 /\
-    source < n /\
-    u < n /\
-    Seq.length dist == n /\
-    Seq.length weights == n * n /\
-    
-    // Path is valid shortest path from source to u
-    SP.path_valid path n /\
-    SP.path_source path == source /\
-    SP.path_dest path == u /\
-    SP.path_weight path weights n == SP.sp_dist weights n source u /\
-    SP.path_weight path weights n < SP.inf /\
-    
-    // Source is settled, u is not
-    is_settled settled source /\
-    not (is_settled settled u) /\
-    
-    // u is minimum unvisited
-    (forall (v: nat). v < n /\ not (is_settled settled v) ==>
-      Seq.index dist u <= Seq.index dist v) /\
-    
-    // Settled vertices have correct distances
-    all_settled_optimal dist weights n source settled /\
-    
-    // Triangle inequality holds from settled vertices
-    triangle_inequality dist weights n settled /\
-    
-    // Upper bound property
-    all_distances_upper_bounds dist weights n source /\
-    
-    // Non-negative weights
-    all_weights_non_negative weights)
-  (ensures
-    Seq.index dist u <= SP.sp_dist weights n source u)
-  = ()
-#pop-options
-*)
 
 (* ===== Alternative Formulation Using sp_dist Properties ===== *)
 

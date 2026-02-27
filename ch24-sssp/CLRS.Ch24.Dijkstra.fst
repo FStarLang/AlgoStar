@@ -19,6 +19,12 @@ module Seq = FStar.Seq
    Graph: weighted adjacency matrix (n×n flat array, 1000000 = no edge/infinity)
    Requires non-negative weights.
    
+   Sentinel constraint: The constant 1000000 encodes infinity. Edge weights and
+   all valid shortest-path distances must be strictly less than 1000000. If any
+   true shortest-path distance reaches 1000000, it becomes indistinguishable
+   from "unreachable." F*'s int is mathematical (unbounded), so arithmetic
+   overflow is not a concern—only the sentinel comparison matters.
+   
    Postcondition:
    - dist[source] == 0
    - All distances non-negative and bounded [0, 1000000]
@@ -27,8 +33,10 @@ module Seq = FStar.Seq
    - Equality: dist[v] == sp_dist(source, v) for all v
      (proven via upper bound from triangle inequality + lower bound from sp_dist triangle ineq)
    
-   One admit() in dependency: sp_dist_k_stabilize in ShortestPath.Triangle.fst
-   (stabilization of sp_dist_k at n-1 — requires pigeonhole/path contraction argument)
+   All dependencies fully proven, including sp_dist_k_stabilize in ShortestPath.Triangle.fst
+   (stabilization of sp_dist_k at n-1 via pigeonhole/path contraction argument).
+   
+   NO admits. NO assumes.
 *)
 
 // All weights are non-negative
@@ -217,6 +225,7 @@ let extend_tri_after_relax
 #pop-options
 
 // Count of entries equal to 1 in s[0..n)
+// Note: These general-purpose utilities are also available in CLRS.Common.CountOnes.
 let rec count_ones (s: Seq.seq int) (n: nat) : Tot nat (decreases n) =
   if n = 0 || n > Seq.length s then 0
   else (if Seq.index s (n-1) = 1 then 1 else 0) + count_ones s (n-1)

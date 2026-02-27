@@ -17,6 +17,12 @@ module SP = CLRS.Ch24.ShortestPath.Spec
 
    Graph: weighted adjacency matrix (n×n flat array, 1000000 = no edge/infinity)
    
+   Sentinel constraint: The constant 1000000 encodes infinity. Edge weights and
+   all valid shortest-path distances must be strictly less than 1000000. If any
+   true shortest-path distance reaches 1000000, it becomes indistinguishable
+   from "unreachable." F*'s int is mathematical (unbounded), so arithmetic
+   overflow is not a concern—only the sentinel comparison matters.
+   
    Postcondition:
    - dist[source] == 0
    - All distances valid (< 1000000 or == 1000000)

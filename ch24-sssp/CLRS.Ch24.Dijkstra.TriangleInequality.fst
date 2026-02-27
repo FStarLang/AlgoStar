@@ -19,8 +19,8 @@ module Seq = FStar.Seq
  * This means:
  * 1. The triangle inequality is NOT a separate verification requirement
  * 2. It follows automatically from the relaxation steps
- * 3. The verification pass (lines 325-393 in CLRS.Ch24.Dijkstra.fst) is redundant
- *    for proving triangle inequality - it only confirms what must already be true!
+ * 3. Any separate verification pass is redundant for proving triangle inequality —
+ *    it only confirms what must already be true!
  * 
  * This file proves that the triangle inequality holds after Dijkstra completes,
  * allowing us to remove the separate verification pass.
@@ -856,9 +856,8 @@ let dijkstra_algorithm_establishes_triangle (#n: nat) (source: nat{source < n})
 (*
  * ===== Summary and Application to Pulse Implementation =====
  * 
- * In CLRS.Ch24.Dijkstra.fst (lines 325-393), the implementation performs
- * a "triangle inequality verification pass" that checks:
- *   for all edges (u,v): w >= inf \/ d_u >= inf \/ d_v <= d_u + w
+ * In CLRS.Ch24.Dijkstra.fst, the implementation establishes the triangle
+ * inequality through the main relaxation loop. Key observation:
  * 
  * Key results from this file:
  * 
@@ -874,18 +873,11 @@ let dijkstra_algorithm_establishes_triangle (#n: nat) (source: nat{source < n})
  *    After processing all vertices (main Dijkstra loop completes),
  *    triangle inequality holds for ALL edges automatically.
  * 
- * 4. The verification pass (lines 325-393) is REDUNDANT for establishing
+ * 4. Any separate verification pass is REDUNDANT for establishing
  *    triangle inequality. It can only confirm what must already be true!
  * 
  * Practical impact:
- * - The verification pass serves NO purpose for triangle inequality
- * - We can remove it and directly assert triangle_inequality in the postcondition
+ * - Triangle inequality follows directly from the main relaxation loop
  * - The postcondition can state: triangle_inequality sweights sdist' (SZ.v n)
  *   and this follows from the main loop by [dijkstra_algorithm_establishes_triangle]
- * 
- * To implement this:
- * 1. Remove the verification pass loop (lines 325-393)
- * 2. Remove tri_result parameter and vtri flag
- * 3. Directly assert triangle_inequality in postcondition
- * 4. Add lemma invocation: dijkstra_algorithm_establishes_triangle (SZ.v source) sweights
  *)
