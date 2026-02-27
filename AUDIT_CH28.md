@@ -239,16 +239,16 @@ This comment is **outdated/incorrect**. The property is fully proven via `lemma_
 
 ### Priority 1 (High) — Documentation Bugs
 
-| # | Task | File | Line(s) | Effort |
+| # | Task | File | Line(s) | Status |
 |---|------|------|---------|--------|
-| 1 | Remove stale "One admit" comment — the property is fully proven | `CLRS.Ch28.Strassen.fst` | 34 | 1 min |
-| 2 | Fix `.rst` references to nonexistent `CLRS.Ch28.MatrixMultiply.Complexity.fst` — point to `CLRS.Ch28.MatrixMultiply.fst` instead | `doc/ch28_matrix_ops.rst` | 100–115 | 5 min |
-| 3 | Fix CLRS section references: "§28.1"/"§28.2" → "§4.2" | `doc/ch28_matrix_ops.rst` | 9, 20, 128 | 2 min |
-| 4 | Update README line count "170 lines" → "~240 lines" | `README.md` | 21 | 1 min |
-| 5 | Add Strassen description to README (currently only mentions MatrixMultiply) | `README.md` | — | 10 min |
-| 6 | Note that Strassen complexity counts multiplications only, not additions | `doc/ch28_matrix_ops.rst` | ~190 | 2 min |
-| 7 | Add an imperative (Pulse) Strassen implementation for extractable code | New file | Large |
-| 10 | Reconcile the two dot product definitions (`dot_product_spec` in MatrixMultiply vs `dot_product` in Strassen) — they are equivalent but defined independently | Both files | Small |
+| 1 | Remove stale "One admit" comment — the property is fully proven | `CLRS.Ch28.Strassen.fst` | 34 | ✅ Done |
+| 2 | Fix `.rst` references to nonexistent `CLRS.Ch28.MatrixMultiply.Complexity.fst` — point to `CLRS.Ch28.MatrixMultiply.fst` instead | `doc/ch28_matrix_ops.rst` | 100–115 | ✅ Done |
+| 3 | Fix CLRS section references: "§28.1"/"§28.2" → "§4.2" | `doc/ch28_matrix_ops.rst` | 9, 20, 128 | ✅ Done |
+| 4 | Update README line count "170 lines" → "~240 lines" | `README.md` | 21 | ✅ Done |
+| 5 | Add Strassen description to README (currently only mentions MatrixMultiply) | `README.md` | — | ✅ Done |
+| 6 | Note that Strassen complexity counts multiplications only, not additions | `doc/ch28_matrix_ops.rst` | ~190 | ✅ Done |
+| 7 | Add an imperative (Pulse) Strassen implementation for extractable code | New file | Large | Deferred |
+| 10 | Reconcile the two dot product definitions (`dot_product_spec` in MatrixMultiply vs `dot_product` in Strassen) — they are equivalent but defined independently | Both files | Small | ✅ Done (cross-ref comments) |
 
 ## Defer
 

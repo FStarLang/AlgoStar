@@ -14,7 +14,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
 (* 
- * Verified implementation of standard matrix multiplication from CLRS Chapter 28.
+ * Verified implementation of SQUARE-MATRIX-MULTIPLY from CLRS §4.2 (pp. 75–76).
  * 
  * Functional correctness: C[i][j] = Σ_{k=0}^{n-1} A[i][k] * B[k][j]
  * Complexity: exactly n³ multiply-add operations.
@@ -61,6 +61,9 @@ let rec dot_product_spec (sa sb: Seq.seq int) (n i j: nat) (limit: nat)
               Seq.index sa (flat_index n i k) * Seq.index sb (flat_index n k j)
 
 // Result correctness: c[i][j] == dot_product_spec for all computed positions
+// Note: this dot_product_spec operates on flat (row-major) sequences.
+// See also: CLRS.Ch28.Strassen.dot_product which defines the equivalent
+// sum over the seq-of-seq matrix representation.
 let mat_mul_correct (sa sb sc: Seq.seq int) (n: nat) : prop =
   Seq.length sc == n * n /\
   (forall (i j: nat). i < n /\ j < n ==> 

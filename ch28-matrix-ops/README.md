@@ -2,7 +2,8 @@
 
 ## Matrix Multiplication
 
-This directory contains a verified Pulse implementation of standard matrix multiplication from CLRS Chapter 28.
+This directory contains verified implementations of matrix multiplication from CLRS §4.2:
+the standard triple-loop algorithm (Pulse) and Strassen's divide-and-conquer algorithm (pure F*).
 
 ### Algorithm
 
@@ -18,7 +19,14 @@ for i = 0 to n-1:
 
 ### Files
 
-- `CLRS.Ch28.MatrixMultiply.fst` - Verified Pulse implementation (170 lines)
+- `CLRS.Ch28.MatrixMultiply.fst` - Verified Pulse implementation (~240 lines)
+  with functional correctness and O(n³) complexity proof
+- `CLRS.Ch28.Strassen.fst` - Strassen's divide-and-conquer algorithm in pure F*
+  (~975 lines) with correctness proof (pointwise equivalence to standard multiply)
+  and O(n^{lg 7}) complexity analysis
+- `CLRS.Ch28.StrassenPulse.fst` - Imperative Pulse Strassen (~450 lines) with
+  Vec allocation/deallocation, recursive `fn rec`, and bridging lemma to the
+  functional spec (4 admits remaining, see file header)
 - `Makefile` - Build configuration
 
 ### Verification
@@ -62,3 +70,23 @@ FSTAR_FILES="CLRS.Ch28.MatrixMultiply.fst" make verify
 - F* with Pulse support
 - PULSE_ROOT environment variable pointing to Pulse installation
 - Standard Pulse libraries (included via Makefile)
+
+## Strassen's Algorithm
+
+A pure F* specification of Strassen's divide-and-conquer matrix multiplication
+(CLRS §4.2, pp. 79–82). Requires square, power-of-2 matrices.
+
+### Key Results
+
+1. **Functional correctness**: Strassen's output equals the standard triple-loop
+   multiply element-wise (`lemma_strassen_correct`)
+2. **Complexity**: The number of scalar multiplications satisfies
+   T(n) = 7^{log₂ n} = n^{lg 7} ≈ n^{2.807}, proven strictly less than n³
+
+### Proof Highlights
+
+- Pointwise equivalence to `standard_multiply` via structural induction
+- Four algebraic distributivity lemmas expand P1–P7 symbolically
+- Connection lemmas bridge quadrant-level dot products to full-matrix dot products
+- `smt_sync'` tactic used for quadrant case proofs to avoid solver timeout
+- Zero admits, zero assumes

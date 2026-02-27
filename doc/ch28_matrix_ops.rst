@@ -4,9 +4,9 @@
 Matrix Operations
 ########################################
 
-This chapter covers matrix multiplication from CLRS Chapter 28: the
-standard triple-loop algorithm (§28.1) and Strassen's divide-and-conquer
-algorithm (§28.2). The standard algorithm is verified in Pulse with
+This chapter covers matrix multiplication from CLRS: the
+standard triple-loop algorithm (§4.2, SQUARE-MATRIX-MULTIPLY) and Strassen's
+divide-and-conquer algorithm (§4.2, pp. 79–82). The standard algorithm is verified in Pulse with
 **zero admits** — both functional correctness and O(n³) complexity are
 fully proven. Strassen's algorithm is verified as a pure F*
 specification with **zero admits** ✅ — all algebraic
@@ -17,7 +17,7 @@ using ``smt_sync'`` for quadrant proofs.
 Standard Matrix Multiply
 =========================
 
-CLRS §28.1 presents the textbook triple-loop algorithm for multiplying
+CLRS §4.2 presents the textbook triple-loop algorithm for multiplying
 two n×n matrices. Our formalization stores matrices as flat arrays in
 row-major order and proves that each output element equals the
 corresponding dot product.
@@ -97,22 +97,17 @@ The complexity-instrumented version threads a ghost counter through
 the implementation. Each multiply-add (``C[i][j] += A[i][k]*B[k][j]``)
 calls ``tick`` once:
 
-.. literalinclude:: ../ch28-matrix-ops/CLRS.Ch28.MatrixMultiply.Complexity.fst
+.. literalinclude:: ../ch28-matrix-ops/CLRS.Ch28.MatrixMultiply.fst
    :language: pulse
    :start-after: //SNIPPET_START: ghost_tick
    :end-before: //SNIPPET_END: ghost_tick
 
 The complexity bound predicate and theorem signature:
 
-.. literalinclude:: ../ch28-matrix-ops/CLRS.Ch28.MatrixMultiply.Complexity.fst
+.. literalinclude:: ../ch28-matrix-ops/CLRS.Ch28.MatrixMultiply.fst
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bound
    :end-before: //SNIPPET_END: complexity_bound
-
-.. literalinclude:: ../ch28-matrix-ops/CLRS.Ch28.MatrixMultiply.Complexity.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: matrix_multiply_complexity_sig
-   :end-before: //SNIPPET_END: matrix_multiply_complexity_sig
 
 The postcondition proves ``cf - c0 == n * n * n``: exactly n³
 multiply-add operations, matching the standard analysis. The proof
@@ -125,7 +120,7 @@ yields ``n * n * n``.
 Strassen's Algorithm
 =====================
 
-CLRS §28.2 presents Strassen's algorithm, which reduces the number
+CLRS §4.2 (pp. 79–82) presents Strassen's algorithm, which reduces the number
 of recursive multiplications from 8 to 7 by computing auxiliary
 products P1–P7 from sums and differences of quadrants.
 
@@ -206,6 +201,15 @@ The closed-form proof proceeds by induction: unfolding
 ``strassen_mult_count n = 7 * strassen_mult_count (n/2)`` and
 applying the inductive hypothesis gives
 ``7 * pow7 (log₂(n/2)) = pow7 (log₂ n)``.
+
+.. note::
+
+   The complexity analysis counts **scalar multiplications only**, not
+   additions. This matches the CLRS analysis which focuses on the
+   multiplication recurrence. The Θ(n²) additions at each recursion
+   level are not counted, but the asymptotic class O(n\ :sup:`lg 7`)
+   ≈ O(n\ :sup:`2.807`) is correctly characterized since
+   n\ :sup:`lg 7` dominates n².
 
 Correctness Proof
 ~~~~~~~~~~~~~~~~~
