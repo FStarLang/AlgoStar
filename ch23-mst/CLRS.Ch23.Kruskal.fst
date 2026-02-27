@@ -8,11 +8,14 @@
    Postcondition:
    - Edge count <= n-1
    - All selected edge endpoints are valid vertices (< n)
-   - Result forms an acyclic forest (references CLRS.Ch23.Kruskal.Spec)
+   - Result forms an acyclic forest (proven via union-find invariant)
    - Union-find parent values remain valid throughout
    
-   NOTE: Acyclicity property relies on assumed lemma.
-   Full proof would require tracking union-find component invariants.
+   Proof: The forest property is maintained by tracking a union-find invariant
+   (uf_inv) that relates the parent array to edge connectivity. When adding an
+   edge, uf_inv_union proves the invariant is maintained, and
+   acyclic_snoc_unreachable proves acyclicity is preserved (since the new edge
+   connects previously unreachable vertices).
 *)
 
 module CLRS.Ch23.Kruskal
@@ -33,6 +36,7 @@ module V = Pulse.Lib.Vec
 module MSTSpec = CLRS.Ch23.MST.Spec
 module KSpec = CLRS.Ch23.Kruskal.Spec
 module UF = CLRS.Ch23.Kruskal.UF
+module Helpers = CLRS.Ch23.Kruskal.Helpers
 
 let valid_parents (sparent: Seq.seq SZ.t) (n: nat) : prop =
   Seq.length sparent == n /\
@@ -83,6 +87,64 @@ let lemma_kruskal_maintains_forest
                     KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
           (ensures result_is_forest seu sev n ec)
   = ()
+
+// valid_endpoints implies all edges have valid vertices (< n)
+let rec valid_endpoints_implies_all_edges_valid
+  (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma (requires valid_endpoints seu sev n ec)
+          (ensures UF.all_edges_valid (edges_from_arrays seu sev ec i) n)
+          (decreases (ec - i))
+  = if i >= ec then ()
+    else valid_endpoints_implies_all_edges_valid seu sev n ec (i + 1)
+
+// Extending valid_endpoints by one: if valid at ec and the new entry is valid, then valid at ec+1
+let valid_endpoints_extend
+  (seu sev seu' sev': Seq.seq int) (n ec: nat) (vbu vbv: nat)
+  : Lemma
+    (requires
+      valid_endpoints seu sev n ec /\
+      ec + 1 <= n /\
+      Seq.length seu' == n /\ Seq.length sev' == n /\
+      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
+                                   Seq.index sev' k = Seq.index sev k) /\
+      Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv /\
+      vbu < n /\ vbv < n)
+    (ensures valid_endpoints seu' sev' n (ec + 1))
+  = // For k < ec: old valid_endpoints + array agreement
+    assert (forall (k:nat). k < ec ==>
+      Seq.index seu' k >= 0 /\ Seq.index seu' k < n /\
+      Seq.index sev' k >= 0 /\ Seq.index sev' k < n);
+    // For k = ec: explicit
+    assert (Seq.index seu' ec >= 0 /\ Seq.index seu' ec < n);
+    assert (Seq.index sev' ec >= 0 /\ Seq.index sev' ec < n)
+
+// Extensionality: edges_from_arrays depends only on values in [i, ec)
+let rec edges_from_arrays_ext (seu1 sev1 seu2 sev2: Seq.seq int) (ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      ec <= Seq.length seu1 /\ ec <= Seq.length sev1 /\
+      ec <= Seq.length seu2 /\ ec <= Seq.length sev2 /\
+      (forall (k:nat). k < ec ==> Seq.index seu1 k >= 0 /\ Seq.index sev1 k >= 0) /\
+      (forall (k:nat). k < ec ==> Seq.index seu2 k >= 0 /\ Seq.index sev2 k >= 0) /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu1 k == Seq.index seu2 k /\ Seq.index sev1 k == Seq.index sev2 k))
+    (ensures edges_from_arrays seu1 sev1 ec i == edges_from_arrays seu2 sev2 ec i)
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else edges_from_arrays_ext seu1 sev1 seu2 sev2 ec (i + 1)
+
+// Extension: adding one element at index ec appends to the edge list
+let rec edges_from_arrays_extend (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec}) (eu ev: nat)
+  : Lemma
+    (requires
+      ec < Seq.length seu /\ ec < Seq.length sev /\
+      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      Seq.index seu ec == eu /\ Seq.index sev ec == ev)
+    (ensures edges_from_arrays seu sev (ec + 1) i ==
+             edges_from_arrays seu sev ec i @ [{u = eu; v = ev; w = 1}])
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else edges_from_arrays_extend seu sev ec (i + 1) eu ev
 
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn find
@@ -141,7 +203,124 @@ fn do_union
 }
 #pop-options
 
-#push-options "--z3rlimit 600 --ifuel 2 --fuel 2"
+// Lemma for when we add an edge: proves uf_inv, is_forest, valid_endpoints for new state.
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+let kruskal_add_edge_proof
+    (sparent sparent': Seq.seq SZ.t)
+    (seu sev seu' sev': Seq.seq int)
+    (n ec: nat)
+    (vbu vbv: nat)
+    (root_u root_v: nat)
+  : Lemma
+    (requires
+      valid_endpoints seu sev n ec /\
+      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
+      vbu < n /\ vbv < n /\
+      root_u == UF.find_pure sparent vbu n n /\
+      root_v == UF.find_pure sparent vbv n n /\
+      root_u <> root_v /\
+      do_union_post sparent sparent' root_u root_v n /\
+      ec + 1 < n /\
+      Seq.length seu' == n /\ Seq.length sev' == n /\
+      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
+                                   Seq.index sev' k = Seq.index sev k) /\
+      Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv /\
+      (forall (k:nat). k < ec + 1 ==> Seq.index seu' k >= 0 /\ Seq.index sev' k >= 0))
+    (ensures
+      UF.uf_inv sparent' (edges_from_arrays seu' sev' (ec + 1) 0) n (ec + 1) /\
+      KSpec.is_forest (edges_from_arrays seu' sev' (ec + 1) 0) n /\
+      valid_endpoints seu' sev' n (ec + 1))
+  = let old_edges = edges_from_arrays seu sev ec 0 in
+    let new_edge : MSTSpec.edge = {u = vbu; v = vbv; w = 1} in
+    edges_from_arrays_ext seu sev seu' sev' ec 0;
+    edges_from_arrays_extend seu' sev' ec 0 vbu vbv;
+    UF.uf_inv_unreachable sparent old_edges n ec vbu vbv;
+    UF.not_mem_when_unreachable new_edge old_edges;
+    MSTSpec.acyclic_when_unreachable n old_edges new_edge;
+    UF.acyclic_cons_to_append n new_edge old_edges;
+    valid_endpoints_implies_all_edges_valid seu sev n ec 0;
+    UF.find_pure_bounded sparent vbu n n;
+    UF.find_pure_bounded sparent vbv n n;
+    UF.uf_inv_union sparent sparent' old_edges n ec vbu vbv root_u root_v new_edge;
+    UF.uf_inv_cons_to_append sparent' new_edge old_edges n (ec + 1);
+    valid_endpoints_extend seu sev seu' sev' n ec vbu vbv
+#pop-options
+
+// Lemma for when we don't add an edge: parent is effectively unchanged.
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+let kruskal_noop_proof
+    (sparent sparent': Seq.seq SZ.t)
+    (seu sev: Seq.seq int)
+    (n ec: nat)
+    (vbu: nat)
+    (root_u root_v: nat)
+  : Lemma
+    (requires
+      valid_endpoints seu sev n ec /\
+      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
+      vbu < n /\
+      root_u == UF.find_pure sparent vbu n n /\
+      root_u == root_v /\
+      do_union_post sparent sparent' root_u root_v n /\
+      Seq.length sparent == n)
+    (ensures
+      UF.uf_inv sparent' (edges_from_arrays seu sev ec 0) n ec /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
+      valid_endpoints seu sev n ec /\
+      valid_parents sparent' n)
+  = UF.find_pure_bounded sparent vbu n n;
+    // root_u is a fixed point: sparent[root_u] = root_u (from uf_inv conjunct 4)
+    assert (SZ.v (Seq.index sparent root_u) == root_u);
+    // do_union sets sparent'[root_u] = root_v = root_u, all others unchanged
+    assert (forall (i:nat). i < n ==> Seq.index sparent' i == Seq.index sparent i);
+    UF.uf_inv_eq sparent sparent' (edges_from_arrays seu sev ec 0) n ec
+#pop-options
+
+// Unified step lemma — dispatches to add_edge or noop proof.
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 2 --split_queries always"
+let kruskal_step_maintains_inv
+  (sparent sparent': Seq.seq SZ.t)
+  (seu sev seu' sev': Seq.seq int)
+  (n ec ec': nat)
+  (vbu vbv: nat)
+  (root_u root_v: nat)
+  (should_add: bool)
+  : Lemma
+    (requires
+      valid_endpoints seu sev n ec /\
+      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
+      vbu < n /\ vbv < n /\
+      root_u == UF.find_pure sparent vbu n n /\
+      root_v == UF.find_pure sparent vbv n n /\
+      (should_add ==> root_u <> root_v) /\
+      (~should_add ==> root_u = root_v) /\
+      do_union_post sparent sparent' root_u root_v n /\
+      ec + 1 < n /\
+      ec' == (if should_add then ec + 1 else ec) /\
+      Seq.length seu' == n /\ Seq.length sev' == n /\
+      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
+                                   Seq.index sev' k = Seq.index sev k) /\
+      (should_add ==> Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv) /\
+      ec' <= Seq.length seu' /\ ec' <= Seq.length sev' /\
+      (forall (k:nat). k < ec' ==> Seq.index seu' k >= 0 /\ Seq.index sev' k >= 0))
+    (ensures
+      UF.uf_inv sparent' (edges_from_arrays seu' sev' ec' 0) n ec' /\
+      KSpec.is_forest (edges_from_arrays seu' sev' ec' 0) n /\
+      valid_endpoints seu' sev' n ec' /\
+      valid_parents sparent' n)
+  = if should_add then
+      kruskal_add_edge_proof sparent sparent' seu sev seu' sev' n ec vbu vbv root_u root_v
+    else begin
+      edges_from_arrays_ext seu sev seu' sev' ec 0;
+      UF.find_pure_bounded sparent vbu n n;
+      kruskal_noop_proof sparent sparent' seu sev n ec vbu root_u root_v
+    end
+#pop-options
+
+#push-options "--z3rlimit 100 --ifuel 2 --fuel 2 --split_queries always"
 //SNIPPET_START: kruskal_sig
 fn kruskal
   (adj: A.array int)
@@ -190,13 +369,17 @@ fn kruskal
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length sparent == SZ.v n /\
-      (forall (j: nat). j < SZ.v vi ==> SZ.v (Seq.index sparent j) < SZ.v n)
+      (forall (j: nat). j < SZ.v vi ==> SZ.v (Seq.index sparent j) = j)
     )
   {
     let vi = !i;
     A.op_Array_Assignment parent vi vi;
     i := vi +^ 1sz;
   };
+  
+  // After init: parent is identity, establish uf_inv
+  with sp_init. assert (A.pts_to parent sp_init);
+  UF.uf_inv_init sp_init (SZ.v n);
   
   // Process n-1 rounds
   let mut round: SZ.t = 0sz;
@@ -215,7 +398,9 @@ fn kruskal
       SZ.v vec <= SZ.v vround /\
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_parents sparent (SZ.v n) /\
-      valid_endpoints seu sev (SZ.v n) (SZ.v vec)
+      valid_endpoints seu sev (SZ.v n) (SZ.v vec) /\
+      UF.uf_inv sparent (edges_from_arrays seu sev (SZ.v vec) 0) (SZ.v n) (SZ.v vec) /\
+      KSpec.is_forest (edges_from_arrays seu sev (SZ.v vec) 0) (SZ.v n)
     )
   {
     let vround = !round;
@@ -227,51 +412,39 @@ fn kruskal
     
     let mut ui: SZ.t = 0sz;
     while (!ui <^ n)
-    invariant exists* vui vbu vbv vbw sparent_s vec_s seu_s sev_s.
-      R.pts_to round vround **
+    invariant exists* vui vbu vbv vbw.
       R.pts_to ui vui **
       R.pts_to best_u vbu **
       R.pts_to best_v vbv **
       R.pts_to best_w vbw **
-      R.pts_to edge_count vec_s **
       A.pts_to adj #p sadj **
-      A.pts_to parent sparent_s **
-      A.pts_to edge_u seu_s **
-      A.pts_to edge_v sev_s **
       pure (
         SZ.v vui <= SZ.v n /\
         SZ.v vbu < SZ.v n /\
         SZ.v vbv < SZ.v n /\
         SZ.fits (SZ.v n * SZ.v n) /\
-        valid_parents sparent_s (SZ.v n) /\
-        valid_endpoints seu_s sev_s (SZ.v n) (SZ.v vec_s) /\
-        SZ.v vec_s <= SZ.v vround
+        vbw >= 0 /\
+        (vbw = 0 ==> SZ.v vbu == SZ.v vbv)
       )
     {
       let vui = !ui;
       let mut vi: SZ.t = 0sz;
       while (!vi <^ n)
-      invariant exists* vvi vbu vbv vbw vec_i sparent_i seu_i sev_i.
-        R.pts_to round vround **
+      invariant exists* vvi vbu vbv vbw.
         R.pts_to ui vui **
         R.pts_to vi vvi **
         R.pts_to best_u vbu **
         R.pts_to best_v vbv **
         R.pts_to best_w vbw **
-        R.pts_to edge_count vec_i **
         A.pts_to adj #p sadj **
-        A.pts_to parent sparent_i **
-        A.pts_to edge_u seu_i **
-        A.pts_to edge_v sev_i **
         pure (
           SZ.v vvi <= SZ.v n /\
           SZ.v vui < SZ.v n /\
           SZ.v vbu < SZ.v n /\
           SZ.v vbv < SZ.v n /\
           SZ.fits (SZ.v n * SZ.v n) /\
-          valid_parents sparent_i (SZ.v n) /\
-          valid_endpoints seu_i sev_i (SZ.v n) (SZ.v vec_i) /\
-          SZ.v vec_i <= SZ.v vround
+          vbw >= 0 /\
+          (vbw = 0 ==> SZ.v vbu == SZ.v vbv)
         )
       {
         let vvi = !vi;
@@ -293,6 +466,11 @@ fn kruskal
       ui := vui +^ 1sz;
     };
     
+    // After inner loops: rebind framed ghost variables
+    with sparent_cur. assert (A.pts_to parent sparent_cur);
+    with seu_cur. assert (A.pts_to edge_u seu_cur);
+    with sev_cur. assert (A.pts_to edge_v sev_cur);
+    
     // Check components and add edge
     let vbu = !best_u;
     let vbv = !best_v;
@@ -304,32 +482,32 @@ fn kruskal
     
     let should_add: bool = (vbw > 0 && root_u <> root_v && vec <^ n);
     
-    // Write edge endpoints
-    // When not adding, preserve old values
+    // Branchless writes: when not adding, preserve old values at position 0
     let old_eu0 = A.op_Array_Access edge_u 0sz;
     let old_ev0 = A.op_Array_Access edge_v 0sz;
     let write_pos: SZ.t = (if should_add then vec else 0sz);
     A.op_Array_Assignment edge_u write_pos (if should_add then SZ.v vbu else old_eu0);
     A.op_Array_Assignment edge_v write_pos (if should_add then SZ.v vbv else old_ev0);
-    
     edge_count := (if should_add then vec +^ 1sz else vec);
-    
-    // Union
     do_union parent root_u root_v n;
+    
+    // Bind post-write existentials and call unified proof
+    with sparent_new. assert (A.pts_to parent sparent_new);
+    with seu_new. assert (A.pts_to edge_u seu_new);
+    with sev_new. assert (A.pts_to edge_v sev_new);
+    with vec_new. assert (R.pts_to edge_count vec_new);
+    kruskal_step_maintains_inv
+      sparent_cur sparent_new seu_cur sev_cur seu_new sev_new
+      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv)
+      (SZ.v root_u) (SZ.v root_v) should_add;
     
     round := vround +^ 1sz;
   };
   
-  // Forest property: UF-based cycle detection ensures each added edge connects
-  // different components, so the result is acyclic. This follows from union-find
-  // soundness + acyclic_when_unreachable from MST.Spec.
-  // TODO: Prove by establishing formal UF component tracking invariant.
-  with seu sev vec. assert (A.pts_to edge_u seu ** A.pts_to edge_v sev ** R.pts_to edge_count vec);
-  // Non-negativity follows from valid_endpoints in the loop invariant.
-  // Only the forest property requires the assume_:
-  assume_ (pure (
-    KSpec.is_forest (edges_from_arrays seu sev (SZ.v vec) 0) (SZ.v n)));
-  lemma_kruskal_maintains_forest seu sev (SZ.v n) (SZ.v vec);
+  // After loop: uf_inv and is_forest are in the invariant — no assume_ needed
+  with seu_f sev_f vec_f. assert (
+    A.pts_to edge_u seu_f ** A.pts_to edge_v sev_f ** R.pts_to edge_count vec_f);
+  lemma_kruskal_maintains_forest seu_f sev_f (SZ.v n) (SZ.v vec_f);
   
   // Clean up
   with sp. assert (A.pts_to parent sp);

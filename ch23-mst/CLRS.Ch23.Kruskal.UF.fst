@@ -289,6 +289,36 @@ let acyclic_cons_to_append (n: nat) (e: edge) (t: list edge)
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 
+// uf_inv is permutation-invariant (cons vs append)
+// Uses comp_reachable to avoid existential reasoning about reachable
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+let uf_inv_cons_to_append (sparent: Seq.seq SZ.t) (e: edge) (t: list edge) (n ec: nat)
+  : Lemma (requires uf_inv sparent (e :: t) n ec /\ all_edges_valid (e :: t) n)
+          (ensures uf_inv sparent (t @ [e]) n ec)
+  = let comp (x: nat) : nat = if x < n then find_pure sparent x n n else x in
+    // For each edge in (t@[e]), comp maps endpoints equally
+    let ecomp (e': edge)
+      : Lemma (requires mem_edge e' (t @ [e]))
+              (ensures comp e'.u = comp e'.v) =
+      mem_edge_cons_iff_append e' e t;
+      mem_edge_reachable e' (e :: t)
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires ecomp);
+    // comp_reachable: reachable (t@[e]) u v ==> comp u = comp v
+    let full (u v: nat)
+      : Lemma (requires u < n /\ v < n /\ reachable (t @ [e]) u v)
+              (ensures find_pure sparent u n n = find_pure sparent v n n) =
+      comp_reachable comp (t @ [e]) u v
+    in
+    let wrap (u: nat) : Lemma (requires u < n)
+      (ensures forall (v: nat). v < n /\ reachable (t @ [e]) u v ==>
+                 find_pure sparent u n n = find_pure sparent v n n) =
+      FStar.Classical.forall_intro (FStar.Classical.move_requires (full u))
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires wrap)
+    // Conjuncts 1-5 of uf_inv are edge-independent; Z3 derives from hypothesis
+#pop-options
+
 // Empty list is acyclic
 let acyclic_empty (n: nat) : Lemma (acyclic n []) = ()
 
