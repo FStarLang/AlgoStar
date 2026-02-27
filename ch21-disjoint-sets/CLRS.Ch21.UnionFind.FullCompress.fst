@@ -443,3 +443,149 @@ fn find_set
   root
 }
 #pop-options
+
+// ========== Read-only find (no compression) ==========
+
+// Walk parent chain to root without modifying the array.
+// Same as pass 1 of find_set, but as a standalone function.
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+fn find
+  (parent: A.array SZ.t)
+  (x: SZ.t) (n: SZ.t)
+  (#sparent: erased (Seq.seq SZ.t))
+  requires
+    A.pts_to parent sparent **
+    pure (
+      is_forest sparent (SZ.v n) /\
+      SZ.v x < SZ.v n
+    )
+  returns root: SZ.t
+  ensures
+    A.pts_to parent sparent **
+    pure (
+      SZ.v root < SZ.v n /\
+      is_root_at sparent (SZ.v root)
+    )
+{
+  let mut curr = x;
+  let mut bound: SZ.t = 0sz;
+  while (
+    let vc = !curr;
+    let p = parent.(vc);
+    not (p = vc) && SZ.lt !bound n
+  )
+  invariant exists* vc vb.
+    R.pts_to curr vc **
+    R.pts_to bound vb **
+    A.pts_to parent sparent **
+    pure (
+      SZ.v vc < SZ.v n /\
+      SZ.v vb <= SZ.v n /\
+      is_forest sparent (SZ.v n) /\
+      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb)
+    )
+  {
+    let vc = !curr;
+    let p = parent.(vc);
+    curr := p;
+    let b = !bound;
+    bound := SZ.add b 1sz
+  };
+
+  let root = !curr;
+  let b = !bound;
+  let p_root = parent.(root);
+  if (p_root = root) {
+    ()
+  } else {
+    assert (pure (SZ.v b >= SZ.v n));
+    assert (pure (has_root_within sparent (SZ.v root) (SZ.v n - SZ.v b)));
+    assert (pure (SZ.v n - SZ.v b <= 0));
+    has_root_within_zero sparent (SZ.v root);
+    assert (pure (SZ.v p_root == SZ.v (Seq.index sparent (SZ.v root))));
+    assert (pure (SZ.v p_root == SZ.v root));
+    assert (pure (p_root == root));
+    assert (pure False);
+    unreachable ()
+  };
+  root
+}
+#pop-options
+
+// ========== Union with full path compression (CLRS §21.3) ==========
+
+// Performs UNION(x,y) with full path compression on both operands.
+// Steps:
+//   1. Find roots of x and y (read-only)
+//   2. Link roots by rank (union by rank)
+//   3. Full path compression on x and y (via find_set)
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+fn union_with_full_compression
+  (parent: A.array SZ.t)
+  (rank: A.array SZ.t)
+  (#sparent: Ghost.erased (Seq.seq SZ.t))
+  (#srank: Ghost.erased (Seq.seq SZ.t))
+  (x: SZ.t) (y: SZ.t) (n: SZ.t)
+  requires
+    A.pts_to parent sparent **
+    A.pts_to rank srank **
+    pure (
+      is_forest sparent (SZ.v n) /\
+      SZ.v x < SZ.v n /\
+      SZ.v y < SZ.v n /\
+      SZ.v n > 0 /\
+      Seq.length srank == Seq.length sparent
+    )
+  returns res: (SZ.t & SZ.t)
+  ensures exists* sp sr.
+    A.pts_to parent sp **
+    A.pts_to rank sr **
+    pure (
+      is_forest sp (SZ.v n) /\
+      Seq.length sp == Seq.length sparent /\
+      Seq.length sr == Seq.length srank
+    )
+{
+  // Step 1: Find roots (read-only — parent unchanged)
+  let root_x = find parent x n;
+  let root_y = find parent y n;
+
+  if (root_x = root_y) {
+    // Already in the same set — just compress paths
+    find_set parent x n;
+    find_set parent y n;
+    (root_x, root_y)
+  } else {
+    // Step 2: Union by rank (CLRS LINK)
+    with sp_pre. assert (A.pts_to parent sp_pre);
+    let rank_x = rank.(root_x);
+    let rank_y = rank.(root_y);
+
+    if (rank_x <^ rank_y) {
+      parent.(root_x) <- root_y;
+      upd_preserves_is_forest sp_pre (SZ.v n) (SZ.v root_x) root_y;
+      // Full path compression on both operands
+      find_set parent x n;
+      find_set parent y n;
+      (root_x, root_y)
+    } else {
+      if (rank_x >^ rank_y) {
+        parent.(root_y) <- root_x;
+        upd_preserves_is_forest sp_pre (SZ.v n) (SZ.v root_y) root_x;
+        find_set parent x n;
+        find_set parent y n;
+        (root_x, root_y)
+      } else {
+        // Equal rank: attach root_y under root_x, increment rank
+        parent.(root_y) <- root_x;
+        upd_preserves_is_forest sp_pre (SZ.v n) (SZ.v root_y) root_x;
+        let new_rank = (if (rank_x <^ SZ.sub n 1sz) then SZ.add rank_x 1sz else rank_x);
+        rank.(root_x) <- new_rank;
+        find_set parent x n;
+        find_set parent y n;
+        (root_x, root_y)
+      }
+    }
+  }
+}
+#pop-options

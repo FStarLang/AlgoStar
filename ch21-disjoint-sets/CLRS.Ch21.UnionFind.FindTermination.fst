@@ -4,50 +4,14 @@
    Key insight: rank strictly increases along parent pointers.
    Decreasing measure: bound - rank(x), where bound >= all ranks.
    
-   We need ranks_bounded (rank < n for all nodes), which is proven
-   in UnionFind.RankBound. We add it as a precondition here to keep
-   this module self-contained.
+   Types and definitions imported from CLRS.Ch21.UnionFind.Spec.
 *)
 module CLRS.Ch21.UnionFind.FindTermination
 
 open FStar.Seq
+open CLRS.Ch21.UnionFind.Spec
+
 module Seq = FStar.Seq
-
-type uf_forest = {
-  parent: Seq.seq nat;
-  rank: Seq.seq nat;
-  n: nat
-}
-
-let is_valid_uf (f: uf_forest) : prop =
-  f.n > 0 /\
-  Seq.length f.parent == f.n /\
-  Seq.length f.rank == f.n /\
-  (forall (i: nat). i < f.n ==> Seq.index f.parent i < f.n) /\
-  (forall (i: nat). i < f.n ==> Seq.index f.rank i >= 0)
-
-let rank_invariant (f: uf_forest) : prop =
-  is_valid_uf f ==>
-  (forall (x: nat{x < f.n}). Seq.index f.parent x <> x ==>
-    Seq.index f.rank x < Seq.index f.rank (Seq.index f.parent x))
-
-let ranks_bounded (f: uf_forest) : prop =
-  is_valid_uf f ==>
-  (forall (x: nat{x < f.n}). Seq.index f.rank x < f.n)
-
-let rec pure_find_fuel (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n}) (fuel: nat)
-  : Tot (option nat) (decreases fuel)
-  = if fuel = 0 then None
-    else
-      let px = Seq.index f.parent x in
-      if px = x then Some x
-      else pure_find_fuel f px (fuel - 1)
-
-(* Explicit quantifier instantiation for rank_invariant *)
-let rank_inv_inst (f: uf_forest{is_valid_uf f}) (x: nat{x < f.n})
-  : Lemma (requires rank_invariant f /\ Seq.index f.parent x <> x)
-          (ensures Seq.index f.rank x < Seq.index f.rank (Seq.index f.parent x))
-  = ()
 
 (* Core lemma: if fuel + rank(x) > bound and all ranks <= bound, find succeeds.
    Decreasing: bound - rank(x). *)
