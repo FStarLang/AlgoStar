@@ -29,11 +29,11 @@ module SL = CLRS.Ch08.CountingSort.StableLemmas
 
 // ========== Specifications ==========
 
-let sorted (s: Seq.seq int) : prop = L.sorted s
+let sorted (s: Seq.seq nat) : prop = L.sorted s
 
-let permutation (s1 s2: Seq.seq int) : prop = L.permutation s1 s2
+let permutation (s1 s2: Seq.seq nat) : prop = L.permutation s1 s2
 
-let in_range (s: Seq.seq int) (k: nat) : prop = L.in_range s k
+let in_range (s: Seq.seq nat) (k: nat) : prop = L.in_range s k
 
 // ========== Main Algorithm ==========
 
@@ -41,12 +41,12 @@ let in_range (s: Seq.seq int) (k: nat) : prop = L.in_range s k
 //SNIPPET_START: counting_sort_stable_sig
 ```pulse
 fn counting_sort_stable
-  (a: A.array int)     // Input array (read-only)
-  (b: A.array int)     // Output array (will be written)
+  (a: A.array nat)     // Input array (read-only)
+  (b: A.array nat)     // Output array (will be written)
   (len: SZ.t)          // Length of arrays
   (k_val: SZ.t)        // Maximum value in array
-  (#sa: erased (Seq.seq int))
-  (#sb: erased (Seq.seq int))
+  (#sa: erased (Seq.seq nat))
+  (#sb: erased (Seq.seq nat))
 requires
   A.pts_to a #0.5R sa **
   A.pts_to b sb **
@@ -227,7 +227,7 @@ ensures exists* sb'.
     let val_j = A.op_Array_Access a vj_back;
     
     // From precondition in_range sa (SZ.v k_val) and vj_back < len
-    assert (pure (val_j >= 0 /\ val_j <= SZ.v k_val));
+    assert (pure (val_j <= SZ.v k_val));
     
     // Read C[val_j]
     let pos = V.op_Array_Access c (SZ.uint_to_t val_j);

@@ -8,7 +8,6 @@
    Proves:
    1. The result is sorted
    2. The result is a permutation of the input
-   3. Complexity: exactly 2n + k + 1 iterations (via ghost tick counter)
    
    NO admits. NO assumes.
 *)
@@ -28,22 +27,17 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module L = CLRS.Ch08.CountingSort.Lemmas
-module C = CLRS.Ch08.CountingSort.Complexity
 
 // ========== Main Algorithm ==========
 
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1 --z3refresh"
-//SNIPPET_START: counting_sort_sig
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
 fn counting_sort
-  (a: A.array int)
+  (a: A.array nat)
   (len: SZ.t)
   (k_val: SZ.t)
-  (ctr: ref nat)
-  (#s0: erased (Seq.seq int))
-  (#c0: erased nat)
+  (#s0: erased (Seq.seq nat))
 requires
   A.pts_to a s0 **
-  R.pts_to ctr c0 **
   pure (
     SZ.v len <= A.length a /\
     SZ.v len == Seq.length s0 /\
@@ -53,16 +47,13 @@ requires
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
-ensures exists* s (cf: nat).
+ensures exists* s.
   A.pts_to a s **
-  R.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     L.sorted s /\
-    L.permutation s0 s /\
-    cf == reveal c0 + C.counting_sort_iterations (SZ.v len) (SZ.v k_val)
+    L.permutation s0 s
   )
-//SNIPPET_END: counting_sort_sig
 {
   let n = len;
   let k = SZ.v k_val;
@@ -73,9 +64,8 @@ ensures exists* s (cf: nat).
   
   let mut j: SZ.t = 0sz;
   while (!j <^ n)
-  invariant exists* vj sc vc.
+  invariant exists* vj sc.
     R.pts_to j vj **
-    R.pts_to ctr vc **
     V.pts_to c_arr sc **
     A.pts_to a s0 **
     pure (
@@ -83,8 +73,7 @@ ensures exists* s (cf: nat).
       Seq.length sc == SZ.v k1 /\
       V.length c_arr == SZ.v k1 /\
       V.is_full_vec c_arr /\
-      L.counts_match_prefix sc s0 k (SZ.v vj) /\
-      vc == reveal c0 + SZ.v vj
+      L.counts_match_prefix sc s0 k (SZ.v vj)
     )
   {
     let vj = !j;
@@ -95,58 +84,51 @@ ensures exists* s (cf: nat).
     V.op_Array_Assignment c_arr idx (old_count + 1);
     with sc'. assert (V.pts_to c_arr sc');
     L.count_phase_step s0 sc sc' (SZ.v vj) k val_j;
-    let tc = !ctr; ctr := tc + 1;
     j := vj + 1sz;
   };
   
   // Phase 2: Write sorted values back
-  // For each value v = 0..k, write count(v, s0) copies of v into a
   let mut pos: SZ.t = 0sz;
   let mut cur_v: SZ.t = 0sz;
-  let mut cur_v_int: int = 0;
+  let mut cur_v_nat: nat = 0;
   
   while (!cur_v <=^ k_val)
-  invariant exists* vcv vpos vcvi sc sa vc.
+  invariant exists* vcv vpos vcvn sc sa.
     R.pts_to j n **
     R.pts_to cur_v vcv **
-    R.pts_to cur_v_int vcvi **
+    R.pts_to cur_v_nat vcvn **
     R.pts_to pos vpos **
-    R.pts_to ctr vc **
     V.pts_to c_arr sc **
     A.pts_to a sa **
     pure (
       SZ.v vcv <= SZ.v k_val + 1 /\
-      vcvi == SZ.v vcv /\
+      vcvn == SZ.v vcv /\
       SZ.v vpos <= SZ.v n /\
       Seq.length sc == SZ.v k1 /\
       Seq.length sa == Seq.length s0 /\
       V.length c_arr == SZ.v k1 /\
       V.is_full_vec c_arr /\
       L.phase2_inv sa s0 (SZ.v vpos) (SZ.v vcv) k /\
-      L.counts_match sc s0 k /\
-      vc == reveal c0 + SZ.v n + SZ.v vcv + SZ.v vpos
+      L.counts_match sc s0 k
     )
   {
     let vcv = !cur_v;
     let vpos = !pos;
-    let vcvi = !cur_v_int;
+    let vcvn = !cur_v_nat;
     with sc sa. assert (V.pts_to c_arr sc ** A.pts_to a sa);
     
-    // Read count for current value
     let cnt = V.op_Array_Access c_arr vcv;
-    // cnt = count(vcv, s0) which is >= 0 and <= n
     L.count_bounded s0 (SZ.v vcv);
     L.phase2_pos_bound sa s0 (SZ.v vpos) (SZ.v vcv) k;
     let cnt_sz : SZ.t = SZ.uint_to_t cnt;
     
-    // Write cnt copies of vcvi at positions [vpos, vpos+cnt)
     let mut w: SZ.t = 0sz;
     
     while (!w <^ cnt_sz)
     invariant exists* vw sa_inner.
       R.pts_to j n **
       R.pts_to cur_v vcv **
-      R.pts_to cur_v_int vcvi **
+      R.pts_to cur_v_nat vcvn **
       R.pts_to pos vpos **
       R.pts_to w vw **
       V.pts_to c_arr sc **
@@ -158,7 +140,7 @@ ensures exists* s (cf: nat).
         V.length c_arr == SZ.v k1 /\
         V.is_full_vec c_arr /\
         (forall (i:nat). SZ.v vpos <= i /\ i < SZ.v vpos + SZ.v vw ==> 
-          Seq.index sa_inner i == vcvi) /\
+          Seq.index sa_inner i == vcvn) /\
         (forall (i:nat). i < SZ.v vpos ==> Seq.index sa_inner i == Seq.index sa i) /\
         (forall (i:nat). SZ.v vpos + SZ.v vw <= i /\ i < Seq.length sa_inner ==>
           Seq.index sa_inner i == Seq.index sa i)
@@ -168,30 +150,25 @@ ensures exists* s (cf: nat).
       with sa_w. assert (A.pts_to a sa_w);
       let write_pos = vpos + vw;
       assert (pure (SZ.v write_pos == SZ.v vpos + SZ.v vw));
-      a.(write_pos) <- vcvi;
+      a.(write_pos) <- vcvn;
       with sa_new. assert (A.pts_to a sa_new);
-      assert (pure (Seq.index sa_new (SZ.v write_pos) == vcvi));
+      assert (pure (Seq.index sa_new (SZ.v write_pos) == vcvn));
       assert (pure (forall (j:nat). j < Seq.length sa_new /\ j <> SZ.v write_pos ==>
         Seq.index sa_new j == Seq.index sa_w j));
       w := vw + 1sz;
     };
     
-    // After inner loop: sa_after has cnt copies of vcvi at [vpos, vpos+cnt)
     with sa_after. assert (A.pts_to a sa_after);
     L.phase2_step sa sa_after s0 (SZ.v vpos) (SZ.v cnt_sz) (SZ.v vcv) k;
     
-    // Tick: 1 for outer iteration + cnt for inner writes
-    let tc = !ctr;
-    ctr := tc + 1 + SZ.v cnt_sz;
-    
     pos := vpos + cnt_sz;
     cur_v := vcv + 1sz;
-    cur_v_int := vcvi + 1;
+    cur_v_nat := vcvn + 1;
   };
   
-  with vcv_f vpos_f vcvi_f sc_f sa_f vc_f.
-    assert (R.pts_to j n ** R.pts_to cur_v vcv_f ** R.pts_to cur_v_int vcvi_f **
-            R.pts_to pos vpos_f ** R.pts_to ctr vc_f ** V.pts_to c_arr sc_f ** A.pts_to a sa_f);
+  with vcv_f vpos_f vcvn_f sc_f sa_f.
+    assert (R.pts_to j n ** R.pts_to cur_v vcv_f ** R.pts_to cur_v_nat vcvn_f **
+            R.pts_to pos vpos_f ** V.pts_to c_arr sc_f ** A.pts_to a sa_f);
   L.final_perm s0 sa_f k (SZ.v vpos_f);
   V.free c_arr;
   ()

@@ -13,65 +13,66 @@ module Classical = FStar.Classical
 // ========== Definitions ==========
 
 //SNIPPET_START: counting_sort_lemma_defs
-let sorted (s: Seq.seq int)
+let sorted (s: Seq.seq nat)
   = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
-let sorted_prefix (s:Seq.seq int) (n:nat{n <= Seq.length s}) : prop =
+let sorted_prefix (s:Seq.seq nat) (n:nat{n <= Seq.length s}) : prop =
   forall (i j: nat). i <= j /\ j < n ==> Seq.index s i <= Seq.index s j
 
 [@@"opaque_to_smt"]
-let permutation (s1 s2: Seq.seq int) : prop = (SeqP.permutation int s1 s2)
+let permutation (s1 s2: Seq.seq nat) : prop = (SeqP.permutation nat s1 s2)
 
-let in_range (s:Seq.seq int) (k:nat) : prop =
-  forall (i:nat). i < Seq.length s ==> Seq.index s i >= 0 /\ Seq.index s i <= k
+let in_range (s:Seq.seq nat) (k:nat) : prop =
+  forall (i:nat). i < Seq.length s ==> Seq.index s i <= k
 //SNIPPET_END: counting_sort_lemma_defs
 
 // Count array matches counts of values in a prefix of input
-let counts_match_prefix (c:Seq.seq int) (input:Seq.seq int) (k:nat) (prefix_len:nat) : prop =
+let counts_match_prefix (c:Seq.seq int) (input:Seq.seq nat) (k:nat) (prefix_len:nat) : prop =
   Seq.length c == k + 1 /\
   prefix_len <= Seq.length input /\
   (forall (v:nat). v <= k ==> Seq.index c v == SeqP.count v (Seq.slice input 0 prefix_len))
 
 // Count of any element is bounded by sequence length
-let rec count_bounded (s:Seq.seq int) (v:int)
+let rec count_bounded (s:Seq.seq nat) (v:nat)
   : Lemma (ensures SeqP.count v s <= Seq.length s)
           (decreases Seq.length s)
   = if Seq.length s = 0 then ()
     else count_bounded (Seq.tail s) v
 
 // Count array matches counts of full input
-let counts_match (c:Seq.seq int) (input:Seq.seq int) (k:nat) : prop =
+let counts_match (c:Seq.seq int) (input:Seq.seq nat) (k:nat) : prop =
   counts_match_prefix c input k (Seq.length input)
 
 // After writing values 0..cur_v-1 with correct counts: prefix is sorted and counts match
-let phase2_inv (sa s0:Seq.seq int) (pos:nat) (cur_v:nat) (k:nat) : prop =
+let phase2_inv (sa s0:Seq.seq nat) (pos:nat) (cur_v:nat) (k:nat) : prop =
   Seq.length sa == Seq.length s0 /\
   pos <= Seq.length sa /\
   sorted_prefix sa pos /\
   (pos > 0 ==> Seq.index sa (pos - 1) < cur_v) /\
-  (forall (w:int). w >= 0 /\ w < cur_v ==> 
+  (forall (w:nat). w < cur_v ==> 
     SeqP.count w (Seq.slice sa 0 pos) == SeqP.count w s0) /\
-  (forall (w:int). (w < 0 \/ w >= cur_v) ==>
+  (forall (w:nat). w >= cur_v ==>
     SeqP.count w (Seq.slice sa 0 pos) == 0)
 
 // ========== Permutation lemmas ==========
 
-let permutation_same_length (s1 s2 : Seq.seq int)
+let permutation_same_length (s1 s2 : Seq.seq nat)
   : Lemma (requires permutation s1 s2)
           (ensures Seq.length s1 == Seq.length s2)
           [SMTPat (permutation s1 s2)]
   = reveal_opaque (`%permutation) (permutation s1 s2);
     SeqP.perm_len s1 s2
 
-let equal_counts_perm (s1 s2:Seq.seq int)
+let equal_counts_perm (s1 s2:Seq.seq nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
-                    (forall (v:int). SeqP.count v s1 == SeqP.count v s2))
+                    (forall (v:nat). SeqP.count v s1 == SeqP.count v s2))
           (ensures permutation s1 s2)
   = reveal_opaque (`%permutation) (permutation s1 s2)
 
 // ========== Count lemmas ==========
 
-let count_extend (s:Seq.seq int) (j:nat{j < Seq.length s}) (v:int)
+#push-options "--z3rlimit 10"
+let count_extend (s:Seq.seq nat) (j:nat{j < Seq.length s}) (v:nat)
   : Lemma (ensures SeqP.count v (Seq.slice s 0 (j+1)) ==
                    SeqP.count v (Seq.slice s 0 j) + (if Seq.index s j = v then 1 else 0))
   = let sl1 = Seq.slice s 0 j in
@@ -79,14 +80,15 @@ let count_extend (s:Seq.seq int) (j:nat{j < Seq.length s}) (v:int)
     let elt = Seq.slice s j (j+1) in
     assert (Seq.equal sl2 (Seq.append sl1 elt));
     SeqP.lemma_append_count sl1 elt
+#pop-options
 
-let count_phase_step (s0:Seq.seq int) (sc sc':Seq.seq int) 
-  (j:nat) (k:nat) (val_j:int)
+let count_phase_step (s0:Seq.seq nat) (sc sc':Seq.seq int) 
+  (j:nat) (k:nat) (val_j:nat)
   : Lemma (requires j < Seq.length s0 /\
                     Seq.length sc == k + 1 /\
                     Seq.length sc' == k + 1 /\
                     val_j == Seq.index s0 j /\
-                    val_j >= 0 /\ val_j <= k /\
+                    val_j <= k /\
                     (forall (v:nat). v <= k ==> Seq.index sc v == SeqP.count v (Seq.slice s0 0 j)) /\
                     (forall (v:nat). v <= k ==> 
                       Seq.index sc' v == (if v = val_j then Seq.index sc v + 1 else Seq.index sc v)))
@@ -118,7 +120,7 @@ let seq_remove_count (#a:eqtype) (s:Seq.seq a) (i:nat{i < Seq.length s}) (w:a)
     SeqP.lemma_append_count_aux w lo hi
 
 // Count of elements in Seq.create
-let rec count_create (n:nat) (x:int) (w:int)
+let rec count_create (n:nat) (x:nat) (w:nat)
   : Lemma (ensures SeqP.count w (Seq.create n x) == (if w = x then n else 0))
           (decreases n)
   = if n = 0 then (
@@ -132,8 +134,9 @@ let rec count_create (n:nat) (x:int) (w:int)
     )
 
 // If for every element, count in s1 <= count in s2, then length s1 <= length s2
-let rec count_le_length_le (s1 s2: Seq.seq int)
-  : Lemma (requires forall (w:int). SeqP.count w s1 <= SeqP.count w s2)
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+let rec count_le_length_le (s1 s2: Seq.seq nat)
+  : Lemma (requires forall (w:nat). SeqP.count w s1 <= SeqP.count w s2)
           (ensures Seq.length s1 <= Seq.length s2)
           (decreases Seq.length s1)
   = if Seq.length s1 = 0 then ()
@@ -141,20 +144,24 @@ let rec count_le_length_le (s1 s2: Seq.seq int)
       let x = Seq.head s1 in
       let t1 = Seq.tail s1 in
       // count(x, s1) >= 1, so count(x, s2) >= 1, so mem x s2
+      assert (SeqP.count x s1 >= 1);
+      assert (SeqP.count x s2 >= 1);
       assert (SeqP.mem x s2);
       let i = SeqP.index_mem x s2 in
       let s2' = seq_remove s2 i in
+      assert (Seq.index s2 i == x);
       // Show count(w, t1) <= count(w, s2') for all w
-      let aux (w:int) : Lemma (SeqP.count w t1 <= SeqP.count w s2') =
+      let aux (w:nat) : Lemma (SeqP.count w t1 <= SeqP.count w s2') =
         seq_remove_count s2 i w
       in
       Classical.forall_intro aux;
       count_le_length_le t1 s2'
     )
+#pop-options
 
 // Given phase2_inv, the next block fits: pos + count(cur_v, s0) <= length s0
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 2"
-let phase2_pos_bound (sa s0:Seq.seq int) (pos:nat) (cur_v:nat) (k:nat)
+let phase2_pos_bound (sa s0:Seq.seq nat) (pos:nat) (cur_v:nat) (k:nat)
   : Lemma (requires phase2_inv sa s0 pos cur_v k /\ in_range s0 k /\ cur_v <= k)
           (ensures pos + SeqP.count cur_v s0 <= Seq.length s0)
   = let prefix = Seq.slice sa 0 pos in
@@ -162,8 +169,8 @@ let phase2_pos_bound (sa s0:Seq.seq int) (pos:nat) (cur_v:nat) (k:nat)
     let block = Seq.create cnt cur_v in
     let extended = Seq.append prefix block in
     Seq.lemma_len_append prefix block;
-    SeqP.lemma_mem_count s0 (fun x -> x >= 0 && x <= k);
-    let aux (w:int) : Lemma (SeqP.count w extended <= SeqP.count w s0) =
+    SeqP.lemma_mem_count s0 (fun x -> x <= k);
+    let aux (w:nat) : Lemma (SeqP.count w extended <= SeqP.count w s0) =
       SeqP.lemma_append_count_aux w prefix block;
       count_create cnt cur_v w
     in
@@ -176,7 +183,7 @@ let phase2_pos_bound (sa s0:Seq.seq int) (pos:nat) (cur_v:nat) (k:nat)
 //   - sorted if old slice [0, pos) was sorted and new element >= max of old slice
 //   - count v = old count + (if v = new_val then 1 else 0)
 #push-options "--z3rlimit 40"
-let write_extend_sorted (s s':Seq.seq int) (pos:nat) (val_w:int)
+let write_extend_sorted (s s':Seq.seq nat) (pos:nat) (val_w:nat)
   : Lemma (requires Seq.length s == Seq.length s' /\
                     pos < Seq.length s /\
                     Seq.index s' pos == val_w /\
@@ -184,12 +191,18 @@ let write_extend_sorted (s s':Seq.seq int) (pos:nat) (val_w:int)
                     sorted_prefix s pos /\
                     (pos > 0 ==> Seq.index s (pos - 1) <= val_w))
           (ensures sorted_prefix s' (pos + 1))
-  = ()
+  = // For i < pos: index s' i = index s i <= index s (pos-1) <= val_w = index s' pos
+    assert (forall (i:nat). i < pos ==> Seq.index s' i <= val_w);
+    // sorted_prefix s' pos follows from sorted_prefix s pos and s' agrees with s on [0,pos)
+    assert (sorted_prefix s' pos);
+    // Now for i <= j < pos+1: if j < pos, use sorted_prefix s' pos
+    // if j = pos, use index s' i <= val_w = index s' pos
+    assert (forall (i j:nat). i <= j /\ j < pos + 1 ==> Seq.index s' i <= Seq.index s' j)
 #pop-options
 
 // After writing cnt copies of val_w at positions [pos, pos+cnt), sorted_prefix and counts
 #push-options "--z3rlimit 30"
-let write_block_sorted (s:Seq.seq int) (pos:nat) (cnt:nat) (val_w:int)
+let write_block_sorted (s:Seq.seq nat) (pos:nat) (cnt:nat) (val_w:nat)
   : Lemma (requires pos + cnt <= Seq.length s /\
                     (forall (i:nat). pos <= i /\ i < pos + cnt ==> Seq.index s i == val_w) /\
                     sorted_prefix s pos /\
@@ -201,7 +214,7 @@ let write_block_sorted (s:Seq.seq int) (pos:nat) (cnt:nat) (val_w:int)
 #pop-options
 
 // Count of a block: cnt copies of val_w contribute cnt to count of val_w, 0 to others
-let rec block_count (s:Seq.seq int) (pos:nat) (cnt:nat) (val_w:int) (v:int)
+let rec block_count (s:Seq.seq nat) (pos:nat) (cnt:nat) (val_w:nat) (v:nat)
   : Lemma (requires pos + cnt <= Seq.length s /\
                     (forall (i:nat). pos <= i /\ i < pos + cnt ==> Seq.index s i == val_w))
           (ensures SeqP.count v (Seq.slice s 0 (pos + cnt)) ==
@@ -215,7 +228,7 @@ let rec block_count (s:Seq.seq int) (pos:nat) (cnt:nat) (val_w:int) (v:int)
 
 // Final lemma: after all values 0..k are written with correct counts,
 // the output has same counts as input => permutation
-let final_perm (s0 sa:Seq.seq int) (k:nat) (pos:nat)
+let final_perm (s0 sa:Seq.seq nat) (k:nat) (pos:nat)
   : Lemma (requires Seq.length sa >= Seq.length s0 /\
                     in_range s0 k /\
                     phase2_inv sa s0 pos (k + 1) k)
@@ -223,14 +236,14 @@ let final_perm (s0 sa:Seq.seq int) (k:nat) (pos:nat)
                    permutation s0 (Seq.slice sa 0 pos) /\
                    sorted (Seq.slice sa 0 pos))
   = let prefix = Seq.slice sa 0 pos in
-    SeqP.lemma_mem_count s0 (fun x -> x >= 0 && x <= k);
-    let aux (v:int) : Lemma (SeqP.count v prefix == SeqP.count v s0) =
-      if v >= 0 && v <= k then (
+    SeqP.lemma_mem_count s0 (fun x -> x <= k);
+    let aux (v:nat) : Lemma (SeqP.count v prefix == SeqP.count v s0) =
+      if v <= k then (
         assert (v < k + 1)
       ) else (
         assert (SeqP.count v prefix == 0);
-        // v < 0 or v > k. lemma_mem_count gives: mem v s0 ==> v >= 0 && v <= k = true
-        // contrapositive: not (v >= 0 && v <= k = true) ==> not (mem v s0) ==> count v s0 = 0
+        // v > k. lemma_mem_count gives: mem v s0 ==> v <= k = true
+        // contrapositive: not (v <= k = true) ==> not (mem v s0) ==> count v s0 = 0
         assert (SeqP.count v s0 == 0)
       )
     in
@@ -243,8 +256,8 @@ let final_perm (s0 sa:Seq.seq int) (k:nat) (pos:nat)
 
 // Combined phase 2 step: after writing cnt copies of cur_v at [pos, pos+cnt)
 // Phase 2 invariant holds for cur_v+1
-#push-options "--z3rlimit 50"
-let phase2_step (sa_before sa_after s0:Seq.seq int) (pos:nat) (cnt:nat) (cur_v:nat) (k:nat)
+#push-options "--z3rlimit 100"
+let phase2_step (sa_before sa_after s0:Seq.seq nat) (pos:nat) (cnt:nat) (cur_v:nat) (k:nat)
   : Lemma (requires phase2_inv sa_before s0 pos cur_v k /\
                     Seq.length sa_after == Seq.length s0 /\
                     pos + cnt <= Seq.length sa_after /\
@@ -257,7 +270,7 @@ let phase2_step (sa_before sa_after s0:Seq.seq int) (pos:nat) (cnt:nat) (cur_v:n
           (ensures phase2_inv sa_after s0 (pos + cnt) (cur_v + 1) k)
   = write_block_sorted sa_after pos cnt cur_v;
     assert (Seq.equal (Seq.slice sa_after 0 pos) (Seq.slice sa_before 0 pos));
-    let aux_count (v:int)
+    let aux_count (v:nat)
       : Lemma (SeqP.count v (Seq.slice sa_after 0 (pos + cnt)) ==
                SeqP.count v (Seq.slice sa_before 0 pos) + (if v = cur_v then cnt else 0))
       = block_count sa_after pos cnt cur_v v
@@ -267,8 +280,8 @@ let phase2_step (sa_before sa_after s0:Seq.seq int) (pos:nat) (cnt:nat) (cur_v:n
     //   and if v = cur_v then ... else 0, so + 0 = count w s0
     // For w = cur_v: count cur_v sa_before[0..pos] = 0 (from old inv, zero clause: cur_v >= cur_v)
     //   and cnt = count cur_v s0, so 0 + cnt = count cur_v s0
-    let aux_match (w:int)
-      : Lemma (requires w >= 0 /\ w < cur_v + 1)
+    let aux_match (w:nat)
+      : Lemma (requires w < cur_v + 1)
               (ensures SeqP.count w (Seq.slice sa_after 0 (pos + cnt)) == SeqP.count w s0)
       = block_count sa_after pos cnt cur_v w;
         if w < cur_v then (
@@ -284,11 +297,11 @@ let phase2_step (sa_before sa_after s0:Seq.seq int) (pos:nat) (cnt:nat) (cur_v:n
         )
     in
     Classical.forall_intro (Classical.move_requires aux_match);
-    let aux_zero (w:int)
-      : Lemma (requires w < 0 \/ w >= cur_v + 1)
+    let aux_zero (w:nat)
+      : Lemma (requires w >= cur_v + 1)
               (ensures SeqP.count w (Seq.slice sa_after 0 (pos + cnt)) == 0)
       = block_count sa_after pos cnt cur_v w;
-        // old inv zero clause: count w sa_before[0..pos] = 0 (since w < 0 or w >= cur_v)
+        // old inv zero clause: count w sa_before[0..pos] = 0 (since w >= cur_v)
         // block_count: count w sa_after[0..pos+cnt] = 0 + 0 = 0 (since w <> cur_v)
         assert (SeqP.count w (Seq.slice sa_before 0 pos) == 0)
     in

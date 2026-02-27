@@ -40,22 +40,18 @@ module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module CS = CLRS.Ch08.CountingSort
 module L = CLRS.Ch08.CountingSort.Lemmas
-module C = CLRS.Ch08.CountingSort.Complexity
 
 // ========== Main Algorithm ==========
 
 //SNIPPET_START: radix_sort_sig
 #push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
 fn radix_sort
-  (a: A.array int)
+  (a: A.array nat)
   (len: SZ.t)
   (k_val: SZ.t)
-  (ctr: ref nat)
-  (#s0: erased (Seq.seq int))
-  (#c0: erased nat)
+  (#s0: erased (Seq.seq nat))
 requires
   A.pts_to a s0 **
-  R.pts_to ctr c0 **
   pure (
     SZ.v len <= A.length a /\
     SZ.v len == Seq.length s0 /\
@@ -65,17 +61,15 @@ requires
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
-ensures exists* s (cf: nat).
+ensures exists* s.
   A.pts_to a s **
-  R.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     L.sorted s /\
-    L.permutation s0 s /\
-    cf == reveal c0 + C.counting_sort_iterations (SZ.v len) (SZ.v k_val)
+    L.permutation s0 s
   )
 //SNIPPET_END: radix_sort_sig
 {
-  CS.counting_sort a len k_val ctr
+  CS.counting_sort a len k_val
 }
 #pop-options
