@@ -254,3 +254,100 @@ let greedy_cost_implies_optimal (ft: HSpec.htree) (freqs: list pos{Cons? freqs})
           (ensures HSpec.is_wpl_optimal ft freqs)
   = huffman_complete_cost_eq_greedy freqs;
     cost_eq_implies_optimal ft freqs
+
+// ========== Greedy cost merge step ==========
+
+// Helper: the first element of a nondecreasing list is the minimum
+let nondecreasing_hd_is_min (sorted: list pos) (f: pos)
+  : Lemma (requires HComp.nondecreasing sorted /\ Cons? sorted /\
+                    mem f sorted /\ (forall x. mem x sorted ==> f <= x))
+          (ensures hd sorted == f)
+  = sorted_head_le_all sorted // hd sorted <= f (since f is in sorted)
+    // f <= hd sorted (since hd sorted is in sorted and f <= all)
+
+// Helper: removing hd from a nondecreasing list gives nondecreasing tail
+let nondecreasing_tail (sorted: list pos)
+  : Lemma (requires HComp.nondecreasing sorted /\ length sorted >= 2)
+          (ensures HComp.nondecreasing (tl sorted))
+  = ()
+
+// Helper: count x (hd :: tl) = (if x = hd then 1 else 0) + count x tl
+let count_cons (x: pos) (h: pos) (tl: list pos)
+  : Lemma (ensures count x (h :: tl) = (if x = h then 1 else 0) + count x tl)
+  = ()
+
+// Key lemma: greedy_cost unfolds using ANY pair of minimums
+// If f1 is the global minimum and f2 is the minimum of (freqs - {f1}),
+// and remaining is freqs - {f1} - {f2}, then
+// greedy_cost(freqs) == (f1+f2) + greedy_cost((f1+f2)::remaining)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+let greedy_cost_unfold_with_mins (freqs: list pos) (f1 f2: pos) (remaining: list pos)
+  : Lemma (requires
+      length freqs >= 2 /\
+      // f1 is the minimum of freqs
+      (forall x. mem x freqs ==> f1 <= x) /\
+      // Multiset decomposition: freqs = {f1} + {f2} + remaining
+      (forall (x: pos). count x freqs = (if x = f1 then 1 else 0) +
+                                    (if x = f2 then 1 else 0) +
+                                    count x remaining) /\
+      // f2 is the minimum of remaining
+      (forall x. mem x remaining ==> f2 <= x))
+    (ensures greedy_cost freqs == (f1 + f2) + greedy_cost ((f1 + f2) :: remaining))
+  = // Step 1: Get sorted version
+    sortWith_pos_length freqs;
+    sortWith_pos_nondecreasing freqs;
+    let sorted = sortWith pos_compare freqs in
+    let aux_perm (x: pos) : Lemma (count x sorted = count x freqs)
+      = sortWith_pos_perm freqs x in
+    Classical.forall_intro aux_perm;
+    // Step 2: sorted[0] == f1
+    assert (count f1 freqs >= 1);
+    HSpec.count_mem f1 freqs;
+    HSpec.count_mem f1 sorted;
+    let aux_f1_le (x: pos) : Lemma (requires mem x sorted) (ensures f1 <= x)
+      = HSpec.count_mem x sorted; HSpec.count_mem x freqs in
+    Classical.forall_intro (Classical.move_requires aux_f1_le);
+    nondecreasing_hd_is_min sorted f1;
+    // Step 3: sorted_tail multiset = {f2} + remaining
+    let sorted_tail = tl sorted in
+    nondecreasing_tail sorted;
+    let aux_tail (x: pos)
+      : Lemma (count x sorted_tail = (if x = f2 then 1 else 0) + count x remaining)
+      = count_cons x f1 sorted_tail  // count x sorted = (if x=f1 then 1 else 0) + count x sorted_tail
+    in
+    Classical.forall_intro aux_tail;
+    // Step 4: sorted_tail[0] == f2
+    assert (count f2 sorted_tail >= 1);
+    HSpec.count_mem f2 sorted_tail;
+    let aux_f2_le (x: pos) : Lemma (requires mem x sorted_tail) (ensures f2 <= x)
+      = HSpec.count_mem x sorted_tail;
+        if x = f2 then ()
+        else begin
+          count_cons x f1 sorted_tail;
+          assert (count x sorted_tail = count x remaining);
+          HSpec.count_mem x remaining
+        end
+    in
+    Classical.forall_intro (Classical.move_requires aux_f2_le);
+    nondecreasing_hd_is_min sorted_tail f2;
+    // Step 5: greedy_cost(freqs) unfolds to (sorted[0]+sorted[1]) + greedy_cost((sorted[0]+sorted[1])::rest)
+    greedy_cost_sorted_unfold sorted;
+    // greedy_cost freqs == greedy_cost sorted (multiset invariance)
+    greedy_cost_multiset_invariant freqs sorted;
+    // Now: greedy_cost freqs == (hd sorted + hd sorted_tail) + greedy_cost((hd sorted + hd sorted_tail) :: sorted_rest)
+    //     = (f1 + f2) + greedy_cost((f1+f2) :: sorted_rest)
+    // Step 6: multiset of sorted_rest == multiset of remaining
+    let sorted_rest = tl sorted_tail in
+    let aux_rest (x: pos)
+      : Lemma (count x sorted_rest = count x remaining)
+      = count_cons x f2 sorted_rest  // count x sorted_tail = (if x=f2 then 1 else 0) + count x sorted_rest
+    in
+    Classical.forall_intro aux_rest;
+    let aux_final (x: pos)
+      : Lemma (count x ((f1+f2) :: sorted_rest) = count x ((f1+f2) :: remaining))
+      = count_cons x (f1+f2) sorted_rest;
+        count_cons x (f1+f2) remaining
+    in
+    Classical.forall_intro aux_final;
+    greedy_cost_multiset_invariant ((f1+f2) :: sorted_rest) ((f1+f2) :: remaining)
+#pop-options

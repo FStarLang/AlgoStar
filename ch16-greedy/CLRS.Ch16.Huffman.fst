@@ -38,6 +38,7 @@ module Box = Pulse.Lib.Box
 module PQ = Pulse.Lib.PriorityQueue
 
 module HSpec = CLRS.Ch16.Huffman.Spec
+module HOpt = CLRS.Ch16.Huffman.Optimality
 
 open Pulse.Lib.TotalOrder
 open FStar.Order
@@ -842,7 +843,7 @@ let forest_distinct_indices_after_merge
     forest_distinct_indices_prepend (list_remove_two active0 j1 j2) (idx, merged, tree)
 
 // Node-pointer correspondence after Seq.upd at idx1
-#push-options "--split_queries always --z3rlimit 40"
+#push-options "--split_queries always --z3rlimit 80"
 let node_ptr_correspondence_upd_tail
   (active0: list forest_entry) (j1 j2: nat)
   (idx1: SZ.t) (merged: hnode_ptr) (tree: HSpec.htree)
@@ -1493,6 +1494,293 @@ let all_leaf_freqs_singleton_full (entries: list forest_entry) (freqs: list pos)
     in
     Classical.forall_intro aux
 
+// ========== Cost tracking infrastructure ==========
+// Used to prove WPL optimality of the Huffman tree.
+
+// Sum of HSpec.cost of all trees in the active forest
+let rec forest_total_cost (entries: list forest_entry) : nat =
+  match entries with
+  | [] -> 0
+  | e :: rest -> HSpec.cost (entry_tree e) + forest_total_cost rest
+
+// List of root frequencies of all trees in the active forest
+let rec forest_root_freqs (entries: list forest_entry) : list pos =
+  match entries with
+  | [] -> []
+  | e :: rest -> HSpec.freq_of (entry_tree e) :: forest_root_freqs rest
+
+// forest_total_cost of all Leaf entries is 0
+let rec forest_total_cost_all_leaves (entries: list forest_entry)
+  : Lemma (requires forall (k: nat). k < L.length entries ==>
+                    HSpec.Leaf? (entry_tree (L.index entries k)))
+          (ensures forest_total_cost entries == 0)
+          (decreases entries)
+  = match entries with
+    | [] -> ()
+    | e :: rest -> forest_total_cost_all_leaves rest
+
+// forest_root_freqs prepend Leaf — count distributes
+let forest_root_freqs_prepend_leaf (idx: SZ.t) (p: hnode_ptr) (f: pos)
+  (rest: list forest_entry) (x: pos)
+  : Lemma (L.count x (forest_root_freqs ((idx, p, HSpec.Leaf f) :: rest)) ==
+           (if x = f then 1 else 0) + L.count x (forest_root_freqs rest))
+  = ()
+
+// forest_total_cost after merge step:
+// removing trees at j1, j2 (with costs c1, c2 and root freqs f1, f2)
+// and prepending Internal(f1+f2, t1, t2) with cost = f1+f2+c1+c2
+// gives forest_total_cost(new) = forest_total_cost(old) + f1 + f2
+let rec forest_total_cost_remove_at (entries: list forest_entry) (j: nat)
+  : Lemma (requires j < L.length entries)
+          (ensures forest_total_cost entries ==
+                   HSpec.cost (entry_tree (L.index entries j)) +
+                   forest_total_cost (list_remove_at entries j))
+          (decreases entries)
+  = match entries with
+    | e :: rest ->
+        if j = 0 then ()
+        else forest_total_cost_remove_at rest (j - 1)
+
+let forest_total_cost_remove_two (entries: list forest_entry) (j1 j2: nat)
+  : Lemma (requires j1 < j2 /\ j2 < L.length entries)
+          (ensures forest_total_cost entries ==
+                   HSpec.cost (entry_tree (L.index entries j1)) +
+                   HSpec.cost (entry_tree (L.index entries j2)) +
+                   forest_total_cost (list_remove_two entries j1 j2))
+  = forest_total_cost_remove_at entries j1;
+    let rem1 = list_remove_at entries j1 in
+    list_remove_at_length entries j1;
+    list_remove_at_index entries j1 (j2 - 1);
+    forest_total_cost_remove_at rem1 (j2 - 1)
+
+let forest_total_cost_merge_step
+  (entries: list forest_entry) (j1 j2: nat) (f: pos) (idx: SZ.t) (p: hnode_ptr)
+  (t1 t2: HSpec.htree)
+  : Lemma (requires j1 < j2 /\ j2 < L.length entries /\
+                    entry_tree (L.index entries j1) == t1 /\
+                    entry_tree (L.index entries j2) == t2 /\
+                    f == HSpec.freq_of t1 + HSpec.freq_of t2)
+          (ensures (let merged = HSpec.Internal f t1 t2 in
+                    let new_active = (idx, p, merged) :: list_remove_two entries j1 j2 in
+                    forest_total_cost new_active ==
+                    forest_total_cost entries + HSpec.freq_of t1 + HSpec.freq_of t2))
+  = forest_total_cost_remove_two entries j1 j2
+
+// forest_root_freqs after removing at position j
+let rec forest_root_freqs_remove_at (entries: list forest_entry) (j: nat) (x: pos)
+  : Lemma (requires j < L.length entries)
+          (ensures L.count x (forest_root_freqs entries) ==
+                   (if x = HSpec.freq_of (entry_tree (L.index entries j)) then 1 else 0) +
+                   L.count x (forest_root_freqs (list_remove_at entries j)))
+          (decreases entries)
+  = match entries with
+    | e :: rest ->
+        if j = 0 then ()
+        else forest_root_freqs_remove_at rest (j - 1) x
+
+let forest_root_freqs_remove_two (entries: list forest_entry) (j1 j2: nat) (x: pos)
+  : Lemma (requires j1 < j2 /\ j2 < L.length entries)
+          (ensures L.count x (forest_root_freqs entries) ==
+                   (if x = HSpec.freq_of (entry_tree (L.index entries j1)) then 1 else 0) +
+                   (if x = HSpec.freq_of (entry_tree (L.index entries j2)) then 1 else 0) +
+                   L.count x (forest_root_freqs (list_remove_two entries j1 j2)))
+  = forest_root_freqs_remove_at entries j1 x;
+    let rem1 = list_remove_at entries j1 in
+    list_remove_at_length entries j1;
+    list_remove_at_index entries j1 (j2 - 1);
+    forest_root_freqs_remove_at rem1 (j2 - 1) x
+
+// forest_root_freqs after merge: prepend (f1+f2) to remaining
+let forest_root_freqs_merge_step
+  (entries: list forest_entry) (j1 j2: nat) (f: pos)
+  (idx: SZ.t) (p: hnode_ptr) (t1 t2: HSpec.htree) (x: pos)
+  : Lemma (requires j1 < j2 /\ j2 < L.length entries /\
+                    entry_tree (L.index entries j1) == t1 /\
+                    entry_tree (L.index entries j2) == t2 /\
+                    f == HSpec.freq_of t1 + HSpec.freq_of t2)
+          (ensures (let merged = HSpec.Internal f t1 t2 in
+                    let new_active = (idx, p, merged) :: list_remove_two entries j1 j2 in
+                    L.count x (forest_root_freqs new_active) ==
+                    (if x = f then 1 else 0) +
+                    L.count x (forest_root_freqs (list_remove_two entries j1 j2))))
+  = ()
+
+// forest_root_freqs of single entry is a singleton list
+let forest_root_freqs_singleton (entries: list forest_entry)
+  : Lemma (requires L.length entries == 1)
+          (ensures forest_root_freqs entries == [HSpec.freq_of (entry_tree (L.index entries 0))])
+  = ()
+
+// forest_total_cost of single entry
+let forest_total_cost_singleton (entries: list forest_entry)
+  : Lemma (requires L.length entries == 1)
+          (ensures forest_total_cost entries == HSpec.cost (entry_tree (L.index entries 0)))
+  = ()
+
+// greedy_cost of a singleton is 0
+let greedy_cost_singleton (f: pos)
+  : Lemma (HOpt.greedy_cost [f] == 0)
+  = HOpt.sortWith_pos_length [f]
+
+// ========== PQ-forest frequency matching infrastructure ==========
+
+// Search PQ for an entry with a given index
+let rec find_pq_idx (pq: Seq.seq pq_entry) (target_idx: SZ.t) (i: nat)
+  : Tot (option nat) (decreases Seq.length pq - i)
+  = if i >= Seq.length pq then None
+    else if snd (Seq.index pq i) = target_idx then Some i
+    else find_pq_idx pq target_idx (i + 1)
+
+let rec find_pq_idx_spec (pq: Seq.seq pq_entry) (target_idx: SZ.t) (i: nat)
+  : Lemma (ensures (match find_pq_idx pq target_idx i with
+                    | None -> forall (j: nat). i <= j /\ j < Seq.length pq ==> snd (Seq.index pq j) <> target_idx
+                    | Some j -> i <= j /\ j < Seq.length pq /\ snd (Seq.index pq j) == target_idx))
+          (decreases Seq.length pq - i)
+  = if i >= Seq.length pq then ()
+    else if snd (Seq.index pq i) = target_idx then ()
+    else find_pq_idx_spec pq target_idx (i + 1)
+
+// find_entry_by_idx with distinct indices: result is THE unique position
+let find_entry_by_idx_unique (entries: list forest_entry) (k: nat) (idx: SZ.t)
+  : Lemma (requires forest_distinct_indices entries /\ k < L.length entries /\
+                    entry_idx (L.index entries k) == idx)
+          (ensures find_entry_by_idx entries idx == Some k)
+  = find_entry_by_idx_spec entries idx;
+    match find_entry_by_idx entries idx with
+    | Some k' ->
+        if k' = k then ()
+        else forest_distinct_indices_elim entries k k'
+    | None -> ()
+
+// PQ entry freq matches the tree root freq at the found position
+let pq_entry_freq_ok (f: int) (idx: SZ.t) (active: list forest_entry) : prop =
+  match find_entry_by_idx active idx with
+  | Some k -> if k < L.length active then f == HSpec.freq_of (entry_tree (L.index active k)) else False
+  | None -> False
+
+// PQ entry frequencies match forest tree root frequencies
+let pq_tree_freq_match (pq: Seq.seq pq_entry) (active: list forest_entry) : prop =
+  forall (j: nat). j < Seq.length pq ==>
+    pq_entry_freq_ok (fst (Seq.index pq j)) (snd (Seq.index pq j)) active
+
+// Every forest entry has a corresponding PQ entry
+let forest_has_pq_entry (pq: Seq.seq pq_entry) (active: list forest_entry) : prop =
+  forall (k: nat). k < L.length active ==>
+    Some? (find_pq_idx pq (entry_idx (L.index active k)) 0)
+
+// PQ minimum is <= all forest root frequencies
+let pq_min_le_forest_root_freqs
+  (pq: Seq.seq pq_entry) (active: list forest_entry) (fmin: int) (imin: SZ.t) (k: nat)
+  : Lemma (requires
+      PQ.is_minimum (fmin, imin) pq /\
+      pq_tree_freq_match pq active /\
+      forest_has_pq_entry pq active /\
+      forest_distinct_indices active /\
+      pq_indices_in_forest pq active /\
+      k < L.length active)
+    (ensures fmin <= HSpec.freq_of (entry_tree (L.index active k)))
+  = // Find the PQ entry for forest entry k
+    find_pq_idx_spec pq (entry_idx (L.index active k)) 0;
+    let Some j = find_pq_idx pq (entry_idx (L.index active k)) 0 in
+    // snd(pq[j]) == entry_idx(active[k])
+    // By find_entry_by_idx_unique: find_entry_by_idx active (entry_idx(active[k])) == Some k
+    find_entry_by_idx_unique active k (entry_idx (L.index active k));
+    // Now pq_entry_freq_ok says fst(pq[j]) == freq_of(entry_tree(active[k]))
+    find_entry_by_idx_spec active (snd (Seq.index pq j));
+    // By PQ is_minimum: fmin <= fst(pq[j])
+    ()
+
+// forest_root_freqs mem implies there exists k
+let rec forest_root_freqs_mem (active: list forest_entry) (x: pos)
+  : Lemma (requires L.mem x (forest_root_freqs active))
+          (ensures exists (k: nat). k < L.length active /\ HSpec.freq_of (entry_tree (L.index active k)) == x)
+          (decreases active)
+  = match active with
+    | e :: rest ->
+        if HSpec.freq_of (entry_tree e) = x then ()
+        else begin
+          forest_root_freqs_mem rest x;
+          // rest gives some k', active gives k' + 1
+          assert (exists (k: nat). k < L.length rest /\ HSpec.freq_of (entry_tree (L.index rest k)) == x);
+          // Now show exists k for full list
+          let aux () : Lemma (exists (k: nat). k < L.length active /\ HSpec.freq_of (entry_tree (L.index active k)) == x)
+            = Classical.exists_elim
+                (exists (k: nat). k < L.length active /\ HSpec.freq_of (entry_tree (L.index active k)) == x)
+                #_
+                #(fun (k: nat) -> k < L.length rest /\ HSpec.freq_of (entry_tree (L.index rest k)) == x)
+                ()
+                (fun k -> assert (L.index active (k + 1) == L.index rest k))
+          in
+          aux ()
+        end
+
+// PQ minimum <= all in forest_root_freqs (mem version)
+let pq_min_le_all_root_freqs
+  (pq: Seq.seq pq_entry) (active: list forest_entry) (fmin: int) (imin: SZ.t)
+  : Lemma (requires
+      PQ.is_minimum (fmin, imin) pq /\
+      pq_tree_freq_match pq active /\
+      forest_has_pq_entry pq active /\
+      forest_distinct_indices active /\
+      pq_indices_in_forest pq active)
+    (ensures forall (x: pos). L.mem x (forest_root_freqs active) ==> fmin <= x)
+  = let aux (x: pos)
+      : Lemma (requires L.mem x (forest_root_freqs active)) (ensures fmin <= x)
+      = forest_root_freqs_mem active x;
+        Classical.exists_elim (fmin <= x)
+          #_
+          #(fun (k: nat) -> k < L.length active /\ HSpec.freq_of (entry_tree (L.index active k)) == x)
+          ()
+          (fun k -> pq_min_le_forest_root_freqs pq active fmin imin k)
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+
+// ========== Maintaining pq_tree_freq_match through operations ==========
+
+// pq_tree_freq_match preserved by extract (shrink)
+let pq_tree_freq_match_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry) (active: list forest_entry)
+  : Lemma (requires PQ.extends s1 s0 x /\ pq_tree_freq_match s0 active)
+          (ensures pq_tree_freq_match s1 active)
+  = let aux (j: nat{j < Seq.length s1})
+      : Lemma (pq_entry_freq_ok (fst (Seq.index s1 j)) (snd (Seq.index s1 j)) active)
+      = let y = Seq.index s1 j in
+        assert (Seq.mem y s1);
+        assert (PQ.count y s1 <= PQ.count y s0);
+        assert (Seq.mem y s0);
+        FStar.Seq.Properties.mem_index y s0
+    in
+    Classical.forall_intro aux
+
+// ========== Maintaining forest_has_pq_entry through operations ==========
+
+// forest_has_pq_entry preserved by extract (shrink), given entry's idx isn't removed
+let forest_has_pq_entry_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry) (active: list forest_entry)
+  : Lemma (requires PQ.extends s1 s0 x /\
+                    forest_has_pq_entry s0 active /\
+                    pq_idx_unique s0 /\
+                    (forall (k: nat). k < L.length active ==> entry_idx (L.index active k) <> snd x))
+          (ensures forest_has_pq_entry s1 active)
+  = let aux (k: nat{k < L.length active})
+      : Lemma (Some? (find_pq_idx s1 (entry_idx (L.index active k)) 0))
+      = let idx = entry_idx (L.index active k) in
+        find_pq_idx_spec s0 idx 0;
+        let Some j0 = find_pq_idx s0 idx 0 in
+        let y = Seq.index s0 j0 in
+        assert (snd y == idx);
+        assert (snd x <> idx);
+        assert (y <> x);
+        // y is in s0 (by construction, y = Seq.index s0 j0)
+        // Seq.mem is count > 0, and we know y appears at position j0
+        FStar.Seq.Properties.lemma_count_slice s0 j0;
+        assert (FStar.Seq.Properties.count y s0 > 0);
+        // extends: for y <> x, count y s1 == count y s0
+        assert (FStar.Seq.Properties.count y s1 > 0);
+        // count > 0 means mem, which means mem_index gives us a witness
+        FStar.Seq.Properties.mem_index y s1;
+        find_pq_idx_spec s1 idx 0
+    in
+    Classical.forall_intro aux
+
 // ========== Full Huffman Tree Construction (CLRS §16.3) ==========
 // Truly imperative: allocates hnode_ptr nodes on the heap.
 // Uses a min-heap priority queue (Pulse.Lib.PriorityQueue) storing
@@ -1501,7 +1789,7 @@ let all_leaf_freqs_singleton_full (entries: list forest_entry) (freqs: list pos)
 // Ownership tracked via forest_own over (hnode_ptr, HSpec.htree) pairs.
 
 //SNIPPET_START: huffman_tree_sig
-#push-options "--z3rlimit 80"
+#push-options "--z3rlimit 200"
 fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))
