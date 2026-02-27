@@ -46,3 +46,17 @@ let quickselect_worst_case_theorem (n: nat)
 let quickselect_worst_case_quadratic (n: nat)
   : Lemma (ensures qs_cost n <= n * n)
   = qs_quadratic n
+
+(* Monotonicity: qs_cost is non-decreasing *)
+let rec qs_cost_monotone (a b: nat)
+  : Lemma (requires a <= b)
+          (ensures qs_cost a <= qs_cost b)
+          (decreases b)
+  = if a = b then ()
+    else qs_cost_monotone a (b - 1)
+
+(* Unfolding lemma for qs_cost when n >= 2 *)
+let qs_cost_unfold (m: nat)
+  : Lemma (requires m >= 2)
+          (ensures qs_cost m == m + qs_cost (m - 1))
+  = ()

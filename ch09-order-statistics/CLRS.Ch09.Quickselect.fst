@@ -35,6 +35,8 @@ module Classical = FStar.Classical
 module Helpers = CLRS.Ch09.Quickselect.Helpers
 module Correctness = CLRS.Ch09.PartialSelectionSort.Correctness
 module Spec = CLRS.Ch09.PartialSelectionSort.Spec
+module GR = Pulse.Lib.GhostReference
+module QC = CLRS.Ch09.Quickselect.Complexity
 
 // ========== Permutation infrastructure ==========
 
@@ -346,6 +348,177 @@ fn quickselect
         lo_ref := p +^ 1sz;
       } else {
         // k == p, found it
+        lo_ref := k;
+        hi_ref := k +^ 1sz;
+      };
+    };
+  };
+
+  let result = A.op_Array_Access a k;
+  with s_final. assert (A.pts_to a s_final);
+  quickselect_correctness s0 s_final (SZ.v k);
+  result
+}
+#pop-options
+
+// ========== Ghost tick infrastructure for complexity tracking ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+let incr_nat_reveal (n: erased nat)
+  : Lemma (reveal (incr_nat n) == reveal n + 1)
+    [SMTPat (incr_nat n)]
+  = ()
+
+let add_nat (n: erased nat) (k: nat) : erased nat = hide (Prims.op_Addition (reveal n) k)
+
+let add_nat_reveal (n: erased nat) (k: nat)
+  : Lemma (reveal (add_nat n k) == reveal n + k)
+    [SMTPat (add_nat n k)]
+  = ()
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+ghost
+fn add_ticks (ctr: GR.ref nat) (#n: erased nat) (k: nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (add_nat n k)
+{
+  GR.(ctr := add_nat n k)
+}
+
+// ========== Partition with complexity tracking ==========
+// Wraps partition_in_range, adding (hi - lo - 1) ticks for the comparisons.
+
+fn partition_in_range_complexity
+  (a: A.array int)
+  (#s0: Ghost.erased (Seq.seq int))
+  (lo: SZ.t)
+  (hi: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0 **
+    pure (
+      SZ.v lo < SZ.v hi /\
+      SZ.v hi <= Seq.length s0 /\
+      Seq.length s0 == A.length a
+    )
+  returns pivot_pos: SZ.t
+  ensures exists* s1 (cf: nat).
+    A.pts_to a s1 ** GR.pts_to ctr cf **
+    pure (
+      Seq.length s1 == Seq.length s0 /\
+      SZ.v lo <= SZ.v pivot_pos /\
+      SZ.v pivot_pos < SZ.v hi /\
+      permutation s0 s1 /\
+      partition_ordered s1 (SZ.v lo) (SZ.v pivot_pos) (SZ.v hi) /\
+      unchanged_outside s0 s1 (SZ.v lo) (SZ.v hi) /\
+      cf >= reveal c0 /\
+      cf - reveal c0 == SZ.v hi - SZ.v lo - 1
+    )
+{
+  let p = partition_in_range a lo hi;
+  add_ticks ctr (SZ.v hi - SZ.v lo - 1);
+  p
+}
+
+// ========== Quickselect with complexity tracking ==========
+// Tracks comparison count via ghost counter.
+// Budget invariant: comparisons_so_far + qs_cost(remaining_range) <= qs_cost(n)
+// Postcondition: total comparisons <= qs_cost(n) = O(n²) worst case.
+
+let complexity_bounded_quickselect (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 <= QC.qs_cost n
+
+#push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
+fn quickselect_complexity
+  (a: A.array int)
+  (#s0: Ghost.erased (Seq.seq int))
+  (n: SZ.t)
+  (k: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0 **
+    pure (
+      SZ.v n == Seq.length s0 /\
+      SZ.v n == A.length a /\
+      SZ.v n > 0 /\
+      SZ.v k < SZ.v n
+    )
+  returns result: int
+  ensures exists* s_final (cf: nat).
+    A.pts_to a s_final ** GR.pts_to ctr cf **
+    pure (
+      Seq.length s_final == Seq.length s0 /\
+      permutation s0 s_final /\
+      SZ.v k < Seq.length s_final /\
+      result == Seq.index s_final (SZ.v k) /\
+      (forall (i: nat). i < SZ.v k /\ i < Seq.length s_final ==>
+        Seq.index s_final i <= result) /\
+      (forall (i: nat). SZ.v k < i /\ i < Seq.length s_final ==>
+        result <= Seq.index s_final i) /\
+      result == Spec.select_spec s0 (SZ.v k) /\
+      complexity_bounded_quickselect cf (reveal c0) (SZ.v n)
+    )
+{
+  let mut lo_ref: SZ.t = 0sz;
+  let mut hi_ref: SZ.t = n;
+
+  while (
+    let vlo = !lo_ref;
+    let vhi = !hi_ref;
+    vhi -^ vlo >^ 1sz
+  )
+  invariant exists* vlo vhi s_cur (vc: nat).
+    R.pts_to lo_ref vlo **
+    R.pts_to hi_ref vhi **
+    A.pts_to a s_cur **
+    GR.pts_to ctr vc **
+    pure (
+      SZ.v vlo <= SZ.v k /\
+      SZ.v k < SZ.v vhi /\
+      SZ.v vhi <= SZ.v n /\
+      Seq.length s_cur == Seq.length s0 /\
+      permutation s0 s_cur /\
+      (forall (i j: nat). i < Seq.length s_cur /\ j < Seq.length s_cur /\
+        i < SZ.v vlo /\ SZ.v vlo <= j /\ j < SZ.v vhi ==>
+        Seq.index s_cur i <= Seq.index s_cur j) /\
+      (forall (i j: nat). i < Seq.length s_cur /\ j < Seq.length s_cur /\
+        SZ.v vlo <= i /\ i < SZ.v vhi /\ SZ.v vhi <= j ==>
+        Seq.index s_cur i <= Seq.index s_cur j) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 + QC.qs_cost (SZ.v vhi - SZ.v vlo) <= QC.qs_cost (SZ.v n)
+    )
+  {
+    let vlo = !lo_ref;
+    let vhi = !hi_ref;
+
+    with s_pre. assert (A.pts_to a s_pre);
+
+    let p = partition_in_range_complexity a vlo vhi ctr;
+
+    with s_after. assert (A.pts_to a s_after);
+
+    perm_lower_bound_forall s_pre s_after (SZ.v vlo) (SZ.v vhi);
+    perm_upper_bound_forall s_pre s_after (SZ.v vlo) (SZ.v vhi);
+
+    QC.qs_cost_unfold (SZ.v vhi - SZ.v vlo);
+
+    if (k <^ p) {
+      QC.qs_cost_monotone (SZ.v p - SZ.v vlo) (SZ.v vhi - SZ.v vlo - 1);
+      hi_ref := p;
+    } else {
+      if (p <^ k) {
+        QC.qs_cost_monotone (SZ.v vhi - SZ.v p - 1) (SZ.v vhi - SZ.v vlo - 1);
+        lo_ref := p +^ 1sz;
+      } else {
+        QC.qs_cost_monotone 1 (SZ.v vhi - SZ.v vlo - 1);
         lo_ref := k;
         hi_ref := k +^ 1sz;
       };

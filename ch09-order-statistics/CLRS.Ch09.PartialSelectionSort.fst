@@ -47,6 +47,7 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
+module GR = Pulse.Lib.GhostReference
 
 // ========== Definitions ==========
 
@@ -268,6 +269,167 @@ fn select
   };
   
   // Return the k-th element (at index k-1)
+  let idx = k - 1sz;
+  with s_arr. assert (A.pts_to a s_arr);
+  let value = a.(idx);
+  assert (pure (value == Seq.index s_arr (SZ.v idx)));
+  value
+}
+#pop-options
+
+// ========== Ghost tick for comparison counting ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+let incr_nat_reveal (n: erased nat)
+  : Lemma (reveal (incr_nat n) == reveal n + 1)
+    [SMTPat (incr_nat n)]
+  = ()
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+// ========== Complexity-tracked find_min_index_from ==========
+
+#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+fn find_min_index_from_complexity
+  (#p: perm)
+  (a: array int)
+  (#s: Ghost.erased (Seq.seq int))
+  (start: SZ.t)
+  (len: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a #p s ** GR.pts_to ctr c0 **
+    pure (
+      SZ.v start < SZ.v len /\
+      SZ.v len == Seq.length s /\
+      SZ.v len == A.length a
+    )
+  returns min_idx: SZ.t
+  ensures exists* (cf: nat).
+    A.pts_to a #p s ** GR.pts_to ctr cf **
+    pure (
+      SZ.v start <= SZ.v min_idx /\
+      SZ.v min_idx < SZ.v len /\
+      is_min_in_range s (SZ.v min_idx) (SZ.v start) (SZ.v len) /\
+      cf >= reveal c0 /\
+      cf - reveal c0 == SZ.v len - SZ.v start - 1
+    )
+{
+  let mut min_idx: SZ.t = start;
+  let mut i: SZ.t = start + 1sz;
+  
+  while (!i <^ len)
+  invariant exists* vi vmin_idx (vc: nat).
+    R.pts_to i vi **
+    R.pts_to min_idx vmin_idx **
+    GR.pts_to ctr vc **
+    A.pts_to a #p s **
+    pure (
+      SZ.v vi > SZ.v start /\
+      SZ.v vi <= SZ.v len /\
+      SZ.v start <= SZ.v vmin_idx /\
+      SZ.v vmin_idx < SZ.v len /\
+      SZ.v vmin_idx < SZ.v vi /\
+      (forall (j: nat). SZ.v start <= j /\ j < SZ.v vi ==>
+        Seq.index s (SZ.v vmin_idx) <= Seq.index s j) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi - SZ.v start - 1
+    )
+  {
+    let vi = !i;
+    let vmin_idx = !min_idx;
+    let curr = a.(vi);
+    let min_val = a.(vmin_idx);
+    
+    tick ctr;
+    if (curr < min_val) {
+      min_idx := vi;
+    };
+    
+    i := vi + 1sz;
+  };
+  
+  !min_idx
+}
+#pop-options
+
+// ========== Complexity-tracked select ==========
+
+let complexity_bounded_select (cf c0 n k: nat) : prop =
+  k > 0 /\ k <= n /\ n > 0 /\
+  cf >= c0 /\
+  cf - c0 <= op_Multiply k (n - 1)
+
+#push-options "--z3rlimit 20 --ifuel 2 --fuel 2"
+fn select_complexity
+  (a: array int)
+  (#s0: Ghost.erased (Seq.seq int))
+  (n: SZ.t)
+  (k: SZ.t)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0 **
+    pure (
+      SZ.v n == Seq.length s0 /\
+      SZ.v n == A.length a /\
+      SZ.v n > 0 /\
+      SZ.v k > 0 /\
+      SZ.v k <= SZ.v n
+    )
+  returns result: int
+  ensures exists* s_final (cf: nat).
+    A.pts_to a s_final ** GR.pts_to ctr cf **
+    pure (
+      Seq.length s_final == Seq.length s0 /\
+      permutation s0 s_final /\
+      sorted_prefix s_final (SZ.v k) /\
+      prefix_leq_suffix s_final (SZ.v k) /\
+      SZ.v k > 0 /\
+      result == Seq.index s_final (SZ.v k `Prims.op_Subtraction` 1) /\
+      complexity_bounded_select cf (reveal c0) (SZ.v n) (SZ.v k)
+    )
+{
+  let mut round: SZ.t = 0sz;
+  
+  while (!round <^ k)
+  invariant exists* vround s_curr (vc: nat).
+    R.pts_to round vround **
+    A.pts_to a s_curr **
+    GR.pts_to ctr vc **
+    pure (
+      SZ.v vround <= SZ.v k /\
+      Seq.length s_curr == Seq.length s0 /\
+      permutation s0 s_curr /\
+      sorted_prefix s_curr (SZ.v vround) /\
+      prefix_leq_suffix s_curr (SZ.v vround) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 <= op_Multiply (SZ.v vround) (SZ.v n - 1)
+    )
+  {
+    let vround = !round;
+    with s_pre. assert (A.pts_to a s_pre);
+    
+    let min_idx = find_min_index_from_complexity a vround n ctr;
+    
+    let val_round = a.(vround);
+    let val_min = a.(min_idx);
+    
+    a.(vround) <- val_min;
+    a.(min_idx) <- val_round;
+    
+    with s_post. assert (A.pts_to a s_post);
+    swap_is_permutation s_pre (SZ.v vround) (SZ.v min_idx);
+    
+    round := vround + 1sz;
+  };
+  
   let idx = k - 1sz;
   with s_arr. assert (A.pts_to a s_arr);
   let value = a.(idx);
