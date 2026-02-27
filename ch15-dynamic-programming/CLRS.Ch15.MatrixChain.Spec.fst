@@ -534,3 +534,235 @@ let mc_spec_equiv (dims: seq int) (n: nat)
       assert (index final_table (0 * n + (n - 1)) == mc_cost dims 0 (n - 1))
     end
 //SNIPPET_END: mc_spec_equiv
+
+// ========== Parenthesization Type and Optimality ==========
+
+/// A parenthesization of the matrix chain A_i · ... · A_j.
+/// PLeaf i: single matrix (no cost).
+/// PSplit k left right: split at k, multiplying (A_i..A_k) × (A_{k+1}..A_j).
+noeq
+type paren : nat -> nat -> Type =
+  | PLeaf : (i:nat) -> paren i i
+  | PSplit : #i:nat -> #j:nat{j > i} -> (k:nat{k >= i /\ k < j})
+             -> paren i k -> paren (k+1) j -> paren i j
+
+/// Cost of a parenthesization under dimension array p.
+let rec paren_cost (p: seq int) (#i #j: nat) (t: paren i j)
+  : Tot int (decreases t)
+  = match t with
+    | PLeaf _ -> 0
+    | PSplit k left right ->
+      split_cost p i k j (paren_cost p left) (paren_cost p right)
+
+// ---------- Upper Bound: mc_cost <= paren_cost ----------
+
+/// For any split point k in [start, j), min_splits <= split_cost at k.
+/// When min_splits reaches k, the accumulator is <= split_cost at k
+/// (because it takes the min), and subsequent iterations only decrease.
+let rec min_splits_le_split_at_k
+  (p: seq int) (i j: nat) (start: nat{start >= i}) (acc: int) (k: nat)
+  : Lemma
+    (requires start <= k /\ k < j /\ i < j /\ length p > j + 1)
+    (ensures min_splits p i j start acc <=
+             split_cost p i k j (mc_cost p i k) (mc_cost p (k+1) j))
+    (decreases (k - start))
+  = let c = split_cost p i start j (mc_cost p i start) (mc_cost p (start + 1) j) in
+    let acc' = if c < acc then c else acc in
+    if start = k then
+      min_splits_le_acc p i j (start + 1) acc'
+    else
+      min_splits_le_split_at_k p i j (start + 1) acc' k
+
+/// mc_cost(i,j) <= split_cost at any valid split point k in [i, j).
+let mc_cost_le_split_at_k (p: seq int) (i j k: nat)
+  : Lemma
+    (requires i <= k /\ k < j /\ length p > j + 1)
+    (ensures mc_cost p i j <=
+             split_cost p i k j (mc_cost p i k) (mc_cost p (k+1) j))
+  = let first = split_cost p i i j (mc_cost p i i) (mc_cost p (i + 1) j) in
+    if k = i then
+      min_splits_le_acc p i j (i + 1) first
+    else
+      min_splits_le_split_at_k p i j (i + 1) first k
+
+/// split_cost is monotone in its left/right cost arguments.
+let split_cost_mono (p: seq int) (i k j: nat) (l1 r1 l2 r2: int)
+  : Lemma (requires l1 <= l2 /\ r1 <= r2)
+          (ensures split_cost p i k j l1 r1 <= split_cost p i k j l2 r2)
+  = ()
+
+/// **Upper bound**: mc_cost <= cost of any parenthesization.
+let rec mc_cost_le_paren_cost (p: seq int) (#i #j: nat) (t: paren i j)
+  : Lemma
+    (requires length p > j + 1)
+    (ensures mc_cost p i j <= paren_cost p t)
+    (decreases t)
+  = match t with
+    | PLeaf _ -> ()
+    | PSplit k left right ->
+      mc_cost_le_paren_cost p left;
+      mc_cost_le_paren_cost p right;
+      mc_cost_le_split_at_k p i j k;
+      split_cost_mono p i k j
+        (mc_cost p i k) (mc_cost p (k+1) j)
+        (paren_cost p left) (paren_cost p right)
+
+// ---------- Achievability: optimal parenthesization exists ----------
+
+/// Mirrors min_splits but returns the split point achieving the minimum.
+let rec find_optimal_k (p: seq int) (i j: nat) (start: nat{start >= i})
+                        (acc: int) (best_k: nat{best_k >= i /\ best_k < j})
+  : Tot (k:nat{k >= i /\ k < j}) (decreases (j - start))
+  = if start >= j || i >= j || length p <= j + 1 then best_k
+    else
+      let c = split_cost p i start j (mc_cost p i start) (mc_cost p (start + 1) j) in
+      if c < acc then find_optimal_k p i j (start + 1) c start
+      else find_optimal_k p i j (start + 1) acc best_k
+
+/// Correctness: min_splits == split_cost at the k returned by find_optimal_k.
+/// Invariant: acc == split_cost at best_k (maintained through iteration).
+let rec find_optimal_k_correct
+  (p: seq int) (i j: nat) (start: nat{start >= i})
+  (acc: int) (best_k: nat{best_k >= i /\ best_k < j})
+  : Lemma
+    (requires i < j /\ length p > j + 1 /\ start <= j /\
+             acc == split_cost p i best_k j (mc_cost p i best_k) (mc_cost p (best_k + 1) j))
+    (ensures (let k = find_optimal_k p i j start acc best_k in
+              min_splits p i j start acc ==
+              split_cost p i k j (mc_cost p i k) (mc_cost p (k + 1) j)))
+    (decreases (j - start))
+  = if start >= j then ()
+    else
+      let c = split_cost p i start j (mc_cost p i start) (mc_cost p (start + 1) j) in
+      if c < acc then
+        find_optimal_k_correct p i j (start + 1) c start
+      else
+        find_optimal_k_correct p i j (start + 1) acc best_k
+
+/// mc_cost(i,j) equals split_cost at the optimal split point.
+let mc_cost_eq_optimal_split (p: seq int) (i j: nat)
+  : Lemma
+    (requires i < j /\ length p > j + 1)
+    (ensures (let first = split_cost p i i j (mc_cost p i i) (mc_cost p (i + 1) j) in
+              let k = find_optimal_k p i j (i + 1) first i in
+              mc_cost p i j ==
+              split_cost p i k j (mc_cost p i k) (mc_cost p (k + 1) j)))
+  = let first = split_cost p i i j (mc_cost p i i) (mc_cost p (i + 1) j) in
+    find_optimal_k_correct p i j (i + 1) first i;
+    assert (mc_cost p i j == min_splits p i j (i + 1) first)
+
+/// Construct a parenthesization achieving mc_cost.
+#push-options "--z3rlimit 20"
+let rec optimal_paren (p: seq int) (i: nat) (j: nat{i <= j /\ length p > j + 1})
+  : Tot (t:paren i j{paren_cost p t == mc_cost p i j}) (decreases (j - i))
+  = if i = j then PLeaf i
+    else
+      let first = split_cost p i i j (mc_cost p i i) (mc_cost p (i + 1) j) in
+      let k = find_optimal_k p i j (i + 1) first i in
+      mc_cost_eq_optimal_split p i j;
+      assert (mc_cost p i j == split_cost p i k j (mc_cost p i k) (mc_cost p (k + 1) j));
+      let left = optimal_paren p i k in
+      let right = optimal_paren p (k + 1) j in
+      assert (paren_cost p left == mc_cost p i k);
+      assert (paren_cost p right == mc_cost p (k + 1) j);
+      PSplit k left right
+#pop-options
+
+/// **Achievability**: there exists a parenthesization with cost equal to mc_cost.
+let mc_cost_achievable (p: seq int) (i j: nat)
+  : Lemma
+    (requires i <= j /\ length p > j + 1)
+    (ensures exists (t: paren i j). paren_cost p t == mc_cost p i j)
+  = let t = optimal_paren p i j in
+    assert (paren_cost p t == mc_cost p i j)
+
+// ========== Bounding mc_cost when dimensions are bounded ==========
+
+/// A left-leaning parenthesization: always split at the leftmost position.
+/// This gives a concrete parenthesization whose cost is easy to bound.
+let rec left_paren (i: nat) (j: nat{j >= i})
+  : Tot (paren i j) (decreases (j - i))
+  = if i = j then PLeaf i
+    else PSplit #i #j i (PLeaf i) (left_paren (i + 1) j)
+
+/// Helper: product of three non-negative ints each bounded by d is at most d^3.
+private let product_bound_3 (a b c d: nat)
+  : Lemma (requires a <= d /\ b <= d /\ c <= d)
+          (ensures a * b * c <= d * d * d)
+  = // a*b <= d*b  (since a <= d, b >= 0)
+    FStar.Math.Lemmas.lemma_mult_le_right b a d;
+    // d*b <= d*d  (since b <= d, d >= 0)
+    FStar.Math.Lemmas.lemma_mult_le_left d b d;
+    // So a*b <= d*d by transitivity
+    // (a*b)*c <= (d*d)*c  (since a*b <= d*d, c >= 0)
+    FStar.Math.Lemmas.lemma_mult_le_right c (a * b) (d * d);
+    // (d*d)*c <= (d*d)*d  (since c <= d, d*d >= 0)
+    FStar.Math.Lemmas.lemma_mult_le_left (d * d) c d
+
+/// Helper: (n-1)*d*d*d + d*d*d == n*d*d*d, used in the inductive step.
+private let arith_distribute (n: nat) (d: nat)
+  : Lemma (requires n >= 1)
+          (ensures (n - 1) * d * d * d + d * d * d == n * d * d * d)
+  = FStar.Math.Lemmas.distributivity_add_left (n - 1) 1 d;
+    FStar.Math.Lemmas.distributivity_add_left ((n - 1) * d) d d;
+    FStar.Math.Lemmas.distributivity_add_left ((n - 1) * d * d) (d * d) d
+
+/// Helper: monotonicity of x * d * d * d in x.
+private let cube_mono (x y: int) (d: nat)
+  : Lemma (requires x >= 0 /\ x <= y)
+          (ensures x * d * d * d <= y * d * d * d)
+  = FStar.Math.Lemmas.lemma_mult_le_right d x y;
+    FStar.Math.Lemmas.lemma_mult_le_right d (x * d) (y * d);
+    FStar.Math.Lemmas.lemma_mult_le_right d (x * d * d) (y * d * d)
+
+/// The cost of the left-leaning parenthesization is bounded by (j - i) * D^3
+/// when all dimension entries in p are non-negative and bounded by D.
+#push-options "--z3rlimit 20"
+let rec left_paren_cost_bound (p: seq int) (i: nat) (j: nat{j >= i}) (d: nat)
+  : Lemma
+    (requires
+      length p > j + 1 /\
+      (forall (idx: nat). idx < length p ==> index p idx >= 0 /\ index p idx <= d))
+    (ensures paren_cost p (left_paren i j) <= (j - i) * d * d * d)
+    (decreases (j - i))
+  = if i = j then ()
+    else begin
+      left_paren_cost_bound p (i + 1) j d;
+      // IH: paren_cost p (left_paren (i+1) j) <= (j - i - 1) * d * d * d
+      // The multiplication term p[i]*p[i+1]*p[j+1] <= d*d*d:
+      product_bound_3 (index p i) (index p (i + 1)) (index p (j + 1)) d;
+      // Arithmetic: (j-i-1)*d*d*d + d*d*d == (j-i)*d*d*d
+      arith_distribute (j - i) d
+    end
+#pop-options
+
+/// **mc_cost is bounded**: mc_cost p i j <= (j - i) * D^3 when all dims
+/// are non-negative and bounded by D.
+let mc_cost_bounded (p: seq int) (i: nat) (j: nat{j >= i}) (d: nat)
+  : Lemma
+    (requires
+      length p > j + 1 /\
+      (forall (idx: nat). idx < length p ==> index p idx >= 0 /\ index p idx <= d))
+    (ensures mc_cost p i j <= (j - i) * d * d * d)
+  = left_paren_cost_bound p i j d;
+    mc_cost_le_paren_cost p (left_paren i j)
+
+/// **Discharge all_costs_bounded**: if all dimension entries are non-negative
+/// and bounded by D, and (n-1)*D^3 fits within the sentinel (1000000000),
+/// then all mc_cost values for subproblems of size < n are bounded by the sentinel.
+/// This makes it trivial to satisfy the `all_costs_bounded` precondition of `mc_spec_equiv`.
+let discharge_all_costs_bounded (dims: seq int) (n: nat) (d: nat)
+  : Lemma
+    (requires
+      n > 0 /\
+      length dims == n + 1 /\
+      (forall (idx: nat). idx < length dims ==> index dims idx >= 0 /\ index dims idx <= d) /\
+      (n - 1) * d * d * d <= 1000000000)
+    (ensures all_costs_bounded dims n n 1000000000)
+  = introduce forall (i j: nat).
+      (i < n /\ j < n /\ i <= j /\ j - i < n) ==> mc_cost dims i j <= 1000000000
+    with introduce _ ==> _ with _.
+      (mc_cost_bounded dims i j d;
+       // mc_cost dims i j <= (j - i) * d * d * d
+       // (j - i) <= (n - 1) since i < n, j < n, i <= j
+       cube_mono (j - i) (n - 1) d)

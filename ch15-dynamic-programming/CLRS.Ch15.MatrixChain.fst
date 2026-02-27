@@ -9,6 +9,12 @@
    Proves: result == mc_outer (Seq.create (n*n) 0) s_dims n 2
    i.e., the result equals the pure Floyd-Warshall-style imperative mirror spec.
    
+   Complexity: O(n³) — specifically exactly (n³-n)/6 innermost-loop iterations.
+   The bound is proven on the pure loop model in MatrixChain.Complexity.fst.
+   Unlike RodCutting.fst and LCS.fst, the Pulse implementation does not carry
+   a ghost tick counter; the loop structure is identical to the pure model,
+   so the O(n³) bound transfers directly.
+   
    NO admits. NO assumes.
 *)
 
