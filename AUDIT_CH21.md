@@ -230,9 +230,21 @@ Generally accurate and helpful. The extensive proof strategy comment in `RankBou
 
 ### Defer
 
-| # | Task | File | Effort |
-|---|---|---|---|
-| 4.1 | **Formalize amortized O(α(n)) bound** — CLRS §21.4 potential-function analysis. Would require defining Ackermann function, inverse Ackermann, and potential function. | New module | Very High |
+| # | Task | File | Effort | Status |
+|---|---|---|---|---|
+| 4.1 | **Formalize amortized O(α(n)) bound** — CLRS §21.4 potential-function analysis. Would require defining Ackermann function, inverse Ackermann, and potential function. | New module | Very High | ⏳ Deferred |
+
+### Summary
+
+**12 of 14 tasks complete.** All 6 modules verify without admits. Key accomplishments:
+- Proved `is_forest` preservation for all three find variants and union (tasks 1.1, 1.2, 2.4)
+- Proved tight logarithmic height bound: tree_height ≤ log₂(n) (task 2.2)
+- Added `union_with_full_compression` with verified is_forest preservation (task 1.3)
+- Eliminated type duplication between FindTermination.fst and Spec.fst (task 3.1)
+
+**Remaining:**
+- Task 3.5 (blocked): Removing the rank overflow guard requires threading a rank invariant through Pulse preconditions, which depends on task 4.2.
+- Task 4.2 (pending): Refinement proof linking Pulse `Seq.seq SZ.t` operations to the pure `Seq.seq nat` model in Spec.fst. Substantial effort to bridge the type gap.
 
 ---
 
