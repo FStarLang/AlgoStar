@@ -1,4 +1,4 @@
-module CLRS.Ch28.MatrixMultiply
+module CLRS.Ch04.MatrixMultiply
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -62,7 +62,7 @@ let rec dot_product_spec (sa sb: Seq.seq int) (n i j: nat) (limit: nat)
 
 // Result correctness: c[i][j] == dot_product_spec for all computed positions
 // Note: this dot_product_spec operates on flat (row-major) sequences.
-// See also: CLRS.Ch28.Strassen.dot_product which defines the equivalent
+// See also: CLRS.Ch04.Strassen.dot_product which defines the equivalent
 // sum over the seq-of-seq matrix representation.
 let mat_mul_correct (sa sb sc: Seq.seq int) (n: nat) : prop =
   Seq.length sc == n * n /\

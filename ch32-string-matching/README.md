@@ -17,7 +17,6 @@ This directory contains verified implementations of string matching algorithms f
 - **CLRS.Ch32.KMP.fst**: Pulse implementation of COMPUTE-PREFIX-FUNCTION and KMP-MATCHER. Proves memory safety, prefix function maximality (`pi_max_sz` — pi is the LONGEST prefix-suffix), full functional correctness (`count == count_matches_spec`), and O(n+m) complexity via amortized analysis. No admits.
 - **CLRS.Ch32.KMP.Bridge.fst**: Bridging lemmas connecting Pulse `pi_max_sz` (SZ.t sequences) to Spec's `pi_max` (int sequences). Incremental proof helpers for the maximality invariant. No admits.
 - **CLRS.Ch32.KMP.Spec.fst**: Pure F* completeness proof that KMP finds all matches. Proves `kmp_step_maximal`, `kmp_match_iff`, `kmp_count_step`, and `count_before_eq_spec`. No admits.
-- **CLRS.Ch32.KMP.StrengthenedSpec.fst**: Design document / specification sketch. Contains definitions (`matches_at`, `count_matches_spec`) and conceptual lemma outlines, but all postconditions are `ensures True`. Not a proof.
 - **CLRS.Ch32.KMP.Test.fst**: Pulse test cases for `compute_prefix_function` and `kmp_string_match`.
 
 ### Reference

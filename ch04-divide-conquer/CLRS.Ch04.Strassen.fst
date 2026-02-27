@@ -35,7 +35,7 @@
    submatrix quadrants preserve square/pow2 (via lemma_submatrix_square_pow2).
 *)
 
-module CLRS.Ch28.Strassen
+module CLRS.Ch04.Strassen
 open FStar.Mul
 open FStar.Seq
 open FStar.Math.Lemmas
@@ -118,7 +118,7 @@ let matrix_sub (a b:matrix{rows a == rows b /\ cols a == cols b})
 //SNIPPET_START: standard_multiply
 // Dot product of row i of a and column j of b
 // Note: this operates on seq-of-seq matrices. See also:
-// CLRS.Ch28.MatrixMultiply.dot_product_spec which defines the equivalent
+// CLRS.Ch04.MatrixMultiply.dot_product_spec which defines the equivalent
 // sum over flat (row-major) arrays.
 let rec dot_product (a b:matrix) (i:nat{i < rows a}) (j:nat{j < cols b})
                     (k:nat{k <= cols a /\ k <= rows b})
