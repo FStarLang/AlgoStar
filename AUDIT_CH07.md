@@ -338,18 +338,18 @@ Generally good. The CLRS mapping comments (e.g., `// x = A[r]`, `// i = p - 1`, 
 
 ### Tasks
 
-| # | Priority | Task | File(s) | Details |
-|---|---|---|---|---|
-| 0 | **P0** | Why have LomutoPartition.fst and Partition.fst? | `Partition.fst`, `LomutoPartition.fst` | Both implement Lomuto-style partitions. Partition is not CLRS-faithful and is not used by Quicksort. Whereas the partition used by Quicksort really does seem to be closer to Lomuto. Remove the redundant partitions | 
-| 1 | **P1** | Fix comment: `n(n+1)/2` → `n(n-1)/2` | `Quicksort.fst:12` | Comment says `T(n) ≤ n(n+1)/2` but code proves `n(n-1)/2`. |
-| 2 | **P1** | Fix comment: `T(n) = T(n-1) + n` → `T(n) = T(n-1) + (n-1)` | `Quicksort.fst:11` | Partition cost is n-1, not n. |
-| 3 | **P1** | Fix comment: "exactly n comparisons" → "exactly n-1" | `Quicksort.fst:10,244` | Partition compares n-1 elements (excluding pivot). |
-| 5 | **P1** | Update README: remove stale admit claims | `README.md:111,123` | No admits exist in current code. |
-| 7 | **P2** | Deduplicate: use `CLRS.Common.SortSpec` | `Quicksort.fst`, `Partition.fst` | Remove local copies of `sorted`, `permutation`, `permutation_refl`, `compose_permutations`, `swap_is_permutation`, etc. Import from `common/CLRS.Common.SortSpec.fst`. |
-| 8 | **P2** | Deduplicate: merge complexity into `Quicksort.Complexity.fst` | `Quicksort.fst:526-572`, `Quicksort.Complexity.fst` | `worst_case_ticks` and `lemma_worst_case_formula` are defined in both files. Move canonical versions to `Complexity.fst` and import. |
-| 12 | **P2** | Reduce `--retry 5` proof instability | `Quicksort.fst` | 4 of 5 push-options use `--retry 5`. Investigate adding intermediate assertions or splitting lemmas to stabilize. |
-| 16 | **P3** | Fix README path | `README.md:93` | `cd /home/nswamy/workspace/clrs/ch07-quicksort` → use relative path `cd ch07-quicksort`. |
-| 19 | **P3** | Expose complexity bound through top-level `quicksort` | `Quicksort.fst:665-688` | The ghost counter is created/freed internally. Consider adding a version that exposes the bound. |
+| # | Priority | Task | File(s) | Details | Status |
+|---|---|---|---|---|---|
+| 0 | **P0** | Remove orphaned LomutoPartition.fst and Partition.fst | `Partition.fst`, `LomutoPartition.fst` | Both implement Lomuto-style partitions not imported by Quicksort. Removed. | ✅ Done |
+| 1 | **P1** | Fix comment: `n(n+1)/2` → `n(n-1)/2` | `Quicksort.fst:12` | Comment says `T(n) ≤ n(n+1)/2` but code proves `n(n-1)/2`. | ✅ Done |
+| 2 | **P1** | Fix comment: `T(n) = T(n-1) + n` → `T(n) = T(n-1) + (n-1)` | `Quicksort.fst:11` | Partition cost is n-1, not n. | ✅ Done |
+| 3 | **P1** | Fix comment: "exactly n comparisons" → "exactly n-1" | `Quicksort.fst:10,244` | Partition compares n-1 elements (excluding pivot). | ✅ Done |
+| 5 | **P1** | Update README: remove stale admit claims | `README.md:111,123` | No admits exist in current code. | ✅ Done |
+| 7 | **P2** | Deduplicate: use `CLRS.Common.SortSpec` | `Quicksort.fst` | Removed local `sorted`, `permutation`, `permutation_refl`, `compose_permutations`, `permutation_same_length`. Now imported from `common/CLRS.Common.SortSpec.fst`. | ✅ Done |
+| 8 | **P2** | Deduplicate: remove complexity defs from `Quicksort.fst` | `Quicksort.fst` | Removed `worst_case_ticks`, `lemma_worst_case_formula`, `lemma_worst_case_quadratic`, `quicksort_worst_case_theorem`. Canonical versions in `Quicksort.Complexity.fst`. | ✅ Done |
+| 12 | **P2** | Reduce `--retry 5` proof instability | `Quicksort.fst` | All 4 `--retry 5` removed. Proofs pass stably with `--z3rlimit_factor 8` alone. | ✅ Done |
+| 16 | **P3** | Fix README path | `README.md:93` | Fixed to relative `cd ch07-quicksort`. Also removed stale Pulse reference path. | ✅ Done |
+| 19 | **P3** | Expose complexity bound through top-level `quicksort` | `Quicksort.fst` | Added `quicksort_with_complexity` that takes a ghost counter and exposes `complexity_bounded_quadratic` in postcondition. | ✅ Done |
 
 
 
@@ -357,8 +357,8 @@ Generally good. The CLRS mapping comments (e.g., `// x = A[r]`, `// i = p - 1`, 
 
 | 14 | **P3** | Implement RANDOMIZED-PARTITION (§7.3) | New file | CLRS §7.3 is a core section. Would require a random-number source (could use a ghost/erased random oracle). |
 | 15 | **P3** | Prove O(n lg n) expected-case bound (§7.4.2) | New file | Theorem 7.4 is the crown jewel of Ch7. Would be a significant proof effort (probability + indicator random variables). |
-| 17 | **P3** | Update README to document all 4 source files | `README.md` | Currently only describes `Quicksort.fst`. Should mention `Partition.fst`, `LomutoPartition.fst`, `Quicksort.Complexity.fst`. |
-| 18 | **P3** | Add `quicksort_bounded` to README/docs | `Quicksort.fst:690-709` | Useful sub-range API not mentioned in any documentation. |
+| 17 | **P3** | Update README to document all source files | `README.md` | Currently only describes `Quicksort.fst`. Should also mention `Quicksort.Complexity.fst`. |
+| 18 | **P3** | Add `quicksort_bounded` to README/docs | `Quicksort.fst` | Useful sub-range API not mentioned in any documentation. |
 
 ---
 

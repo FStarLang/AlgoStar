@@ -60,7 +60,7 @@ Implemented as `clrs_quicksort` with specification that:
 
 ## Structure
 
-The implementation follows the pattern from `/home/nswamy/workspace/pulse/share/pulse/examples/Quicksort.Base.fst` but adapted for the CLRS partition scheme:
+The implementation follows the CLRS partition scheme:
 
 1. **Core Definitions** (lines 1-170):
    - Sequence predicates: `sorted`, `between_bounds`, `larger_than`, `smaller_than`
@@ -89,7 +89,7 @@ The implementation follows the pattern from `/home/nswamy/workspace/pulse/share/
 ## Building
 
 ```bash
-cd /home/nswamy/workspace/clrs/ch07-quicksort
+cd ch07-quicksort
 make
 ```
 
@@ -108,8 +108,6 @@ include $(PULSE_ROOT)/mk/test.mk
 ✅ **Permutation preservation** - Proven via `permutation` predicate
 ✅ **Builds successfully** - All code typechecks with F* and Pulse
 
-⚠️ One `admit()` in optional `quicksort` wrapper (conversion between `pts_to` and `pts_to_range`)
-
 The core algorithms `clrs_partition` and `clrs_quicksort` are **fully verified** without admits.
 
 ## Key Differences from Pulse Quicksort.Base
@@ -120,7 +118,7 @@ The core algorithms `clrs_partition` and `clrs_quicksort` are **fully verified**
 
 ## Verification
 
-All proofs are mechanically checked by F* and Pulse except for the top-level API wrapper which has one `admit()` for the pts_to conversion (not essential for the core algorithms).
+All proofs are mechanically checked by F* and Pulse. NO admits. NO assumes.
 
 The implementation demonstrates:
 - Stateful programming in Pulse

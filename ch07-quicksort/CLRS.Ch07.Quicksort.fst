@@ -7,9 +7,9 @@
    Key results:
    1. Partition correctness: elements ≤ pivot before split, > pivot after
    2. Quicksort correctness: output is sorted permutation of input
-   3. Partition is Θ(n) - exactly n comparisons
-   4. Worst-case recurrence: T(n) = T(n-1) + n when partition is maximally unbalanced
-   5. Closed form: T(n) ≤ n(n+1)/2 = O(n²)
+   3. Partition is Θ(n) - exactly n-1 comparisons (all elements except pivot)
+   4. Worst-case recurrence: T(n) = T(n-1) + (n-1) when partition is maximally unbalanced
+   5. Closed form: T(n) ≤ n(n-1)/2 = O(n²)
    
    The tick counter is threaded through all recursive calls using GhostReference
    to track cumulative operations without runtime overhead.
@@ -26,6 +26,7 @@ module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+open CLRS.Common.SortSpec
 
 // ========== Pure Definitions ==========
 
@@ -56,11 +57,6 @@ let smaller_than (s: Seq.seq int) (rb: int)
 
 let between_bounds (s: Seq.seq int) (lb rb: int)
   = larger_than s lb /\ smaller_than s rb
-
-//SNIPPET_START: sorted
-let sorted (s: Seq.seq int)
-  = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
-//SNIPPET_END: sorted
 
 (** Ghost functions to compute bounds **)
 
@@ -111,34 +107,6 @@ let lemma_min_le_max (s: Seq.seq int)
           (ensures seq_min s <= seq_max s)
   = lemma_seq_min_is_min s 0;
     lemma_seq_max_is_max s 0
-
-// ========== Permutation ==========
-
-[@@"opaque_to_smt"]
-let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
-
-let permutation_same_length (s1 s2 : Seq.seq int)
-  : Lemma (requires permutation s1 s2)
-          (ensures Seq.length s1 == Seq.length s2)
-          [SMTPat (permutation s1 s2)]
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    Seq.Properties.perm_len s1 s2
-
-let compose_permutations (s1 s2 s3: Seq.seq int)
-  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
-    (ensures permutation s1 s3)
-    [SMTPat (permutation s1 s2); SMTPat (permutation s2 s3)]
-   = reveal_opaque (`%permutation) (permutation s1 s2);
-     reveal_opaque (`%permutation) (permutation s2 s3);
-     reveal_opaque (`%permutation) (permutation s1 s3);
-     Seq.perm_len s1 s2;
-     Seq.perm_len s1 s3;
-     Seq.lemma_trans_perm s1 s2 s3 0 (Seq.length s1)
-
-let permutation_refl (s: Seq.seq int)
-  : Lemma (ensures permutation s s)
-    [SMTPat (permutation s s)]
-   = reveal_opaque (`%permutation) (permutation s s)
 
 // ========== Complexity bound predicates ==========
 
@@ -241,9 +209,9 @@ let clrs_partition_pred (s:Seq.seq int) (lo:nat) (j:nat) (i_plus_1: nat) (pivot:
 
 // ========== CLRS Partition with Tick Counter ==========
 
-// This partition performs exactly (hi - lo) comparisons
+// This partition performs exactly (hi - lo - 1) comparisons
 //SNIPPET_START: clrs_partition_sig
-#push-options "--z3rlimit_factor 8 --retry 5"
+#push-options "--z3rlimit_factor 8"
 fn clrs_partition_with_ticks
   (a: A.array int)
   (lo: nat)
@@ -364,7 +332,7 @@ let transfer_smaller_slice
 
 // ========== Partition wrapper with tick counter ==========
 
-#push-options "--z3rlimit_factor 8 --retry 5"
+#push-options "--z3rlimit_factor 8"
 fn clrs_partition_wrapper_with_ticks
   (a: A.array int)
   (lo: nat)
@@ -438,7 +406,7 @@ let append_permutations_3_squash (s1 s2 s3 s1' s3': Seq.seq int)
   : squash (permutation (Seq.append s1 (Seq.append s2 s3)) (Seq.append s1' (Seq.append s2 s3')))
 = append_permutations_3 s1 s2 s3 s1' s3'
 
-#push-options "--retry 5"
+#push-options "--z3rlimit 40"
 let lemma_sorted_append
   (s1 s2 : Seq.seq int)
   (l1 r1 l2 r2 : int)
@@ -518,37 +486,6 @@ fn quicksort_proof
 }
 
 // ========== Complexity lemmas ==========
-
-// Key lemma: For worst-case, we need to track cumulative operations
-// T(n) = (n-1) + T(n-1) when partition is maximally unbalanced (process n-1 elements, pivot doesn't count)
-
-// Recurrence for worst-case: sum from i=0 to n-1 of i = n(n-1)/2
-let rec worst_case_ticks (n: nat) : nat =
-  if n <= 1 then 0
-  else (n - 1) + worst_case_ticks (n - 1)
-
-let rec lemma_worst_case_formula (n: nat)
-  : Lemma (ensures op_Multiply 2 (worst_case_ticks n) == op_Multiply n (n - 1))
-          (decreases n)
-  = if n <= 1 then ()
-    else (
-      lemma_worst_case_formula (n - 1)
-      // Proof by induction:
-      // IH: 2 * worst_case_ticks (n-1) == (n-1) * (n-2)
-      // Goal: 2 * worst_case_ticks n == n * (n-1)
-      // 
-      // 2 * worst_case_ticks n
-      // = 2 * ((n-1) + worst_case_ticks (n-1))
-      // = 2 * (n - 1) + 2 * worst_case_ticks (n-1)
-      // = 2 * (n - 1) + (n-1) * (n-2)         [by IH]
-      // = (n-1) * (2 + (n-2))
-      // = (n-1) * n
-      // = n * (n-1)
-    )
-
-let lemma_worst_case_quadratic (n: nat)
-  : Lemma (ensures worst_case_ticks n <= op_Multiply n (n - 1) / 2)
-  = lemma_worst_case_formula n
 
 // Helper lemma for the recursive case: prove that the sum of partition cost + recursive costs
 // is bounded by n*(n-1)/2
@@ -632,18 +569,10 @@ fn rec clrs_quicksort_with_ticks
   }
 }
 
-// ========== Top-level theorem ==========
-
-// Main theorem: Quicksort performs at most n(n-1)/2 comparisons in worst case
-// This is Θ(n²) asymptotic complexity
-let quicksort_worst_case_theorem (n: nat)
-  : Lemma (ensures worst_case_ticks n <= op_Multiply n (n - 1) / 2)
-  = lemma_worst_case_quadratic n
-
 // ========== Top-level API ==========
 
 // Internal wrapper: creates ghost counter, calls ticked version, frees counter
-#push-options "--z3rlimit_factor 8 --retry 5"
+#push-options "--z3rlimit_factor 8"
 fn clrs_quicksort
   (a: A.array int) 
   (lo: nat) 
@@ -658,6 +587,39 @@ fn clrs_quicksort
   with s_out. assert (A.pts_to_range a lo hi s_out);
   with cf_out. assert (GR.pts_to ctr cf_out);
   GR.free ctr
+}
+#pop-options
+
+// Variant that exposes the worst-case O(n²) complexity bound via ghost counter.
+// Callers provide a ghost counter and observe complexity_bounded_quadratic in the postcondition.
+#push-options "--z3rlimit_factor 8"
+fn quicksort_with_complexity
+  (a: A.array int)
+  (len: SZ.t)
+  (#s0: Ghost.erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to a s0 ** GR.pts_to ctr c0
+  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len /\ SZ.v len > 0)
+  ensures exists* s (cf: nat). (
+    A.pts_to a s ** GR.pts_to ctr cf **
+    pure (sorted s /\ permutation s0 s /\
+          complexity_bounded_quadratic cf (reveal c0) (SZ.v len)))
+{
+  if (SZ.gt len 1sz) {
+    A.pts_to_range_intro a 1.0R s0;
+    
+    lemma_between_bounds_from_min_max s0;
+    lemma_min_le_max s0;
+    
+    clrs_quicksort_with_ticks a 0 (SZ.v len) (hide (seq_min s0)) (hide (seq_max s0)) ctr;
+    
+    with s'. assert (A.pts_to_range a 0 (A.length a) s');
+    A.pts_to_range_elim a 1.0R s';
+    ()
+  } else {
+    ()
+  }
 }
 #pop-options
 
