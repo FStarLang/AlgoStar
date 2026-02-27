@@ -102,3 +102,96 @@ The specifications are pure mathematical functions that can be used in proofs an
 - CLRS 3rd Edition, Chapter 33: Computational Geometry
 - Section 33.1: Line-segment properties
 - Algorithm: SEGMENTS-INTERSECT (page 1017)
+
+---
+
+## Module: CLRS.Ch33.JarvisMarch
+
+Implements Jarvis's March (gift-wrapping) convex hull algorithm from CLRS Section 33.3.
+
+### Functions
+
+#### 1. Find Leftmost Point (`find_leftmost`)
+Finds the point with minimum x-coordinate (breaking ties by minimum y).
+
+**Signature:**
+```fstar
+fn find_leftmost (#p: perm) (xs ys: array int) (len: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
+  returns result: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    pure (SZ.v result == find_leftmost_spec sxs sys /\ SZ.v result < SZ.v len)
+```
+
+#### 2. Find Next Hull Vertex (`find_next`)
+From a current hull vertex, finds the next vertex by selecting the point that makes the most clockwise turn (all other points lie to the left).
+
+**Signature:**
+```fstar
+fn find_next (#p: perm) (xs ys: array int) (len: SZ.t) (current: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
+  returns result: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    pure (SZ.v result == find_next_spec sxs sys (SZ.v current) /\ SZ.v result < SZ.v len)
+```
+
+### Algorithm
+The Jarvis March constructs the convex hull by gift-wrapping:
+1. Start from the leftmost point (guaranteed on the hull)
+2. At each step, find the point that makes the smallest counterclockwise angle
+3. Repeat until returning to the start
+
+**Complexity:** O(nh) where n = input points, h = hull vertices.
+
+### Verification
+- ✅ NO admits, NO assumes
+- ✅ All rlimits < 0.1
+- ✅ Pure spec equivalence proven for both functions
+- ✅ Bounds proven: result indices are always valid
+
+---
+
+## Module: CLRS.Ch33.GrahamScan
+
+Implements Graham's Scan convex hull algorithm building blocks from CLRS Section 33.3.
+
+### Functions
+
+#### 1. Find Bottom Point (`find_bottom`)
+Finds the point with minimum y-coordinate (breaking ties by minimum x). This is the starting point for Graham Scan.
+
+**Signature:**
+```fstar
+fn find_bottom (#p: perm) (xs ys: array int) (len: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
+  returns result: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    pure (SZ.v result == find_bottom_spec sxs sys /\ SZ.v result < SZ.v len)
+```
+
+#### 2. Polar Angle Comparison (`polar_cmp`)
+Compares polar angles of two points w.r.t. a pivot using the cross product. Returns positive if `a` has a smaller angle than `b` (CCW order).
+
+**Signature:**
+```fstar
+fn polar_cmp (#p: perm) (xs ys: array int) (len: SZ.t) (p0 a b: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys ** pure (...)
+  returns result: int
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    pure (result == polar_cmp_spec sxs sys (SZ.v p0) (SZ.v a) (SZ.v b))
+```
+
+### Pure Specifications
+
+The module also provides complete pure specifications for the full Graham Scan algorithm:
+- `pop_non_left`: Pop stack while top elements don't make a left turn
+- `scan_step`: One step of the scan (pop then push)
+- `graham_loop`: Full scan loop over sorted points
+- `graham_scan_sorted`: Complete algorithm given pre-sorted indices
+
+**Complexity:** O(n lg n) dominated by sorting; the scan loop is O(n) amortized.
+
+### Verification
+- ✅ NO admits, NO assumes
+- ✅ All rlimits < 0.1
+- ✅ Pure spec equivalence proven for find_bottom and polar_cmp
