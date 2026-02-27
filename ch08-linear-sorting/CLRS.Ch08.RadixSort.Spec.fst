@@ -10,8 +10,7 @@
    3. CLRS Lemma 8.3: After d passes of stable sort (by digit 0, 1, ..., d-1),
       the array is sorted by the full key value.
    
-   NO admits for basic digit arithmetic.
-   Admits OK for high-level stability lemmas (proof of concept).
+   NO admits. All proofs are complete.
 *)
 
 module CLRS.Ch08.RadixSort.Spec
@@ -21,58 +20,10 @@ open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Classical
 open FStar.IndefiniteDescription
+open CLRS.Ch08.RadixSort.Base
 module Seq = FStar.Seq
 
-(* ========== Power function ========== *)
-
-let rec pow (base: nat) (exp: nat) : nat =
-  if exp = 0 then 1
-  else base * pow base (exp - 1)
-
-let pow_zero (base: nat) 
-  : Lemma (pow base 0 == 1)
-  = ()
-
-let rec pow_succ (base: nat) (d: nat)
-  : Lemma (pow base (d + 1) == base * pow base d)
-  = if d = 0 then ()
-    else pow_succ base (d - 1)
-
-let rec pow_positive (base: nat) (exp: nat)
-  : Lemma (requires base > 0)
-          (ensures pow base exp > 0)
-          (decreases exp)
-  = if exp = 0 then ()
-    else pow_positive base (exp - 1)
-
-let rec pow_one (exp: nat)
-  : Lemma (pow 1 exp == 1)
-  = if exp = 0 then () else pow_one (exp - 1)
-
-let rec pow_monotonic (base exp1 exp2: nat)
-  : Lemma (requires base >= 2 /\ exp1 <= exp2)
-          (ensures pow base exp1 <= pow base exp2)
-          (decreases exp2)
-  = if exp1 = exp2 then ()
-    else if exp1 = 0 then pow_positive base exp2
-    else pow_monotonic base exp1 (exp2 - 1)
-
-(* ========== Digit extraction ========== *)
-
-//SNIPPET_START: digit_extraction
-let digit (k d base: nat) : nat =
-  if base > 0 then (
-    pow_positive base d;
-    (k / pow base d) % base
-  ) else 0
-//SNIPPET_END: digit_extraction
-
-// Digit is always less than base
-let digit_bound (k d base: nat)
-  : Lemma (requires base > 0)
-          (ensures digit k d base < base)
-  = pow_positive base d;
-    lemma_mod_lt (k / pow base d) base
+(* ========== Digit helpers (Spec-specific) ========== *)
 
 // Digit of zero is zero
 let digit_zero (d base: nat)
@@ -89,7 +40,6 @@ let rec digit_sum (k bigD base d: nat) : Tot nat (decreases d) =
   else digit k (d - 1) base * pow base (d - 1) + digit_sum k bigD base (d - 1)
 
 // Main decomposition theorem: k equals the sum of its digits
-// This is a key property but complex to prove - we admit the detailed algebra
 // Helper lemma: if k < base * p then k / p < base
 let lemma_div_pow_bound (k base p: nat)
   : Lemma (requires base >= 1 /\ p > 0 /\ k < base * p)
@@ -270,49 +220,6 @@ let rec digit_decomposition (k bigD base: nat)
       //  = k (by division lemma which we already applied)
       ()
     )
-
-(* ========== Sorted predicates ========== *)
-
-// Sorted by full value
-let rec sorted (s: seq nat) : Tot prop (decreases (length s)) =
-  length s <= 1 \/ (index s 0 <= index s 1 /\ sorted (tail s))
-
-// Sorted by d-th digit only
-let rec sorted_by_digit (s: seq nat) (d base: nat) : Tot prop (decreases (length s)) =
-  base > 0 /\ (
-    length s <= 1 \/ 
-    (digit (index s 0) d base <= digit (index s 1) d base /\ 
-     sorted_by_digit (tail s) d base))
-
-(* ========== Permutation ========== *)
-
-// Count occurrences of x in sequence
-let rec count (s: seq nat) (x: nat) : Tot nat (decreases (length s)) =
-  if length s = 0 then 0
-  else (if index s 0 = x then 1 else 0) + count (tail s) x
-
-// s_out is a permutation of s_in
-let permutation (s_in s_out: seq nat) : prop =
-  length s_in == length s_out /\
-  (forall (x: nat). count s_in x == count s_out x)
-
-(* ========== Count helpers for permutation reasoning ========== *)
-
-/// If count > 0, the element appears somewhere in the sequence
-let rec count_positive_means_appears (s: seq nat) (v: nat)
-  : Lemma (requires count s v > 0)
-          (ensures (exists (i: nat). i < length s /\ index s i == v))
-          (decreases (length s))
-  = if length s = 0 then ()
-    else if index s 0 = v then ()
-    else count_positive_means_appears (tail s) v
-
-/// If an element appears in a sequence, its count is positive
-let rec element_appears_means_count_positive (s: seq nat) (i: nat{i < length s})
-  : Lemma (ensures count s (index s i) > 0)
-          (decreases (length s))
-  = if i = 0 then ()
-    else element_appears_means_count_positive (tail s) (i - 1)
 
 (* ========== Stable sorting ========== *)
 
@@ -558,23 +465,6 @@ let extract_step_property
              is_stable_sort_by_digit s_in s_out step_num base))
   = ()
 
-// Permutation is transitive (via count)
-let permutation_transitive (s1 s2 s3: seq nat)
-  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
-          (ensures permutation s1 s3)
-  = ()
-
-// Helper: permutation preserves bounds
-let permutation_preserves_bounds_spec (s_in s_out: seq nat) (bound: nat)
-  : Lemma (requires permutation s_in s_out /\
-                    (forall (i: nat). i < length s_in ==> index s_in i < bound))
-          (ensures (forall (i: nat). i < length s_out ==> index s_out i < bound))
-  = let aux (i: nat{i < length s_out}) : Lemma (index s_out i < bound) =
-      element_appears_means_count_positive s_out i;
-      count_positive_means_appears s_in (index s_out i)
-    in
-    Classical.forall_intro aux
-
 // Inductive invariant: after d passes, sorted_up_to_digit on digits 0..d-1
 let rec radix_invariant
   (s0: seq nat) (steps: list (seq nat)) (d bigD base: nat)
@@ -807,7 +697,7 @@ let radix_sort_correctness
     assert (sorted_up_to_digit final (bigD - 1) base);
     perm_chain s0 steps bigD bigD base;
     assert (permutation s0 final);
-    permutation_preserves_bounds_spec s0 final (pow base bigD);
+    permutation_preserves_bounds s0 final (pow base bigD);
     lemma_sorted_all_digits_is_sorted final bigD base
 
 // Complete radix sort correctness: combines all the pieces

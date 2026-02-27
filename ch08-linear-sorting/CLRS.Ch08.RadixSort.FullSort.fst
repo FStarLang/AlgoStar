@@ -16,7 +16,7 @@
    - If all digits 0..d-1 are lexicographically ordered, then values are ordered
    - Apply this to the result of radix_sort_invariant
    
-   NO admits for basic arithmetic - admits only for complex digit algebra.
+   NO admits. All proofs are complete.
 *)
 
 module CLRS.Ch08.RadixSort.FullSort
@@ -25,55 +25,10 @@ open FStar.Seq
 open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Classical
+open CLRS.Ch08.RadixSort.Base
 open CLRS.Ch08.RadixSort.Stability
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
-
-(* ========== FullSort-specific definitions ========== *)
-
-/// A sequence is sorted if each element is <= the next
-let rec sorted (s: seq nat) : Tot prop (decreases (length s)) =
-  length s <= 1 \/ (index s 0 <= index s 1 /\ sorted (tail s))
-
-let rec pow_monotonic (base exp1 exp2: nat)
-  : Lemma (requires base >= 2 /\ exp1 <= exp2)
-          (ensures pow base exp1 <= pow base exp2)
-          (decreases exp2)
-  = if exp1 = exp2 then ()
-    else if exp1 = 0 then pow_positive base exp2
-    else pow_monotonic base exp1 (exp2 - 1)
-
-/// Helper: if count > 0, the element appears somewhere in the sequence
-let rec count_positive_means_appears (s: seq nat) (v: nat)
-  : Lemma (requires count s v > 0)
-          (ensures (exists (i: nat). i < length s /\ index s i == v))
-          (decreases (length s))
-  = if length s = 0 then ()
-    else if index s 0 = v then ()
-    else count_positive_means_appears (tail s) v
-
-/// Helper: if an element appears in a sequence, its count is positive
-let rec element_appears_means_count_positive (s: seq nat) (i: nat{i < length s})
-  : Lemma (ensures count s (index s i) > 0)
-          (decreases (length s))
-  = if i = 0 then ()
-    else element_appears_means_count_positive (tail s) (i - 1)
-
-/// Helper: permutation preserves upper bounds on elements
-let permutation_preserves_bounds (s_in s_out: seq nat) (bound: nat)
-  : Lemma (requires permutation s_in s_out /\
-                    (forall (i: nat). i < length s_in ==> index s_in i < bound))
-          (ensures (forall (i: nat). i < length s_out ==> index s_out i < bound))
-  = let aux (i: nat{i < length s_out}) : Lemma (index s_out i < bound) =
-      let v = index s_out i in
-      element_appears_means_count_positive s_out i;
-      assert (count s_out v > 0);
-      assert (count s_in v == count s_out v);
-      assert (count s_in v > 0);
-      count_positive_means_appears s_in v;
-      ()
-    in
-    Classical.forall_intro aux
 
 (* ========== Digit decomposition ========== *)
 

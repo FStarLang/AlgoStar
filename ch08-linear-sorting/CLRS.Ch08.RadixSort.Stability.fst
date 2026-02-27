@@ -24,43 +24,11 @@ open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Classical
 open FStar.IndefiniteDescription
+open CLRS.Ch08.RadixSort.Base
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 
-(* ========== Power function and digit extraction ========== *)
-
-let rec pow (base: nat) (exp: nat) : nat =
-  if exp = 0 then 1
-  else base * pow base (exp - 1)
-
-let rec pow_positive (base: nat) (exp: nat)
-  : Lemma (requires base > 0)
-          (ensures pow base exp > 0)
-          (decreases exp)
-  = if exp = 0 then ()
-    else pow_positive base (exp - 1)
-
-/// Extract the d-th digit of k in the given base.
-let digit (k: nat) (d: nat) (base: nat) : nat =
-  if base > 0 then (
-    pow_positive base d;
-    (k / pow base d) % base
-  ) else 0
-
-let digit_bound (k d base: nat)
-  : Lemma (requires base > 0)
-          (ensures digit k d base < base)
-  = pow_positive base d;
-    lemma_mod_lt (k / pow base d) base
-
-(* ========== Sorted predicates ========== *)
-
-/// Sorted by a single digit position
-let rec sorted_on_digit (s: seq nat) (d: nat) (base: nat) : Tot prop (decreases (length s)) =
-  base > 0 /\ (
-    length s <= 1 \/ 
-    (digit (index s 0) d base <= digit (index s 1) d base /\ 
-     sorted_on_digit (tail s) d base))
+(* ========== Sorted predicates (Stability-specific) ========== *)
 
 /// Sorted by multiple digits 0..max_d (lexicographic order, MSD-primary)
 /// This is the key property maintained by radix sort:
@@ -114,18 +82,6 @@ let first_occurrence (s: seq nat) (v: nat) : option nat =
 /// Helper: value appears at given index
 let appears_at (s: seq nat) (v: nat) (i: nat) : prop =
   i < length s /\ index s i = v
-
-(* ========== Permutation ========== *)
-
-/// Count occurrences of x in sequence
-let rec count (s: seq nat) (x: nat) : Tot nat (decreases (length s)) =
-  if length s = 0 then 0
-  else (if index s 0 = x then 1 else 0) + count (tail s) x
-
-/// Permutation: same length and same counts for all values
-let permutation (s_in s_out: seq nat) : prop =
-  length s_in == length s_out /\
-  (forall (x: nat). count s_in x == count s_out x)
 
 (* ========== Stability definition ========== *)
 
@@ -466,12 +422,6 @@ let rec radix_sort_invariant
 #pop-options
 
 (* ========== Permutation preservation ========== *)
-
-/// Permutation is transitive
-let permutation_transitive (s1 s2 s3: seq nat)
-  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
-          (ensures permutation s1 s3)
-  = ()
 
 /// Stable sort chain preserves permutation
 let rec stable_sort_chain_permutation

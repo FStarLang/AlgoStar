@@ -22,52 +22,12 @@ open FStar.Seq
 open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Classical
+open CLRS.Ch08.RadixSort.Base
 module ID = FStar.IndefiniteDescription
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 
-(* ========== Power function ========== *)
-
-let rec pow (base: nat) (exp: nat) : nat =
-  if exp = 0 then 1
-  else base * pow base (exp - 1)
-
-let rec pow_positive (base: nat) (exp: nat)
-  : Lemma (requires base > 0)
-          (ensures pow base exp > 0)
-          (decreases exp)
-  = if exp = 0 then ()
-    else pow_positive base (exp - 1)
-
-(* ========== Digit extraction ========== *)
-
-/// Extract the d-th digit of k in the given base.
-/// digit k d base = (k / base^d) mod base
-let digit (k: nat) (d: nat) (base: nat) : nat =
-  if base > 0 then (
-    pow_positive base d;
-    (k / pow base d) % base
-  ) else 0
-
-/// Digit is always less than base
-let digit_bound (k d base: nat)
-  : Lemma (requires base > 0)
-          (ensures digit k d base < base)
-  = pow_positive base d;
-    lemma_mod_lt (k / pow base d) base
-
-(* ========== Sorted predicates ========== *)
-
-/// A sequence is sorted if each element is <= the next
-let rec sorted (s: seq nat) : Tot prop (decreases (length s)) =
-  length s <= 1 \/ (index s 0 <= index s 1 /\ sorted (tail s))
-
-/// A sequence is sorted on digit d if comparing only digit d
-let rec sorted_on_digit (s: seq nat) (d: nat) (base: nat) : Tot prop (decreases (length s)) =
-  base > 0 /\ (
-    length s <= 1 \/ 
-    (digit (index s 0) d base <= digit (index s 1) d base /\ 
-     sorted_on_digit (tail s) d base))
+(* ========== Seq helpers ========== *)
 
 /// Helper: cons creates a sequence with head and tail
 let cons_index_0 (x: nat) (s: seq nat)
@@ -88,11 +48,6 @@ let sorted_on_digit_tail (s: seq nat) (d: nat) (base: nat)
 
 (* ========== Permutation ========== *)
 
-/// Count occurrences of x in sequence
-let rec count (s: seq nat) (x: nat) : Tot nat (decreases (length s)) =
-  if length s = 0 then 0
-  else (if index s 0 = x then 1 else 0) + count (tail s) x
-
 /// Helper: count in cons
 let count_cons (x h: nat) (s: seq nat)
   : Lemma (count (cons h s) x == (if h = x then 1 else 0) + count s x)
@@ -103,11 +58,6 @@ let count_cons (x h: nat) (s: seq nat)
       cons_index_0 h s;
       assert (index (cons h s) 0 == h)
     )
-
-/// s_out is a permutation of s_in
-let permutation (s_in s_out: seq nat) : prop =
-  length s_in == length s_out /\
-  (forall (x: nat). count s_in x == count s_out x)
 
 (* ========== Helper: insertion into sorted sequence by digit ========== *)
 
@@ -362,13 +312,6 @@ let rec element_in_seq_has_positive_count (s: seq nat) (x: nat) (i: nat)
       element_in_seq_has_positive_count (tail s) x (i - 1)
     )
 
-/// If count > 0, the element appears somewhere
-let rec count_positive_means_appears (s: seq nat) (v: nat)
-  : Lemma (requires count s v > 0)
-          (ensures exists (i: nat). i < length s /\ index s i == v)
-          (decreases (length s))
-  = if length s = 0 then () else if index s 0 = v then () else count_positive_means_appears (tail s) v
-
 /// Element at position k in s appears somewhere in insert_by_digit h s
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
 let rec insert_contains (h: nat) (s: seq nat) (d base: nat) (k: nat)
@@ -539,12 +482,6 @@ let stable_sort_preserves_order
   = stable_sort_on_digit_permutation s d base;
     stable_sort_on_digit_sorted s d base
 
-/// Helper: permutation is transitive
-let permutation_transitive (s1 s2 s3: seq nat)
-  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
-          (ensures permutation s1 s3)
-  = ()
-
 /// All elements in s are pairwise distinct
 let distinct (s: seq nat) : prop =
   forall (i j: nat). i < j /\ j < length s ==> index s i <> index s j
@@ -703,7 +640,7 @@ let backward_stability_with_order (s: seq nat) (d base: nat) (i: nat)
 #pop-options
 
 /// Stable sort on distinct sequences preserves sorted_up_to_digit ordering
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 40"
 let stable_sort_preserves_sorted_up_to
   (s: seq nat) (d base: nat)
   : Lemma 
