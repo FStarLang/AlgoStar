@@ -4,7 +4,7 @@
 
 A verified implementation of the **Edmonds-Karp algorithm** (BFS-based Ford-Fulkerson method) for computing maximum flow in a network, following CLRS §26.2.
 
-- **3321 lines** across 5 verified F\*/Pulse modules
+- **3591 lines** across 5 verified F\*/Pulse modules
 - **Zero admits** in production code
 - **Max-Flow Min-Cut Theorem** (CLRS Theorem 26.6) fully proven
 
@@ -33,10 +33,10 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 | File | Lines | Description |
 |------|------:|-------------|
 | `CLRS.Ch26.MaxFlow.Spec.fst` | 1125 | Pure spec: flow networks, residual graphs, augmenting paths, cuts, MFMC theorem |
-| `CLRS.Ch26.MaxFlow.fst` | 913 | Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) |
+| `CLRS.Ch26.MaxFlow.fst` | 1108 | Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) |
 | `CLRS.Ch26.MaxFlow.Proofs.fst` | 679 | Proofs: augmentation preserves flow validity, increases flow value |
-| `CLRS.Ch26.MaxFlow.Complexity.fst` | 548 | O(VE²) complexity analysis with ghost tick counter |
-| `CLRS.Ch26.MaxFlow.Test.fst` | 56 | Smoke test on a 3-vertex graph |
+| `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | O(VE²) complexity analysis with ghost tick counter |
+| `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Smoke test on a 3-vertex graph |
 
 ## Verified Properties
 
@@ -65,8 +65,22 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 
 - **Memory safety**: All array accesses bounds-checked
 - **Bounded iterations**: Fuel parameter ensures termination
-- **Flow validity**: Verified via runtime check (`check_imp_valid_flow_fn`) — returns `valid: bool`
-- **No admits or assumes** in production code (1 `assume_` in test harness for `valid_caps`)
+- **Capacity validation**: Runtime `check_valid_caps_fn` verifies non-negative capacities
+- **Flow validity**: Runtime `check_imp_valid_flow_fn` verifies output — returns `valid: bool`
+
+### Explicit axioms (`assume val`)
+
+| Axiom | File | Pending |
+|-------|------|---------|
+| `axiom_spd_source_zero` | `Complexity.fst` | BFS proof |
+| `axiom_spd_bounded` | `Complexity.fst` | BFS proof |
+| `lemma_distances_nondecreasing` (Lemma 26.7) | `Complexity.fst` | BFS proof |
+| `axiom_edge_critical_bound` (Lemma 26.8) | `Complexity.fst` | BFS proof |
+| `axiom_bfs_correctness` | `MaxFlow.fst` | BFS loop invariant |
+| `axiom_augment_direction_consistency` | `MaxFlow.fst` | BFS/augment agreement |
+| `axiom_augment_imp_refines_spec` | `MaxFlow.fst` | Imperative-spec refinement |
+
+Test code uses 1 `assume_` for `valid_caps` (backed by runtime check).
 
 ## Building
 

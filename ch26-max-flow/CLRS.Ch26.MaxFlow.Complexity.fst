@@ -7,8 +7,6 @@ open CLRS.Ch26.MaxFlow.Proofs
 (*
    Edmonds-Karp Algorithm Complexity Analysis (CLRS Theorem 26.8)
    
-   Task P0.1.11: Prove O(VE²) time complexity bound
-   
    Key insights from CLRS §26.2:
    1. BFS finds shortest augmenting path: O(V+E) = O(E) time
    2. After each augmentation, at least one edge becomes saturated/critical
@@ -19,7 +17,14 @@ open CLRS.Ch26.MaxFlow.Proofs
    
    This module defines a ghost tick counter and proves the O(VE²) bound.
    
-   NO admits for core complexity bounds. Helper lemmas about shortest paths may admit.
+   Proven results (zero admits):
+   - lemma_augmentation_creates_critical_edge, edmonds_karp_complexity,
+     edmonds_karp_total_cost, edmonds_karp_verified_complexity, etc.
+   
+   Explicit axioms (assume val — pending BFS correctness proof, task P3.1):
+   - axiom_spd_source_zero, axiom_spd_bounded: shortest-path distance properties
+   - lemma_distances_nondecreasing: CLRS Lemma 26.7
+   - axiom_edge_critical_bound: CLRS Lemma 26.8
 *)
 
 (** Ghost tick counter: tracks computational cost *)

@@ -21,11 +21,18 @@ module Proofs = CLRS.Ch26.MaxFlow.Proofs
    1. BFS on residual graph to find shortest augmenting path
    2. Find bottleneck (min residual capacity) along the path
    3. Augment flow along the path
-   4. Repeat until no augmenting path exists
+   4. Repeat until no augmenting path exists (or fuel exhausted)
    
    Connects to the fully verified pure spec (Spec.fst, Proofs.fst):
    - valid_flow maintained through augmentation
    - MFMC theorem: no augmenting path ⟹ max flow
+   
+   Postcondition uses runtime check (check_imp_valid_flow_fn) for defense-in-depth.
+   
+   Explicit axioms (assume val — pending full proofs):
+   - axiom_bfs_correctness: BFS pred array encodes valid shortest path (P3.1)
+   - axiom_augment_direction_consistency: BFS/augment agree on edge direction (P3.3)
+   - axiom_augment_imp_refines_spec: augment_imp matches spec-level augment (P2.1)
 *)
 
 (* ================================================================
@@ -713,6 +720,48 @@ let lemma_checks_imply_valid_flow
           FStar.Math.Lemmas.distributivity_sub_left n 1 n
     in
     FStar.Classical.forall_intro_2 (fun u v -> FStar.Classical.move_requires_2 aux u v)
+#pop-options
+
+(** Check valid_caps: all capacity entries are non-negative *)
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+fn check_valid_caps_fn
+  (capacity: A.array int)
+  (nn: SZ.t)
+  (#cap_seq: erased (Seq.seq int))
+  requires
+    A.pts_to capacity cap_seq **
+    pure (Seq.length cap_seq == SZ.v nn)
+  returns ok: bool
+  ensures
+    A.pts_to capacity cap_seq **
+    pure (
+      Seq.length cap_seq == SZ.v nn /\
+      (ok ==> (forall (i: nat). i < SZ.v nn ==> Seq.index cap_seq i >= 0)))
+{
+  let mut i = 0sz;
+  let mut result = true;
+  while (
+    let vi = !i;
+    let vr = !result;
+    vr && vi <^ nn
+  )
+  invariant exists* vi vr.
+    R.pts_to i vi **
+    R.pts_to result vr **
+    A.pts_to capacity cap_seq **
+    pure (
+      SZ.v vi <= SZ.v nn /\
+      Seq.length cap_seq == SZ.v nn /\
+      (vr ==> (forall (idx: nat). idx < SZ.v vi ==> Seq.index cap_seq idx >= 0))
+    )
+  {
+    let vi = !i;
+    let c: int = A.op_Array_Access capacity vi;
+    if (c < 0) { result := false } else { () };
+    i := vi +^ 1sz
+  };
+  !result
+}
 #pop-options
 
 (** Check capacity constraint: 0 <= flow[i] <= cap[i] for all i *)
