@@ -9,7 +9,7 @@ module CLRS.Ch10.DS.Spec
    - LinkedList (insertion and deletion properties)
    
    These specifications serve as the mathematical model for the imperative Pulse
-   implementations in CLRS.Ch10.Stack, CLRS.Ch10.Queue, and CLRS.Ch10.LinkedList.
+   implementations in CLRS.Ch10.Stack, CLRS.Ch10.Queue, and the linked-list modules.
 *)
 
 open FStar.List.Tot
@@ -330,3 +330,26 @@ let lemma_list_search_empty (#a: eqtype) (x: a)
 let lemma_list_empty_length (#a: Type)
   : Lemma (list_length (list_empty #a) == 0)
   = ()
+
+(*** Refinement: Imperative ↔ Pure Stack Spec ***)
+
+/// The imperative stack represents contents as a list where push appends
+/// to the end (L.append contents [x]) and the pure spec uses cons (x :: s).
+/// These are related by list reversal: the imperative list is the reverse
+/// of the pure stack.
+
+/// Pushing via append on the imperative list corresponds to cons on the reversed list
+let lemma_stack_push_append_rev (#a: Type) (imp_contents: list a) (x: a)
+  : Lemma (rev (append imp_contents [x]) == x :: rev imp_contents)
+  = rev_append imp_contents [x];
+    append_l_nil (rev imp_contents)
+
+/// Popping via unsnoc on the imperative list corresponds to pop on the reversed list
+let lemma_stack_pop_unsnoc_rev (#a: Type) (imp_contents: list a{Cons? imp_contents})
+  : Lemma (
+    let init = init imp_contents in
+    let last_elem = last imp_contents in
+    rev imp_contents == last_elem :: rev init
+  )
+  = append_init_last imp_contents;
+    lemma_stack_push_append_rev (init imp_contents) (last imp_contents)

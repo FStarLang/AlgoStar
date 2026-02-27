@@ -10,6 +10,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module L = FStar.List.Tot
 module Math = FStar.Math.Lemmas
+open CLRS.Common.ListLemmas
 
 // Helper lemma: modular arithmetic for addition
 let lemma_mod_add_assoc (a b: nat) (n: pos)
@@ -96,27 +97,6 @@ let lemma_empty_queue_inv (arr_seq: Seq.seq 'a) (capacity: pos)
     (ensures forall (i:nat). i < 0 ==> 
              Seq.index arr_seq (i % capacity) == L.index ([] <: list 'a) i)
   = ()
-
-// Helper lemma: append length
-let rec lemma_append_length (#a:Type) (l1 l2: list a)
-  : Lemma (L.length (L.append l1 l2) == L.length l1 + L.length l2)
-  = match l1 with
-    | [] -> ()
-    | x :: xs -> lemma_append_length xs l2
-
-// Helper lemma: indexing into append
-let rec lemma_index_append (#a:Type) (l1 l2: list a) (i:nat)
-  : Lemma 
-    (requires i < L.length (L.append l1 l2))
-    (ensures 
-      (if i < L.length l1 
-       then L.index (L.append l1 l2) i == L.index l1 i
-       else (i - L.length l1 < L.length l2 /\
-             L.index (L.append l1 l2) i == L.index l2 (i - L.length l1))))
-    (decreases l1)
-  = match l1 with
-    | [] -> ()
-    | x :: xs -> if i = 0 then () else lemma_index_append xs l2 (i - 1)
 
 // Helper lemma: updating array preserves queue invariant when enqueuing
 let lemma_enqueue_invariant

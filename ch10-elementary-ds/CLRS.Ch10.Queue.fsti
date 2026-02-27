@@ -11,6 +11,12 @@ module Seq = FStar.Seq
 module L = FStar.List.Tot
 
 // Queue data structure: circular buffer with head, tail, and size tracking
+//
+// Design note: CLRS uses a 2-field design (head + tail) where an empty slot
+// distinguishes full from empty (at most n−1 elements in an n-slot array).
+// We use a 3-field design (head + tail + size) which allows the full capacity
+// to be used and simplifies the full/empty invariant at the cost of one extra
+// field. The ENQUEUE/DEQUEUE logic is otherwise identical to CLRS §10.1.
 //SNIPPET_START: queue_type
 noeq type queue (t:Type) = {
   data: V.vec t;

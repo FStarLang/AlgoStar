@@ -10,33 +10,13 @@ module L = FStar.List.Tot
 
 open Pulse.Lib.Vec
 open Pulse.Lib.Box
+open CLRS.Common.ListLemmas
 
 // Helper lemma: empty list has all indices valid (vacuous)
 let lemma_empty_list_inv (arr_seq: Seq.seq 'a) 
   : Lemma (forall (i:nat). i < L.length ([]) ==> 
            Seq.index arr_seq i == L.index ([] <: list 'a) i)
   = ()
-
-// Helper lemma: indexing into append
-let rec lemma_index_append (#a:Type) (l1 l2: list a) (i:nat)
-  : Lemma 
-    (requires i < L.length (L.append l1 l2))
-    (ensures 
-      (if i < L.length l1 
-       then L.index (L.append l1 l2) i == L.index l1 i
-       else (i - L.length l1 < L.length l2 /\
-             L.index (L.append l1 l2) i == L.index l2 (i - L.length l1))))
-    (decreases l1)
-  = match l1 with
-    | [] -> ()
-    | x :: xs -> if i = 0 then () else lemma_index_append xs l2 (i - 1)
-
-// Helper lemma: length of append
-let rec lemma_append_length (#a:Type) (l1 l2: list a)
-  : Lemma (L.length (L.append l1 l2) == L.length l1 + L.length l2)
-  = match l1 with
-    | [] -> ()
-    | x :: xs -> lemma_append_length xs l2
 
 // Helper lemma: after updating array at position n with new_elem, 
 // the correspondence between array and list is maintained
