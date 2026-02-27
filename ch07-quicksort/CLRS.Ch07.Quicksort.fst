@@ -390,12 +390,9 @@ let append_permutations_3 (s1 s2 s3 s1' s3': Seq.seq int):
   Lemma
     (requires permutation s1 s1' /\ permutation s3 s3')
     (ensures permutation (Seq.append s1 (Seq.append s2 s3)) (Seq.append s1' (Seq.append s2 s3')))
-= reveal_opaque (`%permutation) (permutation s1 s1');
-  reveal_opaque (`%permutation) (permutation s2 s2);
-  reveal_opaque (`%permutation) (permutation s3 s3');
-  Seq.Properties.append_permutations s2 s3 s2 s3';
-  reveal_opaque (`%permutation) (permutation (Seq.append s1 (Seq.append s2 s3)) (Seq.append s1' (Seq.append s2 s3')));
-  Seq.Properties.append_permutations s1 (Seq.append s2 s3) s1' (Seq.append s2 s3')
+= permutation_refl s2;
+  append_permutations s2 s3 s2 s3';
+  append_permutations s1 (Seq.append s2 s3) s1' (Seq.append s2 s3')
 
 let append_permutations_3_squash (s1 s2 s3 s1' s3': Seq.seq int)
   (_ : squash (permutation s1 s1' /\ permutation s3 s3'))
