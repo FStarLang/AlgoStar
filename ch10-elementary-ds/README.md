@@ -19,8 +19,7 @@ in Pulse, following CLRS Chapter 10. All code is **admit-free and assume-free**.
 - **CLRS.Ch10.SinglyLinkedList.Base.fst** — Shared node type, `is_dlist` predicate, ghost helpers
 - **CLRS.Ch10.SinglyLinkedList.fst** — Heap-allocated SLL with insert/search/delete
 - **CLRS.Ch10.SinglyLinkedList.Test.fst** — Test
-- **CLRS.Ch10.SinglyLinkedList.Complexity.fst** — SLL with ghost tick counters (O(1)/O(n) proofs)
-- **CLRS.Ch10.SinglyLinkedList.Complexity.Enhanced.fst** — Precise cost functions and bounds
+- **CLRS.Ch10.SinglyLinkedList.Complexity.fst** — SLL with ghost tick counters and precise cost bounds
 
 ### Doubly-Linked List (§10.2)
 - **CLRS.Ch10.DLL.fst** — True DLL with `dls` segment predicate, insert/search/delete/delete_node

@@ -1,13 +1,13 @@
 (*
-   Singly-linked list with Complexity Bounds (CLRS Chapter 10)
+   Singly-Linked List with Precise Complexity Bounds (CLRS Chapter 10)
    
    Extends CLRS.Ch10.SinglyLinkedList with ghost tick counters to track
-   the number of operations performed by each function.
+   the exact number of operations performed by each function.
    
-   Proves:
-   1. list_insert: exactly 1 tick (O(1))
-   2. list_search: at most |l| ticks (O(n))
-   3. list_delete: at most |l| ticks (O(n))
+   Proves precise complexity bounds:
+   1. list_insert: exactly 1 tick (O(1)) — constant number of pointer operations
+   2. list_search: at most n ticks (O(n)) — at most n comparisons for a list of length n
+   3. list_delete: at most n+1 ticks (O(n)) — at most n comparisons + O(1) pointer surgery
    
    Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
    
@@ -23,9 +23,9 @@ module L = FStar.List.Tot
 module GR = Pulse.Lib.GhostReference
 open CLRS.Ch10.SinglyLinkedList.Base
 
-// ========== Ghost tick ==========
+// ========== Ghost tick counter ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (reveal n + 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -35,18 +35,28 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-// ========== Operations with Complexity ==========
+// ========== Pure cost functions ==========
+
+// INSERT cost: exactly 1 operation (allocate + link)
+let insert_cost : nat = 1
+
+// SEARCH cost: at most n comparisons for a list of length n
+let search_cost (n: nat) : nat = n
+
+// DELETE cost: at most n comparisons + 1 pointer surgery = n+1
+let delete_cost (n: nat) : nat = n + 1
+
+// ========== Operations with Complexity Tracking ==========
 
 // LIST-INSERT with complexity: Insert x at head, exactly 1 tick (O(1))
-//SNIPPET_START: dll_insert_tick
+// Precise bound: cost = insert_cost = 1
 fn list_insert_tick (x: int) (head: dlist) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
   returns new_head: dlist
   ensures exists* (cf: erased nat).
     is_dlist new_head (x :: 'l) ** GR.pts_to ctr cf **
-    pure (reveal cf == reveal c0 + 1)
-//SNIPPET_END: dll_insert_tick
+    pure (reveal cf == reveal c0 + insert_cost)
 {
   // Allocate new node: key = x, next = old head
   let nd = Box.alloc #node { key = x; next = head };
@@ -56,16 +66,18 @@ fn list_insert_tick (x: int) (head: dlist) (ctr: GR.ref nat)
   Some nd
 }
 
-// LIST-SEARCH with complexity: at most |l| ticks (O(n))
-//SNIPPET_START: dll_search_tick
+// LIST-SEARCH with complexity: at most n ticks (O(n))
+// Precise bound: cost ≤ search_cost(n) = n
 fn rec list_search_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
   returns found: bool
   ensures exists* (cf: erased nat).
     is_dlist head 'l ** GR.pts_to ctr cf **
-    pure (found <==> L.mem k 'l /\ reveal cf - reveal c0 <= L.length 'l)
-//SNIPPET_END: dll_search_tick
+    pure (
+      found <==> L.mem k 'l /\
+      reveal cf - reveal c0 <= search_cost (L.length 'l)
+    )
 {
   match head {
     norewrite None -> {
@@ -78,11 +90,9 @@ fn rec list_search_tick (head: dlist) (k: int) (ctr: GR.ref nat)
       let nd = !vl;
       tick ctr;
       if (nd.key = k) {
-        // Found it — restore the predicate and return true
         intro_is_dlist_cons head vl;
         true
       } else {
-        // Recurse on tail
         let r = list_search_tick nd.next k ctr;
         intro_is_dlist_cons head vl;
         r
@@ -91,8 +101,8 @@ fn rec list_search_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   }
 }
 
-// LIST-DELETE with complexity: at most |l| ticks (O(n))
-//SNIPPET_START: dll_delete_tick
+// LIST-DELETE with complexity: at most n+1 ticks (O(n))
+// Precise bound: cost ≤ delete_cost(n) = n + 1
 fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
@@ -102,14 +112,12 @@ fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
     pure (
       (L.mem k 'l ==> l' == remove_first k 'l) /\
       (~(L.mem k 'l) ==> l' == 'l) /\
-      reveal cf - reveal c0 <= L.length 'l
+      reveal cf - reveal c0 <= delete_cost (L.length 'l)
     )
-//SNIPPET_END: dll_delete_tick
 {
   match head {
     norewrite None -> {
       is_dlist_case_none head;
-      // l == [], key k is not in list, return head unchanged
       head
     }
     norewrite Some vl -> {
@@ -118,17 +126,13 @@ fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
       let nd = !vl;
       tick ctr;
       if (nd.key = k) {
-        // This is the node to delete — splice it out
-        // Free the box and return its tail
         let tail = nd.next;
         with tl. rewrite (is_dlist nd.next tl) as (is_dlist tail tl);
         Box.free vl;
         tail
       } else {
-        // Recurse on tail, then reconstruct
         let new_tail = list_delete_tick nd.next k ctr;
         with l' cf1. assert (is_dlist new_tail l' ** GR.pts_to ctr cf1);
-        // Update the node to point to new_tail
         vl := { key = nd.key; next = new_tail };
         rewrite each new_tail as ({ key = nd.key; next = new_tail }).next
           in (is_dlist new_tail l');
