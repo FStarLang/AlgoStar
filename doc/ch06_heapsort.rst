@@ -94,20 +94,22 @@ phases.
 Phase 1: BUILD-MAX-HEAP
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The bottom-up loop starts at ``⌊n/2⌋`` and calls ``max_heapify``
-on each node down to index 0:
+``build_max_heap`` is a standalone Pulse function (CLRS §6.3) that
+converts an arbitrary array into a max-heap via bottom-up
+heapification:
 
 .. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.fst
    :language: pulse
-   :start-after: //SNIPPET_START: build_max_heap_loop
-   :end-before: //SNIPPET_END: build_max_heap_loop
+   :start-after: //SNIPPET_START: build_max_heap_sig
+   :end-before: //SNIPPET_END: build_max_heap_sig
 
-The invariant maintains ``heaps_from s_cur n vi`` — all nodes from
-``vi`` onward satisfy the heap property. Initially ``vi = ⌊n/2⌋``,
-and leaves (indices ≥ ⌊n/2⌋) trivially satisfy the property. Each
-iteration decrements ``vi`` and calls ``max_heapify`` to establish
-the property at the new node. At loop exit, ``vi = 0`` gives
-``is_max_heap``.
+The loop starts at ``⌊n/2⌋`` and calls ``max_heapify``
+on each node down to index 0. The invariant maintains
+``heaps_from s_cur n vi`` — all nodes from ``vi`` onward satisfy
+the heap property. Initially ``vi = ⌊n/2⌋``, and leaves (indices
+≥ ⌊n/2⌋) trivially satisfy the property. Each iteration decrements
+``vi`` and calls ``max_heapify`` to establish the property at the
+new node. At loop exit, ``vi = 0`` gives ``is_max_heap``.
 
 Phase 2: Extract-Max Loop
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -144,28 +146,8 @@ prefix, and hence is bounded by the suffix elements.
 Complexity
 ==========
 
-The basic complexity module defines the comparison count and proves
-the O(n log n) bound:
-
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: heapsort_comparisons
-   :end-before: //SNIPPET_END: heapsort_comparisons
-
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: heapsort_simplified_bound
-   :end-before: //SNIPPET_END: heapsort_simplified_bound
-
-The bound 2n(1 + ⌊log₂ n⌋) follows from bounding each
-``max_heapify`` call by 2⌊log₂ n⌋ comparisons and summing over
-n − 1 extract-max iterations plus the build-heap cost of 2n.
-
-Enhanced Complexity Analysis
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The same module also proves tighter results following CLRS more
-closely.
+The complexity module defines operation counts for each phase and proves
+O(n log n) bounds following CLRS §6.3–6.4.
 
 **BUILD-MAX-HEAP is O(n)** (CLRS Theorem 6.3): the sum
 ∑ ⌈n/2^(h+1)⌉ · 2h over all heights h converges to at most 4n.
@@ -185,6 +167,11 @@ h(h+1) ≤ 2·2^h ≤ 2n:
    :language: fstar
    :start-after: //SNIPPET_START: heapsort_ops_simplified
    :end-before: //SNIPPET_END: heapsort_ops_simplified
+
+The bound 6n(1 + ⌊log₂ n⌋) follows from combining the O(n)
+build-heap cost (≤ 4n) with the extract-max loop cost
+(≤ 2n·⌊log₂ n⌋), where each ``max_heapify`` call costs at most
+2⌊log₂ n⌋ comparisons.
 
 **Heapsort beats quadratic sorting** for n ≥ 11:
 

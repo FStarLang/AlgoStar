@@ -6,8 +6,8 @@
    2. Extract-max loop: swap root (max) to end, shrink heap, MAX-HEAPIFY
    
    Uses max-heap property on int arrays with parent >= children.
-   Heap predicates and sift-down lemmas follow the structure of
-   Pulse.Lib.PriorityQueue (adapted for max-heap on int).
+   Heap predicates and sift-down lemmas follow standard max-heap
+   conventions from CLRS §6.1–6.4, adapted for 0-based indexing.
    
    Proves:
    1. The result is sorted
@@ -26,10 +26,34 @@ open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
+
+open CLRS.Ch06.Heap.CostBound
+
+// ========== Ghost tick ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+ghost
+fn tick2 (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (hide (reveal n + 2))
+{
+  tick ctr;
+  tick ctr
+}
 
 // ========== Heap index functions ==========
 
@@ -316,19 +340,38 @@ let grandparent_after_swap_from (s:Seq.seq int) (len:nat{len <= Seq.length s})
   = ()
 
 // ========== MAX-HEAPIFY (sift_down for max-heap) ==========
+// CLRS §6.2: MAX-HEAPIFY(A, i)
+//
+// The `start` ghost parameter is not in CLRS. It tracks the lower bound of
+// the "heaps_from" region, allowing max_heapify to prove correctness when
+// called from different starting points: build-heap uses start = idx (only
+// the subtree rooted at idx and below is heapified so far), while extract-max
+// uses start = 0 (the entire prefix is a heap except at the root).
+//
+// The `SZ.fits (2 * Seq.length s + 2)` precondition ensures that index
+// arithmetic for left_idx (2*i+1) and right_idx (2*i+2) cannot overflow
+// SizeT, since the maximum computed index is 2*(n-1)+2 = 2*n for an
+// array of length n.
+//
+// The `ctr` ghost counter tracks comparisons: each non-leaf recursive call
+// ticks 2 (for the two child comparisons). The total is bounded by
+// max_heapify_bound(heap_size, idx) = 2 * log2_floor(heap_size / (idx+1)).
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
 //SNIPPET_START: max_heapify_sig
 fn rec max_heapify
   (a: A.array int) (idx: SZ.t) (heap_size: SZ.t) (start: Ghost.erased nat)
+  (ctr: GR.ref nat)
   (#s: erased (Seq.seq int) {
     SZ.v idx < SZ.v heap_size /\
     SZ.v heap_size <= Seq.length s /\
     Seq.length s == A.length a /\
     SZ.fits (op_Multiply 2 (Seq.length s) + 2)
   })
+  (#c0: erased nat)
 requires
   A.pts_to a s **
+  GR.pts_to ctr c0 **
   pure (
     SZ.v idx >= start /\
     almost_heaps_from s (SZ.v heap_size) start (SZ.v idx) /\
@@ -339,19 +382,22 @@ requires
       (right_idx (SZ.v idx) < SZ.v heap_size ==>
         Seq.index s (parent_idx (SZ.v idx)) >= Seq.index s (right_idx (SZ.v idx))))
   )
-ensures exists* s'.
+ensures exists* s' (cf: nat).
   A.pts_to a s' **
+  GR.pts_to ctr cf **
   pure (
     Seq.length s' == Seq.length s /\
     heaps_from s' (SZ.v heap_size) start /\
     permutation s s' /\
-    (forall (k:nat). SZ.v heap_size <= k /\ k < Seq.length s ==> Seq.index s' k == Seq.index s k)
+    (forall (k:nat). SZ.v heap_size <= k /\ k < Seq.length s ==> Seq.index s' k == Seq.index s k) /\
+    cf >= reveal c0 /\
+    cf - reveal c0 <= max_heapify_bound (SZ.v heap_size) (SZ.v idx)
   )
 //SNIPPET_END: max_heapify_sig
 {
   let left = SZ.add (SZ.mul 2sz idx) 1sz;
   if (SZ.gte left heap_size) {
-    // Leaf: heap_down_at trivially holds
+    // Leaf: heap_down_at trivially holds, no ticks needed (bound >= 0)
     almost_to_full s (SZ.v heap_size) start (SZ.v idx);
     ()
   } else {
@@ -374,7 +420,9 @@ ensures exists* s'.
           swap_is_permutation s (SZ.v idx) (SZ.v left);
           swap_length s (SZ.v idx) (SZ.v left);
           swap_index_i s (SZ.v idx) (SZ.v left);
-          max_heapify a left heap_size start #(swap_seq s (SZ.v idx) (SZ.v left))
+          tick2 ctr;
+          max_heapify_bound_left (SZ.v heap_size) (SZ.v idx);
+          max_heapify a left heap_size start ctr #(swap_seq s (SZ.v idx) (SZ.v left))
         } else {
           almost_to_full s (SZ.v heap_size) start (SZ.v idx);
           ()
@@ -393,7 +441,9 @@ ensures exists* s'.
           swap_is_permutation s (SZ.v idx) (SZ.v right);
           swap_length s (SZ.v idx) (SZ.v right);
           swap_index_i s (SZ.v idx) (SZ.v right);
-          max_heapify a right heap_size start #(swap_seq s (SZ.v idx) (SZ.v right))
+          tick2 ctr;
+          max_heapify_bound_right (SZ.v heap_size) (SZ.v idx);
+          max_heapify a right heap_size start ctr #(swap_seq s (SZ.v idx) (SZ.v right))
         } else {
           almost_to_full s (SZ.v heap_size) start (SZ.v idx);
           ()
@@ -413,7 +463,9 @@ ensures exists* s'.
         swap_is_permutation s (SZ.v idx) (SZ.v left);
         swap_length s (SZ.v idx) (SZ.v left);
         swap_index_i s (SZ.v idx) (SZ.v left);
-        max_heapify a left heap_size start #(swap_seq s (SZ.v idx) (SZ.v left))
+        tick2 ctr;
+        max_heapify_bound_left (SZ.v heap_size) (SZ.v idx);
+        max_heapify a left heap_size start ctr #(swap_seq s (SZ.v idx) (SZ.v left))
       } else {
         almost_to_full s (SZ.v heap_size) start (SZ.v idx);
         ()
@@ -427,6 +479,73 @@ ensures exists* s'.
 
 // heaps_from s len k means all nodes from k satisfy heap_down_at
 // When k >= len, it's vacuously true
+
+// heaps_from with start=0 is the same as is_max_heap
+let heaps_from_zero (s:Seq.seq int) (len:nat{len <= Seq.length s})
+  : Lemma (requires heaps_from s len 0) (ensures is_max_heap s len)
+  = ()
+
+#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+//SNIPPET_START: build_max_heap_sig
+fn build_max_heap
+  (a: A.array int)
+  (n: SZ.t)
+  (#s0: erased (Seq.seq int))
+requires
+  A.pts_to a s0 **
+  pure (
+    SZ.v n > 0 /\
+    SZ.v n <= A.length a /\
+    Seq.length s0 == A.length a /\
+    SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
+  )
+ensures exists* s.
+  A.pts_to a s **
+  pure (
+    Seq.length s == Seq.length s0 /\
+    SZ.v n <= Seq.length s /\
+    is_max_heap s (SZ.v n) /\
+    permutation s0 s /\
+    SZ.fits (op_Multiply 2 (Seq.length s) + 2)
+  )
+//SNIPPET_END: build_max_heap_sig
+{
+  let half = SZ.div n 2sz;
+  let mut i: SZ.t = half;
+  let ctr = GR.alloc #nat 0;
+  
+  while (!i >^ 0sz)
+  invariant exists* vi s_cur (vc: nat).
+    R.pts_to i vi **
+    A.pts_to a s_cur **
+    GR.pts_to ctr vc **
+    pure (
+      SZ.v vi <= SZ.v half /\
+      Seq.length s_cur == Seq.length s0 /\
+      Seq.length s_cur == A.length a /\
+      permutation s0 s_cur /\
+      SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
+      heaps_from s_cur (SZ.v n) (SZ.v vi)
+    )
+  {
+    let vi = !i;
+    let idx = vi - 1sz;
+    i := idx;
+    with s_cur. assert (A.pts_to a s_cur);
+    heaps_from_to_almost s_cur (SZ.v n) (SZ.v idx) (SZ.v idx);
+    max_heapify a idx n (SZ.v idx) ctr #s_cur;
+    ()
+  };
+  
+  with s_built. assert (A.pts_to a s_built);
+  heaps_from_zero s_built (SZ.v n);
+  with vc_final. assert (GR.pts_to ctr vc_final);
+  GR.free ctr;
+  ()
+}
+#pop-options
+
+#restart-solver
 
 // ========== Extract-max lemmas ==========
 
@@ -482,11 +601,6 @@ let extract_extends_sorted (s:Seq.seq int) (len:nat{len <= Seq.length s /\ len >
       = root_ge_element s len i
     in
     Classical.forall_intro (Classical.move_requires aux_root)
-
-// heaps_from with start=0 is the same as is_max_heap
-let heaps_from_zero (s:Seq.seq int) (len:nat{len <= Seq.length s})
-  : Lemma (requires heaps_from s len 0) (ensures is_max_heap s len)
-  = ()
 
 // Permuting within [0, k) preserves suffix_sorted and prefix_le_suffix
 
@@ -568,6 +682,12 @@ let perm_preserves_sorted_suffix (s1 s2:Seq.seq int) (k:nat)
 #pop-options
 
 // ========== Main HeapSort ==========
+// CLRS §6.4: HEAPSORT(A)
+// Phase 1: BUILD-MAX-HEAP (standalone function, see CLRS §6.3)
+// Phase 2: Extract-max loop
+//
+// Requires SZ.fits(2*n+2) to prevent SizeT overflow in child index
+// computation (see max_heapify comment above).
 
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
 //SNIPPET_START: heapsort_sig
@@ -593,47 +713,19 @@ ensures exists* s.
   )
 //SNIPPET_END: heapsort_sig
 {
-  //SNIPPET_START: build_max_heap_loop
-  // Phase 1: BUILD-MAX-HEAP (bottom-up)
-  let half = SZ.div n 2sz;
-  let mut i: SZ.t = half;
-  
-  while (!i >^ 0sz)
-  invariant exists* vi s_cur.
-    R.pts_to i vi **
-    A.pts_to a s_cur **
-    pure (
-      SZ.v vi <= SZ.v half /\
-      Seq.length s_cur == Seq.length s0 /\
-      Seq.length s_cur == A.length a /\
-      permutation s0 s_cur /\
-      SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
-      heaps_from s_cur (SZ.v n) (SZ.v vi)
-    )
-  //SNIPPET_END: build_max_heap_loop
-  {
-    let vi = !i;
-    let idx = vi - 1sz;
-    i := idx;
-    
-    with s_cur. assert (A.pts_to a s_cur);
-    // heaps_from s_cur n vi means all j >= vi satisfy heap_down_at
-    // idx = vi - 1, so all j > idx satisfy heap_down_at
-    // This gives us almost_heaps_from s_cur n idx idx
-    heaps_from_to_almost s_cur (SZ.v n) (SZ.v idx) (SZ.v idx);
-    max_heapify a idx n (SZ.v idx) #s_cur;
-    ()
-  };
+  // Phase 1: BUILD-MAX-HEAP
+  build_max_heap a n;
   
   //SNIPPET_START: extract_max_loop
   // Phase 2: Extract-max loop
   let mut heap_sz: SZ.t = n;
+  let ctr_extract = GR.alloc #nat 0;
   
   while (!heap_sz >^ 1sz)
-  invariant exists* vsz s_cur.
-    R.pts_to i 0sz **
+  invariant exists* vsz s_cur (vc: nat).
     R.pts_to heap_sz vsz **
     A.pts_to a s_cur **
+    GR.pts_to ctr_extract vc **
     pure (
       SZ.v vsz > 0 /\
       SZ.v vsz <= SZ.v n /\
@@ -668,7 +760,7 @@ ensures exists* s.
     // new_sz >= 1 since vsz >= 2
     extract_almost_heaps s_cur (SZ.v vsz);
     let zero : Ghost.erased nat = 0;
-    max_heapify a 0sz new_sz zero #(swap_seq s_cur 0 (SZ.v last));
+    max_heapify a 0sz new_sz zero ctr_extract #(swap_seq s_cur 0 (SZ.v last));
     with s_heapified. assert (A.pts_to a s_heapified);
     heaps_from_zero s_heapified (SZ.v new_sz);
     // Elements outside [0, new_sz) are unchanged by max_heapify
@@ -678,6 +770,8 @@ ensures exists* s.
     heap_sz := new_sz;
   };
   
+  with vc_extract. assert (GR.pts_to ctr_extract vc_extract);
+  GR.free ctr_extract;
   ()
 }
 #pop-options

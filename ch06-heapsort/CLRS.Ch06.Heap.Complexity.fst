@@ -1,35 +1,31 @@
 module CLRS.Ch06.Heap.Complexity
 
 /// Complexity analysis for HEAPSORT algorithm from CLRS Chapter 6
-/// This module provides both simple and enhanced complexity proofs:
+/// This module provides complexity proofs following CLRS Theorems 6.3–6.4:
 ///
-/// Simple analysis (Section 1):
-/// - BUILD-MAX-HEAP: conservatively bounded at 2n comparisons
-/// - HEAPSORT: O(n log n) with bound 2n(1 + ⌊log₂ n⌋)
-///
-/// Enhanced analysis (Section 2, following CLRS Theorems 6.3–6.4):
-/// - BUILD-MAX-HEAP: O(n) [Theorem 6.3]
-/// - HEAPSORT: O(n log n) with constant 6
+/// - BUILD-MAX-HEAP: O(n) [Theorem 6.3], proved as ≤ 4n operations
+/// - HEAPSORT: O(n log n) with constant 6, i.e., ≤ 6n(1 + ⌊log₂ n⌋)
+/// - Tighter practical bound: ≤ 2n·log₂n + 4n
 /// - Heapsort beats quadratic sorting for n ≥ 11
 
 open FStar.Mul
 open FStar.Math.Lemmas
 
-/// Floor of logarithm base 2
+/// Floor of logarithm base 2 (used throughout CLRS Chapter 6 complexity analysis)
 let rec log2_floor (n: pos) : nat =
   if n = 1 then 0 else 1 + log2_floor (n / 2)
 
-/// Height of a node at index i in a heap of size n
+/// Height of a node at index i in a heap of size n (CLRS §6.1)
 /// Height is the number of edges on the longest path from node to a leaf
 let height_at_index (i: pos) (n: pos{i <= n}) : nat =
   log2_floor (n / i)
 
-/// MAX-HEAPIFY operations count: at most 2 * height
+/// MAX-HEAPIFY operations count: at most 2 * height (CLRS §6.2, Theorem 6.2)
 /// (2 comparisons per level: find max of {parent, left, right})
 let max_heapify_ops (height: nat) : nat =
   2 * height
 
-/// BUILD-MAX-HEAP operations count (CLRS approach)
+/// BUILD-MAX-HEAP operations count (CLRS §6.3, Theorem 6.3)
 /// Sum over all nodes of max_heapify_ops for their height
 /// We model this by summing over heights: nodes_at_height h * max_heapify_ops h
 let rec sum_from_to (f: nat -> nat) (i: nat) (j: nat) 
@@ -37,7 +33,7 @@ let rec sum_from_to (f: nat -> nat) (i: nat) (j: nat)
   = if i > j then 0
     else f i + sum_from_to f (i + 1) j
 
-/// Count of nodes at height h in a heap of size n
+/// Count of nodes at height h in a heap of size n (CLRS §6.3, Exercise 6.3-3)
 /// A heap of size n has at most ceil(n / 2^(h+1)) nodes at height h
 let nodes_at_height (n: pos) (h: nat) : nat =
   (n + (pow2 (h + 1)) - 1) / (pow2 (h + 1))
@@ -47,12 +43,12 @@ let build_heap_ops (n: pos) : nat =
   let max_height = log2_floor n in
   sum_from_to (fun h -> nodes_at_height n h * max_heapify_ops h) 0 max_height
 
-/// Extract-max loop operations: (n-1) calls to MAX-HEAPIFY on decreasing sizes
+/// Extract-max loop operations (CLRS §6.4): (n-1) calls to MAX-HEAPIFY on decreasing sizes
 let rec extract_max_ops (n: nat) : nat =
   if n <= 1 then 0
   else max_heapify_ops (log2_floor n) + extract_max_ops (n - 1)
 
-/// HEAPSORT total operations
+/// HEAPSORT total operations (CLRS §6.4)
 let heapsort_ops (n: pos) : nat =
   build_heap_ops n + extract_max_ops n
 
@@ -468,48 +464,4 @@ let heapsort_better_than_quadratic (n: pos{n >= 11})
       ()
     end
 
-/// ========================================================================
-/// Simple heapsort analysis (conservative BUILD-MAX-HEAP = 2n bound)
-/// ========================================================================
 
-/// MAX-HEAPIFY comparisons: at most 2 * log2_floor(heap_size)
-/// (2 comparisons per level: find max of {parent, left, right})
-let max_heapify_comparisons (heap_size: pos) : nat =
-  2 * log2_floor heap_size
-
-/// Extract-max loop: (n-1) calls to MAX-HEAPIFY on decreasing heap sizes
-let rec extract_max_comparisons (n: nat) : nat =
-  if n <= 1 then 0
-  else max_heapify_comparisons n + extract_max_comparisons (n - 1)
-
-//SNIPPET_START: heapsort_comparisons
-/// HEAPSORT total comparisons:
-/// BUILD-MAX-HEAP: at most 2n comparisons (CLRS Theorem 6.3)
-/// Extract-max loop: (n-1) calls to MAX-HEAPIFY
-let heapsort_comparisons (n: pos) : nat =
-  2 * n + extract_max_comparisons n
-//SNIPPET_END: heapsort_comparisons
-
-/// Extract-max comparisons are bounded by 2 * n * log2_floor n
-let rec extract_max_comparisons_bound (n: nat)
-  : Lemma (ensures extract_max_comparisons n <= op_Multiply (op_Multiply 2 n) (log2_floor (if n = 0 then 1 else n)))
-          (decreases n)
-  = if n <= 1 then ()
-    else begin
-      extract_max_comparisons_bound (n - 1);
-      log2_floor_monotonic (n - 1) n;
-      log2_floor_tight n;
-      ()
-    end
-
-/// Main theorem - heapsort comparisons are O(n log n)
-let heapsort_comparisons_bound (n: pos)
-  : Lemma (ensures heapsort_comparisons n <= op_Multiply 2 n + op_Multiply (op_Multiply 2 n) (log2_floor n))
-  = extract_max_comparisons_bound n
-
-//SNIPPET_START: heapsort_simplified_bound
-/// Simplified bound: heapsort does at most 2n(1 + log2_floor n) comparisons
-let heapsort_simplified_bound (n: pos)
-  : Lemma (ensures heapsort_comparisons n <= op_Multiply (op_Multiply 2 n) (1 + log2_floor n))
-  = heapsort_comparisons_bound n
-//SNIPPET_END: heapsort_simplified_bound
