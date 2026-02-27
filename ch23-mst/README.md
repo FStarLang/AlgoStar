@@ -14,7 +14,7 @@ This directory contains verified implementations and specifications for MST algo
 | `CLRS.Ch23.Kruskal.fst` | 340 | Pulse | Imperative Kruskal (adj-matrix, union-find) |
 | `CLRS.Ch23.Kruskal.EdgeSorting.fst` | 339 | F* | sort_edges permutation and MST weight independence |
 | `CLRS.Ch23.Kruskal.SortedEdges.fst` | 142 | F* | Kruskal over sorted input: subset/forest proven |
-| `CLRS.Ch23.Kruskal.UF.fst` | 405 | F* | Union-find correctness: find_pure, soundness, completeness |
+| `CLRS.Ch23.Kruskal.UF.fst` | 320 | F* | Union-find correctness: find_pure, uf_inv_union, soundness, completeness |
 | `CLRS.Ch23.Kruskal.Helpers.fst` | 118 | F* | Forest invariant maintenance lemmas for Kruskal |
 | `CLRS.Ch23.Kruskal.Complexity.fst` | 521 | Pulse | Ghost-tick instrumented Kruskal, proves ticks ≤ 4·V³ |
 | `CLRS.Ch23.Prim.fst` | 401 | Pulse | Imperative Prim (adj-matrix, key + parent + in_mst arrays) |
