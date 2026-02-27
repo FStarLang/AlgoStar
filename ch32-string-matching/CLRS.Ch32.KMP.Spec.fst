@@ -66,9 +66,30 @@ let kmp_step_result (pattern pi: seq int) (q: nat) (c: int) (m: nat) : nat =
   if q' < m && q' < length pattern && index pattern q' = c then q' + 1
   else q'
 
+/// Decidable match check (character-by-character)
+let rec check_match_at (text pattern: seq int) (s: nat) (j: nat{j <= length pattern})
+  : Tot bool (decreases (length pattern - j))
+  = if j >= length pattern then true
+    else if s + j >= length text then false
+    else if index text (s + j) = index pattern j
+         then check_match_at text pattern s (j + 1)
+         else false
+
 /// Decidable match check
 let matches_at_dec (text pattern: seq int) (s: nat) : bool =
   s + length pattern <= length text && check_match_at text pattern s 0
+
+/// Count matches at positions s, s+1, ..., n-m (from position s to end)
+let rec count_matches_up_to (text pattern: seq int) (n m s: nat)
+  : Tot nat (decreases (if s <= n - m + 1 && m > 0 && n >= m then n - m + 1 - s else 0))
+  = if m = 0 || n < m || s > n - m then 0
+    else (if matches_at_dec text pattern s then 1 else 0) +
+         count_matches_up_to text pattern n m (s + 1)
+
+/// Total match count: count all matches from position 0
+let count_matches_spec (text pattern: seq int) (n m: nat) : nat =
+  if m > 0 && n >= m then count_matches_up_to text pattern n m 0
+  else 0
 
 /// Count matches at positions 0..limit-1
 let rec count_before (text pattern: seq int) (limit: nat)

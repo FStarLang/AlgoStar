@@ -6,7 +6,10 @@
    where π[i] is the length of the longest proper prefix of P[0..i] 
    that is also a suffix of P[0..i].
 
-   Proves both functional correctness and O(n + m) comparison complexity.
+   Proves memory safety, prefix function correctness (pi is a valid prefix-suffix),
+   and O(n + m) comparison complexity.
+   Functional correctness (count == spec) is proven separately in KMP.Spec.fst;
+   the connection to this Pulse implementation is not yet formally established.
    Key insight from CLRS §32.4:
    - Prefix function computation: at most 2(m-1) comparisons
    - Matching phase: at most 2n comparisons

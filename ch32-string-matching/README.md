@@ -1,80 +1,47 @@
-# KMP String Matching - Verified Implementation in Pulse
+# Chapter 32: String Matching — Verified Implementations
 
-This directory contains verified implementations of string matching algorithms from CLRS Chapter 32.
+This directory contains verified implementations of string matching algorithms from CLRS Chapter 32, in both Pulse (imperative, separation-logic verified) and pure F*.
 
 ## Files
 
-- **CLRS.Ch32.NaiveStringMatch.fst**: Naive string matching (O((n-m+1)*m))
-- **CLRS.Ch32.KMP.fst**: KMP prefix function computation (O(m))
-- **CLRS.Ch32.KMP.Test.fst**: Test cases for KMP prefix function
+### Naive String Matching (§32.1)
+- **CLRS.Ch32.NaiveStringMatch.fst**: Pulse implementation of NAIVE-STRING-MATCHER. Proves full functional correctness (`count == count_matches_up_to`) and O((n-m+1)*m) complexity. Generic over `eqtype`. No admits.
 
-## KMP Prefix Function
+### Rabin-Karp (§32.2)
+- **CLRS.Ch32.RabinKarp.fst**: Pulse implementation using a simple character-sum hash (not the CLRS polynomial hash). Proves full functional correctness (`count == count_matches_up_to`). No admits.
+- **CLRS.Ch32.RabinKarp.Spec.fst**: Pure F* specification using the faithful CLRS polynomial hash with Horner's rule. Proves both no-false-positives and no-false-negatives (`rabin_karp_find_all_correct`). No admits.
+- **CLRS.Ch32.RabinKarp.Complexity.fst**: Pure F* complexity analysis: O(n+m) best case, O(nm) worst case.
 
-The KMP algorithm preprocesses the pattern to build a "prefix function" π that encodes information about how the pattern matches against shifts of itself. This allows the matcher to skip unnecessary comparisons.
+### KMP (§32.4)
+- **CLRS.Ch32.KMP.fst**: Pulse implementation of COMPUTE-PREFIX-FUNCTION and KMP-MATCHER. Proves memory safety, prefix function correctness (`pi_correct`), and O(n+m) complexity via amortized analysis. **Note**: the postcondition only proves count bounds, not `count == spec`. No admits.
+- **CLRS.Ch32.KMP.Spec.fst**: Pure F* completeness proof that KMP finds all matches. Proves `kmp_step_maximal`, `kmp_match_iff`, `kmp_count_step`, and `count_before_eq_spec`. Requires `pi_max` (not yet connected to Pulse impl). No admits.
+- **CLRS.Ch32.KMP.StrengthenedSpec.fst**: Design document / specification sketch. Contains definitions (`matches_at`, `count_matches_spec`) and conceptual lemma outlines, but all postconditions are `ensures True`. Not a proof.
+- **CLRS.Ch32.KMP.Test.fst**: Pulse test cases for `compute_prefix_function` (patterns "aba" and "ababaca").
 
-### Algorithm
+### Reference
+- **reference.fst**: Port of `FStar/examples/algorithms/StringMatching.fst`. Contains verified naive matcher and Rabin-Karp with CLRS polynomial hash. Returns `option nat` (first match only).
+- **test_without_lemma.fst**: 9-line smoke test for `RabinKarp.Spec.rabin_karp_find_all`.
 
-Given pattern P[0..m-1], compute π[q] for each position q:
-- π[q] = length of longest proper prefix of P[0..q] that is also a suffix of P[0..q]
+## Verification Status
 
-```
-compute_prefix(P, m):
-  π[0] = 0
-  k = 0
-  for q = 1 to m-1:
-    while k > 0 && P[k] != P[q]:
-      k = π[k-1]
-    if P[k] == P[q]:
-      k = k + 1
-    π[q] = k
-  return π
-```
+| Algorithm | Correctness | Complexity | Admits? |
+|-----------|:-----------:|:----------:|:-------:|
+| Naive (Pulse) | count == spec | O((n-m+1)*m) | None |
+| Rabin-Karp (Pulse) | count == spec | (pure analysis only) | None |
+| Rabin-Karp (Spec) | bidirectional | N/A (pure) | None |
+| KMP (Pulse) | bounds only | O(n+m) | None |
+| KMP (Spec, pure) | count == spec | N/A (pure) | None |
 
-### Example
+**Key gap**: The KMP Pulse implementation does not yet prove `count == count_matches_spec`. The pure `KMP.Spec.fst` has the full proof but it is not connected to the Pulse code.
 
-Pattern: "ababaca"
-Prefix function: π = [0, 0, 1, 2, 3, 0, 1]
-
-Explanation:
-- π[0] = 0 (by definition)
-- π[1] = 0 (no proper prefix of "ab" is a suffix)
-- π[2] = 1 ("a" is both prefix and suffix of "aba")
-- π[3] = 2 ("ab" is both prefix and suffix of "abab")
-- π[4] = 3 ("aba" is both prefix and suffix of "ababa")
-- π[5] = 0 (no proper prefix of "ababac" is a suffix)
-- π[6] = 1 ("a" is both prefix and suffix of "ababaca")
-
-### Verification
-
-The Pulse implementation proves:
-- **Memory safety**: No out-of-bounds accesses, no memory leaks
-- **Termination**: Both loops terminate (bounded by m)
-- **Well-formedness**: Output satisfies 0 ≤ π[i] ≤ i for all i
-- **No admits/assumes**: All proofs are complete
-
-### Key Implementation Challenges
-
-1. **Inner while loop complexity**: The condition `k > 0 && P[k] != P[q]` requires reading from the pattern array, which in Pulse is a stateful operation. To avoid ghost context issues, we:
-   - Use a bounded outer loop (at most m iterations)
-   - Read pattern values unconditionally
-   - Use conditional logic to decide whether to update k
-   - Break early when k stops decreasing
-
-2. **Explicit array operations**: Pulse requires using `A.op_Array_Access` and `A.op_Array_Assignment` instead of shorthand notation like `a.(idx)`.
-
-3. **Resource tracking**: The implementation explicitly tracks ownership of the pattern array (read-only) and the output array (mutable) through separation logic.
-
-## Building and Testing
+## Building
 
 ```bash
-# Verify KMP implementation
-make verify FSTAR_FILES="CLRS.Ch32.KMP.fst"
-
-# Verify test cases
-make verify FSTAR_FILES="CLRS.Ch32.KMP.Test.fst"
-
 # Verify all files
 make verify
+
+# Verify a specific file
+make verify FSTAR_FILES="CLRS.Ch32.KMP.fst"
 ```
 
 ## Requirements

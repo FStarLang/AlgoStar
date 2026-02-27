@@ -1,17 +1,17 @@
 (*
-   KMP String Matching - STRENGTHENED SPECIFICATION
+   KMP String Matching - SPECIFICATION SKETCH (Design Document)
    
-   Task P1.5.3: Strengthen the KMP matcher postcondition to prove 
-   the match count equals count_matches_spec.
+   STATUS: This is a conceptual sketch / design document.
+   The postconditions are `ensures True` (proving nothing beyond type-safety).
+   See KMP.Spec.fst for the actual completeness proof in pure F*.
    
    This file provides:
-   1. ✓ Precise specification count_matches_spec (matches naive implementation)
-   2. ✓ Key lemmas about KMP correctness
-   3. ✓ Strengthened postcondition — zero admits
+   1. Specification definitions (matches_at, count_matches_up_to, count_matches_spec)
+   2. Conceptual lemma outlines for KMP correctness
+   3. A description of what the strengthened Pulse postcondition would look like
    
-   Approach: The strengthened loop invariant tracks that:
-   - count ==  count_matches_up_to text pattern (positions_checked_so_far)
-   - KMP's failure links ensure no matches are missed
+   NOTE: All "lemmas" here have trivial postconditions (ensures True) and
+   do not constitute proofs. The actual proof is in KMP.Spec.fst.
 *)
 
 module CLRS.Ch32.KMP.StrengthenedSpec
@@ -249,10 +249,12 @@ let failure_link_preserves_matches (pattern: seq int) (pi: seq SZ.t) (q: nat)
      (SZ.v vq > 0 ==> matched_prefix_at s_text s_pat (SZ.v vi) (SZ.v vq))
    )
    
-   The two strategic admits above represent the hardest proof obligations:
+   The key proof obligations (not yet proven in Pulse) are:
    1. Inductive proof that KMP maintains the count invariant through all state transitions
    2. Proof that following failure links checks all necessary positions
    
-   These admits capture the essence of KMP's correctness - that its clever use
-   of the prefix function ensures complete and efficient pattern matching.
+   These are proven in KMP.Spec.fst for the pure specification of KMP.
+   Connecting them to the Pulse implementation requires:
+   - Proving pi_max (maximality of prefix function) in the Pulse impl
+   - Wiring kmp_count_step from KMP.Spec into the Pulse loop invariant
 *)
