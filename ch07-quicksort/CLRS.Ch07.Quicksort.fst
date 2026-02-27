@@ -211,7 +211,6 @@ let clrs_partition_pred (s:Seq.seq int) (lo:nat) (j:nat) (i_plus_1: nat) (pivot:
 
 // This partition performs exactly (hi - lo - 1) comparisons
 //SNIPPET_START: clrs_partition_sig
-#push-options "--z3rlimit_factor 8"
 fn clrs_partition_with_ticks
   (a: A.array int)
   (lo: nat)
@@ -294,7 +293,6 @@ fn clrs_partition_with_ticks
   
   vi_plus_1
 }
-#pop-options
 
 // ========== Helper lemmas for bounds ==========
 
@@ -332,7 +330,6 @@ let transfer_smaller_slice
 
 // ========== Partition wrapper with tick counter ==========
 
-#push-options "--z3rlimit_factor 8"
 fn clrs_partition_wrapper_with_ticks
   (a: A.array int)
   (lo: nat)
@@ -386,7 +383,6 @@ fn clrs_partition_wrapper_with_ticks
   
   p
 }
-#pop-options
 
 // ========== Lemmas for combining sorted sequences ==========
 
@@ -406,7 +402,6 @@ let append_permutations_3_squash (s1 s2 s3 s1' s3': Seq.seq int)
   : squash (permutation (Seq.append s1 (Seq.append s2 s3)) (Seq.append s1' (Seq.append s2 s3')))
 = append_permutations_3 s1 s2 s3 s1' s3'
 
-#push-options "--z3rlimit 40"
 let lemma_sorted_append
   (s1 s2 : Seq.seq int)
   (l1 r1 l2 r2 : int)
@@ -427,7 +422,6 @@ let lemma_sorted_append_squash
               r1 <= l2))
     : squash (sorted (Seq.append s1 s2) /\ between_bounds (Seq.append s1 s2) l1 r2)
   = lemma_sorted_append s1 s2 l1 r1 l2 r2
-#pop-options
 
 // ========== QuickSort specification predicates ==========
 
@@ -572,7 +566,6 @@ fn rec clrs_quicksort_with_ticks
 // ========== Top-level API ==========
 
 // Internal wrapper: creates ghost counter, calls ticked version, frees counter
-#push-options "--z3rlimit_factor 8"
 fn clrs_quicksort
   (a: A.array int) 
   (lo: nat) 
@@ -588,11 +581,9 @@ fn clrs_quicksort
   with cf_out. assert (GR.pts_to ctr cf_out);
   GR.free ctr
 }
-#pop-options
 
 // Variant that exposes the worst-case O(n²) complexity bound via ghost counter.
 // Callers provide a ghost counter and observe complexity_bounded_quadratic in the postcondition.
-#push-options "--z3rlimit_factor 8"
 fn quicksort_with_complexity
   (a: A.array int)
   (len: SZ.t)
@@ -621,7 +612,6 @@ fn quicksort_with_complexity
     ()
   }
 }
-#pop-options
 
 //SNIPPET_START: quicksort_sig
 fn quicksort 

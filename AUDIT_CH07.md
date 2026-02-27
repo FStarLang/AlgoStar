@@ -280,19 +280,14 @@ The chapter would benefit from:
 
 ### 5.2 Z3 Resource Limits and Retries
 
-| File | Line | Setting | Scope |
-|---|---|---|---|
-| `LomutoPartition.fst` | 175 | `--z3rlimit 200 --fuel 2 --ifuel 1` | `lomuto_partition` |
-| `Quicksort.fst` | 246 | `--z3rlimit_factor 8 --retry 5` | `clrs_partition_with_ticks` |
-| `Quicksort.fst` | 367 | `--z3rlimit_factor 8 --retry 5` | `clrs_partition_wrapper_with_ticks` |
-| `Quicksort.fst` | 441 | `--retry 5` | `lemma_sorted_append` |
-| `Quicksort.fst` | 646 | `--z3rlimit_factor 8 --retry 5` | `clrs_quicksort` (wrapper) |
+After deduplication with `CLRS.Common.SortSpec` and removal of redundant complexity definitions,
+**all proofs pass at default rlimits with zero retries**. All `#push-options` blocks were removed.
 
-**Assessment:**
-- `--z3rlimit_factor 8` is 8× the default (which is typically 5, so this is effectively `z3rlimit 40`). Moderate but acceptable for separation-logic proofs with arrays.
-- `--retry 5` appears on 4 of 5 push-options blocks. This indicates **proof instability** — the proofs sometimes fail and need multiple Z3 attempts. While the proofs do eventually succeed, this is a maintainability concern.
-- `--z3rlimit 200` in `LomutoPartition.fst` is high and suggests the proof is expensive.
-- `Partition.fst` and `Quicksort.Complexity.fst` need **no** special options — these are clean proofs.
+Previously, 4 of 5 blocks used `--z3rlimit_factor 8 --retry 5`. The instability was caused by
+duplicated SMT patterns from local `permutation`/`sorted` definitions conflicting with the solver.
+Importing canonical definitions from `CLRS.Common.SortSpec` resolved this entirely.
+
+`Quicksort.Complexity.fst` also needs no special options.
 
 ### 5.3 Proof Techniques
 
@@ -347,7 +342,7 @@ Generally good. The CLRS mapping comments (e.g., `// x = A[r]`, `// i = p - 1`, 
 | 5 | **P1** | Update README: remove stale admit claims | `README.md:111,123` | No admits exist in current code. | ✅ Done |
 | 7 | **P2** | Deduplicate: use `CLRS.Common.SortSpec` | `Quicksort.fst` | Removed local `sorted`, `permutation`, `permutation_refl`, `compose_permutations`, `permutation_same_length`. Now imported from `common/CLRS.Common.SortSpec.fst`. | ✅ Done |
 | 8 | **P2** | Deduplicate: remove complexity defs from `Quicksort.fst` | `Quicksort.fst` | Removed `worst_case_ticks`, `lemma_worst_case_formula`, `lemma_worst_case_quadratic`, `quicksort_worst_case_theorem`. Canonical versions in `Quicksort.Complexity.fst`. | ✅ Done |
-| 12 | **P2** | Reduce `--retry 5` proof instability | `Quicksort.fst` | All 4 `--retry 5` removed. Proofs pass stably with `--z3rlimit_factor 8` alone. | ✅ Done |
+| 12 | **P2** | Reduce `--retry 5` proof instability | `Quicksort.fst` | All 4 `--retry 5` and all `#push-options` removed. Proofs pass at default rlimits after SortSpec deduplication eliminated conflicting SMT patterns. | ✅ Done |
 | 16 | **P3** | Fix README path | `README.md:93` | Fixed to relative `cd ch07-quicksort`. Also removed stale Pulse reference path. | ✅ Done |
 | 19 | **P3** | Expose complexity bound through top-level `quicksort` | `Quicksort.fst` | Added `quicksort_with_complexity` that takes a ghost counter and exposes `complexity_bounded_quadratic` in postcondition. | ✅ Done |
 
