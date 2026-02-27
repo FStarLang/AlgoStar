@@ -1,6 +1,8 @@
 (**
  * CLRS Chapter 13: Red-Black Trees — Complexity Analysis
  *
+ * Covers search, insert, and delete complexity (§13.1–13.4).
+ *
  * This module proves that search and insert operations on red-black trees
  * are O(log n), where n is the number of nodes in the tree.
  *
@@ -141,6 +143,94 @@ let insert_big_o (t: rbtree) (k: int)
 // of nodes and perform at most 2 rotations (CLRS property).
 // This is reflected in our tick counter by not recursing in balance.
 
+(*** Delete Tick Counters ***)
+
+// balL and balR are non-recursive: O(1) work (constant number of pattern matches)
+// balance is also non-recursive: O(1)
+// So we don't need tick counters for balL/balR/balance — they are O(1).
+
+// fuse traverses the inner spines of the two subtrees.
+// Tick count follows the structure of fuse in the Spec module.
+let rec fuse_ticks (l r: rbtree) : Tot nat (decreases (node_count l + node_count r)) =
+  match l, r with
+  | Leaf, _ -> 1
+  | _, Leaf -> 1
+  | Node Red _ _ b, Node Red c _ _ -> 1 + fuse_ticks b c
+  | Node Black _ _ b, Node Black c _ _ -> 1 + fuse_ticks b c
+  | Node Red _ _ b, _ -> 1 + fuse_ticks b r
+  | _, Node Red c _ _ -> 1 + fuse_ticks l c
+
+// del follows a root-to-leaf path, then calls fuse at the found node.
+// balL/balR are O(1).
+let rec del_ticks (t: rbtree) (k: int) : Tot nat (decreases t) =
+  match t with
+  | Leaf -> 1
+  | Node _ l v r ->
+    if k < v then 1 + del_ticks l k
+    else if k > v then 1 + del_ticks r k
+    else 1 + fuse_ticks l r  // fuse at the deletion point
+
+// delete = make_black ∘ del, so +1 for make_black
+let delete_ticks (t: rbtree) (k: int) : nat =
+  del_ticks t k + 1
+
+(*** Delete Tick Bounds ***)
+
+// fuse_ticks is bounded by height l + height r + 1
+// fuse recurses into the inner children, decreasing one height at each step
+let rec fuse_ticks_bounded (l r: rbtree)
+  : Lemma (ensures fuse_ticks l r <= height l + height r + 1)
+    (decreases (node_count l + node_count r))
+  = match l, r with
+    | Leaf, _ -> ()
+    | _, Leaf -> ()
+    | Node Red _ _ b, Node Red c _ _ ->
+      fuse_ticks_bounded b c
+    | Node Black _ _ b, Node Black c _ _ ->
+      fuse_ticks_bounded b c
+    | Node Red _ _ b, _ ->
+      fuse_ticks_bounded b r
+    | _, Node Red c _ _ ->
+      fuse_ticks_bounded l c
+
+// del ticks bounded by height + height_of_subtree_at_deletion_point + 1
+// Since fuse is called at a node whose children have height ≤ h, and del
+// follows a root-to-leaf path (≤ h steps), the total is ≤ 2h + 1.
+let rec del_ticks_bounded (t: rbtree) (k: int)
+  : Lemma (ensures del_ticks t k <= 2 * height t + 1)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node _ l v r ->
+      if k < v then del_ticks_bounded l k
+      else if k > v then del_ticks_bounded r k
+      else fuse_ticks_bounded l r
+
+// delete ticks bounded by 2h + 2
+let delete_ticks_bounded (t: rbtree) (k: int)
+  : Lemma (ensures delete_ticks t k <= 2 * height t + 2)
+  = del_ticks_bounded t k
+
+(*** Delete Logarithmic Bounds ***)
+
+// For a valid RB tree with n ≥ 1 nodes, delete is O(log n)
+let delete_complexity (t: rbtree) (k: int)
+  : Lemma
+    (requires is_rbtree t /\ node_count t >= 1)
+    (ensures delete_ticks t k <= 4 * log2_floor (node_count t + 1) + 2)
+  = delete_ticks_bounded t k;
+    height_bound_theorem t
+
+let delete_big_o (t: rbtree) (k: int)
+  : Lemma
+    (requires is_rbtree t)
+    (ensures (node_count t >= 1 ==>
+              delete_ticks t k <= 4 * log2_floor (node_count t + 1) + 2) /\
+             (node_count t = 0 ==>
+              delete_ticks t k = 2))
+  = if node_count t >= 1 then
+      delete_complexity t k
+
 (*** Concrete Examples ***)
 
 // Example: A tree with 15 nodes (complete binary tree) has height ≤ 7
@@ -156,11 +246,13 @@ let example_bound_15_nodes (t: rbtree) (k: int)
     (requires is_rbtree t /\ node_count t = 15)
     (ensures height t <= 8 /\
              search_ticks t k <= 9 /\
-             insert_ticks t k <= 10)
+             insert_ticks t k <= 10 /\
+             delete_ticks t k <= 18)
   = log2_floor_16 ();
     height_bound_theorem t;
     search_ticks_bounded t k;
-    insert_ticks_bounded t k
+    insert_ticks_bounded t k;
+    delete_ticks_bounded t k
 #pop-options
 
 // Example: A tree with 1023 nodes has height ≤ 20
@@ -176,11 +268,13 @@ let example_bound_1023_nodes (t: rbtree) (k: int)
     (requires is_rbtree t /\ node_count t = 1023)
     (ensures height t <= 20 /\
              search_ticks t k <= 21 /\
-             insert_ticks t k <= 22)
+             insert_ticks t k <= 22 /\
+             delete_ticks t k <= 42)
   = log2_floor_1024 ();
     height_bound_theorem t;
     search_ticks_bounded t k;
-    insert_ticks_bounded t k
+    insert_ticks_bounded t k;
+    delete_ticks_bounded t k
 #pop-options
 
 (*** Summary ***)
@@ -189,8 +283,10 @@ let example_bound_1023_nodes (t: rbtree) (k: int)
 //   - Height h ≤ 2·lg(n+1)  [CLRS Lemma 13.1, proven in Spec module]
 //   - Search takes ≤ h+1 steps
 //   - Insert takes ≤ h+2 steps
-//   - Both operations are O(log n)
+//   - Delete takes ≤ 2h+2 steps (del path O(h) + fuse O(h) + make_black O(1))
+//   - All operations are O(log n)
 //
 // This module provides executable complexity bounds via ghost tick counters,
-// proving that the worst-case time complexity of search and insert is
-// logarithmic in the number of nodes.
+// proving that the worst-case time complexity of search, insert, and delete
+// is logarithmic in the number of nodes.
+

@@ -2,6 +2,7 @@
    Red-Black Tree — Pointer-based verified implementation in Pulse
 
    CLRS Chapter 13: Red-Black Trees with Okasaki-style balance.
+   Covers §13.1–13.4 (properties, rotations, insertion, deletion).
 
    This implementation uses heap-allocated nodes (box) with mutable
    fields, connected via nullable pointers (option (box rb_node)).
@@ -10,13 +11,23 @@
    CLRS.Ch13.RBTree.Spec.
 
    Operations:
-   - rb_search:  recursive BST search, O(h)
-   - rb_ins:     recursive insert with Okasaki balance, O(h)
-   - rb_insert:  ins + make_black
-   - rb_balance: pointer-level implementation of the four rotation cases
+   - rb_search:   recursive BST search, O(h)
+   - rb_ins:      recursive insert with Okasaki balance, O(h)
+   - rb_insert:   ins + make_black
+   - rb_balance:  pointer-level implementation of the four rotation cases
+   - rb_del:      recursive Kahrs-style delete, O(h)
+   - rb_delete:   del + make_black
+   - rb_balL/R:   rebalance after deletion from left/right
+   - rb_fuse:     merge two subtrees at deletion point
+   - free_rbtree: recursive deallocation of all nodes
 
    Each operation's postcondition links to the pure spec: after
-   `rb_insert`, the pointer tree represents `S.insert old_tree key`.
+   `rb_insert`, the pointer tree represents `S.insert old_tree key`;
+   after `rb_delete`, it represents `S.delete old_tree key`.
+
+   Note: `rb_insert` and `rb_delete` consume (destroy) the input tree —
+   ownership of the original pointer structure is transferred to the
+   new tree.
 
    NO admits. NO assumes.
 *)
@@ -710,3 +721,487 @@ fn rb_insert (tree: rb_ptr) (k: int)
   rb_make_black t
 }
 //SNIPPET_END: rb_insert
+
+// ========== Delete — Pulse implementation of Kahrs-style delete ==========
+
+// Redden: recolor a black node to red (used in balL/balR case 3)
+// Spec: S.redden (Node Black l v r) = Node Red l v r
+fn rb_redden (tree: rb_ptr)
+  requires is_rbtree tree 'ft
+  returns y: rb_ptr
+  ensures is_rbtree y (S.redden 'ft)
+{
+  match tree {
+    None -> {
+      is_rbtree_case_none (None #rb_node_ptr);
+      rewrite is_rbtree (None #rb_node_ptr) 'ft as is_rbtree tree (S.redden 'ft);
+      tree
+    }
+    Some p -> {
+      is_rbtree_case_some (Some p) p;
+      let node = !p;
+      if (S.Black? node.color) {
+        p := { key = node.key; color = S.Red; left = node.left; right = node.right };
+        intro_is_rbtree_node (Some p) p;
+        with t. rewrite (is_rbtree (Some p) t) as (is_rbtree tree (S.redden 'ft));
+        tree
+      } else {
+        p := node;
+        intro_is_rbtree_node (Some p) p;
+        with t. rewrite (is_rbtree (Some p) t) as (is_rbtree tree (S.redden 'ft));
+        tree
+      }
+    }
+  }
+}
+
+// balL: rebalance after deletion from left subtree caused a black-height deficit.
+// Spec:
+//   balL (Node Red a x b) v r = Node Red (Node Black a x b) v r
+//   balL l v (Node Black b y c) = balance Black l v (Node Red b y c)
+//   balL l v (Node Red (Node Black b y c) z d) = Node Red (Node Black l v b) y (balance Black c z (redden d))
+//   balL l v r = Node Black l v r  (fallback)
+// Helper: check if a tree pointer is a non-Leaf node with a given color
+fn is_color (tree: rb_ptr) (c: S.color)
+  (#ft: G.erased S.rbtree)
+  preserves is_rbtree tree ft
+  returns b: bool
+  ensures pure (b == (S.Node? ft && S.Node?.c ft = c))
+{
+  match tree {
+    None -> {
+      is_rbtree_case_none (None #rb_node_ptr);
+      rewrite is_rbtree (None #rb_node_ptr) ft as is_rbtree tree ft;
+      false
+    }
+    Some p -> {
+      rewrite each (Some p) as tree;
+      is_rbtree_case_some tree p;
+      let node = !p;
+      let res = (node.color = c);
+      p := node;
+      intro_is_rbtree_node tree p;
+      with t. rewrite (is_rbtree tree t) as (is_rbtree tree ft);
+      res
+    }
+  }
+}
+
+// balL: rebalance after deletion from left subtree caused a black-height deficit.
+// Spec: S.balL lt v rt
+//   Case 1: (Node Red a x b, _) → Node Red (Node Black a x b) v r
+//   Case 2: (_, Node Black b y c) → balance Black l v (Node Red b y c)
+//   Case 3: (_, Node Red (Node Black b y c) z d) → Node Red (Node Black l v b) y (balance Black c z (redden d))
+//   Default: _ → Node Black l v r
+fn rb_balL (l: rb_ptr) (v: int) (r: rb_ptr)
+  (#lt #rt: G.erased S.rbtree)
+  requires is_rbtree l lt ** is_rbtree r rt
+  returns y: rb_ptr
+  ensures is_rbtree y (S.balL lt v rt)
+{
+  let l_red = is_color l S.Red;
+  if l_red {
+    // Case 1: l = Node Red a x b → Node Red (Node Black a x b) v r
+    is_rbtree_not_leaf l;
+    let lp = Some?.v l;
+    rewrite each (Some lp) as l;
+    is_rbtree_case_some l lp;
+    let ln = !lp;
+    lp := { key = ln.key; color = S.Black; left = ln.left; right = ln.right };
+    intro_is_rbtree_node l lp;
+    let y = new_node v S.Red l r;
+    with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balL lt v rt));
+    y
+  } else {
+    let r_black = is_color r S.Black;
+    if r_black {
+      // Case 2: r = Node Black b y c → balance Black l v (Node Red b y c)
+      is_rbtree_not_leaf r;
+      let rp = Some?.v r;
+      rewrite each (Some rp) as r;
+      is_rbtree_case_some r rp;
+      let rn = !rp;
+      rp := { key = rn.key; color = S.Red; left = rn.left; right = rn.right };
+      intro_is_rbtree_node r rp;
+      let y = rb_balance S.Black l v r;
+      with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balL lt v rt));
+      y
+    } else {
+      let r_red = is_color r S.Red;
+      if r_red {
+        // r is Red: check if r.left is Black for Case 3
+        is_rbtree_not_leaf r;
+        let rp = Some?.v r;
+        rewrite each (Some rp) as r;
+        is_rbtree_case_some r rp;
+        let rn = !rp;
+        let rl_black = is_color rn.left S.Black;
+        if rl_black {
+          // Case 3: r = Node Red (Node Black b y c) z d
+          // Result: Node Red (Node Black l v b) y (balance Black c z (redden d))
+          is_rbtree_not_leaf rn.left;
+          let rlp = Some?.v rn.left;
+          rewrite each (Some rlp) as rn.left;
+          is_rbtree_case_some rn.left rlp;
+          let rln = !rlp;
+          let rd = rb_redden rn.right;
+          let right_balanced = rb_balance S.Black rln.right rn.key rd;
+          let left_black = new_node v S.Black l rln.left;
+          Box.free rp;
+          rlp := { key = rln.key; color = S.Red; left = left_black; right = right_balanced };
+          intro_is_rbtree_node (Some rlp) rlp;
+          with t. rewrite (is_rbtree (Some rlp) t) as (is_rbtree (Some rlp) (S.balL lt v rt));
+          Some rlp
+        } else {
+          // r is Red but r.left is not Black — fallback
+          rp := rn;
+          intro_is_rbtree_node r rp;
+          with t. rewrite (is_rbtree r t) as (is_rbtree r rt);
+          let y = new_node v S.Black l r;
+          with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balL lt v rt));
+          y
+        }
+      } else {
+        // r is Leaf and l is not Red — fallback
+        let y = new_node v S.Black l r;
+        with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balL lt v rt));
+        y
+      }
+    }
+  }
+}
+
+// balR: rebalance after deletion from right subtree caused a black-height deficit.
+// Spec: S.balR lt v rt
+//   Case 1: (_, Node Red b y c) → Node Red l v (Node Black b y c)
+//   Case 2: (Node Black a x b, _) → balance Black (Node Red a x b) v r
+//   Case 3: (Node Red a x (Node Black b y c), _) → Node Red (balance Black (redden a) x b) y (Node Black c v r)
+//   Default: _ → Node Black l v r
+fn rb_balR (l: rb_ptr) (v: int) (r: rb_ptr)
+  (#lt #rt: G.erased S.rbtree)
+  requires is_rbtree l lt ** is_rbtree r rt
+  returns y: rb_ptr
+  ensures is_rbtree y (S.balR lt v rt)
+{
+  let r_red = is_color r S.Red;
+  if r_red {
+    // Case 1: r = Node Red b y c → Node Red l v (Node Black b y c)
+    is_rbtree_not_leaf r;
+    let rp = Some?.v r;
+    rewrite each (Some rp) as r;
+    is_rbtree_case_some r rp;
+    let rn = !rp;
+    rp := { key = rn.key; color = S.Black; left = rn.left; right = rn.right };
+    intro_is_rbtree_node r rp;
+    let y = new_node v S.Red l r;
+    with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balR lt v rt));
+    y
+  } else {
+    let l_black = is_color l S.Black;
+    if l_black {
+      // Case 2: l = Node Black a x b → balance Black (Node Red a x b) v r
+      is_rbtree_not_leaf l;
+      let lp = Some?.v l;
+      rewrite each (Some lp) as l;
+      is_rbtree_case_some l lp;
+      let ln = !lp;
+      lp := { key = ln.key; color = S.Red; left = ln.left; right = ln.right };
+      intro_is_rbtree_node l lp;
+      let y = rb_balance S.Black l v r;
+      with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balR lt v rt));
+      y
+    } else {
+      let l_red = is_color l S.Red;
+      if l_red {
+        // l is Red: check if l.right is Black for Case 3
+        is_rbtree_not_leaf l;
+        let lp = Some?.v l;
+        rewrite each (Some lp) as l;
+        is_rbtree_case_some l lp;
+        let ln = !lp;
+        let lr_black = is_color ln.right S.Black;
+        if lr_black {
+          // Case 3: l = Node Red a x (Node Black b y c)
+          // Result: Node Red (balance Black (redden a) x b) y (Node Black c v r)
+          is_rbtree_not_leaf ln.right;
+          let lrp = Some?.v ln.right;
+          rewrite each (Some lrp) as ln.right;
+          is_rbtree_case_some ln.right lrp;
+          let lrn = !lrp;
+          let la = rb_redden ln.left;
+          let left_balanced = rb_balance S.Black la ln.key lrn.left;
+          let right_black = new_node v S.Black lrn.right r;
+          Box.free lp;
+          lrp := { key = lrn.key; color = S.Red; left = left_balanced; right = right_black };
+          intro_is_rbtree_node (Some lrp) lrp;
+          with t. rewrite (is_rbtree (Some lrp) t) as (is_rbtree (Some lrp) (S.balR lt v rt));
+          Some lrp
+        } else {
+          // l is Red but l.right is not Black — fallback
+          lp := ln;
+          intro_is_rbtree_node l lp;
+          with t. rewrite (is_rbtree l t) as (is_rbtree l lt);
+          let y = new_node v S.Black l r;
+          with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balR lt v rt));
+          y
+        }
+      } else {
+        // l is Leaf and r is not Red — fallback
+        let y = new_node v S.Black l r;
+        with t. rewrite (is_rbtree y t) as (is_rbtree y (S.balR lt v rt));
+        y
+      }
+    }
+  }
+}
+
+// fuse: merge two subtrees (used at the deletion point).
+// Spec: S.fuse lt rt
+fn rec rb_fuse (l: rb_ptr) (r: rb_ptr)
+  (#lt #rt: G.erased S.rbtree)
+  requires is_rbtree l lt ** is_rbtree r rt
+  returns y: rb_ptr
+  ensures is_rbtree y (S.fuse lt rt)
+  decreases (S.node_count lt + S.node_count rt)
+{
+  // Case: l is Leaf → return r
+  match l {
+    None -> {
+      cases_of_is_rbtree (None #rb_node_ptr) lt;
+      unfold is_rbtree_cases;
+      // lt == Leaf, so S.fuse Leaf rt = rt
+      with t. rewrite (is_rbtree r t) as (is_rbtree r (S.fuse lt rt));
+      r
+    }
+    Some lp -> {
+      // l is a node. Case: r is Leaf → return l
+      match r {
+        None -> {
+          cases_of_is_rbtree (None #rb_node_ptr) rt;
+          unfold is_rbtree_cases;
+          rewrite each (Some lp) as l;
+          // rt == Leaf, so S.fuse lt Leaf = lt
+          with t. rewrite (is_rbtree l t) as (is_rbtree l (S.fuse lt rt));
+          l
+        }
+        Some rp -> {
+          // Both are nodes. Check colors.
+          rewrite each (Some lp) as l;
+          rewrite each (Some rp) as r;
+          is_rbtree_case_some l lp;
+          is_rbtree_case_some r rp;
+          let ln = !lp;
+          let rn = !rp;
+          if (S.Red? ln.color && S.Red? rn.color) {
+            // Both Red: fuse inner children
+            let s = rb_fuse ln.right rn.left;
+            // Check if s is Red
+            let s_red = is_color s S.Red;
+            if s_red {
+              // s = Node Red b' z c' → Node Red (Node Red a x b') z (Node Red c' y d)
+              is_rbtree_not_leaf s;
+              let sp = Some?.v s;
+              rewrite each (Some sp) as s;
+              is_rbtree_case_some s sp;
+              let sn = !sp;
+              // Build Node Red a x b' (reuse lp)
+              lp := { key = ln.key; color = S.Red; left = ln.left; right = sn.left };
+              intro_is_rbtree_node l lp;
+              // Build Node Red c' y d (reuse rp)
+              rp := { key = rn.key; color = S.Red; left = sn.right; right = rn.right };
+              intro_is_rbtree_node r rp;
+              // Build root Node Red ... z ... (reuse sp)
+              sp := { key = sn.key; color = S.Red; left = l; right = r };
+              intro_is_rbtree_node s sp;
+              with t. rewrite (is_rbtree s t) as (is_rbtree s (S.fuse lt rt));
+              s
+            } else {
+              // s is not Red → Node Red a x (Node Red s y d)
+              // Build Node Red s y d (reuse rp)
+              rp := { key = rn.key; color = S.Red; left = s; right = rn.right };
+              intro_is_rbtree_node r rp;
+              // Build Node Red a x (Node Red s y d) (reuse lp)
+              lp := { key = ln.key; color = S.Red; left = ln.left; right = r };
+              intro_is_rbtree_node l lp;
+              with t. rewrite (is_rbtree l t) as (is_rbtree l (S.fuse lt rt));
+              l
+            }
+          } else if (S.Black? ln.color && S.Black? rn.color) {
+            // Both Black: fuse inner children
+            let s = rb_fuse ln.right rn.left;
+            let s_red = is_color s S.Red;
+            if s_red {
+              // s = Node Red b' z c' → Node Red (Node Black a x b') z (Node Black c' y d)
+              is_rbtree_not_leaf s;
+              let sp = Some?.v s;
+              rewrite each (Some sp) as s;
+              is_rbtree_case_some s sp;
+              let sn = !sp;
+              // Build Node Black a x b' (reuse lp)
+              lp := { key = ln.key; color = S.Black; left = ln.left; right = sn.left };
+              intro_is_rbtree_node l lp;
+              // Build Node Black c' y d (reuse rp)
+              rp := { key = rn.key; color = S.Black; left = sn.right; right = rn.right };
+              intro_is_rbtree_node r rp;
+              // Build root Node Red ... z ... (reuse sp)
+              sp := { key = sn.key; color = S.Red; left = l; right = r };
+              intro_is_rbtree_node s sp;
+              with t. rewrite (is_rbtree s t) as (is_rbtree s (S.fuse lt rt));
+              s
+            } else {
+              // s is not Red → balL a x (Node Black s y d)
+              // Build Node Black s y d (reuse rp)
+              rp := { key = rn.key; color = S.Black; left = s; right = rn.right };
+              intro_is_rbtree_node r rp;
+              // balL ln.left ln.key r
+              Box.free lp;
+              let y = rb_balL ln.left ln.key r;
+              with t. rewrite (is_rbtree y t) as (is_rbtree y (S.fuse lt rt));
+              y
+            }
+          } else if (S.Red? ln.color) {
+            // l is Red, r is not Red → Node Red a x (fuse b r)
+            rp := rn;
+            intro_is_rbtree_node r rp;
+            with t. rewrite (is_rbtree r t) as (is_rbtree r rt);
+            let fused = rb_fuse ln.right r;
+            lp := { key = ln.key; color = S.Red; left = ln.left; right = fused };
+            intro_is_rbtree_node l lp;
+            with t. rewrite (is_rbtree l t) as (is_rbtree l (S.fuse lt rt));
+            l
+          } else {
+            // r is Red, l is not Red → Node Red (fuse l c) y d
+            lp := ln;
+            intro_is_rbtree_node l lp;
+            with t. rewrite (is_rbtree l t) as (is_rbtree l lt);
+            let fused = rb_fuse l rn.left;
+            rp := { key = rn.key; color = S.Red; left = fused; right = rn.right };
+            intro_is_rbtree_node r rp;
+            with t. rewrite (is_rbtree r t) as (is_rbtree r (S.fuse lt rt));
+            r
+          }
+        }
+      }
+    }
+  }
+}
+
+// del: recursive delete helper.
+// Spec: S.del ft k
+fn rec rb_del (tree: rb_ptr) (k: int)
+  requires is_rbtree tree 'ft
+  returns y: rb_ptr
+  ensures is_rbtree y (S.del 'ft k)
+  decreases 'ft
+{
+  match tree {
+    None -> {
+      // Leaf → Leaf
+      is_rbtree_case_none (None #rb_node_ptr);
+      rewrite is_rbtree (None #rb_node_ptr) 'ft as is_rbtree tree (S.del 'ft k);
+      tree
+    }
+    Some p -> {
+      is_rbtree_case_some (Some p) p;
+      let node = !p;
+      if (k < node.key) {
+        // Delete from left subtree
+        // Check if we need balL: c=Black and l=Node Black
+        if (S.Black? node.color) {
+          let l_was_black = is_color node.left S.Black;
+          let new_left = rb_del node.left k;
+          if l_was_black {
+            // c=Black, l=Node Black → balL (del l k) v r
+            Box.free p;
+            let y = rb_balL new_left node.key node.right;
+            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+            y
+          } else {
+            // c=Black, l not Black → Node Black (del l k) v r
+            Box.free p;
+            let y = new_node node.key S.Black new_left node.right;
+            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+            y
+          }
+        } else {
+          // c=Red → Node Red (del l k) v r
+          let new_left = rb_del node.left k;
+          Box.free p;
+          let y = new_node node.key S.Red new_left node.right;
+          with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+          y
+        }
+      } else if (k > node.key) {
+        // Delete from right subtree
+        if (S.Black? node.color) {
+          let r_was_black = is_color node.right S.Black;
+          let new_right = rb_del node.right k;
+          if r_was_black {
+            // c=Black, r=Node Black → balR l v (del r k)
+            Box.free p;
+            let y = rb_balR node.left node.key new_right;
+            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+            y
+          } else {
+            // c=Black, r not Black → Node Black l v (del r k)
+            Box.free p;
+            let y = new_node node.key S.Black node.left new_right;
+            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+            y
+          }
+        } else {
+          // c=Red → Node Red l v (del r k)
+          let new_right = rb_del node.right k;
+          Box.free p;
+          let y = new_node node.key S.Red node.left new_right;
+          with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+          y
+        }
+      } else {
+        // k == node.key: fuse left and right subtrees
+        Box.free p;
+        let y = rb_fuse node.left node.right;
+        with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+        y
+      }
+    }
+  }
+}
+
+// delete: del + make_black.
+// Spec: S.delete ft k = S.make_black (S.del ft k)
+fn rb_delete (tree: rb_ptr) (k: int)
+  requires is_rbtree tree 'ft
+  returns y: rb_ptr
+  ensures is_rbtree y (S.delete 'ft k)
+{
+  let t = rb_del tree k;
+  rb_make_black t
+}
+
+// ========== Deallocation ==========
+
+//SNIPPET_START: free_rbtree
+fn rec free_rbtree (tree: rb_ptr)
+  requires is_rbtree tree 'ft
+  ensures emp
+  decreases 'ft
+{
+  match tree {
+    None -> {
+      // In context: is_rbtree None 'ft (match has substituted tree=None)
+      // But is_rbtree_case_none needs is_rbtree x ft ** pure (x == None)
+      // The slprop has already been rewritten, so just use None directly
+      cases_of_is_rbtree (None #rb_node_ptr) 'ft;
+      unfold is_rbtree_cases
+    }
+    Some p -> {
+      is_rbtree_case_some (Some p) p;
+      let node = !p;
+      free_rbtree node.left;
+      free_rbtree node.right;
+      Box.free p
+    }
+  }
+}
+//SNIPPET_END: free_rbtree

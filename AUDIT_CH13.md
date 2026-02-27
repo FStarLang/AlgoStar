@@ -1,14 +1,14 @@
 # Audit Report — Chapter 13: Red-Black Trees
 
 **Module:** `ch13-rbtree/`  
-**Date:** 2025-07-18  
+**Date:** 2025-07-18 (original); 2026-02-27 (updated after audit remediation)  
 **Files audited:**
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `CLRS.Ch13.RBTree.Spec.fst` | 524 | Pure functional spec: data types, invariants, insert, balance, Theorem 13.1, correctness proofs |
-| `CLRS.Ch13.RBTree.fst` | 712 | Pulse (separation-logic) implementation: heap-allocated nodes, pointer-level balance/insert/search |
-| `CLRS.Ch13.RBTree.Complexity.fst` | 196 | Ghost tick counters proving O(log n) for search and insert |
+| `CLRS.Ch13.RBTree.Spec.fst` | ~1260 | Pure functional spec: data types, invariants, insert, delete, balance, min/max, successor/predecessor, Theorem 13.1, correctness proofs |
+| `CLRS.Ch13.RBTree.fst` | ~1220 | Pulse (separation-logic) implementation: heap-allocated nodes, pointer-level balance/insert/delete/search/free |
+| `CLRS.Ch13.RBTree.Complexity.fst` | ~300 | Ghost tick counters proving O(log n) for search, insert, and delete |
 
 ---
 
@@ -25,7 +25,7 @@ The implementation uses **Okasaki-style functional balancing** rather than the i
 | Parent pointers required | No parent pointers needed |
 | `RB-DELETE` + `RB-DELETE-FIXUP` | **Not implemented** |
 
-**Assessment:** The Okasaki encoding is a standard, well-known alternative to CLRS's imperative rotations. It implements the same logical transformations (LL, LR, RL, RR rotations) but packages them into a single `balance` function applied bottom-up during recursive insertion. This is a valid and faithful representation of the CLRS balancing logic.
+**Assessment:** The Okasaki encoding is a standard, well-known alternative to CLRS's imperative rotations. It implements the same logical transformations (LL, LR, RL, RR rotations) but packages them into a single `balance` function applied bottom-up during recursive insertion. The Kahrs-style delete uses `balL`/`balR` for rebalancing and `fuse` to merge children at the deletion point — equivalent to CLRS's `RB-TRANSPLANT` + `RB-DELETE-FIXUP`. This is a valid and faithful representation of all CLRS Ch13 operations.
 
 ### 1.2 Operations Covered
 
@@ -36,10 +36,10 @@ The implementation uses **Okasaki-style functional balancing** rather than the i
 | RB-INSERT-FIXUP (§13.3) | ✅ Encoded in `balance` | 4 rotation cases |
 | LEFT-ROTATE (§13.2) | ⚠️ Implicit in `balance_ll`, `balance_lr`, `balance_rl`, `balance_rr` | Not standalone |
 | RIGHT-ROTATE (§13.2) | ⚠️ Implicit in `balance_ll`, `balance_lr`, `balance_rl`, `balance_rr` | Not standalone |
-| RB-DELETE (§13.4) | ❌ Not implemented | |
-| RB-DELETE-FIXUP (§13.4) | ❌ Not implemented | |
-| RB-TRANSPLANT (§13.4) | ❌ Not implemented | |
-| TREE-MINIMUM (§12.2) | ❌ Not implemented | Needed for delete |
+| RB-DELETE (§13.4) | ✅ Kahrs-style functional delete | `delete` (Spec), `rb_delete` (Pulse) |
+| RB-DELETE-FIXUP (§13.4) | ✅ Encoded in `balL`/`balR`/`fuse` | Rebalancing during deletion |
+| RB-TRANSPLANT (§13.4) | ✅ Implicit in `fuse` | Merges children at deletion point |
+| TREE-MINIMUM (§12.2) | ✅ `minimum` (Spec) | With `minimum_mem`, `minimum_is_min` proofs |
 
 ### 1.3 Rotation Fidelity
 
@@ -111,6 +111,18 @@ The following are all proven (zero admits):
 
 `ins_properties` (line 489) is the key lemma, proving four properties simultaneously by structural induction — a clean proof strategy.
 
+### 2.3b Delete Preservation Proofs
+
+| Property | Lemma | Status |
+|----------|-------|--------|
+| Membership correctness | `delete_mem` | ✅ Proven |
+| BST preservation | `delete_preserves_bst` | ✅ Proven |
+| RB invariant preservation | `delete_is_rbtree` | ⚠️ Admitted |
+
+The membership and BST proofs for delete are fully verified, including helper lemmas for `balL_mem`, `balR_mem`, `fuse_mem`, `del_mem`, `balL_is_bst`, `balR_is_bst`, `fuse_is_bst`, `del_preserves_bst`.
+
+The RB invariant proof (`delete_is_rbtree`) is admitted. The internal invariant of `del` involves a nuanced color-dependent property: `del` on a Black node preserves `no_red_red` while `del` on a Red node produces `almost_no_red_red`. The interaction between these cases through `balL`/`balR`/`fuse` makes the full proof complex. This is documented as future work.
+
 ### 2.4 Pulse ↔ Spec Linkage
 
 The separation-logic predicate `is_rbtree` (Pulse file, line 54) is a recursive predicate tying the pointer structure to the pure functional `rbtree`:
@@ -123,16 +135,19 @@ Every Pulse operation's postcondition is stated in terms of the spec function:
 - `rb_search`: returns `S.search 'ft k` (line 594)
 - `rb_ins`: returns tree representing `S.ins 'ft k` (line 631)
 - `rb_insert`: returns tree representing `S.insert 'ft k` (line 707)
+- `rb_del`: returns tree representing `S.del 'ft k`
+- `rb_delete`: returns tree representing `S.delete 'ft k`
 
-**Assessment:** ✅ Strong functional correctness linking. The Pulse code is a verified refinement of the pure spec.
+**Assessment:** ✅ Strong functional correctness linking. The Pulse code is a verified refinement of the pure spec for all operations (search, insert, delete, free).
 
 ### 2.5 Gaps in Specification
 
-- **No `delete` specification or implementation** — CLRS §13.4 is entirely missing.
-- **No `minimum`/`maximum` operation** — needed as helper for delete.
-- **No `predecessor`/`successor` operation.**
-- **Memory safety of deallocation**: `rb_ins` calls `Box.free vl` (line 654) when a node is rebalanced. This is safe because the node's ownership is consumed, but there is no explicit `free_rbtree` operation to deallocate an entire tree.
-- **No set-theoretic specification**: e.g., no proof that `insert` into a tree of size n yields size n or n+1.
+- ~~**No `delete` specification or implementation**~~ — ✅ Implemented (Kahrs-style functional delete in Spec; pointer-level in Pulse).
+- ~~**No `minimum`/`maximum` operation**~~ — ✅ Added with correctness proofs (`minimum_mem`, `maximum_mem`, `minimum_is_min`, `maximum_is_max`).
+- ~~**No `predecessor`/`successor` operation.**~~ — ✅ Added with correctness proofs (`successor_is_next`, `predecessor_is_prev`).
+- ~~**Memory safety of deallocation**~~ — ✅ `free_rbtree` added in Pulse.
+- ~~**No set-theoretic specification**~~ — ✅ `insert_node_count` proven (insert preserves or increments node count).
+- **One admit remains:** `delete_is_rbtree` (RB invariant preservation for delete) — see §2.3b.
 
 ---
 
@@ -147,17 +162,21 @@ The Complexity module defines tick functions that mirror the recursive structure
 | `search` | `search_ticks` | ≤ height + 1 |
 | `ins` | `ins_ticks` | ≤ height + 1 |
 | `insert` | `insert_ticks` = `ins_ticks + 1` | ≤ height + 2 |
+| `fuse` | `fuse_ticks` | ≤ height(l) + height(r) + 1 |
+| `del` | `del_ticks` | ≤ 2·height + 1 |
+| `delete` | `delete_ticks` = `del_ticks + 1` | ≤ 2·height + 2 |
 
 ### 3.2 Logarithmic Bounds
 
-Both `search_complexity` (line 77) and `insert_complexity` (line 85) prove:
+Both `search_complexity` (line 77) and `insert_complexity` (line 85) and `delete_complexity` prove:
 
 ```
 search_ticks t k ≤ 2 · log2_floor(n+1) + 1
 insert_ticks t k ≤ 2 · log2_floor(n+1) + 2
+delete_ticks t k ≤ 4 · log2_floor(n+1) + 2
 ```
 
-These follow from `height_bound_theorem` (Theorem 13.1). The constant factors are tight.
+These follow from `height_bound_theorem` (Theorem 13.1). The constant factors are tight. Delete's factor of 4 comes from `del` traversing O(h) steps plus `fuse` traversing O(h) inner spine nodes, combined with height ≤ 2·lg(n+1).
 
 ### 3.3 Balance is O(1)
 
@@ -166,16 +185,16 @@ The Complexity module correctly observes (comment at line 141) that balance oper
 ### 3.4 Concrete Examples
 
 Two concrete examples are verified:
-- 15-node tree: height ≤ 8, search ≤ 9, insert ≤ 10 (line 154)
-- 1023-node tree: height ≤ 20, search ≤ 21, insert ≤ 22 (line 174)
+- 15-node tree: height ≤ 8, search ≤ 9, insert ≤ 10, delete ≤ 18
+- 1023-node tree: height ≤ 20, search ≤ 21, insert ≤ 22, delete ≤ 42
 
 ### 3.5 Complexity Gaps
 
-- **No delete complexity analysis** (delete not implemented).
+- ~~**No delete complexity analysis**~~ — ✅ Added (`fuse_ticks`, `del_ticks`, `delete_ticks` with O(log n) bounds).
 - **No amortized analysis** — CLRS notes that delete-fixup does at most 3 rotations but O(lg n) recolorings. This distinction is not captured.
 - **Tick counters are pure ghost functions**, not embedded into the Pulse implementation. The Pulse code does not carry cost annotations. This means the O(log n) bound is proven for the spec but not directly for the compiled code.
 
-**Assessment:** ✅ The complexity analysis for search and insert is correct and well-structured. The approach of separate ghost tick functions proved against the spec height bound is clean and sufficient.
+**Assessment:** ✅ The complexity analysis for search, insert, and delete is correct and well-structured. The approach of separate ghost tick functions proved against the spec height bound is clean and sufficient.
 
 ---
 
@@ -213,12 +232,9 @@ The Pulse code demonstrates several good patterns:
 
 ### 5.1 Admits and Assumes
 
-**Zero admits. Zero assumes.** Confirmed by grep across all three files. The only hits are in documentation comments:
-- `CLRS.Ch13.RBTree.fst` line 21: `"NO admits. NO assumes."` (comment)
-- `CLRS.Ch13.RBTree.Spec.fst` line 13: `"Zero admits."` (comment)
-- `CLRS.Ch13.RBTree.Complexity.fst` line 15: `"NO admits. NO assumes."` (comment)
+**One admit** in the Spec file: `delete_is_rbtree` (RB invariant preservation for delete). See §2.3b for details. All other proofs are fully verified — zero assumes.
 
-**Assessment:** ✅ Fully verified. This is the gold standard.
+The Pulse implementation (`CLRS.Ch13.RBTree.fst`) has **zero admits, zero assumes**. The Complexity module has **zero admits, zero assumes**.
 
 ### 5.2 Proof Strategies
 
@@ -236,13 +252,15 @@ The Pulse code demonstrates several good patterns:
 | `min_nodes_for_bh` | 2 | 0 | 20 | Low |
 | `bh_height_bound` | 2 | 1 | 30 | Low |
 | `balance_mem` | 3 | 1 | 20 | Low |
-| `ins_preserves_bst` + `balance_is_bst` | 4 | 2 | 200 | ⚠️ Moderate — high fuel+rlimit |
-| `balance_restores_no_red_red_*` + `balance_red_almost` | 8 | 4 | 200 | ⚠️ Moderate — high fuel+rlimit |
+| `ins_preserves_bst` + `balance_is_bst` | 4 | 2 | 40 | Low |
+| `balance_restores_no_red_red_*` + `balance_red_almost` | 4 | 2 | 40 | Low |
 | `ins_properties` | 3 | 1 | 30 | Low |
-| `log2_floor_16` | — | — | 30 (fuel 6) | Low |
-| `log2_floor_1024` | — | — | 30 (fuel 12) | Low |
+| `del_mem` | 5 | 3 | 50 | Moderate |
+| `balL_is_bst` / `balR_is_bst` | 5 | 3 | 80 | Moderate |
+| `fuse_is_bst` | 5 | 3 | 80 | Moderate |
+| `del_preserves_bst` | 4 | 2 | 80 | Moderate |
 
-The `--fuel 8 --ifuel 4 --z3rlimit 200` block (Spec line 465) and `--fuel 4 --ifuel 2 --z3rlimit 200` block (Spec line 390) are the most resource-intensive proofs. While they verify, they could be fragile under Z3 version changes. Consider adding intermediate lemmas to reduce fuel requirements.
+The original fuel 8 / rlimit 200 proofs have been reduced: `balance_restores_no_red_red_*` now uses fuel 4 with explicit case analysis on `l`/`r` structure. Maximum rlimit across the codebase is 80 (was 200).
 
 ### 5.4 Pulse-Specific Proof Patterns
 
@@ -261,11 +279,11 @@ These are clean and idiomatic. The ghost helpers are well-factored and reusable.
 
 | File | Header Claims | Accurate? |
 |------|--------------|-----------|
-| Spec | "Defines: rbtree type, BST ordering, RB invariants, search, insert, Theorem 13.1, correctness" | ✅ All present |
-| Spec | "Zero admits" | ✅ Confirmed |
-| Impl | "Okasaki-style balance", "NO admits. NO assumes." | ✅ Confirmed |
-| Impl | "Operations: rb_search O(h), rb_ins O(h), rb_insert, rb_balance" | ✅ All present |
-| Complexity | "O(log n) search and insert", "NO admits. NO assumes." | ✅ Confirmed |
+| Spec | "Covers §13.1–13.4", "Kahrs-style delete", "min/max, successor/predecessor" | ✅ All present |
+| Spec | "One admit: delete_is_rbtree" | ✅ Documented |
+| Impl | "Covers §13.1–13.4", "Okasaki-style balance, Kahrs-style delete" | ✅ Confirmed |
+| Impl | "Operations: rb_search, rb_ins, rb_insert, rb_balance, rb_del, rb_delete, rb_balL/R, rb_fuse, free_rbtree" | ✅ All present |
+| Complexity | "O(log n) search, insert, and delete" | ✅ Confirmed |
 
 ### 6.2 Inline Documentation
 
@@ -275,9 +293,9 @@ These are clean and idiomatic. The ghost helpers are well-factored and reusable.
 
 ### 6.3 Misleading or Missing Documentation
 
-- **Title says "CLRS Chapter 13"** but only §13.1–13.3 are covered. §13.4 (Deletion) is entirely absent. The module header should note this limitation.
-- **No mention of Okasaki citation** in the Spec file. The Impl file mentions "Okasaki-style balance" but does not cite the original paper (Okasaki, "Red-Black Trees in a Functional Setting", JFP 1999).
-- **No API documentation** for the Pulse functions (e.g., documenting that `rb_insert` destroys the input tree).
+- ~~**Title says "CLRS Chapter 13" but only §13.1–13.3 are covered**~~ — ✅ Now covers §13.1–13.4.
+- ~~**No mention of Okasaki citation**~~ — ✅ Okasaki citation added to Spec header.
+- ~~**No API documentation** for the Pulse functions~~ — ✅ Pulse header documents all operations including that `rb_insert`/`rb_delete` destroy input trees.
 
 ---
 
@@ -285,22 +303,22 @@ These are clean and idiomatic. The ghost helpers are well-factored and reusable.
 
 ### Priority: Critical (P0)
 
-| # | Task | Rationale |
-|---|------|-----------|
-| 2 | **Add `delete` to Spec** with Okasaki-style functional delete | Must precede Pulse implementation. Consider Kahrs/Germane-Might style functional delete. |
-| 3 | **Prove `delete` preserves RB + BST invariants** | Core correctness obligation |
-| 1 | **Implement RB-DELETE** (§13.4) | CLRS Ch13 is incomplete without deletion. This is the most complex operation and the main gap. Requires `RB-TRANSPLANT`, `TREE-MINIMUM`, `RB-DELETE-FIXUP`. |
-| 4 | **Implement `delete` in Pulse** | Pointer-level verified implementation |
-| 5 | **Add delete complexity analysis** | O(log n) delete ticks |
-| 6 | **Add `minimum` / `maximum` operations** | Useful standalone + needed for delete |
-| 7 | **Reduce Z3 resource usage** for `balance_restores_no_red_red_*` (fuel 8, rlimit 200) and `balance_is_bst` (fuel 4, rlimit 200) | Proof stability under Z3 version changes |
-| 8 | **Add `free_rbtree` operation** in Pulse to deallocate an entire tree | Memory management completeness |
-| 9 | **Prove `insert` preserves node count** (size increases by 0 or 1) | Set-theoretic completeness |
-| 10 | **Update module header** to note that §13.4 (delete) is not yet covered | Documentation accuracy |
-| 11 | **Add Okasaki citation** to Spec file header | Academic completeness |
-| 15 | **Embed tick counters into Pulse operations** | Tie complexity proof directly to compiled code |
-| 12 | **Refactor `classify_runtime`** — extract per-case helpers to reduce nesting | Maintainability |
-| 14 | **Add successor / predecessor** | CLRS §12.2 completeness |
+| # | Task | Rationale | Status |
+|---|------|-----------|--------|
+| 2 | **Add `delete` to Spec** with Kahrs-style functional delete | Must precede Pulse implementation | ✅ Done |
+| 3 | **Prove `delete` preserves RB + BST invariants** | Core correctness obligation | ✅ Membership + BST proven; RB admitted |
+| 1 | **Implement RB-DELETE** (§13.4) in Pulse | CLRS Ch13 completeness | ✅ Done (`rb_del`, `rb_delete`, `rb_balL`, `rb_balR`, `rb_fuse`) |
+| 4 | **Implement `delete` in Pulse** | Pointer-level verified implementation | ✅ Done |
+| 5 | **Add delete complexity analysis** | O(log n) delete ticks | ✅ Done (`fuse_ticks`, `del_ticks`, `delete_ticks`) |
+| 6 | **Add `minimum` / `maximum` operations** | Useful standalone + needed for delete | ✅ Done with correctness proofs |
+| 7 | **Reduce Z3 resource usage** | Proof stability under Z3 version changes | ✅ Done (max rlimit 200→80, max fuel 8→4) |
+| 8 | **Add `free_rbtree` operation** in Pulse | Memory management completeness | ✅ Done |
+| 9 | **Prove `insert` preserves node count** | Set-theoretic completeness | ✅ Done (`insert_node_count`) |
+| 10 | **Update module header** | Documentation accuracy | ✅ Done |
+| 11 | **Add Okasaki citation** to Spec file header | Academic completeness | ✅ Done |
+| 14 | **Add successor / predecessor** | CLRS §12.2 completeness | ✅ Done with `successor_is_next`/`predecessor_is_prev` |
+| 15 | **Embed tick counters into Pulse operations** | Tie complexity proof directly to compiled code | ⏳ Deferred — requires invasive signature changes |
+| 12 | **Refactor `classify_runtime`** | Maintainability | ⏳ Deferred — Pulse slprop threading makes extraction counterproductive |
 
 ### DEFER
 
@@ -314,11 +332,11 @@ These are clean and idiomatic. The ghost helpers are well-factored and reusable.
 
 | Dimension | Grade | Notes |
 |-----------|-------|-------|
-| CLRS Fidelity | **B+** | Insert and search are faithful (via Okasaki). Delete (§13.4) is entirely absent — a significant gap for Ch13 completeness. |
-| Specification Strength | **A** | All 5 RB properties, BST invariant, membership correctness, full preservation proofs for insert. |
-| Complexity | **A** | O(log n) for search/insert proven with clean ghost tick approach. Theorem 13.1 fully verified. |
+| CLRS Fidelity | **A** | All of §13.1–13.4 implemented: search, insert, delete (Okasaki/Kahrs style). |
+| Specification Strength | **A** | All 5 RB properties, BST invariant, membership correctness, preservation proofs for insert and delete. One admit: `delete_is_rbtree`. |
+| Complexity | **A** | O(log n) for search, insert, and delete proven with clean ghost tick approach. Theorem 13.1 fully verified. |
 | Code Quality | **A−** | Excellent module separation. Minor verbosity in `classify_runtime`. |
-| Proof Quality | **A+** | Zero admits/assumes. Fully machine-checked. Some high-fuel proofs but all verify. |
-| Documentation | **B+** | Good inline docs. Missing: deletion gap disclosure, Okasaki citation, API-level docs for Pulse functions. |
+| Proof Quality | **A** | One admit (`delete_is_rbtree`). All other proofs fully machine-checked. Max rlimit reduced to 80. |
+| Documentation | **A−** | Headers updated with §13.4 coverage, Okasaki citation, API docs. Admit clearly documented. |
 
-**Overall: A−** — A high-quality verified implementation of RB-tree insertion with strong proofs, limited by the absence of deletion.
+**Overall: A** — A comprehensive verified implementation of Red-Black Trees covering all CLRS Ch13 operations, with strong correctness and complexity proofs. The single admitted lemma (`delete_is_rbtree`) is clearly documented and does not affect the Pulse implementation's functional correctness.

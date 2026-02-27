@@ -1,16 +1,26 @@
 (**
  * CLRS Chapter 13: Red-Black Trees — Pure Functional Specification
  *
+ * Covers CLRS §13.1–13.4 (properties, rotations, insertion, deletion).
+ *
  * Defines:
  *   - Inductive rbtree type with Red/Black colors
  *   - BST ordering predicate (all_lt / all_gt bounds)
  *   - RB invariants: no_red_red, same_black_height, root_black
  *   - Functional search, insert with Okasaki-style balance/fixup
+ *   - Functional delete with Kahrs-style balL/balR/fuse
+ *   - Minimum/maximum and successor/predecessor operations
  *   - CLRS Theorem 13.1: height ≤ 2·lg(n+1)
  *     via key lemma: node_count ≥ 2^bh - 1
- *   - Correctness: insert preserves membership and RB invariants
+ *   - Correctness: insert/delete preserve membership and BST invariants
+ *   - delete_is_rbtree (RB preservation) admitted — see note below
  *
- * Zero admits.
+ * The balancing approach follows Okasaki, "Red-Black Trees in a
+ * Functional Setting", Journal of Functional Programming, 1999.
+ *
+ * One admit: delete_is_rbtree (RB invariant preservation for delete).
+ * The internal invariant of `del` involves a nuanced color-dependent
+ * property (almost_no_red_red vs no_red_red) that is left as future work.
  *)
 module CLRS.Ch13.RBTree.Spec
 
@@ -387,7 +397,7 @@ let rec all_gt_weaken (t: rbtree) (b1 b2: int)
 
 
 // ins preserves BST ordering
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 200"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
 let balance_is_bst (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires is_bst l /\ is_bst r /\ all_lt l v /\ all_gt r v)
@@ -462,18 +472,24 @@ let almost_no_red_red (t: rbtree) : bool =
   | Leaf -> true
   | Node _ l _ r -> no_red_red l && no_red_red r
 
-#push-options "--fuel 8 --ifuel 4 --z3rlimit 200"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
 let balance_restores_no_red_red_left (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires c = Black /\ almost_no_red_red l /\ no_red_red r)
     (ensures no_red_red (balance c l v r))
-  = ()
+  = match l with
+    | Node Red (Node Red _ _ _) _ _ -> ()  // BC_LL
+    | Node Red _ _ (Node Red _ _ _) -> ()  // BC_LR
+    | _ -> ()                               // BC_None (no right-side rotation since r is no_red_red)
 
 let balance_restores_no_red_red_right (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires c = Black /\ no_red_red l /\ almost_no_red_red r)
     (ensures no_red_red (balance c l v r))
-  = ()
+  = match r with
+    | Node Red (Node Red _ _ _) _ _ -> ()  // BC_RL
+    | Node Red _ _ (Node Red _ _ _) -> ()  // BC_RR
+    | _ -> ()                               // BC_None
 
 // Red parent: balance is identity when no fixup patterns match, 
 // so result is almost_no_red_red (children are ok, root might not be)
@@ -522,3 +538,704 @@ let insert_is_rbtree (t: rbtree) (k: int)
     (requires is_rbtree t)
     (ensures is_rbtree (insert t k))
   = ins_properties t k
+
+(*** Minimum / Maximum ***)
+
+// Find the minimum key in a non-empty BST
+let rec minimum (t: rbtree{Node? t}) : int =
+  match t with
+  | Node _ Leaf v _ -> v
+  | Node _ l _ _ -> minimum l
+
+// Find the maximum key in a non-empty BST
+let rec maximum (t: rbtree{Node? t}) : int =
+  match t with
+  | Node _ _ v Leaf -> v
+  | Node _ _ _ r -> maximum r
+
+// minimum is a member of the tree
+let rec minimum_mem (t: rbtree{Node? t})
+  : Lemma (ensures mem (minimum t) t)
+    (decreases t)
+  = match t with
+    | Node _ Leaf v _ -> ()
+    | Node _ l _ _ -> minimum_mem l
+
+// maximum is a member of the tree
+let rec maximum_mem (t: rbtree{Node? t})
+  : Lemma (ensures mem (maximum t) t)
+    (decreases t)
+  = match t with
+    | Node _ _ v Leaf -> ()
+    | Node _ _ _ r -> maximum_mem r
+
+// Helper: all_gt r v /\ mem x r ==> x > v
+let rec all_gt_mem (t: rbtree) (bound: int) (x: int)
+  : Lemma
+    (requires all_gt t bound /\ mem x t)
+    (ensures x > bound)
+    (decreases t)
+  = match t with
+    | Node _ l v r ->
+      if x = v then ()
+      else if mem x l then all_gt_mem l bound x
+      else all_gt_mem r bound x
+
+// Helper: all_lt l v /\ mem x l ==> x < v
+let rec all_lt_mem (t: rbtree) (bound: int) (x: int)
+  : Lemma
+    (requires all_lt t bound /\ mem x t)
+    (ensures x < bound)
+    (decreases t)
+  = match t with
+    | Node _ l v r ->
+      if x = v then ()
+      else if mem x l then all_lt_mem l bound x
+      else all_lt_mem r bound x
+
+// minimum is <= all keys in a BST
+let rec minimum_is_min (t: rbtree{Node? t}) (x: int)
+  : Lemma
+    (requires is_bst t /\ mem x t)
+    (ensures minimum t <= x)
+    (decreases t)
+  = match t with
+    | Node _ Leaf v r ->
+      if x = v then ()
+      else all_gt_mem r v x
+    | Node _ l v r ->
+      if x = v then begin
+        minimum_mem l;
+        all_lt_mem l v (minimum l)
+      end
+      else if mem x l then
+        minimum_is_min l x
+      else begin
+        minimum_mem l;
+        all_lt_mem l v (minimum l);
+        all_gt_mem r v x
+      end
+
+// maximum is >= all keys in a BST
+let rec maximum_is_max (t: rbtree{Node? t}) (x: int)
+  : Lemma
+    (requires is_bst t /\ mem x t)
+    (ensures maximum t >= x)
+    (decreases t)
+  = match t with
+    | Node _ l v Leaf ->
+      if x = v then ()
+      else all_lt_mem l v x
+    | Node _ l v r ->
+      if x = v then begin
+        maximum_mem r;
+        all_gt_mem r v (maximum r)
+      end
+      else if mem x r then
+        maximum_is_max r x
+      else begin
+        maximum_mem r;
+        all_gt_mem r v (maximum r);
+        all_lt_mem l v x
+      end
+
+// Helper: in a BST, if all_gt r v and k <= v, then k is not in r
+let rec bst_lt_not_mem (t: rbtree) (bound: int) (k: int)
+  : Lemma
+    (requires all_gt t bound /\ k <= bound)
+    (ensures mem k t = false)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node _ l v r -> bst_lt_not_mem l bound k; bst_lt_not_mem r bound k
+
+// Helper: in a BST, if all_lt l v and k >= v, then k is not in l
+let rec bst_gt_not_mem (t: rbtree) (bound: int) (k: int)
+  : Lemma
+    (requires all_lt t bound /\ k >= bound)
+    (ensures mem k t = false)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node _ l v r -> bst_gt_not_mem l bound k; bst_gt_not_mem r bound k
+
+(*** Successor / Predecessor — CLRS §12.2 ***)
+
+// Successor: smallest key strictly greater than k.
+// Searches from root (no parent pointers in the pure spec).
+let rec successor (t: rbtree) (k: int) : option int =
+  match t with
+  | Leaf -> None
+  | Node _ l v r ->
+    if k < v then
+      (match successor l k with
+       | Some s -> Some s
+       | None -> Some v)
+    else
+      successor r k
+
+// Predecessor: largest key strictly less than k.
+let rec predecessor (t: rbtree) (k: int) : option int =
+  match t with
+  | Leaf -> None
+  | Node _ l v r ->
+    if k > v then
+      (match predecessor r k with
+       | Some p -> Some p
+       | None -> Some v)
+    else
+      predecessor l k
+
+// Successor correctness: if successor returns Some s, then s > k and s is in the tree
+let rec successor_mem (t: rbtree) (k: int)
+  : Lemma (ensures (match successor t k with
+                     | Some s -> mem s t = true /\ s > k
+                     | None -> true))
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node _ l v r ->
+      if k < v then
+        successor_mem l k
+      else
+        successor_mem r k
+
+// Predecessor correctness: if predecessor returns Some p, then p < k and p is in the tree
+let rec predecessor_mem (t: rbtree) (k: int)
+  : Lemma (ensures (match predecessor t k with
+                     | Some p -> mem p t = true /\ p < k
+                     | None -> true))
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node _ l v r ->
+      if k > v then
+        predecessor_mem r k
+      else
+        predecessor_mem l k
+
+// Successor is the smallest key > k (in a BST)
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 50"
+let rec successor_is_next (t: rbtree) (k: int) (x: int)
+  : Lemma
+    (requires is_bst t /\ mem x t = true /\ x > k)
+    (ensures (match successor t k with
+               | Some s -> s <= x
+               | None -> false))
+    (decreases t)
+  = match t with
+    | Node _ l v r ->
+      if k < v then begin
+        if x < v then begin
+          // x is in l (from is_bst: all_gt r v and x < v means x not in r)
+          bst_lt_not_mem r v x;
+          successor_is_next l k x
+        end else if x = v then begin
+          // successor l k returns Some s with s in l, hence s < v = x; or None → Some v = x
+          successor_mem l k;
+          match successor l k with
+          | Some s -> all_lt_mem l v s
+          | None -> ()
+        end else begin
+          // x > v, x is in r. successor l k gives Some s < v < x, or None → Some v < x
+          successor_mem l k;
+          match successor l k with
+          | Some s -> all_lt_mem l v s
+          | None -> ()
+        end
+      end else begin
+        // k >= v, so x > k >= v, meaning x > v and x must be in r
+        if x > v then begin
+          bst_gt_not_mem l v x;
+          successor_is_next r k x
+        end else ()  // x <= v contradicts x > k >= v
+      end
+#pop-options
+
+// Predecessor is the largest key < k (in a BST)
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 50"
+let rec predecessor_is_prev (t: rbtree) (k: int) (x: int)
+  : Lemma
+    (requires is_bst t /\ mem x t = true /\ x < k)
+    (ensures (match predecessor t k with
+               | Some p -> p >= x
+               | None -> false))
+    (decreases t)
+  = match t with
+    | Node _ l v r ->
+      if k > v then begin
+        if x > v then begin
+          bst_gt_not_mem l v x;
+          predecessor_is_prev r k x
+        end else if x = v then begin
+          predecessor_mem r k;
+          match predecessor r k with
+          | Some p -> all_gt_mem r v p
+          | None -> ()
+        end else begin
+          // x < v, x is in l. predecessor r k gives Some p > v > x, or None → Some v > x
+          predecessor_mem r k;
+          match predecessor r k with
+          | Some p -> all_gt_mem r v p
+          | None -> ()
+        end
+      end else begin
+        if x < v then begin
+          bst_lt_not_mem r v x;
+          predecessor_is_prev l k x
+        end else ()
+      end
+#pop-options
+
+(*** Delete — Kahrs-style functional deletion ***)
+
+// Recolor a black node to red (used in delete rebalancing).
+let redden (t: rbtree) : rbtree =
+  match t with
+  | Node Black l v r -> Node Red l v r
+  | _ -> t
+
+// Rebalance after deletion from the left subtree caused a black-height deficit.
+let balL (l: rbtree) (v: int) (r: rbtree) : rbtree =
+  match l, r with
+  | Node Red a x b, _ ->
+    Node Red (Node Black a x b) v r
+  | _, Node Black b y c ->
+    balance Black l v (Node Red b y c)
+  | _, Node Red (Node Black b y c) z d ->
+    Node Red (Node Black l v b) y (balance Black c z (redden d))
+  | _ -> Node Black l v r
+
+// Rebalance after deletion from the right subtree caused a black-height deficit.
+let balR (l: rbtree) (v: int) (r: rbtree) : rbtree =
+  match l, r with
+  | _, Node Red b y c ->
+    Node Red l v (Node Black b y c)
+  | Node Black a x b, _ ->
+    balance Black (Node Red a x b) v r
+  | Node Red a x (Node Black b y c), _ ->
+    Node Red (balance Black (redden a) x b) y (Node Black c v r)
+  | _ -> Node Black l v r
+
+// Fuse two subtrees: merge the children of a deleted node.
+let rec fuse (l r: rbtree) : Tot rbtree (decreases (node_count l + node_count r)) =
+  match l, r with
+  | Leaf, _ -> r
+  | _, Leaf -> l
+  | Node Red a x b, Node Red c y d ->
+    let s = fuse b c in
+    (match s with
+     | Node Red b' z c' -> Node Red (Node Red a x b') z (Node Red c' y d)
+     | _ -> Node Red a x (Node Red s y d))
+  | Node Black a x b, Node Black c y d ->
+    let s = fuse b c in
+    (match s with
+     | Node Red b' z c' -> Node Red (Node Black a x b') z (Node Black c' y d)
+     | _ -> balL a x (Node Black s y d))
+  | Node Red a x b, _ ->
+    Node Red a x (fuse b r)
+  | _, Node Red c y d ->
+    Node Red (fuse l c) y d
+
+// Delete helper: removes key k from tree t.
+let rec del (t: rbtree) (k: int) : Tot rbtree (decreases t) =
+  match t with
+  | Leaf -> Leaf
+  | Node c l v r ->
+    if k < v then
+      (match c, l with
+       | Black, Node Black _ _ _ -> balL (del l k) v r
+       | _, _ -> Node c (del l k) v r)
+    else if k > v then
+      (match c, r with
+       | Black, Node Black _ _ _ -> balR l v (del r k)
+       | _, _ -> Node c l v (del r k))
+    else
+      fuse l r
+
+// Top-level delete: del + make root black
+let delete (t: rbtree) (k: int) : rbtree =
+  make_black (del t k)
+
+(*** Delete Correctness — Membership ***)
+
+
+// balL preserves membership
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+let balL_mem (l: rbtree) (v: int) (r: rbtree) (x: int)
+  : Lemma (ensures mem x (balL l v r) <==> (x = v || mem x l || mem x r))
+  = match l, r with
+    | _, Node Black b y c -> balance_mem Black l v (Node Red b y c) x
+    | _, Node Red (Node Black b y c) z d ->
+      balance_mem Black c z (redden d) x
+    | _ -> ()
+#pop-options
+
+// balR preserves membership
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+let balR_mem (l: rbtree) (v: int) (r: rbtree) (x: int)
+  : Lemma (ensures mem x (balR l v r) <==> (x = v || mem x l || mem x r))
+  = match l, r with
+    | Node Black a x' b, _ -> balance_mem Black (Node Red a x' b) v r x
+    | Node Red a x' (Node Black b y c), _ ->
+      balance_mem Black (redden a) x' b x
+    | _ -> ()
+#pop-options
+
+// fuse preserves membership
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
+let rec fuse_mem (l r: rbtree) (x: int)
+  : Lemma
+    (ensures mem x (fuse l r) <==> (mem x l || mem x r))
+    (decreases (node_count l + node_count r))
+  = match l, r with
+    | Leaf, _ -> ()
+    | _, Leaf -> ()
+    | Node Red a xv b, Node Red c y d ->
+      fuse_mem b c x
+    | Node Black a xv b, Node Black c y d ->
+      fuse_mem b c x;
+      (match fuse b c with
+       | Node Red _ _ _ -> ()
+       | _ -> balL_mem a xv (Node Black (fuse b c) y d) x)
+    | Node Red a xv b, _ ->
+      fuse_mem b r x
+    | _, Node Red c y d ->
+      fuse_mem l c x
+#pop-options
+
+// del preserves membership (removes exactly k)
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 50"
+let rec del_mem (t: rbtree) (k: int) (x: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures mem x (del t k) <==> (mem x t && x <> k))
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      assert (is_bst l /\ is_bst r);
+      if k < v then begin
+        del_mem l k x;
+        bst_lt_not_mem r v k;
+        assert (mem k r = false);
+        (match c, l with
+         | Black, Node Black _ _ _ -> balL_mem (del l k) v r x
+         | _, _ -> ())
+      end else if k > v then begin
+        del_mem r k x;
+        bst_gt_not_mem l v k;
+        assert (mem k l = false);
+        (match c, r with
+         | Black, Node Black _ _ _ -> balR_mem l v (del r k) x
+         | _, _ -> ())
+      end else begin
+        bst_gt_not_mem l v v;
+        bst_lt_not_mem r v v;
+        fuse_mem l r x
+      end
+#pop-options
+
+// delete preserves membership (removes exactly k)
+let delete_mem (t: rbtree) (k: int) (x: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures mem x (delete t k) <==> (mem x t && x <> k))
+  = del_mem t k x
+
+(*** Delete Correctness — BST Preservation ***)
+
+// balL preserves all_lt / all_gt
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
+let balL_all_lt (l: rbtree) (v: int) (r: rbtree) (bound: int)
+  : Lemma
+    (requires all_lt l bound /\ all_lt r bound /\ v < bound)
+    (ensures all_lt (balL l v r) bound)
+  = match l, r with
+    | _, Node Black b y c -> balance_all_lt Black l v (Node Red b y c) bound
+    | _, Node Red (Node Black b y c) z d ->
+      balance_all_lt Black c z (redden d) bound
+    | _ -> ()
+
+let balL_all_gt (l: rbtree) (v: int) (r: rbtree) (bound: int)
+  : Lemma
+    (requires all_gt l bound /\ all_gt r bound /\ v > bound)
+    (ensures all_gt (balL l v r) bound)
+  = match l, r with
+    | _, Node Black b y c -> balance_all_gt Black l v (Node Red b y c) bound
+    | _, Node Red (Node Black b y c) z d ->
+      balance_all_gt Black c z (redden d) bound
+    | _ -> ()
+
+let balR_all_lt (l: rbtree) (v: int) (r: rbtree) (bound: int)
+  : Lemma
+    (requires all_lt l bound /\ all_lt r bound /\ v < bound)
+    (ensures all_lt (balR l v r) bound)
+  = match l, r with
+    | Node Black a x b, _ -> balance_all_lt Black (Node Red a x b) v r bound
+    | Node Red a x (Node Black b y c), _ ->
+      balance_all_lt Black (redden a) x b bound
+    | _ -> ()
+
+let balR_all_gt (l: rbtree) (v: int) (r: rbtree) (bound: int)
+  : Lemma
+    (requires all_gt l bound /\ all_gt r bound /\ v > bound)
+    (ensures all_gt (balR l v r) bound)
+  = match l, r with
+    | Node Black a x b, _ -> balance_all_gt Black (Node Red a x b) v r bound
+    | Node Red a x (Node Black b y c), _ ->
+      balance_all_gt Black (redden a) x b bound
+    | _ -> ()
+#pop-options
+
+// balL preserves BST
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 80"
+let balL_is_bst (l: rbtree) (v: int) (r: rbtree)
+  : Lemma
+    (requires is_bst l /\ is_bst r /\ all_lt l v /\ all_gt r v)
+    (ensures is_bst (balL l v r))
+  = match l, r with
+    | _, Node Black b y c ->
+      balance_is_bst Black l v (Node Red b y c)
+    | _, Node Red (Node Black b y c) z d ->
+      // Result: Node Red (Node Black l v b) y (balance Black c z (redden d))
+      // Establish facts from preconditions
+      all_lt_weaken l v y;
+      all_gt_weaken d z y;
+      balance_is_bst Black c z (redden d);
+      balance_all_gt Black c z (redden d) y
+    | _ -> ()
+
+let balR_is_bst (l: rbtree) (v: int) (r: rbtree)
+  : Lemma
+    (requires is_bst l /\ is_bst r /\ all_lt l v /\ all_gt r v)
+    (ensures is_bst (balR l v r))
+  = match l, r with
+    | Node Black a x b, _ ->
+      balance_is_bst Black (Node Red a x b) v r
+    | Node Red a x (Node Black b y c), _ ->
+      all_gt_weaken r v y;
+      all_lt_weaken a x y;
+      balance_is_bst Black (redden a) x b;
+      balance_all_lt Black (redden a) x b y
+    | _ -> ()
+#pop-options
+
+// fuse preserves all_lt
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
+let rec fuse_all_lt (l r: rbtree) (bound: int)
+  : Lemma
+    (requires all_lt l bound /\ all_lt r bound)
+    (ensures all_lt (fuse l r) bound)
+    (decreases (node_count l + node_count r))
+  = match l, r with
+    | Leaf, _ -> ()
+    | _, Leaf -> ()
+    | Node Red a x b, Node Red c y d ->
+      fuse_all_lt b c bound
+    | Node Black a x b, Node Black c y d ->
+      fuse_all_lt b c bound;
+      (match fuse b c with
+       | Node Red _ _ _ -> ()
+       | _ -> balL_all_lt a x (Node Black (fuse b c) y d) bound)
+    | Node Red a x b, _ ->
+      fuse_all_lt b r bound
+    | _, Node Red c y d ->
+      fuse_all_lt l c bound
+
+let rec fuse_all_gt (l r: rbtree) (bound: int)
+  : Lemma
+    (requires all_gt l bound /\ all_gt r bound)
+    (ensures all_gt (fuse l r) bound)
+    (decreases (node_count l + node_count r))
+  = match l, r with
+    | Leaf, _ -> ()
+    | _, Leaf -> ()
+    | Node Red a x b, Node Red c y d ->
+      fuse_all_gt b c bound
+    | Node Black a x b, Node Black c y d ->
+      fuse_all_gt b c bound;
+      (match fuse b c with
+       | Node Red _ _ _ -> ()
+       | _ -> balL_all_gt a x (Node Black (fuse b c) y d) bound)
+    | Node Red a x b, _ ->
+      fuse_all_gt b r bound
+    | _, Node Red c y d ->
+      fuse_all_gt l c bound
+#pop-options
+
+// fuse preserves BST — uses explicit bounds (all_lt l sep, all_gt r sep)
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 80"
+let rec fuse_is_bst (l r: rbtree) (sep: int)
+  : Lemma
+    (requires is_bst l /\ is_bst r /\ all_lt l sep /\ all_gt r sep)
+    (ensures is_bst (fuse l r))
+    (decreases (node_count l + node_count r))
+  = match l, r with
+    | Leaf, _ -> ()
+    | _, Leaf -> ()
+    | Node Red a x b, Node Red c y d ->
+      // Derive cross-bounds: all_gt c x and all_lt b y
+      all_gt_weaken c sep x;
+      all_lt_weaken b sep y;
+      fuse_is_bst b c sep;
+      fuse_all_gt b c x;
+      fuse_all_lt b c y;
+      (match fuse b c with
+       | Node Red b' z c' ->
+         all_lt_weaken a x z;
+         all_gt_weaken d y z
+       | _ ->
+         all_gt_weaken d y x)
+    | Node Black a x b, Node Black c y d ->
+      all_gt_weaken c sep x;
+      all_lt_weaken b sep y;
+      fuse_is_bst b c sep;
+      fuse_all_gt b c x;
+      fuse_all_lt b c y;
+      (match fuse b c with
+       | Node Red b' z c' ->
+         all_lt_weaken a x z;
+         all_gt_weaken d y z
+       | _ ->
+         all_gt_weaken d y x;
+         balL_is_bst a x (Node Black (fuse b c) y d))
+    | Node Red a x b, _ ->
+      all_gt_weaken r sep x;
+      fuse_is_bst b r sep;
+      fuse_all_gt b r x
+    | _, Node Red c y d ->
+      all_lt_weaken l sep y;
+      fuse_is_bst l c sep;
+      fuse_all_lt l c y
+#pop-options
+
+// del preserves all_lt / all_gt
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 80"
+let rec del_all_lt (t: rbtree) (k: int) (bound: int)
+  : Lemma
+    (requires is_bst t /\ all_lt t bound)
+    (ensures all_lt (del t k) bound)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k < v then begin
+        del_all_lt l k bound;
+        (match c, l with
+         | Black, Node Black _ _ _ -> balL_all_lt (del l k) v r bound
+         | _, _ -> ())
+      end else if k > v then begin
+        del_all_lt r k bound;
+        (match c, r with
+         | Black, Node Black _ _ _ -> balR_all_lt l v (del r k) bound
+         | _, _ -> ())
+      end else
+        fuse_all_lt l r bound
+
+let rec del_all_gt (t: rbtree) (k: int) (bound: int)
+  : Lemma
+    (requires is_bst t /\ all_gt t bound)
+    (ensures all_gt (del t k) bound)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k < v then begin
+        del_all_gt l k bound;
+        (match c, l with
+         | Black, Node Black _ _ _ -> balL_all_gt (del l k) v r bound
+         | _, _ -> ())
+      end else if k > v then begin
+        del_all_gt r k bound;
+        (match c, r with
+         | Black, Node Black _ _ _ -> balR_all_gt l v (del r k) bound
+         | _, _ -> ())
+      end else
+        fuse_all_gt l r bound
+#pop-options
+
+// del preserves BST
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 80"
+let rec del_preserves_bst (t: rbtree) (k: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures is_bst (del t k))
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k < v then begin
+        del_preserves_bst l k;
+        del_all_lt l k v;
+        (match c, l with
+         | Black, Node Black _ _ _ -> balL_is_bst (del l k) v r
+         | _, _ -> ())
+      end else if k > v then begin
+        del_preserves_bst r k;
+        del_all_gt r k v;
+        (match c, r with
+         | Black, Node Black _ _ _ -> balR_is_bst l v (del r k)
+         | _, _ -> ())
+      end else begin
+        fuse_is_bst l r v
+      end
+#pop-options
+
+let delete_preserves_bst (t: rbtree) (k: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures is_bst (delete t k))
+  = del_preserves_bst t k
+
+(*** Delete Correctness — RB Invariant Preservation ***)
+
+// The RB invariant preservation proof for delete requires careful tracking of
+// color-dependent invariants through balL/balR/fuse/del. The internal invariant
+// of del is: del on a Black node produces (same_bh, no_red_red, bh-1), while
+// del on a Red node produces (same_bh, almost_no_red_red, bh or bh-1 depending
+// on whether the deleted key was at a Red or Black node). This is future work.
+
+// delete maintains all RB properties
+let delete_is_rbtree (t: rbtree) (k: int)
+  : Lemma
+    (requires is_rbtree t)
+    (ensures is_rbtree (delete t k))
+  = admit ()  // TODO: prove via del_properties induction
+
+(*** Insert Preserves Node Count ***)
+
+// balance preserves node count
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+let balance_node_count (c: color) (l: rbtree) (v: int) (r: rbtree)
+  : Lemma (ensures node_count (balance c l v r) = 1 + node_count l + node_count r)
+  = ()
+#pop-options
+
+// ins increases node count by 0 (if key exists) or 1 (if key is new)
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+let rec ins_node_count (t: rbtree) (k: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures node_count (ins t k) = (if mem k t then node_count t else node_count t + 1))
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k < v then begin
+        ins_node_count l k;
+        balance_node_count c (ins l k) v r;
+        bst_lt_not_mem r v k
+      end else if k > v then begin
+        ins_node_count r k;
+        balance_node_count c l v (ins r k);
+        bst_gt_not_mem l v k
+      end else ()
+#pop-options
+
+// insert increases node count by 0 or 1
+let insert_node_count (t: rbtree) (k: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures node_count (insert t k) = (if mem k t then node_count t else node_count t + 1))
+  = ins_node_count t k
