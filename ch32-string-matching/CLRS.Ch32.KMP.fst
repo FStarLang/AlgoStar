@@ -7,15 +7,19 @@
    that is also a suffix of P[0..i].
 
    Proves memory safety, prefix function correctness (pi is a valid prefix-suffix),
-   and O(n + m) comparison complexity.
-   Functional correctness (count == spec) is proven separately in KMP.Spec.fst;
-   the connection to this Pulse implementation is not yet formally established.
+   O(n + m) comparison complexity, and functional correctness:
+   the returned count equals the total number of pattern occurrences in the text,
+   as defined by Spec.count_matches_spec.
    Key insight from CLRS §32.4:
    - Prefix function computation: at most 2(m-1) comparisons
    - Matching phase: at most 2n comparisons
    - Total: at most 2n + 2m comparisons
 
    The proof uses amortized analysis with potential function Φ = k (or q in matcher).
+   The functional correctness proof tracks Spec.is_max_prefix_below and
+   Spec.follow_fail through the KMP loop, connecting the Pulse implementation
+   to the pure specification via Bridge.pi_max_sz_to_spec_pi_max and
+   Spec.kmp_count_step.
 
    NO admits. NO assumes.
 *)
@@ -37,6 +41,7 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Bridge = CLRS.Ch32.KMP.Bridge
+module Spec = CLRS.Ch32.KMP.Spec
 
 open CLRS.Ch32.KMP.PureDefs
 
@@ -221,7 +226,7 @@ fn compute_prefix_function
 
 // ========== KMP Matcher ==========
 
-#push-options "--z3rlimit 50 --ifuel 1 --fuel 1"
+#push-options "--z3rlimit 100 --ifuel 1 --fuel 1"
 
 //SNIPPET_START: kmp_matcher_sig
 fn kmp_matcher
@@ -252,7 +257,8 @@ fn kmp_matcher
       SZ.fits (SZ.v n + 1) /\
       SZ.fits (SZ.v m + 1) /\
       SZ.fits (2 * SZ.v n) /\
-      pi_correct s_pat s_pi
+      pi_correct s_pat s_pi /\
+      Bridge.pi_max_sz s_pat s_pi
     )
   returns count: SZ.t
   ensures exists* (cf: nat).
@@ -263,10 +269,14 @@ fn kmp_matcher
     pure (
       SZ.v count >= 0 /\
       SZ.v count <= SZ.v n + 1 /\
+      SZ.v count == Spec.count_matches_spec (reveal s_text) (reveal s_pat) (SZ.v n) (SZ.v m) /\
       matcher_complexity_bound cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: kmp_matcher_sig
 {
+  // Convert pi_max_sz to Spec.pi_max for the int-sequence version
+  Bridge.pi_max_sz_to_spec_pi_max (reveal s_pat) (reveal s_pi);
+  
   let mut q: SZ.t = 0sz;
   let mut count_matches: SZ.t = 0sz;
   let mut i: SZ.t = 0sz;
@@ -289,11 +299,17 @@ fn kmp_matcher
       SZ.v vcount <= SZ.v vi + 1 /\
       // Amortized invariant: (comparisons - c0) + q <= 2*i
       vc >= reveal c0 /\
-      vc - reveal c0 + SZ.v vq <= 2 * SZ.v vi
+      vc - reveal c0 + SZ.v vq <= 2 * SZ.v vi /\
+      // Spec invariants
+      Spec.is_max_prefix_below (reveal s_text) (reveal s_pat) (SZ.v vi) (SZ.v vq) /\
+      (SZ.v vi >= SZ.v m ==>
+        SZ.v vcount == Spec.count_before (reveal s_text) (reveal s_pat) (SZ.v vi - SZ.v m + 1)) /\
+      (SZ.v vi < SZ.v m ==> SZ.v vcount == 0)
     )
   {
     let vi = !i;
     let vcount_outer = !count_matches;
+    let vq_init = !q;
     
     let mut done_follow: bool = false;
     
@@ -317,7 +333,14 @@ fn kmp_matcher
         (vdone ==> (SZ.v vq_inner == 0 \/ Seq.index s_pat (SZ.v vq_inner) == Seq.index s_text (SZ.v vi))) /\
         // Amortized: (comparisons - c0) + q <= 2*i
         vc_inner >= reveal c0 /\
-        vc_inner - reveal c0 + SZ.v vq_inner <= 2 * SZ.v vi
+        vc_inner - reveal c0 + SZ.v vq_inner <= 2 * SZ.v vi /\
+        // Spec: carry outer invariants and track follow_fail
+        Spec.is_max_prefix_below (reveal s_text) (reveal s_pat) (SZ.v vi) (SZ.v vq_init) /\
+        (SZ.v vi >= SZ.v m ==>
+          SZ.v vcount_outer == Spec.count_before (reveal s_text) (reveal s_pat) (SZ.v vi - SZ.v m + 1)) /\
+        (SZ.v vi < SZ.v m ==> SZ.v vcount_outer == 0) /\
+        Spec.follow_fail (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vq_init) (Seq.index (reveal s_text) (SZ.v vi)) ==
+          Spec.follow_fail (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vq_inner) (Seq.index (reveal s_text) (SZ.v vi))
       )
     {
       let vq = !q;
@@ -335,6 +358,9 @@ fn kmp_matcher
         assert pure (is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v pi_val));
         assert pure (SZ.v pi_val <= SZ.v vq - 1);
         assert pure (SZ.v pi_val < SZ.v vq);
+        
+        // Connect pi_val to pi_int for follow_fail tracking
+        Bridge.sz_seq_to_int_index (reveal s_pi) (SZ.v vq - 1);
         
         q := pi_val
       } else {
@@ -366,6 +392,10 @@ fn kmp_matcher
     let pi_val_for_reset = V.op_Array_Access pi pi_idx_for_reset;
     let new_q_after_match: SZ.t = (if have_match then pi_val_for_reset else vq_final);
     
+    // Connect Pulse result to spec via kmp_count_step
+    Bridge.sz_seq_to_int_index (reveal s_pi) (SZ.v m - 1);
+    Spec.kmp_count_step (reveal s_text) (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vi) (SZ.v vq_init) (SZ.v vcount_outer);
+    
     let vi_next = vi +^ 1sz;
     assert pure (SZ.v old_count <= SZ.v vi + 1);
     assert pure (SZ.v new_count_val <= SZ.v vi + 2);
@@ -379,6 +409,9 @@ fn kmp_matcher
     
     i := vi_next
   };
+  
+  // After loop: convert count_before to count_matches_spec
+  Spec.count_before_eq_spec (reveal s_text) (reveal s_pat) (SZ.v n) (SZ.v m);
   
   let final_count = !count_matches;
   final_count
@@ -425,6 +458,7 @@ fn kmp_string_match
     pure (
       SZ.v count >= 0 /\
       SZ.v count <= SZ.v n + 1 /\
+      SZ.v count == Spec.count_matches_spec (reveal s_text) (reveal s_pat) (SZ.v n) (SZ.v m) /\
       kmp_total_complexity_bound cf (reveal c0) (SZ.v n) (SZ.v m)
     )
 {
