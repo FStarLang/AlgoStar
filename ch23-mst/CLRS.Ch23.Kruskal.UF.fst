@@ -111,9 +111,73 @@ let comp_reachable (comp: nat -> nat) (es: list edge) (a b: nat)
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 
+let mem_edge_reachable (e: edge) (edges: list edge)
+  : Lemma (requires mem_edge e edges)
+          (ensures reachable edges e.u e.v)
+  = edge_eq_reflexive e;
+    assert (is_path_from_to [e] e.u e.v);
+    assert (subset_edges [e] edges)
+
+// All edges have endpoints within [0, n)
+let all_edges_valid (edges: list edge) (n: nat) : prop =
+  forall (e: edge). mem_edge e edges ==> e.u < n /\ e.v < n
+
+// If find_pure sparent v steps n != root_u, then changing only parent[root_u]
+// doesn't affect the find result (the path never visits root_u).
+let rec find_pure_unchanged
+    (sparent sparent': Seq.seq SZ.t) (v: nat) (steps: nat) (n: nat)
+    (root_u: nat)
+  : Lemma
+    (requires
+      valid_parents sparent n /\ valid_parents sparent' n /\
+      root_u < n /\ SZ.v (Seq.index sparent root_u) = root_u /\
+      (forall (i: nat). i < n /\ i <> root_u ==>
+        Seq.index sparent' i == Seq.index sparent i) /\
+      v < n /\ find_pure sparent v steps n <> root_u)
+    (ensures find_pure sparent' v steps n = find_pure sparent v steps n)
+    (decreases steps)
+  = if steps = 0 then ()
+    else begin
+      if v = root_u then begin
+        // Contradiction: find_pure from a fixed point returns root_u
+        find_pure_fixed sparent root_u (steps - 1) n
+      end else begin
+        let pv = SZ.v (Seq.index sparent v) in
+        // parent'[v] = parent[v] since v <> root_u
+        // find_pure sparent pv (steps-1) n = find_pure sparent v steps n <> root_u
+        find_pure_unchanged sparent sparent' pv (steps - 1) n root_u
+      end
+    end
+
+// If find_pure sparent v steps n = root_u, then in sparent' (where
+// parent'[root_u] = root_v), one additional step routes to root_v.
+let rec find_pure_rerouted
+    (sparent sparent': Seq.seq SZ.t) (v: nat) (steps: nat) (n: nat)
+    (root_u root_v: nat)
+  : Lemma
+    (requires
+      valid_parents sparent n /\ valid_parents sparent' n /\
+      root_u < n /\ root_v < n /\ root_u <> root_v /\
+      SZ.v (Seq.index sparent root_u) = root_u /\
+      SZ.v (Seq.index sparent' root_u) = root_v /\
+      SZ.v (Seq.index sparent root_v) = root_v /\
+      SZ.v (Seq.index sparent' root_v) = root_v /\
+      (forall (i: nat). i < n /\ i <> root_u ==>
+        Seq.index sparent' i == Seq.index sparent i) /\
+      v < n /\ find_pure sparent v steps n = root_u)
+    (ensures find_pure sparent' v (steps + 1) n = root_v)
+    (decreases steps)
+  = if steps = 0 then ()
+    else if v = root_u then
+      find_pure_fixed sparent' root_v steps n
+    else begin
+      let pv = SZ.v (Seq.index sparent v) in
+      find_pure_rerouted sparent sparent' pv (steps - 1) n root_u root_v
+    end
+
 // Key theorem: union maintains the UF invariant
 // After adding edge (u_val, v_val) and setting parent[root_u] := root_v
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
 let uf_inv_union
     (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
@@ -127,21 +191,68 @@ let uf_inv_union
                     (forall (i: nat). i < n /\ i <> root_u ==>
                       Seq.index sparent' i == Seq.index sparent i) /\
                     new_edge.u = u_val /\ new_edge.v = v_val /\
-                    ec + 1 < n)
+                    ec + 1 < n /\
+                    all_edges_valid edges n)
           (ensures uf_inv sparent' (new_edge :: edges) n (ec + 1))
-  = // The proof follows from:
-    // 1. After union, vertices with old root root_u get new root root_v
-    // 2. Vertices with other old roots are unchanged
-    // 3. UF completeness extends to new_edge :: edges via comp_reachable
-    admit()
+  = find_pure_bounded sparent u_val n n;
+    find_pure_bounded sparent v_val n n;
+    // Establish routing: find_pure sparent' v n n for each v
+    let route (v: nat) : Lemma (requires v < n)
+      (ensures find_pure sparent' v n n =
+               (if find_pure sparent v n n = root_u then root_v
+                else find_pure sparent v n n) /\
+               find_pure sparent' v n n < n) =
+      if find_pure sparent v n n = root_u then begin
+        find_pure_rerouted sparent sparent' v ec n root_u root_v;
+        find_pure_split sparent' v (ec + 1) (n - ec - 1) n;
+        find_pure_fixed sparent' root_v (n - ec - 1) n
+      end else begin
+        find_pure_unchanged sparent sparent' v n n root_u;
+        find_pure_bounded sparent v n n
+      end
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires route);
+    // ec+1 steps suffice for all v
+    let stp (v: nat) : Lemma (requires v < n)
+      (ensures find_pure sparent' v (ec + 1) n = find_pure sparent' v n n) =
+      route v;
+      if find_pure sparent v n n = root_u then
+        find_pure_rerouted sparent sparent' v ec n root_u root_v
+      else begin
+        find_pure_unchanged sparent sparent' v ec n root_u;
+        find_pure_split sparent' v ec 1 n;
+        find_pure_fixed sparent' (find_pure sparent v n n) 1 n
+      end
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires stp);
+    // Completeness: comp_reachable
+    let comp (x: nat) : nat =
+      if x < n then find_pure sparent' x n n else x in
+    route u_val; route v_val;
+    let ecomp (e: edge) : Lemma
+      (requires mem_edge e (new_edge :: edges))
+      (ensures comp e.u = comp e.v) =
+      if edge_eq e new_edge then ()
+      else begin
+        mem_edge_reachable e edges;
+        route e.u; route e.v
+      end
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires ecomp);
+    let full (u v: nat) : Lemma
+      (requires u < n /\ v < n /\ reachable (new_edge :: edges) u v)
+      (ensures find_pure sparent' u n n = find_pure sparent' v n n) =
+      comp_reachable comp (new_edge :: edges) u v
+    in
+    let wrap (u: nat) : Lemma (requires u < n)
+      (ensures forall (v: nat). v < n /\ reachable (new_edge :: edges) u v ==>
+                 find_pure sparent' u n n = find_pure sparent' v n n) =
+      FStar.Classical.forall_intro (FStar.Classical.move_requires (full u))
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires wrap)
+    // Z3 derives remaining uf_inv conjuncts (root fixed points, etc.) 
+    // from routing + old uf_inv + parent' properties
 #pop-options
-
-let mem_edge_reachable (e: edge) (edges: list edge)
-  : Lemma (requires mem_edge e edges)
-          (ensures reachable edges e.u e.v)
-  = edge_eq_reflexive e;
-    assert (is_path_from_to [e] e.u e.v);
-    assert (subset_edges [e] edges)
 
 let not_mem_when_unreachable (e: edge) (edges: list edge)
   : Lemma (requires ~(reachable edges e.u e.v))
