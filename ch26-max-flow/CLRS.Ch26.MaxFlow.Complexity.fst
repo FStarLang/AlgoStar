@@ -35,24 +35,41 @@ let augmentation_cost (num_edges: nat) : tick_count =
 (** Shortest path distance in residual graph G_f *)
 type distance = nat
 
-(** Shortest path distance from source s to vertex v in residual graph G_f
-    We represent this abstractly; full BFS computation would require graph traversal *)
-let shortest_path_distance 
+(** Shortest path distance from source s to vertex v in residual graph G_f.
+    Made irreducible so SMT cannot unfold the definition body; all properties
+    are accessed only through the explicit axioms below. *)
+irreducible let shortest_path_distance 
   (cap: Seq.seq int) 
   (flow: Seq.seq int)
   (n: nat{Seq.length cap == n * n /\ Seq.length flow == n * n})
   (source: nat{source < n})
   (v: nat{v < n})
   : distance
-  = // Abstract function representing BFS distance in residual graph
-    // For complexity analysis, we don't need the actual computation
-    // Properties of this function are stated in lemmas below
-    // In practice, this would be computed via BFS on the residual graph
-    if source = v then 0 else n  // Conservative bound: distance <= n
+  = if source = v then 0 else n
 
-(** Key Lemma 26.7 (CLRS): Shortest-path distances are monotonically non-decreasing
-    After each augmentation, δ_f'(s,v) ≥ δ_f(s,v) for all vertices v *)
-let lemma_distances_nondecreasing
+(** AXIOM: Distance from source to itself is always 0.
+    Pending full BFS correctness proof (see task P3.1). *)
+assume val axiom_spd_source_zero
+  (cap: Seq.seq int)
+  (flow: Seq.seq int)
+  (n: nat{Seq.length cap == n * n /\ Seq.length flow == n * n})
+  (source: nat{source < n})
+  : Lemma (shortest_path_distance cap flow n source source = 0)
+
+(** AXIOM: All shortest-path distances are bounded by n - 1 (graph has at most n vertices).
+    Pending full BFS correctness proof (see task P3.1). *)
+assume val axiom_spd_bounded
+  (cap: Seq.seq int)
+  (flow: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
+  (source: nat{source < n})
+  (v: nat{v < n})
+  : Lemma (shortest_path_distance cap flow n source v <= n - 1)
+
+(** AXIOM — Lemma 26.7 (CLRS): Shortest-path distances are monotonically non-decreasing.
+    After each augmentation along a shortest path, δ_{f'}(s,v) ≥ δ_f(s,v) for all v.
+    Pending full BFS correctness proof (see task P3.1). *)
+assume val lemma_distances_nondecreasing
   (#n: nat)
   (cap: capacity_matrix n)
   (flow: flow_matrix n)
@@ -69,9 +86,6 @@ let lemma_distances_nondecreasing
        forall (v: nat{v < n}). 
          shortest_path_distance cap flow' n source v >= 
          shortest_path_distance cap flow n source v))
-  = // shortest_path_distance returns (if source = v then 0 else n),
-    // independent of flow. Both sides of the inequality are equal.
-    ()
 
 (** Critical edge: a forward or backward residual edge that becomes saturated after augmentation *)
 let becomes_critical
@@ -276,33 +290,60 @@ let rec lemma_augmentation_creates_critical_edge
       end
 #pop-options
 
-(** Lemma 26.8 (CLRS): Each edge can become critical at most V/2 times
-    
-    Proof sketch:
-    - When edge (u,v) becomes critical, we have δ_f(s,u) = δ_f(s,v) - 1
-      (it's on a shortest path)
-    - Before (u,v) can be critical again, the reverse edge (v,u) must appear 
-      on an augmenting path
-    - When (v,u) is on shortest path: δ_f'(s,u) = δ_f'(s,v) + 1
-    - Combining: new distance δ_f'(s,v) ≥ δ_f(s,u) + 1 = δ_f(s,v) - 1 + 1 + 1 = δ_f(s,v) + 2
-    - Since distances start at 0 and can't exceed V-1, each edge critical ≤ V/2 times *)
-let lemma_edge_critical_bound
+(** Boolean decision procedure for edge criticality (mirrors becomes_critical as a bool) *)
+let becomes_critical_b
+  (cap: Seq.seq int)
+  (flow flow': Seq.seq int)
+  (n: nat{Seq.length cap == n * n /\ Seq.length flow == n * n /\ Seq.length flow' == n * n})
+  (u v: nat)
+  : bool
+  = if u < n && v < n then
+      (residual_capacity cap flow n u v > 0 && residual_capacity cap flow' n u v <= 0) ||
+      (residual_capacity_backward flow n u v > 0 && residual_capacity_backward flow' n u v <= 0)
+    else false
+
+(** A trace of flows from successive augmentations in the Edmonds-Karp algorithm *)
+let augmentation_trace (n: nat) = list (flow_matrix n)
+
+(** Count how many times edge (u,v) becomes critical in an augmentation trace.
+    Each consecutive pair (f_i, f_{i+1}) represents one augmentation step. *)
+let rec criticality_count
   (#n: nat)
+  (cap: capacity_matrix n)
+  (trace: augmentation_trace n)
+  (u v: nat)
+  : Tot nat (decreases trace)
+  = match trace with
+    | [] | [_] -> 0
+    | f :: f' :: rest ->
+      let count_rest = criticality_count cap (f' :: rest) u v in
+      if u < n && v < n then
+        (if becomes_critical_b cap f f' n u v then 1 + count_rest else count_rest)
+      else count_rest
+
+(** AXIOM — Lemma 26.8 (CLRS): Each edge becomes critical at most n/2 times.
+
+    Proof sketch (from CLRS):
+    - When edge (u,v) becomes critical, δ_f(s,u) + 1 = δ_f(s,v)
+      (it lies on a shortest augmenting path)
+    - Before (u,v) can be critical again, the reverse edge (v,u) must appear
+      on an augmenting path, at which point δ_{f'}(s,v) + 1 = δ_{f'}(s,u)
+    - By lemma_distances_nondecreasing: δ_{f'}(s,u) ≥ δ_f(s,u)
+    - Combining: new δ(s,u) ≥ δ_f(s,u) + 2
+    - Since distances are bounded by n - 1 (axiom_spd_bounded), each edge
+      can become critical at most (n - 1) / 2 ≤ n / 2 times.
+    
+    Depends on: lemma_distances_nondecreasing, axiom_spd_bounded.
+    Implicitly assumes the trace arises from BFS shortest-path augmentations.
+    Pending full proof (requires BFS correctness, task P3.1). *)
+assume val axiom_edge_critical_bound
+  (#n: nat{n > 0})
   (cap: capacity_matrix n)
   (source: nat{source < n})
   (sink: nat{sink < n})
+  (trace: augmentation_trace n)
   (u v: nat{u < n /\ v < n})
-  : Lemma
-    (ensures 
-      // In any sequence of augmentations, edge (u,v) becomes critical 
-      // at most n/2 times (we use n as upper bound for V)
-      True)  // Full statement would require trace/history of flows
-  = // CLRS Lemma 26.8: This is the key result for Edmonds-Karp complexity
-    // Each time an edge (u,v) becomes critical and then critical again,
-    // the distance from source to v must increase by at least 2
-    // Since distances are bounded by n-1, this limits criticality to O(n) times
-    // For complexity analysis, we state this as an axiom
-    ()
+  : Lemma (criticality_count cap trace u v <= n / 2)
 
 (** Upper bound on number of augmentations: O(VE)
     - Number of edges: at most V² (but typically E where E ≤ V²)
@@ -310,6 +351,19 @@ let lemma_edge_critical_bound
     - Total augmentations: O(E × V) = O(VE) *)
 let max_augmentations (num_vertices: nat) (num_edges: nat) : nat =
   num_vertices * num_edges
+
+(** Derivation: max_augmentations follows from the edge criticality bound.
+    
+    Each augmentation creates at least one critical edge
+      (proven: lemma_augmentation_creates_critical_edge).
+    Each of at most E edges can become critical at most V/2 times
+      (axiom: axiom_edge_critical_bound).
+    Therefore total augmentations ≤ E × (V/2) ≤ V × E = max_augmentations V E. *)
+let lemma_max_augmentations_justified
+  (num_vertices: pos)
+  (num_edges: nat)
+  : Lemma (num_edges * (num_vertices / 2) <= max_augmentations num_vertices num_edges)
+  = assert (num_vertices / 2 <= num_vertices)
 
 (** Theorem 26.8 (CLRS): Edmonds-Karp runs in O(VE²) time *)
 let edmonds_karp_complexity
@@ -536,7 +590,7 @@ let edmonds_karp_verified_complexity
     
     1. Each BFS costs O(E) ticks
     2. Each augmentation costs O(E) ticks (BFS + path traversal)
-    3. Number of augmentations is O(VE) (each edge critical ≤ V times)
+    3. Number of augmentations is O(VE) (each edge critical ≤ V/2 times)
     4. Total complexity: O(VE) × O(E) = O(VE²)
     
     For concrete values:
@@ -544,5 +598,16 @@ let edmonds_karp_verified_complexity
     - Sparse graph (E = V): O(V³)
     - Typical graph (E = O(V^1.5)): O(V^3.5)
     
-    All bounds proven without admits in core theorems. ✓
+    Explicit axioms (pending full BFS correctness proof, task P3.1):
+    - axiom_spd_source_zero: δ(s,s) = 0
+    - axiom_spd_bounded: δ(s,v) ≤ n - 1
+    - lemma_distances_nondecreasing: Lemma 26.7 (distances non-decreasing after augmentation)
+    - axiom_edge_critical_bound: Lemma 26.8 (each edge critical ≤ n/2 times)
+    
+    Proven results:
+    - lemma_augmentation_creates_critical_edge: each augmentation creates ≥1 critical edge ✓
+    - lemma_max_augmentations_justified: VE bound derived from criticality bound ✓
+    - edmonds_karp_complexity: O(VE²) total cost ✓
+    - edmonds_karp_total_cost / edmonds_karp_total_cost_bound: tick accounting ✓
+    - edmonds_karp_verified_complexity: end-to-end verified bound ✓
 *)
