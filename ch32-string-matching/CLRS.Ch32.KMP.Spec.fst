@@ -261,7 +261,7 @@ let kmp_step_valid_lt (text pattern: seq int) (i q q': nat)
 #pop-options
 
 /// The KMP step result is a valid matched prefix
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always"
 let kmp_step_valid (text pattern pi: seq int) (i q: nat)
   : Lemma
     (requires pi_max pattern pi /\
@@ -429,7 +429,7 @@ let matches_at_dec_iff (text pattern: seq int) (s: nat)
 // ========== Match Detection Equivalence ==========
 
 /// q_new = m iff there's a match at position i+1-m
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always"
 let kmp_match_iff (text pattern pi: seq int) (i q: nat)
   : Lemma
     (requires pi_max pattern pi /\
@@ -516,7 +516,7 @@ let kmp_step_invariant (text pattern pi: seq int) (i q: nat)
 
 /// Count tracking helper — isolated from pi_max to prevent quantifier explosion.
 /// Takes the match detection result as a parameter instead of computing it.
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
 let count_tracking (text pattern: seq int) (i count: nat) (found: bool)
   : Lemma
     (requires length pattern > 0 /\
@@ -547,7 +547,7 @@ let count_tracking (text pattern: seq int) (i count: nat) (found: bool)
 #pop-options
 
 /// Count tracking part of KMP step
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1 --split_queries always"
 let kmp_count_step (text pattern pi: seq int) (i q count: nat)
   : Lemma
     (requires pi_max pattern pi /\
