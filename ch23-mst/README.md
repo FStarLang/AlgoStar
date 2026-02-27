@@ -10,16 +10,17 @@ This directory contains verified implementations and specifications for MST algo
 | `CLRS.Ch23.MST.Spec.fst` | 1 745 | F* | Full proofs including cut property (Theorem 23.1) |
 | `CLRS.Ch23.MST.Complexity.fst` | 102 | F* | Arithmetic O(V³) Kruskal / O(V²) Prim bounds |
 | `CLRS.Ch23.Kruskal.Spec.fst` | 2 951 | F* | Pure Kruskal: BFS components, insertion sort, `pure_kruskal`, MST theorem |
-| `CLRS.Ch23.Kruskal.fst` | 325 | Pulse | Imperative Kruskal (adj-matrix, union-find) |
+| `CLRS.Ch23.Kruskal.fst` | 340 | Pulse | Imperative Kruskal (adj-matrix, union-find) |
 | `CLRS.Ch23.Kruskal.EdgeSorting.fst` | 339 | F* | sort_edges permutation and MST weight independence |
 | `CLRS.Ch23.Kruskal.SortedEdges.fst` | 142 | F* | Kruskal over sorted input: subset/forest proven |
-| `CLRS.Ch23.Kruskal.UF.fst` | 389 | F* | Union-find correctness: find_pure, soundness, completeness |
+| `CLRS.Ch23.Kruskal.UF.fst` | 405 | F* | Union-find correctness: find_pure, soundness, completeness |
+| `CLRS.Ch23.Kruskal.Helpers.fst` | 118 | F* | Forest invariant maintenance lemmas for Kruskal |
 | `CLRS.Ch23.Kruskal.Complexity.fst` | 521 | Pulse | Ghost-tick instrumented Kruskal, proves ticks ≤ 4·V³ |
-| `CLRS.Ch23.Prim.fst` | 352 | Pulse | Imperative Prim (adj-matrix, key + in_mst arrays) |
+| `CLRS.Ch23.Prim.fst` | 401 | Pulse | Imperative Prim (adj-matrix, key + parent + in_mst arrays) |
 | `CLRS.Ch23.Prim.Spec.fst` | 1 036 | F* | Pure Prim: adj-matrix, `pure_prim`, connectivity, safety via cut property |
 | `CLRS.Ch23.Prim.Complexity.fst` | 433 | Pulse | Ghost-tick instrumented Prim, proves ticks ≤ 3·V² |
 
-**Total**: ~8 800 lines across 12 source files.
+**Total**: ~9 300 lines across 13 source files.
 
 ## Verification Status
 
@@ -31,13 +32,14 @@ This directory contains verified implementations and specifications for MST algo
 | Kruskal.EdgeSorting.fst | 0 | ✅ |
 | Kruskal.SortedEdges.fst | 0 | ✅ |
 | Kruskal.UF.fst | 0 | ✅ Fully proven |
+| Kruskal.Helpers.fst | 0 | ✅ Fully proven |
 | Kruskal.Complexity.fst | 0 | ✅ |
-| Prim.fst (Pulse) | 0 | ✅ No admits |
+| Prim.fst (Pulse) | 0 | ✅ Returns (key, parent) pair |
 | Prim.Spec.fst | 0 | ✅ Fully proven |
 | Prim.Complexity.fst | 0 | ✅ |
 | MST.Complexity.fst | 0 | ✅ |
 
-**1 admit** across ~8 800 lines. The `assume_` in Kruskal.fst (line 315) is the only remaining admit — it assumes the imperative output forms a forest.
+**1 admit** across ~9 300 lines. The `assume_` in Kruskal.fst (line ~320) is the only remaining admit — it assumes the imperative output forms a forest.
 
 ## Key Results
 
