@@ -467,6 +467,8 @@ fn topological_sort
       
       // Prove step1_inner_inv advances
       with sin_deg_new. assert (A.pts_to in_degree sin_deg_new);
+      FStar.Math.Lemmas.nat_times_nat_is_nat (SZ.v vi) (SZ.v n);
+      assert (pure (SZ.v vi * SZ.v n + SZ.v vj < Seq.length sadj));
       lemma_step1_inner_step sadj (SZ.v n) (reveal ghost_output) sin_deg_inner sin_deg_new (SZ.v vi) (SZ.v vj);
       
       j := vj +^ 1sz;
@@ -704,7 +706,12 @@ fn topological_sort
     // Now apply lemma_zero_indeg_accounted_after_pn
     lemma_zero_indeg_accounted_after_pn sadj (SZ.v n)
       sin_deg_pre sin_deg_post soutput_post (SZ.v vout + 1)
-      squeue_pre squeue_post (SZ.v vqh + 1) (SZ.v vqt) (SZ.v vtail_post)
+      squeue_pre squeue_post (SZ.v vqh + 1) (SZ.v vqt) (SZ.v vtail_post);
+
+    // Help Z3 re-establish quantified output-sequence properties
+    assert (pure (forall (k: nat). k < SZ.v new_vout ==> Seq.index soutput_new k < SZ.v n));
+    assert (pure (forall (k: nat). SZ.v new_vout <= k /\ k < SZ.v n ==> Seq.index soutput_new k == 0));
+    assert (pure (forall (k: nat). k < Seq.length soutput_new ==> Seq.index soutput_new k >= 0))
   };
   
   // After the loop, extract the existentials

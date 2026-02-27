@@ -308,6 +308,7 @@ let lemma_strong_order_implies_topo_order_int
         (ensures appears_before_int order u v)
       = // has_edge means u < n, v < n, and adj[u*n+v] != 0
         assert (u < n /\ v < n);
+        FStar.Math.Lemmas.nat_times_nat_is_nat u n;
         let idx : nat = u * n + v in
         assert (idx < n * n);
         assert (Seq.index adj idx <> 0);
@@ -519,7 +520,7 @@ let rec lemma_chain_has_path
    Walk positions 0, 1, ..., marking visited. Stop when a repeat is found.
    Terminates: count_visited increases each step until n, then pigeonhole forces repeat. *)
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 80"
 
 private let rec count_visited (visited: Seq.seq bool) (m: nat)
   : Pure nat (requires m <= Seq.length visited) (ensures fun c -> c <= m) (decreases m)
@@ -565,7 +566,12 @@ let rec find_chain_duplicate
             build_chain_value adj n output count v0 j == vk)
           (decreases (k - p))
         = if build_chain_value adj n output count v0 p = vk then p
-          else find_earlier (p + 1)
+          else begin
+            // The witness j from the precondition satisfies j >= p /\ j < k /\ bcv j == vk.
+            // Since bcv p <> vk, j <> p, hence j >= p + 1.
+            assert (exists (j: nat). j >= p + 1 /\ j < k /\ build_chain_value adj n output count v0 j == vk);
+            find_earlier (p + 1)
+          end
       in
       (find_earlier 0, k)
     end
