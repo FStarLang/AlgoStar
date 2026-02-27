@@ -117,6 +117,15 @@ fn find
 }
 #pop-options
 
+// Postcondition predicate for do_union: exposes what happened to parent array
+let do_union_post (sparent sparent': Seq.seq SZ.t) (root_u root_v n: nat) : prop =
+  valid_parents sparent' n /\
+  Seq.length sparent == n /\
+  Seq.length sparent' == n /\
+  (root_u < n ==> SZ.v (Seq.index sparent' root_u) == root_v) /\
+  (forall (i: nat). (i < n /\ i <> root_u) ==>
+    Seq.index sparent' i == Seq.index sparent i)
+
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn do_union
   (parent: A.array SZ.t)
@@ -125,7 +134,8 @@ fn do_union
   requires A.pts_to parent sparent **
     pure (SZ.v root_u < SZ.v n /\ SZ.v root_v < SZ.v n /\ SZ.v n > 0 /\ valid_parents sparent (SZ.v n))
   returns _: unit
-  ensures exists* sparent'. A.pts_to parent sparent' ** pure (valid_parents sparent' (SZ.v n))
+  ensures exists* sparent'. A.pts_to parent sparent' **
+    pure (do_union_post sparent sparent' (SZ.v root_u) (SZ.v root_v) (SZ.v n))
 {
   A.op_Array_Assignment parent root_u root_v;
 }
