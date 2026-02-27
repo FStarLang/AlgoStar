@@ -10,6 +10,8 @@ module C = FStar.Classical
 
 open FStar.Mul
 
+module AP = CLRS.Ch12.BST.ArrayPredicates
+
 (**
  * BST Delete Operations: TREE-MINIMUM, TREE-MAXIMUM, and TREE-DELETE
  * 
@@ -530,6 +532,8 @@ fn tree_delete
   (#keys_seq: Ghost.erased (Seq.seq int))
   (#valid_seq: Ghost.erased (Seq.seq bool))
   (del_idx: SZ.t)
+  (#lo: Ghost.erased int)
+  (#hi: Ghost.erased int)
   requires
     A.pts_to t.keys keys_seq **
     A.pts_to t.valid valid_seq **
@@ -540,7 +544,8 @@ fn tree_delete
       SZ.v t.cap <= A.length t.keys /\
       SZ.v t.cap < 32768 /\
       SZ.v del_idx < SZ.v t.cap /\
-      Seq.index valid_seq (SZ.v del_idx) == true
+      Seq.index valid_seq (SZ.v del_idx) == true /\
+      AP.well_formed_bst keys_seq valid_seq (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
     )
   returns success: bool
   ensures exists* keys_seq' valid_seq'.
@@ -549,11 +554,21 @@ fn tree_delete
     pure (
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
-      // Keys are never modified by delete (only valid is changed)
       Seq.equal keys_seq' keys_seq /\
       (success ==> (SZ.v del_idx < Seq.length valid_seq' /\
                     Seq.index valid_seq' (SZ.v del_idx) == false)) /\
-      (not success ==> Seq.equal valid_seq' valid_seq)
+      (not success ==> Seq.equal valid_seq' valid_seq) /\
+      // BST invariant: preserved for leaf deletion (Case 1)
+      // Cases 2-4 (INCOMPLETE) may orphan children, breaking the invariant
+      (success /\
+       (2 * SZ.v del_idx + 1 >= SZ.v t.cap \/
+        2 * SZ.v del_idx + 1 >= Seq.length valid_seq \/
+        Seq.index valid_seq (2 * SZ.v del_idx + 1) == false) /\
+       (2 * SZ.v del_idx + 2 >= SZ.v t.cap \/
+        2 * SZ.v del_idx + 2 >= Seq.length valid_seq \/
+        Seq.index valid_seq (2 * SZ.v del_idx + 2) == false)
+       ==> AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)) /\
+      (not success ==> AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi))
     )
 //SNIPPET_END: tree_delete
 {
@@ -583,6 +598,10 @@ fn tree_delete
   // Case 1: No children (leaf node) - just mark invalid
   if (not has_left && not has_right) {
     t.valid.(del_idx) <- false;
+    // Prove BST invariant preserved for leaf deletion
+    AP.lemma_is_desc_of_root (SZ.v del_idx);
+    AP.lemma_leaf_delete_wfb keys_seq valid_seq (SZ.v t.cap) 0
+      (Ghost.reveal lo) (Ghost.reveal hi) (SZ.v del_idx);
     true
   }
   // Case 2: Only left child
@@ -647,6 +666,8 @@ fn tree_delete_key
   (#keys_seq: Ghost.erased (Seq.seq int))
   (#valid_seq: Ghost.erased (Seq.seq bool))
   (key: int)
+  (#lo: Ghost.erased int)
+  (#hi: Ghost.erased int)
   requires
     A.pts_to t.keys keys_seq **
     A.pts_to t.valid valid_seq **
@@ -655,7 +676,8 @@ fn tree_delete_key
       Seq.length valid_seq == A.length t.valid /\
       A.length t.keys == A.length t.valid /\
       SZ.v t.cap <= A.length t.keys /\
-      SZ.v t.cap < 32768
+      SZ.v t.cap < 32768 /\
+      AP.well_formed_bst keys_seq valid_seq (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
     )
   returns success: bool
   ensures exists* keys_seq' valid_seq'.
@@ -747,7 +769,11 @@ fn tree_delete_key
   if vf {
     let vfi = !found_idx;
     with ks vs. assert (A.pts_to t.keys ks ** A.pts_to t.valid vs);
-    tree_delete t vfi
+    Seq.lemma_eq_elim ks (Ghost.reveal keys_seq);
+    Seq.lemma_eq_elim vs (Ghost.reveal valid_seq);
+    rewrite (A.pts_to t.keys ks) as (A.pts_to t.keys keys_seq);
+    rewrite (A.pts_to t.valid vs) as (A.pts_to t.valid valid_seq);
+    tree_delete t vfi #lo #hi
   } else {
     false
   }

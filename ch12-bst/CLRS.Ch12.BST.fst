@@ -12,6 +12,7 @@ module C = FStar.Classical
 open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch12.BST.Complexity
+module AP = CLRS.Ch12.BST.ArrayPredicates
 
 // Helper lemma to prove that child indices fit in SZ.t
 let child_indices_fit (cap: nat) (i: nat)
@@ -464,6 +465,8 @@ fn tree_insert
   (#keys_seq: Ghost.erased (Seq.seq int))
   (#valid_seq: Ghost.erased (Seq.seq bool))
   (key: int)
+  (#lo: Ghost.erased int)
+  (#hi: Ghost.erased int)
   requires
     A.pts_to t.keys keys_seq **
     A.pts_to t.valid valid_seq **
@@ -472,7 +475,9 @@ fn tree_insert
       Seq.length valid_seq == A.length t.valid /\
       A.length t.keys == A.length t.valid /\
       SZ.v t.cap <= A.length t.keys /\
-      SZ.v t.cap < 32768
+      SZ.v t.cap < 32768 /\
+      AP.well_formed_bst keys_seq valid_seq (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi) /\
+      Ghost.reveal lo < key /\ key < Ghost.reveal hi
     )
   returns success: bool
   ensures exists* keys_seq' valid_seq'.
@@ -487,7 +492,8 @@ fn tree_insert
                     idx < Seq.length keys_seq' /\
                     idx < Seq.length valid_seq' /\
                     Seq.index keys_seq' idx == key /\
-                    Seq.index valid_seq' idx == true))
+                    Seq.index valid_seq' idx == true)) /\
+      AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
     )
 //SNIPPET_END: tree_insert
 {
@@ -512,9 +518,15 @@ fn tree_insert
         (vs ==> (exists (idx: nat). idx < SZ.v t.cap /\
                  idx < Seq.length ks /\ idx < Seq.length vs' /\
                  Seq.index ks idx == key /\
-                 Seq.index vs' idx == true))
+                 Seq.index vs' idx == true)) /\
+        // BST invariant preserved
+        AP.well_formed_bst ks vs' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
       )) **
-    pure (SZ.v vc <= SZ.v t.cap)
+    pure (SZ.v vc <= SZ.v t.cap /\
+      (vs ==> vd) /\
+      // BST search reaches current position (when still searching)
+      (not vs /\ not vd /\ SZ.v vc < SZ.v t.cap ==>
+        AP.bst_search_reaches keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v vc) key))
   {
     let idx = !current;
     
@@ -529,6 +541,9 @@ fn tree_insert
       
       t.keys.(idx) <- key;
       t.valid.(idx) <- true;
+      // Prove well_formed_bst preserved after insertion
+      AP.lemma_insert_wfb keys_seq valid_seq (SZ.v t.cap) 0
+        (Ghost.reveal lo) (Ghost.reveal hi) (SZ.v idx) key;
       success_flag := true;
       done := true;
     } else {
@@ -543,6 +558,7 @@ fn tree_insert
         if (SZ.gte left_idx t.cap) {
           done := true;
         } else {
+          AP.lemma_bsr_extend_left keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v idx) key;
           current := left_idx;
         };
       } else {
@@ -553,6 +569,7 @@ fn tree_insert
         if (SZ.gte right_idx t.cap) {
           done := true;
         } else {
+          AP.lemma_bsr_extend_right keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v idx) key;
           current := right_idx;
         };
       };
