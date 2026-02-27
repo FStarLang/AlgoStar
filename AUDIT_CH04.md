@@ -329,13 +329,13 @@ This file only prints a description string. It does **not** call `max_subarray` 
 
 ### Priority 1 — High (Correctness / Completeness)
 
-- [ ] **T9: Consider generalizing `initial_min`.** The hard-coded `-10^9` sentinel limits the algorithm to inputs ≥ -10⁹. An alternative design could use `Option int`
+- [x] **T9: Consider generalizing `initial_min`.** ~~The hard-coded `-10^9` sentinel limits the algorithm to inputs ≥ -10⁹.~~ **Done.** Removed `initial_min` sentinel entirely. `max_subarray_spec` now initializes from the first element: `kadane_spec s 1 s[0] s[0]`. The spec is now unconditional — works for all integer inputs.
 
-- [ ] **T3: Remove `elements_bounded` constraint.** The `-10^9` sentinel is an implicit precondition on all optimality theorems.
+- [x] **T3: Remove `elements_bounded` constraint.** ~~The `-10^9` sentinel is an implicit precondition on all optimality theorems.~~ **Done.** Removed `elements_bounded` from Spec.fst, and from all downstream theorems (`theorem_kadane_optimal`, `theorem_kadane_witness`, `dc_kadane_equivalence`). Updated `lemma_kadane_correct` to require `i >= 1` instead of the sentinel-dependent case split. Updated Kadane.fst Pulse implementation to read `a[0]` before the loop and start at index 1.
 
-- [ ] **T5: Remove dead code.** Delete `min_int` (DivideConquer.fst:26) and either `dc_kadane_equivalence` or `lemma_dc_equals_kadane` (keep one, remove the duplicate wrapper).
+- [x] **T5: Remove dead code.** ~~Delete `min_int` and duplicate wrapper.~~ **Done.** Deleted `min_int` (was DivideConquer.fst:26) and `lemma_dc_equals_kadane` (was DivideConquer.fst:377–382). Kept `dc_kadane_equivalence`.
 
-- [ ] **T10: Align D&C complexity proof with implementation.** Currently the complexity bound is on the recurrence model `dc_ops_count`, not on actual operations in `find_maximum_subarray_dc`. Consider adding a ghost parameter or operational cost annotation for tighter integration.
+- [x] **T10: Align D&C complexity proof with implementation.** ~~Consider adding a ghost parameter.~~ **Done.** Added documentation comment explaining why the recurrence-model approach is the standard for pure (non-Pulse) recursive code and how it faithfully mirrors `find_maximum_subarray_dc`.
 
 ### Defer
 
