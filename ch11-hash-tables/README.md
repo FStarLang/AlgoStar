@@ -63,8 +63,8 @@ This directory contains a verified Pulse implementation of a hash table with ope
 make verify
 
 # Or verify manually
-cd /home/nswamy/workspace/clrs/ch11-hash-tables
-fstar.exe --include ../../pulse/out/lib/pulse CLRS.Ch11.HashTable.fst
+cd ch11-hash-tables
+make -C .. verify
 ```
 
 ## Test File

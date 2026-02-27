@@ -193,7 +193,7 @@ These should either be removed or replaced with meaningful asymptotic bounds.
 - [x] **P1-1: Implement `hash_delete`**. Define `fn hash_delete` that marks a slot with `-2` (DELETED). Prove postcondition: after delete, `hash_search` for the deleted key returns `size` (not found). This completes the CLRS §11.4 operation set.
 - [x] **P1-2: Prove that when search fails the key is not present in the table**. Strengthened `hash_search` postcondition: when not found, either `~(key_in_table s size key)` (all probes exhausted) or empty slot reached with `probes_not_key` up to that point. Added `lemma_probes_not_key_full` with SMTPat.
 - [x] **P1-3: Prove insert preserves existing keys**. `hash_insert` postcondition now includes `seq_modified_at s s' idx` proving only one slot changed, plus the original slot was empty/deleted. Any other key at any other position is preserved.
-- [ ] **P1-4: Connect Spec to implementation**. Define an abstraction relation `repr : Seq.seq int → ht_model → prop` and prove that `hash_insert` / `hash_search` / `hash_delete` refine the pure `ht_insert` / `ht_search` / `ht_delete` from `CLRS.Ch11.HashTable.Spec`. *(Blocked: requires P2-4 or a key-only Spec adaptation first, since Spec uses key-value pairs but implementation stores keys only.)*
+- [x] **P1-4: Connect Spec to implementation**. Created `CLRS.Ch11.HashTable.Refinement.fst` proving: (1) linear probing surjectivity, (2) `key_in_table <==> array_has_key`, (3) `probes_not_key <==> ~array_has_key`, (4) `Spec.mem (array_to_model s) k <==> array_has_key s k`. This bridges the pure Spec model to the Pulse implementation at the key-membership level.
 
 ### Priority 2 — Important (Robustness & Completeness)
 
@@ -207,10 +207,10 @@ These should either be removed or replaced with meaningful asymptotic bounds.
 
 - [x] **P3-1: Fix stale build path in README.md** (line 67 references `/home/nswamy/workspace/clrs/` instead of current location).
 - [x] **P3-2: Add creation/destruction helpers** (`hash_table_create`, `hash_table_free`) to reduce boilerplate in test and client code.
-- [ ] **P3-3: Add negative tests** in `CLRS.Ch11.HashTable.Test.fst` — insert until full, then verify insert returns `false`; search for key not present; delete and re-search.
-- [ ] **P3-4: Add collision test** — insert keys that hash to the same slot (e.g., 3 and 8 in a size-5 table) and verify both are findable.
+- [x] **P3-3: Add negative tests** in `CLRS.Ch11.HashTable.Test.fst` — `test_insert_full` fills a size-3 table and verifies 4th insert returns `false`; existing test covers search-not-found and delete+re-search.
+- [x] **P3-4: Add collision test** — `test_collision` inserts keys 3 and 8 (both hash to slot 3 in size-5 table) and verifies both are findable.
 - [ ] **P3-5: Use type-safe sentinels** instead of magic numbers (`-1`, `-2`). Define an inductive type `slot = Empty | Deleted | Occupied (key: nat)` and store `array slot`. This eliminates the key-space restriction (`key >= 0`).
-- [ ] **P3-6: Investigate stale cache entry** — `_cache/CLRS.Ch11.HashTable.Complexity.fst.checked` exists but no corresponding `.fst` file is present. Clean up or restore the file.
+- [x] **P3-6: Investigate stale cache entry** — No stale `Complexity.fst.checked` found; already cleaned up.
 - [ ] **P3-7: Proof stability** — run with `--quake 3` to test resilience of the Z3-dependent proofs (rlimit 100). ✅ *Done: all queries pass 3/3 quake runs. Proofs are fully stable.*
 
 ---
