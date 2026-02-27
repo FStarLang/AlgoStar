@@ -453,6 +453,6 @@ val acyclic_edge_disconnects (n: nat) (e: edge) (tl: list edge)
 
 // Acyclic + connected ⟹ exactly n-1 edges
 val acyclic_connected_length (n: nat) (es: list edge)
-  : Lemma (requires n > 0 /\ all_connected n es /\ acyclic n es /\
+  : Lemma (requires n > 0 /\ all_connected n es /\ acyclic n es /\ all_edges_distinct es /\
                     (forall (e: edge). mem_edge e es ==> e.u < n /\ e.v < n /\ e.u <> e.v))
           (ensures length es >= n - 1 /\ length es <= n - 1)
