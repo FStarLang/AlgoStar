@@ -9,7 +9,8 @@ This directory contains verified implementations and specifications for MST algo
 | `CLRS.Ch23.MST.Spec.fsti` | 458 | F* | Cut-property interface + MST existence vals |
 | `CLRS.Ch23.MST.Spec.fst` | 2 212 | F* | Full proofs including cut property (Theorem 23.1), MST existence |
 | `CLRS.Ch23.MST.Complexity.fst` | 102 | F* | Arithmetic O(V³) Kruskal / O(V²) Prim bounds |
-| `CLRS.Ch23.Kruskal.Spec.fst` | 2 951 | F* | Pure Kruskal: BFS components, insertion sort, `pure_kruskal`, MST theorem |
+| `CLRS.Ch23.Kruskal.Components.fst` | 836 | F* | BFS-based connected components, reachability, path properties |
+| `CLRS.Ch23.Kruskal.Spec.fst` | 2 138 | F* | Pure Kruskal: insertion sort, `pure_kruskal`, MST theorem |
 | `CLRS.Ch23.Kruskal.fst` | 340 | Pulse | Imperative Kruskal (adj-matrix, union-find) |
 | `CLRS.Ch23.Kruskal.EdgeSorting.fst` | 339 | F* | sort_edges permutation and MST weight independence |
 | `CLRS.Ch23.Kruskal.SortedEdges.fst` | 142 | F* | Kruskal over sorted input: subset/forest proven |
@@ -20,13 +21,14 @@ This directory contains verified implementations and specifications for MST algo
 | `CLRS.Ch23.Prim.Spec.fst` | 1 036 | F* | Pure Prim: adj-matrix, `pure_prim`, connectivity, safety via cut property |
 | `CLRS.Ch23.Prim.Complexity.fst` | 433 | Pulse | Ghost-tick instrumented Prim, proves ticks ≤ 3·V² |
 
-**Total**: ~9 800 lines across 13 source files.
+**Total**: ~9 900 lines across 14 source files.
 
 ## Verification Status
 
 | Module | Admits | Status |
 |--------|------:|--------|
 | MST.Spec (.fst + .fsti) | 0 | ✅ Fully proven (acyclic_count_lower_bound closed) |
+| Kruskal.Components.fst | 0 | ✅ Fully proven |
 | Kruskal.Spec.fst | 0 | ✅ Fully proven |
 | Kruskal.fst (Pulse) | 1 `assume_` | ⚠️ Forest property assumed (line 315) |
 | Kruskal.EdgeSorting.fst | 0 | ✅ |
@@ -39,7 +41,7 @@ This directory contains verified implementations and specifications for MST algo
 | Prim.Complexity.fst | 0 | ✅ |
 | MST.Complexity.fst | 0 | ✅ |
 
-**1 admit** across ~9 800 lines. The `assume_` in Kruskal.fst (line ~320) assumes the imperative output forms a forest.
+**1 admit** across ~9 900 lines. The `assume_` in Kruskal.fst (line ~320) assumes the imperative output forms a forest.
 
 ## Key Results
 
