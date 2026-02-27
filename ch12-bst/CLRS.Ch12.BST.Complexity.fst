@@ -77,6 +77,16 @@ let rec log2_floor_monotone (m:nat{m > 0}) (n:nat{n > 0 /\ m <= n})
       if m / 2 > 0 then log2_floor_monotone (m / 2) (n / 2)
     )
 
+(** Lemma: depth of left child (2*i+1) is one more than parent **)
+let node_depth_left_child (i:nat)
+  : Lemma (node_depth (2 * i + 1) == 1 + node_depth i)
+  = ()
+
+(** Lemma: depth of right child (2*i+2) is one more than parent **)
+let node_depth_right_child (i:nat)
+  : Lemma (node_depth (2 * i + 2) == 1 + node_depth i)
+  = assert ((2 * i + 2 - 1) / 2 == i)
+
 (** Lemma: all nodes in a tree of capacity cap have depth <= height **)
 let node_depth_bounded (cap:nat{cap > 0}) (i:nat{i < cap})
   : Lemma (node_depth i <= tree_height cap)

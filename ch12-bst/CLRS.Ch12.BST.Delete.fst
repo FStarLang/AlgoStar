@@ -29,39 +29,19 @@ open FStar.Mul
  * For the array-based representation, DELETE is simplified:
  * - Mark the node as invalid (valid[i] = false)
  * - For structural preservation, we could rebuild subtrees, but for now
- *   we use a simple "mark invalid" approach with admits for complex invariants
+ *   we use a simple "mark invalid" approach (INCOMPLETE: orphans children)
  * 
  * Status:
  * - TREE-MINIMUM and TREE-MAXIMUM: Fully verified (no admits)
- * - TREE-DELETE: Uses admits for complex structural proofs
+ * - TREE-SUCCESSOR and TREE-PREDECESSOR: Fully verified (no admits)
+ * - TREE-DELETE: Two-children case uses successor key-swap; one-child cases
+ *   still just mark invalid (orphaning child subtrees). No admits are used,
+ *   but one-child cases are semantically incomplete.
  *)
 
-// ============================================================================
-// Import BST type and helper lemma from main module
-// ============================================================================
-
-// We need the bst type definition and child_indices_fit lemma
-// These are defined in CLRS.Ch12.BST but we reproduce what we need here
-
-// Helper lemma to prove that child indices fit in SZ.t
-let child_indices_fit (cap: nat) (i: nat)
-  : Lemma
-    (requires cap < 32768 /\ i < cap)
-    (ensures (
-      let left = 2 * i + 1 in
-      let right = 2 * i + 2 in
-      0 <= left /\ left < pow2 16 /\
-      0 <= right /\ right < pow2 16
-    ))
-= ()
-
-// Array-based BST (from CLRS.Ch12.BST)
-noeq
-type bst = {
-  keys: A.array int;
-  valid: A.array bool;
-  cap: SZ.t;
-}
+// Import BST type from main module and shared predicates
+open CLRS.Ch12.BST
+open CLRS.Ch12.BST.ArrayPredicates
 
 // ============================================================================
 // TREE-MINIMUM: Find the minimum key in subtree rooted at start_idx
@@ -250,6 +230,266 @@ fn tree_maximum
   };
   
   !current
+}
+
+// ============================================================================
+// TREE-SUCCESSOR: Find the in-order successor of a node
+// ============================================================================
+
+(**
+ * TREE-SUCCESSOR(x) from CLRS 12.2
+ *
+ * In pointer-based tree:
+ *   TREE-SUCCESSOR(x)
+ *     if x.right ≠ NIL
+ *       return TREE-MINIMUM(x.right)
+ *     y = x.p
+ *     while y ≠ NIL and x == y.right
+ *       x = y
+ *       y = y.p
+ *     return y
+ *
+ * In array-based tree:
+ *   Case 1: If right child exists and is valid, return TREE-MINIMUM(right child)
+ *   Case 2: Walk up while current node is a right child of its parent.
+ *           When we find a node that is a left child, its parent is the successor.
+ *           If we reach the root without finding such a node, there is no successor.
+ *
+ * Array navigation:
+ *   parent(i) = (i-1)/2 for i > 0
+ *   i is a right child iff i > 0 and i is even  (i == 2*parent + 2)
+ *   i is a left child  iff i is odd              (i == 2*parent + 1)
+ *)
+//SNIPPET_START: tree_successor
+fn tree_successor
+  (#p: perm)
+  (t: bst)
+  (#keys_seq: Ghost.erased (Seq.seq int))
+  (#valid_seq: Ghost.erased (Seq.seq bool))
+  (idx: SZ.t)
+  requires
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    pure (
+      Seq.length keys_seq == A.length t.keys /\
+      Seq.length valid_seq == A.length t.valid /\
+      A.length t.keys == A.length t.valid /\
+      SZ.v t.cap <= A.length t.keys /\
+      SZ.v t.cap < 32768 /\
+      SZ.v idx < SZ.v t.cap /\
+      Seq.index valid_seq (SZ.v idx) == true
+    )
+  returns result: option SZ.t
+  ensures
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    pure (
+      (Some? result ==> (
+        SZ.v (Some?.v result) < SZ.v t.cap /\
+        SZ.v (Some?.v result) < Seq.length valid_seq /\
+        Seq.index valid_seq (SZ.v (Some?.v result)) == true))
+    )
+//SNIPPET_END: tree_successor
+{
+  // Step 1: Check if right child exists and is valid
+  child_indices_fit (SZ.v t.cap) (SZ.v idx);
+  let two_idx = SZ.mul 2sz idx;
+  let right_idx = SZ.add two_idx 2sz;
+
+  let has_right =
+    if (SZ.lt right_idx t.cap) {
+      t.valid.(right_idx)
+    } else {
+      false
+    };
+
+  if has_right {
+    // Case 1 (CLRS): x.right ≠ NIL → return TREE-MINIMUM(x.right)
+    let min_idx = tree_minimum t right_idx;
+    Some min_idx
+  } else {
+    // Case 2 (CLRS): No right child — walk up to find successor
+    // y = x.p; while y ≠ NIL and x == y.right: x = y; y = y.p; return y
+    //
+    // Walk up while current is a right child (even index > 0).
+    // A right child has index i where i > 0 and i % 2 == 0.
+    let mut current : SZ.t = idx;
+
+    while (
+      let vc = !current;
+      // Continue while vc > 0 and vc is a right child (even)
+      // A right child has i > 0 and i % 2 == 0, i.e., not (i % 2 > 0)
+      if (SZ.gt vc 0sz) {
+        not (SZ.gt (SZ.rem vc 2sz) 0sz)
+      } else {
+        false
+      }
+    )
+    invariant exists* vc.
+      R.pts_to current vc **
+      A.pts_to t.keys #p keys_seq **
+      A.pts_to t.valid #p valid_seq **
+      pure (
+        SZ.v vc < SZ.v t.cap
+      )
+    {
+      // Move to parent: parent(vc) = (vc - 1) / 2
+      let vc = !current;
+      let parent = SZ.div (SZ.sub vc 1sz) 2sz;
+      current := parent;
+    };
+
+    let vc = !current;
+    // After loop: vc == 0 (reached root) or vc is odd (left child)
+    if (SZ.gt vc 0sz) {
+      // vc is a left child (odd) — its parent is the successor
+      let parent = SZ.div (SZ.sub vc 1sz) 2sz;
+      // Verify parent is in bounds and valid
+      if (SZ.lt parent t.cap) {
+        let parent_valid = t.valid.(parent);
+        if parent_valid {
+          Some parent
+        } else {
+          None #SZ.t
+        }
+      } else {
+        None #SZ.t
+      }
+    } else {
+      // Reached root while always going up through right children — no successor
+      None #SZ.t
+    }
+  }
+}
+
+// ============================================================================
+// TREE-PREDECESSOR: Find the in-order predecessor of a node
+// ============================================================================
+
+(**
+ * TREE-PREDECESSOR(x) from CLRS 12.2 (symmetric to TREE-SUCCESSOR)
+ *
+ * In pointer-based tree:
+ *   TREE-PREDECESSOR(x)
+ *     if x.left ≠ NIL
+ *       return TREE-MAXIMUM(x.left)
+ *     y = x.p
+ *     while y ≠ NIL and x == y.left
+ *       x = y
+ *       y = y.p
+ *     return y
+ *
+ * In array-based tree:
+ *   Case 1: If left child exists and is valid, return TREE-MAXIMUM(left child)
+ *   Case 2: Walk up while current node is a left child of its parent.
+ *           When we find a node that is a right child, its parent is the predecessor.
+ *           If we reach the root without finding such a node, there is no predecessor.
+ *
+ * Array navigation:
+ *   parent(i) = (i-1)/2 for i > 0
+ *   i is a left child  iff i is odd              (i == 2*parent + 1)
+ *   i is a right child iff i > 0 and i is even   (i == 2*parent + 2)
+ *)
+//SNIPPET_START: tree_predecessor
+fn tree_predecessor
+  (#p: perm)
+  (t: bst)
+  (#keys_seq: Ghost.erased (Seq.seq int))
+  (#valid_seq: Ghost.erased (Seq.seq bool))
+  (idx: SZ.t)
+  requires
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    pure (
+      Seq.length keys_seq == A.length t.keys /\
+      Seq.length valid_seq == A.length t.valid /\
+      A.length t.keys == A.length t.valid /\
+      SZ.v t.cap <= A.length t.keys /\
+      SZ.v t.cap < 32768 /\
+      SZ.v idx < SZ.v t.cap /\
+      Seq.index valid_seq (SZ.v idx) == true
+    )
+  returns result: option SZ.t
+  ensures
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    pure (
+      (Some? result ==> (
+        SZ.v (Some?.v result) < SZ.v t.cap /\
+        SZ.v (Some?.v result) < Seq.length valid_seq /\
+        Seq.index valid_seq (SZ.v (Some?.v result)) == true))
+    )
+//SNIPPET_END: tree_predecessor
+{
+  // Step 1: Check if left child exists and is valid
+  child_indices_fit (SZ.v t.cap) (SZ.v idx);
+  let two_idx = SZ.mul 2sz idx;
+  let left_idx = SZ.add two_idx 1sz;
+
+  let has_left =
+    if (SZ.lt left_idx t.cap) {
+      t.valid.(left_idx)
+    } else {
+      false
+    };
+
+  if has_left {
+    // Case 1 (CLRS): x.left ≠ NIL → return TREE-MAXIMUM(x.left)
+    let max_idx = tree_maximum t left_idx;
+    Some max_idx
+  } else {
+    // Case 2 (CLRS): No left child — walk up to find predecessor
+    // y = x.p; while y ≠ NIL and x == y.left: x = y; y = y.p; return y
+    //
+    // Walk up while current is a left child (odd index).
+    // A left child has index i where i > 0 and i % 2 == 1.
+    let mut current : SZ.t = idx;
+
+    while (
+      let vc = !current;
+      // Continue while vc > 0 and vc is a left child (odd)
+      // A left child has i > 0 and i % 2 == 1, i.e., not (i % 2 == 0)
+      if (SZ.gt vc 0sz) {
+        not (not (SZ.gt (SZ.rem vc 2sz) 0sz))
+      } else {
+        false
+      }
+    )
+    invariant exists* vc.
+      R.pts_to current vc **
+      A.pts_to t.keys #p keys_seq **
+      A.pts_to t.valid #p valid_seq **
+      pure (
+        SZ.v vc < SZ.v t.cap
+      )
+    {
+      // Move to parent: parent(vc) = (vc - 1) / 2
+      let vc = !current;
+      let parent = SZ.div (SZ.sub vc 1sz) 2sz;
+      current := parent;
+    };
+
+    let vc = !current;
+    // After loop: vc == 0 (reached root) or vc is even and > 0 (right child)
+    if (SZ.gt vc 0sz) {
+      // vc is a right child (even, > 0) — its parent is the predecessor
+      let parent = SZ.div (SZ.sub vc 1sz) 2sz;
+      // Verify parent is in bounds and valid
+      if (SZ.lt parent t.cap) {
+        let parent_valid = t.valid.(parent);
+        if parent_valid {
+          Some parent
+        } else {
+          None #SZ.t
+        }
+      } else {
+        None #SZ.t
+      }
+    } else {
+      // Reached root while always going up through left children — no predecessor
+      None #SZ.t
+    }
+  }
 }
 
 // ============================================================================

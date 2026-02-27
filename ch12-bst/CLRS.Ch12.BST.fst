@@ -10,6 +10,8 @@ module Seq = FStar.Seq
 module C = FStar.Classical
 
 open FStar.Mul
+open FStar.List.Tot
+open CLRS.Ch12.BST.Complexity
 
 // Helper lemma to prove that child indices fit in SZ.t
 let child_indices_fit (cap: nat) (i: nat)
@@ -38,15 +40,6 @@ type bst = {
   cap: SZ.t;
 }
 //SNIPPET_END: bst_type
-
-// BST property predicate (spec only)
-let bst_property_at (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat) (i: nat) : prop =
-  let left = op_Multiply 2 i + 1 in
-  let right = op_Multiply 2 i + 2 in
-  i < cap /\ cap <= Seq.length keys /\ cap <= Seq.length valid ==>
-    (Seq.index valid i ==>
-      (left < cap ==> (Seq.index valid left ==> Seq.index keys left < Seq.index keys i)) /\
-      (right < cap ==> (Seq.index valid right ==> Seq.index keys right > Seq.index keys i)))
 
 //SNIPPET_START: subtree_in_range
 // Stronger BST property: all keys in subtree are bounded by lo and hi
@@ -342,21 +335,28 @@ fn tree_search
   let lo_ref = GR.alloc #int (reveal lo);
   let hi_ref = GR.alloc #int (reveal hi);
   
+  // Ghost tick counter for O(h) complexity proof
+  let ticks = GR.alloc #nat 0;
+  
   while (
     let vc = !current;
     let vf = !found;
     SZ.lt vc t.cap && not vf
   )
-  invariant exists* vc vf vr vlo vhi.
+  invariant exists* vc vf vr vlo vhi vticks.
     R.pts_to current vc **
     R.pts_to found vf **
     R.pts_to result_idx vr **
     GR.pts_to lo_ref vlo **
     GR.pts_to hi_ref vhi **
+    GR.pts_to ticks vticks **
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
     pure (
       SZ.v vc <= SZ.v t.cap /\
+      // Complexity: tick count tracks node depth
+      (~vf /\ SZ.v vc < SZ.v t.cap ==> vticks == node_depth (SZ.v vc)) /\
+      (SZ.v t.cap > 0 ==> vticks <= tree_height (SZ.v t.cap)) /\
       (vf ==> (SZ.v vr < SZ.v t.cap /\
                Seq.index valid_seq (SZ.v vr) == true /\
                Seq.index keys_seq (SZ.v vr) == key)) /\
@@ -385,7 +385,7 @@ fn tree_search
         assert (pure (SZ.fits (2 * SZ.v idx + 1)));
         
         // Preserve completeness: key in subtree at idx ⟹ key in left subtree
-        with vlo vhi. assert (GR.pts_to lo_ref vlo ** GR.pts_to hi_ref vhi);
+        with vlo vhi vticks_v. assert (GR.pts_to lo_ref vlo ** GR.pts_to hi_ref vhi ** GR.pts_to ticks vticks_v);
         lemma_search_left_preserves_completeness
           keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) vlo vhi key;
         
@@ -396,6 +396,10 @@ fn tree_search
           lemma_out_of_bounds_empty keys_seq valid_seq (SZ.v t.cap) (SZ.v left_idx) key;
           current := t.cap;
         } else {
+          // Complexity: moving to left child increases depth by 1
+          node_depth_left_child (SZ.v idx);
+          node_depth_bounded (SZ.v t.cap) (SZ.v left_idx);
+          GR.op_Colon_Equals ticks (hide (vticks_v + 1));
           // Narrow bounds: hi becomes current_key
           GR.op_Colon_Equals hi_ref (hide current_key);
           current := left_idx;
@@ -406,7 +410,7 @@ fn tree_search
         assert (pure (SZ.fits (2 * SZ.v idx + 2)));
         
         // Preserve completeness: key in subtree at idx ⟹ key in right subtree
-        with vlo vhi. assert (GR.pts_to lo_ref vlo ** GR.pts_to hi_ref vhi);
+        with vlo vhi vticks_v. assert (GR.pts_to lo_ref vlo ** GR.pts_to hi_ref vhi ** GR.pts_to ticks vticks_v);
         lemma_search_right_preserves_completeness
           keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) vlo vhi key;
         
@@ -417,6 +421,10 @@ fn tree_search
           lemma_out_of_bounds_empty keys_seq valid_seq (SZ.v t.cap) (SZ.v right_idx) key;
           current := t.cap;
         } else {
+          // Complexity: moving to right child increases depth by 1
+          node_depth_right_child (SZ.v idx);
+          node_depth_bounded (SZ.v t.cap) (SZ.v right_idx);
+          GR.op_Colon_Equals ticks (hide (vticks_v + 1));
           // Narrow bounds: lo becomes current_key
           GR.op_Colon_Equals lo_ref (hide current_key);
           current := right_idx;
@@ -430,7 +438,10 @@ fn tree_search
   let vc = !current;
   
   // Free ghost references
-  with vlo_f vhi_f. assert (GR.pts_to lo_ref vlo_f ** GR.pts_to hi_ref vhi_f);
+  with vlo_f vhi_f vticks_f. assert (GR.pts_to lo_ref vlo_f ** GR.pts_to hi_ref vhi_f ** GR.pts_to ticks vticks_f);
+  // Complexity bound: search visited at most tree_height(cap) nodes
+  // vticks_f <= tree_height(cap) is guaranteed by the loop invariant
+  GR.free ticks;
   GR.free lo_ref;
   GR.free hi_ref;
   
@@ -550,3 +561,142 @@ fn tree_insert
   
   !success_flag
 }
+
+// Pure specification: inorder traversal returns list of keys in sorted order
+//SNIPPET_START: inorder_spec
+let rec inorder_spec
+  (keys: Seq.seq int)
+  (valid: Seq.seq bool)
+  (cap: nat)
+  (i: nat)
+  : Tot (list int) (decreases (if i < cap then cap - i else 0))
+  = if i >= cap || i >= Seq.length keys || i >= Seq.length valid then []
+    else if not (Seq.index valid i) then []
+    else
+      let left = op_Multiply 2 i + 1 in
+      let right = op_Multiply 2 i + 2 in
+      inorder_spec keys valid cap left @
+      [Seq.index keys i] @
+      inorder_spec keys valid cap right
+//SNIPPET_END: inorder_spec
+
+// Inorder tree walk (CLRS §12.1) — recursive helper
+// Walks the subtree rooted at index `idx`, writing keys to `output` at `write_pos`
+//SNIPPET_START: inorder_helper
+fn rec inorder_helper
+  (#p: perm)
+  (t: bst)
+  (#keys_seq: Ghost.erased (Seq.seq int))
+  (#valid_seq: Ghost.erased (Seq.seq bool))
+  (idx: SZ.t)
+  (output: A.array int)
+  (#out_seq: Ghost.erased (Seq.seq int))
+  (write_pos: R.ref SZ.t)
+  (#wp0: Ghost.erased SZ.t)
+  (out_len: SZ.t)
+  requires
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    A.pts_to output out_seq **
+    R.pts_to write_pos wp0 **
+    pure (
+      Seq.length keys_seq == A.length t.keys /\
+      Seq.length valid_seq == A.length t.valid /\
+      A.length t.keys == A.length t.valid /\
+      SZ.v t.cap <= A.length t.keys /\
+      SZ.v t.cap < 32768 /\
+      SZ.v out_len == A.length output /\
+      Seq.length out_seq == A.length output /\
+      SZ.v wp0 <= SZ.v out_len
+    )
+  ensures
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    (exists* out_seq' wp'.
+      A.pts_to output out_seq' **
+      R.pts_to write_pos wp' **
+      pure (
+        Seq.length out_seq' == A.length output /\
+        SZ.v wp' <= SZ.v out_len
+      ))
+  decreases (if SZ.v idx < SZ.v t.cap then SZ.v t.cap - SZ.v idx else 0)
+{
+  if (SZ.gte idx t.cap) {
+    // Base case: index out of bounds, nothing to do
+    ()
+  } else {
+    let is_valid = t.valid.(idx);
+    if (not is_valid) {
+      // Node is invalid: nothing to do
+      ()
+    } else {
+      // Compute child indices
+      child_indices_fit (SZ.v t.cap) (SZ.v idx);
+      let two_idx = SZ.mul 2sz idx;
+      let left_idx = SZ.add two_idx 1sz;
+      let right_idx = SZ.add two_idx 2sz;
+
+      // Recurse on left subtree
+      inorder_helper #p t #keys_seq #valid_seq left_idx output write_pos out_len;
+
+      // Open existential from left recursive call
+      with out_seq1 wp1. assert (A.pts_to output out_seq1 ** R.pts_to write_pos wp1);
+
+      // Write current node's key to output, then recurse on right subtree
+      let wp = !write_pos;
+      if (SZ.lt wp out_len) {
+        let key = t.keys.(idx);
+        output.(wp) <- key;
+        write_pos := SZ.add wp 1sz;
+        // Recurse on right subtree (after writing)
+        inorder_helper #p t #keys_seq #valid_seq right_idx output write_pos out_len;
+      } else {
+        // Recurse on right subtree (without writing — output full)
+        inorder_helper #p t #keys_seq #valid_seq right_idx output write_pos out_len;
+      };
+    }
+  }
+}
+//SNIPPET_END: inorder_helper
+
+// Inorder tree walk — main entry point starting from root (index 0)
+//SNIPPET_START: inorder_walk
+fn inorder_walk
+  (#p: perm)
+  (t: bst)
+  (#keys_seq: Ghost.erased (Seq.seq int))
+  (#valid_seq: Ghost.erased (Seq.seq bool))
+  (output: A.array int)
+  (#out_seq: Ghost.erased (Seq.seq int))
+  (write_pos: R.ref SZ.t)
+  (#wp0: Ghost.erased SZ.t)
+  (out_len: SZ.t)
+  requires
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    A.pts_to output out_seq **
+    R.pts_to write_pos wp0 **
+    pure (
+      Seq.length keys_seq == A.length t.keys /\
+      Seq.length valid_seq == A.length t.valid /\
+      A.length t.keys == A.length t.valid /\
+      SZ.v t.cap <= A.length t.keys /\
+      SZ.v t.cap < 32768 /\
+      SZ.v out_len == A.length output /\
+      Seq.length out_seq == A.length output /\
+      SZ.v wp0 <= SZ.v out_len
+    )
+  ensures
+    A.pts_to t.keys #p keys_seq **
+    A.pts_to t.valid #p valid_seq **
+    (exists* out_seq' wp'.
+      A.pts_to output out_seq' **
+      R.pts_to write_pos wp' **
+      pure (
+        Seq.length out_seq' == A.length output /\
+        SZ.v wp' <= SZ.v out_len
+      ))
+{
+  inorder_helper #p t #keys_seq #valid_seq 0sz output write_pos out_len
+}
+//SNIPPET_END: inorder_walk
