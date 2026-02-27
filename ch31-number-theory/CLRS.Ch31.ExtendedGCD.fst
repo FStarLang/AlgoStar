@@ -8,6 +8,7 @@
    - d divides both a and b
    
    Uses FStar.Math.Euclid for divides relation and properties.
+   Complexity: O(log b), same as the basic GCD algorithm (uses gcd_steps from CLRS.Ch31.GCD).
    
    NO admits. NO assumes.
 *)
@@ -17,13 +18,11 @@ module CLRS.Ch31.ExtendedGCD
 open FStar.Math.Lemmas
 open FStar.Mul
 open FStar.Math.Euclid
+open CLRS.Ch31.GCD
 
 // ========== GCD Definition ==========
-
-//SNIPPET_START: gcd
-let rec gcd (a b: nat) : Tot nat (decreases b) =
-  if b = 0 then a else gcd b (a % b)
-//SNIPPET_END: gcd
+// Uses gcd_spec from CLRS.Ch31.GCD to avoid duplication
+let gcd = gcd_spec
 
 // ========== Extended GCD Algorithm ==========
 
@@ -152,6 +151,22 @@ let extended_gcd_correctness (a b: nat)
       = extended_gcd_is_greatest a b c
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+// ========== Complexity Analysis ==========
+
+// extended_gcd has the same recursion structure as gcd_spec:
+//   both recurse on (b, a%b) with base case b=0.
+// Therefore gcd_steps counts the recursive calls of extended_gcd,
+// and the O(log b) bound from lemma_gcd_steps_log applies directly.
+
+//SNIPPET_START: extended_gcd_complexity
+let extended_gcd_complexity_bounded (a b: nat) : prop =
+  b > 0 ==> gcd_steps a b <= op_Multiply 2 (num_bits b) + 1
+
+let extended_gcd_complexity (a b: nat)
+  : Lemma (ensures extended_gcd_complexity_bounded a b)
+  = if b > 0 then lemma_gcd_steps_log a b
+//SNIPPET_END: extended_gcd_complexity
 
 // ========== Example Computations ==========
 

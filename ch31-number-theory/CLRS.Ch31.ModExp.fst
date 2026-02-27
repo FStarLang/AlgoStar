@@ -1,9 +1,14 @@
 (*
    Modular Exponentiation - Verified implementation in Pulse
 
-   Implements MODULAR-EXPONENTIATION from CLRS Chapter 31 using repeated squaring.
+   Implements the right-to-left (LSB → MSB) variant of modular exponentiation
+   (CLRS Exercise 31.6-2), not the primary left-to-right algorithm on p. 957.
+   Both compute b^e mod m; this variant maintains a running result accumulator
+   and a squaring base, processing bits from least to most significant.
+
    Functional correctness: result == mod_exp_spec b e m == pow b e % m
    Complexity bound: at most ⌊log₂(e)⌋ + 1 squarings for exponent e.
+   Handles all valid inputs including e = 0 (returns 1 % m) and m = 1 (returns 0).
 
    NO admits. NO assumes.
 *)
@@ -155,7 +160,7 @@ let modexp_complexity_bounded (cf c0: nat) (e_init: nat) : prop =
 //SNIPPET_START: mod_exp_impl_sig
 fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
   (ctr: GR.ref nat) (#c0: erased nat)
-  requires GR.pts_to ctr c0 ** pure (m_init > 1 /\ e_init > 0)
+  requires GR.pts_to ctr c0
   returns result: int
   ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (
     result == mod_exp_spec b_init e_init m_init /\
@@ -164,8 +169,9 @@ fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
 //SNIPPET_END: mod_exp_impl_sig
 {
   pow_mod_base b_init e_init m_init;
+  lemma_mod_mul_distr_l 1 (pow (b_init % m_init) e_init) m_init;
 
-  let mut result: int = 1;
+  let mut result: int = 1 % m_init;
   let mut base: int = b_init % m_init;
   let mut exp: int = e_init;
 

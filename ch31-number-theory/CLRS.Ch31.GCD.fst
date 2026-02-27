@@ -5,7 +5,8 @@
    gcd(a, b) = gcd(b, a mod b) with base case gcd(a, 0) = a
    
    Proves both functional correctness and O(log b) complexity bound.
-   Complexity analysis uses Lamé's theorem (CLRS Theorem 31.11).
+   Complexity analysis uses a direct mod-halving argument (a % b ≤ a/2),
+   capturing the same O(log b) bound as CLRS Theorem 31.11 (Lamé's theorem).
 
    NO admits. NO assumes.
 *)
@@ -15,6 +16,9 @@ module CLRS.Ch31.GCD
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Reference
 open FStar.SizeT
+open FStar.Mul
+open FStar.Math.Euclid
+open FStar.Math.Lemmas
 
 module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
@@ -56,6 +60,26 @@ let rec gcd_spec_comm (a b: nat)
       gcd_spec_comm a (b % a);
       assert (gcd_spec b a == gcd_spec a (b % a));
       assert (gcd_spec a b == gcd_spec b (a % b))
+    )
+
+// ========== Divisibility Properties ==========
+
+// gcd_spec computes the actual greatest common divisor
+let rec gcd_spec_divides (a b: nat)
+  : Lemma (ensures divides (gcd_spec a b) a /\ divides (gcd_spec a b) b)
+          (decreases b)
+  = if b = 0 then (
+      divides_reflexive a;
+      divides_0 a
+    )
+    else (
+      gcd_spec_divides b (a % b);
+      let d = gcd_spec a b in
+      let q = a / b in
+      let r = a % b in
+      euclidean_division_definition a b;
+      divides_mult_right q b d;
+      divides_plus (op_Multiply q b) r d
     )
 
 // ========== Complexity Analysis: Pure Functions and Lemmas ==========
@@ -140,6 +164,17 @@ let gcd_complexity_bounded (cf c0: nat) (a_init b_init: nat) : prop =
   cf - c0 == gcd_steps a_init b_init /\
   (b_init > 0 ==> cf - c0 <= op_Multiply 2 (num_bits b_init) + 1)
 //SNIPPET_END: gcd_complexity_bounded
+
+// O(log min(a,b)) bound: combines the O(log b) bound with commutativity
+let gcd_steps_log_min (a b: nat)
+  : Lemma (requires a > 0 /\ b > 0)
+          (ensures gcd_steps a b <= op_Multiply 2 (num_bits (if a <= b then a else b)) + 2)
+  = if a >= b then
+      lemma_gcd_steps_log a b
+    else (
+      FStar.Math.Lemmas.small_mod a b;
+      lemma_gcd_steps_log b a
+    )
 
 // ========== Pulse Implementation ==========
 

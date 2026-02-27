@@ -41,8 +41,8 @@ make clean  # clean build artifacts
 | ch24 | Bellman-Ford, Dijkstra, **Dijkstra.Correctness** | dist[v] = δ(s,v) proven | O(V³), O(V²) |
 | ch25 | Floyd-Warshall | result == fw_spec | O(n³) with ghost ticks |
 | ch26 | Max Flow ⚠ | ⚠ returns zero flow | — |
-| ch28 | Matrix Multiply, Strassen | C == A × B (dot product) | O(n³) |
-| ch31 | GCD, Modular Exponentiation | gcd_spec, modexp_spec | O(log b), O(log e) |
+| ch28 | Matrix Multiply, Strassen | C == A × B (dot product), Strassen == standard | O(n³), O(n^{lg 7}) |
+| ch31 | GCD, Extended GCD, Modular Exponentiation | gcd_spec, Bézout's identity, modexp_spec | O(log b), O(log e) |
 | ch32 | Naive, Rabin-Karp, KMP | match count == spec | O(nm), O(nm), O(n+m) amortized |
 | ch33 | Segment Intersection | cross product spec | O(1) |
 | ch35 | 2-Approximation Vertex Cover | valid cover | O(V²) |
@@ -56,7 +56,7 @@ make clean  # clean build artifacts
 - **Floyd-Warshall**: `result == fw_outer(input)`
 - **String Matching** (Naive, Rabin-Karp, KMP): match count equals pure spec
 - **Binary Search**: found ⟺ key exists in sorted array
-- **Matrix Multiply**: `C[i][j] == Σ_k A[i][k] · B[k][j]`
+- **Matrix Multiply**: `C[i][j] == Σ_k A[i][k] · B[k][j]`; Strassen == standard multiply
 - **GCD**: `result == gcd_spec(a, b)` with O(log b) via Lamé's theorem
 - **BFS**: distance soundness — `reachable_in(source, v, dist[v])`
 
