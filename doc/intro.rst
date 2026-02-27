@@ -372,13 +372,13 @@ lines. The table below summarizes the status of each algorithm.
      - ⚠️ 2: duality/min-cut
      - ✅
    * - 28
-     - :ref:`Matrix Multiply <Ch28_MatrixOps>`
+     - :ref:`Matrix Multiply <Ch04_MatrixOps>`
      - §28 (App)
      - C = A · B
      - ✅
      - ✅ Linked O(n³)
    * - 28
-     - :ref:`Strassen <Ch28_MatrixOps>`
+     - :ref:`Strassen <Ch04_MatrixOps>`
      - §28 (App)
      - Strassen = standard mult
      - ✅

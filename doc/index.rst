@@ -41,7 +41,6 @@ the F*/Z3 toolchain, unless explicitly marked otherwise.
    ch24_sssp
    ch25_apsp
    ch26_max_flow
-   ch28_matrix_ops
    ch31_number_theory
    ch32_string_match
    ch33_comp_geometry

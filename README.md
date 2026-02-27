@@ -24,7 +24,7 @@ make clean  # clean build artifacts
 | Chapter | Algorithms | Functional Correctness | Complexity Proof |
 |---------|-----------|----------------------|-----------------|
 | ch02 | Insertion Sort, Merge Sort | sorted ∧ permutation | O(n²), O(n log n) |
-| ch04 | Binary Search, Maximum Subarray | found ⟺ key ∈ array | O(log n), O(n) |
+| ch04 | Binary Search, Maximum Subarray, Matrix Multiply, Strassen | found ⟺ key ∈ array, C == A × B, Strassen == standard | O(log n), O(n), O(n³), O(n^{lg 7}) |
 | ch06 | Heapsort | sorted ∧ permutation | O(n log n) |
 | ch07 | Quicksort, Partition | sorted ∧ permutation | O(n²) worst, O(n) partition |
 | ch08 | Counting Sort, Counting Sort (Stable), Radix Sort (d=1), Bucket Sort | sorted ∧ permutation | Θ(n+k) |
@@ -41,7 +41,6 @@ make clean  # clean build artifacts
 | ch24 | Bellman-Ford, Dijkstra, **Dijkstra.Correctness** | dist[v] = δ(s,v) proven | O(V³), O(V²) |
 | ch25 | Floyd-Warshall | result == fw_spec | O(n³) with ghost ticks |
 | ch26 | Max Flow ⚠ | ⚠ returns zero flow | — |
-| ch28 | Matrix Multiply, Strassen | C == A × B (dot product), Strassen == standard | O(n³), O(n^{lg 7}) |
 | ch31 | GCD, Extended GCD, Modular Exponentiation | gcd_spec, Bézout's identity, modexp_spec | O(log b), O(log e) |
 | ch32 | Naive, Rabin-Karp, KMP | match count == spec | O(nm), O(nm), O(n+m) amortized |
 | ch33 | Segment Intersection | cross product spec | O(1) |

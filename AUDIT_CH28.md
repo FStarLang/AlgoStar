@@ -1,6 +1,12 @@
 # Audit Report: Chapter 28 — Matrix Operations
 
-**Scope**: `ch28-matrix-ops/` (2 files, 1217 LOC total)  
+> **Moved**: Matrix Multiply and Strassen have been relocated to
+> `ch04-divide-conquer/` (as `CLRS.Ch04.MatrixMultiply.fst` and
+> `CLRS.Ch04.Strassen.fst`) since they cover CLRS §4.2, not Chapter 28.
+> The `ch28-matrix-ops/` directory has been removed.
+> StrassenPulse.fst was deleted (too many admits, excessive allocation).
+
+**Scope**: ~~`ch28-matrix-ops/`~~ → `ch04-divide-conquer/` (2 files, 1217 LOC total)  
 **Date**: 2025-02-26  
 **Auditor**: Automated audit  
 
