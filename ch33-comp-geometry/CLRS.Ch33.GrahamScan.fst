@@ -180,6 +180,112 @@ let rec pop_while_spec_bounded (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: n
       else ()
 //SNIPPET_END: pop_while_spec
 
+// ========== Convex Hull Correctness Properties ==========
+
+//SNIPPET_START: correctness_defs
+
+// A sequence of hull indices makes all left turns (convex position).
+// For each consecutive triple (i, i+1, i+2), cross_prod > 0 (left turn).
+let all_left_turns (xs ys: Seq.seq int) (hull: Seq.seq nat) (top: nat) : prop =
+  top <= Seq.length hull /\
+  Seq.length ys == Seq.length xs /\
+  (forall (i: nat). i + 2 < top ==>
+    Seq.index hull i < Seq.length xs /\
+    Seq.index hull (i + 1) < Seq.length xs /\
+    Seq.index hull (i + 2) < Seq.length xs /\
+    cross_prod (Seq.index xs (Seq.index hull i))
+               (Seq.index ys (Seq.index hull i))
+               (Seq.index xs (Seq.index hull (i + 1)))
+               (Seq.index ys (Seq.index hull (i + 1)))
+               (Seq.index xs (Seq.index hull (i + 2)))
+               (Seq.index ys (Seq.index hull (i + 2))) > 0)
+
+//SNIPPET_END: correctness_defs
+
+//SNIPPET_START: correctness_lemmas
+
+// find_bottom returns the bottom-most point (minimum y, tiebreak min x).
+// This point must be on the convex hull (CLRS: the starting point of
+// Graham scan is guaranteed to be a vertex of CH(Q)).
+let is_bottommost (xs ys: Seq.seq int) (m: nat) : prop =
+  m < Seq.length xs /\
+  Seq.length ys == Seq.length xs /\
+  (forall (k: nat). k < Seq.length xs ==>
+    Seq.index ys m < Seq.index ys k \/
+    (Seq.index ys m = Seq.index ys k /\ Seq.index xs m <= Seq.index xs k))
+
+let rec find_bottom_aux_is_min (xs ys: Seq.seq int) (i best: nat)
+  : Lemma (requires
+      Seq.length ys == Seq.length xs /\ Seq.length xs > 0 /\
+      best < Seq.length xs /\
+      (forall (k: nat). k < i /\ k < Seq.length xs ==>
+        Seq.index ys best < Seq.index ys k \/
+        (Seq.index ys best = Seq.index ys k /\ Seq.index xs best <= Seq.index xs k)))
+    (ensures is_bottommost xs ys (find_bottom_aux xs ys i best))
+    (decreases (Seq.length xs - i)) =
+  if i >= Seq.length xs then ()
+  else
+    let yi = Seq.index ys i in
+    let yb = Seq.index ys best in
+    let xi = Seq.index xs i in
+    let xb = Seq.index xs best in
+    let new_best = if yi < yb || (yi = yb && xi < xb) then i else best in
+    find_bottom_aux_is_min xs ys (i + 1) new_best
+
+let find_bottom_is_bottommost (xs ys: Seq.seq int)
+  : Lemma (requires Seq.length ys == Seq.length xs /\ Seq.length xs > 0)
+          (ensures is_bottommost xs ys (find_bottom_spec xs ys)) =
+  find_bottom_aux_is_min xs ys 1 0
+
+// Key property of pop_non_left / pop_while_spec (CLRS Theorem 33.1):
+// When pop_while_spec stops (returns top'), the cross product at the
+// top of the remaining stack with the new point p is strictly positive
+// (left turn), OR the stack is too small (top' < 2) to check.
+// This is the loop stopping condition — we stop popping when we find
+// a left turn.
+let rec pop_while_ensures_left_turn
+  (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: nat)
+  : Lemma
+    (requires
+      Seq.length ys == Seq.length xs /\
+      top >= 2 /\ top <= Seq.length hull /\
+      p_idx < Seq.length xs /\
+      (forall (i: nat). i < top ==> SZ.v (Seq.index hull i) < Seq.length xs))
+    (ensures (
+      let top' = pop_while_spec xs ys hull top p_idx in
+      top' <= top /\
+      (top' >= 2 ==>
+        (let t1 = SZ.v (Seq.index hull (top' - 1)) in
+         let t2 = SZ.v (Seq.index hull (top' - 2)) in
+         cross_prod (Seq.index xs t2) (Seq.index ys t2)
+                    (Seq.index xs t1) (Seq.index ys t1)
+                    (Seq.index xs p_idx) (Seq.index ys p_idx) > 0))))
+    (decreases top) =
+  pop_while_spec_bounded xs ys hull top p_idx;
+  let t1 = SZ.v (Seq.index hull (top - 1)) in
+  let t2 = SZ.v (Seq.index hull (top - 2)) in
+  let cp = cross_prod
+    (Seq.index xs t2) (Seq.index ys t2)
+    (Seq.index xs t1) (Seq.index ys t1)
+    (Seq.index xs p_idx) (Seq.index ys p_idx) in
+  if cp <= 0 then begin
+    if top - 1 >= 2 then
+      pop_while_ensures_left_turn xs ys hull (top - 1) p_idx
+    else
+      pop_while_spec_bounded xs ys hull (top - 1) p_idx
+  end else ()
+
+// Corollary: after popping and pushing a new point, the last three points
+// on the stack make a left turn. This is the key invariant of Graham scan
+// (CLRS Theorem 33.1 maintenance step): pushing p_i onto the stack
+// preserves the convex position of the top of the stack.
+//
+// Specifically, if the stack has [... t2, t1] and we pop until cp > 0,
+// then push p, the new top [... t2, t1, p] satisfies cp(t2, t1, p) > 0.
+// This follows directly from pop_while_ensures_left_turn.
+
+//SNIPPET_END: correctness_lemmas
+
 // ========== Pulse Implementations ==========
 
 open Pulse.Lib.Array

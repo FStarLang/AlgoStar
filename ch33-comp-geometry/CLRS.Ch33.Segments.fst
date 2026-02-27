@@ -200,29 +200,5 @@ fn segments_intersect (x1 y1 x2 y2 x3 y3 x4 y4: int)
   }
 }
 
-// ========== Complexity Analysis ==========
-
-// All operations are O(1) — constant number of arithmetic operations.
-
-//SNIPPET_START: op_counts
-// cross_product: 4 subtractions + 2 multiplications + 1 subtraction = 7 ops
-let cross_product_ops : nat = 7
-// direction: delegates to cross_product
-let direction_ops : nat = 7
-// on_segment: 4 min/max comparisons + 4 bounds comparisons = 8 ops
-let on_segment_ops : nat = 8
-// segments_intersect (worst case): 4 directions + 8 straddle comparisons
-//   + 4 equality checks + up to 4 on_segment calls = 28 + 8 + 4 + 32 = 72
-let segments_intersect_ops : nat = 72
-//SNIPPET_END: op_counts
-
-let all_constant () : Lemma
-  (ensures cross_product_ops + direction_ops + on_segment_ops + segments_intersect_ops <= 100)
-  = ()
-
-//SNIPPET_START: composition
-// segments_intersect decomposes into direction + on_segment calls plus comparisons
-let segments_intersect_composition () : Lemma
-  (ensures segments_intersect_ops <= 4 * direction_ops + 4 * on_segment_ops + 12)
-  = ()
-//SNIPPET_END: composition
+// All operations are O(1) — each function performs a constant number of
+// arithmetic operations and comparisons. No complexity tracking is needed.

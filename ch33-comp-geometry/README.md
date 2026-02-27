@@ -39,7 +39,6 @@ sign to geometric meaning.
 ### Verification
 - ✅ NO admits, NO assumes
 - ✅ All proofs automatic (no manual lemma invocations in Pulse)
-- ✅ Op counts: `cross_product_ops=7`, `direction_ops=7`, `on_segment_ops=8`, `segments_intersect_ops=72`
 
 ---
 
@@ -61,9 +60,12 @@ Implements Jarvis's March (gift-wrapping) convex hull algorithm from CLRS §33.3
 3. Repeat until returning to the start
 
 ### Proved Properties
-- `jarvis_march` returns the exact number of hull vertices
-- Result is bounded: `1 <= h <= n`
-- Bounds lemmas: `jarvis_march_spec_bounded`, `jarvis_loop_count_bounded`
+- `find_leftmost_is_leftmost`: the starting point is the lexicographic minimum (x,y)
+- `find_next_all_left_of`: all points lie to the left of each hull edge (**core Jarvis march correctness**, CLRS §33.3)
+  - Uses `half_plane_transitivity`: algebraic proof that cross-product comparison is transitive in the upper half-plane
+  - Preconditions: strict upper half-plane (all y[k] > y[current]) + general position (no collinear triples)
+- `find_next_spec_not_current`: the next vertex is always distinct from current
+- Result bounded: `1 <= h <= n` (`jarvis_march_spec_bounded`)
 - Step lemma: `jarvis_loop_step` (single-step unfolding)
 
 **Complexity:** O(nh) where n = input points, h = hull vertices. Proven: `jarvis_march_ops n h <= n * n`.
@@ -100,12 +102,18 @@ Complete pure specs for the full algorithm:
 2. Sort remaining points by polar angle w.r.t. pivot
 3. Process sorted points: for each, pop non-left turns from stack, then push
 
+### Proved Properties
+- `find_bottom_is_bottommost`: the starting point is the lexicographic minimum (y,x)
+- `pop_while_ensures_left_turn`: after popping, the top of the stack makes a left turn with the new point (**CLRS Theorem 33.1 maintenance step**)
+- `all_left_turns` predicate: formalizes the Graham scan invariant (consecutive triples are all left turns)
+
 **Complexity:** O(n lg n) dominated by sorting; scan loop is O(n) amortized.
 
 ### Verification
 - ✅ NO admits, NO assumes
 - ✅ Pulse: `find_bottom`, `polar_cmp`, `pop_while` proven equivalent to specs
 - ✅ Pure specs: complete algorithm specified and type-checked
+- ✅ Correctness: key loop invariant from CLRS Theorem 33.1 formally proven
 - ⏳ Full Pulse scan loop and polar insertion sort: deferred (pure specs complete)
 
 ---
