@@ -1,5 +1,5 @@
 (*
-   Breadth-First Search - Verified implementation in Pulse
+   Breadth-First Search - Verified implementation in Pulse (Relaxation Variant)
    
    Implements BFS via level-by-level exploration using iterative relaxation.
    Graph represented as adjacency matrix adj[u*n+v] (edge from u to v if != 0).
@@ -14,6 +14,10 @@
    - Source vertex is visited with dist[source] == 0
    - All reachable vertices (within n steps) are visited
    - Distance soundness: for all visited v, reachable_in(source, v, dist[v])
+   
+   Variant note: This is a simpler, self-contained BFS proof using Bellman-Ford-like
+   level expansion (O(V³) work). For the canonical CLRS §22.2 queue-based BFS with
+   GRAY/BLACK coloring, predecessor tracking, and O(V²) complexity, see QueueBFS.fst.
    
    NO admits. NO assumes.
 *)

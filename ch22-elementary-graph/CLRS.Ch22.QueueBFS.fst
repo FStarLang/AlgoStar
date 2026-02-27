@@ -1,5 +1,5 @@
 (*
-   Queue-based Breadth-First Search - CLRS §22.2
+   Queue-based Breadth-First Search - CLRS §22.2 (Canonical BFS Implementation)
 
    Implements the classical BFS algorithm from CLRS using an explicit queue.
    Graph represented as adjacency matrix adj[u*n+v] (edge from u to v if != 0).
@@ -36,15 +36,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module ML = FStar.Math.Lemmas
 
-(* Reachability specification *)
-
-let has_edge (adj: Seq.seq int) (n: nat) (u v: nat) : prop =
-  u < n /\ v < n /\ u * n + v < Seq.length adj /\ Seq.index adj (u * n + v) <> 0
-
-let rec reachable_in (adj: Seq.seq int) (n: nat) (source v: nat) (steps: nat)
-  : Tot prop (decreases steps)
-  = if steps = 0 then v == source
-    else (exists (u: nat). u < n /\ reachable_in adj n source u (steps - 1) /\ has_edge adj n u v)
+open CLRS.Ch22.Graph.Common
 
 (* ================================================================
    COUNT_NONWHITE — counts vertices with color != 0 in [0..k)
@@ -116,10 +108,7 @@ let count_nonwhite_upd_single (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: n
   = count_nonwhite_all_zero s k;
     count_nonwhite_upd_white s k j v
 
-let product_strict_bound (a b c d: nat)
-  : Lemma (requires c < a /\ d < b)
-          (ensures c * b + d < a * b)
-  = ()
+// product_strict_bound imported from CLRS.Ch22.Graph.Common
 
 (* ================================================================
    PREDICATES — Named abstractions for BFS invariant clusters
@@ -260,15 +249,7 @@ let queue_ok_after_discover
    GHOST TICK — for complexity tracking
    ================================================================ *)
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
+// incr_nat and tick imported from CLRS.Ch22.Graph.Common
 
 (* ================================================================
    COMPLEXITY ARITHMETIC LEMMA

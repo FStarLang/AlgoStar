@@ -428,9 +428,9 @@ let lemma_int_order_implies_nat_order (adj: Seq.seq int) (n: nat) (output: Seq.s
  *
  * THEN the output satisfies is_topological_order.
  *
- * Note: We admit two standard lemmas:
- * 1. Pigeonhole principle: n distinct values in [0,n) is a permutation
- * 2. Position finding is same for int vs nat sequences (extensionality)
+ * All lemmas are fully proved, including:
+ * 1. Pigeonhole principle: n distinct values in [0,n) is a permutation (line 253)
+ * 2. Position finding is same for int vs nat sequences (line 377)
  *
  * The core correctness argument - that strong_order_inv implies topological
  * ordering - is fully proven without admits.

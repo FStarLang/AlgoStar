@@ -1,8 +1,15 @@
 (*
-   Stack-based Depth-First Search - CLRS §22.3
+   Stack-based Depth-First Search - CLRS §22.3 (Canonical DFS Implementation)
 
    Implements the classical DFS algorithm from CLRS using an explicit stack.
-   Graph represented as adjacency matrix adj[u*n+v] (edge from u to v if != 0).
+   Graph represented as flat adjacency matrix adj[u*n+v] (edge from u to v if != 0).
+
+   Relationship to DFS.Spec: The pure functional specification in DFS.Spec.fst uses
+   a 2D adjacency matrix (seq (seq int)), while this imperative implementation uses
+   a flat 1D matrix (seq int). The representations are equivalent: adj2d[u][v] ↔
+   adj1d[u*n+v]. DFS.Spec proves the parenthesis theorem, white-path theorem, and
+   edge classification; this file proves the imperative implementation correct with
+   verified O(V²) complexity.
 
    Colors: 0=WHITE (unvisited), 1=GRAY (discovered, on stack), 2=BLACK (finished)
 
@@ -51,15 +58,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module ML = FStar.Math.Lemmas
 
-(* Graph specification *)
-
-let has_edge (adj: Seq.seq int) (n: nat) (u v: nat) : prop =
-  u < n /\ v < n /\ u * n + v < Seq.length adj /\ Seq.index adj (u * n + v) <> 0
-
-let rec reachable_in (adj: Seq.seq int) (n: nat) (source v: nat) (steps: nat)
-  : Tot prop (decreases steps)
-  = if steps = 0 then v == source
-    else (exists (u: nat). u < n /\ reachable_in adj n source u (steps - 1) /\ has_edge adj n u v)
+open CLRS.Ch22.Graph.Common
 
 (* Arithmetic helpers for SZ.fits *)
 let fits_product_smaller (a b c d: nat)
@@ -156,10 +155,7 @@ let rec count_ones_zero_no_gray (s: Seq.seq int) (k: nat{k <= Seq.length s})
   = if k = 0 then ()
     else count_ones_zero_no_gray s (k - 1)
 
-let product_strict_bound (a b c d: nat)
-  : Lemma (requires c < a /\ d < b)
-          (ensures c * b + d < a * b)
-  = ()
+// product_strict_bound imported from CLRS.Ch22.Graph.Common
 
 (* ================================================================
    PREDICATES — Named abstractions for repeated invariant clusters
@@ -283,15 +279,7 @@ let final_postcondition_lemma
    GHOST TICK — for complexity tracking
    ================================================================ *)
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
+// incr_nat and tick imported from CLRS.Ch22.Graph.Common
 
 (* ================================================================
    COMPLEXITY ARITHMETIC LEMMA

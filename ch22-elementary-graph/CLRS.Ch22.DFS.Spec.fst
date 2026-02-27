@@ -11,8 +11,10 @@
  *   - Discovery precedes finish: d[u] < f[u]
  *   - Time is strictly monotonic during traversal
  *
- * Graph representation: adjacency matrix seq (seq int) where adj[u][v] <> 0
- * indicates edge from u to v.
+ * Graph representation: 2D adjacency matrix seq (seq int) where adj[u][v] <> 0
+ * indicates edge from u to v. Note: The imperative implementation in StackDFS.fst
+ * uses a flat 1D matrix (seq int with adj[u*n+v]) for Pulse compatibility.
+ * The two representations are equivalent: adj2d[u][v] ↔ adj1d[u*n+v].
  *)
 module CLRS.Ch22.DFS.Spec
 
@@ -2922,7 +2924,6 @@ let timestamps_bounded (st: dfs_state) (u: nat)
  * 5. Cycle detection: back edge iff cycle exists
  * 6. Topological sort: finish times give reverse topological order (for DAGs)
  *
- * Admits are used for complex theorems that require intricate inductive proofs
- * over the recursive structure of DFS. The key definitions and basic properties
- * are fully specified and provide a solid foundation for reasoning about DFS.
+ * Zero admits. All properties are fully proved via mutual induction
+ * over the recursive structure of DFS.
  *)

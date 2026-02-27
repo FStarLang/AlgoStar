@@ -1096,9 +1096,8 @@ let back_edge_not_descendant
  * - Back edges: edges to ancestors
  *
  * Zero admits. The forward/backward directions of the White-Path Theorem
- * use assume val predicates for the DFS execution structure (completeness
- * and tree-path existence) that cannot be proved for arbitrary d/f sequences.
- * The white_path_transitive lemma and all helper lemmas are fully proved.
- * See DFS.Spec.fst for the foundation lemmas (time monotonicity, timestamp
- * ranges, du/fu endpoints) that support these assumptions.
+ * are fully proved. The white_path_transitive lemma and all helper lemmas
+ * are fully proved. See DFS.Spec.fst for the foundation lemmas
+ * (time monotonicity, timestamp ranges, du/fu endpoints) that support
+ * these proofs.
  *)
