@@ -16,7 +16,7 @@ module CLRS.Ch32.KMP.Spec
 
 open FStar.Seq
 open FStar.Classical
-open CLRS.Ch32.KMP
+open CLRS.Ch32.KMP.PureDefs
 
 module SZ = FStar.SizeT
 
@@ -105,13 +105,13 @@ let matched_prefix_is_match (text pattern: seq int) (i: nat)
   : Lemma
     (requires matched_prefix_at text pattern i (length pattern) /\
              length pattern > 0)
-    (ensures CLRS.Ch32.KMP.matches_at text pattern (i - length pattern))
+    (ensures matches_at text pattern (i - length pattern))
   = ()
 
 /// matches_at implies matched_prefix_at with length m
 let match_is_matched_prefix (text pattern: seq int) (s: nat)
   : Lemma
-    (requires CLRS.Ch32.KMP.matches_at text pattern s /\ length pattern > 0)
+    (requires matches_at text pattern s /\ length pattern > 0)
     (ensures matched_prefix_at text pattern (s + length pattern) (length pattern))
   = let m = length pattern in
     let aux (j: nat{j < m})
@@ -422,7 +422,7 @@ let matches_at_dec_iff (text pattern: seq int) (s: nat)
   : Lemma
     (requires s + length pattern <= length text)
     (ensures matches_at_dec text pattern s <==>
-             CLRS.Ch32.KMP.matches_at text pattern s)
+             matches_at text pattern s)
   = check_match_correct text pattern s 0
 #pop-options
 
@@ -440,7 +440,7 @@ let kmp_match_iff (text pattern pi: seq int) (i q: nat)
               let q_new = kmp_step_result pattern pi q c m in
               (q_new = m <==>
                 (i + 1 >= m /\
-                 CLRS.Ch32.KMP.matches_at text pattern (i + 1 - m)))))
+                 matches_at text pattern (i + 1 - m)))))
   = let c = index text i in
     let m = length pattern in
     let q_new = kmp_step_result pattern pi q c m in
@@ -525,7 +525,7 @@ let count_tracking (text pattern: seq int) (i count: nat) (found: bool)
                count == count_before text pattern (i - length pattern + 1)) /\
              (i < length pattern ==> count == 0) /\
              (i + 1 >= length pattern ==>
-               (found <==> CLRS.Ch32.KMP.matches_at text pattern (i + 1 - length pattern))) /\
+               (found <==> matches_at text pattern (i + 1 - length pattern))) /\
              (i + 1 < length pattern ==> found == false))
     (ensures (let m = length pattern in
               let count' = if found then count + 1 else count in

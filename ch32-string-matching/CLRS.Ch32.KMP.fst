@@ -36,6 +36,9 @@ module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module Bridge = CLRS.Ch32.KMP.Bridge
+
+open CLRS.Ch32.KMP.PureDefs
 
 // ========== Ghost tick ==========
 
@@ -48,104 +51,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 {
   GR.(ctr := incr_nat n)
 }
-
-// ========== Pure Specification ==========
-
-//SNIPPET_START: is_prefix_suffix
-// Does pattern[0..k-1] == pattern[q-k+1..q]? (prefix of length k matches suffix ending at q)
-let is_prefix_suffix (#a: eqtype) (pattern: Seq.seq a) (q: nat{q < Seq.length pattern}) (k: nat) : prop =
-  k <= q /\
-  (forall (i: nat). i < k ==> Seq.index pattern i == Seq.index pattern (q - k + 1 + i))
-//SNIPPET_END: is_prefix_suffix
-
-// Is k a valid prefix-suffix length that could extend to position q+1?
-let extends_to (#a: eqtype) (pattern: Seq.seq a) (q: nat{q + 1 < Seq.length pattern}) (k: nat) : prop =
-  k <= q /\ k < Seq.length pattern /\
-  is_prefix_suffix pattern q k /\
-  Seq.index pattern k == Seq.index pattern (q + 1)
-
-// Key lemma: if is_prefix_suffix pattern q k and pattern[k] == pattern[q+1],
-// then is_prefix_suffix pattern (q+1) (k+1)
-let prefix_suffix_extend (#a: eqtype) (pattern: Seq.seq a) 
-    (q: nat{q + 1 < Seq.length pattern}) (k: nat)
-  : Lemma (requires is_prefix_suffix pattern q k /\ k < Seq.length pattern /\
-                     Seq.index pattern k == Seq.index pattern (q + 1))
-          (ensures is_prefix_suffix pattern (q + 1) (k + 1))
-  = assert (q + 1 - (k + 1) + 1 == q - k + 1)
-
-// Key lemma: is_prefix_suffix pattern q 0 is always true
-let prefix_suffix_zero (#a: eqtype) (pattern: Seq.seq a) (q: nat{q < Seq.length pattern})
-  : Lemma (is_prefix_suffix pattern q 0)
-  = ()
-
-// Failure chain lemma: if k is a prefix-suffix of pattern[0..q] (k > 0),
-// and j is a prefix-suffix of pattern[0..k-1], then j is also a prefix-suffix of pattern[0..q]
-let failure_chain (#a: eqtype) (pattern: Seq.seq a) 
-    (q: nat{q < Seq.length pattern}) (k: nat) (j: nat)
-  : Lemma (requires is_prefix_suffix pattern q k /\ k > 0 /\ k - 1 < Seq.length pattern /\
-                     is_prefix_suffix pattern (k - 1) j)
-          (ensures is_prefix_suffix pattern q j)
-  = assert (j <= k - 1);
-    assert (k <= q);
-    assert (j <= q);
-    assert (forall (i:nat). i < j ==> (k - 1) - j + 1 + i == k - j + i);
-    assert (forall (i:nat). i < j ==> k - j + i < k);
-    assert (forall (i:nat). i < j ==> q - k + 1 + (k - j + i) == q - j + 1 + i);
-    ()
-
-let extend_step_correct (#a: eqtype) (pattern: Seq.seq a)
-    (q: nat{q + 1 < Seq.length pattern}) (k: nat) (chars_match: bool)
-  : Lemma (requires is_prefix_suffix pattern q k /\ k < Seq.length pattern /\
-                     (chars_match <==> Seq.index pattern k == Seq.index pattern (q + 1)) /\
-                     (not chars_match ==> k == 0))
-          (ensures is_prefix_suffix pattern (q + 1) (if chars_match then k + 1 else k))
-  = if chars_match then prefix_suffix_extend pattern q k
-    else prefix_suffix_zero pattern (q + 1)
-
-let inner_step_preserves (#a: eqtype) (pattern: Seq.seq a)
-    (q: nat{q < Seq.length pattern}) (k: nat) (pi_prev: nat) (should_update: bool)
-  : Lemma (requires is_prefix_suffix pattern q k /\
-                     (should_update ==> (k > 0 /\ k - 1 < Seq.length pattern /\
-                                          is_prefix_suffix pattern (k - 1) pi_prev)) /\
-                     (not should_update ==> true))
-          (ensures is_prefix_suffix pattern q (if should_update then pi_prev else k))
-  = if should_update then failure_chain pattern q k pi_prev else ()
-
-//SNIPPET_START: pi_correct
-// The full spec: pi[q] is a valid prefix-suffix
-let pi_correct (#a: eqtype) (pattern: Seq.seq a) (pi: Seq.seq SZ.t) : prop =
-  Seq.length pi == Seq.length pattern /\
-  Seq.length pattern > 0 /\
-  (forall (q: nat). q < Seq.length pattern ==> 
-    is_prefix_suffix pattern q (SZ.v (Seq.index pi q)))
-//SNIPPET_END: pi_correct
-
-// ========== KMP Matcher Specification ==========
-
-// Does the pattern match at position s in the text?
-let matches_at (text pattern: Seq.seq int) (s: nat) : prop =
-  s + Seq.length pattern <= Seq.length text /\
-  (forall (j: nat). j < Seq.length pattern ==> 
-    Seq.index text (s + j) == Seq.index pattern j)
-
-// ========== Complexity bounds ==========
-
-// Prefix function: at most 2*(m-1) comparisons
-let prefix_function_complexity_bound (c_final c_init m: nat) : prop =
-  c_final >= c_init /\
-  (if m >= 1 then c_final - c_init <= 2 * (m - 1) else c_final == c_init)
-
-// Matching: at most 2*n comparisons
-let matcher_complexity_bound (c_final c_init n: nat) : prop =
-  c_final >= c_init /\
-  c_final - c_init <= 2 * n
-
-//SNIPPET_START: kmp_total_complexity
-// Combined complexity bound: prefix + matching
-let kmp_total_complexity_bound (c_final c_init n m: nat) : prop =
-  c_final >= c_init /\
-  c_final - c_init <= 2 * n + 2 * m
-//SNIPPET_END: kmp_total_complexity
 
 // ========== Compute Prefix Function ==========
 
@@ -179,11 +84,13 @@ fn compute_prefix_function
     pure (
       Seq.length s_pi == SZ.v m /\
       pi_correct s_pat s_pi /\
+      Bridge.pi_max_sz s_pat s_pi /\
       prefix_function_complexity_bound cf (reveal c0) (SZ.v m)
     )
 //SNIPPET_END: compute_prefix_function_sig
 {
   prefix_suffix_zero s_pat 0;
+  Bridge.maximality_base s_pat (Seq.create (SZ.v m) 0sz);
   
   let mut k: SZ.t = 0sz;
   let mut q: SZ.t = 1sz;
@@ -206,10 +113,17 @@ fn compute_prefix_function
       is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v vk) /\
       // Amortized potential: (comparisons - c0) + k <= 2*(q - 1)
       vc_outer >= reveal c0 /\
-      vc_outer - reveal c0 + SZ.v vk <= 2 * (SZ.v vq - 1)
+      vc_outer - reveal c0 + SZ.v vk <= 2 * (SZ.v vq - 1) /\
+      // Maximality: pi is maximal at positions 0..vq-1
+      Bridge.pi_max_sz_up_to s_pat s_pi_outer (SZ.v vq) /\
+      // k equals pi[vq-1] (needed for inner loop init)
+      SZ.v vk == SZ.v (Seq.index s_pi_outer (SZ.v vq - 1))
     )
   {
+    with _vq_g _vk_g s_pi_out _vc_g. _;
     let vq = !q;
+    let vk_init = !k;
+    Bridge.inner_maximality_init s_pat s_pi_out (SZ.v vq) (SZ.v vk_init);
     
     let mut done_inner: bool = false;
     
@@ -232,9 +146,14 @@ fn compute_prefix_function
         (vdone ==> (SZ.v vk_inner == 0 \/ Seq.index s_pat (SZ.v vk_inner) == Seq.index s_pat (SZ.v vq))) /\
         // Amortized: (comparisons - c0) + k <= 2*(q - 1)
         vc_inner >= reveal c0 /\
-        vc_inner - reveal c0 + SZ.v vk_inner <= 2 * (SZ.v vq - 1)
+        vc_inner - reveal c0 + SZ.v vk_inner <= 2 * (SZ.v vq - 1) /\
+        // Mismatch invariant: all PS above current k have been checked
+        Bridge.all_ps_above_mismatch s_pat (SZ.v vq) (SZ.v vk_inner) /\
+        // Maximality preserved (pi array unchanged in inner loop)
+        Bridge.pi_max_sz_up_to s_pat s_pi_inner (SZ.v vq)
       )
     {
+      with _vd_il _vki_il s_pi_il _vci_il. _;
       let vk = !k;
       
       let safe_pi_idx: SZ.t = (if SZ.v vk > 0 then vk -^ 1sz else 0sz);
@@ -254,12 +173,15 @@ fn compute_prefix_function
         
         inner_step_preserves s_pat (SZ.v vq - 1) (SZ.v vk) (SZ.v pi_prev) true;
         
+        Bridge.inner_maximality_step s_pat s_pi_il (SZ.v vq) (SZ.v vk) (SZ.v pi_prev);
+        
         k := pi_prev
       } else {
         done_inner := true
       }
     };
     
+    with _vd_post _vki_post s_pi_post _vci_post. _;
     let vk_after_inner = !k;
     
     let pk_final = A.op_Array_Access pattern vk_after_inner;
@@ -278,6 +200,8 @@ fn compute_prefix_function
     let final_k = !k;
     V.op_Array_Assignment pi vq final_k;
     
+    Bridge.extend_maximality s_pat (Seq.upd s_pi_post (SZ.v vq) final_k) (SZ.v vq) (SZ.v vk_after_inner) chars_match;
+    
     assert pure (is_prefix_suffix s_pat (SZ.v vq) (SZ.v final_k));
     assert pure (SZ.v final_k >= 0);
     assert pure (SZ.v final_k <= SZ.v vq);
@@ -285,6 +209,9 @@ fn compute_prefix_function
     
     q := vq +^ 1sz
   };
+  
+  with _vq_f _vk_f s_pi_f _vc_f. _;
+  Bridge.up_to_full s_pat s_pi_f;
   
   let final_q = !q;
   assert pure (SZ.v final_q == SZ.v m)

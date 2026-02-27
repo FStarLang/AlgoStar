@@ -25,7 +25,7 @@
 module CLRS.Ch32.KMP.Bridge
 
 open FStar.Seq
-open CLRS.Ch32.KMP
+open CLRS.Ch32.KMP.PureDefs
 
 module SZ = FStar.SizeT
 module Spec = CLRS.Ch32.KMP.Spec
