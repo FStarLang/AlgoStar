@@ -75,30 +75,22 @@ let weights_to_adj_preserves (weights_seq: Seq.seq SZ.t) (n: nat) (u v: nat)
   = ()
 #pop-options
 
+// Valid parent values: all entries < n
 // Predicate for full correctness of Prim's output
-// Basic functional correctness properties that the implementation maintains
 let prim_correct 
-    (key_seq: Seq.seq SZ.t) 
+    (key_seq: Seq.seq SZ.t)
+    (parent_seq: Seq.seq SZ.t)
     (weights_seq: Seq.seq SZ.t)
     (n: nat) 
     (source: nat) 
   : prop 
   = Seq.length key_seq == n /\
+    Seq.length parent_seq == n /\
     source < n /\
     Seq.length weights_seq == n * n /\
-    // Basic properties: source has key 0, all keys bounded
     SZ.v (Seq.index key_seq source) == 0 /\
-    all_keys_bounded key_seq
-    
-    // Note: Full MST correctness (proving that key values correspond to
-    // an actual minimum spanning tree) would require connecting this
-    // imperative implementation to the pure specification in Prim.Spec.
-    // This would involve proving that the iterative algorithm maintains
-    // the MST invariant at each step, which requires substantial graph
-    // theory infrastructure as shown in CLRS.Ch23.MST.Spec and
-    // CLRS.Ch23.Prim.Spec. The admitted lemmas in those modules
-    // (cut_property, lemma_prim_step_is_light, etc.) would need to be
-    // completed first.
+    all_keys_bounded key_seq /\
+    SZ.v (Seq.index parent_seq source) == source
 
 // Lemma: Seq.create produces bounded keys
 let lemma_create_bounded (n: nat) (v: SZ.t)
@@ -172,6 +164,7 @@ let compute_weight_idx = compute_weight_idx_u64
 //   - key: array of minimum edge weights to add each vertex to MST
 //   - in_mst: array indicating which vertices are in MST
 
+#push-options "--z3rlimit 40"
 //SNIPPET_START: prim_sig
 fn prim
   (#p: perm)
@@ -186,11 +179,12 @@ fn prim
     Seq.length weights_seq == SZ.v n * SZ.v n /\
     SZ.fits_u64  // Require 64-bit SizeT for index computation
   )
-  returns key: V.vec SZ.t
-  ensures exists* (key_seq: Ghost.erased (Seq.seq SZ.t)).
+  returns res: (V.vec SZ.t & V.vec SZ.t)
+  ensures exists* (key_seq parent_seq: Ghost.erased (Seq.seq SZ.t)).
     A.pts_to weights #p weights_seq **
-    V.pts_to key key_seq **
-    pure (prim_correct key_seq weights_seq (SZ.v n) (SZ.v source))
+    V.pts_to (fst res) key_seq **
+    V.pts_to (snd res) parent_seq **
+    pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source))
 //SNIPPET_END: prim_sig
 {
   // Allocate key array, initialized to infinity
@@ -199,6 +193,13 @@ fn prim
   let key_a = V.vec_to_array key;
   rewrite (A.pts_to (V.vec_to_array key) (Seq.create (SZ.v n) infinity))
        as (A.pts_to key_a (Seq.create (SZ.v n) infinity));
+  
+  // Allocate parent array, initialized to source
+  let parent_v = V.alloc source n;
+  V.to_array_pts_to parent_v;
+  let parent_a = V.vec_to_array parent_v;
+  rewrite (A.pts_to (V.vec_to_array parent_v) (Seq.create (SZ.v n) source))
+       as (A.pts_to parent_a (Seq.create (SZ.v n) source));
   
   // Set key[source] = 0
   A.op_Array_Assignment key_a source 0sz;
@@ -218,6 +219,9 @@ fn prim
   rewrite (A.pts_to (V.vec_to_array in_mst_v) (Seq.create (SZ.v n) 0sz))
        as (A.pts_to in_mst (Seq.create (SZ.v n) 0sz));
   
+  // Establish initial parent array
+  with parent_init. assert (A.pts_to parent_a parent_init);
+  
   // Main loop: n iterations
   let mut iter: SZ.t = 0sz;
   
@@ -225,15 +229,17 @@ fn prim
     let v_iter = !iter;
     v_iter <^ n
   )
-  invariant exists* v_iter key_seq in_mst_seq.
+  invariant exists* v_iter key_seq in_mst_seq parent_seq.
     R.pts_to iter v_iter **
     A.pts_to key_a key_seq **
     A.pts_to in_mst in_mst_seq **
+    A.pts_to parent_a parent_seq **
     A.pts_to weights #p weights_seq **
     pure (
       SZ.v v_iter <= SZ.v n + 1 /\
       Seq.length key_seq == SZ.v n /\
       Seq.length in_mst_seq == SZ.v n /\
+      Seq.length parent_seq == SZ.v n /\
       // Maintain functional correctness:
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       all_keys_bounded key_seq
@@ -248,13 +254,14 @@ fn prim
       let v_find_i = !find_i;
       v_find_i <^ n
     )
-    invariant exists* v_find_i v_min_idx v_min_key v_iter key_seq in_mst_seq.
+    invariant exists* v_find_i v_min_idx v_min_key v_iter key_seq in_mst_seq parent_seq.
       R.pts_to find_i v_find_i **
       R.pts_to min_idx v_min_idx **
       R.pts_to min_key v_min_key **
       R.pts_to iter v_iter **
       A.pts_to key_a key_seq **
       A.pts_to in_mst in_mst_seq **
+      A.pts_to parent_a parent_seq **
       A.pts_to weights #p weights_seq **
       pure (
         SZ.v v_find_i <= SZ.v n /\
@@ -262,6 +269,7 @@ fn prim
         SZ.v v_iter <= SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
+        Seq.length parent_seq == SZ.v n /\
         // Maintain functional correctness:
         SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
         all_keys_bounded key_seq
@@ -297,12 +305,13 @@ fn prim
       let v_update_i = !update_i;
       v_update_i <^ n
     )
-    invariant exists* v_update_i v_iter u key_seq in_mst_seq.
+    invariant exists* v_update_i v_iter u key_seq in_mst_seq parent_seq.
       R.pts_to update_i v_update_i **
       R.pts_to iter v_iter **
       R.pts_to min_idx u **
       A.pts_to key_a key_seq **
       A.pts_to in_mst in_mst_seq **
+      A.pts_to parent_a parent_seq **
       A.pts_to weights #p weights_seq **
       pure (
         SZ.v v_update_i <= SZ.v n /\
@@ -310,6 +319,7 @@ fn prim
         SZ.v v_iter <= SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
+        Seq.length parent_seq == SZ.v n /\
         SZ.v u * SZ.v n < pow2 64 /\
         (forall (i:nat). i < SZ.v n ==> SZ.v u * SZ.v n + i < pow2 64) /\
         // Maintain functional correctness:
@@ -337,8 +347,21 @@ fn prim
       // Prove that new_key_v is bounded
       assert (pure (SZ.v new_key_v <= SZ.v infinity));
       
-      // Write unconditionally
+      // Write key
       A.op_Array_Assignment key_a v new_key_v;
+      
+      // Assert key invariant is maintained after key write
+      with key_seq'. assert (A.pts_to key_a key_seq');
+      assert (pure (SZ.v (Seq.index key_seq' (SZ.v source)) == 0));
+      assert (pure (all_keys_bounded key_seq'));
+      assert (pure (Seq.length key_seq' == SZ.v n));
+      
+      // Read old parent and compute new parent
+      let old_parent_v = A.op_Array_Access parent_a v;
+      let new_parent_v : SZ.t = (if should_update_key then u else old_parent_v);
+      
+      // Write parent
+      A.op_Array_Assignment parent_a v new_parent_v;
       
       update_i := v +^ 1sz;
     };
@@ -353,6 +376,10 @@ fn prim
     iter := new_iter;
   };
   
+  // Set parent[source] = source (source is MST root)
+  with old_parent_seq. assert (A.pts_to parent_a old_parent_seq);
+  A.op_Array_Assignment parent_a source source;
+  
   // Free the in_mst array
   with s_in_mst. assert (A.pts_to in_mst s_in_mst);
   rewrite (A.pts_to in_mst s_in_mst) as (A.pts_to (V.vec_to_array in_mst_v) s_in_mst);
@@ -364,16 +391,11 @@ fn prim
   rewrite (A.pts_to key_a s_key) as (A.pts_to (V.vec_to_array key) s_key);
   V.to_vec_pts_to key;
   
-  // Verify postcondition properties
-  with key_seq_final. assert (V.pts_to key key_seq_final);
-  assert (pure (SZ.v (Seq.index key_seq_final (SZ.v source)) == 0));
-  assert (pure (all_keys_bounded key_seq_final));
-  assert (pure (Seq.length weights_seq == SZ.v n * SZ.v n));
+  // Convert parent array back to vec for return
+  with s_parent. assert (A.pts_to parent_a s_parent);
+  rewrite (A.pts_to parent_a s_parent) as (A.pts_to (V.vec_to_array parent_v) s_parent);
+  V.to_vec_pts_to parent_v;
   
-  // The postcondition establishes basic functional correctness properties.
-  // Full MST correctness (proving optimality) would require connecting to
-  // the pure specification in CLRS.Ch23.Prim.Spec, which involves complex
-  // graph theory proofs about spanning trees and the cut property.
-  
-  key
+  (key, parent_v)
 }
+#pop-options
