@@ -556,49 +556,68 @@ let rec path_length_to_root_fuel (parent: Seq.seq nat) (i: nat) (fuel: nat)
 let tree_height (f: uf_forest_sized) (x: nat{x < f.n}) : nat =
   path_length_to_root_fuel f.parent x f.n
 
-// Lemma: Under rank invariant, tree height ≤ rank
-// Proof idea: Each step up the tree increases rank strictly (by rank_invariant),
-// and ranks can be at most n-1, so path length is at most n.
+// Lemma: Under rank invariant, tree height ≤ rank[root]
+// Each step up the tree strictly increases rank (by rank_invariant).
 
-// Key lemma: path length is trivially bounded by fuel
-let rec path_length_bounded_by_fuel
+// Key lemma (fuel version): path_length + rank[x] <= rank[root]
+let rec height_plus_rank_le_root_rank_fuel
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f)})
   (x: nat{x < f.n})
   (fuel: nat)
   : Lemma (requires fuel <= f.n)
-          (ensures path_length_to_root_fuel f.parent x fuel <= fuel)
+          (ensures (let uf = project_to_unsized f in
+                    match pure_find_fuel uf x fuel with
+                    | Some root ->
+                      path_length_to_root_fuel f.parent x fuel + Seq.index f.rank x
+                        <= Seq.index f.rank root
+                    | None -> True))
           (decreases fuel)
-  = if fuel = 0 then ()
+  = let uf = project_to_unsized f in
+    if fuel = 0 then ()
     else
       let p = Seq.index f.parent x in
       if p = x then ()
       else begin
-        path_length_bounded_by_fuel f p (fuel - 1)
+        height_plus_rank_le_root_rank_fuel f p (fuel - 1);
+        rank_inv_inst uf x
       end
 
-let height_le_rank_fuel 
+// Tight bound: tree height ≤ rank[root(x)]
+let height_le_root_rank
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f)})
-  (x: nat{x < f.n}) 
-  (fuel: nat)
-  : Lemma (requires fuel <= f.n)
-          (ensures path_length_to_root_fuel f.parent x fuel <= fuel)
-          (decreases fuel)
-  = path_length_bounded_by_fuel f x fuel
+  (x: nat{x < f.n})
+  : Lemma (ensures (let uf = project_to_unsized f in
+                    pure_find_in_bounds uf x;
+                    tree_height f x <= Seq.index f.rank (pure_find uf x)))
+  = let uf = project_to_unsized f in
+    pure_find_fuel_sufficient uf x;
+    height_plus_rank_le_root_rank_fuel f x f.n;
+    pure_find_in_bounds uf x
 
-let height_le_rank 
+// Trivial bound also still holds: height ≤ n
+let height_le_n 
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f)})
   (x: nat{x < f.n})
   : Lemma (ensures tree_height f x <= f.n)
-  = height_le_rank_fuel f x f.n
+  = let rec path_length_bounded_by_fuel
+      (f: uf_forest_sized{is_valid_uf_sized f /\ rank_invariant (project_to_unsized f)})
+      (x: nat{x < f.n}) (fuel: nat)
+      : Lemma (requires fuel <= f.n) (ensures path_length_to_root_fuel f.parent x fuel <= fuel)
+              (decreases fuel)
+      = if fuel = 0 then ()
+        else let p = Seq.index f.parent x in
+             if p = x then () else path_length_bounded_by_fuel f p (fuel - 1)
+    in
+    path_length_bounded_by_fuel f x f.n
 
 (*** 6. Summary Theorems ***)
 
 // Combined theorem: For union-by-rank, we have:
-// 1. Tree height from x ≤ rank[x]
-// 2. rank[x] ≤ ⌊log₂ n⌋
+// 1. Tree height from x ≤ rank[root(x)]
+// 2. rank[root(x)] ≤ ⌊log₂ n⌋
 // 3. Therefore, tree height ≤ ⌊log₂ n⌋ (logarithmic bound on find)
 
 let union_by_rank_logarithmic_find 
@@ -606,17 +625,14 @@ let union_by_rank_logarithmic_find
                        rank_invariant (project_to_unsized f) /\
                        size_rank_invariant f})
   (x: nat{x < f.n})
-  : Lemma (ensures tree_height f x <= log2_floor f.n + f.n)
-  = // We have two bounds:
-    // 1. rank[x] <= log2_floor f.n (from rank_logarithmic_bound_sized)
-    // 2. tree_height <= f.n (from height_le_rank)
-    // The second bound is weaker, but provable
-    rank_logarithmic_bound_sized f x;
-    height_le_rank f x;
-    // The actual tight bound would be tree_height <= rank[root] <= log2_floor f.n
-    // but we'd need a tighter proof of height <= rank[root]
-    assert (tree_height f x <= f.n);
-    assert (Seq.index f.rank x <= log2_floor f.n)
+  : Lemma (ensures tree_height f x <= log2_floor f.n)
+  = let uf = project_to_unsized f in
+    height_le_root_rank f x;
+    pure_find_in_bounds uf x;
+    let root = pure_find uf x in
+    // height <= rank[root] (from height_le_root_rank)
+    // rank[root] <= log2_floor n (from rank_logarithmic_bound_sized)
+    rank_logarithmic_bound_sized f root
 
 // Corollary: This gives O(log n) worst-case for find operations
 let find_logarithmic_complexity 
@@ -626,7 +642,7 @@ let find_logarithmic_complexity
                        rank_invariant (project_to_unsized f) /\
                        size_rank_invariant f})
   (x: nat{x < f.n})
-  : Lemma (ensures tree_height f x <= log2_floor n + n)
+  : Lemma (ensures tree_height f x <= log2_floor n)
   = union_by_rank_logarithmic_find f x
 
 End of commented out section
