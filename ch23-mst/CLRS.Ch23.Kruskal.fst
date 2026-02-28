@@ -146,6 +146,55 @@ let rec edges_from_arrays_extend (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= e
   = if i >= ec then ()
     else edges_from_arrays_extend seu sev ec (i + 1) eu ev
 
+// Opaque bundled invariant — prevents quantifier pollution in Pulse VCs.
+// Bundles valid_parents, valid_endpoints, uf_inv, and is_forest behind an
+// opaque wall so that ~8 forall quantifiers don't leak into every split query.
+[@@"opaque_to_smt"]
+let kruskal_inv (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat) : prop =
+  valid_parents sparent n /\
+  valid_endpoints seu sev n ec /\
+  UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+  KSpec.is_forest (edges_from_arrays seu sev ec 0) n
+
+let kruskal_inv_intro (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires
+      valid_parents sparent n /\
+      valid_endpoints seu sev n ec /\
+      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
+    (ensures kruskal_inv sparent seu sev n ec)
+  = reveal_opaque (`%kruskal_inv) (kruskal_inv sparent seu sev n ec)
+
+let kruskal_inv_elim (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires kruskal_inv sparent seu sev n ec)
+    (ensures
+      valid_parents sparent n /\
+      valid_endpoints seu sev n ec /\
+      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
+  = reveal_opaque (`%kruskal_inv) (kruskal_inv sparent seu sev n ec)
+
+let kruskal_inv_valid_parents (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma (requires kruskal_inv sparent seu sev n ec)
+          (ensures valid_parents sparent n /\ Seq.length sparent == n /\
+                   Seq.length seu == n /\ Seq.length sev == n /\ ec <= n /\ ec < n)
+  = reveal_opaque (`%kruskal_inv) (kruskal_inv sparent seu sev n ec)
+
+// Extract non-negativity of old array entries (needed to prove new array validity after writes)
+let kruskal_inv_endpoints (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma (requires kruskal_inv sparent seu sev n ec)
+          (ensures valid_endpoints seu sev n ec)
+  = reveal_opaque (`%kruskal_inv) (kruskal_inv sparent seu sev n ec)
+
+let kruskal_inv_init (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n: nat)
+  : Lemma (requires UF.identity_parent n sparent /\ n > 0 /\
+                    Seq.length seu == n /\ Seq.length sev == n)
+          (ensures kruskal_inv sparent seu sev n 0)
+  = UF.uf_inv_init sparent n;
+    reveal_opaque (`%kruskal_inv) (kruskal_inv sparent seu sev n 0)
+
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn find
   (#p: perm)
@@ -204,7 +253,7 @@ fn do_union
 #pop-options
 
 // Lemma for when we add an edge: proves uf_inv, is_forest, valid_endpoints for new state.
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_add_edge_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int)
@@ -248,7 +297,7 @@ let kruskal_add_edge_proof
 #pop-options
 
 // Lemma for when we don't add an edge: parent is effectively unchanged.
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
 let kruskal_noop_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev: Seq.seq int)
@@ -279,7 +328,7 @@ let kruskal_noop_proof
 #pop-options
 
 // Unified step lemma — dispatches to add_edge or noop proof.
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_step_maintains_inv
   (sparent sparent': Seq.seq SZ.t)
   (seu sev seu' sev': Seq.seq int)
@@ -289,9 +338,8 @@ let kruskal_step_maintains_inv
   (should_add: bool)
   : Lemma
     (requires
-      valid_endpoints seu sev n ec /\
-      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
-      KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
+      kruskal_inv sparent seu sev n ec /\
+      Seq.length seu == n /\ Seq.length sev == n /\
       vbu < n /\ vbv < n /\
       root_u == UF.find_pure sparent vbu n n /\
       root_v == UF.find_pure sparent vbv n n /\
@@ -307,21 +355,19 @@ let kruskal_step_maintains_inv
       ec' <= Seq.length seu' /\ ec' <= Seq.length sev' /\
       (forall (k:nat). k < ec' ==> Seq.index seu' k >= 0 /\ Seq.index sev' k >= 0))
     (ensures
-      UF.uf_inv sparent' (edges_from_arrays seu' sev' ec' 0) n ec' /\
-      KSpec.is_forest (edges_from_arrays seu' sev' ec' 0) n /\
-      valid_endpoints seu' sev' n ec' /\
-      valid_parents sparent' n)
-  = if should_add then
+      kruskal_inv sparent' seu' sev' n ec')
+  = kruskal_inv_elim sparent seu sev n ec;
+    if should_add then
       kruskal_add_edge_proof sparent sparent' seu sev seu' sev' n ec vbu vbv root_u root_v
     else begin
       edges_from_arrays_ext seu sev seu' sev' ec 0;
       UF.find_pure_bounded sparent vbu n n;
       kruskal_noop_proof sparent sparent' seu sev n ec vbu root_u root_v
-    end
+    end;
+    kruskal_inv_intro sparent' seu' sev' n ec'
 #pop-options
 
-#push-options "--z3rlimit 800 --ifuel 2 --fuel 2 --split_queries always"
-//SNIPPET_START: kruskal_sig
+#push-options "--z3rlimit 50 --ifuel 2 --fuel 2 --split_queries always"
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
@@ -377,9 +423,11 @@ fn kruskal
     i := vi +^ 1sz;
   };
   
-  // After init: parent is identity, establish uf_inv
+  // After init: establish opaque kruskal_inv (no quantifiers leak into main loop)
   with sp_init. assert (A.pts_to parent sp_init);
-  UF.uf_inv_init sp_init (SZ.v n);
+  with seu_init. assert (A.pts_to edge_u seu_init);
+  with sev_init. assert (A.pts_to edge_v sev_init);
+  kruskal_inv_init sp_init seu_init sev_init (SZ.v n);
   
   // Process n-1 rounds
   let mut round: SZ.t = 0sz;
@@ -397,10 +445,7 @@ fn kruskal
       SZ.v vround <= SZ.v n - 1 /\
       SZ.v vec <= SZ.v vround /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      valid_parents sparent (SZ.v n) /\
-      valid_endpoints seu sev (SZ.v n) (SZ.v vec) /\
-      UF.uf_inv sparent (edges_from_arrays seu sev (SZ.v vec) 0) (SZ.v n) (SZ.v vec) /\
-      KSpec.is_forest (edges_from_arrays seu sev (SZ.v vec) 0) (SZ.v n)
+      kruskal_inv sparent seu sev (SZ.v n) (SZ.v vec)
     )
   {
     let vround = !round;
@@ -471,6 +516,12 @@ fn kruskal
     with seu_cur. assert (A.pts_to edge_u seu_cur);
     with sev_cur. assert (A.pts_to edge_v sev_cur);
     
+    // Extract valid_parents from opaque kruskal_inv for find/do_union
+    with vec_cur. assert (R.pts_to edge_count vec_cur);
+    kruskal_inv_valid_parents sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    // Extract valid_endpoints for proving new array validity after branchless writes
+    kruskal_inv_endpoints sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    
     // Check components and add edge
     let vbu = !best_u;
     let vbv = !best_v;
@@ -504,14 +555,15 @@ fn kruskal
     round := vround +^ 1sz;
   };
   
-  // After loop: uf_inv and is_forest are in the invariant — no assume_ needed
+  // After loop: extract facts from opaque kruskal_inv for result proof
+  with sp_f. assert (A.pts_to parent sp_f);
   with seu_f sev_f vec_f. assert (
     A.pts_to edge_u seu_f ** A.pts_to edge_v sev_f ** R.pts_to edge_count vec_f);
+  kruskal_inv_elim sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
   lemma_kruskal_maintains_forest seu_f sev_f (SZ.v n) (SZ.v vec_f);
   
   // Clean up
-  with sp. assert (A.pts_to parent sp);
-  rewrite (A.pts_to parent sp) as (A.pts_to (V.vec_to_array parent_v) sp);
+  rewrite (A.pts_to parent sp_f) as (A.pts_to (V.vec_to_array parent_v) sp_f);
   V.to_vec_pts_to parent_v;
   V.free parent_v;
 }
