@@ -30,7 +30,7 @@ This directory contains verified implementations and specifications for MST algo
 | MST.Spec (.fst + .fsti) | 0 | ✅ Fully proven (acyclic_count_lower_bound closed) |
 | Kruskal.Components.fst | 0 | ✅ Fully proven |
 | Kruskal.Spec.fst | 0 | ✅ Fully proven |
-| Kruskal.fst (Pulse) | 1 `assume_` | ⚠️ Forest property assumed (line 315) |
+| Kruskal.fst (Pulse) | 0 | ✅ Forest property proven via UF invariant |
 | Kruskal.EdgeSorting.fst | 0 | ✅ |
 | Kruskal.SortedEdges.fst | 0 | ✅ |
 | Kruskal.UF.fst | 0 | ✅ Fully proven |
@@ -41,7 +41,7 @@ This directory contains verified implementations and specifications for MST algo
 | Prim.Complexity.fst | 0 | ✅ |
 | MST.Complexity.fst | 0 | ✅ |
 
-**1 admit** across ~9 900 lines. The `assume_` in Kruskal.fst (line ~320) assumes the imperative output forms a forest.
+**0 admits** across ~10 300 lines. All properties are fully proven.
 
 ## Key Results
 
