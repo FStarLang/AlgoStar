@@ -38,3 +38,17 @@ However, in order to apply that lemma you need to manually keep track of several
 > - Postconditions automatically provide membership guarantees, e.g.:
 >   `rb_insert_v` ensures `valid_rbtree y (S.insert 'ft k) ** pure (S.mem k (S.insert 'ft k) = true)`
 
+
+---
+
+> **Additional work (June 2025):** Besides addressing the above complaints on the
+> Okasaki-style implementation, a **second, CLRS-faithful imperative RB tree** has been
+> added in `CLRS.Ch13.Imp.RBTree.Spec.fst` (pure spec, 474 lines, fully verified) and
+> `CLRS.Ch13.Imp.RBTree.fst` (Pulse implementation, 689 lines, verified by Pulse checker).
+> This implements all CLRS Chapter 13 operations exactly as described:
+> - Array-backed node pool with sentinel at index 0 (= CLRS T.nil, always Black)
+> - Parent pointers on every node
+> - LEFT-ROTATE, RIGHT-ROTATE (§13.2)
+> - RB-INSERT with RB-INSERT-FIXUP, all 3+3 cases (§13.3)
+> - RB-DELETE with RB-TRANSPLANT and RB-DELETE-FIXUP, all 4+4 cases (§13.4)
+> - TREE-MINIMUM, TREE-SEARCH (§12.2)
