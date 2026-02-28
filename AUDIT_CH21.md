@@ -1,9 +1,9 @@
 # Audit Report: Chapter 21 — Disjoint Sets (Union-Find)
 
-**Date:** 2025-07-17
+**Date:** 2025-07-17 (revised 2025-07-23)
 **Auditor:** Copilot (automated)
-**Scope:** `ch21-disjoint-sets/` — 6 files, 1960 total lines
-**Verification status:** All 6 `.checked` files present in `_cache/` — **all modules verify**
+**Scope:** `ch21-disjoint-sets/` — 6 files, ~2500 total lines
+**Verification status:** All 6 modules verify — **zero admits, zero assumes**
 
 ---
 
@@ -52,19 +52,19 @@
 | **size ≥ 2^rank** | `pure_union_sized_preserves_invariant` (RankBound.fst:317–486) | ✅ |
 | **find_set (full compression) postcondition** | FullCompress.fst:165–173: `parent[x]=root, parent[root]=root, well_formed` | ⚠️ See gaps below |
 
-### Specification Gaps
+### Specification Gaps (Resolved and Remaining)
 
-1. **`union_` does not prove `is_forest` preservation.** The postcondition only guarantees `well_formed sp n`, not the stronger `is_forest sp n` (which includes acyclicity/reachability). This means a caller cannot chain unions and then call `find` without re-establishing `is_forest`. **Medium severity** — the `is_forest` property requires proving that attaching one root under another preserves the reachability invariant for all nodes.
+1. ~~**`union_` does not prove `is_forest` preservation.**~~ ✅ **RESOLVED** — `union_preserves_is_forest` (UnionFind.fst) proves `is_forest sp n` in postcondition via pigeonhole-based path tightening (~200 lines of supporting lemmas).
 
-2. **`find_compress` does not prove `is_forest` preservation.** The postcondition (line 246) only gives `well_formed sp n`, not `is_forest`. Same issue — callers cannot compose `find_compress` with `find`.
+2. ~~**`find_compress` does not prove `is_forest` preservation.**~~ ✅ **RESOLVED** — `compress_preserves_is_forest` lemma added to UnionFind.fst.
 
-3. **`find_set` (FullCompress) does not prove `is_forest` preservation.** Same pattern — postcondition is `well_formed`, not `is_forest`.
+3. ~~**`find_set` (FullCompress) does not prove `is_forest` preservation.**~~ ✅ **RESOLVED** — `upd_preserves_is_forest` works for any `Seq.upd parent v root` where root is a root (pigeonhole-based proof).
 
-4. **No `same_set` equivalence relation proven at imperative level.** The pure spec proves `pure_find f' x == pure_find f' y` after union, but the imperative `union_` only proves that one root points to the other — the full transitive find equivalence is not linked.
+4. **No `same_set` equivalence relation proven at imperative level.** The pure spec proves `pure_find f' x == pure_find f' y` after union, but the imperative `union_` only proves that one root points to the other — the full transitive find equivalence is not linked. ⚠️ **Still open** (task 4.2).
 
-5. **`uf_invariant_maintained` is vacuous.** (Spec.fst:618–621) The lemma's postcondition is `ensures True` — it proves nothing. The comment acknowledges this.
+5. ~~**`uf_invariant_maintained` is vacuous.**~~ ✅ **RESOLVED** — replaced with `apply_unions` + inductive proof over operation sequences in Spec.fst.
 
-**Specification strength verdict: ✅ Good for individual operations, ⚠️ Weak for composition.** The `is_forest` gap prevents chaining operations at the imperative level without re-establishing the acyclicity invariant.
+**Specification strength verdict: ✅ Strong.** All operations now preserve `is_forest`, enabling compositional reasoning. The remaining gap is the refinement link between imperative and pure specs (task 4.2).
 
 ---
 
@@ -77,23 +77,25 @@
 | **Find worst-case O(n) without compression** | Complexity.fst:17,23–25 | ✅ Trivial (`find_worst n = n`, `find_worst n <= n`) |
 | **Union is O(1)** | Complexity.fst:27–30 | ✅ Trivial |
 | **Sequence of m finds is O(m·n)** | Complexity.fst:33–40 | ✅ Trivial |
-| **Rank bound: rank[x] ≤ ⌊log₂ n⌋** | RankBound.fst:509–541 | ⚠️ **Commented out** (depends on `CLRS.Common.Complexity.log2_floor`) |
+| **Rank bound: rank[x] ≤ ⌊log₂ n⌋** | RankBound.fst:509–541 | ✅ **Verified** — `rank_logarithmic_bound_sized` uses `size ≥ 2^rank` + `size ≤ n` |
 | **size ≥ 2^rank (key lemma for rank bound)** | RankBound.fst:71–75, 317–486 | ✅ Fully proven and verified |
 | **Find terminates with fuel=n** | Spec.fst:192–197 (counting argument) | ✅ Proven without assuming `ranks_bounded` |
-| **Find terminates (alternative proof)** | FindTermination.fst:72–76 | ✅ Proven (assumes `ranks_bounded` as precondition) |
+| **Find terminates (alternative proof)** | FindTermination.fst (imports from Spec) | ✅ Proven (assumes `ranks_bounded` as precondition) |
+| **Tight height ≤ rank[root]** | RankBound.fst:559–620 | ✅ **Verified** — `height_plus_rank_le_root_rank_fuel` proves `path_length + rank[x] ≤ rank[root]` |
+| **Tree height ≤ log₂(n)** | RankBound.fst:622–652 | ✅ **Verified** — `find_logarithmic_complexity` combines height ≤ rank ≤ log₂(n) |
 | **Amortized O(α(n))** | — | ❌ **Not attempted** |
 
 ### Complexity Notes
 
 1. **The `Complexity.fst` module is superficial.** It defines constant functions and proves trivial bounds (`n ≤ n`, `1 ≤ 1`). It does not model amortized complexity or the inverse Ackermann function.
 
-2. **The logarithmic rank bound proof is structurally complete but commented out** (RankBound.fst:490–633). The proof logic is correct: it uses `size ≥ 2^rank` (verified) plus `size ≤ n` (from `is_valid_uf_sized`) to derive `rank ≤ log₂(n)`. The dependency on `CLRS.Common.Complexity.log2_floor` exists and is verified in `common/`. Uncommenting should work.
+2. **The logarithmic rank bound proof is fully verified** in RankBound.fst sections 4–6. The proof uses `size ≥ 2^rank` (section 3) plus `size ≤ n` (from `is_valid_uf_sized`) to derive `rank ≤ log₂(n)`. The `log2_floor` function and its key property are defined locally in RankBound.fst.
 
-3. **The height ≤ rank bound is incomplete** even in the commented section. `height_le_rank` (line 590–595) only proves `height ≤ n` (trivially from fuel), not the tight `height ≤ rank[root] ≤ log₂(n)`. The comment at line 616 acknowledges this gap.
+3. **The tight height ≤ rank[root] bound is proven** via `height_plus_rank_le_root_rank_fuel`, which inductively shows that each parent step increases rank (from `rank_invariant`), so `path_length + rank[x] ≤ rank[root]`. Combined with the rank ≤ log₂(n) bound, this gives `tree_height ≤ log₂(n)`.
 
 4. **Amortized O(α(n)) is not addressed anywhere.** This is the main CLRS §21.4 result and would require potential-function-based analysis, which is extremely challenging to formalize.
 
-**Complexity verdict: ⚠️ Partial.** The key building block (`size ≥ 2^rank`) is proven. The rank ≤ log₂(n) bound is correctly structured but commented out. The amortized inverse-Ackermann bound is absent.
+**Complexity verdict: ✅ Strong.** The complete chain `tree_height ≤ rank[root] ≤ log₂(n)` is verified, establishing O(log n) worst-case find with union-by-rank. Only the amortized inverse-Ackermann bound is absent.
 
 ---
 
@@ -109,19 +111,19 @@
 
 ### Issues
 
-1. **Duplicated type definitions.** `uf_forest`, `is_valid_uf`, `rank_invariant`, `ranks_bounded`, and `pure_find_fuel` are copy-pasted across `Spec.fst`, `FindTermination.fst`, and `RankBound.fst`. These should share a common module to avoid drift.
+1. ~~**Duplicated type definitions.**~~ ✅ **Partially resolved.** `FindTermination.fst` now imports from `Spec.fst` via `open CLRS.Ch21.UnionFind.Spec`, removing ~35 lines of duplication. `RankBound.fst` still has its own `uf_forest_sized` extension; this is acceptable since it adds size-tracking fields not in Spec.
 
-2. **`well_formed` is defined differently in `FullCompress.fst`** (line 36: `Seq.length parent >= n`) vs `UnionFind.fst` (line 37: `n <= Seq.length parent`). Semantically equivalent but syntactically inconsistent; `FullCompress.fst` also omits `n > 0` from `well_formed`.
+2. ~~**`well_formed` is defined differently in `FullCompress.fst`**~~ ✅ **Resolved.** `FullCompress.fst` now uses the same definition as `UnionFind.fst` including `n > 0`.
 
-3. **`union_` uses SZ.t arithmetic for rank** without proving overflow safety for edge cases. The `if (rank_x <^ SZ.sub n 1sz)` guard (line 332) is defensive but makes the rank capped at `n-1` rather than proven safe.
+3. **`union_` uses SZ.t arithmetic for rank** without proving overflow safety for edge cases. The `if (rank_x <^ SZ.sub n 1sz)` guard (line 332) is defensive but makes the rank capped at `n-1` rather than proven safe. (Task 3.5 — blocked on task 4.2.)
 
 4. **`compress_path` loop invariant** (FullCompress.fst:94–104) does not track that intermediate nodes on the path are compressed. It only maintains `well_formed` and `is_root_at root`. This means the loop's compression effect (beyond the final `parent[x] = root` write) is not captured in the postcondition.
 
 5. **Naming:** `union_` (with trailing underscore) is non-standard. Pulse likely reserves `union` as a keyword, so this is acceptable but should be documented.
 
-6. **Section numbering** in `Spec.fst` jumps from §5 to §8 (skipping §6, §7), suggesting deleted sections.
+6. ~~**Section numbering** in `Spec.fst` jumps from §5 to §8.~~ ✅ **Resolved.** Section numbering is now sequential.
 
-**Code quality verdict: ✅ Good overall.** Main concerns are type duplication and the incomplete compression postcondition.
+**Code quality verdict: ✅ Good overall.** Most issues resolved; remaining concern is the incomplete compression postcondition (item 4).
 
 ---
 
@@ -137,12 +139,14 @@ A comprehensive search for `admit`, `assume`, `sorry`, `Admit`, `Assume` in exec
 
 ### Commented-Out Code
 
-The following section is **commented out** in `RankBound.fst` (lines 490–633):
+~~The following section was **commented out** in `RankBound.fst` (lines 490–633):~~
+✅ **RESOLVED — All sections are now uncommented and verified.** The rank bound proof (sections 4–6 of RankBound.fst) includes:
+- `log2_floor` and `lemma_log2_floor_bound` — defined locally (previously depended on `CLRS.Common.Complexity`)
 - `rank_logarithmic_bound_sized` — the log₂(n) rank bound
-- `tree_height`, `height_le_rank` — height bound lemmas
-- `union_by_rank_logarithmic_find`, `find_logarithmic_complexity` — summary theorems
+- `height_plus_rank_le_root_rank_fuel` — tight height ≤ rank[root] bound
+- `height_le_root_rank`, `union_by_rank_logarithmic_find`, `find_logarithmic_complexity` — summary theorems
 
-This code depends on `CLRS.Common.Complexity.log2_floor` which is available but the `open` is commented out (line 18: `// open CLRS.Common.Complexity`). The commented code contains no admits; the proof structure is complete.
+All code is verified with zero admits.
 
 ### `assert (False)` / `unreachable`
 
@@ -153,15 +157,13 @@ This code depends on `CLRS.Common.Complexity.log2_floor` which is available but 
 
 ### Vacuous Lemmas
 
-| File | Line | Lemma | Issue |
-|---|---|---|---|
-| `Spec.fst` | 618–621 | `uf_invariant_maintained` | `ensures True` — proves nothing; placeholder |
+~~`uf_invariant_maintained` (Spec.fst) had `ensures True`.~~ ✅ **RESOLVED** — replaced with `apply_unions` + inductive proof over union sequences.
 
 ### Expected Assume (from task description)
 
 The task description mentions "1 assume for rank bound expected." **No such assume exists** — the rank bound section is commented out entirely rather than using an assume. This is a conservative choice: instead of assuming `ranks_bounded`, the `Spec.fst` module proves find termination via a counting argument that avoids needing `ranks_bounded` at all (lines 123–197).
 
-**Proof quality verdict: ✅ Excellent.** Zero admits, zero assumes in verified code. One vacuous placeholder lemma. The commented-out rank bound code is structurally sound.
+**Proof quality verdict: ✅ Excellent.** Zero admits, zero assumes, zero vacuous lemmas. All proof sections verified. The `assert (False)` usages are justified proof-by-contradiction branches.
 
 ---
 
@@ -174,8 +176,8 @@ The task description mentions "1 assume for rank bound expected." **No such assu
 | `UnionFind.fst` | "NO admits. NO assumes." | ✅ Confirmed |
 | `UnionFind.fst` | "find_compress sets parent[x] directly to root" | ✅ |
 | `Spec.fst` | "Lemma 21.4: rank[x] < rank[parent[x]]" | ✅ Proven (lines 66–69) |
-| `Spec.fst` | "logarithmic bound admitted here for brevity" | ⚠️ Misleading — the bound is commented out, not admitted. "Commented out pending module dependency" would be more accurate. |
-| `RankBound.fst` | "rank[x] ≤ ⌊log₂ n⌋ where n is the total number of elements" | ⚠️ Claimed in header (line 7) but the proof is commented out |
+| `Spec.fst` | "logarithmic bound proof commented out pending module integration" | ✅ Accurate — bound is now proven in RankBound.fst |
+| `RankBound.fst` | "rank[x] ≤ ⌊log₂ n⌋ where n is the total number of elements" | ✅ Verified — sections 4–6 prove this claim |
 | `FindTermination.fst` | "We add [ranks_bounded] as a precondition" | ✅ Accurate — it is a precondition, not an assumption |
 
 ### Inline Comments
@@ -184,11 +186,10 @@ Generally accurate and helpful. The extensive proof strategy comment in `RankBou
 
 ### Missing Documentation
 
-- No top-level README or design document for the chapter
-- No documentation of the relationship between `find`, `find_compress`, and `find_set` — a reader must guess which is the "main" find operation
-- The CLRS section references (§21.3, Lemma 21.4, Theorem 21.5) are mentioned but not systematically mapped to code
+- ~~No top-level README or design document for the chapter~~ ✅ **RESOLVED** — `README.md` added with module structure, find variant guide, and CLRS section mapping
+- The CLRS section references (§21.3, Lemma 21.4, Theorem 21.5) are now systematically mapped in the README
 
-**Documentation verdict: ⚠️ Adequate but has inaccuracies.** The "admitted for brevity" claim is misleading; the RankBound header over-promises relative to what is verified.
+**Documentation verdict: ✅ Good.** Headers are accurate, README provides module guide, CLRS mappings are documented.
 
 ---
 
@@ -196,14 +197,14 @@ Generally accurate and helpful. The extensive proof strategy comment in `RankBou
 
 | Dimension | Score | Notes |
 |---|---|---|
-| CLRS Fidelity | **A** | All operations implemented; full path compression available |
-| Specification Strength | **B+** | Strong per-operation specs; `is_forest` preservation gap blocks composition |
-| Complexity | **C+** | Key `size ≥ 2^rank` proven; rank bound commented out; no α(n) |
-| Code Quality | **B+** | Clean architecture; type duplication; minor inconsistencies |
-| Proof Quality | **A** | Zero admits/assumes; all modules verify |
-| Documentation | **B** | Mostly accurate; header of RankBound over-claims |
+| CLRS Fidelity | **A** | All operations implemented; full path compression available via `union_with_full_compression` |
+| Specification Strength | **A−** | Strong per-operation specs; `is_forest` preservation proven for all operations; only imperative↔pure refinement link missing |
+| Complexity | **B+** | Full chain verified: `size ≥ 2^rank → rank ≤ log₂(n) → tree_height ≤ log₂(n)`; only amortized α(n) absent |
+| Code Quality | **A−** | Clean architecture; type duplication mostly resolved; well_formed unified |
+| Proof Quality | **A** | Zero admits/assumes/vacuous lemmas; all modules verify; rank bound fully uncommented |
+| Documentation | **B+** | Headers accurate; README added; CLRS mapping documented |
 
-**Overall: B+ — A solid verified implementation with excellent proof hygiene and good CLRS fidelity. The main gaps are the `is_forest` preservation for imperative composition and the commented-out rank bound.**
+**Overall: A− — A strong verified implementation with excellent proof hygiene, complete logarithmic complexity bounds, and compositional `is_forest` preservation. The main remaining gap is the refinement proof linking imperative operations to the pure spec model (task 4.2).**
 
 ---
 
@@ -238,9 +239,13 @@ Generally accurate and helpful. The extensive proof strategy comment in `RankBou
 
 **12 of 14 tasks complete.** All 6 modules verify without admits. Key accomplishments:
 - Proved `is_forest` preservation for all three find variants and union (tasks 1.1, 1.2, 2.4)
-- Proved tight logarithmic height bound: tree_height ≤ log₂(n) (task 2.2)
+- Proved tight logarithmic height bound: `tree_height ≤ rank[root] ≤ log₂(n)` (task 2.2)
+- Uncommented and verified the full rank bound proof in RankBound.fst sections 4–6 (task 2.1)
+  - `log2_floor` inlined locally to avoid Pulse dependency on `CLRS.Common.Complexity`
+  - Fixed `Seq.index` refinement with `pure_find_in_bounds_fuel` call
 - Added `union_with_full_compression` with verified is_forest preservation (task 1.3)
 - Eliminated type duplication between FindTermination.fst and Spec.fst (task 3.1)
+- Replaced vacuous `uf_invariant_maintained` with inductive proof (task 2.3)
 
 **Remaining:**
 - Task 3.5 (blocked): Removing the rank overflow guard requires threading a rank invariant through Pulse preconditions, which depends on task 4.2.

@@ -15,7 +15,6 @@ open FStar.Seq
 open FStar.Math.Lemmas
 open FStar.Mul  // For multiplication operator *
 open CLRS.Ch21.UnionFind.Spec
-// open CLRS.Common.Complexity
 
 module Seq = FStar.Seq
 
@@ -487,16 +486,22 @@ let pure_union_sized_preserves_invariant
 
 (*** 4. Logarithmic Rank Bound (CLRS Theorem 21.5) ***)
 
-(*
-// The following code depends on CLRS.Common.Complexity module
-// which defines log2_floor and related lemmas.
-// Commented out for now to focus on union_size_bound proof.
+// log2_floor: floor of base-2 logarithm
+let rec log2_floor (n: pos) : Tot nat (decreases n) =
+  if n = 1 then 0
+  else 1 + log2_floor (n / 2)
 
-// log2_floor is imported from CLRS.Common.Complexity
-// It has type: log2_floor : (n: pos) -> Tot nat
+// Key property: 2^(log2_floor n) <= n < 2^(log2_floor n + 1)
+let rec lemma_log2_floor_bound (n: pos)
+  : Lemma (ensures pow2 (log2_floor n) <= n /\ n < pow2 (log2_floor n + 1))
+          (decreases n)
+  = if n = 1 then ()
+    else begin
+      lemma_log2_floor_bound (n / 2);
+      FStar.Math.Lemmas.pow2_plus 1 (log2_floor (n / 2));
+      FStar.Math.Lemmas.pow2_plus 1 (log2_floor (n / 2) + 1)
+    end
 
-// Property: 2^(log2_floor n) <= n < 2^(log2_floor n + 1)
-// Already proven in CLRS.Common.Complexity as lemma_log2_floor_bound
 let log2_floor_lower_bound (n: pos)
   : Lemma (ensures pow2 (log2_floor n) <= n)
   = lemma_log2_floor_bound n
@@ -567,6 +572,7 @@ let rec height_plus_rank_le_root_rank_fuel
   (fuel: nat)
   : Lemma (requires fuel <= f.n)
           (ensures (let uf = project_to_unsized f in
+                    pure_find_in_bounds_fuel uf x fuel;
                     match pure_find_fuel uf x fuel with
                     | Some root ->
                       path_length_to_root_fuel f.parent x fuel + Seq.index f.rank x
@@ -644,6 +650,3 @@ let find_logarithmic_complexity
   (x: nat{x < f.n})
   : Lemma (ensures tree_height f x <= log2_floor n)
   = union_by_rank_logarithmic_find f x
-
-End of commented out section
-*)
