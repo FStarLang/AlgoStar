@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST.ArrayPredicates
+module CLRS.Ch12.BSTArray.Predicates
 
 (**
  * Shared array-based BST predicates and lemmas

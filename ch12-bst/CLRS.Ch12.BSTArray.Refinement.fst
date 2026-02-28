@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST.Refinement
+module CLRS.Ch12.BSTArray.Refinement
 
 (**
  * Refinement proof: the array-based BST operations refine
@@ -16,7 +16,7 @@ open FStar.Seq             // for Seq.length, Seq.index  (shadows List length/in
 open FStar.Mul             // for *
 open FStar.Classical
 open CLRS.Ch12.BST.Spec.Complete
-open CLRS.Ch12.BST.ArrayPredicates
+open CLRS.Ch12.BSTArray.Predicates
 
 #push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 

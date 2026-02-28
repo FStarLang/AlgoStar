@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST
+module CLRS.Ch12.BSTArray
 #lang-pulse
 open Pulse.Lib.Pervasives
 
@@ -11,8 +11,8 @@ module C = FStar.Classical
 
 open FStar.Mul
 open FStar.List.Tot
-open CLRS.Ch12.BST.Complexity
-module AP = CLRS.Ch12.BST.ArrayPredicates
+open CLRS.Ch12.BSTArray.Complexity
+module AP = CLRS.Ch12.BSTArray.Predicates
 
 // Helper lemma to prove that child indices fit in SZ.t
 let child_indices_fit (cap: nat) (i: nat)

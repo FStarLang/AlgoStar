@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST.Delete
+module CLRS.Ch12.BSTArray.Delete
 #lang-pulse
 open Pulse.Lib.Pervasives
 
@@ -10,7 +10,7 @@ module C = FStar.Classical
 
 open FStar.Mul
 
-module AP = CLRS.Ch12.BST.ArrayPredicates
+module AP = CLRS.Ch12.BSTArray.Predicates
 
 (**
  * BST Delete Operations: TREE-MINIMUM, TREE-MAXIMUM, and TREE-DELETE
@@ -42,8 +42,8 @@ module AP = CLRS.Ch12.BST.ArrayPredicates
  *)
 
 // Import BST type from main module and shared predicates
-open CLRS.Ch12.BST
-open CLRS.Ch12.BST.ArrayPredicates
+open CLRS.Ch12.BSTArray
+open CLRS.Ch12.BSTArray.Predicates
 
 // ============================================================================
 // TREE-MINIMUM: Find the minimum key in subtree rooted at start_idx

@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST.Complexity
+module CLRS.Ch12.BSTArray.Complexity
 
 open FStar.Mul
 
