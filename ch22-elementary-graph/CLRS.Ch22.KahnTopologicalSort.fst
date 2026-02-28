@@ -359,52 +359,8 @@ fn topological_sort
     )
 //SNIPPET_END: topological_sort_sig
 {
-  // Complexity: tick n*n times upfront (ghost-only, erased at runtime)
-  let mut gi: SZ.t = 0sz;
-  while (!gi <^ n)
-  invariant exists* vgi (vc: nat).
-    R.pts_to gi vgi **
-    A.pts_to adj sadj **
-    GR.pts_to ctr vc **
-    pure (
-      SZ.v vgi <= SZ.v n /\
-      vc >= reveal c0 /\
-      vc - reveal c0 == SZ.v vgi * SZ.v n
-    )
-  {
-    let vgi = !gi;
-    let mut gj: SZ.t = 0sz;
-    while (!gj <^ n)
-    invariant exists* vgj (vc2: nat).
-      R.pts_to gi vgi **
-      R.pts_to gj vgj **
-      A.pts_to adj sadj **
-      GR.pts_to ctr vc2 **
-      pure (
-        SZ.v vgi < SZ.v n /\
-        SZ.v vgj <= SZ.v n /\
-        vc2 >= reveal c0 /\
-        vc2 - reveal c0 == SZ.v vgi * SZ.v n + SZ.v vgj
-      )
-    {
-      let vgj = !gj;
-      tick ctr;
-      gj := vgj +^ 1sz
-    };
-    with vc_mid. assert (GR.pts_to ctr vc_mid);
-    assert (pure (reveal vc_mid - reveal c0 == SZ.v vgi * SZ.v n + SZ.v n));
-    assert (pure (SZ.v vgi * SZ.v n + SZ.v n == (SZ.v vgi + 1) * SZ.v n));
-    gi := vgi +^ 1sz
-  };
-  // After ghost ticking: cf - c0 <= n * n
-  // Destructure all existentials to get pure facts in context
-  with vgi_final vc_after_tick. assert (
-    R.pts_to gi vgi_final **
-    A.pts_to adj sadj **
-    GR.pts_to ctr vc_after_tick
-  );
-
   // Step 1: Compute in-degrees
+  // Ticks are placed in the inner loop of the n×n adjacency scan.
   let in_degree_v = V.alloc 0 n;
   V.to_array_pts_to in_degree_v;
   let in_degree = V.vec_to_array in_degree_v;
@@ -420,14 +376,17 @@ fn topological_sort
   // For each vertex i
   let mut i: SZ.t = 0sz;
   while (!i <^ n)
-  invariant exists* vi sin_degree.
+  invariant exists* vi sin_degree (vc: nat).
     R.pts_to i vi **
     A.pts_to adj sadj **
     A.pts_to in_degree sin_degree **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length sin_degree == SZ.v n /\
-      step1_outer_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v vi)
+      step1_outer_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v vi) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi * SZ.v n
     )
   {
     let vi = !i;
@@ -439,18 +398,21 @@ fn topological_sort
     // For each vertex j, check if edge vi->j exists
     let mut j: SZ.t = 0sz;
     while (!j <^ n)
-    invariant exists* vj sin_degree.
+    invariant exists* vj sin_degree (vc2: nat).
       R.pts_to i vi **
       R.pts_to j vj **
       A.pts_to adj sadj **
       A.pts_to in_degree sin_degree **
+      GR.pts_to ctr vc2 **
       pure (
         SZ.v vi < SZ.v n /\
         SZ.v vj <= SZ.v n /\
         Seq.length sin_degree == SZ.v n /\
         Seq.length sadj == SZ.v n * SZ.v n /\
         SZ.fits (SZ.v n * SZ.v n) /\
-        step1_inner_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v vi) (SZ.v vj)
+        step1_inner_inv sadj (SZ.v n) (reveal ghost_output) sin_degree (SZ.v vi) (SZ.v vj) /\
+        vc2 >= reveal c0 /\
+        vc2 - reveal c0 == SZ.v vi * SZ.v n + SZ.v vj
       )
     {
       let vj = !j;
@@ -471,6 +433,9 @@ fn topological_sort
       assert (pure (SZ.v vi * SZ.v n + SZ.v vj < Seq.length sadj));
       lemma_step1_inner_step sadj (SZ.v n) (reveal ghost_output) sin_deg_inner sin_deg_new (SZ.v vi) (SZ.v vj);
       
+      // Tick: one unit of work per adjacency check
+      tick ctr;
+      
       j := vj +^ 1sz;
     };
     
@@ -478,10 +443,15 @@ fn topological_sort
     with sin_deg_after_inner. assert (A.pts_to in_degree sin_deg_after_inner);
     lemma_step1_inner_to_outer sadj (SZ.v n) (reveal ghost_output) sin_deg_after_inner (SZ.v vi);
     
+    // Tick count: vi*n + n == (vi+1)*n
+    with vc_mid. assert (GR.pts_to ctr vc_mid);
+    assert (pure (reveal vc_mid - reveal c0 == SZ.v vi * SZ.v n + SZ.v n));
+    assert (pure (SZ.v vi * SZ.v n + SZ.v n == (SZ.v vi + 1) * SZ.v n));
+    
     i := vi +^ 1sz;
   };
   
-  // After Step 1: we have step1_outer_inv at row=n
+  // After Step 1: n*n ticks have been charged during the adjacency scan
   // Capture in_degree state for indeg_correct conversion
   with sin_deg_after_step1. assert (A.pts_to in_degree sin_deg_after_step1);
   
@@ -498,18 +468,21 @@ fn topological_sort
   
   let mut i: SZ.t = 0sz;
   while (!i <^ n)
-  invariant exists* vi vqt squeue.
+  invariant exists* vi vqt squeue (vc: nat).
     R.pts_to i vi **
     R.pts_to queue_tail vqt **
     A.pts_to adj sadj **
     A.pts_to queue squeue **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       SZ.v vqt <= SZ.v vi /\
       SZ.v vqt <= SZ.v n /\
       Seq.length squeue == SZ.v n /\
       // Step 2 queue invariant (includes queue_distinct, entries < vi, entries have indeg 0)
-      step2_queue_inv sadj (SZ.v n) sin_deg_after_step1 (reveal ghost_output) squeue (SZ.v vqt) (SZ.v vi)
+      step2_queue_inv sadj (SZ.v n) sin_deg_after_step1 (reveal ghost_output) squeue (SZ.v vqt) (SZ.v vi) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v n * SZ.v n
     )
   {
     let vi = !i;
@@ -572,7 +545,7 @@ fn topological_sort
   lemma_step2_to_zero_indeg_accounted sin_deg_init (SZ.v n) soutput_init squeue_init (SZ.v vqt_init);
   
   while (!queue_head <^ !queue_tail)
-  invariant exists* vqh vqt vout sin_degree squeue soutput.
+  invariant exists* vqh vqt vout sin_degree squeue soutput (vc: nat).
     R.pts_to queue_head vqh **
     R.pts_to queue_tail vqt **
     R.pts_to out_idx vout **
@@ -580,6 +553,7 @@ fn topological_sort
     A.pts_to in_degree sin_degree **
     A.pts_to queue squeue **
     A.pts_to output soutput **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vqh <= SZ.v vqt /\
       SZ.v vqt <= SZ.v n /\
@@ -600,7 +574,9 @@ fn topological_sort
       queue_entries_zero_indeg sin_degree squeue (SZ.v vqt) /\
       queue_distinct_sz squeue 0 (SZ.v vqt) /\
       zero_indeg_accounted sin_degree (SZ.v n) soutput (SZ.v vout) squeue (SZ.v vqh) (SZ.v vqt) /\
-      ~(has_cycle sadj (SZ.v n))
+      ~(has_cycle sadj (SZ.v n)) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v n * SZ.v n
     )
   {
     let vqh = !queue_head;
@@ -715,7 +691,7 @@ fn topological_sort
   };
   
   // After the loop, extract the existentials
-  with vqh vqt vout sin_degree squeue soutput. _;
+  with vqh vqt vout sin_degree squeue soutput vc_final. _;
   
   // Loop exit: vqh == vqt (queue empty), vout == vqh
   // Prove vout == n using DAG completeness
