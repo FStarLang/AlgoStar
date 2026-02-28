@@ -223,7 +223,7 @@ Prim uses `65535sz` as infinity in the imperative code but `1000000000` in the p
 
 | ID | Task | File(s) | Effort |
 |----|------|---------|--------|
-| **T1** | **Close Kruskal `assume_` at line 315**: Prove `is_forest (edges_from_arrays ...)` by connecting the UF component invariant (soundness: different roots ⟹ unreachable; completeness: reachable ⟹ same root) to `acyclic_when_unreachable` from MST.Spec. This requires maintaining a ghost edge-list in the imperative loop and proving that UF-find correctly tracks connected components. | `Kruskal.fst`, `Kruskal.UF.fst` | **Large** (2–4 days) |
+| **T1** | ✅ **DONE** — Close Kruskal `assume_` at line 315: Proved `is_forest` via UF invariant (`uf_inv`), `uf_inv_union`, `uf_inv_cons_to_append`, and `acyclic_snoc_unreachable`. Added `Helpers.fst` module. 0 admits, 518 lines. | `Kruskal.fst`, `Kruskal.UF.fst`, `Kruskal.Helpers.fst` | **Done** |
 | **T2** | **Close UF `admit()` at line 360**: Add precondition `e.u < n ∧ e.v < n` to the enclosing lemma, or prove the `find_pure` identity property for out-of-range vertices. The latter is straightforward: `find_pure` returns `v` when `v ≥ n`. | `Kruskal.UF.fst` | **Small** (1–2 hours) |
 | **T3** | **Connect Prim Pulse to pure spec**: Currently `prim_correct` only asserts `source key = 0 ∧ keys bounded`. Add a ghost `tree_edges` accumulator or post-hoc extraction and prove the result matches `pure_prim`, inheriting MST correctness from `prim_spec`. | `Prim.fst`, `Prim.Spec.fst` | **Large** (3–5 days) |
 | **T4** | **Connect Kruskal Pulse to pure spec**: Similarly, bridge imperative output to `pure_kruskal` and inherit `theorem_kruskal_produces_mst`. Depends on T1. | `Kruskal.fst`, `Kruskal.Spec.fst` | **Large** (3–5 days) |
