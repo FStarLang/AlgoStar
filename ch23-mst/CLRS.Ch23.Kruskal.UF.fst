@@ -291,7 +291,7 @@ let acyclic_cons_to_append (n: nat) (e: edge) (t: list edge)
 
 // uf_inv is permutation-invariant (cons vs append)
 // Uses comp_reachable to avoid existential reasoning about reachable
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
 let uf_inv_cons_to_append (sparent: Seq.seq SZ.t) (e: edge) (t: list edge) (n ec: nat)
   : Lemma (requires uf_inv sparent (e :: t) n ec /\ all_edges_valid (e :: t) n)
           (ensures uf_inv sparent (t @ [e]) n ec)
