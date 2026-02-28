@@ -320,7 +320,7 @@ let kruskal_step_maintains_inv
     end
 #pop-options
 
-#push-options "--z3rlimit 100 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 800 --ifuel 2 --fuel 2 --split_queries always"
 //SNIPPET_START: kruskal_sig
 fn kruskal
   (adj: A.array int)
