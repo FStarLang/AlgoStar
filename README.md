@@ -32,7 +32,7 @@ make clean  # clean build artifacts
 | ch10 | Stack, Queue, Linked List | list abstraction | O(1) push/pop, O(n) search |
 | ch11 | Hash Table (open addressing) | functional map spec | O(n) worst case |
 | ch12 | Binary Search Tree | key found ⟹ key at index | O(h) search |
-| ch13 | Red-Black Tree | Okasaki balance ∧ BST ∧ Thm 13.1 | O(lg n) |
+| ch13 | Red-Black Tree | Okasaki balance ∧ BST ∧ Thm 13.1 ∧ delete¹ | O(lg n) |
 | ch15 | Rod Cutting, Matrix Chain, LCS | result == optimal_spec | O(n²), O(n³), O(mn) |
 | ch16 | Activity Selection, Huffman, **Huffman.Spec** | greedy choice, CLRS Eq 16.4 | O(n log n) |
 | ch21 | Union-Find (path compression) | find returns root | O(n) find, O(1) union |
@@ -47,6 +47,7 @@ make clean  # clean build artifacts
 | ch35 | 2-Approximation Vertex Cover | valid cover | O(V²) |
 
 ⚠ = Known limitations, see RESEARCH_DOC.md for details
+¹ = `delete_is_rbtree` admitted (see Known Limitations)
 
 ## Functional Correctness Highlights
 
@@ -67,5 +68,6 @@ make clean  # clean build artifacts
 - **RadixSort (Ch08)**: Multi-digit radix sort has 10 admits in stability proofs; single-digit (d=1) fully verified
 - **Kruskal/Prim (Ch23)**: Kruskal is actively being worked on; Prim proves key bounds only, no full MST property
 - **DFS theorems (Ch22)**: DFS.Spec (5 admits) and DFS.WhitePath (3 admits) for parenthesis/white-path theorems remain open
+- **RB-Tree delete (Ch13)**: `delete_is_rbtree` is admitted — the internal color-dependent invariant for Kahrs-style `del` is complex; membership and BST preservation are fully proven
 
 See `RESEARCH_DOC.md` for comprehensive audit and `PROGRESS_PLAN.md` for improvement roadmap.

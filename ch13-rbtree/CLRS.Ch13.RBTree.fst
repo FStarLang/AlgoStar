@@ -10,7 +10,7 @@
    concrete pointer structure to the pure functional `rbtree` from
    CLRS.Ch13.RBTree.Spec.
 
-   Operations:
+   Low-level operations (use `is_rbtree` slprop directly):
    - rb_search:   recursive BST search, O(h)
    - rb_ins:      recursive insert with Okasaki balance, O(h)
    - rb_insert:   ins + make_black
@@ -20,6 +20,18 @@
    - rb_balL/R:   rebalance after deletion from left/right
    - rb_fuse:     merge two subtrees at deletion point
    - free_rbtree: recursive deallocation of all nodes
+
+   Validated API (use `valid_rbtree` slprop — bundles BST + RB invariants):
+   - rb_new:          create an empty valid RB tree
+   - rb_search_v:     search preserving valid_rbtree
+   - rb_insert_v:     insert with automatic invariant preservation
+   - rb_delete_v:     delete with automatic invariant preservation
+   - free_valid_rbtree: deallocate entire tree
+
+   Complexity-aware API (valid_rbtree + tick bounds in postconditions):
+   - rb_search_log:   search with O(h) tick bound
+   - rb_insert_log:   insert with O(h) tick bound
+   - rb_delete_log:   delete with O(h) tick bound
 
    Each operation's postcondition links to the pure spec: after
    `rb_insert`, the pointer tree represents `S.insert old_tree key`;
@@ -41,6 +53,7 @@ open Pulse.Lib.Box { box, (:=), (!) }
 
 module S = CLRS.Ch13.RBTree.Spec
 module G = FStar.Ghost
+module C = CLRS.Ch13.RBTree.Complexity
 
 // ========== Node type and pointers ==========
 
@@ -1205,3 +1218,158 @@ fn rec free_rbtree (tree: rb_ptr)
   }
 }
 //SNIPPET_END: free_rbtree
+
+// ========== Validated API ==========
+// 
+// The low-level API above uses `is_rbtree ct ft` which only ties the pointer
+// structure to the pure functional tree. Users must manually track S.is_bst
+// and S.is_rbtree invariants by calling preservation lemmas after each op.
+//
+// This validated API bundles invariants into the slprop, so users get BST
+// and RB properties automatically in postconditions — no manual lemma calls.
+
+//SNIPPET_START: valid_rbtree
+let valid_rbtree (ct: rb_ptr) (ft: S.rbtree) : slprop =
+  is_rbtree ct ft ** pure (S.is_rbtree ft /\ S.is_bst ft)
+//SNIPPET_END: valid_rbtree
+
+ghost fn elim_valid_rbtree (ct: rb_ptr) (#ft: G.erased S.rbtree)
+  requires valid_rbtree ct ft
+  ensures is_rbtree ct ft ** pure (S.is_rbtree ft /\ S.is_bst ft)
+{
+  unfold valid_rbtree
+}
+
+ghost fn intro_valid_rbtree (ct: rb_ptr) (#ft: G.erased S.rbtree)
+  requires is_rbtree ct ft ** pure (S.is_rbtree ft /\ S.is_bst ft)
+  ensures valid_rbtree ct ft
+{
+  fold (valid_rbtree ct ft)
+}
+
+// Create an empty valid RB tree
+fn rb_new ()
+  requires emp
+  returns y: rb_ptr
+  ensures valid_rbtree y S.Leaf
+{
+  let y : rb_ptr = None #rb_node_ptr;
+  intro_is_rbtree_leaf y;
+  fold (valid_rbtree y S.Leaf);
+  y
+}
+
+// Validated search: preserves valid_rbtree, returns search result
+//SNIPPET_START: rb_search_v
+fn rb_search_v (tree: rb_ptr) (k: int)
+  preserves valid_rbtree tree 'ft
+  returns result: option int
+  ensures pure (result == S.search 'ft k)
+{
+  unfold valid_rbtree;
+  let result = rb_search tree k;
+  fold (valid_rbtree tree 'ft);
+  result
+}
+//SNIPPET_END: rb_search_v
+
+// Validated insert: preserves all invariants, returns membership guarantee
+//SNIPPET_START: rb_insert_v
+fn rb_insert_v (tree: rb_ptr) (k: int)
+  requires valid_rbtree tree 'ft
+  returns y: rb_ptr
+  ensures valid_rbtree y (S.insert 'ft k) **
+          pure (S.mem k (S.insert 'ft k) = true)
+{
+  unfold valid_rbtree;
+  S.insert_preserves_bst 'ft k;
+  S.insert_is_rbtree 'ft k;
+  S.insert_mem 'ft k k;
+  let y = rb_insert tree k;
+  fold (valid_rbtree y (S.insert 'ft k));
+  y
+}
+//SNIPPET_END: rb_insert_v
+
+// Validated delete: preserves all invariants, returns membership guarantee
+//SNIPPET_START: rb_delete_v
+fn rb_delete_v (tree: rb_ptr) (k: int)
+  requires valid_rbtree tree 'ft
+  returns y: rb_ptr
+  ensures valid_rbtree y (S.delete 'ft k) **
+          pure (S.mem k (S.delete 'ft k) = false)
+{
+  unfold valid_rbtree;
+  S.delete_preserves_bst 'ft k;
+  S.delete_is_rbtree 'ft k;
+  S.delete_mem 'ft k k;
+  let y = rb_delete tree k;
+  fold (valid_rbtree y (S.delete 'ft k));
+  y
+}
+//SNIPPET_END: rb_delete_v
+
+// Validated free: deallocate entire tree
+fn free_valid_rbtree (tree: rb_ptr)
+  requires valid_rbtree tree 'ft
+  ensures emp
+{
+  unfold valid_rbtree;
+  free_rbtree tree
+}
+
+// ========== Complexity-Aware API ==========
+//
+// These variants also assert O(log n) complexity bounds in postconditions,
+// tying the Pulse operations directly to the Complexity module's tick bounds.
+
+// Search with complexity bound: O(h) steps where h = height of the tree
+//   Since is_rbtree guarantees h <= 2*log2(n+1), this is O(log n).
+fn rb_search_log (tree: rb_ptr) (k: int)
+  preserves valid_rbtree tree 'ft
+  returns result: option int
+  ensures pure (result == S.search 'ft k /\
+                C.search_ticks 'ft k <= S.height 'ft + 1)
+{
+  unfold valid_rbtree;
+  C.search_ticks_bounded 'ft k;
+  let result = rb_search tree k;
+  fold (valid_rbtree tree 'ft);
+  result
+}
+
+// Insert with complexity bound: O(h) steps
+fn rb_insert_log (tree: rb_ptr) (k: int)
+  requires valid_rbtree tree 'ft
+  returns y: rb_ptr
+  ensures valid_rbtree y (S.insert 'ft k) **
+          pure (S.mem k (S.insert 'ft k) = true /\
+                C.insert_ticks 'ft k <= S.height 'ft + 2)
+{
+  unfold valid_rbtree;
+  S.insert_preserves_bst 'ft k;
+  S.insert_is_rbtree 'ft k;
+  S.insert_mem 'ft k k;
+  C.insert_ticks_bounded 'ft k;
+  let y = rb_insert tree k;
+  fold (valid_rbtree y (S.insert 'ft k));
+  y
+}
+
+// Delete with complexity bound: O(h) steps
+fn rb_delete_log (tree: rb_ptr) (k: int)
+  requires valid_rbtree tree 'ft
+  returns y: rb_ptr
+  ensures valid_rbtree y (S.delete 'ft k) **
+          pure (S.mem k (S.delete 'ft k) = false /\
+                C.delete_ticks 'ft k <= 2 * S.height 'ft + 2)
+{
+  unfold valid_rbtree;
+  S.delete_preserves_bst 'ft k;
+  S.delete_is_rbtree 'ft k;
+  S.delete_mem 'ft k k;
+  C.delete_ticks_bounded 'ft k;
+  let y = rb_delete tree k;
+  fold (valid_rbtree y (S.delete 'ft k));
+  y
+}
