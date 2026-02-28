@@ -8,8 +8,8 @@ This directory contains verified implementations of string matching algorithms f
 - **CLRS.Ch32.NaiveStringMatch.fst**: Pulse implementation of NAIVE-STRING-MATCHER. Proves full functional correctness (`count == count_matches_up_to`) and O((n-m+1)*m) complexity. Generic over `eqtype`. No admits.
 
 ### Rabin-Karp (§32.2)
-- **CLRS.Ch32.RabinKarp.fst**: Pulse implementation using a simple character-sum hash (not the CLRS polynomial hash). Proves full functional correctness (`count == count_matches_up_to`). No admits.
-- **CLRS.Ch32.RabinKarp.Spec.fst**: Pure F* specification using the faithful CLRS polynomial hash with Horner's rule. Proves both no-false-positives and no-false-negatives (`rabin_karp_find_all_correct`). No admits.
+- **CLRS.Ch32.RabinKarp.fst**: Pulse implementation using the CLRS polynomial hash (Horner's rule) from RabinKarp.Spec. On hash match, verifies character-by-character. Uses rolling hash update (`rolling_hash_step`) for O(1) per-position hash computation. Proves full functional correctness (`count == count_matches_up_to`). No admits.
+- **CLRS.Ch32.RabinKarp.Spec.fst**: Pure F* specification with CLRS polynomial hash, rolling hash correctness proof, and bidirectional correctness (`rabin_karp_find_all_correct`). No admits.
 - **CLRS.Ch32.RabinKarp.Complexity.fst**: Pure F* complexity analysis: O(n+m) best case, O(nm) worst case.
 
 ### KMP (§32.4)
