@@ -354,8 +354,11 @@ let rec insert_before_equal (x: nat) (s: seq nat) (d base: nat) (py: nat)
                 ()))
 #pop-options
 
-/// Insert preserves relative order of existing elements
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+/// Insert preserves relative order of existing elements.
+/// Explicit witness shifting needed: the existential postcondition with
+/// insert_by_digit creates a refinement matching loop (~4M quantifier
+/// instances) when Z3 attempts to find witnesses implicitly.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80 --split_queries always"
 let rec insert_preserves_order (h: nat) (s: seq nat) (d base: nat) (px py: nat)
   : Lemma (requires base > 0 /\ px < py /\ py < length s)
           (ensures (insert_by_digit_length h s d base;
@@ -372,13 +375,20 @@ let rec insert_preserves_order (h: nat) (s: seq nat) (d base: nat) (px py: nat)
           if px = 0 then insert_contains h t d base (py - 1)
           else (insert_preserves_order h t d base (px - 1) (py - 1);
                 let rt = insert_by_digit h t d base in
+                let result = insert_by_digit h s d base in
+                assert (result == Seq.cons (index s 0) rt);
                 let px'' = ID.indefinite_description_ghost nat
                   (fun px'' -> exists (py'': nat). px'' < py'' /\ py'' < length rt /\
                     index rt px'' == index t (px - 1) /\ index rt py'' == index t (py - 1)) in
-                let _py'' = ID.indefinite_description_ghost nat
+                let py'' = ID.indefinite_description_ghost nat
                   (fun py'' -> px'' < py'' /\ py'' < length rt /\
                     index rt px'' == index t (px - 1) /\ index rt py'' == index t (py - 1)) in
-                ()))
+                // Witnesses for result = cons (head s) rt: shift +1
+                // result[px''+1] = rt[px''] = t[px-1] = s[px]
+                // result[py''+1] = rt[py''] = t[py-1] = s[py]
+                assert (px'' + 1 < py'' + 1 /\ py'' + 1 < length result /\
+                        index result (px'' + 1) == index s px /\
+                        index result (py'' + 1) == index s py)))
 #pop-options
 
 /// Length of insertion sort result equals input length
@@ -686,7 +696,7 @@ let rec radix_sort_permutation
 #pop-options
 
 /// Helper for radix_sort_invariant inductive step
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 20 --split_queries always"
 let radix_sort_invariant_step
   (s: seq nat) (num_digits: nat) (base: nat)
   : Lemma (requires base >= 2 /\ distinct s /\ num_digits > 1 /\
@@ -912,7 +922,7 @@ let digits_lexicographic_implies_value_le
 /// Helper: from ∀d<nd. digit x d ≤ digit y d, establish lexicographic ordering.
 /// Either all digits are equal, or the most significant differing digit has x<y
 /// and all higher digits are equal.
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
 let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
   : Lemma (requires base >= 2 /\
                     (forall (d:nat). d < nd ==> digit x d base <= digit y d base))
