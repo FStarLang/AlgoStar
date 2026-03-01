@@ -96,6 +96,12 @@ let pure_find_idempotent (f: uf_forest{uf_inv f}) (x: nat{x < f.n})
     pure_find_is_root f x;
     pure_find_root f (pure_find f x)
 
+// Stepping through parent preserves pure_find for non-roots
+let pure_find_step (f: uf_forest{uf_inv f}) (x: nat{x < f.n})
+  : Lemma (requires Seq.index f.parent x <> x)
+          (ensures (pure_find f x == pure_find f (Seq.index f.parent x)))
+  = count_above_strict f.rank (Seq.index f.rank x) (Seq.index f.parent x) 0 f.n
+
 (*** 4. Make Forest ***)
 
 let make_forest (n: nat{n > 0}) : (f: uf_forest{uf_inv f}) =
@@ -107,6 +113,108 @@ let make_forest (n: nat{n > 0}) : (f: uf_forest{uf_inv f}) =
 let make_forest_find (n: nat{n > 0}) (x: nat{x < n})
   : Lemma (pure_find (make_forest n) x == x)
   = ()
+
+(*** 4b. Compression Lemmas ***)
+
+// Rank monotonicity along path to root
+let rec rank_mono (f: uf_forest{uf_inv f}) (x: nat{x < f.n})
+  : Lemma (ensures (pure_find_in_bounds f x;
+                    Seq.index f.rank x <= Seq.index f.rank (pure_find f x)))
+          (decreases (count_above f.rank (Seq.index f.rank x) 0 f.n))
+  = let p = Seq.index f.parent x in
+    if p = x then pure_find_root f x
+    else begin count_above_strict f.rank (Seq.index f.rank x) p 0 f.n;
+               rank_mono f p; pure_find_in_bounds f p end
+
+// Strict version for non-roots
+let rank_strict_mono (f: uf_forest{uf_inv f}) (x: nat{x < f.n})
+  : Lemma (requires Seq.index f.parent x <> x)
+          (ensures (pure_find_in_bounds f x;
+                    Seq.index f.rank x < Seq.index f.rank (pure_find f x)))
+  = count_above_strict f.rank (Seq.index f.rank x) (Seq.index f.parent x) 0 f.n;
+    rank_mono f (Seq.index f.parent x); pure_find_in_bounds f (Seq.index f.parent x)
+
+// Compression of v to its root preserves uf_inv
+#push-options "--z3rlimit 20"
+let compress_preserves_uf_inv (f: uf_forest{uf_inv f}) (v: nat{v < f.n})
+  : Lemma (ensures (pure_find_in_bounds f v;
+                    uf_inv { f with parent = Seq.upd f.parent v (pure_find f v) }))
+  = pure_find_in_bounds f v; pure_find_is_root f v;
+    let f' = { f with parent = Seq.upd f.parent v (pure_find f v) } in
+    let valid_aux (i: nat{i < f'.n}) : Lemma (Seq.index f'.parent i < f'.n) = () in
+    FStar.Classical.forall_intro valid_aux;
+    if Seq.index f.parent v = v then ()
+    else begin
+      rank_strict_mono f v;
+      let ri_aux (z: nat{z < f'.n /\ Seq.index f'.parent z <> z})
+        : Lemma (Seq.index f'.rank z < Seq.index f'.rank (Seq.index f'.parent z))
+        = () in FStar.Classical.forall_intro ri_aux
+    end
+#pop-options
+
+// pure_find of a non-root differs from the node itself
+let pure_find_nonroot (f: uf_forest{uf_inv f}) (v: nat{v < f.n})
+  : Lemma (requires Seq.index f.parent v <> v)
+          (ensures pure_find f v <> v)
+  = pure_find_is_root f v
+
+// Compression of v to its root preserves pure_find for ALL nodes
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 80"
+let rec compress_preserves_find
+  (f: uf_forest{uf_inv f}) (v: nat{v < f.n}) (z: nat{z < f.n})
+  : Lemma (requires (pure_find_in_bounds f v;
+                     pure_find_is_root f v;
+                     True))
+          (ensures (let root = pure_find f v in
+                    let f' = { f with parent = Seq.upd f.parent v root } in
+                    compress_preserves_uf_inv f v;
+                    pure_find f' z == pure_find f z))
+          (decreases (count_above f.rank (Seq.index f.rank z) 0 f.n))
+  = pure_find_in_bounds f v; pure_find_is_root f v;
+    compress_preserves_uf_inv f v;
+    let root = pure_find f v in
+    let f' = { f with parent = Seq.upd f.parent v root } in
+    let pz = Seq.index f.parent z in
+    if pz = z then begin
+      if z = v then (pure_find_root f v; assert (root == v))
+      else ()
+    end
+    else begin
+      if z = v then begin
+        pure_find_nonroot f v;
+        rank_strict_mono f v;
+        // f'[v] = root, root != v, f'[root] = f[root] = root
+        // pure_find f' root = root (1 unfolding, root is a root in f')
+        assert (Seq.index f'.parent root == root);
+        pure_find_root f' root;
+        // pure_find f' v steps to pure_find f' root (another unfolding)
+        count_above_strict f'.rank (Seq.index f'.rank v) root 0 f'.n;
+        assert (pure_find f' v == root)
+      end
+      else begin
+        count_above_strict f.rank (Seq.index f.rank z) pz 0 f.n;
+        compress_preserves_find f v pz;
+        count_above_strict f'.rank (Seq.index f'.rank z) pz 0 f'.n
+      end
+    end
+#pop-options
+
+// Forall wrapper: compression preserves pure_find for ALL nodes at once
+let compress_preserves_find_all (f: uf_forest{uf_inv f}) (v: nat{v < f.n})
+  : Lemma (ensures (pure_find_in_bounds f v;
+                    let root = pure_find f v in
+                    let f' = { f with parent = Seq.upd f.parent v root } in
+                    uf_inv f' /\
+                    (forall (z: nat). z < f.n ==> pure_find f' z == pure_find f z)))
+  = compress_preserves_uf_inv f v;
+    pure_find_in_bounds f v;
+    let root = pure_find f v in
+    let f' = { f with parent = Seq.upd f.parent v root } in
+    let aux (z: nat{z < f.n})
+      : Lemma (pure_find f' z == pure_find f z)
+      = compress_preserves_find f v z
+    in
+    FStar.Classical.forall_intro aux
 
 (*** 5. Pure Union ***)
 

@@ -50,6 +50,29 @@ let to_nat_seq_upd (s: Seq.seq SZ.t) (n: nat{n <= Seq.length s}) (i: nat{i < n})
       (to_nat_seq (Seq.upd s i v) n)
       (Seq.upd (to_nat_seq s n) i (SZ.v v))
 
+// Bridge: imperative parent update corresponds to spec record update
+let to_uf_upd_parent (sp srank: Seq.seq SZ.t) (n: nat{n <= Seq.length sp}) (i: nat{i < n}) (v: SZ.t)
+  : Lemma (to_uf (Seq.upd sp i v) srank n ==
+           { (to_uf sp srank n) with Spec.parent = Seq.upd (to_uf sp srank n).Spec.parent i (SZ.v v) })
+  = to_nat_seq_upd sp n i v;
+    assert (to_nat_seq (Seq.upd sp i v) n == Seq.upd (to_nat_seq sp n) i (SZ.v v))
+
+// Bridge: imperative rank update corresponds to spec record update
+let to_uf_upd_rank (sp srank: Seq.seq SZ.t) (n: nat{n <= Seq.length srank}) (i: nat{i < n}) (v: SZ.t)
+  : Lemma (to_uf sp (Seq.upd srank i v) n ==
+           { (to_uf sp srank n) with Spec.rank = Seq.upd (to_uf sp srank n).Spec.rank i (SZ.v v) })
+  = to_nat_seq_upd srank n i v
+
+// Bridge: combined parent + rank update
+let to_uf_upd_both (sp srank: Seq.seq SZ.t) (n: nat{n <= Seq.length sp /\ n <= Seq.length srank})
+  (ip: nat{ip < n}) (vp: SZ.t) (ir: nat{ir < n}) (vr: SZ.t)
+  : Lemma (to_uf (Seq.upd sp ip vp) (Seq.upd srank ir vr) n ==
+           { Spec.parent = Seq.upd (to_uf sp srank n).Spec.parent ip (SZ.v vp);
+             Spec.rank = Seq.upd (to_uf sp srank n).Spec.rank ir (SZ.v vr);
+             Spec.n = n })
+  = to_nat_seq_upd sp n ip vp;
+    to_nat_seq_upd srank n ir vr
+
 // ========== Imperative forest invariants (for loop termination) ==========
 
 let well_formed (parent: Seq.seq SZ.t) (n: nat) : prop =
@@ -358,13 +381,17 @@ let has_root_within_zero (parent: Seq.seq SZ.t) (i: nat)
 fn compress_path
   (parent: A.array SZ.t) (x: SZ.t) (root: SZ.t) (n: SZ.t)
   (#sparent: erased (Seq.seq SZ.t))
+  (#srank: erased (Seq.seq SZ.t))
   requires
     A.pts_to parent sparent **
     pure (
       is_forest sparent (SZ.v n) /\
       SZ.v x < SZ.v n /\
       SZ.v root < SZ.v n /\
-      is_root_at sparent (SZ.v root)
+      SZ.v n <= Seq.length sparent /\
+      is_root_at sparent (SZ.v root) /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      SZ.v root == Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x)
     )
   ensures exists* sp.
     A.pts_to parent sp **
@@ -375,7 +402,12 @@ fn compress_path
       SZ.v n <= Seq.length sp /\
       is_forest sp (SZ.v n) /\
       SZ.v (Seq.index sp (SZ.v x)) == SZ.v root /\
-      SZ.v (Seq.index sp (SZ.v root)) == SZ.v root
+      SZ.v (Seq.index sp (SZ.v root)) == SZ.v root /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      Spec.uf_inv (to_uf sp srank (SZ.v n)) /\
+      (forall (z: nat). z < SZ.v n ==>
+        Spec.pure_find (to_uf sp srank (SZ.v n)) z ==
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
     )
 {
   let mut curr = x;
@@ -393,13 +425,30 @@ fn compress_path
       SZ.v vcount <= SZ.v n /\
       is_forest sp (SZ.v n) /\
       Seq.length sp == Seq.length sparent /\
-      is_root_at sp (SZ.v root)
+      SZ.v n <= Seq.length sp /\
+      is_root_at sp (SZ.v root) /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      Spec.uf_inv (to_uf sp srank (SZ.v n)) /\
+      SZ.v root == Spec.pure_find (to_uf sp srank (SZ.v n)) (SZ.v vc) /\
+      (forall (z: nat). z < SZ.v n ==>
+        Spec.pure_find (to_uf sp srank (SZ.v n)) z ==
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
     )
   {
     let vc = !curr;
     with sp_pre. assert (A.pts_to parent sp_pre);
     let par = parent.(vc);
+    // vc is not root, so vc is not a self-loop in the current spec forest
+    to_nat_seq_index sp_pre (SZ.v n) (SZ.v vc);
+    // pure_find(current, par) == pure_find(current, vc) == root
+    Spec.pure_find_step (to_uf sp_pre srank (SZ.v n)) (SZ.v vc);
+    // Compression: parent[vc] <- root
     parent.(vc) <- root;
+    // Bridge: to_uf after upd == spec record update
+    to_uf_upd_parent sp_pre srank (SZ.v n) (SZ.v vc) root;
+    // Spec preservation
+    Spec.compress_preserves_find_all (to_uf sp_pre srank (SZ.v n)) (SZ.v vc);
+    // Structural preservation
     upd_preserves_is_forest sp_pre (SZ.v n) (SZ.v vc) root;
     curr := par;
     let c = !count;
@@ -408,99 +457,42 @@ fn compress_path
   let _vc_f = !curr;
   let _cnt_f = !count;
   with sp_pre2. assert (A.pts_to parent sp_pre2);
+  // Final compression of x itself (harmless no-op if x == root)
   parent.(x) <- root;
+  to_uf_upd_parent sp_pre2 srank (SZ.v n) (SZ.v x) root;
+  Spec.compress_preserves_find_all (to_uf sp_pre2 srank (SZ.v n)) (SZ.v x);
   upd_preserves_is_forest sp_pre2 (SZ.v n) (SZ.v x) root;
   with sp_final. assert (A.pts_to parent sp_final)
 }
 #pop-options
 
-// FIND-SET: two-pass (find root, then compress)
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
-fn find_set
-  (parent: A.array SZ.t) (x: SZ.t) (n: SZ.t)
-  (#sparent: erased (Seq.seq SZ.t))
-  requires
-    A.pts_to parent sparent **
-    pure (
-      is_forest sparent (SZ.v n) /\
-      SZ.v x < SZ.v n
-    )
-  returns root: SZ.t
-  ensures exists* sp.
-    A.pts_to parent sp **
-    pure (
-      SZ.v root < SZ.v n /\
-      SZ.v x < SZ.v n /\
-      Seq.length sp == Seq.length sparent /\
-      SZ.v n <= Seq.length sp /\
-      is_forest sp (SZ.v n) /\
-      SZ.v (Seq.index sp (SZ.v x)) == SZ.v root /\
-      SZ.v (Seq.index sp (SZ.v root)) == SZ.v root
-    )
-{
-  // Pass 1: find root
-  let mut curr = x;
-  let mut bound: SZ.t = 0sz;
-  while (
-    let vc = !curr;
-    let p = parent.(vc);
-    not (p = vc) && SZ.lt !bound n
-  )
-  invariant exists* vc vb.
-    R.pts_to curr vc **
-    R.pts_to bound vb **
-    A.pts_to parent sparent **
-    pure (
-      SZ.v vc < SZ.v n /\
-      SZ.v vb <= SZ.v n /\
-      is_forest sparent (SZ.v n) /\
-      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb)
-    )
-  {
-    let vc = !curr;
-    let p = parent.(vc);
-    curr := p;
-    let b = !bound;
-    bound := SZ.add b 1sz
-  };
-  let root = !curr;
-  let b = !bound;
-  let p_root = parent.(root);
-  if (p_root = root) { () }
-  else {
-    assert (pure (SZ.v b >= SZ.v n));
-    assert (pure (has_root_within sparent (SZ.v root) (SZ.v n - SZ.v b)));
-    has_root_within_zero sparent (SZ.v root);
-    assert (pure False);
-    unreachable ()
-  };
-  // Pass 2: compress
-  compress_path parent x root n;
-  root
-}
-#pop-options
+// ========== FIND-SET: full path compression (CLRS §21.3) ==========
 
-// ========== UNION: by rank, returns unit ==========
-
-// Read-only root-finding (no path compression) for internal use in union
+// Read-only root-finding (no path compression) for internal use
 fn find_root_imp
   (#p: perm)
   (parent: A.array SZ.t)
   (#sparent: Ghost.erased (Seq.seq SZ.t))
   (x: SZ.t)
   (n: SZ.t)
+  (#srank: Ghost.erased (Seq.seq SZ.t))
   requires
     A.pts_to parent #p sparent **
     pure (
       is_forest sparent (SZ.v n) /\
-      SZ.v x < SZ.v n
+      SZ.v x < SZ.v n /\
+      SZ.v n <= Seq.length sparent /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n))
     )
   returns root: SZ.t
   ensures
     A.pts_to parent #p sparent **
     pure (
       SZ.v root < SZ.v n /\
-      is_root_at sparent (SZ.v root)
+      is_root_at sparent (SZ.v root) /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      SZ.v x < SZ.v n /\
+      SZ.v root == Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x)
     )
 {
   let mut curr = x;
@@ -518,17 +510,69 @@ fn find_root_imp
       SZ.v vc < SZ.v n /\
       SZ.v vb <= SZ.v n /\
       is_forest sparent (SZ.v n) /\
-      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb)
+      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb) /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v vc) ==
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x)
     )
   {
     let vc = !curr;
     let p = parent.(vc);
+    to_nat_seq_index sparent (SZ.v n) (SZ.v vc);
+    Spec.pure_find_step (to_uf sparent srank (SZ.v n)) (SZ.v vc);
     curr := p;
     let b = !bound;
     bound := SZ.add b 1sz
   };
-  !curr
+  let root = !curr;
+  let p_root = parent.(root);
+  to_nat_seq_index sparent (SZ.v n) (SZ.v root);
+  Spec.pure_find_root (to_uf sparent srank (SZ.v n)) (SZ.v root);
+  root
 }
+
+// FIND-SET: two-pass (find root, then compress)
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+fn find_set
+  (parent: A.array SZ.t) (x: SZ.t) (n: SZ.t)
+  (#sparent: erased (Seq.seq SZ.t))
+  (#srank: erased (Seq.seq SZ.t))
+  requires
+    A.pts_to parent sparent **
+    pure (
+      is_forest sparent (SZ.v n) /\
+      SZ.v x < SZ.v n /\
+      SZ.v n <= Seq.length sparent /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n))
+    )
+  returns root: SZ.t
+  ensures exists* sp.
+    A.pts_to parent sp **
+    pure (
+      SZ.v root < SZ.v n /\
+      SZ.v x < SZ.v n /\
+      Seq.length sp == Seq.length sparent /\
+      SZ.v n <= Seq.length sp /\
+      is_forest sp (SZ.v n) /\
+      SZ.v (Seq.index sp (SZ.v x)) == SZ.v root /\
+      SZ.v (Seq.index sp (SZ.v root)) == SZ.v root /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      Spec.uf_inv (to_uf sp srank (SZ.v n)) /\
+      SZ.v root == Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x) /\
+      (forall (z: nat). z < SZ.v n ==>
+        Spec.pure_find (to_uf sp srank (SZ.v n)) z ==
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
+    )
+{
+  // Pass 1: find root (read-only)
+  let root = find_root_imp parent x n #srank;
+  // Pass 2: compress path from x to root
+  compress_path parent x root n #sparent #srank;
+  root
+}
+#pop-options
+
+// ========== UNION: by rank, returns unit ==========
 
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
 fn union
@@ -546,7 +590,10 @@ fn union
       is_forest sparent (SZ.v n) /\
       SZ.v x < SZ.v n /\
       SZ.v y < SZ.v n /\
-      Seq.length srank == Seq.length sparent
+      Seq.length srank == Seq.length sparent /\
+      SZ.v n <= Seq.length sparent /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      (forall (i: nat). i < SZ.v n ==> SZ.v (Seq.index srank i) < SZ.v n)
     )
   ensures exists* sp sr.
     A.pts_to parent sp **
@@ -554,32 +601,54 @@ fn union
     pure (
       is_forest sp (SZ.v n) /\
       Seq.length sp == Seq.length sparent /\
-      Seq.length sr == Seq.length srank
+      Seq.length sr == Seq.length srank /\
+      Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
+      Spec.uf_inv (to_uf sp sr (SZ.v n)) /\
+      SZ.v x < SZ.v n /\ SZ.v y < SZ.v n /\
+      Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x) ==
+        Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v y)
     )
 {
   // Find roots (read-only — no compression during union)
-  let root_x = find_root_imp parent x n;
-  let root_y = find_root_imp parent y n;
+  let root_x = find_root_imp #_ parent #sparent x n #srank;
+  let root_y = find_root_imp #_ parent #sparent y n #srank;
+  // Connect imperative rank reads to spec rank values
+  to_nat_seq_index srank (SZ.v n) (SZ.v root_x);
+  to_nat_seq_index srank (SZ.v n) (SZ.v root_y);
   if (root_x = root_y) {
+    // Same root: no change. pure_find(result, x) = root = pure_find(result, y).
+    Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+    Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
     ()
   } else {
     let rank_x = rank.(root_x);
     let rank_y = rank.(root_y);
     if (rank_x <^ rank_y) {
+      // Link root_x -> root_y (lower rank under higher)
       parent.(root_x) <- root_y;
       upd_preserves_is_forest sparent (SZ.v n) (SZ.v root_x) root_y;
+      to_uf_upd_parent sparent srank (SZ.v n) (SZ.v root_x) root_y;
+      Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+      Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
       ()
     } else {
       if (rank_x >^ rank_y) {
+        // Link root_y -> root_x (lower rank under higher)
         parent.(root_y) <- root_x;
         upd_preserves_is_forest sparent (SZ.v n) (SZ.v root_y) root_x;
+        to_uf_upd_parent sparent srank (SZ.v n) (SZ.v root_y) root_x;
+        Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       } else {
+        // Equal rank: link root_y -> root_x and increment rank[root_x]
         parent.(root_y) <- root_x;
         upd_preserves_is_forest sparent (SZ.v n) (SZ.v root_y) root_x;
-        // Equal rank: CLRS increments rank[root_x]
-        let new_rank = (if rank_x <^ SZ.sub n 1sz then SZ.add rank_x 1sz else rank_x);
+        let new_rank = SZ.add rank_x 1sz;
         rank.(root_x) <- new_rank;
+        to_uf_upd_both sparent srank (SZ.v n) (SZ.v root_y) root_x (SZ.v root_x) new_rank;
+        Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       }
     }
