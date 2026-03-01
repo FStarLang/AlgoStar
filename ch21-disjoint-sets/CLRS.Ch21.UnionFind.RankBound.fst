@@ -564,7 +564,24 @@ let tree_height (f: uf_forest_sized) (x: nat{x < f.n}) : nat =
 // Lemma: Under rank invariant, tree height ≤ rank[root]
 // Each step up the tree strictly increases rank (by rank_invariant).
 
-// Key lemma (fuel version): path_length + rank[x] <= rank[root]
+// Helper: rank is monotonically non-decreasing along path to root
+let rec rank_le_root_rank
+  (f: uf_forest{uf_inv f})
+  (x: nat{x < f.n})
+  : Lemma (ensures (pure_find_in_bounds f x;
+                    Seq.index f.rank x <= Seq.index f.rank (pure_find f x)))
+          (decreases (count_above f.rank (Seq.index f.rank x) 0 f.n))
+  = let p = Seq.index f.parent x in
+    if p = x then
+      pure_find_root f x
+    else begin
+      // rank[x] < rank[p] (rank_invariant) and pure_find f x = pure_find f p
+      count_above_strict f.rank (Seq.index f.rank x) p 0 f.n;
+      rank_le_root_rank f p;
+      pure_find_in_bounds f p
+    end
+
+// Key lemma: path_length + rank[x] <= rank[root]
 let rec height_plus_rank_le_root_rank_fuel
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f)})
@@ -572,21 +589,29 @@ let rec height_plus_rank_le_root_rank_fuel
   (fuel: nat)
   : Lemma (requires fuel <= f.n)
           (ensures (let uf = project_to_unsized f in
-                    pure_find_in_bounds_fuel uf x fuel;
-                    match pure_find_fuel uf x fuel with
-                    | Some root ->
-                      path_length_to_root_fuel f.parent x fuel + Seq.index f.rank x
-                        <= Seq.index f.rank root
-                    | None -> True))
+                    pure_find_in_bounds uf x;
+                    path_length_to_root_fuel f.parent x fuel + Seq.index f.rank x
+                      <= Seq.index f.rank (pure_find uf x)))
           (decreases fuel)
   = let uf = project_to_unsized f in
-    if fuel = 0 then ()
+    if fuel = 0 then begin
+      // fuel = 0: path_length = 0, need rank[x] <= rank[root(x)]
+      rank_le_root_rank uf x
+    end
     else
       let p = Seq.index f.parent x in
-      if p = x then ()
+      if p = x then begin
+        // x is a root: path_length = 0, pure_find = x, rank[x] <= rank[x]
+        pure_find_root uf x
+      end
       else begin
-        height_plus_rank_le_root_rank_fuel f p (fuel - 1);
-        rank_inv_inst uf x
+        height_plus_rank_le_root_rank_fuel f p (fuel - 1)
+        // IH: path_length(p, fuel-1) + rank[p] <= rank[root(p)]
+        // rank_inv: rank[x] < rank[p], so rank[x] + 1 <= rank[p]
+        // height = 1 + path_length(p, fuel-1)
+        // height + rank[x] = 1 + path_length(p, fuel-1) + rank[x]
+        //                  <= path_length(p, fuel-1) + rank[p]
+        //                  <= rank[root(p)] = rank[root(x)]
       end
 
 // Tight bound: tree height ≤ rank[root(x)]
@@ -598,7 +623,6 @@ let height_le_root_rank
                     pure_find_in_bounds uf x;
                     tree_height f x <= Seq.index f.rank (pure_find uf x)))
   = let uf = project_to_unsized f in
-    pure_find_fuel_sufficient uf x;
     height_plus_rank_le_root_rank_fuel f x f.n;
     pure_find_in_bounds uf x
 
