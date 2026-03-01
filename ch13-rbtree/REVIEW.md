@@ -44,13 +44,15 @@ However, in order to apply that lemma you need to manually keep track of several
 ---
 
 > **Additional work (June 2025):** Besides addressing the above complaints on the
-> Okasaki-style implementation, a **second, CLRS-faithful imperative RB tree** has been
-> added in `CLRS.Ch13.Imp.RBTree.Spec.fst` (pure spec, 474 lines, fully verified) and
-> `CLRS.Ch13.Imp.RBTree.fst` (Pulse implementation, 689 lines, verified by Pulse checker).
-> This implements all CLRS Chapter 13 operations exactly as described:
-> - Array-backed node pool with sentinel at index 0 (= CLRS T.nil, always Black)
-> - Parent pointers on every node
-> - LEFT-ROTATE, RIGHT-ROTATE (§13.2)
-> - RB-INSERT with RB-INSERT-FIXUP, all 3+3 cases (§13.3)
-> - RB-DELETE with RB-TRANSPLANT and RB-DELETE-FIXUP, all 4+4 cases (§13.4)
-> - TREE-MINIMUM, TREE-SEARCH (§12.2)
+> Okasaki-style implementation, `CLRS.Ch13.Imp.RBTree.fst` has been **rewritten** to use
+> Pulse `Box` heap-allocated nodes with `option (box rb_node)` nullable pointers
+> (matching the ch12-bst BST pattern), with **full functional correctness proofs** linking
+> every operation to the pure spec in `CLRS.Ch13.RBTree.Spec` — zero admits.
+>
+> Operations implemented (~1178 lines, all verified):
+> - TREE-SEARCH (§12.2): recursive BST search
+> - TREE-MINIMUM (§12.2): walk left to min
+> - RB-INSERT with Okasaki-style balance fixup (§13.3)
+> - RB-DELETE with Kahrs-style balL/balR/fuse fixup (§13.4)
+> - TREE-FREE: recursive deallocation
+> - Validated API: `valid_rbtree` bundles BST + RB invariants
