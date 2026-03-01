@@ -1,689 +1,1178 @@
 (*
    Red-Black Tree — CLRS-faithful imperative implementation in Pulse
 
-   CLRS Chapter 13: Red-Black Trees with parent pointers and sentinel.
-   Array-backed node pool: index 0 = sentinel T.nil (always Black).
+   CLRS Chapter 13: Red-Black Trees with parent pointers.
+   Uses Pulse.Lib.Box heap-allocated nodes with nullable option pointers.
 
-   Implements faithfully:
-   - LEFT-ROTATE, RIGHT-ROTATE (§13.2)
-   - RB-INSERT with RB-INSERT-FIXUP (§13.3)
-   - RB-DELETE with RB-TRANSPLANT and RB-DELETE-FIXUP (§13.4)
-   - TREE-SEARCH, TREE-MINIMUM (§12.2)
+   Implements:
+   - TREE-SEARCH (§12.2): recursive BST search, O(h)
+   - TREE-MINIMUM / TREE-MAXIMUM (§12.2): walk left/right to min/max
+   - RB-INSERT with Okasaki-style balance fixup (§13.3)
+   - RB-DELETE with Kahrs-style balL/balR/fuse fixup (§13.4)
+   - TREE-FREE: recursive deallocation of all nodes
 
-   Design: Uses an array pool where nodes are stored by index.
-   Index 0 is the sentinel (T.nil in CLRS), always Black.
-   Bounds-checking is assumed via read_node/write_node helpers;
-   a full verification would derive these from a well-formedness
-   invariant (all indices in bounds for a valid tree).
+   Each operation's postcondition links to the pure spec in
+   CLRS.Ch13.RBTree.Spec — full functional correctness, no admits.
+
+   Node type: { key, color, left, right, p } with parent pointer.
+   Pointer type: option (box rb_node) for nullable pointers.
+   Separation logic predicate: rbtree_subtree ct ft parent.
+
+   The parent pointer design follows CLRS.Ch12.BST (ch12-bst):
+   each node stores its parent as a value in the `p` field,
+   but ownership flows downward through left/right only.
 *)
 
 module CLRS.Ch13.Imp.RBTree
 #lang-pulse
-
 open Pulse.Lib.Pervasives
-open Pulse.Lib.Array
-open Pulse.Lib.Reference
-module A  = Pulse.Lib.Array
-module R  = Pulse.Lib.Reference
-module SZ = FStar.SizeT
 
-// ========== Colors ==========
+module Box = Pulse.Lib.Box
+open Pulse.Lib.Box { box, (:=), (!) }
 
-type color = | Red | Black
+module S = CLRS.Ch13.RBTree.Spec
+module G = FStar.Ghost
 
-// ========== Node data (with parent pointer) ==========
+// ============================================================
+// §12.1 Node type
+// ============================================================
 
 noeq
-type node_data = {
+type rb_node = {
   key:   int;
-  color: color;
-  left:  SZ.t;
-  right: SZ.t;
-  p:     SZ.t;      // parent pointer
+  color: S.color;
+  left:  rb_ptr;
+  right: rb_ptr;
+  p:     rb_ptr;     // parent pointer (CLRS §12.1)
 }
 
-let nil_idx : SZ.t = 0sz
+and rb_node_ptr = box rb_node
 
-let is_nil (x: SZ.t) : bool = x = nil_idx
+and rb_ptr = option rb_node_ptr
 
-let nil_node : node_data = {
-  key = 0; color = Black; left = nil_idx; right = nil_idx; p = nil_idx
-}
+// ============================================================
+// Separation logic predicate: rbtree_subtree
+// ============================================================
 
-// ========== Helpers (encapsulate bounds assumptions) ==========
+let rec rbtree_subtree (ct: rb_ptr) (ft: S.rbtree) (parent: rb_ptr)
+  : Tot slprop (decreases ft)
+  = match ft with
+    | S.Leaf -> pure (ct == None)
+    | S.Node c l v r ->
+      exists* (bp: rb_node_ptr) (node: rb_node).
+        pure (ct == Some bp) **
+        (bp |-> node) **
+        pure (node.key == v /\ node.color == c /\ node.p == parent) **
+        rbtree_subtree node.left l (Some bp) **
+        rbtree_subtree node.right r (Some bp)
 
-inline_for_extraction
-fn read_node (pool: A.array node_data) (i: SZ.t)
-  requires A.pts_to pool 's
-  returns nd: node_data
-  ensures A.pts_to pool 's
+// ============================================================
+// Ghost fold/unfold helpers
+// ============================================================
+
+ghost fn elim_rbtree_leaf (x: rb_ptr) (#parent: rb_ptr)
+  requires rbtree_subtree x S.Leaf parent
+  ensures pure (x == None)
 {
-  assume_ (pure (SZ.v i < Seq.length 's));
-  A.op_Array_Access pool i
+  unfold (rbtree_subtree x S.Leaf parent)
 }
 
-inline_for_extraction
-fn write_node (pool: A.array node_data) (i: SZ.t) (nd: node_data)
-  requires A.pts_to pool 's
-  ensures exists* s'. A.pts_to pool s'
+ghost fn intro_rbtree_leaf (x: rb_ptr) (parent: rb_ptr)
+  requires pure (x == None)
+  ensures rbtree_subtree x S.Leaf parent
 {
-  assume_ (pure (SZ.v i < Seq.length 's));
-  A.op_Array_Assignment pool i nd
+  fold (rbtree_subtree x S.Leaf parent)
 }
 
-// Set parent of `c` to `new_p`, unless `c` is nil (sentinel).
-inline_for_extraction
-fn set_parent_if_nonnull
-  (pool: A.array node_data) (c: SZ.t) (new_p: SZ.t)
-  requires A.pts_to pool 's
-  ensures exists* s'. A.pts_to pool s'
+ghost fn intro_rbtree_node (ct: rb_ptr) (bp: rb_node_ptr)
+  (#node: rb_node) (#lt #rt: S.rbtree)
+  requires
+    (bp |-> node) **
+    rbtree_subtree node.left lt (Some bp) **
+    rbtree_subtree node.right rt (Some bp) **
+    pure (ct == Some bp)
+  ensures
+    rbtree_subtree ct (S.Node node.color lt node.key rt) node.p
 {
-  if (not (is_nil c)) {
-    let cn = read_node pool c;
-    write_node pool c ({ cn with p = new_p })
-  }
+  fold (rbtree_subtree ct (S.Node node.color lt node.key rt) node.p)
 }
 
-// Link `parent`'s child pointer (that pointed to `old_child`) to `new_child`.
-// If parent is nil (i.e., old_child was root), update root instead.
-inline_for_extraction
-fn link_parent
-  (pool: A.array node_data) (root: R.ref SZ.t)
-  (parent: SZ.t) (old_child: SZ.t) (new_child: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
+// Case analysis predicate
+[@@no_mkeys]
+let rbtree_cases (x: rb_ptr) (ft: S.rbtree) (parent: rb_ptr)
+  = match x with
+    | None -> pure (ft == S.Leaf)
+    | Some bp ->
+      exists* (node: rb_node) (lt rt: S.rbtree).
+        (bp |-> node) **
+        pure (ft == S.Node node.color lt node.key rt /\ node.p == parent) **
+        rbtree_subtree node.left lt (Some bp) **
+        rbtree_subtree node.right rt (Some bp)
+
+ghost fn cases_of_rbtree (x: rb_ptr) (ft: S.rbtree) (parent: rb_ptr)
+  requires rbtree_subtree x ft parent
+  ensures rbtree_cases x ft parent
 {
-  if (is_nil parent) {
-    root := new_child
-  } else {
-    let pn = read_node pool parent;
-    if (pn.left = old_child) {
-      write_node pool parent ({ pn with left = new_child })
-    } else {
-      write_node pool parent ({ pn with right = new_child })
+  match ft {
+    S.Leaf -> {
+      unfold (rbtree_subtree x S.Leaf parent);
+      fold (rbtree_cases (None #rb_node_ptr) ft parent);
+      rewrite rbtree_cases (None #rb_node_ptr) ft parent
+           as rbtree_cases x ft parent;
+    }
+    S.Node c l k r -> {
+      unfold (rbtree_subtree x (S.Node c l k r) parent);
+      with bp node. _;
+      fold (rbtree_cases (Some bp) ft parent);
+      rewrite (rbtree_cases (Some bp) ft parent)
+           as rbtree_cases x ft parent;
     }
   }
 }
 
-// ========== LEFT-ROTATE (§13.2) ==========
-// Rotates x down-left, making x.right the new subtree root.
-//
-// CLRS pseudocode:
-//   y = x.right
-//   x.right = y.left
-//   if y.left ≠ T.nil  then  y.left.p = x
-//   y.p = x.p
-//   if x.p == T.nil then T.root = y
-//   elseif x == x.p.left then x.p.left = y
-//   else x.p.right = y
-//   y.left = x
-//   x.p = y
-
-fn left_rotate
-  (pool: A.array node_data) (root: R.ref SZ.t) (x: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
+ghost fn rbtree_case_none (x: rb_ptr) (#ft: S.rbtree) (#parent: rb_ptr)
+  preserves rbtree_subtree x ft parent
+  requires pure (x == None)
+  ensures pure (ft == S.Leaf)
 {
-  let xn = read_node pool x;
-  let y = xn.right;
-  let yn = read_node pool y;
-  // x.right = y.left
-  write_node pool x ({ xn with right = yn.left });
-  // if y.left ≠ T.nil: y.left.p = x
-  set_parent_if_nonnull pool yn.left x;
-  // y.p = x.p
-  let yn2 = read_node pool y;
-  write_node pool y ({ yn2 with p = xn.p });
-  // Link x's parent to y
-  link_parent pool root xn.p x y;
-  // y.left = x
-  let yn3 = read_node pool y;
-  write_node pool y ({ yn3 with left = x });
-  // x.p = y
-  let xn2 = read_node pool x;
-  write_node pool x ({ xn2 with p = y })
+  rewrite each x as (None #rb_node_ptr);
+  cases_of_rbtree (None #rb_node_ptr) ft parent;
+  unfold rbtree_cases;
+  intro_rbtree_leaf (None #rb_node_ptr) parent;
+  rewrite rbtree_subtree (None #rb_node_ptr) S.Leaf parent
+       as rbtree_subtree x ft parent;
+  ()
 }
 
-// ========== RIGHT-ROTATE (symmetric to LEFT-ROTATE) ==========
-// Rotates y down-right, making y.left the new subtree root.
-
-fn right_rotate
-  (pool: A.array node_data) (root: R.ref SZ.t) (y: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
+ghost fn rbtree_case_some (x: rb_ptr) (bp: rb_node_ptr)
+  (#ft: S.rbtree) (#parent: rb_ptr)
+  requires rbtree_subtree x ft parent ** pure (x == Some bp)
+  ensures exists* (node: rb_node) (lt rt: S.rbtree).
+    (bp |-> node) **
+    rbtree_subtree node.left lt (Some bp) **
+    rbtree_subtree node.right rt (Some bp) **
+    pure (ft == S.Node node.color lt node.key rt /\ node.p == parent)
 {
-  let yn = read_node pool y;
-  let x = yn.left;
-  let xn = read_node pool x;
-  // y.left = x.right
-  write_node pool y ({ yn with left = xn.right });
-  // if x.right ≠ T.nil: x.right.p = y
-  set_parent_if_nonnull pool xn.right y;
-  // x.p = y.p
-  let xn2 = read_node pool x;
-  write_node pool x ({ xn2 with p = yn.p });
-  // Link y's parent to x
-  link_parent pool root yn.p y x;
-  // x.right = y
-  let xn3 = read_node pool x;
-  write_node pool x ({ xn3 with right = y });
-  // y.p = x
-  let yn2 = read_node pool y;
-  write_node pool y ({ yn2 with p = x })
+  rewrite each x as (Some bp);
+  cases_of_rbtree (Some bp) ft parent;
+  unfold rbtree_cases;
 }
 
-// ========== RB-TRANSPLANT (§13.4) ==========
-// Replaces subtree rooted at u with subtree rooted at v.
-
-fn rb_transplant
-  (pool: A.array node_data) (root: R.ref SZ.t) (u v: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
+// Learn that Node? ft implies Some? ct
+ghost fn rbtree_not_leaf (x: rb_ptr) (#ft: S.rbtree) (#parent: rb_ptr)
+  preserves rbtree_subtree x ft parent
+  requires pure (S.Node? ft)
+  ensures pure (Some? x)
 {
-  let un = read_node pool u;
-  // Link u's parent to v
-  link_parent pool root un.p u v;
-  // v.p = u.p
-  let vn = read_node pool v;
-  write_node pool v ({ vn with p = un.p })
+  let S.Node c lt v rt = ft;
+  unfold (rbtree_subtree x (S.Node c lt v rt) parent);
+  with bp node. _;
+  fold (rbtree_subtree x (S.Node c lt v rt) parent);
+  rewrite rbtree_subtree x (S.Node c lt v rt) parent
+       as rbtree_subtree x ft parent;
+  ()
 }
 
-// ========== TREE-MINIMUM (§12.2) ==========
-// Walk left until left child is nil.
-
-fn tree_minimum
-  (pool: A.array node_data) (x0: SZ.t)
-  requires A.pts_to pool 's
-  returns m: SZ.t
-  ensures A.pts_to pool 's
+// Consume a Leaf subtree (null pointer)
+ghost fn consume_rbtree_leaf (x: rb_ptr) (#ft: S.rbtree) (#parent: rb_ptr)
+  requires rbtree_subtree x ft parent ** pure (x == None)
+  ensures pure (ft == S.Leaf)
 {
-  let mut cur = x0;
-  let mut cont = (not (is_nil x0));
-  while ( !cont )
-  invariant exists* cv curv. (
-    A.pts_to pool 's ** R.pts_to cur curv ** R.pts_to cont cv
-  )
-  {
-    let c = !cur;
-    let cn = read_node pool c;
-    if (is_nil cn.left) {
-      cont := false
-    } else {
-      cur := cn.left
+  rewrite each x as (None #rb_node_ptr);
+  cases_of_rbtree (None #rb_node_ptr) ft parent;
+  unfold rbtree_cases;
+}
+
+// ============================================================
+// Helper: set_parent_ptr — update a subtree root's parent
+// ============================================================
+
+fn set_parent_ptr (child: rb_ptr) (new_parent: rb_ptr)
+  requires rbtree_subtree child 'ft 'old_parent
+  ensures rbtree_subtree child 'ft new_parent
+{
+  match child {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) 'ft 'old_parent
+           as rbtree_subtree (None #rb_node_ptr) S.Leaf 'old_parent;
+      elim_rbtree_leaf (None #rb_node_ptr);
+      intro_rbtree_leaf (None #rb_node_ptr) new_parent;
+      rewrite rbtree_subtree (None #rb_node_ptr) S.Leaf new_parent
+           as rbtree_subtree child 'ft new_parent;
     }
-  };
-  !cur
+    Some bp -> {
+      rbtree_case_some (Some bp) bp;
+      let nd = !bp;
+      bp := { nd with p = new_parent };
+      intro_rbtree_node (Some bp) bp;
+      with t p. rewrite (rbtree_subtree (Some bp) t p)
+                     as rbtree_subtree child 'ft new_parent;
+    }
+  }
 }
 
-// ========== TREE-SEARCH (§12.2) ==========
-// Walk down comparing keys. Returns nil_idx if not found.
+// ============================================================
+// Helper: new node
+// ============================================================
 
-fn tree_search
-  (pool: A.array node_data) (root: SZ.t) (k: int)
-  requires A.pts_to pool 's
-  returns x: SZ.t
-  ensures A.pts_to pool 's
+fn new_node (k: int) (c: S.color) (l: rb_ptr) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.Node c lt k rt) parent ** pure (Some? y)
 {
-  let mut cur = root;
-  let mut cont = (not (is_nil root));
-  while ( !cont )
-  invariant exists* curv cv. (
-    A.pts_to pool 's ** R.pts_to cur curv ** R.pts_to cont cv
-  )
-  {
-    let c = !cur;
-    let cn = read_node pool c;
-    if (cn.key = k) {
-      cont := false
-    } else {
-      if (k < cn.key) {
-        cur := cn.left;
-        cont := (not (is_nil cn.left))
+  let bp = Box.alloc ({ key = k; color = c; left = l; right = r; p = parent } <: rb_node);
+  set_parent_ptr l (Some bp);
+  set_parent_ptr r (Some bp);
+  intro_rbtree_node (Some bp) bp;
+  with t pp. rewrite (rbtree_subtree (Some bp) t pp)
+       as (rbtree_subtree (Some bp) (S.Node c lt k rt) parent);
+  Some bp
+}
+
+// ============================================================
+// TREE-SEARCH (§12.2) — recursive, read-only
+// ============================================================
+
+fn rec rb_search (tree: rb_ptr) (k: int)
+  preserves rbtree_subtree tree 'ft 'parent
+  returns result: option int
+  ensures pure (result == S.search 'ft k)
+{
+  match tree {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) 'ft 'parent
+           as rbtree_subtree tree 'ft 'parent;
+      None #int
+    }
+    Some bp -> {
+      rbtree_case_some (Some bp) bp;
+      let node = !bp;
+      if (k < node.key) {
+        let res = rb_search node.left k;
+        intro_rbtree_node (Some bp) bp;
+        with t p. rewrite (rbtree_subtree (Some bp) t p)
+                       as (rbtree_subtree tree 'ft 'parent);
+        res
+      } else if (k > node.key) {
+        let res = rb_search node.right k;
+        intro_rbtree_node (Some bp) bp;
+        with t p. rewrite (rbtree_subtree (Some bp) t p)
+                       as (rbtree_subtree tree 'ft 'parent);
+        res
       } else {
-        cur := cn.right;
-        cont := (not (is_nil cn.right))
+        intro_rbtree_node (Some bp) bp;
+        with t p. rewrite (rbtree_subtree (Some bp) t p)
+                       as (rbtree_subtree tree 'ft 'parent);
+        Some node.key
       }
     }
-  };
-  !cur
-}
-
-// ========== RB-INSERT-FIXUP (§13.3) ==========
-// Restores RB properties after inserting a red node.
-// 3 cases + 3 symmetric cases.
-//
-// while z.p.color == RED:
-//   if z.p == z.p.p.left:            -- z's parent is left child
-//     y = z.p.p.right                -- uncle
-//     Case 1: y.color == RED → recolor parent, uncle, grandparent; z = z.p.p
-//     Case 2: z == z.p.right → z = z.p; LEFT-ROTATE(T, z)
-//     Case 3: recolor parent + grandparent; RIGHT-ROTATE(T, z.p.p)
-//   else: (symmetric with left↔right)
-// T.root.color = BLACK
-
-// Case 2 helper (left variant): if z is a right child, rotate it up
-inline_for_extraction
-fn fixup_case2_left
-  (pool: A.array node_data) (root: R.ref SZ.t) (z: R.ref SZ.t) (zp: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r ** R.pts_to z 'zv
-  ensures exists* s' r' zv'. A.pts_to pool s' ** R.pts_to root r' ** R.pts_to z zv'
-{
-  let pnd = read_node pool zp;
-  let zv = !z;
-  if (zv = pnd.right) {
-    z := zp;
-    left_rotate pool root zp
   }
 }
 
-// Case 2 helper (right variant): if z is a left child, rotate it up
-inline_for_extraction
-fn fixup_case2_right
-  (pool: A.array node_data) (root: R.ref SZ.t) (z: R.ref SZ.t) (zp: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r ** R.pts_to z 'zv
-  ensures exists* s' r' zv'. A.pts_to pool s' ** R.pts_to root r' ** R.pts_to z zv'
+// ============================================================
+// TREE-MINIMUM (§12.2)
+// ============================================================
+
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+fn rec rb_minimum (tree: rb_ptr) (bp: rb_node_ptr)
+  preserves rbtree_subtree tree 'ft 'parent
+  requires pure (tree == Some bp)
+  returns result: int
+  ensures pure (S.Node? 'ft /\ result == S.minimum 'ft)
 {
-  let pnd = read_node pool zp;
-  let zv = !z;
-  if (zv = pnd.left) {
-    z := zp;
-    right_rotate pool root zp
+  rewrite each tree as (Some bp);
+  rbtree_case_some (Some bp) bp;
+  let nd = !bp;
+  match nd.left {
+    None -> {
+      rbtree_case_none nd.left;
+      intro_rbtree_node (Some bp) bp;
+      with t p. rewrite (rbtree_subtree (Some bp) t p)
+                     as rbtree_subtree tree 'ft 'parent;
+      nd.key
+    }
+    Some lbp -> {
+      let result = rb_minimum nd.left lbp;
+      intro_rbtree_node (Some bp) bp;
+      with t p. rewrite (rbtree_subtree (Some bp) t p)
+                     as rbtree_subtree tree 'ft 'parent;
+      result
+    }
+  }
+}
+#pop-options
+
+// ============================================================
+// Balance — runtime classification
+// ============================================================
+
+// Read-only: check if tree root has a specific color
+fn is_color (tree: rb_ptr) (c: S.color)
+  (#ft: G.erased S.rbtree) (#parent: G.erased rb_ptr)
+  preserves rbtree_subtree tree ft parent
+  returns b: bool
+  ensures pure (b == (S.Node? ft && S.Node?.c ft = c))
+{
+  match tree {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) ft parent
+           as rbtree_subtree tree ft parent;
+      false
+    }
+    Some bp -> {
+      rewrite each (Some bp) as tree;
+      rbtree_case_some tree bp;
+      let node = !bp;
+      let res = (node.color = c);
+      intro_rbtree_node tree bp;
+      with t p. rewrite (rbtree_subtree tree t p)
+                     as (rbtree_subtree tree ft parent);
+      res
+    }
   }
 }
 
-fn rb_insert_fixup
-  (pool: A.array node_data) (root: R.ref SZ.t) (z0: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
+// Check left subtree for LL or LR balance case
+// Opens the node, reads child colors with is_color (no nested opening),
+// folds back, then classifies from pure values
+fn check_left_balance (l: rb_ptr)
+  (#lt: G.erased S.rbtree) (#lp: G.erased rb_ptr)
+  preserves rbtree_subtree l lt lp
+  returns bc: S.balance_case
+  ensures pure (bc == (match lt with
+    | S.Node S.Red (S.Node S.Red _ _ _) _ _ -> S.BC_LL
+    | S.Node S.Red _ _ (S.Node S.Red _ _ _) -> S.BC_LR
+    | _ -> S.BC_None))
 {
-  let mut z = z0;
-  let mut cont = true;
-  while ( !cont )
-  invariant exists* s' r' zv cv. (
-    A.pts_to pool s' ** R.pts_to root r' **
-    R.pts_to z zv ** R.pts_to cont cv
-  )
-  {
-    let zv = !z;
-    let zn = read_node pool zv;
-    let pn = read_node pool zn.p;
-    if (pn.color = Red) {
-      let zp = zn.p;
-      let pn_rd = read_node pool zp;
-      let zpp = pn_rd.p;
-      let ppn = read_node pool zpp;
-      if (zp = ppn.left) {
-        // z.p is LEFT child of grandparent
-        let uncle = ppn.right;
-        let un = read_node pool uncle;
-        if (un.color = Red) {
-          // Case 1: uncle is red → recolor
-          let pnd = read_node pool zp;
-          write_node pool zp ({ pnd with color = Black });
-          write_node pool uncle ({ un with color = Black });
-          let ppnd = read_node pool zpp;
-          write_node pool zpp ({ ppnd with color = Red });
-          z := zpp
+  match l {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) lt lp
+           as rbtree_subtree l lt lp;
+      S.BC_None
+    }
+    Some lvl -> {
+      rewrite each (Some lvl) as l;
+      rbtree_case_some l lvl;
+      let ln = !lvl;
+      let ll_red = is_color ln.left S.Red;
+      let lr_red = is_color ln.right S.Red;
+      intro_rbtree_node l lvl;
+      with t p. rewrite (rbtree_subtree l t p) as (rbtree_subtree l lt lp);
+      if (S.Red? ln.color && ll_red) {
+        S.BC_LL
+      } else if (S.Red? ln.color && lr_red) {
+        S.BC_LR
+      } else {
+        S.BC_None
+      }
+    }
+  }
+}
+
+// Check right subtree for RL or RR balance case
+fn check_right_balance (r: rb_ptr)
+  (#rt: G.erased S.rbtree) (#rp: G.erased rb_ptr)
+  preserves rbtree_subtree r rt rp
+  returns bc: S.balance_case
+  ensures pure (bc == (match rt with
+    | S.Node S.Red (S.Node S.Red _ _ _) _ _ -> S.BC_RL
+    | S.Node S.Red _ _ (S.Node S.Red _ _ _) -> S.BC_RR
+    | _ -> S.BC_None))
+{
+  match r {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) rt rp
+           as rbtree_subtree r rt rp;
+      S.BC_None
+    }
+    Some rvl -> {
+      rewrite each (Some rvl) as r;
+      rbtree_case_some r rvl;
+      let rn = !rvl;
+      let rl_red = is_color rn.left S.Red;
+      let rr_red = is_color rn.right S.Red;
+      intro_rbtree_node r rvl;
+      with t p. rewrite (rbtree_subtree r t p) as (rbtree_subtree r rt rp);
+      if (S.Red? rn.color && rl_red) {
+        S.BC_RL
+      } else if (S.Red? rn.color && rr_red) {
+        S.BC_RR
+      } else {
+        S.BC_None
+      }
+    }
+  }
+}
+
+// Runtime classification matching S.classify_balance
+fn classify_runtime (c: S.color) (l: rb_ptr) (r: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  preserves rbtree_subtree l lt lp ** rbtree_subtree r rt rp
+  returns bc: S.balance_case
+  ensures pure (bc == S.classify_balance c lt rt)
+{
+  if (S.Red? c) {
+    S.BC_None
+  } else {
+    let lbc = check_left_balance l;
+    if (not (S.BC_None? lbc)) {
+      lbc
+    } else {
+      check_right_balance r
+    }
+  }
+}
+
+// ============================================================
+// Balance cases
+// ============================================================
+
+fn balance_ll (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp **
+           pure (S.BC_LL? (S.classify_balance S.Black lt rt))
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.balance S.Black lt v rt) parent
+{
+  S.classify_balance_lemma S.Black lt v rt;
+  rbtree_not_leaf l;
+  let lvl = Some?.v l;
+  rbtree_case_some l lvl;
+  let ln = !lvl;
+  rbtree_not_leaf ln.left;
+  let llvl = Some?.v ln.left;
+  rewrite each (Some llvl) as ln.left;
+  rbtree_case_some ln.left llvl;
+  let lln = !llvl;
+  // Reuse llvl for Node Black a x b
+  llvl := { lln with color = S.Black };
+  intro_rbtree_node ln.left llvl;
+  // New node for Node Black c_ v r
+  let right_black = new_node v S.Black ln.right r parent;
+  // Reuse lvl for Node Red root
+  Box.free lvl;
+  let result = new_node ln.key S.Red ln.left right_black parent;
+  with t. rewrite (rbtree_subtree result t parent)
+       as (rbtree_subtree result (S.balance S.Black lt v rt) parent);
+  result
+}
+
+fn balance_lr (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp **
+           pure (S.BC_LR? (S.classify_balance S.Black lt rt))
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.balance S.Black lt v rt) parent
+{
+  S.classify_balance_lemma S.Black lt v rt;
+  rbtree_not_leaf l;
+  let lvl = Some?.v l;
+  rbtree_case_some l lvl;
+  let ln = !lvl;
+  rbtree_not_leaf ln.right;
+  let lrvl = Some?.v ln.right;
+  rewrite each (Some lrvl) as ln.right;
+  rbtree_case_some ln.right lrvl;
+  let lrn = !lrvl;
+  // Reuse lvl for Node Black a x b
+  lvl := { key = ln.key; color = S.Black; left = ln.left; right = lrn.left; p = parent };
+  set_parent_ptr lrn.left (Some lvl);
+  intro_rbtree_node l lvl;
+  // New node for Node Black c_ v r
+  let right_black = new_node v S.Black lrn.right r parent;
+  // Reuse lrvl for Node Red root
+  Box.free lrvl;
+  let result = new_node lrn.key S.Red l right_black parent;
+  with t. rewrite (rbtree_subtree result t parent)
+       as (rbtree_subtree result (S.balance S.Black lt v rt) parent);
+  result
+}
+
+fn balance_rl (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp **
+           pure (S.BC_RL? (S.classify_balance S.Black lt rt))
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.balance S.Black lt v rt) parent
+{
+  S.classify_balance_lemma S.Black lt v rt;
+  rbtree_not_leaf r;
+  let rvl = Some?.v r;
+  rbtree_case_some r rvl;
+  let rn = !rvl;
+  rbtree_not_leaf rn.left;
+  let rlvl = Some?.v rn.left;
+  rewrite each (Some rlvl) as rn.left;
+  rbtree_case_some rn.left rlvl;
+  let rln = !rlvl;
+  // New node for Node Black l v b
+  let left_black = new_node v S.Black l rln.left parent;
+  // Reuse rvl for Node Black c_ z d
+  rvl := { key = rn.key; color = S.Black; left = rln.right; right = rn.right; p = parent };
+  set_parent_ptr rln.right (Some rvl);
+  intro_rbtree_node r rvl;
+  // Reuse rlvl for Node Red root
+  Box.free rlvl;
+  let result = new_node rln.key S.Red left_black r parent;
+  with t. rewrite (rbtree_subtree result t parent)
+       as (rbtree_subtree result (S.balance S.Black lt v rt) parent);
+  result
+}
+
+fn balance_rr (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp **
+           pure (S.BC_RR? (S.classify_balance S.Black lt rt))
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.balance S.Black lt v rt) parent
+{
+  S.classify_balance_lemma S.Black lt v rt;
+  rbtree_not_leaf r;
+  let rvl = Some?.v r;
+  rbtree_case_some r rvl;
+  let rn = !rvl;
+  rbtree_not_leaf rn.right;
+  let rrvl = Some?.v rn.right;
+  rewrite each (Some rrvl) as rn.right;
+  rbtree_case_some rn.right rrvl;
+  let rrn = !rrvl;
+  // New node for Node Black l v b
+  let left_black = new_node v S.Black l rn.left parent;
+  // Reuse rrvl for Node Black c_ z d
+  rrvl := { rrn with color = S.Black };
+  intro_rbtree_node rn.right rrvl;
+  // Reuse rvl for Node Red root
+  Box.free rvl;
+  let result = new_node rn.key S.Red left_black rn.right parent;
+  with t. rewrite (rbtree_subtree result t parent)
+       as (rbtree_subtree result (S.balance S.Black lt v rt) parent);
+  result
+}
+
+fn rb_balance (c: S.color) (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.balance c lt v rt) parent
+{
+  let bc = classify_runtime c l r;
+  match bc {
+    S.BC_LL -> {
+      let y = balance_ll l v r parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.balance c lt v rt) parent);
+      y
+    }
+    S.BC_LR -> {
+      let y = balance_lr l v r parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.balance c lt v rt) parent);
+      y
+    }
+    S.BC_RL -> {
+      let y = balance_rl l v r parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.balance c lt v rt) parent);
+      y
+    }
+    S.BC_RR -> {
+      let y = balance_rr l v r parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.balance c lt v rt) parent);
+      y
+    }
+    S.BC_None -> {
+      S.classify_balance_lemma c lt v rt;
+      let y = new_node v c l r parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.balance c lt v rt) parent);
+      y
+    }
+  }
+}
+
+// ============================================================
+// Insert
+// ============================================================
+
+fn rec rb_ins (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires rbtree_subtree tree 'ft parent
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.ins 'ft k) parent
+{
+  match tree {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) 'ft parent
+           as rbtree_subtree (None #rb_node_ptr) S.Leaf parent;
+      elim_rbtree_leaf (None #rb_node_ptr);
+      let left_leaf : rb_ptr = None #rb_node_ptr;
+      intro_rbtree_leaf left_leaf (None #rb_node_ptr);
+      let right_leaf : rb_ptr = None #rb_node_ptr;
+      intro_rbtree_leaf right_leaf (None #rb_node_ptr);
+      let y = new_node k S.Red left_leaf right_leaf parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.ins 'ft k) parent);
+      y
+    }
+    Some vl -> {
+      rbtree_case_some (Some vl) vl;
+      let node = !vl;
+      if (k < node.key) {
+        let new_left = rb_ins node.left k (Some vl);
+        Box.free vl;
+        let y = rb_balance node.color new_left node.key node.right parent;
+        with t. rewrite (rbtree_subtree y t parent)
+             as (rbtree_subtree y (S.ins 'ft k) parent);
+        y
+      } else if (k > node.key) {
+        let new_right = rb_ins node.right k (Some vl);
+        Box.free vl;
+        let y = rb_balance node.color node.left node.key new_right parent;
+        with t. rewrite (rbtree_subtree y t parent)
+             as (rbtree_subtree y (S.ins 'ft k) parent);
+        y
+      } else {
+        // Duplicate key
+        vl := { node with p = parent };
+        intro_rbtree_node (Some vl) vl;
+        with t p. rewrite (rbtree_subtree (Some vl) t p)
+             as (rbtree_subtree tree (S.ins 'ft k) parent);
+        tree
+      }
+    }
+  }
+}
+
+fn rb_make_black (tree: rb_ptr) (parent: rb_ptr)
+  requires rbtree_subtree tree 'ft 'old_parent
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.make_black 'ft) parent
+{
+  match tree {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) 'ft 'old_parent
+           as rbtree_subtree (None #rb_node_ptr) S.Leaf 'old_parent;
+      elim_rbtree_leaf (None #rb_node_ptr);
+      intro_rbtree_leaf (None #rb_node_ptr) parent;
+      rewrite rbtree_subtree (None #rb_node_ptr) S.Leaf parent
+           as rbtree_subtree tree (S.make_black 'ft) parent;
+      tree
+    }
+    Some vl -> {
+      rbtree_case_some (Some vl) vl;
+      let node = !vl;
+      vl := { node with color = S.Black; p = parent };
+      intro_rbtree_node (Some vl) vl;
+      with t p. rewrite (rbtree_subtree (Some vl) t p)
+           as (rbtree_subtree tree (S.make_black 'ft) parent);
+      tree
+    }
+  }
+}
+
+fn rb_insert (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires rbtree_subtree tree 'ft parent
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.insert 'ft k) parent
+{
+  let t = rb_ins tree k parent;
+  rb_make_black t parent
+}
+
+// ============================================================
+// Delete — Kahrs-style
+// ============================================================
+
+fn rb_redden (tree: rb_ptr)
+  requires rbtree_subtree tree 'ft 'parent
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.redden 'ft) 'parent
+{
+  match tree {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) 'ft 'parent
+           as rbtree_subtree tree (S.redden 'ft) 'parent;
+      tree
+    }
+    Some p -> {
+      rbtree_case_some (Some p) p;
+      let node = !p;
+      if (S.Black? node.color) {
+        p := { node with color = S.Red };
+        intro_rbtree_node (Some p) p;
+        with t pp. rewrite (rbtree_subtree (Some p) t pp)
+             as (rbtree_subtree tree (S.redden 'ft) 'parent);
+        tree
+      } else {
+        p := node;
+        intro_rbtree_node (Some p) p;
+        with t pp. rewrite (rbtree_subtree (Some p) t pp)
+             as (rbtree_subtree tree (S.redden 'ft) 'parent);
+        tree
+      }
+    }
+  }
+}
+
+fn rb_balL (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.balL lt v rt) parent
+{
+  let l_red = is_color l S.Red;
+  if l_red {
+    // Case 1: Node Red a x b
+    rbtree_not_leaf l;
+    let lvl = Some?.v l;
+    rbtree_case_some l lvl;
+    let ln = !lvl;
+    lvl := { ln with color = S.Black };
+    intro_rbtree_node l lvl;
+    let y = new_node v S.Red l r parent;
+    with t. rewrite (rbtree_subtree y t parent)
+         as (rbtree_subtree y (S.balL lt v rt) parent);
+    y
+  } else {
+    let r_black = is_color r S.Black;
+    if r_black {
+      // Case 2: ..., Node Black a y b
+      rbtree_not_leaf r;
+      let rvl = Some?.v r;
+      rbtree_case_some r rvl;
+      let rn = !rvl;
+      rvl := { rn with color = S.Red };
+      intro_rbtree_node r rvl;
+      let y = rb_balance S.Black l v r parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.balL lt v rt) parent);
+      y
+    } else {
+      let r_red = is_color r S.Red;
+      if r_red {
+        // Case 3: ..., Node Red (Node Black ...) y c
+        rbtree_not_leaf r;
+        let rvl = Some?.v r;
+        rbtree_case_some r rvl;
+        let rn = !rvl;
+        let rl_black = is_color rn.left S.Black;
+        if rl_black {
+          rbtree_not_leaf rn.left;
+          let rlvl = Some?.v rn.left;
+          rewrite each (Some rlvl) as rn.left;
+          rbtree_case_some rn.left rlvl;
+          let rln = !rlvl;
+          let rd = rb_redden rn.right;
+          let right_balanced = rb_balance S.Black rln.right rn.key rd parent;
+          let left_black = new_node v S.Black l rln.left parent;
+          Box.free rvl;
+          Box.free rlvl;
+          let y = new_node rln.key S.Red left_black right_balanced parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.balL lt v rt) parent);
+          y
         } else {
-          // Case 2 → Case 3
-          fixup_case2_left pool root z zp;
-          // Case 3: recolor + right rotate
-          let zv3 = !z;
-          let zn3 = read_node pool zv3;
-          let zp3 = zn3.p;
-          let pnd3 = read_node pool zp3;
-          write_node pool zp3 ({ pnd3 with color = Black });
-          let zpp3 = pnd3.p;
-          let ppnd3 = read_node pool zpp3;
-          write_node pool zpp3 ({ ppnd3 with color = Red });
-          right_rotate pool root zpp3
+          // r is Red but r.left is not Black => fallback
+          rvl := rn;
+          intro_rbtree_node r rvl;
+          with t p. rewrite (rbtree_subtree r t p) as (rbtree_subtree r rt rp);
+          let y = new_node v S.Black l r parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.balL lt v rt) parent);
+          y
         }
       } else {
-        // Symmetric: z.p is RIGHT child of grandparent
-        let uncle = ppn.left;
-        let un = read_node pool uncle;
-        if (un.color = Red) {
-          // Case 1 symmetric
-          let pnd = read_node pool zp;
-          write_node pool zp ({ pnd with color = Black });
-          write_node pool uncle ({ un with color = Black });
-          let ppnd = read_node pool zpp;
-          write_node pool zpp ({ ppnd with color = Red });
-          z := zpp
-        } else {
-          // Case 2 → Case 3 (symmetric)
-          fixup_case2_right pool root z zp;
-          // Case 3 symmetric: recolor + left rotate
-          let zv3 = !z;
-          let zn3 = read_node pool zv3;
-          let zp3 = zn3.p;
-          let pnd3 = read_node pool zp3;
-          write_node pool zp3 ({ pnd3 with color = Black });
-          let zpp3 = pnd3.p;
-          let ppnd3 = read_node pool zpp3;
-          write_node pool zpp3 ({ ppnd3 with color = Red });
-          left_rotate pool root zpp3
-        }
+        // Neither red nor black at root => Leaf or something; just make node
+        let y = new_node v S.Black l r parent;
+        with t. rewrite (rbtree_subtree y t parent)
+             as (rbtree_subtree y (S.balL lt v rt) parent);
+        y
       }
-    } else {
-      // z.p.color is Black → done
-      cont := false
     }
-  };
-  // T.root.color = BLACK
-  let r = !root;
-  let rn = read_node pool r;
-  write_node pool r ({ rn with color = Black })
+  }
 }
 
-// ========== RB-INSERT (§13.3) ==========
-// Walk down to find insertion point, create red node, call fixup.
-// `next_id` is the next free slot in the pool (simple bump allocator).
-
-// Attach new node z to parent yy, or set as root if tree was empty.
-inline_for_extraction
-fn attach_child
-  (pool: A.array node_data) (root: R.ref SZ.t) (yv: SZ.t) (z: SZ.t) (k: int)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
+fn rb_balR (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.balR lt v rt) parent
 {
-  if (is_nil yv) {
-    root := z
+  let r_red = is_color r S.Red;
+  if r_red {
+    rbtree_not_leaf r;
+    let rvl = Some?.v r;
+    rbtree_case_some r rvl;
+    let rn = !rvl;
+    rvl := { rn with color = S.Black };
+    intro_rbtree_node r rvl;
+    let y = new_node v S.Red l r parent;
+    with t. rewrite (rbtree_subtree y t parent)
+         as (rbtree_subtree y (S.balR lt v rt) parent);
+    y
   } else {
-    let yn = read_node pool yv;
-    if (k < yn.key) {
-      write_node pool yv ({ yn with left = z })
+    let l_black = is_color l S.Black;
+    if l_black {
+      rbtree_not_leaf l;
+      let lvl = Some?.v l;
+      rbtree_case_some l lvl;
+      let ln = !lvl;
+      lvl := { ln with color = S.Red };
+      intro_rbtree_node l lvl;
+      let y = rb_balance S.Black l v r parent;
+      with t. rewrite (rbtree_subtree y t parent)
+           as (rbtree_subtree y (S.balR lt v rt) parent);
+      y
     } else {
-      write_node pool yv ({ yn with right = z })
-    }
-  }
-}
-
-fn rb_insert
-  (pool: A.array node_data) (root: R.ref SZ.t) (next_id: R.ref SZ.t) (k: int)
-  requires A.pts_to pool 's ** R.pts_to root 'r ** R.pts_to next_id 'n
-  ensures exists* s' r' n'. A.pts_to pool s' ** R.pts_to root r' ** R.pts_to next_id n'
-{
-  let r = !root;
-  let mut yy = nil_idx;
-  let mut xx = r;
-  let mut cont = (not (is_nil r));
-  // Walk down: yy tracks parent, xx tracks current
-  while ( !cont )
-  invariant exists* s' r' n' xv yv cv. (
-    A.pts_to pool s' ** R.pts_to root r' ** R.pts_to next_id n' **
-    R.pts_to xx xv ** R.pts_to yy yv ** R.pts_to cont cv
-  )
-  {
-    let xv = !xx;
-    let xn = read_node pool xv;
-    yy := xv;
-    if (k < xn.key) {
-      xx := xn.left;
-      cont := (not (is_nil xn.left))
-    } else {
-      xx := xn.right;
-      cont := (not (is_nil xn.right))
-    }
-  };
-  // z = next_id; next_id++
-  let z = !next_id;
-  assume_ (pure (SZ.fits (SZ.v z + 1)));
-  let next_val = SZ.add z 1sz;
-  next_id := next_val;
-  // Initialize z: key=k, color=Red, left=nil, right=nil, p=y
-  let yv = !yy;
-  write_node pool z ({ key = k; color = Red; left = nil_idx; right = nil_idx; p = yv });
-  // Attach z to parent
-  attach_child pool root yv z k;
-  // Fixup
-  rb_insert_fixup pool root z
-}
-
-// ========== RB-DELETE-FIXUP (§13.4) ==========
-// Restores RB properties after delete. 4 cases + 4 symmetric.
-//
-// while x ≠ T.root and x.color == BLACK:
-//   if x == x.p.left:
-//     w = x.p.right (sibling)
-//     Case 1: w is red → recolor + left-rotate parent
-//     Case 2: both w's children black → recolor w, x = x.p
-//     Case 3: w.right black → recolor + right-rotate w
-//     Case 4: w.right red → recolor + left-rotate parent, x = root
-//   else: (symmetric)
-// x.color = BLACK
-
-// Case 1 left helper: if sibling w is red, recolor + left rotate + update w
-inline_for_extraction
-fn fixup_case1_left
-  (pool: A.array node_data) (root: R.ref SZ.t) (w: R.ref SZ.t) (xp: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r ** R.pts_to w 'wv
-  ensures exists* s' r' wv'. A.pts_to pool s' ** R.pts_to root r' ** R.pts_to w wv'
-{
-  let wv = !w;
-  let wn = read_node pool wv;
-  if (wn.color = Red) {
-    write_node pool wv ({ wn with color = Black });
-    let pnd = read_node pool xp;
-    write_node pool xp ({ pnd with color = Red });
-    left_rotate pool root xp;
-    let pnd2 = read_node pool xp;
-    w := pnd2.right
-  }
-}
-
-// Case 1 right helper (symmetric)
-inline_for_extraction
-fn fixup_case1_right
-  (pool: A.array node_data) (root: R.ref SZ.t) (w: R.ref SZ.t) (xp: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r ** R.pts_to w 'wv
-  ensures exists* s' r' wv'. A.pts_to pool s' ** R.pts_to root r' ** R.pts_to w wv'
-{
-  let wv = !w;
-  let wn = read_node pool wv;
-  if (wn.color = Red) {
-    write_node pool wv ({ wn with color = Black });
-    let pnd = read_node pool xp;
-    write_node pool xp ({ pnd with color = Red });
-    right_rotate pool root xp;
-    let pnd2 = read_node pool xp;
-    w := pnd2.left
-  }
-}
-
-// Case 3 left helper: if w.right is black, recolor + right rotate w + update w
-inline_for_extraction
-fn fixup_case3_left
-  (pool: A.array node_data) (root: R.ref SZ.t) (w: R.ref SZ.t) (xp: SZ.t) (wrc: color)
-  requires A.pts_to pool 's ** R.pts_to root 'r ** R.pts_to w 'wv
-  ensures exists* s' r' wv'. A.pts_to pool s' ** R.pts_to root r' ** R.pts_to w wv'
-{
-  if (wrc = Black) {
-    let wv = !w;
-    let wn = read_node pool wv;
-    let wln = read_node pool wn.left;
-    write_node pool wn.left ({ wln with color = Black });
-    write_node pool wv ({ wn with color = Red });
-    right_rotate pool root wv;
-    let pnd = read_node pool xp;
-    w := pnd.right
-  }
-}
-
-// Case 3 right helper (symmetric)
-inline_for_extraction
-fn fixup_case3_right
-  (pool: A.array node_data) (root: R.ref SZ.t) (w: R.ref SZ.t) (xp: SZ.t) (wlc: color)
-  requires A.pts_to pool 's ** R.pts_to root 'r ** R.pts_to w 'wv
-  ensures exists* s' r' wv'. A.pts_to pool s' ** R.pts_to root r' ** R.pts_to w wv'
-{
-  if (wlc = Black) {
-    let wv = !w;
-    let wn = read_node pool wv;
-    let wrn = read_node pool wn.right;
-    write_node pool wn.right ({ wrn with color = Black });
-    write_node pool wv ({ wn with color = Red });
-    left_rotate pool root wv;
-    let pnd = read_node pool xp;
-    w := pnd.left
-  }
-}
-
-fn rb_delete_fixup
-  (pool: A.array node_data) (root: R.ref SZ.t) (x0: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
-{
-  let mut x = x0;
-  let mut cont = true;
-  while ( !cont )
-  invariant exists* s' r' xv cv. (
-    A.pts_to pool s' ** R.pts_to root r' **
-    R.pts_to x xv ** R.pts_to cont cv
-  )
-  {
-    let xv = !x;
-    let r = !root;
-    let xn = read_node pool xv;
-    if (xv <> r && xn.color = Black) {
-      let xp = xn.p;
-      let pn = read_node pool xp;
-      if (xv = pn.left) {
-        // x is left child
-        let mut w = pn.right;
-        // Case 1: sibling w is red
-        fixup_case1_left pool root w xp;
-        let wv = !w;
-        let wn = read_node pool wv;
-        let wln = read_node pool wn.left;
-        let wrn = read_node pool wn.right;
-        if (wln.color = Black && wrn.color = Black) {
-          // Case 2: both of w's children are black
-          write_node pool wv ({ wn with color = Red });
-          x := xp
+      let l_red = is_color l S.Red;
+      if l_red {
+        rbtree_not_leaf l;
+        let lvl = Some?.v l;
+        rbtree_case_some l lvl;
+        let ln = !lvl;
+        let lr_black = is_color ln.right S.Black;
+        if lr_black {
+          rbtree_not_leaf ln.right;
+          let lrvl = Some?.v ln.right;
+          rewrite each (Some lrvl) as ln.right;
+          rbtree_case_some ln.right lrvl;
+          let lrn = !lrvl;
+          let la = rb_redden ln.left;
+          let left_balanced = rb_balance S.Black la ln.key lrn.left parent;
+          let right_black = new_node v S.Black lrn.right r parent;
+          Box.free lvl;
+          Box.free lrvl;
+          let y = new_node lrn.key S.Red left_balanced right_black parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.balR lt v rt) parent);
+          y
         } else {
-          // Case 3: w.right is black → rotate
-          fixup_case3_left pool root w xp wrn.color;
-          // Case 4: w.right is red → recolor + rotate → done
-          let wv2 = !w;
-          let wn2 = read_node pool wv2;
-          let pnd4 = read_node pool xp;
-          write_node pool wv2 ({ wn2 with color = pnd4.color });
-          write_node pool xp ({ pnd4 with color = Black });
-          let wrn2 = read_node pool wn2.right;
-          write_node pool wn2.right ({ wrn2 with color = Black });
-          left_rotate pool root xp;
-          let r2 = !root;
-          x := r2;
-          cont := false
+          lvl := ln;
+          intro_rbtree_node l lvl;
+          with t p. rewrite (rbtree_subtree l t p) as (rbtree_subtree l lt lp);
+          let y = new_node v S.Black l r parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.balR lt v rt) parent);
+          y
         }
       } else {
-        // Symmetric: x is right child
-        let mut w = pn.left;
-        fixup_case1_right pool root w xp;
-        let wv = !w;
-        let wn = read_node pool wv;
-        let wrn = read_node pool wn.right;
-        let wln = read_node pool wn.left;
-        if (wrn.color = Black && wln.color = Black) {
-          write_node pool wv ({ wn with color = Red });
-          x := xp
-        } else {
-          fixup_case3_right pool root w xp wln.color;
-          let wv2 = !w;
-          let wn2 = read_node pool wv2;
-          let pnd4 = read_node pool xp;
-          write_node pool wv2 ({ wn2 with color = pnd4.color });
-          write_node pool xp ({ pnd4 with color = Black });
-          let wln2 = read_node pool wn2.left;
-          write_node pool wn2.left ({ wln2 with color = Black });
-          right_rotate pool root xp;
-          let r2 = !root;
-          x := r2;
-          cont := false
+        let y = new_node v S.Black l r parent;
+        with t. rewrite (rbtree_subtree y t parent)
+             as (rbtree_subtree y (S.balR lt v rt) parent);
+        y
+      }
+    }
+  }
+}
+
+// fuse: merge two subtrees at deletion point
+fn rec rb_fuse (l: rb_ptr) (r: rb_ptr) (parent: rb_ptr)
+  (#lt #rt: G.erased S.rbtree) (#lp #rp: G.erased rb_ptr)
+  requires rbtree_subtree l lt lp ** rbtree_subtree r rt rp
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.fuse lt rt) parent
+  decreases (S.node_count lt + S.node_count rt)
+{
+  match l {
+    None -> {
+      consume_rbtree_leaf (None #rb_node_ptr);
+      set_parent_ptr r parent;
+      with t. rewrite (rbtree_subtree r t parent)
+           as (rbtree_subtree r (S.fuse lt rt) parent);
+      r
+    }
+    Some lvl -> {
+      rewrite each (Some lvl) as l;
+      match r {
+        None -> {
+          consume_rbtree_leaf (None #rb_node_ptr);
+          set_parent_ptr l parent;
+          with t. rewrite (rbtree_subtree l t parent)
+               as (rbtree_subtree l (S.fuse lt rt) parent);
+          l
+        }
+        Some rvl -> {
+          rewrite each (Some rvl) as r;
+          rbtree_case_some l lvl;
+          rbtree_case_some r rvl;
+          let ln = !lvl;
+          let rn = !rvl;
+          if (S.Red? ln.color && S.Red? rn.color) {
+            let s = rb_fuse ln.right rn.left (None #rb_node_ptr);
+            let s_red = is_color s S.Red;
+            if s_red {
+              rbtree_not_leaf s;
+              let svl = Some?.v s;
+              rbtree_case_some s svl;
+              let sn = !svl;
+              lvl := { key = ln.key; color = S.Red; left = ln.left; right = sn.left; p = parent };
+              set_parent_ptr sn.left (Some lvl);
+              intro_rbtree_node l lvl;
+              rvl := { key = rn.key; color = S.Red; left = sn.right; right = rn.right; p = parent };
+              set_parent_ptr sn.right (Some rvl);
+              intro_rbtree_node r rvl;
+              svl := { key = sn.key; color = S.Red; left = l; right = r; p = parent };
+              set_parent_ptr l (Some svl);
+              set_parent_ptr r (Some svl);
+              intro_rbtree_node s svl;
+              with t pp. rewrite (rbtree_subtree s t pp)
+                   as (rbtree_subtree s (S.fuse lt rt) parent);
+              s
+            } else {
+              rvl := { key = rn.key; color = S.Red; left = s; right = rn.right; p = parent };
+              set_parent_ptr s (Some rvl);
+              intro_rbtree_node r rvl;
+              lvl := { key = ln.key; color = S.Red; left = ln.left; right = r; p = parent };
+              set_parent_ptr r (Some lvl);
+              intro_rbtree_node l lvl;
+              with t pp. rewrite (rbtree_subtree l t pp)
+                   as (rbtree_subtree l (S.fuse lt rt) parent);
+              l
+            }
+          } else if (S.Black? ln.color && S.Black? rn.color) {
+            let s = rb_fuse ln.right rn.left (None #rb_node_ptr);
+            let s_red = is_color s S.Red;
+            if s_red {
+              rbtree_not_leaf s;
+              let svl = Some?.v s;
+              rbtree_case_some s svl;
+              let sn = !svl;
+              lvl := { key = ln.key; color = S.Black; left = ln.left; right = sn.left; p = parent };
+              set_parent_ptr sn.left (Some lvl);
+              intro_rbtree_node l lvl;
+              rvl := { key = rn.key; color = S.Black; left = sn.right; right = rn.right; p = parent };
+              set_parent_ptr sn.right (Some rvl);
+              intro_rbtree_node r rvl;
+              svl := { key = sn.key; color = S.Red; left = l; right = r; p = parent };
+              set_parent_ptr l (Some svl);
+              set_parent_ptr r (Some svl);
+              intro_rbtree_node s svl;
+              with t pp. rewrite (rbtree_subtree s t pp)
+                   as (rbtree_subtree s (S.fuse lt rt) parent);
+              s
+            } else {
+              rvl := { key = rn.key; color = S.Black; left = s; right = rn.right; p = parent };
+              set_parent_ptr s (Some rvl);
+              intro_rbtree_node r rvl;
+              Box.free lvl;
+              let y = rb_balL ln.left ln.key r parent;
+              with t. rewrite (rbtree_subtree y t parent)
+                   as (rbtree_subtree y (S.fuse lt rt) parent);
+              y
+            }
+          } else if (S.Red? ln.color) {
+            rvl := rn;
+            intro_rbtree_node r rvl;
+            with t p. rewrite (rbtree_subtree r t p) as (rbtree_subtree r rt rp);
+            let fused = rb_fuse ln.right r (None #rb_node_ptr);
+            lvl := { key = ln.key; color = S.Red; left = ln.left; right = fused; p = parent };
+            set_parent_ptr fused (Some lvl);
+            intro_rbtree_node l lvl;
+            with t pp. rewrite (rbtree_subtree l t pp)
+                 as (rbtree_subtree l (S.fuse lt rt) parent);
+            l
+          } else {
+            lvl := ln;
+            intro_rbtree_node l lvl;
+            with t p. rewrite (rbtree_subtree l t p) as (rbtree_subtree l lt lp);
+            let fused = rb_fuse l rn.left (None #rb_node_ptr);
+            rvl := { key = rn.key; color = S.Red; left = fused; right = rn.right; p = parent };
+            set_parent_ptr fused (Some rvl);
+            intro_rbtree_node r rvl;
+            with t pp. rewrite (rbtree_subtree r t pp)
+                 as (rbtree_subtree r (S.fuse lt rt) parent);
+            r
+          }
         }
       }
-    } else {
-      // x == root or x.color == Red → done
-      cont := false
-    }
-  };
-  // x.color = BLACK
-  let xv = !x;
-  let xn = read_node pool xv;
-  write_node pool xv ({ xn with color = Black })
-}
-
-// ========== RB-DELETE (§13.4) ==========
-// Delete node z. Tracks y-original-color for fixup.
-//
-// if z.left == T.nil: transplant z with z.right
-// elseif z.right == T.nil: transplant z with z.left
-// else: find successor y = TREE-MINIMUM(z.right)
-//   splice out y, replace z with y, fixup if y was black
-
-// Helper: if successor y is direct child of z, just set x.p = y.
-// Otherwise, splice out y and attach z's right subtree.
-inline_for_extraction
-fn splice_successor
-  (pool: A.array node_data) (root: R.ref SZ.t)
-  (z: SZ.t) (y: SZ.t) (x: SZ.t) (zn_right: SZ.t) (yn_p: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
-{
-  if (yn_p = z) {
-    let xn = read_node pool x;
-    write_node pool x ({ xn with p = y })
-  } else {
-    rb_transplant pool root y x;
-    let yn2 = read_node pool y;
-    write_node pool y ({ yn2 with right = zn_right });
-    let zrn = read_node pool zn_right;
-    write_node pool zn_right ({ zrn with p = y })
-  }
-}
-
-// Helper: conditional fixup after delete
-inline_for_extraction
-fn maybe_fixup
-  (pool: A.array node_data) (root: R.ref SZ.t) (x: SZ.t) (orig_color: color)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
-{
-  if (orig_color = Black) {
-    rb_delete_fixup pool root x
-  }
-}
-
-fn rb_delete
-  (pool: A.array node_data) (root: R.ref SZ.t) (z: SZ.t)
-  requires A.pts_to pool 's ** R.pts_to root 'r
-  ensures exists* s' r'. A.pts_to pool s' ** R.pts_to root r'
-{
-  let zn = read_node pool z;
-  if (is_nil zn.left) {
-    // No left child: transplant right
-    rb_transplant pool root z zn.right;
-    maybe_fixup pool root zn.right zn.color
-  } else {
-    if (is_nil zn.right) {
-      // No right child: transplant left
-      rb_transplant pool root z zn.left;
-      maybe_fixup pool root zn.left zn.color
-    } else {
-      // Two children: find successor y = TREE-MINIMUM(z.right)
-      let y = tree_minimum pool zn.right;
-      let yn = read_node pool y;
-      let y_orig_color = yn.color;
-      let x = yn.right;
-      splice_successor pool root z y x zn.right yn.p;
-      // Replace z with y
-      rb_transplant pool root z y;
-      let yn3 = read_node pool y;
-      write_node pool y ({ yn3 with left = zn.left; color = zn.color });
-      let zln = read_node pool zn.left;
-      write_node pool zn.left ({ zln with p = y });
-      maybe_fixup pool root x y_orig_color
     }
   }
+}
+
+// del: recursive delete helper
+fn rec rb_del (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires rbtree_subtree tree 'ft 'old_parent
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.del 'ft k) parent
+  decreases 'ft
+{
+  match tree {
+    None -> {
+      rbtree_case_none (None #rb_node_ptr);
+      rewrite rbtree_subtree (None #rb_node_ptr) 'ft 'old_parent
+           as rbtree_subtree (None #rb_node_ptr) S.Leaf 'old_parent;
+      elim_rbtree_leaf (None #rb_node_ptr);
+      intro_rbtree_leaf (None #rb_node_ptr) parent;
+      rewrite rbtree_subtree (None #rb_node_ptr) S.Leaf parent
+           as rbtree_subtree tree (S.del 'ft k) parent;
+      tree
+    }
+    Some vl -> {
+      rbtree_case_some (Some vl) vl;
+      let node = !vl;
+      if (k < node.key) {
+        let l_was_black = is_color node.left S.Black;
+        let new_left = rb_del node.left k (None #rb_node_ptr);
+        if l_was_black {
+          Box.free vl;
+          let y = rb_balL new_left node.key node.right parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.del 'ft k) parent);
+          y
+        } else {
+          Box.free vl;
+          let y = new_node node.key S.Red new_left node.right parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.del 'ft k) parent);
+          y
+        }
+      } else if (k > node.key) {
+        let r_was_black = is_color node.right S.Black;
+        let new_right = rb_del node.right k (None #rb_node_ptr);
+        if r_was_black {
+          Box.free vl;
+          let y = rb_balR node.left node.key new_right parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.del 'ft k) parent);
+          y
+        } else {
+          Box.free vl;
+          let y = new_node node.key S.Red node.left new_right parent;
+          with t. rewrite (rbtree_subtree y t parent)
+               as (rbtree_subtree y (S.del 'ft k) parent);
+          y
+        }
+      } else {
+        Box.free vl;
+        let y = rb_fuse node.left node.right parent;
+        with t. rewrite (rbtree_subtree y t parent)
+             as (rbtree_subtree y (S.del 'ft k) parent);
+        y
+      }
+    }
+  }
+}
+
+fn rb_delete (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires rbtree_subtree tree 'ft 'old_parent
+  returns y: rb_ptr
+  ensures rbtree_subtree y (S.delete 'ft k) parent
+{
+  let t = rb_del tree k parent;
+  rb_make_black t parent
+}
+
+// ============================================================
+// Deallocation
+// ============================================================
+
+fn rec free_rbtree (tree: rb_ptr)
+  requires rbtree_subtree tree 'ft 'parent
+  ensures emp
+  decreases 'ft
+{
+  match tree {
+    None -> {
+      cases_of_rbtree (None #rb_node_ptr) 'ft 'parent;
+      unfold rbtree_cases
+    }
+    Some bp -> {
+      rbtree_case_some (Some bp) bp;
+      let node = !bp;
+      free_rbtree node.left;
+      free_rbtree node.right;
+      Box.free bp
+    }
+  }
+}
+
+// ============================================================
+// Validated API — bundles BST + RB invariants
+// ============================================================
+
+let valid_rbtree (ct: rb_ptr) (ft: S.rbtree) (parent: rb_ptr) : slprop =
+  rbtree_subtree ct ft parent ** pure (S.is_rbtree ft /\ S.is_bst ft)
+
+ghost fn elim_valid (ct: rb_ptr) (#ft: G.erased S.rbtree) (#parent: G.erased rb_ptr)
+  requires valid_rbtree ct ft parent
+  ensures rbtree_subtree ct ft parent ** pure (S.is_rbtree ft /\ S.is_bst ft)
+{
+  unfold valid_rbtree
+}
+
+ghost fn intro_valid (ct: rb_ptr) (#ft: G.erased S.rbtree) (#parent: G.erased rb_ptr)
+  requires rbtree_subtree ct ft parent ** pure (S.is_rbtree ft /\ S.is_bst ft)
+  ensures valid_rbtree ct ft parent
+{
+  fold (valid_rbtree ct ft parent)
+}
+
+fn rb_new ()
+  requires emp
+  returns y: rb_ptr
+  ensures valid_rbtree y S.Leaf (None #rb_node_ptr)
+{
+  let y : rb_ptr = None #rb_node_ptr;
+  intro_rbtree_leaf y (None #rb_node_ptr);
+  fold (valid_rbtree y S.Leaf (None #rb_node_ptr));
+  y
+}
+
+fn rb_search_v (tree: rb_ptr) (k: int)
+  (#parent: G.erased rb_ptr)
+  preserves valid_rbtree tree 'ft parent
+  returns result: option int
+  ensures pure (result == S.search 'ft k)
+{
+  unfold valid_rbtree;
+  let result = rb_search tree k;
+  fold (valid_rbtree tree 'ft parent);
+  result
+}
+
+fn rb_insert_v (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires valid_rbtree tree 'ft parent
+  returns y: rb_ptr
+  ensures valid_rbtree y (S.insert 'ft k) parent **
+          pure (S.mem k (S.insert 'ft k) = true)
+{
+  unfold valid_rbtree;
+  S.insert_preserves_bst 'ft k;
+  S.insert_is_rbtree 'ft k;
+  S.insert_mem 'ft k k;
+  let y = rb_insert tree k parent;
+  fold (valid_rbtree y (S.insert 'ft k) parent);
+  y
+}
+
+fn rb_delete_v (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires valid_rbtree tree 'ft parent
+  returns y: rb_ptr
+  ensures valid_rbtree y (S.delete 'ft k) parent **
+          pure (S.mem k (S.delete 'ft k) = false)
+{
+  unfold valid_rbtree;
+  S.delete_preserves_bst 'ft k;
+  S.delete_is_rbtree 'ft k;
+  S.delete_mem 'ft k k;
+  let y = rb_delete tree k parent;
+  fold (valid_rbtree y (S.delete 'ft k) parent);
+  y
+}
+
+fn free_valid_rbtree (tree: rb_ptr)
+  requires valid_rbtree tree 'ft 'parent
+  ensures emp
+{
+  unfold valid_rbtree;
+  free_rbtree tree
 }
