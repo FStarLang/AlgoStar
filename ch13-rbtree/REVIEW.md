@@ -7,8 +7,10 @@ Even the audit has green checkmarks next to deletion?..
 > - **Spec**: Kahrs-style `delete` with `redden`, `balL`, `balR`, `fuse`, `del`
 > - **Pulse**: `rb_delete` with pointer-level `rb_balL`, `rb_balR`, `rb_fuse`, `rb_del`
 > - **Proofs**: `delete_mem` (membership), `delete_preserves_bst` (BST order) — fully verified
-> - **One admit**: `delete_is_rbtree` (RB invariant preservation) — the internal invariant for
->   Kahrs-style `del` is color-dependent and complex. The README now mentions this honestly.
+> - **`delete_is_rbtree`**: Now fully proven (zero admits). The proof tracks a color-dependent
+>   invariant: `del` on a Black node yields `bh-1` with `almost_no_red_red`, while `del` on
+>   a Red node preserves `bh` with the stronger `no_red_red`. Also fixed a bug in `del` where
+>   it dispatched on `(parent_color, child_color)` instead of just `child_color`.
 > - **Complexity**: `delete_ticks ≤ 2·height + 2`, with O(log n) bound via RB height lemma
 
 The complexity results are completely vacuous. 👎
