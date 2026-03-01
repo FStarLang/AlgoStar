@@ -1119,26 +1119,17 @@ fn rec rb_del (tree: rb_ptr) (k: int)
       let node = !p;
       if (k < node.key) {
         // Delete from left subtree
-        // Check if we need balL: c=Black and l=Node Black
-        if (S.Black? node.color) {
-          let l_was_black = is_color node.left S.Black;
-          let new_left = rb_del node.left k;
-          if l_was_black {
-            // c=Black, l=Node Black → balL (del l k) v r
-            Box.free p;
-            let y = rb_balL new_left node.key node.right;
-            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
-            y
-          } else {
-            // c=Black, l not Black → Node Black (del l k) v r
-            Box.free p;
-            let y = new_node node.key S.Black new_left node.right;
-            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
-            y
-          }
+        // Check if we need balL: l=Node Black (regardless of parent color)
+        let l_was_black = is_color node.left S.Black;
+        let new_left = rb_del node.left k;
+        if l_was_black {
+          // l=Node Black → balL (del l k) v r
+          Box.free p;
+          let y = rb_balL new_left node.key node.right;
+          with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+          y
         } else {
-          // c=Red → Node Red (del l k) v r
-          let new_left = rb_del node.left k;
+          // l not Black → Node Red (del l k) v r
           Box.free p;
           let y = new_node node.key S.Red new_left node.right;
           with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
@@ -1146,25 +1137,16 @@ fn rec rb_del (tree: rb_ptr) (k: int)
         }
       } else if (k > node.key) {
         // Delete from right subtree
-        if (S.Black? node.color) {
-          let r_was_black = is_color node.right S.Black;
-          let new_right = rb_del node.right k;
-          if r_was_black {
-            // c=Black, r=Node Black → balR l v (del r k)
-            Box.free p;
-            let y = rb_balR node.left node.key new_right;
-            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
-            y
-          } else {
-            // c=Black, r not Black → Node Black l v (del r k)
-            Box.free p;
-            let y = new_node node.key S.Black node.left new_right;
-            with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
-            y
-          }
+        let r_was_black = is_color node.right S.Black;
+        let new_right = rb_del node.right k;
+        if r_was_black {
+          // r=Node Black → balR l v (del r k)
+          Box.free p;
+          let y = rb_balR node.left node.key new_right;
+          with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));
+          y
         } else {
-          // c=Red → Node Red l v (del r k)
-          let new_right = rb_del node.right k;
+          // r not Black → Node Red l v (del r k)
           Box.free p;
           let y = new_node node.key S.Red node.left new_right;
           with t. rewrite (is_rbtree y t) as (is_rbtree y (S.del 'ft k));

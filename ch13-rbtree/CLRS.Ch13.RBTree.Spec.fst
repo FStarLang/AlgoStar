@@ -13,14 +13,12 @@
  *   - CLRS Theorem 13.1: height ≤ 2·lg(n+1)
  *     via key lemma: node_count ≥ 2^bh - 1
  *   - Correctness: insert/delete preserve membership and BST invariants
- *   - delete_is_rbtree (RB preservation) admitted — see note below
+ *   - insert_is_rbtree / delete_is_rbtree: RB invariant preservation
  *
  * The balancing approach follows Okasaki, "Red-Black Trees in a
  * Functional Setting", Journal of Functional Programming, 1999.
  *
- * One admit: delete_is_rbtree (RB invariant preservation for delete).
- * The internal invariant of `del` involves a nuanced color-dependent
- * property (almost_no_red_red vs no_red_red) that is left as future work.
+ * All proofs are fully verified — no admits.
  *)
 module CLRS.Ch13.RBTree.Spec
 
@@ -838,18 +836,21 @@ let rec fuse (l r: rbtree) : Tot rbtree (decreases (node_count l + node_count r)
     Node Red (fuse l c) y d
 
 // Delete helper: removes key k from tree t.
+// Following Kahrs' formulation: when the target child is Black, use balL/balR
+// to rebalance (the child's bh decreases by 1). When the child is not Black
+// (Red or Leaf), use Node Red to absorb the parent's black level.
 let rec del (t: rbtree) (k: int) : Tot rbtree (decreases t) =
   match t with
   | Leaf -> Leaf
   | Node c l v r ->
     if k < v then
-      (match c, l with
-       | Black, Node Black _ _ _ -> balL (del l k) v r
-       | _, _ -> Node c (del l k) v r)
+      (match l with
+       | Node Black _ _ _ -> balL (del l k) v r
+       | _ -> Node Red (del l k) v r)
     else if k > v then
-      (match c, r with
-       | Black, Node Black _ _ _ -> balR l v (del r k)
-       | _, _ -> Node c l v (del r k))
+      (match r with
+       | Node Black _ _ _ -> balR l v (del r k)
+       | _ -> Node Red l v (del r k))
     else
       fuse l r
 
@@ -919,16 +920,16 @@ let rec del_mem (t: rbtree) (k: int) (x: int)
         del_mem l k x;
         bst_lt_not_mem r v k;
         assert (mem k r = false);
-        (match c, l with
-         | Black, Node Black _ _ _ -> balL_mem (del l k) v r x
-         | _, _ -> ())
+        (match l with
+         | Node Black _ _ _ -> balL_mem (del l k) v r x
+         | _ -> ())
       end else if k > v then begin
         del_mem r k x;
         bst_gt_not_mem l v k;
         assert (mem k l = false);
-        (match c, r with
-         | Black, Node Black _ _ _ -> balR_mem l v (del r k) x
-         | _, _ -> ())
+        (match r with
+         | Node Black _ _ _ -> balR_mem l v (del r k) x
+         | _ -> ())
       end else begin
         bst_gt_not_mem l v v;
         bst_lt_not_mem r v v;
@@ -1122,14 +1123,14 @@ let rec del_all_lt (t: rbtree) (k: int) (bound: int)
     | Node c l v r ->
       if k < v then begin
         del_all_lt l k bound;
-        (match c, l with
-         | Black, Node Black _ _ _ -> balL_all_lt (del l k) v r bound
-         | _, _ -> ())
+        (match l with
+         | Node Black _ _ _ -> balL_all_lt (del l k) v r bound
+         | _ -> ())
       end else if k > v then begin
         del_all_lt r k bound;
-        (match c, r with
-         | Black, Node Black _ _ _ -> balR_all_lt l v (del r k) bound
-         | _, _ -> ())
+        (match r with
+         | Node Black _ _ _ -> balR_all_lt l v (del r k) bound
+         | _ -> ())
       end else
         fuse_all_lt l r bound
 
@@ -1143,14 +1144,14 @@ let rec del_all_gt (t: rbtree) (k: int) (bound: int)
     | Node c l v r ->
       if k < v then begin
         del_all_gt l k bound;
-        (match c, l with
-         | Black, Node Black _ _ _ -> balL_all_gt (del l k) v r bound
-         | _, _ -> ())
+        (match l with
+         | Node Black _ _ _ -> balL_all_gt (del l k) v r bound
+         | _ -> ())
       end else if k > v then begin
         del_all_gt r k bound;
-        (match c, r with
-         | Black, Node Black _ _ _ -> balR_all_gt l v (del r k) bound
-         | _, _ -> ())
+        (match r with
+         | Node Black _ _ _ -> balR_all_gt l v (del r k) bound
+         | _ -> ())
       end else
         fuse_all_gt l r bound
 #pop-options
@@ -1168,15 +1169,15 @@ let rec del_preserves_bst (t: rbtree) (k: int)
       if k < v then begin
         del_preserves_bst l k;
         del_all_lt l k v;
-        (match c, l with
-         | Black, Node Black _ _ _ -> balL_is_bst (del l k) v r
-         | _, _ -> ())
+        (match l with
+         | Node Black _ _ _ -> balL_is_bst (del l k) v r
+         | _ -> ())
       end else if k > v then begin
         del_preserves_bst r k;
         del_all_gt r k v;
-        (match c, r with
-         | Black, Node Black _ _ _ -> balR_is_bst l v (del r k)
-         | _, _ -> ())
+        (match r with
+         | Node Black _ _ _ -> balR_is_bst l v (del r k)
+         | _ -> ())
       end else begin
         fuse_is_bst l r v
       end
@@ -1192,16 +1193,191 @@ let delete_preserves_bst (t: rbtree) (k: int)
 
 // The RB invariant preservation proof for delete requires careful tracking of
 // color-dependent invariants through balL/balR/fuse/del. The internal invariant
-// of del is: del on a Black node produces (same_bh, no_red_red, bh-1), while
-// del on a Red node produces (same_bh, almost_no_red_red, bh or bh-1 depending
-// on whether the deleted key was at a Red or Black node). This is future work.
+// of del is: del on a Black Node produces (same_bh, almost_no_red_red, bh - 1),
+// and del on a Red Node produces (same_bh, no_red_red, same bh).
+// The stronger no_red_red for Red parents follows because Red nodes' children
+// are always Black (by no_red_red), constraining which balL/balR cases fire.
+
+// ====== Properties of balL (with weak left precondition) ======
+// balL is called with del's output (which may only have almost_no_red_red)
+
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 80"
+let balL_props (l: rbtree) (v: int) (r: rbtree)
+  : Lemma
+    (requires same_bh l /\ same_bh r /\ bh l + 1 = bh r /\
+             almost_no_red_red l /\ no_red_red r)
+    (ensures same_bh (balL l v r) /\
+             bh (balL l v r) = bh r /\
+             almost_no_red_red (balL l v r))
+  = match l, r with
+    | Node Red a x b, _ -> ()
+    | _, Node Black b y c ->
+      balance_same_bh Black l v (Node Red b y c);
+      balance_bh Black l v (Node Red b y c);
+      // l is not Red (case 1 didn't fire), so Leaf or Black => no_red_red l
+      balance_restores_no_red_red_right Black l v (Node Red b y c)
+    | _, Node Red (Node Black b y c) z d ->
+      balance_same_bh Black c z (redden d);
+      balance_bh Black c z (redden d);
+      balance_restores_no_red_red_right Black c z (redden d)
+    | _ -> ()
+#pop-options
+
+// Stronger: when r is Black or Leaf (sibling of a Red parent's child),
+// balL always produces no_red_red (not just almost_no_red_red)
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 80"
+let balL_strong (l: rbtree) (v: int) (r: rbtree)
+  : Lemma
+    (requires same_bh l /\ same_bh r /\ bh l + 1 = bh r /\
+             almost_no_red_red l /\ no_red_red r /\
+             (Leaf? r \/ Black? (Node?.c r)))
+    (ensures same_bh (balL l v r) /\
+             bh (balL l v r) = bh r /\
+             no_red_red (balL l v r))
+  = match l, r with
+    | Node Red a x b, _ -> ()
+    | _, Node Black b y c ->
+      balance_same_bh Black l v (Node Red b y c);
+      balance_bh Black l v (Node Red b y c);
+      balance_restores_no_red_red_right Black l v (Node Red b y c)
+    | _ -> () // r is Black or Leaf, so case 3 (r = Node Red ...) cannot fire
+#pop-options
+
+// ====== Properties of balR (symmetric) ======
+
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 80"
+let balR_props (l: rbtree) (v: int) (r: rbtree)
+  : Lemma
+    (requires same_bh l /\ same_bh r /\ bh l = bh r + 1 /\
+             no_red_red l /\ almost_no_red_red r)
+    (ensures same_bh (balR l v r) /\
+             bh (balR l v r) = bh l /\
+             almost_no_red_red (balR l v r))
+  = match l, r with
+    | _, Node Red b y c -> ()
+    | Node Black a x b, _ ->
+      balance_same_bh Black (Node Red a x b) v r;
+      balance_bh Black (Node Red a x b) v r;
+      balance_restores_no_red_red_left Black (Node Red a x b) v r
+    | Node Red a x (Node Black b y c), _ ->
+      balance_same_bh Black (redden a) x b;
+      balance_bh Black (redden a) x b;
+      balance_restores_no_red_red_left Black (redden a) x b
+    | _ -> ()
+#pop-options
+
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 80"
+let balR_strong (l: rbtree) (v: int) (r: rbtree)
+  : Lemma
+    (requires same_bh l /\ same_bh r /\ bh l = bh r + 1 /\
+             no_red_red l /\ almost_no_red_red r /\
+             (Leaf? l \/ Black? (Node?.c l)))
+    (ensures same_bh (balR l v r) /\
+             bh (balR l v r) = bh l /\
+             no_red_red (balR l v r))
+  = match l, r with
+    | _, Node Red b y c -> ()
+    | Node Black a x b, _ ->
+      balance_same_bh Black (Node Red a x b) v r;
+      balance_bh Black (Node Red a x b) v r;
+      balance_restores_no_red_red_left Black (Node Red a x b) v r
+    | _ -> ()
+#pop-options
+
+// ====== Properties of fuse ======
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 60"
+let rec fuse_props (l r: rbtree)
+  : Lemma
+    (requires same_bh l /\ same_bh r /\ bh l = bh r /\ no_red_red l /\ no_red_red r)
+    (ensures
+      same_bh (fuse l r) /\
+      bh (fuse l r) = bh l /\
+      ((Leaf? l \/ Black? (Node?.c l)) /\ (Leaf? r \/ Black? (Node?.c r)) ==>
+        no_red_red (fuse l r)) /\
+      almost_no_red_red (fuse l r))
+    (decreases (node_count l + node_count r))
+  = match l, r with
+    | Leaf, _ -> ()
+    | _, Leaf -> ()
+    | Node Red a x b, Node Red c y d ->
+      fuse_props b c;
+      (match fuse b c with
+       | Node Red b' z c' -> ()
+       | _ -> ())
+    | Node Black a x b, Node Black c y d ->
+      fuse_props b c;
+      (match fuse b c with
+       | Node Red b' z c' -> ()
+       | _ ->
+         balL_props a x (Node Black (fuse b c) y d))
+    | Node Red a x b, _ ->
+      fuse_props b r
+    | _, Node Red c y d ->
+      fuse_props l c
+#pop-options
+
+// ====== Properties of del ======
+// del on a Black Node: bh decreases by 1, almost_no_red_red
+// del on a Red Node: bh unchanged, no_red_red (stronger, since children Black)
+// del on Leaf: identity
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 80"
+let rec del_props (t: rbtree) (k: int)
+  : Lemma
+    (requires same_bh t /\ no_red_red t)
+    (ensures
+      same_bh (del t k) /\
+      (Leaf? t ==> del t k == Leaf) /\
+      (Node? t /\ Black? (Node?.c t) ==>
+        bh (del t k) = bh t - 1 /\ almost_no_red_red (del t k)) /\
+      (Node? t /\ Red? (Node?.c t) ==>
+        bh (del t k) = bh t /\ no_red_red (del t k)))
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k < v then begin
+        match l with
+        | Node Black _ _ _ ->
+          del_props l k;
+          if c = Red then
+            // Red parent: r is Black/Leaf (no_red_red), so balL_strong applies
+            balL_strong (del l k) v r
+          else
+            balL_props (del l k) v r
+        | _ ->
+          // l is Leaf or Node Red: del l k has IH-dependent properties
+          (match l with
+           | Leaf -> ()
+           | Node Red _ _ _ ->
+             del_props l k)
+      end else if k > v then begin
+        match r with
+        | Node Black _ _ _ ->
+          del_props r k;
+          if c = Red then
+            balR_strong l v (del r k)
+          else
+            balR_props l v (del r k)
+        | _ ->
+          (match r with
+           | Leaf -> ()
+           | Node Red _ _ _ ->
+             del_props r k)
+      end else
+        fuse_props l r
+#pop-options
 
 // delete maintains all RB properties
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let delete_is_rbtree (t: rbtree) (k: int)
   : Lemma
-    (requires is_rbtree t)
-    (ensures is_rbtree (delete t k))
-  = admit ()  // TODO: prove via del_properties induction
+    (requires is_rbtree t /\ is_bst t)
+    (ensures is_rbtree (delete t k) /\ is_bst (delete t k))
+  = del_props t k;
+    del_preserves_bst t k
+#pop-options
 
 (*** Insert Preserves Node Count ***)
 
