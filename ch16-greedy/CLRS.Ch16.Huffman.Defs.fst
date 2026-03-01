@@ -276,28 +276,6 @@ let forest_distinct_indices_elim (entries: list forest_entry) (i j: nat)
 
 // ========== Find-entry helpers ==========
 
-// Find position of a value in a list  
-let rec list_find_pos (#a: eqtype) (l: list a) (x: a) (pos: nat)
-  : Tot (option nat) (decreases l) =
-  match l with
-  | [] -> None
-  | h :: t -> if h = x then Some pos else list_find_pos t x (pos + 1)
-
-// If x is in the list, list_find_pos returns Some with correct index
-let rec list_find_pos_spec (#a: eqtype) (l: list a) (x: a) (pos: nat)
-  : Lemma (ensures (match list_find_pos l x pos with
-                    | None -> ~(L.mem x l)
-                    | Some k -> k >= pos /\ k - pos < L.length l /\ L.index l (k - pos) == x))
-          (decreases l)
-  = match l with
-    | [] -> ()
-    | h :: t -> if h = x then () else list_find_pos_spec t x (pos + 1)
-
-// If x is in the list, list_find_pos returns Some
-let list_find_pos_mem (#a: eqtype) (l: list a) (x: a) (pos: nat)
-  : Lemma (requires L.mem x l) (ensures Some? (list_find_pos l x pos))
-  = list_find_pos_spec l x pos
-
 // Find position of a forest_entry by its SZ.t index
 let rec find_entry_by_idx (entries: list forest_entry) (idx: SZ.t)
   : Tot (option nat) (decreases entries)
@@ -358,14 +336,6 @@ let rec seq_to_pos_list_length (s: Seq.seq int) (k: nat)
   = if k >= Seq.length s then ()
     else seq_to_pos_list_length s (k + 1)
 
-// When all elements are positive, seq_to_pos_list index k is Seq.index s k
-let seq_to_pos_list_index (s: Seq.seq int) (k: nat)
-  : Lemma (requires k < Seq.length s /\ Seq.index s k > 0)
-          (ensures Cons? (seq_to_pos_list s k) /\
-                   L.hd (seq_to_pos_list s k) == Seq.index s k /\
-                   L.tl (seq_to_pos_list s k) == seq_to_pos_list s (k + 1))
-  = ()
-
 // ========== all_leaf_freqs ==========
 
 // All leaf frequencies across the forest
@@ -379,12 +349,6 @@ let all_leaf_freqs_cons (e: forest_entry) (rest: list forest_entry) (x: pos)
   : Lemma (L.count x (all_leaf_freqs (e :: rest)) ==
            L.count x (HSpec.leaf_freqs (entry_tree e)) + L.count x (all_leaf_freqs rest))
   = LP.append_count (HSpec.leaf_freqs (entry_tree e)) (all_leaf_freqs rest) x
-
-// all_leaf_freqs of a single Leaf entry
-let all_leaf_freqs_single_leaf (idx: SZ.t) (p: hnode_ptr) (f: pos) (x: pos)
-  : Lemma (L.count x (all_leaf_freqs [(idx, p, HSpec.Leaf f)]) ==
-           (if x = f then 1 else 0))
-  = ()
 
 // Splitting all_leaf_freqs at position j
 let rec all_leaf_freqs_remove_at (entries: list forest_entry) (j: nat) (x: pos)

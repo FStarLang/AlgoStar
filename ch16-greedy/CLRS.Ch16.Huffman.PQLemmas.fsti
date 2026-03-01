@@ -43,27 +43,10 @@ val pq_idx_lt_bound (pq: Seq.seq pq_entry) (forest: list forest_entry) (bound: S
                     (forall (k: nat). k < L.length forest ==> SZ.v (entry_idx (L.index forest k)) < SZ.v bound))
           (ensures forall (j: nat). j < Seq.length pq ==> snd (Seq.index pq j) <> bound)
 
-val pq_idx_neq (pq: Seq.seq pq_entry) (forest: list forest_entry) (target: SZ.t)
-  : Lemma (requires pq_indices_in_forest pq forest /\
-                    (forall (k: nat). k < L.length forest ==> entry_idx (L.index forest k) <> target))
-          (ensures forall (j: nat). j < Seq.length pq ==> snd (Seq.index pq j) <> target)
-
-val pq_indices_in_forest_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry) (forest: list forest_entry)
-  : Lemma (requires PQ.extends s1 s0 x /\ pq_indices_in_forest s0 forest)
-          (ensures pq_indices_in_forest s1 forest)
-
 val find_entry_by_idx_unique (entries: list forest_entry) (k: nat) (idx: SZ.t)
   : Lemma (requires forest_distinct_indices entries /\ k < L.length entries /\
                     entry_idx (L.index entries k) == idx)
           (ensures find_entry_by_idx entries idx == Some k)
-
-val pq_extracted_idx_distinct (s0 s1: Seq.seq pq_entry) (x y: pq_entry)
-  : Lemma (requires PQ.extends s1 s0 x /\ pq_idx_unique s0 /\ Seq.mem y s1)
-          (ensures snd x <> snd y)
-
-val pq_in_forest_mem (pq: Seq.seq pq_entry) (forest: list forest_entry) (x: pq_entry)
-  : Lemma (requires pq_indices_in_forest pq forest /\ Seq.mem x pq)
-          (ensures Some? (find_entry_by_idx forest (snd x)))
 
 val two_extracts_forest_positions
   (pq0 pq1: Seq.seq pq_entry)

@@ -50,10 +50,6 @@ val pq_no_idx_elim_mem (pq: Seq.seq pq_entry) (idx: SZ.t) (y: pq_entry)
   : Lemma (requires pq_no_idx pq idx /\ Seq.mem y pq)
           (ensures snd y <> idx)
 
-val pq_no_idx_elim_pos (pq: Seq.seq pq_entry) (idx: SZ.t) (j: nat)
-  : Lemma (requires pq_no_idx pq idx /\ j < Seq.length pq)
-          (ensures snd (Seq.index pq j) <> idx)
-
 // ========== Section 2: PQ minimum vs forest root freqs ==========
 
 val pq_min_le_forest_root_freqs
@@ -152,10 +148,6 @@ val forest_has_pq_entry_init_step
 val forest_has_pq_entry_remove_at (pq: Seq.seq pq_entry) (active: list forest_entry) (j: nat)
   : Lemma (requires forest_has_pq_entry pq active /\ j < L.length active)
           (ensures forest_has_pq_entry pq (list_remove_at active j))
-
-val forest_has_pq_entry_remove_two (pq: Seq.seq pq_entry) (active: list forest_entry) (j1 j2: nat)
-  : Lemma (requires forest_has_pq_entry pq active /\ j1 < L.length active /\ j2 < L.length active /\ j1 <> j2)
-          (ensures forest_has_pq_entry pq (list_remove_two active j1 j2))
 
 val forest_has_pq_entry_prepend
   (s0 s1: Seq.seq pq_entry) (f: pos) (idx: SZ.t)

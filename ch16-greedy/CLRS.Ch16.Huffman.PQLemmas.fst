@@ -255,21 +255,6 @@ let pq_idx_lt_bound (pq: Seq.seq pq_entry) (forest: list forest_entry) (bound: S
     in
     Classical.forall_intro aux
 
-// If no forest entry has idx == target, then no PQ entry has snd == target
-let pq_idx_neq (pq: Seq.seq pq_entry) (forest: list forest_entry) (target: SZ.t)
-  : Lemma (requires pq_indices_in_forest pq forest /\
-                    (forall (k: nat). k < L.length forest ==> entry_idx (L.index forest k) <> target))
-          (ensures forall (j: nat). j < Seq.length pq ==> snd (Seq.index pq j) <> target)
-  = let aux (j: nat{j < Seq.length pq})
-      : Lemma (snd (Seq.index pq j) <> target) =
-      let idx = snd (Seq.index pq j) in
-      find_entry_by_idx_spec forest idx;
-      let k = Some?.v (find_entry_by_idx forest idx) in
-      assert (entry_idx (L.index forest k) == idx);
-      assert (entry_idx (L.index forest k) <> target)
-    in
-    Classical.forall_intro aux
-
 // pq_indices_in_forest subset: shrink then reduce forest
 let pq_indices_in_forest_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry) (forest: list forest_entry)
   : Lemma (requires PQ.extends s1 s0 x /\ pq_indices_in_forest s0 forest)

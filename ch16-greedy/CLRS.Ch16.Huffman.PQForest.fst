@@ -63,11 +63,6 @@ let pq_no_idx_elim_mem (pq: Seq.seq pq_entry) (idx: SZ.t) (y: pq_entry)
   = reveal_opaque (`%pq_no_idx) pq_no_idx;
     FStar.Seq.Properties.mem_index y pq
 
-let pq_no_idx_elim_pos (pq: Seq.seq pq_entry) (idx: SZ.t) (j: nat)
-  : Lemma (requires pq_no_idx pq idx /\ j < Seq.length pq)
-          (ensures snd (Seq.index pq j) <> idx)
-  = reveal_opaque (`%pq_no_idx) pq_no_idx
-
 // ========== Section 2: PQ minimum vs forest root freqs ==========
 
 let pq_min_le_forest_root_freqs
@@ -410,14 +405,6 @@ let forest_has_pq_entry_remove_at (pq: Seq.seq pq_entry) (active: list forest_en
         assert (L.index (list_remove_at active j) k == L.index active k')
     in
     Classical.forall_intro aux
-
-let forest_has_pq_entry_remove_two (pq: Seq.seq pq_entry) (active: list forest_entry) (j1 j2: nat)
-  : Lemma (requires forest_has_pq_entry pq active /\ j1 < L.length active /\ j2 < L.length active /\ j1 <> j2)
-          (ensures forest_has_pq_entry pq (list_remove_two active j1 j2))
-  = forest_has_pq_entry_remove_at pq active j1;
-    list_remove_at_length active j1;
-    let j2' : nat = if j2 < j1 then j2 else j2 - 1 in
-    forest_has_pq_entry_remove_at pq (list_remove_at active j1) j2'
 
 #push-options "--z3rlimit 200"
 let forest_has_pq_entry_prepend
