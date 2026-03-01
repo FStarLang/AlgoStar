@@ -32,7 +32,6 @@ SUBDIRS += ch23-mst
 SUBDIRS += ch24-sssp
 SUBDIRS += ch25-apsp
 SUBDIRS += ch26-max-flow
-SUBDIRS += ch28-matrix-ops
 SUBDIRS += ch31-number-theory
 SUBDIRS += ch32-string-matching
 SUBDIRS += ch33-comp-geometry
