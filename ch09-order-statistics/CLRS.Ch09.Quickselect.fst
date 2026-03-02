@@ -177,6 +177,7 @@ fn partition_in_range
       // Elements outside [lo, hi) are unchanged from s0
       unchanged_outside s0 s_cur (SZ.v lo) (SZ.v hi)
     )
+  decreases (SZ.v hi_m1 `Prims.op_Subtraction` SZ.v !j_ref)
   {
     let vj = !j_ref;
     let vi = !i_ref;
@@ -302,15 +303,13 @@ fn quickselect
 {
   let mut lo_ref: SZ.t = 0sz;
   let mut hi_ref: SZ.t = n;
+  let mut go: bool = (n >^ 1sz);
 
-  while (
-    let vlo = !lo_ref;
-    let vhi = !hi_ref;
-    vhi -^ vlo >^ 1sz
-  )
-  invariant exists* vlo vhi s_cur.
+  while (!go)
+  invariant exists* vlo vhi s_cur vgo.
     R.pts_to lo_ref vlo **
     R.pts_to hi_ref vhi **
+    R.pts_to go vgo **
     A.pts_to a s_cur **
     pure (
       SZ.v vlo <= SZ.v k /\
@@ -318,6 +317,7 @@ fn quickselect
       SZ.v vhi <= SZ.v n /\
       Seq.length s_cur == Seq.length s0 /\
       permutation s0 s_cur /\
+      (not vgo ==> SZ.v vhi - SZ.v vlo <= 1) /\
       // Elements before vlo are <= all elements in [vlo, vhi)
       (forall (i j: nat). i < Seq.length s_cur /\ j < Seq.length s_cur /\
         i < SZ.v vlo /\ SZ.v vlo <= j /\ j < SZ.v vhi ==>
@@ -327,6 +327,7 @@ fn quickselect
         SZ.v vlo <= i /\ i < SZ.v vhi /\ SZ.v vhi <= j ==>
         Seq.index s_cur i <= Seq.index s_cur j)
     )
+  // TODO: decreases
   {
     let vlo = !lo_ref;
     let vhi = !hi_ref;
@@ -343,13 +344,16 @@ fn quickselect
 
     if (k <^ p) {
       hi_ref := p;
+      go := (p >^ vlo +^ 1sz);
     } else {
       if (p <^ k) {
         lo_ref := p +^ 1sz;
+        go := (vhi >^ p +^ 1sz +^ 1sz);
       } else {
         // k == p, found it
         lo_ref := k;
         hi_ref := k +^ 1sz;
+        go := false;
       };
     };
   };
@@ -469,15 +473,13 @@ fn quickselect_complexity
 {
   let mut lo_ref: SZ.t = 0sz;
   let mut hi_ref: SZ.t = n;
+  let mut go: bool = (n >^ 1sz);
 
-  while (
-    let vlo = !lo_ref;
-    let vhi = !hi_ref;
-    vhi -^ vlo >^ 1sz
-  )
-  invariant exists* vlo vhi s_cur (vc: nat).
+  while (!go)
+  invariant exists* vlo vhi s_cur (vc: nat) vgo.
     R.pts_to lo_ref vlo **
     R.pts_to hi_ref vhi **
+    R.pts_to go vgo **
     A.pts_to a s_cur **
     GR.pts_to ctr vc **
     pure (
@@ -486,6 +488,8 @@ fn quickselect_complexity
       SZ.v vhi <= SZ.v n /\
       Seq.length s_cur == Seq.length s0 /\
       permutation s0 s_cur /\
+      (vgo ==> SZ.v vhi - SZ.v vlo > 1) /\
+      (not vgo ==> SZ.v vhi - SZ.v vlo <= 1) /\
       (forall (i j: nat). i < Seq.length s_cur /\ j < Seq.length s_cur /\
         i < SZ.v vlo /\ SZ.v vlo <= j /\ j < SZ.v vhi ==>
         Seq.index s_cur i <= Seq.index s_cur j) /\
@@ -495,6 +499,7 @@ fn quickselect_complexity
       vc >= reveal c0 /\
       vc - reveal c0 + QC.qs_cost (SZ.v vhi - SZ.v vlo) <= QC.qs_cost (SZ.v n)
     )
+  decreases (SZ.v !hi_ref `Prims.op_Subtraction` SZ.v !lo_ref)
   {
     let vlo = !lo_ref;
     let vhi = !hi_ref;
@@ -513,14 +518,17 @@ fn quickselect_complexity
     if (k <^ p) {
       QC.qs_cost_monotone (SZ.v p - SZ.v vlo) (SZ.v vhi - SZ.v vlo - 1);
       hi_ref := p;
+      go := (p >^ vlo +^ 1sz);
     } else {
       if (p <^ k) {
         QC.qs_cost_monotone (SZ.v vhi - SZ.v p - 1) (SZ.v vhi - SZ.v vlo - 1);
         lo_ref := p +^ 1sz;
+        go := (vhi >^ p +^ 1sz +^ 1sz);
       } else {
         QC.qs_cost_monotone 1 (SZ.v vhi - SZ.v vlo - 1);
         lo_ref := k;
         hi_ref := k +^ 1sz;
+        go := false;
       };
     };
   };

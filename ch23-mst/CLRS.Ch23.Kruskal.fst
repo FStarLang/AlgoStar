@@ -217,6 +217,7 @@ fn find
     pure (SZ.v vcurr < SZ.v n /\ SZ.v vsteps <= SZ.v n /\ valid_parents sparent (SZ.v n) /\
           UF.find_pure sparent (SZ.v vcurr) (SZ.v n - SZ.v vsteps) (SZ.v n) =
           UF.find_pure sparent (SZ.v v) (SZ.v n) (SZ.v n))
+  decreases (SZ.v n - SZ.v !steps)
   {
     let vcurr = !curr;
     let p = A.op_Array_Access parent vcurr;
@@ -417,6 +418,7 @@ fn kruskal
       Seq.length sparent == SZ.v n /\
       (forall (j: nat). j < SZ.v vi ==> SZ.v (Seq.index sparent j) = j)
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment parent vi vi;
@@ -447,6 +449,7 @@ fn kruskal
       SZ.fits (SZ.v n * SZ.v n) /\
       kruskal_inv sparent seu sev (SZ.v n) (SZ.v vec)
     )
+  decreases (SZ.v max_rounds - SZ.v !round)
   {
     let vround = !round;
     
@@ -471,6 +474,7 @@ fn kruskal
         vbw >= 0 /\
         (vbw = 0 ==> SZ.v vbu == SZ.v vbv)
       )
+    decreases (SZ.v n - SZ.v !ui)
     {
       let vui = !ui;
       let mut vi: SZ.t = 0sz;
@@ -491,6 +495,7 @@ fn kruskal
           vbw >= 0 /\
           (vbw = 0 ==> SZ.v vbu == SZ.v vbv)
         )
+      decreases (SZ.v n - SZ.v !vi)
       {
         let vvi = !vi;
         lemma_index_in_bounds (SZ.v vui) (SZ.v vvi) (SZ.v n);

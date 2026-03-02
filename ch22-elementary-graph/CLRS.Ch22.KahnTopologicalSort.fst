@@ -308,6 +308,7 @@ fn process_neighbors
       SZ.v vtail_init <= Seq.length squeue /\
       Seq.length squeue == SZ.v n
     )
+  decreases (SZ.v n - SZ.v !v)
   {
     let vv = !v;
     
@@ -388,6 +389,7 @@ fn topological_sort
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi * SZ.v n
     )
+  // TODO: decreases — adding decreases here breaks inner loop proof at line ~436
   {
     let vi = !i;
     with sin_deg_outer. assert (A.pts_to in_degree sin_deg_outer);
@@ -414,6 +416,7 @@ fn topological_sort
         vc2 >= reveal c0 /\
         vc2 - reveal c0 == SZ.v vi * SZ.v n + SZ.v vj
       )
+    // TODO: decreases
     {
       let vj = !j;
       with sin_deg_inner. assert (A.pts_to in_degree sin_deg_inner);
@@ -484,6 +487,7 @@ fn topological_sort
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v n * SZ.v n
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     let vqt = !queue_tail;
@@ -578,6 +582,7 @@ fn topological_sort
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v n * SZ.v n
     )
+  // TODO: decreases — (SZ.v n - SZ.v !queue_head) causes with-binding shift at line ~699
   {
     let vqh = !queue_head;
     let vqt = !queue_tail;
@@ -691,7 +696,7 @@ fn topological_sort
   };
   
   // After the loop, extract the existentials
-  with vqh vqt vout sin_degree squeue soutput vc_final. _;
+  with _b vqh vqt vout sin_degree squeue soutput vc_final. _;
   
   // Loop exit: vqh == vqt (queue empty), vout == vqh
   // Prove vout == n using DAG completeness

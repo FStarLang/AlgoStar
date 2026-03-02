@@ -191,6 +191,7 @@ fn bellman_ford_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi
     )
+  decreases (SZ.v n - SZ.v !init_i)
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else 1000000);
@@ -221,6 +222,7 @@ fn bellman_ford_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n
     )
+  decreases (SZ.v n - SZ.v !round)
   {
     let vround = !round;
     
@@ -243,6 +245,7 @@ fn bellman_ford_complexity
         vc_u >= reveal c0 /\
         vc_u - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n + SZ.v vu * SZ.v n
       )
+    decreases (SZ.v n - SZ.v !u)
     {
       let vu = !u;
       let dist_u = A.op_Array_Access dist vu;
@@ -268,6 +271,7 @@ fn bellman_ford_complexity
           vc_v >= reveal c0 /\
           vc_v - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n + SZ.v vu * SZ.v n + SZ.v vv
         )
+      decreases (SZ.v n - SZ.v !v)
       {
         let vv = !v;
         
@@ -334,6 +338,7 @@ fn bellman_ford_complexity
       vc_c >= reveal c0 /\
       vc_c - reveal c0 == SZ.v n + (SZ.v n - 1) * SZ.v n * SZ.v n + SZ.v vcu * SZ.v n
     )
+  decreases (SZ.v n - SZ.v !cu)
   {
     let vcu = !cu;
     with sdist_check. assert (A.pts_to dist sdist_check);
@@ -357,6 +362,7 @@ fn bellman_ford_complexity
         vc_cv >= reveal c0 /\
         vc_cv - reveal c0 == SZ.v n + (SZ.v n - 1) * SZ.v n * SZ.v n + SZ.v vcu * SZ.v n + SZ.v vcv
       )
+    decreases (SZ.v n - SZ.v !cv)
     {
       let vcv = !cv;
       

@@ -210,6 +210,7 @@ fn rod_cutting
       vc >= reveal c0 /\
       vc - reveal c0 == triangle (SZ.v vj - 1)
     )
+  decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !j)
   {
     let vj = !j;
     let mut q: nat = 0;
@@ -235,6 +236,7 @@ fn rod_cutting
         vc_inner >= reveal c0 /\
         vc_inner - reveal c0 == triangle (SZ.v vj - 1) + (SZ.v vi - 1)
       )
+    decreases (Prims.op_Addition (SZ.v vj) 1 `Prims.op_Subtraction` SZ.v !i)
     {
       let vi = !i;
       let vq = !q;

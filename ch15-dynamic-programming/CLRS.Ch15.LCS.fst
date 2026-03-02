@@ -227,6 +227,7 @@ fn lcs
       vc >= reveal c0 /\
       vc - reveal c0 == op_Multiply (SZ.v vi) (SZ.v n + 1)
     )
+  decreases (Prims.op_Addition (SZ.v m) 1 `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let mut j: SZ.t = 0sz;
@@ -248,6 +249,7 @@ fn lcs
         vc_inner >= reveal c0 /\
         vc_inner - reveal c0 == op_Multiply (SZ.v vi) (SZ.v n + 1) + SZ.v vj
       )
+    decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !j)
     {
       let vj = !j;
       with s_before. assert (V.pts_to table s_before);

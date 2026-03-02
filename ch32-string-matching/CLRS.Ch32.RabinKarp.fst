@@ -120,6 +120,7 @@ fn compute_hash
       vacc >= 0 /\
       vacc == RKSpec.hash s d q (SZ.v start) (SZ.v start + SZ.v vi)
     )
+  decreases (SZ.v len - SZ.v !i)
   {
     let vi = !i;
     let vacc = !acc;
@@ -156,6 +157,7 @@ fn compute_pow_mod
       vacc >= 0 /\
       vacc == RKSpec.pow_mod d (SZ.v vi) q
     )
+  decreases (SZ.v exp - SZ.v !i)
   {
     let vi = !i;
     let vacc = !acc;
@@ -232,6 +234,7 @@ fn rabin_karp
       p_hash == RKSpec.hash s_pat d q 0 (SZ.v m) /\
       h == RKSpec.pow_mod d (SZ.v m - 1) q
     )
+  decreases (SZ.v n - SZ.v !s)
   {
     let vs = !s;
     let vcount_outer = !count;
@@ -269,6 +272,7 @@ fn rabin_karp
         (hash_match /\ (forall (k: nat). k < SZ.v vj ==>
           Seq.index s_text (SZ.v vs + k) == Seq.index s_pat k) ==> vverified == 1)
       )
+    decreases (SZ.v m - SZ.v !j)
     {
       let vj = !j;
 

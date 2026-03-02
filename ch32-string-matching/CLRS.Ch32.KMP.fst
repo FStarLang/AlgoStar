@@ -124,6 +124,7 @@ fn compute_prefix_function
       // k equals pi[vq-1] (needed for inner loop init)
       SZ.v vk == SZ.v (Seq.index s_pi_outer (SZ.v vq - 1))
     )
+  decreases (SZ.v m - SZ.v !q)
   {
     with _vq_g _vk_g s_pi_out _vc_g. _;
     let vq = !q;
@@ -157,6 +158,7 @@ fn compute_prefix_function
         // Maximality preserved (pi array unchanged in inner loop)
         Bridge.pi_max_sz_up_to s_pat s_pi_inner (SZ.v vq)
       )
+    // TODO: decreases
     {
       with _vd_il _vki_il s_pi_il _vci_il. _;
       let vk = !k;
@@ -186,7 +188,7 @@ fn compute_prefix_function
       }
     };
     
-    with _vd_post _vki_post s_pi_post _vci_post. _;
+    with _ _vd_post _vki_post s_pi_post _vci_post. _;
     let vk_after_inner = !k;
     
     let pk_final = A.op_Array_Access pattern vk_after_inner;
@@ -215,7 +217,7 @@ fn compute_prefix_function
     q := vq +^ 1sz
   };
   
-  with _vq_f _vk_f s_pi_f _vc_f. _;
+  with _ _vq_f _vk_f s_pi_f _vc_f. _;
   Bridge.up_to_full s_pat s_pi_f;
   
   let final_q = !q;
@@ -306,6 +308,7 @@ fn kmp_matcher
         SZ.v vcount == Spec.count_before (reveal s_text) (reveal s_pat) (SZ.v vi - SZ.v m + 1)) /\
       (SZ.v vi < SZ.v m ==> SZ.v vcount == 0)
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     let vcount_outer = !count_matches;
@@ -342,6 +345,7 @@ fn kmp_matcher
         Spec.follow_fail (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vq_init) (Seq.index (reveal s_text) (SZ.v vi)) ==
           Spec.follow_fail (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vq_inner) (Seq.index (reveal s_text) (SZ.v vi))
       )
+    // TODO: decreases
     {
       let vq = !q;
       let text_char = A.op_Array_Access text vi;

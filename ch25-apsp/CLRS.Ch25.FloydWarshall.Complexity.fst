@@ -95,6 +95,7 @@ fn floyd_warshall_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vk * SZ.v n * SZ.v n
     )
+  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !k)
 //SNIPPET_END: complexity_k_invariant
   {
     let vk = !k;
@@ -114,6 +115,7 @@ fn floyd_warshall_complexity
         vc_i >= reveal c0 /\
         vc_i - reveal c0 == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n
       )
+    decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
     {
       let vi = !i;
       let mut j : SZ.t = 0sz;
@@ -138,6 +140,7 @@ fn floyd_warshall_complexity
           vc_j >= reveal c0 /\
           vc_j - reveal c0 == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n + SZ.v vj
         )
+      decreases (SZ.v n `Prims.op_Subtraction` SZ.v !j)
       {
         let vj = !j;
 

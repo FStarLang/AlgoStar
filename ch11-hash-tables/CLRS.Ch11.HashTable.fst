@@ -340,6 +340,7 @@ fn hash_insert
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi
     )
+  decreases (SZ.v size - SZ.v !i)
   {
     let vi = !i;
     let idx = hash_probe key vi size;
@@ -440,6 +441,7 @@ fn hash_search
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi
     )
+  decreases (SZ.v size - SZ.v !i)
   {
     let vi = !i;
     let idx = hash_probe key vi size;
@@ -551,6 +553,7 @@ fn hash_delete
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi
     )
+  decreases (SZ.v size - SZ.v !i)
   {
     let vi = !i;
     let idx = hash_probe key vi size;

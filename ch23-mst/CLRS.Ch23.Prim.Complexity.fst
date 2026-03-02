@@ -230,6 +230,7 @@ fn prim_complexity
       // We use 3*n to account for overhead
       vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n
     )
+  // TODO: decreases
   {
     // Find minimum key vertex not in MST
     let mut min_idx: SZ.t = 0sz;
@@ -261,6 +262,7 @@ fn prim_complexity
         // Accumulate ticks: previous iterations + current find loop
         vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n + SZ.v v_find_i
       )
+    decreases (SZ.v n - SZ.v !find_i)
     {
       let v_find_i = !find_i;
       let ki = A.op_Array_Access key_a v_find_i;
@@ -327,6 +329,7 @@ fn prim_complexity
         // Accumulate ticks: previous iterations + find loop (n) + update loop so far
         vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n + SZ.v n + SZ.v v_update_i
       )
+    decreases (SZ.v n - SZ.v !update_i)
     {
       let v = !update_i;
       

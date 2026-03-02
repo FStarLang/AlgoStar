@@ -506,6 +506,7 @@ fn find_leftmost (#p: perm) (xs ys: array int)
       SZ.v len == Seq.length sxs /\
       find_leftmost_aux sxs sys (SZ.v vi) (SZ.v vbest) == find_leftmost_spec sxs sys
     )
+  decreases (SZ.v len - SZ.v !i)
   {
     let vi = !i;
     let vbest = !best;
@@ -565,6 +566,7 @@ fn find_next (#p: perm) (xs ys: array int)
       find_next_aux sxs sys (SZ.v current) (SZ.v vnext) (SZ.v vj) ==
         find_next_spec sxs sys (SZ.v current)
     )
+  decreases (SZ.v len - SZ.v !j)
   {
     let vj = !j;
     let vnext = !next;
@@ -650,6 +652,7 @@ fn jarvis_march (#p: perm) (xs ys: array int)
         (not vrunning ==>
           SZ.v vh == jarvis_march_spec sxs sys)
       )
+    // TODO: decreases
     {
       let vc = !current;
       let next = find_next xs ys len vc;

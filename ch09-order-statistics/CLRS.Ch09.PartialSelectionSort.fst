@@ -180,6 +180,7 @@ fn find_min_index_from
       (forall (j: nat). SZ.v start <= j /\ j < SZ.v vi ==>
         Seq.index s (SZ.v vmin_idx) <= Seq.index s j)
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let vmin_idx = !min_idx;
@@ -248,6 +249,7 @@ fn select
       sorted_prefix s_curr (SZ.v vround) /\
       prefix_leq_suffix s_curr (SZ.v vround)
     )
+  decreases (SZ.v k `Prims.op_Subtraction` SZ.v !round)
   {
     let vround = !round;
     with s_pre. assert (A.pts_to a s_pre);
@@ -342,6 +344,7 @@ fn find_min_index_from_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi - SZ.v start - 1
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let vmin_idx = !min_idx;
@@ -412,6 +415,7 @@ fn select_complexity
       vc >= reveal c0 /\
       vc - reveal c0 <= op_Multiply (SZ.v vround) (SZ.v n - 1)
     )
+  decreases (SZ.v k `Prims.op_Subtraction` SZ.v !round)
   {
     let vround = !round;
     with s_pre. assert (A.pts_to a s_pre);

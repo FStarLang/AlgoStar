@@ -82,6 +82,7 @@ fn max_subarray
       // Complexity: exactly i ticks so far (relative to c0)
       vc == reveal c0 + SZ.v vi
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let vcur = !current_sum;

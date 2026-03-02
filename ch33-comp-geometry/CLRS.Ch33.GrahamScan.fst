@@ -331,6 +331,7 @@ fn find_bottom (#p: perm) (xs ys: array int)
       SZ.v len == Seq.length sxs /\
       find_bottom_aux sxs sys (SZ.v vi) (SZ.v vbest) == find_bottom_spec sxs sys
     )
+  decreases (SZ.v len - SZ.v !i)
   {
     let vi = !i;
     let vbest = !best;
@@ -435,6 +436,7 @@ fn pop_while (#p: perm) (xs ys: array int)
       (not vkg ==>
         SZ.v vt == pop_while_spec sxs sys shull (SZ.v top_in) (SZ.v p_idx))
     )
+  // TODO: decreases
   {
     let vt = !t;
     if (vt <^ 2sz) {

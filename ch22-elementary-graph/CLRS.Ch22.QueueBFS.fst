@@ -492,6 +492,7 @@ fn queue_bfs
       (forall (j: nat). j < SZ.v vi ==> Seq.index spred_i j == (-1)) /\
       vc == reveal c0
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment color vi 0;
@@ -545,6 +546,7 @@ fn queue_bfs
       vc >= reveal c0 /\
       vc - reveal c0 <= SZ.v vhead * (SZ.v n + 1)
     )
+  // TODO: decreases
   {
     // Tick for vertex dequeue
     tick ctr;
@@ -598,6 +600,7 @@ fn queue_bfs
         vc2 >= reveal c0 /\
         vc2 - reveal c0 <= SZ.v vhead * (SZ.v n + 1) + 1 + SZ.v vv
       )
+    decreases (SZ.v n - SZ.v !v)
     {
       let vv = !v;
 

@@ -133,6 +133,7 @@ fn floyd_warshall
       // Remaining work: processing k..n-1 from current state = processing 0..n-1 from initial
       fw_outer contents_k (SZ.v n) (SZ.v vk) == fw_outer contents (SZ.v n) 0
     )
+  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !k)
 //SNIPPET_END: outer_loop
   {
     let vk = !k;
@@ -150,6 +151,7 @@ fn floyd_warshall
         fw_outer (fw_inner_i contents_i (SZ.v n) (SZ.v vk) (SZ.v vi)) (SZ.v n) (SZ.v vk + 1) 
           == fw_outer contents (SZ.v n) 0
       )
+    decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
 //SNIPPET_END: inner_i_loop
     {
       let vi = !i;
@@ -174,6 +176,7 @@ fn floyd_warshall
             (SZ.v n) (SZ.v vk + 1)
             == fw_outer contents (SZ.v n) 0
         )
+      decreases (SZ.v n `Prims.op_Subtraction` SZ.v !j)
 //SNIPPET_END: inner_j_loop
       {
         let vj = !j;

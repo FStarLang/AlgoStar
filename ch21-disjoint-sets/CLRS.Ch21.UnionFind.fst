@@ -380,6 +380,7 @@ fn make_set
       SZ.v n <= Seq.length sp /\
       SZ.v n <= Seq.length sr
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     parent.(vi) <- vi;
@@ -438,22 +439,25 @@ fn find
 {
   let mut current: SZ.t = x;
   let mut fuel: SZ.t = n;
+  // Compute initial condition
+  let p0 = parent.(x);
+  let mut go: bool = not (p0 = x);
   
-  while (
-    let curr = !current;
-    let parent_curr = parent.(curr);
-    not (parent_curr = curr)
-  )
-  invariant exists* vcurr vfuel.
+  while (!go)
+  invariant exists* vcurr vfuel vgo.
     R.pts_to current vcurr **
     R.pts_to fuel vfuel **
+    R.pts_to go vgo **
     A.pts_to parent #p s **
     pure (
       SZ.v vcurr < SZ.v n /\
       SZ.v vfuel <= SZ.v n /\
       has_root_within s (SZ.v vcurr) (SZ.v vfuel) /\
-      find_root s (SZ.v vcurr) (SZ.v vfuel) == find_root s (SZ.v x) (SZ.v n)
+      find_root s (SZ.v vcurr) (SZ.v vfuel) == find_root s (SZ.v x) (SZ.v n) /\
+      (vgo ==> Seq.index s (SZ.v vcurr) <> vcurr) /\
+      (not vgo ==> Seq.index s (SZ.v vcurr) = vcurr)
     )
+  decreases (SZ.v !fuel)
   {
     let curr = !current;
     let parent_curr = parent.(curr);
@@ -461,6 +465,9 @@ fn find
     // parent_curr <> curr, so depth > 0 and we can step
     current := parent_curr;
     fuel := vfuel -^ 1sz;
+    // Recompute condition
+    let new_p = parent.(parent_curr);
+    go := not (new_p = parent_curr)
   };
   
   !current

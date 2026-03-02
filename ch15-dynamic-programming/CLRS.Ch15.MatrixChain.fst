@@ -165,6 +165,7 @@ fn matrix_chain_order
       mc_outer sm s_dims (SZ.v n) (SZ.v vl) == 
         mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
     )
+  decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !l)
   {
     let vl = !l;
     
@@ -187,6 +188,7 @@ fn matrix_chain_order
         mc_outer (mc_inner_i sm_i s_dims (SZ.v n) (SZ.v vl) (SZ.v vi)) s_dims (SZ.v n) (SZ.v vl + 1) ==
           mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
       )
+    decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
     {
       let vi = !i;
       
@@ -226,6 +228,7 @@ fn matrix_chain_order
           mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost ==
             mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vi) 1000000000
         )
+      decreases (SZ.v j `Prims.op_Subtraction` SZ.v !k)
       {
         let vk = !k;
         let vmin_cost = !min_cost;
@@ -235,8 +238,8 @@ fn matrix_chain_order
         lemma_index_in_bounds (SZ.v vi) (SZ.v vk) (SZ.v n);
         
         // Compute index for m[k+1][j]
-        let idx_k1j = (vk + 1sz) *^ n + j;
         lemma_index_in_bounds (SZ.v vk + 1) (SZ.v j) (SZ.v n);
+        let idx_k1j = (vk + 1sz) *^ n + j;
         
         // Read m[i][k] and m[k+1][j]
         let cost_ik = V.op_Array_Access m idx_ik;

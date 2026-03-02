@@ -208,6 +208,7 @@ fn gcd_impl (a_init b_init: SZ.t)
       vc - reveal c0 + gcd_steps (SZ.v va) (SZ.v vb) == gcd_steps (SZ.v a_init) (SZ.v b_init) /\
       vc >= reveal c0
     )
+  decreases (SZ.v !b)
   {
     let va = !a;
     let vb = !b;

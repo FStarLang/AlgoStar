@@ -423,6 +423,7 @@ fn extended_rod_cutting
       // s_cuts achieve optimal: prices[s[k]-1] + r[k-s[k]] == r[k]
       cuts_achieve_optimal s_prices sr sc (SZ.v vj - 1)
     )
+  decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !j)
   {
     let vj = !j;
     
@@ -460,6 +461,7 @@ fn extended_rod_cutting
         // Preserve outer cuts_achieve_optimal through inner loop
         cuts_achieve_optimal s_prices sr_inner sc_inner (SZ.v vj - 1)
       )
+    // TODO: decreases
     {
       let vi = !i;
       let vq = !q;

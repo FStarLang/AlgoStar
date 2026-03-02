@@ -342,6 +342,7 @@ fn find_min_unvisited
         (forall (j: nat). j < SZ.v vi ==>
           Seq.index svisited j = 1))
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     let visited_i = V.op_Array_Access visited vi;
@@ -366,6 +367,13 @@ fn find_min_unvisited
   let _ = !min_val;
   result
 }
+
+let lemma_2d_index_fits (u v n: nat)
+  : Lemma (requires u < n /\ v < n /\ SZ.fits (n * n))
+          (ensures SZ.fits (u * n + v) /\ SZ.fits (u * n) /\ u * n + v < n * n)
+  = assert (u * n <= (n - 1) * n);
+    assert ((n - 1) * n + v < n * n)
+
 #push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --split_queries always"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
@@ -420,6 +428,7 @@ fn dijkstra
       (forall (j:nat). j < SZ.v vi /\ j <> SZ.v source ==>
         Seq.index sdist_current j == 1000000)
     )
+  decreases (SZ.v n - SZ.v !init_i)
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else 1000000);
@@ -467,6 +476,7 @@ fn dijkstra
       count_ones svisited_current (SZ.v n) == SZ.v vround /\
       dist_ge_sp_dist sdist_current sweights (SZ.v n) (SZ.v source)
     )
+  decreases (SZ.v n - SZ.v !round)
   {
     let vround = !round;
     
@@ -504,8 +514,20 @@ fn dijkstra
       V.pts_to visited svisited_v **
       pure (
         SZ.v vv <= SZ.v n /\
+        SZ.v n > 0 /\
+        SZ.v u < SZ.v n /\
+        SZ.fits (SZ.v n * SZ.v n) /\
+        Seq.length sweights == SZ.v n * SZ.v n /\
+        all_weights_non_negative sweights /\
         Seq.length sdist_v == SZ.v n /\
         Seq.length svisited_v == SZ.v n /\
+        Seq.length sdist_pre == SZ.v n /\
+        Seq.length svisited_pre == SZ.v n /\
+        Seq.index svisited_pre (SZ.v u) = 0 /\
+        tri_from_visited sweights sdist_pre svisited_pre (SZ.v n) /\
+        visited_le_unvisited sdist_pre svisited_pre (SZ.v n) /\
+        (forall (j: nat). j < SZ.v n /\ Seq.index svisited_pre j = 0 ==>
+          Seq.index sdist_pre (SZ.v u) <= Seq.index sdist_pre j) /\
         Seq.index sdist_v (SZ.v source) == 0 /\
         all_non_negative sdist_v /\
         all_bounded sdist_v /\
@@ -533,9 +555,11 @@ fn dijkstra
         (forall (v': nat). v' >= SZ.v vv /\ v' < SZ.v n ==>
           Seq.index sdist_v v' == Seq.index sdist_pre v')
       )
+    decreases (SZ.v n - SZ.v !v)
     {
       let vv = !v;
       
+      lemma_2d_index_fits (SZ.v u) (SZ.v vv) (SZ.v n);
       let w_idx = u *^ n +^ vv;
       let w = A.op_Array_Access weights w_idx;
       

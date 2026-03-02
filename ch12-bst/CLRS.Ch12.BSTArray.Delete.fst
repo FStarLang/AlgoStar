@@ -103,38 +103,49 @@ fn tree_minimum
 {
   let mut current : SZ.t = start_idx;
   
-  while (
-    let vc = !current;
-    // Check if left child exists and is valid
-    child_indices_fit (SZ.v t.cap) (SZ.v vc);
-    assert (pure (SZ.fits (2 * SZ.v vc + 1)));
-    
-    let two_vc = SZ.mul 2sz vc;
-    let left_idx = SZ.add two_vc 1sz;
-    
-    let has_left = SZ.lt left_idx t.cap;
-    if has_left {
-      let left_valid = t.valid.(left_idx);
-      left_valid
-    } else {
-      false
-    }
-  )
-  invariant exists* vc.
+  // Compute initial condition: does start_idx have a valid left child?
+  child_indices_fit (SZ.v t.cap) (SZ.v start_idx);
+  let two_s = SZ.mul 2sz start_idx;
+  let left_s = SZ.add two_s 1sz;
+  let mut go: bool = false;
+  if SZ.lt left_s t.cap {
+    go := t.valid.(left_s);
+  };
+  
+  while (!go)
+  invariant exists* vc vgo.
     R.pts_to current vc **
+    R.pts_to go vgo **
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
     pure (
       SZ.v vc < SZ.v t.cap /\
       SZ.v vc < Seq.length valid_seq /\
-      Seq.index valid_seq (SZ.v vc) == true
+      Seq.index valid_seq (SZ.v vc) == true /\
+      (vgo ==> (2 * SZ.v vc + 1 < SZ.v t.cap /\
+                2 * SZ.v vc + 1 < Seq.length valid_seq /\
+                Seq.index valid_seq (2 * SZ.v vc + 1) == true)) /\
+      (not vgo ==> (2 * SZ.v vc + 1 >= SZ.v t.cap \/
+                    (2 * SZ.v vc + 1 < Seq.length valid_seq /\
+                     Seq.index valid_seq (2 * SZ.v vc + 1) == false)))
     )
+  decreases (SZ.v t.cap - SZ.v !current)
   {
     let vc = !current;
     child_indices_fit (SZ.v t.cap) (SZ.v vc);
     let two_vc = SZ.mul 2sz vc;
     let left_idx = SZ.add two_vc 1sz;
     current := left_idx;
+    
+    // Recompute condition for next iteration
+    child_indices_fit (SZ.v t.cap) (SZ.v left_idx);
+    let new_two = SZ.mul 2sz left_idx;
+    let new_left = SZ.add new_two 1sz;
+    if SZ.lt new_left t.cap {
+      go := t.valid.(new_left);
+    } else {
+      go := false;
+    };
   };
   
   !current
@@ -197,38 +208,49 @@ fn tree_maximum
 {
   let mut current : SZ.t = start_idx;
   
-  while (
-    let vc = !current;
-    // Check if right child exists and is valid
-    child_indices_fit (SZ.v t.cap) (SZ.v vc);
-    assert (pure (SZ.fits (2 * SZ.v vc + 2)));
-    
-    let two_vc = SZ.mul 2sz vc;
-    let right_idx = SZ.add two_vc 2sz;
-    
-    let has_right = SZ.lt right_idx t.cap;
-    if has_right {
-      let right_valid = t.valid.(right_idx);
-      right_valid
-    } else {
-      false
-    }
-  )
-  invariant exists* vc.
+  // Compute initial condition: does start_idx have a valid right child?
+  child_indices_fit (SZ.v t.cap) (SZ.v start_idx);
+  let two_s = SZ.mul 2sz start_idx;
+  let right_s = SZ.add two_s 2sz;
+  let mut go: bool = false;
+  if SZ.lt right_s t.cap {
+    go := t.valid.(right_s);
+  };
+  
+  while (!go)
+  invariant exists* vc vgo.
     R.pts_to current vc **
+    R.pts_to go vgo **
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
     pure (
       SZ.v vc < SZ.v t.cap /\
       SZ.v vc < Seq.length valid_seq /\
-      Seq.index valid_seq (SZ.v vc) == true
+      Seq.index valid_seq (SZ.v vc) == true /\
+      (vgo ==> (2 * SZ.v vc + 2 < SZ.v t.cap /\
+                2 * SZ.v vc + 2 < Seq.length valid_seq /\
+                Seq.index valid_seq (2 * SZ.v vc + 2) == true)) /\
+      (not vgo ==> (2 * SZ.v vc + 2 >= SZ.v t.cap \/
+                    (2 * SZ.v vc + 2 < Seq.length valid_seq /\
+                     Seq.index valid_seq (2 * SZ.v vc + 2) == false)))
     )
+  decreases (SZ.v t.cap - SZ.v !current)
   {
     let vc = !current;
     child_indices_fit (SZ.v t.cap) (SZ.v vc);
     let two_vc = SZ.mul 2sz vc;
     let right_idx = SZ.add two_vc 2sz;
     current := right_idx;
+    
+    // Recompute condition for next iteration
+    child_indices_fit (SZ.v t.cap) (SZ.v right_idx);
+    let new_two = SZ.mul 2sz right_idx;
+    let new_right = SZ.add new_two 2sz;
+    if SZ.lt new_right t.cap {
+      go := t.valid.(new_right);
+    } else {
+      go := false;
+    };
   };
   
   !current
@@ -334,6 +356,7 @@ fn tree_successor
       pure (
         SZ.v vc < SZ.v t.cap
       )
+    decreases (SZ.v !current)
     {
       // Move to parent: parent(vc) = (vc - 1) / 2
       let vc = !current;
@@ -464,6 +487,7 @@ fn tree_predecessor
       pure (
         SZ.v vc < SZ.v t.cap
       )
+    decreases (SZ.v !current)
     {
       // Move to parent: parent(vc) = (vc - 1) / 2
       let vc = !current;
@@ -728,6 +752,7 @@ fn tree_delete_key
                  Seq.index vs (SZ.v vfi) == true /\
                  Seq.index ks (SZ.v vfi) == key))
       ))
+  // TODO: decreases
   {
     let idx = !current;
     

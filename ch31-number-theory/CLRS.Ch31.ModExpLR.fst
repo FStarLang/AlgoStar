@@ -118,6 +118,7 @@ fn mod_exp_lr_impl (b_init: int) (e_init: nat) (m_init: pos)
       vc >= reveal c0 /\
       vc - reveal c0 + (vi_val + 1) == CLRS.Ch31.GCD.num_bits e_init
     )
+  decreases (!i + 1)
   {
     let vi = !i;
     let vd = !d;

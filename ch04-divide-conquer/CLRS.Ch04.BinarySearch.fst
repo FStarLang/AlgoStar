@@ -146,6 +146,7 @@ fn binary_search
       (not vfound /\ SZ.v vhi > SZ.v vlo ==>
         (vc - reveal c0) + log2f (SZ.v vhi - SZ.v vlo) <= log2f (SZ.v len))
     )
+  decreases ((if not !found then 1 else 0) `Prims.op_Addition` (SZ.v !hi `Prims.op_Subtraction` SZ.v !lo))
   {
     let vlo = !lo;
     let vhi = !hi;

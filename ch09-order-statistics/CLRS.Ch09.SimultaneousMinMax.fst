@@ -119,6 +119,7 @@ fn find_minmax
       (exists (k:nat). k < SZ.v vi /\ Seq.index s0 k == vmax) /\
       (forall (k:nat). k < SZ.v vi ==> vmax >= Seq.index s0 k)
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let elem = a.(vi);
@@ -204,6 +205,7 @@ fn find_minmax_pairs
       (exists (k:nat). k < SZ.v vi /\ Seq.index s0 k == vmax) /\
       (forall (k:nat). k < SZ.v vi ==> vmax >= Seq.index s0 k)
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let a_i = a.(vi);
@@ -299,6 +301,7 @@ fn find_minmax_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == op_Multiply 2 (SZ.v vi - 1)
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let elem = a.(vi);
@@ -399,6 +402,7 @@ fn find_minmax_pairs_complexity
       vc >= reveal c0 /\
       op_Multiply 2 (vc - reveal c0) <= op_Multiply 3 (SZ.v vi) - 2
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let a_i = a.(vi);

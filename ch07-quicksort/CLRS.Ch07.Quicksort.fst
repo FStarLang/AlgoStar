@@ -270,6 +270,7 @@ fn clrs_partition_with_ticks
         // Tick counter: exactly (!j - lo) comparisons so far
         vc == reveal c0 + (!j - lo)
       ))
+  decreases (hi - !j)
   { 
     let vj = !j;
     let aj = a.(SZ.uint_to_t vj);

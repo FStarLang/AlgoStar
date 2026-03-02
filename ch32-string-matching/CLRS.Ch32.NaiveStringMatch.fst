@@ -165,6 +165,7 @@ fn naive_string_match
       vc >= reveal c0 /\
       vc - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m)
     )
+  decreases (SZ.v n - SZ.v !s)
   {
     let vs = !s;
     let vcount_outer = !count;
@@ -193,6 +194,7 @@ fn naive_string_match
         vc_inner - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v vj /\
         vc_inner - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v m
       )
+    decreases (SZ.v m - SZ.v !j)
     {
       let vj = !j;
       

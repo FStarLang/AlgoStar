@@ -149,6 +149,7 @@ fn activity_selection
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi - 1
     )
+  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let curr_start = start_times.(vi);

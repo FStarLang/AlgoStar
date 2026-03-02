@@ -244,6 +244,7 @@ fn prim
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       all_keys_bounded key_seq
     )
+  // TODO: decreases
   {
     // Find minimum key vertex not in MST
     let mut min_idx: SZ.t = 0sz;
@@ -274,6 +275,7 @@ fn prim
         SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
         all_keys_bounded key_seq
       )
+    decreases (SZ.v n - SZ.v !find_i)
     {
       let v_find_i = !find_i;
       let ki = A.op_Array_Access key_a v_find_i;
@@ -326,6 +328,7 @@ fn prim
         SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
         all_keys_bounded key_seq
       )
+    decreases (SZ.v n - SZ.v !update_i)
     {
       let v = !update_i;
       

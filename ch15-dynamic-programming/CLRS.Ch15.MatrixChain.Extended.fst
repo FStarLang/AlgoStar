@@ -295,6 +295,7 @@ fn extended_matrix_chain_order
       mc_outer sm s_dims (SZ.v n) (SZ.v vl) == 
         mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
     )
+  decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !l)
   {
     let vl = !l;
     
@@ -320,6 +321,7 @@ fn extended_matrix_chain_order
         mc_outer (mc_inner_i sm_i s_dims (SZ.v n) (SZ.v vl) (SZ.v vi)) s_dims (SZ.v n) (SZ.v vl + 1) ==
           mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
       )
+    decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
     {
       let vi = !i;
       
@@ -364,6 +366,7 @@ fn extended_matrix_chain_order
           mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost ==
             mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vi) 1000000000
         )
+      decreases (SZ.v j `Prims.op_Subtraction` SZ.v !k)
       {
         let vk = !k;
         let vmin_cost = !min_cost;

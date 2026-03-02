@@ -75,6 +75,7 @@ ensures exists* s.
       V.is_full_vec c_arr /\
       L.counts_match_prefix sc s0 k (SZ.v vj)
     )
+  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !j)
   {
     let vj = !j;
     with sc. assert (V.pts_to c_arr sc);
@@ -111,6 +112,7 @@ ensures exists* s.
       L.phase2_inv sa s0 (SZ.v vpos) (SZ.v vcv) k /\
       L.counts_match sc s0 k
     )
+  decreases (Prims.op_Addition (SZ.v k_val) 1 `Prims.op_Subtraction` SZ.v !cur_v)
   {
     let vcv = !cur_v;
     let vpos = !pos;

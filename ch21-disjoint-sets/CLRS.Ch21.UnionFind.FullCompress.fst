@@ -305,6 +305,7 @@ fn compress_path
       Seq.length sp == Seq.length sparent /\
       is_root_at sp (SZ.v root)
     )
+  decreases (SZ.v n - SZ.v !count)
   {
     let vc = !curr;
     // Capture ghost state before modification
@@ -378,27 +379,35 @@ fn find_set
   // Pass 1: Find root — walk parent chain until self-loop
   let mut curr = x;
   let mut bound: SZ.t = 0sz;
-  while (
-    let vc = !curr;
-    let p = parent.(vc);
-    not (p = vc) && SZ.lt !bound n
-  )
-  invariant exists* vc vb.
+  // Compute initial condition
+  let p0 = parent.(x);
+  let mut go: bool = not (p0 = x) && SZ.lt 0sz n;
+  while (!go)
+  invariant exists* vc vb vgo.
     R.pts_to curr vc **
     R.pts_to bound vb **
+    R.pts_to go vgo **
     A.pts_to parent sparent **
     pure (
       SZ.v vc < SZ.v n /\
       SZ.v vb <= SZ.v n /\
       is_forest sparent (SZ.v n) /\
-      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb)
+      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb) /\
+      (vgo ==> (Seq.index sparent (SZ.v vc) <> vc /\ SZ.v vb < SZ.v n)) /\
+      (not vgo ==> (Seq.index sparent (SZ.v vc) = vc \/ SZ.v vb >= SZ.v n))
     )
+  decreases (SZ.v n - SZ.v !bound)
   {
     let vc = !curr;
     let p = parent.(vc);
     curr := p;
     let b = !bound;
-    bound := SZ.add b 1sz
+    bound := SZ.add b 1sz;
+    // Recompute condition
+    let new_vc = p;
+    let new_p = parent.(new_vc);
+    let new_b = SZ.add b 1sz;
+    go := not (new_p = new_vc) && SZ.lt new_b n
   };
 
   let root = !curr;
@@ -469,27 +478,35 @@ fn find
 {
   let mut curr = x;
   let mut bound: SZ.t = 0sz;
-  while (
-    let vc = !curr;
-    let p = parent.(vc);
-    not (p = vc) && SZ.lt !bound n
-  )
-  invariant exists* vc vb.
+  // Compute initial condition
+  let p0 = parent.(x);
+  let mut go: bool = not (p0 = x) && SZ.lt 0sz n;
+  while (!go)
+  invariant exists* vc vb vgo.
     R.pts_to curr vc **
     R.pts_to bound vb **
+    R.pts_to go vgo **
     A.pts_to parent sparent **
     pure (
       SZ.v vc < SZ.v n /\
       SZ.v vb <= SZ.v n /\
       is_forest sparent (SZ.v n) /\
-      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb)
+      has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb) /\
+      (vgo ==> (Seq.index sparent (SZ.v vc) <> vc /\ SZ.v vb < SZ.v n)) /\
+      (not vgo ==> (Seq.index sparent (SZ.v vc) = vc \/ SZ.v vb >= SZ.v n))
     )
+  decreases (SZ.v n - SZ.v !bound)
   {
     let vc = !curr;
     let p = parent.(vc);
     curr := p;
     let b = !bound;
-    bound := SZ.add b 1sz
+    bound := SZ.add b 1sz;
+    // Recompute condition
+    let new_vc = p;
+    let new_p = parent.(new_vc);
+    let new_b = SZ.add b 1sz;
+    go := not (new_p = new_vc) && SZ.lt new_b n
   };
 
   let root = !curr;

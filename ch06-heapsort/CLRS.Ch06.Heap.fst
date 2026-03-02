@@ -527,6 +527,7 @@ ensures exists* s.
       SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
       heaps_from s_cur (SZ.v n) (SZ.v vi)
     )
+  decreases (SZ.v !i)
   {
     let vi = !i;
     let idx = vi - 1sz;
@@ -738,6 +739,7 @@ ensures exists* s.
       prefix_le_suffix s_cur (SZ.v vsz)
     )
   //SNIPPET_END: extract_max_loop
+  decreases (SZ.v !heap_sz)
   {
     let vsz = !heap_sz;
     with s_cur. assert (A.pts_to a s_cur);

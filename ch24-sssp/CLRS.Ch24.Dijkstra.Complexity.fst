@@ -185,6 +185,7 @@ fn find_min_unvisited_complexity
       // Complexity: vc == vc0 + vi
       vc == reveal vc0 + SZ.v vi
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     let visited_i = V.op_Array_Access visited vi;
@@ -270,6 +271,7 @@ fn dijkstra_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi
     )
+  decreases (SZ.v n - SZ.v !init_i)
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else 1000000);
@@ -305,6 +307,7 @@ fn dijkstra_complexity
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v n + 2 * SZ.v vround * SZ.v n
     )
+  decreases (SZ.v n - SZ.v !round)
   {
     let vround = !round;
 
@@ -339,6 +342,7 @@ fn dijkstra_complexity
         vc_v >= reveal c0 /\
         vc_v - reveal c0 == SZ.v n + 2 * SZ.v vround * SZ.v n + SZ.v n + SZ.v vv
       )
+    decreases (SZ.v n - SZ.v !v)
     {
       let vv = !v;
 

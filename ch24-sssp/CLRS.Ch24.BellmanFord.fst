@@ -340,6 +340,7 @@ fn bellman_ford
          then Seq.index sdist_current j == 0 
          else Seq.index sdist_current j == 1000000))
     )
+  decreases (SZ.v n - SZ.v !init_i)
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else 1000000);
@@ -371,6 +372,7 @@ fn bellman_ford
       (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
         lower_bound_inv sdist_current sweights (SZ.v n) (SZ.v source))
     )
+  decreases (SZ.v n - SZ.v !round)
   {
     let vround = !round;
     
@@ -391,6 +393,7 @@ fn bellman_ford
         (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
           lower_bound_inv sdist_u sweights (SZ.v n) (SZ.v source))
       )
+    decreases (SZ.v n - SZ.v !u)
     {
       let vu = !u;
       let dist_u = A.op_Array_Access dist vu;
@@ -414,6 +417,7 @@ fn bellman_ford
           (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
             lower_bound_inv sdist_v sweights (SZ.v n) (SZ.v source))
         )
+      decreases (SZ.v n - SZ.v !v)
       {
         let vv = !v;
         with sdist_v. assert (A.pts_to dist sdist_v);
@@ -487,6 +491,7 @@ fn bellman_ford
       (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
         lower_bound_inv sdist_check sweights (SZ.v n) (SZ.v source))
     )
+  decreases (SZ.v n - SZ.v !cu)
   {
     let vcu = !cu;
     with sdist_check. assert (A.pts_to dist sdist_check);
@@ -507,6 +512,7 @@ fn bellman_ford
         (vno_inner == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv)) /\
         (vno_inner == false ==> exists_violation sdist_check sweights (SZ.v n))
       )
+    decreases (SZ.v n - SZ.v !cv)
     {
       let vcv = !cv;
       

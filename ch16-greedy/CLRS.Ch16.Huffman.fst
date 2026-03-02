@@ -299,6 +299,7 @@ fn huffman_tree
       (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0) /\
       init_bundle freq_seq nd_contents pq_contents active (SZ.v vi) (SZ.v n)
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     let freq_val = A.op_Array_Access freqs vi;
@@ -358,6 +359,7 @@ fn huffman_tree
       SZ.fits (2 * Seq.length pq_contents + 2) /\
       merge_bundle freq_seq nd_contents pq_contents active (SZ.v n)
     )
+  decreases (SZ.v n_minus_1 - SZ.v !iter)
   {
     // Extract properties from merge_bundle
     with pq0. assert (PQ.is_pqueue pq pq0 (SZ.v n));

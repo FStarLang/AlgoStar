@@ -144,6 +144,7 @@ fn matrix_multiply
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi * SZ.v n * SZ.v n
     )
+  decreases (SZ.v n - SZ.v !i)
   //SNIPPET_END: outer_loop
   {
     let vi = !i;
@@ -166,6 +167,7 @@ fn matrix_multiply
         vc_ij >= reveal c0 /\
         vc_ij - reveal c0 == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n
       )
+    decreases (SZ.v n - SZ.v !j)
     {
       let vj = !j;
       
@@ -205,6 +207,7 @@ fn matrix_multiply
           vc_ijk >= reveal c0 /\
           vc_ijk - reveal c0 == SZ.v vi * SZ.v n * SZ.v n + SZ.v vj * SZ.v n + SZ.v vk
         )
+      decreases (SZ.v n - SZ.v !k)
       //SNIPPET_END: inner_loop
       {
         let vk = !k;

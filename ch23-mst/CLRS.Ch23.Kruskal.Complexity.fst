@@ -219,6 +219,7 @@ fn find_complexity
       vc >= reveal c /\
       vc - reveal c <= SZ.v vsteps
     )
+  decreases (SZ.v n - SZ.v !steps)
   {
     let vcurr = !curr;
     valid_parents_index sparent (SZ.v n) (SZ.v vcurr);
@@ -323,6 +324,7 @@ fn kruskal_complexity
       vc >= reveal c0 /\
       vc - reveal c0 <= SZ.v vi
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment parent vi vi;
@@ -360,6 +362,7 @@ fn kruskal_complexity
       // Per-round budget: 3*n*n (holds for n >= 2; loop doesn't run for n=1)
       vc - reveal c0 <= SZ.v n + SZ.v vround * 3 * SZ.v n * SZ.v n
     )
+  decreases (SZ.v max_rounds - SZ.v !round)
   {
     let vround = !round;
     
@@ -394,6 +397,7 @@ fn kruskal_complexity
         // Accumulated: previous + current scan
         vc - reveal c0 <= SZ.v n + SZ.v vround * 3 * SZ.v n * SZ.v n + SZ.v vui * SZ.v n
       )
+    decreases (SZ.v n - SZ.v !ui)
     {
       let vui = !ui;
       let mut vi: SZ.t = 0sz;
@@ -424,6 +428,7 @@ fn kruskal_complexity
           // Count each comparison
           vc - reveal c0 <= SZ.v n + SZ.v vround * 3 * SZ.v n * SZ.v n + SZ.v vui * SZ.v n + SZ.v vvi
         )
+      decreases (SZ.v n - SZ.v !vi)
       {
         let vvi = !vi;
         lemma_index_in_bounds (SZ.v vui) (SZ.v vvi) (SZ.v n);

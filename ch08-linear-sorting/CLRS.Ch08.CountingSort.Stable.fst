@@ -102,6 +102,7 @@ ensures exists* sb'.
       Seq.length sc == SZ.v k_val + 1 /\
       L.counts_match_prefix sc sa (SZ.v k_val) (SZ.v vj)
     )
+  decreases (SZ.v len - SZ.v !j)
   {
     let vj = !j;
     
@@ -153,6 +154,7 @@ ensures exists* sb'.
       Seq.length sc == SZ.v k_val + 1 /\
       SL.prefix_sum_inv sc sa (SZ.v k_val) (SZ.v vi)
     )
+  decreases (SZ.v k_val + 1 - SZ.v !i)
   {
     let vi = !i;
     
@@ -214,6 +216,7 @@ ensures exists* sb'.
       SL.phase4_c_inv sc sa (SZ.v k_val) (SZ.v len) (if vdone then 0 else SZ.v vj_back + 1) /\
       SL.phase4_b_inv sc sa sb_curr (SZ.v k_val) (SZ.v len)
     )
+  // TODO: decreases clause for backward flag loop
   {
     let vj_back = !j_back;
     

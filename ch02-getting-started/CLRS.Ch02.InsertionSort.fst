@@ -126,28 +126,29 @@ fn insertion_sort
       vc >= reveal c0 /\
       vc <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !j)
   {
     let vj = !j;
     with s_outer. assert (A.pts_to a s_outer);
     let key = a.(vj);
     
     let mut i: SZ.t = vj;
-    let mut continue: bool = true;
+    let mut cont: bool = true;
     
     // Initial comparison: tick for the first comparison
     if (vj >^ 0sz) {
       let prev = a.(vj - 1sz);
-      continue := (prev > key);
+      cont := (prev > key);
       tick ctr;
     } else {
-      continue := false;
+      cont := false;
     };
     
     // Inner loop: each iteration swaps, decrements i, and makes a comparison (with tick).
-    while (!continue)
+    while (!cont)
     invariant exists* vi vcont s_inner (vc_inner : nat).
       R.pts_to i vi **
-      R.pts_to continue vcont **
+      R.pts_to cont vcont **
       R.pts_to j vj **
       A.pts_to a s_inner **
       GR.pts_to ctr vc_inner **
@@ -172,6 +173,7 @@ fn insertion_sort
         vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj + 1 - SZ.v vi /\
         (not vcont ==> vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj)
       )
+    decreases (SZ.v !i)
     {
       let vi = !i;
       with s_pre. assert (A.pts_to a s_pre);
@@ -193,11 +195,11 @@ fn insertion_sort
       
       if (new_i >^ 0sz) {
         let new_prev = a.(new_i - 1sz);
-        continue := (new_prev > key);
+        cont := (new_prev > key);
         // Tick for inner comparison
         tick ctr;
       } else {
-        continue := false;
+        cont := false;
       };
       
       ()

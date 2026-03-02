@@ -407,6 +407,7 @@ fn bfs_init
       (forall (j: nat). j < SZ.v vi ==> seq_get sp j == -1) /\
       (forall (j: nat). j < SZ.v vi ==> seq_get sd j == -1)
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment color vi 0;
@@ -578,6 +579,7 @@ fn bfs_explore_neighbors
       queue_valid sq 0 (SZ.v vt) (SZ.v n) /\
       preds_in_range sp (SZ.v n)
     )
+  decreases (SZ.v n - SZ.v !v)
   {
     let vv = !v;
     maybe_discover capacity flow color pred dist queue n u vv q_tail;
@@ -666,6 +668,7 @@ fn bfs_residual
       queue_valid squeue_q 0 (SZ.v vtail) (SZ.v n) /\
       preds_in_range spred_q (SZ.v n)
     )
+  decreases (SZ.v n - SZ.v !q_head)
   {
     let vh = !q_head;
     let u: SZ.t = A.op_Array_Access queue vh;
@@ -738,6 +741,7 @@ fn find_bottleneck_imp
       preds_in_range spred (SZ.v n) /\
       SZ.fits (SZ.v n * SZ.v n)
     )
+  // TODO: decreases
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
@@ -823,6 +827,7 @@ fn augment_imp
       preds_in_range spred (SZ.v n) /\
       SZ.fits (SZ.v n * SZ.v n)
     )
+  // TODO: decreases
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
@@ -918,6 +923,7 @@ fn check_valid_caps_fn
       Seq.length cap_seq == SZ.v nn /\
       (vr ==> (forall (idx: nat). idx < SZ.v vi ==> Seq.index cap_seq idx >= 0))
     )
+  decreases (SZ.v nn - SZ.v !i)
   {
     let vi = !i;
     let c: int = A.op_Array_Access capacity vi;
@@ -970,6 +976,7 @@ fn check_capacity_fn
       (vr ==> (forall (idx: nat). idx < SZ.v vi ==>
         0 <= Seq.index flow_seq idx /\ Seq.index flow_seq idx <= Seq.index cap_seq idx))
     )
+  decreases (SZ.v nn - SZ.v !i)
   {
     let vi = !i;
     let f: int = A.op_Array_Access flow vi;
@@ -1020,6 +1027,7 @@ fn check_vertex_conservation
       si == sum_flow_into flow_seq (SZ.v n) (SZ.v u) (SZ.v vv) /\
       so == sum_flow_out flow_seq (SZ.v n) (SZ.v u) (SZ.v vv)
     )
+  decreases (SZ.v n - SZ.v !v)
   {
     let vv = !v;
     let idx_in: SZ.t = vv *^ n +^ u;
@@ -1082,6 +1090,7 @@ fn check_all_conservation
       (vr ==> (forall (w: nat). w < SZ.v vu /\ w <> SZ.v source /\ w <> SZ.v sink ==>
         sum_flow_into flow_seq (SZ.v n) w (SZ.v n) == sum_flow_out flow_seq (SZ.v n) w (SZ.v n)))
     )
+  decreases (SZ.v n - SZ.v !u_idx)
   {
     let vu = !u_idx;
     let ok_v = check_vertex_conservation flow n vu;
@@ -1160,6 +1169,7 @@ fn zero_init_flow
       Seq.length fs == SZ.v nn /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index fs j == 0)
     )
+  decreases (SZ.v nn - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment flow vi 0;
@@ -1239,6 +1249,7 @@ fn max_flow
       SZ.v itr <= SZ.v fuel /\
       valid_caps cap_seq (SZ.v n)
     )
+  decreases (SZ.v fuel - SZ.v !iters)
   {
     iters := !iters +^ 1sz;
 

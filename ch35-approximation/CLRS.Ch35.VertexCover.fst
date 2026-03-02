@@ -216,6 +216,7 @@ fn approx_vertex_cover
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
       matching_inv s_adj s_cover (SZ.v n) vm
     )
+  decreases (SZ.v n - SZ.v !u)
 //SNIPPET_END: outer_loop
   {
     let vu = !u;
@@ -245,6 +246,7 @@ fn approx_vertex_cover
         (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover_inner i = 0 \/ Seq.index s_cover_inner i = 1)) /\
         matching_inv s_adj s_cover_inner (SZ.v n) vm_inner
       )
+    decreases (SZ.v n - SZ.v !v)
     {
       let vv = !v;
       

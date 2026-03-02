@@ -91,6 +91,7 @@ fn find_minimum
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi - 1
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let curr = a.(vi);
@@ -153,6 +154,7 @@ fn find_maximum
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi - 1
     )
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
     let curr = a.(vi);

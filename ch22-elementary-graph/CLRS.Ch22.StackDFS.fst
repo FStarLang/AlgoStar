@@ -616,6 +616,7 @@ fn dfs_visit
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_w j == 0 ==> SZ.v (Seq.index sscan_w j) == 0))
     )
+  // TODO: decreases
   {
     // u = PEEK(stack)
     let top = !stack_top;
@@ -677,6 +678,7 @@ fn dfs_visit
         (* WHITE scan zero preserved *)
         (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_scan j == 0 ==> SZ.v (Seq.index sscan_scan j) == 0))
       )
+    decreases (SZ.v n - SZ.v !scan)
     {
       let vscan = !scan;
 
@@ -969,6 +971,7 @@ fn stack_dfs
       (forall (j: nat). j < SZ.v vi ==> Seq.index spred_i j == (-1)) /\
       vc == reveal c0
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment color vi 0;      // WHITE
@@ -1005,6 +1008,7 @@ fn stack_dfs
       (forall (j: nat). j < SZ.v n ==> Seq.index spred_ib j == (-1)) /\
       vc == reveal c0
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment scan_idx vi 0sz;
@@ -1051,6 +1055,7 @@ fn stack_dfs
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_s j == 0 ==> SZ.v (Seq.index sscan_s j) == 0))
     )
+  decreases (SZ.v n - SZ.v !s)
   {
     let vs = !s;
 

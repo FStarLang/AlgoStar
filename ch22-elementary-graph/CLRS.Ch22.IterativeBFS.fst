@@ -113,6 +113,7 @@ fn bfs
       (forall (j: nat). j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
       (forall (j: nat). j < SZ.v vi ==> Seq.index sdist_i j == (-1))
     )
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     A.op_Array_Assignment color vi 0;
@@ -146,6 +147,7 @@ fn bfs
         Seq.index sdist_r v >= 0 /\
         reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_r v))
     )
+  decreases (SZ.v n - SZ.v !round)
   {
     let vround = !round;
 
@@ -175,6 +177,7 @@ fn bfs
           Seq.index sdist_u v >= 0 /\
           reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_u v))
       )
+    decreases (SZ.v n - SZ.v !u)
     {
       let vu = !u;
 
@@ -218,6 +221,7 @@ fn bfs
           // dist[vu] is preserved during inner loop
           Seq.index sdist_v (SZ.v vu) == du
         )
+      // TODO: decreases
       {
         let vv = !v;
 

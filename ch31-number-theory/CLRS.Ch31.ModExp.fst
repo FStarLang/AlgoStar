@@ -194,6 +194,7 @@ fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
       vc - reveal c0 <= log2f e_init + 1 /\
       (ve > 0 ==> (vc - reveal c0) + log2f ve <= log2f e_init)
     )
+  decreases (!exp)
   {
     let ve = !exp;
     let vr = !result;
