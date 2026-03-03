@@ -254,6 +254,7 @@ val queue_entries_valid_after_enqueue
    INITIALIZATION INVARIANTS — for Step 1 (compute in-degrees)
    ================================================================ *)
 
+[@@"opaque_to_smt"]
 let step1_inner_inv
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg: Seq.seq int)
   (row col: nat) : prop =
@@ -267,6 +268,7 @@ let step1_inner_inv
 (* After processing rows [0, row) fully,
    in_degree[j] == count_remaining_preds adj n output 0 j row for all j < n. *)
 
+[@@"opaque_to_smt"]
 let step1_outer_inv
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg: Seq.seq int)
   (row: nat) : prop =
@@ -435,6 +437,7 @@ val lemma_step2_to_zero_indeg_accounted
    BUNDLED INVARIANT — opaque to SMT for performance
    ================================================================ *)
 
+[@@"opaque_to_smt"]
 let kahn_outer_inv
   (adj: Seq.seq int) (n: nat)
   (sin_deg: Seq.seq int) (squeue: Seq.seq SZ.t) (soutput: Seq.seq int)

@@ -1718,7 +1718,7 @@ let lemma_zero_indeg_accounted_after_pn
 (* Combined lemma: after process_neighbors, re-establish kahn_outer_inv.
    Combines inner_indeg_complete + indeg_transition + bridge_queue_through_pn + kahn_outer_inv_intro.
    This avoids generating a single huge VC in the Pulse loop body. *)
-#push-options "--z3rlimit 400"
+#push-options "--z3rlimit 10"
 let lemma_post_process_neighbors
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int)

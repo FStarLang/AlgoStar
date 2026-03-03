@@ -50,7 +50,7 @@ let lemma_topsort_complexity_bound (n i j: nat)
    HELPER: maybe_enqueue — Process edge and potentially enqueue vertex
    ================================================================ *)
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 10"
 fn maybe_enqueue
   (adj: A.array int)
   (in_degree: A.array int)
@@ -142,7 +142,7 @@ fn maybe_enqueue
 
 (* Ghost wrapper: performs one step of the inner loop.
    Avoids Pulse VC closure issue with multiple with-captures in loops. *)
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 fn pn_loop_step
   (adj: A.array int) (in_degree: A.array int)
   (queue_data: A.array SZ.t) (queue_tail: R.ref SZ.t)
@@ -224,7 +224,7 @@ fn pn_loop_step
    Extracted to keep the outer loop VC small.
    ================================================================ *)
 
-#push-options "--z3rlimit 80"
+#push-options "--z3rlimit 10"
 fn process_neighbors
   (adj: A.array int)
   (in_degree: A.array int)
@@ -319,7 +319,7 @@ fn process_neighbors
 }
 #pop-options
 
-#push-options "--z3rlimit 200"
+#push-options "--z3rlimit 10 --split_queries always --ifuel 2"
 // Input: adjacency matrix adj (n×n represented as flat array)
 // Output: array containing topological order of vertices
 //SNIPPET_START: topological_sort_sig
@@ -389,7 +389,7 @@ fn topological_sort
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi * SZ.v n
     )
-  // TODO: decreases — proof interference
+  decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
     with sin_deg_outer. assert (A.pts_to in_degree sin_deg_outer);
@@ -416,7 +416,7 @@ fn topological_sort
         vc2 >= reveal c0 /\
         vc2 - reveal c0 == SZ.v vi * SZ.v n + SZ.v vj
       )
-    // TODO: decreases — proof interference
+    decreases (SZ.v n - SZ.v !j)
     {
       let vj = !j;
       with sin_deg_inner. assert (A.pts_to in_degree sin_deg_inner);
@@ -582,7 +582,7 @@ fn topological_sort
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v n * SZ.v n
     )
-  // TODO: decreases — (SZ.v n - SZ.v !queue_head) causes proof instability
+  decreases (SZ.v n - SZ.v !queue_head)
   {
     let vqh = !queue_head;
     let vqt = !queue_tail;
