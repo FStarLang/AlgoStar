@@ -499,14 +499,15 @@ fn find_root_imp
 {
   let mut curr = x;
   let mut bound: SZ.t = 0sz;
-  while (
-    let vc = !curr;
-    let p = parent.(vc);
-    not (p = vc)
-  )
-  invariant exists* vc vb.
+  // Read initial parent to set up flag-based loop
+  // (array reads in while conditions are incompatible with NuWhile encoding)
+  let p_init = parent.(x);
+  let mut go: bool = not (p_init = x);
+  while (!go)
+  invariant exists* vc vb vgo.
     R.pts_to curr vc **
     R.pts_to bound vb **
+    R.pts_to go vgo **
     A.pts_to parent #p sparent **
     pure (
       SZ.v vc < SZ.v n /\
@@ -515,7 +516,9 @@ fn find_root_imp
       has_root_within sparent (SZ.v vc) (SZ.v n - SZ.v vb) /\
       Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
       Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v vc) ==
-        Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x)
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x) /\
+      (not vgo ==> is_root_at sparent (SZ.v vc)) /\
+      (vgo ==> ~(is_root_at sparent (SZ.v vc)))
     )
   decreases (SZ.v n - SZ.v !bound)
   {
@@ -525,10 +528,12 @@ fn find_root_imp
     Spec.pure_find_step (to_uf sparent srank (SZ.v n)) (SZ.v vc);
     curr := p;
     let b = !bound;
-    bound := SZ.add b 1sz
+    bound := SZ.add b 1sz;
+    // Check if new position is a root
+    let p2 = parent.(p);
+    go := not (p2 = p)
   };
   let root = !curr;
-  let p_root = parent.(root);
   to_nat_seq_index sparent (SZ.v n) (SZ.v root);
   Spec.pure_find_root (to_uf sparent srank (SZ.v n)) (SZ.v root);
   root
