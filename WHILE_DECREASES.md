@@ -2,8 +2,8 @@
 
 ## Summary
 
-**149 of ~153 while loops** now have `decreases` clauses. 10 remain as `// TODO: decreases`
-due to proof interference (7), complex measures (1 StackDFS ghost counter),
+**152 of ~153 while loops** now have `decreases` clauses. 7 remain as `// TODO: decreases`
+due to proof interference (4), complex measures (1 StackDFS ghost counter),
 or need for predecessor-chain acyclicity proof (2 MaxFlow path-following).
 
 All 20 chapters verify with `make -j8`.
