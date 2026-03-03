@@ -2,8 +2,9 @@
 
 ## Summary
 
-**130 of ~153 while loops** now have `decreases` clauses. 20 are marked `// TODO: decreases`
-(flag-based loops, proof interference, or complex measures). 3 have no loop (spec-only).
+**149 of ~153 while loops** now have `decreases` clauses. 10 remain as `// TODO: decreases`
+due to proof interference (7), complex measures (1 StackDFS ghost counter),
+or need for predecessor-chain acyclicity proof (2 MaxFlow path-following).
 
 All 20 chapters verify with `make -j8`.
 
@@ -13,8 +14,15 @@ All 20 chapters verify with `make -j8`.
    `Prims.op_Subtraction` and `Prims.op_Addition` instead of `-`/`+` in decreases expressions.
 2. **NuWhile `with` shift:** After Pulse commit `26a5bb640` (NuWhile-only encoding), `with`
    bindings after while loops need an extra `_b` variable at the front for the condition boolean.
+   When `decreases` is also present, add `_meas` before `_b` for the measure existential.
 3. **Proof interference:** Some decreases clauses break existing proofs by changing SMT context.
-   In these cases, the decreases is removed and marked `// TODO: decreases`.
+   In these cases, the decreases is removed and marked `// TODO: decreases — proof interference`.
+4. **Lexicographic flag pattern:** For flag-based loops where the counter doesn't change on the
+   last iteration, use `decreases %[(if !flag then 0 else 1); measure]`.
+5. **Path-following loops (MaxFlow):** Would require fuel counter + acyclicity proof of BFS
+   predecessor tree. Left as TODO.
+6. **Ghost counter loops (StackDFS):** The termination measure is a ghost ref (`GR.ref nat`)
+   which cannot be read in decreases expressions. Would need Pulse support for ghost decreases.
 
 ## Overview
 
