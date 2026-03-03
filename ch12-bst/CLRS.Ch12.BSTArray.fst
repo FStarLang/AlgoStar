@@ -367,7 +367,7 @@ fn tree_search
         (SZ.v vc < SZ.v t.cap ==>
           subtree_in_range keys_seq valid_seq (SZ.v t.cap) (SZ.v vc) vlo vhi)))
     )
-  // TODO: decreases
+  decreases (SZ.v t.cap - SZ.v !current + (if not !found then 1 else 0))
   {
     let idx = !current;
     let is_valid = t.valid.(idx);
@@ -528,7 +528,7 @@ fn tree_insert
       // BST search reaches current position (when still searching)
       (not vs /\ not vd /\ SZ.v vc < SZ.v t.cap ==>
         AP.bst_search_reaches keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v vc) key))
-  // TODO: decreases
+  decreases (SZ.v t.cap - SZ.v !current + (if not !done then 1 else 0))
   {
     let idx = !current;
     

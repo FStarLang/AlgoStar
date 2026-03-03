@@ -461,7 +461,7 @@ fn extended_rod_cutting
         // Preserve outer cuts_achieve_optimal through inner loop
         cuts_achieve_optimal s_prices sr_inner sc_inner (SZ.v vj - 1)
       )
-    // TODO: decreases
+    // TODO: decreases — proof interference
     {
       let vi = !i;
       let vq = !q;

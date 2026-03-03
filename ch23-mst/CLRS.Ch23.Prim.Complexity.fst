@@ -230,7 +230,7 @@ fn prim_complexity
       // We use 3*n to account for overhead
       vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n
     )
-  // TODO: decreases
+  // TODO: decreases — proof interference
   {
     // Find minimum key vertex not in MST
     let mut min_idx: SZ.t = 0sz;

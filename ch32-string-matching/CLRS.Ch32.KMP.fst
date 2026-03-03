@@ -158,7 +158,7 @@ fn compute_prefix_function
         // Maximality preserved (pi array unchanged in inner loop)
         Bridge.pi_max_sz_up_to s_pat s_pi_inner (SZ.v vq)
       )
-    // TODO: decreases
+    decreases %[(if !done_inner then 0 else 1); SZ.v !k]
     {
       with _vd_il _vki_il s_pi_il _vci_il. _;
       let vk = !k;
@@ -345,7 +345,7 @@ fn kmp_matcher
         Spec.follow_fail (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vq_init) (Seq.index (reveal s_text) (SZ.v vi)) ==
           Spec.follow_fail (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vq_inner) (Seq.index (reveal s_text) (SZ.v vi))
       )
-    // TODO: decreases
+    decreases %[(if !done_follow then 0 else 1); SZ.v !q]
     {
       let vq = !q;
       let text_char = A.op_Array_Access text vi;

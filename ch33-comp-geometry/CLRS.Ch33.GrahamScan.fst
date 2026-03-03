@@ -436,7 +436,7 @@ fn pop_while (#p: perm) (xs ys: array int)
       (not vkg ==>
         SZ.v vt == pop_while_spec sxs sys shull (SZ.v top_in) (SZ.v p_idx))
     )
-  // TODO: decreases
+  decreases (SZ.v !t + (if !keep_going then 1 else 0))
   {
     let vt = !t;
     if (vt <^ 2sz) {

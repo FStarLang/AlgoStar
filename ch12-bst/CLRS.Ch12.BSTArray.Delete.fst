@@ -752,7 +752,7 @@ fn tree_delete_key
                  Seq.index vs (SZ.v vfi) == true /\
                  Seq.index ks (SZ.v vfi) == key))
       ))
-  // TODO: decreases
+  decreases (SZ.v t.cap - SZ.v !current + (if not !found then 1 else 0))
   {
     let idx = !current;
     

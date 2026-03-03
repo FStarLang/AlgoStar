@@ -327,7 +327,7 @@ fn quickselect
         SZ.v vlo <= i /\ i < SZ.v vhi /\ SZ.v vhi <= j ==>
         Seq.index s_cur i <= Seq.index s_cur j)
     )
-  // TODO: decreases
+  decreases ((SZ.v !hi_ref `Prims.op_Subtraction` SZ.v !lo_ref) `Prims.op_Addition` (if !go then 1 else 0))
   {
     let vlo = !lo_ref;
     let vhi = !hi_ref;

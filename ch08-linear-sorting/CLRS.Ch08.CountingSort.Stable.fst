@@ -216,7 +216,7 @@ ensures exists* sb'.
       SL.phase4_c_inv sc sa (SZ.v k_val) (SZ.v len) (if vdone then 0 else SZ.v vj_back + 1) /\
       SL.phase4_b_inv sc sa sb_curr (SZ.v k_val) (SZ.v len)
     )
-  // TODO: decreases clause for backward flag loop
+  decreases %[(if !done then 0 else 1); SZ.v !j_back]
   {
     let vj_back = !j_back;
     

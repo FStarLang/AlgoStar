@@ -652,7 +652,7 @@ fn jarvis_march (#p: perm) (xs ys: array int)
         (not vrunning ==>
           SZ.v vh == jarvis_march_spec sxs sys)
       )
-    // TODO: decreases
+    decreases (SZ.v len - SZ.v !h + (if !running then 1 else 0))
     {
       let vc = !current;
       let next = find_next xs ys len vc;

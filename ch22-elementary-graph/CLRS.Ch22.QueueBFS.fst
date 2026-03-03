@@ -546,7 +546,7 @@ fn queue_bfs
       vc >= reveal c0 /\
       vc - reveal c0 <= SZ.v vhead * (SZ.v n + 1)
     )
-  // TODO: decreases
+  decreases (SZ.v n - SZ.v !q_head)
   {
     // Tick for vertex dequeue
     tick ctr;

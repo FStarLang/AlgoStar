@@ -244,7 +244,7 @@ fn prim
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       all_keys_bounded key_seq
     )
-  // TODO: decreases
+  // TODO: decreases — proof interference
   {
     // Find minimum key vertex not in MST
     let mut min_idx: SZ.t = 0sz;
