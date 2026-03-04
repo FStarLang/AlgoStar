@@ -4,7 +4,7 @@
  * Complexity bounds for Kahn's topological sort with adjacency-matrix
  * representation. The outer loop processes each vertex once, and for each
  * dequeued vertex scans V neighbors to decrement in-degrees, yielding O(V²).
- * The ghost tick counter in KahnTopologicalSort.fst proves ≤ V².
+ * The ghost tick counter in TopologicalSort.Impl.fst proves ≤ V².
  *)
 module CLRS.Ch22.TopologicalSort.Complexity
 

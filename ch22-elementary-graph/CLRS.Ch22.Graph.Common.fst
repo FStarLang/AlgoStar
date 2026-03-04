@@ -16,7 +16,7 @@
  * - QueueBFS: migrated (uses these shared definitions)
  * - StackDFS: migrated (uses these shared definitions)
  * - IterativeBFS: local copies retained (Z3 proof sensitivity)
- * - KahnTopologicalSort: local copies retained (Z3 proof sensitivity)
+ * - TopologicalSort.Impl: local copies retained (Z3 proof sensitivity)
  *
  * New Pulse implementations should use these shared definitions via:
  *   open CLRS.Ch22.Graph.Common

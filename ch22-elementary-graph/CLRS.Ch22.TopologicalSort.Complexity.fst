@@ -4,8 +4,8 @@
  * Proves complexity bounds for Kahn's topological sort with
  * adjacency-matrix representation.
  *
- * Key result: KahnTopologicalSort runs in O(V²) time, verified via ghost
- * tick counter in KahnTopologicalSort.fst (≤ V² ticks). Each of V vertices
+ * Key result: TopologicalSort.Impl runs in O(V²) time, verified via ghost
+ * tick counter in TopologicalSort.Impl.fst (≤ V² ticks). Each of V vertices
  * is dequeued once, and for each vertex we scan V columns for in-degree
  * updates.
  *

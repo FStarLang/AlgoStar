@@ -3,18 +3,6 @@ module CLRS.Ch22.TopologicalSort.Lemmas
 open FStar.Seq
 open FStar.Mul
 
-(* Topological ordering: for every vertex w at output position j,
-   every predecessor u of w appears at some earlier position k < j. *)
-
-let strong_order_inv (adj: seq int) (n: nat) (output: seq int) (count: nat) : prop =
-  count <= Seq.length output /\
-  Seq.length adj == n * n /\
-  (forall (j: nat). j < count ==>
-    (let w = Seq.index output j in
-     w >= 0 /\ w < n ==>
-     (forall (u: nat). u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0 ==>
-       (exists (k: nat). k < j /\ Seq.index output k == u))))
-
 (* Extending strong_order_inv: when adding a vertex v at position count
    whose all predecessors are already in output[0..count) *)
 let lemma_strong_order_extend 
@@ -39,30 +27,6 @@ let lemma_strong_order_base (adj: seq int) (n: nat) (output: seq int)
     (requires Seq.length adj == n * n /\ 0 <= Seq.length output)
     (ensures strong_order_inv adj n output 0)
   = ()
-
-(* Queue property: every vertex in queue[qh..qt) has all predecessors in output[0..count) *)
-let queue_preds_in_output (adj: seq int) (n: nat) (queue: seq int) (qh qt: nat) 
-                          (output: seq int) (count: nat) : prop =
-  qh <= qt /\ qt <= Seq.length queue /\
-  count <= Seq.length output /\
-  Seq.length adj == n * n /\
-  (forall (qi: nat). qh <= qi /\ qi < qt ==>
-    (let w = Seq.index queue qi in
-     w >= 0 /\ w < n /\
-     (forall (u: nat). u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0 ==>
-       (exists (k: nat). k < count /\ Seq.index output k == u))))
-
-(* For SizeT queue: use SZ.v to get int value *)
-let queue_preds_in_output_sz (adj: seq int) (n: nat) (queue: seq FStar.SizeT.t) (qh qt: nat)
-                              (output: seq int) (count: nat) : prop =
-  qh <= qt /\ qt <= Seq.length queue /\
-  count <= Seq.length output /\
-  Seq.length adj == n * n /\
-  (forall (qi: nat). qh <= qi /\ qi < qt ==>
-    (let w = FStar.SizeT.v (Seq.index queue qi) in
-     w >= 0 /\ w < n /\
-     (forall (u: nat). u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0 ==>
-       (exists (k: nat). k < count /\ Seq.index output k == u))))
 
 (* Dequeuing from queue preserves the property for the rest *)
 let lemma_queue_preds_dequeue (adj: seq int) (n: nat) (queue: seq FStar.SizeT.t) 
@@ -161,33 +125,6 @@ let initial_indeg_zero_no_preds (adj: seq int) (n: nat) (in_deg: seq int) (v: na
     (ensures
       forall (u: nat). u < n /\ u * n + v < n * n /\ Seq.index adj (u * n + v) <> 0 ==> false)
   = ()
-
-(* --- In-degree correctness --- *)
-
-(* Check if vertex x is in output[0..count) *)
-let rec is_in_output (output: seq int) (count: nat) (x: int) : Tot bool (decreases count) =
-  if count = 0 then false
-  else if count > Seq.length output then false
-  else if Seq.index output (count - 1) = x then true
-  else is_in_output output (count - 1) x
-
-(* Count predecessors of v not yet in output[0..count), scanning u from 0 to scan *)
-let rec count_remaining_preds (adj: seq int) (n: nat) (output: seq int) (count: nat)
-                               (v: nat) (scan: nat) : Tot nat (decreases scan) =
-  if scan = 0 then 0
-  else
-    let u = scan - 1 in
-    let rest = count_remaining_preds adj n output count v u in
-    if u < n && v < n && Seq.length adj = n * n && u * n + v < Seq.length adj &&
-       Seq.index adj (u * n + v) <> 0 && count <= Seq.length output &&
-       not (is_in_output output count u)
-    then 1 + rest
-    else rest
-
-(* In-degree correctness: in_deg[v] == number of predecessors of v NOT in output *)
-let indeg_correct (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) : prop =
-  Seq.length in_deg >= n /\ Seq.length adj == n * n /\ count <= Seq.length output /\
-  (forall (v: nat). v < n ==> Seq.index in_deg v == count_remaining_preds adj n output count v n)
 
 (* Key lemma: if in_deg[v] == 0 under indeg_correct, then all predecessors are in output *)
 let rec lemma_zero_means_all_preds_output 
