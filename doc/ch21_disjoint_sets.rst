@@ -16,9 +16,9 @@ compression variant.
 specification (``Spec.fst``) has 1 ``assume`` call: in
 ``pure_find_fuel_sufficient``, where ``ranks_bounded`` is assumed
 to avoid a circular dependency — the bound ``rank[x] < n`` is
-proved in a separate module (``RankBound.fst``) via the
+proved in a separate module (``Lemmas.fst``) via the
 ``size_rank_invariant``. The ``FindTermination``,
-``RankBound``, and ``FullCompress`` modules have zero admits.
+``Lemmas``, and ``FullCompress`` modules have zero admits.
 
 Pure Specification
 ==================
@@ -99,10 +99,10 @@ modified forest to ``pure_find`` on the original.
 Rank Bound
 ~~~~~~~~~~
 
-The ``RankBound`` module proves that ``size[x] ≥ 2^rank[x]``
+The ``Lemmas`` module proves that ``size[x] ≥ 2^rank[x]``
 is preserved by union:
 
-.. literalinclude:: ../ch21-disjoint-sets/CLRS.Ch21.UnionFind.RankBound.fst
+.. literalinclude:: ../ch21-disjoint-sets/CLRS.Ch21.UnionFind.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: size_rank_invariant
    :end-before: //SNIPPET_END: size_rank_invariant
@@ -122,7 +122,7 @@ The Pulse ``find`` traverses parent pointers in a loop, using a
 ``fuel`` counter that mirrors the pure specification. It takes a
 shared (fractional) permission on the parent array:
 
-.. literalinclude:: ../ch21-disjoint-sets/CLRS.Ch21.UnionFind.fst
+.. literalinclude:: ../ch21-disjoint-sets/CLRS.Ch21.UnionFind.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: find_sig
    :end-before: //SNIPPET_END: find_sig
@@ -139,7 +139,7 @@ Union
 The Pulse ``union_`` calls ``find`` on both operands, then links the
 roots by rank:
 
-.. literalinclude:: ../ch21-disjoint-sets/CLRS.Ch21.UnionFind.fst
+.. literalinclude:: ../ch21-disjoint-sets/CLRS.Ch21.UnionFind.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: union_sig
    :end-before: //SNIPPET_END: union_sig
@@ -175,7 +175,7 @@ The ``Complexity`` module provides simple worst-case bounds:
 - ``find_sequence_worst m n = m × n``: a sequence of *m* finds is
   O(*mn*).
 
-With union-by-rank, the ``RankBound`` module shows that tree height
+With union-by-rank, the ``Lemmas`` module shows that tree height
 is O(log *n*), improving find to O(log *n*). With both union-by-rank
 and path compression, the amortized cost is O(*m* · α(*n*)) where α
 is the inverse Ackermann function (CLRS Theorem 21.14). The

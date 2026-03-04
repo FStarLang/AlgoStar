@@ -11,7 +11,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch21.UnionFind
+module CLRS.Ch21.UnionFind.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -26,15 +26,7 @@ module Spec = CLRS.Ch21.UnionFind.Spec
 
 // ========== Bridge: imperative arrays <-> pure spec ==========
 
-// Truncated nat-conversion: take first n elements (total: pads with 0 if out of bounds)
-let to_nat_seq (s: Seq.seq SZ.t) (n: nat) : Seq.seq nat =
-  Seq.init n (fun (i: nat{i < n}) ->
-    if i < Seq.length s then (SZ.v (Seq.index s i) <: nat) else (0 <: nat))
-
-let to_uf (parent rank: Seq.seq SZ.t) (n: nat) : Spec.uf_forest =
-  { Spec.parent = to_nat_seq parent n;
-    Spec.rank = to_nat_seq rank n;
-    Spec.n = n }
+// to_nat_seq and to_uf are defined in the .fsti
 
 let to_nat_seq_index (s: Seq.seq SZ.t) (n: nat) (i: nat{i < n /\ i < Seq.length s})
   : Lemma (Seq.index (to_nat_seq s n) i == SZ.v (Seq.index s i))

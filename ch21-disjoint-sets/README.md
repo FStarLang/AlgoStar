@@ -7,8 +7,9 @@ Verified implementation of CLRS Chapter 21 union-by-rank with full path compress
 | Module | Description |
 |---|---|
 | `CLRS.Ch21.UnionFind.Spec` | Pure F\* specification: total `pure_find`, `pure_union`, partition correctness proofs, compression lemmas |
-| `CLRS.Ch21.UnionFind` | Pulse imperative implementation: `make_set`, `find_set` (full compression), `union` (returns unit) |
-| `CLRS.Ch21.UnionFind.RankBound` | Proof that `size ≥ 2^rank` and `rank ≤ ⌊log₂ n⌋`, tree height ≤ rank |
+| `CLRS.Ch21.UnionFind.Impl` | Pulse imperative implementation: `make_set`, `find_set` (full compression), `union` (returns unit) |
+| `CLRS.Ch21.UnionFind.Lemmas` | Proof that `size ≥ 2^rank` and `rank ≤ ⌊log₂ n⌋`, tree height ≤ rank |
+| `CLRS.Ch21.UnionFind.Complexity` | O(log n) worst-case find complexity bound |
 
 ## Key Properties Proven
 
@@ -20,7 +21,7 @@ Verified implementation of CLRS Chapter 21 union-by-rank with full path compress
 - **`compress_preserves_uf_inv`**: Single-node compression preserves `uf_inv`
 - **`compress_preserves_find_all`**: Single-node compression preserves `pure_find` for ALL nodes
 
-### Implementation (`UnionFind.fst`) — Functionally Correct
+### Implementation (`Impl.fst`) — Functionally Correct
 - **`make_set`**: Postcondition includes `Spec.uf_inv` on the pure spec bridge
 - **`find_set`**: Two-pass full CLRS path compression; postcondition:
   - `root == pure_find(original, x)` (root is the correct representative)
@@ -32,7 +33,7 @@ Verified implementation of CLRS Chapter 21 union-by-rank with full path compress
 - **`find_root_imp`**: Read-only root traversal; postcondition: `root == pure_find(original, x)`
 - All operations preserve `is_forest` (acyclicity)
 
-### Rank Bound (`RankBound.fst`)
+### Lemmas (`Lemmas.fst`)
 - Tree height ≤ rank\[root\] ≤ ⌊log₂ n⌋
 - Logarithmic worst-case find complexity
 
@@ -42,12 +43,12 @@ Verified implementation of CLRS Chapter 21 union-by-rank with full path compress
 |---|---|---|
 | §21.1 | Disjoint-set operations | `Spec.fst` (pure model) |
 | §21.2 | Linked-list representation | Not implemented (array-based instead) |
-| §21.3 | Disjoint-set forests | `UnionFind.fst` |
-| §21.3 | MAKE-SET | `make_set` in `UnionFind.fst` |
-| §21.3 | FIND-SET (with compression) | `find_set` in `UnionFind.fst` |
-| §21.3 | UNION / LINK | `union` in `UnionFind.fst` |
+| §21.3 | Disjoint-set forests | `Impl.fst` |
+| §21.3 | MAKE-SET | `make_set` in `Impl.fst` |
+| §21.3 | FIND-SET (with compression) | `find_set` in `Impl.fst` |
+| §21.3 | UNION / LINK | `union` in `Impl.fst` |
 | Lemma 21.4 | rank\[x\] < rank\[parent\[x\]\] | `Spec.fst` (`rank_invariant`) |
-| Theorem 21.5 | rank ≤ ⌊log₂ n⌋ | `RankBound.fst` §4-6 |
+| Theorem 21.5 | rank ≤ ⌊log₂ n⌋ | `Lemmas.fst` §4-6 |
 | §21.4 | Amortised O(α(n)) | Not implemented |
 
 ## Verification

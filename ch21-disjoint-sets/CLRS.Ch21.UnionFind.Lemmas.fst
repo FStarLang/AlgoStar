@@ -9,7 +9,7 @@
    This establishes the logarithmic bound on find operations in union-by-rank.
 *)
 
-module CLRS.Ch21.UnionFind.RankBound
+module CLRS.Ch21.UnionFind.Lemmas
 
 open FStar.Seq
 open FStar.Math.Lemmas
