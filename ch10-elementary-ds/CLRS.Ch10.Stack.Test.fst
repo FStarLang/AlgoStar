@@ -1,7 +1,7 @@
 module CLRS.Ch10.Stack.Test
 #lang-pulse
 open Pulse.Lib.Pervasives
-open CLRS.Ch10.Stack
+open CLRS.Ch10.Stack.Impl
 
 module SZ = FStar.SizeT
 

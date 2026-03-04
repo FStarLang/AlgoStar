@@ -4,8 +4,7 @@
    Contains: node type, dlist type alias, is_dlist recursive predicate,
    ghost boilerplate (fold/unfold helpers), and remove_first.
    
-   Used by: SinglyLinkedList.fst, SinglyLinkedList.Complexity.fst,
-            SinglyLinkedList.Complexity.Enhanced.fst
+   Used by: SinglyLinkedList.Impl.fst
 *)
 
 module CLRS.Ch10.SinglyLinkedList.Base

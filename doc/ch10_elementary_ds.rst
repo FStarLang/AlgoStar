@@ -289,34 +289,21 @@ ownership of the head node from the tail segment, and ghost functions
 Complexity
 ==========
 
-The complexity module defines the operation counts as constants and
-functions, then proves they satisfy the expected bounds:
+Complexity tracking is fused into the Pulse implementation modules
+where it provides meaningful bounds. For stack and queue the operations
+are O(1) by construction (single array access / pointer update), so
+no separate complexity tracking is needed.
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DataStructures.Complexity.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: ds_complexity
-   :end-before: //SNIPPET_END: ds_complexity
+For the singly-linked list, ``CLRS.Ch10.SinglyLinkedList.Impl``
+includes ghost-tick instrumented variants (``list_insert_tick``,
+``list_search_tick``, ``list_delete_tick``) that use a
+``GhostReference.ref nat`` counter. Each node visit calls ``tick``
+once, and the postcondition bounds the counter increment:
 
-The ghost-tick complexity module
-``CLRS.Ch10.DoublyLinkedList.Complexity`` instruments the linked-list
-operations with a ``GhostReference.ref nat`` counter. Each node visit
-calls ``tick`` once, and the postcondition bounds the counter
-increment:
-
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DoublyLinkedList.Complexity.fst
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
    :language: pulse
-   :start-after: //SNIPPET_START: dll_insert_tick
-   :end-before: //SNIPPET_END: dll_insert_tick
-
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DoublyLinkedList.Complexity.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: dll_search_tick
-   :end-before: //SNIPPET_END: dll_search_tick
-
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DoublyLinkedList.Complexity.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: dll_delete_tick
-   :end-before: //SNIPPET_END: dll_delete_tick
+   :start-after: //SNIPPET_START: sll_tick_ops
+   :end-before: //SNIPPET_END: sll_tick_ops
 
 The complexity invariant in each loop or recursive call tracks
 ``cf - c0 == number_of_iterations``. For insert this is exactly 1;

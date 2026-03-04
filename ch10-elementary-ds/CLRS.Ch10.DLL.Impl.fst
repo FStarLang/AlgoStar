@@ -1,4 +1,4 @@
-module CLRS.Ch10.DLL
+module CLRS.Ch10.DLL.Impl
 // CLRS §10.2: True Doubly-Linked List
 //
 // Nodes have {key, prev, next}. Segment predicate `dls` from Pulse.Lib.Deque.
@@ -14,48 +14,7 @@ open Pulse.Lib.Box { box, (:=), (!) }
 module L = FStar.List.Tot
 open FStar.List.Tot
 
-//SNIPPET_START: dll_node
-noeq
-type node = {
-  key:  int;
-  prev: option (box node);
-  next: option (box node);
-}
-
-let dptr = option (box node)
-//SNIPPET_END: dll_node
-
-// DLS segment predicate for NON-EMPTY lists.
-//SNIPPET_START: dll_dls
-let rec dls
-  ([@@@mkey] p: box node)
-  (l: list int {Cons? l})
-  (prev_ptr: dptr)
-  (tail: box node)
-  (last_ptr: dptr)
-  : Tot slprop (decreases l)
-  = match l with
-    | [k] ->
-      exists* (v: node).
-        pts_to p v **
-        pure (v.key == k /\ v.prev == prev_ptr /\
-              v.next == last_ptr /\ p == tail)
-    | k :: rest ->
-      exists* (v: node) (np: box node).
-        pts_to p v **
-        dls np rest (Some p) tail last_ptr **
-        pure (v.key == k /\ v.prev == prev_ptr /\
-              v.next == Some np)
-
-// Full DLL
-let dll (hd tl: dptr) (l: list int) : slprop =
-  match l with
-  | [] -> pure (hd == None /\ tl == None)
-  | k :: rest ->
-    exists* (hp tp: box node).
-      dls hp (k :: rest) None tp None **
-      pure (hd == Some hp /\ tl == Some tp)
-//SNIPPET_END: dll_dls
+// Types node, dptr and predicates dls, dll are defined in CLRS.Ch10.DLL.Impl.fsti
 
 // dll hd==None ↔ l==[]
 ghost
@@ -593,10 +552,7 @@ fn list_search_ptr (hd tl: dptr) (k: int)
 
 // --- LIST-DELETE ---
 
-let rec remove_first (k: int) (l: list int) : list int =
-  match l with
-  | [] -> []
-  | hd :: tl -> if hd = k then tl else hd :: remove_first k tl
+// remove_first is defined in CLRS.Ch10.DLL.Impl.fsti
 
 let remove_first_head (k: int) (l: list int)
   : Lemma (requires Cons? l /\ L.hd l = k)
@@ -872,11 +828,7 @@ fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
 // Precondition: caller provides the dll and an erased index i < L.length l.
 // Postcondition: dll with the element at position i removed.
 
-// remove element at index i from a list
-let rec remove_at (i: nat) (l: list int) : list int =
-  match l with
-  | [] -> []
-  | hd :: tl -> if i = 0 then tl else hd :: remove_at (i - 1) tl
+// remove_at is defined in CLRS.Ch10.DLL.Impl.fsti
 
 // Recursive delete at index i within a DLS segment.
 // Similar to delete_in_dls, but uses position index instead of key search.

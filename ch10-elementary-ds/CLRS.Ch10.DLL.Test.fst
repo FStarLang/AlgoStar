@@ -1,7 +1,7 @@
 module CLRS.Ch10.DLL.Test
 #lang-pulse
 open Pulse.Lib.Pervasives
-open CLRS.Ch10.DLL
+open CLRS.Ch10.DLL.Impl
 module R = Pulse.Lib.Reference
 
 // Test basic DLL operations: insert, search, delete

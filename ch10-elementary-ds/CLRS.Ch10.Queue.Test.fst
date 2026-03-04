@@ -1,9 +1,9 @@
 module CLRS.Ch10.Queue.Test
 #lang-pulse
 open Pulse.Lib.Pervasives
-open CLRS.Ch10.Queue
+open CLRS.Ch10.Queue.Impl
 
-module Q = CLRS.Ch10.Queue
+module Q = CLRS.Ch10.Queue.Impl
 module SZ = FStar.SizeT
 module L = FStar.List.Tot
 

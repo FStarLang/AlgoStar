@@ -1,4 +1,4 @@
-module CLRS.Ch10.Stack
+module CLRS.Ch10.Stack.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 

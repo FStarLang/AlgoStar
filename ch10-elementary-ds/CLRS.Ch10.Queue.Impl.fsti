@@ -1,4 +1,4 @@
-module CLRS.Ch10.Queue
+module CLRS.Ch10.Queue.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 

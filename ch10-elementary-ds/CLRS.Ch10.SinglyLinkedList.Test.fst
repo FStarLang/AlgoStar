@@ -2,7 +2,7 @@ module CLRS.Ch10.SinglyLinkedList.Test
 #lang-pulse
 open Pulse.Lib.Pervasives
 open CLRS.Ch10.SinglyLinkedList.Base
-open CLRS.Ch10.SinglyLinkedList
+open CLRS.Ch10.SinglyLinkedList.Impl
 
 // Test basic SLL operations: insert, search, delete
 fn test_sll ()

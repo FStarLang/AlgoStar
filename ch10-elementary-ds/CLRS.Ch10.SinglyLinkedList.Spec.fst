@@ -1,4 +1,4 @@
-module CLRS.Ch10.LinkedList.Spec
+module CLRS.Ch10.SinglyLinkedList.Spec
 
 open FStar.List.Tot
 

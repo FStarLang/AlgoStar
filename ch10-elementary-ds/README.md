@@ -17,18 +17,16 @@ in Pulse, following CLRS Chapter 10. All code is **admit-free and assume-free**.
 
 ### Singly-Linked List (§10.2)
 - **CLRS.Ch10.SinglyLinkedList.Base.fst** — Shared node type, `is_dlist` predicate, ghost helpers
-- **CLRS.Ch10.SinglyLinkedList.fst** — Heap-allocated SLL with insert/search/delete
+- **CLRS.Ch10.SinglyLinkedList.Impl.fst/fsti** — Heap-allocated SLL with insert/search/delete + ghost-tick complexity tracking
 - **CLRS.Ch10.SinglyLinkedList.Test.fst** — Test
-- **CLRS.Ch10.SinglyLinkedList.Complexity.fst** — SLL with ghost tick counters and precise cost bounds
 
 ### Doubly-Linked List (§10.2)
-- **CLRS.Ch10.DLL.fst** — True DLL with `dls` segment predicate, insert/search/delete/delete_node
+- **CLRS.Ch10.DLL.Impl.fst/fsti** — True DLL with `dls` segment predicate, insert/search/delete/delete_node
 - **CLRS.Ch10.DLL.Test.fst** — Test
 
 ### Pure Specifications
 - **CLRS.Ch10.DS.Spec.fst** — Stack (8+ lemmas), Queue (12 lemmas), LinkedList (9 lemmas), refinement lemmas
-- **CLRS.Ch10.LinkedList.Spec.fst** — 17 lemmas + 1 theorem for linked-list spec
-- **CLRS.Ch10.DataStructures.Complexity.fst** — Operation-count constants
+- **CLRS.Ch10.SinglyLinkedList.Spec.fst** — 17 lemmas + 1 theorem for linked-list spec
 
 ## Stack
 
