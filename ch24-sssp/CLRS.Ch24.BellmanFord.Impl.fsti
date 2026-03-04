@@ -1,8 +1,9 @@
 (*
    Bellman-Ford Single-Source Shortest Paths — Implementation Interface
 
-   Pulse function signatures for the verified Bellman-Ford algorithm,
-   including O(V³) complexity instrumentation with ghost tick counting.
+   Pulse function signature for the verified Bellman-Ford algorithm,
+   providing both full correctness and O(V³) complexity guarantees
+   in a single function via ghost tick counting.
 
    Uses adjacency matrix representation (n×n flat array, 1000000 = no edge/∞).
 
@@ -12,10 +13,9 @@
    - If no negative cycle: triangle inequality + upper bound (CLRS Cor 24.3)
    - Negative-cycle detection (CLRS Cor 24.5)
    - Shortest-path equality under no negative cycles (CLRS Thm 24.4)
+   - O(V³) complexity bound via ghost counter
 
-   Complexity (bellman_ford_complexity):
-   - Ghost tick counter proves n + n³ total operations
-   - Bounded by 2n³, establishing O(V³) (CLRS §24.1)
+   NO admits. NO assumes.
 *)
 
 module CLRS.Ch24.BellmanFord.Impl
@@ -67,52 +67,6 @@ let lower_bound_inv (dist: Seq.seq int) (weights: Seq.seq int) (n source: nat) :
   (forall (v: nat). v < n ==>
     Seq.index dist v >= SP.sp_dist weights n source v)
 
-// ========== Main Algorithm ==========
-
-//SNIPPET_START: bellman_ford_sig
-/// Bellman-Ford SSSP algorithm (imperative, adjacency matrix)
-fn bellman_ford
-  (weights: A.array int)
-  (n: SZ.t)
-  (source: SZ.t)
-  (dist: A.array int)
-  (result: R.ref bool)
-  (#sweights: erased (Seq.seq int))
-  (#sdist: erased (Seq.seq int))
-  (#sresult: erased bool)
-  requires
-    A.pts_to weights sweights **
-    A.pts_to dist sdist **
-    R.pts_to result sresult **
-    pure (
-      SZ.v n > 0 /\
-      SZ.v source < SZ.v n /\
-      Seq.length sweights == SZ.v n * SZ.v n /\
-      Seq.length sdist == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
-    )
-  ensures exists* sdist' no_neg_cycle.
-    A.pts_to weights sweights **
-    A.pts_to dist sdist' **
-    R.pts_to result no_neg_cycle **
-    pure (
-      Seq.length sdist' == SZ.v n /\
-      SZ.v source < Seq.length sdist' /\
-      Seq.index sdist' (SZ.v source) == 0 /\
-      valid_distances sdist' (SZ.v n) /\
-      (no_neg_cycle == true ==> triangle_inequality sdist' sweights (SZ.v n)) /\
-      (no_neg_cycle == true ==>
-        (forall (v: nat). v < SZ.v n ==>
-          Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
-      (no_neg_cycle == false ==> exists_violation sdist' sweights (SZ.v n)) /\
-      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
-        lower_bound_inv sdist' sweights (SZ.v n) (SZ.v source)) /\
-      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) /\ no_neg_cycle == true ==>
-        (forall (v: nat). v < SZ.v n ==>
-          Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
-    )
-//SNIPPET_END: bellman_ford_sig
-
 // ========== Complexity Bounds ==========
 
 /// Total iteration count for Bellman-Ford with adjacency matrix
@@ -133,10 +87,11 @@ val bellman_ford_complexity_is_cubic (cf c0 n: nat) : Lemma
   (requires bellman_ford_complexity_bounded cf c0 n /\ n >= 1)
   (ensures cf - c0 <= 2 * n * n * n)
 
-// ========== Algorithm with Complexity ==========
+// ========== Algorithm: Correctness + Complexity ==========
 
-/// Bellman-Ford with ghost tick counting for O(V³) complexity proof
-fn bellman_ford_complexity
+//SNIPPET_START: bellman_ford_sig
+/// Bellman-Ford SSSP — correctness + O(V³) complexity in one function
+fn bellman_ford
   (weights: A.array int)
   (n: SZ.t)
   (source: SZ.t)
@@ -173,5 +128,12 @@ fn bellman_ford_complexity
       (no_neg_cycle == true ==>
         (forall (v: nat). v < SZ.v n ==>
           Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
+      (no_neg_cycle == false ==> exists_violation sdist' sweights (SZ.v n)) /\
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
+        lower_bound_inv sdist' sweights (SZ.v n) (SZ.v source)) /\
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) /\ no_neg_cycle == true ==>
+        (forall (v: nat). v < SZ.v n ==>
+          Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
       bellman_ford_complexity_bounded cf (reveal c0) (SZ.v n)
     )
+//SNIPPET_END: bellman_ford_sig

@@ -246,6 +246,59 @@ let bf_sp_equality_cond (dist weights: Seq.seq int) (n source: nat) (flag: bool)
 
 // ========== Main Algorithm ==========
 
+// Ghost tick for complexity counting
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+// Pure complexity bounds
+
+(**
+ * Simplify: n + (n-1)n² + n² = n + n³ - n² + n² = n + n³
+ *)
+let bellman_ford_simplified (n: nat) : Lemma
+  (requires n >= 1)
+  (ensures bellman_ford_iterations n == n + n * n * n)
+  =
+  assert ((n - 1) * n * n + n * n == n * n * n)
+
+(**
+ * Main complexity bound: prove the total is at most 2n³ for n ≥ 1
+ * This establishes O(n³) asymptotic complexity.
+ *)
+let bellman_ford_cubic_bound (n: nat) : Lemma
+  (requires n >= 1)
+  (ensures bellman_ford_iterations n <= 2 * n * n * n)
+  =
+  bellman_ford_simplified n;
+  assert (n >= 1);
+  assert (n <= n * n);
+  assert (n * n <= n * n * n);
+  assert (n + n * n * n <= 2 * n * n * n)
+
+(**
+ * Lower bound: for n ≥ 2, we do at least n³ operations
+ *)
+let bellman_ford_lower_bound (n: nat) : Lemma
+  (requires n >= 2)
+  (ensures bellman_ford_iterations n >= n * n * n)
+  =
+  bellman_ford_simplified n;
+  assert (n + n * n * n >= n * n * n)
+
+/// Ghost counter proves O(n³): cf - c0 ≤ 2n³
+let bellman_ford_complexity_is_cubic (cf c0 n: nat) : Lemma
+  (requires bellman_ford_complexity_bounded cf c0 n /\ n >= 1)
+  (ensures cf - c0 <= 2 * n * n * n)
+  =
+  bellman_ford_cubic_bound n
+
 #push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
 //SNIPPET_START: bellman_ford_sig
 fn bellman_ford
@@ -257,10 +310,13 @@ fn bellman_ford
   (#sweights: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
   (#sresult: erased bool)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to weights sweights **
     A.pts_to dist sdist **
     R.pts_to result sresult **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       SZ.v source < SZ.v n /\
@@ -268,10 +324,11 @@ fn bellman_ford
       Seq.length sdist == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n)
     )
-  ensures exists* sdist' no_neg_cycle.
+  ensures exists* sdist' no_neg_cycle (cf: nat).
     A.pts_to weights sweights **
     A.pts_to dist sdist' **
     R.pts_to result no_neg_cycle **
+    GR.pts_to ctr cf **
     pure (
       Seq.length sdist' == SZ.v n /\
       SZ.v source < Seq.length sdist' /\
@@ -288,10 +345,11 @@ fn bellman_ford
       (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
         lower_bound_inv sdist' sweights (SZ.v n) (SZ.v source)) /\
       // Shortest-path equality (CLRS Theorem 24.4):
-      // When no negative cycles and detection passed, dist[v] == sp_dist[v] for all v
       (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) /\ no_neg_cycle == true ==>
         (forall (v: nat). v < SZ.v n ==>
-          Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v))
+          Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
+      // O(V³) complexity bound
+      bellman_ford_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: bellman_ford_sig
 {
@@ -302,22 +360,26 @@ fn bellman_ford
     let vi = !init_i;
     vi <^ n
   )
-  invariant exists* vi sdist_current.
+  invariant exists* vi sdist_current (vc: nat).
     R.pts_to init_i vi **
     A.pts_to dist sdist_current **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
       (forall (j: nat). j < SZ.v vi ==>
         (if j = SZ.v source 
          then Seq.index sdist_current j == 0 
-         else Seq.index sdist_current j == 1000000))
+         else Seq.index sdist_current j == 1000000)) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v vi
     )
   decreases (SZ.v n - SZ.v !init_i)
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else 1000000);
     A.op_Array_Assignment dist vi new_val;
+    tick ctr;
     init_i := vi +^ 1sz;
   };
   
@@ -334,16 +396,19 @@ fn bellman_ford
     let vround = !round;
     vround <^ n
   )
-  invariant exists* vround sdist_current.
+  invariant exists* vround sdist_current (vc: nat).
     R.pts_to round vround **
     A.pts_to dist sdist_current **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vround <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
       Seq.index sdist_current (SZ.v source) == 0 /\
       valid_distances sdist_current (SZ.v n) /\
       (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
-        lower_bound_inv sdist_current sweights (SZ.v n) (SZ.v source))
+        lower_bound_inv sdist_current sweights (SZ.v n) (SZ.v source)) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n
     )
   decreases (SZ.v n - SZ.v !round)
   {
@@ -355,16 +420,19 @@ fn bellman_ford
       let vu = !u;
       vu <^ n
     )
-    invariant exists* vu sdist_u.
+    invariant exists* vu sdist_u (vc_u: nat).
       R.pts_to u vu **
       A.pts_to dist sdist_u **
+      GR.pts_to ctr vc_u **
       pure (
         SZ.v vu <= SZ.v n /\
         Seq.length sdist_u == SZ.v n /\
         Seq.index sdist_u (SZ.v source) == 0 /\
         valid_distances sdist_u (SZ.v n) /\
         (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
-          lower_bound_inv sdist_u sweights (SZ.v n) (SZ.v source))
+          lower_bound_inv sdist_u sweights (SZ.v n) (SZ.v source)) /\
+        vc_u >= reveal c0 /\
+        vc_u - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n + SZ.v vu * SZ.v n
       )
     decreases (SZ.v n - SZ.v !u)
     {
@@ -379,16 +447,19 @@ fn bellman_ford
         let vv = !v;
         vv <^ n
       )
-      invariant exists* vv sdist_v.
+      invariant exists* vv sdist_v (vc_v: nat).
         R.pts_to v vv **
         A.pts_to dist sdist_v **
+        GR.pts_to ctr vc_v **
         pure (
           SZ.v vv <= SZ.v n /\
           Seq.length sdist_v == SZ.v n /\
           Seq.index sdist_v (SZ.v source) == 0 /\
           valid_distances sdist_v (SZ.v n) /\
           (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
-            lower_bound_inv sdist_v sweights (SZ.v n) (SZ.v source))
+            lower_bound_inv sdist_v sweights (SZ.v n) (SZ.v source)) /\
+          vc_v >= reveal c0 /\
+          vc_v - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n + SZ.v vu * SZ.v n + SZ.v vv
         )
       decreases (SZ.v n - SZ.v !v)
       {
@@ -426,6 +497,7 @@ fn bellman_ford
           new_dist_v;
         
         A.op_Array_Assignment dist vv new_dist_v;
+        tick ctr;
         
         v := vv +^ 1sz;
       };
@@ -450,333 +522,6 @@ fn bellman_ford
     let vcu = !cu;
     vcu <^ n
   )
-  invariant exists* vcu sdist_check vno.
-    R.pts_to cu vcu **
-    R.pts_to no_neg vno **
-    A.pts_to dist sdist_check **
-    pure (
-      SZ.v vcu <= SZ.v n /\
-      Seq.length sdist_check == SZ.v n /\
-      Seq.index sdist_check (SZ.v source) == 0 /\
-      valid_distances sdist_check (SZ.v n) /\
-      (vno == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) 0) /\
-      (vno == false ==> exists_violation sdist_check sweights (SZ.v n)) /\
-      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
-        lower_bound_inv sdist_check sweights (SZ.v n) (SZ.v source))
-    )
-  decreases (SZ.v n - SZ.v !cu)
-  {
-    let vcu = !cu;
-    with sdist_check. assert (A.pts_to dist sdist_check);
-    let dist_cu = A.op_Array_Access dist vcu;
-    
-    let mut cv: SZ.t = 0sz;
-    
-    while (
-      let vcv = !cv;
-      vcv <^ n
-    )
-    invariant exists* vcv vno_inner.
-      R.pts_to cv vcv **
-      R.pts_to no_neg vno_inner **
-      A.pts_to dist sdist_check **
-      pure (
-        SZ.v vcv <= SZ.v n /\
-        (vno_inner == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv)) /\
-        (vno_inner == false ==> exists_violation sdist_check sweights (SZ.v n))
-      )
-    decreases (SZ.v n - SZ.v !cv)
-    {
-      let vcv = !cv;
-      
-      let w_idx = vcu *^ n +^ vcv;
-      let w = A.op_Array_Access weights w_idx;
-      let d_u = dist_cu;
-      let d_v = A.op_Array_Access dist vcv;
-      
-      // Check triangle inequality for this edge
-      let edge_ok = (w >= 1000000 || d_u >= 1000000 || d_v <= d_u + w);
-      
-      let vno = !no_neg;
-      // Must call before the if — Pulse can't call lemmas inside if blocks
-      check_edge_violation sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv) w d_u d_v edge_ok;
-      if (not edge_ok) {
-        no_neg := false;
-      };
-      
-      cv := vcv +^ 1sz;
-    };
-    
-    let _ = !cv;
-    cu := vcu +^ 1sz;
-  };
-  
-  let _ = !cu;
-  
-  let final_no_neg = !no_neg;
-  with sdist_final. assert (A.pts_to dist sdist_final);
-  // Connect triangle inequality to shortest-path upper bound
-  bf_sp_upper_bound_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
-  // Connect upper + lower bound to equality (under no_neg_cycles_flat)
-  bf_sp_equality_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
-  
-  result := final_no_neg;
-}
-#pop-options
-
-// ========== Ghost tick for complexity counting ==========
-
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
-
-// ========== Pure Complexity Bounds ==========
-
-(**
- * Simplify: n + (n-1)n² + n² = n + n³ - n² + n² = n + n³
- *)
-let bellman_ford_simplified (n: nat) : Lemma
-  (requires n >= 1)
-  (ensures bellman_ford_iterations n == n + n * n * n)
-  =
-  assert ((n - 1) * n * n + n * n == n * n * n)
-
-(**
- * Main complexity bound: prove the total is at most 2n³ for n ≥ 1
- * This establishes O(n³) asymptotic complexity.
- *)
-let bellman_ford_cubic_bound (n: nat) : Lemma
-  (requires n >= 1)
-  (ensures bellman_ford_iterations n <= 2 * n * n * n)
-  =
-  bellman_ford_simplified n;
-  assert (n >= 1);
-  assert (n <= n * n);
-  assert (n * n <= n * n * n);
-  assert (n + n * n * n <= 2 * n * n * n)
-
-(**
- * Lower bound: for n ≥ 2, we do at least n³ operations
- *)
-let bellman_ford_lower_bound (n: nat) : Lemma
-  (requires n >= 2)
-  (ensures bellman_ford_iterations n >= n * n * n)
-  =
-  bellman_ford_simplified n;
-  assert (n + n * n * n >= n * n * n)
-
-// ========== Complexity bound predicate ==========
-
-/// Ghost counter proves O(n³): cf - c0 ≤ 2n³
-let bellman_ford_complexity_is_cubic (cf c0 n: nat) : Lemma
-  (requires bellman_ford_complexity_bounded cf c0 n /\ n >= 1)
-  (ensures cf - c0 <= 2 * n * n * n)
-  =
-  bellman_ford_cubic_bound n
-
-// ========== Bellman-Ford with Complexity Instrumentation ==========
-
-#push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
-fn bellman_ford_complexity
-  (weights: A.array int)
-  (n: SZ.t)
-  (source: SZ.t)
-  (dist: A.array int)
-  (result: R.ref bool)
-  (#sweights: erased (Seq.seq int))
-  (#sdist: erased (Seq.seq int))
-  (#sresult: erased bool)
-  (ctr: GR.ref nat)
-  (#c0: erased nat)
-  requires
-    A.pts_to weights sweights **
-    A.pts_to dist sdist **
-    R.pts_to result sresult **
-    GR.pts_to ctr c0 **
-    pure (
-      SZ.v n > 0 /\
-      SZ.v source < SZ.v n /\
-      Seq.length sweights == SZ.v n * SZ.v n /\
-      Seq.length sdist == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
-    )
-  ensures exists* sdist' no_neg_cycle (cf: nat).
-    A.pts_to weights sweights **
-    A.pts_to dist sdist' **
-    R.pts_to result no_neg_cycle **
-    GR.pts_to ctr cf **
-    pure (
-      Seq.length sdist' == SZ.v n /\
-      SZ.v source < Seq.length sdist' /\
-      Seq.index sdist' (SZ.v source) == 0 /\
-      valid_distances sdist' (SZ.v n) /\
-      (no_neg_cycle == true ==> triangle_inequality sdist' sweights (SZ.v n)) /\
-      (no_neg_cycle == true ==>
-        (forall (v: nat). v < SZ.v n ==>
-          Seq.index sdist' v <= SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
-      bellman_ford_complexity_bounded cf (reveal c0) (SZ.v n)
-    )
-{
-  // Initialization: dist[source] = 0, all others = 1000000 — n ticks
-  let mut init_i: SZ.t = 0sz;
-  
-  while (
-    let vi = !init_i;
-    vi <^ n
-  )
-  invariant exists* vi sdist_current (vc: nat).
-    R.pts_to init_i vi **
-    A.pts_to dist sdist_current **
-    GR.pts_to ctr vc **
-    pure (
-      SZ.v vi <= SZ.v n /\
-      Seq.length sdist_current == SZ.v n /\
-      (forall (j: nat). j < SZ.v vi ==>
-        (if j = SZ.v source 
-         then Seq.index sdist_current j == 0 
-         else Seq.index sdist_current j == 1000000)) /\
-      // Complexity: vc == c0 + vi
-      vc >= reveal c0 /\
-      vc - reveal c0 == SZ.v vi
-    )
-  decreases (SZ.v n - SZ.v !init_i)
-  {
-    let vi = !init_i;
-    let new_val: int = (if vi = source then 0 else 1000000);
-    A.op_Array_Assignment dist vi new_val;
-    tick ctr;
-    init_i := vi +^ 1sz;
-  };
-  
-  let _ = !init_i;
-  
-  // Relaxation: (n-1) rounds, each checking all n² edges
-  let mut round: SZ.t = 1sz;
-  
-  while (
-    let vround = !round;
-    vround <^ n
-  )
-  invariant exists* vround sdist_current (vc: nat).
-    R.pts_to round vround **
-    A.pts_to dist sdist_current **
-    GR.pts_to ctr vc **
-    pure (
-      SZ.v vround <= SZ.v n /\
-      Seq.length sdist_current == SZ.v n /\
-      Seq.index sdist_current (SZ.v source) == 0 /\
-      valid_distances sdist_current (SZ.v n) /\
-      // Complexity: vc == c0 + n + (vround - 1) * n * n
-      vc >= reveal c0 /\
-      vc - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n
-    )
-  decreases (SZ.v n - SZ.v !round)
-  {
-    let vround = !round;
-    
-    let mut u: SZ.t = 0sz;
-    
-    while (
-      let vu = !u;
-      vu <^ n
-    )
-    invariant exists* vu sdist_u (vc_u: nat).
-      R.pts_to u vu **
-      A.pts_to dist sdist_u **
-      GR.pts_to ctr vc_u **
-      pure (
-        SZ.v vu <= SZ.v n /\
-        Seq.length sdist_u == SZ.v n /\
-        Seq.index sdist_u (SZ.v source) == 0 /\
-        valid_distances sdist_u (SZ.v n) /\
-        // Complexity: vc_u == c0 + n + (vround - 1) * n * n + vu * n
-        vc_u >= reveal c0 /\
-        vc_u - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n + SZ.v vu * SZ.v n
-      )
-    decreases (SZ.v n - SZ.v !u)
-    {
-      let vu = !u;
-      let dist_u = A.op_Array_Access dist vu;
-      
-      assert pure (dist_u < 1000000 \/ dist_u == 1000000);
-      
-      let mut v: SZ.t = 0sz;
-      
-      while (
-        let vv = !v;
-        vv <^ n
-      )
-      invariant exists* vv sdist_v (vc_v: nat).
-        R.pts_to v vv **
-        A.pts_to dist sdist_v **
-        GR.pts_to ctr vc_v **
-        pure (
-          SZ.v vv <= SZ.v n /\
-          Seq.length sdist_v == SZ.v n /\
-          Seq.index sdist_v (SZ.v source) == 0 /\
-          valid_distances sdist_v (SZ.v n) /\
-          // Complexity: vc_v == c0 + n + (vround - 1) * n * n + vu * n + vv
-          vc_v >= reveal c0 /\
-          vc_v - reveal c0 == SZ.v n + (SZ.v vround - 1) * SZ.v n * SZ.v n + SZ.v vu * SZ.v n + SZ.v vv
-        )
-      decreases (SZ.v n - SZ.v !v)
-      {
-        let vv = !v;
-        
-        let w_idx = vu *^ n +^ vv;
-        let w_uv = A.op_Array_Access weights w_idx;
-        
-        let old_dist_v = A.op_Array_Access dist vv;
-        
-        let can_relax = (w_uv < 1000000 && dist_u < 1000000);
-        let sum = dist_u + w_uv;
-        let should_update = (can_relax && sum < old_dist_v && vv <> source);
-        
-        let new_dist_v: int = (if should_update then sum else old_dist_v);
-        
-        assert pure (old_dist_v < 1000000 \/ old_dist_v == 1000000);
-        
-        if should_update {
-          assert pure (sum < 1000000);
-        };
-        
-        assert pure (new_dist_v < 1000000 \/ new_dist_v == 1000000);
-        
-        if (vv = source) {
-          assert pure (old_dist_v == 0);
-          assert pure (new_dist_v == 0);
-        };
-        
-        A.op_Array_Assignment dist vv new_dist_v;
-        tick ctr;
-        
-        v := vv +^ 1sz;
-      };
-      
-      let _ = !v;
-      u := vu +^ 1sz;
-    };
-    
-    let _ = !u;
-    round := vround +^ 1sz;
-  };
-  
-  let _ = !round;
-  
-  // Negative-cycle detection + triangle inequality verification — n² ticks
-  let mut no_neg: bool = true;
-  let mut cu: SZ.t = 0sz;
-  
-  while (
-    let vcu = !cu;
-    vcu <^ n
-  )
   invariant exists* vcu sdist_check vno (vc_c: nat).
     R.pts_to cu vcu **
     R.pts_to no_neg vno **
@@ -788,7 +533,9 @@ fn bellman_ford_complexity
       Seq.index sdist_check (SZ.v source) == 0 /\
       valid_distances sdist_check (SZ.v n) /\
       (vno == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) 0) /\
-      // Complexity: vc_c == c0 + n + (n - 1) * n * n + vcu * n
+      (vno == false ==> exists_violation sdist_check sweights (SZ.v n)) /\
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==>
+        lower_bound_inv sdist_check sweights (SZ.v n) (SZ.v source)) /\
       vc_c >= reveal c0 /\
       vc_c - reveal c0 == SZ.v n + (SZ.v n - 1) * SZ.v n * SZ.v n + SZ.v vcu * SZ.v n
     )
@@ -812,7 +559,7 @@ fn bellman_ford_complexity
       pure (
         SZ.v vcv <= SZ.v n /\
         (vno_inner == true ==> no_violations_partial sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv)) /\
-        // Complexity: vc_cv == c0 + n + (n - 1) * n * n + vcu * n + vcv
+        (vno_inner == false ==> exists_violation sdist_check sweights (SZ.v n)) /\
         vc_cv >= reveal c0 /\
         vc_cv - reveal c0 == SZ.v n + (SZ.v n - 1) * SZ.v n * SZ.v n + SZ.v vcu * SZ.v n + SZ.v vcv
       )
@@ -825,9 +572,12 @@ fn bellman_ford_complexity
       let d_u = dist_cu;
       let d_v = A.op_Array_Access dist vcv;
       
+      // Check triangle inequality for this edge
       let edge_ok = (w >= 1000000 || d_u >= 1000000 || d_v <= d_u + w);
       
       let vno = !no_neg;
+      // Must call before the if — Pulse can't call lemmas inside if blocks
+      check_edge_violation sdist_check sweights (SZ.v n) (SZ.v vcu) (SZ.v vcv) w d_u d_v edge_ok;
       if (not edge_ok) {
         no_neg := false;
       };
@@ -845,13 +595,14 @@ fn bellman_ford_complexity
   
   let final_no_neg = !no_neg;
   with sdist_final. assert (A.pts_to dist sdist_final);
+  // Connect triangle inequality to shortest-path upper bound
+  bf_sp_upper_bound_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
+  // Connect upper + lower bound to equality (under no_neg_cycles_flat)
+  bf_sp_equality_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
   
   // At this point: cf - c0 == n + (n-1)n² + n² == n + n³
-  // Prove the bound
   assert pure (SZ.v n >= 1);
   bellman_ford_simplified (SZ.v n);
-  
-  bf_sp_upper_bound_cond sdist_final sweights (SZ.v n) (SZ.v source) final_no_neg;
   
   result := final_no_neg;
 }
