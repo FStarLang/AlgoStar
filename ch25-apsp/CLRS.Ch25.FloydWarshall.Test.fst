@@ -3,7 +3,8 @@ module CLRS.Ch25.FloydWarshall.Test
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open CLRS.Ch25.FloydWarshall
+open CLRS.Ch25.FloydWarshall.Spec
+open CLRS.Ch25.FloydWarshall.Impl
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec

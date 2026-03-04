@@ -17,8 +17,8 @@ module CLRS.Ch25.FloydWarshall.Paths
 open FStar.Mul
 module Seq = FStar.Seq
 open FStar.List.Tot
-open CLRS.Ch25.FloydWarshall
 open CLRS.Ch25.FloydWarshall.Spec
+open CLRS.Ch25.FloydWarshall.Lemmas
 
 (* ========================================================================
    § 1. Walk Definitions

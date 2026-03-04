@@ -19,7 +19,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
-open CLRS.Ch25.FloydWarshall
+open CLRS.Ch25.FloydWarshall.Spec
 
 #set-options "--z3rlimit 40"
 
@@ -46,12 +46,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 open Pulse.Lib.BoundedIntegers
 
 // ========== Main Algorithm with Complexity ==========
-
-//SNIPPET_START: complexity_bound
-// Complexity bound predicate
-let fw_complexity_bounded (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 == n * n * n
-//SNIPPET_END: complexity_bound
 
 //SNIPPET_START: floyd_warshall_complexity_sig
 fn floyd_warshall_complexity

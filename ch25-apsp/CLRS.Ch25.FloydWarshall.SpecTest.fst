@@ -10,8 +10,8 @@ module CLRS.Ch25.FloydWarshall.SpecTest
 
 open FStar.Mul
 open FStar.Seq
-open CLRS.Ch25.FloydWarshall
 open CLRS.Ch25.FloydWarshall.Spec
+open CLRS.Ch25.FloydWarshall.Lemmas
 
 // 3x3 test adjacency matrix (row-major):
 //     0   1   2

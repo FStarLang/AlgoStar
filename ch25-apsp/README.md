@@ -83,10 +83,14 @@ See `CLRS.Ch25.FloydWarshall.Test.fst` for a complete example with a 3×3 graph.
 
 | File | Purpose |
 |------|---------|
-| `CLRS.Ch25.FloydWarshall.fst` | Main Pulse implementation + safety predicates |
-| `CLRS.Ch25.FloydWarshall.Spec.fst` | Pure spec (fw_entry/fw_outer) and correctness proof |
+| `CLRS.Ch25.FloydWarshall.Spec.fst` | Pure specification: `fw_entry` recurrence, `fw_inner_j/i`, `fw_outer`, safety predicates, length lemmas |
+| `CLRS.Ch25.FloydWarshall.Lemmas.fsti` | Interface for correctness lemma signatures |
+| `CLRS.Ch25.FloydWarshall.Lemmas.fst` | Correctness proofs: `fw_outer ≡ fw_entry` (main theorem) |
 | `CLRS.Ch25.FloydWarshall.Paths.fst` | Walk formalism connecting fw_entry to graph-theoretic paths |
+| `CLRS.Ch25.FloydWarshall.Complexity.fsti` | Interface for complexity bound definition and signature |
 | `CLRS.Ch25.FloydWarshall.Complexity.fst` | O(n³) ghost-tick complexity proof |
+| `CLRS.Ch25.FloydWarshall.Impl.fsti` | Interface for the imperative Floyd-Warshall entry point |
+| `CLRS.Ch25.FloydWarshall.Impl.fst` | Pulse implementation proven equivalent to `fw_outer` |
 | `CLRS.Ch25.FloydWarshall.SpecTest.fst` | Concrete 3×3 test verification (all 9 entries + no-neg-cycle) |
 | `CLRS.Ch25.FloydWarshall.Test.fst` | Pulse compilation/runtime test |
 
