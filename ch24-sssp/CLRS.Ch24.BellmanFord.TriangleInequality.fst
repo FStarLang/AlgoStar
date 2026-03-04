@@ -20,25 +20,6 @@ module Seq = FStar.Seq
  * implementation - it's automatically implied by passing the negative cycle check!
  *)
 
-let inf : int = 1000000
-
-(* Distance vector: current distance estimates *)
-type dist_vec (n: nat) = d:Seq.seq int{Seq.length d == n}
-
-(* Weight matrix: n×n adjacency matrix (flattened) *)
-type weight_matrix (n: nat) = w:Seq.seq int{Seq.length w == n * n}
-
-(* Triangle inequality for a single edge (u,v) *)
-let edge_satisfies_triangle (dist: dist_vec 'n) (weights: weight_matrix 'n) (u v: nat{u < 'n /\ v < 'n}) : prop =
-  let d_u = Seq.index dist u in
-  let d_v = Seq.index dist v in
-  let w = Seq.index weights (u * 'n + v) in
-  (w < inf /\ d_u < inf) ==> d_v <= d_u + w
-
-(* Triangle inequality holds for all edges *)
-let triangle_inequality (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) : prop =
-  forall (u v: nat). u < n /\ v < n ==> edge_satisfies_triangle dist weights u v
-
 (* ===== Connection to Negative Cycle Check ===== *)
 
 (* The negative cycle check verifies that no edge violates the triangle inequality.
@@ -98,7 +79,7 @@ let bf_round (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) : dist_vec 
 
 (* k rounds of Bellman-Ford *)
 let rec bf_k_rounds (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) (k: nat)
-  : Tot (dist_vec n) (decreases k)
+  : Tot (dist_vec n)
   =
   if k = 0 then dist
   else bf_round (bf_k_rounds dist weights (k - 1)) weights

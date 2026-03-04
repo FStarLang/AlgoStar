@@ -1,17 +1,7 @@
 (*
-   Dijkstra's Algorithm — Complexity Interface
+   Dijkstra's Algorithm — Complexity Implementation
 
-   Ghost-tick instrumented Dijkstra proves exact complexity: n + 2n² ticks.
-   
-   CLRS §24.3: With adjacency matrix and array-based min-priority queue:
-   - n EXTRACT-MIN: O(n) each → O(n²) total
-   - n × n relaxations → O(n²) total
-   - Overall: O(V²)
-
-   Bound: n + 2n² ≤ 3n²
-
-   NOTE: The complexity-instrumented implementation is integrated into
-   CLRS.Ch24.Dijkstra.Impl, which re-exports from CLRS.Ch24.Dijkstra.
+   Re-exports the ghost-tick instrumented Dijkstra from CLRS.Ch24.Dijkstra.
 *)
 
 module CLRS.Ch24.Dijkstra.Complexity
@@ -31,32 +21,17 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module D = CLRS.Ch24.Dijkstra
 
-/// All weights are non-negative
-let all_weights_non_negative = D.all_weights_non_negative
-
-/// All distances are non-negative
-let all_non_negative = D.all_non_negative
-
-/// All distances bounded: 0 ≤ d ≤ 1000000
-let all_bounded = D.all_bounded
-
-/// Total iteration count: n + 2n²
-let dijkstra_iterations = D.dijkstra_iterations
-
-/// Complexity predicate connecting pure math to ghost counter
-let dijkstra_complexity_bounded = D.dijkstra_complexity_bounded
-
-/// Quadratic bound: n + 2n² ≤ 3n²
-val dijkstra_quadratic_bound (n: nat) : Lemma
+let dijkstra_quadratic_bound (n: nat) : Lemma
   (ensures dijkstra_iterations n <= 3 * n * n)
+  =
+  D.dijkstra_quadratic_bound n
 
-/// O(V²) bound via complexity predicate
-val dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
+let dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
   (requires dijkstra_complexity_bounded cf c0 n)
   (ensures cf - c0 <= 3 * n * n)
+  =
+  D.dijkstra_complexity_is_quadratic cf c0 n
 
-//SNIPPET_START: dijkstra_complexity_sig
-/// Dijkstra with ghost-tick complexity instrumentation
 fn dijkstra_complexity
   (weights: A.array int)
   (n: SZ.t)
@@ -90,4 +65,6 @@ fn dijkstra_complexity
       all_bounded sdist' /\
       dijkstra_complexity_bounded cf (reveal c0) (SZ.v n)
     )
-//SNIPPET_END: dijkstra_complexity_sig
+{
+  D.dijkstra_complexity weights n source dist ctr
+}

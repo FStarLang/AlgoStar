@@ -26,37 +26,7 @@ module Seq = FStar.Seq
  * allowing us to remove the separate verification pass.
  *)
 
-let inf : int = 1000000
-
-(* Distance vector: current distance estimates *)
-type dist_vec (n: nat) = d:Seq.seq int{Seq.length d == n}
-
-(* Weight matrix: n×n adjacency matrix (flattened) *)
-type weight_matrix (n: nat) = w:Seq.seq int{Seq.length w == n * n}
-
-(* All weights are non-negative (required for Dijkstra) *)
-let all_weights_non_negative (#n: nat) (weights: weight_matrix n) : prop =
-  forall (i: nat). i < n * n ==> Seq.index weights i >= 0
-
-(* Triangle inequality for a single edge (u,v) *)
-let edge_satisfies_triangle (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) 
-                           (u v: nat{u < n /\ v < n}) : prop =
-  let d_u = Seq.index dist u in
-  let d_v = Seq.index dist v in
-  let w = Seq.index weights (u * n + v) in
-  (w < inf /\ d_u < inf) ==> d_v <= d_u + w
-
-(* Triangle inequality holds for all edges *)
-let triangle_inequality (#n: nat) (dist: dist_vec n) (weights: weight_matrix n) : prop =
-  forall (u v: nat). u < n /\ v < n ==> edge_satisfies_triangle dist weights u v
-
-(* A vertex has been "processed" if all its outgoing edges have been relaxed *)
-type processed_set = nat -> bool
-
 let is_processed (p: processed_set) (u: nat) : bool = p u
-
-(* Initially no vertices are processed *)
-let initial_processed : processed_set = fun _ -> false
 
 (* Add a vertex to the processed set *)
 let add_to_processed (p: processed_set) (u: nat) : processed_set =
@@ -518,7 +488,7 @@ let find_min_spec (#n: nat) (dist: dist_vec n) (processed: processed_set)
 (* Process vertices in Dijkstra order (greedy min-distance selection) *)
 let rec process_vertices (#n: nat) (dist: dist_vec n) (weights: weight_matrix n)
                          (processed: processed_set) (remaining: nat)
-  : Tot (dist_vec n) (decreases remaining)
+  : Tot (dist_vec n)
   =
   if remaining = 0 then dist
   else
