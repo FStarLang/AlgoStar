@@ -1,4 +1,4 @@
-module CLRS.Ch26.MaxFlow
+module CLRS.Ch26.MaxFlow.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -12,7 +12,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module L = FStar.List.Tot
 open CLRS.Ch26.MaxFlow.Spec
-module Proofs = CLRS.Ch26.MaxFlow.Proofs
+module Lemmas = CLRS.Ch26.MaxFlow.Lemmas
 
 (*
    Ford-Fulkerson (Edmonds-Karp) — Verified in Pulse
@@ -23,8 +23,8 @@ module Proofs = CLRS.Ch26.MaxFlow.Proofs
    3. Augment flow along the path
    4. Repeat until no augmenting path exists (or fuel exhausted)
    
-   Connects to the fully verified pure spec (Spec.fst, Proofs.fst):
-   - valid_flow maintained through augmentation (Proofs.augment_preserves_valid)
+   Connects to the fully verified pure spec (Spec.fst, Lemmas.fst):
+   - valid_flow maintained through augmentation (Lemmas.augment_preserves_valid)
    - MFMC theorem: no augmenting path => max flow
    
    Postcondition guarantees imp_valid_flow (static proof, no runtime check).
@@ -39,6 +39,9 @@ module Proofs = CLRS.Ch26.MaxFlow.Proofs
 (* ================================================================
    TOTAL WRAPPERS for sequence operations (avoid partial Seq.index)
    ================================================================ *)
+
+(** Maximum 63-bit signed integer, used as initial bottleneck sentinel *)
+let int_max : int = 2147483647
 
 let seq_get (s: Seq.seq int) (i: nat) : int =
   if i < Seq.length s then Seq.index s i else 0
@@ -721,7 +724,7 @@ fn find_bottleneck_imp
     pure (bn >= 0)
 {
   let mut current: SZ.t = sink;
-  let mut bottleneck: int = 2147483647;
+  let mut bottleneck: int = int_max;
 
   while (
     let c = !current;

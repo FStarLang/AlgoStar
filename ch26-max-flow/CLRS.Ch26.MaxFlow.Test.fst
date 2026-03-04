@@ -4,7 +4,7 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
 open FStar.Mul
-open CLRS.Ch26.MaxFlow
+open CLRS.Ch26.MaxFlow.Impl
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec

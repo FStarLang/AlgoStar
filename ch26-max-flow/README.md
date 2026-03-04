@@ -4,8 +4,8 @@
 
 A verified implementation of the **Edmonds-Karp algorithm** (BFS-based Ford-Fulkerson method) for computing maximum flow in a network, following CLRS §26.2.
 
-- **~3700 lines** across 5 verified F\*/Pulse modules
-- **Zero admits** in spec and proofs (Spec.fst, Proofs.fst)
+- **~3700 lines** across 5 verified F\*/Pulse modules + 3 interface files
+- **Zero admits** in spec and lemmas (Spec.fst, Lemmas.fst)
 - **Max-Flow Min-Cut Theorem** (CLRS Theorem 26.6) fully proven
 
 ## Algorithm (CLRS §26.2, p. 714)
@@ -26,16 +26,19 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 - **BFS on residual graph** (`bfs_residual`): BFS with color/pred/dist/queue arrays
 - **Bottleneck computation** (`find_bottleneck_imp`): Walks pred chain from sink to source
 - **Flow augmentation** (`augment_imp`): Updates flow along the augmenting path
-- **Static validity**: Postcondition guarantees `imp_valid_flow` (no runtime check needed)
+- **Static validity**: Postcondition guarantees `imp_valid_flow` (backed by runtime check)
 
 ## Files
 
 | File | Lines | Description |
 |------|------:|-------------|
 | `CLRS.Ch26.MaxFlow.Spec.fst` | 1125 | Pure spec: flow networks, residual graphs, augmenting paths, cuts, MFMC theorem |
-| `CLRS.Ch26.MaxFlow.fst` | ~1280 | Imperative Pulse implementation: BFS + augmentation + pure path lemmas |
-| `CLRS.Ch26.MaxFlow.Proofs.fst` | 679 | Proofs: augmentation preserves flow validity, increases flow value |
+| `CLRS.Ch26.MaxFlow.Lemmas.fsti` | — | Interface: augmentation lemma signatures |
+| `CLRS.Ch26.MaxFlow.Lemmas.fst` | 679 | Lemmas: augmentation preserves flow validity, increases flow value |
+| `CLRS.Ch26.MaxFlow.Complexity.fsti` | — | Interface: complexity theorem signatures |
 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | O(VE²) complexity analysis with ghost tick counter |
+| `CLRS.Ch26.MaxFlow.Impl.fsti` | — | Interface: `max_flow` public API |
+| `CLRS.Ch26.MaxFlow.Impl.fst` | ~1285 | Imperative Pulse implementation: BFS + augmentation + pure path lemmas |
 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Smoke test on a 3-vertex graph |
 
 ## Verified Properties
@@ -47,12 +50,12 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 | Lemma 26.4: \|f\| = net flow across any cut | `Spec.fst` — `lemma_flow_value_eq_net_flow` |
 | Corollary 26.5: Weak duality \|f\| ≤ c(S,T) | `Spec.fst` — `weak_duality` |
 | Theorem 26.6: Max-flow min-cut | `Spec.fst` — `max_flow_min_cut_theorem` |
-| Flow conservation preserved by augmentation | `Proofs.fst` — `augment_preserves_valid` |
-| Capacity constraints preserved by augmentation | `Proofs.fst` — `lemma_augment_preserves_capacity` |
-| Flow value strictly increases per augmentation | `Proofs.fst` — `augment_increases_value` |
-| Zero flow is valid | `Proofs.fst` — `zero_flow_valid` |
+| Flow conservation preserved by augmentation | `Lemmas.fst` — `augment_preserves_valid` |
+| Capacity constraints preserved by augmentation | `Lemmas.fst` — `lemma_augment_preserves_capacity` |
+| Flow value strictly increases per augmentation | `Lemmas.fst` — `augment_increases_value` |
+| Zero flow is valid | `Lemmas.fst` — `zero_flow_valid` |
 
-### Pure path lemmas (fully proven in MaxFlow.fst)
+### Pure path lemmas (fully proven in Impl.fst)
 
 | Property | Lemma |
 |----------|-------|
@@ -77,13 +80,13 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 - **Memory safety**: All array accesses bounds-checked
 - **Bounded iterations**: Fuel parameter ensures termination
 - **Capacity validation**: Runtime `check_valid_caps_fn` verifies non-negative capacities
-- **Static flow validity**: `max_flow` postcondition guarantees `imp_valid_flow` unconditionally
+- **Static flow validity**: `max_flow` postcondition guarantees `imp_valid_flow`
 
 ### Remaining proof obligations
 
 | Obligation | File | Notes |
 |------------|------|-------|
-| `lemma_augment_imp_preserves_valid` | `MaxFlow.fst` | `admit()` — augmentation preserves validity |
+| `lemma_augment_imp_preserves_valid` | `Impl.fst` | `admit()` — augmentation preserves validity |
 | `axiom_spd_source_zero` | `Complexity.fst` | BFS shortest-path distance |
 | `axiom_spd_bounded` | `Complexity.fst` | BFS shortest-path bound |
 | `lemma_distances_nondecreasing` | `Complexity.fst` | Lemma 26.7 |

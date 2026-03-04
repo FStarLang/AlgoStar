@@ -2,7 +2,7 @@ module CLRS.Ch26.MaxFlow.Complexity
 
 open FStar.Mul
 open CLRS.Ch26.MaxFlow.Spec
-open CLRS.Ch26.MaxFlow.Proofs
+open CLRS.Ch26.MaxFlow.Lemmas
 
 (*
    Edmonds-Karp Algorithm Complexity Analysis (CLRS Theorem 26.8)
@@ -26,9 +26,6 @@ open CLRS.Ch26.MaxFlow.Proofs
    - lemma_distances_nondecreasing: CLRS Lemma 26.7
    - axiom_edge_critical_bound: CLRS Lemma 26.8
 *)
-
-(** Ghost tick counter: tracks computational cost *)
-type tick_count = nat
 
 (** Cost of one BFS traversal: proportional to E (all edges examined once) *)
 let bfs_cost (num_edges: nat) : tick_count = num_edges

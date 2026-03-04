@@ -1,4 +1,4 @@
-module CLRS.Ch26.MaxFlow.Proofs
+module CLRS.Ch26.MaxFlow.Lemmas
 
 open FStar.Mul
 open FStar.List.Tot
