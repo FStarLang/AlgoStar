@@ -19,13 +19,6 @@ open CLRS.Ch23.MST.Spec
 
 (*** Adjacency Matrix Representation ***)
 
-// Adjacency matrix: adj.[u].[v] = weight of edge (u,v)
-// Use a large value to represent "no edge"
-let adj_matrix = seq (seq int)
-
-// Use a large value for infinity (larger than any real edge weight)
-let infinity : int = 1000000000
-
 // Well-formed adjacency matrix: square, symmetric
 let well_formed_adj (adj: adj_matrix) (n: nat) : prop =
   length adj = n /\
@@ -96,11 +89,6 @@ let adj_to_graph_edges_valid (adj: adj_matrix) (n: nat) (e: edge)
   = adj_to_edges_aux_valid adj n 0 e
 
 (*** Prim's Algorithm State ***)
-
-// Vertices are partitioned into:
-// - Tree vertices: in_tree.[v] = true
-// - Non-tree vertices: in_tree.[v] = false
-type vertex_set = seq bool
 
 // Check if vertex is in tree
 let in_tree (s: vertex_set) (v: nat) : prop =

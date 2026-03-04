@@ -181,9 +181,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 // - Total: (V-1) × (V² + V) ≈ V³
 // - We use a bound of 4V³ to account for overhead
 
-let complexity_bounded_kruskal (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 <= 4 * n * n * n
-
 // ========== Find with tick counting ==========
 
 #push-options "--ifuel 1 --fuel 0"

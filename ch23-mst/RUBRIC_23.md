@@ -1,28 +1,36 @@
 # Chapter 23: Minimum Spanning Trees — Rubric Compliance
 
-**Generated**: 2025-07-18
-**Source**: `/ch23-mst/` — 14 source files, 9 660 lines of F\*/Pulse
+**Generated**: 2025-07-18 (Updated: 2026-03-04)
+**Source**: `/ch23-mst/` — 22 source files
 
 ---
 
 ## Current File Inventory
 
-| # | File | Lines | Lang | Rubric Slot |
-|---|------|------:|------|-------------|
-| 1 | `CLRS.Ch23.MST.Spec.fsti` | 458 | F\* | **Shared Spec interface** — graph, spanning tree, MST, cut, light edge, exchange/path lemma sigs |
-| 2 | `CLRS.Ch23.MST.Spec.fst` | 2 212 | F\* | **Shared Spec impl** — cut\_property (Thm 23.1), exchange argument, all supporting lemmas |
-| 3 | `CLRS.Ch23.MST.Complexity.fst` | 102 | F\* | **Shared Complexity** — arithmetic O(V³) Kruskal / O(V²) Prim bounds |
-| 4 | `CLRS.Ch23.Kruskal.Spec.fst` | 2 138 | F\* | **Kruskal Spec** — edge sorting, `pure_kruskal`, `theorem_kruskal_produces_mst` |
-| 5 | `CLRS.Ch23.Kruskal.Components.fst` | 836 | F\* | **Kruskal Lemmas** — BFS components, forest/acyclicity, reachability |
-| 6 | `CLRS.Ch23.Kruskal.EdgeSorting.fst` | 339 | F\* | **Kruskal Lemmas** — sort permutation, MST weight independence |
-| 7 | `CLRS.Ch23.Kruskal.SortedEdges.fst` | 130 | F\* | **Kruskal Lemmas** — kruskal\_spec over sorted input, subset/forest |
-| 8 | `CLRS.Ch23.Kruskal.UF.fst` | 350 | F\* | **Kruskal Lemmas** — union-find correctness: `find_pure`, soundness, completeness |
-| 9 | `CLRS.Ch23.Kruskal.Helpers.fst` | 118 | F\* | **Kruskal Lemmas** — forest-invariant helpers for Pulse proof |
-| 10 | `CLRS.Ch23.Kruskal.fst` | 575 | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, flat arrays, union-find) |
-| 11 | `CLRS.Ch23.Kruskal.Complexity.fst` | 526 | Pulse | **Kruskal Complexity** — ghost-tick instrumented, proves `ticks ≤ 4·V³` |
-| 12 | `CLRS.Ch23.Prim.Spec.fst` | 1 036 | F\* | **Prim Spec** — `pure_prim`, n−1 edges, connectivity, safety via cut property |
-| 13 | `CLRS.Ch23.Prim.fst` | 404 | Pulse | **Prim Impl** — imperative Prim (adj-matrix, `in_mst` + `key` arrays) |
-| 14 | `CLRS.Ch23.Prim.Complexity.fst` | 436 | Pulse | **Prim Complexity** — ghost-tick instrumented, proves `ticks ≤ 3·V²` |
+| # | File | Lang | Rubric Slot |
+|---|------|------|-------------|
+| 1 | `CLRS.Ch23.MST.Spec.fsti` | F\* | **Shared Spec interface** — graph, spanning tree, MST, cut, light edge |
+| 2 | `CLRS.Ch23.MST.Spec.fst` | F\* | **Shared Spec impl** — cut\_property (Thm 23.1), exchange argument |
+| 3 | `CLRS.Ch23.MST.Complexity.fsti` | F\* | **Shared Complexity interface** — kruskal\_cubic, prim\_quadratic |
+| 4 | `CLRS.Ch23.MST.Complexity.fst` | F\* | **Shared Complexity** — arithmetic O(V³) Kruskal / O(V²) Prim bounds |
+| 5 | `CLRS.Ch23.Kruskal.Spec.fsti` | F\* | **Kruskal Spec interface** — pure\_kruskal, MST theorem signatures |
+| 6 | `CLRS.Ch23.Kruskal.Spec.fst` | F\* | **Kruskal Spec** — edge sorting, `pure_kruskal`, `theorem_kruskal_produces_mst` |
+| 7 | `CLRS.Ch23.Kruskal.Components.fst` | F\* | **Kruskal Lemmas** — BFS components, forest/acyclicity, reachability |
+| 8 | `CLRS.Ch23.Kruskal.EdgeSorting.fst` | F\* | **Kruskal Lemmas** — sort permutation, MST weight independence |
+| 9 | `CLRS.Ch23.Kruskal.SortedEdges.fst` | F\* | **Kruskal Lemmas** — kruskal\_spec over sorted input, subset/forest |
+| 10 | `CLRS.Ch23.Kruskal.UF.fst` | F\* | **Kruskal Lemmas** — union-find correctness: `find_pure`, soundness, completeness |
+| 11 | `CLRS.Ch23.Kruskal.Helpers.fst` | F\* | **Kruskal Lemmas** — forest-invariant helpers for Pulse proof |
+| 12 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F\* | **Kruskal Lemmas interface** — re-exports from sub-modules |
+| 13 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F\* | **Kruskal Lemmas façade** — delegates to sub-modules |
+| 14 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, union-find) |
+| 15 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | **Kruskal Complexity interface** — complexity\_bounded\_kruskal |
+| 16 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | **Kruskal Complexity** — ghost-tick instrumented, proves `ticks ≤ 4·V³` |
+| 17 | `CLRS.Ch23.Prim.Spec.fsti` | F\* | **Prim Spec interface** — pure\_prim, prim\_spec signatures |
+| 18 | `CLRS.Ch23.Prim.Spec.fst` | F\* | **Prim Spec** — `pure_prim`, n−1 edges, connectivity, safety via cut property |
+| 19 | `CLRS.Ch23.Prim.Impl.fsti` | Pulse | **Prim Impl interface** — prim fn signature |
+| 20 | `CLRS.Ch23.Prim.Impl.fst` | Pulse | **Prim Impl** — imperative Prim (adj-matrix, `in_mst` + `key` + `parent` arrays) |
+| 21 | `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | **Prim Complexity interface** — complexity\_bounded\_prim |
+| 22 | `CLRS.Ch23.Prim.Complexity.fst` | Pulse | **Prim Complexity** — ghost-tick instrumented, proves `ticks ≤ 3·V²` |
 
 ---
 
@@ -60,45 +68,45 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 
 | Rubric Slot | Expected File | Actual File(s) | Status |
 |-------------|---------------|-----------------|--------|
-| Spec | `CLRS.Ch23.MST.Spec.fst` | `CLRS.Ch23.MST.Spec.fst` (2 212 lines) | ✅ Present |
-| Spec interface | `CLRS.Ch23.MST.Spec.fsti` | `CLRS.Ch23.MST.Spec.fsti` (458 lines) | ✅ Present |
-| Complexity | `CLRS.Ch23.MST.Complexity.fst` | `CLRS.Ch23.MST.Complexity.fst` (102 lines) | ✅ Present |
-| Complexity.fsti | `CLRS.Ch23.MST.Complexity.fsti` | — | ❌ Missing |
+| Spec | `CLRS.Ch23.MST.Spec.fst` | `CLRS.Ch23.MST.Spec.fst` | ✅ Present |
+| Spec interface | `CLRS.Ch23.MST.Spec.fsti` | `CLRS.Ch23.MST.Spec.fsti` | ✅ Present |
+| Complexity | `CLRS.Ch23.MST.Complexity.fst` | `CLRS.Ch23.MST.Complexity.fst` | ✅ Present |
+| Complexity.fsti | `CLRS.Ch23.MST.Complexity.fsti` | `CLRS.Ch23.MST.Complexity.fsti` | ✅ Present |
 
 ### Kruskal
 
 | Rubric Slot | Expected File | Actual File(s) | Status |
 |-------------|---------------|-----------------|--------|
-| Spec | `CLRS.Ch23.Kruskal.Spec.fst` | `CLRS.Ch23.Kruskal.Spec.fst` (2 138 lines) | ✅ Present |
-| Spec.fsti | `CLRS.Ch23.Kruskal.Spec.fsti` | — | ❌ Missing |
-| Lemmas | `CLRS.Ch23.Kruskal.Lemmas.fst` | Split across 5 files: `Components` (836), `EdgeSorting` (339), `SortedEdges` (130), `UF` (350), `Helpers` (118) | 🔶 Content present, naming diverges |
-| Lemmas.fsti | `CLRS.Ch23.Kruskal.Lemmas.fsti` | — | ❌ Missing |
-| Complexity | `CLRS.Ch23.Kruskal.Complexity.fst` | `CLRS.Ch23.Kruskal.Complexity.fst` (526 lines) | ✅ Present |
-| Complexity.fsti | `CLRS.Ch23.Kruskal.Complexity.fsti` | — | ❌ Missing |
-| Impl | `CLRS.Ch23.Kruskal.Impl.fst` | `CLRS.Ch23.Kruskal.fst` (575 lines) | 🔶 Present, named `Kruskal.fst` not `Kruskal.Impl.fst` |
-| Impl.fsti | `CLRS.Ch23.Kruskal.Impl.fsti` | — | ❌ Missing |
+| Spec | `CLRS.Ch23.Kruskal.Spec.fst` | `CLRS.Ch23.Kruskal.Spec.fst` | ✅ Present |
+| Spec.fsti | `CLRS.Ch23.Kruskal.Spec.fsti` | `CLRS.Ch23.Kruskal.Spec.fsti` | ✅ Present |
+| Lemmas | `CLRS.Ch23.Kruskal.Lemmas.fst` | `CLRS.Ch23.Kruskal.Lemmas.fst` (façade) + Components, EdgeSorting, SortedEdges, UF, Helpers | ✅ Present |
+| Lemmas.fsti | `CLRS.Ch23.Kruskal.Lemmas.fsti` | `CLRS.Ch23.Kruskal.Lemmas.fsti` | ✅ Present |
+| Complexity | `CLRS.Ch23.Kruskal.Complexity.fst` | `CLRS.Ch23.Kruskal.Complexity.fst` | ✅ Present |
+| Complexity.fsti | `CLRS.Ch23.Kruskal.Complexity.fsti` | `CLRS.Ch23.Kruskal.Complexity.fsti` | ✅ Present |
+| Impl | `CLRS.Ch23.Kruskal.Impl.fst` | `CLRS.Ch23.Kruskal.Impl.fst` | ✅ Present |
+| Impl.fsti | `CLRS.Ch23.Kruskal.Impl.fsti` | — | ❌ Missing (predicates tightly coupled to impl) |
 
 ### Prim
 
 | Rubric Slot | Expected File | Actual File(s) | Status |
 |-------------|---------------|-----------------|--------|
-| Spec | `CLRS.Ch23.Prim.Spec.fst` | `CLRS.Ch23.Prim.Spec.fst` (1 036 lines) | ✅ Present |
-| Spec.fsti | `CLRS.Ch23.Prim.Spec.fsti` | — | ❌ Missing |
-| Lemmas | `CLRS.Ch23.Prim.Lemmas.fst` | — (lemmas are inline in `Prim.Spec.fst`) | ❌ Missing (content exists, not factored) |
+| Spec | `CLRS.Ch23.Prim.Spec.fst` | `CLRS.Ch23.Prim.Spec.fst` | ✅ Present |
+| Spec.fsti | `CLRS.Ch23.Prim.Spec.fsti` | `CLRS.Ch23.Prim.Spec.fsti` | ✅ Present |
+| Lemmas | `CLRS.Ch23.Prim.Lemmas.fst` | — (lemmas inline in Prim.Spec.fst) | ❌ Missing |
 | Lemmas.fsti | `CLRS.Ch23.Prim.Lemmas.fsti` | — | ❌ Missing |
-| Complexity | `CLRS.Ch23.Prim.Complexity.fst` | `CLRS.Ch23.Prim.Complexity.fst` (436 lines) | ✅ Present |
-| Complexity.fsti | `CLRS.Ch23.Prim.Complexity.fsti` | — | ❌ Missing |
-| Impl | `CLRS.Ch23.Prim.Impl.fst` | `CLRS.Ch23.Prim.fst` (404 lines) | 🔶 Present, named `Prim.fst` not `Prim.Impl.fst` |
-| Impl.fsti | `CLRS.Ch23.Prim.Impl.fsti` | — | ❌ Missing |
+| Complexity | `CLRS.Ch23.Prim.Complexity.fst` | `CLRS.Ch23.Prim.Complexity.fst` | ✅ Present |
+| Complexity.fsti | `CLRS.Ch23.Prim.Complexity.fsti` | `CLRS.Ch23.Prim.Complexity.fsti` | ✅ Present |
+| Impl | `CLRS.Ch23.Prim.Impl.fst` | `CLRS.Ch23.Prim.Impl.fst` | ✅ Present |
+| Impl.fsti | `CLRS.Ch23.Prim.Impl.fsti` | `CLRS.Ch23.Prim.Impl.fsti` | ✅ Present |
 
 ### Summary
 
-| | ✅ Present | 🔶 Partial | ❌ Missing |
-|---|:-:|:-:|:-:|
-| **MST Shared** | 3 | 0 | 1 |
-| **Kruskal** | 2 | 2 | 4 |
-| **Prim** | 2 | 1 | 5 |
-| **Total** | **7** | **3** | **10** |
+| | ✅ Present | ❌ Missing |
+|---|:-:|:-:|
+| **MST Shared** | 4 | 0 |
+| **Kruskal** | 7 | 1 |
+| **Prim** | 6 | 2 |
+| **Total** | **17** | **3** |
 
 ---
 
@@ -106,30 +114,30 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 
 ### A. Interface Files (❌ → ✅)
 
-| ID | Action | Priority | Effort |
+| ID | Action | Priority | Status |
 |----|--------|----------|--------|
-| A1 | Create `CLRS.Ch23.Kruskal.Spec.fsti` — export `pure_kruskal`, `theorem_kruskal_produces_mst`, `theorem_kruskal_produces_spanning_tree` signatures | Medium | Small |
-| A2 | Create `CLRS.Ch23.Prim.Spec.fsti` — export `pure_prim`, `prim_spec`, `prim_produces_n_minus_1_edges` signatures | Medium | Small |
-| A3 | Create `CLRS.Ch23.Kruskal.Impl.fsti` — public imperative API signature | Medium | Small |
-| A4 | Create `CLRS.Ch23.Prim.Impl.fsti` — public imperative API signature | Medium | Small |
-| A5 | Create `CLRS.Ch23.MST.Complexity.fsti` — export `kruskal_cubic`, `prim_quadratic` | Low | Trivial |
-| A6 | Create `CLRS.Ch23.Kruskal.Complexity.fsti` — export tick-bound signature | Low | Trivial |
-| A7 | Create `CLRS.Ch23.Prim.Complexity.fsti` — export tick-bound signature | Low | Trivial |
+| A1 | Create `CLRS.Ch23.Kruskal.Spec.fsti` — export `pure_kruskal`, `theorem_kruskal_produces_mst`, `theorem_kruskal_produces_spanning_tree` signatures | Medium | ✅ **DONE** |
+| A2 | Create `CLRS.Ch23.Prim.Spec.fsti` — export `pure_prim`, `prim_spec`, `prim_produces_n_minus_1_edges` signatures | Medium | ✅ **DONE** |
+| A3 | Create `CLRS.Ch23.Kruskal.Impl.fsti` — public imperative API signature | Medium | ❌ Skipped — predicates tightly coupled to impl internals |
+| A4 | Create `CLRS.Ch23.Prim.Impl.fsti` — public imperative API signature | Medium | ✅ **DONE** |
+| A5 | Create `CLRS.Ch23.MST.Complexity.fsti` — export `kruskal_cubic`, `prim_quadratic` | Low | ✅ **DONE** |
+| A6 | Create `CLRS.Ch23.Kruskal.Complexity.fsti` — export tick-bound signature | Low | ✅ **DONE** |
+| A7 | Create `CLRS.Ch23.Prim.Complexity.fsti` — export tick-bound signature | Low | ✅ **DONE** |
 
 ### B. Naming Conformance (🔶 → ✅)
 
-| ID | Action | Priority | Effort |
+| ID | Action | Priority | Status |
 |----|--------|----------|--------|
-| B1 | Rename `CLRS.Ch23.Kruskal.fst` → `CLRS.Ch23.Kruskal.Impl.fst` | Low | Trivial (+ update Makefile/.depend) |
-| B2 | Rename `CLRS.Ch23.Prim.fst` → `CLRS.Ch23.Prim.Impl.fst` | Low | Trivial (+ update Makefile/.depend) |
+| B1 | Rename `CLRS.Ch23.Kruskal.fst` → `CLRS.Ch23.Kruskal.Impl.fst` | Low | ✅ **DONE** |
+| B2 | Rename `CLRS.Ch23.Prim.fst` → `CLRS.Ch23.Prim.Impl.fst` | Low | ✅ **DONE** |
 
 ### C. Lemmas Consolidation (🔶 → ✅)
 
-| ID | Action | Priority | Effort |
+| ID | Action | Priority | Status |
 |----|--------|----------|--------|
-| C1 | Create `CLRS.Ch23.Kruskal.Lemmas.fsti` re-exporting key signatures from Components, EdgeSorting, SortedEdges, UF, Helpers | Medium | Small |
-| C2 | Optionally create `CLRS.Ch23.Kruskal.Lemmas.fst` as a façade that opens all five sub-modules | Low | Small |
-| C3 | Factor Prim lemmas out of `Prim.Spec.fst` into `CLRS.Ch23.Prim.Lemmas.fst`/`.fsti` | Medium | Medium |
+| C1 | Create `CLRS.Ch23.Kruskal.Lemmas.fsti` re-exporting key signatures from Components, EdgeSorting, SortedEdges, UF, Helpers | Medium | ✅ **DONE** |
+| C2 | Create `CLRS.Ch23.Kruskal.Lemmas.fst` as a façade that opens all five sub-modules | Low | ✅ **DONE** |
+| C3 | Factor Prim lemmas out of `Prim.Spec.fst` into `CLRS.Ch23.Prim.Lemmas.fst`/`.fsti` | Medium | ❌ Not yet done |
 
 ### D. Proof Gaps (from AUDIT_CH23.md)
 
@@ -157,7 +165,7 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 
 | Check | Result |
 |-------|--------|
-| `grep -n 'admit\|assume_' *.fst *.fsti` | **0 live admits** — all previously reported admits (Kruskal.fst:315, UF.fst:360) appear resolved |
+| `grep -n 'admit\|assume_' *.fst *.fsti` | **0 live admits** — all files verify cleanly |
 | Remaining assumed preconditions | `∃ t. is_mst g t` in `Kruskal.Spec` and `Prim.Spec` — existence not derived from connectivity |
 
 ### Spec ↔ Impl Connection
@@ -183,6 +191,7 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 
 ### Overall Rubric Score
 
-- **Slots filled**: 7 / 20 fully compliant, 3 partial → **35% full, 50% with partials**
+- **Slots filled**: 17 / 20 fully compliant, 0 partial → **85% full**
+- **Remaining gaps**: Kruskal.Impl.fsti (predicates tightly coupled), Prim.Lemmas.fst/.fsti (content inline in Spec)
 - **Proof quality**: Strong pure layer; imperative layer under-specified
-- **Top priorities**: (D2) Prim Impl↔Spec bridge, (D3) Kruskal Impl↔Spec bridge, (A1–A4) interface files
+- **Top priorities**: (D2) Prim Impl↔Spec bridge, (D3) Kruskal Impl↔Spec bridge, (C3) Prim Lemmas factoring

@@ -18,7 +18,7 @@
    connects previously unreachable vertices).
 *)
 
-module CLRS.Ch23.Kruskal
+module CLRS.Ch23.Kruskal.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array

@@ -16,25 +16,7 @@ open FStar.List.Tot
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Components
 
-// Re-export from Components for backward compatibility with qualified KSpec.is_forest
-let is_forest (edges: list edge) (n: nat) : prop =
-  CLRS.Ch23.Kruskal.Components.is_forest edges n
-
 (*** Edge Sorting ***)
-
-// Sort edges by weight (ascending order)
-// Using insertion sort for simplicity
-let rec insert_edge (e: edge) (sorted: list edge) : list edge =
-  match sorted with
-  | [] -> [e]
-  | hd :: tl ->
-    if e.w <= hd.w then e :: sorted
-    else hd :: insert_edge e tl
-
-let rec sort_edges (edges: list edge) : list edge =
-  match edges with
-  | [] -> []
-  | e :: rest -> insert_edge e (sort_edges rest)
 
 // Properties of sorted edges
 let rec insert_edge_mem (e e': edge) (sorted: list edge)
@@ -133,13 +115,6 @@ let sort_edges_subset (edges: list edge)
   = sort_edges_subset_forward edges;
     sort_edges_subset_backward edges
 
-// If edges are sorted, elements appear in non-decreasing weight order
-let rec is_sorted_by_weight (edges: list edge) : bool =
-  match edges with
-  | [] -> true
-  | [e] -> true
-  | e1 :: e2 :: rest -> e1.w <= e2.w && is_sorted_by_weight (e2 :: rest)
-
 let rec insert_maintains_sorted (e: edge) (sorted: list edge)
   : Lemma (requires is_sorted_by_weight sorted)
           (ensures is_sorted_by_weight (insert_edge e sorted))
@@ -161,37 +136,6 @@ let rec sort_edges_sorted (edges: list edge)
     | e :: rest ->
       sort_edges_sorted rest;
       insert_maintains_sorted e (sort_edges rest)
-
-(*** Pure Kruskal Step ***)
-
-//SNIPPET_START: kruskal_step
-// Single step of Kruskal: try to add next edge if it connects different components
-// This is a pure specification function - the is_forest check is implicit
-let kruskal_step (e: edge) (forest: list edge) (n: nat) : list edge =
-  if e.u < n && e.v < n && 
-     not (same_component_dec forest e.u e.v) &&
-     not (mem_edge e forest)
-  then e :: forest
-  else forest
-//SNIPPET_END: kruskal_step
-
-// Process all edges in order
-let rec kruskal_process (sorted_edges: list edge) (forest: list edge) (n: nat) 
-  : Tot (list edge) (decreases sorted_edges)
-  = match sorted_edges with
-    | [] -> forest
-    | e :: rest ->
-      let forest' = kruskal_step e forest n in
-      kruskal_process rest forest' n
-
-(*** Pure Kruskal Algorithm ***)
-
-//SNIPPET_START: pure_kruskal
-// Main Kruskal algorithm: sort edges, then greedily add safe edges
-let pure_kruskal (g: graph) : list edge =
-  let sorted = sort_edges g.edges in
-  kruskal_process sorted [] g.n
-//SNIPPET_END: pure_kruskal
 
 (*** Correctness Properties ***)
 
@@ -1650,6 +1594,7 @@ let connected_min_edges (n: nat) (es: list edge)
     count_all n;
     count_reachable_bound es 0 n
 
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
                     all_connected g.n g.edges /\
@@ -1726,14 +1671,19 @@ let theorem_kruskal_produces_spanning_tree (g: graph)
         assert (noRepeats_edge result);
         // |result| ≤ |mst'| from subset + noRepeats
         subset_noRepeats_length_le result mst';
-        assert (length result <= length mst');
-        assert (length mst' = g.n - 1);
         // |result| ≥ g.n - 1 from connected_min_edges
         connected_min_edges g.n result;
+        // Together: is_spanning_tree g result
+        assert (subset_edges result g.edges);
+        assert (all_connected g.n result);
+        assert (acyclic g.n result);
+        assert (g.n > 0);
+        assert (length result <= length mst');
+        assert (length mst' = g.n - 1);
         assert (length result >= g.n - 1);
-        // Together: length result = g.n - 1
         assert (length result = g.n - 1)
       )
+#pop-options
 
 // total_weight of remove_edge_first
 let rec total_weight_remove (e: edge) (l: list edge)

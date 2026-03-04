@@ -150,9 +150,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 // - Total: V × (V + V) = 2V²
 // - We use a bound of 3V² to account for overhead
 
-let complexity_bounded_prim (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 <= 3 * n * n
-
 // ========== Prim's MST with Complexity Counting ==========
 
 fn prim_complexity

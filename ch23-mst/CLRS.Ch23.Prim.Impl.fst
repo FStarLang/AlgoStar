@@ -1,4 +1,4 @@
-module CLRS.Ch23.Prim
+module CLRS.Ch23.Prim.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -8,7 +8,6 @@ open FStar.Mul
 open FStar.Math.Lib
 open FStar.UInt
 open CLRS.Ch23.MST.Spec
-open CLRS.Ch23.Prim.Spec
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -17,24 +16,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module U64 = FStar.UInt64
 
-// Use a large value for infinity that fits in SizeT (max is typically 2^16-1 or 2^32-1)
-// For MST algorithm, any value larger than max possible path weight works
-// NOTE: Edge weights must be < infinity for correct behavior; weights >= infinity
-// are treated as "no edge" in the imperative code.
-let infinity : SZ.t = 65535sz
-
-// All real edge weights must be strictly less than infinity.
-// Weights of 0 represent self-loops or zero-weight edges;
-// weights >= infinity are treated as absent.
-let valid_weights (weights_seq: Seq.seq SZ.t) (n: nat) : prop =
-  Seq.length weights_seq == n * n /\
-  (forall (i: nat). i < n * n ==>
-    SZ.v (Seq.index weights_seq i) = 0 \/
-    (SZ.v (Seq.index weights_seq i) > 0 /\ SZ.v (Seq.index weights_seq i) < SZ.v infinity))
-
-// Predicate: all elements in sequence are <= infinity
-let all_keys_bounded (s: Seq.seq SZ.t) : prop =
-  forall (i:nat). i < Seq.length s ==> SZ.v (Seq.index s i) <= SZ.v infinity
+module PrimSpec = CLRS.Ch23.Prim.Spec
 
 // Convert SizeT weights to int for specification
 let sizet_to_int (x: SZ.t) : int = SZ.v x
@@ -55,7 +37,7 @@ let weights_to_adj_matrix (weights_seq: Seq.seq SZ.t) (n: nat)
         let w_sizet = Seq.index weights_seq idx in
         let w : int = sizet_to_int w_sizet in
         // Use spec's infinity value for comparison
-        if w >= sizet_to_int infinity then Prim.Spec.infinity else w
+        if w >= sizet_to_int infinity then PrimSpec.infinity else w
       )
     )
 
@@ -71,26 +53,9 @@ let weights_to_adj_preserves (weights_seq: Seq.seq SZ.t) (n: nat) (u v: nat)
                     let w_spec = Seq.index (Seq.index adj u) v in
                     (w_imp > 0 /\ w_imp < SZ.v infinity ==> w_spec = w_imp) /\
                     (w_imp = 0 ==> w_spec = 0) /\
-                    (w_imp >= SZ.v infinity ==> w_spec = Prim.Spec.infinity)))
+                    (w_imp >= SZ.v infinity ==> w_spec = PrimSpec.infinity)))
   = ()
 #pop-options
-
-// Valid parent values: all entries < n
-// Predicate for full correctness of Prim's output
-let prim_correct 
-    (key_seq: Seq.seq SZ.t)
-    (parent_seq: Seq.seq SZ.t)
-    (weights_seq: Seq.seq SZ.t)
-    (n: nat) 
-    (source: nat) 
-  : prop 
-  = Seq.length key_seq == n /\
-    Seq.length parent_seq == n /\
-    source < n /\
-    Seq.length weights_seq == n * n /\
-    SZ.v (Seq.index key_seq source) == 0 /\
-    all_keys_bounded key_seq /\
-    SZ.v (Seq.index parent_seq source) == source
 
 // Lemma: Seq.create produces bounded keys
 let lemma_create_bounded (n: nat) (v: SZ.t)
