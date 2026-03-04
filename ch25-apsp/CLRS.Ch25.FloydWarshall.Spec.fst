@@ -33,6 +33,12 @@ let non_negative_diagonal (d: seq int) (n: nat) : prop =
   (forall (v: nat). v < n ==> index d (v * n + v) >= 0)
 //SNIPPET_END: safety_predicates
 
+//SNIPPET_START: complexity_bound
+// Complexity bound predicate: cf - c0 == n³ relaxation operations
+let fw_complexity_bounded (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n * n * n
+//SNIPPET_END: complexity_bound
+
 (*** Pure imperative-mirroring specification ***)
 
 //SNIPPET_START: pure_spec

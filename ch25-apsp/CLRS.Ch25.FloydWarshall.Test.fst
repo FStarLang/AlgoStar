@@ -8,6 +8,7 @@ open CLRS.Ch25.FloydWarshall.Impl
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
@@ -48,8 +49,14 @@ fn test_floyd_warshall ()
   A.op_Array_Assignment dist 7sz inf;
   A.op_Array_Assignment dist 8sz 0;
   
-  // Run Floyd-Warshall
-  floyd_warshall dist n;
+  // Ghost tick counter (erased at extraction)
+  let ctr = GR.alloc #nat 0;
+  
+  // Run Floyd-Warshall (proves correctness + complexity)
+  floyd_warshall dist n ctr;
+  
+  // Free ghost counter
+  GR.free ctr;
   
   // Clean up
   with s. assert (A.pts_to dist s);
