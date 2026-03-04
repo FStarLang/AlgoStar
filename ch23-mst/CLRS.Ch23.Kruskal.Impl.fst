@@ -1,7 +1,9 @@
 (*
    Kruskal's MST Algorithm - Verified implementation in Pulse
    
-   Simplified Kruskal's: selects minimum-weight edges without creating cycles.
+   Simplified Kruskal's: each round scans the full V×V adjacency matrix for the
+   minimum-weight cross-component edge (i.e., the lightest edge whose endpoints
+   are in different union-find components), then adds it to the forest.
    Graph: weighted adjacency matrix (n×n flat array, 0 = no edge).
    Union-Find: parent array with find and union operations.
    
@@ -10,6 +12,9 @@
    - All selected edge endpoints are valid vertices (< n)
    - Result forms an acyclic forest (proven via union-find invariant)
    - Union-find parent values remain valid throughout
+   
+   Key inner-scan invariant: if best_w > 0, then find(best_u) ≠ find(best_v),
+   ensuring the selected edge always connects distinct components.
    
    Proof: The forest property is maintained by tracking a union-find invariant
    (uf_inv) that relates the parent array to edge connectivity. When adding an
@@ -453,7 +458,17 @@ fn kruskal
   {
     let vround = !round;
     
-    // Find minimum weight edge
+    // Bind ghost variables BEFORE inner scan (find calls need parent + valid_parents)
+    with sparent_cur. assert (A.pts_to parent sparent_cur);
+    with seu_cur. assert (A.pts_to edge_u seu_cur);
+    with sev_cur. assert (A.pts_to edge_v sev_cur);
+    with vec_cur. assert (R.pts_to edge_count vec_cur);
+    
+    // Extract valid_parents before scan (find needs it inside inner loop)
+    kruskal_inv_valid_parents sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    kruskal_inv_endpoints sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    
+    // Find minimum weight cross-component edge
     let mut best_u: SZ.t = 0sz;
     let mut best_v: SZ.t = 0sz;
     let mut best_w: int = 0;
@@ -466,13 +481,18 @@ fn kruskal
       R.pts_to best_v vbv **
       R.pts_to best_w vbw **
       A.pts_to adj #p sadj **
+      A.pts_to parent sparent_cur **
       pure (
         SZ.v vui <= SZ.v n /\
         SZ.v vbu < SZ.v n /\
         SZ.v vbv < SZ.v n /\
         SZ.fits (SZ.v n * SZ.v n) /\
+        SZ.v n > 0 /\
         vbw >= 0 /\
-        (vbw = 0 ==> SZ.v vbu == SZ.v vbv)
+        valid_parents sparent_cur (SZ.v n) /\
+        (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
+        (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
+                      UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n))
       )
     decreases (SZ.v n - SZ.v !ui)
     {
@@ -486,14 +506,19 @@ fn kruskal
         R.pts_to best_v vbv **
         R.pts_to best_w vbw **
         A.pts_to adj #p sadj **
+        A.pts_to parent sparent_cur **
         pure (
           SZ.v vvi <= SZ.v n /\
           SZ.v vui < SZ.v n /\
           SZ.v vbu < SZ.v n /\
           SZ.v vbv < SZ.v n /\
           SZ.fits (SZ.v n * SZ.v n) /\
+          SZ.v n > 0 /\
           vbw >= 0 /\
-          (vbw = 0 ==> SZ.v vbu == SZ.v vbv)
+          valid_parents sparent_cur (SZ.v n) /\
+          (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
+          (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
+                        UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n))
         )
       decreases (SZ.v n - SZ.v !vi)
       {
@@ -506,7 +531,12 @@ fn kruskal
         let vbu_old = !best_u;
         let vbv_old = !best_v;
         
-        let take_it: bool = (w > 0 && (vbw = 0 || w < vbw));
+        // Component check: only consider edges between different components
+        let root_ui = find parent vui n;
+        let root_vi = find parent vvi n;
+        let diff_comp: bool = (root_ui <> root_vi);
+        
+        let take_it: bool = (w > 0 && diff_comp && (vbw = 0 || w < vbw));
         best_u := (if take_it then vui else vbu_old);
         best_v := (if take_it then vvi else vbv_old);
         best_w := (if take_it then w else vbw);
@@ -516,16 +546,8 @@ fn kruskal
       ui := vui +^ 1sz;
     };
     
-    // After inner loops: rebind framed ghost variables
-    with sparent_cur. assert (A.pts_to parent sparent_cur);
-    with seu_cur. assert (A.pts_to edge_u seu_cur);
-    with sev_cur. assert (A.pts_to edge_v sev_cur);
-    
-    // Extract valid_parents from opaque kruskal_inv for find/do_union
-    with vec_cur. assert (R.pts_to edge_count vec_cur);
-    kruskal_inv_valid_parents sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
-    // Extract valid_endpoints for proving new array validity after branchless writes
-    kruskal_inv_endpoints sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    // After scan: edge_u, edge_v, edge_count were framed (unchanged)
+    // parent was in inner invariant and comes back as sparent_cur
     
     // Check components and add edge
     let vbu = !best_u;
