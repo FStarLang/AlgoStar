@@ -1,13 +1,14 @@
 (*
-   Helper lemmas for strengthening quickselect's postcondition.
+   CLRS Chapter 9.2: Quickselect — Lemmas
 
    Key result: if s1 is a permutation of s_pre, and they agree outside [lo, hi),
    then a bound on all values in s_pre[lo..hi) also holds for s1[lo..hi).
 
    This enables propagating ordering invariants through partition calls.
-*)
 
-module CLRS.Ch09.Quickselect.Helpers
+   NO admits. NO assumes.
+*)
+module CLRS.Ch09.Quickselect.Lemmas
 
 open FStar.Seq
 open FStar.Classical
@@ -35,7 +36,6 @@ let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
           (ensures Seq.Properties.count x (Seq.slice s_pre lo hi) ==
                    Seq.Properties.count x (Seq.slice s1 lo hi))
   = let n = Seq.length s_pre in
-    // Outside slices are propositionally equal
     slice_eq_from_pointwise s_pre s1 0 lo;
     Seq.lemma_eq_elim (Seq.slice s_pre 0 lo) (Seq.slice s1 0 lo);
     slice_eq_from_pointwise s_pre s1 hi n;
@@ -44,18 +44,12 @@ let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
     let pre_m = Seq.slice s_pre lo hi in
     let pre_r = Seq.slice s_pre hi n in
     let s1_m = Seq.slice s1 lo hi in
-    // Establish three-way decomposition via propositional equality
     Seq.lemma_eq_elim s_pre (Seq.append pre_l (Seq.append pre_m pre_r));
     Seq.lemma_eq_elim s1 (Seq.append pre_l (Seq.append s1_m pre_r));
-    // Split counts using lemma_append_count_aux for specific x
     Seq.Properties.lemma_append_count_aux x pre_l (Seq.append pre_m pre_r);
     Seq.Properties.lemma_append_count_aux x pre_m pre_r;
     Seq.Properties.lemma_append_count_aux x pre_l (Seq.append s1_m pre_r);
     Seq.Properties.lemma_append_count_aux x s1_m pre_r;
-    // count x s_pre = count x pre_l + count x pre_m + count x pre_r
-    // count x s1   = count x pre_l + count x s1_m  + count x pre_r
-    // permutation: count x s_pre = count x s1
-    // Therefore: count x pre_m = count x s1_m
     ()
 #pop-options
 
@@ -83,8 +77,6 @@ let rec count_pos_has_index (s: Seq.seq int) (x: int)
 #pop-options
 
 // ========== Main lemma: lower bound preservation ==========
-// If all values in s_pre[lo..hi) are >= v, and s1 is a permutation of s_pre
-// with elements outside [lo,hi) unchanged, then all values in s1[lo..hi) are >= v.
 
 #push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
 let perm_unchanged_lower_bound
@@ -101,15 +93,10 @@ let perm_unchanged_lower_bound
   = let x = Seq.index s1 j in
     let s1_slice = Seq.slice s1 lo hi in
     let pre_slice = Seq.slice s_pre lo hi in
-    // s1[j] = s1_slice[j - lo], so count(x, s1_slice) >= 1
     assert (Seq.index s1_slice (j - lo) == x);
     index_has_positive_count s1_slice (j - lo);
-    // count(x, s1_slice) = count(x, pre_slice)
     count_range_eq s_pre s1 lo hi x;
-    // count(x, pre_slice) >= 1, so x appears somewhere in pre_slice
     count_pos_has_index pre_slice x;
-    // There exists i' < hi-lo with pre_slice[i'] = x, i.e., s_pre[lo+i'] = x
-    // By premise, v <= s_pre[lo+i'] = x = s1[j]
     ()
 #pop-options
 
@@ -138,7 +125,6 @@ let perm_unchanged_upper_bound
 #pop-options
 
 // ========== Universally-quantified versions ==========
-// These produce forall-quantified conclusions for use with SMT
 
 #push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
 let perm_unchanged_lower_bound_forall
@@ -198,11 +184,10 @@ let perm_unchanged_upper_bound_forall
 
 // ========== Bridge: Seq.Properties.permutation <==> count_occ-based is_permutation ==========
 
-module Spec = CLRS.Ch09.PartialSelectionSort.Spec
+module PSSSpec = CLRS.Ch09.PartialSelectionSort.Spec
 
-// Seq.Properties.count and Spec.count_occ are equivalent
 let rec count_eq (s: Seq.seq int) (x: int)
-  : Lemma (ensures Seq.Properties.count x s = Spec.count_occ s x)
+  : Lemma (ensures Seq.Properties.count x s = PSSSpec.count_occ s x)
           (decreases Seq.length s)
   = if Seq.length s = 0 then ()
     else (
@@ -210,12 +195,11 @@ let rec count_eq (s: Seq.seq int) (x: int)
       count_eq (Seq.tail s) x
     )
 
-// Bridge: Seq.Properties.permutation ==> Spec.is_permutation (given equal lengths)
 let seq_perm_implies_is_perm (s1 s2: Seq.seq int)
   : Lemma (requires Seq.Properties.permutation int s1 s2 /\
                     Seq.length s1 == Seq.length s2)
-          (ensures Spec.is_permutation s1 s2)
-  = let aux (x: int) : Lemma (Spec.count_occ s1 x = Spec.count_occ s2 x) =
+          (ensures PSSSpec.is_permutation s1 s2)
+  = let aux (x: int) : Lemma (PSSSpec.count_occ s1 x = PSSSpec.count_occ s2 x) =
       count_eq s1 x;
       count_eq s2 x
     in

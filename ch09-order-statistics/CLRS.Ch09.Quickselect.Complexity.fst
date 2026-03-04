@@ -11,7 +11,6 @@ module CLRS.Ch09.Quickselect.Complexity
 *)
 
 open FStar.Mul
-open CLRS.Common.Complexity
 
 (* Worst-case cost for quickselect
    T(0) = 0, T(1) = 0

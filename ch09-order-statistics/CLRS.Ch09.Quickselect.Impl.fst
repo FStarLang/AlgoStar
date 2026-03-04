@@ -1,24 +1,20 @@
 (*
-   CLRS Chapter 9.2: RANDOMIZED-SELECT (Quickselect) — Verified in Pulse
+   CLRS Chapter 9.2: RANDOMIZED-SELECT (Quickselect) — Pulse Implementation
 
    Finds the k-th smallest element using partition-based selection.
    Algorithm: pick last element as pivot, partition, recurse on relevant half.
 
    Complexity: O(n²) worst case (deterministic pivot; O(n) expected requires
    randomized pivot, which is not implemented here).
-   This replaces the O(nk) selection sort approach in PartialSelectionSort.fst.
 
    Verification:
    - NO admits, NO assumes
    - Permutation: output array is a rearrangement of input
    - Partition ordering: elements [0,k) ≤ a[k] and elements (k,n) ≥ a[k]
    - Correctness: result == select_spec s0 k (the k-th order statistic)
-     Uses bridge lemmas in Helpers.fst to connect Seq.Properties.permutation
-     to count_occ-based is_permutation, then applies pulse_correctness_hint
-     from Correctness.fst
 *)
 
-module CLRS.Ch09.Quickselect
+module CLRS.Ch09.Quickselect.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -32,93 +28,23 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
-module Helpers = CLRS.Ch09.Quickselect.Helpers
-module Correctness = CLRS.Ch09.PartialSelectionSort.Correctness
-module Spec = CLRS.Ch09.PartialSelectionSort.Spec
+module QSpec = CLRS.Ch09.Quickselect.Spec
+module Lemmas = CLRS.Ch09.Quickselect.Lemmas
+module Correctness = CLRS.Ch09.PartialSelectionSort.Lemmas
+module PSSSpec = CLRS.Ch09.PartialSelectionSort.Spec
 module GR = Pulse.Lib.GhostReference
 module QC = CLRS.Ch09.Quickselect.Complexity
 
-// ========== Permutation infrastructure ==========
-
-[@@"opaque_to_smt"]
-let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
-
-let permutation_same_length (s1 s2 : Seq.seq int)
-  : Lemma (requires permutation s1 s2)
-          (ensures Seq.length s1 == Seq.length s2)
-          [SMTPat (permutation s1 s2)]
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    Seq.Properties.perm_len s1 s2
-
-let permutation_refl (s: Seq.seq int)
-  : Lemma (ensures permutation s s)
-    [SMTPat (permutation s s)]
-  = reveal_opaque (`%permutation) (permutation s s)
-
-let compose_permutations (s1 s2 s3: Seq.seq int)
-  : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
-    (ensures permutation s1 s3)
-    [SMTPat (permutation s1 s2); SMTPat (permutation s2 s3)]
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    reveal_opaque (`%permutation) (permutation s2 s3);
-    reveal_opaque (`%permutation) (permutation s1 s3);
-    Seq.perm_len s1 s2;
-    Seq.perm_len s1 s3;
-    Seq.lemma_trans_perm s1 s2 s3 0 (Seq.length s1)
-
-// ========== Swap ==========
-
-let swap_is_permutation (s: Seq.seq int) (i j: nat)
-  : Lemma (requires i < Seq.length s /\ j < Seq.length s)
-          (ensures (let s1 = Seq.upd s i (Seq.index s j) in
-                    let s2 = Seq.upd s1 j (Seq.index s i) in
-                    permutation s s2))
-  = let vi = Seq.index s i in
-    let vj = Seq.index s j in
-    let s1 = Seq.upd s i vj in
-    let s2 = Seq.upd s1 j vi in
-    reveal_opaque (`%permutation) (permutation s s2);
-    if i = j then (
-      Seq.lemma_index_upd1 s i vj;
-      Seq.lemma_eq_elim s1 s;
-      Seq.lemma_index_upd1 s1 j vi;
-      Seq.lemma_eq_elim s2 s1
-    ) else (
-      let sw = Seq.swap s (if i < j then i else j) (if i < j then j else i) in
-      let aux (k: nat{k < Seq.length s})
-        : Lemma (Seq.index s2 k == Seq.index sw k) = ()
-      in
-      Classical.forall_intro aux;
-      Seq.lemma_eq_elim s2 sw;
-      if i < j then Seq.Properties.lemma_swap_permutes s i j
-      else Seq.Properties.lemma_swap_permutes s j i
-    )
-
-// ========== Partition correctness predicates ==========
-
-// Elements outside [lo, hi) are unchanged
-let unchanged_outside (s1 s2: Seq.seq int) (lo hi: nat) : prop =
-  Seq.length s1 == Seq.length s2 /\
-  lo <= hi /\ hi <= Seq.length s1 /\
-  (forall (i: nat). i < Seq.length s1 ==>
-    (i < lo \/ hi <= i) ==>
-    Seq.index s1 i == Seq.index s2 i)
-
-//SNIPPET_START: partition_ordered
-// Partition ordering property
-let partition_ordered (s: Seq.seq int) (lo p hi: nat) : prop =
-  lo <= p /\ p < hi /\ hi <= Seq.length s /\
-  (forall (idx: nat). idx < Seq.length s ==>
-    (lo <= idx /\ idx < p) ==> Seq.index s idx <= Seq.index s p) /\
-  (forall (idx: nat). idx < Seq.length s ==>
-    (p < idx /\ idx < hi) ==> Seq.index s idx >= Seq.index s p)
-//SNIPPET_END: partition_ordered
+// Re-export spec definitions for use in Pulse code
+let permutation = QSpec.permutation
+let permutation_same_length = QSpec.permutation_same_length
+let permutation_refl = QSpec.permutation_refl
+let compose_permutations = QSpec.compose_permutations
+let swap_is_permutation = QSpec.swap_is_permutation
+let unchanged_outside = QSpec.unchanged_outside
+let partition_ordered = QSpec.partition_ordered
 
 // ========== In-place partition of a[lo..hi) using a[hi-1] as pivot ==========
-// Returns pivot position p such that:
-//   - a[lo..p) all <= pivot_value
-//   - a[p] == pivot_value
-//   - a[p+1..hi) all > pivot_value
 
 #push-options "--z3rlimit 120 --ifuel 2 --fuel 2"
 //SNIPPET_START: partition_in_range
@@ -236,9 +162,9 @@ let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
     (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
               (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
               v <= Seq.index s1 j)
-  = reveal_opaque (`%permutation) (permutation s_pre s1);
+  = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s_pre s1);
     assert (Seq.Properties.permutation int s_pre s1);
-    Helpers.perm_unchanged_lower_bound_forall s_pre s1 lo hi
+    Lemmas.perm_unchanged_lower_bound_forall s_pre s1 lo hi
 
 let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma
@@ -250,9 +176,9 @@ let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
     (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
               (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
               Seq.index s1 j <= v)
-  = reveal_opaque (`%permutation) (permutation s_pre s1);
+  = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s_pre s1);
     assert (Seq.Properties.permutation int s_pre s1);
-    Helpers.perm_unchanged_upper_bound_forall s_pre s1 lo hi
+    Lemmas.perm_unchanged_upper_bound_forall s_pre s1 lo hi
 #pop-options
 
 // Bridge from opaque permutation + partition ordering to select_spec
@@ -264,9 +190,9 @@ let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
               (forall (i: nat). i < k ==> Seq.index s_final i <= Seq.index s_final k) /\
               (forall (i: nat). k < i /\ i < Seq.length s_final ==>
                 Seq.index s_final k <= Seq.index s_final i))
-    (ensures Seq.index s_final k == Spec.select_spec s0 k)
-  = reveal_opaque (`%permutation) (permutation s0 s_final);
-    Helpers.seq_perm_implies_is_perm s0 s_final;
+    (ensures Seq.index s_final k == PSSSpec.select_spec s0 k)
+  = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s0 s_final);
+    Lemmas.seq_perm_implies_is_perm s0 s_final;
     Correctness.pulse_correctness_hint s0 s_final k
 
 #push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
@@ -297,7 +223,7 @@ fn quickselect
       (forall (i: nat). SZ.v k < i /\ i < Seq.length s_final ==>
         result <= Seq.index s_final i) /\
       // Correctness: result is the k-th order statistic
-      result == Spec.select_spec s0 (SZ.v k)
+      result == PSSSpec.select_spec s0 (SZ.v k)
     )
 //SNIPPET_END: quickselect
 {
@@ -398,7 +324,6 @@ fn add_ticks (ctr: GR.ref nat) (#n: erased nat) (k: nat)
 }
 
 // ========== Partition with complexity tracking ==========
-// Wraps partition_in_range, adding (hi - lo - 1) ticks for the comparisons.
 
 fn partition_in_range_complexity
   (a: A.array int)
@@ -433,9 +358,6 @@ fn partition_in_range_complexity
 }
 
 // ========== Quickselect with complexity tracking ==========
-// Tracks comparison count via ghost counter.
-// Budget invariant: comparisons_so_far + qs_cost(remaining_range) <= qs_cost(n)
-// Postcondition: total comparisons <= qs_cost(n) = O(n²) worst case.
 
 let complexity_bounded_quickselect (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 <= QC.qs_cost n
@@ -467,7 +389,7 @@ fn quickselect_complexity
         Seq.index s_final i <= result) /\
       (forall (i: nat). SZ.v k < i /\ i < Seq.length s_final ==>
         result <= Seq.index s_final i) /\
-      result == Spec.select_spec s0 (SZ.v k) /\
+      result == PSSSpec.select_spec s0 (SZ.v k) /\
       complexity_bounded_quickselect cf (reveal c0) (SZ.v n)
     )
 {

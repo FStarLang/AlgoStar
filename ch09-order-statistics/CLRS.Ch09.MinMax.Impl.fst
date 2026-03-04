@@ -1,5 +1,5 @@
 (*
-   Min/Max Finding with Correctness and Complexity — Verified in Pulse
+   CLRS Chapter 9.1: MINIMUM / MAXIMUM — Verified Pulse Implementation
 
    Implements linear-time algorithms to find minimum and maximum elements in an array.
 
@@ -8,19 +8,17 @@
    2. The returned value is the minimum/maximum (universally bounded)
    3. Exactly (n - 1) comparisons for an array of length n — Θ(n)
 
-   Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
-   A ghost `tick` function increments the counter by 1 for each comparison.
-
    NO admits. NO assumes.
 *)
-
-module CLRS.Ch09.MinMax
+module CLRS.Ch09.MinMax.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
+open CLRS.Ch09.MinMax.Spec
+open CLRS.Ch09.MinMax.Complexity
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -28,31 +26,8 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-// ========== Ghost tick: increment counter by 1 ==========
-
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
-
-// ========== Complexity bound predicates ==========
-
-//SNIPPET_START: minmax_complexity_bound
-let complexity_bounded_min (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 == n - 1
-
-let complexity_bounded_max (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 == n - 1
-//SNIPPET_END: minmax_complexity_bound
-
 // ========== Minimum Finding ==========
 
-// Proves: exactly (len - 1) comparisons, i.e., Θ(n)
 //SNIPPET_START: find_minimum
 fn find_minimum
   (#p: perm)
@@ -100,7 +75,6 @@ fn find_minimum
     let curr = a.(vi);
     let vmin = !min;
     
-    // Count the comparison — one ghost tick
     tick ctr;
     
     if (curr < vmin) {
@@ -115,7 +89,6 @@ fn find_minimum
 
 // ========== Maximum Finding ==========
 
-// Proves: exactly (len - 1) comparisons, i.e., Θ(n)
 //SNIPPET_START: find_maximum
 fn find_maximum
   (#p: perm)
@@ -163,7 +136,6 @@ fn find_maximum
     let curr = a.(vi);
     let vmax = !max;
     
-    // Count the comparison — one ghost tick
     tick ctr;
     
     if (curr > vmax) {

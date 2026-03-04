@@ -1,40 +1,22 @@
 (*
-   Selection Algorithm - Verified implementation in Pulse
-   
+   Selection Algorithm — Verified implementation in Pulse
+
    Implements the k-th smallest element finder using partial selection sort.
-   
+
    CLRS Chapter 9 presents:
    - RANDOMIZED-SELECT: O(n) expected via randomized partitioning (§9.2)
    - SELECT (median-of-medians): O(n) worst case (§9.3)
-   
+
    This implementation uses partial selection sort: O(nk) worst case.
    For k = O(1), this matches CLRS. For k = n/2 (median), this is O(n²)
-   while CLRS algorithms are O(n). See Select.Complexity.fst for analysis.
-   
-   Algorithm:
-   - For each round i from 0 to k-1:
-     - Find the index of the minimum element in a[i..n-1]
-     - Swap a[i] with the minimum element
-   - Return a[k-1]
-   
-   After k rounds, the first k elements are the k smallest elements in sorted order,
-   and a[k-1] contains the k-th smallest element.
-   
-   Verification Status:
+   while CLRS algorithms are O(n). See Complexity.fst for analysis.
+
+   Verification:
    - NO admits, NO assumes ✓
-   - Correctness properties proven:
-     * The output array is a permutation of the input ✓
-     * sorted_prefix: s_final[0..k-1] is sorted ✓
-     * prefix_leq_suffix: all elements in [0,k) are ≤ all in [k,n) ✓
-     * Together these imply s_final[k-1] is the k-th smallest element ✓
-   
-   Limitation: Uses O(nk) partial selection sort instead of CLRS's O(n) algorithms.
-   Implementing RANDOMIZED-SELECT requires a random number source.
-   Implementing median-of-medians SELECT requires recursive partitioning with
-   median-of-5 groups, which is a significant implementation effort.
+   - Correctness: permutation, sorted_prefix, prefix_leq_suffix ✓
 *)
 
-module CLRS.Ch09.PartialSelectionSort
+module CLRS.Ch09.PartialSelectionSort.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -52,27 +34,22 @@ module GR = Pulse.Lib.GhostReference
 // ========== Definitions ==========
 
 //SNIPPET_START: selection_defs
-// Permutation: make opaque for SMT performance
 [@@"opaque_to_smt"]
 let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
 
-// Predicate: index i has a minimum value in range [start, len)
 let is_min_in_range (s: Seq.seq int) (i: nat) (start: nat) (len: nat) : prop =
   start <= i /\ i < len /\ len <= Seq.length s /\
   (forall (j: nat). start <= j /\ j < len ==> Seq.index s i <= Seq.index s j)
 
-// sorted_prefix: s[0..bound-1] is sorted
 let sorted_prefix (s: Seq.seq int) (bound: nat) : prop =
   bound <= Seq.length s /\
   (forall (i j: nat). i < j /\ j < bound ==> Seq.index s i <= Seq.index s j)
 
-// prefix_leq_suffix: all elements in [0,bound) are <= all elements in [bound, len)
 let prefix_leq_suffix (s: Seq.seq int) (bound: nat) : prop =
   bound <= Seq.length s /\
   (forall (i j: nat). i < bound /\ bound <= j /\ j < Seq.length s ==>
     Seq.index s i <= Seq.index s j)
 //SNIPPET_END: selection_defs
-
 
 let permutation_same_length (s1 s2 : Seq.seq int)
   : Lemma (requires permutation s1 s2)
@@ -138,10 +115,7 @@ let swap_is_permutation (s: Seq.seq int) (i j: nat)
       else Seq.Properties.lemma_swap_permutes s j i
     )
 
-// ========== Helper: Find index of minimum in range [start, len) ==========
-// Scans the array from start to len-1 and returns the index of an element
-// that is <= all other elements in that range.
-// Proves: the returned index points to a minimum value in the range.
+// ========== Find index of minimum in range [start, len) ==========
 
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn find_min_index_from
@@ -176,7 +150,6 @@ fn find_min_index_from
       SZ.v start <= SZ.v vmin_idx /\
       SZ.v vmin_idx < SZ.v len /\
       SZ.v vmin_idx < SZ.v vi /\
-      // min_idx is minimum in [start, vi)
       (forall (j: nat). SZ.v start <= j /\ j < SZ.v vi ==>
         Seq.index s (SZ.v vmin_idx) <= Seq.index s j)
     )
@@ -199,14 +172,6 @@ fn find_min_index_from
 #pop-options
 
 // ========== Main Selection Algorithm ==========
-// Uses partial selection sort: perform k rounds of min-finding and swapping.
-//
-// Proves:
-// 1. The output array is a permutation of the input
-// 2. The returned result equals the value at position k-1 in the final array
-//
-// The algorithm is a verified implementation of the selection algorithm from
-// CLRS Chapter 9, using the simple O(n²) approach of partial selection sort.
 
 #push-options "--z3rlimit 10 --ifuel 2 --fuel 2"
 //SNIPPET_START: select
@@ -254,10 +219,8 @@ fn select
     let vround = !round;
     with s_pre. assert (A.pts_to a s_pre);
     
-    // Find minimum in range [vround, n)
     let min_idx = find_min_index_from a vround n;
     
-    // Swap element at vround with element at min_idx
     let val_round = a.(vround);
     let val_min = a.(min_idx);
     
@@ -270,7 +233,6 @@ fn select
     round := vround + 1sz;
   };
   
-  // Return the k-th element (at index k-1)
   let idx = k - 1sz;
   with s_arr. assert (A.pts_to a s_arr);
   let value = a.(idx);
