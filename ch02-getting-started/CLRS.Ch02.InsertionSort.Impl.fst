@@ -11,7 +11,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch02.InsertionSort
+module CLRS.Ch02.InsertionSort.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -19,73 +19,15 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
 open CLRS.Common.SortSpec
+open CLRS.Ch02.InsertionSort.Spec
+open CLRS.Ch02.InsertionSort.Lemmas
+open CLRS.Common.Complexity
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
-
-// ========== Ghost tick ==========
-
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
-
-// ========== Sortedness lemmas ==========
-
-let lemma_prefix_le_key
-  (s s_outer: Seq.seq int) (vi vj: nat) (key: int)
-  : Lemma
-    (requires
-      vi <= vj /\ vj < Seq.length s /\ Seq.length s == Seq.length s_outer /\
-      prefix_sorted s_outer vj /\
-      prefix_sorted s vi /\
-      (forall (k: nat). k < vi ==> Seq.index s k == Seq.index s_outer k) /\
-      (forall (k: nat). k + 1 == vi ==> Seq.index s_outer k <= key))
-    (ensures forall (k: nat). k < vi ==> Seq.index s k <= key)
-  = if vi = 0 then ()
-    else
-      let pred = vi - 1 in
-      assert (pred + 1 == vi);
-      assert (Seq.index s_outer pred <= key);
-      assert (forall (k: nat). k < vi ==> k <= pred);
-      assert (forall (k: nat). k <= pred /\ pred < vj ==> Seq.index s_outer k <= Seq.index s_outer pred);
-      ()
-
-let lemma_combine_sorted_regions
-  (s: Seq.seq int) (vi vj: nat) (key: int)
-  : Lemma
-    (requires vi <= vj /\ vj < Seq.length s /\
-      prefix_sorted s vi /\
-      Seq.index s vi == key /\
-      (forall (k: nat). k < vi ==> Seq.index s k <= key) /\
-      (forall (k: nat). vi < k /\ k <= vj ==> Seq.index s k > key) /\
-      (forall (k1 k2: nat). vi < k1 /\ k1 <= k2 /\ k2 <= vj ==>
-        Seq.index s k1 <= Seq.index s k2))
-    (ensures prefix_sorted s (vj + 1))
-  = ()
-
-// ========== Complexity arithmetic helper ==========
-
-// vj*(vj-1)/2 + vj = (vj+1)*vj/2
-let lemma_triangle_step (vj: nat)
-  : Lemma (requires vj >= 1)
-          (ensures op_Multiply vj (vj - 1) / 2 + vj == op_Multiply (vj + 1) vj / 2)
-  = assert (op_Multiply vj (vj - 1) + op_Multiply 2 vj == op_Multiply vj (vj + 1))
-
-// ========== Main Algorithm with Complexity ==========
-
-// Complexity bound predicate (avoids BoundedIntegers issues in Pulse ensures)
-let complexity_bounded (cf c0: nat) (n: nat) : prop =
-  cf >= c0 /\
-  cf - c0 <= op_Multiply n (n - 1) / 2
 
 //SNIPPET_START: insertion_sort_sig
 fn insertion_sort
