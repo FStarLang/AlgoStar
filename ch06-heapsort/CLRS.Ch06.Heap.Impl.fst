@@ -195,28 +195,32 @@ ensures exists* s' (cf: nat).
 fn build_max_heap
   (a: A.array int)
   (n: SZ.t)
-  (#s0: erased (Seq.seq int))
-requires
-  A.pts_to a s0 **
-  pure (
+  (ctr: GR.ref nat)
+  (#s0: erased (Seq.seq int) {
     SZ.v n > 0 /\
     SZ.v n <= A.length a /\
     Seq.length s0 == A.length a /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
-  )
-ensures exists* s.
+  })
+  (#c0: erased nat)
+requires
+  A.pts_to a s0 **
+  GR.pts_to ctr c0
+ensures exists* s (cf: nat).
   A.pts_to a s **
+  GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     SZ.v n <= Seq.length s /\
     is_max_heap s (SZ.v n) /\
     permutation s0 s /\
-    SZ.fits (op_Multiply 2 (Seq.length s) + 2)
+    SZ.fits (op_Multiply 2 (Seq.length s) + 2) /\
+    cf >= reveal c0 /\
+    cf - reveal c0 <= CB.build_cost_bound (SZ.v n)
   )
 {
   let half = SZ.div n 2sz;
   let mut i: SZ.t = half;
-  let ctr = GR.alloc #nat 0;
   
   while (!i >^ 0sz)
   invariant exists* vi s_cur (vc: nat).
@@ -229,7 +233,9 @@ ensures exists* s.
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
       SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
-      heaps_from s_cur (SZ.v n) (SZ.v vi)
+      heaps_from s_cur (SZ.v n) (SZ.v vi) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 <= op_Multiply (SZ.v half - SZ.v vi) (CB.max_heapify_bound (SZ.v n) 0)
     )
   decreases (SZ.v !i)
   {
@@ -238,14 +244,13 @@ ensures exists* s.
     i := idx;
     with s_cur. assert (A.pts_to a s_cur);
     heaps_from_to_almost s_cur (SZ.v n) (SZ.v idx) (SZ.v idx);
+    CB.max_heapify_bound_le_root (SZ.v n) (SZ.v idx);
     max_heapify a idx n (SZ.v idx) ctr #s_cur;
     ()
   };
   
   with s_built. assert (A.pts_to a s_built);
   heaps_from_zero s_built (SZ.v n);
-  with vc_final. assert (GR.pts_to ctr vc_final);
-  GR.free ctr;
   ()
 }
 #pop-options
@@ -260,41 +265,45 @@ ensures exists* s.
 // Requires SZ.fits(2*n+2) to prevent SizeT overflow in child index
 // computation (see max_heapify comment above).
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 fn heapsort
   (a: A.array int)
   (n: SZ.t)
-  (#s0: erased (Seq.seq int))
-requires
-  A.pts_to a s0 **
-  pure (
+  (ctr: GR.ref nat)
+  (#s0: erased (Seq.seq int) {
     SZ.v n <= A.length a /\
     SZ.v n == Seq.length s0 /\
     Seq.length s0 == A.length a /\
     SZ.v n > 0 /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
-  )
-ensures exists* s.
+  })
+  (#c0: erased nat)
+requires
+  A.pts_to a s0 **
+  GR.pts_to ctr c0
+ensures exists* s (cf: nat).
   A.pts_to a s **
+  GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     sorted s /\
-    permutation s0 s
+    permutation s0 s /\
+    cf >= reveal c0 /\
+    cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)
   )
 {
   // Phase 1: BUILD-MAX-HEAP
-  build_max_heap a n;
+  build_max_heap a n ctr;
   
   //SNIPPET_START: extract_max_loop
   // Phase 2: Extract-max loop
   let mut heap_sz: SZ.t = n;
-  let ctr_extract = GR.alloc #nat 0;
   
   while (!heap_sz >^ 1sz)
   invariant exists* vsz s_cur (vc: nat).
     R.pts_to heap_sz vsz **
     A.pts_to a s_cur **
-    GR.pts_to ctr_extract vc **
+    GR.pts_to ctr vc **
     pure (
       SZ.v vsz > 0 /\
       SZ.v vsz <= SZ.v n /\
@@ -304,7 +313,10 @@ ensures exists* s.
       SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
       is_max_heap s_cur (SZ.v vsz) /\
       suffix_sorted s_cur (SZ.v vsz) /\
-      prefix_le_suffix s_cur (SZ.v vsz)
+      prefix_le_suffix s_cur (SZ.v vsz) /\
+      vc >= reveal c0 /\
+      vc - reveal c0 <= CB.build_cost_bound (SZ.v n) +
+                         op_Multiply (SZ.v n - SZ.v vsz) (CB.max_heapify_bound (SZ.v n) 0)
     )
   //SNIPPET_END: extract_max_loop
   decreases (SZ.v !heap_sz)
@@ -326,16 +338,18 @@ ensures exists* s.
     let new_sz = vsz - 1sz;
     extract_almost_heaps s_cur (SZ.v vsz);
     let zero : Ghost.erased nat = 0;
-    max_heapify a 0sz new_sz zero ctr_extract #(swap_seq s_cur 0 (SZ.v last));
+    CB.max_heapify_bound_monotone (SZ.v new_sz) (SZ.v n) 0;
+    max_heapify a 0sz new_sz zero ctr #(swap_seq s_cur 0 (SZ.v last));
     with s_heapified. assert (A.pts_to a s_heapified);
+    with vc_after. assert (GR.pts_to ctr vc_after);
+    // Help SMT: (n-vsz)*m + m = (n-vsz+1)*m by distributivity
+    FStar.Math.Lemmas.distributivity_add_left (SZ.v n - SZ.v vsz) 1 (CB.max_heapify_bound (SZ.v n) 0);
     heaps_from_zero s_heapified (SZ.v new_sz);
     perm_preserves_sorted_suffix (swap_seq s_cur 0 (SZ.v last)) s_heapified (SZ.v new_sz);
     
     heap_sz := new_sz;
   };
   
-  with vc_extract. assert (GR.pts_to ctr_extract vc_extract);
-  GR.free ctr_extract;
   ()
 }
 #pop-options

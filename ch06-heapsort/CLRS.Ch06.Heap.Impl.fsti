@@ -64,23 +64,28 @@ ensures exists* s' (cf: nat).
 fn build_max_heap
   (a: A.array int)
   (n: SZ.t)
-  (#s0: erased (Seq.seq int))
-requires
-  A.pts_to a s0 **
-  pure (
+  (ctr: GR.ref nat)
+  (#s0: erased (Seq.seq int) {
     SZ.v n > 0 /\
     SZ.v n <= A.length a /\
     Seq.length s0 == A.length a /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
-  )
-ensures exists* s.
+  })
+  (#c0: erased nat)
+requires
+  A.pts_to a s0 **
+  GR.pts_to ctr c0
+ensures exists* s (cf: nat).
   A.pts_to a s **
+  GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     SZ.v n <= Seq.length s /\
     is_max_heap s (SZ.v n) /\
     permutation s0 s /\
-    SZ.fits (op_Multiply 2 (Seq.length s) + 2)
+    SZ.fits (op_Multiply 2 (Seq.length s) + 2) /\
+    cf >= reveal c0 /\
+    cf - reveal c0 <= CB.build_cost_bound (SZ.v n)
   )
 //SNIPPET_END: build_max_heap_sig
 
@@ -88,21 +93,26 @@ ensures exists* s.
 fn heapsort
   (a: A.array int)
   (n: SZ.t)
-  (#s0: erased (Seq.seq int))
-requires
-  A.pts_to a s0 **
-  pure (
+  (ctr: GR.ref nat)
+  (#s0: erased (Seq.seq int) {
     SZ.v n <= A.length a /\
     SZ.v n == Seq.length s0 /\
     Seq.length s0 == A.length a /\
     SZ.v n > 0 /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
-  )
-ensures exists* s.
+  })
+  (#c0: erased nat)
+requires
+  A.pts_to a s0 **
+  GR.pts_to ctr c0
+ensures exists* s (cf: nat).
   A.pts_to a s **
+  GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
     sorted s /\
-    permutation s0 s
+    permutation s0 s /\
+    cf >= reveal c0 /\
+    cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)
   )
 //SNIPPET_END: heapsort_sig

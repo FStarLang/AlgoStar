@@ -80,3 +80,31 @@ let max_heapify_bound_monotone (hs1 hs2: pos) (idx: nat{idx < hs1 /\ idx < hs2})
     heap_div_pos hs2 idx;
     lemma_div_le hs1 hs2 (idx + 1);
     log2_floor_monotonic (hs1 / (idx + 1)) (hs2 / (idx + 1))
+
+// max_heapify_bound is largest at the root (idx=0)
+// Proof: larger idx means larger divisor, so smaller quotient, so smaller log
+let max_heapify_bound_le_root (heap_size: pos) (idx: nat{idx < heap_size})
+  : Lemma (ensures max_heapify_bound heap_size idx <= max_heapify_bound heap_size 0)
+  = heap_div_pos heap_size idx;
+    heap_div_pos heap_size 0;
+    div_anti_monotone heap_size 1 (idx + 1);
+    log2_floor_monotonic (heap_size / (idx + 1)) (heap_size / 1)
+
+// Cost bounds (definitions are in the .fsti, these are for reference)
+// build_cost_bound n = (n / 2) * max_heapify_bound n 0
+// extract_cost_bound n = (n - 1) * max_heapify_bound n 0
+// heapsort_cost_bound n = build_cost_bound n + extract_cost_bound n
+
+// Heapsort cost is O(n log n)
+// Proof: (n/2)*m + (n-1)*m <= n*m + n*m = 2*n*m where m = max_heapify_bound(n,0) = 2*log2_floor(n)
+//        so total <= 2*n*2*log2_floor(n) = 4*n*log2_floor(n)
+#push-options "--z3rlimit 20"
+let heapsort_cost_nlogn (n: pos)
+  : Lemma (ensures heapsort_cost_bound n <= 4 * n * log2_floor n)
+  = max_heapify_bound_root n;
+    let lg = log2_floor n in
+    assert (max_heapify_bound n 0 == 2 * lg);
+    assert (build_cost_bound n == (n / 2) * (2 * lg));
+    assert (extract_cost_bound n == (n - 1) * (2 * lg));
+    ()
+#pop-options
