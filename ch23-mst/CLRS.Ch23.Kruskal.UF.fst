@@ -13,14 +13,8 @@ open CLRS.Ch23.MST.Spec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-let valid_parents (sparent: Seq.seq SZ.t) (n: nat) : prop =
-  Seq.length sparent == n /\
-  (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) < n)
-
-let rec find_pure (sparent: Seq.seq SZ.t) (v: nat) (steps: nat) (n: nat)
-  : Tot nat (decreases steps)
-  = if steps = 0 || v >= n || Seq.length sparent <> n then v
-    else find_pure sparent (SZ.v (Seq.index sparent v)) (steps - 1) n
+(* valid_parents, find_pure, uf_inv, identity_parent, all_edges_valid
+   are defined transparently in the .fsti *)
 
 let rec find_pure_bounded (sparent: Seq.seq SZ.t) (v: nat) (steps: nat) (n: nat)
   : Lemma (requires valid_parents sparent n /\ v < n)
@@ -47,16 +41,6 @@ let rec find_pure_split (sparent: Seq.seq SZ.t) (v: nat) (k1 k2: nat) (n: nat)
       find_pure_split sparent (SZ.v (Seq.index sparent v)) (k1 - 1) k2 n
     end
 
-// UF invariant: relates parent array to edge-list connectivity
-let uf_inv (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat) : prop =
-  valid_parents sparent n /\ ec < n /\
-  (forall (v: nat). v < n ==> find_pure sparent v n n < n) /\
-  (forall (v: nat). v < n ==>
-    SZ.v (Seq.index sparent (find_pure sparent v n n)) = find_pure sparent v n n) /\
-  (forall (v: nat). v < n ==> find_pure sparent v ec n = find_pure sparent v n n) /\
-  (forall (u v: nat). u < n /\ v < n /\ reachable edges u v ==>
-    find_pure sparent u n n = find_pure sparent v n n)
-
 let uf_inv_unreachable (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u v: nat)
   : Lemma (requires uf_inv sparent edges n ec /\ u < n /\ v < n /\
@@ -64,9 +48,7 @@ let uf_inv_unreachable (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: 
           (ensures ~(reachable edges u v))
   = ()
 
-let identity_parent (n: nat) (sparent: Seq.seq SZ.t) : prop =
-  Seq.length sparent == n /\
-  (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) = i)
+(* identity_parent is defined transparently in the .fsti *)
 
 let rec find_pure_identity (sparent: Seq.seq SZ.t) (v: nat) (steps: nat) (n: nat)
   : Lemma (requires identity_parent n sparent /\ v < n)
@@ -118,9 +100,7 @@ let mem_edge_reachable (e: edge) (edges: list edge)
     assert (is_path_from_to [e] e.u e.v);
     assert (subset_edges [e] edges)
 
-// All edges have endpoints within [0, n)
-let all_edges_valid (edges: list edge) (n: nat) : prop =
-  forall (e: edge). mem_edge e edges ==> e.u < n /\ e.v < n
+(* all_edges_valid is defined transparently in the .fsti *)
 
 // If find_pure sparent v steps n != root_u, then changing only parent[root_u]
 // doesn't affect the find result (the path never visits root_u).

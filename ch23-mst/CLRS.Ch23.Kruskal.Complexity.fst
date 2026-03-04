@@ -18,6 +18,23 @@
    the cubic complexity bound: ticks ≤ 4 × V³.
 
    Uses GhostReference for tick counter — fully erased at runtime.
+
+   ============================================================
+   WARNING — DISCONNECTED / WORK IN PROGRESS
+   ============================================================
+   This module is NOT connected to Kruskal.Impl. It re-implements
+   Kruskal's algorithm from scratch with ghost tick counters for
+   complexity analysis. The postcondition only proves
+   `valid_endpoints` and `complexity_bounded_kruskal` — it does
+   NOT prove the result is a forest, spanning tree, or MST. It
+   also does NOT reference Kruskal.Spec or Kruskal.UF.
+
+   To fully connect this module:
+   1. Import and use kruskal_inv from Kruskal.Impl (or factor it
+      into a shared module)
+   2. Add result_is_forest / is_mst to the postcondition
+   3. Or: add ghost tick counting directly to Kruskal.Impl
+   ============================================================
 *)
 
 module CLRS.Ch23.Kruskal.Complexity

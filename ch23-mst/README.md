@@ -15,20 +15,20 @@ This directory contains verified implementations and specifications for MST algo
 | `CLRS.Ch23.Kruskal.Components.fst` | F* | BFS-based connected components, reachability, path properties |
 | `CLRS.Ch23.Kruskal.EdgeSorting.fst` | F* | sort_edges permutation and MST weight independence |
 | `CLRS.Ch23.Kruskal.SortedEdges.fst` | F* | Kruskal over sorted input: subset/forest proven |
+| `CLRS.Ch23.Kruskal.UF.fsti` | F* | Union-find interface: find_pure, uf_inv, lemma sigs |
 | `CLRS.Ch23.Kruskal.UF.fst` | F* | Union-find correctness: find_pure, uf_inv_union, soundness, completeness |
 | `CLRS.Ch23.Kruskal.Helpers.fst` | F* | Forest invariant maintenance lemmas for Kruskal |
 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F* | Lemmas interface: re-exports from Components, EdgeSorting, SortedEdges, UF |
 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F* | Lemmas façade module |
-| `CLRS.Ch23.Kruskal.Impl.fsti` | Pulse | Imperative Kruskal interface: kruskal fn signature |
-| `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | Imperative Kruskal (adj-matrix, union-find) |
-| `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | Kruskal complexity interface: ticks ≤ 4·V³ |
-| `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | Ghost-tick instrumented Kruskal, proves ticks ≤ 4·V³ |
+| `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | Imperative Kruskal (adj-matrix, union-find) + admitted MST bridge |
+| `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | Kruskal complexity interface: ticks ≤ 4·V³ (⚠️ disconnected) |
+| `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | Ghost-tick instrumented Kruskal, proves ticks ≤ 4·V³ (⚠️ disconnected) |
 | `CLRS.Ch23.Prim.Spec.fsti` | F* | Prim spec interface: pure_prim, prim_spec sigs |
 | `CLRS.Ch23.Prim.Spec.fst` | F* | Pure Prim: adj-matrix, `pure_prim`, connectivity, safety via cut property |
-| `CLRS.Ch23.Prim.Impl.fsti` | Pulse | Imperative Prim interface: prim fn signature |
+| `CLRS.Ch23.Prim.Impl.fsti` | Pulse | Imperative Prim interface: prim fn sig + admitted MST bridging |
 | `CLRS.Ch23.Prim.Impl.fst` | Pulse | Imperative Prim (adj-matrix, key + parent + in_mst arrays) |
-| `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | Prim complexity interface: ticks ≤ 3·V² |
-| `CLRS.Ch23.Prim.Complexity.fst` | Pulse | Ghost-tick instrumented Prim, proves ticks ≤ 3·V² |
+| `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | Prim complexity interface: ticks ≤ 3·V² (⚠️ disconnected) |
+| `CLRS.Ch23.Prim.Complexity.fst` | Pulse | Ghost-tick instrumented Prim, proves ticks ≤ 3·V² (⚠️ disconnected) |
 
 ## Verification Status
 
@@ -39,17 +39,19 @@ This directory contains verified implementations and specifications for MST algo
 | Kruskal.Components.fst | 0 | ✅ Fully proven |
 | Kruskal.EdgeSorting.fst | 0 | ✅ |
 | Kruskal.SortedEdges.fst | 0 | ✅ |
-| Kruskal.UF.fst | 0 | ✅ Fully proven |
+| Kruskal.UF (.fst + .fsti) | 0 | ✅ Fully proven |
 | Kruskal.Helpers.fst | 0 | ✅ Fully proven |
 | Kruskal.Lemmas (.fst + .fsti) | 0 | ✅ Façade |
-| Kruskal.Impl (.fst + .fsti) | 0 | ✅ Forest property proven via UF invariant |
-| Kruskal.Complexity (.fst + .fsti) | 0 | ✅ |
+| Kruskal.Impl.fst | 1* | ⚠️ Forest proven; `kruskal_impl_produces_mst` **admitted** |
+| Kruskal.Complexity (.fst + .fsti) | 0 | ⚠️ Verified but disconnected from Kruskal.Impl |
 | Prim.Spec (.fst + .fsti) | 0 | ✅ Fully proven |
-| Prim.Impl (.fst + .fsti) | 0 | ✅ Returns (key, parent) pair |
-| Prim.Complexity (.fst + .fsti) | 0 | ✅ |
+| Prim.Impl (.fst + .fsti) | 1* | ⚠️ Postcondition proven; `prim_impl_produces_mst` **admitted** |
+| Prim.Complexity (.fst + .fsti) | 0 | ⚠️ Verified but disconnected from Prim.Impl |
 | MST.Complexity (.fst + .fsti) | 0 | ✅ |
 
-**0 admits** across all source files. All properties are fully proven.
+\* The admitted lemmas use `--admit_smt_queries true` — the lemma statements type-check but proofs are not provided.
+
+**0 admits** in core modules. Bridging lemmas (`kruskal_impl_produces_mst`, `prim_impl_produces_mst`) use `--admit_smt_queries true` and are clearly marked as work-in-progress.
 
 ## Rubric Compliance
 

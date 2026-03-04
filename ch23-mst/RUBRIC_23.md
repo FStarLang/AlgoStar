@@ -1,7 +1,7 @@
 # Chapter 23: Minimum Spanning Trees — Rubric Compliance
 
 **Generated**: 2025-07-18 (Updated: 2026-03-04)
-**Source**: `/ch23-mst/` — 22 source files
+**Source**: `/ch23-mst/` — 23 source files
 
 ---
 
@@ -18,19 +18,20 @@
 | 7 | `CLRS.Ch23.Kruskal.Components.fst` | F\* | **Kruskal Lemmas** — BFS components, forest/acyclicity, reachability |
 | 8 | `CLRS.Ch23.Kruskal.EdgeSorting.fst` | F\* | **Kruskal Lemmas** — sort permutation, MST weight independence |
 | 9 | `CLRS.Ch23.Kruskal.SortedEdges.fst` | F\* | **Kruskal Lemmas** — kruskal\_spec over sorted input, subset/forest |
-| 10 | `CLRS.Ch23.Kruskal.UF.fst` | F\* | **Kruskal Lemmas** — union-find correctness: `find_pure`, soundness, completeness |
-| 11 | `CLRS.Ch23.Kruskal.Helpers.fst` | F\* | **Kruskal Lemmas** — forest-invariant helpers for Pulse proof |
-| 12 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F\* | **Kruskal Lemmas interface** — re-exports from sub-modules |
-| 13 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F\* | **Kruskal Lemmas façade** — delegates to sub-modules |
-| 14 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, union-find) |
-| 15 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | **Kruskal Complexity interface** — complexity\_bounded\_kruskal |
-| 16 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | **Kruskal Complexity** — ghost-tick instrumented, proves `ticks ≤ 4·V³` |
-| 17 | `CLRS.Ch23.Prim.Spec.fsti` | F\* | **Prim Spec interface** — pure\_prim, prim\_spec signatures |
-| 18 | `CLRS.Ch23.Prim.Spec.fst` | F\* | **Prim Spec** — `pure_prim`, n−1 edges, connectivity, safety via cut property |
-| 19 | `CLRS.Ch23.Prim.Impl.fsti` | Pulse | **Prim Impl interface** — prim fn signature |
-| 20 | `CLRS.Ch23.Prim.Impl.fst` | Pulse | **Prim Impl** — imperative Prim (adj-matrix, `in_mst` + `key` + `parent` arrays) |
-| 21 | `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | **Prim Complexity interface** — complexity\_bounded\_prim |
-| 22 | `CLRS.Ch23.Prim.Complexity.fst` | Pulse | **Prim Complexity** — ghost-tick instrumented, proves `ticks ≤ 3·V²` |
+| 10 | `CLRS.Ch23.Kruskal.UF.fsti` | F\* | **Kruskal Lemmas** — UF interface: find\_pure, uf\_inv, union/init lemma sigs |
+| 11 | `CLRS.Ch23.Kruskal.UF.fst` | F\* | **Kruskal Lemmas** — union-find correctness: `find_pure`, soundness, completeness |
+| 12 | `CLRS.Ch23.Kruskal.Helpers.fst` | F\* | **Kruskal Lemmas** — forest-invariant helpers for Pulse proof |
+| 13 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F\* | **Kruskal Lemmas interface** — re-exports from sub-modules |
+| 14 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F\* | **Kruskal Lemmas façade** — delegates to sub-modules |
+| 15 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, union-find) + admitted MST bridging |
+| 16 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | **Kruskal Complexity interface** — complexity\_bounded\_kruskal (⚠️ disconnected) |
+| 17 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | **Kruskal Complexity** — ghost-tick instrumented, proves `ticks ≤ 4·V³` (⚠️ disconnected) |
+| 18 | `CLRS.Ch23.Prim.Spec.fsti` | F\* | **Prim Spec interface** — pure\_prim, prim\_spec signatures |
+| 19 | `CLRS.Ch23.Prim.Spec.fst` | F\* | **Prim Spec** — `pure_prim`, n−1 edges, connectivity, safety via cut property |
+| 20 | `CLRS.Ch23.Prim.Impl.fsti` | Pulse | **Prim Impl interface** — prim fn sig + admitted MST bridging lemma |
+| 21 | `CLRS.Ch23.Prim.Impl.fst` | Pulse | **Prim Impl** — imperative Prim (adj-matrix, `in_mst` + `key` + `parent` arrays) |
+| 22 | `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | **Prim Complexity interface** — complexity\_bounded\_prim (⚠️ disconnected) |
+| 23 | `CLRS.Ch23.Prim.Complexity.fst` | Pulse | **Prim Complexity** — ghost-tick instrumented, proves `ticks ≤ 3·V²` (⚠️ disconnected) |
 
 ---
 
@@ -108,6 +109,8 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 | **Prim** | 6 | 2 |
 | **Total** | **17** | **3** |
 
+Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
+
 ---
 
 ## Detailed Action Items
@@ -141,14 +144,24 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 
 ### D. Proof Gaps (from AUDIT_CH23.md)
 
-| ID | Audit Ref | Action | Priority | Effort |
+| ID | Audit Ref | Action | Priority | Status |
 |----|-----------|--------|----------|--------|
-| D1 | T2 | Close UF edge-endpoint edge case (was `admit()` at line 360 — verify current status) | High | Small |
-| D2 | T3 | Connect Prim Pulse postcondition to `prim_spec` (MST correctness) | High | Large |
-| D3 | T4 | Connect Kruskal Pulse postcondition to `theorem_kruskal_produces_mst` | High | Large |
-| D4 | T5 | Prove MST existence from connectivity (remove assumed precondition) | Medium | Medium |
-| D5 | T8 | Add π (parent) array to Prim Impl to materialize MST edges | Medium | Small |
-| D6 | T11 | Reconcile infinity values (Prim Pulse 65535 vs Prim.Spec 10⁹) | Medium | Small |
+| D1 | T2 | Close UF edge-endpoint edge case (was `admit()` at line 360 — verify current status) | High | ✅ No admits found |
+| D2 | T3 | Connect Prim Pulse postcondition to `prim_spec` (MST correctness) | High | ⚠️ Bridging lemma stated but **admitted** (`prim_impl_produces_mst`) |
+| D3 | T4 | Connect Kruskal Pulse postcondition to `theorem_kruskal_produces_mst` | High | ⚠️ Bridging lemma stated but **admitted** (`kruskal_impl_produces_mst`) |
+| D4 | T5 | Prove MST existence from connectivity (remove assumed precondition) | Medium | ❌ Not yet done |
+| D5 | T8 | Add π (parent) array to Prim Impl to materialize MST edges | Medium | ✅ **DONE** (parent array added in earlier commit) |
+| D6 | T11 | Reconcile infinity values (Prim Pulse 65535 vs Prim.Spec 10⁹) | Medium | ❌ Not yet done |
+
+### D'. New Tasks
+
+| ID | Action | Priority | Status |
+|----|--------|----------|--------|
+| D7 | Create `CLRS.Ch23.Kruskal.UF.fsti` — interface for UF sub-module | Medium | ✅ **DONE** |
+| D8 | Add disconnection warnings to Kruskal.Complexity and Prim.Complexity | Low | ✅ **DONE** |
+| D9 | Prove `prim_impl_produces_mst` (strengthen Prim loop invariant) | High | ❌ Not yet done |
+| D10 | Prove `kruskal_impl_produces_mst` (strengthen Kruskal loop invariant) | High | ❌ Not yet done |
+| D11 | Connect Complexity modules to Impl modules | Medium | ❌ Not yet done |
 
 ### E. Dead Code / Cleanup
 
@@ -170,17 +183,17 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 
 ### Spec ↔ Impl Connection
 
-| Algorithm | Pure spec proves MST? | Impl postcondition proves MST? | Gap? |
-|-----------|:---------------------:|:------------------------------:|:----:|
-| Kruskal | ✅ `theorem_kruskal_produces_mst` | ❌ Postcondition: forest + edge count + valid endpoints | **Yes** |
-| Prim | ✅ `prim_spec` | ❌ Postcondition: `source key = 0 ∧ keys bounded` | **Yes** |
+| Algorithm | Pure spec proves MST? | Impl postcondition proves MST? | Bridging lemma? |
+|-----------|:---------------------:|:------------------------------:|:---------------:|
+| Kruskal | ✅ `theorem_kruskal_produces_mst` | ❌ Postcondition: forest + edge count + valid endpoints | ⚠️ `kruskal_impl_produces_mst` — **admitted** |
+| Prim | ✅ `prim_spec` | ❌ Postcondition: `source key = 0 ∧ keys bounded` | ⚠️ `prim_impl_produces_mst` — **admitted** |
 
 ### Complexity
 
-| Algorithm | Proven Bound | CLRS Textbook Bound | Match? |
-|-----------|-------------|---------------------|--------|
-| Kruskal (adj-matrix) | `ticks ≤ 4·V³` | O(E lg V) with sorted edges + UF | ❌ Weaker — matches implemented V²-scan variant, not CLRS |
-| Prim (adj-matrix) | `ticks ≤ 3·V²` | O(V²) with adj-matrix | ✅ Matches |
+| Algorithm | Proven Bound | CLRS Textbook Bound | Match? | Connected to Impl? |
+|-----------|-------------|---------------------|--------|:------------------:|
+| Kruskal (adj-matrix) | `ticks ≤ 4·V³` | O(E lg V) with sorted edges + UF | ❌ Weaker — matches implemented V²-scan variant, not CLRS | ❌ Disconnected |
+| Prim (adj-matrix) | `ticks ≤ 3·V²` | O(V²) with adj-matrix | ✅ Matches | ❌ Disconnected |
 
 ### CLRS Fidelity
 
@@ -193,5 +206,6 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 
 - **Slots filled**: 17 / 20 fully compliant, 0 partial → **85% full**
 - **Remaining gaps**: Kruskal.Impl.fsti (predicates tightly coupled), Prim.Lemmas.fst/.fsti (content inline in Spec)
-- **Proof quality**: Strong pure layer; imperative layer under-specified
-- **Top priorities**: (D2) Prim Impl↔Spec bridge, (D3) Kruskal Impl↔Spec bridge, (C3) Prim Lemmas factoring
+- **New in this round**: UF.fsti interface, Complexity disconnection warnings, Impl↔Spec bridging lemmas (admitted)
+- **Proof quality**: Strong pure layer; imperative layer has admitted bridging to spec
+- **Top priorities**: (1) Prove `prim_impl_produces_mst` (strengthen loop invariant), (2) Prove `kruskal_impl_produces_mst`, (3) Connect Complexity modules to Impl

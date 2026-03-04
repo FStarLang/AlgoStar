@@ -120,6 +120,74 @@ let compute_weight_idx_u64 (u n v: SZ.t{SZ.v u < SZ.v n /\ SZ.v v < SZ.v n /\ SZ
 inline_for_extraction
 let compute_weight_idx = compute_weight_idx_u64
 
+(*** Impl ↔ Spec Bridging — WORK IN PROGRESS ***)
+
+(*
+   ============================================================
+   CONNECTION TO PRIM.SPEC — INCOMPLETE
+   ============================================================
+   The current postcondition (prim_correct) only proves:
+   - key[source] = 0
+   - all keys bounded by infinity
+   - parent[source] = source
+
+   To prove the result is an MST, we need to show that the edges
+   encoded in the parent array (i.e., {parent[v], v, w(parent[v],v)}
+   for v ≠ source) match the output of pure_prim from Prim.Spec.
+   This requires a loop invariant that tracks, at each iteration,
+   the correspondence between the imperative key/parent state and
+   the pure spec's recursive prim_step.
+
+   The function edges_from_parent_key below extracts edges from the
+   parent array. The lemma prim_impl_produces_mst states the desired
+   connection but is currently admitted.
+   ============================================================
+*)
+
+// Extract MST edges from the parent array:
+// For each vertex v ≠ source, emit edge {parent[v], v, key[v]}
+let rec edges_from_parent_key
+  (parent_seq key_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
+  : Pure (list edge)
+    (requires Seq.length parent_seq == n /\ Seq.length key_seq == n /\ i <= n)
+    (ensures fun _ -> True)
+    (decreases (n - i))
+  = if i >= n then []
+    else if i = source then edges_from_parent_key parent_seq key_seq n source (i + 1)
+    else
+      let p = SZ.v (Seq.index parent_seq i) in
+      let w = SZ.v (Seq.index key_seq i) in
+      { u = p; v = i; w = w } :: edges_from_parent_key parent_seq key_seq n source (i + 1)
+
+// TODO(admit): This lemma states the desired Impl ↔ Spec connection.
+// Proving it requires strengthening the main prim loop invariant to track
+// correspondence between the imperative key/parent arrays and pure_prim_step
+// at each iteration. The key insight is that both the imperative and pure
+// versions perform the same greedy choice (minimum key vertex not in MST),
+// so their outputs should agree.
+#push-options "--admit_smt_queries true"
+let prim_impl_produces_mst
+  (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma (requires
+      prim_correct key_seq parent_seq weights_seq n source /\
+      valid_weights weights_seq n /\
+      n > 0 /\ source < n /\
+      n * n < pow2 64 /\
+      PrimSpec.well_formed_adj (weights_to_adj_matrix weights_seq n) n /\
+      all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n) /\
+      (exists (t: list edge). is_mst (PrimSpec.adj_to_graph (weights_to_adj_matrix weights_seq n) n) t))
+    (ensures (
+      let adj = weights_to_adj_matrix weights_seq n in
+      let g = PrimSpec.adj_to_graph adj n in
+      let impl_edges = edges_from_parent_key parent_seq key_seq n source 0 in
+      // The edges encoded in the parent array form a spanning tree
+      // that is a subset of some MST (same property proven for pure_prim in Prim.Spec)
+      List.Tot.length impl_edges = n - 1 /\
+      (exists (t: list edge). is_mst g t /\ subset_edges impl_edges t) /\
+      all_connected n impl_edges))
+  = ()  // ADMITTED via --admit_smt_queries true
+#pop-options
+
 // Prim's MST algorithm
 // Given:
 //   - weights: n×n weight matrix (flattened as array[n*n])

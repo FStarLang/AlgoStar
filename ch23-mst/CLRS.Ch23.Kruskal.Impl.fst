@@ -573,3 +573,76 @@ fn kruskal
   V.free parent_v;
 }
 #pop-options
+
+(*** Impl ↔ Spec Bridging — WORK IN PROGRESS ***)
+
+(*
+   ============================================================
+   CONNECTION TO KRUSKAL.SPEC — INCOMPLETE
+   ============================================================
+   The current postcondition (result_is_forest) proves:
+   - The selected edges form a forest (acyclic)
+   - All endpoints are valid vertices (< n)
+   - Edge count ≤ n-1
+
+   To prove the result is an MST, we need to show that the
+   edges selected by the imperative algorithm match the output of
+   pure_kruskal from Kruskal.Spec. This requires:
+   1. A bridging function adj_array_to_graph converting the flat
+      adjacency matrix to a graph value
+   2. Proving the imperative greedy selection (min-weight edge
+      per round, union-find cycle detection) produces the same
+      edge set as the pure insertion-sort + kruskal_process
+
+   The lemma kruskal_impl_produces_mst below states the desired
+   connection but is currently admitted.
+   ============================================================
+*)
+
+// Convert flat adjacency matrix (array of int, n×n) to graph
+// Emits one edge {u, v, w} for each position (u,v) with w > 0 and u < v
+// (avoiding duplicates for undirected graphs)
+let rec adj_row_edges (sadj: Seq.seq int) (n: nat) (u v: nat)
+  : Pure (list edge)
+    (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0)
+    (ensures fun _ -> True)
+    (decreases (n - v))
+  = if v >= n then []
+    else
+      let w = Seq.index sadj (u * n + v) in
+      let rest = adj_row_edges sadj n u (v + 1) in
+      if w > 0 && u < v then { u = u; v = v; w = w } :: rest
+      else rest
+
+let rec adj_all_edges (sadj: Seq.seq int) (n: nat) (u: nat)
+  : Pure (list edge)
+    (requires Seq.length sadj == n * n /\ u <= n /\ n > 0)
+    (ensures fun _ -> True)
+    (decreases (n - u))
+  = if u >= n then []
+    else adj_row_edges sadj n u 0 @ adj_all_edges sadj n (u + 1)
+
+let adj_array_to_graph (sadj: Seq.seq int) (n: nat{Seq.length sadj == n * n /\ n > 0}) : graph =
+  { n = n; edges = adj_all_edges sadj n 0 }
+
+// TODO(admit): This lemma states the desired Impl ↔ Spec connection.
+// Proving it requires showing that the imperative V²-scan variant selects
+// the same edges as pure_kruskal's insertion-sort approach. Both algorithms
+// greedily add the minimum-weight edge that doesn't create a cycle, so
+// they should produce the same forest (up to edge ordering).
+#push-options "--admit_smt_queries true"
+let kruskal_impl_produces_mst
+  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma (requires
+      result_is_forest seu sev n ec /\
+      Seq.length sadj == n * n /\
+      n > 0 /\
+      (let g = adj_array_to_graph sadj n in
+       all_connected g.n g.edges /\
+       (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v) /\
+       (exists (mst: list edge). is_mst g mst)))
+    (ensures (
+      let g = adj_array_to_graph sadj n in
+      is_mst g (edges_from_arrays seu sev ec 0)))
+  = ()  // ADMITTED via --admit_smt_queries true
+#pop-options
