@@ -9,33 +9,11 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch15.LCS.Spec
+module CLRS.Ch15.LCS.Lemmas
 
 open FStar.Seq
 open FStar.Classical
-open CLRS.Ch15.LCS
-
-// ========== Subsequence Definition ==========
-
-/// sub[0..k-1] is a subsequence of s[0..n-1].
-/// Greedy-from-right: when sub[k-1] = s[n-1], always match them.
-let rec is_subseq (sub: seq int) (k: nat) (s: seq int) (n: nat)
-  : Tot bool (decreases k + n) =
-  if k = 0 then true
-  else if n = 0 then false
-  else if k > length sub || n > length s then false
-  else if index sub (k - 1) = index s (n - 1) then
-    is_subseq sub (k - 1) s (n - 1)
-  else
-    is_subseq sub k s (n - 1)
-
-/// Full-sequence wrapper
-let is_subsequence (sub s: seq int) : bool =
-  is_subseq sub (length sub) s (length s)
-
-/// Common subsequence of x and y
-let is_common_subsequence (sub x y: seq int) : prop =
-  is_subsequence sub x /\ is_subsequence sub y
+open CLRS.Ch15.LCS.Spec
 
 // ========== Optimality Proof ==========
 

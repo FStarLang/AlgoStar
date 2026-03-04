@@ -8,10 +8,53 @@
    - CLRS.Ch15.RodCutting.Extended (extended Pulse implementation with cuts array)
 *)
 
-module CLRS.Ch15.RodCutting.DPSpec
+module CLRS.Ch15.RodCutting.Spec
 
+open FStar.List.Tot
 open FStar.Seq
 open FStar.Mul
+
+// ========== Problem Specification ==========
+
+//SNIPPET_START: cutting_defs
+/// A cutting is valid if all pieces are positive and sum to n
+let rec valid_cutting (n: nat) (cuts: list nat) : prop =
+  match cuts with
+  | [] -> n = 0
+  | piece :: rest -> piece > 0 /\ piece <= n /\ valid_cutting (n - piece) rest
+
+/// Revenue from a cutting: sum of prices for each piece
+/// prices[i] = price for a piece of length (i+1)
+let rec cutting_revenue (prices: seq nat) (cuts: list nat) : nat =
+  match cuts with
+  | [] -> 0
+  | piece :: rest ->
+    if piece > 0 && piece - 1 < length prices
+    then index prices (piece - 1) + cutting_revenue prices rest
+    else 0 + cutting_revenue prices rest  // out-of-bounds piece has price 0
+//SNIPPET_END: cutting_defs
+
+/// The sum of pieces in a cutting
+let rec cutting_sum (cuts: list nat) : Tot nat (decreases cuts) =
+  match cuts with
+  | [] -> 0
+  | piece :: rest -> piece + cutting_sum rest
+
+/// Maximum over a range of positive naturals
+let rec max_over_range (f: (i:nat{i > 0} -> nat)) (n: nat{n > 0}) : Tot nat (decreases n) =
+  if n = 1 then f 1
+  else
+    let prev = max_over_range f (n - 1) in
+    let curr = f n in
+    if curr >= prev then curr else prev
+
+/// Revenue from a first cut at position i using a precomputed table
+let revenue_with_first_cut (prices: seq nat) (prev_table: seq nat) (j: nat) (i: nat{i > 0 /\ i <= j}) : nat =
+  if i - 1 < length prices && j - i < length prev_table
+  then index prices (i - 1) + index prev_table (j - i)
+  else 0
+
+// ========== DP Recurrence ==========
 
 // Accumulated max: max over i in [1, limit] of (prices[i-1] + r[j-i])
 // r is a sequence of subproblem values

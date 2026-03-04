@@ -39,7 +39,8 @@ module Seq = FStar.Seq
 // ========== Reuse the pure spec from CLRS.Ch15.MatrixChain ==========
 
 // We import the original spec and result function to state the cost postcondition.
-open CLRS.Ch15.MatrixChain
+open CLRS.Ch15.MatrixChain.Spec
+open CLRS.Ch15.MatrixChain.Lemmas
 
 // ========== Extended Pure Specification (imperative mirror with split tracking) ==========
 

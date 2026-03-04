@@ -14,7 +14,7 @@ module CLRS.Ch15.MatrixChain.Test
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open CLRS.Ch15.MatrixChain
+open CLRS.Ch15.MatrixChain.Impl
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec

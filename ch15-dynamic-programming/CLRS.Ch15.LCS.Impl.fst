@@ -13,7 +13,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch15.LCS
+module CLRS.Ch15.LCS.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -40,117 +40,9 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-// ========== Pure Specifications ==========
-// IMPORTANT: These MUST come BEFORE `open Pulse.Lib.BoundedIntegers`
-// because BoundedIntegers interferes with `decreases` clauses on nat parameters.
+// ========== Imports ==========
 
-// Pure spec: length of LCS of x[0..i-1] and y[0..j-1]
-//SNIPPET_START: lcs_spec
-let rec lcs_length (x y: Seq.seq int) (i j: nat) : Tot int (decreases i + j) =
-  if i = 0 || j = 0 then 0
-  else if i <= Seq.length x && j <= Seq.length y && 
-          Seq.index x (i - 1) = Seq.index y (j - 1) then
-    1 + lcs_length x y (i - 1) (j - 1)
-  else
-    let l1 = lcs_length x y (i - 1) j in
-    let l2 = lcs_length x y i (j - 1) in
-    if l1 >= l2 then l1 else l2
-//SNIPPET_END: lcs_spec
-
-// Pure spec: build the DP table row by row
-let lcs_at (x y: Seq.seq int) (i j: nat) : int =
-  if i <= Seq.length x && j <= Seq.length y then lcs_length x y i j else 0
-
-// Pure spec: index into flattened table
-let tbl_idx (i j: nat) (n1: nat) : nat = op_Multiply i n1 + j
-
-// Lemma: lcs_length is non-negative
-let rec lcs_length_nonneg (x y: Seq.seq int) (i j: nat)
-  : Lemma (ensures lcs_length x y i j >= 0)
-          (decreases i + j)
-  = if i = 0 || j = 0 then ()
-    else if i <= Seq.length x && j <= Seq.length y &&
-            Seq.index x (i - 1) = Seq.index y (j - 1) then
-      lcs_length_nonneg x y (i - 1) (j - 1)
-    else begin
-      lcs_length_nonneg x y (i - 1) j;
-      lcs_length_nonneg x y i (j - 1)
-    end
-
-// Lemma: relating DP recurrence to lcs_length  
-let lcs_recurrence_correct (x y: Seq.seq int) (i j: nat) 
-  (val_diag val_up val_left: int)
-  : Lemma 
-    (requires 
-      i > 0 /\ j > 0 /\
-      i <= Seq.length x /\ j <= Seq.length y /\
-      val_diag == lcs_length x y (i - 1) (j - 1) /\
-      val_up == lcs_length x y (i - 1) j /\
-      val_left == lcs_length x y i (j - 1))
-    (ensures 
-      (if Seq.index x (i - 1) = Seq.index y (j - 1) then val_diag + 1
-       else if val_up >= val_left then val_up
-       else val_left) == lcs_length x y i j)
-  = ()
-
-// DP table correctness predicate:
-// All cells (r,c) with r < i, or r == i and c < j, are correct
-let lcs_table_correct (x y: Seq.seq int) (tbl: Seq.seq int) (m n: nat) (i j: nat) : prop =
-  let n1 = n + 1 in
-  Seq.length tbl == op_Multiply (m + 1) n1 /\
-  i <= m + 1 /\ j <= n + 1 /\
-  (forall (r c: nat). (r < i \/ (r == i /\ c < j)) ==> r <= m ==> c <= n ==>
-    Seq.index tbl (op_Multiply r n1 + c) == lcs_length x y r c)
-
-// Lemma: updating table[i*(n+1)+j] with lcs_length value preserves correctness
-// and advances to (i, j+1)
-#push-options "--z3rlimit 20"
-let lcs_table_update_preserves (x y: Seq.seq int) (tbl: Seq.seq int) (m n i j: nat) (v: int)
-  : Lemma 
-    (requires 
-      lcs_table_correct x y tbl m n i j /\
-      i <= m /\ j <= n /\
-      v == lcs_length x y i j)
-    (ensures (
-      let idx = op_Multiply i (n + 1) + j in
-      let tbl' = Seq.upd tbl idx v in
-      lcs_table_correct x y tbl' m n i (j + 1)))
-  = let n1 = n + 1 in
-    let idx = op_Multiply i n1 + j in
-    let tbl' = Seq.upd tbl idx v in
-    assert (forall (r c: nat). ((r < i \/ (r == i /\ c < j + 1)) /\ r <= m /\ c <= n) ==>
-      (let idx2 = op_Multiply r n1 + c in
-       Seq.index tbl' idx2 == lcs_length x y r c))
-#pop-options
-
-// Lemma: advancing to next row resets column
-let lcs_table_next_row (x y: Seq.seq int) (tbl: Seq.seq int) (m n i: nat)
-  : Lemma 
-    (requires lcs_table_correct x y tbl m n i (n + 1) /\ i <= m)
-    (ensures lcs_table_correct x y tbl m n (i + 1) 0)
-  = ()
-
-// Combined lemma for DP value correctness
-let lcs_step_correct (x y: Seq.seq int) (tbl: Seq.seq int) (m n i j: nat) (value: int)
-  : Lemma
-    (requires
-      i <= m /\ j <= n /\
-      m == Seq.length x /\ n == Seq.length y /\
-      lcs_table_correct x y tbl m n i j /\
-      (i = 0 \/ j = 0 ==> value == 0) /\
-      (i > 0 /\ j > 0 ==> (
-        let n1 = n + 1 in
-        let val_diag = Seq.index tbl (op_Multiply (i - 1) n1 + (j - 1)) in
-        let val_up = Seq.index tbl (op_Multiply (i - 1) n1 + j) in
-        let val_left = Seq.index tbl (op_Multiply i n1 + (j - 1)) in
-        let xi = Seq.index x (i - 1) in
-        let yj = Seq.index y (j - 1) in
-        value == (if xi = yj then val_diag + 1
-                  else if val_up >= val_left then val_up
-                  else val_left))))
-    (ensures value == lcs_length x y i j)
-  = if i = 0 || j = 0 then ()
-    else ()
+open CLRS.Ch15.LCS.Spec
 
 open Pulse.Lib.BoundedIntegers
 
@@ -165,10 +57,6 @@ let lemma_index_in_bounds (i j m n: nat)
 let lemma_table_size_positive (m n: nat)
   : Lemma (op_Multiply (m + 1) (n + 1) > 0)
   = ()
-
-// Complexity bound predicate
-let lcs_complexity_bounded (cf c0 m n: nat) : prop =
-  cf >= c0 /\ cf - c0 == op_Multiply (m + 1) (n + 1)
 
 // ========== Main Implementation ==========
 

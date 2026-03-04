@@ -18,7 +18,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch15.MatrixChain
+module CLRS.Ch15.MatrixChain.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -35,85 +35,7 @@ module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-// ========== Pure Specification (imperative mirror) ==========
-
-//SNIPPET_START: mc_spec
-// mc_inner_k: process split points k..j-1, accumulating min cost
-// Reads from table but doesn't modify it
-let rec mc_inner_k (table: Seq.seq int) (dims: Seq.seq int) (n i j k: nat) (min_acc: int)
-  : Tot int (decreases (j - k))
-  = if k >= j || i >= n || j >= n || Seq.length table <> n * n || Seq.length dims <> n + 1 then min_acc
-    else
-      let cost_ik = Seq.index table (i * n + k) in
-      let cost_k1j = Seq.index table ((k + 1) * n + j) in
-      let dim_i = Seq.index dims i in
-      let dim_k1 = Seq.index dims (k + 1) in
-      let dim_j1 = Seq.index dims (j + 1) in
-      let q = cost_ik + cost_k1j + dim_i * dim_k1 * dim_j1 in
-      let new_min = if q < min_acc then q else min_acc in
-      mc_inner_k table dims n i j (k + 1) new_min
-
-// mc_inner_i: process starting positions i..n-l, updating table for chain length l
-let rec mc_inner_i (table: Seq.seq int) (dims: Seq.seq int) (n l i: nat)
-  : Tot (Seq.seq int) (decreases (n - l + 1 - i))
-  = if l < 2 || i + l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then table
-    else
-      let j = i + l - 1 in
-      let min_cost = mc_inner_k table dims n i j i 1000000000 in
-      let table' = Seq.upd table (i * n + j) min_cost in
-      mc_inner_i table' dims n l (i + 1)
-
-// mc_outer: process chain lengths l=l..n
-let rec mc_outer (table: Seq.seq int) (dims: Seq.seq int) (n l: nat)
-  : Tot (Seq.seq int) (decreases (n + 1 - l))
-  = if l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then table
-    else
-      let table' = mc_inner_i table dims n l 0 in
-      mc_outer table' dims n (l + 1)
-//SNIPPET_END: mc_spec
-
-// Length preservation lemmas
-let rec lemma_mc_inner_i_len (table: Seq.seq int) (dims: Seq.seq int) (n l i: nat)
-  : Lemma (ensures Seq.length (mc_inner_i table dims n l i) == Seq.length table)
-          (decreases (n - l + 1 - i))
-  = if l < 2 || i + l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then ()
-    else begin
-      let j = i + l - 1 in
-      let min_cost = mc_inner_k table dims n i j i 1000000000 in
-      lemma_mc_inner_i_len (Seq.upd table (i * n + j) min_cost) dims n l (i + 1)
-    end
-
-let rec lemma_mc_outer_len (table: Seq.seq int) (dims: Seq.seq int) (n l: nat)
-  : Lemma (ensures Seq.length (mc_outer table dims n l) == Seq.length table)
-          (decreases (n + 1 - l))
-  = if l > n || Seq.length table <> n * n || Seq.length dims <> n + 1 then ()
-    else begin
-      lemma_mc_inner_i_len table dims n l 0;
-      lemma_mc_outer_len (mc_inner_i table dims n l 0) dims n (l + 1)
-    end
-
-// The final result (what the postcondition expresses)
-let mc_result (dims: Seq.seq int) (n: nat) : int =
-  if n = 0 || Seq.length dims <> n + 1 then 0
-  else begin
-    let table = Seq.create (n * n) 0 in
-    let final_table = mc_outer table dims n 2 in
-    lemma_mc_outer_len table dims n 2;
-    assert (Seq.length final_table == n * n);
-    Seq.index final_table (n - 1)
-  end
-
-// ========== Helper Lemmas ==========
-
-// Bounds checking lemma for 2D indexing
-let lemma_index_in_bounds (i j n: nat)
-  : Lemma (requires i < n /\ j < n)
-          (ensures op_Multiply i n + j < op_Multiply n n)
-  = ()
-
-let lemma_table_size_positive (n: nat{n > 0})
-  : Lemma (op_Multiply n n > 0)
-  = ()
+open CLRS.Ch15.MatrixChain.Spec
 
 // ========== Main Implementation ==========
 
