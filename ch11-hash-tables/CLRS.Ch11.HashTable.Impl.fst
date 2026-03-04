@@ -1,5 +1,5 @@
 (*
-   Hash Table with Open Addressing — Correctness and Complexity
+   Hash Table with Open Addressing — Implementation
 
    CLRS §11.4: Open addressing hash table operations with linear probing.
 
@@ -15,7 +15,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch11.HashTable
+module CLRS.Ch11.HashTable.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -30,9 +30,6 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-// Hash table with open addressing using linear probing
-// Sentinel values: -1 = empty, -2 = deleted, >= 0 = valid key
-
 // ========== Ghost tick primitives ==========
 
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
@@ -45,23 +42,9 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-// ========== Complexity bound predicates ==========
+// ========== Internal hash functions ==========
 
-//SNIPPET_START: ht_complexity_bounds
-// Insert complexity: at most n probes
-let hash_insert_complexity_bounded (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 <= n
-
-// Search complexity: at most n probes
-let hash_search_complexity_bounded (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 <= n
-
-// Delete complexity: at most n probes
-let hash_delete_complexity_bounded (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 <= n
-//SNIPPET_END: ht_complexity_bounds
-
-//SNIPPET_START: ht_hash
+//SNIPPET_START: ht_hash_internal
 // Hash function: h(k) = k % table_size
 let hash (k: int{k >= 0 /\ SZ.fits k}) (size: SZ.t{SZ.v size > 0}) : SZ.t =
   SZ.rem (SZ.uint_to_t k) size
@@ -71,11 +54,9 @@ let hash_probe (k: int{k >= 0 /\ SZ.fits k}) (i: SZ.t) (size: SZ.t{SZ.v size > 0
   let h = hash k size in
   let sum = SZ.v h + SZ.v i in
   SZ.uint_to_t (sum % SZ.v size)
+//SNIPPET_END: ht_hash_internal
 
-// Pure version of hash_probe for reasoning
-let hash_probe_nat (key: int{key >= 0}) (probe: nat) (size: nat{size > 0}) : nat =
-  (key % size + probe) % size
-//SNIPPET_END: ht_hash
+// ========== Internal lemmas ==========
 
 // Lemma: hash_probe_nat is always in bounds
 let lemma_hash_probe_nat_in_bounds (key: int{key >= 0}) (probe: nat) (size: nat{size > 0})
@@ -86,31 +67,6 @@ let lemma_hash_probe_nat_in_bounds (key: int{key >= 0}) (probe: nat) (size: nat{
 let lemma_hash_probe_consistent (key: int{key >= 0 /\ SZ.fits key}) (i: SZ.t) (size: SZ.t{SZ.v size > 0})
   : Lemma (ensures SZ.v (hash_probe key i size) == hash_probe_nat key (SZ.v i) (SZ.v size))
   = ()
-
-// Abstract specification: key is present somewhere in the probe sequence
-//SNIPPET_START: ht_key_in_table
-let key_in_table (s: Seq.seq int) (size: nat{size > 0}) (key: int{key >= 0}) : prop =
-  exists (probe: nat). probe < size /\ probe < Seq.length s /\ 
-    hash_probe_nat key probe size < Seq.length s /\
-    Seq.index s (hash_probe_nat key probe size) == key
-//SNIPPET_END: ht_key_in_table
-
-// Stronger: key is findable by hash_search — it's at some probe position p,
-// and no empty slot (-1) appears at any earlier probe position.
-// This guarantees hash_search will reach the key.
-//SNIPPET_START: ht_key_findable
-let key_findable (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: int{key >= 0}) : prop =
-  exists (probe: nat). probe < size /\
-    hash_probe_nat key probe size < Seq.length s /\
-    Seq.index s (hash_probe_nat key probe size) == key /\
-    (forall (p: nat). {:pattern (hash_probe_nat key p size)}
-      p < probe ==> Seq.index s (hash_probe_nat key p size) =!= -1)
-//SNIPPET_END: ht_key_findable
-
-// Helper: all probes up to i did not contain the key
-let probes_not_key (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: int{key >= 0}) (i: nat) : prop =
-  forall (probe: nat). {:pattern (hash_probe_nat key probe size)} 
-    probe < i ==> Seq.index s (hash_probe_nat key probe size) =!= key
 
 // Instantiation lemma for probes_not_key
 let lemma_probes_not_key_inst 
@@ -136,29 +92,7 @@ let lemma_probes_not_key_full
     [SMTPat (probes_not_key s size key size)]
   = ()
 
-// Helper: table only changed at one position
-let seq_modified_at (s s': Seq.seq int) (idx: nat{idx < Seq.length s /\ Seq.length s' == Seq.length s}) : prop =
-  forall (j: nat). j < Seq.length s /\ j =!= idx ==> Seq.index s j == Seq.index s' j
-
-// ========== Table well-formedness invariant ==========
-//
-// CLRS's correctness argument for HASH-SEARCH relies on the fact that no
-// operation ever turns a slot into NIL (-1).  INSERT fills NIL/DELETED slots
-// with keys; DELETE turns key slots into DELETED (-2).  Therefore, if we
-// encounter a NIL slot at probe position j, no key can exist beyond j in
-// the probe sequence — it would have been placed at or before j by INSERT.
-//
-// valid_ht captures this: for EVERY occurrence of a valid key at some probe
-// position, no NIL (-1) slot appears at any earlier probe position.
-
-//SNIPPET_START: ht_valid_ht
-let valid_ht (s: Seq.seq int) (size: nat) : prop =
-  size > 0 /\ size == Seq.length s /\
-  (forall (k: int) (probe: nat). {:pattern (Seq.index s (hash_probe_nat k probe size))}
-    k >= 0 /\ probe < size /\ Seq.index s (hash_probe_nat k probe size) == k ==>
-    (forall (p: nat). {:pattern (hash_probe_nat k p size)}
-      p < probe ==> Seq.index s (hash_probe_nat k p size) =!= -1))
-//SNIPPET_END: ht_valid_ht
+// ========== valid_ht lemmas ==========
 
 // Key lemma: under valid_ht, an empty slot in the probe sequence proves
 // the key is absent from the entire table.
@@ -171,11 +105,7 @@ let lemma_valid_ht_search_not_found
               Seq.index s (hash_probe_nat key j size) == -1 /\
               probes_not_key s size key (j + 1))
     (ensures ~(key_in_table s size key))
-  = // key_in_table gives exists probe < size with s[hash_probe_nat key probe size] == key
-    // probes_not_key for j+1 means probe > j.
-    // valid_ht gives: forall p < probe. s[hash_probe_nat key p size] != -1
-    // Since j < probe: s[hash_probe_nat key j size] != -1. Contradicts == -1.
-    ()
+  = ()
 
 // valid_ht holds for a fresh table (all -1): vacuously true, no key >= 0 present
 let lemma_valid_ht_create (size: nat{size > 0})
@@ -191,10 +121,6 @@ let lemma_valid_ht_delete
     (requires valid_ht s size /\ Seq.index s idx >= 0)
     (ensures valid_ht (Seq.upd s idx (-2)) size)
   = let s' = Seq.upd s idx (-2) in
-    // For any k >= 0 at probe p in s': s'[hash_probe_nat k p size] == k >= 0 != -2
-    // so hash_probe_nat k p size != idx, hence s[same] == k.
-    // By valid_ht(s): forall q < p. s[hash_probe_nat k q size] != -1
-    // In s': if hash_probe_nat k q size == idx then s'[idx] == -2 != -1, else s'[...] == s[...]
     introduce forall (k: int) (probe: nat).
       k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
       (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
@@ -231,20 +157,14 @@ let lemma_valid_ht_insert
       introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
       with introduce _ ==> _
       with _. (
-        // Case 1: hash_probe_nat k probe size != idx
-        //   s[same] == k, valid_ht(s) gives s[hash_probe_nat k p size] != -1
-        //   In s': if hash_probe_nat k p size == idx then s'[idx] == key >= 0 != -1
-        //   else s'[...] == s[...] != -1
-        // Case 2: hash_probe_nat k probe size == idx
-        //   s'[idx] == key, so k == key. probe == probe_i (unique for linear probing).
-        //   For p < probe_i: hash_probe_nat key p size != idx (injectivity),
-        //   so s'[...] == s[...]. By the precondition, s[hash_probe_nat key p size] >= 0 != -1.
         ()
       )
     )
 #pop-options
 
-//SNIPPET_START: ht_helpers
+// ========== Operations ==========
+
+//SNIPPET_START: ht_helpers_impl
 fn hash_table_create (size: SZ.t)
   requires pure (SZ.v size > 0)
   returns tv: V.vec int
@@ -264,23 +184,23 @@ fn hash_table_free (tv: V.vec int) (#s: erased (Seq.seq int))
   V.to_vec_pts_to tv;
   V.free tv
 }
-//SNIPPET_END: ht_helpers
+//SNIPPET_END: ht_helpers_impl
 
 // Returns true if successful, false if table is full
 // Proves both correctness and O(n) complexity
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
-//SNIPPET_START: ht_hash_insert
+//SNIPPET_START: ht_hash_insert_impl
 fn hash_insert
   (table: A.array int)
   (#s: erased (Seq.seq int))
   (size: SZ.t)
-  (key: int)
+  (key: int{key >= 0 /\ SZ.fits key})
   (ctr: GR.ref nat)
   (#c0: erased nat)
   requires
     A.pts_to table s **
     GR.pts_to ctr c0 **
-    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key /\
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\
           valid_ht s (SZ.v size))
   returns result: bool
   ensures exists* s' cf.
@@ -300,7 +220,7 @@ fn hash_insert
        else s' == s) /\
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
-//SNIPPET_END: ht_hash_insert
+//SNIPPET_END: ht_hash_insert_impl
 {
   let mut i: SZ.t = 0sz;
   let mut inserted: bool = false;
@@ -380,18 +300,18 @@ fn hash_insert
 // Returns the index if found, or returns size (invalid index) if not found
 // Proves both correctness and O(n) complexity
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
-//SNIPPET_START: ht_hash_search
+//SNIPPET_START: ht_hash_search_impl
 fn hash_search
   (table: A.array int)
   (#s: erased (Seq.seq int))
   (size: SZ.t)
-  (key: int)
+  (key: int{key >= 0 /\ SZ.fits key})
   (ctr: GR.ref nat)
   (#c0: erased nat)
   requires
     A.pts_to table s **
     GR.pts_to ctr c0 **
-    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key /\
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\
           valid_ht s (SZ.v size))
   returns result: SZ.t
   ensures exists* cf.
@@ -412,7 +332,7 @@ fn hash_search
       // Complexity bound: at most size probes
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
-//SNIPPET_END: ht_hash_search
+//SNIPPET_END: ht_hash_search_impl
 {
   let mut i: SZ.t = 0sz;
   let mut found_idx: SZ.t = size;
@@ -487,18 +407,18 @@ fn hash_search
 // Returns true if the key was found and deleted (marked with -2), false otherwise
 // Proves both correctness and O(n) complexity
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
-//SNIPPET_START: ht_hash_delete
+//SNIPPET_START: ht_hash_delete_impl
 fn hash_delete
   (table: A.array int)
   (#s: erased (Seq.seq int))
   (size: SZ.t)
-  (key: int)
+  (key: int{key >= 0 /\ SZ.fits key})
   (ctr: GR.ref nat)
   (#c0: erased nat)
   requires
     A.pts_to table s **
     GR.pts_to ctr c0 **
-    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\ key >= 0 /\ SZ.fits key /\
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\
           valid_ht s (SZ.v size))
   returns result: bool
   ensures exists* s' cf.
@@ -517,7 +437,7 @@ fn hash_delete
                seq_modified_at s s' idx)
        else Seq.equal s' s)
     )
-//SNIPPET_END: ht_hash_delete
+//SNIPPET_END: ht_hash_delete_impl
 {
   let mut i: SZ.t = 0sz;
   let mut deleted_at: SZ.t = size;

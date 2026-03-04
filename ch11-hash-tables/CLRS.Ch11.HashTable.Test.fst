@@ -3,7 +3,7 @@ module CLRS.Ch11.HashTable.Test
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open CLRS.Ch11.HashTable
+open CLRS.Ch11.HashTable.Impl
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
