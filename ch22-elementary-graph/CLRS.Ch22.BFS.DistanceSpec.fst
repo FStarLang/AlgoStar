@@ -6,7 +6,7 @@
  * Key insight: BFS explores vertices in order of distance. If v is discovered
  * at distance d, then:
  *   1. There exists a path of length d from source to v (easy direction)
- *   2. No shorter path exists (harder - admitted)
+ *   2. No shorter path exists (harder direction — fully proved via bfs_correctness)
  *)
 module CLRS.Ch22.BFS.DistanceSpec
 
