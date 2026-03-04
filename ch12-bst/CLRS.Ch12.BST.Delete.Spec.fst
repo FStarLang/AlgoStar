@@ -5,13 +5,13 @@ module CLRS.Ch12.BST.Delete.Spec
  * 
  * Theorem: key_set(delete(t,k)) = key_set(t) \ {k} for valid BST t where k ∈ t
  * 
- * Uses list-based BST from CLRS.Ch12.BST.Spec.Complete
+ * Uses list-based BST from CLRS.Ch12.BST.Spec
  * Main lemma verified with zero admits (FiniteSet algebra via all_finite_set_facts_lemma)
  *)
 
 open FStar.List.Tot
 module FS = FStar.FiniteSet.Base
-open CLRS.Ch12.BST.Spec.Complete
+open CLRS.Ch12.BST.Spec
 open CLRS.Ch12.BST.KeySet
 
 let rec lemma_all_less_excludes_bound (m: int) (xs: list int)

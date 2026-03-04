@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST.Spec.Complete
+module CLRS.Ch12.BST.Spec
 
 (* ========================================================================
    Pure BST Specification - Complete CLRS Chapter 12 Implementation

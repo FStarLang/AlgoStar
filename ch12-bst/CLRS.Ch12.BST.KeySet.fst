@@ -9,7 +9,7 @@ module CLRS.Ch12.BST.KeySet
 
 open FStar.List.Tot
 module FS = FStar.FiniteSet.Base
-open CLRS.Ch12.BST.Spec.Complete
+open CLRS.Ch12.BST.Spec
 
 let rec list_to_set (xs: list int) : FS.set int =
   match xs with [] -> FS.emptyset | x :: xs' -> FS.insert x (list_to_set xs')

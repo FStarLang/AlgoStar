@@ -1,7 +1,8 @@
 # Chapter 12: Binary Search Trees — Rubric Compliance
 
 **Generated:** 2025-07-18  
-**Source files:** 12 `.fst` files, ~5 146 LOC total  
+**Updated:** 2026-03-04  
+**Source files:** 15 `.fst`/`.fsti` files (was 12), ~5 800 LOC total  
 **Layers:** BST.\* (pointer-based Pulse + pure spec) · BSTArray.\* (array-based Pulse)
 
 ---
@@ -10,11 +11,14 @@
 
 | # | File | LOC | Layer | Role |
 |---|------|-----|-------|------|
-| 1 | `CLRS.Ch12.BST.Spec.Complete.fst` | 949 | Pure spec | Full inductive BST: type, validity, search, insert, delete, inorder, correctness lemmas |
-| 2 | `CLRS.Ch12.BST.Spec.Complexity.fst` | 352 | Pure spec | O(h) tick-counting bounds for search, min, max, insert, delete |
+| 1 | `CLRS.Ch12.BST.Spec.fst` | 949 | Pure spec | Full inductive BST: type, validity, search, insert, delete, inorder, correctness lemmas *(renamed from Spec.Complete)* |
+| 2 | `CLRS.Ch12.BST.Complexity.fst` | 352 | Pure spec | O(h) tick-counting bounds for search, min, max, insert, delete *(renamed from Spec.Complexity)* |
+| 2i | `CLRS.Ch12.BST.Complexity.fsti` | ~70 | Pure spec | Interface: tick definitions + O(h) bound signatures |
 | 3 | `CLRS.Ch12.BST.KeySet.fst` | 33 | Pure spec | Shared `list_to_set` / `key_set` helpers (used by Insert.Spec + Delete.Spec) |
 | 4 | `CLRS.Ch12.BST.Insert.Spec.fst` | 78 | Pure spec | `key_set(insert(t,k)) = key_set(t) ∪ {k}` theorem |
 | 5 | `CLRS.Ch12.BST.Delete.Spec.fst` | 329 | Pure spec | `key_set(delete(t,k)) = key_set(t) \ {k}` theorem |
+| 5a | `CLRS.Ch12.BST.Lemmas.fst` | ~80 | Pure spec | Unified re-export of correctness lemmas from Insert.Spec, Delete.Spec, KeySet, Spec |
+| 5b | `CLRS.Ch12.BST.Lemmas.fsti` | ~60 | Pure spec | Interface: key-set algebra, search correctness, validity preservation, inorder sorted |
 | 6 | `CLRS.Ch12.BST.fst` | 580 | Pointer-based Pulse | `bst_node` with parent pointer, sep-logic `bst_subtree`, search/insert/delete/free linked to pure spec |
 | 7 | `CLRS.Ch12.BSTArray.fst` | 721 | Array Pulse | Imperative search + insert + inorder walk with ghost O(h) ticks |
 | 8 | `CLRS.Ch12.BSTArray.Delete.fst` | 805 | Array Pulse | min/max/successor/predecessor/delete (leaf case proven; 1-/2-child cases incomplete) |
@@ -22,6 +26,9 @@
 | 10 | `CLRS.Ch12.BSTArray.Spec.fst` | 344 | Array shared | Pure search over arrays + soundness/completeness proofs |
 | 11 | `CLRS.Ch12.BSTArray.Refinement.fst` | 249 | Array shared | `array_to_bst` abstraction, inorder/validity/search refinement proofs |
 | 12 | `CLRS.Ch12.BSTArray.Complexity.fst` | 135 | Array shared | `log2_floor`, `tree_height`, `node_depth ≤ tree_height` structural bounds |
+| 12i | `CLRS.Ch12.BSTArray.Complexity.fsti` | ~60 | Array shared | Interface: structural bound signatures |
+| 13 | `CLRS.Ch12.BSTArray.Lemmas.fst` | ~100 | Array shared | Unified re-export from Predicates + Refinement |
+| 13i | `CLRS.Ch12.BSTArray.Lemmas.fsti` | ~50 | Array shared | Interface: validity/search/inorder refinement signatures |
 
 ---
 
@@ -83,25 +90,25 @@ The canonical rubric requires seven artefacts per algorithm. This chapter has **
 
 | Rubric Artefact | Required File | Status | Actual File(s) | Notes |
 |-----------------|---------------|--------|-----------------|-------|
-| **Spec.fst** | `CLRS.Ch12.BST.Spec.fst` | ✅ | `BST.Spec.Complete.fst` | Pure spec with all operations; naming uses `.Spec.Complete` instead of `.Spec` |
-| **Lemmas.fst** | `CLRS.Ch12.BST.Lemmas.fst` | 🔶 | `Insert.Spec.fst`, `Delete.Spec.fst`, `KeySet.fst` | Key-set theorems exist as separate files; no unified `Lemmas.fst` |
-| **Lemmas.fsti** | `CLRS.Ch12.BST.Lemmas.fsti` | ❌ | — | No interface files exist anywhere in chapter |
-| **Complexity.fst** | `CLRS.Ch12.BST.Complexity.fst` | ✅ | `BST.Spec.Complexity.fst` | O(h) bounds for all operations; naming uses `.Spec.Complexity` |
-| **Complexity.fsti** | `CLRS.Ch12.BST.Complexity.fsti` | ❌ | — | No interface file |
+| **Spec.fst** | `CLRS.Ch12.BST.Spec.fst` | ✅ | `BST.Spec.fst` | Renamed from `BST.Spec.Complete.fst` |
+| **Lemmas.fst** | `CLRS.Ch12.BST.Lemmas.fst` | ✅ | `BST.Lemmas.fst` | Unified re-export from Insert.Spec, Delete.Spec, KeySet, Spec |
+| **Lemmas.fsti** | `CLRS.Ch12.BST.Lemmas.fsti` | ✅ | `BST.Lemmas.fsti` | Interface with key-set algebra, validity, search, inorder lemma signatures |
+| **Complexity.fst** | `CLRS.Ch12.BST.Complexity.fst` | ✅ | `BST.Complexity.fst` | Renamed from `BST.Spec.Complexity.fst`; O(h) bounds for all operations |
+| **Complexity.fsti** | `CLRS.Ch12.BST.Complexity.fsti` | ✅ | `BST.Complexity.fsti` | Interface: tick definitions + O(h) bound signatures |
 | **Impl.fst** | `CLRS.Ch12.BST.Impl.fst` | ✅ | `BST.fst` | Pulse pointer-based impl with `bst_subtree` sep-logic; naming is `.BST` not `.Impl` |
-| **Impl.fsti** | `CLRS.Ch12.BST.Impl.fsti` | ❌ | — | No interface file |
+| **Impl.fsti** | `CLRS.Ch12.BST.Impl.fsti` | ❌ | — | Pulse interface; deferred (requires Pulse .fsti support) |
 
 ### BSTArray (Array-Based) — `CLRS.Ch12.BSTArray.*`
 
 | Rubric Artefact | Required File | Status | Actual File(s) | Notes |
 |-----------------|---------------|--------|-----------------|-------|
 | **Spec.fst** | `CLRS.Ch12.BSTArray.Spec.fst` | ✅ | `BSTArray.Spec.fst` | Pure search over arrays + soundness/completeness |
-| **Lemmas.fst** | `CLRS.Ch12.BSTArray.Lemmas.fst` | 🔶 | `Predicates.fst`, `Refinement.fst` | Lemmas split across Predicates (frame, preservation) and Refinement (abstraction proofs) |
-| **Lemmas.fsti** | `CLRS.Ch12.BSTArray.Lemmas.fsti` | ❌ | — | No interface file |
+| **Lemmas.fst** | `CLRS.Ch12.BSTArray.Lemmas.fst` | ✅ | `BSTArray.Lemmas.fst` | Unified re-export from Predicates + Refinement |
+| **Lemmas.fsti** | `CLRS.Ch12.BSTArray.Lemmas.fsti` | ✅ | `BSTArray.Lemmas.fsti` | Interface: validity/search/inorder refinement signatures |
 | **Complexity.fst** | `CLRS.Ch12.BSTArray.Complexity.fst` | 🔶 | `BSTArray.Complexity.fst` | Structural bounds only (`node_depth ≤ log₂ cap`); does not connect to operation costs |
-| **Complexity.fsti** | `CLRS.Ch12.BSTArray.Complexity.fsti` | ❌ | — | No interface file |
+| **Complexity.fsti** | `CLRS.Ch12.BSTArray.Complexity.fsti` | ✅ | `BSTArray.Complexity.fsti` | Interface: structural bound signatures |
 | **Impl.fst** | `CLRS.Ch12.BSTArray.Impl.fst` | ✅ | `BSTArray.fst` + `BSTArray.Delete.fst` | Split across two files; naming uses `.BSTArray` not `.Impl` |
-| **Impl.fsti** | `CLRS.Ch12.BSTArray.Impl.fsti` | ❌ | — | No interface file |
+| **Impl.fsti** | `CLRS.Ch12.BSTArray.Impl.fsti` | ❌ | — | Pulse interface; deferred (requires Pulse .fsti support) |
 
 ### Cross-Cutting Concerns
 
@@ -120,30 +127,31 @@ The canonical rubric requires seven artefacts per algorithm. This chapter has **
 
 ### P0 — Naming Compliance
 
-| # | Action | Current | Target | Effort |
+| # | Action | Current | Target | Status |
 |---|--------|---------|--------|--------|
-| 1 | Rename or alias `BST.Spec.Complete` → `BST.Spec` | `CLRS.Ch12.BST.Spec.Complete.fst` | `CLRS.Ch12.BST.Spec.fst` | Low — rename + update imports |
-| 2 | Rename or alias `BST.Spec.Complexity` → `BST.Complexity` | `CLRS.Ch12.BST.Spec.Complexity.fst` | `CLRS.Ch12.BST.Complexity.fst` | Low |
+| 1 | ~~Rename or alias `BST.Spec.Complete` → `BST.Spec`~~ | ~~`CLRS.Ch12.BST.Spec.Complete.fst`~~ | `CLRS.Ch12.BST.Spec.fst` | ✅ DONE — renamed + all imports updated |
+| 2 | ~~Rename or alias `BST.Spec.Complexity` → `BST.Complexity`~~ | ~~`CLRS.Ch12.BST.Spec.Complexity.fst`~~ | `CLRS.Ch12.BST.Complexity.fst` | ✅ DONE — renamed + module decl updated |
 
-> **Note:** Item 1 conflicts with the existing `CLRS.Ch12.BSTArray.Spec.fst`. The two layers use different naming prefixes (`BST` vs `BSTArray`), so the rename is safe within each prefix.
+> **Note:** Impl.fsti files (items 5, 8) are deferred because the implementation files
+> use `#lang-pulse` and Pulse .fsti interface support requires further investigation.
 
 ### P1 — Missing Interface Files (.fsti)
 
-| # | Action | File to Create |
-|---|--------|----------------|
-| 3 | Create BST Lemmas interface | `CLRS.Ch12.BST.Lemmas.fsti` — expose `insert_key_set_lemma`, `delete_key_set_lemma`, correctness lemma signatures |
-| 4 | Create BST Complexity interface | `CLRS.Ch12.BST.Complexity.fsti` — expose tick bound signatures (`bst_search_ticks ≤ bst_height`, etc.) |
-| 5 | Create BST Impl interface | `CLRS.Ch12.BST.Impl.fsti` — public signatures for `tree_search`, `tree_insert`, `tree_delete`, `tree_free` |
-| 6 | Create BSTArray Lemmas interface | `CLRS.Ch12.BSTArray.Lemmas.fsti` — expose `well_formed_bst`, `lemma_insert_wfb`, refinement lemma signatures |
-| 7 | Create BSTArray Complexity interface | `CLRS.Ch12.BSTArray.Complexity.fsti` — expose `tree_height`, `node_depth_bounded` |
-| 8 | Create BSTArray Impl interface | `CLRS.Ch12.BSTArray.Impl.fsti` — public signatures for Pulse operations |
+| # | Action | File to Create | Status |
+|---|--------|----------------|--------|
+| 3 | ~~Create BST Lemmas interface~~ | `CLRS.Ch12.BST.Lemmas.fsti` | ✅ DONE — exposes insert/delete key-set lemmas, search correctness, validity preservation, inorder sorted |
+| 4 | ~~Create BST Complexity interface~~ | `CLRS.Ch12.BST.Complexity.fsti` | ✅ DONE — exposes tick definitions + O(h) bound signatures |
+| 5 | Create BST Impl interface | `CLRS.Ch12.BST.Impl.fsti` | ❌ DEFERRED — requires Pulse .fsti support |
+| 6 | ~~Create BSTArray Lemmas interface~~ | `CLRS.Ch12.BSTArray.Lemmas.fsti` | ✅ DONE — exposes validity/search/inorder refinement signatures |
+| 7 | ~~Create BSTArray Complexity interface~~ | `CLRS.Ch12.BSTArray.Complexity.fsti` | ✅ DONE — exposes structural bound signatures |
+| 8 | Create BSTArray Impl interface | `CLRS.Ch12.BSTArray.Impl.fsti` | ❌ DEFERRED — requires Pulse .fsti support |
 
 ### P1 — Consolidate Lemma Files
 
-| # | Action | Details |
-|---|--------|---------|
-| 9 | Create unified `CLRS.Ch12.BST.Lemmas.fst` | Consolidate or re-export from `Insert.Spec.fst`, `Delete.Spec.fst`, `KeySet.fst` |
-| 10 | Create unified `CLRS.Ch12.BSTArray.Lemmas.fst` | Consolidate or re-export from `Predicates.fst` and `Refinement.fst` |
+| # | Action | Details | Status |
+|---|--------|---------|--------|
+| 9 | ~~Create unified `CLRS.Ch12.BST.Lemmas.fst`~~ | Re-exports from `Insert.Spec.fst`, `Delete.Spec.fst`, `KeySet.fst`, `Spec.fst` | ✅ DONE — verified, zero admits |
+| 10 | ~~Create unified `CLRS.Ch12.BSTArray.Lemmas.fst`~~ | Re-exports from `Predicates.fst` and `Refinement.fst` | ✅ DONE — verified, zero admits |
 
 ### P2 — Completeness Gaps
 

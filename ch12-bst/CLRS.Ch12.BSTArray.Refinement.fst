@@ -15,7 +15,7 @@ open FStar.List.Tot.Base   // for @ (list append)
 open FStar.Seq             // for Seq.length, Seq.index  (shadows List length/index)
 open FStar.Mul             // for *
 open FStar.Classical
-open CLRS.Ch12.BST.Spec.Complete
+open CLRS.Ch12.BST.Spec
 open CLRS.Ch12.BSTArray.Predicates
 
 #push-options "--z3rlimit 40 --fuel 2 --ifuel 1"

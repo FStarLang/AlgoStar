@@ -5,7 +5,7 @@ module CLRS.Ch12.BST.Insert.Spec
  *
  * Theorem: key_set(insert(t,k)) = key_set(t) ∪ {k} for valid BST t
  *
- * Uses list-based BST from CLRS.Ch12.BST.Spec.Complete
+ * Uses list-based BST from CLRS.Ch12.BST.Spec
  * Main lemma verified with zero admits (FiniteSet algebra via all_finite_set_facts_lemma)
  *
  * Proof approach: Option B from PROGRESS_PLAN — mirrors CLRS.Ch12.BST.Delete.Spec
@@ -13,7 +13,7 @@ module CLRS.Ch12.BST.Insert.Spec
 
 open FStar.List.Tot
 module FS = FStar.FiniteSet.Base
-open CLRS.Ch12.BST.Spec.Complete
+open CLRS.Ch12.BST.Spec
 open CLRS.Ch12.BST.KeySet
 
 (* ========================================================================

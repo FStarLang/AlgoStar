@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST.Spec.Complexity
+module CLRS.Ch12.BST.Complexity
 
 (* ========================================================================
    Pure BST Complexity Analysis
@@ -17,7 +17,7 @@ module CLRS.Ch12.BST.Spec.Complexity
    - Theorem 12.3 (implied by §12.3): Insert and Delete maintain the BST property.
    ======================================================================== *)
 
-open CLRS.Ch12.BST.Spec.Complete
+open CLRS.Ch12.BST.Spec
 open FStar.Mul
 
 (* Helper: max function for natural numbers *)

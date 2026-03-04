@@ -5,7 +5,7 @@ module CLRS.Ch12.BST
    Each node has { key, left, right, p } following CLRS §12.1.
    A recursive separation logic predicate `bst_subtree` ties the
    concrete pointer structure to the pure functional `bst` from
-   CLRS.Ch12.BST.Spec.Complete.
+   CLRS.Ch12.BST.Spec.
 
    Operations follow CLRS pseudocode:
    - TREE-SEARCH   (§12.2): recursive BST search, O(h)
@@ -24,7 +24,7 @@ open Pulse.Lib.Pervasives
 module Box = Pulse.Lib.Box
 open Pulse.Lib.Box { box, (:=), (!) }
 
-open CLRS.Ch12.BST.Spec.Complete
+open CLRS.Ch12.BST.Spec
 
 // ============================================================
 // §12.1 Node type
