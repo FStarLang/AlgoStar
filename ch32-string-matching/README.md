@@ -2,38 +2,65 @@
 
 This directory contains verified implementations of string matching algorithms from CLRS Chapter 32, in both Pulse (imperative, separation-logic verified) and pure F*.
 
+## Rubric Structure
+
+Each algorithm follows the rubric structure from `RUBRIC.md`:
+- **Spec.fst** — Pure F* specification (definitions, decidable checks)
+- **Lemmas.fst / .fsti** — Correctness proofs about the specification
+- **Complexity.fst / .fsti** — Complexity analysis and bounds
+- **Impl** (main `.fst`) — Pulse implementation, proven equivalent to spec
+
 ## Files
 
 ### Naive String Matching (§32.1)
-- **CLRS.Ch32.NaiveStringMatch.fst**: Pulse implementation of NAIVE-STRING-MATCHER. Proves full functional correctness (`count == count_matches_up_to`) and O((n-m+1)*m) complexity. Generic over `eqtype`. No admits.
+
+| File | Rubric Role | Description |
+|------|-------------|-------------|
+| `CLRS.Ch32.NaiveStringMatch.Spec.fst` | **Spec** | Pure spec: `matches_at`, `matches_at_dec`, `count_matches_up_to` |
+| `CLRS.Ch32.NaiveStringMatch.Lemmas.fst` | **Lemmas** | Correctness: `matches_at_dec_correct`, `count_matches_up_to_bounded` |
+| `CLRS.Ch32.NaiveStringMatch.Lemmas.fsti` | **Lemmas interface** | Public signatures for correctness lemmas |
+| `CLRS.Ch32.NaiveStringMatch.Complexity.fst` | **Complexity** | Bound: `string_match_complexity_bounded` — O((n−m+1)·m) |
+| `CLRS.Ch32.NaiveStringMatch.Complexity.fsti` | **Complexity interface** | Public signatures for complexity |
+| `CLRS.Ch32.NaiveStringMatch.fst` | **Impl** | Pulse implementation with ghost tick counter |
 
 ### Rabin-Karp (§32.2)
-- **CLRS.Ch32.RabinKarp.fst**: Pulse implementation using the CLRS polynomial hash (Horner's rule) from RabinKarp.Spec. On hash match, verifies character-by-character. Uses rolling hash update (`rolling_hash_step`) for O(1) per-position hash computation. Proves full functional correctness (`count == count_matches_up_to`). No admits.
-- **CLRS.Ch32.RabinKarp.Spec.fst**: Pure F* specification with CLRS polynomial hash, rolling hash correctness proof, and bidirectional correctness (`rabin_karp_find_all_correct`). No admits.
-- **CLRS.Ch32.RabinKarp.Complexity.fst**: Pure F* complexity analysis: O(n+m) best case, O(nm) worst case.
+
+| File | Rubric Role | Description |
+|------|-------------|-------------|
+| `CLRS.Ch32.RabinKarp.Spec.fst` | **Spec** | CLRS polynomial hash (Horner's rule), rolling hash, `matches_at`, `verify_match`, `rabin_karp_find_all` |
+| `CLRS.Ch32.RabinKarp.Lemmas.fst` | **Lemmas** | Bidirectional correctness: `no_false_positives`, `no_false_negatives`, `find_all_correct` |
+| `CLRS.Ch32.RabinKarp.Lemmas.fsti` | **Lemmas interface** | Public signatures for correctness lemmas |
+| `CLRS.Ch32.RabinKarp.Complexity.fst` | **Complexity** | O(n+m) best case, O(nm) worst case |
+| `CLRS.Ch32.RabinKarp.Complexity.fsti` | **Complexity interface** | Public signatures for complexity |
+| `CLRS.Ch32.RabinKarp.fst` | **Impl** | Pulse implementation with rolling hash from `RabinKarp.Spec` |
 
 ### KMP (§32.4)
-- **CLRS.Ch32.KMP.PureDefs.fst**: Shared pure definitions (`is_prefix_suffix`, `pi_correct`, complexity bounds).
-- **CLRS.Ch32.KMP.fst**: Pulse implementation of COMPUTE-PREFIX-FUNCTION and KMP-MATCHER. Proves memory safety, prefix function maximality (`pi_max_sz` — pi is the LONGEST prefix-suffix), full functional correctness (`count == count_matches_spec`), and O(n+m) complexity via amortized analysis. No admits.
-- **CLRS.Ch32.KMP.Bridge.fst**: Bridging lemmas connecting Pulse `pi_max_sz` (SZ.t sequences) to Spec's `pi_max` (int sequences). Incremental proof helpers for the maximality invariant. No admits.
-- **CLRS.Ch32.KMP.Spec.fst**: Pure F* completeness proof that KMP finds all matches. Proves `kmp_step_maximal`, `kmp_match_iff`, `kmp_count_step`, and `count_before_eq_spec`. No admits.
-- **CLRS.Ch32.KMP.Test.fst**: Pulse test cases for `compute_prefix_function` and `kmp_string_match`.
 
-### Reference
-- **reference/reference.fst**: Port of `FStar/examples/algorithms/StringMatching.fst`. Contains verified naive matcher and Rabin-Karp with CLRS polynomial hash. Returns `option nat` (first match only).
-- **reference/test_without_lemma.fst**: 9-line smoke test for `RabinKarp.Spec.rabin_karp_find_all`.
+| File | Rubric Role | Description |
+|------|-------------|-------------|
+| `CLRS.Ch32.KMP.PureDefs.fst` | **Spec** | `is_prefix_suffix`, `pi_correct`, `matches_at`, complexity bounds |
+| `CLRS.Ch32.KMP.Spec.fst` | **Lemmas** (completeness) | Full completeness proof: `kmp_step_maximal`, `kmp_match_iff`, `kmp_count_step`, `count_before_eq_spec` |
+| `CLRS.Ch32.KMP.Bridge.fst` | **Lemmas** (bridging) | Connects Pulse `pi_correct` to `Spec.pi_max` via `pi_optimal_extension` |
+| `CLRS.Ch32.KMP.fst` | **Impl** | Pulse `compute_prefix_function` + `kmp_matcher` + `kmp_string_match` with O(n+m) complexity |
+| `CLRS.Ch32.KMP.Test.fst` | Test | Pulse test cases for prefix function and matcher |
+
+### Reference (not part of verified library)
+- `reference/reference.fst` — Port of `FStar/examples/algorithms/StringMatching.fst`
+- `reference/test_without_lemma.fst` — Smoke test for `RabinKarp.Spec.rabin_karp_find_all`
 
 ## Verification Status
 
-| Algorithm | Correctness | Complexity | Admits? |
-|-----------|:-----------:|:----------:|:-------:|
-| Naive (Pulse) | count == spec | O((n-m+1)*m) | None |
-| Rabin-Karp (Pulse) | count == spec | (pure analysis only) | None |
-| Rabin-Karp (Spec) | bidirectional | N/A (pure) | None |
-| KMP (Pulse) | count == spec | O(n+m) | None |
-| KMP (Spec, pure) | count == spec | N/A (pure) | None |
+| Algorithm | Correctness | Complexity | Admits? | .fsti? |
+|-----------|:-----------:|:----------:|:-------:|:------:|
+| Naive (Pulse) | count == spec | O((n-m+1)·m) | None | ✅ Lemmas, Complexity |
+| Rabin-Karp (Spec) | bidirectional | N/A (pure) | None | — |
+| Rabin-Karp (Lemmas) | bidirectional | N/A | None | ✅ |
+| Rabin-Karp (Pulse) | count == spec | (pure analysis only) | None | — |
+| Rabin-Karp (Complexity) | — | O(n+m) / O(nm) | None | ✅ |
+| KMP (Pulse) | count == spec | O(n+m) | None | — |
+| KMP (Spec, pure) | count == spec | N/A (pure) | None | — |
 
-All three algorithms now have **complete functional correctness proofs** (`count == count_matches_spec`) with **zero admits**.
+All algorithms have **complete functional correctness proofs** with **zero admits**.
 
 ## Building
 

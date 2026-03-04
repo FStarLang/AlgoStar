@@ -2,7 +2,7 @@
 
 **Rubric source**: `RUBRIC.md` (repo root)
 **Audit source**: `AUDIT_CH32.md` (repo root)
-**Date**: 2025-07-18
+**Date**: 2025-07-18 (updated 2026-03-04)
 
 ---
 
@@ -10,19 +10,27 @@
 
 | # | File | Lines | Rubric Role | Algorithm |
 |---|------|------:|-------------|-----------|
-| 1 | `CLRS.Ch32.NaiveStringMatch.fst` | 240 | Impl + Spec + Complexity (all-in-one) | Naive |
-| 2 | `CLRS.Ch32.RabinKarp.Spec.fst` | 368 | Spec | Rabin-Karp |
-| 3 | `CLRS.Ch32.RabinKarp.fst` | 326 | Impl | Rabin-Karp |
-| 4 | `CLRS.Ch32.RabinKarp.Complexity.fst` | 113 | Complexity | Rabin-Karp |
-| 5 | `CLRS.Ch32.KMP.PureDefs.fst` | 112 | **Spec** (≈ `Spec.fst`) | KMP |
-| 6 | `CLRS.Ch32.KMP.Spec.fst` | 623 | Lemmas (completeness proof) | KMP |
-| 7 | `CLRS.Ch32.KMP.Bridge.fst` | 383 | **Lemmas** (≈ `Lemmas.fst`) | KMP |
-| 8 | `CLRS.Ch32.KMP.fst` | 486 | Impl + Complexity (inline) | KMP |
-| 9 | `CLRS.Ch32.KMP.Test.fst` | 77 | Test harness | KMP |
+| 1 | `CLRS.Ch32.NaiveStringMatch.Spec.fst` | ~45 | **Spec** | Naive |
+| 2 | `CLRS.Ch32.NaiveStringMatch.Lemmas.fst` | ~50 | **Lemmas** | Naive |
+| 3 | `CLRS.Ch32.NaiveStringMatch.Lemmas.fsti` | ~35 | **Lemmas interface** | Naive |
+| 4 | `CLRS.Ch32.NaiveStringMatch.Complexity.fst` | ~25 | **Complexity** | Naive |
+| 5 | `CLRS.Ch32.NaiveStringMatch.Complexity.fsti` | ~22 | **Complexity interface** | Naive |
+| 6 | `CLRS.Ch32.NaiveStringMatch.fst` | ~180 | **Impl** | Naive |
+| 7 | `CLRS.Ch32.RabinKarp.Spec.fst` | 368 | **Spec** | Rabin-Karp |
+| 8 | `CLRS.Ch32.RabinKarp.Lemmas.fst` | ~115 | **Lemmas** | Rabin-Karp |
+| 9 | `CLRS.Ch32.RabinKarp.Lemmas.fsti` | ~55 | **Lemmas interface** | Rabin-Karp |
+| 10 | `CLRS.Ch32.RabinKarp.Complexity.fst` | ~85 | **Complexity** | Rabin-Karp |
+| 11 | `CLRS.Ch32.RabinKarp.Complexity.fsti` | ~40 | **Complexity interface** | Rabin-Karp |
+| 12 | `CLRS.Ch32.RabinKarp.fst` | 326 | **Impl** | Rabin-Karp |
+| 13 | `CLRS.Ch32.KMP.PureDefs.fst` | 112 | **Spec** | KMP |
+| 14 | `CLRS.Ch32.KMP.Spec.fst` | 623 | **Lemmas** (completeness) | KMP |
+| 15 | `CLRS.Ch32.KMP.Bridge.fst` | 383 | **Lemmas** (bridging) | KMP |
+| 16 | `CLRS.Ch32.KMP.fst` | 486 | **Impl** + Complexity (inline) | KMP |
+| 17 | `CLRS.Ch32.KMP.Test.fst` | 77 | Test harness | KMP |
 
 Ancillary (in `reference/` subdirectory): `reference.fst`, `test_without_lemma.fst` — not part of the verified library.
 
-**Admits / Assumes**: Zero in all 9 production files (confirmed by grep).
+**Admits / Assumes**: Zero in all production files (confirmed by grep).
 
 ---
 
@@ -75,15 +83,16 @@ The rubric requires 7 files per algorithm. Status key: ✅ = present & conformin
 
 | Rubric File | Naive | Rabin-Karp | KMP |
 |-------------|:-----:|:----------:|:---:|
-| **Spec.fst** | 🔶 inline in `NaiveStringMatch.fst` | ✅ `RabinKarp.Spec.fst` | 🔶 `KMP.PureDefs.fst` |
-| **Lemmas.fst** | 🔶 inline (correctness proved with impl) | 🔶 inline in `RabinKarp.Spec.fst` | 🔶 `KMP.Bridge.fst` + `KMP.Spec.fst` |
-| **Lemmas.fsti** | ❌ missing | ❌ missing | ❌ missing |
-| **Complexity.fst** | 🔶 inline in `NaiveStringMatch.fst` | ✅ `RabinKarp.Complexity.fst` | 🔶 inline in `KMP.fst` |
-| **Complexity.fsti** | ❌ missing | ❌ missing | ❌ missing |
+| **Spec.fst** | ✅ `NaiveStringMatch.Spec.fst` | ✅ `RabinKarp.Spec.fst` | 🔶 `KMP.PureDefs.fst` |
+| **Lemmas.fst** | ✅ `NaiveStringMatch.Lemmas.fst` | ✅ `RabinKarp.Lemmas.fst` | 🔶 `KMP.Bridge.fst` + `KMP.Spec.fst` |
+| **Lemmas.fsti** | ✅ `NaiveStringMatch.Lemmas.fsti` | ✅ `RabinKarp.Lemmas.fsti` | ❌ missing |
+| **Complexity.fst** | ✅ `NaiveStringMatch.Complexity.fst` | ✅ `RabinKarp.Complexity.fst` | 🔶 inline in `KMP.fst` |
+| **Complexity.fsti** | ✅ `NaiveStringMatch.Complexity.fsti` | ✅ `RabinKarp.Complexity.fsti` | ❌ missing |
 | **Impl.fst** | 🔶 `NaiveStringMatch.fst` (no `.Impl` suffix) | 🔶 `RabinKarp.fst` (no `.Impl` suffix) | 🔶 `KMP.fst` (no `.Impl` suffix) |
 | **Impl.fsti** | ❌ missing | ❌ missing | ❌ missing |
 
-**Summary**: 3/21 fully conforming, 12/21 present but non-conforming names/structure, 6/21 missing.
+**Summary**: 10/21 fully conforming, 8/21 present but non-conforming names/structure, 3/21 missing.
+*Previous*: 3/21 fully conforming, 12/21 non-conforming, 6/21 missing.
 
 ---
 
@@ -91,27 +100,27 @@ The rubric requires 7 files per algorithm. Status key: ✅ = present & conformin
 
 ### High — Structural conformance
 
-| ID | Action | Files affected | Notes |
-|----|--------|----------------|-------|
-| R1 | **Add `.fsti` interface files** for Lemmas, Complexity, and Impl for all three algorithms (6 files). | New files | The rubric requires `.fsti` files exposing public signatures. Currently zero `.fsti` files exist. |
-| R2 | **Factor Naive into separate files**: extract spec (`NaiveStringMatch.Spec.fst`) and complexity proof from the monolithic `NaiveStringMatch.fst`. | Split 1 → 3+ files | Aligns Naive with the rubric's multi-file structure. |
-| R3 | **Rename KMP files to rubric names**: `PureDefs` → `Spec`, `Bridge` → `Lemmas`. | `KMP.PureDefs.fst` → `KMP.Spec.fst`; current `KMP.Spec.fst` needs a new name (e.g., `KMP.Completeness.fst` or fold into `KMP.Lemmas.fst`). | Requires updating all `open`/`module` aliases across KMP files. |
-| R4 | **Add `.Impl` suffix** to Pulse implementation files, or document the naming deviation. | `NaiveStringMatch.fst`, `RabinKarp.fst`, `KMP.fst` | Alternatively, amend the rubric to permit the current naming if it is the project convention. |
-| R5 | **Extract KMP complexity** into a separate `KMP.Complexity.fst` (and `.fsti`). | New file; slim `KMP.fst` | Amortized analysis is currently woven into the Pulse loop invariants, so full extraction may not be practical — inline may be acceptable with a note. |
+| ID | Action | Files affected | Status |
+|----|--------|----------------|--------|
+| R1 | **Add `.fsti` interface files** for Lemmas and Complexity for Naive and Rabin-Karp (4 files created). KMP still needs `.fsti` files. Impl `.fsti` files deferred (see R4). | `NaiveStringMatch.Lemmas.fsti`, `NaiveStringMatch.Complexity.fsti`, `RabinKarp.Lemmas.fsti`, `RabinKarp.Complexity.fsti` | ✅ **Partial** — 4/6 `.fsti` files created. KMP `.fsti` files outstanding. |
+| R2 | **Factor Naive into separate files**: extracted spec, lemmas, and complexity from monolithic `NaiveStringMatch.fst`. | `NaiveStringMatch.Spec.fst`, `NaiveStringMatch.Lemmas.fst`, `NaiveStringMatch.Complexity.fst`; `NaiveStringMatch.fst` modified to import. | ✅ **Closed** |
+| R3 | **Rename KMP files to rubric names**: `PureDefs` → `Spec`, `Bridge` → `Lemmas`. | `KMP.PureDefs.fst` → `KMP.Spec.fst`; current `KMP.Spec.fst` needs a new name. | ❌ **Open** — Risky rename; requires updating all imports across KMP files. |
+| R4 | **Add `.Impl` suffix** to Pulse implementation files, or document the naming deviation. | `NaiveStringMatch.fst`, `RabinKarp.fst`, `KMP.fst` | 🔶 **Documented** — Current convention omits `.Impl` suffix; documented in README.md. |
+| R5 | **Extract KMP complexity** into a separate `KMP.Complexity.fst` (and `.fsti`). | New file; slim `KMP.fst` | ❌ **Open** — Amortized analysis is woven into Pulse loop invariants; full extraction not practical. |
 
 ### Medium — Content gaps
 
-| ID | Action | Notes |
-|----|--------|-------|
-| R6 | **Add ghost tick counter to `RabinKarp.fst`** and prove O(nm) worst-case inline. | Currently complexity is pure-only (`RabinKarp.Complexity.fst`); the Pulse impl has no runtime bound in its postcondition. |
-| R7 | **Factor Rabin-Karp correctness lemmas** out of `RabinKarp.Spec.fst` into a dedicated `RabinKarp.Lemmas.fst`. | `Spec.fst` currently contains both definitions and proofs (bidirectional correctness, rolling hash correctness). |
+| ID | Action | Status |
+|----|--------|--------|
+| R6 | **Add ghost tick counter to `RabinKarp.fst`** and prove O(nm) worst-case inline. | ❌ Open — no ghost ticks in `RabinKarp.fst`. |
+| R7 | **Factor Rabin-Karp correctness lemmas** out of `RabinKarp.Spec.fst` into a dedicated `RabinKarp.Lemmas.fst`. | ✅ **Closed** — `RabinKarp.Lemmas.fst` created with `no_false_positives`, `no_false_negatives`, `find_all_correct`. Note: proofs also remain in `RabinKarp.Spec.fst` for backward compatibility. |
 
 ### Low — Cleanup
 
-| ID | Action | Notes |
-|----|--------|-------|
-| R8 | **Update `README.md`** to list all 9 files and describe the rubric mapping. | README is outdated (still lists only 3 files per the audit). |
-| R9 | **Decide fate of `reference/`** subdirectory. | Contains `reference.fst` and `test_without_lemma.fst` — useful as reference material but not part of the verified library. Document or remove. |
+| ID | Action | Status |
+|----|--------|--------|
+| R8 | **Update `README.md`** to list all files and describe the rubric mapping. | ✅ **Closed** — README updated with full file inventory and rubric role mapping. |
+| R9 | **Decide fate of `reference/`** subdirectory. | 🔶 **Documented** — Listed as "not part of the verified library" in README. |
 
 ---
 
@@ -123,8 +132,8 @@ The rubric requires 7 files per algorithm. Status key: ✅ = present & conformin
 | Functional correctness (count == spec) | ✅ | ✅ | ✅ |
 | Complexity proven | ✅ O((n−m+1)m) | 🔶 Pure only | ✅ O(n+m) |
 | CLRS-faithful algorithm | ✅ | ✅ | ✅ |
-| Spec/Impl separation | 🔶 monolithic | ✅ | ✅ (non-standard names) |
-| Interface (`.fsti`) files | ❌ | ❌ | ❌ |
+| Spec/Impl separation | ✅ (factored) | ✅ | ✅ (non-standard names) |
+| Interface (`.fsti`) files | ✅ Lemmas+Complexity | ✅ Lemmas+Complexity | ❌ |
 | Tests | ❌ | ❌ | ✅ `KMP.Test.fst` |
 
 ### Changes since AUDIT_CH32.md
@@ -141,4 +150,14 @@ The audit (dated 2025-02-26) identified several critical gaps. Current status:
 | P2.3 | Delete backup files | ✅ **Closed** — no backup files in directory. |
 | P2.1 | Extract shared spec module | 🔶 Partial — `KMP.PureDefs.fst` shares KMP definitions; Naive/RK still have independent `matches_at`/`count_matches_up_to`. |
 | P2.4 | Add complexity to RabinKarp Pulse | ❌ Open — no ghost ticks in `RabinKarp.fst`. |
-| P3.1 | Update README.md | ❌ Open. |
+| P3.1 | Update README.md | ✅ **Closed** — README updated with full file inventory and rubric mapping. |
+
+### Changes in rubric compliance pass (2026-03-04)
+
+| Change | Details |
+|--------|---------|
+| Naive factored into 3+1 files | `NaiveStringMatch.Spec.fst`, `.Lemmas.fst`, `.Complexity.fst` created; `.fst` refactored to import from them. |
+| Rabin-Karp Lemmas factored | `RabinKarp.Lemmas.fst` created from correctness proofs in `RabinKarp.Spec.fst`. |
+| `.fsti` interface files added | 4 new interface files: `NaiveStringMatch.{Lemmas,Complexity}.fsti`, `RabinKarp.{Lemmas,Complexity}.fsti`. |
+| README.md updated | Full file inventory, rubric role mapping, verification status table. |
+| Compliance: 3/21 → 10/21 | Fully conforming files increased from 3 to 10 out of 21 rubric slots. |

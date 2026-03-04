@@ -1,11 +1,15 @@
 (*
-   Naive String Matching Algorithm - Verified implementation in Pulse
+   Naive String Matching Algorithm - Verified implementation in Pulse (CLRS §32.1)
    
    Implements the naive string matching algorithm from CLRS Chapter 32:
    Given text of length n and pattern of length m, finds all occurrences
    of pattern in text using the straightforward O((n-m+1)*m) algorithm.
    
    Proves both functional correctness and O((n-m+1)·m) complexity bound.
+
+   Pure specification in CLRS.Ch32.NaiveStringMatch.Spec
+   Correctness lemmas in CLRS.Ch32.NaiveStringMatch.Lemmas
+   Complexity definition in CLRS.Ch32.NaiveStringMatch.Complexity
 
    NO admits. NO assumes.
 *)
@@ -16,6 +20,10 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
+
+open CLRS.Ch32.NaiveStringMatch.Spec
+open CLRS.Ch32.NaiveStringMatch.Lemmas
+open CLRS.Ch32.NaiveStringMatch.Complexity
 
 #push-options "--z3rlimit 40 --ifuel 2 --fuel 2"
 
@@ -36,75 +44,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 {
   GR.(ctr := incr_nat n)
 }
-
-// ========== Pure Specification ==========
-
-//SNIPPET_START: matches_at_spec
-// Does pattern match text starting at position s?
-let matches_at (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (s: nat) : prop =
-  s + Seq.length pattern <= Seq.length text /\
-  (forall (j: nat). j < Seq.length pattern ==> 
-    Seq.index text (s + j) == Seq.index pattern j)
-//SNIPPET_END: matches_at_spec
-
-// Decidable check for matching
-let rec check_match_at (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (s: nat) (j: nat{j <= Seq.length pattern})
-  : Tot bool (decreases (Seq.length pattern - j))
-  = if j >= Seq.length pattern then true
-    else if s + j >= Seq.length text then false
-    else if Seq.index text (s + j) = Seq.index pattern j 
-         then check_match_at text pattern s (j + 1)
-         else false
-
-// Decidable version
-let matches_at_dec (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (s: nat) : bool =
-  s + Seq.length pattern <= Seq.length text && check_match_at text pattern s 0
-
-// Lemma: correctness of decidable version
-let rec check_match_at_correct (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (s: nat) (j: nat{j <= Seq.length pattern})
-  : Lemma (requires s + Seq.length pattern <= Seq.length text)
-          (ensures check_match_at text pattern s j <==> 
-                   (forall (k: nat). j <= k /\ k < Seq.length pattern ==> 
-                     Seq.index text (s + k) == Seq.index pattern k))
-          (decreases (Seq.length pattern - j))
-  = if j >= Seq.length pattern then ()
-    else check_match_at_correct text pattern s (j + 1)
-
-let matches_at_dec_correct (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (s: nat)
-  : Lemma (requires s + Seq.length pattern <= Seq.length text)
-          (ensures matches_at_dec text pattern s <==> matches_at text pattern s)
-  = check_match_at_correct text pattern s 0
-
-// Simple count: how many positions from 0 to limit have matches
-let rec count_matches_up_to (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (limit: nat)
-  : Tot nat (decreases limit)
-  = if limit = 0 then 0
-    else count_matches_up_to text pattern (limit - 1) + 
-         (if matches_at_dec text pattern (limit - 1) then 1 else 0)
-
-// ========== Helper Lemmas ==========
-
-// Unfold one step of count_matches_up_to
-let count_matches_up_to_unfold (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (limit: nat)
-  : Lemma (requires limit > 0)
-          (ensures count_matches_up_to text pattern limit ==
-                   count_matches_up_to text pattern (limit - 1) + 
-                   (if matches_at_dec text pattern (limit - 1) then 1 else 0))
-  = ()
-
-// count_matches_up_to is bounded by the limit
-let rec count_matches_up_to_bounded (#a: eqtype) (text: Seq.seq a) (pattern: Seq.seq a) (limit: nat)
-  : Lemma (ensures count_matches_up_to text pattern limit <= limit)
-          (decreases limit)
-  = if limit = 0 then ()
-    else count_matches_up_to_bounded text pattern (limit - 1)
-
-// ========== Complexity bound predicate ==========
-
-//SNIPPET_START: complexity_bound_naive
-let string_match_complexity_bounded (cf c0 n m: nat) : prop =
-  cf >= c0 /\ cf - c0 <= op_Multiply (n - m + 1) m
-//SNIPPET_END: complexity_bound_naive
 
 // ========== Pulse Implementation ==========
 
