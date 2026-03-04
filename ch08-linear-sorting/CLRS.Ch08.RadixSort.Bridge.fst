@@ -2,9 +2,9 @@
    Bridge between CountingSort (Pulse) and RadixSort (pure spec) definitions.
 
    CountingSort uses:
-   - L.sorted: pairwise on seq nat via forall i j
-   - L.permutation: SeqP.permutation nat (count-based, implicit length)
-   - L.in_range: all elements <= k
+   - S.sorted: pairwise on seq nat via forall i j
+   - S.permutation: SeqP.permutation nat (count-based, implicit length)
+   - S.in_range: all elements <= k
 
    RadixSort.Base uses:
    - sorted: recursive, head <= next
@@ -23,6 +23,7 @@ open FStar.Mul
 open FStar.Classical
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
+module S = CLRS.Ch08.CountingSort.Spec
 module L = CLRS.Ch08.CountingSort.Lemmas
 module B = CLRS.Ch08.RadixSort.Base
 
@@ -56,33 +57,33 @@ let base_perm_implies_seqp_perm (s1 s2: seq nat)
     in
     FStar.Classical.forall_intro aux
 
-/// L.permutation (opaque SeqP.permutation) implies Base.permutation
+/// S.permutation (opaque SeqP.permutation) implies Base.permutation
 let l_perm_implies_base_perm (s1 s2: seq nat)
-  : Lemma (requires L.permutation s1 s2)
+  : Lemma (requires S.permutation s1 s2)
           (ensures B.permutation s1 s2)
-  = reveal_opaque (`%L.permutation) (L.permutation s1 s2);
+  = reveal_opaque (`%S.permutation) (S.permutation s1 s2);
     seqp_perm_implies_base_perm s1 s2
 
 (* ========== Sorted bridge ========== *)
 
-/// L.sorted on tail — need to shift indices
+/// S.sorted on tail — need to shift indices
 #push-options "--z3rlimit 40"
 let l_sorted_tail (s: seq nat)
-  : Lemma (requires L.sorted s /\ length s > 1)
-          (ensures L.sorted (tail s))
+  : Lemma (requires S.sorted s /\ length s > 1)
+          (ensures S.sorted (tail s))
   = let t = tail s in
     // Each index of tail s equals shifted index of s
     assert (length t == length s - 1);
     assert (forall (k:nat). k < length t ==> index t k == index s (k + 1));
-    // Shifted indices in s are still ordered by L.sorted s
+    // Shifted indices in s are still ordered by S.sorted s
     assert (forall (i j:nat). (i+1) <= (j+1) /\ (j+1) < length s ==> index s (i+1) <= index s (j+1));
-    assert (L.sorted t)
+    assert (S.sorted t)
 #pop-options
 
-/// L.sorted (pairwise) implies B.sorted (recursive)
+/// S.sorted (pairwise) implies B.sorted (recursive)
 #push-options "--z3rlimit 20"
 let rec l_sorted_implies_base_sorted (s: seq nat)
-  : Lemma (requires L.sorted s)
+  : Lemma (requires S.sorted s)
           (ensures B.sorted s)
           (decreases (length s))
   = if length s <= 1 then ()
@@ -103,7 +104,7 @@ let digit_zero (k: nat) (base: nat)
     FStar.Math.Lemmas.small_mod k base
 
 let rec l_sorted_implies_sorted_on_digit_0 (s: seq nat) (base: nat)
-  : Lemma (requires L.sorted s /\ base > 0 /\
+  : Lemma (requires S.sorted s /\ base > 0 /\
                     (forall (i: nat). i < length s ==> index s i < base))
           (ensures B.sorted_on_digit s 0 base)
           (decreases (length s))
@@ -122,10 +123,10 @@ let rec l_sorted_implies_sorted_on_digit_0 (s: seq nat) (base: nat)
 /// CountingSort output satisfies RadixSort.Base predicates for d=0
 let counting_sort_is_radix_base_sort
   (s_in s_out: seq nat) (k: nat)
-  : Lemma (requires L.sorted s_out /\
-                    L.permutation s_in s_out /\
+  : Lemma (requires S.sorted s_out /\
+                    S.permutation s_in s_out /\
                     length s_in == length s_out /\
-                    L.in_range s_in k)
+                    S.in_range s_in k)
           (ensures B.permutation s_in s_out /\
                    B.sorted_on_digit s_out 0 (k + 1))
   = l_perm_implies_base_perm s_in s_out;
@@ -152,10 +153,10 @@ let digit_zero_all (s: seq nat) (base: nat)
 
 let counting_sort_is_stable_on_digit_0
   (s_in s_out: seq nat) (k: nat)
-  : Lemma (requires L.sorted s_out /\
-                    L.permutation s_in s_out /\
+  : Lemma (requires S.sorted s_out /\
+                    S.permutation s_in s_out /\
                     length s_in == length s_out /\
-                    L.in_range s_in k)
+                    S.in_range s_in k)
           (ensures Stab.is_stable_sort_on_digit s_in s_out 0 (k + 1))
   = counting_sort_is_radix_base_sort s_in s_out k;
     let base = k + 1 in

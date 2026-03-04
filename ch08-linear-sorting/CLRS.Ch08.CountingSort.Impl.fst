@@ -11,7 +11,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch08.CountingSort.Stable
+module CLRS.Ch08.CountingSort.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -24,23 +24,18 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
+module S = CLRS.Ch08.CountingSort.Spec
 module L = CLRS.Ch08.CountingSort.Lemmas
 module SL = CLRS.Ch08.CountingSort.StableLemmas
 
-// ========== Specifications ==========
-
-let sorted (s: Seq.seq nat) : prop = L.sorted s
-
-let permutation (s1 s2: Seq.seq nat) : prop = L.permutation s1 s2
-
-let in_range (s: Seq.seq nat) (k: nat) : prop = L.in_range s k
+// sorted, permutation, in_range are defined in Spec.fst (module S)
 
 // ========== Main Algorithm ==========
 
 #push-options "--z3rlimit 120 --fuel 1 --ifuel 1"
-//SNIPPET_START: counting_sort_stable_sig
+//SNIPPET_START: counting_sort_impl_sig
 ```pulse
-fn counting_sort_stable
+fn counting_sort_impl
   (a: A.array nat)     // Input array (read-only)
   (b: A.array nat)     // Output array (will be written)
   (len: SZ.t)          // Length of arrays
@@ -57,7 +52,7 @@ requires
     SZ.v len == Seq.length sb /\
     Seq.length sa == A.length a /\
     Seq.length sb == A.length b /\
-    in_range sa (SZ.v k_val) /\
+    S.in_range sa (SZ.v k_val) /\
     SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
@@ -67,10 +62,10 @@ ensures exists* sb'.
   A.pts_to b sb' **
   pure (
     Seq.length sb' == Seq.length sa /\
-    sorted sb' /\
-    permutation sb' sa
+    S.sorted sb' /\
+    S.permutation sb' sa
   )
-//SNIPPET_END: counting_sort_stable_sig
+//SNIPPET_END: counting_sort_impl_sig
 {
   let k_plus_1 = k_val +^ 1sz;
   
@@ -270,6 +265,159 @@ ensures exists* sb'.
   SL.phase4_final_perm sc_final sa sb_final (SZ.v k_val) (SZ.v len);
   
   V.free c;
+  ()
+}
+```
+#pop-options
+
+// ========== In-place Counting Sort (2-phase variant used by RadixSort) ==========
+
+open Pulse.Lib.BoundedIntegers
+
+#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+```pulse
+fn counting_sort_inplace
+  (a: A.array nat)
+  (len: SZ.t)
+  (k_val: SZ.t)
+  (#s0: erased (Seq.seq nat))
+requires
+  A.pts_to a s0 **
+  pure (
+    SZ.v len <= A.length a /\
+    SZ.v len == Seq.length s0 /\
+    Seq.length s0 == A.length a /\
+    S.in_range s0 (SZ.v k_val) /\
+    SZ.v len > 0 /\
+    SZ.fits (SZ.v k_val + 2) /\
+    SZ.fits (SZ.v len + SZ.v k_val + 2)
+  )
+ensures exists* s.
+  A.pts_to a s **
+  pure (
+    Seq.length s == Seq.length s0 /\
+    S.sorted s /\
+    S.permutation s0 s
+  )
+{
+  let n = len;
+  let k = SZ.v k_val;
+  let k1 = k_val + 1sz;
+
+  // Phase 1: Build count array C where C[v] = count of v in s0
+  let c_arr = V.alloc 0 k1;
+  
+  let mut j: SZ.t = 0sz;
+  while (!j <^ n)
+  invariant exists* vj sc.
+    R.pts_to j vj **
+    V.pts_to c_arr sc **
+    A.pts_to a s0 **
+    pure (
+      SZ.v vj <= SZ.v n /\
+      Seq.length sc == SZ.v k1 /\
+      V.length c_arr == SZ.v k1 /\
+      V.is_full_vec c_arr /\
+      L.counts_match_prefix sc s0 k (SZ.v vj)
+    )
+  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !j)
+  {
+    let vj = !j;
+    with sc. assert (V.pts_to c_arr sc);
+    let val_j = a.(vj);
+    let idx : SZ.t = SZ.uint_to_t val_j;
+    let old_count = V.op_Array_Access c_arr idx;
+    V.op_Array_Assignment c_arr idx (old_count + 1);
+    with sc'. assert (V.pts_to c_arr sc');
+    L.count_phase_step s0 sc sc' (SZ.v vj) k val_j;
+    j := vj + 1sz;
+  };
+  
+  // Phase 2: Write sorted values back
+  let mut pos: SZ.t = 0sz;
+  let mut cur_v: SZ.t = 0sz;
+  let mut cur_v_nat: nat = 0;
+  
+  while (!cur_v <=^ k_val)
+  invariant exists* vcv vpos vcvn sc sa.
+    R.pts_to j n **
+    R.pts_to cur_v vcv **
+    R.pts_to cur_v_nat vcvn **
+    R.pts_to pos vpos **
+    V.pts_to c_arr sc **
+    A.pts_to a sa **
+    pure (
+      SZ.v vcv <= SZ.v k_val + 1 /\
+      vcvn == SZ.v vcv /\
+      SZ.v vpos <= SZ.v n /\
+      Seq.length sc == SZ.v k1 /\
+      Seq.length sa == Seq.length s0 /\
+      V.length c_arr == SZ.v k1 /\
+      V.is_full_vec c_arr /\
+      L.phase2_inv sa s0 (SZ.v vpos) (SZ.v vcv) k /\
+      L.counts_match sc s0 k
+    )
+  decreases (Prims.op_Addition (SZ.v k_val) 1 `Prims.op_Subtraction` SZ.v !cur_v)
+  {
+    let vcv = !cur_v;
+    let vpos = !pos;
+    let vcvn = !cur_v_nat;
+    with sc sa. assert (V.pts_to c_arr sc ** A.pts_to a sa);
+    
+    let cnt = V.op_Array_Access c_arr vcv;
+    L.count_bounded s0 (SZ.v vcv);
+    L.phase2_pos_bound sa s0 (SZ.v vpos) (SZ.v vcv) k;
+    let cnt_sz : SZ.t = SZ.uint_to_t cnt;
+    
+    let mut w: SZ.t = 0sz;
+    
+    while (!w <^ cnt_sz)
+    invariant exists* vw sa_inner.
+      R.pts_to j n **
+      R.pts_to cur_v vcv **
+      R.pts_to cur_v_nat vcvn **
+      R.pts_to pos vpos **
+      R.pts_to w vw **
+      V.pts_to c_arr sc **
+      A.pts_to a sa_inner **
+      pure (
+        SZ.v vw <= SZ.v cnt_sz /\
+        SZ.v vpos + SZ.v cnt_sz <= SZ.v n /\
+        Seq.length sa_inner == Seq.length s0 /\
+        V.length c_arr == SZ.v k1 /\
+        V.is_full_vec c_arr /\
+        (forall (i:nat). SZ.v vpos <= i /\ i < SZ.v vpos + SZ.v vw ==> 
+          Seq.index sa_inner i == vcvn) /\
+        (forall (i:nat). i < SZ.v vpos ==> Seq.index sa_inner i == Seq.index sa i) /\
+        (forall (i:nat). SZ.v vpos + SZ.v vw <= i /\ i < Seq.length sa_inner ==>
+          Seq.index sa_inner i == Seq.index sa i)
+      )
+    {
+      let vw = !w;
+      with sa_w. assert (A.pts_to a sa_w);
+      let write_pos = vpos + vw;
+      assert (pure (SZ.v write_pos == SZ.v vpos + SZ.v vw));
+      a.(write_pos) <- vcvn;
+      with sa_new. assert (A.pts_to a sa_new);
+      assert (pure (Seq.index sa_new (SZ.v write_pos) == vcvn));
+      assert (pure (forall (j:nat). j < Seq.length sa_new /\ j <> SZ.v write_pos ==>
+        Seq.index sa_new j == Seq.index sa_w j));
+      w := vw + 1sz;
+    };
+    
+    with sa_after. assert (A.pts_to a sa_after);
+    L.phase2_step sa sa_after s0 (SZ.v vpos) (SZ.v cnt_sz) (SZ.v vcv) k;
+    
+    pos := vpos + cnt_sz;
+    cur_v := vcv + 1sz;
+    cur_v_nat := vcvn + 1;
+  };
+  
+  with vcv_f vpos_f vcvn_f sc_f sa_f.
+    assert (R.pts_to j n ** R.pts_to cur_v vcv_f ** R.pts_to cur_v_nat vcvn_f **
+            R.pts_to pos vpos_f ** V.pts_to c_arr sc_f ** A.pts_to a sa_f);
+  L.final_perm s0 sa_f k (SZ.v vpos_f);
+  V.free c_arr;
   ()
 }
 ```

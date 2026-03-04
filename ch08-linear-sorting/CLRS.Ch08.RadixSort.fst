@@ -9,14 +9,8 @@
          use a stable sort to sort array A on digit i
    
    Current scope: Integers in [0, k] — single-digit (d=1) radix sort
-   with counting sort as the stable subroutine.
-   
-   Limitation: A multi-digit version (d > 1) would require:
-   - Digit extraction: digit_i(x) = (x / base^i) mod base
-   - Stability proof for counting sort (currently proven as permutation)
-   - Inductive argument: after i passes, elements are sorted on low i digits
-   
-   The d=1 case is correct but does not exercise the multi-pass structure.
+   using counting_sort_inplace (in-place counting sort)
+   as the subroutine.
    
    Proves:
    1. The result is sorted
@@ -29,22 +23,19 @@ module CLRS.Ch08.RadixSort
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
-module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
-module SeqP = FStar.Seq.Properties
-module CS = CLRS.Ch08.CountingSort
-module L = CLRS.Ch08.CountingSort.Lemmas
+module Impl = CLRS.Ch08.CountingSort.Impl
+module S = CLRS.Ch08.CountingSort.Spec
 
 // ========== Main Algorithm ==========
 
 //SNIPPET_START: radix_sort_sig
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
 fn radix_sort
   (a: A.array nat)
   (len: SZ.t)
@@ -56,7 +47,7 @@ requires
     SZ.v len <= A.length a /\
     SZ.v len == Seq.length s0 /\
     Seq.length s0 == A.length a /\
-    L.in_range s0 (SZ.v k_val) /\
+    S.in_range s0 (SZ.v k_val) /\
     SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
@@ -65,11 +56,12 @@ ensures exists* s.
   A.pts_to a s **
   pure (
     Seq.length s == Seq.length s0 /\
-    L.sorted s /\
-    L.permutation s0 s
+    S.sorted s /\
+    S.permutation s0 s
   )
 //SNIPPET_END: radix_sort_sig
 {
-  CS.counting_sort a len k_val
+  // d=1: one pass of in-place counting sort
+  Impl.counting_sort_inplace a len k_val
 }
 #pop-options

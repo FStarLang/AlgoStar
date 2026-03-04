@@ -10,6 +10,7 @@ module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
 module L = CLRS.Ch08.CountingSort.Lemmas
+module S = CLRS.Ch08.CountingSort.Spec
 
 // ========== count_le: count elements in [0, v] ==========
 
@@ -54,7 +55,7 @@ let rec count_le_monotone (s: Seq.seq nat) (v1 v2: int)
     else count_le_monotone (Seq.tail s) v1 v2
 
 let rec count_le_full (s: Seq.seq nat) (k: nat)
-  : Lemma (requires L.in_range s k)
+  : Lemma (requires S.in_range s k)
           (ensures count_le s k == Seq.length s)
           (decreases Seq.length s)
   = if Seq.length s = 0 then ()
@@ -65,12 +66,12 @@ let rec count_le_full (s: Seq.seq nat) (k: nat)
 let prefix_sum_inv (sc: Seq.seq int) (sa: Seq.seq nat) (k: nat) (progress: nat) : prop =
   Seq.length sc == k + 1 /\
   progress >= 1 /\ progress <= k + 1 /\
-  L.in_range sa k /\
+  S.in_range sa k /\
   (forall (v: nat). v < progress /\ v <= k ==> Seq.index sc v == count_le sa v) /\
   (forall (v: nat). v >= progress /\ v <= k ==> Seq.index sc v == SeqP.count v sa)
 
 let prefix_sum_inv_init (sc: Seq.seq int) (sa: Seq.seq nat) (k: nat)
-  : Lemma (requires L.counts_match sc sa k /\ L.in_range sa k /\ k >= 0)
+  : Lemma (requires L.counts_match sc sa k /\ S.in_range sa k /\ k >= 0)
           (ensures prefix_sum_inv sc sa k 1)
   = count_le_step sa 0;
     count_le_negative sa (-1)
@@ -121,7 +122,7 @@ let phase4_pos_bounds
   (sc_key: int) (key: nat)
   : Lemma (requires
       Seq.length sa > 0 /\
-      L.in_range sa k /\
+      S.in_range sa k /\
       remaining > 0 /\ remaining <= Seq.length sa /\
       key <= k /\
       key == Seq.index sa (remaining - 1) /\
@@ -161,7 +162,7 @@ let phase4_pos_bounds
 let write_pos_not_in_smaller_range
   (sa: Seq.seq nat) (k: nat) (remaining: nat) (key v: nat) (pos: int)
   : Lemma (requires
-      L.in_range sa k /\ remaining > 0 /\ remaining <= Seq.length sa /\
+      S.in_range sa k /\ remaining > 0 /\ remaining <= Seq.length sa /\
       key <= k /\ v <= k /\ v < key /\
       key == Seq.index sa (remaining - 1) /\
       pos == count_le sa key - SeqP.count key (Seq.slice sa remaining (Seq.length sa)) /\
@@ -185,7 +186,7 @@ let write_pos_not_in_larger_range
   (sc_init: Seq.seq int) (sa: Seq.seq nat) (k: nat) (remaining: nat) (key v: nat)
   (pos sc_v: int)
   : Lemma (requires
-      L.in_range sa k /\ remaining > 0 /\ remaining <= Seq.length sa /\
+      S.in_range sa k /\ remaining > 0 /\ remaining <= Seq.length sa /\
       Seq.length sc_init == k + 1 /\
       key <= k /\ v <= k /\ v > key /\
       key == Seq.index sa (remaining - 1) /\
@@ -224,7 +225,7 @@ let write_pos_not_in_larger_range
 // Find which key range a position belongs to
 let rec find_key (sa: Seq.seq nat) (k: nat) (p: nat) (lo: nat)
   : Pure nat
-    (requires L.in_range sa k /\ p < count_le sa k /\ lo <= k + 1 /\
+    (requires S.in_range sa k /\ p < count_le sa k /\ lo <= k + 1 /\
               (lo = 0 \/ p >= count_le sa (lo - 1)))
     (ensures fun v -> v <= k /\
                  (v = 0 \/ count_le sa (v - 1) <= p) /\
@@ -243,7 +244,7 @@ let rec find_key (sa: Seq.seq nat) (k: nat) (p: nat) (lo: nat)
 #push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
 let final_sorted_aux (sa sb: Seq.seq nat) (k: nat) (i j: nat)
   : Lemma (requires
-      L.in_range sa k /\ Seq.length sb == Seq.length sa /\
+      S.in_range sa k /\ Seq.length sb == Seq.length sa /\
       i <= j /\ j < Seq.length sa /\
       count_le sa k == Seq.length sa /\
       // All ranges are filled correctly
@@ -286,24 +287,24 @@ let rec count_of_constant_block (sb: Seq.seq nat) (lo hi: nat) (v: nat) (w: nat)
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
 let final_sorted (sa sb: Seq.seq nat) (k: nat)
   : Lemma (requires
-      L.in_range sa k /\ Seq.length sb == Seq.length sa /\
+      S.in_range sa k /\ Seq.length sb == Seq.length sa /\
       Seq.length sa > 0 /\
       count_le sa k == Seq.length sa /\
       (forall (v: nat). v <= k ==>
         (forall (p: nat). (v = 0 \/ count_le sa (v - 1) <= p) /\ p < count_le sa v ==>
           p < Seq.length sb /\ Seq.index sb p == v)))
-    (ensures L.sorted sb)
+    (ensures S.sorted sb)
   = let n = Seq.length sa in
     count_le_full sa k;
     count_le_negative sa (-1);
     let rec prove_sorted (v: nat)
       : Lemma (requires v <= k /\
-                        count_le sa k == n /\ L.in_range sa k /\ Seq.length sb == n /\
+                        count_le sa k == n /\ S.in_range sa k /\ Seq.length sb == n /\
                         (forall (w: nat). w <= k ==>
                           (forall (p: nat). (w = 0 \/ count_le sa (w - 1) <= p) /\ p < count_le sa w ==>
                             p < n /\ Seq.index sb p == w)))
               (ensures count_le sa v <= n /\
-                       L.sorted_prefix sb (count_le sa v) /\
+                       S.sorted_prefix sb (count_le sa v) /\
                        (count_le sa v > 0 ==> Seq.index sb (count_le sa v - 1) <= v))
               (decreases v)
       = count_le_bounded sa v;
@@ -324,10 +325,10 @@ let final_sorted (sa sb: Seq.seq nat) (k: nat)
 #pop-options
 
 // Permutation helper: count elements in block-structured output
-#push-options "--z3rlimit 200 --split_queries always"
+#push-options "--z3rlimit 400 --split_queries always"
 let rec perm_count_blocks (sa sb: Seq.seq nat) (k: nat) (v: nat) (w: nat)
   : Lemma (requires v <= k /\
-                    count_le sa k == Seq.length sa /\ L.in_range sa k /\
+                    count_le sa k == Seq.length sa /\ S.in_range sa k /\
                     Seq.length sb == Seq.length sa /\
                     count_le sa (-1) == 0 /\
                     (forall (u: nat). u <= k ==>
@@ -349,6 +350,7 @@ let rec perm_count_blocks (sa sb: Seq.seq nat) (k: nat) (v: nat) (w: nat)
       count_le_monotone sa (v - 1) v;
       let lo = count_le sa (v - 1) in
       let cnt = count_le sa v - lo in
+      assert (lo + cnt <= Seq.length sb);
       assert (forall (i:nat). lo <= i /\ i < lo + cnt ==> Seq.index sb i == v);
       L.block_count sb lo cnt v w
     )
@@ -358,14 +360,14 @@ let rec perm_count_blocks (sa sb: Seq.seq nat) (k: nat) (v: nat) (w: nat)
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --split_queries always"
 let final_perm (sa sb: Seq.seq nat) (k: nat)
   : Lemma (requires
-      L.in_range sa k /\ Seq.length sb == Seq.length sa /\
+      S.in_range sa k /\ Seq.length sb == Seq.length sa /\
       Seq.length sa > 0 /\
       count_le sa k == Seq.length sa /\
       count_le sa (-1) == 0 /\
       (forall (v: nat). v <= k ==>
         (forall (p: nat). (v = 0 \/ count_le sa (v - 1) <= p) /\ p < count_le sa v ==>
           p < Seq.length sb /\ Seq.index sb p == v)))
-    (ensures L.permutation sb sa)
+    (ensures S.permutation sb sa)
   = let n = Seq.length sa in
     count_le_full sa k;
     count_le_negative sa (-1);
@@ -388,7 +390,7 @@ let final_perm (sa sb: Seq.seq nat) (k: nat)
 [@@"opaque_to_smt"]
 let phase4_c_inv (sc: Seq.seq int) (sa: Seq.seq nat) (k n remaining: nat) : prop =
   Seq.length sc == k + 1 /\ Seq.length sa == n /\ n > 0 /\
-  remaining <= n /\ L.in_range sa k /\
+  remaining <= n /\ S.in_range sa k /\
   (forall (v: nat). v <= k ==>
     Seq.index sc v == count_le sa v - SeqP.count v (Seq.slice sa remaining n))
 
@@ -396,7 +398,7 @@ let phase4_c_inv (sc: Seq.seq int) (sa: Seq.seq nat) (k n remaining: nat) : prop
 [@@"opaque_to_smt"]
 let phase4_b_inv (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat) : prop =
   Seq.length sc == k + 1 /\ Seq.length sa == n /\ Seq.length sb_curr == n /\
-  L.in_range sa k /\
+  S.in_range sa k /\
   (forall (v: nat). v <= k ==>
     (forall (p: nat). Seq.index sc v <= p /\ p < count_le sa v ==>
       p < n /\ Seq.index sb_curr p == v))
@@ -420,7 +422,7 @@ let count_extend_suffix (sa: Seq.seq nat) (remaining: nat) (v: nat)
 #push-options "--z3rlimit 50"
 let phase4_c_inv_init (sc: Seq.seq int) (sa: Seq.seq nat) (k: nat)
   : Lemma (requires
-      Seq.length sc == k + 1 /\ L.in_range sa k /\ Seq.length sa > 0 /\
+      Seq.length sc == k + 1 /\ S.in_range sa k /\ Seq.length sa > 0 /\
       (forall (v: nat). v <= k ==> Seq.index sc v == count_le sa v))
     (ensures phase4_c_inv sc sa k (Seq.length sa) (Seq.length sa))
   = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa k (Seq.length sa) (Seq.length sa));
@@ -430,7 +432,7 @@ let phase4_c_inv_init (sc: Seq.seq int) (sa: Seq.seq nat) (k: nat)
 // Initialize B filling (empty at start)
 let phase4_b_inv_init (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k: nat)
   : Lemma (requires
-      Seq.length sc == k + 1 /\ L.in_range sa k /\ Seq.length sa > 0 /\
+      Seq.length sc == k + 1 /\ S.in_range sa k /\ Seq.length sa > 0 /\
       Seq.length sb_curr == Seq.length sa /\
       (forall (v: nat). v <= k ==> Seq.index sc v == count_le sa v))
     (ensures phase4_b_inv sc sa sb_curr k (Seq.length sa))
@@ -457,7 +459,7 @@ let phase4_c_pos_bounds (sc: Seq.seq int) (sa: Seq.seq nat) (k n remaining: nat)
 let phase4_c_step (sc sc': Seq.seq int) (sa: Seq.seq nat) (k n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa k n remaining /\
-      Seq.length sa == n /\ n > 0 /\ remaining <= n /\ L.in_range sa k /\
+      Seq.length sa == n /\ n > 0 /\ remaining <= n /\ S.in_range sa k /\
       remaining > 0 /\ key <= k /\
       key == Seq.index sa (remaining - 1) /\
       Seq.length sc == k + 1 /\ Seq.length sc' == k + 1 /\
@@ -498,7 +500,7 @@ let phase4_b_step (sc sc': Seq.seq int) (sa sb_curr sb_curr': Seq.seq nat) (k n 
   : Lemma (requires
       phase4_c_inv sc sa k n remaining /\
       phase4_b_inv sc sa sb_curr k n /\
-      Seq.length sa == n /\ n > 0 /\ remaining <= n /\ L.in_range sa k /\
+      Seq.length sa == n /\ n > 0 /\ remaining <= n /\ S.in_range sa k /\
       remaining > 0 /\ key <= k /\
       Seq.length sc == k + 1 /\ Seq.length sb_curr == n /\
       key == Seq.index sa (remaining - 1) /\
@@ -544,8 +546,8 @@ let phase4_b_step (sc sc': Seq.seq int) (sa sb_curr sb_curr': Seq.seq nat) (k n 
 #push-options "--z3rlimit 50"
 let phase4_final_sorted (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat)
   : Lemma (requires phase4_c_inv sc sa k n 0 /\ phase4_b_inv sc sa sb_curr k n /\
-                    Seq.length sc == k + 1 /\ Seq.length sa == n /\ n > 0 /\ Seq.length sb_curr == n /\ L.in_range sa k)
-          (ensures L.sorted sb_curr)
+                    Seq.length sc == k + 1 /\ Seq.length sa == n /\ n > 0 /\ Seq.length sb_curr == n /\ S.in_range sa k)
+          (ensures S.sorted sb_curr)
   = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa k n 0);
     reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb_curr k n);
     assert (Seq.equal (Seq.slice sa 0 n) sa);
@@ -565,8 +567,8 @@ let phase4_final_sorted (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat)
 #push-options "--z3rlimit 50"
 let phase4_final_perm (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat)
   : Lemma (requires phase4_c_inv sc sa k n 0 /\ phase4_b_inv sc sa sb_curr k n /\
-                    Seq.length sc == k + 1 /\ Seq.length sa == n /\ n > 0 /\ Seq.length sb_curr == n /\ L.in_range sa k)
-          (ensures L.permutation sb_curr sa)
+                    Seq.length sc == k + 1 /\ Seq.length sa == n /\ n > 0 /\ Seq.length sb_curr == n /\ S.in_range sa k)
+          (ensures S.permutation sb_curr sa)
   = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa k n 0);
     reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb_curr k n);
     assert (Seq.equal (Seq.slice sa 0 n) sa);
