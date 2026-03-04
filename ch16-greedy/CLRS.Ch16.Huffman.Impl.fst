@@ -1,4 +1,4 @@
-module CLRS.Ch16.Huffman
+module CLRS.Ch16.Huffman.Impl
 #lang-pulse
 
 open Pulse.Lib.Pervasives
@@ -129,6 +129,7 @@ fn forest_own_take_at
 
 // Prove: forest_own entries == 
 //   is_htree(entries[j1]) ** is_htree(entries[j2]) ** forest_own(remove_two entries j1 j2)
+#push-options "--split_queries always"
 let forest_own_split_two_lemma
   (entries: list forest_entry)
   (j1 j2: nat)
@@ -151,6 +152,7 @@ let forest_own_split_two_lemma
     // rem1[j2'] == entries[j2], and list_remove_at rem1 j2' == list_remove_two entries j1 j2
     // So: forest_own entries ==
     //   is_htree(entries[j1]) ** (is_htree(entries[j2]) ** forest_own(list_remove_two entries j1 j2))
+#pop-options
 
 // Extract two elements at list positions j1, j2 from forest_own
 ghost

@@ -1,81 +1,92 @@
-# Activity Selection - Greedy Algorithm (Verified in Pulse)
+# Chapter 16: Greedy Algorithms — Verified in F*/Pulse
 
 ## Overview
-This implementation provides a verified greedy algorithm for the Activity Selection problem from CLRS Chapter 16.
+This directory implements verified greedy algorithms from CLRS Chapter 16:
+1. **Activity Selection** (§16.1) — GREEDY-ACTIVITY-SELECTOR
+2. **Huffman Coding** (§16.3) — HUFFMAN
 
-## Algorithm
-Given a set of activities with start and finish times (sorted by finish time), the algorithm selects the maximum number of non-overlapping activities.
+Both algorithms have **zero admits** and **zero assumes** across all source files.
 
-**Greedy Strategy**: Always select the activity that finishes earliest among the remaining compatible activities.
+---
 
-## Implementation Details
+## Activity Selection (CLRS §16.1)
 
-### Input
-- `start_times`: Array of activity start times
-- `finish_times`: Array of activity finish times (pre-sorted by finish time)
-- `n`: Number of activities (must be > 0)
+### Algorithm
+Given activities with start and finish times (sorted by finish time), the greedy
+algorithm selects the maximum number of non-overlapping activities by always
+choosing the earliest-finishing compatible activity.
 
-### Output
-- `count`: Number of selected activities (SZ.t)
+### Key Results
+- **Full optimality**: `count == max_compatible_count` proven end-to-end
+- **Exact complexity**: n−1 comparisons (O(n) for presorted input)
+- **Greedy choice property** (CLRS Theorem 16.1): proven via exchange argument
+- **Optimal substructure**: proven
+- **Dominance lemma**: greedy selection dominates any valid selection
 
-### Preconditions
-1. Both arrays have length n
-2. Activities are sorted by finish time
-3. Each activity is valid (start ≤ finish)
+### Files
+| File | Role |
+|------|------|
+| `CLRS.Ch16.ActivitySelection.Spec.fst` | Full optimality proof |
+| `CLRS.Ch16.ActivitySelection.Lemmas.fst/.fsti` | Loop invariant definitions & lemmas |
+| `CLRS.Ch16.ActivitySelection.Complexity.fst/.fsti` | Complexity bound definition |
+| `CLRS.Ch16.ActivitySelection.Impl.fst/.fsti` | Pulse implementation |
 
-### Postconditions
-1. At least one activity is selected: `count ≥ 1`
-2. At most n activities selected: `count ≤ n`
+### Postcondition
+```fstar
+SZ.v count == S.max_compatible_count ss sf (SZ.v n)
+complexity_bounded_linear cf (reveal c0) (SZ.v n)  // exactly n-1 comparisons
+```
 
-## Verification
-The implementation is fully verified in Pulse with:
-- **NO admits**
-- **NO assumes**
-- Complete loop invariants
-- Proper separation logic for array access
+---
+
+## Huffman Coding (CLRS §16.3)
+
+### Algorithm
+Builds an optimal prefix-code tree by repeatedly merging the two lowest-frequency
+subtrees using a priority queue. Three levels of implementation:
+
+1. **`huffman_complete`** (Complete.fst) — Pure spec-level construction using
+   sorted list as PQ; WPL-optimality fully proven.
+2. **`huffman_tree`** (Huffman.Impl.fst) — Imperative Pulse implementation using
+   `Pulse.Lib.PriorityQueue` (binary heap); postcondition includes `is_wpl_optimal`.
+
+### Key Results
+- **WPL-optimality**: proven for both spec and imperative implementations
+- **Greedy choice** (CLRS Lemma 16.2): fully proven via exchange argument
+- **Optimal substructure** (CLRS Lemma 16.3): WPL(T) = WPL(T') + f1 + f2
+- **Frequency multiset preservation**: proven through construction
+- **Complexity**: O(n²) proven for sorted-list variant
+
+### Files
+| File | Role |
+|------|------|
+| `CLRS.Ch16.Huffman.Spec.fst` | htree type, WPL, cost, greedy choice theorem |
+| `CLRS.Ch16.Huffman.Complete.fst` | Spec-level construction + WPL optimality |
+| `CLRS.Ch16.Huffman.Optimality.fst` | Bridge: greedy cost ↔ WPL |
+| `CLRS.Ch16.Huffman.Complexity.fst/.fsti` | O(n²) complexity proof (sorted list) |
+| `CLRS.Ch16.Huffman.Defs.fst` | Shared definitions for Impl |
+| `CLRS.Ch16.Huffman.PQLemmas.fst/.fsti` | PQ invariant preservation lemmas |
+| `CLRS.Ch16.Huffman.ForestLemmas.fst/.fsti` | Forest–PQ structural lemmas |
+| `CLRS.Ch16.Huffman.PQForest.fst/.fsti` | Opaque predicate intro/elim |
+| `CLRS.Ch16.Huffman.Impl.fst/.fsti` | Pulse imperative implementation |
+| `TestHuffman.fst` | Smoke test (CLRS Figure 16.3 frequencies) |
+
+### Postcondition (`huffman_tree`)
+```fstar
+HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list freq_seq 0) /\
+HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0) /\
+HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0)
+```
+
+---
 
 ## Building
 ```bash
-cd /home/nswamy/workspace/clrs/ch16-greedy
-rm -rf .depend _cache
-make _cache/CLRS.Ch16.ActivitySelection.fst.checked
+cd /home/nswamy/ws2/AutoCLRS
+make -C ch16-greedy
 ```
 
-## Key Specifications
-
-### finish_sorted
-```fstar
-let finish_sorted (f: Seq.seq int) : prop =
-  forall (i j: nat). i <= j /\ j < Seq.length f ==> 
-    Seq.index f i <= Seq.index f j
-```
-
-### compatible
-```fstar
-let compatible (s f: Seq.seq int) (i j: nat) : prop =
-  i < Seq.length s /\ j < Seq.length s /\
-  i < Seq.length f /\ j < Seq.length f /\
-  Seq.index f i <= Seq.index s j
-```
-
-### valid_activity
-```fstar
-let valid_activity (s f: Seq.seq int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\ 
-  Seq.index s i <= Seq.index f i
-```
-
-## Loop Invariant
-The algorithm maintains:
-1. `vi` tracks current position (1 ≤ vi ≤ n)
-2. `vcount` tracks selected activities (1 ≤ vcount ≤ vi)
-3. `vlast_finish` is the finish time of the last selected activity
-4. `vlast_finish` is a valid finish time from activities [0, vi)
-
-## Time Complexity
-O(n) - single linear scan through the activities
-
-## Notes
-- This is a read-only algorithm (arrays are accessed with permission `#p`)
-- The algorithm assumes activities are pre-sorted by finish time
-- Full optimality proof (showing this equals the maximum independent set) would require additional theorems, but the basic correctness properties are proven
+## Verification Status
+- **All source files verified** (`.checked` caches present)
+- **Zero admits** across all files
+- **Zero assumes** across all files

@@ -1796,10 +1796,10 @@ let huffman_complete_optimal (freqs: list pos{Cons? freqs})
    
    Full WPL-optimality for the multi-element case (that no other tree with the
    same frequency multiset has lower WPL) uses the greedy choice property from
-   CLRS Lemma 16.2, axiomatized in the Spec module with a correct statement.
+   CLRS Lemma 16.2, fully proven in the Spec module.
    
    To verify:
-   cd /home/nswamy/workspace/everest/AutoCLRS
+   cd /home/nswamy/ws2/AutoCLRS
    fstar.exe --include $(realpath ../pulse)/out/lib/pulse \
              --include common \
              --include ch16-greedy \

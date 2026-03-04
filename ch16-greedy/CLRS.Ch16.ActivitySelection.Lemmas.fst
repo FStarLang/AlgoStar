@@ -2,65 +2,6 @@ module CLRS.Ch16.ActivitySelection.Lemmas
 
 open FStar.Seq
 
-(* Activities are sorted by finish time *)
-let finish_sorted (f: seq int) : prop =
-  forall (i j: nat). i <= j /\ j < Seq.length f ==> Seq.index f i <= Seq.index f j
-
-(* Valid activity: start < finish (CLRS assumes strict inequality) *)
-let valid_activity (s f: seq int) (i: nat) : prop =
-  i < Seq.length s /\ i < Seq.length f /\ Seq.index s i < Seq.index f i
-
-(* Selected activities: a sequence of indices into the activity arrays *)
-
-(* All indices are valid *)
-let all_valid_indices (sel: seq nat) (n: nat) : prop =
-  forall (i: nat). i < Seq.length sel ==> Seq.index sel i < n
-
-(* Indices are strictly increasing *)
-let strictly_increasing (sel: seq nat) : prop =
-  forall (i j: nat). i < j /\ j < Seq.length sel ==> Seq.index sel i < Seq.index sel j
-
-(* Selected activities are pairwise non-overlapping:
-   for consecutive selected activities, finish[sel[i]] <= start[sel[i+1]] *)
-let pairwise_compatible (sel: seq nat) (s f: seq int) : prop =
-  (forall (i: nat). i < Seq.length sel ==> Seq.index sel i < Seq.length s /\ Seq.index sel i < Seq.length f) /\
-  (forall (i: nat). i + 1 < Seq.length sel ==>
-    Seq.index f (Seq.index sel i) <= Seq.index s (Seq.index sel (i + 1)))
-
-(* Earliest-compatible property: each selected activity is the earliest compatible one.
-   For consecutive sel[i], sel[i+1]: all z with sel[i] < z < sel[i+1] are incompatible.
-   For the last sel[last]: all z with sel[last] < z < processed are incompatible. *)
-let earliest_compatible (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) : prop =
-  Seq.length sel >= 1 /\
-  // Between consecutive selected activities, all are incompatible with the earlier one
-  (forall (i: nat). i + 1 < Seq.length sel ==>
-    (forall (z: nat). Seq.index sel i < z /\ z < Seq.index sel (i + 1) /\
-                       z < n /\ z < Seq.length s /\ z < Seq.length f ==>
-      Seq.index s z < Seq.index f (Seq.index sel i))) /\
-  // After the last selected, all processed activities are incompatible
-  (forall (z: nat). Seq.index sel (Seq.length sel - 1) < z /\ z < processed /\
-                     z < n /\ z < Seq.length s /\ z < Seq.length f ==>
-    Seq.index s z < Seq.index f (Seq.index sel (Seq.length sel - 1)))
-
-//SNIPPET_START: greedy_selection_inv
-(* The full greedy selection invariant *)
-let greedy_selection_inv (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) (last_finish: int) : prop =
-  // Basic properties
-  Seq.length sel >= 1 /\
-  all_valid_indices sel n /\
-  strictly_increasing sel /\
-  pairwise_compatible sel s f /\
-  // All selected indices are in [0, processed)
-  (forall (i: nat). i < Seq.length sel ==> Seq.index sel i < processed) /\
-  // last_finish is the finish time of the last selected activity
-  Seq.index sel (Seq.length sel - 1) < Seq.length f /\
-  Seq.index f (Seq.index sel (Seq.length sel - 1)) == last_finish /\
-  // First selected is index 0
-  Seq.index sel 0 == 0 /\
-  // Greedy earliest-compatible property
-  earliest_compatible sel s f n processed
-//SNIPPET_END: greedy_selection_inv
-
 (* Lemma: extending the selection with a new compatible activity *)
 let lemma_extend_selection
   (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) (last_finish: int) (new_idx: nat)
@@ -161,13 +102,6 @@ let lemma_initial_selection (s f: seq int) (n: nat)
     ()
 
 (* ====== OPTIMALITY PROOF ====== *)
-
-(* A valid selection: a compatible set of activities *)
-let is_valid_selection (sel: seq nat) (s f: seq int) (n: nat) : prop =
-  Seq.length sel >= 1 /\
-  all_valid_indices sel n /\
-  strictly_increasing sel /\
-  pairwise_compatible sel s f
 
 //SNIPPET_START: lemma_greedy_choice_seq
 (* Greedy choice property (CLRS Theorem 16.1):

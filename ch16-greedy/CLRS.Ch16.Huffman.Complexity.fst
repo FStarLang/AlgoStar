@@ -99,10 +99,6 @@ let huffman_length_decreases (t1 t2: htree) (rest: list htree)
     ))
   = insert_sorted_length (merge t1 t2) rest
 
-// Helper: square function to avoid parsing issues with `*` in ensures clauses
-let square (n: nat) : Tot nat = op_Multiply n n
-
-//SNIPPET_START: huffman_ticks_bounded
 // Key lemma: Prove ticks bounded by n²
 let rec huffman_ticks_bounded (l: list htree{Cons? l})
   : Lemma (ensures huffman_ticks l <= square (length l))
@@ -217,7 +213,7 @@ let rec huffman_with_ticks_correct (l: list htree{Cons? l})
    NO admits in complexity proofs.
    
    To verify:
-   cd /home/nswamy/workspace/everest/AutoCLRS
+   cd /home/nswamy/ws2/AutoCLRS
    fstar.exe --include $(realpath ../pulse)/out/lib/pulse \
              --include common \
              --include ch16-greedy \

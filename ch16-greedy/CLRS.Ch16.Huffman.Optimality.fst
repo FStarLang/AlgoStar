@@ -48,7 +48,7 @@ let rec sorted_multiset_unique (l1 l2: list pos)
 
 // ========== sortWith pos_compare ==========
 
-let pos_compare (a b: pos) : int = a - b
+// pos_compare is defined in the .fsti
 
 let rec partition_pos_le (pivot: pos) (l: list pos)
   : Lemma (ensures (let hi, lo = partition (bool_of_compare pos_compare pivot) l in
@@ -151,6 +151,10 @@ let rec greedy_cost (freqs: list pos) : Tot nat (decreases length freqs) =
         (f1 + f2) + greedy_cost ((f1 + f2) :: rest)
     | _ -> 0
   end
+
+let greedy_cost_singleton (f: pos)
+  : Lemma (greedy_cost [f] == 0)
+  = sortWith_pos_length [f]
 
 let greedy_cost_multiset_invariant (l1 l2: list pos)
   : Lemma (requires forall (x: pos). count x l1 = count x l2)

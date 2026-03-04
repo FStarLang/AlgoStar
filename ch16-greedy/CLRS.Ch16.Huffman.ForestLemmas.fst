@@ -659,7 +659,7 @@ let forest_total_cost_singleton (entries: list forest_entry)
 // greedy_cost of a singleton is 0
 let greedy_cost_singleton (f: pos)
   : Lemma (HOpt.greedy_cost [f] == 0)
-  = HOpt.sortWith_pos_length [f]
+  = HOpt.greedy_cost_singleton f
 
 // forest_root_freqs length matches forest length
 let rec forest_root_freqs_length (entries: list forest_entry)

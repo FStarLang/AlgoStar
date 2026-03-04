@@ -1,5 +1,5 @@
 (*
-   Test for CLRS.Ch16.Huffman
+   Test for CLRS.Ch16.Huffman.Impl
    
    Example from CLRS: frequencies [5; 9; 12; 13; 16; 45]
    Builds a Huffman tree (verified optimal) and drops it.
@@ -10,7 +10,7 @@ module TestHuffman
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open CLRS.Ch16.Huffman
+open CLRS.Ch16.Huffman.Impl
 open CLRS.Ch16.Huffman.Defs
 
 module A = Pulse.Lib.Array

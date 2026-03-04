@@ -21,7 +21,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch16.ActivitySelection
+module CLRS.Ch16.ActivitySelection.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -40,8 +40,6 @@ module S = CLRS.Ch16.ActivitySelection.Spec
 // ========== Definitions ==========
 
 // Ghost tick infrastructure
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
   requires GR.pts_to ctr n
@@ -50,21 +48,9 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-//SNIPPET_START: complexity_bounded_linear
-let complexity_bounded_linear (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 == n - 1
-//SNIPPET_END: complexity_bounded_linear
-
-// The first `count` entries of out_seq match sel (as SZ.t values)
-let out_matches_sel (out_seq: Seq.seq SZ.t) (sel: Seq.seq nat) (count: nat) (n: nat) : prop =
-  count <= Seq.length out_seq /\
-  Seq.length sel == count /\
-  (forall (j: nat). j < count ==> SZ.v (Seq.index out_seq j) == Seq.index sel j /\
-                                    Seq.index sel j < n)
-
 // ========== Activity Selection Algorithm ==========
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 2"
 //SNIPPET_START: activity_selection_sig
 fn activity_selection 
   (#p: perm)
@@ -79,40 +65,14 @@ fn activity_selection
     A.pts_to start_times #p ss ** A.pts_to finish_times #p sf **
     A.pts_to out sout0 **
     GR.pts_to ctr c0 **
-    pure (
-      SZ.v n == Seq.length ss /\ 
-      SZ.v n == Seq.length sf /\
-      SZ.v n == A.length start_times /\ 
-      SZ.v n == A.length finish_times /\
-      SZ.v n == A.length out /\
-      SZ.v n == Seq.length sout0 /\
-      SZ.v n > 0 /\
-      L.finish_sorted sf /\
-      (forall (i:nat). i < Seq.length ss ==> L.valid_activity ss sf i)
-    )
+    pure (activity_selection_pre n ss sf sout0 start_times finish_times out)
   returns count: SZ.t
   ensures exists* sout (cf: nat).
     A.pts_to start_times #p ss ** 
     A.pts_to finish_times #p sf **
     A.pts_to out sout **
     GR.pts_to ctr cf **
-    pure (
-      SZ.v count >= 1 /\ 
-      SZ.v count <= SZ.v n /\
-      Seq.length sout == SZ.v n /\
-      complexity_bounded_linear cf (reveal c0) (SZ.v n) /\
-      // The first count entries of out are the selected activity indices
-      (exists (sel: Seq.seq nat).
-        Seq.length sel == SZ.v count /\
-        out_matches_sel sout sel (SZ.v count) (SZ.v n) /\
-        L.all_valid_indices sel (SZ.v n) /\
-        L.strictly_increasing sel /\
-        L.pairwise_compatible sel ss sf /\
-        Seq.index sel 0 == 0 /\
-        L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n) /\
-        // Optimality: the selection has maximum cardinality
-        SZ.v count == S.max_compatible_count ss sf (SZ.v n))
-    )
+    pure (activity_selection_post count n sout cf (reveal c0) ss sf)
 //SNIPPET_END: activity_selection_sig
 {
   // First activity (earliest finish) is always selected

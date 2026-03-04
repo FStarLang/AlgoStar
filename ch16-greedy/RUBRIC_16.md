@@ -3,12 +3,14 @@
 **Directory**: `ch16-greedy/`
 **Date**: 2025-07-18
 **Based on**: `RUBRIC.md` (canonical), `AUDIT_CH16.md` (prior audit, 2025-02-26)
-**Total LOC**: ~9,985 across 16 source files (9 `.fst` + 3 `.fsti` + support)
 
-> **Key change since audit**: `Huffman.fst` was refactored from 2,308 → 521 lines
-> by extracting `Defs.fst`, `PQLemmas.fst/.fsti`, `ForestLemmas.fst/.fsti`, and
-> `PQForest.fst/.fsti`. All files (including `Huffman.fst`) now have `.checked`
-> caches. The `huffman_tree` postcondition now includes `is_wpl_optimal`.
+> **Key changes since audit**:
+> - `Huffman.fst` refactored from 2,308 → 521 lines (extracted `Defs`, `PQLemmas`,
+>   `ForestLemmas`, `PQForest`). `huffman_tree` postcondition now includes `is_wpl_optimal`.
+> - Impl files renamed: `ActivitySelection.fst` → `ActivitySelection.Impl.fst`,
+>   `Huffman.fst` → `Huffman.Impl.fst` (per rubric naming convention).
+> - Created `.fsti` interfaces for all modules: Impl, Lemmas, Complexity, Optimality.
+> - All files verified (zero admits, zero assumes).
 
 ---
 
@@ -16,14 +18,21 @@
 
 | File | Lines | `.checked` | Rubric Role | Algorithm |
 |------|------:|:----------:|-------------|-----------|
-| `CLRS.Ch16.ActivitySelection.fst` | 197 | ✅ | **Impl** (Pulse) | ActivitySelection |
-| `CLRS.Ch16.ActivitySelection.Lemmas.fst` | 316 | ✅ | **Lemmas** | ActivitySelection |
+| `CLRS.Ch16.ActivitySelection.Impl.fst` | 157 | ✅ | **Impl** (Pulse) | ActivitySelection |
+| `CLRS.Ch16.ActivitySelection.Impl.fsti` | 85 | ✅ | **Impl** interface | ActivitySelection |
+| `CLRS.Ch16.ActivitySelection.Lemmas.fst` | 256 | ✅ | **Lemmas** | ActivitySelection |
+| `CLRS.Ch16.ActivitySelection.Lemmas.fsti` | 96 | ✅ | **Lemmas** interface | ActivitySelection |
 | `CLRS.Ch16.ActivitySelection.Spec.fst` | 1,178 | ✅ | **Spec** | ActivitySelection |
-| `CLRS.Ch16.Huffman.fst` | 521 | ✅ | **Impl** (Pulse) | Huffman |
+| `CLRS.Ch16.ActivitySelection.Complexity.fst` | 11 | ✅ | **Complexity** | ActivitySelection |
+| `CLRS.Ch16.ActivitySelection.Complexity.fsti` | 13 | ✅ | **Complexity** interface | ActivitySelection |
+| `CLRS.Ch16.Huffman.Impl.fst` | 523 | ✅ | **Impl** (Pulse) | Huffman |
+| `CLRS.Ch16.Huffman.Impl.fsti` | 52 | ✅ | **Impl** interface | Huffman |
 | `CLRS.Ch16.Huffman.Spec.fst` | 2,124 | ✅ | **Spec** | Huffman |
-| `CLRS.Ch16.Huffman.Complete.fst` | 1,807 | ✅ | **Lemmas** (WPL optimality) | Huffman |
+| `CLRS.Ch16.Huffman.Complete.fst` | 1,807 | ✅ | **Lemmas** (pure algorithm + WPL optimality proof) | Huffman |
 | `CLRS.Ch16.Huffman.Optimality.fst` | 353 | ✅ | **Lemmas** (bridge: greedy cost ↔ WPL) | Huffman |
-| `CLRS.Ch16.Huffman.Complexity.fst` | 225 | ✅ | **Complexity** (O(n²) sorted-list) | Huffman |
+| `CLRS.Ch16.Huffman.Optimality.fsti` | 73 | ✅ | **Lemmas** interface (greedy_cost + key lemmas) | Huffman |
+| `CLRS.Ch16.Huffman.Complexity.fst` | 223 | ✅ | **Complexity** (O(n²) sorted-list) | Huffman |
+| `CLRS.Ch16.Huffman.Complexity.fsti` | 49 | ✅ | **Complexity** interface | Huffman |
 | `CLRS.Ch16.Huffman.Defs.fst` | 475 | ✅ | **Lemmas** (shared defs for Impl) | Huffman |
 | `CLRS.Ch16.Huffman.PQLemmas.fst` | 323 | ✅ | **Lemmas** (PQ invariant preservation) | Huffman |
 | `CLRS.Ch16.Huffman.PQLemmas.fsti` | 65 | ✅ | **Lemmas** interface | Huffman |
@@ -52,18 +61,26 @@ translation of CLRS pseudocode.
 Builds an optimal prefix-code tree by repeatedly merging the two lowest-frequency
 subtrees. The codebase provides:
 
-1. **`huffman_complete`** (Complete.fst) — Pure spec-level construction using sorted list as PQ; WPL-optimality proven.
-2. **`huffman_tree`** (Huffman.fst) — Imperative Pulse implementation using `Pulse.Lib.PriorityQueue` (binary heap); postcondition now includes `is_wpl_optimal`.
-3. **`huffman_cost`** — Cost-only shortcut (flat array, linear scans); present in the older audit but superseded by the refactored implementation.
+1. **`huffman_complete`** (Complete.fst) — Pure spec-level construction using sorted list as PQ; WPL-optimality proven via CLRS Lemma 16.2 (greedy exchange argument).
+2. **`huffman_tree`** (Impl.fst) — Imperative Pulse implementation using `Pulse.Lib.PriorityQueue` (binary heap); postcondition includes `is_wpl_optimal`.
+3. **Optimality bridge** (Optimality.fst) — Proves `cost(huffman_complete freqs) == greedy_cost freqs` and the critical `greedy_cost_implies_optimal` lemma used by the Pulse Impl.
+
+**Huffman.Complete** is the correctness cornerstone: it implements the algorithm purely
+(no mutation) and proves WPL-optimality (`huffman_complete_optimal`). Optimality.fst
+bridges the gap by defining `greedy_cost` and showing cost-equivalence. The Pulse Impl
+references `greedy_cost_implies_optimal` to close its postcondition.
+
+**Huffman module dependency chain**:
+`Spec` (types, WPL) → `Complete` (pure algorithm + optimality proof) → `Optimality` (greedy cost bridge) → `Impl` (Pulse imperative)
 
 **Huffman module mapping** (fragmented → rubric):
 
 | Rubric Slot | Mapped Modules |
 |-------------|----------------|
 | `Spec` | `Huffman.Spec.fst` — htree type, WPL, cost, swap lemma, greedy choice theorem |
-| `Lemmas` | `Huffman.Complete.fst` (WPL optimality), `Huffman.Optimality.fst` (bridge), `Huffman.Defs.fst` (shared defs), `Huffman.PQLemmas.fst/.fsti`, `Huffman.ForestLemmas.fst/.fsti`, `Huffman.PQForest.fst/.fsti` |
-| `Complexity` | `Huffman.Complexity.fst` — O(n²) for sorted-list variant |
-| `Impl` | `Huffman.fst` — Pulse imperative `huffman_tree` |
+| `Lemmas` | `Huffman.Complete.fst` (WPL optimality), `Huffman.Optimality.fst/.fsti` (bridge), `Huffman.Defs.fst` (shared defs), `Huffman.PQLemmas.fst/.fsti`, `Huffman.ForestLemmas.fst/.fsti`, `Huffman.PQForest.fst/.fsti` |
+| `Complexity` | `Huffman.Complexity.fst/.fsti` — O(n²) for sorted-list variant |
+| `Impl` | `Huffman.Impl.fst/.fsti` — Pulse imperative `huffman_tree` |
 
 ---
 
@@ -74,12 +91,12 @@ subtrees. The codebase provides:
 | Rubric File | Required? | Status | Current File | Notes |
 |-------------|:---------:|:------:|--------------|-------|
 | `AlgoName.Spec.fst` | ✅ | ✅ | `ActivitySelection.Spec.fst` (1,178 L) | Full optimality proof |
-| `AlgoName.Lemmas.fst` | ✅ | ✅ | `ActivitySelection.Lemmas.fst` (316 L) | Loop invariant defs & lemmas |
-| `AlgoName.Lemmas.fsti` | ✅ | ❌ | *Missing* | No interface file for Lemmas |
-| `AlgoName.Complexity.fst` | ✅ | 🔶 | *Inline in Impl* | Tick counter in `.fst` proves n−1 comparisons; no separate module |
-| `AlgoName.Complexity.fsti` | ✅ | ❌ | *Missing* | No complexity interface |
-| `AlgoName.Impl.fst` | ✅ | ✅ | `ActivitySelection.fst` (197 L) | Pulse impl, verified |
-| `AlgoName.Impl.fsti` | ✅ | ❌ | *Missing* | No public interface for Impl |
+| `AlgoName.Lemmas.fst` | ✅ | ✅ | `ActivitySelection.Lemmas.fst` (256 L) | Loop invariant defs & lemmas |
+| `AlgoName.Lemmas.fsti` | ✅ | ✅ | `ActivitySelection.Lemmas.fsti` | Interface file with predicate defs + lemma signatures |
+| `AlgoName.Complexity.fst` | ✅ | ✅ | `ActivitySelection.Complexity.fst` | Defines `complexity_bounded_linear` |
+| `AlgoName.Complexity.fsti` | ✅ | ✅ | `ActivitySelection.Complexity.fsti` | Interface for complexity definition |
+| `AlgoName.Impl.fst` | ✅ | ✅ | `ActivitySelection.Impl.fst` (157 L) | Pulse impl, verified |
+| `AlgoName.Impl.fsti` | ✅ | ✅ | `ActivitySelection.Impl.fsti` | Named-predicate pre/postcondition |
 
 ### Huffman
 
@@ -87,21 +104,21 @@ subtrees. The codebase provides:
 |-------------|:---------:|:------:|-----------------|-------|
 | `AlgoName.Spec.fst` | ✅ | ✅ | `Huffman.Spec.fst` (2,124 L) | htree, WPL, cost, greedy choice, optimal substructure |
 | `AlgoName.Lemmas.fst` | ✅ | 🔶 | 7 modules (see mapping above) | Correct content, non-standard naming; total ~4,200 L |
-| `AlgoName.Lemmas.fsti` | ✅ | 🔶 | `PQLemmas.fsti`, `ForestLemmas.fsti`, `PQForest.fsti` | Fragmented across 3 interfaces |
-| `AlgoName.Complexity.fst` | ✅ | 🔶 | `Huffman.Complexity.fst` (225 L) | O(n²) for sorted-list only; O(n lg n) for heap-PQ not proven |
-| `AlgoName.Complexity.fsti` | ✅ | ❌ | *Missing* | No complexity interface |
-| `AlgoName.Impl.fst` | ✅ | ✅ | `Huffman.fst` (521 L) | Pulse impl, now verified ✅ |
-| `AlgoName.Impl.fsti` | ✅ | ❌ | *Missing* | No public interface for Impl |
+| `AlgoName.Lemmas.fsti` | ✅ | 🔶 | `PQLemmas.fsti`, `ForestLemmas.fsti`, `PQForest.fsti`, `Optimality.fsti` | Fragmented across 4 interfaces |
+| `AlgoName.Complexity.fst` | ✅ | 🔶 | `Huffman.Complexity.fst` (223 L) | O(n²) for sorted-list only; O(n lg n) for heap-PQ not proven |
+| `AlgoName.Complexity.fsti` | ✅ | ✅ | `Huffman.Complexity.fsti` | Interface for complexity definitions and lemmas |
+| `AlgoName.Impl.fst` | ✅ | ✅ | `Huffman.Impl.fst` (523 L) | Pulse impl, verified ✅ |
+| `AlgoName.Impl.fsti` | ✅ | ✅ | `Huffman.Impl.fsti` | Public Pulse interface for `huffman_tree` and `free_htree` |
 
 ### Summary
 
 | Category | Activity Selection | Huffman |
 |----------|:-----------------:|:-------:|
 | Spec | ✅ | ✅ |
-| Lemmas | ✅ (no `.fsti`) | 🔶 Fragmented (7 modules) |
-| Complexity | 🔶 Inline | 🔶 Sorted-list only |
-| Impl | ✅ (no `.fsti`) | ✅ (no `.fsti`) |
-| Verified (`.checked`) | ✅ All 3 files | ✅ All 13 files |
+| Lemmas | ✅ (with `.fsti`) | 🔶 Fragmented (7 modules, all with `.fsti`) |
+| Complexity | ✅ Separate module | 🔶 Sorted-list only (with `.fsti`) |
+| Impl | ✅ `.Impl.fst/.fsti` | ✅ `.Impl.fst/.fsti` |
+| Verified (`.checked`) | ✅ All files | ✅ All files |
 | Admits / Assumes | ✅ Zero | ✅ Zero |
 | Optimality in postcondition | ✅ `count == max_compatible_count` | ✅ `is_wpl_optimal` |
 
@@ -116,13 +133,15 @@ now have `.checked` caches, and the `huffman_tree` postcondition includes `is_wp
 
 ### P1 — Rubric Structural Compliance
 
-| # | Task | Detail |
-|---|------|--------|
-| 1 | **Add `ActivitySelection.Lemmas.fsti`** | Rubric requires an interface file for Lemmas. Extract signatures from `Lemmas.fst`. |
-| 2 | **Add `ActivitySelection.Impl.fsti`** | Rubric requires a public interface for the Pulse implementation. Extract `activity_selection` signature. |
-| 3 | **Add `Huffman.Impl.fsti`** | Rubric requires a public interface for `huffman_tree`. Extract signature with `is_wpl_optimal` postcondition. |
-| 4 | **Extract `ActivitySelection.Complexity.fst/.fsti`** | Complexity proof (tick counter) is inline in Impl. Move to a separate module per rubric. |
-| 5 | **Add `Huffman.Complexity.fsti`** | Rubric requires an interface file for the complexity module. |
+| # | Task | Detail | Status |
+|---|------|--------|--------|
+| 1 | **Add `ActivitySelection.Lemmas.fsti`** | Interface file with predicate definitions + lemma signatures. | ✅ Done |
+| 2 | **Add `ActivitySelection.Impl.fsti`** | Public Pulse interface for `activity_selection` with full postcondition. | ✅ Done |
+| 3 | **Add `Huffman.Impl.fsti`** | Public Pulse interface for `huffman_tree` and `free_htree`. | ✅ Done |
+| 4 | **Extract `ActivitySelection.Complexity.fst/.fsti`** | Created separate module with `complexity_bounded_linear`; Impl imports it. | ✅ Done |
+| 5 | **Add `Huffman.Complexity.fsti`** | Interface with complexity definitions and lemma signatures. | ✅ Done |
+| 6 | **Rename Impl files** | `ActivitySelection.fst` → `.Impl.fst`, `Huffman.fst` → `.Impl.fst` (per rubric naming). | ✅ Done |
+| 7 | **Add `Huffman.Optimality.fsti`** | Interface with `greedy_cost` definition and key lemma signatures. | ✅ Done |
 
 ### P2 — Proof & Specification Gaps
 
@@ -133,13 +152,13 @@ now have `.checked` caches, and the `huffman_tree` postcondition includes `is_wp
 
 ### P3 — Documentation & Cleanup
 
-| # | Task | Detail |
-|---|------|--------|
-| 8 | **Update README.md** | Missing Huffman docs; incorrect build path (`clrs` → `AutoCLRS`); outdated claim that optimality proof is missing. |
-| 9 | **Update stale module comments** | `Complete.fst` says greedy choice is "axiomatized" — it is now fully proven in `Spec.fst`. |
-| 10 | **Add Activity Selection test file** | No `TestActivitySelection.fst` exists. Add a smoke test. |
-| 11 | **Add more Huffman test cases** | `TestHuffman.fst` covers only CLRS Figure 16.3. Add edge cases (1 char, 2 chars, equal freqs). |
-| 12 | **Clean up orphan cache** | Remove `_cache/CLRS.Ch16.ActivitySelection.Complexity.fst.checked` if it still exists (no matching source). |
+| # | Task | Detail | Status |
+|---|------|--------|--------|
+| 8 | **Update README.md** | Added Huffman documentation, fixed build path, removed outdated optimality claim. | ✅ Done |
+| 9 | **Update stale module comments** | `Complete.fst`: "axiomatized" → "fully proven"; fixed stale build paths in `Complete.fst` and `Complexity.fst`. | ✅ Done |
+| 10 | **Add Activity Selection test file** | No `TestActivitySelection.fst` exists. Add a smoke test. | Pending |
+| 11 | **Add more Huffman test cases** | `TestHuffman.fst` covers only CLRS Figure 16.3. Add edge cases (1 char, 2 chars, equal freqs). | Pending |
+| 12 | **Clean up orphan cache** | `_cache/CLRS.Ch16.ActivitySelection.Complexity.fst.checked` — no longer orphaned (source exists now). | ✅ Resolved |
 
 ---
 
@@ -158,16 +177,22 @@ now have `.checked` caches, and the `huffman_tree` postcondition includes `is_wp
 
 | Check | Result |
 |-------|--------|
-| All `.fst` have `.checked` | ✅ 9/9 |
-| All `.fsti` have `.checked` | ✅ 3/3 (PQLemmas, ForestLemmas, PQForest) |
-| `Huffman.fst` verified | ✅ **Resolved** (was ❌ in prior audit) |
+| All `.fst` have `.checked` | ✅ 12/12 |
+| All `.fsti` have `.checked` | ✅ 10/10 |
+| `Huffman.Impl.fst` verified | ✅ **Resolved** (was ❌ in prior audit) |
+| Pulse `.Impl.fsti` verified against `.Impl.fst` | ✅ Both `ActivitySelection.Impl` and `Huffman.Impl` |
+
+> **Note**: All Pulse `.fsti` files (`ActivitySelection.Impl.fsti`, `Huffman.Impl.fsti`) have been
+> verified against their `.fst` implementations. `ActivitySelection.Impl.fsti` uses named
+> predicates (`activity_selection_pre`, `activity_selection_post`) to avoid SMT subtyping
+> issues with inline quantifiers in Pulse fn declarations.
 
 ### z3rlimit Health
 
 | File | Max rlimit | Assessment |
 |------|:----------:|------------|
-| `ActivitySelection.fst` | — | Clean |
-| `Huffman.fst` | 8 | Clean (post-refactor) |
+| `ActivitySelection.Impl.fst` | 40 | Clean |
+| `Huffman.Impl.fst` | 8 | Clean (post-refactor) |
 | `Huffman.Defs.fst` | 8 | Clean |
 | `Huffman.PQLemmas.fst` | 8 | Clean |
 | `Huffman.ForestLemmas.fst` | 8 | Clean |
