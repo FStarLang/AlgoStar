@@ -12,7 +12,6 @@ module CLRS.Ch09.MinMax.Impl
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open CLRS.Ch09.MinMax.Spec
-open CLRS.Ch09.MinMax.Complexity
 
 module A = Pulse.Lib.Array
 module GR = Pulse.Lib.GhostReference

@@ -18,7 +18,7 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
 open CLRS.Ch09.MinMax.Spec
-open CLRS.Ch09.MinMax.Complexity
+open CLRS.Common.Complexity
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

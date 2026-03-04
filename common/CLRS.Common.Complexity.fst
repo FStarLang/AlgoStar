@@ -32,6 +32,16 @@ module GR = Pulse.Lib.GhostReference
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
 let add_nat (n: erased nat) (k: nat) : erased nat = hide (Prims.op_Addition (reveal n) k)
 
+let incr_nat_reveal (n: erased nat)
+  : Lemma (reveal (incr_nat n) == reveal n + 1)
+    [SMTPat (incr_nat n)]
+  = ()
+
+let add_nat_reveal (n: erased nat) (k: nat)
+  : Lemma (reveal (add_nat n k) == reveal n + k)
+    [SMTPat (add_nat n k)]
+  = ()
+
 (* ---------- tick: increment the ghost tick counter by 1 ---------- *)
 
 ghost
