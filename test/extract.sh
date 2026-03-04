@@ -38,7 +38,7 @@ MODULES=(
     "CLRS.Ch02.MergeSort:ch02-getting-started"
     "CLRS.Ch04.MaxSubarray:ch04-divide-conquer"
     "CLRS.Ch06.Heap:ch06-heapsort"
-    "CLRS.Ch07.Quicksort:ch07-quicksort"
+    "CLRS.Ch07.Quicksort.Impl:ch07-quicksort"
     "CLRS.Ch08.CountingSort:ch08-linear-sorting"
     "CLRS.Ch08.RadixSort:ch08-linear-sorting"
     "CLRS.Ch08.BucketSort:ch08-linear-sorting"
