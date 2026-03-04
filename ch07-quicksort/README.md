@@ -10,8 +10,7 @@ The implementation follows the canonical rubric structure:
 
 | File | Role |
 |------|------|
-| `CLRS.Ch07.Partition.Spec.fst` | Pure predicates: `clrs_partition_pred`, `between_bounds`, `complexity_exact_linear` |
-| `CLRS.Ch07.Partition.Lemmas.fsti` | Interface for partition lemmas |
+| `CLRS.Ch07.Partition.Lemmas.fsti` | Shared definitions (`between_bounds`, `seq_swap`, etc.) + lemma interface |
 | `CLRS.Ch07.Partition.Lemmas.fst` | Proofs: `permutation_swap`, `transfer_larger_slice`, `transfer_smaller_slice` |
 | `CLRS.Ch07.Partition.Complexity.fsti` | Interface for partition complexity |
 | `CLRS.Ch07.Partition.Complexity.fst` | Partition performs exactly n−1 comparisons |
@@ -22,8 +21,7 @@ The implementation follows the canonical rubric structure:
 
 | File | Role |
 |------|------|
-| `CLRS.Ch07.Quicksort.Spec.fst` | Pure specs: `seq_min`/`seq_max`, `complexity_bounded_quadratic`, `pure_pre/post_quicksort` |
-| `CLRS.Ch07.Quicksort.Lemmas.fsti` | Interface for quicksort lemmas |
+| `CLRS.Ch07.Quicksort.Lemmas.fsti` | Shared definitions (`seq_min`/`seq_max`, `complexity_bounded_quadratic`) + lemma interface |
 | `CLRS.Ch07.Quicksort.Lemmas.fst` | Proofs: `lemma_sorted_append`, `append_permutations_3`, `lemma_quicksort_complexity_bound` |
 | `CLRS.Ch07.Quicksort.Complexity.fsti` | Interface for complexity analysis |
 | `CLRS.Ch07.Quicksort.Complexity.fst` | Worst-case recurrence T(n) = n(n−1)/2, convexity, monotonicity |
@@ -80,4 +78,4 @@ make
 
 All proofs are mechanically checked by F* and Pulse. **NO admits. NO assumes.**
 
-All 15 source files verify at default rlimits with zero retries.
+All 13 source files verify at default rlimits with zero retries.

@@ -8,8 +8,8 @@ module CLRS.Ch07.Quicksort.Impl
 #lang-pulse
 
 open Pulse.Lib.Pervasives
-open CLRS.Ch07.Partition.Spec
-open CLRS.Ch07.Quicksort.Spec
+open CLRS.Ch07.Partition.Lemmas
+open CLRS.Ch07.Quicksort.Lemmas
 open CLRS.Common.SortSpec
 module A = Pulse.Lib.Array
 module GR = Pulse.Lib.GhostReference

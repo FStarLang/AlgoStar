@@ -12,7 +12,7 @@
 *)
 module CLRS.Ch07.Partition.Complexity
 
-open CLRS.Ch07.Partition.Spec
+open CLRS.Ch07.Partition.Lemmas
 
 let partition_comparisons_linear (n:nat{n > 0})
   : Lemma (ensures complexity_exact_linear (n - 1) 0 (n - 1))

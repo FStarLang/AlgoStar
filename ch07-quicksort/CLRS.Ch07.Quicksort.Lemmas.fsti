@@ -1,7 +1,11 @@
 (*
-   CLRS Chapter 7: Quicksort — Lemma Signatures
+   CLRS Chapter 7: Quicksort — Definitions and Lemma Signatures
 
-   Interface for correctness and complexity lemmas used by quicksort:
+   Shared definitions for quicksort:
+   - Ghost seq_min / seq_max for computing bounds
+   - Quadratic complexity bound predicate
+
+   Lemma signatures for correctness and complexity:
    - Bounds lemmas (seq_min, seq_max)
    - Permutation composition for 3-way splits
    - Sorted append for combining sorted halves
@@ -9,10 +13,32 @@
 *)
 module CLRS.Ch07.Quicksort.Lemmas
 
-open CLRS.Ch07.Partition.Spec
-open CLRS.Ch07.Quicksort.Spec
+open CLRS.Ch07.Partition.Lemmas
 open CLRS.Common.SortSpec
 module Seq = FStar.Seq
+
+// ========== Shared definitions ==========
+
+let rec seq_min (s: Seq.seq int) : GTot int (decreases (Seq.length s)) =
+  if Seq.length s = 0 then 0
+  else if Seq.length s = 1 then Seq.index s 0
+  else let h = Seq.index s 0 in
+       let t = seq_min (Seq.tail s) in
+       if h < t then h else t
+
+let rec seq_max (s: Seq.seq int) : GTot int (decreases (Seq.length s)) =
+  if Seq.length s = 0 then 0
+  else if Seq.length s = 1 then Seq.index s 0
+  else let h = Seq.index s 0 in
+       let t = seq_max (Seq.tail s) in
+       if h > t then h else t
+
+//SNIPPET_START: complexity_bounded_quadratic
+let complexity_bounded_quadratic (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 <= op_Multiply n (n - 1) / 2
+//SNIPPET_END: complexity_bounded_quadratic
+
+// ========== Lemma signatures ==========
 
 val lemma_seq_min_is_min (s: Seq.seq int) (i: nat{i < Seq.length s})
   : Lemma (ensures seq_min s <= Seq.index s i)

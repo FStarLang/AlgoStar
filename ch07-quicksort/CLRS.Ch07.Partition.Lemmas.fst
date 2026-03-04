@@ -10,7 +10,6 @@
 *)
 module CLRS.Ch07.Partition.Lemmas
 
-open CLRS.Ch07.Partition.Spec
 open CLRS.Common.SortSpec
 module Seq = FStar.Seq
 

@@ -6,7 +6,7 @@
 *)
 module CLRS.Ch07.Partition.Complexity
 
-open CLRS.Ch07.Partition.Spec
+open CLRS.Ch07.Partition.Lemmas
 
 /// Partition performs exactly n-1 comparisons on an n-element sub-array.
 /// Starting from counter 0, after n-1 ticks the exact linear bound holds.

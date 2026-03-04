@@ -1,14 +1,40 @@
 (*
-   CLRS Chapter 7: Partition — Lemma Signatures
+   CLRS Chapter 7: Partition — Definitions and Lemma Signatures
 
-   Interface for correctness lemmas about the partition operation:
-   swap commutativity, swap-permutation, and bounds transfer.
+   Shared definitions for the Lomuto partition algorithm:
+   - Sequence swap, bounds predicates, partition predicate
+   - Complexity predicate for exact linear cost
+
+   Lemma signatures for correctness proofs:
+   - Swap commutativity and permutation preservation
+   - Bounds transfer for slices
 *)
 module CLRS.Ch07.Partition.Lemmas
 
-open CLRS.Ch07.Partition.Spec
 open CLRS.Common.SortSpec
 module Seq = FStar.Seq
+
+// ========== Shared definitions ==========
+
+let nat_smaller (n: nat) = i:nat{i < n}
+
+let seq_swap (#a: Type) (s: Seq.seq a) (i j: nat_smaller (Seq.length s)) : GTot _ =
+  Seq.swap s j i
+
+let larger_than (s: Seq.seq int) (lb: int)
+  = forall (k: int). 0 <= k /\ k < Seq.length s ==> lb <= Seq.index s k
+
+let smaller_than (s: Seq.seq int) (rb: int)
+  = forall (k: int). 0 <= k /\ k < Seq.length s ==> Seq.index s k <= rb
+
+let between_bounds (s: Seq.seq int) (lb rb: int)
+  = larger_than s lb /\ smaller_than s rb
+
+// Linear bound: cf - c0 = n (exactly n operations)
+let complexity_exact_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n
+
+// ========== Lemma signatures ==========
 
 val seq_swap_commute (s: Seq.seq int) (i j: nat_smaller (Seq.length s))
   : Lemma (seq_swap s i j == seq_swap s j i)

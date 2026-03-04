@@ -20,9 +20,8 @@ module CLRS.Ch07.Quicksort.Impl
 #lang-pulse
 
 open Pulse.Lib.Pervasives
-open CLRS.Ch07.Partition.Spec
+open CLRS.Ch07.Partition.Lemmas
 open CLRS.Ch07.Partition.Impl
-open CLRS.Ch07.Quicksort.Spec
 open CLRS.Ch07.Quicksort.Lemmas
 open CLRS.Common.SortSpec
 module A = Pulse.Lib.Array
@@ -30,6 +29,25 @@ module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+
+// ========== Internal spec predicates ==========
+
+unfold
+let pure_pre_quicksort (a: A.array int) (lo: nat) (hi:(hi:nat{lo <= hi})) (lb rb: int) (s0: Seq.seq int)
+  = hi <= A.length a /\
+    between_bounds s0 lb rb /\
+    Seq.length s0 = hi - lo /\
+    lo <= A.length a /\
+    lb <= rb
+
+unfold
+let pure_post_quicksort (a: A.array int) (lo: nat) (hi:(hi:nat{lo <= hi})) (lb rb: int) (s0 s: Seq.seq int)
+  = hi <= A.length a /\
+    Seq.length s0 = hi - lo /\
+    Seq.length s = hi - lo /\
+    sorted s /\
+    between_bounds s lb rb /\
+    permutation s0 s
 
 // ========== Ghost proof function ==========
 

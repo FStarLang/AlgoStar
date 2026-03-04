@@ -1,15 +1,31 @@
 # Chapter 07: Quicksort — Rubric Compliance
 
 **Date:** 2025-07-18 (updated 2026-03-04)
-**Source files:** 15 files across Partition.* and Quicksort.* modules
+**Source files:** 13 files across Partition.* and Quicksort.* modules
 **Canonical rubric:** `RUBRIC.md`
 
 ---
 
 ## Current File Inventory
 
-| File | Lines | Role | Notes |
-|------|------:|------|-------|
+| File | Role | Notes |
+|------|------|-------|
+| `CLRS.Ch07.Partition.Lemmas.fsti` | Shared definitions + lemma interface | `nat_smaller`, `seq_swap`, `larger_than`, `smaller_than`, `between_bounds`, `complexity_exact_linear` + lemma sigs |
+| `CLRS.Ch07.Partition.Lemmas.fst` | Lemma proofs | `seq_swap_commute`, `permutation_swap`, bounds transfer |
+| `CLRS.Ch07.Partition.Complexity.fsti` | Complexity interface | Partition is Θ(n−1) |
+| `CLRS.Ch07.Partition.Complexity.fst` | Complexity proof | `partition_comparisons_linear` |
+| `CLRS.Ch07.Partition.Impl.fsti` | Impl interface (#lang-pulse) | `clrs_partition_wrapper_with_ticks` |
+| `CLRS.Ch07.Partition.Impl.fst` | Pulse implementation | `tick`, `swap`, `clrs_partition_with_ticks`, wrapper, `clrs_partition_pred` |
+| `CLRS.Ch07.Quicksort.Lemmas.fsti` | Shared definitions + lemma interface | `seq_min`, `seq_max`, `complexity_bounded_quadratic` + lemma sigs |
+| `CLRS.Ch07.Quicksort.Lemmas.fst` | Lemma proofs | `lemma_sorted_append`, `append_permutations_3`, complexity bound |
+| `CLRS.Ch07.Quicksort.Complexity.fsti` | Complexity interface | `worst_case_comparisons`, `sum_of_parts_bound`, etc. |
+| `CLRS.Ch07.Quicksort.Complexity.fst` | Complexity proofs | Recurrence T(n)=n(n−1)/2, convexity, monotonicity |
+| `CLRS.Ch07.Quicksort.Impl.fsti` | Impl interface (#lang-pulse) | `quicksort`, `quicksort_with_complexity`, `quicksort_bounded` |
+| `CLRS.Ch07.Quicksort.Impl.fst` | Pulse implementation | `quicksort_proof`, recursive sort, top-level API, `pure_pre/post_quicksort` |
+| `README.md` | Documentation | |
+| `Makefile` | Build | |
+
+------|------:|------|-------|
 | `CLRS.Ch07.Partition.Spec.fst` | 44 | Pure predicates | `clrs_partition_pred`, `between_bounds`, `complexity_exact_linear` |
 | `CLRS.Ch07.Partition.Lemmas.fsti` | 39 | Lemma interface | `permutation_swap`, `transfer_larger_slice`, `transfer_smaller_slice` |
 | `CLRS.Ch07.Partition.Lemmas.fst` | 57 | Lemma proofs | `seq_swap_commute`, `permutation_swap`, bounds transfer |
@@ -50,39 +66,36 @@ The canonical rubric requires these files per algorithm:
 
 | Required File | Status | Current Location |
 |---------------|--------|------------------|
-| `CLRS.Ch07.Partition.Spec.fst` | ✅ Done | `clrs_partition_pred`, `complexity_exact_linear`, `between_bounds`, `larger_than`, `smaller_than`, `nat_smaller`, `seq_swap` |
+| `CLRS.Ch07.Partition.Lemmas.fsti` | ✅ Done | Shared definitions (`between_bounds`, `seq_swap`, etc.) + lemma interface |
 | `CLRS.Ch07.Partition.Lemmas.fst` | ✅ Done | `seq_swap_commute`, `permutation_swap` [SMTPat], `transfer_larger_slice`, `transfer_smaller_slice` |
-| `CLRS.Ch07.Partition.Lemmas.fsti` | ✅ Done | Interface with val signatures for all lemmas |
 | `CLRS.Ch07.Partition.Complexity.fst` | ✅ Done | `partition_comparisons_linear`: exactly n−1 comparisons |
 | `CLRS.Ch07.Partition.Complexity.fsti` | ✅ Done | Interface for partition complexity |
-| `CLRS.Ch07.Partition.Impl.fst` | ✅ Done | `tick`, `swap`, `clrs_partition_with_ticks`, `clrs_partition_wrapper_with_ticks` |
+| `CLRS.Ch07.Partition.Impl.fst` | ✅ Done | `tick`, `swap`, `clrs_partition_with_ticks`, wrapper, `clrs_partition_pred` |
 | `CLRS.Ch07.Partition.Impl.fsti` | ✅ Done | `#lang-pulse` interface exposing `clrs_partition_wrapper_with_ticks` |
 
 ### Quicksort (`CLRS.Ch07.Quicksort.*`)
 
 | Required File | Status | Current Location |
 |---------------|--------|------------------|
-| `CLRS.Ch07.Quicksort.Spec.fst` | ✅ Done | `seq_min`, `seq_max`, `complexity_bounded_quadratic`, `pure_pre_quicksort`, `pure_post_quicksort` |
+| `CLRS.Ch07.Quicksort.Lemmas.fsti` | ✅ Done | Shared definitions (`seq_min`, `seq_max`, `complexity_bounded_quadratic`) + lemma interface |
 | `CLRS.Ch07.Quicksort.Lemmas.fst` | ✅ Done | `lemma_sorted_append`, `append_permutations_3`, `lemma_quicksort_complexity_bound`, bounds lemmas |
-| `CLRS.Ch07.Quicksort.Lemmas.fsti` | ✅ Done | Interface with val signatures for all lemmas |
-| `CLRS.Ch07.Quicksort.Complexity.fst` | ✅ Exists | `worst_case_comparisons`, `worst_case_bound`, `sum_of_parts_bound`, `partition_split_bounded`, `worst_case_monotonic` |
+| `CLRS.Ch07.Quicksort.Complexity.fst` | ✅ Done | `worst_case_comparisons`, `worst_case_bound`, `sum_of_parts_bound`, `partition_split_bounded`, `worst_case_monotonic` |
 | `CLRS.Ch07.Quicksort.Complexity.fsti` | ✅ Done | Interface with val signatures for all complexity functions |
-| `CLRS.Ch07.Quicksort.Impl.fst` | ✅ Done | `quicksort_proof`, `clrs_quicksort_with_ticks`, `clrs_quicksort`, `quicksort_with_complexity`, `quicksort`, `quicksort_bounded` |
+| `CLRS.Ch07.Quicksort.Impl.fst` | ✅ Done | `quicksort_proof`, `clrs_quicksort_with_ticks`, `clrs_quicksort`, `quicksort_with_complexity`, `quicksort`, `quicksort_bounded`, `pure_pre/post_quicksort` |
 | `CLRS.Ch07.Quicksort.Impl.fsti` | ✅ Done | `#lang-pulse` interface exposing `quicksort`, `quicksort_with_complexity`, `quicksort_bounded` |
 
 ### Summary
 
 | Rubric Slot | Partition | Quicksort |
 |-------------|-----------|-----------|
-| `Spec.fst` | ✅ | ✅ |
 | `Lemmas.fst` | ✅ | ✅ |
-| `Lemmas.fsti` | ✅ | ✅ |
+| `Lemmas.fsti` | ✅ (includes shared defs) | ✅ (includes shared defs) |
 | `Complexity.fst` | ✅ | ✅ |
 | `Complexity.fsti` | ✅ | ✅ |
 | `Impl.fst` | ✅ | ✅ |
 | `Impl.fsti` | ✅ | ✅ |
 
-**Overall: 14/14 rubric slots fully compliant (100%).**
+**Overall: 12/12 rubric slots fully compliant (100%).** Spec modules folded into Lemmas.fsti (shared defs) and Impl.fst (internal predicates).
 
 ---
 
@@ -92,14 +105,14 @@ All action items from the original rubric have been completed:
 
 | # | Action | Status |
 |---|--------|--------|
-| 1 | [SPLIT] Extract `CLRS.Ch07.Partition.Spec.fst` | ✅ Done |
+| 1 | [SPLIT] Extract partition specs | ✅ Done (folded into Lemmas.fsti + Impl.fst) |
 | 2 | [SPLIT] Extract `CLRS.Ch07.Partition.Lemmas.fst` | ✅ Done |
 | 3 | [ADD_INTERFACE] Create `CLRS.Ch07.Partition.Lemmas.fsti` | ✅ Done |
 | 4 | [SPLIT] Extract `CLRS.Ch07.Partition.Impl.fst` | ✅ Done |
 | 5 | [ADD_INTERFACE] Create `CLRS.Ch07.Partition.Impl.fsti` | ✅ Done (`#lang-pulse`) |
 | 6 | [CREATE] `CLRS.Ch07.Partition.Complexity.fst` | ✅ Done |
 | 7 | [ADD_INTERFACE] `CLRS.Ch07.Partition.Complexity.fsti` | ✅ Done |
-| 8 | [SPLIT] Extract `CLRS.Ch07.Quicksort.Spec.fst` | ✅ Done |
+| 8 | [SPLIT] Extract quicksort specs | ✅ Done (folded into Lemmas.fsti + Impl.fst) |
 | 9 | [SPLIT] Extract `CLRS.Ch07.Quicksort.Lemmas.fst` | ✅ Done |
 | 10 | [ADD_INTERFACE] Create `CLRS.Ch07.Quicksort.Lemmas.fsti` | ✅ Done |
 | 11 | [ADD_INTERFACE] Create `CLRS.Ch07.Quicksort.Complexity.fsti` | ✅ Done |
@@ -125,11 +138,9 @@ Prove Theorem 7.4: expected running time of RANDOMIZED-QUICKSORT is O(n lg n). R
 
 | File | Count | Details |
 |------|------:|---------|
-| `CLRS.Ch07.Partition.Spec.fst` | 0 | ✅ Admit-free, assume-free |
 | `CLRS.Ch07.Partition.Lemmas.fst` | 0 | ✅ Admit-free, assume-free |
 | `CLRS.Ch07.Partition.Complexity.fst` | 0 | ✅ Admit-free, assume-free |
 | `CLRS.Ch07.Partition.Impl.fst` | 0 | ✅ Admit-free, assume-free |
-| `CLRS.Ch07.Quicksort.Spec.fst` | 0 | ✅ Admit-free, assume-free |
 | `CLRS.Ch07.Quicksort.Lemmas.fst` | 0 | ✅ Admit-free, assume-free |
 | `CLRS.Ch07.Quicksort.Complexity.fst` | 0 | ✅ Admit-free, assume-free |
 | `CLRS.Ch07.Quicksort.Impl.fst` | 0 | ✅ Admit-free, assume-free |
@@ -140,7 +151,7 @@ Prove Theorem 7.4: expected running time of RANDOMIZED-QUICKSORT is O(n lg n). R
 |------|:----------------------:|:---------------:|:-------------------:|--------|
 | All files | 0 | None | None | ✅ Stable |
 
-All 15 source files verify at default rlimits with zero retries.
+All 13 source files verify at default rlimits with zero retries.
 
 ### Imports / Dependencies
 
@@ -149,7 +160,7 @@ All 15 source files verify at default rlimits with zero retries.
 | Uses `CLRS.Common.SortSpec` | ✅ | Imported in Spec and Lemmas modules |
 | No duplicate `sorted` def | ✅ | Imported from `SortSpec` |
 | No duplicate `permutation` def | ✅ | Imported from `SortSpec` |
-| Clean module dependencies | ✅ | Partition.Spec → Partition.Lemmas → Partition.Impl; Quicksort.Spec → Quicksort.Lemmas → Quicksort.Impl |
+| Clean module dependencies | ✅ | Partition.Lemmas → Partition.Impl; Quicksort.Lemmas → Quicksort.Impl |
 | No orphaned modules | ✅ | Old monolithic `Quicksort.fst` removed |
 
 ### Functional Correctness Properties

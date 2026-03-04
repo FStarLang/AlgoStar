@@ -15,7 +15,6 @@ module CLRS.Ch07.Partition.Impl
 #lang-pulse
 
 open Pulse.Lib.Pervasives
-open CLRS.Ch07.Partition.Spec
 open CLRS.Ch07.Partition.Lemmas
 open CLRS.Common.SortSpec
 module A = Pulse.Lib.Array
@@ -37,6 +36,17 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 }
 
 // ========== Array access helpers ==========
+
+// Partition loop invariant predicate (internal to this module)
+let clrs_partition_pred (s:Seq.seq int) (lo:nat) (j:nat) (i_plus_1: nat) (pivot: int)
+: prop
+= forall (k:nat). {:pattern (Seq.index s k)}
+   k < Seq.length s ==> (
+    let kk = k + lo in
+    (lo <= kk /\ kk < i_plus_1 ==> Seq.index s k <= pivot) /\
+    (i_plus_1 <= kk /\ kk < j   ==> Seq.index s k > pivot))
+
+// ========== Array access via pts_to_range ==========
 
 let op_Array_Access
   (#t: Type)
