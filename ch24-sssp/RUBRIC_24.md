@@ -1,8 +1,8 @@
 # Chapter 24: Single-Source Shortest Paths — Rubric Compliance
 
-**Date:** 2025-07-17
-**Scope:** `ch24-sssp/` — 12 `.fst` files, ~5 900 lines
-**Verification:** All 12 `.fst.checked` files present — **all files verify**
+**Date:** 2025-07-17 (updated 2026-03-04)
+**Scope:** `ch24-sssp/` — 17 `.fst` files + 6 `.fsti` files, ~6 500 lines
+**Verification:** All 23 `.fst`/`.fsti` files verify — **all files verify**
 
 ---
 
@@ -13,15 +13,20 @@
 | 1 | `CLRS.Ch24.ShortestPath.Spec.fst` | 504 | **Spec** (shared) | — (shared by BF & Dijkstra) |
 | 2 | `CLRS.Ch24.ShortestPath.Triangle.fst` | 330 | **Lemmas** (shared) | — (shared by BF & Dijkstra) |
 | 3 | `CLRS.Ch24.BellmanFord.Spec.fst` | 1 040 | **Spec** | Bellman-Ford |
-| 4 | `CLRS.Ch24.BellmanFord.fst` | 540 | **Impl** | Bellman-Ford |
-| 5 | `CLRS.Ch24.BellmanFord.SpecBridge.fst` | 219 | **Lemmas** | Bellman-Ford |
-| 6 | `CLRS.Ch24.BellmanFord.TriangleInequality.fst` | 339 | **Lemmas** | Bellman-Ford |
-| 7 | `CLRS.Ch24.BellmanFord.Complexity.fst` | 101 | **Complexity** | Bellman-Ford |
-| 8 | `CLRS.Ch24.BellmanFord.Complexity.Instrumented.fst` | 459 | **Complexity** (variant) | Bellman-Ford |
-| 9 | `CLRS.Ch24.Dijkstra.fst` | 587 | **Impl** | Dijkstra |
-| 10 | `CLRS.Ch24.Dijkstra.Correctness.fst` | 539 | **Lemmas** | Dijkstra |
-| 11 | `CLRS.Ch24.Dijkstra.Complexity.fst` | 372 | **Complexity** | Dijkstra |
-| 12 | `CLRS.Ch24.Dijkstra.TriangleInequality.fst` | 891 | **Lemmas** | Dijkstra |
+| 4 | `CLRS.Ch24.BellmanFord.fst` | 540 | **Impl** (core) | Bellman-Ford |
+| 5 | `CLRS.Ch24.BellmanFord.Impl.fst` + `.fsti` | ~100 | **Impl** (rubric wrapper) | Bellman-Ford |
+| 6 | `CLRS.Ch24.BellmanFord.SpecBridge.fst` | 219 | **Lemmas** (bridge) | Bellman-Ford |
+| 7 | `CLRS.Ch24.BellmanFord.TriangleInequality.fst` | 339 | **Lemmas** (triangle) | Bellman-Ford |
+| 8 | `CLRS.Ch24.BellmanFord.Lemmas.fst` + `.fsti` | ~80 | **Lemmas** (re-export) | Bellman-Ford |
+| 9 | `CLRS.Ch24.BellmanFord.Complexity.fst` + `.fsti` | 101 | **Complexity** | Bellman-Ford |
+| 10 | `CLRS.Ch24.BellmanFord.Complexity.Instrumented.fst` | 459 | **Complexity** (variant) | Bellman-Ford |
+| 11 | `CLRS.Ch24.Dijkstra.fst` | 587 | **Impl** (core) | Dijkstra |
+| 12 | `CLRS.Ch24.Dijkstra.Impl.fst` + `.fsti` | ~80 | **Impl** (rubric wrapper) | Dijkstra |
+| 13 | `CLRS.Ch24.Dijkstra.Spec.fst` | ~40 | **Spec** (re-export) | Dijkstra |
+| 14 | `CLRS.Ch24.Dijkstra.Correctness.fst` | 539 | **Lemmas** (greedy) | Dijkstra |
+| 15 | `CLRS.Ch24.Dijkstra.TriangleInequality.fst` | 891 | **Lemmas** (triangle) | Dijkstra |
+| 16 | `CLRS.Ch24.Dijkstra.Lemmas.fst` + `.fsti` | ~80 | **Lemmas** (re-export) | Dijkstra |
+| 17 | `CLRS.Ch24.Dijkstra.Complexity.fst` + `.fsti` | 372 | **Complexity** | Dijkstra |
 
 ---
 
@@ -59,46 +64,46 @@ The canonical rubric (from `RUBRIC.md`) requires seven files per algorithm:
 
 | Rubric Slot | Bellman-Ford | Dijkstra | Status |
 |-------------|-------------|----------|--------|
-| **Spec.fst** — Pure specification | ✅ `BellmanFord.Spec.fst` + shared `ShortestPath.Spec.fst` | 🔶 Uses shared `ShortestPath.Spec.fst` only; no `Dijkstra.Spec.fst` | BF ✅ / Dij 🔶 |
-| **Lemmas.fst** — Correctness proofs | 🔶 Split across `SpecBridge.fst` + `TriangleInequality.fst` (not named `Lemmas`) | 🔶 Split across `Correctness.fst` + `TriangleInequality.fst` (not named `Lemmas`) | 🔶 Substance present, naming differs |
-| **Lemmas.fsti** — Interface | ❌ Missing | ❌ Missing | ❌ Both missing |
+| **Spec.fst** — Pure specification | ✅ `BellmanFord.Spec.fst` + shared `ShortestPath.Spec.fst` | ✅ `Dijkstra.Spec.fst` (re-exports shared `ShortestPath.Spec.fst`) | ✅ Both present |
+| **Lemmas.fst** — Correctness proofs | ✅ `BellmanFord.Lemmas.fst` (re-exports `SpecBridge` + `TriangleInequality`) | ✅ `Dijkstra.Lemmas.fst` (re-exports `Correctness` + `TriangleInequality`) | ✅ Both present |
+| **Lemmas.fsti** — Interface | ✅ `BellmanFord.Lemmas.fsti` | ✅ `Dijkstra.Lemmas.fsti` | ✅ Both present |
 | **Complexity.fst** — Complexity proofs | ✅ `Complexity.fst` + `Complexity.Instrumented.fst` | ✅ `Dijkstra.Complexity.fst` | ✅ Both present |
-| **Complexity.fsti** — Interface | ❌ Missing | ❌ Missing | ❌ Both missing |
-| **Impl.fst** — Pulse implementation | 🔶 `BellmanFord.fst` (not named `Impl`) | 🔶 `Dijkstra.fst` (not named `Impl`) | 🔶 Substance present, naming differs |
-| **Impl.fsti** — Public interface | ❌ Missing | ❌ Missing | ❌ Both missing |
+| **Complexity.fsti** — Interface | ✅ `BellmanFord.Complexity.fsti` | ✅ `Dijkstra.Complexity.fsti` | ✅ Both present |
+| **Impl.fst** — Pulse implementation | ✅ `BellmanFord.Impl.fst` (wrapper) + `BellmanFord.fst` (core) | ✅ `Dijkstra.Impl.fst` (wrapper) + `Dijkstra.fst` (core) | ✅ Both present |
+| **Impl.fsti** — Public interface | ✅ `BellmanFord.Impl.fsti` | ✅ `Dijkstra.Impl.fsti` | ✅ Both present |
 
 ### Summary Counts
 
 | Status | Count | Description |
 |--------|------:|-------------|
-| ✅ Full compliance | 3/14 | Spec (BF), Complexity (BF), Complexity (Dij) |
-| 🔶 Substance present, naming/structure differs | 5/14 | Spec (Dij), Lemmas (BF), Lemmas (Dij), Impl (BF), Impl (Dij) |
-| ❌ Missing | 6/14 | Lemmas.fsti ×2, Complexity.fsti ×2, Impl.fsti ×2 |
+| ✅ Full compliance | 14/14 | All rubric slots filled for both algorithms |
+| 🔶 Substance present, naming/structure differs | 0/14 | — |
+| ❌ Missing | 0/14 | — |
 
 ---
 
 ## Detailed Action Items
 
-### Priority 1 — Structural Compliance (naming)
+### Priority 1 — Structural Compliance (naming) — ✅ DONE
 
-| # | Action | Current | Target | Effort |
-|---|--------|---------|--------|--------|
-| 1.1 | **Rename BellmanFord.fst → BellmanFord.Impl.fst** | `CLRS.Ch24.BellmanFord.fst` | `CLRS.Ch24.BellmanFord.Impl.fst` | Low — rename + update imports in `Complexity.Instrumented.fst` |
-| 1.2 | **Rename Dijkstra.fst → Dijkstra.Impl.fst** | `CLRS.Ch24.Dijkstra.fst` | `CLRS.Ch24.Dijkstra.Impl.fst` | Low — rename + update imports |
-| 1.3 | **Consolidate BF lemmas into BellmanFord.Lemmas.fst** | `SpecBridge.fst` + `TriangleInequality.fst` | Single `BellmanFord.Lemmas.fst` or keep split with a top-level re-export | Medium — may need to merge or create re-export module |
-| 1.4 | **Consolidate Dijkstra lemmas into Dijkstra.Lemmas.fst** | `Correctness.fst` + `TriangleInequality.fst` | Single `Dijkstra.Lemmas.fst` or keep split with re-export | Medium |
-| 1.5 | **Create Dijkstra.Spec.fst** (or document that `ShortestPath.Spec.fst` serves as shared spec) | No Dijkstra-specific spec | Either new file or explicit documentation that shared spec suffices | Low–Medium |
+| # | Action | Status |
+|---|--------|--------|
+| 1.1 | **Create BellmanFord.Impl.fst** — wrapper re-exporting `bellman_ford` from `BellmanFord.fst` | ✅ Done |
+| 1.2 | **Create Dijkstra.Impl.fst** — wrapper re-exporting `dijkstra` from `Dijkstra.fst` | ✅ Done |
+| 1.3 | **Create BellmanFord.Lemmas.fst** — re-export module combining `SpecBridge` + `TriangleInequality` | ✅ Done |
+| 1.4 | **Create Dijkstra.Lemmas.fst** — re-export module combining `Correctness` + `TriangleInequality` | ✅ Done |
+| 1.5 | **Create Dijkstra.Spec.fst** — re-export of `ShortestPath.Spec` for rubric compliance | ✅ Done |
 
-### Priority 2 — Missing Interface Files
+### Priority 2 — Missing Interface Files — ✅ DONE
 
-| # | Action | Notes |
-|---|--------|-------|
-| 2.1 | **Create BellmanFord.Lemmas.fsti** | Expose `bf_convergence`, `bf_sp_equality`, `bf_negative_cycle_detection`, `stable_distances_have_triangle`, `sp_dist_k_equiv` |
-| 2.2 | **Create Dijkstra.Lemmas.fsti** | Expose `greedy_choice_invariant`, `dijkstra_algorithm_establishes_triangle` |
-| 2.3 | **Create BellmanFord.Complexity.fsti** | Expose `bellman_ford_cubic`, `bellman_ford_complexity_bounded` |
-| 2.4 | **Create Dijkstra.Complexity.fsti** | Expose `dijkstra_quadratic_bound`, `dijkstra_complexity_bounded` |
-| 2.5 | **Create BellmanFord.Impl.fsti** | Public signature for `bellman_ford` |
-| 2.6 | **Create Dijkstra.Impl.fsti** | Public signature for `dijkstra` |
+| # | Action | Status |
+|---|--------|--------|
+| 2.1 | **Create BellmanFord.Lemmas.fsti** | ✅ Done |
+| 2.2 | **Create Dijkstra.Lemmas.fsti** | ✅ Done |
+| 2.3 | **Create BellmanFord.Complexity.fsti** | ✅ Done |
+| 2.4 | **Create Dijkstra.Complexity.fsti** | ✅ Done |
+| 2.5 | **Create BellmanFord.Impl.fsti** | ✅ Done |
+| 2.6 | **Create Dijkstra.Impl.fsti** | ✅ Done |
 
 ### Priority 3 — Feature Gaps (from Audit)
 
@@ -115,11 +120,11 @@ The canonical rubric (from `RUBRIC.md`) requires seven files per algorithm:
 
 | Check | Result |
 |-------|--------|
-| Zero `admit()` across all 12 files | ✅ |
-| Zero `assume` across all 12 files | ✅ |
+| Zero `admit()` across all files | ✅ |
+| Zero `assume` across all files | ✅ |
 | Zero `ensures true` (trivial postconditions) | ✅ (cleaned in audit) |
 | Zero commented-out code | ✅ (cleaned in audit) |
-| All `.fst.checked` files present | ✅ (12/12) |
+| All `.fst.checked` / `.fsti.checked` files present | ✅ (23/23) |
 
 ### CLRS Theorem Coverage
 
@@ -144,7 +149,7 @@ The canonical rubric (from `RUBRIC.md`) requires seven files per algorithm:
 
 | Check | Result |
 |-------|--------|
-| All 12 files have module-level doc headers | ✅ |
+| All files have module-level doc headers | ✅ |
 | README.md covers all files and properties | ✅ |
 | Sentinel constraint documented | ✅ |
 | SNIPPET markers in Impl files | ✅ |
@@ -169,6 +174,6 @@ The canonical rubric (from `RUBRIC.md`) requires seven files per algorithm:
 | CLRS Fidelity | ★★★★☆ — faithful adj-matrix adaptation; missing predecessor π |
 | Specification Strength | ★★★★★ — d[v]=δ(s,v) proven for both algorithms |
 | Complexity | ★★★★★ — exact tick counts; asymptotic bounds verified |
-| Proof Quality | ★★★★★ — zero admits/assumes across 12 files |
+| Proof Quality | ★★★★★ — zero admits/assumes across all files |
 | Documentation | ★★★★★ — comprehensive headers; sentinel documented |
-| **Rubric Structural Compliance** | **★★★☆☆** — substance fully present; 6/14 interface files missing; naming diverges from rubric convention |
+| **Rubric Structural Compliance** | **★★★★★** — all 14/14 rubric slots filled; interface files present; Impl/Lemmas/Spec/Complexity naming convention satisfied |
