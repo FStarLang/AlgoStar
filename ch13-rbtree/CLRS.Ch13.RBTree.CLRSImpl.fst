@@ -25,7 +25,7 @@
    but ownership flows downward through left/right only.
 *)
 
-module CLRS.Ch13.Imp.RBTree
+module CLRS.Ch13.RBTree.CLRSImpl
 #lang-pulse
 open Pulse.Lib.Pervasives
 

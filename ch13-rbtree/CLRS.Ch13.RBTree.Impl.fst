@@ -44,7 +44,7 @@
    NO admits. NO assumes.
 *)
 
-module CLRS.Ch13.RBTree
+module CLRS.Ch13.RBTree.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 
@@ -52,6 +52,7 @@ module Box = Pulse.Lib.Box
 open Pulse.Lib.Box { box, (:=), (!) }
 
 module S = CLRS.Ch13.RBTree.Spec
+module L = CLRS.Ch13.RBTree.Lemmas
 module G = FStar.Ghost
 module C = CLRS.Ch13.RBTree.Complexity
 
@@ -411,7 +412,7 @@ fn balance_ll (l: rb_ptr) (v: int) (r: rb_ptr)
   returns y: rb_ptr
   ensures is_rbtree y (S.balance S.Black lt v rt)
 {
-  S.classify_balance_lemma S.Black lt v rt;
+  L.classify_balance_lemma S.Black lt v rt;
   // BC_LL implies lt is a Node
   is_rbtree_not_leaf l;
   let lp = Some?.v l;
@@ -458,7 +459,7 @@ fn balance_lr (l: rb_ptr) (v: int) (r: rb_ptr)
   returns y: rb_ptr
   ensures is_rbtree y (S.balance S.Black lt v rt)
 {
-  S.classify_balance_lemma S.Black lt v rt;
+  L.classify_balance_lemma S.Black lt v rt;
   is_rbtree_not_leaf l;
   let lp = Some?.v l;
   rewrite each (Some lp) as l;
@@ -497,7 +498,7 @@ fn balance_rl (l: rb_ptr) (v: int) (r: rb_ptr)
   returns y: rb_ptr
   ensures is_rbtree y (S.balance S.Black lt v rt)
 {
-  S.classify_balance_lemma S.Black lt v rt;
+  L.classify_balance_lemma S.Black lt v rt;
   is_rbtree_not_leaf r;
   let rp = Some?.v r;
   rewrite each (Some rp) as r;
@@ -536,7 +537,7 @@ fn balance_rr (l: rb_ptr) (v: int) (r: rb_ptr)
   returns y: rb_ptr
   ensures is_rbtree y (S.balance S.Black lt v rt)
 {
-  S.classify_balance_lemma S.Black lt v rt;
+  L.classify_balance_lemma S.Black lt v rt;
   is_rbtree_not_leaf r;
   let rp = Some?.v r;
   rewrite each (Some rp) as r;
@@ -599,7 +600,7 @@ fn rb_balance (c: S.color) (l: rb_ptr) (v: int) (r: rb_ptr)
       y
     }
     S.BC_None -> {
-      S.classify_balance_lemma c lt v rt;
+      L.classify_balance_lemma c lt v rt;
       let y = new_node v c l r;
       with result_tree. rewrite (is_rbtree y result_tree)
            as (is_rbtree y (S.balance c lt v rt));
@@ -1264,9 +1265,9 @@ fn rb_insert_v (tree: rb_ptr) (k: int)
           pure (S.mem k (S.insert 'ft k) = true)
 {
   unfold valid_rbtree;
-  S.insert_preserves_bst 'ft k;
-  S.insert_is_rbtree 'ft k;
-  S.insert_mem 'ft k k;
+  L.insert_preserves_bst 'ft k;
+  L.insert_is_rbtree 'ft k;
+  L.insert_mem 'ft k k;
   let y = rb_insert tree k;
   fold (valid_rbtree y (S.insert 'ft k));
   y
@@ -1282,9 +1283,9 @@ fn rb_delete_v (tree: rb_ptr) (k: int)
           pure (S.mem k (S.delete 'ft k) = false)
 {
   unfold valid_rbtree;
-  S.delete_preserves_bst 'ft k;
-  S.delete_is_rbtree 'ft k;
-  S.delete_mem 'ft k k;
+  L.delete_preserves_bst 'ft k;
+  L.delete_is_rbtree 'ft k;
+  L.delete_mem 'ft k k;
   let y = rb_delete tree k;
   fold (valid_rbtree y (S.delete 'ft k));
   y
@@ -1329,9 +1330,9 @@ fn rb_insert_log (tree: rb_ptr) (k: int)
                 C.insert_ticks 'ft k <= S.height 'ft + 2)
 {
   unfold valid_rbtree;
-  S.insert_preserves_bst 'ft k;
-  S.insert_is_rbtree 'ft k;
-  S.insert_mem 'ft k k;
+  L.insert_preserves_bst 'ft k;
+  L.insert_is_rbtree 'ft k;
+  L.insert_mem 'ft k k;
   C.insert_ticks_bounded 'ft k;
   let y = rb_insert tree k;
   fold (valid_rbtree y (S.insert 'ft k));
@@ -1347,9 +1348,9 @@ fn rb_delete_log (tree: rb_ptr) (k: int)
                 C.delete_ticks 'ft k <= 2 * S.height 'ft + 2)
 {
   unfold valid_rbtree;
-  S.delete_preserves_bst 'ft k;
-  S.delete_is_rbtree 'ft k;
-  S.delete_mem 'ft k k;
+  L.delete_preserves_bst 'ft k;
+  L.delete_is_rbtree 'ft k;
+  L.delete_mem 'ft k k;
   C.delete_ticks_bounded 'ft k;
   let y = rb_delete tree k;
   fold (valid_rbtree y (S.delete 'ft k));

@@ -23,6 +23,7 @@ module CLRS.Ch13.RBTree.CLRSSpec
 
 open FStar.Mul
 open CLRS.Ch13.RBTree.Spec
+open CLRS.Ch13.RBTree.Lemmas
 
 (*** §13.2 — Rotation Primitives ***)
 
