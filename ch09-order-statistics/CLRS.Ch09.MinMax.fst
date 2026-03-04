@@ -40,10 +40,13 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-// ========== Complexity bound predicate ==========
+// ========== Complexity bound predicates ==========
 
 //SNIPPET_START: minmax_complexity_bound
 let complexity_bounded_min (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n - 1
+
+let complexity_bounded_max (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == n - 1
 //SNIPPET_END: minmax_complexity_bound
 
@@ -132,7 +135,7 @@ fn find_maximum
     pure (
       (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == max_val) /\
       (forall (k:nat). k < Seq.length s0 ==> max_val >= Seq.index s0 k) /\
-      complexity_bounded_min cf (reveal c0) (SZ.v len)
+      complexity_bounded_max cf (reveal c0) (SZ.v len)
     )
 //SNIPPET_END: find_maximum
 {

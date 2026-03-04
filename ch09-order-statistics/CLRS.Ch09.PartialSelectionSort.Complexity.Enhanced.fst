@@ -22,7 +22,7 @@ open FStar.Mul
 module Seq = FStar.Seq
 
 (**
- * Enhanced Complexity Analysis for Quickselect Algorithm
+ * Enhanced Complexity Analysis for Partial Selection Sort and Quickselect
  *
  * This module proves the O(n²) worst-case complexity bound for the quickselect
  * algorithm by defining a pure function that computes results with tick counts.

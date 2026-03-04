@@ -29,7 +29,7 @@
      * Together these imply s_final[k-1] is the k-th smallest element ✓
    
    Limitation: Uses O(nk) partial selection sort instead of CLRS's O(n) algorithms.
-   Implementing RANDOMIZED-SELECT requires a random number source (not available).
+   Implementing RANDOMIZED-SELECT requires a random number source.
    Implementing median-of-medians SELECT requires recursive partitioning with
    median-of-5 groups, which is a significant implementation effort.
 *)

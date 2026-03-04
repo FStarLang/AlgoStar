@@ -248,9 +248,9 @@ The canonical rubric requires **7 files per algorithm**: `Spec.fst`, `Lemmas.fst
 |---|----------|--------|---------|
 | Q1 | P2 | Extract shared permutation infrastructure | ~65 lines duplicated between `Quickselect.fst` (33–85) and `PartialSelectionSort.fst` (55–138): `permutation`, `permutation_same_length`, `permutation_refl`, `compose_permutations`, `swap_is_permutation` |
 | Q2 | P2 | Unify ghost tick infrastructure | `incr_nat` + `tick` duplicated in `MinMax.fst` (33–41), `SimultaneousMinMax.fst` (39–61), `PartialSelectionSort.fst` (284–297), `Quickselect.fst` (370–398) — 4 copies |
-| Q3 | P3 | Fix `complexity_bounded_min` naming | `find_maximum` in `MinMax.fst` reuses `complexity_bounded_min` predicate name for the max complexity bound |
-| Q4 | P3 | Dead code: `partition_preserves_permutation` | `Correctness.fst:42–46` — trivial identity lemma, never meaningfully used |
-| Q5 | P3 | Dead code: `select_partition_spec` | `Correctness.fst:226–227` — alias for `select_spec`, never used elsewhere |
+| Q3 | ✅ DONE | Fix `complexity_bounded_min` naming | Added `complexity_bounded_max` predicate in `MinMax.fst`; `find_maximum` now uses `complexity_bounded_max` |
+| Q4 | ✅ DONE | Dead code: `partition_preserves_permutation` | Removed trivial identity lemma from `Correctness.fst` |
+| Q5 | ✅ DONE | Dead code: `select_partition_spec` | Removed unused alias from `Correctness.fst` |
 | Q6 | P3 | Module naming: `PartialSelectionSort.Correctness` contains quickselect lemmas | `partition_pivot_is_kth`, `pulse_correctness_hint` are about quickselect, not partial selection sort |
 | Q7 | P3 | `Complexity.Enhanced.fst` covers both algorithms | Blurs boundary between PartialSelectionSort and Quickselect complexity |
 
@@ -261,8 +261,8 @@ The canonical rubric requires **7 files per algorithm**: `Spec.fst`, `Lemmas.fst
 | D1 | ✅ DONE | Fix "O(n) expected" comment | `Quickselect.fst:7` now correctly states "O(n²) worst case (deterministic pivot; O(n) expected requires randomized pivot, which is not implemented here)" |
 | D2 | ✅ DONE | Fix stale `Select.fst` reference | `Quickselect.fst:9` now references `PartialSelectionSort.fst` |
 | D3 | ✅ DONE | SimultaneousMinMax header updated | Header (lines 1–21) now documents both simple scan and CLRS pair-processing implementations |
-| D4 | P3 | `PartialSelectionSort.fst:33` claims randomization "not available" | Randomization is available in Pulse; this comment is inaccurate |
-| D5 | P3 | `Complexity.Enhanced.fst:25` header says "Quickselect" | Module is primarily about partial selection sort |
+| D4 | ✅ DONE | `PartialSelectionSort.fst:33` claims randomization "not available" | Fixed: removed "(not available)" — randomization is available in Pulse |
+| D5 | ✅ DONE | `Complexity.Enhanced.fst:25` header says "Quickselect" | Fixed: header now says "Partial Selection Sort and Quickselect" |
 
 ---
 
@@ -326,9 +326,9 @@ Files with `SNIPPET_START`/`SNIPPET_END` markers (for documentation extraction):
 | **Specification strength** | 8/10 | Quickselect now proves k-th order statistic ✅; PartialSelectionSort strong but implicit; permutation bridge done ✅ |
 | **Complexity proofs** | 8/10 | All four algorithms have ghost-tick proofs connected to Pulse implementations ✅; tight bound for PartialSelectionSort not wired in |
 | **Proof quality** | 9/10 | Zero admits; permutation notions bridged ✅; solver sensitivity in SortedPerm |
-| **Code quality** | 5/10 | ~65 lines permutation duplication × 2; ~30 lines ghost-tick duplication × 4; some dead code; aggressive z3rlimits |
-| **Documentation** | 8/10 | Honest about limitations; most inaccurate comments now fixed; one remaining inaccuracy (D4) |
-| **Overall** | 7.1/10 | Strong verification foundation; main gaps are rubric structural compliance and code deduplication |
+| **Code quality** | 6/10 | ~65 lines permutation duplication × 2; ~30 lines ghost-tick duplication × 4; aggressive z3rlimits. Dead code removed ✅; naming fixed ✅ |
+| **Documentation** | 9/10 | Honest about limitations; inaccurate comments fixed ✅ |
+| **Overall** | 7.4/10 | Strong verification foundation; main gaps are rubric structural compliance and code deduplication |
 
 ### 5.6 Progress Since Audit
 
@@ -342,11 +342,11 @@ Files with `SNIPPET_START`/`SNIPPET_END` markers (for documentation extraction):
 | P2-3: Ghost-tick counter for Pulse quickselect | ✅ Fixed | `quickselect_complexity` at line 444 |
 | P2-4: Ghost-tick counter for Pulse `select` | ✅ Fixed | `select_complexity` at line 374 |
 | P2-5: Tighten PartialSelectionSort complexity | 🔶 Partial | `select_comparisons_tight` exists in pure F* but not connected to Pulse proof |
-| P3-2: Fix `complexity_bounded_min` naming | ❌ Open | Still uses `complexity_bounded_min` for `find_maximum` |
+| P3-2: Fix `complexity_bounded_min` naming | ✅ Fixed | Added `complexity_bounded_max`; `find_maximum` now uses it |
 | P3-3: Fix stale `Select.fst` reference | ✅ Fixed | Line 9 now references `PartialSelectionSort.fst` |
 | P3-5: Fix D1 comment accuracy | ✅ Fixed | Comment updated |
 | P2-1: Extract shared permutation infra | ❌ Open | Still duplicated |
 | P2-2: Unify ghost-tick infrastructure | ❌ Open | Still duplicated in 4 files |
-| P3-1: Remove dead code | ❌ Open | `partition_preserves_permutation`, `select_partition_spec` still present |
+| P3-1: Remove dead code | ✅ Fixed | Removed `partition_preserves_permutation` and `select_partition_spec` from `Correctness.fst` |
 | P3-4: Rename Correctness/Spec modules | ❌ Open | `PartialSelectionSort.Correctness` still contains quickselect lemmas |
 | P3-6: Reduce z3rlimit 200 | ❌ Open | z3rlimit 200 still used; z3rlimit 500 added in `SimultaneousMinMax.fst` |

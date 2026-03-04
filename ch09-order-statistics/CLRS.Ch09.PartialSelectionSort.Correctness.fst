@@ -38,13 +38,6 @@ open CLRS.Ch09.PartialSelectionSort.SortedPerm
 
 (*** Key Lemmas ***)
 
-// Lemma 1: Partitioning preserves permutation
-let partition_preserves_permutation (s s': seq int) (lo hi p: nat)
-  : Lemma (requires lo <= p /\ p < hi /\ hi <= Seq.length s /\
-                     is_permutation s s')
-          (ensures is_permutation s s')
-  = ()
-
 // sorted_permutation_equal is imported from SortedPerm module
 
 #restart-solver
@@ -221,10 +214,6 @@ let pulse_correctness_hint (s0 s_final: seq int) (k: nat)
 #pop-options
 
 (*** Alternative Specification: Partition Characterization ***)
-
-// An alternative way to specify correctness: the result has the partition property
-let select_partition_spec (s: seq int) (k: nat{k < Seq.length s}) : int =
-  select_spec s k
 
 let select_partition_property (s: seq int) (k: nat{k < Seq.length s}) (result: int)
   : prop =
