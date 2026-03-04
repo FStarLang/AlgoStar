@@ -91,7 +91,8 @@ let rec key_in_subtree
 // Public Operations
 // ============================================================
 
-(** TREE-SEARCH (§12.2): iterative BST search with O(h) ghost ticks *)
+(** TREE-SEARCH (§12.2): iterative BST search with O(h) ghost ticks
+    Postcondition: ticks bounded by tree_height(cap) *)
 fn tree_search
   (#p: perm)
   (t: bst)
@@ -100,9 +101,11 @@ fn tree_search
   (#lo: Ghost.erased int)
   (#hi: Ghost.erased int)
   (key: int)
+  (ticks: GR.ref nat)
   requires
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
+    GR.pts_to ticks 'n **
     pure (
       Seq.length keys_seq == A.length t.keys /\
       Seq.length valid_seq == A.length t.valid /\
@@ -112,10 +115,13 @@ fn tree_search
       subtree_in_range keys_seq valid_seq (SZ.v t.cap) 0 lo hi
     )
   returns result: option SZ.t
-  ensures
+  ensures exists* vticks.
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
+    GR.pts_to ticks vticks **
     pure (
+      vticks >= 'n /\
+      (SZ.v t.cap > 0 ==> vticks - 'n <= tree_height (SZ.v t.cap)) /\
       (Some? result ==> (
         SZ.v (Some?.v result) < Seq.length keys_seq /\
         SZ.v (Some?.v result) < Seq.length valid_seq /\
@@ -124,7 +130,8 @@ fn tree_search
       (None? result ==> ~(key_in_subtree keys_seq valid_seq (SZ.v t.cap) 0 key))
     )
 
-(** TREE-INSERT (§12.3): iterative BST insert, well_formed_bst pre/post *)
+(** TREE-INSERT (§12.3): iterative BST insert, well_formed_bst pre/post
+    Postcondition: ticks bounded by tree_height(cap) *)
 fn tree_insert
   (t: bst)
   (#keys_seq: Ghost.erased (Seq.seq int))
@@ -132,9 +139,11 @@ fn tree_insert
   (key: int)
   (#lo: Ghost.erased int)
   (#hi: Ghost.erased int)
+  (ticks: GR.ref nat)
   requires
     A.pts_to t.keys keys_seq **
     A.pts_to t.valid valid_seq **
+    GR.pts_to ticks 'n **
     pure (
       Seq.length keys_seq == A.length t.keys /\
       Seq.length valid_seq == A.length t.valid /\
@@ -145,10 +154,13 @@ fn tree_insert
       Ghost.reveal lo < key /\ key < Ghost.reveal hi
     )
   returns success: bool
-  ensures exists* keys_seq' valid_seq'.
+  ensures exists* keys_seq' valid_seq' vticks.
     A.pts_to t.keys keys_seq' **
     A.pts_to t.valid valid_seq' **
+    GR.pts_to ticks vticks **
     pure (
+      vticks >= 'n /\
+      (SZ.v t.cap > 0 ==> vticks - 'n <= tree_height (SZ.v t.cap)) /\
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
       (not success ==> Seq.equal keys_seq' keys_seq /\

@@ -241,9 +241,11 @@ fn tree_search
   (#lo: Ghost.erased int)
   (#hi: Ghost.erased int)
   (key: int)
+  (ticks: GR.ref nat)
   requires
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
+    GR.pts_to ticks 'n **
     pure (
       Seq.length keys_seq == A.length t.keys /\
       Seq.length valid_seq == A.length t.valid /\
@@ -253,10 +255,13 @@ fn tree_search
       subtree_in_range keys_seq valid_seq (SZ.v t.cap) 0 lo hi
     )
   returns result: option SZ.t
-  ensures
+  ensures exists* vticks.
     A.pts_to t.keys #p keys_seq **
     A.pts_to t.valid #p valid_seq **
+    GR.pts_to ticks vticks **
     pure (
+      vticks >= 'n /\
+      (SZ.v t.cap > 0 ==> vticks - 'n <= tree_height (SZ.v t.cap)) /\
       (Some? result ==> (
         SZ.v (Some?.v result) < Seq.length keys_seq /\
         SZ.v (Some?.v result) < Seq.length valid_seq /\
@@ -273,9 +278,6 @@ fn tree_search
   // Ghost references for BST bounds tracking
   let lo_ref = GR.alloc #int (reveal lo);
   let hi_ref = GR.alloc #int (reveal hi);
-  
-  // Ghost tick counter for O(h) complexity proof
-  let ticks = GR.alloc #nat 0;
   
   while (
     let vc = !current;
@@ -294,8 +296,9 @@ fn tree_search
     pure (
       SZ.v vc <= SZ.v t.cap /\
       // Complexity: tick count tracks node depth
-      (~vf /\ SZ.v vc < SZ.v t.cap ==> vticks == node_depth (SZ.v vc)) /\
-      (SZ.v t.cap > 0 ==> vticks <= tree_height (SZ.v t.cap)) /\
+      vticks >= 'n /\
+      (~vf /\ SZ.v vc < SZ.v t.cap ==> vticks - 'n == node_depth (SZ.v vc)) /\
+      (SZ.v t.cap > 0 ==> vticks - 'n <= tree_height (SZ.v t.cap)) /\
       (vf ==> (SZ.v vr < SZ.v t.cap /\
                Seq.index valid_seq (SZ.v vr) == true /\
                Seq.index keys_seq (SZ.v vr) == key)) /\
@@ -377,11 +380,8 @@ fn tree_search
   let vr = !result_idx;
   let vc = !current;
   
-  // Free ghost references
-  with vlo_f vhi_f vticks_f. assert (GR.pts_to lo_ref vlo_f ** GR.pts_to hi_ref vhi_f ** GR.pts_to ticks vticks_f);
-  // Complexity bound: search visited at most tree_height(cap) nodes
-  // vticks_f <= tree_height(cap) is guaranteed by the loop invariant
-  GR.free ticks;
+  // Free ghost references (not the external ticks — caller owns that)
+  with vlo_f vhi_f. assert (GR.pts_to lo_ref vlo_f ** GR.pts_to hi_ref vhi_f);
   GR.free lo_ref;
   GR.free hi_ref;
   
@@ -406,9 +406,11 @@ fn tree_insert
   (key: int)
   (#lo: Ghost.erased int)
   (#hi: Ghost.erased int)
+  (ticks: GR.ref nat)
   requires
     A.pts_to t.keys keys_seq **
     A.pts_to t.valid valid_seq **
+    GR.pts_to ticks 'n **
     pure (
       Seq.length keys_seq == A.length t.keys /\
       Seq.length valid_seq == A.length t.valid /\
@@ -419,10 +421,13 @@ fn tree_insert
       Ghost.reveal lo < key /\ key < Ghost.reveal hi
     )
   returns success: bool
-  ensures exists* keys_seq' valid_seq'.
+  ensures exists* keys_seq' valid_seq' vticks.
     A.pts_to t.keys keys_seq' **
     A.pts_to t.valid valid_seq' **
+    GR.pts_to ticks vticks **
     pure (
+      vticks >= 'n /\
+      (SZ.v t.cap > 0 ==> vticks - 'n <= tree_height (SZ.v t.cap)) /\
       Seq.length keys_seq' == Seq.length keys_seq /\
       Seq.length valid_seq' == Seq.length valid_seq /\
       (not success ==> Seq.equal keys_seq' keys_seq /\
@@ -445,10 +450,11 @@ fn tree_insert
     let vd = !done;
     SZ.lt vc t.cap && not vd
   )
-  invariant exists* vc vd vs.
+  invariant exists* vc vd vs vticks.
     R.pts_to current vc **
     R.pts_to done vd **
     R.pts_to success_flag vs **
+    GR.pts_to ticks vticks **
     (exists* ks vs'. A.pts_to t.keys ks ** A.pts_to t.valid vs' ** 
       pure (Seq.length ks == A.length t.keys /\ Seq.length vs' == A.length t.valid /\
         // If not yet successful, arrays unchanged
@@ -462,6 +468,10 @@ fn tree_insert
         AP.well_formed_bst ks vs' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
       )) **
     pure (SZ.v vc <= SZ.v t.cap /\
+      vticks >= 'n /\
+      // Complexity: tick count tracks node depth
+      (~vs /\ ~vd /\ SZ.v vc < SZ.v t.cap ==> vticks - 'n == node_depth (SZ.v vc)) /\
+      (SZ.v t.cap > 0 ==> vticks - 'n <= tree_height (SZ.v t.cap)) /\
       (vs ==> vd) /\
       // BST search reaches current position (when still searching)
       (not vs /\ not vd /\ SZ.v vc < SZ.v t.cap ==>
@@ -499,6 +509,11 @@ fn tree_insert
           done := true;
         } else {
           AP.lemma_bsr_extend_left keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v idx) key;
+          // Complexity: moving to left child increases depth by 1
+          with vticks_v. assert (GR.pts_to ticks vticks_v);
+          node_depth_left_child (SZ.v idx);
+          node_depth_bounded (SZ.v t.cap) (SZ.v left_idx);
+          GR.op_Colon_Equals ticks (hide (vticks_v + 1));
           current := left_idx;
         };
       } else {
@@ -510,6 +525,11 @@ fn tree_insert
           done := true;
         } else {
           AP.lemma_bsr_extend_right keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v idx) key;
+          // Complexity: moving to right child increases depth by 1
+          with vticks_v. assert (GR.pts_to ticks vticks_v);
+          node_depth_right_child (SZ.v idx);
+          node_depth_bounded (SZ.v t.cap) (SZ.v right_idx);
+          GR.op_Colon_Equals ticks (hide (vticks_v + 1));
           current := right_idx;
         };
       };

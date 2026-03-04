@@ -7,13 +7,14 @@ module CLRS.Ch12.BST.Impl
    concrete pointer structure to the pure functional `bst` from
    CLRS.Ch12.BST.Spec.
 
-   Operations follow CLRS pseudocode:
-   - TREE-SEARCH   (§12.2): recursive BST search, O(h)
-   - TREE-MINIMUM  (§12.2): find the minimum key, O(h)
-   - TREE-MAXIMUM  (§12.2): find the maximum key, O(h)
-   - TREE-INSERT   (§12.3): recursive insert with parent-pointer maintenance
-   - TREE-DELETE   (§12.3): recursive key-based deletion with parent-pointer maintenance
-   - TREE-FREE: recursive deallocation of all nodes
+   Operations follow CLRS pseudocode and carry a ghost tick counter
+   linked to the complexity functions in CLRS.Ch12.BST.Complexity:
+   - TREE-SEARCH   (§12.2): ticks == bst_search_ticks
+   - TREE-MINIMUM  (§12.2): ticks == bst_minimum_ticks
+   - TREE-MAXIMUM  (§12.2): ticks == bst_maximum_ticks
+   - TREE-INSERT   (§12.3): ticks == bst_insert_ticks
+   - TREE-DELETE   (§12.3): ticks == bst_delete_ticks
+   - TREE-FREE: no ticks
 
    Types, bst_subtree predicate, and operation signatures are in the .fsti.
    This file contains the implementations.
@@ -24,8 +25,10 @@ open Pulse.Lib.Pervasives
 
 module Box = Pulse.Lib.Box
 open Pulse.Lib.Box { box, (:=), (!) }
+module GR = Pulse.Lib.GhostReference
 
 open CLRS.Ch12.BST.Spec
+open CLRS.Ch12.BST.Complexity
 
 // ============================================================
 // Ghost fold/unfold helpers
@@ -129,10 +132,12 @@ ghost fn bst_case_some (x: bst_ptr) (bp: bst_node_ptr)
 // ============================================================
 
 //SNIPPET_START: tree_search
-fn rec tree_search (tree: bst_ptr) (k: int)
+fn rec tree_search (tree: bst_ptr) (k: int) (ticks: GR.ref nat)
   preserves bst_subtree tree 'ft 'parent
+  requires GR.pts_to ticks 'n
   returns result: bool
-  ensures pure (result == bst_search 'ft k)
+  ensures GR.pts_to ticks ('n + bst_search_ticks 'ft k) **
+          pure (result == bst_search 'ft k)
 {
   match tree {
     None -> {
@@ -145,18 +150,27 @@ fn rec tree_search (tree: bst_ptr) (k: int)
       bst_case_some (Some bp) bp;
       let node = !bp;
       if (k = node.key) {
+        // 1 tick for visiting this node
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
         intro_bst_node (Some bp) bp;
         with t p. rewrite (bst_subtree (Some bp) t p)
                        as bst_subtree tree 'ft 'parent;
         true
       } else if (k < node.key) {
-        let res = tree_search node.left k;
+        // 1 tick for visiting this node, then recurse left
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
+        let res = tree_search node.left k ticks;
         intro_bst_node (Some bp) bp;
         with t p. rewrite (bst_subtree (Some bp) t p)
                        as bst_subtree tree 'ft 'parent;
         res
       } else {
-        let res = tree_search node.right k;
+        // 1 tick for visiting this node, then recurse right
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
+        let res = tree_search node.right k ticks;
         intro_bst_node (Some bp) bp;
         with t p. rewrite (bst_subtree (Some bp) t p)
                        as bst_subtree tree 'ft 'parent;
@@ -175,17 +189,21 @@ fn rec tree_search (tree: bst_ptr) (k: int)
 // ============================================================
 
 //SNIPPET_START: tree_minimum
-fn rec tree_minimum (tree: bst_ptr) (bp: bst_node_ptr)
+fn rec tree_minimum (tree: bst_ptr) (bp: bst_node_ptr) (ticks: GR.ref nat)
   preserves bst_subtree tree 'ft 'parent
-  requires pure (tree == Some bp)
+  requires GR.pts_to ticks 'n ** pure (tree == Some bp)
   returns result: int
-  ensures pure (bst_minimum 'ft == Some result)
+  ensures GR.pts_to ticks ('n + bst_minimum_ticks 'ft) **
+          pure (bst_minimum 'ft == Some result)
 {
   rewrite each tree as (Some bp);
   bst_case_some (Some bp) bp;
   let nd = !bp;
   match nd.left {
     None -> {
+      // 1 tick: check left is Leaf, return key
+      with n0. assert (GR.pts_to ticks n0);
+      GR.op_Colon_Equals ticks (hide (n0 + 1));
       bst_case_none nd.left;
       intro_bst_node (Some bp) bp;
       with t p. rewrite (bst_subtree (Some bp) t p)
@@ -193,7 +211,10 @@ fn rec tree_minimum (tree: bst_ptr) (bp: bst_node_ptr)
       nd.key
     }
     Some lbp -> {
-      let result = tree_minimum nd.left lbp;
+      // 1 tick: check left, then recurse
+      with n0. assert (GR.pts_to ticks n0);
+      GR.op_Colon_Equals ticks (hide (n0 + 1));
+      let result = tree_minimum nd.left lbp ticks;
       intro_bst_node (Some bp) bp;
       with t p. rewrite (bst_subtree (Some bp) t p)
                      as bst_subtree tree 'ft 'parent;
@@ -211,17 +232,21 @@ fn rec tree_minimum (tree: bst_ptr) (bp: bst_node_ptr)
 // ============================================================
 
 //SNIPPET_START: tree_maximum
-fn rec tree_maximum (tree: bst_ptr) (bp: bst_node_ptr)
+fn rec tree_maximum (tree: bst_ptr) (bp: bst_node_ptr) (ticks: GR.ref nat)
   preserves bst_subtree tree 'ft 'parent
-  requires pure (tree == Some bp)
+  requires GR.pts_to ticks 'n ** pure (tree == Some bp)
   returns result: int
-  ensures pure (bst_maximum 'ft == Some result)
+  ensures GR.pts_to ticks ('n + bst_maximum_ticks 'ft) **
+          pure (bst_maximum 'ft == Some result)
 {
   rewrite each tree as (Some bp);
   bst_case_some (Some bp) bp;
   let nd = !bp;
   match nd.right {
     None -> {
+      // 1 tick: check right is Leaf, return key
+      with n0. assert (GR.pts_to ticks n0);
+      GR.op_Colon_Equals ticks (hide (n0 + 1));
       bst_case_none nd.right;
       intro_bst_node (Some bp) bp;
       with t p. rewrite (bst_subtree (Some bp) t p)
@@ -229,7 +254,10 @@ fn rec tree_maximum (tree: bst_ptr) (bp: bst_node_ptr)
       nd.key
     }
     Some rbp -> {
-      let result = tree_maximum nd.right rbp;
+      // 1 tick: check right, then recurse
+      with n0. assert (GR.pts_to ticks n0);
+      GR.op_Colon_Equals ticks (hide (n0 + 1));
+      let result = tree_maximum nd.right rbp ticks;
       intro_bst_node (Some bp) bp;
       with t p. rewrite (bst_subtree (Some bp) t p)
                      as bst_subtree tree 'ft 'parent;
@@ -288,14 +316,16 @@ fn new_bst_node (k: int) (parent: bst_ptr)
 // ============================================================
 
 //SNIPPET_START: tree_insert
-fn rec tree_insert (tree: bst_ptr) (k: int) (parent: bst_ptr)
-  requires bst_subtree tree 'ft parent
+fn rec tree_insert (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat)
+  requires bst_subtree tree 'ft parent ** GR.pts_to ticks 'n
   returns y: bst_ptr
-  ensures bst_subtree y (bst_insert 'ft k) parent
+  ensures bst_subtree y (bst_insert 'ft k) parent **
+          GR.pts_to ticks ('n + bst_insert_ticks 'ft k)
 {
   match tree {
     None -> {
       // Leaf: allocate Node Leaf k Leaf with the given parent
+      // bst_insert_ticks Leaf k = 0, so no tick increment
       bst_case_none (None #bst_node_ptr);
       rewrite bst_subtree (None #bst_node_ptr) 'ft parent
            as bst_subtree (None #bst_node_ptr) Leaf parent;
@@ -309,23 +339,29 @@ fn rec tree_insert (tree: bst_ptr) (k: int) (parent: bst_ptr)
       bst_case_some (Some vl) vl;
       let node = !vl;
       if (k < node.key) {
-        // Insert into left subtree
-        let new_left = tree_insert node.left k (Some vl);
+        // 1 tick, then insert into left subtree
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
+        let new_left = tree_insert node.left k (Some vl) ticks;
         vl := { node with left = new_left };
         intro_bst_node (Some vl) vl;
         with t p. rewrite (bst_subtree (Some vl) t p)
                        as (bst_subtree (Some vl) (bst_insert 'ft k) parent);
         Some vl
       } else if (k > node.key) {
-        // Insert into right subtree
-        let new_right = tree_insert node.right k (Some vl);
+        // 1 tick, then insert into right subtree
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
+        let new_right = tree_insert node.right k (Some vl) ticks;
         vl := { node with right = new_right };
         intro_bst_node (Some vl) vl;
         with t p. rewrite (bst_subtree (Some vl) t p)
                        as (bst_subtree (Some vl) (bst_insert 'ft k) parent);
         Some vl
       } else {
-        // Duplicate key — return unchanged (CLRS convention)
+        // 1 tick for duplicate key
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
         intro_bst_node (Some vl) vl;
         with t p. rewrite (bst_subtree (Some vl) t p)
                        as (bst_subtree tree (bst_insert 'ft k) parent);
@@ -426,15 +462,16 @@ ghost fn consume_bst_leaf (x: bst_ptr) (#ft: bst) (#parent: bst_ptr)
 //SNIPPET_START: tree_delete
 #push-options "--z3rlimit 40 --fuel 2 --ifuel 2"
 
-fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr)
-  requires bst_subtree tree 'ft parent
+fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat)
+  requires bst_subtree tree 'ft parent ** GR.pts_to ticks 'n
   returns result: bst_ptr
-  ensures bst_subtree result (bst_delete 'ft k) parent
+  ensures bst_subtree result (bst_delete 'ft k) parent **
+          GR.pts_to ticks ('n + bst_delete_ticks 'ft k)
   decreases 'ft
 {
   match tree {
     None -> {
-      // Leaf: nothing to delete, bst_delete Leaf k = Leaf
+      // Leaf: nothing to delete, bst_delete_ticks Leaf k = 0
       bst_case_none (None #bst_node_ptr);
       rewrite bst_subtree (None #bst_node_ptr) 'ft parent
            as bst_subtree (None #bst_node_ptr) Leaf parent;
@@ -446,30 +483,35 @@ fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr)
       bst_case_some (Some bp) bp;
       let nd = !bp;
       if (k < nd.key) {
-        // Delete from left subtree
-        let new_left = tree_delete nd.left k (Some bp);
+        // 1 tick, then delete from left subtree
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
+        let new_left = tree_delete nd.left k (Some bp) ticks;
         bp := { nd with left = new_left };
         intro_bst_node (Some bp) bp;
         with t p. rewrite (bst_subtree (Some bp) t p)
                        as (bst_subtree (Some bp) (bst_delete 'ft k) parent);
         Some bp
       } else if (k > nd.key) {
-        // Delete from right subtree
-        let new_right = tree_delete nd.right k (Some bp);
+        // 1 tick, then delete from right subtree
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
+        let new_right = tree_delete nd.right k (Some bp) ticks;
         bp := { nd with right = new_right };
         intro_bst_node (Some bp) bp;
         with t p. rewrite (bst_subtree (Some bp) t p)
                        as (bst_subtree (Some bp) (bst_delete 'ft k) parent);
         Some bp
       } else {
-        // k == nd.key: found the node to delete
+        // k == nd.key: found the node to delete — 1 tick
+        with n0. assert (GR.pts_to ticks n0);
+        GR.op_Colon_Equals ticks (hide (n0 + 1));
         match nd.left {
           None -> {
-            // No left child (left is Leaf): promote right child
-            // bst_delete (Node Leaf key right) key = right (for any right)
-            consume_bst_leaf nd.left;  // consume left Leaf subtree, learn ghost left == Leaf
-            set_parent_ptr nd.right parent;  // update right child's parent
-            Box.free bp;               // free the deleted node
+            // No left child: promote right child
+            consume_bst_leaf nd.left;
+            set_parent_ptr nd.right parent;
+            Box.free bp;
             with t p. rewrite (bst_subtree nd.right t p)
                            as (bst_subtree nd.right (bst_delete 'ft k) parent);
             nd.right
@@ -477,24 +519,20 @@ fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr)
           Some lbp -> {
             match nd.right {
               None -> {
-                // Left child exists, no right child (right is Leaf): promote left child
-                // bst_delete (Node left key Leaf) key = left (for any left)
-                consume_bst_leaf nd.right;  // consume right Leaf subtree, learn ghost right == Leaf
-                set_parent_ptr nd.left parent;  // update left child's parent
-                Box.free bp;             // free the deleted node
+                // No right child: promote left child
+                consume_bst_leaf nd.right;
+                set_parent_ptr nd.left parent;
+                Box.free bp;
                 with t p. rewrite (bst_subtree nd.left t p)
                                as (bst_subtree nd.left (bst_delete 'ft k) parent);
                 nd.left
               }
               Some rbp -> {
-                // Two children: replace key with successor, delete successor from right
-                // bst_delete (Node lt key rt) key
-                //   = Node lt sk (bst_delete rt sk)
-                //   where bst_minimum rt = Some sk
-                bst_subtree_some_is_node nd.left lbp;   // learn: ghost left tree is Node
-                bst_subtree_some_is_node nd.right rbp;  // learn: ghost right tree is Node
-                let sk = tree_minimum nd.right rbp;     // find successor key
-                let new_right = tree_delete nd.right sk (Some bp);  // delete successor from right
+                // Two children: replace key with successor, delete successor
+                bst_subtree_some_is_node nd.left lbp;
+                bst_subtree_some_is_node nd.right rbp;
+                let sk = tree_minimum nd.right rbp ticks;
+                let new_right = tree_delete nd.right sk (Some bp) ticks;
                 bp := { nd with key = sk; right = new_right };
                 intro_bst_node (Some bp) bp;
                 with t p. rewrite (bst_subtree (Some bp) t p)
