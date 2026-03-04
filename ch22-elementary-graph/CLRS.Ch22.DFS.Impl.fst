@@ -42,7 +42,7 @@
    - Use scan_idx[] to track how far we've scanned each vertex's neighbors
 *)
 
-module CLRS.Ch22.StackDFS
+module CLRS.Ch22.DFS.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array

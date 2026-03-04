@@ -1,4 +1,4 @@
-module CLRS.Ch22.KahnTopologicalSort.Defs
+module CLRS.Ch22.TopologicalSort.Impl.Defs
 open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch22.TopologicalSort.Spec

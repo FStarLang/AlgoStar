@@ -20,7 +20,7 @@
        u.color = BLACK
 *)
 
-module CLRS.Ch22.QueueBFS
+module CLRS.Ch22.BFS.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array

@@ -1,4 +1,4 @@
-module CLRS.Ch22.KahnTopologicalSort
+module CLRS.Ch22.TopologicalSort.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -10,7 +10,7 @@ open CLRS.Ch22.TopologicalSort.Spec
 open CLRS.Ch22.TopologicalSort.Lemmas
 open CLRS.Ch22.TopologicalSort.Verified
 
-open CLRS.Ch22.KahnTopologicalSort.Defs
+open CLRS.Ch22.TopologicalSort.Impl.Defs
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

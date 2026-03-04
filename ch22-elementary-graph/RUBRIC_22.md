@@ -1,127 +1,73 @@
-# Chapter 22: Elementary Graph Algorithms — Rubric Compliance
+# Chapter 22: Elementary Graph Algorithms — Rubric
 
-**Files:** 29 (22 `.fst` + 7 `.fsti`) | **Verified:** All
 **Date:** 2025-07-14 (updated 2026-03-04)
 
 ---
 
-## Current File Inventory
+## File Inventory
 
-| # | File | Lines | Layer | Role |
-|---|------|------:|-------|------|
-| 1 | `CLRS.Ch22.BFS.Spec.fst` | 166 | Spec | Pure BFS level-set specification |
-| 2 | `CLRS.Ch22.BFS.DistanceSpec.fst` | 1,116 | Spec | BFS shortest-path distance — CLRS Thm 22.5 fully proved |
-| 3 | `CLRS.Ch22.BFS.Lemmas.fst` | ~90 | Lemmas | Consolidates key BFS lemma proofs |
-| 4 | `CLRS.Ch22.BFS.Lemmas.fsti` | ~90 | Lemmas | Interface for BFS lemma signatures |
-| 5 | `CLRS.Ch22.BFS.Complexity.fst` | ~28 | Complexity | BFS O(V²) complexity proofs |
-| 6 | `CLRS.Ch22.BFS.Complexity.fsti` | ~22 | Complexity | Interface for BFS complexity bounds |
-| 7 | `CLRS.Ch22.BFS.Impl.fst` | 661 | Impl | ✅ Queue-based BFS (CLRS §22.2, O(V²)) — renamed from QueueBFS |
-| 8 | `CLRS.Ch22.BFS.Impl.fsti` | ~85 | Impl | ✅ Interface exposing `queue_bfs` signature |
-| 9 | `CLRS.Ch22.DFS.Spec.fst` | 2,929 | Spec | Pure DFS with timestamps, parenthesis theorem, edge classification |
-| 10 | `CLRS.Ch22.DFS.WhitePath.fst` | 1,103 | Spec | White-path theorem (CLRS Thm 22.9) both directions |
-| 11 | `CLRS.Ch22.DFS.Lemmas.fst` | ~50 | Lemmas | Consolidates key DFS lemma proofs |
-| 12 | `CLRS.Ch22.DFS.Lemmas.fsti` | ~55 | Lemmas | Interface for DFS lemma signatures |
-| 13 | `CLRS.Ch22.DFS.Complexity.fst` | ~28 | Complexity | DFS O(V²) complexity proofs |
-| 14 | `CLRS.Ch22.DFS.Complexity.fsti` | ~30 | Complexity | Interface for DFS complexity bounds |
-| 15 | `CLRS.Ch22.DFS.Impl.fst` | 1,105 | Impl | ✅ Stack-based DFS (CLRS §22.3, O(V²)) — renamed from StackDFS |
-| 16 | `CLRS.Ch22.DFS.Impl.fsti` | ~95 | Impl | ✅ Interface exposing `stack_dfs` signature |
-| 17 | `CLRS.Ch22.DFS.TopologicalSort.fst` | 731 | Spec | DFS-based topological sort (§22.4), bridges DFS.Spec ↔ TS.Spec |
-| 18 | `CLRS.Ch22.TopologicalSort.Spec.fst` | 243 | Spec | Topological order definition, DAG property |
-| 19 | `CLRS.Ch22.TopologicalSort.Lemmas.fst` | ~670 | Lemmas | Helper lemmas for Kahn's correctness proof |
-| 20 | `CLRS.Ch22.TopologicalSort.Lemmas.fsti` | ~300 | Lemmas | ✅ Interface: definitions exposed, proof details hidden |
-| 21 | `CLRS.Ch22.TopologicalSort.Verified.fst` | 608 | Lemmas | Full correctness proof: Kahn's → `is_topological_order` |
-| 22 | `CLRS.Ch22.TopologicalSort.Complexity.fst` | ~26 | Complexity | Kahn's O(V²) complexity proofs |
-| 23 | `CLRS.Ch22.TopologicalSort.Complexity.fsti` | ~22 | Complexity | Interface for TopSort complexity bounds |
-| 24 | `CLRS.Ch22.TopologicalSort.Impl.fst` | 751 | Impl | ✅ Kahn's topological sort — renamed from KahnTopologicalSort |
-| 25 | `CLRS.Ch22.TopologicalSort.Impl.fsti` | ~60 | Impl | ✅ Interface exposing `topological_sort` signature |
-| 26 | `CLRS.Ch22.TopologicalSort.Impl.Defs.fst` | 1,827 | Impl | ✅ Kahn's predicate lemmas — renamed from KahnTopologicalSort.Defs |
-| 27 | `CLRS.Ch22.TopologicalSort.Impl.Defs.fsti` | 1,293 | Impl | ✅ Interface for Kahn's definitions — renamed from KahnTopologicalSort.Defs |
-| 28 | `CLRS.Ch22.Graph.Common.fst` | 78 | Shared | `has_edge`, `reachable_in`, `tick`, `product_strict_bound` |
-| 29 | `CLRS.Ch22.Graph.Complexity.fst` | 69 | Shared | O(V²) meta-bound for adjacency-matrix algorithms |
-| 30 | `CLRS.Ch22.IterativeBFS.fst` | 265 | Impl | Relaxation-based BFS (Bellman-Ford-like, O(V³)) — alternative, not canonical |
+### BFS (CLRS §22.2)
 
----
+| File | Lines | Role |
+|------|------:|------|
+| `CLRS.Ch22.BFS.Spec.fst` | 166 | Pure level-set BFS specification. Graph as flat `seq int`. Proves CLRS Lemma 22.1 (edge ⟹ visited at next level), source distance = 0. |
+| `CLRS.Ch22.BFS.DistanceSpec.fst` | 1,116 | Shortest-path specification via BFS state machine. Graph as `seq bool`. Proves CLRS Thm 22.5 (`bfs_correctness`: BFS distances = shortest-path distances). |
+| `CLRS.Ch22.BFS.Impl.fst` | 661 | Pulse queue-based BFS (CLRS §22.2 pseudocode). Graph as flat `seq int` via `Graph.Common`. Ghost tick counter proves ≤ 2V² operations. |
+| `CLRS.Ch22.BFS.Impl.fsti` | 85 | Interface exposing `queue_bfs` signature with pre/postconditions. |
+| `CLRS.Ch22.IterativeBFS.fst` | 265 | Alternative relaxation-based BFS (Bellman-Ford-like, O(V³)). Self-contained. |
 
-## Rubric Compliance Matrix
+**Architecture note:** BFS.Spec, BFS.DistanceSpec, and BFS.Impl are three independent developments using different graph representations. Impl does not depend on Spec or DistanceSpec — it proves its own invariants inline. All three are fully proved (zero admits).
 
-The rubric requires per-algorithm: **Spec**, **Lemmas** (`.fst` + `.fsti`), **Complexity** (`.fst` + `.fsti`), **Impl** (`.fst` + `.fsti`).
+### DFS (CLRS §22.3)
 
-### BFS (§22.2)
+| File | Lines | Role |
+|------|------:|------|
+| `CLRS.Ch22.DFS.Spec.fst` | 2,929 | Pure functional DFS with discovery/finish timestamps. Graph as 2D `seq (seq int)`. Proves parenthesis theorem (Thm 22.7), edge classification (tree/back/forward/cross), cycle ⟺ back edge (Thm 22.11). |
+| `CLRS.Ch22.DFS.WhitePath.fst` | 1,103 | White-path theorem (Thm 22.9) — both directions. Depends on DFS.Spec. |
+| `CLRS.Ch22.DFS.TopologicalSort.fst` | 731 | Proves DFS finish-time ordering is a valid topological order. Bridges DFS.Spec (2D) ↔ TopologicalSort.Spec (1D) via `adj_equiv` + `has_edge_equiv`. |
+| `CLRS.Ch22.DFS.Impl.fst` | 1,105 | Pulse stack-based DFS (CLRS §22.3). Graph as flat `seq int` via `Graph.Common`. Ghost tick counter proves ≤ 2V² operations. |
+| `CLRS.Ch22.DFS.Impl.fsti` | 95 | Interface exposing `stack_dfs` signature with pre/postconditions. |
 
-| Rubric File | Expected Name | Status | Actual File |
-|-------------|---------------|--------|-------------|
-| `Spec.fst` | `CLRS.Ch22.BFS.Spec.fst` | ✅ Present | `BFS.Spec.fst` (166 lines) |
-| `Lemmas.fst` | `CLRS.Ch22.BFS.Lemmas.fst` | ✅ Present | `BFS.Lemmas.fst` |
-| `Lemmas.fsti` | `CLRS.Ch22.BFS.Lemmas.fsti` | ✅ Present | `BFS.Lemmas.fsti` |
-| `Complexity.fst` | `CLRS.Ch22.BFS.Complexity.fst` | ✅ Present | `BFS.Complexity.fst` |
-| `Complexity.fsti` | `CLRS.Ch22.BFS.Complexity.fsti` | ✅ Present | `BFS.Complexity.fsti` |
-| `Impl.fst` | `CLRS.Ch22.BFS.Impl.fst` | ✅ Present | `BFS.Impl.fst` (renamed from QueueBFS) |
-| `Impl.fsti` | `CLRS.Ch22.BFS.Impl.fsti` | ✅ Present | `BFS.Impl.fsti` |
+**Architecture note:** DFS.Spec (2D adjacency) and DFS.Impl (flat 1D) are disconnected — Impl does not depend on Spec. DFS.TopologicalSort bridges the two representations. All files fully proved (zero admits).
 
-**Additional BFS files (outside rubric):**
-- `BFS.DistanceSpec.fst` (1,116 lines) — path infrastructure for Thm 22.5 (fully proved)
-- `IterativeBFS.fst` (265 lines) — alternative relaxation-based BFS (self-contained)
+### Topological Sort (CLRS §22.4)
 
-### DFS (§22.3)
+| File | Lines | Role |
+|------|------:|------|
+| `CLRS.Ch22.TopologicalSort.Spec.fst` | 243 | Core definitions: `is_topological_order`, `has_cycle`, `is_dag`, `all_distinct`. Proves topological order ⟹ DAG. |
+| `CLRS.Ch22.TopologicalSort.Lemmas.fst` | ~670 | Invariant predicates for Kahn's algorithm: `strong_order_inv`, `queue_preds_in_output`, `indeg_correct`. ~38 lemmas about invariant preservation under enqueue/dequeue/output-extend operations. |
+| `CLRS.Ch22.TopologicalSort.Lemmas.fsti` | ~300 | Interface: definitions exposed as `let`, proofs hidden as `val`. |
+| `CLRS.Ch22.TopologicalSort.Verified.fst` | 608 | Bridge: proves Kahn's `strong_order_inv` ⟹ `is_topological_order`. Converts int↔nat representations. Includes pigeonhole principle for completeness and `non_output_implies_cycle` for termination. |
+| `CLRS.Ch22.TopologicalSort.Impl.Defs.fst` | 1,827 | Named predicates for Kahn's loop invariants (Pulse-facing): `partial_distinct`, `queue_fresh`, `zero_indeg_accounted`, etc. |
+| `CLRS.Ch22.TopologicalSort.Impl.Defs.fsti` | 1,293 | Interface for Impl.Defs. |
+| `CLRS.Ch22.TopologicalSort.Impl.fst` | 751 | Pulse implementation of Kahn's algorithm. Full verification chain: Spec → Lemmas → Verified → Impl.Defs → Impl. |
+| `CLRS.Ch22.TopologicalSort.Impl.fsti` | ~60 | Interface exposing `topological_sort` signature. |
 
-| Rubric File | Expected Name | Status | Actual File |
-|-------------|---------------|--------|-------------|
-| `Spec.fst` | `CLRS.Ch22.DFS.Spec.fst` | ✅ Present | `DFS.Spec.fst` (2,929 lines) |
-| `Lemmas.fst` | `CLRS.Ch22.DFS.Lemmas.fst` | ✅ Present | `DFS.Lemmas.fst` |
-| `Lemmas.fsti` | `CLRS.Ch22.DFS.Lemmas.fsti` | ✅ Present | `DFS.Lemmas.fsti` |
-| `Complexity.fst` | `CLRS.Ch22.DFS.Complexity.fst` | ✅ Present | `DFS.Complexity.fst` |
-| `Complexity.fsti` | `CLRS.Ch22.DFS.Complexity.fsti` | ✅ Present | `DFS.Complexity.fsti` |
-| `Impl.fst` | `CLRS.Ch22.DFS.Impl.fst` | ✅ Present | `DFS.Impl.fst` (renamed from StackDFS) |
-| `Impl.fsti` | `CLRS.Ch22.DFS.Impl.fsti` | ✅ Present | `DFS.Impl.fsti` |
+**Architecture note:** Unlike BFS/DFS, TopologicalSort has a complete verification chain from spec to implementation. The DFS-based topological sort (CLRS §22.4 canonical algorithm) is proved correct in `DFS.TopologicalSort.fst`.
 
-**Additional DFS files (outside rubric):**
-- `DFS.WhitePath.fst` (1,103 lines) — White-path theorem (Thm 22.9)
-- `DFS.TopologicalSort.fst` (731 lines) — bridges DFS.Spec ↔ TopologicalSort.Spec
+### Shared Infrastructure
 
-### Topological Sort (§22.4)
-
-| Rubric File | Expected Name | Status | Actual File |
-|-------------|---------------|--------|-------------|
-| `Spec.fst` | `CLRS.Ch22.TopologicalSort.Spec.fst` | ✅ Present | `TopologicalSort.Spec.fst` (243 lines) |
-| `Lemmas.fst` | `CLRS.Ch22.TopologicalSort.Lemmas.fst` | ✅ Present | `TopologicalSort.Lemmas.fst` (~670 lines) |
-| `Lemmas.fsti` | `CLRS.Ch22.TopologicalSort.Lemmas.fsti` | ✅ Present | `TopologicalSort.Lemmas.fsti` |
-| `Complexity.fst` | `CLRS.Ch22.TopologicalSort.Complexity.fst` | ✅ Present | `TopologicalSort.Complexity.fst` |
-| `Complexity.fsti` | `CLRS.Ch22.TopologicalSort.Complexity.fsti` | ✅ Present | `TopologicalSort.Complexity.fsti` |
-| `Impl.fst` | `CLRS.Ch22.TopologicalSort.Impl.fst` | ✅ Present | `TopologicalSort.Impl.fst` (renamed from KahnTopologicalSort) |
-| `Impl.fsti` | `CLRS.Ch22.TopologicalSort.Impl.fsti` | ✅ Present | `TopologicalSort.Impl.fsti` |
-
-**Additional TopSort files (outside rubric):**
-- `TopologicalSort.Verified.fst` (608 lines) — full Kahn's correctness proof
-- `TopologicalSort.Impl.Defs.fst/.fsti` (1,827/1,293 lines) — Kahn's predicate lemmas
-
-### Summary Counts
-
-| | ✅ Present | ❌ Missing | Total Expected |
-|---|:---:|:---:|:---:|
-| **Spec.fst** | 3 | 0 | 3 |
-| **Lemmas.fst** | 3 | 0 | 3 |
-| **Lemmas.fsti** | 3 | 0 | 3 |
-| **Complexity.fst** | 3 | 0 | 3 |
-| **Complexity.fsti** | 3 | 0 | 3 |
-| **Impl.fst** | 3 | 0 | 3 |
-| **Impl.fsti** | 3 | 0 | 3 |
-| **Total** | **21** | **0** | **21** |
-
-**All 21 rubric-required files present and verified. ✅**
+| File | Lines | Role |
+|------|------:|------|
+| `CLRS.Ch22.Graph.Common.fst` | 78 | `has_edge` (flat matrix), `reachable_in`, ghost counter helpers (`tick`, `incr_nat`), `product_strict_bound`. Used by BFS.Impl and DFS.Impl. |
 
 ---
 
-## Quality Checks
+## Proof Quality
 
-### Proof Quality: ✅ Excellent
-
-- **Zero admits** across all 13,637+ lines — no `admit()`, `admit_()`, `assume()`, or `assume_()` calls
-- **Deep CLRS theorems proved:**
-  - Parenthesis Theorem (Thm 22.7) — mutual induction in `DFS.Spec`
-  - White-Path Theorem (Thm 22.9) — both directions in `DFS.WhitePath`
-  - Edge classification (Tree/Back/Forward/Cross) — `DFS.Spec`
-  - Cycle ⟺ back edge (Thm 22.11) — `DFS.Spec`
-  - Kahn's correctness including pigeonhole — `TopologicalSort.Verified`
+- **Zero admits** across all ~13,600 lines — no `admit()`, `admit_()`, `assume()`, `assume_()`
+- **CLRS theorems proved:**
+  - Parenthesis Theorem (Thm 22.7) — `DFS.Spec`
+  - White-Path Theorem (Thm 22.9) — `DFS.WhitePath`
+  - Edge Classification — `DFS.Spec`
+  - Cycle ⟺ Back Edge (Thm 22.11) — `DFS.Spec`
+  - BFS Shortest-Path Optimality (Thm 22.5) — `BFS.DistanceSpec`
   - DFS-based topological sort correctness — `DFS.TopologicalSort`
-  - BFS shortest-path optimality (Thm 22.5) — `BFS.DistanceSpec`
-- **Complexity accounting:** Ghost tick counters in BFS.Impl (≤ 2V²), DFS.Impl (≤ 2V²), TopologicalSort.Impl (≤ V²)
+  - Kahn's correctness + completeness — `TopologicalSort.Verified`
+- **Complexity:** Ghost tick counters prove BFS.Impl ≤ 2V², DFS.Impl ≤ 2V², TopologicalSort.Impl ≤ V²
+
+## Known Architectural Debt
+
+1. **Spec↔Impl disconnect (BFS, DFS):** The pure specs and Pulse implementations use different graph representations and don't share code. Each proves things independently. Connecting them would require bridging lemmas similar to what DFS.TopologicalSort does.
+2. **Graph representation proliferation:** `has_edge` appears with 4+ signatures across files — flat `seq int`, flat `seq bool`, 2D `seq (seq int)`, prop vs bool returns.
+3. **Code duplication:** `reachable_in`, `incr_nat`/`tick` duplicated locally in some files due to Z3 proof sensitivity (documented in `Graph.Common` header).
