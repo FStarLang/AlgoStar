@@ -3,7 +3,7 @@
 **Date**: 2025-07-18 (updated 2026-03-04)
 **Canonical rubric**: `../RUBRIC.md`
 **Audit reference**: `../AUDIT_CH26.md`
-**Verification status**: All 8 `.checked` files present in `_cache/` (5 `.fst` + 3 `.fsti`)
+**Verification status**: All 10 `.checked` files present in `_cache/` (6 `.fst` + 4 `.fsti`)
 
 ---
 
@@ -11,15 +11,17 @@
 
 | # | File | Lines | Rubric Role | Verified |
 |---|------|------:|-------------|:--------:|
-| 1 | `CLRS.Ch26.MaxFlow.Spec.fst` | 1125 | **Spec** — Pure specification: flow networks, residual graphs, augmenting paths, cuts, MFMC theorem | ✅ |
+| 1 | `CLRS.Ch26.MaxFlow.Spec.fst` | 341 | **Spec** — Pure specification: flow networks, residual graphs, augmenting paths, cuts | ✅ |
 | 2 | `CLRS.Ch26.MaxFlow.Lemmas.fsti` | — | **Lemmas interface** — Public API for augmentation lemmas | ✅ |
 | 3 | `CLRS.Ch26.MaxFlow.Lemmas.fst` | 679 | **Lemmas** — Augmentation preserves validity, increases flow value | ✅ |
-| 4 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | — | **Complexity interface** — Public API for complexity theorems | ✅ |
-| 5 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | **Complexity** — O(VE²) bound with ghost tick counter | ✅ |
-| 6 | `CLRS.Ch26.MaxFlow.Impl.fsti` | — | **Impl interface** — Public API for `max_flow` | ✅ |
-| 7 | `CLRS.Ch26.MaxFlow.Impl.fst` | ~1285 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
-| 8 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Test — Smoke test on 3-vertex graph | ✅ |
-| | **Total** | **~3768** | | |
+| 4 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti` | — | **MFMC interface** — Public API for MFMC theorem | ✅ |
+| 5 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fst` | 804 | **MFMC** — Weak duality, strong duality (CLRS Theorem 26.6) | ✅ |
+| 6 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | — | **Complexity interface** — Public API for complexity theorems | ✅ |
+| 7 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | **Complexity** — O(VE²) bound with ghost tick counter | ✅ |
+| 8 | `CLRS.Ch26.MaxFlow.Impl.fsti` | — | **Impl interface** — Public API for `max_flow` + bridge lemma | ✅ |
+| 9 | `CLRS.Ch26.MaxFlow.Impl.fst` | ~1300 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
+| 10 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Test — Smoke test on 3-vertex graph | ✅ |
+| | **Total** | **~3800** | | |
 
 ---
 
@@ -78,15 +80,16 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 
 | CLRS Result | Location | Status |
 |-------------|----------|:------:|
-| Lemma 26.4: \|f\| = net flow across any cut | Spec.fst:582 | ✅ Proven |
-| Corollary 26.5: Weak duality \|f\| ≤ c(S,T) | Spec.fst:597 | ✅ Proven |
-| Theorem 26.6: Max-flow min-cut | Spec.fst:1076 | ✅ Proven |
+| Lemma 26.4: \|f\| = net flow across any cut | Lemmas.MaxFlowMinCut.fst:262 | ✅ Proven |
+| Corollary 26.5: Weak duality \|f\| ≤ c(S,T) | Lemmas.MaxFlowMinCut.fst:276 | ✅ Proven |
+| Theorem 26.6: Max-flow min-cut | Lemmas.MaxFlowMinCut.fst:755 | ✅ Proven |
 | Lemma 26.7: Distances non-decreasing | Complexity.fst:75 | ❌ `assume val` |
 | Theorem 26.8: O(VE²) complexity | Complexity.fst:313 | 🔶 Arithmetic proven; key lemmas axiomatized |
 | Augmentation preserves valid flow | Lemmas.fst:628 | ✅ Proven |
 | Augmentation increases flow value | Lemmas.fst:656 | ✅ Proven |
 | Zero flow is valid | Lemmas.fst:672 | ✅ Proven |
-| Path shortening (pigeonhole) | Spec.fst:877+ | ✅ Proven |
+| Path shortening (pigeonhole) | Lemmas.MaxFlowMinCut.fst | ✅ Proven |
+| imp_valid_flow ⟹ valid_flow (bridge) | Impl.fst | ✅ Proven |
 
 ---
 
@@ -163,8 +166,8 @@ let lemma_augment_imp_preserves_valid (flow_seq cap_seq: Seq.seq int) (n source 
 | **Zero `admit` in complexity** | 🔶 | No `admit`, but 4 `assume val` axioms pending BFS correctness |
 | **Zero `admit` in impl** | ❌ | **1 `admit()` at Impl.fst:355** — `lemma_augment_imp_preserves_valid` |
 | **Zero `assume_` in production** | ✅ | Only `assume_` is in Test.fst (test-only) |
-| **All files verified (.checked)** | ✅ | 8/8 `.checked` files in `_cache/` (5 `.fst` + 3 `.fsti`) |
-| **MFMC theorem proven** | ✅ | Spec.fst:1076, constructive (2)⟹(3) direction of Theorem 26.6 |
+| **All files verified (.checked)** | ✅ | 10/10 `.checked` files in `_cache/` (6 `.fst` + 4 `.fsti`) |
+| **MFMC theorem proven** | ✅ | Lemmas.MaxFlowMinCut.fst:755, constructive (2)⟹(3) direction of Theorem 26.6 |
 | **Flow conservation proven** | ✅ | Lemmas.fst:628, for all augmentations on valid simple paths |
 | **O(VE²) bound proven** | 🔶 | Arithmetic correct; depends on 4 axiomatized lemmas |
 
@@ -172,13 +175,15 @@ let lemma_augment_imp_preserves_valid (flow_seq cap_seq: Seq.seq int) (n source 
 
 | Criterion | Score | Notes |
 |-----------|:-----:|-------|
-| Spec file present & correct | ✅ | Naming matches rubric exactly |
+| Spec file present & correct | ✅ | Pure definitions only (341 lines) |
 | Lemmas file present | ✅ | Renamed from Proofs.fst to Lemmas.fst |
 | Lemmas interface (.fsti) | ✅ | Created with key lemma + helper signatures |
+| MFMC theorem in Lemmas | ✅ | Extracted to Lemmas.MaxFlowMinCut.fst/fsti (804 lines) |
 | Complexity file present | 🔶 | Present; 4 `assume val` axioms |
 | Complexity interface (.fsti) | ✅ | Created with theorem signatures |
 | Impl file present | 🔶 | Renamed from MaxFlow.fst to Impl.fst; **has `admit()`** |
 | Impl interface (.fsti) | ✅ | Created with `max_flow` public API |
+| imp_valid_flow ↔ valid_flow | ✅ | Bridge lemma connects Impl postcondition to Spec.valid_flow |
 | No admits in production | ❌ | **1 admit at Impl.fst:355** |
 | Documentation accurate | ✅ | README updated to reflect current file structure |
 
@@ -187,12 +192,12 @@ let lemma_augment_imp_preserves_valid (flow_seq cap_seq: Seq.seq int) (n source 
 | Dimension | Rating |
 |-----------|--------|
 | CLRS Fidelity | ★★★★☆ |
-| Specification Strength | ★★★★☆ |
+| Specification Strength | ★★★★★ |
 | Complexity Proofs | ★★★☆☆ |
 | Code Quality | ★★★★☆ |
 | Proof Quality (Spec+Lemmas) | ★★★★★ |
 | Proof Quality (Impl) | ★★☆☆☆ |
-| Rubric Structural Compliance | ★★★★☆ |
-| Documentation | ★★★★☆ |
+| Rubric Structural Compliance | ★★★★★ |
+| Documentation | ★★★★★ |
 
-**Bottom line**: Excellent pure-spec proofs (MFMC, conservation, augmentation — all zero-admit). All rubric naming and interface file requirements now met. The **single `admit()` at Impl.fst:355** remains the highest-priority item: it breaks the static proof chain from implementation to spec. Four `assume val` axioms in Complexity.fst are secondary concerns pending BFS correctness proof.
+**Bottom line**: Excellent pure-spec proofs (MFMC, conservation, augmentation — all zero-admit). MFMC theorem now isolated in Lemmas.MaxFlowMinCut with clean interface. Bridge lemma (`imp_valid_flow_implies_valid_flow`) connects Impl postcondition to `Spec.valid_flow`, enabling callers to use MFMC theorem results. All rubric naming and interface file requirements met. The **single `admit()` at Impl.fst:355** remains the highest-priority item. Four `assume val` axioms in Complexity.fst are secondary concerns.

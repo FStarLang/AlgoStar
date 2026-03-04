@@ -80,6 +80,32 @@ let lemma_zero_array_eq_create (s: Seq.seq int) (len: nat)
     (ensures s == Seq.create len 0)
   = Seq.lemma_eq_intro s (Seq.create len 0)
 
+(** Bridge lemma: imp_valid_flow implies Spec.valid_flow.
+    This connects the imperative postcondition to the spec-level predicate
+    used by the MFMC theorem. The two predicates are equivalent when indices
+    are in range: seq_get s (u*n+v) = get s n u v = Seq.index s (u*n+v). *)
+let imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
+  : Lemma
+    (requires imp_valid_flow flow_seq cap_seq n source sink)
+    (ensures
+      n > 0 /\ source < n /\ sink < n /\
+      Seq.length flow_seq == n * n /\ Seq.length cap_seq == n * n /\
+      valid_flow #n flow_seq cap_seq source sink)
+  = // imp_valid_flow provides length constraints
+    assert (Seq.length flow_seq == n * n);
+    assert (Seq.length cap_seq == n * n);
+    // seq_get and get are both Seq.index for in-range indices
+    let aux_cap (u: nat{u < n}) (v: nat{v < n})
+      : Lemma (0 <= get flow_seq n u v /\ get flow_seq n u v <= get cap_seq n u v)
+      = let idx = u * n + v in
+        assert (idx < n * n);
+        assert (seq_get flow_seq idx == Seq.index flow_seq idx);
+        assert (get flow_seq n u v == Seq.index flow_seq idx);
+        assert (seq_get cap_seq idx == Seq.index cap_seq idx);
+        assert (get cap_seq n u v == Seq.index cap_seq idx)
+    in
+    FStar.Classical.forall_intro_2 aux_cap
+
 (** Queue entries are valid vertices *)
 let queue_valid (squeue: Seq.seq SZ.t) (head tail: nat) (n: nat) : prop =
   forall (k: nat). k >= head /\ k < tail ==> SZ.v (seq_get_sz squeue k) < n

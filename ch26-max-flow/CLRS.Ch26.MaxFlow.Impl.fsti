@@ -35,6 +35,16 @@ val valid_caps (cap_seq: Seq.seq int) (n: nat) : prop
 (** Imperative flow validity: capacity constraints + flow conservation *)
 val imp_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat) : prop
 
+(** Bridge lemma: imp_valid_flow implies Spec.valid_flow.
+    Allows callers to use the MFMC theorem with the result of max_flow. *)
+val imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
+  : Lemma
+    (requires imp_valid_flow flow_seq cap_seq n source sink)
+    (ensures
+      n > 0 /\ source < n /\ sink < n /\
+      Seq.length flow_seq == n * n /\ Seq.length cap_seq == n * n /\
+      valid_flow #n flow_seq cap_seq source sink)
+
 (** Runtime check for valid capacities *)
 fn check_valid_caps_fn
   (capacity: A.array int)
