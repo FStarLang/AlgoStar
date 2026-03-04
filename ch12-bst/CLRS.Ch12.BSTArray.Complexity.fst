@@ -7,20 +7,9 @@ open FStar.Mul
     This module proves O(h) complexity bounds for BST search operations,
     where h is the height of the tree.
     
-    Key insights from CLRS Chapter 12:
-    - TREE-SEARCH follows a root-to-leaf path
-    - At each level, it does O(1) work (one comparison)
-    - Total work is O(h) where h = height of tree
-    
-    Array representation:
-    - Node at index i has left child at 2*i+1, right child at 2*i+2
-    - For capacity cap, maximum height is ⌊log₂(cap)⌋
+    Definitions (log2_floor, tree_height, node_depth) are in the .fsti.
+    This file contains only the lemma proofs.
 **)
-
-(** Compute floor of log base 2 of a positive natural number **)
-let rec log2_floor (n:nat{n > 0}) : nat =
-  if n = 1 then 0
-  else 1 + log2_floor (n / 2)
 
 (** Lemma: log2_floor is bounded by its input **)
 let rec log2_floor_bounded (n:nat{n > 0})
@@ -41,20 +30,10 @@ let rec log2_floor_power_bounds (n:nat{n > 0})
       Math.Lemmas.pow2_plus 1 (log2_floor (n / 2))
     )
 
-(** Height of array-backed BST with given capacity
-    This is the maximum depth from root (index 0) to any valid index < cap **)
-let tree_height (cap:nat{cap > 0}) : nat =
-  log2_floor cap
-
 (** Lemma: height is bounded by capacity **)
 let height_bounded_by_capacity (cap:nat{cap > 0})
   : Lemma (tree_height cap <= cap)
   = log2_floor_bounded cap
-
-(** Depth of a node at index i in the array-backed BST **)
-let rec node_depth (i:nat) : nat =
-  if i = 0 then 0
-  else 1 + node_depth ((i - 1) / 2)  // parent index
 
 (** Lemma: node depth equals floor log of (i+1) **)
 let rec node_depth_is_log (i:nat)
@@ -100,36 +79,19 @@ let search_path_length (cap:nat{cap > 0}) (start:nat{start < cap})
   : Lemma (node_depth start + 1 <= tree_height cap + 1)
   = node_depth_bounded cap start
 
-(** Main complexity theorem: BST search does O(h) work
-    
-    Theorem: A search operation starting from the root (index 0) in an 
-    array-backed BST with capacity cap visits at most h+1 nodes, where
-    h = tree_height cap = ⌊log₂(cap)⌋.
-    
-    Since each node visit does O(1) work (one comparison), total work is O(h).
-**)
+(** Main complexity theorem: BST search does O(h) work **)
 let search_complexity_bound (cap:nat{cap > 0})
   : Lemma (
       let h = tree_height cap in
-      h <= cap /\  // height is at most linear
-      h = log2_floor cap /\ // height is logarithmic for full tree
-      (forall (i:nat{i < cap}). node_depth i <= h)  // all nodes within height
+      h <= cap /\
+      h = log2_floor cap /\
+      (forall (i:nat{i < cap}). node_depth i <= h)
     )
   = log2_floor_bounded cap;
     introduce forall (i:nat{i < cap}). node_depth i <= tree_height cap
     with node_depth_bounded cap i
 
-(** Corollary: For balanced trees with n nodes in capacity cap where cap ≈ 2n,
-    height is Θ(log n) **)
+(** Corollary: For balanced trees with n nodes **)
 let balanced_tree_height (n:nat{n > 0}) (cap:nat{cap >= n /\ cap <= 2 * n})
   : Lemma (tree_height cap <= log2_floor (2 * n))
   = log2_floor_monotone cap (2 * n)
-
-(** Summary: BST operations have the following complexity bounds:
-    
-    1. tree_height cap = ⌊log₂(cap)⌋ for array capacity cap
-    2. Any search path has length ≤ h + 1 where h = tree_height cap  
-    3. Each step does O(1) work, so total work is O(h)
-    4. For balanced trees, h = Θ(log n), giving O(log n) search
-    5. For degenerate trees, h can be Θ(n), giving O(n) search in worst case
-**)

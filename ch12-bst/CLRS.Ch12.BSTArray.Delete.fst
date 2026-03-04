@@ -42,7 +42,7 @@ module AP = CLRS.Ch12.BSTArray.Predicates
  *)
 
 // Import BST type from main module and shared predicates
-open CLRS.Ch12.BSTArray
+open CLRS.Ch12.BSTArray.Impl
 open CLRS.Ch12.BSTArray.Predicates
 
 // ============================================================================

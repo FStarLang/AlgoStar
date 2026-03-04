@@ -1,4 +1,4 @@
-module CLRS.Ch12.BST
+module CLRS.Ch12.BST.Impl
 (*
    CLRS Chapter 12: Pointer-Based Binary Search Tree
 
@@ -15,7 +15,8 @@ module CLRS.Ch12.BST
    - TREE-DELETE   (§12.3): recursive key-based deletion with parent-pointer maintenance
    - TREE-FREE: recursive deallocation of all nodes
 
-   Each operation's postcondition links to the pure spec.
+   Types, bst_subtree predicate, and operation signatures are in the .fsti.
+   This file contains the implementations.
    NO admits. NO assumes.
 *)
 #lang-pulse
@@ -25,48 +26,6 @@ module Box = Pulse.Lib.Box
 open Pulse.Lib.Box { box, (:=), (!) }
 
 open CLRS.Ch12.BST.Spec
-
-// ============================================================
-// §12.1 Node type
-// ============================================================
-
-//SNIPPET_START: bst_node
-noeq
-type bst_node = {
-  key:   int;
-  left:  bst_ptr;
-  right: bst_ptr;
-  p:     bst_ptr;     // parent pointer (CLRS §12.1)
-}
-
-and bst_node_ptr = box bst_node
-
-// Nullable pointer to a node
-and bst_ptr = option bst_node_ptr
-//SNIPPET_END: bst_node
-
-// ============================================================
-// Separation logic predicate: bst_subtree
-//
-// `bst_subtree ct ft parent` asserts that:
-//   - `ct` is the concrete pointer to the root of the subtree
-//   - `ft` is the ghost/pure BST shape
-//   - `parent` is the expected parent-pointer value for the root
-// ============================================================
-
-//SNIPPET_START: bst_subtree
-let rec bst_subtree (ct: bst_ptr) (ft: bst) (parent: bst_ptr)
-  : Tot slprop (decreases ft)
-  = match ft with
-    | Leaf -> pure (ct == None)
-    | Node l k r ->
-      exists* (bp: bst_node_ptr) (node: bst_node).
-        pure (ct == Some bp) **
-        (bp |-> node) **
-        pure (node.key == k /\ node.p == parent) **
-        bst_subtree node.left l (Some bp) **
-        bst_subtree node.right r (Some bp)
-//SNIPPET_END: bst_subtree
 
 // ============================================================
 // Ghost fold/unfold helpers

@@ -1,4 +1,4 @@
-module CLRS.Ch12.BSTArray
+module CLRS.Ch12.BSTArray.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 
@@ -13,68 +13,6 @@ open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch12.BSTArray.Complexity
 module AP = CLRS.Ch12.BSTArray.Predicates
-
-// Helper lemma to prove that child indices fit in SZ.t
-let child_indices_fit (cap: nat) (i: nat)
-  : Lemma
-    (requires cap < 32768 /\ i < cap)
-    (ensures (
-      let left = 2 * i + 1 in
-      let right = 2 * i + 2 in
-      0 <= left /\ left < pow2 16 /\
-      0 <= right /\ right < pow2 16
-    ))
-= ()
-  // Since cap < 32768 and i < cap, we have i < 32768, so i <= 32767
-  // Actually i < cap < 32768, so i <= cap - 1 <= 32767 - 1 = 32766
-  // Wait: if cap < 32768, then cap <= 32767
-  // And i < cap, so i <= cap - 1 <= 32767 - 1 = 32766  
-  // Therefore: 2 * i + 2 <= 2 * 32766 + 2 = 65534 < 65536 = pow2 16
-
-//SNIPPET_START: bst_type
-// Array-based BST (simplified representation)
-// Node i has: left at 2*i+1, right at 2*i+2
-noeq
-type bst = {
-  keys: A.array int;
-  valid: A.array bool;
-  cap: SZ.t;
-}
-//SNIPPET_END: bst_type
-
-//SNIPPET_START: subtree_in_range
-// Stronger BST property: all keys in subtree are bounded by lo and hi
-let rec subtree_in_range 
-  (keys: Seq.seq int) 
-  (valid: Seq.seq bool) 
-  (cap: nat) 
-  (i: nat) 
-  (lo hi: int)
-  : Tot prop (decreases (if i < cap then cap - i else 0))
-  = if i >= cap || i >= Seq.length keys || i >= Seq.length valid then True
-    else if not (Seq.index valid i) then True
-    else 
-      let k = Seq.index keys i in
-      let left = op_Multiply 2 i + 1 in
-      let right = op_Multiply 2 i + 2 in
-      lo < k /\ k < hi /\
-      subtree_in_range keys valid cap left lo k /\
-      subtree_in_range keys valid cap right k hi
-//SNIPPET_END: subtree_in_range
-
-// Key membership in subtree rooted at i
-let rec key_in_subtree 
-  (keys: Seq.seq int) 
-  (valid: Seq.seq bool) 
-  (cap: nat) 
-  (i: nat) 
-  (key: int)
-  : Tot prop (decreases (if i < cap then cap - i else 0))
-  = i < cap /\ i < Seq.length keys /\ i < Seq.length valid /\
-    Seq.index valid i /\
-    (Seq.index keys i == key \/
-     key_in_subtree keys valid cap (op_Multiply 2 i + 1) key \/
-     key_in_subtree keys valid cap (op_Multiply 2 i + 2) key)
 
 // Lemma: If key is in a bounded subtree, it must be within the bounds
 let rec lemma_key_in_bounded_subtree
