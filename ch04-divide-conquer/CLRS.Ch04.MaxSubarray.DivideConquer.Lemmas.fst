@@ -1,182 +1,22 @@
 (*
-   Maximum Subarray - Divide and Conquer (CLRS Section 4.1)
-   
-   Implements the divide-and-conquer algorithm from CLRS Chapter 4.1:
-   1. FIND-MAX-CROSSING-SUBARRAY: Find max subarray crossing the midpoint
-   2. FIND-MAXIMUM-SUBARRAY: Recursively solve left, right, and crossing cases
-   
+   Maximum Subarray D&C — Correctness Lemmas
+
    Proves:
-   - Algorithm structure follows CLRS exactly
-   - Complexity: O(n lg n) via T(n) = 2T(n/2) + Theta(n) recurrence
-   - Correctness for base cases and recursive structure
-   - Equivalence with Kadane's algorithm (proved)
-   
-   This is a pure implementation (not Pulse).
+   - D&C returns a valid subarray sum (lemma_dc_sum_correct)
+   - D&C is optimal: result >= every subarray sum (lemma_dc_optimal)
+   - D&C result is non-empty for non-empty input (lemma_dc_nonempty)
+   - Equivalence with Kadane's algorithm (dc_kadane_equivalence)
+
+   NO admits. NO assumes.
 *)
 
-module CLRS.Ch04.MaxSubarray.DivideConquer
+module CLRS.Ch04.MaxSubarray.DivideConquer.Lemmas
 open FStar.Seq
 open FStar.Math.Lemmas
 open CLRS.Ch04.MaxSubarray.Spec
 open CLRS.Ch04.MaxSubarray.Lemmas
+open CLRS.Ch04.MaxSubarray.DivideConquer.Spec
 module Seq = FStar.Seq
-module Spec = CLRS.Ch04.MaxSubarray.Spec
-
-// ========== Local Definitions ==========
-
-let min_int (a b: int) : Tot int = if a <= b then a else b
-
-// ========== Find Maximum Crossing Subarray ==========
-
-// Find best sum extending left from position i (inclusive) down to low
-// Returns (best_sum, best_left_index)
-let rec find_max_crossing_left (s: Seq.seq int) (low mid: nat) 
-  (i: nat) (current_sum: int) (best_sum: int) (best_idx: nat)
-  : Pure (int * nat)
-  (requires low <= i /\ i < mid /\ mid <= Seq.length s /\ low <= best_idx /\ best_idx < mid)
-  (ensures fun (sum, idx) -> low <= idx /\ idx < mid /\ sum >= best_sum)
-  (decreases i)
-  =
-  let new_sum = current_sum + Seq.index s i in
-  let (new_best_sum, new_best_idx) = 
-    if new_sum > best_sum then (new_sum, i) else (best_sum, best_idx) in
-  if i = low then (new_best_sum, new_best_idx)
-  else (
-    let i_prev : nat = i - 1 in
-    find_max_crossing_left s low mid i_prev new_sum new_best_sum new_best_idx
-  )
-
-// Find best sum extending right from position i (inclusive) to high-1
-// Returns (best_sum, best_right_index)  
-let rec find_max_crossing_right (s: Seq.seq int) (mid high: nat)
-  (i: nat) (current_sum: int) (best_sum: int) (best_idx: nat)
-  : Pure (int * nat)
-  (requires mid <= i /\ i < high /\ high <= Seq.length s /\ mid < best_idx /\ best_idx <= high)
-  (ensures fun (sum, idx) -> mid < idx /\ idx <= high /\ sum >= best_sum)
-  (decreases high - i)
-  =
-  let new_sum = current_sum + Seq.index s i in
-  let (new_best_sum, new_best_idx) =
-    if new_sum > best_sum then (new_sum, i + 1) else (best_sum, best_idx) in
-  if i + 1 >= high then (new_best_sum, new_best_idx)
-  else find_max_crossing_right s mid high (i + 1) new_sum new_best_sum new_best_idx
-
-// Find maximum subarray crossing mid (combining left and right extensions)
-let find_max_crossing_subarray (s: Seq.seq int) (low mid high: nat) 
-  : Pure (int * nat * nat)
-  (requires low < mid /\ mid < high /\ high <= Seq.length s)
-  (ensures fun (sum, left_idx, right_idx) -> 
-    low <= left_idx /\ left_idx < mid /\ 
-    mid < right_idx /\ right_idx <= high)
-  =
-  let (left_sum, left_idx) = 
-    find_max_crossing_left s low mid (mid - 1) 0 (Seq.index s (mid - 1)) (mid - 1) in
-  let (right_sum, right_idx) =
-    find_max_crossing_right s mid high mid 0 (Seq.index s mid) (mid + 1) in
-  (left_sum + right_sum, left_idx, right_idx)
-
-// ========== Main Divide-and-Conquer Algorithm ==========
-
-//SNIPPET_START: find_maximum_subarray_dc
-// Returns (max_sum, left_index, right_index) where the max subarray is [left, right)
-let rec find_maximum_subarray_dc (s: Seq.seq int) (low high: nat) 
-  : Pure (int * nat * nat)
-  (requires low <= high /\ high <= Seq.length s)
-  (ensures fun (sum, left, right) -> low <= left /\ left <= right /\ right <= high)
-  (decreases high - low)
-  =
-  if low >= high then (0, low, low)  // Empty range
-  else if low + 1 = high then (Seq.index s low, low, high)  // Single element
-  else (
-    let mid = low + (high - low) / 2 in
-    let (left_sum, left_low, left_high) = find_maximum_subarray_dc s low mid in
-    let (right_sum, right_low, right_high) = find_maximum_subarray_dc s mid high in
-    let (cross_sum, cross_low, cross_high) = find_max_crossing_subarray s low mid high in
-    
-    // Return the maximum of the three cases
-    if left_sum >= right_sum && left_sum >= cross_sum then
-      (left_sum, left_low, left_high)
-    else if right_sum >= cross_sum then
-      (right_sum, right_low, right_high)
-    else
-      (cross_sum, cross_low, cross_high)
-  )
-//SNIPPET_END: find_maximum_subarray_dc
-
-// Simple interface: just return the sum
-let find_maximum_subarray_sum (s: Seq.seq int) : Tot int =
-  if Seq.length s = 0 then 0
-  else (
-    let (sum, _, _) = find_maximum_subarray_dc s 0 (Seq.length s) in
-    sum
-  )
-
-// ========== Complexity Analysis ==========
-
-//SNIPPET_START: dc_ops_count
-// Operation count for D&C algorithm
-// T(n) = 2T(n/2) + cn for n > 1, T(1) = c
-let rec dc_ops_count (n: nat) : Tot nat =
-  if n <= 1 then 1
-  else
-    let half_ops = dc_ops_count (n / 2) in
-    let double_half = half_ops + half_ops in
-    double_half + n
-//SNIPPET_END: dc_ops_count
-
-// log2 ceiling function for complexity bounds
-let rec log2_ceil (n: pos) : Tot nat (decreases n) =
-  if n = 1 then 0
-  else 1 + log2_ceil ((n + 1) / 2)
-
-// Key property: 2^(log2_ceil n - 1) < n <= 2^(log2_ceil n)
-let rec lemma_log2_ceil_bounds (n: pos)
-  : Lemma (ensures (log2_ceil n = 0 /\ n = 1) \/
-                    (log2_ceil n > 0 /\ pow2 (log2_ceil n - 1) < n /\ n <= pow2 (log2_ceil n)))
-          (decreases n)
-  =
-  if n = 1 then ()
-  else (
-    let n' = (n + 1) / 2 in
-    if n' > 0 then lemma_log2_ceil_bounds n'
-  )
-
-// log2_ceil is monotone
-let rec log2_ceil_monotone (a b: pos)
-  : Lemma (requires a <= b) (ensures log2_ceil a <= log2_ceil b) (decreases b)
-  = if a = b then ()
-    else if b = 1 then ()
-    else if a = 1 then ()
-    else begin
-      assert ((a + 1) / 2 <= (b + 1) / 2);
-      log2_ceil_monotone ((a + 1) / 2) ((b + 1) / 2)
-    end
-
-// log2_ceil(n) >= 1 + log2_ceil(n/2) for n >= 2
-let log2_ceil_halving (n: pos{n >= 2})
-  : Lemma (ensures log2_ceil n >= 1 + log2_ceil (n / 2))
-  = assert (n / 2 >= 1);
-    log2_ceil_monotone (n / 2) ((n + 1) / 2)
-
-//SNIPPET_START: dc_complexity_bound
-// Prove: T(n) = O(n log n) via Master Theorem case 2
-// T(n) = 2T(n/2) + n, solution T(n) <= 4n(log2_ceil(n) + 1)
-let rec lemma_dc_complexity_bound (n: pos) 
-  : Lemma (ensures dc_ops_count n <= op_Multiply 4 (op_Multiply n (log2_ceil n + 1)))
-          (decreases n)
-//SNIPPET_END: dc_complexity_bound
-  = if n = 1 then ()
-    else begin
-      let h = n / 2 in
-      assert (h >= 1);
-      lemma_dc_complexity_bound h;
-      // IH: T(h) <= 4h(log2_ceil(h)+1). T(n) = 2*T(h)+n <= 8h(log2_ceil(h)+1)+n
-      // Since 8h <= 4n: T(n) <= 4n(log2_ceil(h)+1)+n = 4n*log2_ceil(h)+5n
-      // Need <= 4n*(log2_ceil(n)+1) = 4n*log2_ceil(n)+4n
-      // i.e., 4*log2_ceil(h)+1 <= 4*log2_ceil(n). By halving: log2_ceil(n) >= 1+log2_ceil(h)
-      assert (op_Multiply 8 h <= op_Multiply 4 n);
-      log2_ceil_halving n
-    end
 
 // ========== Correctness Properties ==========
 
@@ -246,13 +86,12 @@ let lemma_crossing_sum_correct (s: Seq.seq int) (low mid high: nat)
               mid < right_idx /\ right_idx <= high /\
               sum == sum_range s left_idx right_idx))
   =
-  // Establish that initial values satisfy preconditions
-  assert (sum_range s mid mid == 0);  // empty range
-  assert (Seq.index s (mid - 1) == sum_range s (mid - 1) mid);  // single element
+  assert (sum_range s mid mid == 0);
+  assert (Seq.index s (mid - 1) == sum_range s (mid - 1) mid);
   lemma_crossing_left_sum s low mid (mid - 1) 0 (Seq.index s (mid - 1)) (mid - 1);
   
-  assert (sum_range s mid mid == 0);  // empty range
-  assert (Seq.index s mid == sum_range s mid (mid + 1));  // single element
+  assert (sum_range s mid mid == 0);
+  assert (Seq.index s mid == sum_range s mid (mid + 1));
   lemma_crossing_right_sum s mid high mid 0 (Seq.index s mid) (mid + 1);
   
   let (left_sum, left_idx) = 
@@ -286,10 +125,6 @@ let rec lemma_dc_sum_correct (s: Seq.seq int) (low high: nat)
     let (cross_sum, cross_low, cross_high) = find_max_crossing_subarray s low mid high in
     ()
   )
-
-// ========== Equivalence with Kadane (Proved) ==========
-
-// Use shared spec definitions from CLRS.Ch04.MaxSubarray.Spec
 
 // ========== D&C crossing optimality ==========
 
@@ -351,34 +186,20 @@ let rec lemma_dc_optimal (s: Seq.seq int) (low high qi qj: nat)
       lemma_crossing_right_opt s mid high mid 0 (Seq.index s mid) (mid + 1) qj
     )
 
-// ========== Equivalence ==========
+// ========== Equivalence with Kadane ==========
 
 //SNIPPET_START: dc_kadane_equivalence
 // Proved equivalence: D&C and Kadane compute the same result.
 // Both algorithms compute the unique maximum non-empty subarray sum.
-// The elements_bounded precondition ensures Kadane's sentinel value (-10^9)
-// does not interfere with the result.
 let dc_kadane_equivalence (s: Seq.seq int)
   : Lemma (requires Seq.length s > 0 /\ elements_bounded s)
           (ensures find_maximum_subarray_sum s == max_subarray_spec s) =
   let n = Seq.length s in
-  // Kadane = max_sub_sum
   lemma_kadane_correct s 0 0 initial_min;
-  // DC returns a valid subarray sum
   lemma_dc_sum_correct s 0 n;
   lemma_dc_nonempty s 0 n;
   let (_, l, r) = find_maximum_subarray_dc s 0 n in
-  // DC <= max_sub_sum (DC = sum_range l r; max_sub_sum >= all sum_range)
   lemma_max_sub_ge s (n - 1) l r;
-  // DC >= max_sub_sum (max_sub_sum = sum_range mj mk; DC >= all sum_range)
   let (mj, mk) = max_sub_witness s (n - 1) in
   lemma_dc_optimal s 0 n mj mk
 //SNIPPET_END: dc_kadane_equivalence
-
-let lemma_dc_equals_kadane (s: Seq.seq int)
-  : Lemma
-    (requires Seq.length s > 0 /\ elements_bounded s)
-    (ensures find_maximum_subarray_sum s == max_subarray_spec s)
-  =
-  dc_kadane_equivalence s
-

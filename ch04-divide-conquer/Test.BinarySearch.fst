@@ -7,7 +7,7 @@ module Test.BinarySearch
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open CLRS.Ch04.BinarySearch
+open CLRS.Ch04.BinarySearch.Impl
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
