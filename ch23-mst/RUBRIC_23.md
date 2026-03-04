@@ -23,7 +23,7 @@
 | 12 | `CLRS.Ch23.Kruskal.Helpers.fst` | F\* | **Kruskal Lemmas** — forest-invariant helpers for Pulse proof |
 | 13 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F\* | **Kruskal Lemmas interface** — re-exports from sub-modules |
 | 14 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F\* | **Kruskal Lemmas façade** — delegates to sub-modules |
-| 15 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, union-find) + admitted MST bridging |
+| 15 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, union-find) + MST bridging |
 | 16 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | **Kruskal Complexity interface** — complexity\_bounded\_kruskal (⚠️ disconnected) |
 | 17 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | **Kruskal Complexity** — ghost-tick instrumented, proves `ticks ≤ 4·V³` (⚠️ disconnected) |
 | 18 | `CLRS.Ch23.Prim.Spec.fsti` | F\* | **Prim Spec interface** — pure\_prim, prim\_spec signatures |
@@ -51,12 +51,12 @@ Provides the common foundation used by both Kruskal and Prim:
   - `SortedEdges` — kruskal over pre-sorted input, subset/forest
   - `UF` — `find_pure`, soundness (`find ≠ ⟹ ¬reachable`), completeness
   - `Helpers` — `uf_inv_union`, `acyclic_snoc_unreachable`, forest-invariant glue
-- **Impl** (`Kruskal.fst`): Pulse, adj-matrix V²-scan variant (not edge-sorted CLRS)
+- **Impl** (`Kruskal.Impl.fst`): Pulse, adj-matrix V²-scan with cross-component check + MST proof infrastructure
 - **Complexity** (`Kruskal.Complexity`): ghost-tick proof of `ticks ≤ 4·V³`
 
 ### Prim's Algorithm (CLRS §23.2, p. 634)
 - **Pure spec** (`Prim.Spec`): adj-matrix, `pure_prim`, n−1 edges, all-connected, subset-of-MST via cut property
-- **Impl** (`Prim.fst`): Pulse, adj-matrix linear-scan extract-min
+- **Impl** (`Prim.Impl.fst`): Pulse, adj-matrix linear-scan extract-min
 - **Complexity** (`Prim.Complexity`): ghost-tick proof of `ticks ≤ 3·V²`
 
 ---
@@ -148,7 +148,7 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 |----|-----------|--------|----------|--------|
 | D1 | T2 | Close UF edge-endpoint edge case (was `admit()` at line 360 — verify current status) | High | ✅ No admits found |
 | D2 | T3 | Connect Prim Pulse postcondition to `prim_spec` (MST correctness) | High | ⚠️ Bridging lemma stated but **admitted** (`prim_impl_produces_mst`) |
-| D3 | T4 | Connect Kruskal Pulse postcondition to `theorem_kruskal_produces_mst` | High | ⚠️ Bridging lemma stated but **admitted** (`kruskal_impl_produces_mst`) |
+| D3 | T4 | Connect Kruskal Pulse postcondition to `theorem_kruskal_produces_mst` | High | 🔶 **In Progress** — see D10 below |
 | D4 | T5 | Prove MST existence from connectivity (remove assumed precondition) | Medium | ❌ Not yet done |
 | D5 | T8 | Add π (parent) array to Prim Impl to materialize MST edges | Medium | ✅ **DONE** (parent array added in earlier commit) |
 | D6 | T11 | Reconcile infinity values (Prim Pulse 65535 vs Prim.Spec 10⁹) | Medium | ❌ Not yet done |
@@ -160,7 +160,7 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 | D7 | Create `CLRS.Ch23.Kruskal.UF.fsti` — interface for UF sub-module | Medium | ✅ **DONE** |
 | D8 | Add disconnection warnings to Kruskal.Complexity and Prim.Complexity | Low | ✅ **DONE** |
 | D9 | Prove `prim_impl_produces_mst` (strengthen Prim loop invariant) | High | ❌ Not yet done |
-| D10 | Prove `kruskal_impl_produces_mst` (strengthen Kruskal loop invariant) | High | ❌ Not yet done |
+| D10 | Prove `kruskal_impl_produces_mst` (strengthen Kruskal loop invariant) | High | 🔶 **In Progress** — see MST Proof Status below |
 | D11 | Connect Complexity modules to Impl modules | Medium | ❌ Not yet done |
 
 ### E. Dead Code / Cleanup
@@ -172,21 +172,59 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 
 ---
 
+## Kruskal MST Proof Status
+
+### Bug Fix: Inner Scan Component Check ✅
+The original inner scan found the global minimum-weight edge **without checking** if endpoints are in different union-find components. This caused each round to re-find the same minimum edge. Fixed by adding `find` calls inside the inner scan with a strengthened invariant:
+```
+(vbw > 0 ==> find_pure(best_u) ≠ find_pure(best_v))
+```
+
+### Infrastructure ✅
+- **`edges_adj_pos`**: Opaque predicate tracking that each selected edge `(u,v)` has `adj[u*n+v] > 0`. Maintained through the loop with init/step lemmas.
+- **`result_is_forest_adj`**: Strengthened postcondition = `result_is_forest ∧ edges_adj_pos`.
+- **`weighted_edges_from_arrays`**: Constructs edges with correct weights from the adjacency matrix (vs. weight-1 in `edges_from_arrays`).
+- **Weight-adj tracking in inner scan**: Invariant `vbw > 0 ==> sadj[vbu*n+vbv] = vbw` connects the scan result to the adjacency matrix.
+
+### Proof Decomposition
+The proof of `kruskal_impl_produces_mst` is decomposed into 4 clear sub-lemmas:
+
+| Part | Lemma | Status | Proof Sketch |
+|------|-------|--------|--------------|
+| **(A)** | `weighted_edges_from_arrays` | ✅ Proved | Direct construction from adj matrix |
+| **(B.1)** | `acyclic_weight_independent` | ⚠️ Admitted | Acyclicity depends on u,v structure; weight-1 acyclicity transfers to weighted edges |
+| **(B.2)** | `weighted_edges_subset_graph` | ⚠️ Admitted | By `edges_adj_pos` + matrix symmetry, each weighted edge matches a graph edge via `edge_eq` |
+| **(B.3)** | `kruskal_connected` | ⚠️ Admitted | For connected graph, scan always finds cross-component edge → algorithm adds n−1 edges |
+| **(C)** | `kruskal_minimum_weight` | ⚠️ Admitted | Inductive cut property: each round adds a light edge crossing a UF-component cut |
+
+### Proof Dependency Graph
+```
+MST.Spec.cut_property ──────────────────────────────────┐
+                                                         ▼
+edges_adj_pos (proved) ──▶ weighted_edges_subset_graph ─▶ is_spanning_tree ─▶ is_mst
+result_is_forest (proved) ──▶ acyclic_weight_independent ─▶ │                    ▲
+                             kruskal_connected ──────────▶ │                    │
+                                              kruskal_minimum_weight ───────────┘
+```
+
+---
+
 ## Quality Checks
 
 ### Admits / Assumes
 
 | Check | Result |
 |-------|--------|
-| `grep -n 'admit\|assume_' *.fst *.fsti` | **0 live admits** — all files verify cleanly |
+| `grep -n 'admit\|assume_' *.fst *.fsti` | **0 live admits** in pure code |
+| `--admit_smt_queries true` sections | 4 admitted sub-lemmas in Kruskal.Impl bridging; 1 in Prim.Impl |
 | Remaining assumed preconditions | `∃ t. is_mst g t` in `Kruskal.Spec` and `Prim.Spec` — existence not derived from connectivity |
 
 ### Spec ↔ Impl Connection
 
-| Algorithm | Pure spec proves MST? | Impl postcondition proves MST? | Bridging lemma? |
-|-----------|:---------------------:|:------------------------------:|:---------------:|
-| Kruskal | ✅ `theorem_kruskal_produces_mst` | ❌ Postcondition: forest + edge count + valid endpoints | ⚠️ `kruskal_impl_produces_mst` — **admitted** |
-| Prim | ✅ `prim_spec` | ❌ Postcondition: `source key = 0 ∧ keys bounded` | ⚠️ `prim_impl_produces_mst` — **admitted** |
+| Algorithm | Pure spec proves MST? | Impl postcondition | Bridging lemma? |
+|-----------|:---------------------:|:------------------:|:---------------:|
+| Kruskal | ✅ `theorem_kruskal_produces_mst` | ✅ Forest + adj-tracking (`result_is_forest_adj`) | 🔶 Structured into 4 sub-lemmas (4 admitted) |
+| Prim | ✅ `prim_spec` | ❌ `source key = 0 ∧ keys bounded` | ⚠️ `prim_impl_produces_mst` — **admitted** |
 
 ### Complexity
 
@@ -199,13 +237,12 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 
 | Algorithm | Pure Spec | Imperative Impl | Notes |
 |-----------|-----------|-----------------|-------|
-| Kruskal | ✅ Faithful | ⚠️ V²-scan variant, not edge-sorted | Imperative is Borůvka-like; pure follows CLRS |
+| Kruskal | ✅ Faithful | ⚠️ V²-scan variant with component check | Each round finds min-weight cross-component edge |
 | Prim | ✅ Faithful | ✅ Faithful | Only gap: no π array, keys-only output |
 
 ### Overall Rubric Score
 
-- **Slots filled**: 17 / 20 fully compliant, 0 partial → **85% full**
+- **Slots filled**: 17 / 20 fully compliant → **85% full**
 - **Remaining gaps**: Kruskal.Impl.fsti (predicates tightly coupled), Prim.Lemmas.fst/.fsti (content inline in Spec)
-- **New in this round**: UF.fsti interface, Complexity disconnection warnings, Impl↔Spec bridging lemmas (admitted)
-- **Proof quality**: Strong pure layer; imperative layer has admitted bridging to spec
-- **Top priorities**: (1) Prove `prim_impl_produces_mst` (strengthen loop invariant), (2) Prove `kruskal_impl_produces_mst`, (3) Connect Complexity modules to Impl
+- **Kruskal MST proof**: Algorithm fixed + proof infrastructure in place + 4 clear sub-lemmas (all admitted)
+- **Top priorities**: (1) Prove admitted Kruskal sub-lemmas, (2) Prove `prim_impl_produces_mst`, (3) Connect Complexity modules to Impl
