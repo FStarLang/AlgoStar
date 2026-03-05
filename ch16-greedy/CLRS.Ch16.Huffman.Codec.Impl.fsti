@@ -139,5 +139,7 @@ fn encode_impl
                 Some? d /\
                 (let enc = Some?.v d in
                  SZ.v bit_count == FStar.List.Tot.length enc /\
-                 Seq.length out_seq' == SZ.v out_capacity)))
+                 Seq.length out_seq' == SZ.v out_capacity /\
+                 SZ.v bit_count <= SZ.v out_capacity /\
+                 (forall (i: nat). i < FStar.List.Tot.length enc ==> Seq.index out_seq' i == FStar.List.Tot.index enc i))))
 

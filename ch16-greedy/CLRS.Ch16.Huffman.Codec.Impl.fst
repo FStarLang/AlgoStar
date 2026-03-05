@@ -362,9 +362,78 @@ let syms_as_list_cons (s: Seq.seq nat) (lo hi: nat)
           (ensures syms_as_list s lo hi == Seq.index s lo :: syms_as_list s (lo + 1) hi)
   = ()
 
+#push-options "--z3rlimit 20"
+let rec append_index_left (l1 l2: list bool) (i: nat)
+  : Lemma (requires i < L.length l1)
+          (ensures L.length (l1 @ l2) == L.length l1 + L.length l2 /\
+                   L.index (l1 @ l2) i == L.index l1 i)
+          (decreases l1)
+  = L.append_length l1 l2;
+    match l1 with
+    | _ :: tl -> if i = 0 then () else append_index_left tl l2 (i - 1)
+
+let rec append_index_right (l1 l2: list bool) (i: nat)
+  : Lemma (requires i < L.length l2)
+          (ensures L.length (l1 @ l2) == L.length l1 + L.length l2 /\
+                   L.index (l1 @ l2) (L.length l1 + i) == L.index l2 i)
+          (decreases l1)
+  = L.append_length l1 l2;
+    match l1 with
+    | [] -> ()
+    | _ :: tl -> append_index_right tl l2 i
+#pop-options
+
+// After one encode step: remaining-suffix index invariant is maintained (list-only, no Seq)
+#push-options "--z3rlimit 40"
+let encode_suffix_step
+  (ft: HSpec.htree)
+  (msg_seq: Seq.seq nat)
+  (si msg_len bp: nat) (s: nat)
+  : Lemma
+    (requires
+      si < msg_len /\ msg_len <= Seq.length msg_seq /\
+      s == Seq.index msg_seq si /\
+      Some? (HCodec.encode ft (syms_as_list msg_seq si msg_len)) /\
+      Some? (HCodec.encode ft (syms_as_list msg_seq 0 msg_len)) /\
+      Some? (HCodec.codeword ft s) /\
+      (let remaining_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq si msg_len)) in
+       let full_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq 0 msg_len)) in
+       bp + L.length remaining_enc == L.length full_enc /\
+       (forall (j: nat). j < L.length remaining_enc ==>
+         L.index remaining_enc j == L.index full_enc (bp + j))))
+    (ensures
+      Some? (HCodec.encode ft (syms_as_list msg_seq (si + 1) msg_len)) /\
+      (let cw = Some?.v (HCodec.codeword ft s) in
+       let new_remaining = Some?.v (HCodec.encode ft (syms_as_list msg_seq (si + 1) msg_len)) in
+       let full_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq 0 msg_len)) in
+       let new_bp = bp + L.length cw in
+       new_bp + L.length new_remaining == L.length full_enc /\
+       (forall (k: nat). k < L.length cw ==> L.index cw k == L.index full_enc (bp + k)) /\
+       (forall (j: nat). j < L.length new_remaining ==>
+         L.index new_remaining j == L.index full_enc (new_bp + j))))
+  = syms_as_list_cons msg_seq si msg_len;
+    HCodec.encode_cons ft s (syms_as_list msg_seq (si + 1) msg_len);
+    let remaining_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq si msg_len)) in
+    let full_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq 0 msg_len)) in
+    let cw = Some?.v (HCodec.codeword ft s) in
+    let new_remaining = Some?.v (HCodec.encode ft (syms_as_list msg_seq (si + 1) msg_len)) in
+    assert (remaining_enc == cw @ new_remaining);
+    L.append_length cw new_remaining;
+    let aux_cw (k: nat{k < L.length cw})
+      : Lemma (L.index cw k == L.index full_enc (bp + k))
+      = append_index_left cw new_remaining k
+    in
+    Classical.forall_intro (Classical.move_requires aux_cw);
+    let aux_suffix (j: nat{j < L.length new_remaining})
+      : Lemma (L.index new_remaining j == L.index full_enc (bp + L.length cw + j))
+      = append_index_right cw new_remaining j
+    in
+    Classical.forall_intro (Classical.move_requires aux_suffix)
+#pop-options
+
 // Encode: for each symbol in msg, look up codeword and write to output.
 // Uses suffix-based invariant: tracks encode of remaining symbols.
-#push-options "--z3rlimit 200 --split_queries always --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
 fn encode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (msg: A.array nat) (msg_len: SZ.t)
@@ -383,7 +452,9 @@ fn encode_impl
                 Some? d /\
                 (let enc = Some?.v d in
                  SZ.v bit_count == L.length enc /\
-                 Seq.length out_seq' == SZ.v out_capacity)))
+                 Seq.length out_seq' == SZ.v out_capacity /\
+                 SZ.v bit_count <= SZ.v out_capacity /\
+                 (forall (i: nat). i < L.length enc ==> Seq.index out_seq' i == L.index enc i))))
 {
   let mut sym_idx: SZ.t = 0sz;
   let mut bit_pos: SZ.t = 0sz;
@@ -407,7 +478,10 @@ fn encode_impl
       (let remaining_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq (SZ.v si_v) (SZ.v msg_len))) in
        let full_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq 0 (SZ.v msg_len))) in
        SZ.v bp_v + L.length remaining_enc == L.length full_enc /\
-       SZ.v bp_v + tree_height ft <= SZ.v out_capacity)
+       SZ.v bp_v + tree_height ft <= SZ.v out_capacity /\
+       (forall (i: nat). i < SZ.v bp_v ==> Seq.index out_seq i == L.index full_enc i) /\
+       (forall (j: nat). j < L.length remaining_enc ==>
+         L.index remaining_enc j == L.index full_enc (SZ.v bp_v + j)))
     )
   decreases (SZ.v msg_len - SZ.v !sym_idx)
   {
@@ -426,6 +500,9 @@ fn encode_impl
     with cw_out. assert (A.pts_to output cw_out);
 
     let cw_len = snd result;
+
+    // Prove the suffix invariant is maintained (list-level facts)
+    encode_suffix_step ft msg_seq (SZ.v si) (SZ.v msg_len) (SZ.v bp) s;
 
     // Update indices
     bit_pos := bp +^ cw_len;
