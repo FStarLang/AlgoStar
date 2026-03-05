@@ -1,12 +1,12 @@
 (*
    Dijkstra's Single-Source Shortest Paths — Implementation
 
-   Wraps CLRS.Ch24.Dijkstra.dijkstra (correctness-proven core) with
-   ghost-counter complexity accounting.  A Pulse elaboration bug prevents
-   adding the ghost counter directly to the inner-loop-rich core, so
-   the complexity witness is produced in this thin wrapper instead.
+   Thin wrapper that re-exports CLRS.Ch24.Dijkstra.dijkstra under
+   the rubric-required Impl naming convention.
 
-   Single function provides both correctness and O(V²) complexity proof.
+   The core Dijkstra algorithm in CLRS.Ch24.Dijkstra.fst provides both
+   full functional correctness (dist[v] = δ(s,v) for all v) and O(V²)
+   complexity in a single function via ghost tick counting.
 
    NO admits. NO assumes.
 *)
@@ -34,15 +34,6 @@ let dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
   (ensures cf - c0 <= 3 * n * n)
   =
   D.dijkstra_complexity_is_quadratic cf c0 n
-
-/// Bulk-advance the ghost counter by k steps
-ghost
-fn advance (ctr: GR.ref nat) (k: nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (hide (reveal n + k))
-{
-  GR.(ctr := hide (reveal n + k))
-}
 
 //SNIPPET_START: dijkstra_sig
 /// Dijkstra SSSP — correctness + O(V²) complexity in one function
@@ -84,8 +75,5 @@ fn dijkstra
     )
 //SNIPPET_END: dijkstra_sig
 {
-  // Call core Dijkstra for correctness (ghost counter framed through)
-  D.dijkstra weights n source dist;
-  // Advance ghost counter to witness O(V²) complexity bound
-  advance ctr (D.dijkstra_iterations (SZ.v n));
+  D.dijkstra weights n source dist ctr;
 }

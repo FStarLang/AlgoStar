@@ -18,8 +18,8 @@
 | 6 | `CLRS.Ch24.BellmanFord.TriangleInequality.fst` + `.fsti` | 340 | **Lemmas** (triangle) | Bellman-Ford |
 | 7 | `CLRS.Ch24.BellmanFord.Lemmas.fst` + `.fsti` | ~80 | **Lemmas** (re-export) | Bellman-Ford |
 | 8 | `CLRS.Ch24.BellmanFord.Complexity.fst` + `.fsti` | 101 | **Complexity** (pure bounds) | Bellman-Ford |
-| 9 | `CLRS.Ch24.Dijkstra.fst` | ~870 | **Impl** (core: correctness + complexity fns) | Dijkstra |
-| 10 | `CLRS.Ch24.Dijkstra.Impl.fst` + `.fsti` | ~200 | **Impl** (unified fn: correctness + complexity) | Dijkstra |
+| 9 | `CLRS.Ch24.Dijkstra.fst` | ~740 | **Impl** (core: single fn with correctness + complexity) | Dijkstra |
+| 10 | `CLRS.Ch24.Dijkstra.Impl.fst` + `.fsti` | ~100 | **Impl** (re-export wrapper) | Dijkstra |
 | 11 | `CLRS.Ch24.Dijkstra.Spec.fst` | ~40 | **Spec** (re-export) | Dijkstra |
 | 12 | `CLRS.Ch24.Dijkstra.Correctness.fst` + `.fsti` | 539 | **Lemmas** (greedy, Thm 24.6) | Dijkstra |
 | 13 | `CLRS.Ch24.Dijkstra.TriangleInequality.fst` + `.fsti` | 891 | **Lemmas** (triangle) | Dijkstra |
@@ -58,7 +58,7 @@
 | Stabilization / pigeonhole | `ShortestPath.Triangle.fst` | Same as BF |
 | Greedy-choice property (Thm 24.6) | `Dijkstra.Correctness.fst` + `.fsti` | Proof follows CLRS contradiction argument; tight interface |
 | Triangle inequality from relaxation | `Dijkstra.TriangleInequality.fst` + `.fsti` | Processing all vertices ⇒ triangle; tight interface |
-| Pulse implementation + complexity | `Dijkstra.fst` → `Dijkstra.Impl.fst/fsti` | **Single `dijkstra` function** with ghost-counter complexity proof (O(V²)); core in `.fst`, wrapper in `Impl` adds complexity witness |
+| Pulse implementation + complexity | `Dijkstra.fst` → `Dijkstra.Impl.fst/fsti` | **Single `dijkstra` function** with ghost-tick complexity proof (O(V²)); inner relax loop extracted into `dijkstra_relax_round` for SMT tractability |
 | Complexity (re-export) | `Dijkstra.Complexity.fst` + `.fsti` | Re-exports from `Dijkstra.fst`; O(V²) |
 
 ---
@@ -96,14 +96,20 @@ The old `BellmanFord.fst` (core implementation) and `BellmanFord.Complexity.Inst
 `fn bellman_ford` that provides both correctness (dist[v] = δ(s,v)) and O(V³) complexity
 guarantees via ghost tick counting threaded through all loop invariants.
 
-### Dijkstra.Impl — Single Unified Function (wrapper pattern)
+### Dijkstra.Impl — Single Unified Function
 
-`Dijkstra.Impl.fst` exposes a single `fn dijkstra` with both correctness and O(V²)
-complexity guarantees. Due to a Pulse elaboration bug (adding ANY existential to loop
-invariants in `Dijkstra.fst` triggers an "Assertion failed" in the inner relax loop),
-the complexity witness is produced by a wrapper: the core `Dijkstra.fst` provides
-correctness, and `Dijkstra.Impl.fst` frames the ghost counter through the call and
-advances it by `dijkstra_iterations(n) = n + 2n²` afterward.
+`Dijkstra.fst` contains a single `fn dijkstra` with both correctness (dist[v] = δ(s,v))
+and O(V²) complexity guarantees. Ghost tick counting is threaded through all loop invariants
+(init loop, find-min loop, relax loop in the outer loop body). Individual ticks are counted
+per inner-loop iteration.
+
+To work around an SMT scalability issue with Pulse nested loops (adding an extra
+existential to an outer loop invariant causes inner-loop SMT blowup when the inner loop
+has a complex invariant referencing outer `with`-bound variables), the inner relax loop +
+bridge lemmas are extracted into a separate helper function `dijkstra_relax_round`. This
+gives the inner loop its own Pulse elaboration scope, keeping SMT queries tractable.
+
+`Dijkstra.Impl.fst` is a thin re-export wrapper under the rubric-required naming convention.
 
 ### Tight Interface Files
 
