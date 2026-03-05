@@ -274,12 +274,46 @@ let slice_count_split (s: Seq.seq nat) (a b c: nat) (x: nat)
   = let mid = Seq.slice s a c in
     let left = Seq.slice s a b in
     let right = Seq.slice s b c in
-    assert (Seq.equal mid (Seq.append left right));
+    Seq.lemma_eq_intro mid (Seq.append left right);
     SeqP.lemma_append_count_aux x left right
+
+/// Count is preserved when sequences are pointwise equal
+let rec count_pointwise_eq (s1 s2: Seq.seq nat) (x: nat)
+  : Lemma (requires Seq.length s1 == Seq.length s2 /\
+                    (forall (i:nat). i < Seq.length s1 ==> Seq.index s1 i == Seq.index s2 i))
+          (ensures SeqP.count x s1 == SeqP.count x s2)
+          (decreases Seq.length s1)
+  = if Seq.length s1 = 0 then ()
+    else begin
+      assert (Seq.head s1 == Seq.head s2);
+      let t1 = Seq.tail s1 in
+      let t2 = Seq.tail s2 in
+      assert (Seq.length t1 == Seq.length t2);
+      let aux (i:nat{i < Seq.length t1}) : Lemma
+        (Seq.index t1 i == Seq.index t2 i)
+        = assert (Seq.index s1 (i+1) == Seq.index s2 (i+1))
+      in
+      Classical.forall_intro aux;
+      count_pointwise_eq t1 t2 x
+    end
+
+/// Count on a length-1 slice: avoids forall precondition that breaks under split queries
+let count_singleton (s: Seq.seq nat) (lo hi: nat) (x: nat)
+  : Lemma (requires lo < hi /\ hi <= Seq.length s /\ hi - lo == 1)
+          (ensures SeqP.count x (Seq.slice s lo hi) == (if Seq.index s lo = x then 1 else 0))
+  = Seq.lemma_index_slice s lo hi 0
+
+/// If s has element x at index i, then count x s > 0
+let rec count_index_positive (s: Seq.seq nat) (i: nat) (x: nat)
+  : Lemma (requires i < Seq.length s /\ Seq.index s i == x)
+          (ensures SeqP.count x s > 0)
+          (decreases Seq.length s)
+  = if i = 0 then ()
+    else count_index_positive (Seq.tail s) (i - 1) x
 
 (* ========== Phase 4 position bounds ========== *)
 
-#push-options "--z3rlimit 80"
+#push-options "--z3rlimit 80 --z3refresh --split_queries always"
 let phase4_pos_bounds (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -379,7 +413,51 @@ let write_pos_outside_larger (sa: Seq.seq nat) (d base: nat) (remaining: nat)
     digit_count_le_monotone sa key (v - 1) d base
 #pop-options
 
-#push-options "--z3rlimit 120"
+/// Sub-lemma for phase4_b_step: does NOT reveal opaque defs.
+/// Takes the needed facts from the old b-invariant explicitly.
+#push-options "--z3rlimit 40 --z3refresh --fuel 2 --ifuel 2"
+let phase4_b_step_core
+  (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sc == base /\ Seq.length sb == n /\
+      Seq.length sc' == base /\ Seq.length sb' == n /\
+      base > 0 /\ remaining > 0 /\ remaining <= n /\ key < base /\
+      key == B.digit (Seq.index sa (remaining - 1)) d base /\
+      // sc encodes: sc[v] = digit_count_le(sa, v) - digit_count(suffix, v)
+      (forall (v: nat). v < base ==>
+        Seq.index sc v == digit_count_le sa v d base -
+          digit_count (Seq.slice sa remaining n) v d base) /\
+      // Old b-inv: filled positions have correct digits
+      (forall (v: nat). v < base ==>
+        (forall (p: nat). Seq.index sc v <= p /\ p < digit_count_le sa v d base ==>
+          p < n /\ B.digit (Seq.index sb p) d base == v)) /\
+      // sc' update
+      (forall (v: nat). v < base /\ v <> key ==> Seq.index sc' v == Seq.index sc v) /\
+      Seq.index sc' key == Seq.index sc key - 1 /\
+      Seq.index sc key >= 1 /\ Seq.index sc key <= n /\
+      // sb' update
+      (forall (p: nat). p < n /\ p <> Seq.index sc key - 1 ==> Seq.index sb' p == Seq.index sb p) /\
+      Seq.index sb' (Seq.index sc key - 1) == Seq.index sa (remaining - 1))
+    (ensures
+      (forall (v: nat). v < base ==>
+        (forall (p: nat). Seq.index sc' v <= p /\ p < digit_count_le sa v d base ==>
+          p < n /\ B.digit (Seq.index sb' p) d base == v)))
+  = let pos = Seq.index sc key in
+    digit_count_le_bounded sa key d base;
+    let target (v: nat{v < base}) : Lemma
+      (forall (p: nat). Seq.index sc' v <= p /\ p < digit_count_le sa v d base ==>
+        p < n /\ B.digit (Seq.index sb' p) d base == v)
+      = if v < key then
+          write_pos_outside_smaller sa d base remaining key v pos
+        else if v > key then
+          write_pos_outside_larger sa d base remaining key v pos (Seq.index sc v)
+        else ()
+    in
+    Classical.forall_intro (Classical.move_requires target)
+#pop-options
+
+/// Wrapper that reveals opaque defs and calls the core
+#push-options "--z3rlimit 40 --z3refresh"
 let phase4_b_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -397,24 +475,14 @@ let phase4_b_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remai
     (ensures phase4_b_inv sc' sa sb' d base n)
   = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa d base n remaining);
     reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb d base n);
-    reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc' sa sb' d base n);
-    let pos = Seq.index sc key in
-    digit_count_le_bounded sa key d base;
-    let target (v: nat{v < base}) : Lemma
-      (forall (p: nat). Seq.index sc' v <= p /\ p < digit_count_le sa v d base ==>
-        p < n /\ B.digit (Seq.index sb' p) d base == v)
-      = if v < key then
-          write_pos_outside_smaller sa d base remaining key v pos
-        else if v > key then
-          write_pos_outside_larger sa d base remaining key v pos (Seq.index sc v)
-        else ()
-    in
-    Classical.forall_intro (Classical.move_requires target)
+    phase4_b_step_core sc sc' sa sb sb' d base n remaining key;
+    reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc' sa sb' d base n)
 #pop-options
 
 (* ========== Phase 4 step: content tracking ========== *)
 
 /// pos is not in block v when v <> key
+#push-options "--z3rlimit 40"
 let pos_not_in_other_block (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: nat) (key v: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -425,12 +493,259 @@ let pos_not_in_other_block (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaini
     (ensures (let pos = Seq.index sc key - 1 in
              pos < Seq.index sc v \/ pos >= digit_count_le sa v d base))
   = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa d base n remaining);
+    let suffix = Seq.slice sa remaining n in
+    assert (Seq.index sc key == digit_count_le sa key d base - digit_count suffix key d base);
+    assert (Seq.index sc v == digit_count_le sa v d base - digit_count suffix v d base);
     if v < key then
       write_pos_outside_smaller sa d base remaining key v (Seq.index sc key)
     else
       write_pos_outside_larger sa d base remaining key v (Seq.index sc key) (Seq.index sc v)
+#pop-options
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+/// Sub-lemma: v <> key, multiset part
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --z3refresh --split_queries always"
+let content_step_other_multiset
+  (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key v: nat)
+  (lo hi: nat)
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
+      remaining > 0 /\ remaining <= n /\ key < base /\ v < base /\ v <> key /\
+      key == B.digit (Seq.index sa (remaining - 1)) d base /\
+      lo >= 0 /\ hi <= n /\ lo <= hi /\
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb lo hi) ==
+          (if B.digit x d base = v
+           then SeqP.count x (Seq.slice sa remaining n)
+           else 0)) /\
+      (forall (p:nat). lo <= p /\ p < hi ==> Seq.index sb' p == Seq.index sb p))
+    (ensures
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb' lo hi) ==
+          (if B.digit x d base = v
+           then SeqP.count x (Seq.slice sa (remaining - 1) n)
+           else 0)))
+  = let elem = Seq.index sa (remaining - 1) in
+    let count_ext (x: nat) : Lemma
+      (SeqP.count x (Seq.slice sb' lo hi) ==
+        (if B.digit x d base = v
+         then SeqP.count x (Seq.slice sa (remaining - 1) n)
+         else 0))
+      = count_pointwise_eq (Seq.slice sb' lo hi) (Seq.slice sb lo hi) x;
+        slice_count_split sa (remaining - 1) remaining n x
+    in
+    Classical.forall_intro count_ext
+#pop-options
+
+/// Sub-lemma: v <> key, order preservation part  
+#push-options "--z3rlimit 20"
+let content_step_other_order
+  (sa sb sb': Seq.seq nat) (d base n: nat)
+  (lo hi: nat)
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
+      lo >= 0 /\ hi <= n /\ lo <= hi /\
+      (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+        Seq.index sb p1 <> Seq.index sb p2 ==>
+        (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+          Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2)) /\
+      (forall (p:nat). lo <= p /\ p < hi ==> Seq.index sb' p == Seq.index sb p))
+    (ensures
+      (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+        Seq.index sb' p1 <> Seq.index sb' p2 ==>
+        (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+          Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)))
+  = ()
+#pop-options
+
+/// Sub-lemma for phase4_content_step: v == key multiset proof
+/// Does NOT reveal opaque invariants; takes needed facts as preconditions
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --z3refresh --split_queries always"
+let content_step_key_multiset
+  (sa sb sb': Seq.seq nat)
+  (d base n remaining: nat) (key: nat)
+  (pos lo hi: nat)
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
+      remaining > 0 /\ remaining <= n /\ key < base /\
+      key == B.digit (Seq.index sa (remaining - 1)) d base /\
+      pos == lo - 1 /\ hi == digit_count_le sa key d base /\
+      lo >= 1 /\ hi <= n /\ lo <= hi /\
+      // Old invariant facts for block key (at lo..hi):
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb lo hi) ==
+          (if B.digit x d base = key
+           then SeqP.count x (Seq.slice sa remaining n)
+           else 0)) /\
+      // sb' agrees with sb except at pos
+      (forall (p:nat). p < n /\ p <> pos ==> Seq.index sb' p == Seq.index sb p) /\
+      Seq.index sb' pos == Seq.index sa (remaining - 1))
+    (ensures
+      pos >= 0 /\ hi <= n /\ pos <= hi /\
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb' pos hi) ==
+          (if B.digit x d base = key
+           then SeqP.count x (Seq.slice sa (remaining - 1) n)
+           else 0)))
+  = let elem = Seq.index sa (remaining - 1) in
+    digit_count_le_bounded sa key d base;
+    let count_ext (x: nat) : Lemma
+      (SeqP.count x (Seq.slice sb' pos hi) ==
+        (if B.digit x d base = key
+         then SeqP.count x (Seq.slice sa (remaining - 1) n) else 0))
+      = // Split count on sb' side: [pos..hi) = [pos..lo) ++ [lo..hi)
+        slice_count_split sb' pos lo hi x;
+        // [lo..hi) unchanged: sb'[lo..hi) == sb[lo..hi)
+        count_pointwise_eq (Seq.slice sb' lo hi) (Seq.slice sb lo hi) x;
+        // Split count on sa side: [remaining-1..n) = [remaining-1..remaining) ++ [remaining..n)
+        slice_count_split sa (remaining - 1) remaining n x;
+        // Both single-element slices contain elem, so counts match
+        count_singleton sb' pos lo x;
+        count_singleton sa (remaining - 1) remaining x
+    in
+    Classical.forall_intro count_ext
+#pop-options
+
+/// Helper: given sb[lo..hi) has element y at position p2 (lo <= p2 < hi),
+/// find a witness j2 in sa[remaining..n) such that sa[remaining + j2] == y.
+/// Returns the offset j2 within the suffix sa[remaining..n).
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --z3refresh"
+let key_order_find_witness
+  (sa sb: Seq.seq nat) (d base n remaining: nat) (key: nat)
+  (lo hi p2: nat) (y: nat)
+  : Pure nat
+    (requires
+      Seq.length sa == n /\ Seq.length sb == n /\
+      remaining > 0 /\ remaining <= n /\ key < base /\
+      lo >= 0 /\ hi <= n /\ lo <= hi /\
+      lo <= p2 /\ p2 < hi /\
+      Seq.index sb p2 == y /\
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb lo hi) ==
+          (if B.digit x d base = key
+           then SeqP.count x (Seq.slice sa remaining n)
+           else 0)))
+    (ensures fun j2 ->
+      j2 < n - remaining /\
+      Seq.index sa (remaining + j2) == y)
+  = Seq.lemma_index_slice sb lo hi (p2 - lo);
+    count_index_positive (Seq.slice sb lo hi) (p2 - lo) y;
+    let right = Seq.slice sa remaining n in
+    assert (SeqP.count y right > 0);
+    let j2 = count_positive_find right y in
+    Seq.lemma_index_slice sa remaining n j2;
+    j2
+#pop-options
+
+/// Sub-sub-lemma: introduces the existential witness explicitly when p1 = pos
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --z3refresh"
+let key_order_new_elem_witness
+  (sa sb sb': Seq.seq nat)
+  (d base n remaining: nat) (key: nat)
+  (pos lo hi p2: nat)
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
+      remaining > 0 /\ remaining <= n /\ key < base /\
+      key == B.digit (Seq.index sa (remaining - 1)) d base /\
+      pos == lo - 1 /\ hi == digit_count_le sa key d base /\
+      lo >= 1 /\ hi <= n /\ lo <= hi /\
+      pos < p2 /\ p2 < hi /\
+      Seq.index sb' pos <> Seq.index sb' p2 /\
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb lo hi) ==
+          (if B.digit x d base = key
+           then SeqP.count x (Seq.slice sa remaining n)
+           else 0)) /\
+      (forall (p:nat). p < n /\ p <> pos ==> Seq.index sb' p == Seq.index sb p) /\
+      Seq.index sb' pos == Seq.index sa (remaining - 1))
+    (ensures exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+        Seq.index sa j1 == Seq.index sb' pos /\ Seq.index sa j2 == Seq.index sb' p2)
+  = let y = Seq.index sb p2 in
+    let j2_off = key_order_find_witness sa sb d base n remaining key lo hi p2 y in
+    let j1 : nat = remaining - 1 in
+    let j2 : nat = remaining + j2_off in
+    assert (Seq.index sa j1 == Seq.index sb' pos);
+    assert (Seq.index sa j2 == y)
+#pop-options
+
+/// Sub-lemma for content_step_key_order: p1 = pos case (new element)
+/// This is trivial given key_order_new_elem_witness
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --z3refresh"
+let key_order_case_new
+  (sa sb sb': Seq.seq nat)
+  (d base n remaining: nat) (key: nat)
+  (pos lo hi: nat) (p2: (p2:nat{p2 < n}))
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
+      remaining > 0 /\ remaining <= n /\ key < base /\
+      key == B.digit (Seq.index sa (remaining - 1)) d base /\
+      pos == lo - 1 /\ hi == digit_count_le sa key d base /\
+      lo >= 1 /\ hi <= n /\ lo <= hi /\
+      pos < p2 /\ p2 < hi /\
+      Seq.index sb' pos <> Seq.index sb' p2 /\
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb lo hi) ==
+          (if B.digit x d base = key
+           then SeqP.count x (Seq.slice sa remaining n)
+           else 0)) /\
+      (forall (p:nat). p < n /\ p <> pos ==> Seq.index sb' p == Seq.index sb p) /\
+      Seq.index sb' pos == Seq.index sa (remaining - 1))
+    (ensures exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+        Seq.index sa j1 == Seq.index sb' pos /\ Seq.index sa j2 == Seq.index sb' p2)
+  = key_order_new_elem_witness sa sb sb' d base n remaining key pos lo hi p2
+#pop-options
+
+/// Sub-lemma for content_step_key_order: p1 > pos case (old element)
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --z3refresh"
+let key_order_case_old
+  (sa sb sb': Seq.seq nat)
+  (n: nat) (pos lo hi p1 p2: nat)
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
+      lo >= 1 /\ hi <= n /\ lo <= hi /\
+      pos == lo - 1 /\
+      pos < p1 /\ p1 < p2 /\ p2 < hi /\
+      Seq.index sb' p1 <> Seq.index sb' p2 /\
+      (forall (q1 q2: nat). lo <= q1 /\ q1 < q2 /\ q2 < hi /\
+        Seq.index sb q1 <> Seq.index sb q2 ==>
+        (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+          Seq.index sa j1 == Seq.index sb q1 /\ Seq.index sa j2 == Seq.index sb q2)) /\
+      (forall (p:nat). p < n /\ p <> pos ==> Seq.index sb' p == Seq.index sb p))
+    (ensures exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+        Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)
+  = ()
+#pop-options
+
+/// Sub-lemma for phase4_content_step: v == key, NEW element order (p1=pos)
+/// Uses bounded types to avoid Seq.index subtyping issues under split queries
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+let content_step_key_order
+  (sa sb sb': Seq.seq nat)
+  (d base n remaining: nat) (key: nat)
+  (pos lo hi: nat)
+  : Lemma (requires
+      Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
+      remaining > 0 /\ remaining <= n /\ key < base /\
+      key == B.digit (Seq.index sa (remaining - 1)) d base /\
+      pos == lo - 1 /\ hi == digit_count_le sa key d base /\
+      lo >= 1 /\ hi <= n /\ lo <= hi /\
+      (forall (x: nat).
+        SeqP.count x (Seq.slice sb lo hi) ==
+          (if B.digit x d base = key
+           then SeqP.count x (Seq.slice sa remaining n)
+           else 0)) /\
+      (forall (p:nat). p < n /\ p <> pos ==> Seq.index sb' p == Seq.index sb p) /\
+      Seq.index sb' pos == Seq.index sa (remaining - 1))
+    (ensures
+      (forall (p2: (p2:nat{p2 < n})). pos < p2 /\ p2 < hi /\
+        Seq.index sb' pos <> Seq.index sb' p2 ==>
+        (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+          Seq.index sa j1 == Seq.index sb' pos /\ Seq.index sa j2 == Seq.index sb' p2)))
+  = Classical.forall_intro (Classical.move_requires
+      (key_order_case_new sa sb sb' d base n remaining key pos lo hi))
+#pop-options
+
+/// Main content step: reveals invariants, dispatches to sub-lemmas
+#push-options "--z3rlimit 40 --z3refresh"
 let phase4_content_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -450,9 +765,6 @@ let phase4_content_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n
     reveal_opaque (`%phase4_content_inv) (phase4_content_inv sc sa sb d base n remaining);
     reveal_opaque (`%phase4_content_inv) (phase4_content_inv sc' sa sb' d base n (remaining - 1));
     let pos = Seq.index sc key - 1 in
-    let elem = Seq.index sa (remaining - 1) in
-    // For v != key: block unchanged (pos not in this block)
-    // For v == key: block expands by one element (elem)
     let prove_v (v: nat{v < base}) : Lemma
       (let lo' = Seq.index sc' v in
        let hi = digit_count_le sa v d base in
@@ -467,77 +779,15 @@ let phase4_content_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)))
       = let lo = Seq.index sc v in
-        let lo' = Seq.index sc' v in
         let hi = digit_count_le sa v d base in
         digit_count_le_bounded sa v d base;
         if v <> key then begin
-          // Block unchanged: pos is outside [lo, hi)
           pos_not_in_other_block sc sa d base n remaining key v;
-          assert (lo' == lo);
-          // sb' and sb agree on [lo, hi)
-          assert (forall (p:nat). lo <= p /\ p < hi ==> Seq.index sb' p == Seq.index sb p);
-          assert (Seq.equal (Seq.slice sb' lo hi) (Seq.slice sb lo hi));
-          // Suffix: digit(elem) = key != v, so if digit(x) = v then x != elem
-          // count(x, sa[remaining-1..n-1]) = count(x, sa[remaining..n-1]) + (if x = elem then 1 else 0)
-          // Since digit(x) = v != key = digit(elem), x != elem
-          // So count(x, sa[remaining-1..n-1]) = count(x, sa[remaining..n-1])
-          let full = Seq.slice sa (remaining - 1) n in
-          let mid = Seq.slice sa (remaining - 1) remaining in
-          let right = Seq.slice sa remaining n in
-          assert (Seq.equal full (Seq.append mid right));
-          let count_ext (x: nat) : Lemma
-            (requires B.digit x d base = v)
-            (ensures SeqP.count x full == SeqP.count x right)
-            = SeqP.lemma_append_count_aux x mid right;
-              assert (Seq.length mid == 1 /\ Seq.index mid 0 == elem);
-              // digit(x) = v != key = digit(elem), so x != elem
-              // count(x, mid) = 0
-              ()
-          in
-          Classical.forall_intro (Classical.move_requires count_ext)
+          content_step_other_multiset sa sb sb' d base n remaining key v lo hi;
+          content_step_other_order sa sb sb' d base n lo hi
         end else begin
-          // v == key: block expands from [lo, hi) to [lo-1, hi) = [pos, hi)
-          assert (lo' == pos);
-          let new_slice = Seq.slice sb' pos hi in
-          let old_slice = Seq.slice sb lo hi in
-          let one_elem = Seq.create 1 elem in
-          assert (Seq.equal new_slice (Seq.append one_elem old_slice));
-          let full = Seq.slice sa (remaining - 1) n in
-          let mid = Seq.slice sa (remaining - 1) remaining in
-          let right = Seq.slice sa remaining n in
-          assert (Seq.equal full (Seq.append mid right));
-          // Multiset proof
-          let count_ext (x: nat) : Lemma
-            (SeqP.count x new_slice ==
-              (if B.digit x d base = key
-               then SeqP.count x full else 0))
-            = SeqP.lemma_append_count_aux x one_elem old_slice;
-              SeqP.lemma_append_count_aux x mid right;
-              assert (Seq.length mid == 1 /\ Seq.index mid 0 == elem)
-          in
-          Classical.forall_intro count_ext;
-          // Order preservation proof
-          let order_proof (p1 p2: nat) : Lemma
-            (requires pos <= p1 /\ p1 < p2 /\ p2 < hi /\
-              Seq.index sb' p1 <> Seq.index sb' p2)
-            (ensures exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
-              Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)
-            = if p1 = pos then begin
-                assert (Seq.index sb' p2 == Seq.index sb p2);
-                let y = Seq.index sb p2 in
-                assert (Seq.index old_slice (p2 - lo) == y);
-                assert (SeqP.count y old_slice > 0);
-                assert (SeqP.count y right > 0);
-                let j2_local = count_positive_find right y in
-                assert (Seq.index sa (remaining + j2_local) == y);
-                assert (remaining - 1 < remaining + j2_local)
-              end else begin
-                assert (Seq.index sb' p1 == Seq.index sb p1);
-                assert (Seq.index sb' p2 == Seq.index sb p2)
-              end
-          in
-          Classical.forall_intro (fun (p1:nat) ->
-            Classical.forall_intro (Classical.move_requires (order_proof p1)))
+          content_step_key_multiset sa sb sb' d base n remaining key pos lo hi;
+          content_step_key_order sa sb sb' d base n remaining key pos lo hi
         end
     in
     Classical.forall_intro (Classical.move_requires prove_v)

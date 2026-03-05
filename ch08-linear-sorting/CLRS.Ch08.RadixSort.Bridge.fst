@@ -166,3 +166,42 @@ let counting_sort_is_stable_on_digit_0
     // So the stability forall is vacuously true
     reveal_opaque (`%Stab.is_stable_sort_on_digit) (Stab.is_stable_sort_on_digit s_in s_out 0 base)
 #pop-options
+
+(* ========== Reverse bridges: Base → CountingSort ========== *)
+
+/// Helper: extract adjacent ordering from B.sorted
+let rec base_sorted_adjacent (s: seq nat) (i: nat)
+  : Lemma (requires B.sorted s /\ i + 1 < length s)
+          (ensures index s i <= index s (i + 1))
+          (decreases i)
+  = if i = 0 then ()
+    else base_sorted_adjacent (tail s) (i - 1)
+
+/// B.sorted (recursive) implies S.sorted (pairwise)
+let rec base_sorted_pairwise (s: seq nat) (i j: nat)
+  : Lemma (requires B.sorted s /\ i <= j /\ j < length s)
+          (ensures index s i <= index s j)
+          (decreases (j - i))
+  = if i = j then ()
+    else (
+      base_sorted_pairwise s i (j - 1);
+      base_sorted_adjacent s (j - 1)
+    )
+
+#push-options "--z3rlimit 20"
+let base_sorted_implies_l_sorted (s: seq nat)
+  : Lemma (requires B.sorted s)
+          (ensures S.sorted s)
+  = let aux (i: nat) (j: nat) : Lemma 
+      (ensures (i <= j /\ j < length s) ==> index s i <= index s j)
+      = if i <= j && j < length s then base_sorted_pairwise s i j else ()
+    in
+    Classical.forall_intro_2 aux
+#pop-options
+
+/// B.permutation implies S.permutation
+let base_perm_implies_s_perm (s1 s2: seq nat)
+  : Lemma (requires B.permutation s1 s2)
+          (ensures S.permutation s1 s2)
+  = base_perm_implies_seqp_perm s1 s2;
+    reveal_opaque (`%S.permutation) (S.permutation s1 s2)
