@@ -4,13 +4,23 @@
 
 | File | Lines | Pure Specs | Lemmas | Pulse Impl | Complexity | .fsti |
 |------|------:|:----------:|:------:|:----------:|:----------:|:-----:|
-| `CLRS.Ch33.Segments.fst` | 205 | Inline | Inline (5) | 4 fns | Comment only | ❌ |
-| `CLRS.Ch33.GrahamScan.fst` | 499 | Inline | Inline (5) | 3 fns (partial) | Inline (6 defs, 2 lemmas) | ❌ |
-| `CLRS.Ch33.JarvisMarch.fst` | 702 | Inline | Inline (14) | 3 fns (full) | Inline (3 defs, 2 lemmas) | ❌ |
+| `CLRS.Ch33.Segments.Spec.fst` | 73 | ✅ 6 defs | — | — | — | — |
+| `CLRS.Ch33.Segments.Lemmas.fst` | 32 | — | ✅ 5 | — | — | ✅ |
+| `CLRS.Ch33.Segments.Complexity.fst` | 22 | — | — | — | ✅ 4 defs, 2 lemmas | ✅ |
+| `CLRS.Ch33.Segments.Impl.fst` | 97 | — | — | ✅ 4 fns | — | ✅ |
+| `CLRS.Ch33.GrahamScan.Spec.fst` | 159 | ✅ 11 defs | — | — | — | — |
+| `CLRS.Ch33.GrahamScan.Lemmas.fst` | 115 | — | ✅ 6 | — | — | ✅ |
+| `CLRS.Ch33.GrahamScan.Complexity.fst` | 34 | — | — | — | ✅ 6 defs, 2 lemmas | ✅ |
+| `CLRS.Ch33.GrahamScan.Impl.fst` | 183 | — | — | ✅ 3 fns | — | ✅ |
+| `CLRS.Ch33.JarvisMarch.Spec.fst` | 108 | ✅ 10 defs | — | — | — | — |
+| `CLRS.Ch33.JarvisMarch.Lemmas.fst` | 222 | — | ✅ 14 | — | — | ✅ |
+| `CLRS.Ch33.JarvisMarch.Complexity.fst` | 30 | — | — | — | ✅ 3 defs, 2 lemmas | ✅ |
+| `CLRS.Ch33.JarvisMarch.Impl.fst` | 215 | — | — | ✅ 3 fns | — | ✅ |
 
-All three files are **monolithic**: specs, lemmas, Pulse implementations, and complexity
-analysis are co-located in a single `.fst` file per algorithm. No file follows the
-rubric's 7-file decomposition.
+All twelve files follow the rubric's 7-file decomposition per algorithm (Spec, Lemmas+fsti,
+Complexity+fsti, Impl+fsti). The original three monolithic files (`CLRS.Ch33.Segments.fst`,
+`CLRS.Ch33.GrahamScan.fst`, `CLRS.Ch33.JarvisMarch.fst`) are retained for reference but
+are superseded by the decomposed versions.
 
 ---
 
@@ -79,89 +89,74 @@ The rubric requires 7 files per algorithm: `Spec.fst`, `Lemmas.fst`, `Lemmas.fst
 
 | Required File | Status | Notes |
 |---|---|---|
-| `CLRS.Ch33.Segments.Spec.fst` | ❌ Missing | Specs are inline in `Segments.fst` (lines 20–64) |
-| `CLRS.Ch33.Segments.Lemmas.fst` | ❌ Missing | 5 lemmas inline in `Segments.fst` (lines 78–102) |
-| `CLRS.Ch33.Segments.Lemmas.fsti` | ❌ Missing | No interface file |
-| `CLRS.Ch33.Segments.Complexity.fst` | ❌ Missing | Only a comment; no formal defs |
-| `CLRS.Ch33.Segments.Complexity.fsti` | ❌ Missing | No interface file |
-| `CLRS.Ch33.Segments.Impl.fst` | ❌ Missing | Pulse fns inline in `Segments.fst` (lines 104–201) |
-| `CLRS.Ch33.Segments.Impl.fsti` | ❌ Missing | No interface file |
+| `CLRS.Ch33.Segments.Spec.fst` | ✅ Done | Pure specs: cross_product_spec, direction_spec, on_segment_spec, segments_intersect_spec, orientation |
+| `CLRS.Ch33.Segments.Lemmas.fst` | ✅ Done | 5 lemmas: antisymmetry, translation invariance, degenerate cases |
+| `CLRS.Ch33.Segments.Lemmas.fsti` | ✅ Done | Interface with val signatures for all 5 lemmas |
+| `CLRS.Ch33.Segments.Complexity.fst` | ✅ Done | Formal O(1) op counts + composition lemma |
+| `CLRS.Ch33.Segments.Complexity.fsti` | ✅ Done | Interface with op count vals + lemma sigs |
+| `CLRS.Ch33.Segments.Impl.fst` | ✅ Done | 4 Pulse fns with spec-equivalence postconditions |
+| `CLRS.Ch33.Segments.Impl.fsti` | ✅ Done | Interface with Pulse fn signatures |
 
-**Score: 0/7 files** — All content exists but in a single monolithic file.
+**Score: 7/7 files** — Fully decomposed. All files verified (zero warns/errors).
 
 ### Graham Scan (§33.3)
 
 | Required File | Status | Notes |
 |---|---|---|
-| `CLRS.Ch33.GrahamScan.Spec.fst` | ❌ Missing | Specs inline (lines 30–142) |
-| `CLRS.Ch33.GrahamScan.Lemmas.fst` | ❌ Missing | Lemmas inline (lines 56–287) |
-| `CLRS.Ch33.GrahamScan.Lemmas.fsti` | ❌ Missing | No interface file |
-| `CLRS.Ch33.GrahamScan.Complexity.fst` | ❌ Missing | Complexity inline (lines 465–498) |
-| `CLRS.Ch33.GrahamScan.Complexity.fsti` | ❌ Missing | No interface file |
-| `CLRS.Ch33.GrahamScan.Impl.fst` | ❌ Missing | Pulse fns inline (lines 289–463); partial — no top-level `graham_scan` fn |
-| `CLRS.Ch33.GrahamScan.Impl.fsti` | ❌ Missing | No interface file |
+| `CLRS.Ch33.GrahamScan.Spec.fst` | ✅ Done | Pure specs using Segments.Spec.cross_product_spec; includes scan_step, graham_loop, pop_while_spec, correctness defs |
+| `CLRS.Ch33.GrahamScan.Lemmas.fst` | ✅ Done | Bounds lemmas, find_bottom_is_bottommost, pop_while_ensures_left_turn |
+| `CLRS.Ch33.GrahamScan.Lemmas.fsti` | ✅ Done | Interface with val signatures for all lemmas |
+| `CLRS.Ch33.GrahamScan.Complexity.fst` | ✅ Done | Op counts + O(n²) bound + scan_linear lemma |
+| `CLRS.Ch33.GrahamScan.Complexity.fsti` | ✅ Done | Interface with op count vals + lemma sigs |
+| `CLRS.Ch33.GrahamScan.Impl.fst` | ✅ Done | 3 Pulse fns: find_bottom, polar_cmp, pop_while |
+| `CLRS.Ch33.GrahamScan.Impl.fsti` | ✅ Done | Interface with Pulse fn signatures |
 
-**Score: 0/7 files** — Content exists monolithically. Pulse impl is incomplete (helpers
-only; no end-to-end `graham_scan` Pulse function; no polar-angle sorting step).
+**Score: 7/7 files** — Fully decomposed. All files verified (zero warns/errors).
+Pulse impl is partial (helpers only; no end-to-end `graham_scan` Pulse fn; no sorting).
 
 ### Jarvis March (§33.3)
 
 | Required File | Status | Notes |
 |---|---|---|
-| `CLRS.Ch33.JarvisMarch.Spec.fst` | ❌ Missing | Specs inline (lines 29–174) |
-| `CLRS.Ch33.JarvisMarch.Lemmas.fst` | ❌ Missing | 14 lemmas inline (lines 60–461) |
-| `CLRS.Ch33.JarvisMarch.Lemmas.fsti` | ❌ Missing | No interface file |
-| `CLRS.Ch33.JarvisMarch.Complexity.fst` | ❌ Missing | Complexity inline (lines 676–702) |
-| `CLRS.Ch33.JarvisMarch.Complexity.fsti` | ❌ Missing | No interface file |
-| `CLRS.Ch33.JarvisMarch.Impl.fst` | ❌ Missing | Pulse fns inline (lines 464–674); complete — `jarvis_march` fn present |
-| `CLRS.Ch33.JarvisMarch.Impl.fsti` | ❌ Missing | No interface file |
+| `CLRS.Ch33.JarvisMarch.Spec.fst` | ✅ Done | Pure specs using Segments.Spec.cross_product_spec; includes jarvis_march_spec, correctness defs |
+| `CLRS.Ch33.JarvisMarch.Lemmas.fst` | ✅ Done | 14 lemmas including half_plane_transitivity, find_next_all_left_of |
+| `CLRS.Ch33.JarvisMarch.Lemmas.fsti` | ✅ Done | Interface with val signatures for all 14 lemmas |
+| `CLRS.Ch33.JarvisMarch.Complexity.fst` | ✅ Done | O(nh) ≤ O(n²) bound + helpers_linear lemma |
+| `CLRS.Ch33.JarvisMarch.Complexity.fsti` | ✅ Done | Interface with op count vals + lemma sigs |
+| `CLRS.Ch33.JarvisMarch.Impl.fst` | ✅ Done | 3 Pulse fns: find_leftmost, find_next, jarvis_march |
+| `CLRS.Ch33.JarvisMarch.Impl.fsti` | ✅ Done | Interface with Pulse fn signatures |
 
-**Score: 0/7 files** — Content exists monolithically. This is the most complete of the
-three, with full Pulse implementation and substantial correctness proofs
-(`find_next_all_left_of`, `half_plane_transitivity`).
+**Score: 7/7 files** — Fully decomposed. All files verified (zero warns/errors).
+Most complete algorithm with full Pulse implementation and substantial correctness proofs.
 
 ### Overall Rubric Compliance
 
 | Rubric Dimension | Segments | Graham Scan | Jarvis March |
 |---|---|---|---|
-| Separate Spec file | ❌ | ❌ | ❌ |
-| Separate Lemmas file | ❌ | ❌ | ❌ |
-| Lemmas .fsti | ❌ | ❌ | ❌ |
-| Separate Complexity file | ❌ | ❌ | ❌ |
-| Complexity .fsti | ❌ | ❌ | ❌ |
-| Separate Impl file | ❌ | ❌ | ❌ |
-| Impl .fsti | ❌ | ❌ | ❌ |
+| Separate Spec file | ✅ | ✅ | ✅ |
+| Separate Lemmas file | ✅ | ✅ | ✅ |
+| Lemmas .fsti | ✅ | ✅ | ✅ |
+| Separate Complexity file | ✅ | ✅ | ✅ |
+| Complexity .fsti | ✅ | ✅ | ✅ |
+| Separate Impl file | ✅ | ✅ | ✅ |
+| Impl .fsti | ✅ | ✅ | ✅ |
 | Pure spec exists (anywhere) | ✅ | ✅ | ✅ |
 | Pulse impl exists (anywhere) | ✅ | 🔶 Partial | ✅ |
 | Impl postcondition = spec | ✅ | ✅ (for helpers) | ✅ |
 | Zero admits | ✅ | ✅ | ✅ |
 | Zero assumes | ✅ | ✅ | ✅ |
-| Complexity analysis | 🔶 Comment | ✅ Formal | ✅ Formal |
+| Complexity analysis | ✅ Formal | ✅ Formal | ✅ Formal |
 | Correctness lemmas | 🔶 Algebraic only | 🔶 Partial | ✅ Substantial |
 
 ---
 
 ## Detailed Action Items
 
-### Priority 1: File Decomposition (structural rubric compliance)
+### Priority 1: File Decomposition (structural rubric compliance) — ✅ COMPLETE
 
-Each monolithic `.fst` must be split into the rubric's 7-file structure. The content
-already exists; the work is mechanical extraction.
-
-| # | Action | Source | Target Files | Est. Effort |
-|---|---|---|---|---|
-| 1a | Extract Segments specs | `Segments.fst` lines 18–76 | `Segments.Spec.fst` | Low |
-| 1b | Extract Segments lemmas | `Segments.fst` lines 78–102 | `Segments.Lemmas.fst` + `.fsti` | Low |
-| 1c | Create Segments complexity | New (O(1) for all) | `Segments.Complexity.fst` + `.fsti` | Low |
-| 1d | Extract Segments Pulse impl | `Segments.fst` lines 104–201 | `Segments.Impl.fst` + `.fsti` | Low |
-| 2a | Extract GrahamScan specs | `GrahamScan.fst` lines 28–181 | `GrahamScan.Spec.fst` | Low |
-| 2b | Extract GrahamScan lemmas | `GrahamScan.fst` lines 183–287 | `GrahamScan.Lemmas.fst` + `.fsti` | Low |
-| 2c | Extract GrahamScan complexity | `GrahamScan.fst` lines 465–498 | `GrahamScan.Complexity.fst` + `.fsti` | Low |
-| 2d | Extract GrahamScan Pulse impl | `GrahamScan.fst` lines 289–463 | `GrahamScan.Impl.fst` + `.fsti` | Low |
-| 3a | Extract JarvisMarch specs | `JarvisMarch.fst` lines 27–174 | `JarvisMarch.Spec.fst` | Low |
-| 3b | Extract JarvisMarch lemmas | `JarvisMarch.fst` lines 176–461 | `JarvisMarch.Lemmas.fst` + `.fsti` | Medium |
-| 3c | Extract JarvisMarch complexity | `JarvisMarch.fst` lines 676–702 | `JarvisMarch.Complexity.fst` + `.fsti` | Low |
-| 3d | Extract JarvisMarch Pulse impl | `JarvisMarch.fst` lines 464–674 | `JarvisMarch.Impl.fst` + `.fsti` | Low |
+All three monolithic `.fst` files have been decomposed into the rubric's 7-file structure.
+All 21 new files verify with zero admits, zero assumes, and zero warnings.
+Cross-product definitions are now shared from `Segments.Spec.cross_product_spec`.
 
 ### Priority 2: Missing Implementations
 
@@ -182,11 +177,11 @@ already exists; the work is mechanical extraction.
 | 11 | Connect GrahamScan complexity to O(n lg n) with merge-sort (not O(n²) insertion) | GrahamScan | Medium |
 | 12 | Introduce `type point = { x: int; y: int }` record to reduce parameter counts | All | Medium |
 
-### Priority 4: Cross-file Deduplication
+### Priority 4: Cross-file Deduplication — ✅ COMPLETE
 
 | # | Action | Notes |
 |---|---|---|
-| 13 | Deduplicate `cross_prod` — defined identically in all 3 files | Graham Scan & Jarvis March should import from `Segments.Spec` |
+| 13 | ✅ Deduplicate `cross_prod` | Graham Scan & Jarvis March now alias `Segments.Spec.cross_product_spec` |
 | 14 | Deduplicate `find_bottom` / `find_leftmost` — structurally identical (min-y vs min-x) | Consider a generic `find_extreme` with a comparator parameter |
 
 ---
@@ -229,16 +224,16 @@ All Pulse functions have postconditions proving `result == <pure_spec>(...)`:
 
 ### Summary
 
-**Chapter 33 is the least rubric-compliant chapter in the repository.** While the
-algorithmic content is substantial — particularly Jarvis March with 14 inline lemmas
-including a non-trivial transitivity proof — no file follows the rubric's 7-file
-decomposition. All three files are monolithic. The primary remediation is mechanical
-file splitting (Priority 1), followed by completing the Graham Scan Pulse implementation
-(Priority 2) and strengthening correctness proofs (Priority 3).
+**Chapter 33 is now fully rubric-compliant in file structure.** All three algorithms
+(Segments, Graham Scan, Jarvis March) have been decomposed into the rubric's 7-file
+structure (Spec, Lemmas, Lemmas.fsti, Complexity, Complexity.fsti, Impl, Impl.fsti).
+All 21 new files plus the 3 original monolithic files verify with zero admits, zero
+assumes, and zero warnings. Cross-product definitions in GrahamScan.Spec and
+JarvisMarch.Spec now alias Segments.Spec.cross_product_spec, eliminating duplication.
 
 | Metric | Current | Target |
 |---|---|---|
-| Rubric-compliant files | 0 / 21 | 21 / 21 |
+| Rubric-compliant files | 21 / 21 | 21 / 21 |
 | Algorithms with complete Pulse impl | 2 / 3 | 3 / 3 (+ §33.2, §33.4) |
-| .fsti interface files | 0 | 9 (3 × Lemmas + Complexity + Impl) |
-| Cross-product definitions | 3 (duplicated) | 1 (shared from Segments.Spec) |
+| .fsti interface files | 9 | 9 (3 × Lemmas + Complexity + Impl) |
+| Cross-product definitions | 1 (shared via alias) | 1 (shared from Segments.Spec) |
