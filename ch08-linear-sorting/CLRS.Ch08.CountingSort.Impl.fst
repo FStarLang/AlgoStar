@@ -27,6 +27,9 @@ module SeqP = FStar.Seq.Properties
 module S = CLRS.Ch08.CountingSort.Spec
 module L = CLRS.Ch08.CountingSort.Lemmas
 module SL = CLRS.Ch08.CountingSort.StableLemmas
+module B = CLRS.Ch08.RadixSort.Base
+module DL = CLRS.Ch08.CountingSort.DigitSortLemmas
+module Stab = CLRS.Ch08.RadixSort.Stability
 
 // sorted, permutation, in_range are defined in Spec.fst (module S)
 
@@ -418,6 +421,240 @@ ensures exists* s.
             R.pts_to pos vpos_f ** V.pts_to c_arr sc_f ** A.pts_to a sa_f);
   L.final_perm s0 sa_f k (SZ.v vpos_f);
   V.free c_arr;
+  ()
+}
+```
+#pop-options
+
+// ========== Digit-keyed Counting Sort (for multi-digit RadixSort) ==========
+
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+```pulse
+fn counting_sort_by_digit
+  (a: A.array nat)     // Input array (read-only)
+  (b: A.array nat)     // Output array (will be written)
+  (len: SZ.t)          // Length of arrays
+  (base_val: SZ.t)     // Base for digit extraction
+  (d: nat)             // Digit position
+  (#sa: erased (Seq.seq nat))
+  (#sb: erased (Seq.seq nat))
+requires
+  A.pts_to a #0.5R sa **
+  A.pts_to b sb **
+  pure (
+    SZ.v len <= A.length a /\
+    SZ.v len <= A.length b /\
+    SZ.v len == Seq.length sa /\
+    SZ.v len == Seq.length sb /\
+    Seq.length sa == A.length a /\
+    Seq.length sb == A.length b /\
+    SZ.v base_val >= 2 /\
+    SZ.v len > 0 /\
+    SZ.fits (SZ.v base_val + 2) /\
+    SZ.fits (SZ.v len + SZ.v base_val + 2)
+  )
+ensures exists* sb'.
+  A.pts_to a #0.5R sa **
+  A.pts_to b sb' **
+  pure (
+    Seq.length sb' == Seq.length sa /\
+    Stab.is_stable_sort_on_digit sa sb' d (SZ.v base_val)
+  )
+{
+  // Allocate count array C[0..base-1]
+  let c : V.vec int = V.alloc 0 base_val;
+
+  // ========== Phase 1: Initialize C[0..base-1] = 0 ==========
+  // Already done by alloc
+
+  // ========== Phase 2: Count occurrences by digit ==========
+  // for j = 0 to len-1: key = digit(A[j], d, base); C[key]++
+
+  let mut j : SZ.t = 0sz;
+
+  assert (pure (Seq.length sa > 0));
+
+  while (
+    let vj = !j;
+    vj <^ len
+  )
+  invariant exists* vj sc.
+    R.pts_to j vj **
+    A.pts_to a #0.5R sa **
+    A.pts_to b sb **
+    V.pts_to c sc **
+    pure (
+      SZ.v vj <= SZ.v len /\
+      Seq.length sc == SZ.v base_val /\
+      DL.digit_counts_match_prefix sc sa d (SZ.v base_val) (SZ.v vj)
+    )
+  decreases (SZ.v len - SZ.v !j)
+  {
+    let vj = !j;
+
+    with sc. assert (V.pts_to c sc);
+
+    // Read A[j]
+    let val_j = A.op_Array_Access a vj;
+
+    // Compute digit key
+    let key = B.digit val_j d (SZ.v base_val);
+    B.digit_bound val_j d (SZ.v base_val);
+
+    // Read C[key]
+    let count_old = V.op_Array_Access c (SZ.uint_to_t key);
+
+    // C[key] = C[key] + 1
+    V.op_Array_Assignment c (SZ.uint_to_t key) (count_old + 1);
+
+    with sc'. assert (V.pts_to c sc');
+
+    // Establish new invariant using lemma
+    DL.digit_count_phase_step sa sc sc' (SZ.v vj) d (SZ.v base_val) key;
+
+    // j++
+    j := vj +^ 1sz;
+  };
+
+  // After phase 2: C contains digit counts
+  with sc_after_phase2. assert (V.pts_to c sc_after_phase2);
+  assert (pure (DL.digit_counts_match sc_after_phase2 sa d (SZ.v base_val)));
+
+  // Initialize prefix sum tracking
+  DL.digit_prefix_sum_init sc_after_phase2 sa d (SZ.v base_val);
+
+  // ========== Phase 3: Prefix sum ==========
+  // for i = 1 to base-1: C[i] = C[i] + C[i-1]
+
+  let mut i : SZ.t = 1sz;
+
+  while (
+    let vi = !i;
+    vi <^ base_val
+  )
+  invariant exists* vi sc.
+    R.pts_to i vi **
+    A.pts_to a #0.5R sa **
+    A.pts_to b sb **
+    V.pts_to c sc **
+    pure (
+      SZ.v vi >= 1 /\
+      SZ.v vi <= SZ.v base_val /\
+      Seq.length sc == SZ.v base_val /\
+      DL.digit_prefix_sum_inv sc sa d (SZ.v base_val) (SZ.v vi)
+    )
+  decreases (SZ.v base_val - SZ.v !i)
+  {
+    let vi = !i;
+
+    with sc. assert (V.pts_to c sc);
+
+    let vi_minus_1 = vi -^ 1sz;
+
+    // Read C[i-1]
+    let prev_count = V.op_Array_Access c vi_minus_1;
+
+    // Read C[i]
+    let curr_count = V.op_Array_Access c vi;
+
+    // C[i] = C[i] + C[i-1]
+    V.op_Array_Assignment c vi (curr_count + prev_count);
+
+    with sc'. assert (V.pts_to c sc');
+    DL.digit_prefix_sum_step sc sc' sa d (SZ.v base_val) (SZ.v vi);
+
+    // i++
+    i := vi +^ 1sz;
+  };
+
+  // ========== Phase 4: Place elements (backwards) ==========
+
+  // After phase 3: establish cumulative digit counts
+  with sc_after_phase3. assert (V.pts_to c sc_after_phase3);
+  DL.digit_prefix_sum_complete sc_after_phase3 sa d (SZ.v base_val);
+
+  // Initialize phase 4 tracking invariants
+  DL.phase4_c_inv_init sc_after_phase3 sa d (SZ.v base_val);
+  DL.phase4_b_inv_init sc_after_phase3 sa sb d (SZ.v base_val);
+  DL.phase4_content_inv_init sc_after_phase3 sa sb d (SZ.v base_val);
+
+  // Start from len-1 (last element)
+  let mut j_back : SZ.t = len -^ 1sz;
+  let mut done : bool = false;
+
+  while (
+    let vdone = !done;
+    not vdone
+  )
+  invariant exists* vj_back vdone sc sb_curr.
+    R.pts_to j_back vj_back **
+    R.pts_to done vdone **
+    A.pts_to a #0.5R sa **
+    V.pts_to c sc **
+    A.pts_to b sb_curr **
+    pure (
+      Seq.length sc == SZ.v base_val /\
+      Seq.length sb_curr == Seq.length sb /\
+      (not vdone ==> SZ.v vj_back < SZ.v len) /\
+      DL.phase4_c_inv sc sa d (SZ.v base_val) (SZ.v len) (if vdone then 0 else SZ.v vj_back + 1) /\
+      DL.phase4_b_inv sc sa sb_curr d (SZ.v base_val) (SZ.v len) /\
+      DL.phase4_content_inv sc sa sb_curr d (SZ.v base_val) (SZ.v len) (if vdone then 0 else SZ.v vj_back + 1)
+    )
+  decreases %[(if !done then 0 else 1); SZ.v !j_back]
+  {
+    let vj_back = !j_back;
+
+    with sc. assert (V.pts_to c sc);
+    with sb_curr. assert (A.pts_to b sb_curr);
+
+    // From loop invariant: not vdone ==> SZ.v vj_back < SZ.v len
+    assert (pure (SZ.v vj_back < SZ.v len));
+
+    // Read A[j_back]
+    let val_j = A.op_Array_Access a vj_back;
+
+    // Compute digit key
+    let key = B.digit val_j d (SZ.v base_val);
+    B.digit_bound val_j d (SZ.v base_val);
+
+    // Read C[key]
+    let pos = V.op_Array_Access c (SZ.uint_to_t key);
+
+    // Prove pos >= 1 /\ pos <= len from tracking invariant
+    DL.phase4_pos_bounds sc sa d (SZ.v base_val) (SZ.v len) (SZ.v vj_back + 1) key;
+
+    // B[pos-1] = val_j  (CLRS uses 1-based, we use 0-based)
+    A.op_Array_Assignment b (SZ.uint_to_t (pos - 1)) val_j;
+
+    with sb_curr'. assert (A.pts_to b sb_curr');
+
+    // C[key]--
+    V.op_Array_Assignment c (SZ.uint_to_t key) (pos - 1);
+
+    with sc'. assert (V.pts_to c sc');
+
+    // Step the tracking invariants
+    DL.phase4_c_step sc sc' sa d (SZ.v base_val) (SZ.v len) (SZ.v vj_back + 1) key;
+    DL.phase4_b_step sc sc' sa sb_curr sb_curr' d (SZ.v base_val) (SZ.v len) (SZ.v vj_back + 1) key;
+    DL.phase4_content_step sc sc' sa sb_curr sb_curr' d (SZ.v base_val) (SZ.v len) (SZ.v vj_back + 1) key;
+
+    // Check if we're done (j_back == 0)
+    if (vj_back = 0sz) {
+      done := true;
+    } else {
+      // j_back--
+      j_back := vj_back -^ 1sz;
+    };
+  };
+
+  // Free count array and prove final result
+  with sc_final. assert (V.pts_to c sc_final);
+  with sb_final. assert (A.pts_to b sb_final);
+
+  // Prove is_stable_sort_on_digit from completed invariants
+  DL.phase4_final_is_stable sc_final sa sb_final d (SZ.v base_val) (SZ.v len);
+
+  V.free c;
   ()
 }
 ```

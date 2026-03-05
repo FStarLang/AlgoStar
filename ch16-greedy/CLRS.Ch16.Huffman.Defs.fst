@@ -250,6 +250,7 @@ let extends_length (#t: eqtype) (s0 s1: Seq.seq t) (x: t)
 // ========== Heap node types (needed by forest_entry) ==========
 
 noeq type hnode = {
+    sym: int;
     freq: int;
     left: option (Box.box hnode);
     right: option (Box.box hnode);

@@ -43,11 +43,11 @@ fn alloc_hnode (h: hnode)
 // Recursive separation logic predicate: relates a heap-allocated tree to a spec tree.
 let rec is_htree ([@@@mkey] p: hnode_ptr) (ft: HSpec.htree) : Tot slprop (decreases ft) =
   match ft with
-  | HSpec.Leaf _ f ->
-    p |-> ({ freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
+  | HSpec.Leaf s f ->
+    p |-> ({ sym = s; freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
   | HSpec.Internal f l r ->
     exists* (lp: hnode_ptr) (rp: hnode_ptr).
-      (p |-> ({ freq = f; left = Some lp; right = Some rp } <: hnode)) **
+      (p |-> ({ sym = 0; freq = f; left = Some lp; right = Some rp } <: hnode)) **
       is_htree lp l **
       is_htree rp r
 
@@ -129,7 +129,7 @@ fn forest_own_take_at
 
 // Prove: forest_own entries == 
 //   is_htree(entries[j1]) ** is_htree(entries[j2]) ** forest_own(remove_two entries j1 j2)
-#push-options "--split_queries always"
+#push-options "--split_queries always --z3rlimit 40"
 let forest_own_split_two_lemma
   (entries: list forest_entry)
   (j1 j2: nat)
@@ -180,8 +180,8 @@ fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
   decreases ft
 {
   match ft {
-    HSpec.Leaf _ f -> {
-      unfold (is_htree p (HSpec.Leaf _ f));
+    HSpec.Leaf s f -> {
+      unfold (is_htree p (HSpec.Leaf s f));
       Box.free p;
     }
     HSpec.Internal f l r -> {
@@ -270,7 +270,7 @@ fn huffman_tree
 //SNIPPET_END: huffman_tree_sig
 {
   // Allocate node pointer array and PQ
-  let dummy = alloc_hnode ({ freq = 0; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
+  let dummy = alloc_hnode ({ sym = 0; freq = 0; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
   let nodes = V.alloc dummy n;
   let pq = PQ.create #pq_entry n;
   
@@ -289,7 +289,7 @@ fn huffman_tree
     V.pts_to nodes nd_contents **
     PQ.is_pqueue pq pq_contents (SZ.v n) **
     A.pts_to freqs freq_seq **
-    Box.pts_to dummy ({ freq = 0; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode) **
+    Box.pts_to dummy ({ sym = 0; freq = 0; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode) **
     forest_own active **
     pure (
       SZ.v vi <= SZ.v n /\
@@ -311,7 +311,7 @@ fn huffman_tree
     with nd_old. assert (V.pts_to nodes nd_old);
     
     // Allocate leaf node on the heap
-    let leaf = alloc_hnode ({ freq = freq_val; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
+    let leaf = alloc_hnode ({ sym = SZ.v vi; freq = freq_val; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
     V.op_Array_Assignment nodes vi leaf;
     
     // Insert (freq, index) into PQ
@@ -321,8 +321,8 @@ fn huffman_tree
     extends_length pq_old pq_new (freq_val, vi);
     
     // Fold is_htree for this leaf and add to forest_own
-    fold (is_htree leaf (HSpec.Leaf 0 freq_val));
-    forest_own_put_head active_old vi leaf (HSpec.Leaf 0 freq_val);
+    fold (is_htree leaf (HSpec.Leaf (SZ.v vi) freq_val));
+    forest_own_put_head active_old vi leaf (HSpec.Leaf (SZ.v vi) freq_val);
     
     // Single bundle step maintains ALL invariants
     init_bundle_step freq_seq nd_old (Seq.upd nd_old (SZ.v vi) leaf)
@@ -351,7 +351,7 @@ fn huffman_tree
     V.pts_to nodes nd_contents **
     PQ.is_pqueue pq pq_contents (SZ.v n) **
     A.pts_to freqs freq_seq **
-    Box.pts_to dummy ({ freq = 0; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode) **
+    Box.pts_to dummy ({ sym = 0; freq = 0; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode) **
     forest_own active **
     pure (
       SZ.v viter <= SZ.v n - 1 /\
@@ -416,7 +416,7 @@ fn huffman_tree
                       (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))));
     
     // Create merged internal node
-    let merged = alloc_hnode ({ freq = sum_freq; left = Some left_ptr; right = Some right_ptr } <: hnode);
+    let merged = alloc_hnode ({ sym = 0; freq = sum_freq; left = Some left_ptr; right = Some right_ptr } <: hnode);
     
     // Fold is_htree for the merged node
     fold (is_htree merged (HSpec.Internal (sum_freq <: pos)
