@@ -339,22 +339,22 @@ let pq_tree_freq_match_init_step
                     pq_tree_freq_match s0 active_old /\
                     pq_indices_in_forest s0 active_old /\
                     (forall (k: nat). k < L.length active_old ==> entry_idx (L.index active_old k) <> idx))
-          (ensures pq_tree_freq_match s1 ((idx, p, HSpec.Leaf f) :: active_old))
-  = let new_active = (idx, p, HSpec.Leaf f) :: active_old in
+          (ensures pq_tree_freq_match s1 ((idx, p, HSpec.Leaf 0 f) :: active_old))
+  = let new_active = (idx, p, HSpec.Leaf 0 f) :: active_old in
     let aux (j: nat)
       : Lemma (ensures (j < Seq.length s1 ==>
                pq_entry_freq_ok (fst (Seq.index s1 j)) (snd (Seq.index s1 j)) new_active))
       = if j < Seq.length s1 then begin
           let y = Seq.index s1 j in
           if y = (f, idx) then begin
-            find_entry_prepend active_old idx p (HSpec.Leaf f);
+            find_entry_prepend active_old idx p (HSpec.Leaf 0 f);
             pq_entry_freq_ok_intro_at f idx new_active 0
           end else begin
             extends_mem s0 s1 (f, idx) j;
             pq_tree_freq_match_elim_mem s0 active_old y;
             pq_entry_freq_ok_elim (fst y) (snd y) active_old;
             find_entry_by_idx_spec active_old (snd y);
-            find_entry_prepend_other active_old (idx, p, HSpec.Leaf f) (snd y);
+            find_entry_prepend_other active_old (idx, p, HSpec.Leaf 0 f) (snd y);
             reveal_opaque (`%pq_entry_freq_ok) pq_entry_freq_ok
           end
         end
@@ -369,9 +369,9 @@ let forest_has_pq_entry_init_step
                     forest_has_pq_entry s0 active_old /\
                     pq_idx_unique s0 /\
                     (forall (k: nat). k < L.length active_old ==> entry_idx (L.index active_old k) <> idx))
-          (ensures forest_has_pq_entry s1 ((idx, p, HSpec.Leaf f) :: active_old))
+          (ensures forest_has_pq_entry s1 ((idx, p, HSpec.Leaf 0 f) :: active_old))
   = reveal_opaque (`%forest_has_pq_entry) forest_has_pq_entry;
-    let new_active = (idx, p, HSpec.Leaf f) :: active_old in
+    let new_active = (idx, p, HSpec.Leaf 0 f) :: active_old in
     let aux (k: nat{k < L.length new_active})
       : Lemma (Some? (find_pq_idx s1 (entry_idx (L.index new_active k)) 0))
       = if k = 0 then begin
@@ -613,9 +613,9 @@ let init_bundle_step
       PQ.extends pq_old pq_new (freq_val, vi) /\
       Seq.length pq_new == SZ.v vi + 1)
     (ensures
-      init_bundle freq_seq nd_new pq_new ((vi, leaf, HSpec.Leaf freq_val) :: active_old) (SZ.v vi + 1) (SZ.v n))
+      init_bundle freq_seq nd_new pq_new ((vi, leaf, HSpec.Leaf 0 freq_val) :: active_old) (SZ.v vi + 1) (SZ.v n))
   = reveal_opaque (`%init_bundle) init_bundle;
-    let new_entry : forest_entry = (vi, leaf, HSpec.Leaf freq_val) in
+    let new_entry : forest_entry = (vi, leaf, HSpec.Leaf 0 freq_val) in
     // valid_pq_entries, pq_freqs_positive
     valid_pq_entries_extends pq_old pq_new (freq_val, vi) (SZ.v n);
     pq_freqs_positive_extends pq_old pq_new (freq_val, vi);
@@ -627,14 +627,14 @@ let init_bundle_step
     forest_distinct_indices_prepend active_old new_entry;
     // pq_indices_in_forest
     pq_forest_prepend pq_old active_old new_entry;
-    find_entry_prepend active_old vi leaf (HSpec.Leaf freq_val);
+    find_entry_prepend active_old vi leaf (HSpec.Leaf 0 freq_val);
     pq_forest_extends pq_old pq_new (freq_val, vi) (new_entry :: active_old);
     // pq_tree_freq_match
     pq_tree_freq_match_init_step pq_old pq_new freq_val vi active_old leaf;
     // forest_has_pq_entry
     forest_has_pq_entry_init_step pq_old pq_new freq_val vi active_old leaf;
     // node-ptr correspondence
-    node_ptr_correspondence_init_step active_old vi leaf (HSpec.Leaf freq_val) nd_old n;
+    node_ptr_correspondence_init_step active_old vi leaf (HSpec.Leaf 0 freq_val) nd_old n;
     // leaf frequency multiset
     all_leaf_freqs_init_step active_old vi leaf freq_val freq_seq (SZ.v vi)
 #pop-options

@@ -147,15 +147,15 @@ let huffman_complexity_simple (n: nat{n >= 1})
 
 // Example from CLRS Figure 16.3: frequencies [5; 9; 12; 13; 16; 45]
 let example_trees : list htree = 
-  [Leaf 5; Leaf 9; Leaf 12; Leaf 13; Leaf 16; Leaf 45]
+  [Leaf 0 5; Leaf 0 9; Leaf 0 12; Leaf 0 13; Leaf 0 16; Leaf 0 45]
 
 // Verify it's already sorted by frequency
 let example_sorted : squash (
-  freq_of (Leaf 5) <= freq_of (Leaf 9) /\
-  freq_of (Leaf 9) <= freq_of (Leaf 12) /\
-  freq_of (Leaf 12) <= freq_of (Leaf 13) /\
-  freq_of (Leaf 13) <= freq_of (Leaf 16) /\
-  freq_of (Leaf 16) <= freq_of (Leaf 45)
+  freq_of (Leaf 0 5) <= freq_of (Leaf 0 9) /\
+  freq_of (Leaf 0 9) <= freq_of (Leaf 0 12) /\
+  freq_of (Leaf 0 12) <= freq_of (Leaf 0 13) /\
+  freq_of (Leaf 0 13) <= freq_of (Leaf 0 16) /\
+  freq_of (Leaf 0 16) <= freq_of (Leaf 0 45)
 ) = ()
 
 // Compute the tick count for this example

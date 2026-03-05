@@ -43,7 +43,7 @@ fn alloc_hnode (h: hnode)
 // Recursive separation logic predicate: relates a heap-allocated tree to a spec tree.
 let rec is_htree ([@@@mkey] p: hnode_ptr) (ft: HSpec.htree) : Tot slprop (decreases ft) =
   match ft with
-  | HSpec.Leaf f ->
+  | HSpec.Leaf _ f ->
     p |-> ({ freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
   | HSpec.Internal f l r ->
     exists* (lp: hnode_ptr) (rp: hnode_ptr).
@@ -180,8 +180,8 @@ fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
   decreases ft
 {
   match ft {
-    HSpec.Leaf f -> {
-      unfold (is_htree p (HSpec.Leaf f));
+    HSpec.Leaf _ f -> {
+      unfold (is_htree p (HSpec.Leaf _ f));
       Box.free p;
     }
     HSpec.Internal f l r -> {
@@ -321,8 +321,8 @@ fn huffman_tree
     extends_length pq_old pq_new (freq_val, vi);
     
     // Fold is_htree for this leaf and add to forest_own
-    fold (is_htree leaf (HSpec.Leaf freq_val));
-    forest_own_put_head active_old vi leaf (HSpec.Leaf freq_val);
+    fold (is_htree leaf (HSpec.Leaf 0 freq_val));
+    forest_own_put_head active_old vi leaf (HSpec.Leaf 0 freq_val);
     
     // Single bundle step maintains ALL invariants
     init_bundle_step freq_seq nd_old (Seq.upd nd_old (SZ.v vi) leaf)

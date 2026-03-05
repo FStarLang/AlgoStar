@@ -8,7 +8,7 @@ open FStar.Math.Lib
 
 //SNIPPET_START: htree_def
 type htree =
-  | Leaf : freq:pos -> htree
+  | Leaf : sym:nat -> freq:pos -> htree
   | Internal : freq:pos -> left:htree -> right:htree -> htree
 //SNIPPET_END: htree_def
 
@@ -16,12 +16,12 @@ type htree =
 
 let rec freq_of (t: htree) : pos =
   match t with
-  | Leaf f -> f
+  | Leaf _ f -> f
   | Internal _ l r -> freq_of l + freq_of r
 
 let rec depth (t: htree) : nat =
   match t with
-  | Leaf _ -> 0
+  | Leaf _ _ -> 0
   | Internal _ l r -> 1 + max (depth l) (depth r)
 
 (*** Weighted Path Length ***)
@@ -29,7 +29,7 @@ let rec depth (t: htree) : nat =
 //SNIPPET_START: weighted_path_length
 let rec weighted_path_length_aux (t: htree) (d: nat) : nat =
   match t with
-  | Leaf f -> f `op_Multiply` d
+  | Leaf _ f -> f `op_Multiply` d
   | Internal _ l r ->
       weighted_path_length_aux l (d + 1) +
       weighted_path_length_aux r (d + 1)
@@ -42,7 +42,7 @@ let weighted_path_length (t: htree) : nat =
 
 let rec cost_aux (t: htree) : nat =
   match t with
-  | Leaf _ -> 0
+  | Leaf _ _ -> 0
   | Internal _ l r -> freq_of l + freq_of r + cost_aux l + cost_aux r
 
 let cost (t: htree) : nat = cost_aux t
@@ -54,7 +54,7 @@ let rec wpl_cost_relation (t: htree) (d: nat)
   : Lemma (ensures weighted_path_length_aux t d == cost_aux t + d `op_Multiply` freq_of t)
           (decreases t)
   = match t with
-    | Leaf f -> ()
+    | Leaf _ f -> ()
     | Internal f l r ->
         wpl_cost_relation l (d + 1);
         wpl_cost_relation r (d + 1)
@@ -106,7 +106,7 @@ let rec huffman_from_sorted (l: list htree{Cons? l})
         // length (insert_sorted (merge t1 t2) rest) = length rest + 1
         // So length decreases by 1
         huffman_from_sorted (insert_sorted (merge t1 t2) rest)
-    | _ -> Leaf 1 // unreachable but needed for exhaustiveness
+    | _ -> Leaf 0 1 // unreachable but needed for exhaustiveness
 //SNIPPET_END: huffman_from_sorted
 
 // Sort helper: compare by frequency
@@ -115,7 +115,7 @@ let freq_cmp (t1 t2: htree) : int =
 
 // Build Huffman tree from a non-empty list of frequencies
 let huffman_build (freqs: list pos{Cons? freqs}) : htree =
-  let trees = map (fun f -> Leaf f) freqs in
+  let trees = map (fun f -> Leaf 0 f) freqs in
   let sorted = sortWith freq_cmp trees in
   huffman_from_sorted sorted
 
@@ -183,7 +183,7 @@ let rec list_sum (l: list pos{Cons? l}) : pos =
 
 // Lemma: mapping Leaf and summing preserves total
 let rec map_leaf_sum (l: list pos{Cons? l})
-  : Lemma (ensures sum_tree_freqs (map (fun f -> Leaf f) l) == list_sum l)
+  : Lemma (ensures sum_tree_freqs (map (fun f -> Leaf 0 f) l) == list_sum l)
           (decreases l)
   = match l with
     | [_] -> ()
@@ -200,20 +200,20 @@ let rec map_leaf_sum (l: list pos{Cons? l})
 // (This is implicit in our htree definition, but we make it explicit for clarity)
 let rec is_full_binary_tree (t: htree) : prop =
   match t with
-  | Leaf _ -> True
+  | Leaf _ _ -> True
   | Internal _ l r -> is_full_binary_tree l /\ is_full_binary_tree r
 
 // All htrees are full binary trees by construction
 let rec htree_is_full (t: htree)
   : Lemma (ensures is_full_binary_tree t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r -> htree_is_full l; htree_is_full r
 
 // Definition: Get the list of leaf frequencies in a tree (in order)
 let rec leaf_freqs (t: htree) : list pos =
   match t with
-  | Leaf f -> [f]
+  | Leaf _ f -> [f]
   | Internal _ l r -> leaf_freqs l @ leaf_freqs r
 
 //SNIPPET_START: is_optimal
@@ -242,20 +242,20 @@ let rec min_freq (l: list pos{Cons? l}) : pos =
 // Helper: find maximum depth of any leaf
 let rec max_leaf_depth (t: htree) (d: nat) : nat =
   match t with
-  | Leaf _ -> d
+  | Leaf _ _ -> d
   | Internal _ l r -> max (max_leaf_depth l (d + 1)) (max_leaf_depth r (d + 1))
 
 // Helper: check if two leaves are siblings (share the same parent)
 let rec are_siblings (t: htree) (f1 f2: pos) : bool =
   match t with
-  | Leaf _ -> false
-  | Internal _ (Leaf f1') (Leaf f2') -> (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1)
+  | Leaf _ _ -> false
+  | Internal _ (Leaf _ f1') (Leaf _ f2') -> (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1)
   | Internal _ l r -> are_siblings l f1 f2 || are_siblings r f1 f2
 
 // Helper: get depth of a specific leaf frequency (first occurrence)
 let rec depth_of_leaf (t: htree) (f: pos) (d: nat) : option nat =
   match t with
-  | Leaf f' -> if f = f' then Some d else None
+  | Leaf _ f' -> if f = f' then Some d else None
   | Internal _ l r ->
       match depth_of_leaf l f (d + 1) with
       | Some depth -> Some depth
@@ -271,16 +271,22 @@ let rec get_subtree_at (t: htree) (pos: tree_position) : option htree =
   | [] -> Some t
   | hd :: tl ->
       match t with
-      | Leaf _ -> None
+      | Leaf _ _ -> None
       | Internal _ l r ->
           if hd then get_subtree_at l tl else get_subtree_at r tl
+
+// Helper: check if position in tree has a Leaf with given frequency (sym-agnostic)
+let is_leaf_at (t: htree) (p: tree_position) (f: pos) : bool =
+  match get_subtree_at t p with
+  | Some (Leaf _ f') -> f' = f
+  | _ -> false
 
 let rec replace_subtree_at (t: htree) (pos: tree_position) (new_t: htree) : option htree =
   match pos with
   | [] -> Some new_t
   | hd :: tl ->
       match t with
-      | Leaf _ -> None
+      | Leaf _ _ -> None
       | Internal f l r ->
           if hd then
             match replace_subtree_at l tl new_t with
@@ -299,15 +305,15 @@ let rec replace_subtree_at (t: htree) (pos: tree_position) (new_t: htree) : opti
 // in favor of the swap (original WPL >= swapped WPL).
 let swap_reduces_wpl_statement (t: htree) (pos_high pos_low: tree_position) : prop =
   match get_subtree_at t pos_high, get_subtree_at t pos_low with
-  | Some (Leaf f_high), Some (Leaf f_low) ->
+  | Some (Leaf _ f_high), Some (Leaf _ f_low) ->
       let depth_high = length pos_high in
       let depth_low = length pos_low in
       // High-freq leaf at DEEP position, low-freq leaf at SHALLOW position (suboptimal)
       if f_high >= f_low && depth_high >= depth_low then
-        (match replace_subtree_at t pos_high (Leaf f_low), 
-               replace_subtree_at t pos_low (Leaf f_high) with
+        (match replace_subtree_at t pos_high (Leaf 0 f_low), 
+               replace_subtree_at t pos_low (Leaf 0 f_high) with
          | Some t_temp, _ ->
-             (match replace_subtree_at t_temp pos_low (Leaf f_high) with
+             (match replace_subtree_at t_temp pos_low (Leaf 0 f_high) with
               | Some t_swapped ->
                   weighted_path_length t_swapped <= weighted_path_length t
               | None -> True)
@@ -385,27 +391,27 @@ let rec replace_subtree_wpl_aux (t: htree) (pos: tree_position) (new_t: htree) (
                       weighted_path_length_aux l (d + 1) + weighted_path_length_aux r' (d + 1));
               assert (d + 1 + length tl == d + length (hd :: tl))
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // Specialization for replacing a leaf: WPL change is exactly the frequency times depth difference
 #push-options "--z3rlimit 30"
 let replace_leaf_wpl (t: htree) (position: tree_position) (f_new: pos) (d: nat)
   : Lemma (requires (match get_subtree_at t position with
-                     | Some (Leaf f_old) -> True
+                     | Some (Leaf _ f_old) -> True
                      | _ -> False))
           (ensures (
-            let Some (Leaf f_old) = get_subtree_at t position in
-            match replace_subtree_at t position (Leaf f_new) with
+            let Some (Leaf _ f_old) = get_subtree_at t position in
+            match replace_subtree_at t position (Leaf 0 f_new) with
             | Some t' ->
                 weighted_path_length_aux t d + f_new `op_Multiply` (d + length position) ==
                 weighted_path_length_aux t' d + f_old `op_Multiply` (d + length position)
             | None -> True
           ))
-  = let Some (Leaf f_old) = get_subtree_at t position in
-    match replace_subtree_at t position (Leaf f_new) with
+  = let Some (Leaf _ f_old) = get_subtree_at t position in
+    match replace_subtree_at t position (Leaf 0 f_new) with
     | Some t' ->
-        replace_subtree_wpl_aux t position (Leaf f_new) d;
+        replace_subtree_wpl_aux t position (Leaf 0 f_new) d;
         // From replace_subtree_wpl_aux:
         // wpl_aux t d = wpl_aux t' d + wpl_aux (Leaf f_old) (d + |position|) - wpl_aux (Leaf f_new) (d + |position|)
         // wpl_aux (Leaf f_old) (d + |position|) = f_old * (d + |position|)
@@ -473,7 +479,7 @@ let rec disjoint_replacement_preserves_subtree (t: htree) (pos1 pos2: tree_posit
               // Different directions - subtrees are independent
               ()
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // Helper lemma: if positions are disjoint (neither is prefix of the other),
@@ -514,7 +520,7 @@ let rec disjoint_replacements_commute (t: htree) (pos1 pos2: tree_position) (new
               // No need to recurse, the replacements are clearly independent
               ()
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // Key disjoint-case proof: when positions don't overlap, the swap arithmetic works
@@ -531,7 +537,7 @@ let rec get_implies_replace (t: htree) (pos: tree_position) (new_t: htree)
         | Internal _ l r ->
             if hd then get_implies_replace l tl new_t
             else get_implies_replace r tl new_t
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // After replace_subtree_at, getting at the same position yields the new subtree
@@ -547,38 +553,38 @@ let rec replace_then_get (t: htree) (pos: tree_position) (new_t: htree)
         | Internal w l r ->
             if hd then replace_then_get l tl new_t
             else replace_then_get r tl new_t
-        | Leaf _ -> ())
+        | Leaf _ _ -> ())
 #pop-options
 
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
 let swap_reduces_wpl_disjoint (t: htree) (pos_high pos_low: tree_position) (f_high f_low: pos)
   : Lemma (requires
-            get_subtree_at t pos_high == Some (Leaf f_high) /\
-            get_subtree_at t pos_low == Some (Leaf f_low) /\
+            is_leaf_at t pos_high f_high /\
+            is_leaf_at t pos_low f_low /\
             f_high >= f_low /\
             length pos_high >= length pos_low /\
             pos_high =!= pos_low /\
             not (is_prefix pos_high pos_low) /\
             not (is_prefix pos_low pos_high) /\
-            Some? (replace_subtree_at t pos_high (Leaf f_low)))
+            Some? (replace_subtree_at t pos_high (Leaf 0 f_low)))
           (ensures (
-            let Some t_temp = replace_subtree_at t pos_high (Leaf f_low) in
-            get_subtree_at t_temp pos_low == Some (Leaf f_low) /\
-            (match replace_subtree_at t_temp pos_low (Leaf f_high) with
+            let Some t_temp = replace_subtree_at t pos_high (Leaf 0 f_low) in
+            is_leaf_at t_temp pos_low f_low /\
+            (match replace_subtree_at t_temp pos_low (Leaf 0 f_high) with
              | Some t_swapped ->
                  weighted_path_length t_swapped <= weighted_path_length t
              | None -> True)))
   = let d_high = length pos_high in
     let d_low = length pos_low in
-    let Some t_temp = replace_subtree_at t pos_high (Leaf f_low) in
+    let Some t_temp = replace_subtree_at t pos_high (Leaf 0 f_low) in
     
     // Step 1: pos_low is unaffected by replacing at pos_high (disjoint)
-    disjoint_replacement_preserves_subtree t pos_high pos_low (Leaf f_low);
+    disjoint_replacement_preserves_subtree t pos_high pos_low (Leaf 0 f_low);
     
     // Step 2: WPL analysis
     replace_leaf_wpl t pos_high f_low 0;
     
-    match replace_subtree_at t_temp pos_low (Leaf f_high) with
+    match replace_subtree_at t_temp pos_low (Leaf 0 f_high) with
     | Some t_swapped ->
         replace_leaf_wpl t_temp pos_low f_high 0;
         
@@ -594,21 +600,23 @@ let swap_reduces_wpl_disjoint (t: htree) (pos_high pos_low: tree_position) (f_hi
 
 // If a position points to a leaf, any extension of it points to None
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
-let rec leaf_position_no_extension (t: htree) (pos1 pos2: tree_position) (f: pos)
-  : Lemma (requires get_subtree_at t pos1 == Some (Leaf f) /\ is_prefix pos1 pos2)
+let rec leaf_position_no_extension (t: htree) (pos1 pos2: tree_position)
+  : Lemma (requires (match get_subtree_at t pos1 with
+                     | Some (Leaf _ _) -> True
+                     | _ -> False) /\ is_prefix pos1 pos2)
           (ensures get_subtree_at t pos2 == None)
           (decreases pos1)
   = match pos1, pos2 with
     | [], hd2 :: tl2 ->
-        // t itself is the Leaf f, so going into it returns None
+        // t itself is a Leaf, so going into it returns None
         ()
     | hd1 :: tl1, hd2 :: tl2 ->
         assert (hd1 = hd2);
         (match t with
         | Internal _ l r ->
-            if hd1 then leaf_position_no_extension l tl1 tl2 f
-            else leaf_position_no_extension r tl1 tl2 f
-        | Leaf _ -> ())
+            if hd1 then leaf_position_no_extension l tl1 tl2
+            else leaf_position_no_extension r tl1 tl2
+        | Leaf _ _ -> ())
     | _, _ -> () // can't happen
 #pop-options
 
@@ -617,25 +625,25 @@ let rec leaf_position_no_extension (t: htree) (pos1 pos2: tree_position) (f: pos
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
 let swap_reduces_wpl (t: htree) (pos_high pos_low: tree_position)
   : Lemma (requires (match get_subtree_at t pos_high, get_subtree_at t pos_low with
-                     | Some (Leaf f_high), Some (Leaf f_low) ->
+                     | Some (Leaf _ f_high), Some (Leaf _ f_low) ->
                          f_high >= f_low /\ length pos_high >= length pos_low /\
                          pos_high =!= pos_low
                      | _, _ -> False))
           (ensures swap_reduces_wpl_statement t pos_high pos_low)
   = match get_subtree_at t pos_high, get_subtree_at t pos_low with
-    | Some (Leaf f_high), Some (Leaf f_low) ->
+    | Some (Leaf _ f_high), Some (Leaf _ f_low) ->
         // Both positions point to leaves and pos_high =!= pos_low.
         // Case 1: is_prefix pos_low pos_high → impossible
         //   pos_low points to a Leaf, so any extension returns None, contradicting pos_high → Some
         if is_prefix pos_low pos_high then
-          leaf_position_no_extension t pos_low pos_high f_low
+          leaf_position_no_extension t pos_low pos_high
         // Case 2: is_prefix pos_high pos_low → impossible 
         //   pos_high points to a Leaf, so any extension returns None, contradicting pos_low → Some
         else if is_prefix pos_high pos_low then
-          leaf_position_no_extension t pos_high pos_low f_high
+          leaf_position_no_extension t pos_high pos_low
         // Case 3: disjoint positions → use swap_reduces_wpl_disjoint
         else (
-          get_implies_replace t pos_high (Leaf f_low);
+          get_implies_replace t pos_high (Leaf 0 f_low);
           swap_reduces_wpl_disjoint t pos_high pos_low f_high f_low
         )
     | _, _ -> ()
@@ -646,11 +654,11 @@ let swap_reduces_wpl (t: htree) (pos_high pos_low: tree_position)
 // Helper: A non-leaf tree has at least 2 leaves
 let rec tree_has_two_leaves (t: htree)
   : Lemma (ensures (match t with
-                    | Leaf _ -> length (leaf_freqs t) == 1
+                    | Leaf _ _ -> length (leaf_freqs t) == 1
                     | Internal _ _ _ -> length (leaf_freqs t) >= 2))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r ->
         tree_has_two_leaves l;
         tree_has_two_leaves r;
@@ -669,9 +677,9 @@ let rec exists_sibling_leaves (t: htree)
           (ensures (exists (f1 f2: pos). are_siblings t f1 f2 == true))
           (decreases t)
   = match t with
-    | Internal _ (Leaf f1) (Leaf f2) -> 
+    | Internal _ (Leaf _ f1) (Leaf _ f2) -> 
         assert (are_siblings t f1 f2 == true)
-    | Internal _ (Leaf _) r ->
+    | Internal _ (Leaf _ _) r ->
         exists_sibling_leaves r;
         // IH gives: exists f1 f2. are_siblings r f1 f2 == true
         // are_siblings t f1 f2 = false || are_siblings r f1 f2 = are_siblings r f1 f2
@@ -679,7 +687,7 @@ let rec exists_sibling_leaves (t: htree)
         let aux (f1 f2: pos) : Lemma (requires are_siblings r f1 f2 == true)
                                      (ensures are_siblings t f1 f2 == true) = () in
         FStar.Classical.forall_intro_2 (fun f1 -> FStar.Classical.move_requires (aux f1))
-    | Internal _ l (Leaf _) ->
+    | Internal _ l (Leaf _ _) ->
         exists_sibling_leaves l;
         let aux (f1 f2: pos) : Lemma (requires are_siblings l f1 f2 == true)
                                      (ensures are_siblings t f1 f2 == true) = () in
@@ -694,7 +702,7 @@ let rec exists_sibling_leaves (t: htree)
 // Helper: Compute a position reaching a leaf at maximum depth
 let rec max_depth_position (t: htree) : Tot tree_position (decreases t) =
   match t with
-  | Leaf _ -> []
+  | Leaf _ _ -> []
   | Internal _ l r ->
       if max_leaf_depth l 0 >= max_leaf_depth r 0 then true :: max_depth_position l
       else false :: max_depth_position r
@@ -704,7 +712,7 @@ let rec max_leaf_depth_shift (t: htree) (d: nat) (k: nat)
   : Lemma (ensures max_leaf_depth t (d + k) = max_leaf_depth t d + k)
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r ->
         max_leaf_depth_shift l (d + 1) k;
         max_leaf_depth_shift r (d + 1) k
@@ -715,11 +723,11 @@ let rec max_depth_position_correct (t: htree) (d: nat)
   : Lemma (ensures (let p = max_depth_position t in
                     d + length p = max_leaf_depth t d /\
                     (match get_subtree_at t p with
-                     | Some (Leaf _) -> True
+                     | Some (Leaf _ _) -> True
                      | _ -> False)))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r ->
         let ml0 = max_leaf_depth l 0 in
         let mr0 = max_leaf_depth r 0 in
@@ -743,7 +751,7 @@ let exists_leaf_at_max_depth (t: htree) (d: nat)
                     exists (p: tree_position).
                       d + length p = max_d /\
                       (match get_subtree_at t p with
-                       | Some (Leaf _) -> True
+                       | Some (Leaf _ _) -> True
                        | _ -> False)))
   = max_depth_position_correct t d
 
@@ -753,7 +761,7 @@ let exists_leaf_at_max_depth (t: htree) (d: nat)
 let rec find_leaf_position (t: htree) (f: pos) (prefix: tree_position)
   : Tot (option tree_position) (decreases t)
   = match t with
-    | Leaf f' -> if f = f' then Some prefix else None
+    | Leaf _ f' -> if f = f' then Some prefix else None
     | Internal _ l r ->
         match find_leaf_position l f (prefix @ [true]) with
         | Some pos -> Some pos
@@ -768,11 +776,11 @@ let sibling_swap_maintains_optimality
   (pos_sib1 pos_sib2 pos_min1 pos_min2: tree_position)
   : Lemma (requires 
             // Siblings exist at max depth
-            get_subtree_at t pos_sib1 == Some (Leaf f_sib1) /\
-            get_subtree_at t pos_sib2 == Some (Leaf f_sib2) /\
+            is_leaf_at t pos_sib1 f_sib1 /\
+            is_leaf_at t pos_sib2 f_sib2 /\
             // Min freq leaves exist
-            get_subtree_at t pos_min1 == Some (Leaf f_min1) /\
-            get_subtree_at t pos_min2 == Some (Leaf f_min2) /\
+            is_leaf_at t pos_min1 f_min1 /\
+            is_leaf_at t pos_min2 f_min2 /\
             // Min freq chars have freq <= siblings
             f_min1 <= f_sib1 /\ f_min2 <= f_sib2 /\
             // Sibling positions are deeper or equal
@@ -861,7 +869,7 @@ let rec count_append (x: pos) (l1 l2: list pos)
 
 // If there's a Leaf at some position in the tree, its freq is in leaf_freqs
 let rec subtree_leaf_mem (t: htree) (p: tree_position) (f: pos)
-  : Lemma (requires get_subtree_at t p == Some (Leaf f))
+  : Lemma (requires is_leaf_at t p f)
           (ensures mem f (leaf_freqs t))
           (decreases p)
   = match p with
@@ -876,12 +884,12 @@ let rec subtree_leaf_mem (t: htree) (p: tree_position) (f: pos)
               subtree_leaf_mem r tl f;
               FStar.List.Tot.Properties.append_mem_forall (leaf_freqs l) (leaf_freqs r)
             )
-        | Leaf _ -> ())
+        | Leaf _ _ -> ())
 let rec leaf_freqs_nonempty (t: htree)
   : Lemma (ensures Cons? (leaf_freqs t))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r -> 
         leaf_freqs_nonempty l;
         append_l_cons (hd (leaf_freqs l)) (tl (leaf_freqs l)) (leaf_freqs r)
@@ -891,7 +899,7 @@ let same_multiset_internal (t: htree) (freqs: list pos{length freqs >= 2})
   : Lemma (requires same_frequency_multiset t freqs)
           (ensures Internal? t)
   = match t with
-    | Leaf f ->
+    | Leaf _ f ->
         // leaf_freqs (Leaf f) = [f], so count has total 1, but freqs has >= 2 elements
         // length [f] = 1 but length freqs >= 2 means different counts
         assert (count f (leaf_freqs t) = 1);
@@ -924,7 +932,7 @@ let rec max_leaf_depth_ge (t: htree) (d: nat)
   : Lemma (ensures max_leaf_depth t d >= d)
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r ->
         max_leaf_depth_ge l (d + 1);
         max_leaf_depth_ge r (d + 1)
@@ -934,8 +942,8 @@ let rec max_leaf_depth_ge (t: htree) (d: nat)
 let rec max_depth_has_sibling_leaves (t: htree)
   : Lemma (requires Internal? t)
           (ensures (exists (parent: tree_position) (fl fr: pos).
-                      get_subtree_at t (parent @ [true]) == Some (Leaf fl) /\
-                      get_subtree_at t (parent @ [false]) == Some (Leaf fr) /\
+                      is_leaf_at t (parent @ [true]) fl /\
+                      is_leaf_at t (parent @ [false]) fr /\
                       length (parent @ [true]) = max_leaf_depth t 0 /\
                       length (parent @ [false]) = max_leaf_depth t 0))
           (decreases t)
@@ -946,12 +954,12 @@ let rec max_depth_has_sibling_leaves (t: htree)
     max_leaf_depth_ge r 0;
     if ml >= mr then (
       match l with
-      | Leaf fl ->
+      | Leaf _ fl ->
           assert (mr = 0);
           (match r with
-           | Leaf fr ->
-               assert (get_subtree_at t ([] @ [true]) == Some (Leaf fl));
-               assert (get_subtree_at t ([] @ [false]) == Some (Leaf fr));
+           | Leaf _ fr ->
+               assert (is_leaf_at t ([] @ [true]) fl);
+               assert (is_leaf_at t ([] @ [false]) fr);
                max_leaf_depth_shift l 0 1;
                max_leaf_depth_shift r 0 1
            | Internal _ _ _ ->
@@ -960,19 +968,21 @@ let rec max_depth_has_sibling_leaves (t: htree)
       | Internal _ _ _ ->
           max_depth_has_sibling_leaves l;
           eliminate exists (parent: tree_position) (fl fr: pos).
-                      get_subtree_at l (parent @ [true]) == Some (Leaf fl) /\
-                      get_subtree_at l (parent @ [false]) == Some (Leaf fr) /\
+                      is_leaf_at l (parent @ [true]) fl /\
+                      is_leaf_at l (parent @ [false]) fr /\
                       length (parent @ [true]) = ml /\
                       length (parent @ [false]) = ml
           returns exists (parent: tree_position) (fl fr: pos).
-                      get_subtree_at t (parent @ [true]) == Some (Leaf fl) /\
-                      get_subtree_at t (parent @ [false]) == Some (Leaf fr) /\
+                      is_leaf_at t (parent @ [true]) fl /\
+                      is_leaf_at t (parent @ [false]) fr /\
                       length (parent @ [true]) = max_leaf_depth t 0 /\
                       length (parent @ [false]) = max_leaf_depth t 0
           with _. (
             let parent' = true :: parent in
             assert (get_subtree_at t (parent' @ [true]) == get_subtree_at l (parent @ [true]));
             assert (get_subtree_at t (parent' @ [false]) == get_subtree_at l (parent @ [false]));
+            assert (is_leaf_at t (parent' @ [true]) fl);
+            assert (is_leaf_at t (parent' @ [false]) fr);
             max_leaf_depth_shift l 0 1;
             max_leaf_depth_shift r 0 1;
             assert (length (parent' @ [true]) = 1 + length (parent @ [true]));
@@ -980,12 +990,12 @@ let rec max_depth_has_sibling_leaves (t: htree)
           )
     ) else (
       match r with
-      | Leaf fr ->
+      | Leaf _ fr ->
           assert (mr = 0);
           (match l with
-           | Leaf fl ->
-               assert (get_subtree_at t ([] @ [true]) == Some (Leaf fl));
-               assert (get_subtree_at t ([] @ [false]) == Some (Leaf fr));
+           | Leaf _ fl ->
+               assert (is_leaf_at t ([] @ [true]) fl);
+               assert (is_leaf_at t ([] @ [false]) fr);
                max_leaf_depth_shift l 0 1;
                max_leaf_depth_shift r 0 1
            | Internal _ _ _ ->
@@ -994,19 +1004,21 @@ let rec max_depth_has_sibling_leaves (t: htree)
       | Internal _ _ _ ->
           max_depth_has_sibling_leaves r;
           eliminate exists (parent: tree_position) (fl fr: pos).
-                      get_subtree_at r (parent @ [true]) == Some (Leaf fl) /\
-                      get_subtree_at r (parent @ [false]) == Some (Leaf fr) /\
+                      is_leaf_at r (parent @ [true]) fl /\
+                      is_leaf_at r (parent @ [false]) fr /\
                       length (parent @ [true]) = mr /\
                       length (parent @ [false]) = mr
           returns exists (parent: tree_position) (fl fr: pos).
-                      get_subtree_at t (parent @ [true]) == Some (Leaf fl) /\
-                      get_subtree_at t (parent @ [false]) == Some (Leaf fr) /\
+                      is_leaf_at t (parent @ [true]) fl /\
+                      is_leaf_at t (parent @ [false]) fr /\
                       length (parent @ [true]) = max_leaf_depth t 0 /\
                       length (parent @ [false]) = max_leaf_depth t 0
           with _. (
             let parent' = false :: parent in
             assert (get_subtree_at t (parent' @ [true]) == get_subtree_at r (parent @ [true]));
             assert (get_subtree_at t (parent' @ [false]) == get_subtree_at r (parent @ [false]));
+            assert (is_leaf_at t (parent' @ [true]) fl);
+            assert (is_leaf_at t (parent' @ [false]) fr);
             max_leaf_depth_shift l 0 1;
             max_leaf_depth_shift r 0 1;
             assert (length (parent' @ [true]) = 1 + length (parent @ [true]));
@@ -1020,15 +1032,15 @@ let rec max_depth_has_sibling_leaves (t: htree)
 // Uses additive formulation to avoid nat subtraction issues
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
 let rec replace_leaf_changes_freqs (t: htree) (p: tree_position) (f_old f_new: pos)
-  : Lemma (requires get_subtree_at t p == Some (Leaf f_old))
-          (ensures (match replace_subtree_at t p (Leaf f_new) with
+  : Lemma (requires is_leaf_at t p f_old)
+          (ensures (match replace_subtree_at t p (Leaf 0 f_new) with
                     | Some t' ->
                         (forall (x: pos). 
                           count x (leaf_freqs t') + (if x = f_old then 1 else 0) = 
                           count x (leaf_freqs t) + (if x = f_new then 1 else 0))
                     | None -> False))
           (decreases p)
-  = get_implies_replace t p (Leaf f_new);
+  = get_implies_replace t p (Leaf 0 f_new);
     match p with
     | [] -> ()
     | hd :: tl ->
@@ -1036,7 +1048,7 @@ let rec replace_leaf_changes_freqs (t: htree) (p: tree_position) (f_old f_new: p
         | Internal f l r ->
             if hd then (
               replace_leaf_changes_freqs l tl f_old f_new;
-              let Some l' = replace_subtree_at l tl (Leaf f_new) in
+              let Some l' = replace_subtree_at l tl (Leaf 0 f_new) in
               let aux (x: pos) : Lemma (count x (leaf_freqs l' @ leaf_freqs r) + (if x = f_old then 1 else 0) = 
                                         count x (leaf_freqs l @ leaf_freqs r) + (if x = f_new then 1 else 0))
                 = count_append x (leaf_freqs l') (leaf_freqs r);
@@ -1044,39 +1056,39 @@ let rec replace_leaf_changes_freqs (t: htree) (p: tree_position) (f_old f_new: p
               FStar.Classical.forall_intro aux
             ) else (
               replace_leaf_changes_freqs r tl f_old f_new;
-              let Some r' = replace_subtree_at r tl (Leaf f_new) in
+              let Some r' = replace_subtree_at r tl (Leaf 0 f_new) in
               let aux (x: pos) : Lemma (count x (leaf_freqs l @ leaf_freqs r') + (if x = f_old then 1 else 0) = 
                                         count x (leaf_freqs l @ leaf_freqs r) + (if x = f_new then 1 else 0))
                 = count_append x (leaf_freqs l) (leaf_freqs r');
                   count_append x (leaf_freqs l) (leaf_freqs r) in
               FStar.Classical.forall_intro aux
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // A single leaf swap (replace f_old at pos with f_new) preserves the multiset
 // when the "other" copy is also updated (both changes cancel out)
 let swap_preserves_multiset (t: htree) (pos1 pos2: tree_position) (f1 f2: pos)
   : Lemma (requires 
-            get_subtree_at t pos1 == Some (Leaf f1) /\
-            get_subtree_at t pos2 == Some (Leaf f2) /\
+            is_leaf_at t pos1 f1 /\
+            is_leaf_at t pos2 f2 /\
             pos1 =!= pos2 /\
             not (is_prefix pos1 pos2) /\
             not (is_prefix pos2 pos1))
           (ensures (
-            let _ = get_implies_replace t pos1 (Leaf f2) in
-            let Some t1 = replace_subtree_at t pos1 (Leaf f2) in
-            match replace_subtree_at t1 pos2 (Leaf f1) with
+            let _ = get_implies_replace t pos1 (Leaf 0 f2) in
+            let Some t1 = replace_subtree_at t pos1 (Leaf 0 f2) in
+            match replace_subtree_at t1 pos2 (Leaf 0 f1) with
             | Some t2 ->
                 (forall (x: pos). count x (leaf_freqs t2) = count x (leaf_freqs t))
             | None -> True))
-  = get_implies_replace t pos1 (Leaf f2);
-    let Some t1 = replace_subtree_at t pos1 (Leaf f2) in
+  = get_implies_replace t pos1 (Leaf 0 f2);
+    let Some t1 = replace_subtree_at t pos1 (Leaf 0 f2) in
     replace_leaf_changes_freqs t pos1 f1 f2;
-    disjoint_replacement_preserves_subtree t pos1 pos2 (Leaf f2);
-    assert (get_subtree_at t1 pos2 == Some (Leaf f2));
-    get_implies_replace t1 pos2 (Leaf f1);
-    match replace_subtree_at t1 pos2 (Leaf f1) with
+    disjoint_replacement_preserves_subtree t pos1 pos2 (Leaf 0 f2);
+    assert (is_leaf_at t1 pos2 f2);
+    get_implies_replace t1 pos2 (Leaf 0 f1);
+    match replace_subtree_at t1 pos2 (Leaf 0 f1) with
     | Some t2 ->
         replace_leaf_changes_freqs t1 pos2 f2 f1;
         // From first: count x t1 + [x=f1] = count x t + [x=f2]
@@ -1097,7 +1109,7 @@ let swap_preserves_multiset (t: htree) (pos1 pos2: tree_position) (f1 f2: pos)
 // Any leaf's position depth <= max_leaf_depth
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let rec leaf_depth_le_max (t: htree) (p: tree_position) (f: pos)
-  : Lemma (requires get_subtree_at t p == Some (Leaf f))
+  : Lemma (requires is_leaf_at t p f)
           (ensures length p <= max_leaf_depth t 0)
           (decreases p)
   = match p with
@@ -1114,13 +1126,13 @@ let rec leaf_depth_le_max (t: htree) (p: tree_position) (f: pos)
               max_leaf_depth_shift l 0 1;
               max_leaf_depth_shift r 0 1
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // Find a leaf with given frequency and return its position (without prefix accumulator)
 let rec find_leaf_pos (t: htree) (f: pos) : Tot (option tree_position) (decreases t)
   = match t with
-    | Leaf f' -> if f = f' then Some [] else None
+    | Leaf _ f' -> if f = f' then Some [] else None
     | Internal _ l r ->
         match find_leaf_pos l f with
         | Some pos -> Some (true :: pos)
@@ -1133,11 +1145,11 @@ let rec find_leaf_pos (t: htree) (f: pos) : Tot (option tree_position) (decrease
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
 let rec find_leaf_pos_correct (t: htree) (f: pos)
   : Lemma (ensures (match find_leaf_pos t f with
-                     | Some p -> get_subtree_at t p == Some (Leaf f)
+                     | Some p -> is_leaf_at t p f
                      | None -> count f (leaf_freqs t) = 0))
           (decreases t)
   = match t with
-    | Leaf f' -> ()
+    | Leaf _ f' -> ()
     | Internal _ l r ->
         find_leaf_pos_correct l f;
         find_leaf_pos_correct r f;
@@ -1150,7 +1162,7 @@ let rec find_leaf_pos_none (t: htree) (f: pos)
   : Lemma (ensures (find_leaf_pos t f == None <==> count f (leaf_freqs t) = 0))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r ->
         find_leaf_pos_none l f;
         find_leaf_pos_none r f;
@@ -1166,28 +1178,28 @@ let single_swap_optimal
   (freqs: list pos)
   : Lemma (requires 
             is_wpl_optimal t freqs /\
-            get_subtree_at t pos_deep == Some (Leaf f_deep) /\
-            get_subtree_at t pos_shallow == Some (Leaf f_shallow) /\
+            is_leaf_at t pos_deep f_deep /\
+            is_leaf_at t pos_shallow f_shallow /\
             f_deep >= f_shallow /\
             length pos_deep >= length pos_shallow /\
             pos_deep =!= pos_shallow /\
             not (is_prefix pos_deep pos_shallow) /\
             not (is_prefix pos_shallow pos_deep))
           (ensures (
-            Some? (replace_subtree_at t pos_deep (Leaf f_shallow)) /\
-            (let Some t1 = replace_subtree_at t pos_deep (Leaf f_shallow) in
-             Some? (replace_subtree_at t1 pos_shallow (Leaf f_deep)) /\
-             (let Some t2 = replace_subtree_at t1 pos_shallow (Leaf f_deep) in
+            Some? (replace_subtree_at t pos_deep (Leaf 0 f_shallow)) /\
+            (let Some t1 = replace_subtree_at t pos_deep (Leaf 0 f_shallow) in
+             Some? (replace_subtree_at t1 pos_shallow (Leaf 0 f_deep)) /\
+             (let Some t2 = replace_subtree_at t1 pos_shallow (Leaf 0 f_deep) in
               is_wpl_optimal t2 freqs))))
-  = get_implies_replace t pos_deep (Leaf f_shallow);
-    let Some t1 = replace_subtree_at t pos_deep (Leaf f_shallow) in
+  = get_implies_replace t pos_deep (Leaf 0 f_shallow);
+    let Some t1 = replace_subtree_at t pos_deep (Leaf 0 f_shallow) in
     // Multiset preservation
     swap_preserves_multiset t pos_deep pos_shallow f_deep f_shallow;
     // WPL analysis
     swap_reduces_wpl t pos_deep pos_shallow;
-    disjoint_replacement_preserves_subtree t pos_deep pos_shallow (Leaf f_shallow);
-    get_implies_replace t1 pos_shallow (Leaf f_deep);
-    let Some t2 = replace_subtree_at t1 pos_shallow (Leaf f_deep) in
+    disjoint_replacement_preserves_subtree t pos_deep pos_shallow (Leaf 0 f_shallow);
+    get_implies_replace t1 pos_shallow (Leaf 0 f_deep);
+    let Some t2 = replace_subtree_at t1 pos_shallow (Leaf 0 f_deep) in
     assert (same_frequency_multiset t2 freqs);
     assert (weighted_path_length t2 <= weighted_path_length t);
     assert (weighted_path_length t <= weighted_path_length t2);
@@ -1206,23 +1218,23 @@ let greedy_choice_property (freqs: list pos{length freqs >= 2}) : prop =
 // Two leaves at children positions implies parent is Internal with those leaves
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let rec parent_has_leaf_children (t: htree) (parent: tree_position) (a b: pos)
-  : Lemma (requires get_subtree_at t (parent @ [true]) == Some (Leaf a) /\
-                    get_subtree_at t (parent @ [false]) == Some (Leaf b))
+  : Lemma (requires is_leaf_at t (parent @ [true]) a /\
+                    is_leaf_at t (parent @ [false]) b)
           (ensures (match get_subtree_at t parent with
-                    | Some (Internal _ (Leaf a') (Leaf b')) -> a' = a /\ b' = b
+                    | Some (Internal _ (Leaf _ a') (Leaf _ b')) -> a' = a /\ b' = b
                     | _ -> False))
           (decreases parent)
   = match parent with
     | [] ->
         (match t with
         | Internal _ l r -> ()
-        | Leaf _ -> ())
+        | Leaf _ _ -> ())
     | hd :: tl ->
         (match t with
         | Internal _ l r ->
             if hd then parent_has_leaf_children l tl a b
             else parent_has_leaf_children r tl a b
-        | Leaf _ -> ())
+        | Leaf _ _ -> ())
 #pop-options
 
 // are_siblings after replacing the parent subtree with Internal (Leaf f1) (Leaf f2)
@@ -1230,9 +1242,9 @@ let rec parent_has_leaf_children (t: htree) (parent: tree_position) (a b: pos)
 let rec are_siblings_after_replace_parent 
   (t: htree) (parent: tree_position) (f1 f2: pos)
   : Lemma (requires (match get_subtree_at t parent with
-                      | Some (Internal _ (Leaf _) (Leaf _)) -> True
+                      | Some (Internal _ (Leaf _ _) (Leaf _ _)) -> True
                       | _ -> False))
-          (ensures (match replace_subtree_at t parent (Internal (f1 + f2) (Leaf f1) (Leaf f2)) with
+          (ensures (match replace_subtree_at t parent (Internal (f1 + f2) (Leaf 0 f1) (Leaf 0 f2)) with
                     | Some t' -> are_siblings t' f1 f2 == true
                     | None -> True))
           (decreases parent)
@@ -1243,16 +1255,16 @@ let rec are_siblings_after_replace_parent
         | Internal f l r ->
             if hd then (
               are_siblings_after_replace_parent l tl f1 f2;
-              match replace_subtree_at l tl (Internal (f1 + f2) (Leaf f1) (Leaf f2)) with
+              match replace_subtree_at l tl (Internal (f1 + f2) (Leaf 0 f1) (Leaf 0 f2)) with
               | Some l' -> ()
               | None -> ()
             ) else (
               are_siblings_after_replace_parent r tl f1 f2;
-              match replace_subtree_at r tl (Internal (f1 + f2) (Leaf f1) (Leaf f2)) with
+              match replace_subtree_at r tl (Internal (f1 + f2) (Leaf 0 f1) (Leaf 0 f2)) with
               | Some r' -> ()
               | None -> ()
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // replace_internal_pair_changes_freqs: replacing Internal (Leaf a)(Leaf b) with Internal (Leaf f1)(Leaf f2) 
@@ -1260,16 +1272,16 @@ let rec are_siblings_after_replace_parent
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
 let rec replace_internal_pair_changes_freqs
   (t: htree) (parent: tree_position) (a b f1 f2: pos)
-  : Lemma (requires (get_subtree_at t parent == Some (Internal (a+b) (Leaf a) (Leaf b))))
+  : Lemma (requires (get_subtree_at t parent == Some (Internal (a+b) (Leaf 0 a) (Leaf 0 b))))
           (ensures (
-            match replace_subtree_at t parent (Internal (f1+f2) (Leaf f1) (Leaf f2)) with
+            match replace_subtree_at t parent (Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2)) with
             | Some t' ->
                 (forall (x: pos).
                   count x (leaf_freqs t') + (if x = a then 1 else 0) + (if x = b then 1 else 0) =
                   count x (leaf_freqs t) + (if x = f1 then 1 else 0) + (if x = f2 then 1 else 0))
             | None -> False))
           (decreases parent)
-  = get_implies_replace t parent (Internal (f1+f2) (Leaf f1) (Leaf f2));
+  = get_implies_replace t parent (Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2));
     match parent with
     | [] -> ()
     | hd :: tl ->
@@ -1277,7 +1289,7 @@ let rec replace_internal_pair_changes_freqs
         | Internal f l r ->
             if hd then (
               replace_internal_pair_changes_freqs l tl a b f1 f2;
-              let new_sub = Internal (f1+f2) (Leaf f1) (Leaf f2) in
+              let new_sub = Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2) in
               let Some l' = replace_subtree_at l tl new_sub in
               let aux (x: pos) : Lemma (
                 count x (leaf_freqs l' @ leaf_freqs r) + (if x = a then 1 else 0) + (if x = b then 1 else 0) =
@@ -1287,7 +1299,7 @@ let rec replace_internal_pair_changes_freqs
               FStar.Classical.forall_intro aux
             ) else (
               replace_internal_pair_changes_freqs r tl a b f1 f2;
-              let new_sub = Internal (f1+f2) (Leaf f1) (Leaf f2) in
+              let new_sub = Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2) in
               let Some r' = replace_subtree_at r tl new_sub in
               let aux (x: pos) : Lemma (
                 count x (leaf_freqs l @ leaf_freqs r') + (if x = a then 1 else 0) + (if x = b then 1 else 0) =
@@ -1296,23 +1308,23 @@ let rec replace_internal_pair_changes_freqs
                   count_append x (leaf_freqs l) (leaf_freqs r) in
               FStar.Classical.forall_intro aux
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // WPL after replacing sibling pair: since f1 <= a and f2 <= b, WPL doesn't increase
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
 let replace_pair_wpl 
   (t: htree) (parent: tree_position) (a b f1 f2: pos)
-  : Lemma (requires get_subtree_at t parent == Some (Internal (a+b) (Leaf a) (Leaf b)) /\
+  : Lemma (requires get_subtree_at t parent == Some (Internal (a+b) (Leaf 0 a) (Leaf 0 b)) /\
                     f1 <= a /\ f2 <= b)
           (ensures (
-            match replace_subtree_at t parent (Internal (f1+f2) (Leaf f1) (Leaf f2)) with
+            match replace_subtree_at t parent (Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2)) with
             | Some t' ->
                 weighted_path_length t' <= weighted_path_length t
             | None -> False))
-  = get_implies_replace t parent (Internal (f1+f2) (Leaf f1) (Leaf f2));
-    let old_sub = Internal (a+b) (Leaf a) (Leaf b) in
-    let new_sub = Internal (f1+f2) (Leaf f1) (Leaf f2) in
+  = get_implies_replace t parent (Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2));
+    let old_sub = Internal (a+b) (Leaf 0 a) (Leaf 0 b) in
+    let new_sub = Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2) in
     replace_subtree_wpl_aux t parent new_sub 0;
     let dp = length parent in
     assert (weighted_path_length_aux old_sub dp = a `op_Multiply` (dp + 1) + b `op_Multiply` (dp + 1));
@@ -1360,7 +1372,7 @@ let rec find_two_mins_le2 (l: list pos{length l >= 2})
 let rec subtree_siblings_implies_are_siblings
   (t: htree) (parent: tree_position) (f1 f2: pos)
   : Lemma (requires (match get_subtree_at t parent with
-                      | Some (Internal _ (Leaf f1') (Leaf f2')) -> 
+                      | Some (Internal _ (Leaf _ f1') (Leaf _ f2')) -> 
                           (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1)
                       | _ -> False))
           (ensures are_siblings t f1 f2 == true)
@@ -1375,18 +1387,18 @@ let rec subtree_siblings_implies_are_siblings
             ) else (
               subtree_siblings_implies_are_siblings r tl f1 f2
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // replace_leaf_preserves_max_depth: replacing a leaf with another leaf preserves max_leaf_depth
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let rec replace_leaf_preserves_max_depth (t: htree) (p: tree_position) (f_old f_new: pos)
-  : Lemma (requires get_subtree_at t p == Some (Leaf f_old))
-          (ensures (match replace_subtree_at t p (Leaf f_new) with
+  : Lemma (requires is_leaf_at t p f_old)
+          (ensures (match replace_subtree_at t p (Leaf 0 f_new) with
                     | Some t' -> max_leaf_depth t' 0 = max_leaf_depth t 0
                     | None -> False))
           (decreases p)
-  = get_implies_replace t p (Leaf f_new);
+  = get_implies_replace t p (Leaf 0 f_new);
     match p with
     | [] -> ()
     | hd :: tl ->
@@ -1396,16 +1408,16 @@ let rec replace_leaf_preserves_max_depth (t: htree) (p: tree_position) (f_old f_
               replace_leaf_preserves_max_depth l tl f_old f_new;
               max_leaf_depth_shift l 0 1;
               max_leaf_depth_shift r 0 1;
-              let Some l' = replace_subtree_at l tl (Leaf f_new) in
+              let Some l' = replace_subtree_at l tl (Leaf 0 f_new) in
               max_leaf_depth_shift l' 0 1
             ) else (
               replace_leaf_preserves_max_depth r tl f_old f_new;
               max_leaf_depth_shift l 0 1;
               max_leaf_depth_shift r 0 1;
-              let Some r' = replace_subtree_at r tl (Leaf f_new) in
+              let Some r' = replace_subtree_at r tl (Leaf 0 f_new) in
               max_leaf_depth_shift r' 0 1
             )
-        | Leaf _ -> ()
+        | Leaf _ _ -> ()
 #pop-options
 
 // Sibling positions are distinct and not prefixes
@@ -1432,7 +1444,7 @@ let rec subtree_count_le (t: htree) (p: tree_position) (f: pos)
         count_append f (leaf_freqs l) (leaf_freqs r);
         if hd then subtree_count_le l tl f
         else subtree_count_le r tl f
-      | Leaf _ -> ()
+      | Leaf _ _ -> ()
 #pop-options
 
 // If find_two_mins returns equal values, count >= 2
@@ -1505,13 +1517,13 @@ let rec find_two_mins_count_ge2 (l: list pos{length l >= 2}) (m1: pos)
 // Two leaves at distinct positions with same freq => count >= 2
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
 let rec two_leaves_count_ge2 (t: htree) (p1 p2: tree_position) (f: pos)
-  : Lemma (requires get_subtree_at t p1 == Some (Leaf f) /\
-                    get_subtree_at t p2 == Some (Leaf f) /\
+  : Lemma (requires is_leaf_at t p1 f /\
+                    is_leaf_at t p2 f /\
                     p1 =!= p2)
           (ensures count f (leaf_freqs t) >= 2)
           (decreases p1)
   = match t with
-    | Leaf _ -> () // p1 and p2 can't both be valid and distinct
+    | Leaf _ _ -> () // p1 and p2 can't both be valid and distinct
     | Internal _ l r ->
       count_append f (leaf_freqs l) (leaf_freqs r);
       (match p1, p2 with
@@ -1535,7 +1547,7 @@ let rec two_leaves_count_ge2 (t: htree) (p1 p2: tree_position) (f: pos)
 let rec find_leaf_pos_avoiding (t: htree) (f: pos) (avoid: tree_position)
   : Tot (option tree_position) (decreases t)
   = match t with
-    | Leaf g ->
+    | Leaf _ g ->
       if g = f then
         (match avoid with
          | [] -> None
@@ -1569,11 +1581,11 @@ let rec find_leaf_pos_avoiding (t: htree) (f: pos) (avoid: tree_position)
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
 let rec find_leaf_pos_avoiding_correct (t: htree) (f: pos) (avoid: tree_position)
   : Lemma (ensures (match find_leaf_pos_avoiding t f avoid with
-                    | Some p -> get_subtree_at t p == Some (Leaf f) /\ p =!= avoid
+                    | Some p -> is_leaf_at t p f /\ p =!= avoid
                     | None -> True))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r ->
       match avoid with
       | [] ->
@@ -1591,11 +1603,11 @@ let rec find_leaf_pos_avoiding_correct (t: htree) (f: pos) (avoid: tree_position
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
 let rec find_leaf_pos_avoiding_some (t: htree) (f: pos) (avoid: tree_position)
   : Lemma (requires count f (leaf_freqs t) >= 2 /\
-                    get_subtree_at t avoid == Some (Leaf f))
+                    is_leaf_at t avoid f)
           (ensures Some? (find_leaf_pos_avoiding t f avoid))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
+    | Leaf _ _ -> ()
     | Internal _ l r ->
       count_append f (leaf_freqs l) (leaf_freqs r);
       find_leaf_pos_none l f;
@@ -1623,8 +1635,8 @@ let greedy_exchange
   : Lemma (requires
       is_wpl_optimal t freqs /\
       (let (m1, m2) = find_two_mins freqs in f1 == m1 /\ f2 == m2) /\
-      get_subtree_at t (parent @ [true]) == Some (Leaf a) /\
-      get_subtree_at t (parent @ [false]) == Some (Leaf b) /\
+      is_leaf_at t (parent @ [true]) a /\
+      is_leaf_at t (parent @ [false]) b /\
       length (parent @ [true]) = max_leaf_depth t 0 /\
       length (parent @ [false]) = max_leaf_depth t 0 /\
       f1 <= f2 /\
@@ -1687,8 +1699,8 @@ let greedy_exchange
       // But tgt_b < f2 and tgt_b >= f1 (since tgt_b = a = f1), so f1 < f2.
       // f1 = f2 and f1 < f2 is a contradiction. F* should derive False.
     ) else (
-    assert (get_subtree_at t tgt1 == Some (Leaf tgt_a));
-    assert (get_subtree_at t tgt2 == Some (Leaf tgt_b));
+    assert (is_leaf_at t tgt1 tgt_a);
+    assert (is_leaf_at t tgt2 tgt_b);
     assert (tgt1 =!= tgt2);
     assert (not (is_prefix tgt1 tgt2));
     assert (not (is_prefix tgt2 tgt1));
@@ -1719,48 +1731,48 @@ let greedy_exchange
             // f2 = tgt_b, but tgt_b <> f2. Contradiction.
             ()
           ) else (
-          (if is_prefix tgt2 pos_f2' then leaf_position_no_extension t tgt2 pos_f2' tgt_b
-           else if is_prefix pos_f2' tgt2 then leaf_position_no_extension t pos_f2' tgt2 f2);
+          (if is_prefix tgt2 pos_f2' then leaf_position_no_extension t tgt2 pos_f2'
+           else if is_prefix pos_f2' tgt2 then leaf_position_no_extension t pos_f2' tgt2);
           single_swap_optimal t tgt2 pos_f2' tgt_b f2 freqs;
-          let Some t1 = replace_subtree_at t tgt2 (Leaf f2) in
-          let Some t2 = replace_subtree_at t1 pos_f2' (Leaf tgt_b) in
+          let Some t1 = replace_subtree_at t tgt2 (Leaf 0 f2) in
+          let Some t2 = replace_subtree_at t1 pos_f2' (Leaf 0 tgt_b) in
           // Preserve tgt1 through both replacements
-          get_implies_replace t tgt2 (Leaf f2);
-          disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf f2);
-          disjoint_replacement_preserves_subtree t tgt2 pos_f2' (Leaf f2);
-          (if is_prefix pos_f2' tgt1 then leaf_position_no_extension t1 pos_f2' tgt1 f2
-           else if is_prefix tgt1 pos_f2' then leaf_position_no_extension t1 tgt1 pos_f2' f1);
-          get_implies_replace t1 pos_f2' (Leaf tgt_b);
-          disjoint_replacement_preserves_subtree t1 pos_f2' tgt1 (Leaf tgt_b);
+          get_implies_replace t tgt2 (Leaf 0 f2);
+          disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf 0 f2);
+          disjoint_replacement_preserves_subtree t tgt2 pos_f2' (Leaf 0 f2);
+          (if is_prefix pos_f2' tgt1 then leaf_position_no_extension t1 pos_f2' tgt1
+           else if is_prefix tgt1 pos_f2' then leaf_position_no_extension t1 tgt1 pos_f2');
+          get_implies_replace t1 pos_f2' (Leaf 0 tgt_b);
+          disjoint_replacement_preserves_subtree t1 pos_f2' tgt1 (Leaf 0 tgt_b);
           // Preserve tgt2
-          replace_then_get t tgt2 (Leaf f2);
-          (if is_prefix pos_f2' tgt2 then leaf_position_no_extension t1 pos_f2' tgt2 f2
-           else if is_prefix tgt2 pos_f2' then leaf_position_no_extension t1 tgt2 pos_f2' f2);
-          disjoint_replacement_preserves_subtree t1 pos_f2' tgt2 (Leaf tgt_b);
+          replace_then_get t tgt2 (Leaf 0 f2);
+          (if is_prefix pos_f2' tgt2 then leaf_position_no_extension t1 pos_f2' tgt2
+           else if is_prefix tgt2 pos_f2' then leaf_position_no_extension t1 tgt2 pos_f2');
+          disjoint_replacement_preserves_subtree t1 pos_f2' tgt2 (Leaf 0 tgt_b);
           parent_has_leaf_children t2 parent
             (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
           subtree_siblings_implies_are_siblings t2 parent f1 f2
           ))
         ) else (
         leaf_depth_le_max t pos_f2 f2;
-        (if is_prefix tgt2 pos_f2 then leaf_position_no_extension t tgt2 pos_f2 tgt_b
-         else if is_prefix pos_f2 tgt2 then leaf_position_no_extension t pos_f2 tgt2 f2);
+        (if is_prefix tgt2 pos_f2 then leaf_position_no_extension t tgt2 pos_f2
+         else if is_prefix pos_f2 tgt2 then leaf_position_no_extension t pos_f2 tgt2);
         single_swap_optimal t tgt2 pos_f2 tgt_b f2 freqs;
-        let Some t1 = replace_subtree_at t tgt2 (Leaf f2) in
-        let Some t2 = replace_subtree_at t1 pos_f2 (Leaf tgt_b) in
+        let Some t1 = replace_subtree_at t tgt2 (Leaf 0 f2) in
+        let Some t2 = replace_subtree_at t1 pos_f2 (Leaf 0 tgt_b) in
         // Preserve tgt1 through both replacements
-        get_implies_replace t tgt2 (Leaf f2);
-        disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf f2);
-        disjoint_replacement_preserves_subtree t tgt2 pos_f2 (Leaf f2);
-        (if is_prefix pos_f2 tgt1 then leaf_position_no_extension t1 pos_f2 tgt1 f2
-         else if is_prefix tgt1 pos_f2 then leaf_position_no_extension t1 tgt1 pos_f2 f1);
-        get_implies_replace t1 pos_f2 (Leaf tgt_b);
-        disjoint_replacement_preserves_subtree t1 pos_f2 tgt1 (Leaf tgt_b);
+        get_implies_replace t tgt2 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree t tgt2 pos_f2 (Leaf 0 f2);
+        (if is_prefix pos_f2 tgt1 then leaf_position_no_extension t1 pos_f2 tgt1
+         else if is_prefix tgt1 pos_f2 then leaf_position_no_extension t1 tgt1 pos_f2);
+        get_implies_replace t1 pos_f2 (Leaf 0 tgt_b);
+        disjoint_replacement_preserves_subtree t1 pos_f2 tgt1 (Leaf 0 tgt_b);
         // Preserve tgt2: replace_then_get + disjoint from pos_f2
-        replace_then_get t tgt2 (Leaf f2);
-        (if is_prefix pos_f2 tgt2 then leaf_position_no_extension t1 pos_f2 tgt2 f2
-         else if is_prefix tgt2 pos_f2 then leaf_position_no_extension t1 tgt2 pos_f2 f2);
-        disjoint_replacement_preserves_subtree t1 pos_f2 tgt2 (Leaf tgt_b);
+        replace_then_get t tgt2 (Leaf 0 f2);
+        (if is_prefix pos_f2 tgt2 then leaf_position_no_extension t1 pos_f2 tgt2
+         else if is_prefix tgt2 pos_f2 then leaf_position_no_extension t1 tgt2 pos_f2);
+        disjoint_replacement_preserves_subtree t1 pos_f2 tgt2 (Leaf 0 tgt_b);
         parent_has_leaf_children t2 parent
           (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
         subtree_siblings_implies_are_siblings t2 parent f1 f2
@@ -1774,23 +1786,23 @@ let greedy_exchange
       find_leaf_pos_correct t f1;
       let Some pos_f1 = find_leaf_pos t f1 in
       leaf_depth_le_max t pos_f1 f1;
-      (if is_prefix tgt1 pos_f1 then leaf_position_no_extension t tgt1 pos_f1 tgt_a
-       else if is_prefix pos_f1 tgt1 then leaf_position_no_extension t pos_f1 tgt1 f1);
+      (if is_prefix tgt1 pos_f1 then leaf_position_no_extension t tgt1 pos_f1
+       else if is_prefix pos_f1 tgt1 then leaf_position_no_extension t pos_f1 tgt1);
       single_swap_optimal t tgt1 pos_f1 tgt_a f1 freqs;
-      let Some s1 = replace_subtree_at t tgt1 (Leaf f1) in
-      let Some s2 = replace_subtree_at s1 pos_f1 (Leaf tgt_a) in
+      let Some s1 = replace_subtree_at t tgt1 (Leaf 0 f1) in
+      let Some s2 = replace_subtree_at s1 pos_f1 (Leaf 0 tgt_a) in
       // s2 is optimal
       // Establish positions in s1 and s2
-      replace_then_get t tgt1 (Leaf f1);
-      disjoint_replacement_preserves_subtree t tgt1 pos_f1 (Leaf f1);
+      replace_then_get t tgt1 (Leaf 0 f1);
+      disjoint_replacement_preserves_subtree t tgt1 pos_f1 (Leaf 0 f1);
       // tgt1 preserved through pos_f1 replacement
-      (if is_prefix pos_f1 tgt1 then leaf_position_no_extension s1 pos_f1 tgt1 f1
-       else if is_prefix tgt1 pos_f1 then leaf_position_no_extension s1 tgt1 pos_f1 f1);
-      get_implies_replace s1 pos_f1 (Leaf tgt_a);
-      disjoint_replacement_preserves_subtree s1 pos_f1 tgt1 (Leaf tgt_a);
-      assert (get_subtree_at s2 tgt1 == Some (Leaf f1));
+      (if is_prefix pos_f1 tgt1 then leaf_position_no_extension s1 pos_f1 tgt1
+       else if is_prefix tgt1 pos_f1 then leaf_position_no_extension s1 tgt1 pos_f1);
+      get_implies_replace s1 pos_f1 (Leaf 0 tgt_a);
+      disjoint_replacement_preserves_subtree s1 pos_f1 tgt1 (Leaf 0 tgt_a);
+      assert (is_leaf_at s2 tgt1 f1);
       // tgt2 in s1 and s2
-      disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf f1);
+      disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf 0 f1);
       // pos_f1 vs tgt2: if equal, then f1 = tgt_b, and tgt_b >= f2 >= f1, so f1 = f2 = tgt_b
       if pos_f1 = tgt2 then (
         // pos_f1 = tgt2, so f1 = tgt_b and f1 = f2.
@@ -1810,35 +1822,35 @@ let greedy_exchange
           // f1 already at tgt1 = tgt_a. But tgt_a <> f1 (we're in else branch). Contradiction.
           ()
         ) else (
-        (if is_prefix tgt1 pos_f1' then leaf_position_no_extension t tgt1 pos_f1' tgt_a
-         else if is_prefix pos_f1' tgt1 then leaf_position_no_extension t pos_f1' tgt1 f1);
+        (if is_prefix tgt1 pos_f1' then leaf_position_no_extension t tgt1 pos_f1'
+         else if is_prefix pos_f1' tgt1 then leaf_position_no_extension t pos_f1' tgt1);
         single_swap_optimal t tgt1 pos_f1' tgt_a f1 freqs;
-        let Some s1' = replace_subtree_at t tgt1 (Leaf f1) in
-        let Some s2' = replace_subtree_at s1' pos_f1' (Leaf tgt_a) in
+        let Some s1' = replace_subtree_at t tgt1 (Leaf 0 f1) in
+        let Some s2' = replace_subtree_at s1' pos_f1' (Leaf 0 tgt_a) in
         // tgt1 has f1 in s2'
-        replace_then_get t tgt1 (Leaf f1);
-        get_implies_replace t tgt1 (Leaf f1);
-        disjoint_replacement_preserves_subtree t tgt1 pos_f1' (Leaf f1);
-        (if is_prefix pos_f1' tgt1 then leaf_position_no_extension s1' pos_f1' tgt1 f1
-         else if is_prefix tgt1 pos_f1' then leaf_position_no_extension s1' tgt1 pos_f1' f1);
-        get_implies_replace s1' pos_f1' (Leaf tgt_a);
-        disjoint_replacement_preserves_subtree s1' pos_f1' tgt1 (Leaf tgt_a);
-        assert (get_subtree_at s2' tgt1 == Some (Leaf f1));
+        replace_then_get t tgt1 (Leaf 0 f1);
+        get_implies_replace t tgt1 (Leaf 0 f1);
+        disjoint_replacement_preserves_subtree t tgt1 pos_f1' (Leaf 0 f1);
+        (if is_prefix pos_f1' tgt1 then leaf_position_no_extension s1' pos_f1' tgt1
+         else if is_prefix tgt1 pos_f1' then leaf_position_no_extension s1' tgt1 pos_f1');
+        get_implies_replace s1' pos_f1' (Leaf 0 tgt_a);
+        disjoint_replacement_preserves_subtree s1' pos_f1' tgt1 (Leaf 0 tgt_a);
+        assert (is_leaf_at s2' tgt1 f1);
         // tgt2 has f2 = f1 = tgt_b in s2'
-        disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf f1);
-        (if is_prefix pos_f1' tgt2 then leaf_position_no_extension s1' pos_f1' tgt2 f1
-         else if is_prefix tgt2 pos_f1' then leaf_position_no_extension s1' tgt2 pos_f1' tgt_b);
-        disjoint_replacement_preserves_subtree s1' pos_f1' tgt2 (Leaf tgt_a);
-        assert (get_subtree_at s2' tgt2 == Some (Leaf tgt_b));
+        disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf 0 f1);
+        (if is_prefix pos_f1' tgt2 then leaf_position_no_extension s1' pos_f1' tgt2
+         else if is_prefix tgt2 pos_f1' then leaf_position_no_extension s1' tgt2 pos_f1');
+        disjoint_replacement_preserves_subtree s1' pos_f1' tgt2 (Leaf 0 tgt_a);
+        assert (is_leaf_at s2' tgt2 tgt_b);
         parent_has_leaf_children s2' parent
           (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
         subtree_siblings_implies_are_siblings s2' parent f1 f2
         )
       ) else (
-      (if is_prefix pos_f1 tgt2 then leaf_position_no_extension s1 pos_f1 tgt2 f1
-       else if is_prefix tgt2 pos_f1 then leaf_position_no_extension s1 tgt2 pos_f1 tgt_b);
-      disjoint_replacement_preserves_subtree s1 pos_f1 tgt2 (Leaf tgt_a);
-      assert (get_subtree_at s2 tgt2 == Some (Leaf tgt_b));
+      (if is_prefix pos_f1 tgt2 then leaf_position_no_extension s1 pos_f1 tgt2
+       else if is_prefix tgt2 pos_f1 then leaf_position_no_extension s1 tgt2 pos_f1);
+      disjoint_replacement_preserves_subtree s1 pos_f1 tgt2 (Leaf 0 tgt_a);
+      assert (is_leaf_at s2 tgt2 tgt_b);
       
       if tgt_b = f2 then (
         parent_has_leaf_children s2 parent
@@ -1872,28 +1884,28 @@ let greedy_exchange
             // f2 = tgt_b, but tgt_b <> f2. Contradiction.
             ()
           ) else (
-          (if is_prefix tgt2 pos_f2' then leaf_position_no_extension s2 tgt2 pos_f2' tgt_b
-           else if is_prefix pos_f2' tgt2 then leaf_position_no_extension s2 pos_f2' tgt2 f2);
+          (if is_prefix tgt2 pos_f2' then leaf_position_no_extension s2 tgt2 pos_f2'
+           else if is_prefix pos_f2' tgt2 then leaf_position_no_extension s2 pos_f2' tgt2);
           single_swap_optimal s2 tgt2 pos_f2' tgt_b f2 freqs;
-          let Some s3 = replace_subtree_at s2 tgt2 (Leaf f2) in
-          let Some s4 = replace_subtree_at s3 pos_f2' (Leaf tgt_b) in
+          let Some s3 = replace_subtree_at s2 tgt2 (Leaf 0 f2) in
+          let Some s4 = replace_subtree_at s3 pos_f2' (Leaf 0 tgt_b) in
           // Establish positions in s3 and s4
-          replace_then_get s2 tgt2 (Leaf f2);
-          disjoint_replacement_preserves_subtree s2 tgt2 pos_f2' (Leaf f2);
+          replace_then_get s2 tgt2 (Leaf 0 f2);
+          disjoint_replacement_preserves_subtree s2 tgt2 pos_f2' (Leaf 0 f2);
           // tgt1 preserved in s3
-          (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1 tgt_b
-           else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2 f1);
-          get_implies_replace s2 tgt2 (Leaf f2);
-          disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf f2);
+          (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1
+           else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2);
+          get_implies_replace s2 tgt2 (Leaf 0 f2);
+          disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf 0 f2);
           // tgt1 preserved in s4
-          (if is_prefix pos_f2' tgt1 then leaf_position_no_extension s3 pos_f2' tgt1 f2
-           else if is_prefix tgt1 pos_f2' then leaf_position_no_extension s3 tgt1 pos_f2' f1);
-          get_implies_replace s3 pos_f2' (Leaf tgt_b);
-          disjoint_replacement_preserves_subtree s3 pos_f2' tgt1 (Leaf tgt_b);
+          (if is_prefix pos_f2' tgt1 then leaf_position_no_extension s3 pos_f2' tgt1
+           else if is_prefix tgt1 pos_f2' then leaf_position_no_extension s3 tgt1 pos_f2');
+          get_implies_replace s3 pos_f2' (Leaf 0 tgt_b);
+          disjoint_replacement_preserves_subtree s3 pos_f2' tgt1 (Leaf 0 tgt_b);
           // tgt2 preserved in s4
-          (if is_prefix pos_f2' tgt2 then leaf_position_no_extension s3 pos_f2' tgt2 f2
-           else if is_prefix tgt2 pos_f2' then leaf_position_no_extension s3 tgt2 pos_f2' f2);
-          disjoint_replacement_preserves_subtree s3 pos_f2' tgt2 (Leaf tgt_b);
+          (if is_prefix pos_f2' tgt2 then leaf_position_no_extension s3 pos_f2' tgt2
+           else if is_prefix tgt2 pos_f2' then leaf_position_no_extension s3 tgt2 pos_f2');
+          disjoint_replacement_preserves_subtree s3 pos_f2' tgt2 (Leaf 0 tgt_b);
           parent_has_leaf_children s4 parent
             (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
           subtree_siblings_implies_are_siblings s4 parent f1 f2
@@ -1907,28 +1919,28 @@ let greedy_exchange
         assert (length tgt2 = max_leaf_depth t 0);
         assert (length tgt2 >= length pos_f2);
         assert (tgt2 =!= pos_f2);
-        (if is_prefix tgt2 pos_f2 then leaf_position_no_extension s2 tgt2 pos_f2 tgt_b
-         else if is_prefix pos_f2 tgt2 then leaf_position_no_extension s2 pos_f2 tgt2 f2);
+        (if is_prefix tgt2 pos_f2 then leaf_position_no_extension s2 tgt2 pos_f2
+         else if is_prefix pos_f2 tgt2 then leaf_position_no_extension s2 pos_f2 tgt2);
         single_swap_optimal s2 tgt2 pos_f2 tgt_b f2 freqs;
-        let Some s3 = replace_subtree_at s2 tgt2 (Leaf f2) in
-        let Some s4 = replace_subtree_at s3 pos_f2 (Leaf tgt_b) in
+        let Some s3 = replace_subtree_at s2 tgt2 (Leaf 0 f2) in
+        let Some s4 = replace_subtree_at s3 pos_f2 (Leaf 0 tgt_b) in
         // Establish positions in s3 and s4
-        replace_then_get s2 tgt2 (Leaf f2);
-        disjoint_replacement_preserves_subtree s2 tgt2 pos_f2 (Leaf f2);
+        replace_then_get s2 tgt2 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree s2 tgt2 pos_f2 (Leaf 0 f2);
         // tgt1 preserved in s3
-        (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1 tgt_b
-         else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2 f1);
-        get_implies_replace s2 tgt2 (Leaf f2);
-        disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf f2);
+        (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1
+         else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2);
+        get_implies_replace s2 tgt2 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf 0 f2);
         // tgt1 preserved in s4
-        (if is_prefix pos_f2 tgt1 then leaf_position_no_extension s3 pos_f2 tgt1 f2
-         else if is_prefix tgt1 pos_f2 then leaf_position_no_extension s3 tgt1 pos_f2 f1);
-        get_implies_replace s3 pos_f2 (Leaf tgt_b);
-        disjoint_replacement_preserves_subtree s3 pos_f2 tgt1 (Leaf tgt_b);
+        (if is_prefix pos_f2 tgt1 then leaf_position_no_extension s3 pos_f2 tgt1
+         else if is_prefix tgt1 pos_f2 then leaf_position_no_extension s3 tgt1 pos_f2);
+        get_implies_replace s3 pos_f2 (Leaf 0 tgt_b);
+        disjoint_replacement_preserves_subtree s3 pos_f2 tgt1 (Leaf 0 tgt_b);
         // tgt2 preserved in s4
-        (if is_prefix pos_f2 tgt2 then leaf_position_no_extension s3 pos_f2 tgt2 f2
-         else if is_prefix tgt2 pos_f2 then leaf_position_no_extension s3 tgt2 pos_f2 f2);
-        disjoint_replacement_preserves_subtree s3 pos_f2 tgt2 (Leaf tgt_b);
+        (if is_prefix pos_f2 tgt2 then leaf_position_no_extension s3 pos_f2 tgt2
+         else if is_prefix tgt2 pos_f2 then leaf_position_no_extension s3 tgt2 pos_f2);
+        disjoint_replacement_preserves_subtree s3 pos_f2 tgt2 (Leaf 0 tgt_b);
         parent_has_leaf_children s4 parent
           (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
         subtree_siblings_implies_are_siblings s4 parent f1 f2
@@ -1954,8 +1966,8 @@ let greedy_choice_theorem (freqs: list pos{length freqs >= 2})
       = same_multiset_internal t freqs;
         max_depth_has_sibling_leaves t;
         eliminate exists (parent: tree_position) (fl fr: pos).
-            get_subtree_at t (parent @ [true]) == Some (Leaf fl) /\
-            get_subtree_at t (parent @ [false]) == Some (Leaf fr) /\
+            is_leaf_at t (parent @ [true]) fl /\
+            is_leaf_at t (parent @ [false]) fr /\
             length (parent @ [true]) = max_leaf_depth t 0 /\
             length (parent @ [false]) = max_leaf_depth t 0
         returns exists (t': htree). is_wpl_optimal t' freqs /\ are_siblings t' f1 f2 == true
@@ -2004,10 +2016,10 @@ let rec remove_and_merge (l: list pos) (f1 f2: pos)
 // Helper: Replace two sibling leaves with a single leaf in a tree
 let rec replace_siblings_with_merged (t: htree) (f1 f2: pos) : option htree =
   match t with
-  | Leaf _ -> None
-  | Internal freq (Leaf f1') (Leaf f2') ->
+  | Leaf _ _ -> None
+  | Internal freq (Leaf _ f1') (Leaf _ f2') ->
       if (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1) then
-        Some (Leaf (f1' + f2'))
+        Some (Leaf 0 (f1' + f2'))
       else None
   | Internal freq l r ->
       match replace_siblings_with_merged l f1 f2 with
@@ -2022,20 +2034,20 @@ let rec replace_siblings_with_merged (t: htree) (f1 f2: pos) : option htree =
 // Lemma: WPL relationship when merging siblings
 let wpl_merge_siblings (t: htree) (f1 f2: pos)
   : Lemma (requires (match t with
-                     | Internal _ (Leaf f1') (Leaf f2') -> 
+                     | Internal _ (Leaf _ f1') (Leaf _ f2') -> 
                          f1' = f1 && f2' = f2
                      | _ -> False))
           (ensures (match t with
                     | Internal _ l r ->
                         weighted_path_length t == 
-                        weighted_path_length (Leaf (f1 + f2)) + f1 + f2
+                        weighted_path_length (Leaf 0 (f1 + f2)) + f1 + f2
                     | _ -> True))
   = match t with
-    | Internal _ (Leaf f1') (Leaf f2') ->
-        assert (weighted_path_length_aux (Leaf f1') 1 == f1');
-        assert (weighted_path_length_aux (Leaf f2') 1 == f2');
+    | Internal _ (Leaf _ f1') (Leaf _ f2') ->
+        assert (weighted_path_length_aux (Leaf 0 f1') 1 == f1');
+        assert (weighted_path_length_aux (Leaf 0 f2') 1 == f2');
         assert (weighted_path_length t == f1' + f2');
-        assert (weighted_path_length (Leaf (f1' + f2')) == 0)
+        assert (weighted_path_length (Leaf 0 (f1' + f2')) == 0)
     | _ -> ()
 
 // Lemma: Replacing siblings with merge decreases WPL by the sum of their frequencies
@@ -2051,14 +2063,14 @@ let rec wpl_after_merge (t: htree) (f1 f2: pos) (d: nat)
                     | None -> True))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
-    | Internal freq (Leaf f1') (Leaf f2') ->
+    | Leaf _ _ -> ()
+    | Internal freq (Leaf _ f1') (Leaf _ f2') ->
         if (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1) then (
-          assert (weighted_path_length_aux (Internal freq (Leaf f1') (Leaf f2')) d ==
-                  weighted_path_length_aux (Leaf f1') (d+1) + weighted_path_length_aux (Leaf f2') (d+1));
-          assert (weighted_path_length_aux (Leaf f1') (d+1) == f1' `op_Multiply` (d+1));
-          assert (weighted_path_length_aux (Leaf f2') (d+1) == f2' `op_Multiply` (d+1));
-          assert (weighted_path_length_aux (Leaf (f1' + f2')) d == (f1' + f2') `op_Multiply` d);
+          assert (weighted_path_length_aux (Internal freq (Leaf 0 f1') (Leaf 0 f2')) d ==
+                  weighted_path_length_aux (Leaf 0 f1') (d+1) + weighted_path_length_aux (Leaf 0 f2') (d+1));
+          assert (weighted_path_length_aux (Leaf 0 f1') (d+1) == f1' `op_Multiply` (d+1));
+          assert (weighted_path_length_aux (Leaf 0 f2') (d+1) == f2' `op_Multiply` (d+1));
+          assert (weighted_path_length_aux (Leaf 0 (f1' + f2')) d == (f1' + f2') `op_Multiply` d);
           ()
         ) else ()
     | Internal freq l r ->
@@ -2106,8 +2118,8 @@ let rec are_siblings_implies_replace (t: htree) (f1 f2: pos)
           (ensures Some? (replace_siblings_with_merged t f1 f2))
           (decreases t)
   = match t with
-    | Leaf _ -> ()
-    | Internal _ (Leaf f1') (Leaf f2') ->
+    | Leaf _ _ -> ()
+    | Internal _ (Leaf _ f1') (Leaf _ f2') ->
         if (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1) then ()
         else ()
     | Internal _ l r ->

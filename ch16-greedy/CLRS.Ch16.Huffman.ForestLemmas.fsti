@@ -145,7 +145,7 @@ val all_leaf_freqs_init_step
                     (forall (x: pos). L.count x (all_leaf_freqs entries) + L.count x (seq_to_pos_list s k) ==
                                       L.count x (seq_to_pos_list s 0)))
           (ensures (forall (x: pos). 
-                    L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf f) :: entries)) +
+                    L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf 0 f) :: entries)) +
                     L.count x (seq_to_pos_list s (k + 1)) ==
                     L.count x (seq_to_pos_list s 0)))
 

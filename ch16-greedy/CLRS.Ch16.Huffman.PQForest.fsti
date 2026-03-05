@@ -134,7 +134,7 @@ val pq_tree_freq_match_init_step
                     pq_tree_freq_match s0 active_old /\
                     pq_indices_in_forest s0 active_old /\
                     (forall (k: nat). k < L.length active_old ==> entry_idx (L.index active_old k) <> idx))
-          (ensures pq_tree_freq_match s1 ((idx, p, HSpec.Leaf f) :: active_old))
+          (ensures pq_tree_freq_match s1 ((idx, p, HSpec.Leaf 0 f) :: active_old))
 
 val forest_has_pq_entry_init_step
   (s0 s1: Seq.seq pq_entry) (f: pos) (idx: SZ.t)
@@ -143,7 +143,7 @@ val forest_has_pq_entry_init_step
                     forest_has_pq_entry s0 active_old /\
                     pq_idx_unique s0 /\
                     (forall (k: nat). k < L.length active_old ==> entry_idx (L.index active_old k) <> idx))
-          (ensures forest_has_pq_entry s1 ((idx, p, HSpec.Leaf f) :: active_old))
+          (ensures forest_has_pq_entry s1 ((idx, p, HSpec.Leaf 0 f) :: active_old))
 
 val forest_has_pq_entry_remove_at (pq: Seq.seq pq_entry) (active: list forest_entry) (j: nat)
   : Lemma (requires forest_has_pq_entry pq active /\ j < L.length active)
@@ -254,7 +254,7 @@ val init_bundle_step
       PQ.extends pq_old pq_new (freq_val, vi) /\
       Seq.length pq_new == SZ.v vi + 1)
     (ensures
-      init_bundle freq_seq nd_new pq_new ((vi, leaf, HSpec.Leaf freq_val) :: active_old) (SZ.v vi + 1) (SZ.v n))
+      init_bundle freq_seq nd_new pq_new ((vi, leaf, HSpec.Leaf 0 freq_val) :: active_old) (SZ.v vi + 1) (SZ.v n))
 
 val init_to_merge_bundle
   (freq_seq: Seq.seq int) (nd_contents: Seq.seq hnode_ptr)

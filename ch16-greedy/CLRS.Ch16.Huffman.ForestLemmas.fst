@@ -416,9 +416,9 @@ let all_leaf_freqs_merge_step
 // Prepend Leaf preserves counts with extension
 let all_leaf_freqs_prepend_leaf
   (entries: list forest_entry) (idx: SZ.t) (p: hnode_ptr) (f: pos) (x: pos)
-  : Lemma (L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf f) :: entries)) ==
+  : Lemma (L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf 0 f) :: entries)) ==
            L.count x (all_leaf_freqs entries) + (if x = f then 1 else 0))
-  = all_leaf_freqs_cons (idx, p, HSpec.Leaf f) entries x
+  = all_leaf_freqs_cons (idx, p, HSpec.Leaf 0 f) entries x
 
 // seq_to_pos_list extension: adding one more element
 let seq_to_pos_list_snoc (s: Seq.seq int) (k: nat) (x: pos)
@@ -442,11 +442,11 @@ let all_leaf_freqs_init_step
                     (forall (x: pos). L.count x (all_leaf_freqs entries) + L.count x (seq_to_pos_list s k) ==
                                       L.count x (seq_to_pos_list s 0)))
           (ensures (forall (x: pos). 
-                    L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf f) :: entries)) +
+                    L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf 0 f) :: entries)) +
                     L.count x (seq_to_pos_list s (k + 1)) ==
                     L.count x (seq_to_pos_list s 0)))
   = let aux (x: pos)
-      : Lemma (L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf f) :: entries)) +
+      : Lemma (L.count x (all_leaf_freqs ((idx, p, HSpec.Leaf 0 f) :: entries)) +
                L.count x (seq_to_pos_list s (k + 1)) ==
                L.count x (seq_to_pos_list s 0))
       = all_leaf_freqs_prepend_leaf entries idx p f x;
@@ -507,7 +507,7 @@ let rec forest_total_cost_all_leaves (entries: list forest_entry)
 // forest_root_freqs prepend Leaf — count distributes
 let forest_root_freqs_prepend_leaf (idx: SZ.t) (p: hnode_ptr) (f: pos)
   (rest: list forest_entry) (x: pos)
-  : Lemma (L.count x (forest_root_freqs ((idx, p, HSpec.Leaf f) :: rest)) ==
+  : Lemma (L.count x (forest_root_freqs ((idx, p, HSpec.Leaf 0 f) :: rest)) ==
            (if x = f then 1 else 0) + L.count x (forest_root_freqs rest))
   = ()
 
@@ -754,7 +754,7 @@ let forest_root_freqs_remove_two_forall (entries: list forest_entry) (j1 j2: nat
 
 let all_leaves_prepend (active: list forest_entry) (idx: SZ.t) (p: hnode_ptr) (f: pos)
   : Lemma (requires forest_all_leaves active)
-          (ensures forest_all_leaves ((idx, p, HSpec.Leaf f) :: active))
+          (ensures forest_all_leaves ((idx, p, HSpec.Leaf 0 f) :: active))
   = reveal_opaque (`%forest_all_leaves) forest_all_leaves
 
 // Eliminate all_leaves: every entry is a Leaf

@@ -183,10 +183,10 @@ let rec huffman_from_pq_cost_eq_greedy (pq: HComp.priority_queue)
           (ensures HSpec.cost (HComp.huffman_from_pq pq) == greedy_cost (HComp.all_leaf_freqs pq))
           (decreases length pq)
   = match pq with
-    | [HSpec.Leaf f] -> ()
-    | (HSpec.Leaf f1) :: (HSpec.Leaf f2) :: rest ->
-        let merged = HSpec.merge (HSpec.Leaf f1) (HSpec.Leaf f2) in
-        let leaf_merged = HSpec.Leaf (f1 + f2) in
+    | [HSpec.Leaf _ f] -> ()
+    | (HSpec.Leaf s1 f1) :: (HSpec.Leaf s2 f2) :: rest ->
+        let merged = HSpec.merge (HSpec.Leaf s1 f1) (HSpec.Leaf s2 f2) in
+        let leaf_merged = HSpec.Leaf 0 (f1 + f2) in
         HSpec.insert_sorted_length merged rest;
         HSpec.insert_sorted_nonempty merged rest;
         HComp.insert_sorted_maintains_sorted merged rest;
@@ -224,12 +224,12 @@ let huffman_complete_cost_eq_greedy (freqs: list pos{Cons? freqs})
   : Lemma (ensures HSpec.cost (HComp.huffman_complete freqs) == greedy_cost freqs)
   = let pq = HComp.init_pq freqs in
     HComp.map_leaf_all_leaves freqs;
-    HComp.sortWith_preserves_all_leaves (map (fun (f:pos) -> HSpec.Leaf f) freqs);
+    HComp.sortWith_preserves_all_leaves (map (fun (f:pos) -> HSpec.Leaf 0 f) freqs);
     huffman_from_pq_cost_eq_greedy pq;
     let aux (x: pos)
       : Lemma (count x (HComp.all_leaf_freqs pq) = count x freqs)
       = HComp.sortWith_preserves_all_leaf_freqs
-          (map (fun (f:pos) -> HSpec.Leaf f) freqs) x;
+          (map (fun (f:pos) -> HSpec.Leaf 0 f) freqs) x;
         HComp.all_leaf_freqs_of_map_leaf freqs
     in
     Classical.forall_intro aux;
