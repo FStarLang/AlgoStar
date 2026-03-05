@@ -521,3 +521,36 @@ fn huffman_tree
   result
 }
 #pop-options
+
+// ========== Ghost fold/unfold helpers for is_htree (used by Codec.Impl) ==========
+
+ghost fn elim_is_htree_leaf (p: hnode_ptr) (s: nat) (f: pos)
+  requires is_htree p (HSpec.Leaf s f)
+  ensures p |-> ({ sym = s; freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
+{
+  unfold (is_htree p (HSpec.Leaf s f))
+}
+
+ghost fn intro_is_htree_leaf (p: hnode_ptr) (s: nat) (f: pos)
+  requires p |-> ({ sym = s; freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
+  ensures is_htree p (HSpec.Leaf s f)
+{
+  fold (is_htree p (HSpec.Leaf s f))
+}
+
+ghost fn elim_is_htree_internal (p: hnode_ptr) (f: pos) (l r: HSpec.htree)
+  requires is_htree p (HSpec.Internal f l r)
+  ensures exists* (lp rp: hnode_ptr).
+    (p |-> ({ sym = 0; freq = f; left = Some lp; right = Some rp } <: hnode)) **
+    is_htree lp l ** is_htree rp r
+{
+  unfold (is_htree p (HSpec.Internal f l r))
+}
+
+ghost fn intro_is_htree_internal (p: hnode_ptr) (lp rp: hnode_ptr) (f: pos) (l r: HSpec.htree)
+  requires (p |-> ({ sym = 0; freq = f; left = Some lp; right = Some rp } <: hnode)) **
+           is_htree lp l ** is_htree rp r
+  ensures is_htree p (HSpec.Internal f l r)
+{
+  fold (is_htree p (HSpec.Internal f l r))
+}

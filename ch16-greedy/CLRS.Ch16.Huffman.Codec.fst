@@ -114,6 +114,21 @@ let rec decode_step_codeword (t: htree) (s: nat) (rest: list bool)
         | Some _ -> decode_step_codeword r s rest
         | None -> ()
 
+(*** Computation rules ***)
+
+let decode_step_leaf (s: nat) (f: pos) (bits: list bool)
+  : Lemma (decode_step (Leaf s f) bits == Some (s, bits))
+  = ()
+
+let decode_step_internal (f: pos) (l r: htree) (b: bool) (rest: list bool)
+  : Lemma (decode_step (Internal f l r) (b :: rest) ==
+            (if b then decode_step l rest else decode_step r rest))
+  = ()
+
+let decode_step_internal_nil (f: pos) (l r: htree)
+  : Lemma (decode_step (Internal f l r) [] == None)
+  = ()
+
 (*** Main theorem: encode then decode = identity ***)
 
 let rec encode_decode_roundtrip (t: htree) (msg: list nat)

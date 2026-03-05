@@ -38,6 +38,18 @@ val decode_step (cur: htree) (bits: list bool) : option (nat & list bool)
 
 val decode (t: htree) (bits: list bool) : Tot (option (list nat))
 
+(*** Computation rules (for use by Codec.Impl) ***)
+
+val decode_step_leaf (s: nat) (f: pos) (bits: list bool)
+  : Lemma (decode_step (Leaf s f) bits == Some (s, bits))
+
+val decode_step_internal (f: pos) (l r: htree) (b: bool) (rest: list bool)
+  : Lemma (decode_step (Internal f l r) (b :: rest) ==
+            (if b then decode_step l rest else decode_step r rest))
+
+val decode_step_internal_nil (f: pos) (l r: htree)
+  : Lemma (decode_step (Internal f l r) [] == None)
+
 (*** Round-trip theorems ***)
 
 /// encode then decode = identity (no wf needed — prefix-free is structural)

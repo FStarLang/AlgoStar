@@ -50,3 +50,24 @@ fn huffman_tree
                         HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0) /\
                         HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0)))
 //SNIPPET_END: huffman_tree_iface
+
+// ========== Ghost fold/unfold helpers for is_htree ==========
+
+ghost fn elim_is_htree_leaf (p: hnode_ptr) (s: nat) (f: pos)
+  requires is_htree p (HSpec.Leaf s f)
+  ensures p |-> ({ sym = s; freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
+
+ghost fn intro_is_htree_leaf (p: hnode_ptr) (s: nat) (f: pos)
+  requires p |-> ({ sym = s; freq = f; left = None #(Box.box hnode); right = None #(Box.box hnode) } <: hnode)
+  ensures is_htree p (HSpec.Leaf s f)
+
+ghost fn elim_is_htree_internal (p: hnode_ptr) (f: pos) (l r: HSpec.htree)
+  requires is_htree p (HSpec.Internal f l r)
+  ensures exists* (lp rp: hnode_ptr).
+    (p |-> ({ sym = 0; freq = f; left = Some lp; right = Some rp } <: hnode)) **
+    is_htree lp l ** is_htree rp r
+
+ghost fn intro_is_htree_internal (p: hnode_ptr) (lp rp: hnode_ptr) (f: pos) (l r: HSpec.htree)
+  requires (p |-> ({ sym = 0; freq = f; left = Some lp; right = Some rp } <: hnode)) **
+           is_htree lp l ** is_htree rp r
+  ensures is_htree p (HSpec.Internal f l r)
