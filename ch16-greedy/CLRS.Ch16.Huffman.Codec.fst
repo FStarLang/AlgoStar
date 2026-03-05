@@ -76,13 +76,25 @@ let rec decode (t: htree) (bits: list bool) : Tot (option (list nat))
         | None -> None
       else None
 
-(*** Helper lemmas ***)
+(*** Computation rules — must match .fsti declaration order ***)
 
-// decode_step consumes at least one bit when starting from an Internal node
+let decode_step_leaf (s: nat) (f: pos) (bits: list bool)
+  : Lemma (decode_step (Leaf s f) bits == Some (s, bits))
+  = ()
+
+let decode_step_internal (f: pos) (l r: htree) (b: bool) (rest: list bool)
+  : Lemma (decode_step (Internal f l r) (b :: rest) ==
+            (if b then decode_step l rest else decode_step r rest))
+  = ()
+
+let decode_step_internal_nil (f: pos) (l r: htree)
+  : Lemma (decode_step (Internal f l r) [] == None)
+  = ()
+
 let rec decode_step_progress (cur: htree) (bits: list bool)
   : Lemma (requires Internal? cur /\ Some? (decode_step cur bits))
-          (ensures (let Some (_, remaining) = decode_step cur bits in
-                    length remaining < length bits))
+          (ensures (let ds = Some?.v (decode_step cur bits) in
+                    length (snd ds) < length bits))
           (decreases cur)
   = match cur with
     | Internal _ l r ->
@@ -91,6 +103,53 @@ let rec decode_step_progress (cur: htree) (bits: list bool)
       match child with
       | Leaf _ _ -> ()
       | Internal _ _ _ -> decode_step_progress child rest
+
+let decode_nil (t: htree) : Lemma (decode t [] == Some []) = ()
+
+let decode_cons (t: htree) (bits: list bool)
+  : Lemma (requires Cons? bits /\ Internal? t /\ Some? (decode_step t bits))
+          (ensures (let ds = Some?.v (decode_step t bits) in
+                    length (snd ds) < length bits /\
+                    (match decode t (snd ds) with
+                     | Some rest_msg -> decode t bits == Some (fst ds :: rest_msg)
+                     | None -> decode t bits == None)))
+  = decode_step_progress t bits
+
+let decode_some_implies_step (t: htree) (bits: list bool)
+  : Lemma (requires Internal? t /\ Cons? bits /\ Some? (decode t bits))
+          (ensures Some? (decode_step t bits))
+  = ()
+
+let list_index_zero (#a: Type) (hd: a) (tl: list a)
+  : Lemma (index (hd :: tl) 0 == hd) = ()
+
+let list_index_succ (#a: Type) (hd: a) (tl: list a) (i: nat{i < length tl})
+  : Lemma (index (hd :: tl) (i + 1) == index tl i) = ()
+
+let codeword_leaf_match (s: nat) (f: pos) : Lemma (codeword (Leaf s f) s == Some []) = ()
+
+let codeword_leaf_mismatch (s s': nat) (f: pos)
+  : Lemma (requires s <> s') (ensures codeword (Leaf s' f) s == None) = ()
+
+let codeword_internal (f: pos) (l r: htree) (s: nat)
+  : Lemma (codeword (Internal f l r) s ==
+           (match codeword l s with
+            | Some path -> Some (true :: path)
+            | None -> match codeword r s with
+                      | Some path -> Some (false :: path)
+                      | None -> None))
+  = ()
+
+let encode_nil (t: htree) : Lemma (encode t [] == Some []) = ()
+
+let encode_cons (t: htree) (s: nat) (rest: list nat)
+  : Lemma (encode t (s :: rest) ==
+           (match codeword t s, encode t rest with
+            | Some cw, Some rest_bits -> Some (cw @ rest_bits)
+            | _, _ -> None))
+  = ()
+
+(*** Helper lemmas ***)
 
 // codeword is non-empty for symbols in an Internal tree
 let rec codeword_nonempty (t: htree) (s: nat)
@@ -113,21 +172,6 @@ let rec decode_step_codeword (t: htree) (s: nat) (rest: list bool)
         match codeword r s with
         | Some _ -> decode_step_codeword r s rest
         | None -> ()
-
-(*** Computation rules ***)
-
-let decode_step_leaf (s: nat) (f: pos) (bits: list bool)
-  : Lemma (decode_step (Leaf s f) bits == Some (s, bits))
-  = ()
-
-let decode_step_internal (f: pos) (l r: htree) (b: bool) (rest: list bool)
-  : Lemma (decode_step (Internal f l r) (b :: rest) ==
-            (if b then decode_step l rest else decode_step r rest))
-  = ()
-
-let decode_step_internal_nil (f: pos) (l r: htree)
-  : Lemma (decode_step (Internal f l r) [] == None)
-  = ()
 
 (*** Main theorem: encode then decode = identity ***)
 

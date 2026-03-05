@@ -40,6 +40,7 @@ val decode (t: htree) (bits: list bool) : Tot (option (list nat))
 
 (*** Computation rules (for use by Codec.Impl) ***)
 
+// decode_step rules
 val decode_step_leaf (s: nat) (f: pos) (bits: list bool)
   : Lemma (decode_step (Leaf s f) bits == Some (s, bits))
 
@@ -49,6 +50,62 @@ val decode_step_internal (f: pos) (l r: htree) (b: bool) (rest: list bool)
 
 val decode_step_internal_nil (f: pos) (l r: htree)
   : Lemma (decode_step (Internal f l r) [] == None)
+
+/// decode_step on Internal always consumes at least one bit
+val decode_step_progress (cur: htree) (bits: list bool)
+  : Lemma (requires Internal? cur /\ Some? (decode_step cur bits))
+          (ensures (let ds = Some?.v (decode_step cur bits) in
+                    length (snd ds) < length bits))
+
+// decode rules
+val decode_nil (t: htree)
+  : Lemma (decode t [] == Some [])
+
+val decode_cons (t: htree) (bits: list bool)
+  : Lemma (requires Cons? bits /\ Internal? t /\ Some? (decode_step t bits))
+          (ensures (let ds = Some?.v (decode_step t bits) in
+                    length (snd ds) < length bits /\
+                    (match decode t (snd ds) with
+                     | Some rest_msg -> decode t bits == Some (fst ds :: rest_msg)
+                     | None -> decode t bits == None)))
+
+/// If decode succeeds on non-empty bits, then decode_step also succeeds
+val decode_some_implies_step (t: htree) (bits: list bool)
+  : Lemma (requires Internal? t /\ Cons? bits /\ Some? (decode t bits))
+          (ensures Some? (decode_step t bits))
+
+/// List indexing into cons
+val list_index_zero (#a: Type) (hd: a) (tl: list a)
+  : Lemma (index (hd :: tl) 0 == hd)
+
+val list_index_succ (#a: Type) (hd: a) (tl: list a) (i: nat{i < length tl})
+  : Lemma (index (hd :: tl) (i + 1) == index tl i)
+
+// codeword rules
+val codeword_leaf_match (s: nat) (f: pos)
+  : Lemma (codeword (Leaf s f) s == Some [])
+
+val codeword_leaf_mismatch (s s': nat) (f: pos)
+  : Lemma (requires s <> s')
+          (ensures codeword (Leaf s' f) s == None)
+
+val codeword_internal (f: pos) (l r: htree) (s: nat)
+  : Lemma (codeword (Internal f l r) s ==
+           (match codeword l s with
+            | Some path -> Some (true :: path)
+            | None -> match codeword r s with
+                      | Some path -> Some (false :: path)
+                      | None -> None))
+
+// encode rules
+val encode_nil (t: htree)
+  : Lemma (encode t [] == Some [])
+
+val encode_cons (t: htree) (s: nat) (rest: list nat)
+  : Lemma (encode t (s :: rest) ==
+           (match codeword t s, encode t rest with
+            | Some cw, Some rest_bits -> Some (cw @ rest_bits)
+            | _, _ -> None))
 
 (*** Round-trip theorems ***)
 
