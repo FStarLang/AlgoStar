@@ -1,4 +1,4 @@
-module CLRS.Ch35.VertexCover
+module CLRS.Ch35.VertexCover.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
@@ -7,6 +7,7 @@ open FStar.SizeT
 open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch35.VertexCover.Spec
+open CLRS.Ch35.VertexCover.Lemmas
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -14,51 +15,37 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Spec = CLRS.Ch35.VertexCover.Spec
+module Lemmas = CLRS.Ch35.VertexCover.Lemmas
 module GR = Pulse.Lib.GhostReference
 
-// 2-approximation vertex cover algorithm from CLRS Chapter 35
+// 2-approximation vertex cover algorithm from CLRS Chapter 35.
 // Given an adjacency matrix for an undirected graph with n vertices,
-// returns a cover array where cover[i] = 1 if vertex i is in the cover
+// returns a cover array where cover[i] = 1 if vertex i is in the cover.
 //
 // NOTE: The algorithm scans only upper-triangular entries (u < v),
 // which is correct for undirected graphs where adj[u*n+v] = adj[v*n+u].
-// For directed graphs, edges (v,u) with v > u would be silently ignored.
-
-//SNIPPET_START: is_cover
-let is_cover (s_adj s_cover: Seq.seq int) (n: nat) (bound_u bound_v: nat) : prop =
-  Seq.length s_adj == n * n /\
-  Seq.length s_cover == n /\
-  (forall (u v: nat). (u < bound_u \/ (u == bound_u /\ v < bound_v)) ==>
-    u < n ==> v < n ==> u < v ==>
-    Seq.index s_adj (u * n + v) <> 0 ==>
-    (Seq.index s_cover u <> 0 \/ Seq.index s_cover v <> 0))
-//SNIPPET_END: is_cover
 
 // Lemma: is_cover with bound_v <= bound_u implies is_cover at next value
-// since no edges (u,v) with u=bound_u, v < bound_v satisfy u < v when bound_v <= bound_u
 let is_cover_skip_to (s_adj s_cover: Seq.seq int) (n: nat) (u v: nat)
   : Lemma 
-    (requires is_cover s_adj s_cover n u 0 /\ v <= u + 1)
-    (ensures is_cover s_adj s_cover n u v)
+    (requires Spec.is_cover s_adj s_cover n u 0 /\ v <= u + 1)
+    (ensures Spec.is_cover s_adj s_cover n u v)
   = ()
 
 // Lemma: is_cover with bound_v >= n is equivalent to advancing to next row
 let is_cover_next_row (s_adj s_cover: Seq.seq int) (n: nat) (u: nat)
   : Lemma 
-    (requires is_cover s_adj s_cover n u n /\ u < n)
-    (ensures is_cover s_adj s_cover n (u + 1) 0)
+    (requires Spec.is_cover s_adj s_cover n u n /\ u < n)
+    (ensures Spec.is_cover s_adj s_cover n (u + 1) 0)
   = ()
 
 // Lemma: updating cover preserves is_cover when the update only sets values to non-zero
-// After writing cover[vu] := new_cu and cover[vv] := new_cv,
-// the cover property is preserved for previously covered edges,
-// and the current edge (vu, vv) becomes covered
 #push-options "--z3rlimit 30"
 let is_cover_step (s_adj s_cover: Seq.seq int) (n vu vv: nat) 
   (cu cv has_edge: int) (new_cu new_cv: int)
   : Lemma
     (requires
-      is_cover s_adj s_cover n vu vv /\
+      Spec.is_cover s_adj s_cover n vu vv /\
       vu < n /\ vv < n /\ vu < vv /\
       cu == Seq.index s_cover vu /\
       cv == Seq.index s_cover vv /\
@@ -68,7 +55,7 @@ let is_cover_step (s_adj s_cover: Seq.seq int) (n vu vv: nat)
     (ensures (
       let s1 = Seq.upd s_cover vu new_cu in
       let s2 = Seq.upd s1 vv new_cv in
-      is_cover s_adj s2 n vu (vv + 1)))
+      Spec.is_cover s_adj s2 n vu (vv + 1)))
   = let s1 = Seq.upd s_cover vu new_cu in
     let s2 = Seq.upd s1 vv new_cv in
     assert (forall (u v: nat). ((u < vu \/ (u == vu /\ v < vv + 1)) /\ u < n /\ v < n /\ u < v /\
@@ -138,7 +125,6 @@ let matching_inv_step (s_adj s_cover: Seq.seq int) (n vu vv: nat) (m: list Spec.
   = let s1 = Seq.upd s_cover vu new_cu in
     let s2 = Seq.upd s1 vv new_cv in
     if has_edge <> 0 && cu = 0 && cv = 0 then (
-      // vu and vv are not in any existing matching edge
       existsb_false_means_all_false (fun (e: Spec.edge) -> Spec.edge_uses_vertex e vu) m;
       existsb_false_means_all_false (fun (e: Spec.edge) -> Spec.edge_uses_vertex e vv) m
     ) else ()
@@ -147,7 +133,7 @@ let matching_inv_step (s_adj s_cover: Seq.seq int) (n vu vv: nat) (m: list Spec.
 // Lemma: Apply the approximation bound for all possible opt values
 let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat) (m: list Spec.edge)
   : Lemma (requires 
-            is_cover s_adj s_cover n n 0 /\
+            Spec.is_cover s_adj s_cover n n 0 /\
             Seq.length s_cover = n /\
             Seq.length s_adj = n * n /\
             (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
@@ -158,11 +144,11 @@ let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat) (m: list Spe
   = let bound (c_opt: Spec.cover_fn)
       : Lemma (requires Spec.is_valid_graph_cover s_adj n c_opt)
               (ensures Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n <= 2 * Spec.count_cover c_opt n) =
-      Spec.approximation_ratio_theorem s_adj s_cover n m c_opt
+      Lemmas.approximation_ratio_theorem s_adj s_cover n m c_opt
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires bound)
 
-//SNIPPET_START: approx_vertex_cover_sig
+//SNIPPET_START: approx_vertex_cover
 fn approx_vertex_cover
   (#p: perm)
   (adj: array int)
@@ -181,12 +167,12 @@ fn approx_vertex_cover
     V.pts_to cover s_cover **
     pure (
       Seq.length s_cover == SZ.v n /\
-      is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
+      Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
       (forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
         Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) <= 2 * opt)
     )
-//SNIPPET_END: approx_vertex_cover_sig
+//SNIPPET_END: approx_vertex_cover
 {
   // Initialize cover array with all zeros
   let cover = V.alloc 0 n;
@@ -201,7 +187,6 @@ fn approx_vertex_cover
   // Outer loop: u from 0 to n-1
   let mut u: SZ.t = 0sz;
   
-//SNIPPET_START: outer_loop
   while (!u <^ n)
   invariant exists* vu s_cover vm.
     R.pts_to u vu **
@@ -212,12 +197,11 @@ fn approx_vertex_cover
       SZ.v vu <= SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length s_cover == SZ.v n /\
-      is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0 /\
+      Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0 /\
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
       matching_inv s_adj s_cover (SZ.v n) vm
     )
   decreases (SZ.v n - SZ.v !u)
-//SNIPPET_END: outer_loop
   {
     let vu = !u;
     
@@ -242,7 +226,7 @@ fn approx_vertex_cover
         SZ.fits (SZ.v vu * SZ.v n) /\
         SZ.fits (SZ.v vu * SZ.v n + SZ.v n) /\
         Seq.length s_cover_inner == SZ.v n /\
-        is_cover s_adj s_cover_inner (SZ.v n) (SZ.v vu) (SZ.v vv) /\
+        Spec.is_cover s_adj s_cover_inner (SZ.v n) (SZ.v vu) (SZ.v vv) /\
         (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover_inner i = 0 \/ Seq.index s_cover_inner i = 1)) /\
         matching_inv s_adj s_cover_inner (SZ.v n) vm_inner
       )
@@ -311,7 +295,7 @@ fn approx_vertex_cover
   // Free ghost matching reference
   GR.free matching_ref;
   
-  assert pure (is_cover s_adj s_final (SZ.v n) (SZ.v n) 0);
+  assert pure (Spec.is_cover s_adj s_final (SZ.v n) (SZ.v n) 0);
   assert pure (Seq.length s_final == SZ.v n);
   assert pure (forall (i: nat). i < SZ.v n ==> (Seq.index s_final i = 0 \/ Seq.index s_final i = 1));
   
@@ -341,6 +325,6 @@ fn approx_vertex_cover
  * 1. The matching is pairwise disjoint (no shared vertices)
  * 2. The cover consists exactly of the matching endpoints
  * 3. Each matching edge is a valid graph edge
- * Then Spec.approximation_ratio_theorem applies CLRS Theorem 35.1:
+ * Then Lemmas.approximation_ratio_theorem applies CLRS Theorem 35.1:
  *   |cover| = 2|matching| ≤ 2 * count(any valid cover) ≤ 2 * OPT
  *)

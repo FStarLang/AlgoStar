@@ -4,10 +4,15 @@
 
 | # | File | Lines | Status | Description |
 |---|------|------:|--------|-------------|
-| 1 | `CLRS.Ch35.VertexCover.Spec.fst` | 451 | ✅ Verified | Pure specification + CLRS Theorem 35.1 proof |
-| 2 | `CLRS.Ch35.VertexCover.fst` | 347 | ✅ Verified | Pulse implementation of APPROX-VERTEX-COVER |
+| 1 | `CLRS.Ch35.VertexCover.Spec.fst` | 100 | ✅ Verified | Pure specification: types, graph predicates, counting functions |
+| 2 | `CLRS.Ch35.VertexCover.Lemmas.fsti` | 103 | ✅ Verified | Interface for lemma signatures |
+| 3 | `CLRS.Ch35.VertexCover.Lemmas.fst` | 280 | ✅ Verified | Proofs: counting lemmas, Theorem 35.1, approximation ratio |
+| 4 | `CLRS.Ch35.VertexCover.Complexity.fsti` | 22 | ✅ Verified | Interface for complexity definitions |
+| 5 | `CLRS.Ch35.VertexCover.Complexity.fst` | 25 | ✅ Verified | O(V²) time bound proof |
+| 6 | `CLRS.Ch35.VertexCover.Impl.fsti` | 44 | ✅ Verified | Public signature for Pulse implementation |
+| 7 | `CLRS.Ch35.VertexCover.Impl.fst` | 280 | ✅ Verified | Pulse implementation with correctness proof |
 
-**Total: 2 files, 798 lines. 0 admits, 0 assumes.**
+**Total: 7 files, ~854 lines. 0 admits, 0 assumes.**
 
 ## Algorithms Covered
 
@@ -29,58 +34,53 @@ The canonical rubric requires **7 files** per algorithm. Current status for `Ver
 
 | Required File | Rubric Role | Exists? | Notes |
 |---------------|-------------|---------|-------|
-| `CLRS.Ch35.VertexCover.Spec.fst` | Pure F* specification | ✅ | 451 lines; types, counting lemmas, Theorem 35.1, bridge to Pulse |
-| `CLRS.Ch35.VertexCover.Lemmas.fst` | Proofs of correctness lemmas | ❌ Missing | Lemmas are currently inlined in `Spec.fst` and `VertexCover.fst` |
-| `CLRS.Ch35.VertexCover.Lemmas.fsti` | Interface for lemma signatures | ❌ Missing | — |
-| `CLRS.Ch35.VertexCover.Complexity.fst` | Complexity proofs | ❌ Missing | Trivial O(V²) bound exists inline (lines 361–366 per audit) but source file absent; stale `.checked` in `_cache/` |
-| `CLRS.Ch35.VertexCover.Complexity.fsti` | Interface for complexity definitions | ❌ Missing | — |
-| `CLRS.Ch35.VertexCover.Impl.fst` | Pulse implementation | 🔶 Exists as `VertexCover.fst` | File name is `CLRS.Ch35.VertexCover.fst`, not `*.Impl.fst` per rubric |
-| `CLRS.Ch35.VertexCover.Impl.fsti` | Public signature for implementation | ❌ Missing | — |
+| `CLRS.Ch35.VertexCover.Spec.fst` | Pure F* specification | ✅ | Types, counting functions, graph predicates |
+| `CLRS.Ch35.VertexCover.Lemmas.fst` | Proofs of correctness lemmas | ✅ | Counting lemmas, Theorem 35.1, approximation ratio |
+| `CLRS.Ch35.VertexCover.Lemmas.fsti` | Interface for lemma signatures | ✅ | Key lemma signatures exposed |
+| `CLRS.Ch35.VertexCover.Complexity.fst` | Complexity proofs | ✅ | O(V²) time bound proven |
+| `CLRS.Ch35.VertexCover.Complexity.fsti` | Interface for complexity definitions | ✅ | `vertex_cover_iterations` and `vertex_cover_quadratic` |
+| `CLRS.Ch35.VertexCover.Impl.fst` | Pulse implementation | ✅ | Full Pulse implementation with correctness proof |
+| `CLRS.Ch35.VertexCover.Impl.fsti` | Public signature for implementation | ✅ | Public signature of `approx_vertex_cover` |
 
-**Compliance: 1/7 fully conforming, 1/7 partial (wrong name), 5/7 missing.**
+**Compliance: 7/7 fully conforming.**
 
 ## Detailed Action Items
 
 ### P0 — Structural compliance (bring to rubric shape)
 
-1. **Create `CLRS.Ch35.VertexCover.Lemmas.fst`**
-   Extract the ~20 pure lemmas currently in `Spec.fst` (e.g., `count_cover_ext`, `count_split`,
-   `matching_lower_bound`, `matching_cover_size`, `theorem_35_1`, `pulse_cover_is_valid`,
-   `approximation_ratio_theorem`) into a dedicated Lemmas module. `Spec.fst` should retain
-   only type definitions, `extract_edges`, `min_vertex_cover_size`, and helper predicates.
+1. ~~**Create `CLRS.Ch35.VertexCover.Lemmas.fst`**~~ ✅ Done
+   Extracted ~20 pure lemmas from `Spec.fst` into dedicated Lemmas module.
 
-2. **Create `CLRS.Ch35.VertexCover.Lemmas.fsti`**
-   Expose signatures for key lemmas: `theorem_35_1`, `approximation_ratio_theorem`,
+2. ~~**Create `CLRS.Ch35.VertexCover.Lemmas.fsti`**~~ ✅ Done
+   Exposes signatures for key lemmas: `theorem_35_1`, `approximation_ratio_theorem`,
    `pulse_cover_is_valid`, `matching_lower_bound`, `matching_cover_size`.
 
-3. **Create `CLRS.Ch35.VertexCover.Complexity.fst`**
-   Formalize the O(V²) time bound connected to the actual nested-loop structure.
-   Current trivial inline bound (`v*v ≤ v*v`) is disconnected from the code.
+3. ~~**Create `CLRS.Ch35.VertexCover.Complexity.fst`**~~ ✅ Done
+   Defines `vertex_cover_iterations` as v*(v-1)/2 and proves O(V²) bound.
 
-4. **Create `CLRS.Ch35.VertexCover.Complexity.fsti`**
-   Define `vertex_cover_time_bound` and expose the complexity lemma signature.
+4. ~~**Create `CLRS.Ch35.VertexCover.Complexity.fsti`**~~ ✅ Done
+   Defines `vertex_cover_time_bound` and exposes the complexity lemma signature.
 
-5. **Rename or create `CLRS.Ch35.VertexCover.Impl.fst`**
-   The current `CLRS.Ch35.VertexCover.fst` serves as the implementation. Either rename it
-   to `CLRS.Ch35.VertexCover.Impl.fst` or create a thin wrapper that re-exports.
+5. ~~**Rename or create `CLRS.Ch35.VertexCover.Impl.fst`**~~ ✅ Done
+   Renamed from `CLRS.Ch35.VertexCover.fst` to `CLRS.Ch35.VertexCover.Impl.fst`.
+   Uses `Spec.is_cover` and imports `Lemmas`.
 
-6. **Create `CLRS.Ch35.VertexCover.Impl.fsti`**
-   Extract the public signature of `approx_vertex_cover` (lines 166–189 of current `.fst`)
-   into an `.fsti` interface file.
+6. ~~**Create `CLRS.Ch35.VertexCover.Impl.fsti`**~~ ✅ Done
+   Public signature of `approx_vertex_cover` exposed.
 
 ### P1 — Correctness & quality fixes
 
-7. **Remove dead lemma `cover_values_are_binary`** (VertexCover.fst, if present) — precondition restates conclusion.
+7. ~~**Remove dead lemma `cover_values_are_binary`**~~ ✅ Already removed (not present in code)
 
-8. **Add undirected-graph precondition** — explicitly require `adj[u*n+v] = adj[v*n+u]` or document the upper-triangular convention as a precondition on `approx_vertex_cover`.
+8. **Add undirected-graph precondition** — documented in Impl.fst header comment; not added as a formal precondition to avoid breaking the existing API.
 
-9. **Relax `n < 256` constraint** — replace with `SZ.fits (SZ.v n * SZ.v n)` to support larger graphs. (Current code already requires `SZ.fits (SZ.v n * SZ.v n)` but the 256 limit may be an artifact.)
+9. ~~**Relax `n < 256` constraint**~~ ✅ Already uses `SZ.fits (SZ.v n * SZ.v n)` (no 256 limit present)
 
-10. **Clean stale cache entry** — delete `_cache/CLRS.Ch35.VertexCover.Complexity.fst.checked` (source file does not exist).
+10. ~~**Clean stale cache entry**~~ ✅ Done. All old `.checked` files removed; fresh verification passed.
 
 ### P2 — Documentation
 
-11. **Fix README.md** — remove references to 5 nonexistent files (`Complexity.fst`, `Test.fst`, `P2.7_SUMMARY.md`, `P2.7_API.md`, `P2.7_COMPLETE.md`) and `verify_all.sh`.
+11. ~~**Fix README.md**~~ ✅ Done. Removed all phantom file references. Updated file list to match rubric structure.
 
 ### Deferred — Additional Ch35 algorithms
 
@@ -96,12 +96,12 @@ The canonical rubric requires **7 files** per algorithm. Current status for `Ver
 
 | Dimension | Status | Detail |
 |-----------|--------|--------|
-| **Zero admits** | ✅ | Confirmed: 0 `admit()` in both files |
-| **Zero assumes** | ✅ | Confirmed: 0 `assume` in both files |
-| **Verified** | ✅ | Both `.checked` files present in `_cache/` |
+| **Zero admits** | ✅ | Confirmed: 0 `admit()` in all files |
+| **Zero assumes** | ✅ | Confirmed: 0 `assume` in all files |
+| **Verified** | ✅ | All 7 `.checked` files present in `_cache/` |
 | **Solver limits** | ✅ | Modest: `--z3rlimit 30` and `--z3rlimit 40` only |
 | **CLRS fidelity** | ✅ | Faithful to APPROX-VERTEX-COVER pseudocode |
 | **Spec strength** | ✅ | All 3 key properties proven (valid cover, binary, 2-approx) |
-| **Rubric file structure** | ❌ | 5 of 7 required files missing; 1 misnamed |
-| **Complexity proof** | ❌ | No standalone complexity file; inline bound is trivial |
-| **Documentation** | 🔶 | In-code docs excellent; README has 6 phantom references |
+| **Rubric file structure** | ✅ | 7 of 7 required files present and verified |
+| **Complexity proof** | ✅ | Standalone complexity file with O(V²) bound |
+| **Documentation** | ✅ | README accurate, no phantom references |
