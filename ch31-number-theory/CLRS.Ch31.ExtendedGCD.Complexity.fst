@@ -15,9 +15,6 @@ open FStar.Mul
 open CLRS.Ch31.GCD.Complexity
 
 //SNIPPET_START: extended_gcd_complexity
-let extended_gcd_complexity_bounded (a b: nat) : prop =
-  b > 0 ==> gcd_steps a b <= op_Multiply 2 (num_bits b) + 1
-
 let extended_gcd_complexity (a b: nat)
   : Lemma (ensures extended_gcd_complexity_bounded a b)
   = if b > 0 then lemma_gcd_steps_log a b
