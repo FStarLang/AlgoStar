@@ -1,7 +1,7 @@
 # Chapter 16: Greedy Algorithms — Rubric Compliance
 
 **Directory**: `ch16-greedy/`
-**Date**: 2025-07-18
+**Date**: 2025-07-18 (updated 2025-07-24)
 **Based on**: `RUBRIC.md` (canonical), `AUDIT_CH16.md` (prior audit, 2025-02-26)
 
 > **Key changes since audit**:
@@ -10,6 +10,10 @@
 > - Impl files renamed: `ActivitySelection.fst` → `ActivitySelection.Impl.fst`,
 >   `Huffman.fst` → `Huffman.Impl.fst` (per rubric naming convention).
 > - Created `.fsti` interfaces for all modules: Impl, Lemmas, Complexity, Optimality.
+> - Added `sym:nat` to `htree` Leaf (CLRS §16.3 character labels) + `sym:int` to heap `hnode`.
+> - New `Huffman.Codec.fst/.fsti`: verified encode/decode with round-trip proofs on real htree.
+> - New `Huffman.Codec.Impl.fst/.fsti`: Pulse imperative decode_step with proof connection to pure Codec.
+> - Ghost elim/intro helpers for `is_htree` exposed in `Huffman.Impl.fsti`.
 > - All files verified (zero admits, zero assumes).
 
 ---
@@ -25,12 +29,16 @@
 | `CLRS.Ch16.ActivitySelection.Spec.fst` | 1,178 | ✅ | **Spec** | ActivitySelection |
 | `CLRS.Ch16.ActivitySelection.Complexity.fst` | 11 | ✅ | **Complexity** | ActivitySelection |
 | `CLRS.Ch16.ActivitySelection.Complexity.fsti` | 13 | ✅ | **Complexity** interface | ActivitySelection |
-| `CLRS.Ch16.Huffman.Impl.fst` | 523 | ✅ | **Impl** (Pulse) | Huffman |
-| `CLRS.Ch16.Huffman.Impl.fsti` | 52 | ✅ | **Impl** interface | Huffman |
+| `CLRS.Ch16.Huffman.Impl.fst` | 556 | ✅ | **Impl** (Pulse) | Huffman |
+| `CLRS.Ch16.Huffman.Impl.fsti` | 73 | ✅ | **Impl** interface | Huffman |
 | `CLRS.Ch16.Huffman.Spec.fst` | 2,124 | ✅ | **Spec** | Huffman |
 | `CLRS.Ch16.Huffman.Complete.fst` | 1,807 | ✅ | **Lemmas** (pure algorithm + WPL optimality proof) | Huffman |
 | `CLRS.Ch16.Huffman.Optimality.fst` | 353 | ✅ | **Lemmas** (bridge: greedy cost ↔ WPL) | Huffman |
 | `CLRS.Ch16.Huffman.Optimality.fsti` | 73 | ✅ | **Lemmas** interface (greedy_cost + key lemmas) | Huffman |
+| `CLRS.Ch16.Huffman.Codec.fst` | 240 | ✅ | **Lemmas** (encode/decode round-trip proofs) | Huffman |
+| `CLRS.Ch16.Huffman.Codec.fsti` | 65 | ✅ | **Lemmas** interface (encode, decode, round-trips) | Huffman |
+| `CLRS.Ch16.Huffman.Codec.Impl.fst` | 108 | ✅ | **Impl** (Pulse decode_step) | Huffman |
+| `CLRS.Ch16.Huffman.Codec.Impl.fsti` | 56 | ✅ | **Impl** interface (Pulse decode_step) | Huffman |
 | `CLRS.Ch16.Huffman.Complexity.fst` | 223 | ✅ | **Complexity** (O(n²) sorted-list) | Huffman |
 | `CLRS.Ch16.Huffman.Complexity.fsti` | 49 | ✅ | **Complexity** interface | Huffman |
 | `CLRS.Ch16.Huffman.Defs.fst` | 475 | ✅ | **Lemmas** (shared defs for Impl) | Huffman |
@@ -64,6 +72,11 @@ subtrees. The codebase provides:
 1. **`huffman_complete`** (Complete.fst) — Pure spec-level construction using sorted list as PQ; WPL-optimality proven via CLRS Lemma 16.2 (greedy exchange argument).
 2. **`huffman_tree`** (Impl.fst) — Imperative Pulse implementation using `Pulse.Lib.PriorityQueue` (binary heap); postcondition includes `is_wpl_optimal`.
 3. **Optimality bridge** (Optimality.fst) — Proves `cost(huffman_complete freqs) == greedy_cost freqs` and the critical `greedy_cost_implies_optimal` lemma used by the Pulse Impl.
+4. **Codec** (Codec.fst) — Pure encode/decode on real `htree` with verified round-trip:
+   `decode(encode(msg)) == msg` and `encode(decode(bits)) == bits` (for well-formed trees).
+5. **Codec.Impl** (Codec.Impl.fst) — Pulse imperative `decode_step_impl` that walks a heap-allocated tree, preserving `is_htree`, with postcondition connecting to the pure `HCodec.decode_step` spec.
+
+**htree type**: Leaves carry `sym:nat` (CLRS character label) and `freq:pos`. The heap `hnode` has `sym:int` matched by `is_htree`.
 
 **Huffman.Complete** is the correctness cornerstone: it implements the algorithm purely
 (no mutation) and proves WPL-optimality (`huffman_complete_optimal`). Optimality.fst
@@ -77,10 +90,10 @@ references `greedy_cost_implies_optimal` to close its postcondition.
 
 | Rubric Slot | Mapped Modules |
 |-------------|----------------|
-| `Spec` | `Huffman.Spec.fst` — htree type, WPL, cost, swap lemma, greedy choice theorem |
-| `Lemmas` | `Huffman.Complete.fst` (WPL optimality), `Huffman.Optimality.fst/.fsti` (bridge), `Huffman.Defs.fst` (shared defs), `Huffman.PQLemmas.fst/.fsti`, `Huffman.ForestLemmas.fst/.fsti`, `Huffman.PQForest.fst/.fsti` |
+| `Spec` | `Huffman.Spec.fst` — htree type (Leaf sym:nat freq:pos), WPL, cost, swap lemma, greedy choice theorem |
+| `Lemmas` | `Huffman.Complete.fst` (WPL optimality), `Huffman.Optimality.fst/.fsti` (bridge), `Huffman.Codec.fst/.fsti` (encode/decode round-trips), `Huffman.Defs.fst` (shared defs), `Huffman.PQLemmas.fst/.fsti`, `Huffman.ForestLemmas.fst/.fsti`, `Huffman.PQForest.fst/.fsti` |
 | `Complexity` | `Huffman.Complexity.fst/.fsti` — O(n²) for sorted-list variant |
-| `Impl` | `Huffman.Impl.fst/.fsti` — Pulse imperative `huffman_tree` |
+| `Impl` | `Huffman.Impl.fst/.fsti` — Pulse imperative `huffman_tree`, `free_htree`, ghost helpers; `Huffman.Codec.Impl.fst/.fsti` — Pulse `decode_step_impl` |
 
 ---
 
@@ -121,6 +134,8 @@ references `greedy_cost_implies_optimal` to close its postcondition.
 | Verified (`.checked`) | ✅ All files | ✅ All files |
 | Admits / Assumes | ✅ Zero | ✅ Zero |
 | Optimality in postcondition | ✅ `count == max_compatible_count` | ✅ `is_wpl_optimal` |
+| Encode/Decode round-trip | — | ✅ `encode_decode_roundtrip`, `decode_encode_roundtrip` |
+| Pulse Codec | — | ✅ `decode_step_impl` with pure spec connection |
 
 ---
 
@@ -177,8 +192,8 @@ now have `.checked` caches, and the `huffman_tree` postcondition includes `is_wp
 
 | Check | Result |
 |-------|--------|
-| All `.fst` have `.checked` | ✅ 12/12 |
-| All `.fsti` have `.checked` | ✅ 10/10 |
+| All `.fst` have `.checked` | ✅ 14/14 |
+| All `.fsti` have `.checked` | ✅ 12/12 |
 | `Huffman.Impl.fst` verified | ✅ **Resolved** (was ❌ in prior audit) |
 | Pulse `.Impl.fsti` verified against `.Impl.fst` | ✅ Both `ActivitySelection.Impl` and `Huffman.Impl` |
 
