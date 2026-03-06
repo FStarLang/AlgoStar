@@ -40,7 +40,7 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | — | Interface: complexity theorem signatures |
 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | O(VE²) complexity analysis with ghost tick counter |
 | `CLRS.Ch26.MaxFlow.Impl.fsti` | — | Interface: `max_flow` public API + bridge lemma |
-| `CLRS.Ch26.MaxFlow.Impl.fst` | ~1300 | Imperative Pulse implementation: BFS + augmentation + pure path lemmas |
+| `CLRS.Ch26.MaxFlow.Impl.fst` | ~1390 | Imperative Pulse implementation: BFS + augmentation + pure path lemmas |
 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Smoke test on a 3-vertex graph |
 
 ## Verified Properties
@@ -84,12 +84,15 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 - **Capacity validation**: Runtime `check_valid_caps_fn` verifies non-negative capacities
 - **Static flow validity**: `max_flow` postcondition guarantees `imp_valid_flow`
 - **Spec bridge**: `imp_valid_flow_implies_valid_flow` connects imperative postcondition to `Spec.valid_flow`, enabling use with MFMC theorem
+- **MFMC usability**: `max_flow` returns `completed: bool`. When `true` (natural termination), postcondition additionally guarantees `no_augmenting_path` — the exact precondition of the MFMC theorem. A caller can: (1) call `max_flow`, (2) bridge to `valid_flow`, (3) apply MFMC to conclude the result is maximum and equals the min-cut capacity.
 
 ### Remaining proof obligations
 
 | Obligation | File | Notes |
 |------------|------|-------|
 | `lemma_augment_imp_preserves_valid` | `Impl.fst` | `admit()` — augmentation preserves validity |
+| `axiom_bfs_complete` | `Impl.fst` | `assume val` — BFS completeness ⟹ no augmenting path |
+| BFS postcondition `bfs_complete` | `Impl.fst` | `assume_` ×2 — source colored + BFS completeness invariant |
 | `axiom_spd_source_zero` | `Complexity.fst` | BFS shortest-path distance |
 | `axiom_spd_bounded` | `Complexity.fst` | BFS shortest-path bound |
 | `lemma_distances_nondecreasing` | `Complexity.fst` | Lemma 26.7 |

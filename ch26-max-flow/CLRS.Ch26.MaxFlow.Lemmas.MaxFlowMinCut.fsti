@@ -43,10 +43,7 @@ val max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matr
   : Lemma
     (requires
       valid_flow flow cap source sink /\
-      (forall (path: list nat).
-        Cons? path /\ L.hd path = source /\ L.last path = sink /\
-        (forall (v: nat). L.mem v path ==> v < n) ==>
-        bottleneck cap flow n path <= 0))
+      no_augmenting_path cap flow source sink)
     (ensures
       (exists (s_set: nat -> bool).
         is_st_cut s_set n source sink /\

@@ -757,11 +757,7 @@ let max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matr
   : Lemma
     (requires
       valid_flow flow cap source sink /\
-      // No augmenting path exists: all paths from source have a zero-residual-capacity edge
-      (forall (path: list nat).
-        Cons? path /\ L.hd path = source /\ L.last path = sink /\
-        (forall (v: nat). L.mem v path ==> v < n) ==>
-        bottleneck cap flow n path <= 0))
+      no_augmenting_path cap flow source sink)
     (ensures
       // Flow value equals some cut capacity (strong duality)
       (exists (s_set: nat -> bool).

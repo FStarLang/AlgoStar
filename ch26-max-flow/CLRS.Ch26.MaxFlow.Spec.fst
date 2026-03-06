@@ -341,3 +341,12 @@ let rec net_flow_aux (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
 
 let net_flow_across_cut (#n: nat) (flow: flow_matrix n) (s_set: nat -> bool) : int =
   net_flow_aux flow n s_set n
+
+(** No augmenting path exists: every source-to-sink path has bottleneck ≤ 0.
+    This is the key precondition of the max-flow min-cut theorem (CLRS Theorem 26.6). *)
+let no_augmenting_path (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
+                        (source: nat{source < n}) (sink: nat{sink < n}) : prop =
+  forall (path: list nat).
+    Cons? path /\ L.hd path = source /\ L.last path = sink /\
+    (forall (v: nat). L.mem v path ==> v < n) ==>
+    bottleneck cap flow n path <= 0

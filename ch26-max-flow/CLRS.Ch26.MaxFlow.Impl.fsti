@@ -69,7 +69,12 @@ fn check_valid_caps_fn
     - source, sink: source and sink vertex indices
     - fuel: maximum number of augmentation iterations
     
-    Postcondition guarantees imp_valid_flow on the resulting flow array. *)
+    Returns completed = true when BFS found no augmenting path (natural
+    termination); false when fuel was exhausted.
+    
+    Postcondition:
+    - Always: imp_valid_flow on the resulting flow array
+    - When completed: additionally no_augmenting_path, enabling the MFMC theorem *)
 fn max_flow
   (capacity: A.array int)
   (#cap_seq: Ghost.erased (Seq.seq int))
@@ -92,10 +97,17 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n)
     )
+  returns completed: bool
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
     pure (
+      SZ.v n > 0 /\
+      SZ.v source < SZ.v n /\
+      SZ.v sink < SZ.v n /\
+      SZ.v source <> SZ.v sink /\
+      Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
-      imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink)
+      imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
+      (completed ==> no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
     )

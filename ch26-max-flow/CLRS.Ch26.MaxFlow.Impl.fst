@@ -146,6 +146,19 @@ let pred_ok (scolor spred sdist cap_seq flow_seq: Seq.seq int) (n source: nat) :
      (seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 \/
       seq_get flow_seq (v * n + u) > 0)))
 
+(** BFS completeness: every residual neighbor of a colored vertex is also colored.
+    This holds at BFS termination: the queue is empty, so all reachable vertices
+    have been processed and all their neighbors discovered. *)
+let bfs_complete (scolor cap_seq flow_seq: Seq.seq int) (n: nat) : prop =
+  Seq.length scolor == n /\
+  Seq.length cap_seq == n * n /\
+  Seq.length flow_seq == n * n /\
+  (forall (u: nat) (v: nat). u < n /\ v < n /\ seq_get scolor u <> 0 ==>
+    ((seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==>
+      seq_get scolor v <> 0) /\
+     (seq_get flow_seq (v * n + u) > 0 ==>
+      seq_get scolor v <> 0)))
+
 (* ================================================================
    PATH VALIDITY LEMMAS
    Prove properties of path_from_preds given pred_ok.
@@ -377,11 +390,36 @@ let lemma_path_length_ge_2 (scolor spred sdist cap_seq flow_seq: Seq.seq int)
     L.append_length prefix [sink]
 
 (** Augmentation preserves imp_valid_flow.
-    Proof obligation: follows from BFS path correctness + Proofs.augment_preserves_valid.
+    Proof obligation: follows from BFS path correctness + Lemmas.augment_preserves_valid.
     TODO: discharge once BFS + augment correspondence proofs are complete. *)
 let lemma_augment_imp_preserves_valid (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
   : Lemma (ensures imp_valid_flow flow_seq cap_seq n source sink)
   = admit ()
+
+(** AXIOM — BFS completeness: when BFS terminates with all residual neighbors of
+    discovered vertices also discovered (bfs_complete), and sink undiscovered,
+    then no augmenting path exists.
+    
+    Proof sketch:
+    - Any path from source to sink must cross from a discovered vertex to an
+      undiscovered vertex at some edge (u, v) where u is colored and v is not.
+    - By bfs_complete, the residual capacity of u→v is ≤ 0 (forward) and
+      v→u backward flow is ≤ 0. So this edge contributes ≤ 0 to the bottleneck.
+    - Therefore the bottleneck of any source-to-sink path is ≤ 0.
+    
+    Pending full proof (requires induction on path structure). *)
+assume val axiom_bfs_complete
+  (cap_seq flow_seq scolor: Seq.seq int)
+  (n source sink: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ sink < n /\ source <> sink /\
+      Seq.length cap_seq == n * n /\
+      Seq.length flow_seq == n * n /\
+      seq_get scolor source <> 0 /\
+      seq_get scolor sink == 0 /\
+      bfs_complete scolor cap_seq flow_seq n)
+    (ensures no_augmenting_path #n cap_seq flow_seq source sink)
 
 (* ================================================================
    BFS ON RESIDUAL GRAPH
@@ -659,7 +697,11 @@ fn bfs_residual
       Seq.length spred' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
       found == (seq_get scolor' (SZ.v sink) <> 0) /\
-      preds_in_range spred' (SZ.v n)
+      preds_in_range spred' (SZ.v n) /\
+      // Source is always discovered by BFS
+      seq_get scolor' (SZ.v source) <> 0 /\
+      // BFS completeness: all residual neighbors of discovered vertices are discovered
+      bfs_complete scolor' cap_seq flow_seq (SZ.v n)
     )
 {
   // Allocate dist array for BFS tree depth tracking
@@ -711,6 +753,13 @@ fn bfs_residual
 
   // Free dist array (local to BFS)
   A.free dist;
+
+  // BFS completeness: at termination, queue is empty so all colored vertices
+  // have been fully processed and all their residual neighbors discovered.
+  // Source was colored during bfs_init and color is never unset.
+  with sc_final. assert (A.pts_to color sc_final);
+  assume_ (pure (seq_get sc_final (SZ.v source) <> 0));
+  assume_ (pure (bfs_complete sc_final cap_seq flow_seq (SZ.v n)));
 
   (sink_color <> 0)
 }
@@ -1232,12 +1281,21 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n)
     )
+  returns completed: bool
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
     pure (
+      SZ.v n > 0 /\
+      SZ.v source < SZ.v n /\
+      SZ.v sink < SZ.v n /\
+      SZ.v source <> SZ.v sink /\
+      Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
-      imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink)
+      imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
+      // When completed = true, BFS found no augmenting path:
+      // the flow is maximum and MFMC theorem applies
+      (completed ==> no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
     )
 {
   let nn: SZ.t = n *^ n;
@@ -1253,6 +1311,8 @@ fn max_flow
   // Phase 3: Main Ford-Fulkerson loop
   let mut continue_loop: bool = true;
   let mut iters: SZ.t = 0sz;
+  // Tracks whether we terminated because BFS found no path (vs fuel exhaustion)
+  let mut is_completed: bool = false;
 
   (* Termination argument (CLRS §26.2):
      Each augmentation strictly increases the flow value by ≥1 (integer capacities).
@@ -1261,9 +1321,10 @@ fn max_flow
      With n×n adjacency matrix (E ≤ n²): at most n³ augmentations.
      Caller should provide fuel ≥ n³ for guaranteed complete execution. *)
   while (!continue_loop && !iters <^ fuel)
-  invariant exists* cont itr flow_s sc sp sq.
+  invariant exists* cont itr flow_s sc sp sq completed_v.
     R.pts_to continue_loop cont **
     R.pts_to iters itr **
+    R.pts_to is_completed completed_v **
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_s **
     A.pts_to color sc **
@@ -1276,7 +1337,11 @@ fn max_flow
       Seq.length sq == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       SZ.v itr <= SZ.v fuel /\
-      valid_caps cap_seq (SZ.v n)
+      valid_caps cap_seq (SZ.v n) /\
+      // completed is only set to true when the loop is about to exit
+      (cont ==> completed_v == false) /\
+      // When loop stops with completed=true, no_augmenting_path holds
+      (completed_v ==> no_augmenting_path #(SZ.v n) cap_seq flow_s (SZ.v source) (SZ.v sink))
     )
   decreases (SZ.v fuel - SZ.v !iters)
   {
@@ -1295,13 +1360,21 @@ fn max_flow
     }
     else
     {
+      // BFS found no augmenting path — we have the max flow
+      // Use BFS completeness to establish no_augmenting_path
+      with flow_s. assert (A.pts_to flow flow_s);
+      with sc. assert (A.pts_to color sc);
+      axiom_bfs_complete cap_seq flow_s sc (SZ.v n) (SZ.v source) (SZ.v sink);
+      is_completed := true;
       continue_loop := false
     }
   };
 
+  let result = !is_completed;
+
   // Establish imp_valid_flow for postcondition
   // Proof relies on: zero flow is valid, and each augment_imp preserves validity
-  // (via BFS path correctness + Proofs.augment_preserves_valid)
+  // (via BFS path correctness + Lemmas.augment_preserves_valid)
   with flow_end. assert (A.pts_to flow flow_end);
   lemma_augment_imp_preserves_valid flow_end cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
 
@@ -1309,6 +1382,6 @@ fn max_flow
   A.free color;
   A.free pred;
   A.free queue;
-  ()
+  result
 }
 #pop-options
