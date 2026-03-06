@@ -525,3 +525,335 @@ let rec sp_dist_source_nonpositive (weights: Seq.seq int) (n: nat) (s: nat) (k: 
     sp_dist_k_monotone weights n s s (k - 1);
     min_over_predecessors_improves weights n s s k (sp_dist_k weights n s s (k - 1)) 0
   end
+
+// ========== Declarative Characterisation of sp_dist ==========
+//
+// sp_dist is defined algorithmically via Bellman-Ford-style DP.
+// Below we show it IS the shortest-path distance in the declarative
+// sense: it equals the minimum weight of all valid paths from s to v.
+//
+//   Optimality:    path_weight p >= sp_dist_k(s, v, path_edges p)
+//   Achievability: sp_dist_k(s, v, k) < inf ==> exists witnessing path
+
+(* Remove the last vertex from a path with at least 2 vertices *)
+let rec path_prefix (p: path)
+  : Pure path
+    (requires length p >= 2)
+    (ensures fun r -> length r == length p - 1 /\
+                      hd r == hd p)
+    (decreases length p)
+  = match p with
+    | [a; _] -> [a]
+    | a :: tl -> a :: path_prefix tl
+
+(* Second-to-last vertex in a path with at least one edge *)
+let rec path_penult (p: path)
+  : Pure nat
+    (requires length p >= 2)
+    (ensures fun _ -> True)
+    (decreases length p)
+  = match p with
+    | [u; _] -> u
+    | _ :: tl -> path_penult tl
+
+(* path_source of prefix is same as path_source of original *)
+let path_prefix_source (p: path)
+  : Lemma (requires length p >= 2)
+          (ensures path_source (path_prefix p) == path_source p)
+  = ()
+
+(* path_dest of prefix is the penultimate vertex *)
+let rec path_prefix_dest (p: path)
+  : Lemma (requires length p >= 2)
+          (ensures path_dest (path_prefix p) == path_penult p)
+          (decreases length p)
+  = match p with
+    | [_; _] -> ()
+    | _ :: tl -> path_prefix_dest tl
+
+(* path_edges of prefix *)
+let path_prefix_edges (p: path)
+  : Lemma (requires length p >= 2)
+          (ensures path_edges (path_prefix p) == path_edges p - 1)
+  = ()
+
+(* path_valid is preserved by prefix *)
+let rec path_prefix_valid (p: path) (n: nat)
+  : Lemma (requires length p >= 2 /\ path_valid p n)
+          (ensures path_valid (path_prefix p) n)
+          (decreases length p)
+  = match p with
+    | [_; _] -> ()
+    | _ :: tl -> path_prefix_valid tl n
+
+(* path_all_edges_exist is preserved by prefix *)
+let rec path_prefix_edges_exist (p: path) (weights: Seq.seq int) (n: nat)
+  : Lemma (requires length p >= 2 /\ path_all_edges_exist p weights n)
+          (ensures path_all_edges_exist (path_prefix p) weights n)
+          (decreases length p)
+  = match p with
+    | [_; _] -> ()
+    | _ :: tl -> path_prefix_edges_exist tl weights n
+
+(* Weight decomposition: weight(p) = weight(prefix) + w(penult, dest) *)
+let rec path_weight_snoc (p: path) (weights: Seq.seq int) (n: nat)
+  : Lemma
+    (requires length p >= 2)
+    (ensures (let u = path_penult p in
+              let v = path_dest p in
+              let w = if u < n && v < n && u * n + v < Seq.length weights
+                      then Seq.index weights (u * n + v) else inf in
+              path_weight p weights n == path_weight (path_prefix p) weights n + w))
+    (decreases length p)
+  = match p with
+    | [_; _] -> ()
+    | _ :: tl -> path_weight_snoc tl weights n
+
+(* Penult is a valid vertex when path is valid *)
+let rec path_penult_valid (p: path) (n: nat)
+  : Lemma (requires length p >= 2 /\ path_valid p n)
+          (ensures path_penult p < n)
+          (decreases length p)
+  = match p with
+    | [_; _] -> ()
+    | _ :: tl -> path_penult_valid tl n
+
+(* Last edge exists when all edges exist *)
+let rec path_last_edge_exists (p: path) (weights: Seq.seq int) (n: nat)
+  : Lemma (requires length p >= 2 /\ path_all_edges_exist p weights n)
+          (ensures (let u = path_penult p in
+                    let v = path_dest p in
+                    u < n /\ v < n /\ u * n + v < Seq.length weights /\
+                    Seq.index weights (u * n + v) < inf))
+          (decreases length p)
+  = match p with
+    | [_; _] -> ()
+    | _ :: tl -> path_last_edge_exists tl weights n
+
+(* Extend a path by appending a vertex *)
+let path_snoc (p: path) (v: nat) : path = FStar.List.Tot.append p [v]
+
+let rec path_snoc_dest (p: path) (v: nat)
+  : Lemma (ensures path_dest (path_snoc p v) == v)
+          (decreases length p)
+  = match p with
+    | [_] -> ()
+    | _ :: tl -> path_snoc_dest tl v
+
+let path_snoc_source (p: path) (v: nat)
+  : Lemma (ensures path_source (path_snoc p v) == path_source p)
+  = ()
+
+let path_snoc_edges (p: path) (v: nat)
+  : Lemma (ensures path_edges (path_snoc p v) == path_edges p + 1)
+  = FStar.List.Tot.Properties.append_length p [v]
+
+let rec path_snoc_valid (p: path) (v: nat) (n: nat)
+  : Lemma (requires path_valid p n /\ v < n)
+          (ensures path_valid (path_snoc p v) n)
+          (decreases length p)
+  = match p with
+    | [_] -> ()
+    | _ :: tl -> path_snoc_valid tl v n
+
+let rec path_snoc_weight (p: path) (v: nat) (weights: Seq.seq int) (n: nat)
+  : Lemma (ensures (let u = path_dest p in
+                    let w = if u < n && v < n && u * n + v < Seq.length weights
+                            then Seq.index weights (u * n + v) else inf in
+                    path_weight (path_snoc p v) weights n ==
+                    path_weight p weights n + w))
+          (decreases length p)
+  = match p with
+    | [_] -> ()
+    | _ :: tl -> path_snoc_weight tl v weights n
+
+let rec path_snoc_edges_exist (p: path) (v: nat) (weights: Seq.seq int) (n: nat)
+  : Lemma (requires path_all_edges_exist p weights n /\
+                    (let u = path_dest p in
+                     u < n /\ v < n /\ u * n + v < Seq.length weights /\
+                     Seq.index weights (u * n + v) < inf))
+          (ensures path_all_edges_exist (path_snoc p v) weights n)
+          (decreases length p)
+  = match p with
+    | [_] -> ()
+    | _ :: tl -> path_snoc_edges_exist tl v weights n
+
+(* ---- Optimality ---- *)
+
+(* Helper: non-negative weights make prefix weight ≤ path weight *)
+let rec path_weight_nonneg (p: path) (weights: Seq.seq int) (n: nat)
+  : Lemma
+    (requires path_all_edges_exist p weights n /\
+              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
+                Seq.index weights (i * n + j) >= 0))
+    (ensures path_weight p weights n >= 0)
+    (decreases length p)
+  = match p with
+    | [_] -> ()
+    | _ :: tl -> path_weight_nonneg tl weights n
+
+(* Monotonicity generalized: sp_dist_k is non-increasing in k *)
+let rec sp_dist_k_monotone_le (weights: Seq.seq int) (n: nat) (s v: nat) (j k: nat)
+  : Lemma (requires j <= k)
+          (ensures sp_dist_k weights n s v k <= sp_dist_k weights n s v j)
+          (decreases k - j)
+  = if j = k then ()
+    else begin
+      sp_dist_k_monotone weights n s v (k - 1);
+      sp_dist_k_monotone_le weights n s v j (k - 1)
+    end
+
+(* Core optimality: for paths with exactly k edges *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec sp_dist_k_le_path_weight_exact
+  (weights: Seq.seq int) (n: nat) (s v: nat) (k: nat) (p: path)
+  : Lemma
+    (requires n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+              path_source p == s /\ path_dest p == v /\
+              path_edges p == k /\
+              path_valid p n /\ path_all_edges_exist p weights n /\
+              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
+                Seq.index weights (i * n + j) >= 0))
+    (ensures sp_dist_k weights n s v k <= path_weight p weights n)
+    (decreases k)
+  = if k = 0 then ()
+    else begin
+      let u = path_penult p in
+      let p' = path_prefix p in
+      path_weight_snoc p weights n;
+      path_prefix_source p;
+      path_prefix_valid p n;
+      path_prefix_edges_exist p weights n;
+      path_prefix_dest p;
+      path_prefix_edges p;
+      path_penult_valid p n;
+      path_last_edge_exists p weights n;
+      let w_uv = Seq.index weights (u * n + v) in
+      sp_dist_k_le_path_weight_exact weights n s u (k - 1) p';
+      let sp_u = sp_dist_k weights n s u (k - 1) in
+      if sp_u < inf then
+        sp_dist_k_triangle weights n s u v k
+      else begin
+        sp_dist_k_bounded weights n s u (k - 1);
+        sp_dist_k_bounded weights n s v k
+      end
+    end
+#pop-options
+
+(* General optimality: for paths with at most k edges *)
+let sp_dist_k_optimal
+  (weights: Seq.seq int) (n: nat) (s v: nat) (k: nat) (p: path)
+  : Lemma
+    (requires n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+              path_source p == s /\ path_dest p == v /\
+              path_edges p <= k /\
+              path_valid p n /\ path_all_edges_exist p weights n /\
+              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
+                Seq.index weights (i * n + j) >= 0))
+    (ensures sp_dist_k weights n s v k <= path_weight p weights n)
+  = sp_dist_k_le_path_weight_exact weights n s v (path_edges p) p;
+    sp_dist_k_monotone_le weights n s v (path_edges p) k
+
+//SNIPPET_START: sp_dist_optimal
+(* OPTIMALITY: sp_dist is at most the weight of any valid path (non-negative weights) *)
+let sp_dist_optimal
+  (weights: Seq.seq int) (n: nat) (s v: nat) (p: path)
+  : Lemma
+    (requires n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+              path_source p == s /\ path_dest p == v /\
+              path_edges p <= n - 1 /\
+              path_valid p n /\ path_all_edges_exist p weights n /\
+              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
+                Seq.index weights (i * n + j) >= 0))
+    (ensures sp_dist weights n s v <= path_weight p weights n)
+  = sp_dist_k_optimal weights n s v (n - 1) p
+//SNIPPET_END: sp_dist_optimal
+
+(* ---- Achievability ---- *)
+
+(* Helper: find the predecessor that achieves the min_over_predecessors result *)
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 0"
+let rec find_achieving_predecessor
+  (weights: Seq.seq int) (n: nat) (s v: nat) (k: nat{k > 0}) (best: int) (u: nat)
+  : Pure nat
+    (requires s < n /\ v < n /\ Seq.length weights == n * n /\
+              best <= inf /\
+              min_over_predecessors weights n s v k best u < best)
+    (ensures fun r -> u <= r /\ r < n /\
+              sp_dist_k weights n s r (k - 1) < inf /\
+              r * n + v < Seq.length weights /\
+              Seq.index weights (r * n + v) < inf /\
+              sp_dist_k weights n s r (k - 1) + Seq.index weights (r * n + v) ==
+                min_over_predecessors weights n s v k best u)
+    (decreases n - u)
+  = let w = if u * n + v < Seq.length weights then Seq.index weights (u * n + v) else inf in
+    let via_u = sp_dist_k weights n s u (k - 1) in
+    let candidate = if via_u < inf && w < inf then via_u + w else inf in
+    let new_best = if candidate < best then candidate else best in
+    if u + 1 >= n then
+      u
+    else begin
+      min_over_predecessors_improves weights n s v k new_best (u + 1);
+      let inner = min_over_predecessors weights n s v k new_best (u + 1) in
+      if inner < new_best then
+        find_achieving_predecessor weights n s v k new_best (u + 1)
+      else if candidate < best then
+        u
+      else begin
+        (* new_best = best, inner >= new_best = best, but 
+           min_over_predecessors(best, u) = inner <= new_best = best and < best: contradiction *)
+        assert false;
+        u
+      end
+    end
+#pop-options
+
+(* Achievability: construct a path witnessing sp_dist_k *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 0"
+let rec sp_dist_k_achieving_path
+  (weights: Seq.seq int) (n: nat) (s v: nat) (k: nat)
+  : Pure path
+    (requires n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+              sp_dist_k weights n s v k < inf)
+    (ensures fun p ->
+      path_source p == s /\ path_dest p == v /\
+      path_edges p <= k /\
+      path_valid p n /\ path_all_edges_exist p weights n /\
+      path_weight p weights n == sp_dist_k weights n s v k)
+    (decreases k)
+  = if k = 0 then [s]
+    else begin
+      let without = sp_dist_k weights n s v (k - 1) in
+      min_over_predecessors_improves weights n s v k without 0;
+      if sp_dist_k weights n s v k = without then
+        sp_dist_k_achieving_path weights n s v (k - 1)
+      else begin
+        sp_dist_k_bounded weights n s v (k - 1);
+        let u = find_achieving_predecessor weights n s v k without 0 in
+        let p' = sp_dist_k_achieving_path weights n s u (k - 1) in
+        let result = path_snoc p' v in
+        path_snoc_dest p' v;
+        path_snoc_source p' v;
+        path_snoc_edges p' v;
+        path_snoc_valid p' v n;
+        path_snoc_weight p' v weights n;
+        path_snoc_edges_exist p' v weights n;
+        result
+      end
+    end
+#pop-options
+
+//SNIPPET_START: sp_dist_achievable
+(* ACHIEVABILITY: if sp_dist is finite, there exists a path achieving it *)
+let sp_dist_achievable
+  (weights: Seq.seq int) (n: nat) (s v: nat)
+  : Pure path
+    (requires n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+              sp_dist weights n s v < inf)
+    (ensures fun p ->
+      path_source p == s /\ path_dest p == v /\
+      path_edges p <= n - 1 /\
+      path_valid p n /\ path_all_edges_exist p weights n /\
+      path_weight p weights n == sp_dist weights n s v)
+  = sp_dist_k_achieving_path weights n s v (n - 1)
+//SNIPPET_END: sp_dist_achievable

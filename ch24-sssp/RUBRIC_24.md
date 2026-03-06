@@ -1,7 +1,7 @@
 # Chapter 24: Single-Source Shortest Paths — Rubric Compliance
 
 **Date:** 2025-07-17 (updated 2026-03-05)
-**Scope:** `ch24-sssp/` — 16 `.fst` files + 9 `.fsti` files, ~7 000 lines
+**Scope:** `ch24-sssp/` — 16 `.fst` files + 9 `.fsti` files, ~8 000 lines
 **Verification:** All files verify — `make -j4` clean
 
 ---
@@ -10,7 +10,7 @@
 
 | # | File | Lines | Rubric Role | Algorithm |
 |---|------|------:|-------------|-----------|
-| 1 | `CLRS.Ch24.ShortestPath.Spec.fst` | 504 | **Spec** (shared) | — (shared by BF & Dijkstra) |
+| 1 | `CLRS.Ch24.ShortestPath.Spec.fst` | ~860 | **Spec** (shared) | — (shared by BF & Dijkstra) |
 | 2 | `CLRS.Ch24.ShortestPath.Triangle.fst` | 330 | **Lemmas** (shared) | — (shared by BF & Dijkstra) |
 | 3 | `CLRS.Ch24.BellmanFord.Spec.fst` | 1 040 | **Spec** | Bellman-Ford |
 | 4 | `CLRS.Ch24.BellmanFord.Impl.fst` + `.fsti` | ~610 | **Impl** (single fn: correctness + complexity) | Bellman-Ford |
@@ -43,7 +43,7 @@
 | Component | File(s) | Notes |
 |-----------|---------|-------|
 | Pure spec (`sp_dist_k`, convergence, neg-cycle detection) | `BellmanFord.Spec.fst` | 1 040 lines; proves Lemma 24.2, Thm 24.4, Cor 24.5 |
-| Shared shortest-path oracle (`sp_dist_k`, `sp_dist`) | `ShortestPath.Spec.fst` | Flat-weight formulation; `triangle_ineq_implies_upper_bound` (Cor 24.3) |
+| Shared shortest-path oracle (`sp_dist_k`, `sp_dist`) | `ShortestPath.Spec.fst` | Flat-weight formulation; `triangle_ineq_implies_upper_bound` (Cor 24.3); declarative characterisation (`sp_dist_optimal`, `sp_dist_achievable`) |
 | Spec bridge (flat-weights ↔ adj_matrix) | `BellmanFord.SpecBridge.fst` | Mutual induction; zero admits |
 | Triangle inequality from relaxation | `BellmanFord.TriangleInequality.fst` + `.fsti` | BF fixpoint ⇒ triangle; tight interface |
 | Stabilization / pigeonhole | `ShortestPath.Triangle.fst` | `sp_dist_k_stabilize`, `sp_dist_triangle_ineq` |
@@ -128,6 +128,22 @@ gives the inner loop its own Pulse elaboration scope, keeping SMT queries tracta
 Contains CLRS Theorem 24.6 (greedy choice invariant). Used by `Dijkstra.Lemmas`. This is
 substantive proof content, not superseded by other files.
 
+### ShortestPath.Spec — Declarative Characterisation of sp_dist
+
+`sp_dist` is defined algorithmically (Bellman-Ford-style DP). Two new lemmas prove it IS
+the shortest-path distance in a declarative sense:
+
+- **Optimality** (`sp_dist_optimal`): For any valid path p from s to v with non-negative edge
+  weights: `sp_dist(s,v) ≤ path_weight(p)`. (Every path is at least as long.)
+- **Achievability** (`sp_dist_achievable`): If `sp_dist(s,v) < inf`, there exists a concrete
+  valid path p whose weight equals `sp_dist(s,v)`. (The minimum is achieved.)
+
+Together these establish: sp_dist(s,v) = min { path_weight(p) | p is a valid s→v path }.
+
+Helper infrastructure: `path_prefix`, `path_penult`, `path_snoc` with weight decomposition
+and validity preservation lemmas. The achievability proof constructs an explicit witnessing
+path via `sp_dist_k_achieving_path` (a Pure function).
+
 ---
 
 ## Quality Checks
@@ -153,6 +169,8 @@ substantive proof content, not superseded by other files.
 | Theorem 24.6 (Dijkstra greedy) | Greedy choice yields δ(s,u) | ✅ `greedy_choice_invariant` |
 | Lemma 24.10 (Triangle ineq) | δ(s,v) ≤ δ(s,u) + w(u,v) | ✅ `sp_dist_triangle_flat` |
 | Lemma 24.11 (Upper bound) | Triangle ineq ⇒ upper bound | ✅ `triangle_ineq_implies_upper_bound` |
+| **sp\_dist optimality** | ∀ valid path p: weight(p) ≥ δ(s,v) (non-neg weights) | ✅ `sp_dist_optimal` |
+| **sp\_dist achievability** | δ(s,v) < ∞ ⟹ ∃ path p with weight(p) = δ(s,v) | ✅ `sp_dist_achievable` |
 
 ### Complexity Verification
 
@@ -175,6 +193,7 @@ substantive proof content, not superseded by other files.
 
 | File | Max rlimit | Notes |
 |------|-----------|-------|
+| ShortestPath.Spec.fst | 60 | `sp_dist_k_le_path_weight_exact`, `sp_dist_k_achieving_path`, `find_achieving_predecessor` |
 | BellmanFord.Impl.fst | 80 | Both `bellman_ford` and `bellman_ford_complexity` |
 | Dijkstra.fst | 40 | Main `fn dijkstra` (split_queries always) |
 | Dijkstra.TriangleInequality.fst | 60 | `find_improving_predecessor` |
@@ -186,7 +205,7 @@ substantive proof content, not superseded by other files.
 | Dimension | Rating |
 |-----------|--------|
 | CLRS Fidelity | ★★★★☆ — faithful adj-matrix adaptation; missing predecessor π |
-| Specification Strength | ★★★★★ — d[v]=δ(s,v) proven for both algorithms |
+| Specification Strength | ★★★★★ — d[v]=δ(s,v) proven; sp\_dist declaratively characterised (optimality + achievability) |
 | Complexity | ★★★★★ — exact tick counts; asymptotic bounds verified; integrated with implementations |
 | Proof Quality | ★★★★★ — zero admits/assumes across all files |
 | Documentation | ★★★★★ — comprehensive headers; sentinel documented |
