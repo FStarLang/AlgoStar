@@ -13,6 +13,7 @@
    - All distances non-negative and bounded [0, 1000000]
    - Triangle inequality for all edges
    - Shortest-path equality: dist[v] == sp_dist(source, v) for all v
+   - Predecessor tree: pred encodes a shortest-path tree
    - O(V²) complexity bound via ghost counter
 
    NOTE: The core Pulse implementation lives in CLRS.Ch24.Dijkstra.fst because
@@ -52,6 +53,9 @@ let all_bounded = D.all_bounded
 /// Triangle inequality: for all finite edges, dist[v] <= dist[u] + w
 let triangle_inequality = D.triangle_inequality
 
+/// Predecessor consistency: pred encodes a shortest-path tree
+let pred_consistent = D.pred_consistent
+
 // ========== Complexity Bounds ==========
 
 /// Total iteration count for Dijkstra with adjacency matrix
@@ -68,31 +72,36 @@ val dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
 // ========== Algorithm: Correctness + Complexity ==========
 
 //SNIPPET_START: dijkstra_sig
-/// Dijkstra SSSP — correctness + O(V²) complexity in one function
+/// Dijkstra SSSP — correctness + O(V²) complexity + predecessor tree
 fn dijkstra
   (weights: A.array int)
   (n: SZ.t)
   (source: SZ.t)
   (dist: A.array int)
+  (pred: A.array SZ.t)
+  (ctr: GR.ref nat)
   (#sweights: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
-  (ctr: GR.ref nat)
+  (#spred: erased (Seq.seq SZ.t))
   (#c0: erased nat)
   requires
     A.pts_to weights sweights **
     A.pts_to dist sdist **
+    A.pts_to pred spred **
     GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       SZ.v source < SZ.v n /\
       Seq.length sweights == SZ.v n * SZ.v n /\
       Seq.length sdist == SZ.v n /\
+      Seq.length spred == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       all_weights_non_negative sweights
     )
-  ensures exists* sdist' (cf: nat).
+  ensures exists* sdist' spred' (cf: nat).
     A.pts_to weights sweights **
     A.pts_to dist sdist' **
+    A.pts_to pred spred' **
     GR.pts_to ctr cf **
     pure (
       Seq.length sdist' == SZ.v n /\
@@ -103,6 +112,7 @@ fn dijkstra
       triangle_inequality sweights sdist' (SZ.v n) /\
       (forall (v: nat). v < SZ.v n ==>
         Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v) /\
+      pred_consistent spred' sdist' sweights (SZ.v n) (SZ.v source) /\
       dijkstra_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: dijkstra_sig

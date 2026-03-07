@@ -98,6 +98,32 @@ let dijkstra_sp_upper_bound (sdist sweights: Seq.seq int) (n source: nat) : Lemm
     FStar.Classical.forall_intro aux
 #pop-options
 
+//SNIPPET_START: pred_consistent
+/// Predecessor consistency: pred encodes a shortest-path tree.
+/// For every reachable vertex v ≠ source, pred[v] is the predecessor on a shortest path:
+///   dist[v] = dist[pred[v]] + w(pred[v], v)
+let pred_consistent (spred: Seq.seq SZ.t) (sdist sweights: Seq.seq int) (n source: nat) : prop =
+  Seq.length spred == n /\
+  Seq.length sdist == n /\
+  Seq.length sweights >= n * n /\
+  (source < n ==> SZ.v (Seq.index spred source) == source) /\
+  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < 1000000 ==>
+    (let p = SZ.v (Seq.index spred v) in
+     p < n /\
+     p * n + v < Seq.length sweights /\
+     Seq.index sweights (p * n + v) < 1000000 /\
+     Seq.index sdist p < 1000000 /\
+     Seq.index sdist v == Seq.index sdist p + Seq.index sweights (p * n + v)))
+//SNIPPET_END: pred_consistent
+
+/// Internal: pred consistency + predecessors are visited vertices
+let pred_ok (spred: Seq.seq SZ.t) (sdist sweights svisited: Seq.seq int) (n source: nat) : prop =
+  pred_consistent spred sdist sweights n source /\
+  Seq.length svisited == n /\
+  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < 1000000 ==>
+    SZ.v (Seq.index spred v) < n /\
+    Seq.index svisited (SZ.v (Seq.index spred v)) = 1)
+
 /// dist[v] >= sp_dist(source, v) for all v (no underestimate property)
 let dist_ge_sp_dist (sdist sweights: Seq.seq int) (n source: nat) : prop =
   Seq.length sdist == n /\
@@ -145,6 +171,70 @@ let relax_round_lb_post
       (ensures Seq.index sdist_after v >= SP.sp_dist sweights n source v) =
       if Seq.index sdist_after v = Seq.index sdist_pre v then ()
       else SPT.sp_dist_triangle_ineq sweights n source u v
+    in
+    FStar.Classical.forall_intro aux
+#pop-options
+
+/// Bridge lemma: pred_ok is preserved by the relaxation round
+#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+let relax_round_pred_ok
+  (sweights sdist_pre sdist_after: Seq.seq int)
+  (spred_pre spred_after: Seq.seq SZ.t)
+  (svisited_pre: Seq.seq int)
+  (n source u: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ u < n /\
+      Seq.length sweights == n * n /\
+      Seq.length sdist_pre == n /\ Seq.length sdist_after == n /\
+      Seq.length spred_pre == n /\ Seq.length spred_after == n /\
+      Seq.length svisited_pre == n /\
+      Seq.index svisited_pre u = 0 /\
+      Seq.index sdist_pre source == 0 /\
+      all_non_negative sdist_pre /\
+      all_weights_non_negative sweights /\
+      (forall (j: nat). j < n ==>
+        (Seq.index svisited_pre j = 0 \/ Seq.index svisited_pre j = 1)) /\
+      pred_ok spred_pre sdist_pre sweights svisited_pre n source /\
+      (* Visited vertices' distances don't change *)
+      (forall (x: nat). x < n /\ (Seq.index svisited_pre x = 1 \/ x = u) ==>
+        Seq.index sdist_after x == Seq.index sdist_pre x) /\
+      (* Relax effect: for each v, either unchanged or STRICTLY improved through u *)
+      (forall (v: nat). v < n ==>
+        (Seq.index sdist_after v == Seq.index sdist_pre v /\
+         Seq.index spred_after v == Seq.index spred_pre v) \/
+        (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
+         Seq.index sdist_after v < Seq.index sdist_pre v /\
+         Seq.index sweights (u * n + v) < 1000000 /\
+         Seq.index sdist_pre u < 1000000 /\
+         SZ.v (Seq.index spred_after v) == u))
+    )
+    (ensures pred_ok spred_after sdist_after sweights (Seq.upd svisited_pre u 1) n source)
+  = let svisited_now = Seq.upd svisited_pre u 1 in
+    // Source is never "updated" since dist[source] = 0 and the update requires strict decrease
+    // (dist_u + w >= 0 = dist_pre[source], so no strict decrease is possible)
+    assert (Seq.index sdist_after source == Seq.index sdist_pre source);
+    assert (Seq.index spred_after source == Seq.index spred_pre source);
+    let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < 1000000}) : Lemma
+      (ensures (let p = SZ.v (Seq.index spred_after v) in
+                p < n /\
+                p * n + v < Seq.length sweights /\
+                Seq.index sweights (p * n + v) < 1000000 /\
+                Seq.index sdist_after p < 1000000 /\
+                Seq.index sdist_after v == Seq.index sdist_after p + Seq.index sweights (p * n + v) /\
+                Seq.index svisited_now p = 1))
+      = if Seq.index sdist_after v = Seq.index sdist_pre v &&
+           Seq.index spred_after v = Seq.index spred_pre v
+        then begin
+          let p = SZ.v (Seq.index spred_pre v) in
+          assert (Seq.index svisited_pre p = 1);
+          assert (Seq.index sdist_after p == Seq.index sdist_pre p);
+          assert (Seq.index svisited_now p = 1)
+        end else begin
+          assert (SZ.v (Seq.index spred_after v) == u);
+          assert (Seq.index sdist_after u == Seq.index sdist_pre u);
+          assert (Seq.index svisited_now u = 1)
+        end
     in
     FStar.Classical.forall_intro aux
 #pop-options
@@ -415,24 +505,27 @@ let lemma_2d_index_fits (u v n: nat)
     assert ((n - 1) * n + v < n * n)
 
 // Relax loop + bridge lemmas, extracted to its own scope for SMT tractability
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 60 --fuel 0 --ifuel 0 --split_queries always"
 fn dijkstra_relax_round
   (weights: A.array int)
   (n: SZ.t)
   (source: SZ.t)
   (dist: A.array int)
+  (pred: A.array SZ.t)
   (visited: V.vec int)
   (u: SZ.t)
   (dist_u: int)
   (ctr: GR.ref nat)
   (#sweights: erased (Seq.seq int))
   (#sdist_pre: erased (Seq.seq int))
+  (#spred_pre: erased (Seq.seq SZ.t))
   (#svisited_pre: erased (Seq.seq int))
   (#svisited_now: erased (Seq.seq int))
   (#vc0: erased nat)
   requires
     A.pts_to weights sweights **
     A.pts_to dist sdist_pre **
+    A.pts_to pred spred_pre **
     V.pts_to visited svisited_now **
     GR.pts_to ctr vc0 **
     pure (
@@ -443,6 +536,7 @@ fn dijkstra_relax_round
       Seq.length sweights == SZ.v n * SZ.v n /\
       all_weights_non_negative sweights /\
       Seq.length sdist_pre == SZ.v n /\
+      Seq.length spred_pre == SZ.v n /\
       Seq.length svisited_pre == SZ.v n /\
       svisited_now == Seq.upd svisited_pre (SZ.v u) 1 /\
       Seq.index sdist_pre (SZ.v source) == 0 /\
@@ -456,17 +550,21 @@ fn dijkstra_relax_round
       visited_le_unvisited sdist_pre svisited_pre (SZ.v n) /\
       (forall (j: nat). j < SZ.v n /\ Seq.index svisited_pre j = 0 ==>
         Seq.index sdist_pre (SZ.v u) <= Seq.index sdist_pre j) /\
-      dist_ge_sp_dist sdist_pre sweights (SZ.v n) (SZ.v source)
+      dist_ge_sp_dist sdist_pre sweights (SZ.v n) (SZ.v source) /\
+      pred_ok spred_pre sdist_pre sweights svisited_pre (SZ.v n) (SZ.v source)
     )
-  ensures exists* sdist_after (vc1: nat).
+  ensures exists* sdist_after spred_after (vc1: nat).
     A.pts_to weights sweights **
     A.pts_to dist sdist_after **
+    A.pts_to pred spred_after **
     V.pts_to visited svisited_now **
     GR.pts_to ctr vc1 **
     pure (
       Seq.length sdist_after == SZ.v n /\
+      Seq.length spred_after == SZ.v n /\
       Seq.length svisited_now == SZ.v n /\
       Seq.length sdist_pre == SZ.v n /\
+      Seq.length spred_pre == SZ.v n /\
       SZ.v source < SZ.v n /\
       SZ.v source < Seq.length sdist_after /\
       Seq.index sdist_after (SZ.v source) == 0 /\
@@ -477,6 +575,7 @@ fn dijkstra_relax_round
       tri_from_visited sweights sdist_after svisited_now (SZ.v n) /\
       visited_le_unvisited sdist_after svisited_now (SZ.v n) /\
       dist_ge_sp_dist sdist_after sweights (SZ.v n) (SZ.v source) /\
+      pred_ok spred_after sdist_after sweights svisited_now (SZ.v n) (SZ.v source) /\
       vc1 >= reveal vc0 /\ vc1 - reveal vc0 == SZ.v n
     )
 {
@@ -486,9 +585,10 @@ fn dijkstra_relax_round
     let vv = !v;
     vv <^ n
   )
-  invariant exists* vv sdist_v (vc_v: nat).
+  invariant exists* vv sdist_v spred_v (vc_v: nat).
     R.pts_to v vv **
     A.pts_to dist sdist_v **
+    A.pts_to pred spred_v **
     V.pts_to visited svisited_now **
     A.pts_to weights sweights **
     GR.pts_to ctr vc_v **
@@ -500,7 +600,9 @@ fn dijkstra_relax_round
       Seq.length sweights == SZ.v n * SZ.v n /\
       all_weights_non_negative sweights /\
       Seq.length sdist_v == SZ.v n /\
+      Seq.length spred_v == SZ.v n /\
       Seq.length sdist_pre == SZ.v n /\
+      Seq.length spred_pre == SZ.v n /\
       Seq.length svisited_pre == SZ.v n /\
       Seq.index svisited_pre (SZ.v u) = 0 /\
       tri_from_visited sweights sdist_pre svisited_pre (SZ.v n) /\
@@ -526,14 +628,19 @@ fn dijkstra_relax_round
       (forall (j: nat). j < SZ.v n /\ Seq.index svisited_pre j = 0 ==>
         Seq.index sdist_v j >= Seq.index sdist_pre (SZ.v u)) /\
       (forall (v': nat). v' < SZ.v vv /\ v' < SZ.v n ==>
-        Seq.index sdist_v v' == Seq.index sdist_pre v' \/
+        (Seq.index sdist_v v' == Seq.index sdist_pre v' /\
+         Seq.index spred_v v' == Seq.index spred_pre v') \/
         (Seq.index sdist_v v' == Seq.index sdist_pre (SZ.v u) + Seq.index sweights (SZ.v u * SZ.v n + v') /\
+         Seq.index sdist_v v' < Seq.index sdist_pre v' /\
          Seq.index sweights (SZ.v u * SZ.v n + v') < 1000000 /\
-         Seq.index sdist_pre (SZ.v u) < 1000000)) /\
+         Seq.index sdist_pre (SZ.v u) < 1000000 /\
+         SZ.v (Seq.index spred_v v') == SZ.v u)) /\
       (forall (v': nat). v' >= SZ.v vv /\ v' < SZ.v n ==>
-        Seq.index sdist_v v' == Seq.index sdist_pre v') /\
+        Seq.index sdist_v v' == Seq.index sdist_pre v' /\
+        Seq.index spred_v v' == Seq.index spred_pre v') /\
       vc_v == reveal vc0 + SZ.v vv /\
-      dist_ge_sp_dist sdist_pre sweights (SZ.v n) (SZ.v source)
+      dist_ge_sp_dist sdist_pre sweights (SZ.v n) (SZ.v source) /\
+      pred_ok spred_pre sdist_pre sweights svisited_pre (SZ.v n) (SZ.v source)
     )
   decreases (SZ.v n - SZ.v !v)
   {
@@ -545,13 +652,16 @@ fn dijkstra_relax_round
 
     let visited_v = V.op_Array_Access visited vv;
     let old_dist = A.op_Array_Access dist vv;
+    let old_pred = A.op_Array_Access pred vv;
 
     let can_relax = (visited_v = 0 && w < 1000000 && dist_u < 1000000);
     let sum = dist_u + w;
     let should_update = (can_relax && sum < old_dist);
     let new_dist: int = (if should_update then sum else old_dist);
+    let new_pred: SZ.t = (if should_update then u else old_pred);
 
     A.op_Array_Assignment dist vv new_dist;
+    A.op_Array_Assignment pred vv new_pred;
 
     tick ctr;
 
@@ -562,6 +672,7 @@ fn dijkstra_relax_round
 
   // Apply bridge lemma to establish ghost invariants
   with sdist_after. assert (A.pts_to dist sdist_after);
+  with spred_after. assert (A.pts_to pred spred_after);
 
   assert (pure (Seq.index svisited_pre (SZ.v u) = 0));
   assert (pure (tri_from_visited sweights sdist_pre svisited_pre (SZ.v n)));
@@ -576,6 +687,8 @@ fn dijkstra_relax_round
 
   relax_round_lb_post sdist_pre sdist_after sweights (SZ.v n) (SZ.v source) (SZ.v u);
 
+  relax_round_pred_ok sweights sdist_pre sdist_after spred_pre spred_after svisited_pre (SZ.v n) (SZ.v source) (SZ.v u);
+
   // Help SMT connect svisited_now with Seq.upd svisited_pre
   assert (pure (svisited_now == Seq.upd svisited_pre (SZ.v u) 1));
   assert (pure (tri_from_visited sweights sdist_after svisited_now (SZ.v n)));
@@ -583,32 +696,37 @@ fn dijkstra_relax_round
 }
 #pop-options
 
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 60 --fuel 0 --ifuel 0 --split_queries always"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)
   (n: SZ.t)
   (source: SZ.t)
   (dist: A.array int)
+  (pred: A.array SZ.t)
   (ctr: GR.ref nat)
   (#sweights: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
+  (#spred: erased (Seq.seq SZ.t))
   (#c0: erased nat)
   requires
     A.pts_to weights sweights **
     A.pts_to dist sdist **
+    A.pts_to pred spred **
     GR.pts_to ctr c0 **
     pure (
       SZ.v n > 0 /\
       SZ.v source < SZ.v n /\
       Seq.length sweights == SZ.v n * SZ.v n /\
       Seq.length sdist == SZ.v n /\
+      Seq.length spred == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       all_weights_non_negative sweights
     )
-  ensures exists* sdist' (cf: nat).
+  ensures exists* sdist' spred' (cf: nat).
     A.pts_to weights sweights **
     A.pts_to dist sdist' **
+    A.pts_to pred spred' **
     GR.pts_to ctr cf **
     pure (
       Seq.length sdist' == SZ.v n /\
@@ -619,29 +737,33 @@ fn dijkstra
       triangle_inequality sweights sdist' (SZ.v n) /\
       (forall (v: nat). v < SZ.v n ==>
         Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v) /\
+      pred_consistent spred' sdist' sweights (SZ.v n) (SZ.v source) /\
       dijkstra_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: dijkstra_sig
 {
-  // Initialization: dist[source] = 0, all others = 1000000
+  // Initialization: dist[source] = 0, all others = 1000000; pred[v] = v
   let mut init_i: SZ.t = 0sz;
   
   while (
     let vi = !init_i;
     vi <^ n
   )
-  invariant exists* vi sdist_current (vc: nat).
+  invariant exists* vi sdist_current spred_current (vc: nat).
     R.pts_to init_i vi **
     A.pts_to dist sdist_current **
+    A.pts_to pred spred_current **
     GR.pts_to ctr vc **
     pure (
       SZ.v vi <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
+      Seq.length spred_current == SZ.v n /\
       (SZ.v vi > SZ.v source ==> Seq.index sdist_current (SZ.v source) == 0) /\
       (forall (j:nat). j < SZ.v vi ==> 
         Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= 1000000) /\
       (forall (j:nat). j < SZ.v vi /\ j <> SZ.v source ==>
         Seq.index sdist_current j == 1000000) /\
+      (forall (j:nat). j < SZ.v vi ==> SZ.v (Seq.index spred_current j) == j) /\
       vc == reveal c0 + SZ.v vi
     )
   decreases (SZ.v n - SZ.v !init_i)
@@ -649,6 +771,7 @@ fn dijkstra
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else 1000000);
     A.op_Array_Assignment dist vi new_val;
+    A.op_Array_Assignment pred vi vi;
     tick ctr;
     init_i := vi +^ 1sz;
   };
@@ -658,6 +781,9 @@ fn dijkstra
   // Establish dist >= sp_dist after initialization
   with sdist_init. assert (A.pts_to dist sdist_init);
   init_dist_ge_sp_dist sdist_init sweights (SZ.v n) (SZ.v source);
+  
+  // Capture pred state after init
+  with spred_init. assert (A.pts_to pred spred_init);
   
   // Allocate visited array (all 0 initially)
   let visited = V.alloc 0 n;
@@ -673,14 +799,16 @@ fn dijkstra
     let vround = !round;
     vround <^ n
   )
-  invariant exists* vround sdist_current svisited_current (vc: nat).
+  invariant exists* vround sdist_current spred_current svisited_current (vc: nat).
     R.pts_to round vround **
     A.pts_to dist sdist_current **
+    A.pts_to pred spred_current **
     V.pts_to visited svisited_current **
     GR.pts_to ctr vc **
     pure (
       SZ.v vround <= SZ.v n /\
       Seq.length sdist_current == SZ.v n /\
+      Seq.length spred_current == SZ.v n /\
       Seq.length svisited_current == SZ.v n /\
       Seq.index sdist_current (SZ.v source) == 0 /\
       all_non_negative sdist_current /\
@@ -693,6 +821,7 @@ fn dijkstra
       visited_le_unvisited sdist_current svisited_current (SZ.v n) /\
       count_ones svisited_current (SZ.v n) == SZ.v vround /\
       dist_ge_sp_dist sdist_current sweights (SZ.v n) (SZ.v source) /\
+      pred_ok spred_current sdist_current sweights svisited_current (SZ.v n) (SZ.v source) /\
       vc == reveal c0 + SZ.v n + 2 * SZ.v vround * SZ.v n
     )
   decreases (SZ.v n - SZ.v !round)
@@ -704,6 +833,7 @@ fn dijkstra
     
     // Ghost: capture state before marking
     with sdist_pre. assert (A.pts_to dist sdist_pre);
+    with spred_pre. assert (A.pts_to pred spred_pre);
     with svisited_pre. assert (V.pts_to visited svisited_pre);
     
     // Resolve has_min_dist_unvisited disjunction: u must be unvisited
@@ -718,9 +848,15 @@ fn dijkstra
     // Get dist[u] — cached, won't change during relaxation
     let dist_u = A.op_Array_Access dist u;
     
-    // Relax all neighbors of u — n ticks
-    dijkstra_relax_round weights n source dist visited u dist_u ctr
-      #sweights #sdist_pre #svisited_pre;
+    // Relax all neighbors of u — n ticks (also updates pred)
+    dijkstra_relax_round weights n source dist pred visited u dist_u ctr
+      #sweights #sdist_pre #spred_pre #svisited_pre;
+    
+    // Help SMT connect postcondition to loop invariant
+    with sdist_after. assert (A.pts_to dist sdist_after);
+    with spred_after. assert (A.pts_to pred spred_after);
+    with svisited_after. assert (V.pts_to visited svisited_after);
+    assert (pure (pred_ok spred_after sdist_after sweights svisited_after (SZ.v n) (SZ.v source)));
     
     round := vround +^ 1sz;
   };
@@ -729,10 +865,13 @@ fn dijkstra
   
   // After main loop: all vertices visited → full triangle inequality
   with sdist_final. assert (A.pts_to dist sdist_final);
+  with spred_final. assert (A.pts_to pred spred_final);
   with svisited_final. assert (V.pts_to visited svisited_final);
   count_ones_full svisited_final (SZ.v n);
   all_visited_tri_is_full sweights sdist_final svisited_final (SZ.v n);
   assert (pure (triangle_inequality sweights sdist_final (SZ.v n)));
+  assert (pure (dist_ge_sp_dist sdist_final sweights (SZ.v n) (SZ.v source)));
+  assert (pure (pred_ok spred_final sdist_final sweights svisited_final (SZ.v n) (SZ.v source)));
   
   // Free visited array
   V.free visited;
@@ -741,6 +880,8 @@ fn dijkstra
   dijkstra_sp_upper_bound sdist_final sweights (SZ.v n) (SZ.v source);
   assert (pure (forall (v: nat). v < SZ.v n ==>
     Seq.index sdist_final v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v));
+  // pred_consistent follows from pred_ok
+  assert (pure (pred_consistent spred_final sdist_final sweights (SZ.v n) (SZ.v source)));
 }
 #pop-options
 
