@@ -47,7 +47,7 @@ fn test_max_flow_example ()
   assume_ (pure (valid_caps sc2 (SZ.v n)));
   
   // Run max flow algorithm (postcondition guarantees imp_valid_flow)
-  max_flow capacity flow n 0sz 2sz 100sz;
+  max_flow capacity flow n 0sz 2sz;
   
   // Clean up
   with sc. assert (A.pts_to capacity sc);

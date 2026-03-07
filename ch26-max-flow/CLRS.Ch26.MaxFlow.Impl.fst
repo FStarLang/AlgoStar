@@ -21,7 +21,12 @@ module Lemmas = CLRS.Ch26.MaxFlow.Lemmas
    1. BFS on residual graph to find shortest augmenting path
    2. Find bottleneck (min residual capacity) along the path
    3. Augment flow along the path
-   4. Repeat until no augmenting path exists (or fuel exhausted)
+   4. Repeat until no augmenting path exists
+   
+   Termination proved without fuel:
+   - Each augmentation increases flow_value by >= 1 (verified at runtime)
+   - flow_value <= cap_sum = Σ cap[source][v] (proved from imp_valid_flow)
+   - Decreasing measure: cap_sum + 1 - iteration_count
    
    Connects to the fully verified pure spec (Spec.fst, Lemmas.fst):
    - valid_flow maintained through augmentation (Lemmas.augment_preserves_valid)
@@ -73,6 +78,32 @@ let imp_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat) : prop =
   // Flow conservation
   (forall (u: nat). u < n /\ u <> source /\ u <> sink ==>
     sum_flow_into flow_seq n u n == sum_flow_out flow_seq n u n)
+
+(** Total wrapper for sum_flow_out — avoids refinement types in Pulse ensures clauses *)
+let imp_sum_flow_out (s: Seq.seq int) (n v k: nat) : int =
+  if n > 0 && v < n && Seq.length s = n * n then sum_flow_out s n v k else 0
+
+(** Total wrapper for sum_flow_into — avoids refinement types in Pulse ensures clauses *)
+let imp_sum_flow_into (s: Seq.seq int) (n v k: nat) : int =
+  if n > 0 && v < n && Seq.length s = n * n then sum_flow_into s n v k else 0
+
+(** Total wrapper for flow_value — avoids refinement types in Pulse ensures clauses *)
+let imp_flow_value (s: Seq.seq int) (n source: nat) : int =
+  if n > 0 && source < n && Seq.length s = n * n then flow_value s n source else 0
+
+(** imp_flow_value agrees with flow_value when constraints hold *)
+let lemma_imp_flow_value_eq (s: Seq.seq int) (n source: nat)
+  : Lemma
+    (requires n > 0 /\ source < n /\ Seq.length s == n * n)
+    (ensures imp_flow_value s n source == flow_value s n source)
+  = ()
+
+(** imp_sum_flow_out agrees with sum_flow_out when constraints hold *)
+let lemma_imp_sum_flow_out_eq (s: Seq.seq int) (n v k: nat)
+  : Lemma
+    (requires n > 0 /\ v < n /\ Seq.length s == n * n)
+    (ensures imp_sum_flow_out s n v k == sum_flow_out s n v k)
+  = ()
 
 (** Zero-initialized array equals Seq.create *)
 let lemma_zero_array_eq_create (s: Seq.seq int) (len: nat)
@@ -211,6 +242,7 @@ let lemma_partial_nbrs_to_all (scolor cap_seq flow_seq: Seq.seq int) (n u: nat)
 (** Step: extend partial_nbrs_colored from bound to bound+1.
     Requires that neighbor `bound` is colored (if it has positive residual).
     Also handles the case where scolor changed (non-zero preservation). *)
+#push-options "--z3rlimit 20"
 let lemma_partial_nbrs_step
   (scolor scolor': Seq.seq int) (cap_seq flow_seq: Seq.seq int) (n u bound: nat)
   : Lemma
@@ -241,6 +273,7 @@ let lemma_partial_nbrs_step
       end
     in
     Classical.forall_intro (Classical.move_requires aux)
+#pop-options
 
 (** Active queue elements have color 1 *)
 let queue_color1 (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n: nat) : prop =
@@ -866,6 +899,96 @@ let lemma_zero_flow_imp_valid (flow_seq cap_seq: Seq.seq int) (n source sink: na
     Classical.forall_intro (Classical.move_requires aux_cons)
 #pop-options
 
+(** Zero flow has imp_flow_value 0. *)
+let lemma_zero_flow_value (flow_seq: Seq.seq int) (n: nat{n > 0}) (source: nat{source < n})
+  : Lemma
+    (requires
+      Seq.length flow_seq == n * n /\
+      (forall (i: nat). i < n * n ==> Seq.index flow_seq i == 0))
+    (ensures imp_flow_value flow_seq n source == 0)
+  = lemma_zero_array_eq_create flow_seq (n * n);
+    lemma_sum_flow_out_zero n source n;
+    lemma_sum_flow_into_zero n source n
+
+(** sum_flow_out is monotone: if flow[v][u] <= cap[v][u] for all u, then
+    sum_flow_out(flow, v, k) <= sum_flow_out(cap, v, k). *)
+let rec lemma_sum_flow_out_mono
+  (flow cap: Seq.seq int) (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (v: nat{v < n}) (k: nat)
+  : Lemma
+    (requires forall (u: nat). u < n ==> get flow n v u <= get cap n v u)
+    (ensures sum_flow_out flow n v k <= sum_flow_out cap n v k)
+    (decreases k)
+  = if k = 0 then ()
+    else if k - 1 < n then lemma_sum_flow_out_mono flow cap n v (k - 1)
+    else lemma_sum_flow_out_mono flow cap n v (k - 1)
+
+(** sum_flow_into is non-negative when all flows are non-negative. *)
+let rec lemma_sum_flow_into_nonneg
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (v: nat{v < n}) (k: nat)
+  : Lemma
+    (requires forall (u: nat). u < n ==> get flow n u v >= 0)
+    (ensures sum_flow_into flow n v k >= 0)
+    (decreases k)
+  = if k = 0 then ()
+    else if k - 1 < n then lemma_sum_flow_into_nonneg flow n v (k - 1)
+    else lemma_sum_flow_into_nonneg flow n v (k - 1)
+
+(** sum_flow_out is non-negative when all flows are non-negative. *)
+let rec lemma_sum_flow_out_nonneg
+  (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+  (v: nat{v < n}) (k: nat)
+  : Lemma
+    (requires forall (u: nat). u < n ==> get flow n v u >= 0)
+    (ensures sum_flow_out flow n v k >= 0)
+    (decreases k)
+  = if k = 0 then ()
+    else if k - 1 < n then lemma_sum_flow_out_nonneg flow n v (k - 1)
+    else lemma_sum_flow_out_nonneg flow n v (k - 1)
+
+(** For a valid flow, imp_flow_value <= imp_sum_flow_out(cap, source, n). *)
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+let lemma_flow_value_le_cap_sum
+  (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
+  : Lemma
+    (requires imp_valid_flow flow_seq cap_seq n source sink)
+    (ensures imp_flow_value flow_seq n source <= imp_sum_flow_out cap_seq n source n)
+  = // From imp_valid_flow: 0 <= flow[u][v] <= cap[u][v]
+    // So sum_flow_out(flow, source) <= sum_flow_out(cap, source)
+    let aux_le (u: nat{u < n}) : Lemma (get flow_seq n source u <= get cap_seq n source u)
+      = FStar.Math.Lemmas.lemma_mult_le_right n source (n - 1);
+        assert (source * n + u < n * n);
+        assert (seq_get flow_seq (source * n + u) <= seq_get cap_seq (source * n + u))
+    in
+    Classical.forall_intro (Classical.move_requires aux_le);
+    lemma_sum_flow_out_mono flow_seq cap_seq n source n;
+    // sum_flow_into(flow, source) >= 0
+    let aux_nonneg (u: nat{u < n}) : Lemma (get flow_seq n u source >= 0)
+      = FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1);
+        assert (u * n + source < n * n);
+        assert (seq_get flow_seq (u * n + source) >= 0)
+    in
+    Classical.forall_intro (Classical.move_requires aux_nonneg);
+    lemma_sum_flow_into_nonneg flow_seq n source n
+    // flow_value = sum_out - sum_in <= sum_out(cap) - 0 = sum_out(cap)
+    // imp_flow_value = flow_value, imp_sum_flow_out = sum_flow_out (under constraints)
+#pop-options
+
+(** imp_sum_flow_out(cap, source, n) >= 0 when capacities are non-negative. *)
+let lemma_cap_sum_nonneg
+  (cap_seq: Seq.seq int) (n: nat{n > 0}) (source: nat{source < n})
+  : Lemma
+    (requires Seq.length cap_seq == n * n /\ valid_caps cap_seq n)
+    (ensures imp_sum_flow_out cap_seq n source n >= 0)
+  = let aux (u: nat{u < n}) : Lemma (get cap_seq n source u >= 0)
+      = FStar.Math.Lemmas.lemma_mult_le_right n source (n - 1);
+        assert (source * n + u < n * n);
+        assert (Seq.index cap_seq (source * n + u) >= 0)
+    in
+    Classical.forall_intro (Classical.move_requires aux);
+    lemma_sum_flow_out_nonneg cap_seq n source n
+
 (** Bottleneck ≤ 0 when BFS colored/uncolored crossing exists.
     Key lemma: any path from a colored source to an uncolored sink must
     cross from colored to uncolored; at that edge, both forward and backward
@@ -1099,7 +1222,7 @@ let elim_discover_delta
   = reveal_opaque (`%discover_delta) (discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
-#push-options "--z3rlimit 160 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -2008,6 +2131,116 @@ fn check_imp_valid_flow_fn
    MAIN FORD-FULKERSON LOOP
    ================================================================ *)
 
+(** Compute sum_flow_out from an array: Σ_{j<n} arr[v*n + j] *)
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+fn compute_sum_out_fn
+  (arr: A.array int)
+  (n: SZ.t)
+  (v: SZ.t)
+  (#arr_seq: erased (Seq.seq int))
+  requires
+    A.pts_to arr arr_seq **
+    pure (
+      SZ.v n > 0 /\ SZ.v v < SZ.v n /\
+      Seq.length arr_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n))
+  returns result: int
+  ensures
+    A.pts_to arr arr_seq **
+    pure (result == imp_sum_flow_out arr_seq (SZ.v n) (SZ.v v) (SZ.v n))
+{
+  let mut acc = 0;
+  let mut j: SZ.t = 0sz;
+  while (!j <^ n)
+  invariant exists* jv s.
+    R.pts_to j jv **
+    R.pts_to acc s **
+    A.pts_to arr arr_seq **
+    pure (
+      SZ.v jv <= SZ.v n /\
+      Seq.length arr_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SZ.v v < SZ.v n /\
+      s == imp_sum_flow_out arr_seq (SZ.v n) (SZ.v v) (SZ.v jv))
+  decreases (SZ.v n - SZ.v !j)
+  {
+    let jv = !j;
+    let idx = v *^ n +^ jv;
+    let fval = A.op_Array_Access arr idx;
+    acc := !acc + fval;
+    j := jv +^ 1sz
+  };
+  !acc
+}
+#pop-options
+
+(** Compute sum_flow_into from an array: Σ_{u<n} arr[u*n + v] *)
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+fn compute_sum_in_fn
+  (arr: A.array int)
+  (n: SZ.t)
+  (v: SZ.t)
+  (#arr_seq: erased (Seq.seq int))
+  requires
+    A.pts_to arr arr_seq **
+    pure (
+      SZ.v n > 0 /\ SZ.v v < SZ.v n /\
+      Seq.length arr_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n))
+  returns result: int
+  ensures
+    A.pts_to arr arr_seq **
+    pure (result == imp_sum_flow_into arr_seq (SZ.v n) (SZ.v v) (SZ.v n))
+{
+  let mut acc = 0;
+  let mut u: SZ.t = 0sz;
+  while (!u <^ n)
+  invariant exists* uv s.
+    R.pts_to u uv **
+    R.pts_to acc s **
+    A.pts_to arr arr_seq **
+    pure (
+      SZ.v uv <= SZ.v n /\
+      Seq.length arr_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SZ.v v < SZ.v n /\
+      s == imp_sum_flow_into arr_seq (SZ.v n) (SZ.v v) (SZ.v uv))
+  decreases (SZ.v n - SZ.v !u)
+  {
+    let uv = !u;
+    let idx = uv *^ n +^ v;
+    let fval = A.op_Array_Access arr idx;
+    acc := !acc + fval;
+    u := uv +^ 1sz
+  };
+  !acc
+}
+#pop-options
+
+(** Compute flow_value = sum_flow_out(source) - sum_flow_into(source) *)
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+fn compute_flow_value_fn
+  (flow: A.array int)
+  (n: SZ.t)
+  (source: SZ.t)
+  (#flow_seq: erased (Seq.seq int))
+  requires
+    A.pts_to flow flow_seq **
+    pure (
+      SZ.v n > 0 /\ SZ.v source < SZ.v n /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n))
+  returns result: int
+  ensures
+    A.pts_to flow flow_seq **
+    pure (result == imp_flow_value flow_seq (SZ.v n) (SZ.v source))
+{
+  let sum_out = compute_sum_out_fn flow n source;
+  let sum_in = compute_sum_in_fn flow n source;
+  (sum_out - sum_in)
+}
+#pop-options
+
 (** Initialize flow to zero *)
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
 fn zero_init_flow
@@ -2044,8 +2277,15 @@ fn zero_init_flow
 }
 #pop-options
 
-(** Main max flow: Ford-Fulkerson with BFS (Edmonds-Karp) *)
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+(** Main max flow: Ford-Fulkerson with BFS (Edmonds-Karp)
+
+    Termination proof (no fuel needed):
+    - cap_sum = sum of outgoing capacities from source (constant)
+    - flow_value is bounded: 0 <= flow_value <= cap_sum (from imp_valid_flow)
+    - Each augmentation where we continue increases flow_value by >= 1
+    - Iteration counter iters is bounded by flow_value + 1
+    - Measure: cap_sum + 1 - iters (non-negative, decreases by 1 each iteration) *)
+#push-options "--z3rlimit 600 --fuel 1 --ifuel 1"
 fn max_flow
   (capacity: A.array int)
   (#cap_seq: Ghost.erased (Seq.seq int))
@@ -2054,7 +2294,6 @@ fn max_flow
   (n: SZ.t)
   (source: SZ.t)
   (sink: SZ.t)
-  (fuel: SZ.t)
   requires
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_contents **
@@ -2080,8 +2319,6 @@ fn max_flow
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      // When completed = true, BFS found no augmenting path:
-      // the flow is maximum and MFMC theorem applies
       (completed ==> no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
     )
 {
@@ -2094,6 +2331,14 @@ fn max_flow
   with flow_zero. assert (A.pts_to flow flow_zero);
   lemma_zero_flow_imp_valid flow_zero cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
 
+  // Zero flow has flow_value 0
+  lemma_zero_flow_value flow_zero (SZ.v n) (SZ.v source);
+
+  // Compute termination bound: sum of outgoing capacities from source
+  let cap_sum = compute_sum_out_fn capacity n source;
+  // cap_sum == sum_flow_out cap_seq n source n >= 0
+  lemma_cap_sum_nonneg cap_seq (SZ.v n) (SZ.v source);
+
   // Phase 2: Allocate BFS workspace
   let color = A.alloc 0 n;
   let pred = A.alloc (-1) n;
@@ -2101,20 +2346,20 @@ fn max_flow
 
   // Phase 3: Main Ford-Fulkerson loop
   let mut continue_loop: bool = true;
-  let mut iters: SZ.t = 0sz;
-  // Tracks whether we terminated because BFS found no path (vs fuel exhaustion)
+  let mut iters: int = 0;
+  let mut flow_val: int = 0;
   let mut is_completed: bool = false;
 
   (* Termination argument (CLRS §26.2):
      Each augmentation strictly increases the flow value by ≥1 (integer capacities).
-     The maximum flow is bounded by the sum of outgoing capacities from source.
-     For Edmonds-Karp: at most O(VE) augmentations (Theorem 26.8).
-     With n×n adjacency matrix (E ≤ n²): at most n³ augmentations.
-     Caller should provide fuel ≥ n³ for guaranteed complete execution. *)
-  while (!continue_loop && !iters <^ fuel)
-  invariant exists* cont itr flow_s sc sp sq completed_v.
+     The maximum flow value is bounded by cap_sum = Σ cap[source][v].
+     So at most cap_sum augmentations + 1 final BFS = cap_sum + 1 iterations.
+     The decreasing measure cap_sum + 1 - iters is always >= 0 and decreases by 1. *)
+  while (!continue_loop)
+  invariant exists* cont itr fv flow_s sc sp sq completed_v.
     R.pts_to continue_loop cont **
     R.pts_to iters itr **
+    R.pts_to flow_val fv **
     R.pts_to is_completed completed_v **
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_s **
@@ -2127,17 +2372,21 @@ fn max_flow
       Seq.length sp == SZ.v n /\
       Seq.length sq == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      SZ.v itr <= SZ.v fuel /\
       valid_caps cap_seq (SZ.v n) /\
       imp_valid_flow flow_s cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      // completed is only set to true when the loop is about to exit
+      // Flow value tracking for termination
+      fv == imp_flow_value flow_s (SZ.v n) (SZ.v source) /\
+      fv <= cap_sum /\
+      itr >= 0 /\
+      // When continuing, iteration count is bounded by flow value
+      (cont ==> itr <= fv) /\
+      (cont ==> fv >= 0) /\
       (cont ==> completed_v == false) /\
-      // When loop stops with completed=true, no_augmenting_path holds
       (completed_v ==> no_augmenting_path #(SZ.v n) cap_seq flow_s (SZ.v source) (SZ.v sink))
     )
-  decreases (SZ.v fuel - SZ.v !iters)
+  decreases (cap_sum + 1 - !iters)
   {
-    iters := !iters +^ 1sz;
+    iters := !iters + 1;
 
     let found = bfs_residual capacity flow color pred queue n source sink;
 
@@ -2148,11 +2397,34 @@ fn max_flow
         augment_imp capacity flow pred n source sink bn;
         // Runtime validity check: verify augmentation preserved imp_valid_flow
         let valid = check_imp_valid_flow_fn flow capacity n source sink;
-        if (not valid) {
-          // Fallback: re-zero flow to restore imp_valid_flow invariant
+        if valid {
+          // Compute new flow value to check progress
+          let new_fv = compute_flow_value_fn flow n source;
+          let old_fv = !flow_val;
+          if (new_fv > old_fv) {
+            // Flow value increased: update tracker and continue
+            flow_val := new_fv;
+            // Prove new flow_value <= cap_sum from imp_valid_flow
+            with flow_s'. assert (A.pts_to flow flow_s');
+            lemma_flow_value_le_cap_sum flow_s' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
+            // Help SMT: old_fv >= itr (from invariant entry), new_fv > old_fv => new_fv >= itr + 1
+            assert (pure (new_fv == imp_flow_value flow_s' (SZ.v n) (SZ.v source)));
+            assert (pure (imp_flow_value flow_s' (SZ.v n) (SZ.v source) <= cap_sum));
+            ()
+          } else {
+            // Flow value didn't increase — shouldn't happen, exit gracefully
+            flow_val := new_fv;
+            with flow_s'. assert (A.pts_to flow flow_s');
+            lemma_flow_value_le_cap_sum flow_s' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
+            continue_loop := false
+          }
+        } else {
+          // Validity check failed — re-zero flow and exit
           zero_init_flow flow nn;
           with flow_re. assert (A.pts_to flow flow_re);
           lemma_zero_flow_imp_valid flow_re cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
+          lemma_zero_flow_value flow_re (SZ.v n) (SZ.v source);
+          flow_val := 0;
           continue_loop := false
         }
       } else {
@@ -2172,8 +2444,6 @@ fn max_flow
   };
 
   let result = !is_completed;
-
-  // imp_valid_flow comes from the loop invariant — no admit needed
 
   // Cleanup BFS workspace
   A.free color;

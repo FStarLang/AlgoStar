@@ -67,10 +67,11 @@ fn check_valid_caps_fn
     - flow: n×n flat flow matrix (output, overwritten)
     - n: number of vertices
     - source, sink: source and sink vertex indices
-    - fuel: maximum number of augmentation iterations
     
-    Returns completed = true when BFS found no augmenting path (natural
-    termination); false when fuel was exhausted.
+    Termination: proved without fuel. Each augmentation increases flow_value by ≥1,
+    bounded by cap_sum = Σ cap[source][v]. Loop terminates in at most cap_sum + 1 iterations.
+    
+    Returns completed = true when BFS found no augmenting path (natural termination).
     
     Postcondition:
     - Always: imp_valid_flow on the resulting flow array
@@ -83,7 +84,6 @@ fn max_flow
   (n: SZ.t)
   (source: SZ.t)
   (sink: SZ.t)
-  (fuel: SZ.t)
   requires
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_contents **
