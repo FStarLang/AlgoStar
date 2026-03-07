@@ -428,7 +428,7 @@ ensures exists* s.
 
 // ========== Digit-keyed Counting Sort (for multi-digit RadixSort) ==========
 
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1 --split_queries always"
 ```pulse
 fn counting_sort_by_digit
   (a: A.array nat)     // Input array (read-only)
@@ -488,7 +488,7 @@ ensures exists* sb'.
       Seq.length sc == SZ.v base_val /\
       DL.digit_counts_match_prefix sc sa d (SZ.v base_val) (SZ.v vj)
     )
-  decreases (SZ.v len - SZ.v !j)
+  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !j)
   {
     let vj = !j;
 
@@ -543,7 +543,7 @@ ensures exists* sb'.
       Seq.length sc == SZ.v base_val /\
       DL.digit_prefix_sum_inv sc sa d (SZ.v base_val) (SZ.v vi)
     )
-  decreases (SZ.v base_val - SZ.v !i)
+  decreases (SZ.v base_val `Prims.op_Subtraction` SZ.v !i)
   {
     let vi = !i;
 

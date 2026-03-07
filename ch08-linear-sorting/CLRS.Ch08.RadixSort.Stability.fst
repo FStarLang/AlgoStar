@@ -122,6 +122,29 @@ let is_stable_get_witnesses (s_in s_out: seq nat) (d base: nat) (j1 j2: nat)
                     index s_in i1 == index s_out j1 /\ index s_in i2 == index s_out j2)
   = reveal_opaque (`%is_stable_sort_on_digit) (is_stable_sort_on_digit s_in s_out d base)
 
+/// Pack components into is_stable_sort_on_digit.
+/// The order_proof function provides stability witnesses for each pair.
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
+let pack_is_stable (s_in s_out: seq nat) (d base: nat)
+  (order_proof: (j1: nat) -> (j2: nat) -> Lemma
+    (requires j1 < j2 /\ j2 < length s_out /\
+      digit (index s_out j1) d base == digit (index s_out j2) d base /\
+      index s_out j1 <> index s_out j2)
+    (ensures exists (i1 i2: nat). i1 < i2 /\ i2 < length s_in /\
+      index s_in i1 == index s_out j1 /\ index s_in i2 == index s_out j2))
+  : Lemma (requires base > 0 /\ permutation s_in s_out /\ sorted_on_digit s_out d base)
+    (ensures is_stable_sort_on_digit s_in s_out d base)
+  = reveal_opaque (`%is_stable_sort_on_digit) (is_stable_sort_on_digit s_in s_out d base);
+    introduce forall (j1: nat) (j2: nat).
+      j1 < j2 /\ j2 < length s_out /\
+      digit (index s_out j1) d base == digit (index s_out j2) d base /\
+      index s_out j1 <> index s_out j2 ==>
+      (exists (i1 i2: nat). i1 < i2 /\ i2 < length s_in /\
+        index s_in i1 == index s_out j1 /\ index s_in i2 == index s_out j2)
+    with introduce _ ==> _ with _.
+      order_proof j1 j2
+#pop-options
+
 (* ========== Helper lemmas for sorted_up_to_digit ========== *)
 
 /// Base case: empty sequence is sorted up to any digit
