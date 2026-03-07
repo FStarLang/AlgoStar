@@ -655,29 +655,24 @@ fn kruskal
 }
 #pop-options
 
-(*** Impl ↔ Spec Bridging ***)
+(*** Impl ↔ Spec Bridging — Pure Helper Functions ***)
 
 (*
-   ============================================================
-   CONNECTION TO MST.SPEC — Proof Structure
-   ============================================================
-   The postcondition (result_is_forest_adj) now proves:
+   The postcondition (result_is_forest_adj) proves:
    - The selected edges form a forest (acyclic)
    - All endpoints are valid vertices (< n)
    - Edge count ≤ n-1
-   - Each edge comes from a positive adjacency matrix entry
+   - Each edge comes from a positive adjacency matrix entry (edges_adj_pos)
 
-   The MST proof proceeds in three parts:
-   (A) Build weighted edges with correct weights from the adjacency matrix
-   (B) Prove the weighted edges form a spanning tree (subset + acyclic + connected)
-   (C) Prove minimum weight via cut property induction
-
-   Parts (A) and (B-acyclic) are fully proved below.
-   Part (B-subset) is proved modulo symmetric adjacency matrix.
-   Parts (B-connected) and (C) are stated with clear proof obligations
-   but currently admitted — these require additional machinery for
-   the completeness argument and the inductive cut property step.
-   ============================================================
+   The functions below provide the pure machinery to convert between
+   the imperative representation (flat adjacency matrix, edge arrays)
+   and the graph/edge-list representation used in MST.Spec.
+   
+   A full MST proof would additionally need to show:
+   - The weighted edges form a spanning tree of the input graph
+   - The total weight is minimum among all spanning trees
+   These require the cut property (MST.Spec.cut_property) applied
+   inductively at each algorithm step.
 *)
 
 // Convert flat adjacency matrix (array of int, n×n) to graph
@@ -706,10 +701,9 @@ let rec adj_all_edges (sadj: Seq.seq int) (n: nat) (u: nat)
 let adj_array_to_graph (sadj: Seq.seq int) (n: nat{Seq.length sadj == n * n /\ n > 0}) : graph =
   { n = n; edges = adj_all_edges sadj n 0 }
 
-// --- Part (A): Weighted edges with correct weights ---
-
 // Edges with actual weights from the adjacency matrix
-// (edges_from_arrays uses weight 1; this version uses adj[u*n+v])
+// (edges_from_arrays uses weight 1 for internal forest tracking;
+//  this version uses adj[u*n+v] for MST weight reasoning)
 let rec weighted_edges_from_arrays
   (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
   : Pure (list edge)
@@ -727,120 +721,3 @@ let rec weighted_edges_from_arrays
       let v_int = Seq.index sev i in
       let w = Seq.index sadj (u_int * n + v_int) in
       {u = u_int; v = v_int; w = w} :: weighted_edges_from_arrays sadj seu sev n ec (i + 1)
-
-// --- Part (B): Spanning tree properties ---
-
-// (B.1) Acyclicity: depends only on edge structure (u,v), not weights.
-// If the weight-1 edge list is acyclic, so is the weighted version.
-// Proof: any simple cycle in weighted edges has the same u,v-path structure
-// as a cycle in weight-1 edges (edge_eq for cycles uses is_path_from_to
-// which only inspects u,v fields).
-#push-options "--admit_smt_queries true"
-let acyclic_weight_independent
-  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma (requires
-      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
-      Seq.length sadj == n * n /\
-      valid_endpoints seu sev n ec /\
-      MSTSpec.acyclic n (edges_from_arrays seu sev ec 0))
-    (ensures MSTSpec.acyclic n (weighted_edges_from_arrays sadj seu sev n ec 0))
-  = ()  // ADMITTED: structural induction on cycle paths
-#pop-options
-
-// (B.2) Subset of graph edges: each weighted edge is in adj_array_to_graph.
-// Requires symmetric adjacency matrix (for undirected graphs) because
-// adj_array_to_graph only emits edges with u < v, but the algorithm may
-// select edges with u > v.
-#push-options "--admit_smt_queries true"
-let weighted_edges_subset_graph
-  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma (requires
-      result_is_forest_adj sadj seu sev n ec /\
-      Seq.length sadj == n * n /\ n > 0 /\
-      // Symmetric adjacency matrix (undirected graph)
-      (forall (u v: nat). u < n /\ v < n ==> 
-        Seq.index sadj (u * n + v) = Seq.index sadj (v * n + u)))
-    (ensures
-      MSTSpec.subset_edges
-        (weighted_edges_from_arrays sadj seu sev n ec 0)
-        (adj_array_to_graph sadj n).edges)
-  = ()  // ADMITTED: by edges_adj_pos + symmetry, each edge matches a graph edge
-#pop-options
-
-// (B.3) Connectivity: for a connected graph, the algorithm finds n-1 edges
-// that connect all vertices.
-// Proof sketch: after each round, if the forest has < n-1 edges, there exist
-// vertices in different components. Since the graph is connected, an edge
-// exists between components. The scan finds the minimum such edge (vbw > 0),
-// so an edge is always added until n-1 edges are reached.
-#push-options "--admit_smt_queries true"
-let kruskal_connected
-  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma (requires
-      result_is_forest_adj sadj seu sev n ec /\
-      Seq.length sadj == n * n /\ n > 0 /\
-      (let g = adj_array_to_graph sadj n in
-       all_connected g.n g.edges /\
-       (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v)))
-    (ensures
-      MSTSpec.all_connected n (weighted_edges_from_arrays sadj seu sev n ec 0) /\
-      ec = n - 1)
-  = ()  // ADMITTED: completeness argument for greedy Kruskal
-#pop-options
-
-// --- Part (C): Minimum weight via cut property ---
-
-// The key inductive argument: at each step, the algorithm adds the minimum-
-// weight cross-component edge. By the cut property (MST.Spec.cut_property),
-// this is a light edge crossing a cut that respects the current forest.
-// Hence the forest remains a subset of some MST after each addition.
-// After n-1 steps, the forest IS an MST.
-#push-options "--admit_smt_queries true"
-let kruskal_minimum_weight
-  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma (requires
-      result_is_forest_adj sadj seu sev n ec /\
-      Seq.length sadj == n * n /\ n > 0 /\
-      (let g = adj_array_to_graph sadj n in
-       all_connected g.n g.edges /\
-       (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v) /\
-       (exists (mst: list edge). is_mst g mst)) /\
-      (forall (u v: nat). u < n /\ v < n ==> 
-        Seq.index sadj (u * n + v) = Seq.index sadj (v * n + u)))
-    (ensures (
-      let g = adj_array_to_graph sadj n in
-      let we = weighted_edges_from_arrays sadj seu sev n ec 0 in
-      forall (t: list edge). is_spanning_tree g t ==> total_weight we <= total_weight t))
-  = ()  // ADMITTED: inductive cut property argument
-#pop-options
-
-// --- Main theorem: assembles parts (A)-(C) ---
-
-#push-options "--admit_smt_queries true"
-let kruskal_impl_produces_mst
-  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma (requires
-      result_is_forest_adj sadj seu sev n ec /\
-      Seq.length sadj == n * n /\
-      n > 0 /\
-      // Symmetric adjacency matrix (undirected graph)
-      (forall (u v: nat). u < n /\ v < n ==> 
-        Seq.index sadj (u * n + v) = Seq.index sadj (v * n + u)) /\
-      (let g = adj_array_to_graph sadj n in
-       all_connected g.n g.edges /\
-       (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v) /\
-       (exists (mst: list edge). is_mst g mst)))
-    (ensures (
-      let g = adj_array_to_graph sadj n in
-      is_mst g (weighted_edges_from_arrays sadj seu sev n ec 0)))
-  = let g = adj_array_to_graph sadj n in
-    let we = weighted_edges_from_arrays sadj seu sev n ec 0 in
-    // (B.1) Acyclicity
-    acyclic_weight_independent sadj seu sev n ec;
-    // (B.2) Subset of graph edges
-    weighted_edges_subset_graph sadj seu sev n ec;
-    // (B.3) Connectivity + edge count
-    kruskal_connected sadj seu sev n ec;
-    // (C) Minimum weight
-    kruskal_minimum_weight sadj seu sev n ec
-#pop-options
