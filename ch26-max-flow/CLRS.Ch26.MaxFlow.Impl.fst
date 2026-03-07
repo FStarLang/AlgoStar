@@ -263,6 +263,10 @@ let queue_entries_unique (squeue: Seq.seq SZ.t) (vtail: nat) : prop =
 let queue_ok (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail n: nat) : prop =
   queue_nonzero scolor squeue 0 vtail n /\ queue_entries_unique squeue vtail
 
+(** Queue prefix preserved: entries below a threshold are unchanged *)
+let queue_prefix_preserved (sq sq': Seq.seq SZ.t) (vtail: nat) : prop =
+  forall (j: nat). j < vtail ==> seq_get_sz sq' j == seq_get_sz sq j
+
 (** Extending queue with a fresh element preserves uniqueness.
     The new element has color 0 while all existing entries have non-zero color,
     so the new element must differ from all existing entries. *)
@@ -349,6 +353,60 @@ let lemma_queue_ok_after_discover
         // squeue[j] ≠ vv (since scolor[squeue[j]] ≠ 0 but scolor[vv] = 0)
         ()
       end
+    in Classical.forall_intro (Classical.move_requires aux)
+
+(** queue_color1 is preserved when color-1 entries stay color-1 and queue prefix is preserved.
+    Also extends to new entries if they have color 1 in the new state. *)
+let lemma_queue_color1_preserved
+  (scolor scolor': Seq.seq int) (squeue squeue': Seq.seq SZ.t)
+  (vhead vtail vtail' n: nat)
+  : Lemma
+    (requires
+      vhead <= vtail /\ vtail <= vtail' /\
+      queue_color1 scolor squeue vhead vtail n /\
+      queue_valid squeue 0 vtail n /\
+      queue_prefix_preserved squeue squeue' vtail /\
+      (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1) /\
+      queue_color1 scolor' squeue' vtail vtail' n)
+    (ensures queue_color1 scolor' squeue' vhead vtail' n)
+  = let aux (j: nat)
+      : Lemma (requires vhead <= j /\ j < vtail')
+        (ensures seq_get scolor' (SZ.v (seq_get_sz squeue' j)) == 1)
+      = if j < vtail then begin
+          // Old entry: queue prefix preserved, color-1 preservation
+          assert (seq_get_sz squeue' j == seq_get_sz squeue j);
+          assert (seq_get scolor (SZ.v (seq_get_sz squeue j)) == 1);
+          assert (SZ.v (seq_get_sz squeue j) < n)  // from queue_valid
+        end
+    in Classical.forall_intro (Classical.move_requires aux)
+
+(** Transitivity for queue_prefix_preserved *)
+let lemma_queue_prefix_trans (sq0 sq1 sq2: Seq.seq SZ.t) (n0 n1: nat)
+  : Lemma
+    (requires n0 <= n1 /\ queue_prefix_preserved sq0 sq1 n0 /\ queue_prefix_preserved sq1 sq2 n1)
+    (ensures queue_prefix_preserved sq0 sq2 n0)
+  = ()
+
+(** Extending queue_color1 range: old [a,b) + new [b,c) = [a,c) using color-1 pres + prefix pres *)
+let lemma_queue_color1_chain
+  (sc0 sc1: Seq.seq int) (sq0 sq1: Seq.seq SZ.t) (a b c n: nat)
+  : Lemma
+    (requires
+      a <= b /\ b <= c /\
+      queue_color1 sc0 sq0 a b n /\
+      queue_valid sq0 0 b n /\
+      queue_prefix_preserved sq0 sq1 b /\
+      (forall (j: nat). j < n /\ seq_get sc0 j == 1 ==> seq_get sc1 j == 1) /\
+      queue_color1 sc1 sq1 b c n)
+    (ensures queue_color1 sc1 sq1 a c n)
+  = let aux (j: nat)
+      : Lemma (requires a <= j /\ j < c)
+        (ensures seq_get sc1 (SZ.v (seq_get_sz sq1 j)) == 1)
+      = if j < b then begin
+          assert (seq_get_sz sq1 j == seq_get_sz sq0 j);
+          assert (seq_get sc0 (SZ.v (seq_get_sz sq0 j)) == 1);
+          assert (SZ.v (seq_get_sz sq0 j) < n)
+        end
     in Classical.forall_intro (Classical.move_requires aux)
 
 (** Count of color-1 vertices in positions [0..k) *)
@@ -783,19 +841,59 @@ let lemma_augment_imp_preserves_valid (flow_seq cap_seq: Seq.seq int) (n source 
   : Lemma (ensures imp_valid_flow flow_seq cap_seq n source sink)
   = admit ()
 
-(** AXIOM — BFS completeness: when BFS terminates with all residual neighbors of
-    discovered vertices also discovered (bfs_complete), and sink undiscovered,
-    then no augmenting path exists.
-    
-    Proof sketch:
-    - Any path from source to sink must cross from a discovered vertex to an
-      undiscovered vertex at some edge (u, v) where u is colored and v is not.
-    - By bfs_complete, the residual capacity of u→v is ≤ 0 (forward) and
-      v→u backward flow is ≤ 0. So this edge contributes ≤ 0 to the bottleneck.
-    - Therefore the bottleneck of any source-to-sink path is ≤ 0.
-    
-    Pending full proof (requires induction on path structure). *)
-assume val axiom_bfs_complete
+(** Bottleneck ≤ 0 when BFS colored/uncolored crossing exists.
+    Key lemma: any path from a colored source to an uncolored sink must
+    cross from colored to uncolored; at that edge, both forward and backward
+    residual capacity are ≤ 0 (by bfs_complete), giving bottleneck ≤ 0. *)
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec lemma_bottleneck_crossing
+  (scolor cap flow: Seq.seq int)
+  (n: nat)
+  (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
+  : Lemma
+    (requires
+      n > 0 /\
+      Seq.length scolor >= n /\
+      Seq.length cap == n * n /\ Seq.length flow == n * n /\
+      bfs_complete scolor cap flow n /\
+      seq_get scolor (L.hd path) <> 0 /\
+      seq_get scolor (L.last path) == 0)
+    (ensures bottleneck cap flow n path <= 0)
+    (decreases path)
+  = match path with
+    | [_] -> () // impossible: hd == last, colored and uncolored. False.
+    | u :: v :: rest ->
+      assert (u < n /\ v < n);
+      if seq_get scolor v = 0 then begin
+        // Crossing edge: u colored, v uncolored
+        // bfs_complete: colored u => residual neighbors colored. v uncolored => not a residual nbr.
+        assert (seq_get cap (u * n + v) - seq_get flow (u * n + v) <= 0);
+        assert (seq_get flow (v * n + u) <= 0);
+        // These equal residual_capacity and residual_capacity_backward
+        // edge_capacity: if rc > 0 then rc else rcb, both ≤ 0 ⟹ edge_capacity ≤ 0
+        // bottleneck = min(edge_capacity, rest_cap) ≤ edge_capacity ≤ 0
+        ()
+      end else begin
+        // v is colored. Recurse on (v :: rest).
+        // L.last (v :: rest) == L.last path == uncolored.
+        // If rest = []: L.last [v] = v, but v is colored. Contradiction. False.
+        if Nil? rest then ()
+        else begin
+          lemma_bottleneck_crossing scolor cap flow n (v :: rest);
+          // bottleneck (v :: rest) ≤ 0
+          // bottleneck path = min(edge(u,v), bottleneck(v::rest))
+          // In both cases of min, result ≤ 0
+          ()
+        end
+      end
+    | [] -> () // impossible: Cons? path
+#pop-options
+
+(** BFS completeness lemma — replaces axiom_bfs_complete.
+    When BFS terminates with all residual neighbors of discovered vertices
+    also discovered, and sink is undiscovered, no augmenting path exists. *)
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let lemma_bfs_complete
   (cap_seq flow_seq scolor: Seq.seq int)
   (n source sink: nat)
   : Lemma
@@ -807,6 +905,14 @@ assume val axiom_bfs_complete
       seq_get scolor sink == 0 /\
       bfs_complete scolor cap_seq flow_seq n)
     (ensures no_augmenting_path #n cap_seq flow_seq source sink)
+  = let aux (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
+      : Lemma
+        (requires L.hd path = source /\ L.last path = sink)
+        (ensures bottleneck cap_seq flow_seq n path <= 0)
+      = lemma_bottleneck_crossing scolor cap_seq flow_seq n path
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+#pop-options
 
 (* ================================================================
    BFS ON RESIDUAL GRAPH
@@ -929,7 +1035,9 @@ let discover_delta
   nbr_colored_if_residual scolor' cap_seq flow_seq n u vv /\
   count_color1 scolor' n + vtail == count_color1 scolor n + vtail' /\
   (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
-  (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1)
+  (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1) /\
+  queue_prefix_preserved squeue squeue' vtail /\
+  queue_color1 scolor' squeue' vtail vtail' n
 
 let mk_discover_delta
   (scolor scolor': Seq.seq int) (spred': Seq.seq int)
@@ -942,7 +1050,9 @@ let mk_discover_delta
       nbr_colored_if_residual scolor' cap_seq flow_seq n u vv /\
       count_color1 scolor' n + vtail == count_color1 scolor n + vtail' /\
       (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
-      (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1))
+      (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1) /\
+      queue_prefix_preserved squeue squeue' vtail /\
+      queue_color1 scolor' squeue' vtail vtail' n)
     (ensures discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
   = reveal_opaque (`%discover_delta) (discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
 
@@ -958,11 +1068,13 @@ let elim_discover_delta
       nbr_colored_if_residual scolor' cap_seq flow_seq n u vv /\
       count_color1 scolor' n + vtail == count_color1 scolor n + vtail' /\
       (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
-      (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1))
+      (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1) /\
+      queue_prefix_preserved squeue squeue' vtail /\
+      queue_color1 scolor' squeue' vtail vtail' n)
   = reveal_opaque (`%discover_delta) (discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 120 --fuel 1 --ifuel 1"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -1008,6 +1120,14 @@ let maybe_discover_then_proof
     assert (c1 == c0 + 1);
     assert (c1 + vtail == c0 + 1 + vtail);
     assert (c0 + 1 + vtail == c0 + (vtail + 1));
+    // Queue prefix: writing at position vtail doesn't affect positions < vtail
+    assert (Seq.length sq' == n);
+    assert (forall (j: nat). j < vtail ==> j < Seq.length sq' /\ Seq.index sq' j == Seq.index squeue j);
+    assert (queue_prefix_preserved squeue sq' vtail);
+    // New entry at position vtail has color 1: sq'[vtail]=vv and sc'[vv]=1
+    assert (Seq.index sq' vtail == vv);
+    assert (Seq.index sc' (SZ.v vv) == 1);
+    assert (queue_color1 sc' sq' vtail (vtail + 1) n);
     mk_discover_delta scolor sc' sp' squeue sq'
       cap_seq flow_seq n u (SZ.v vv) source vtail (vtail + 1)
 #pop-options
@@ -1189,7 +1309,9 @@ fn bfs_explore_neighbors
       count_color1 scolor' (SZ.v n) + SZ.v vtail == count_color1 scolor (SZ.v n) + SZ.v vtail' /\
       all_nbrs_colored scolor' cap_seq flow_seq (SZ.v n) (SZ.v u) /\
       (forall (j: nat). j < SZ.v n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
-      (forall (j: nat). j < SZ.v n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1)
+      (forall (j: nat). j < SZ.v n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1) /\
+      queue_prefix_preserved squeue squeue' (SZ.v vtail) /\
+      queue_color1 scolor' squeue' (SZ.v vtail) (SZ.v vtail') (SZ.v n)
     )
 {
   let mut v: SZ.t = 0sz;
@@ -1225,7 +1347,9 @@ fn bfs_explore_neighbors
       count_color1 sc (SZ.v n) + SZ.v vtail == count_color1 scolor (SZ.v n) + SZ.v vt /\
       partial_nbrs_colored sc cap_seq flow_seq (SZ.v n) (SZ.v u) (SZ.v vi) /\
       (forall (j: nat). j < SZ.v n /\ seq_get scolor j <> 0 ==> seq_get sc j <> 0) /\
-      (forall (j: nat). j < SZ.v n /\ seq_get scolor j == 1 ==> seq_get sc j == 1)
+      (forall (j: nat). j < SZ.v n /\ seq_get scolor j == 1 ==> seq_get sc j == 1) /\
+      queue_prefix_preserved squeue sq (SZ.v vtail) /\
+      queue_color1 sc sq (SZ.v vtail) (SZ.v vt) (SZ.v n)
     )
   decreases (SZ.v n - SZ.v !v)
   {
@@ -1252,6 +1376,11 @@ fn bfs_explore_neighbors
       (SZ.v vtail) (count_color1 scolor (SZ.v n))
       (SZ.v vt_before) (SZ.v vt_after);
     lemma_partial_nbrs_step sc_before sc_after cap_seq flow_seq (SZ.v n) (SZ.v u) (SZ.v vv);
+    // Queue prefix transitivity: squeue → sq_before → sq_after
+    lemma_queue_prefix_trans squeue sq_before sq_after (SZ.v vtail) (SZ.v vt_before);
+    // queue_color1 chain: old [vtail, vt_before) + new [vt_before, vt_after) = [vtail, vt_after)
+    lemma_queue_color1_chain sc_before sc_after sq_before sq_after
+      (SZ.v vtail) (SZ.v vt_before) (SZ.v vt_after) (SZ.v n);
     v := vv +^ 1sz
   };
   with sc_done. assert (A.pts_to color sc_done);
@@ -1317,6 +1446,7 @@ fn bfs_residual
   with scolor_init. assert (A.pts_to color scolor_init);
   with squeue_init. assert (A.pts_to queue squeue_init);
   lemma_count_nonzero_single scolor_init (SZ.v n) (SZ.v source);
+  lemma_count_color1_single scolor_init (SZ.v n) (SZ.v source);
   let mut q_head: SZ.t = 0sz;
   let mut q_tail: SZ.t = 1sz;
 
@@ -1350,11 +1480,16 @@ fn bfs_residual
       processed_complete scolor_q cap_seq flow_seq (SZ.v n) /\
       colors_valid scolor_q (SZ.v n) /\
       count_nonzero scolor_q (SZ.v n) == SZ.v vtail /\
-      queue_ok scolor_q squeue_q (SZ.v vtail) (SZ.v n)
+      queue_ok scolor_q squeue_q (SZ.v vtail) (SZ.v n) /\
+      count_color1 scolor_q (SZ.v n) == SZ.v vtail - SZ.v vhead /\
+      queue_color1 scolor_q squeue_q (SZ.v vhead) (SZ.v vtail) (SZ.v n)
     )
   decreases (SZ.v n - SZ.v !q_head)
   {
     let vh = !q_head;
+    with sc_cur. assert (A.pts_to color sc_cur);
+    with sq_cur. assert (A.pts_to queue sq_cur);
+    with vt_cur. assert (R.pts_to q_tail vt_cur);
     let u: SZ.t = A.op_Array_Access queue vh;
     ();
     q_head := vh +^ 1sz;
@@ -1362,11 +1497,18 @@ fn bfs_residual
     with sc_post. assert (A.pts_to color sc_post);
     with sq_post. assert (A.pts_to queue sq_post);
     with vtail_post. assert (R.pts_to q_tail vtail_post);
-    // u is non-zero (from queue_nonzero + non-zero preservation)
-    // So count_nonzero preserved, processed_complete extends
+    // u has color 1 (from queue_color1 + color-1 preservation)
+    // So count_color1 decreases by 1 after color[u]=2, and processed_complete extends
     lemma_count_nonzero_preserve sc_post (SZ.v n) (SZ.v u) 2;
     lemma_processed_complete_extend sc_post cap_seq flow_seq (SZ.v n) (SZ.v u);
     lemma_queue_nonzero_upd_color sc_post sq_post 0 (SZ.v vtail_post) (SZ.v n) (SZ.v u) 2;
+    // queue_color1 for full range [vhead, vtail_post)
+    lemma_queue_color1_preserved sc_cur sc_post sq_cur sq_post
+      (SZ.v vh) (SZ.v vt_cur) (SZ.v vtail_post) (SZ.v n);
+    // After color[u]=2: shift queue_color1 to [vhead+1, vtail_post)
+    lemma_queue_color1_after_set2 sc_post sq_post (SZ.v vh) (SZ.v vtail_post) (SZ.v n) (SZ.v u);
+    // count_color1 decreases by 1
+    lemma_count_color1_set_2 sc_post (SZ.v n) (SZ.v u);
     A.op_Array_Assignment color u 2;
     ()
   };
@@ -1375,12 +1517,11 @@ fn bfs_residual
   // Free dist array (local to BFS)
   A.free dist;
 
-  // BFS completeness: at termination, queue is empty so all colored vertices
-  // have been fully processed and all their residual neighbors discovered.
-  // Source was colored during bfs_init and color is never unset.
+  // BFS completeness: at termination, queue is empty → count_color1 == 0 → no color-1 vertices
+  // → processed_complete = bfs_complete
   with sc_final. assert (A.pts_to color sc_final);
-  // Source colored follows from loop invariant
-  assume_ (pure (bfs_complete sc_final cap_seq flow_seq (SZ.v n)));
+  lemma_count_zero_no_color1 sc_final (SZ.v n);
+  lemma_processed_to_bfs_complete sc_final cap_seq flow_seq (SZ.v n);
 
   (sink_color <> 0)
 }
@@ -1985,7 +2126,7 @@ fn max_flow
       // Use BFS completeness to establish no_augmenting_path
       with flow_s. assert (A.pts_to flow flow_s);
       with sc. assert (A.pts_to color sc);
-      axiom_bfs_complete cap_seq flow_s sc (SZ.v n) (SZ.v source) (SZ.v sink);
+      lemma_bfs_complete cap_seq flow_s sc (SZ.v n) (SZ.v source) (SZ.v sink);
       is_completed := true;
       continue_loop := false
     }
