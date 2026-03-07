@@ -159,167 +159,392 @@ let bfs_complete (scolor cap_seq flow_seq: Seq.seq int) (n: nat) : prop =
      (seq_get flow_seq (v * n + u) > 0 ==>
       seq_get scolor v <> 0)))
 
-(** Colors are valid: each vertex has color 0, 1, or 2 *)
+(** All colors are in {0, 1, 2} — maintained by BFS operations *)
 let colors_valid (scolor: Seq.seq int) (n: nat) : prop =
   forall (u: nat). u < n ==> (seq_get scolor u == 0 \/ seq_get scolor u == 1 \/ seq_get scolor u == 2)
 
-(** All residual neighbors of vertex u are colored *)
-let all_nbrs_colored (scolor cap_seq flow_seq: Seq.seq int) (n u: nat) : prop =
-  forall (v: nat). v < n ==>
-    ((seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==> seq_get scolor v <> 0) /\
-     (seq_get flow_seq (v * n + u) > 0 ==> seq_get scolor v <> 0))
-
+(** Processed-complete: color-2 vertices have all residual neighbors colored.
+    This is the BFS loop invariant — becomes bfs_complete when no color-1 remains. *)
 let processed_complete (scolor cap_seq flow_seq: Seq.seq int) (n: nat) : prop =
-  forall (u: nat). u < n /\ seq_get scolor u == 2 ==> all_nbrs_colored scolor cap_seq flow_seq n u
+  (forall (u: nat) (v: nat). u < n /\ v < n /\ seq_get scolor u == 2 ==>
+    ((seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==>
+      seq_get scolor v <> 0) /\
+     (seq_get flow_seq (v * n + u) > 0 ==>
+      seq_get scolor v <> 0)))
 
-let lemma_processed_complete_set_1 (scolor cap_seq flow_seq: Seq.seq int) (n idx: nat)
-  : Lemma (requires idx < n /\ Seq.length scolor == n /\ seq_get scolor idx == 0 /\
-              processed_complete scolor cap_seq flow_seq n)
-    (ensures processed_complete (Seq.upd scolor idx 1) cap_seq flow_seq n) = ()
+(** All residual neighbors of vertex u are colored (non-zero) *)
+let all_nbrs_colored (scolor cap_seq flow_seq: Seq.seq int) (n: nat) (u: nat) : prop =
+  u < n /\
+  (forall (v: nat). v < n ==>
+    ((seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==>
+      seq_get scolor v <> 0) /\
+     (seq_get flow_seq (v * n + u) > 0 ==>
+      seq_get scolor v <> 0)))
 
-let lemma_processed_complete_extend (scolor cap_seq flow_seq: Seq.seq int) (n u: nat)
-  : Lemma (requires u < n /\ Seq.length scolor == n /\
-              processed_complete scolor cap_seq flow_seq n /\
-              all_nbrs_colored scolor cap_seq flow_seq n u)
-    (ensures processed_complete (Seq.upd scolor u 2) cap_seq flow_seq n) = ()
+(** Single-neighbor residual coloring: if there's positive residual from u to v, v is colored *)
+let nbr_colored_if_residual (scolor cap_seq flow_seq: Seq.seq int) (n u v: nat) : prop =
+  (seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==>
+    seq_get scolor v <> 0) /\
+  (seq_get flow_seq (v * n + u) > 0 ==>
+    seq_get scolor v <> 0)
 
-let lemma_processed_to_bfs_complete (scolor cap_seq flow_seq: Seq.seq int) (n: nat)
-  : Lemma (requires Seq.length scolor == n /\ Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\
-      processed_complete scolor cap_seq flow_seq n /\
-      (forall (u: nat). u < n ==> seq_get scolor u <> 1) /\ colors_valid scolor n)
-    (ensures bfs_complete scolor cap_seq flow_seq n) = ()
-
-let partial_nbrs_colored (scolor cap_seq flow_seq: Seq.seq int) (n u k: nat) : prop =
-  forall (v: nat). v < k ==>
-    ((seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==> seq_get scolor v <> 0) /\
-     (seq_get flow_seq (v * n + u) > 0 ==> seq_get scolor v <> 0))
+(** Partial neighbor exploration: neighbors w < bound of u are colored if residual > 0 *)
+let partial_nbrs_colored (scolor cap_seq flow_seq: Seq.seq int) (n u bound: nat) : prop =
+  u < n /\
+  (forall (w: nat). w < n /\ w < bound ==>
+    ((seq_get cap_seq (u * n + w) - seq_get flow_seq (u * n + w) > 0 ==>
+      seq_get scolor w <> 0) /\
+     (seq_get flow_seq (w * n + u) > 0 ==>
+      seq_get scolor w <> 0)))
 
 let lemma_partial_nbrs_zero (scolor cap_seq flow_seq: Seq.seq int) (n u: nat)
-  : Lemma (ensures partial_nbrs_colored scolor cap_seq flow_seq n u 0) = ()
+  : Lemma (requires u < n)
+    (ensures partial_nbrs_colored scolor cap_seq flow_seq n u 0)
+  = ()
 
 let lemma_partial_nbrs_to_all (scolor cap_seq flow_seq: Seq.seq int) (n u: nat)
   : Lemma (requires partial_nbrs_colored scolor cap_seq flow_seq n u n)
-    (ensures all_nbrs_colored scolor cap_seq flow_seq n u) = ()
+    (ensures all_nbrs_colored scolor cap_seq flow_seq n u)
+  = ()
 
-let lemma_partial_nbrs_step (scolor scolor': Seq.seq int) (cap_seq flow_seq: Seq.seq int) (n u v: nat)
-  : Lemma (requires v < n /\
-      partial_nbrs_colored scolor cap_seq flow_seq n u v /\
+(** Step: extend partial_nbrs_colored from bound to bound+1.
+    Requires that neighbor `bound` is colored (if it has positive residual).
+    Also handles the case where scolor changed (non-zero preservation). *)
+let lemma_partial_nbrs_step
+  (scolor scolor': Seq.seq int) (cap_seq flow_seq: Seq.seq int) (n u bound: nat)
+  : Lemma
+    (requires
+      partial_nbrs_colored scolor cap_seq flow_seq n u bound /\
+      bound < n /\
       (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
-      ((seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==> seq_get scolor' v <> 0) /\
-       (seq_get flow_seq (v * n + u) > 0 ==> seq_get scolor' v <> 0)))
-    (ensures partial_nbrs_colored scolor' cap_seq flow_seq n u (v + 1)) = ()
+      nbr_colored_if_residual scolor' cap_seq flow_seq n u bound)
+    (ensures partial_nbrs_colored scolor' cap_seq flow_seq n u (bound + 1))
+  = assert (u < n);
+    let aux (w: nat) : Lemma
+      (requires w < n /\ w < bound + 1)
+      (ensures
+        (seq_get cap_seq (u * n + w) - seq_get flow_seq (u * n + w) > 0 ==>
+          seq_get scolor' w <> 0) /\
+        (seq_get flow_seq (w * n + u) > 0 ==>
+          seq_get scolor' w <> 0))
+    = if w < bound then begin
+        assert (seq_get cap_seq (u * n + w) - seq_get flow_seq (u * n + w) > 0 ==>
+          seq_get scolor w <> 0);
+        assert (seq_get flow_seq (w * n + u) > 0 ==>
+          seq_get scolor w <> 0);
+        // From preservation: scolor[w] <> 0 ==> scolor'[w] <> 0
+        ()
+      end else begin
+        // w == bound: directly from the precondition
+        ()
+      end
+    in
+    Classical.forall_intro (Classical.move_requires aux)
 
-let nbr_colored_if_residual (scolor cap_seq flow_seq: Seq.seq int) (n u v: nat) : prop =
-  (seq_get cap_seq (u * n + v) - seq_get flow_seq (u * n + v) > 0 ==> seq_get scolor v <> 0) /\
-  (seq_get flow_seq (v * n + u) > 0 ==> seq_get scolor v <> 0)
+(** Active queue elements have color 1 *)
+let queue_color1 (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n: nat) : prop =
+  forall (j: nat). vhead <= j /\ j < vtail ==> seq_get scolor (SZ.v (seq_get_sz squeue j)) == 1
 
+(** Active queue elements are colored (non-zero) — weaker, but maintained after color[u]=2 *)
 let queue_nonzero (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n: nat) : prop =
   forall (j: nat). vhead <= j /\ j < vtail ==> seq_get scolor (SZ.v (seq_get_sz squeue j)) <> 0
 
+(** Updating a color to a non-zero value preserves queue_nonzero *)
 let lemma_queue_nonzero_upd_color (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n idx: nat) (v: int)
   : Lemma (requires queue_nonzero scolor squeue vhead vtail n /\ idx < Seq.length scolor /\ v <> 0)
-    (ensures queue_nonzero (Seq.upd scolor idx v) squeue vhead vtail n) = ()
+    (ensures queue_nonzero (Seq.upd scolor idx v) squeue vhead vtail n)
+  = ()
 
+(** Queue entries are distinct: no vertex appears twice in [0, vtail) *)
 let queue_entries_unique (squeue: Seq.seq SZ.t) (vtail: nat) : prop =
   forall (i j: nat). i < vtail /\ j < vtail /\ i <> j ==> seq_get_sz squeue i <> seq_get_sz squeue j
 
+(** Combined: queue entries non-zero AND unique *)
 let queue_ok (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail n: nat) : prop =
   queue_nonzero scolor squeue 0 vtail n /\ queue_entries_unique squeue vtail
 
-let lemma_queue_ok_extend (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail n: nat) (vv: SZ.t)
-  : Lemma (requires vtail < Seq.length squeue /\ SZ.v vv < n /\ Seq.length scolor == n /\
-      queue_ok scolor squeue vtail n /\ seq_get scolor (SZ.v vv) == 0 /\ queue_valid squeue 0 vtail n)
-    (ensures queue_ok (Seq.upd scolor (SZ.v vv) 1) (Seq.upd squeue vtail vv) (vtail + 1) n)
+(** Extending queue with a fresh element preserves uniqueness.
+    The new element has color 0 while all existing entries have non-zero color,
+    so the new element must differ from all existing entries. *)
+let lemma_queue_unique_extend
+  (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail n: nat) (vv: SZ.t)
+  : Lemma
+    (requires
+      vtail < Seq.length squeue /\
+      SZ.v vv < n /\
+      queue_entries_unique squeue vtail /\
+      queue_nonzero scolor squeue 0 vtail n /\
+      seq_get scolor (SZ.v vv) == 0 /\
+      queue_valid squeue 0 vtail n)
+    (ensures queue_entries_unique (Seq.upd squeue vtail vv) (vtail + 1))
   = let squeue' = Seq.upd squeue vtail vv in
     let aux (i j: nat)
       : Lemma (requires i < vtail + 1 /\ j < vtail + 1 /\ i <> j)
         (ensures seq_get_sz squeue' i <> seq_get_sz squeue' j)
       = if i < vtail && j < vtail then ()
-        else if i = vtail then (assert (seq_get scolor (SZ.v vv) == 0); assert (seq_get scolor (SZ.v (seq_get_sz squeue j)) <> 0))
-        else (assert (seq_get scolor (SZ.v vv) == 0); assert (seq_get scolor (SZ.v (seq_get_sz squeue i)) <> 0))
+        else if i = vtail then (
+          assert (seq_get scolor (SZ.v vv) == 0);
+          assert (seq_get scolor (SZ.v (seq_get_sz squeue j)) <> 0)
+        ) else (
+          assert (seq_get scolor (SZ.v vv) == 0);
+          assert (seq_get scolor (SZ.v (seq_get_sz squeue i)) <> 0)
+        )
     in
     assert (queue_entries_unique squeue' (vtail + 1))
       by (FStar.Tactics.norm [delta_only [`%queue_entries_unique; `%seq_get_sz]];
           FStar.Tactics.smt ())
 
-let lemma_queue_ok_after_set2 (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n u: nat)
-  : Lemma (requires vhead < vtail /\ queue_ok scolor squeue vtail n /\
-      u == SZ.v (seq_get_sz squeue vhead) /\ u < Seq.length scolor /\ seq_get scolor u == 1)
-    (ensures queue_nonzero (Seq.upd scolor u 2) squeue (vhead + 1) vtail n)
+(** Updating queue beyond vtail preserves uniqueness in [0, vtail) *)
+let lemma_queue_unique_frame (squeue: Seq.seq SZ.t) (vtail: nat) (idx: nat) (v: SZ.t)
+  : Lemma (requires queue_entries_unique squeue vtail /\ idx >= vtail /\ idx < Seq.length squeue)
+    (ensures queue_entries_unique (Seq.upd squeue idx v) vtail)
+  = ()
+
+(** queue_color1 after setting color[u]=2, using queue uniqueness to skip position vhead *)
+let lemma_queue_color1_after_set2
+  (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n u: nat)
+  : Lemma
+    (requires
+      vhead < vtail /\
+      queue_color1 scolor squeue vhead vtail n /\
+      queue_entries_unique squeue vtail /\
+      u == SZ.v (seq_get_sz squeue vhead) /\
+      u < Seq.length scolor)
+    (ensures queue_color1 (Seq.upd scolor u 2) squeue (vhead + 1) vtail n)
   = let scolor' = Seq.upd scolor u 2 in
-    let aux (j: nat) : Lemma (requires vhead + 1 <= j /\ j < vtail)
-      (ensures seq_get scolor' (SZ.v (seq_get_sz squeue j)) <> 0)
-      = assert (j <> vhead); assert (seq_get_sz squeue j <> seq_get_sz squeue vhead)
+    let aux (j: nat) : Lemma
+      (requires vhead + 1 <= j /\ j < vtail)
+      (ensures seq_get scolor' (SZ.v (seq_get_sz squeue j)) == 1)
+      = // queue[j] <> queue[vhead] = u by uniqueness (j <> vhead)
+        assert (j <> vhead);
+        assert (seq_get_sz squeue j <> seq_get_sz squeue vhead)
     in
     Classical.forall_intro (fun j -> Classical.move_requires aux j)
 
-let rec count_color1 (scolor: Seq.seq int) (k: nat) : Tot nat (decreases k) =
-  if k = 0 then 0 else count_color1 scolor (k - 1) + (if seq_get scolor (k - 1) = 1 then 1 else 0)
+(** Combined: queue_ok after discovering vertex vv (color 0→1, append to queue) *)
+let lemma_queue_ok_after_discover
+  (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail n: nat) (vv: SZ.t)
+  : Lemma
+    (requires
+      queue_ok scolor squeue vtail n /\
+      queue_valid squeue 0 vtail n /\
+      seq_get scolor (SZ.v vv) == 0 /\
+      SZ.v vv < n /\
+      Seq.length scolor >= n /\
+      vtail < Seq.length squeue)
+    (ensures
+      queue_ok (Seq.upd scolor (SZ.v vv) 1) (Seq.upd squeue vtail vv) (vtail + 1) n)
+  = let sc' = Seq.upd scolor (SZ.v vv) 1 in
+    let sq' = Seq.upd squeue vtail vv in
+    // Part 1: queue_entries_unique sq' (vtail+1)
+    lemma_queue_unique_extend scolor squeue vtail n vv;
+    // Part 2: queue_nonzero sc' sq' 0 (vtail+1) n
+    let aux (j: nat)
+      : Lemma (requires 0 <= j /\ j < vtail + 1)
+        (ensures seq_get sc' (SZ.v (seq_get_sz sq' j)) <> 0) =
+      if j = vtail then ()  // sq'[vtail] = vv, sc'[vv] = 1 ≠ 0
+      else begin
+        // j < vtail: sq'[j] = squeue[j], color was non-zero
+        assert (seq_get scolor (SZ.v (seq_get_sz squeue j)) <> 0);
+        // squeue[j] ≠ vv (since scolor[squeue[j]] ≠ 0 but scolor[vv] = 0)
+        ()
+      end
+    in Classical.forall_intro (Classical.move_requires aux)
 
-let rec lemma_count_color1_frame (scolor: Seq.seq int) (k idx: nat) (v: int)
-  : Lemma (requires idx >= k /\ idx < Seq.length scolor)
-    (ensures count_color1 (Seq.upd scolor idx v) k == count_color1 scolor k) (decreases k)
+(** Count of color-1 vertices in positions [0..k) *)
+let rec count_color1 (scolor: Seq.seq int) (k: nat) : Tot nat (decreases k) =
+  if k = 0 then 0
+  else count_color1 scolor (k - 1) + (if seq_get scolor (k - 1) = 1 then 1 else 0)
+
+(** Updating index >= k doesn't affect count over [0..k) *)
+let rec lemma_count_color1_frame (scolor: Seq.seq int) (k: nat) (idx: nat) (v: int)
+  : Lemma (requires idx < Seq.length scolor /\ idx >= k)
+    (ensures count_color1 (Seq.upd scolor idx v) k == count_color1 scolor k)
+    (decreases k)
   = if k = 0 then () else lemma_count_color1_frame scolor (k - 1) idx v
 
-let rec lemma_count_color1_set_1 (scolor: Seq.seq int) (k idx: nat)
-  : Lemma (requires idx < k /\ Seq.length scolor >= k /\ seq_get scolor idx == 0)
-    (ensures count_color1 (Seq.upd scolor idx 1) k == count_color1 scolor k + 1) (decreases k)
+(** Setting a non-1 cell to 1 increases count by 1 *)
+let rec lemma_count_color1_set_1 (scolor: Seq.seq int) (k: nat) (idx: nat)
+  : Lemma (requires idx < Seq.length scolor /\ idx < k /\ Seq.index scolor idx <> 1)
+    (ensures count_color1 (Seq.upd scolor idx 1) k == count_color1 scolor k + 1)
+    (decreases k)
   = if k - 1 = idx then (if k > 1 then lemma_count_color1_frame scolor (k - 1) idx 1)
     else lemma_count_color1_set_1 scolor (k - 1) idx
 
-let rec lemma_count_color1_set_2 (scolor: Seq.seq int) (k idx: nat)
-  : Lemma (requires idx < k /\ Seq.length scolor >= k /\ seq_get scolor idx == 1)
-    (ensures count_color1 scolor k >= 1 /\ count_color1 (Seq.upd scolor idx 2) k == count_color1 scolor k - 1)
+(** Setting a color-1 cell to 2 decreases count by 1 *)
+let rec lemma_count_color1_set_2 (scolor: Seq.seq int) (k: nat) (idx: nat)
+  : Lemma (requires idx < Seq.length scolor /\ idx < k /\ Seq.index scolor idx == 1)
+    (ensures count_color1 scolor k >= 1 /\
+             count_color1 (Seq.upd scolor idx 2) k == count_color1 scolor k - 1)
     (decreases k)
   = if k - 1 = idx then (if k > 1 then lemma_count_color1_frame scolor (k - 1) idx 2)
     else lemma_count_color1_set_2 scolor (k - 1) idx
 
+(** Updating a non-1 cell to a non-1 value preserves count *)
+let rec lemma_count_color1_preserve (scolor: Seq.seq int) (k: nat) (idx: nat) (v: int)
+  : Lemma (requires idx < Seq.length scolor /\ idx < k /\ Seq.index scolor idx <> 1 /\ v <> 1)
+    (ensures count_color1 (Seq.upd scolor idx v) k == count_color1 scolor k)
+    (decreases k)
+  = if k - 1 = idx then (if k > 1 then lemma_count_color1_frame scolor (k - 1) idx v)
+    else lemma_count_color1_preserve scolor (k - 1) idx v
+
+(** If count_color1 is 0, no vertex has color 1 *)
 let rec lemma_count_zero_no_color1 (scolor: Seq.seq int) (k: nat)
-  : Lemma (requires count_color1 scolor k == 0) (ensures forall (u: nat). u < k ==> seq_get scolor u <> 1) (decreases k)
+  : Lemma (requires count_color1 scolor k == 0)
+    (ensures forall (u: nat). u < k ==> seq_get scolor u <> 1)
+    (decreases k)
   = if k = 0 then () else lemma_count_zero_no_color1 scolor (k - 1)
 
+(** If all entries are 0, count_color1 is 0 *)
 let rec lemma_count_color1_all_zero (scolor: Seq.seq int) (k: nat)
-  : Lemma (requires forall (j: nat). j < k ==> seq_get scolor j == 0) (ensures count_color1 scolor k == 0) (decreases k)
+  : Lemma (requires forall (j: nat). j < k ==> seq_get scolor j == 0)
+    (ensures count_color1 scolor k == 0)
+    (decreases k)
   = if k = 0 then () else lemma_count_color1_all_zero scolor (k - 1)
 
-let rec lemma_count_color1_single (scolor: Seq.seq int) (k idx: nat)
-  : Lemma (requires idx < k /\ seq_get scolor idx == 1 /\ (forall (j: nat). j < k /\ j <> idx ==> seq_get scolor j == 0))
-    (ensures count_color1 scolor k == 1) (decreases k)
-  = if k = 0 then () else if k - 1 = idx then lemma_count_color1_all_zero scolor (k - 1)
+(** If exactly one entry has color 1 and the rest are 0, count_color1 is 1 *)
+let rec lemma_count_color1_single (scolor: Seq.seq int) (k: nat) (idx: nat)
+  : Lemma
+    (requires
+      idx < k /\
+      seq_get scolor idx == 1 /\
+      (forall (j: nat). j < k /\ j <> idx ==> seq_get scolor j == 0))
+    (ensures count_color1 scolor k == 1)
+    (decreases k)
+  = if k = 0 then ()
+    else if k - 1 = idx then lemma_count_color1_all_zero scolor (k - 1)
     else lemma_count_color1_single scolor (k - 1) idx
 
+(** Count of non-zero colored vertices in positions [0..k) *)
 let rec count_nonzero (scolor: Seq.seq int) (k: nat) : Tot nat (decreases k) =
-  if k = 0 then 0 else count_nonzero scolor (k - 1) + (if seq_get scolor (k - 1) <> 0 then 1 else 0)
+  if k = 0 then 0
+  else count_nonzero scolor (k - 1) + (if seq_get scolor (k - 1) <> 0 then 1 else 0)
 
+(** Helper for chaining addition-form count_color1 equations *)
 let lemma_add_chain (a1 a2 b c d1 d2: nat)
-  : Lemma (requires a1 + b == c + d1 /\ a2 + d1 == a1 + d2) (ensures a2 + b == c + d2) = ()
+  : Lemma (requires a1 + b == c + d1 /\ a2 + d1 == a1 + d2)
+    (ensures a2 + b == c + d2)
+  = ()
 
+(** count_nonzero <= k *)
 let rec lemma_count_nonzero_bound (scolor: Seq.seq int) (k: nat)
-  : Lemma (ensures count_nonzero scolor k <= k) (decreases k)
+  : Lemma (ensures count_nonzero scolor k <= k)
+    (decreases k)
   = if k = 0 then () else lemma_count_nonzero_bound scolor (k - 1)
 
-let rec lemma_count_nonzero_set_nz (scolor: Seq.seq int) (k idx: nat) (v: int)
-  : Lemma (requires idx < k /\ Seq.length scolor >= k /\ seq_get scolor idx == 0 /\ v <> 0)
-    (ensures count_nonzero (Seq.upd scolor idx v) k == count_nonzero scolor k + 1) (decreases k)
-  = let rec fr (s: Seq.seq int) (m i: nat) (w: int) : Lemma (requires i >= m /\ i < Seq.length s) (ensures count_nonzero (Seq.upd s i w) m == count_nonzero s m) (decreases m) = if m = 0 then () else fr s (m - 1) i w in
-    if k - 1 = idx then (if k > 1 then fr scolor (k - 1) idx v) else lemma_count_nonzero_set_nz scolor (k - 1) idx v
+(** Updating index >= k doesn't affect count_nonzero over [0..k) *)
+let rec lemma_count_nonzero_frame (scolor: Seq.seq int) (k: nat) (idx: nat) (v: int)
+  : Lemma (requires idx < Seq.length scolor /\ idx >= k)
+    (ensures count_nonzero (Seq.upd scolor idx v) k == count_nonzero scolor k)
+    (decreases k)
+  = if k = 0 then () else lemma_count_nonzero_frame scolor (k - 1) idx v
 
-let rec lemma_count_nonzero_preserve (scolor: Seq.seq int) (k idx: nat) (v: int)
-  : Lemma (requires idx < k /\ Seq.length scolor >= k /\ seq_get scolor idx <> 0 /\ v <> 0)
-    (ensures count_nonzero (Seq.upd scolor idx v) k == count_nonzero scolor k) (decreases k)
-  = let rec fr (s: Seq.seq int) (m i: nat) (w: int) : Lemma (requires i >= m /\ i < Seq.length s) (ensures count_nonzero (Seq.upd s i w) m == count_nonzero s m) (decreases m) = if m = 0 then () else fr s (m - 1) i w in
-    if k - 1 = idx then (if k > 1 then fr scolor (k - 1) idx v) else lemma_count_nonzero_preserve scolor (k - 1) idx v
+(** Setting a zero cell to non-zero increases count_nonzero by 1 *)
+let rec lemma_count_nonzero_set_nz (scolor: Seq.seq int) (k: nat) (idx: nat) (v: int)
+  : Lemma (requires idx < Seq.length scolor /\ idx < k /\ Seq.index scolor idx == 0 /\ v <> 0)
+    (ensures count_nonzero (Seq.upd scolor idx v) k == count_nonzero scolor k + 1)
+    (decreases k)
+  = if k - 1 = idx then (if k > 1 then lemma_count_nonzero_frame scolor (k - 1) idx v)
+    else lemma_count_nonzero_set_nz scolor (k - 1) idx v
 
-let rec lemma_count_nonzero_lt_has_zero (scolor: Seq.seq int) (k idx: nat)
-  : Lemma (requires idx < k /\ seq_get scolor idx == 0) (ensures count_nonzero scolor k < k) (decreases k)
-  = if k = 0 then () else (lemma_count_nonzero_bound scolor (k - 1);
-    if k - 1 = idx then () else lemma_count_nonzero_lt_has_zero scolor (k - 1) idx)
+(** Setting a non-zero cell to non-zero preserves count_nonzero *)
+let rec lemma_count_nonzero_preserve (scolor: Seq.seq int) (k: nat) (idx: nat) (v: int)
+  : Lemma (requires idx < Seq.length scolor /\ idx < k /\ Seq.index scolor idx <> 0 /\ v <> 0)
+    (ensures count_nonzero (Seq.upd scolor idx v) k == count_nonzero scolor k)
+    (decreases k)
+  = if k - 1 = idx then (if k > 1 then lemma_count_nonzero_frame scolor (k - 1) idx v)
+    else lemma_count_nonzero_preserve scolor (k - 1) idx v
 
-let rec lemma_count_nonzero_single (scolor: Seq.seq int) (k idx: nat)
-  : Lemma (requires idx < k /\ seq_get scolor idx <> 0 /\ (forall (j: nat). j < k /\ j <> idx ==> seq_get scolor j == 0))
-    (ensures count_nonzero scolor k == 1) (decreases k)
-  = let rec az (s: Seq.seq int) (m: nat) : Lemma (requires forall (j: nat). j < m ==> seq_get s j == 0) (ensures count_nonzero s m == 0) (decreases m) = if m = 0 then () else az s (m - 1) in
-    if k = 0 then () else if k - 1 = idx then az scolor (k - 1) else lemma_count_nonzero_single scolor (k - 1) idx
+(** If count_nonzero < k, there exists a zero-colored vertex (hence vtail < k) *)
+let rec lemma_count_nonzero_lt_has_zero (scolor: Seq.seq int) (k: nat) (idx: nat)
+  : Lemma (requires idx < k /\ seq_get scolor idx == 0)
+    (ensures count_nonzero scolor k < k)
+    (decreases k)
+  = if k = 0 then () 
+    else begin
+      lemma_count_nonzero_bound scolor (k - 1);
+      if k - 1 = idx then ()
+      else lemma_count_nonzero_lt_has_zero scolor (k - 1) idx
+    end
+
+(** If all entries in [0,k) are zero, count_nonzero is 0 *)
+let rec lemma_count_nonzero_all_zero (scolor: Seq.seq int) (k: nat)
+  : Lemma (requires forall (j: nat). j < k ==> seq_get scolor j == 0)
+    (ensures count_nonzero scolor k == 0)
+    (decreases k)
+  = if k = 0 then () else lemma_count_nonzero_all_zero scolor (k - 1)
+
+(** If exactly one entry in [0,k) is non-zero, count_nonzero is 1 *)
+let rec lemma_count_nonzero_single (scolor: Seq.seq int) (k: nat) (idx: nat)
+  : Lemma
+    (requires
+      idx < k /\
+      seq_get scolor idx <> 0 /\
+      (forall (j: nat). j < k /\ j <> idx ==> seq_get scolor j == 0))
+    (ensures count_nonzero scolor k == 1)
+    (decreases k)
+  = if k = 0 then ()
+    else if k - 1 = idx then lemma_count_nonzero_all_zero scolor (k - 1)
+    else lemma_count_nonzero_single scolor (k - 1) idx
+
+(** processed_complete + no color-1 vertices + colors_valid => bfs_complete *)
+let lemma_processed_to_bfs_complete (scolor cap_seq flow_seq: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      Seq.length scolor == n /\ Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\
+      processed_complete scolor cap_seq flow_seq n /\
+      (forall (u: nat). u < n ==> seq_get scolor u <> 1) /\
+      colors_valid scolor n)
+    (ensures bfs_complete scolor cap_seq flow_seq n)
+  = ()
+
+(** Setting a zero-colored cell to 1 preserves processed_complete *)
+let lemma_processed_complete_set_1 (scolor cap_seq flow_seq: Seq.seq int) (n: nat) (idx: nat)
+  : Lemma
+    (requires idx < n /\ Seq.length scolor == n /\ seq_get scolor idx == 0 /\
+              processed_complete scolor cap_seq flow_seq n)
+    (ensures processed_complete (Seq.upd scolor idx 1) cap_seq flow_seq n)
+  = ()
+
+(** Setting color[u]=2 after all neighbors are colored extends processed_complete *)
+let lemma_processed_complete_extend (scolor cap_seq flow_seq: Seq.seq int) (n: nat) (u: nat)
+  : Lemma
+    (requires u < n /\ Seq.length scolor == n /\
+              processed_complete scolor cap_seq flow_seq n /\
+              all_nbrs_colored scolor cap_seq flow_seq n u)
+    (ensures processed_complete (Seq.upd scolor u 2) cap_seq flow_seq n)
+  = ()
+
+(** Extending queue_valid by one entry *)
+let lemma_queue_valid_extend (squeue: Seq.seq SZ.t) (tail n: nat) (v: SZ.t)
+  : Lemma
+    (requires queue_valid squeue 0 tail n /\
+              tail < Seq.length squeue /\
+              SZ.v v < n)
+    (ensures queue_valid (Seq.upd squeue tail v) 0 (tail + 1) n)
+  = let sq' = Seq.upd squeue tail v in
+    let aux (k: nat)
+      : Lemma (requires k >= 0 /\ k < tail + 1) (ensures SZ.v (seq_get_sz sq' k) < n) =
+      if k = tail then () else ()
+    in Classical.forall_intro (Classical.move_requires aux)
+
+(** Updating one pred entry preserves preds_in_range *)
+let lemma_preds_in_range_upd (spred: Seq.seq int) (n: nat) (idx: nat) (v: int)
+  : Lemma
+    (requires preds_in_range spred n /\ idx < n /\ v >= -1 /\ v < n)
+    (ensures preds_in_range (Seq.upd spred idx v) n)
+  = let sp' = Seq.upd spred idx v in
+    let aux (w: nat)
+      : Lemma (requires w < n) (ensures seq_get sp' w >= -1 /\ seq_get sp' w < n) =
+      if w = idx then () else ()
+    in Classical.forall_intro (Classical.move_requires aux)
+
+(** colors_valid is preserved when setting a zero cell to 1 *)
+let lemma_colors_valid_set_1 (scolor: Seq.seq int) (n: nat) (idx: nat)
+  : Lemma
+    (requires colors_valid scolor n /\ idx < n /\ Seq.length scolor == n)
+    (ensures colors_valid (Seq.upd scolor idx 1) n)
+  = ()
 
 (* ================================================================
    PATH VALIDITY LEMMAS
@@ -650,12 +875,168 @@ fn bfs_init
 }
 #pop-options
 
+(** BFS invariant properties — opaque to SMT to prevent Pulse elaboration blowup *)
+[@"opaque_to_smt"]
+let bfs_inv_props (scolor: Seq.seq int) (spred: Seq.seq int)
+  (squeue: Seq.seq SZ.t) (cap_seq flow_seq: Seq.seq int)
+  (n source vtail: nat) : prop =
+  queue_valid squeue 0 vtail n /\
+  preds_in_range spred n /\
+  seq_get scolor source <> 0 /\
+  processed_complete scolor cap_seq flow_seq n /\
+  colors_valid scolor n /\
+  count_nonzero scolor n == vtail /\
+  queue_ok scolor squeue vtail n
+
+let mk_bfs_inv_props (scolor: Seq.seq int) (spred: Seq.seq int)
+  (squeue: Seq.seq SZ.t) (cap_seq flow_seq: Seq.seq int)
+  (n source vtail: nat)
+  : Lemma
+    (requires
+      queue_valid squeue 0 vtail n /\
+      preds_in_range spred n /\
+      seq_get scolor source <> 0 /\
+      processed_complete scolor cap_seq flow_seq n /\
+      colors_valid scolor n /\
+      count_nonzero scolor n == vtail /\
+      queue_ok scolor squeue vtail n)
+    (ensures bfs_inv_props scolor spred squeue cap_seq flow_seq n source vtail)
+  = reveal_opaque (`%bfs_inv_props) (bfs_inv_props scolor spred squeue cap_seq flow_seq n source vtail)
+
+let elim_bfs_inv_props (scolor: Seq.seq int) (spred: Seq.seq int)
+  (squeue: Seq.seq SZ.t) (cap_seq flow_seq: Seq.seq int)
+  (n source vtail: nat)
+  : Lemma
+    (requires bfs_inv_props scolor spred squeue cap_seq flow_seq n source vtail)
+    (ensures
+      queue_valid squeue 0 vtail n /\
+      preds_in_range spred n /\
+      seq_get scolor source <> 0 /\
+      processed_complete scolor cap_seq flow_seq n /\
+      colors_valid scolor n /\
+      count_nonzero scolor n == vtail /\
+      queue_ok scolor squeue vtail n)
+  = reveal_opaque (`%bfs_inv_props) (bfs_inv_props scolor spred squeue cap_seq flow_seq n source vtail)
+
+(** Discover-specific postcondition delta — opaque to SMT *)
+[@"opaque_to_smt"]
+let discover_delta
+  (scolor scolor': Seq.seq int) (spred': Seq.seq int)
+  (squeue squeue': Seq.seq SZ.t) (cap_seq flow_seq: Seq.seq int)
+  (n u vv source: nat) (vtail vtail': nat) : prop =
+  bfs_inv_props scolor' spred' squeue' cap_seq flow_seq n source vtail' /\
+  vtail' >= vtail /\
+  nbr_colored_if_residual scolor' cap_seq flow_seq n u vv /\
+  count_color1 scolor' n + vtail == count_color1 scolor n + vtail' /\
+  (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
+  (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1)
+
+let mk_discover_delta
+  (scolor scolor': Seq.seq int) (spred': Seq.seq int)
+  (squeue squeue': Seq.seq SZ.t) (cap_seq flow_seq: Seq.seq int)
+  (n u vv source: nat) (vtail vtail': nat)
+  : Lemma
+    (requires
+      bfs_inv_props scolor' spred' squeue' cap_seq flow_seq n source vtail' /\
+      vtail' >= vtail /\
+      nbr_colored_if_residual scolor' cap_seq flow_seq n u vv /\
+      count_color1 scolor' n + vtail == count_color1 scolor n + vtail' /\
+      (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
+      (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1))
+    (ensures discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
+  = reveal_opaque (`%discover_delta) (discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
+
+let elim_discover_delta
+  (scolor scolor': Seq.seq int) (spred': Seq.seq int)
+  (squeue squeue': Seq.seq SZ.t) (cap_seq flow_seq: Seq.seq int)
+  (n u vv source: nat) (vtail vtail': nat)
+  : Lemma
+    (requires discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
+    (ensures
+      bfs_inv_props scolor' spred' squeue' cap_seq flow_seq n source vtail' /\
+      vtail' >= vtail /\
+      nbr_colored_if_residual scolor' cap_seq flow_seq n u vv /\
+      count_color1 scolor' n + vtail == count_color1 scolor n + vtail' /\
+      (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
+      (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1))
+  = reveal_opaque (`%discover_delta) (discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
+
+(** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+let maybe_discover_then_proof
+  (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
+  (cap_seq flow_seq: Seq.seq int)
+  (n u source vtail: nat) (vv: SZ.t)
+  : Lemma
+    (requires
+      n > 0 /\ u < n /\ SZ.v vv < n /\ source < n /\ vtail < n /\
+      Seq.length scolor == n /\ Seq.length spred == n /\ Seq.length squeue == n /\
+      Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\
+      bfs_inv_props scolor spred squeue cap_seq flow_seq n source vtail /\
+      seq_get scolor (SZ.v vv) == 0 /\
+      (seq_get cap_seq (u * n + SZ.v vv) - seq_get flow_seq (u * n + SZ.v vv) > 0 \/
+       seq_get flow_seq (SZ.v vv * n + u) > 0))
+    (ensures
+      discover_delta scolor (Seq.upd scolor (SZ.v vv) 1) (Seq.upd spred (SZ.v vv) u)
+        squeue (Seq.upd squeue vtail vv)
+        cap_seq flow_seq n u (SZ.v vv) source vtail (vtail + 1) /\
+      Seq.length (Seq.upd scolor (SZ.v vv) 1) == n /\
+      Seq.length (Seq.upd spred (SZ.v vv) u) == n /\
+      Seq.length (Seq.upd squeue vtail vv) == n)
+  = elim_bfs_inv_props scolor spred squeue cap_seq flow_seq n source vtail;
+    lemma_count_nonzero_lt_has_zero scolor n (SZ.v vv);
+    lemma_queue_ok_after_discover scolor squeue vtail n vv;
+    lemma_queue_valid_extend squeue vtail n vv;
+    lemma_processed_complete_set_1 scolor cap_seq flow_seq n (SZ.v vv);
+    lemma_count_nonzero_set_nz scolor n (SZ.v vv) 1;
+    lemma_count_color1_set_1 scolor n (SZ.v vv);
+    lemma_colors_valid_set_1 scolor n (SZ.v vv);
+    lemma_preds_in_range_upd spred n (SZ.v vv) u;
+    let sc' = Seq.upd scolor (SZ.v vv) 1 in
+    let sp' = Seq.upd spred (SZ.v vv) u in
+    let sq' = Seq.upd squeue vtail vv in
+    mk_bfs_inv_props sc' sp' sq' cap_seq flow_seq n source (vtail + 1);
+    // Help SMT with each conjunct of mk_discover_delta's precondition
+    assert (bfs_inv_props sc' sp' sq' cap_seq flow_seq n source (vtail + 1));
+    assert (vtail + 1 >= vtail);
+    assert (nbr_colored_if_residual sc' cap_seq flow_seq n u (SZ.v vv));
+    assert (SZ.v vv < Seq.length scolor);
+    assert (Seq.index scolor (SZ.v vv) == 0);
+    assert (count_color1 sc' n == count_color1 scolor n + 1);
+    let c1 = count_color1 sc' n in
+    let c0 = count_color1 scolor n in
+    assert (c1 == c0 + 1);
+    assert (c1 + vtail == c0 + 1 + vtail);
+    assert (c0 + 1 + vtail == c0 + (vtail + 1));
+    mk_discover_delta scolor sc' sp' squeue sq'
+      cap_seq flow_seq n u (SZ.v vv) source vtail (vtail + 1)
+#pop-options
+
+(** Proof helper for maybe_discover else-branch: trivial delta *)
+let maybe_discover_else_proof
+  (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
+  (cap_seq flow_seq: Seq.seq int)
+  (n u vv source vtail: nat)
+  : Lemma
+    (requires
+      n > 0 /\ u < n /\ vv < n /\ source < n /\ vtail <= n /\
+      Seq.length scolor == n /\ Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\
+      bfs_inv_props scolor spred squeue cap_seq flow_seq n source vtail /\
+      (seq_get scolor vv <> 0 \/
+       (seq_get cap_seq (u * n + vv) - seq_get flow_seq (u * n + vv) <= 0 /\
+        seq_get flow_seq (vv * n + u) <= 0)))
+    (ensures
+      discover_delta scolor scolor spred squeue squeue
+        cap_seq flow_seq n u vv source vtail vtail)
+  = mk_discover_delta scolor scolor spred squeue squeue
+      cap_seq flow_seq n u vv source vtail vtail
+
 (** Try to discover vertex vv from u in the residual graph *)
 #push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 fn maybe_discover
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
-  (n u vv: SZ.t)
+  (n u vv source: SZ.t)
   (q_tail: R.ref SZ.t)
   (#cap_seq: erased (Seq.seq int))
   (#flow_seq: erased (Seq.seq int))
@@ -676,6 +1057,7 @@ fn maybe_discover
       SZ.v n > 0 /\
       SZ.v u < SZ.v n /\
       SZ.v vv < SZ.v n /\
+      SZ.v source < SZ.v n /\
       SZ.v vtail <= SZ.v n /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
@@ -684,8 +1066,7 @@ fn maybe_discover
       Seq.length sdist == SZ.v n /\
       Seq.length squeue == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      queue_valid squeue 0 (SZ.v vtail) (SZ.v n) /\
-      preds_in_range spred (SZ.v n)
+      bfs_inv_props scolor spred squeue cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v vtail)
     )
   ensures exists* scolor' spred' sdist' squeue' vtail'.
     A.pts_to capacity cap_seq **
@@ -697,13 +1078,13 @@ fn maybe_discover
     R.pts_to q_tail vtail' **
     pure (
       SZ.v vtail' <= SZ.v n /\
-      SZ.v vtail' >= SZ.v vtail /\
       Seq.length scolor' == SZ.v n /\
       Seq.length spred' == SZ.v n /\
       Seq.length sdist' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
-      queue_valid squeue' 0 (SZ.v vtail') (SZ.v n) /\
-      preds_in_range spred' (SZ.v n)
+      discover_delta scolor scolor' spred' squeue squeue'
+        cap_seq flow_seq (SZ.v n) (SZ.v u) (SZ.v vv) (SZ.v source)
+        (SZ.v vtail) (SZ.v vtail')
     )
 {
   let vt = !q_tail;
@@ -714,8 +1095,16 @@ fn maybe_discover
   let flow_fwd: int = A.op_Array_Access flow idx_fwd;
   let flow_bwd: int = A.op_Array_Access flow idx_bwd;
   let res_fwd: int = cap_val - flow_fwd;
-  if (cv = 0 && (res_fwd > 0 || flow_bwd > 0) && vt <^ n)
+  // Reveal BFS invariant facts (AFTER array reads to avoid Ill-typed elaboration)
+  elim_bfs_inv_props scolor spred squeue cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v vtail);
+  if (cv = 0 && (res_fwd > 0 || flow_bwd > 0))
   {
+    // Establish vtail < n from the zero-colored vertex
+    lemma_count_nonzero_lt_has_zero scolor (SZ.v n) (SZ.v vv);
+    // Use pure proof helper (avoids Seq.upd terms in Pulse elaboration)
+    maybe_discover_then_proof scolor spred squeue cap_seq flow_seq
+      (SZ.v n) (SZ.v u) (SZ.v source) (SZ.v vtail) vv;
+    // Perform stateful updates
     let du: int = A.op_Array_Access dist u;
     A.op_Array_Assignment color vv 1;
     A.op_Array_Assignment pred vv (SZ.v u);
@@ -724,16 +1113,21 @@ fn maybe_discover
     q_tail := vt +^ 1sz;
     ()
   }
-  else { () }
+  else {
+    // No change — use else proof helper
+    maybe_discover_else_proof scolor spred squeue cap_seq flow_seq
+      (SZ.v n) (SZ.v u) (SZ.v vv) (SZ.v source) (SZ.v vtail);
+    ()
+  }
 }
 #pop-options
 
 (** Explore all neighbors of vertex u in the residual graph *)
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
 fn bfs_explore_neighbors
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
-  (n u: SZ.t)
+  (n u source: SZ.t)
   (q_tail: R.ref SZ.t)
   (#cap_seq: erased (Seq.seq int))
   (#flow_seq: erased (Seq.seq int))
@@ -753,6 +1147,7 @@ fn bfs_explore_neighbors
     pure (
       SZ.v n > 0 /\
       SZ.v u < SZ.v n /\
+      SZ.v source < SZ.v n /\
       SZ.v vtail <= SZ.v n /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
@@ -762,7 +1157,12 @@ fn bfs_explore_neighbors
       Seq.length squeue == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       queue_valid squeue 0 (SZ.v vtail) (SZ.v n) /\
-      preds_in_range spred (SZ.v n)
+      preds_in_range spred (SZ.v n) /\
+      seq_get scolor (SZ.v source) <> 0 /\
+      processed_complete scolor cap_seq flow_seq (SZ.v n) /\
+      colors_valid scolor (SZ.v n) /\
+      count_nonzero scolor (SZ.v n) == SZ.v vtail /\
+      queue_ok scolor squeue (SZ.v vtail) (SZ.v n)
     )
   ensures exists* scolor' spred' sdist' squeue' vtail'.
     A.pts_to capacity cap_seq **
@@ -780,13 +1180,22 @@ fn bfs_explore_neighbors
       Seq.length sdist' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
       queue_valid squeue' 0 (SZ.v vtail') (SZ.v n) /\
-      preds_in_range spred' (SZ.v n)
+      preds_in_range spred' (SZ.v n) /\
+      seq_get scolor' (SZ.v source) <> 0 /\
+      processed_complete scolor' cap_seq flow_seq (SZ.v n) /\
+      colors_valid scolor' (SZ.v n) /\
+      count_nonzero scolor' (SZ.v n) == SZ.v vtail' /\
+      queue_ok scolor' squeue' (SZ.v vtail') (SZ.v n) /\
+      count_color1 scolor' (SZ.v n) + SZ.v vtail == count_color1 scolor (SZ.v n) + SZ.v vtail' /\
+      all_nbrs_colored scolor' cap_seq flow_seq (SZ.v n) (SZ.v u) /\
+      (forall (j: nat). j < SZ.v n /\ seq_get scolor j <> 0 ==> seq_get scolor' j <> 0) /\
+      (forall (j: nat). j < SZ.v n /\ seq_get scolor j == 1 ==> seq_get scolor' j == 1)
     )
 {
   let mut v: SZ.t = 0sz;
   while (!v <^ n)
-  invariant exists* vv sc sp sd sq vt.
-    R.pts_to v vv **
+  invariant exists* vi sc sp sd sq vt.
+    R.pts_to v vi **
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq **
     A.pts_to color sc **
@@ -795,7 +1204,8 @@ fn bfs_explore_neighbors
     A.pts_to queue sq **
     R.pts_to q_tail vt **
     pure (
-      SZ.v vv <= SZ.v n /\
+      SZ.v vi <= SZ.v n /\
+      SZ.v u < SZ.v n /\
       SZ.v vt <= SZ.v n /\
       SZ.v vt >= SZ.v vtail /\
       Seq.length sc == SZ.v n /\
@@ -806,14 +1216,46 @@ fn bfs_explore_neighbors
       Seq.length flow_seq == SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       queue_valid sq 0 (SZ.v vt) (SZ.v n) /\
-      preds_in_range sp (SZ.v n)
+      preds_in_range sp (SZ.v n) /\
+      seq_get sc (SZ.v source) <> 0 /\
+      processed_complete sc cap_seq flow_seq (SZ.v n) /\
+      colors_valid sc (SZ.v n) /\
+      count_nonzero sc (SZ.v n) == SZ.v vt /\
+      queue_ok sc sq (SZ.v vt) (SZ.v n) /\
+      count_color1 sc (SZ.v n) + SZ.v vtail == count_color1 scolor (SZ.v n) + SZ.v vt /\
+      partial_nbrs_colored sc cap_seq flow_seq (SZ.v n) (SZ.v u) (SZ.v vi) /\
+      (forall (j: nat). j < SZ.v n /\ seq_get scolor j <> 0 ==> seq_get sc j <> 0) /\
+      (forall (j: nat). j < SZ.v n /\ seq_get scolor j == 1 ==> seq_get sc j == 1)
     )
   decreases (SZ.v n - SZ.v !v)
   {
     let vv = !v;
-    maybe_discover capacity flow color pred dist queue n u vv q_tail;
+    with sc_before. assert (A.pts_to color sc_before);
+    with sp_before. assert (A.pts_to pred sp_before);
+    with sq_before. assert (A.pts_to queue sq_before);
+    with vt_before. assert (R.pts_to q_tail vt_before);
+    // Pack BFS invariant for maybe_discover's precondition
+    mk_bfs_inv_props sc_before sp_before sq_before cap_seq flow_seq
+      (SZ.v n) (SZ.v source) (SZ.v vt_before);
+    maybe_discover capacity flow color pred dist queue n u vv source q_tail;
+    with sc_after. assert (A.pts_to color sc_after);
+    with sp_after. assert (A.pts_to pred sp_after);
+    with sq_after. assert (A.pts_to queue sq_after);
+    with vt_after. assert (R.pts_to q_tail vt_after);
+    // Unpack discover_delta to get individual facts
+    elim_discover_delta sc_before sc_after sp_after sq_before sq_after
+      cap_seq flow_seq (SZ.v n) (SZ.v u) (SZ.v vv) (SZ.v source) (SZ.v vt_before) (SZ.v vt_after);
+    elim_bfs_inv_props sc_after sp_after sq_after cap_seq flow_seq
+      (SZ.v n) (SZ.v source) (SZ.v vt_after);
+    lemma_add_chain
+      (count_color1 sc_before (SZ.v n)) (count_color1 sc_after (SZ.v n))
+      (SZ.v vtail) (count_color1 scolor (SZ.v n))
+      (SZ.v vt_before) (SZ.v vt_after);
+    lemma_partial_nbrs_step sc_before sc_after cap_seq flow_seq (SZ.v n) (SZ.v u) (SZ.v vv);
     v := vv +^ 1sz
   };
+  with sc_done. assert (A.pts_to color sc_done);
+  lemma_partial_nbrs_to_all sc_done cap_seq flow_seq (SZ.v n) (SZ.v u);
   ()
 }
 #pop-options
@@ -871,6 +1313,10 @@ fn bfs_residual
 
   bfs_init color pred dist n source;
   A.op_Array_Assignment queue 0sz source;
+  // Establish invariant preconditions for the BFS loop
+  with scolor_init. assert (A.pts_to color scolor_init);
+  with squeue_init. assert (A.pts_to queue squeue_init);
+  lemma_count_nonzero_single scolor_init (SZ.v n) (SZ.v source);
   let mut q_head: SZ.t = 0sz;
   let mut q_tail: SZ.t = 1sz;
 
@@ -899,7 +1345,12 @@ fn bfs_residual
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
       queue_valid squeue_q 0 (SZ.v vtail) (SZ.v n) /\
-      preds_in_range spred_q (SZ.v n)
+      preds_in_range spred_q (SZ.v n) /\
+      seq_get scolor_q (SZ.v source) <> 0 /\
+      processed_complete scolor_q cap_seq flow_seq (SZ.v n) /\
+      colors_valid scolor_q (SZ.v n) /\
+      count_nonzero scolor_q (SZ.v n) == SZ.v vtail /\
+      queue_ok scolor_q squeue_q (SZ.v vtail) (SZ.v n)
     )
   decreases (SZ.v n - SZ.v !q_head)
   {
@@ -907,7 +1358,15 @@ fn bfs_residual
     let u: SZ.t = A.op_Array_Access queue vh;
     ();
     q_head := vh +^ 1sz;
-    bfs_explore_neighbors capacity flow color pred dist queue n u q_tail;
+    bfs_explore_neighbors capacity flow color pred dist queue n u source q_tail;
+    with sc_post. assert (A.pts_to color sc_post);
+    with sq_post. assert (A.pts_to queue sq_post);
+    with vtail_post. assert (R.pts_to q_tail vtail_post);
+    // u is non-zero (from queue_nonzero + non-zero preservation)
+    // So count_nonzero preserved, processed_complete extends
+    lemma_count_nonzero_preserve sc_post (SZ.v n) (SZ.v u) 2;
+    lemma_processed_complete_extend sc_post cap_seq flow_seq (SZ.v n) (SZ.v u);
+    lemma_queue_nonzero_upd_color sc_post sq_post 0 (SZ.v vtail_post) (SZ.v n) (SZ.v u) 2;
     A.op_Array_Assignment color u 2;
     ()
   };
@@ -920,7 +1379,7 @@ fn bfs_residual
   // have been fully processed and all their residual neighbors discovered.
   // Source was colored during bfs_init and color is never unset.
   with sc_final. assert (A.pts_to color sc_final);
-  assume_ (pure (seq_get sc_final (SZ.v source) <> 0));
+  // Source colored follows from loop invariant
   assume_ (pure (bfs_complete sc_final cap_seq flow_seq (SZ.v n)));
 
   (sink_color <> 0)
