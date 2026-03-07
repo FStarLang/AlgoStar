@@ -14,6 +14,55 @@ module L = FStar.List.Tot
    See CLRS.Ch26.MaxFlow.Lemmas.fst for implementations.
 *)
 
+(** Sum-flow update lemmas for augmentation reasoning *)
+val lemma_sum_flow_into_update_other (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                                      (u: nat{u < n}) (v: nat{v < n}) (x: int)
+                                      (w: nat{w < n /\ w <> v}) (k: nat)
+  : Lemma (ensures sum_flow_into (set flow n u v x) n w k == sum_flow_into flow n w k)
+
+val lemma_sum_flow_out_update_other (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                                     (u: nat{u < n}) (v: nat{v < n}) (x: int)
+                                     (w: nat{w < n /\ w <> u}) (k: nat)
+  : Lemma (ensures sum_flow_out (set flow n u v x) n w k == sum_flow_out flow n w k)
+
+val lemma_sum_flow_out_increase (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                                 (u: nat{u < n}) (v: nat{v < n}) (delta: int) (k: nat)
+  : Lemma (requires k > v)
+          (ensures sum_flow_out (set flow n u v (get flow n u v + delta)) n u k == 
+                   sum_flow_out flow n u k + delta)
+
+val lemma_sum_flow_into_increase (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
+                                  (u: nat{u < n}) (v: nat{v < n}) (delta: int) (k: nat)
+  : Lemma (requires k > u)
+          (ensures sum_flow_into (set flow n u v (get flow n u v + delta)) n v k == 
+                   sum_flow_into flow n v k + delta)
+
+(** Augmenting a single edge maintains capacity constraints *)
+val lemma_augment_edge_capacity (flow: Seq.seq int) (cap: Seq.seq int)
+                                 (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+                                 (u: nat{u < n}) (v: nat{v < n}) (delta: int)
+  : Lemma
+    (requires 
+      0 <= get flow n u v /\ get flow n u v <= get cap n u v /\
+      0 <= get flow n v u /\ get flow n v u <= get cap n v u /\
+      delta > 0 /\
+      (residual_capacity cap flow n u v > 0 ==> delta <= residual_capacity cap flow n u v) /\
+      (residual_capacity cap flow n u v <= 0 ==> delta <= get flow n v u))
+    (ensures 
+      (let flow' = augment_edge flow cap n u v delta in
+       0 <= get flow' n u v /\ get flow' n u v <= get cap n u v /\
+       0 <= get flow' n v u /\ get flow' n v u <= get cap n v u))
+
+(** Conservation preserved at vertices w ≠ u and w ≠ v after augmenting edge (u,v) *)
+val lemma_augment_edge_conservation_other (flow: Seq.seq int) (cap: Seq.seq int)
+                                           (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+                                           (u: nat{u < n}) (v: nat{v < n}) (delta: int)
+                                           (w: nat{w < n /\ w <> u /\ w <> v})
+  : Lemma
+    (requires sum_flow_into flow n w n == sum_flow_out flow n w n)
+    (ensures (let flow' = augment_edge flow cap n u v delta in
+              sum_flow_into flow' n w n == sum_flow_out flow' n w n))
+
 (** get/set non-interference: setting (u,v) doesn't affect get (a,b) when (a,b) ≠ (u,v) *)
 val lemma_get_set_other (m: Seq.seq int) (n: nat{n > 0 /\ Seq.length m == n * n})
                          (u v: nat{u < n /\ v < n}) (x: int) (a b: nat{a < n /\ b < n})

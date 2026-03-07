@@ -303,7 +303,7 @@ let rec lemma_bottleneck_unchanged
     | [] -> () // impossible due to Cons? precondition
 
 (** Main lemma: Path augmentation preserves valid flow (P0.1.7 + P0.1.8) *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
 let rec lemma_augment_preserves_capacity (flow: Seq.seq int) (cap: Seq.seq int)
                                           (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
                                           (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
