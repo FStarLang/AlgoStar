@@ -19,9 +19,9 @@
 | 6 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | — | **Complexity interface** — Public API for complexity theorems | ✅ |
 | 7 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | **Complexity** — O(VE²) bound with ghost tick counter | ✅ |
 | 8 | `CLRS.Ch26.MaxFlow.Impl.fsti` | — | **Impl interface** — Public API for `max_flow` + bridge lemma | ✅ |
-| 9 | `CLRS.Ch26.MaxFlow.Impl.fst` | ~1390 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
+| 9 | `CLRS.Ch26.MaxFlow.Impl.fst` | ~1800 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
 | 10 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Test — Smoke test on 3-vertex graph | ✅ |
-| | **Total** | **~3800** | | |
+| | **Total** | **~4200** | | |
 
 ---
 
@@ -54,21 +54,24 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 | `Lemmas.fsti` | `CLRS.Ch26.MaxFlow.Lemmas.fsti` | `CLRS.Ch26.MaxFlow.Lemmas.fsti` | ✅ | Created — exports key lemma signatures |
 | `Complexity.fst` | `CLRS.Ch26.MaxFlow.Complexity.fst` | `CLRS.Ch26.MaxFlow.Complexity.fst` | 🔶 | Present, but contains 4 `assume val` axioms |
 | `Complexity.fsti` | `CLRS.Ch26.MaxFlow.Complexity.fsti` | `CLRS.Ch26.MaxFlow.Complexity.fsti` | ✅ | Created — exports complexity theorem signatures |
-| `Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | 🔶 | Renamed from MaxFlow.fst; **contains `admit()` at line 355** |
+| `Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | 🔶 | Renamed from MaxFlow.fst; **1 `admit()` remains** (augment_imp_preserves_valid). BFS completeness fully proven. |
 | `Impl.fsti` | `CLRS.Ch26.MaxFlow.Impl.fsti` | `CLRS.Ch26.MaxFlow.Impl.fsti` | ✅ | Created — exports `max_flow` public API |
 
 ### Proof Soundness Inventory
 
 | # | File | Line | Construct | Severity | Context |
 |---|------|-----:|-----------|:--------:|---------|
-| **1** | **Impl.fst** | **395** | **`admit ()`** | **🔴 CRITICAL** | `lemma_augment_imp_preserves_valid` — asserts `imp_valid_flow` without proof |
-| 2 | Impl.fst | 411 | `assume val` | 🟡 Medium | `axiom_bfs_complete` — BFS completeness: bfs_complete + sink uncolored ⟹ no_augmenting_path |
-| 3 | Impl.fst | ~762 | `assume_` ×2 | 🟡 Medium | BFS postcondition: `bfs_complete` and `source colored` at BFS termination |
-| 4 | Test.fst | 47 | `assume_` | 🟡 Medium | Assumes `valid_caps` after manual array writes; test-only |
-| 5 | Complexity.fst | 55 | `assume val` | 🟡 Medium | `axiom_spd_source_zero` — SPD source = 0 |
-| 6 | Complexity.fst | 64 | `assume val` | 🟡 Medium | `axiom_spd_bounded` — SPD bounded by n−1 |
-| 7 | Complexity.fst | 75 | `assume val` | 🟠 High | `lemma_distances_nondecreasing` — CLRS Lemma 26.7 |
-| 8 | Complexity.fst | 342 | `assume val` | 🟠 High | `axiom_edge_critical_bound` — CLRS Lemma 26.8 |
+| **1** | **Impl.fst** | **842** | **`admit ()`** | **🔴 CRITICAL** | `lemma_augment_imp_preserves_valid` — asserts `imp_valid_flow` without proof |
+| 2 | Test.fst | 47 | `assume_` | 🟡 Medium | Assumes `valid_caps` after manual array writes; test-only |
+| 3 | Complexity.fst | 55 | `assume val` | 🟡 Medium | `axiom_spd_source_zero` — SPD source = 0 |
+| 4 | Complexity.fst | 64 | `assume val` | 🟡 Medium | `axiom_spd_bounded` — SPD bounded by n−1 |
+| 5 | Complexity.fst | 75 | `assume val` | 🟠 High | `lemma_distances_nondecreasing` — CLRS Lemma 26.7 |
+| 6 | Complexity.fst | 342 | `assume val` | 🟠 High | `axiom_edge_critical_bound` — CLRS Lemma 26.8 |
+
+**Eliminated** (previously present, now proven):
+- ~~`assume val axiom_bfs_complete`~~ → Replaced by `lemma_bfs_complete` + `lemma_bottleneck_crossing` (proven by induction on path structure)
+- ~~`assume_ (bfs_complete ...)`~~ → Eliminated via BFS loop counting invariant (`count_color1 == vtail - vhead`, `queue_color1`)
+- ~~`assume_ (source colored)`~~ → Follows directly from BFS loop invariant
 
 **Vacuous proofs** (accepted by F\* but logically trivial):
 
@@ -92,7 +95,9 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 | Zero flow is valid | Lemmas.fst:672 | ✅ Proven |
 | Path shortening (pigeonhole) | Lemmas.MaxFlowMinCut.fst | ✅ Proven |
 | imp_valid_flow ⟹ valid_flow (bridge) | Impl.fst | ✅ Proven |
-| max_flow returns `completed` + no_augmenting_path | Impl.fst/fsti | ✅ Postcondition (via axiom_bfs_complete) |
+| max_flow returns `completed` + no_augmenting_path | Impl.fst/fsti | ✅ Postcondition (via proven lemma_bfs_complete) |
+| BFS completeness: bfs_complete ⟹ no_augmenting_path | Impl.fst | ✅ Proven (lemma_bottleneck_crossing, induction on path) |
+| BFS termination ⟹ bfs_complete | Impl.fst | ✅ Proven (counting invariant: count_color1 + queue_color1) |
 
 ---
 
@@ -100,7 +105,7 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 
 ### 🔴 P0 — CRITICAL: Eliminate `admit()` in Production Code
 
-**File**: `CLRS.Ch26.MaxFlow.Impl.fst`, line 355
+**File**: `CLRS.Ch26.MaxFlow.Impl.fst`, line 842
 **Function**: `lemma_augment_imp_preserves_valid`
 **Current code**:
 ```fstar
@@ -167,8 +172,8 @@ let lemma_augment_imp_preserves_valid (flow_seq cap_seq: Seq.seq int) (n source 
 |-----------|:------:|--------|
 | **Zero `admit` in spec/lemmas** | ✅ | Spec.fst (1125 lines) and Lemmas.fst (679 lines) are fully proven |
 | **Zero `admit` in complexity** | 🔶 | No `admit`, but 4 `assume val` axioms pending BFS correctness |
-| **Zero `admit` in impl** | ❌ | **1 `admit()` at Impl.fst:355** — `lemma_augment_imp_preserves_valid` |
-| **Zero `assume_` in production** | 🔶 | 2 `assume_` in BFS postcondition (bfs_complete + source colored) |
+| **Zero `admit` in impl** | ❌ | **1 `admit()` at Impl.fst:842** — `lemma_augment_imp_preserves_valid` |
+| **Zero `assume_` in production** | ✅ | All BFS `assume_` eliminated; only test `assume_` remains |
 | **All files verified (.checked)** | ✅ | 10/10 `.checked` files in `_cache/` (6 `.fst` + 4 `.fsti`) |
 | **MFMC theorem proven** | ✅ | Lemmas.MaxFlowMinCut.fst:755, constructive (2)⟹(3) direction of Theorem 26.6 |
 | **Flow conservation proven** | ✅ | Lemmas.fst:628, for all augmentations on valid simple paths |
@@ -200,8 +205,8 @@ let lemma_augment_imp_preserves_valid (flow_seq cap_seq: Seq.seq int) (n source 
 | Complexity Proofs | ★★★☆☆ |
 | Code Quality | ★★★★☆ |
 | Proof Quality (Spec+Lemmas) | ★★★★★ |
-| Proof Quality (Impl) | ★★☆☆☆ |
+| Proof Quality (Impl) | ★★★★☆ |
 | Rubric Structural Compliance | ★★★★★ |
 | Documentation | ★★★★★ |
 
-**Bottom line**: Excellent pure-spec proofs (MFMC, conservation, augmentation — all zero-admit). MFMC theorem now isolated in Lemmas.MaxFlowMinCut with clean interface. Bridge lemma (`imp_valid_flow_implies_valid_flow`) connects Impl postcondition to `Spec.valid_flow`, enabling callers to use MFMC theorem results. `max_flow` returns `completed: bool` — when `true`, the postcondition includes `no_augmenting_path`, which is exactly the MFMC precondition. This makes the full theorem chain usable: `max_flow` → bridge lemma → `valid_flow` + `no_augmenting_path` → MFMC → max flow = min cut. BFS completeness is captured via explicit `assume val axiom_bfs_complete` + 2 `assume_` in BFS postcondition. All rubric naming and interface file requirements met. The **single `admit()` at Impl.fst** remains the highest-priority item. Four `assume val` axioms in Complexity.fst are secondary concerns.
+**Bottom line**: Excellent pure-spec proofs (MFMC, conservation, augmentation — all zero-admit). MFMC theorem now isolated in Lemmas.MaxFlowMinCut with clean interface. Bridge lemma (`imp_valid_flow_implies_valid_flow`) connects Impl postcondition to `Spec.valid_flow`, enabling callers to use MFMC theorem results. `max_flow` returns `completed: bool` — when `true`, the postcondition includes `no_augmenting_path`, which is exactly the MFMC precondition. This makes the full theorem chain usable: `max_flow` → bridge lemma → `valid_flow` + `no_augmenting_path` → MFMC → max flow = min cut. **BFS completeness is fully proven**: counting invariants (`count_color1`, `queue_color1`, `queue_prefix_preserved`) track the BFS queue state through maybe_discover → bfs_explore_neighbors → bfs_residual, and `lemma_bottleneck_crossing` proves any source-to-sink path through the colored/uncolored partition has bottleneck ≤ 0 by induction on path structure. All `assume val` and `assume_` in BFS have been eliminated. All rubric naming and interface file requirements met. The **single `admit()` at Impl.fst** (augment_imp_preserves_valid) remains the highest-priority item. Four `assume val` axioms in Complexity.fst are secondary concerns.

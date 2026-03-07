@@ -4,8 +4,9 @@
 
 A verified implementation of the **Edmonds-Karp algorithm** (BFS-based Ford-Fulkerson method) for computing maximum flow in a network, following CLRS §26.2.
 
-- **~3800 lines** across 6 verified F\*/Pulse modules + 4 interface files
+- **~4200 lines** across 6 verified F\*/Pulse modules + 4 interface files
 - **Zero admits** in spec and lemmas (Spec.fst, Lemmas.fst)
+- **Zero assumes** in BFS and implementation (all BFS completeness fully proven)
 - **Max-Flow Min-Cut Theorem** (CLRS Theorem 26.6) fully proven
 
 ## Algorithm (CLRS §26.2, p. 714)
@@ -40,7 +41,7 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | — | Interface: complexity theorem signatures |
 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | O(VE²) complexity analysis with ghost tick counter |
 | `CLRS.Ch26.MaxFlow.Impl.fsti` | — | Interface: `max_flow` public API + bridge lemma |
-| `CLRS.Ch26.MaxFlow.Impl.fst` | ~1390 | Imperative Pulse implementation: BFS + augmentation + pure path lemmas |
+| `CLRS.Ch26.MaxFlow.Impl.fst` | ~1800 | Imperative Pulse implementation: BFS + augmentation + BFS completeness proof |
 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Smoke test on a 3-vertex graph |
 
 ## Verified Properties
@@ -68,6 +69,16 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 | Path has distinct vertices | `lemma_path_distinct` |
 | Augmenting path has length ≥ 2 | `lemma_path_length_ge_2` |
 
+### BFS completeness (fully proven in Impl.fst)
+
+| Property | Lemma |
+|----------|-------|
+| Bottleneck ≤ 0 across colored/uncolored partition | `lemma_bottleneck_crossing` |
+| BFS complete + sink uncolored ⟹ no augmenting path | `lemma_bfs_complete` |
+| BFS termination ⟹ bfs_complete | Loop invariant: `count_color1`, `queue_color1`, `processed_complete` |
+| Queue entries have color 1 | `queue_color1`, `lemma_queue_color1_preserved`, `lemma_queue_color1_after_set2` |
+| Color-1 count tracks queue occupancy | `count_color1 == vtail - vhead` invariant |
+
 ### Complexity (O(VE²) arithmetic proven)
 
 | CLRS Result | Location | Status |
@@ -91,12 +102,14 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 | Obligation | File | Notes |
 |------------|------|-------|
 | `lemma_augment_imp_preserves_valid` | `Impl.fst` | `admit()` — augmentation preserves validity |
-| `axiom_bfs_complete` | `Impl.fst` | `assume val` — BFS completeness ⟹ no augmenting path |
-| BFS postcondition `bfs_complete` | `Impl.fst` | `assume_` ×2 — source colored + BFS completeness invariant |
 | `axiom_spd_source_zero` | `Complexity.fst` | BFS shortest-path distance |
 | `axiom_spd_bounded` | `Complexity.fst` | BFS shortest-path bound |
 | `lemma_distances_nondecreasing` | `Complexity.fst` | Lemma 26.7 |
 | `axiom_edge_critical_bound` | `Complexity.fst` | Lemma 26.8 |
+
+**Previously present, now proven:**
+- ~~`axiom_bfs_complete`~~ → `lemma_bfs_complete` + `lemma_bottleneck_crossing` (induction on path)
+- ~~BFS postcondition `assume_` ×2~~ → Counting invariants (`count_color1`, `queue_color1`) prove `bfs_complete` at termination
 
 Test code uses 1 `assume_` for `valid_caps` (backed by runtime check).
 
