@@ -1,7 +1,7 @@
 # Chapter 23: Minimum Spanning Trees — Rubric Compliance
 
 **Generated**: 2025-07-18 (Updated: 2026-03-04)
-**Source**: `/ch23-mst/` — 23 source files
+**Source**: `/ch23-mst/` — 25 source files
 
 ---
 
@@ -52,6 +52,7 @@ Provides the common foundation used by both Kruskal and Prim:
   - `UF` — `find_pure`, soundness (`find ≠ ⟹ ¬reachable`), completeness
   - `Helpers` — `uf_inv_union`, `acyclic_snoc_unreachable`, forest-invariant glue
 - **Impl** (`Kruskal.Impl.fst`): Pulse, adj-matrix V²-scan with cross-component check + MST proof infrastructure
+- **Bridge** (`Kruskal.Bridge`): Greedy MST correctness — `greedy_step_safe` (cut property at each step) + `safe_spanning_tree_is_mst`
 - **Complexity** (`Kruskal.Complexity`): ghost-tick proof of `ticks ≤ 4·V³`
 
 ### Prim's Algorithm (CLRS §23.2, p. 634)
@@ -160,7 +161,7 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 | D7 | Create `CLRS.Ch23.Kruskal.UF.fsti` — interface for UF sub-module | Medium | ✅ **DONE** |
 | D8 | Add disconnection warnings to Kruskal.Complexity and Prim.Complexity | Low | ✅ **DONE** |
 | D9 | Prove `prim_impl_produces_mst` (strengthen Prim loop invariant) | High | ❌ Removed (was admitted) |
-| D10 | Prove `kruskal_impl_produces_mst` (strengthen Kruskal loop invariant) | High | ❌ Removed (was admitted) |
+| D10 | Prove `kruskal_impl_produces_mst` (strengthen Kruskal loop invariant) | High | 🔶 Bridge proved; Pulse integration pending |
 | D11 | Connect Complexity modules to Impl modules | Medium | ❌ Not yet done |
 
 ### E. Dead Code / Cleanup
@@ -193,7 +194,15 @@ The pure spec layer proves MST correctness (`theorem_kruskal_produces_mst`). The
 - All edge endpoints are valid
 - Each edge comes from a positive adjacency matrix entry
 
-**Not yet connected**: An end-to-end proof that the Pulse implementation produces an MST would additionally need to show the weighted edges form a spanning tree with minimum weight. This requires an inductive argument using `MST.Spec.cut_property` at each algorithm step.
+**Bridge module** (`Kruskal.Bridge`): Provides the key mathematical bridge between the greedy V²-scan algorithm and MST correctness:
+- `greedy_step_safe`: If forest ⊆ some MST and we add the minimum-weight cross-component edge, the new forest ⊆ some MST. Uses CLRS Theorem 23.1 (cut property) with the component cut.
+- `safe_spanning_tree_is_mst`: If a spanning tree is safe (⊆ some MST) with no repeated edges, it IS an MST.
+
+**Remaining for end-to-end**: Integrating the Bridge into the Pulse loop requires:
+1. Strengthening the inner scan invariant to track that `best_w` is the minimum cross-component weight (not just any cross-component edge)
+2. Adding `safe_edges` (forest ⊆ some MST) to the outer loop invariant
+3. At each step, deriving the `greedy_step_safe` preconditions from the scan result
+4. Proving the output is a spanning tree (requires graph connectivity assumption)
 
 ---
 
@@ -210,7 +219,7 @@ The pure spec layer proves MST correctness (`theorem_kruskal_produces_mst`). The
 
 | Algorithm | Pure spec proves MST? | Impl postcondition | End-to-end MST proof? |
 |-----------|:---------------------:|:------------------:|:---------------------:|
-| Kruskal | ✅ `theorem_kruskal_produces_mst` | ✅ Forest + adj-tracking (`result_is_forest_adj`) | ❌ Not yet connected |
+| Kruskal | ✅ `theorem_kruskal_produces_mst` | ✅ Forest + adj-tracking (`result_is_forest_adj`) | 🔶 Bridge proved (`greedy_step_safe` + `safe_spanning_tree_is_mst`), Pulse integration pending |
 | Prim | ✅ `prim_spec` | ✅ `prim_correct` (key/parent) | ❌ Not yet connected |
 
 ### Complexity

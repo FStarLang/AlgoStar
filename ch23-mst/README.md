@@ -21,6 +21,8 @@ This directory contains verified implementations and specifications for MST algo
 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F* | Lemmas interface: re-exports from Components, EdgeSorting, SortedEdges, UF |
 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F* | Lemmas façade module |
 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | Imperative Kruskal (adj-matrix, union-find, cross-component scan) |
+| `CLRS.Ch23.Kruskal.Bridge.fsti` | F* | Greedy MST bridge interface: greedy_step_safe, safe_spanning_tree_is_mst |
+| `CLRS.Ch23.Kruskal.Bridge.fst` | F* | Bridge proofs: cut-property-based greedy MST correctness + weight equality |
 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | Kruskal complexity interface: ticks ≤ 4·V³ (⚠️ disconnected) |
 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | Ghost-tick instrumented Kruskal, proves ticks ≤ 4·V³ (⚠️ disconnected) |
 | `CLRS.Ch23.Prim.Spec.fsti` | F* | Prim spec interface: pure_prim, prim_spec sigs |
@@ -32,7 +34,7 @@ This directory contains verified implementations and specifications for MST algo
 
 ## Verification Status
 
-All 23 files verify with **zero admits, zero assumes, zero `--admit_smt_queries`**.
+All 25 files verify with **zero admits, zero assumes, zero `--admit_smt_queries`**.
 
 | Module | Status |
 |--------|--------|
@@ -42,6 +44,7 @@ All 23 files verify with **zero admits, zero assumes, zero `--admit_smt_queries`
 | Kruskal.UF (.fst + .fsti) | ✅ Fully proven |
 | Kruskal.Helpers / Lemmas | ✅ Fully proven |
 | Kruskal.Impl.fst | ✅ Proves forest + acyclicity + adj-tracking (`result_is_forest_adj`) |
+| Kruskal.Bridge (.fst + .fsti) | ✅ `greedy_step_safe` + `safe_spanning_tree_is_mst` — MST correctness via cut property |
 | Kruskal.Complexity (.fst + .fsti) | ⚠️ Verified but disconnected from Kruskal.Impl |
 | Prim.Spec (.fst + .fsti) | ✅ Fully proven |
 | Prim.Impl (.fst + .fsti) | ✅ Proves key/parent correctness (`prim_correct`) |
@@ -56,6 +59,7 @@ Follows the canonical rubric structure: Spec, Spec.fsti, Lemmas, Lemmas.fsti, Co
 
 - **Cut Property (Theorem 23.1)**: Fully formalized and proven in MST.Spec
 - **Kruskal MST correctness**: Proven in pure spec (`theorem_kruskal_produces_mst`)
+- **Kruskal Greedy Bridge**: `greedy_step_safe` — adding min-weight cross-component edge to safe forest preserves safety (via cut property)
 - **Prim MST correctness**: Proven in pure spec (`prim_spec`)
 - **Kruskal Impl**: Proves result is acyclic forest with edges from adjacency matrix (`edges_adj_pos`)
 - **Prim Impl**: Proves key[source]=0, all keys bounded, parent[source]=source
@@ -74,4 +78,4 @@ make          # verify all files
 1. **Infinity Value**: Prim Pulse uses `65535sz` (SizeT constraint); Prim.Spec uses `1000000000`
 2. **Matrix Indexing**: Flat array `weights[u*n+v]` with proven overflow safety when `n² < 2⁶⁴`
 3. **Platform Requirement**: Requires 64-bit SizeT (`SZ.fits_u64`)
-4. **Impl ↔ Spec gap**: Neither Pulse implementation has a proven end-to-end connection to the pure MST spec yet; infrastructure (weighted edges, adj-to-graph conversion) is in place
+4. **Impl ↔ Spec gap**: Kruskal.Bridge provides the mathematical bridge (greedy MST via cut property); Pulse loop integration requires strengthening inner scan invariant to track minimum cross-component weight. Prim has no bridge yet.
