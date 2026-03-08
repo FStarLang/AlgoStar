@@ -1217,6 +1217,31 @@ let rec lemma_bottleneck_via_pred_positive (scolor spred sdist cap_seq flow_seq:
     end
 #pop-options
 
+(** Fuel monotonicity: bottleneck_via_pred gives the same result with any sufficient fuel *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec lemma_bottleneck_fuel_mono (scolor spred sdist cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (fuel1 fuel2: nat)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_seq n source /\
+      Seq.length scolor == n /\ Seq.length sdist == n /\
+      seq_get scolor current <> 0 /\ seq_get sdist current >= 0 /\
+      fuel1 > seq_get sdist current /\ fuel2 > seq_get sdist current)
+    (ensures
+      bottleneck_via_pred spred cap_seq flow_seq n source current fuel1 ==
+      bottleneck_via_pred spred cap_seq flow_seq n source current fuel2)
+    (decreases fuel1)
+  = if current = source then ()
+    else begin
+      let u = seq_get spred current in
+      assert (u >= 0 /\ u < n);
+      assert (seq_get scolor u <> 0);
+      assert (seq_get sdist current == seq_get sdist u + 1);
+      lemma_bottleneck_fuel_mono scolor spred sdist cap_seq flow_seq n source u (fuel1 - 1) (fuel2 - 1)
+    end
+#pop-options
+
 (** Pure augment via pred walk: walks pred from current to source,
     augmenting each edge. Matches augment_imp. *)
 let rec augment_via_pred (spred: Seq.seq int) (flow_seq cap_seq: Seq.seq int)
@@ -1230,6 +1255,33 @@ let rec augment_via_pred (spred: Seq.seq int) (flow_seq cap_seq: Seq.seq int)
         let flow' = augment_edge flow_seq cap_seq n u current bn in
         augment_via_pred spred flow' cap_seq n source u bn (fuel - 1)
       else flow_seq
+
+(** Fuel monotonicity for augment_via_pred *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec lemma_augment_fuel_mono (scolor spred sdist cap_seq flow_seq flow_comp: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ 
+          Seq.length flow_comp == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (bn: int) (fuel1 fuel2: nat)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_seq n source /\
+      Seq.length scolor == n /\ Seq.length sdist == n /\
+      seq_get scolor current <> 0 /\ seq_get sdist current >= 0 /\
+      fuel1 > seq_get sdist current /\ fuel2 > seq_get sdist current)
+    (ensures
+      augment_via_pred spred flow_comp cap_seq n source current bn fuel1 ==
+      augment_via_pred spred flow_comp cap_seq n source current bn fuel2)
+    (decreases fuel1)
+  = if current = source then ()
+    else begin
+      let u = seq_get spred current in
+      assert (u >= 0 /\ u < n);
+      assert (seq_get scolor u <> 0);
+      assert (seq_get sdist current == seq_get sdist u + 1);
+      let flow' = augment_edge flow_comp cap_seq n u current bn in
+      lemma_augment_fuel_mono scolor spred sdist cap_seq flow_seq flow' n source u bn (fuel1 - 1) (fuel2 - 1)
+    end
+#pop-options
 
 (** init of (l ++ [x]) == l when l is non-empty *)
 let rec lemma_init_append_singleton (l: list nat{Cons? l}) (x: nat)
