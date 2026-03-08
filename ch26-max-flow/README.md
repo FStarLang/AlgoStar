@@ -4,11 +4,11 @@
 
 A verified implementation of the **Edmonds-Karp algorithm** (BFS-based Ford-Fulkerson method) for computing maximum flow in a network, following CLRS §26.2.
 
-- **~5300 lines** across 6 verified F\*/Pulse modules + 4 interface files
-- **Zero admits** in Spec, Lemmas, Lemmas.MaxFlowMinCut (all fully proven)
-- **4 `assume val`** in Complexity.fst for BFS shortest-path distance properties
+- **~7260 lines** across 6 verified F\*/Pulse modules + 4 interface files
+- **Zero admits, zero assume vals, zero runtime checks** in all production code (Spec, Lemmas, MFMC, Complexity, Impl)
 - **Max-Flow Min-Cut Theorem** (CLRS Theorem 26.6) fully proven
 - **Termination** proven without fuel (bounded by `cap_sum`)
+- **Static correctness**: Augmentation preserves valid flow via `lemma_augment_chain` proof chain
 
 ## Algorithm (CLRS §26.2, p. 714)
 
@@ -28,7 +28,7 @@ The implementation specializes to Edmonds-Karp by using **BFS** to find shortest
 - **BFS on residual graph** (`bfs_residual`): BFS with color/pred/dist/queue arrays
 - **Bottleneck computation** (`find_bottleneck_imp`): Walks pred chain from sink to source
 - **Flow augmentation** (`augment_imp`): Updates flow along the augmenting path
-- **Static validity**: Postcondition guarantees `imp_valid_flow` (backed by runtime check)
+- **Static validity**: Postcondition guarantees `imp_valid_flow` and `no_augmenting_path` (fully static, no runtime checks)
 
 ## Specification
 
@@ -87,7 +87,7 @@ fn max_flow
     pure (
       ...
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      (completed ==> no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink)))
+      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
 ```
 
 **Postcondition breakdown:**
@@ -95,7 +95,7 @@ fn max_flow
 | Conjunct | Meaning |
 |----------|---------|
 | `imp_valid_flow flow_seq' cap_seq ...` | Resulting flow satisfies capacity constraints and conservation (always) |
-| `completed ==> no_augmenting_path ...` | When `completed = true`, no augmenting path exists (MFMC precondition) |
+| `no_augmenting_path ...` | No augmenting path exists — unconditionally guaranteed (MFMC precondition) |
 
 ### Bridge Lemma
 
@@ -123,7 +123,7 @@ val max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matr
 ```
 
 **Usage pattern for callers:**
-1. Call `max_flow` → get `imp_valid_flow` + `no_augmenting_path` (when `completed = true`)
+1. Call `max_flow` → get `imp_valid_flow` + `no_augmenting_path` (unconditional)
 2. Apply `imp_valid_flow_implies_valid_flow` → get `Spec.valid_flow`
 3. Apply `max_flow_min_cut_theorem` → conclude result is maximum and equals min-cut capacity
 
@@ -132,22 +132,12 @@ val max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matr
 The postcondition is the strongest functional guarantee achievable:
 - `imp_valid_flow` is equivalent to the textbook definition of a valid flow (capacity + conservation).
 - `no_augmenting_path` is the exact condition under which CLRS Theorem 26.6 guarantees the flow is maximum.
-- Together they certify that any caller can derive max-flow = min-cut via the proven MFMC theorem, without any additional axioms.
+- Both are unconditional — no `completed` flag, no runtime checks, no defensive paths.
+- Together they certify that any caller can derive max-flow = min-cut via the proven MFMC theorem, without any additional axioms or assumptions.
 
 ## Limitations
 
 ### Admits / Assumes
-
-**In `Complexity.fst` (4 `assume val`):**
-
-| `assume val` | CLRS Reference | Description |
-|--------------|---------------|-------------|
-| `axiom_spd_source_zero` | BFS property | δ(s,s) = 0 in residual graph |
-| `axiom_spd_bounded` | BFS property | δ(s,v) ≤ n − 1 for all v |
-| `lemma_distances_nondecreasing` | Lemma 26.7 | Shortest-path distances non-decreasing after augmentation |
-| `axiom_edge_critical_bound` | Lemma 26.8 | Each edge becomes critical at most n/2 times |
-
-These are the **only** `assume val` statements in the entire project outside ch22 and ch24. They are all in the complexity analysis module and pertain to BFS shortest-path distance properties. The functional correctness of the implementation (valid flow + no augmenting path) is **fully proven** without any assumes.
 
 **In `Test.fst` (1 `assume_`):**
 
@@ -158,22 +148,26 @@ These are the **only** `assume val` statements in the entire project outside ch2
 **Previously admitted, now proven:**
 - ~~`axiom_bfs_complete`~~ → `lemma_bfs_complete` + `lemma_bottleneck_crossing` (induction on path)
 - ~~BFS postcondition `assume_` ×2~~ → Counting invariants (`count_color1`, `queue_color1`) prove `bfs_complete` at termination
+- ~~`axiom_spd_source_zero`~~ → Proved: δ(s,s) = 0 from BFS-layer definition
+- ~~`axiom_spd_bounded`~~ → Proved: δ(s,v) ≤ n from BFS-layer bound
+- ~~`lemma_distances_nondecreasing` (Lemma 26.7)~~ → Fully proven via BFS layer induction + new-edge-from-path argument
+- ~~`axiom_edge_critical_bound` (Lemma 26.8)~~ → Fully proven via forward/backward two-state machine induction
+- ~~`check_imp_valid_flow_fn` runtime check~~ → Replaced by `lemma_augment_chain` static proof
+- ~~`completed` flag / partial results~~ → Removed; `no_augmenting_path` is unconditional
 
 ## Complexity
 
 | CLRS Result | Location | Status |
 |-------------|----------|--------|
-| O(VE²) total cost bound | `Complexity.fst` — `edmonds_karp_complexity` | **Proven** (from 4 axioms) |
-| Each augmentation creates ≥1 critical edge | `Complexity.fst` — `lemma_augmentation_creates_critical_edge` | **Proven** (zero axioms) |
-| O(VE) max augmentations | `Complexity.fst` — `lemma_max_augmentations_justified` | **Proven** (from axiom) |
+| O(VE²) total cost bound | `Complexity.fst` — `edmonds_karp_complexity` | **Proven** |
+| Each augmentation creates ≥1 critical edge | `Complexity.fst` — `lemma_augmentation_creates_critical_edge` | **Proven** |
+| O(VE) max augmentations | `Complexity.fst` — `lemma_max_augmentations_justified` | **Proven** |
 | Dense graph O(V⁵) | `Complexity.fst` — `edmonds_karp_dense_graph_complexity` | **Proven** |
 | Sparse graph O(V³) | `Complexity.fst` — `edmonds_karp_sparse_graph_complexity` | **Proven** |
-| Distance monotonicity (Lemma 26.7) | `Complexity.fst` — `lemma_distances_nondecreasing` | **Axiom** |
-| Edge criticality bound (Lemma 26.8) | `Complexity.fst` — `axiom_edge_critical_bound` | **Axiom** |
+| Distance monotonicity (Lemma 26.7) | `Complexity.fst` — `lemma_distances_nondecreasing` | **Proven** (BFS layer induction) |
+| Edge criticality bound (Lemma 26.8) | `Complexity.fst` — `lemma_edge_critical_bound` | **Proven** (two-state machine induction) |
 
-**Ghost tick framework**: The `edmonds_karp_state` type threads a `tick_count` (ghost nat) through the computation. Each BFS + augmentation adds `augmentation_cost(E)` ticks. The total is bounded by `max_augmentations(V, E) × augmentation_cost(E) ≤ V·E·2E = O(VE²)`.
-
-**Gap**: The 4 axioms bridge BFS correctness to the O(VE²) bound. All other complexity results (critical edge creation, cost accounting, dense/sparse corollaries) are fully proven.
+**Ghost tick framework**: The `edmonds_karp_state` type threads a `tick_count` (ghost nat) through the computation. Each BFS + augmentation adds `augmentation_cost(E)` ticks. The total is bounded by `max_augmentations(V, E) × augmentation_cost(E) ≤ V·E·2E = O(VE²)`. All results fully proven with zero axioms.
 
 ## Verified Properties
 
@@ -213,23 +207,23 @@ These are the **only** `assume val` statements in the entire project outside ch2
 - **Memory safety**: All array accesses bounds-checked
 - **Termination**: Proven without fuel — each augmentation increases `flow_value` by ≥1, bounded by `cap_sum`
 - **Capacity validation**: Runtime `check_valid_caps_fn` verifies non-negative capacities
-- **Static flow validity**: `max_flow` postcondition guarantees `imp_valid_flow`
+- **Static flow validity**: `max_flow` postcondition guarantees `imp_valid_flow` (statically proven, no runtime check)
 - **Spec bridge**: `imp_valid_flow_implies_valid_flow` connects imperative postcondition to `Spec.valid_flow`
-- **MFMC usability**: When `completed = true`, `no_augmenting_path` holds → callers can apply the MFMC theorem
+- **MFMC usability**: `no_augmenting_path` unconditional → callers can always apply the MFMC theorem
 
 ## File Inventory
 
 | File | Lines | Role | Admits/Assumes |
 |------|------:|------|:--------------:|
-| `CLRS.Ch26.MaxFlow.Spec.fst` | 355 | Pure spec: flow networks, residual graphs, augmenting paths, cuts | 0 |
-| `CLRS.Ch26.MaxFlow.Lemmas.fsti` | 138 | Interface: augmentation lemma signatures | 0 |
-| `CLRS.Ch26.MaxFlow.Lemmas.fst` | 679 | Lemmas: augmentation preserves validity, increases value | 0 |
+| `CLRS.Ch26.MaxFlow.Spec.fst` | 356 | Pure spec: flow networks, residual graphs, augmenting paths, cuts | 0 |
+| `CLRS.Ch26.MaxFlow.Lemmas.fsti` | 159 | Interface: augmentation lemma signatures | 0 |
+| `CLRS.Ch26.MaxFlow.Lemmas.fst` | 887 | Lemmas: augmentation preserves validity, increases value, commutativity | 0 |
 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti` | 52 | Interface: MFMC theorem signatures | 0 |
 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fst` | 800 | MFMC theorem: weak duality, strong duality (Thm 26.6) | 0 |
 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | 66 | Interface: complexity theorem signatures | 0 |
-| `CLRS.Ch26.MaxFlow.Complexity.fst` | 618 | O(VE²) complexity analysis with ghost tick counter | **4 `assume val`** |
+| `CLRS.Ch26.MaxFlow.Complexity.fst` | 1546 | O(VE²) complexity analysis with ghost tick counter | 0 |
 | `CLRS.Ch26.MaxFlow.Impl.fsti` | 116 | Interface: `max_flow` public API + bridge lemma | 0 |
-| `CLRS.Ch26.MaxFlow.Impl.fst` | 2454 | Pulse implementation: BFS + augmentation + BFS completeness proof | 0 |
+| `CLRS.Ch26.MaxFlow.Impl.fst` | 3217 | Pulse implementation: BFS + augmentation + BFS completeness + static correctness proof | 0 |
 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Smoke test on a 3-vertex graph | 1 `assume_` (test) |
 
 ## Summary
@@ -237,12 +231,13 @@ These are the **only** `assume val` statements in the entire project outside ch2
 | Property | Status |
 |----------|--------|
 | Functional correctness (`valid_flow` + `no_augmenting_path`) | ✅ Fully proven |
-| Bridge to spec (`imp_valid_flow → valid_flow`) | ✅ Fully proven |
+| Bridge to spec (`imp_valid_flow → valid_flow`) | ✅ Fully proven (both directions) |
+| Static augmentation correctness (no runtime checks) | ✅ Fully proven via `lemma_augment_chain` |
 | Max-Flow Min-Cut Theorem (Thm 26.6) | ✅ Fully proven |
 | Weak duality (Cor 26.5) | ✅ Fully proven |
 | BFS completeness | ✅ Fully proven |
 | Termination (no fuel) | ✅ Proven via `cap_sum` bound |
-| O(VE²) complexity | ⚠️ Proven modulo 4 `assume val` (BFS distance properties) |
+| O(VE²) complexity | ✅ Fully proven (all supporting lemmas verified) |
 | Memory safety | ✅ Pulse separation logic |
 
 ## Building

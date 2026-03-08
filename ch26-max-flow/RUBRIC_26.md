@@ -1,6 +1,6 @@
 # Chapter 26: Maximum Flow — Rubric Compliance
 
-**Date**: 2025-07-18 (updated 2025-07-19)
+**Date**: 2025-07-18 (updated 2025-07-20)
 **Canonical rubric**: `../RUBRIC.md`
 **Audit reference**: `../AUDIT_CH26.md`
 **Verification status**: All 10 `.checked` files present in `_cache/` (6 `.fst` + 4 `.fsti`)
@@ -11,17 +11,17 @@
 
 | # | File | Lines | Rubric Role | Verified |
 |---|------|------:|-------------|:--------:|
-| 1 | `CLRS.Ch26.MaxFlow.Spec.fst` | 341 | **Spec** — Pure specification: flow networks, residual graphs, augmenting paths, cuts | ✅ |
-| 2 | `CLRS.Ch26.MaxFlow.Lemmas.fsti` | — | **Lemmas interface** — Public API for augmentation lemmas | ✅ |
-| 3 | `CLRS.Ch26.MaxFlow.Lemmas.fst` | 679 | **Lemmas** — Augmentation preserves validity, increases flow value | ✅ |
-| 4 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti` | — | **MFMC interface** — Public API for MFMC theorem | ✅ |
-| 5 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fst` | 804 | **MFMC** — Weak duality, strong duality (CLRS Theorem 26.6) | ✅ |
-| 6 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | — | **Complexity interface** — Public API for complexity theorems | ✅ |
-| 7 | `CLRS.Ch26.MaxFlow.Complexity.fst` | ~1550 | **Complexity** — O(VE²) bound with ghost tick counter, BFS layer proofs | ✅ |
-| 8 | `CLRS.Ch26.MaxFlow.Impl.fsti` | — | **Impl interface** — Public API for `max_flow` + bridge lemma | ✅ |
-| 9 | `CLRS.Ch26.MaxFlow.Impl.fst` | ~2450 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
+| 1 | `CLRS.Ch26.MaxFlow.Spec.fst` | 356 | **Spec** — Pure specification: flow networks, residual graphs, augmenting paths, cuts | ✅ |
+| 2 | `CLRS.Ch26.MaxFlow.Lemmas.fsti` | 159 | **Lemmas interface** — Public API for augmentation lemmas | ✅ |
+| 3 | `CLRS.Ch26.MaxFlow.Lemmas.fst` | 887 | **Lemmas** — Augmentation preserves validity, increases flow value, edge commutativity | ✅ |
+| 4 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti` | 52 | **MFMC interface** — Public API for MFMC theorem | ✅ |
+| 5 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fst` | 800 | **MFMC** — Weak duality, strong duality (CLRS Theorem 26.6) | ✅ |
+| 6 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | 66 | **Complexity interface** — Public API for complexity theorems | ✅ |
+| 7 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 1546 | **Complexity** — O(VE²) bound with ghost tick counter, BFS layer proofs | ✅ |
+| 8 | `CLRS.Ch26.MaxFlow.Impl.fsti` | 116 | **Impl interface** — Public API for `max_flow` + bridge lemma | ✅ |
+| 9 | `CLRS.Ch26.MaxFlow.Impl.fst` | 3217 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
 | 10 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Test — Smoke test on 3-vertex graph | ✅ |
-| | **Total** | **~4450** | | |
+| | **Total** | **~7260** | | |
 
 ---
 
@@ -31,11 +31,11 @@
 
 | CLRS Pseudocode Step | Implementation | Location |
 |-----------------------|---------------|----------|
-| **FORD-FULKERSON** line 1: init flow to 0 | `zero_init_flow flow nn` | MaxFlow.fst |
-| **FORD-FULKERSON** line 2: while ∃ augmenting path in G_f | `bfs_residual` returns `found: bool` | MaxFlow.fst |
-| **FORD-FULKERSON** line 3: augment flow along path | `find_bottleneck_imp` + `augment_imp` | MaxFlow.fst |
-| **FORD-FULKERSON** line 4: return f | Returns `valid: bool` + flow in array | MaxFlow.fst |
-| BFS shortest-path selection (Edmonds-Karp) | Standard BFS with queue, color, predecessor arrays | MaxFlow.fst `bfs_residual` |
+| **FORD-FULKERSON** line 1: init flow to 0 | `zero_init_flow flow nn` | Impl.fst |
+| **FORD-FULKERSON** line 2: while ∃ augmenting path in G_f | `bfs_residual` returns `found: bool` | Impl.fst |
+| **FORD-FULKERSON** line 3: augment flow along path | `find_bottleneck_imp` + `augment_imp` | Impl.fst |
+| **FORD-FULKERSON** line 4: return f | Returns flow in array with `imp_valid_flow` + `no_augmenting_path` | Impl.fst |
+| BFS shortest-path selection (Edmonds-Karp) | Standard BFS with queue, color, predecessor arrays | Impl.fst `bfs_residual` |
 
 **Spec-level variants** (Spec.fst):
 - `ford_fulkerson` (line 203): explicit path-list functional specification
@@ -49,13 +49,13 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 
 | Rubric File | Expected Name | Actual File | Status | Notes |
 |-------------|---------------|-------------|:------:|-------|
-| `Spec.fst` | `CLRS.Ch26.MaxFlow.Spec.fst` | `CLRS.Ch26.MaxFlow.Spec.fst` | ✅ | 1125 lines, pure spec, zero admits |
-| `Lemmas.fst` | `CLRS.Ch26.MaxFlow.Lemmas.fst` | `CLRS.Ch26.MaxFlow.Lemmas.fst` | ✅ | Renamed from Proofs.fst |
+| `Spec.fst` | `CLRS.Ch26.MaxFlow.Spec.fst` | `CLRS.Ch26.MaxFlow.Spec.fst` | ✅ | 356 lines, pure spec, zero admits |
+| `Lemmas.fst` | `CLRS.Ch26.MaxFlow.Lemmas.fst` | `CLRS.Ch26.MaxFlow.Lemmas.fst` | ✅ | Renamed from Proofs.fst; includes edge commutativity proofs |
 | `Lemmas.fsti` | `CLRS.Ch26.MaxFlow.Lemmas.fsti` | `CLRS.Ch26.MaxFlow.Lemmas.fsti` | ✅ | Created — exports key lemma signatures |
 | `Complexity.fst` | `CLRS.Ch26.MaxFlow.Complexity.fst` | `CLRS.Ch26.MaxFlow.Complexity.fst` | ✅ | Present, zero admits, zero assume vals. All 4 former axioms now fully proven. |
 | `Complexity.fsti` | `CLRS.Ch26.MaxFlow.Complexity.fsti` | `CLRS.Ch26.MaxFlow.Complexity.fsti` | ✅ | Created — exports complexity theorem signatures |
-| `Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | ✅ | Renamed from MaxFlow.fst; **zero admits**, `imp_valid_flow` maintained as loop invariant |
-| `Impl.fsti` | `CLRS.Ch26.MaxFlow.Impl.fsti` | `CLRS.Ch26.MaxFlow.Impl.fsti` | ✅ | Created — exports `max_flow` public API |
+| `Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | `CLRS.Ch26.MaxFlow.Impl.fst` | ✅ | Renamed from MaxFlow.fst; **zero admits**, augmentation statically proven to preserve `imp_valid_flow` |
+| `Impl.fsti` | `CLRS.Ch26.MaxFlow.Impl.fsti` | `CLRS.Ch26.MaxFlow.Impl.fsti` | ✅ | Created — exports `max_flow` public API with unconditional `no_augmenting_path` |
 
 ### Proof Soundness Inventory
 
@@ -64,7 +64,10 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 | 1 | Test.fst | 47 | `assume_` | 🟡 Medium | Assumes `valid_caps` after manual array writes; test-only |
 
 **Eliminated** (previously present, now proven):
-- ~~`admit()` in `lemma_augment_imp_preserves_valid`~~ → Replaced by `imp_valid_flow` as loop invariant + `lemma_zero_flow_imp_valid` for initialization; augmentation validity maintained via runtime check `check_imp_valid_flow_fn`
+- ~~`admit()` in `lemma_augment_imp_preserves_valid`~~ → Replaced by static proof chain: `lemma_augment_chain` chains `imp_valid_flow → valid_flow → augment_preserves_valid → valid_flow → imp_valid_flow`
+- ~~Runtime `check_imp_valid_flow_fn`~~ → Removed; augmentation statically proven to preserve `imp_valid_flow`
+- ~~`completed` flag / partial results~~ → Removed; `no_augmenting_path` is unconditional in postcondition
+- ~~Defensive re-zero path~~ → Removed; impossible to reach with static proofs
 - ~~`assume val axiom_bfs_complete`~~ → Replaced by `lemma_bfs_complete` + `lemma_bottleneck_crossing` (proven by induction on path structure)
 - ~~`assume_ (bfs_complete ...)`~~ → Eliminated via BFS loop counting invariant (`count_color1 == vtail - vhead`, `queue_color1`)
 - ~~`assume_ (source colored)`~~ → Follows directly from BFS loop invariant
@@ -89,9 +92,13 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 | Zero flow is valid | Lemmas.fst:672 | ✅ Proven |
 | Path shortening (pigeonhole) | Lemmas.MaxFlowMinCut.fst | ✅ Proven |
 | imp_valid_flow ⟹ valid_flow (bridge) | Impl.fst | ✅ Proven |
-| imp_valid_flow loop invariant (zero init + dynamic check) | Impl.fst | ✅ Verified |
+| valid_flow ⟹ imp_valid_flow (reverse bridge) | Impl.fst | ✅ Proven |
+| augment_imp preserves imp_valid_flow (static) | Impl.fst `lemma_augment_chain` | ✅ Proven (chains: imp→valid→augment_preserves→valid→imp) |
+| augment_imp refines augment_via_pred | Impl.fst `augment_imp` postcondition | ✅ Proven (loop invariant tracks `augment_via_pred`) |
+| find_bottleneck_imp = bottleneck_via_pred | Impl.fst `find_bottleneck_imp` postcondition | ✅ Proven (loop invariant tracks `bottleneck_via_pred`) |
+| imp_valid_flow loop invariant (zero init + static proof) | Impl.fst | ✅ Verified |
 | Edmonds-Karp terminates (no fuel) | Impl.fst | ✅ Proven (flow_value bounded by cap_sum, decreasing measure) |
-| MFMC usable by callers | Impl.fst/fsti | ✅ `completed=true` ⟹ `no_augmenting_path` in postcondition |
+| MFMC usable by callers | Impl.fst/fsti | ✅ `no_augmenting_path` unconditional in postcondition |
 | BFS completeness: bfs_complete ⟹ no_augmenting_path | Impl.fst | ✅ Proven (lemma_bottleneck_crossing, induction on path) |
 | BFS termination ⟹ bfs_complete | Impl.fst | ✅ Proven (counting invariant: count_color1 + queue_color1) |
 
@@ -99,19 +106,22 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 
 ## Detailed Action Items
 
-### ✅ P0 — RESOLVED: `admit()` in Production Code Eliminated
+### ✅ P0 — RESOLVED: `admit()` and Runtime Checks Eliminated
 
-**File**: `CLRS.Ch26.MaxFlow.Impl.fst` (formerly line 842)
-**Function**: `lemma_augment_imp_preserves_valid` — **DELETED**
-**Resolution**: Replaced with a loop-invariant approach:
+**File**: `CLRS.Ch26.MaxFlow.Impl.fst`
+**Resolution**: Fully static proof chain replaces all runtime checks:
 1. `lemma_zero_flow_imp_valid` proves the zero flow satisfies `imp_valid_flow` (loop invariant initialization)
 2. `imp_valid_flow` is carried as a conjunct in the main Ford-Fulkerson while-loop invariant
-3. After each augmentation, `check_imp_valid_flow_fn` dynamically verifies validity is preserved
-4. If the check ever fails (should not happen for correct BFS+augmentation), the flow is defensively re-zeroed
+3. After each augmentation, `lemma_augment_chain` statically proves `imp_valid_flow` is preserved
+4. `find_bottleneck_imp` postcondition proves `bn > 0 /\ bn == bottleneck_via_pred ...`
+5. `augment_imp` postcondition proves `flow_seq' == augment_via_pred ...`
+6. `no_augmenting_path` is unconditionally guaranteed — no `completed` flag needed
 
-The postcondition `imp_valid_flow` is now **unconditionally guaranteed** by the loop invariant — no `admit()` or `assume` needed.
-
-**Trade-off**: The runtime check adds O(n²) overhead per augmentation. A pure static proof (showing `augment_imp` refines `augment_aux`) would eliminate this overhead but requires ~250 lines of additional BFS path correspondence proofs.
+**Key proof artifacts**:
+- `lemma_augment_chain`: Chains imp_valid_flow → valid_flow → augment_preserves_valid → valid_flow → imp_valid_flow; also proves flow_value strictly increases
+- `lemma_bottleneck_step` / `lemma_augment_step`: One-loop-iteration lemmas for loop invariant maintenance
+- `lemma_augment_edge_fwd/bwd`: Bridges Pulse array operations to pure `augment_edge` specification
+- `bfs_pred_ok`: Opaque predicate that bundles all BFS postcondition properties for ghost parameter passing
 
 ---
 
@@ -176,10 +186,10 @@ The postcondition `imp_valid_flow` is now **unconditionally guaranteed** by the 
 | MFMC theorem in Lemmas | ✅ | Extracted to Lemmas.MaxFlowMinCut.fst/fsti (804 lines) |
 | Complexity file present | ✅ | Present; zero admits, zero assume vals |
 | Complexity interface (.fsti) | ✅ | Created with theorem signatures |
-| Impl file present | ✅ | Renamed from MaxFlow.fst to Impl.fst; zero admits |
-| Impl interface (.fsti) | ✅ | Created with `max_flow` public API |
-| imp_valid_flow ↔ valid_flow | ✅ | Bridge lemma connects Impl postcondition to Spec.valid_flow |
-| MFMC usable by callers | ✅ | `max_flow` returns `completed: bool`; when true, `no_augmenting_path` in postcondition enables MFMC |
+| Impl file present | ✅ | Renamed from MaxFlow.fst to Impl.fst; zero admits, no runtime checks |
+| Impl interface (.fsti) | ✅ | Created with `max_flow` public API; `no_augmenting_path` unconditional |
+| imp_valid_flow ↔ valid_flow | ✅ | Bridge lemma (both directions) connects Impl postcondition to Spec.valid_flow |
+| MFMC usable by callers | ✅ | `no_augmenting_path` unconditional in postcondition — directly satisfies MFMC precondition |
 | No admits in production | ✅ | Zero admits across Spec, Lemmas, MFMC, and Impl |
 | Documentation accurate | ✅ | README updated to reflect current file structure |
 
@@ -187,13 +197,13 @@ The postcondition `imp_valid_flow` is now **unconditionally guaranteed** by the 
 
 | Dimension | Rating |
 |-----------|--------|
-| CLRS Fidelity | ★★★★☆ |
+| CLRS Fidelity | ★★★★★ |
 | Specification Strength | ★★★★★ |
 | Complexity Proofs | ★★★★★ |
-| Code Quality | ★★★★☆ |
+| Code Quality | ★★★★★ |
 | Proof Quality (Spec+Lemmas) | ★★★★★ |
 | Proof Quality (Impl) | ★★★★★ |
 | Rubric Structural Compliance | ★★★★★ |
 | Documentation | ★★★★★ |
 
-**Bottom line**: Excellent pure-spec proofs (MFMC, conservation, augmentation — all zero-admit). **Zero admits and zero assume vals in all production code** (Spec, Lemmas, MFMC, Complexity, Impl). **All 4 former Complexity axioms now fully proven**: BFS-layer shortest_path_distance definition, spd_source_zero, spd_bounded, Lemma 26.7 (distances non-decreasing via BFS layer induction + new-edge-from-path argument), and Lemma 26.8 (edge criticality bound via forward/backward two-state machine induction). **Edmonds-Karp termination proven without fuel**: flow_value increases by ≥1 per augmentation, bounded by cap_sum = Σ cap[source][v]; decreasing measure `cap_sum + 1 - iters` guarantees finite iterations. MFMC theorem isolated in Lemmas.MaxFlowMinCut with clean interface. Bridge lemma (`imp_valid_flow_implies_valid_flow`) connects Impl postcondition to `Spec.valid_flow`, enabling callers to use MFMC theorem results. `max_flow` returns `completed: bool` — when `true`, the postcondition includes `no_augmenting_path`, which is exactly the MFMC precondition. **BFS completeness fully proven**: counting invariants track BFS queue state, and `lemma_bottleneck_crossing` proves any source-to-sink path through the colored/uncolored partition has bottleneck ≤ 0 by induction on path structure. Only remaining `assume_` is in Test.fst (test-only).
+**Bottom line**: Excellent pure-spec proofs (MFMC, conservation, augmentation — all zero-admit). **Zero admits, zero assume vals, zero runtime checks in all production code** (Spec, Lemmas, MFMC, Complexity, Impl). **All 4 former Complexity axioms now fully proven**: BFS-layer shortest_path_distance definition, spd_source_zero, spd_bounded, Lemma 26.7 (distances non-decreasing via BFS layer induction + new-edge-from-path argument), and Lemma 26.8 (edge criticality bound via forward/backward two-state machine induction). **Edmonds-Karp termination proven without fuel**: flow_value increases by ≥1 per augmentation, bounded by cap_sum = Σ cap[source][v]; decreasing measure `cap_sum + 1 - iters` guarantees finite iterations. **Augmentation statically proven correct**: `lemma_augment_chain` chains imp_valid_flow → valid_flow → augment_preserves_valid → valid_flow → imp_valid_flow, eliminating all runtime validity checks and defensive re-zero paths. MFMC theorem isolated in Lemmas.MaxFlowMinCut with clean interface. Bridge lemmas (both directions) connect Impl postcondition to `Spec.valid_flow`, enabling callers to use MFMC theorem results. `no_augmenting_path` is **unconditional** in the postcondition — exactly the MFMC precondition. **BFS completeness fully proven**: counting invariants track BFS queue state, and `lemma_bottleneck_crossing` proves any source-to-sink path through the colored/uncolored partition has bottleneck ≤ 0 by induction on path structure. Only remaining `assume_` is in Test.fst (test-only).
