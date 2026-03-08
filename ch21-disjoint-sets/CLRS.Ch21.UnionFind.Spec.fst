@@ -353,3 +353,23 @@ let pure_union_other_set (f: uf_forest{uf_inv f}) (x y z: nat{x < f.n /\ y < f.n
         pure_find_after_link f f' root_y root_x z
     end
 #pop-options
+
+// Stability (universal): union does not merge any unrelated set
+#restart-solver
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+let pure_union_stability (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n})
+  : Lemma (ensures (pure_union_preserves_inv f x y;
+                    let f' = pure_union f x y in
+                    forall (z: nat). z < f.n ==>
+                      pure_find f z <> pure_find f x ==>
+                      pure_find f z <> pure_find f y ==>
+                      pure_find f' z == pure_find f z))
+  = pure_union_preserves_inv f x y;
+    let aux (z: nat{z < f.n})
+      : Lemma (requires pure_find f z <> pure_find f x /\
+                        pure_find f z <> pure_find f y)
+              (ensures pure_find (pure_union f x y) z == pure_find f z)
+      = pure_union_other_set f x y z
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options

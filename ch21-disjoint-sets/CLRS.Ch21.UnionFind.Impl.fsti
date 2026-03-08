@@ -104,7 +104,8 @@ fn find_set
     )
 
 (** UNION: Union by rank (CLRS §21.3)
-    After union, find(x) == find(y) in the resulting forest. *)
+    After union, find(x) == find(y) in the resulting forest,
+    and elements disjoint from both x and y are unchanged. *)
 fn union
   (parent: array SZ.t)
   (rank: array SZ.t)
@@ -135,6 +136,15 @@ fn union
       Spec.uf_inv (to_uf sparent srank (SZ.v n)) /\
       Spec.uf_inv (to_uf sp sr (SZ.v n)) /\
       SZ.v x < SZ.v n /\ SZ.v y < SZ.v n /\
+      // Merge: x and y end up in the same equivalence class
       Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x) ==
-        Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v y)
+        Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v y) /\
+      // Stability: elements disjoint from both x and y are unchanged
+      (forall (z: nat). z < SZ.v n ==>
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) z <>
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x) ==>
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) z <>
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y) ==>
+        Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
     )

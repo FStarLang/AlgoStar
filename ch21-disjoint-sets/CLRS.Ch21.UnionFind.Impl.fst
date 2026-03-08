@@ -606,7 +606,14 @@ fn union
       Spec.uf_inv (to_uf sp sr (SZ.v n)) /\
       SZ.v x < SZ.v n /\ SZ.v y < SZ.v n /\
       Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x) ==
-        Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v y)
+        Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v y) /\
+      (forall (z: nat). z < SZ.v n ==>
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) z <>
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x) ==>
+        Spec.pure_find (to_uf sparent srank (SZ.v n)) z <>
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y) ==>
+        Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
     )
 {
   // Find roots (read-only — no compression during union)
@@ -619,6 +626,7 @@ fn union
     // Same root: no change. pure_find(result, x) = root = pure_find(result, y).
     Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
     Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+    Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
     ()
   } else {
     let rank_x = rank.(root_x);
@@ -630,6 +638,7 @@ fn union
       to_uf_upd_parent sparent srank (SZ.v n) (SZ.v root_x) root_y;
       Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
       Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+      Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
       ()
     } else {
       if (rank_x >^ rank_y) {
@@ -639,6 +648,7 @@ fn union
         to_uf_upd_parent sparent srank (SZ.v n) (SZ.v root_y) root_x;
         Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       } else {
         // Equal rank: link root_y -> root_x and increment rank[root_x]
@@ -649,6 +659,7 @@ fn union
         to_uf_upd_both sparent srank (SZ.v n) (SZ.v root_y) root_x (SZ.v root_x) new_rank;
         Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       }
     }
