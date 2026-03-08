@@ -1242,6 +1242,90 @@ let rec lemma_bottleneck_fuel_mono (scolor spred sdist cap_seq flow_seq: Seq.seq
     end
 #pop-options
 
+(** bottleneck_via_pred always returns a value <= int_max (since int_max is the base case
+    and we only take min) *)
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec lemma_bottleneck_via_pred_le_int_max (spred cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
+  : Lemma
+    (ensures bottleneck_via_pred spred cap_seq flow_seq n source current fuel <= int_max)
+    (decreases fuel)
+  = if fuel = 0 || current = source then ()
+    else
+      let u = seq_get spred current in
+      if u >= 0 && u < n then
+        lemma_bottleneck_via_pred_le_int_max spred cap_seq flow_seq n source u (fuel - 1)
+      else ()
+#pop-options
+
+(** One step of the bottleneck loop: given the invariant holds for (vc, vbn),
+    after computing new_vbn via the code's branching, the invariant holds for (u, new_vbn).
+    This encapsulates all the case analysis + fuel mono + min associativity. *)
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+let lemma_bottleneck_step
+  (scolor spred sdist cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0
+           /\ Seq.length scolor == n /\ Seq.length sdist == n})
+  (source: nat{source < n}) (sink: nat{sink < n}) (current: nat{current < n /\ current <> source})
+  (vbn: int)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_seq n source /\
+      seq_get scolor current <> 0 /\
+      vbn >= 0 /\ vbn <= int_max /\
+      bottleneck_via_pred spred cap_seq flow_seq n source sink n ==
+        (if vbn < bottleneck_via_pred spred cap_seq flow_seq n source current n
+         then vbn
+         else bottleneck_via_pred spred cap_seq flow_seq n source current n))
+    (ensures (
+      let u = seq_get spred current in
+      u >= 0 /\ u < n /\
+      seq_get scolor u <> 0 /\
+      (let res_fwd = seq_get cap_seq (u * n + current) - seq_get flow_seq (u * n + current) in
+       let flow_bwd = seq_get flow_seq (current * n + u) in
+       let new_vbn =
+         if res_fwd > 0 then (if res_fwd < vbn then res_fwd else vbn)
+         else (if flow_bwd > 0 && flow_bwd < vbn then flow_bwd else vbn) in
+       new_vbn >= 0 /\ new_vbn <= int_max /\
+       bottleneck_via_pred spred cap_seq flow_seq n source sink n ==
+         (if new_vbn < bottleneck_via_pred spred cap_seq flow_seq n source u n
+          then new_vbn
+          else bottleneck_via_pred spred cap_seq flow_seq n source u n))))
+  = let u = seq_get spred current in
+    // From pred_ok: u is valid predecessor
+    assert (u >= 0 /\ u < n /\ seq_get scolor u <> 0);
+    // Residual condition: res_fwd > 0 \/ flow_bwd > 0
+    let res_fwd = seq_get cap_seq (u * n + current) - seq_get flow_seq (u * n + current) in
+    let flow_bwd = seq_get flow_seq (current * n + u) in
+    assert (res_fwd > 0 \/ flow_bwd > 0);
+    // Fuel mono: BVP(u, n-1) = BVP(u, n)
+    lemma_bottleneck_fuel_mono scolor spred sdist cap_seq flow_seq n source u (n - 1) n;
+    // Now BVP(current, n) = min(edge_res, BVP(u, n)) by definition unfolding
+    // (since current ≠ source, fuel = n > 0, u = seq_get spred current, u >= 0 && u < n)
+    // edge_res = if res_fwd > 0 then res_fwd else flow_bwd
+    let bvp_u = bottleneck_via_pred spred cap_seq flow_seq n source u n in
+    let bvp_cur = bottleneck_via_pred spred cap_seq flow_seq n source current n in
+    let edge_res = if res_fwd > 0 then res_fwd else flow_bwd in
+    assert (bvp_cur == (if edge_res < bvp_u then edge_res else bvp_u));
+    // Old invariant: BVP(sink) = min(vbn, bvp_cur) = min(vbn, min(edge_res, bvp_u))
+    // Code computes new_vbn = min(vbn, edge_res) [using pred_ok: res_fwd > 0 \/ flow_bwd > 0]
+    let new_vbn =
+      if res_fwd > 0 then (if res_fwd < vbn then res_fwd else vbn)
+      else (if flow_bwd > 0 && flow_bwd < vbn then flow_bwd else vbn) in
+    // Case analysis to show new_vbn = min(vbn, edge_res)
+    assert (new_vbn == (if edge_res < vbn then edge_res else vbn));
+    // min associativity: min(vbn, min(edge_res, bvp_u)) = min(min(vbn, edge_res), bvp_u)
+    // = min(new_vbn, bvp_u)
+    assert (
+      (if vbn < (if edge_res < bvp_u then edge_res else bvp_u)
+       then vbn
+       else (if edge_res < bvp_u then edge_res else bvp_u)) ==
+      (if (if edge_res < vbn then edge_res else vbn) < bvp_u
+       then (if edge_res < vbn then edge_res else vbn)
+       else bvp_u))
+#pop-options
+
 (** Pure augment via pred walk: walks pred from current to source,
     augmenting each edge. Matches augment_imp. *)
 let rec augment_via_pred (spred: Seq.seq int) (flow_seq cap_seq: Seq.seq int)
@@ -1282,6 +1366,56 @@ let rec lemma_augment_fuel_mono (scolor spred sdist cap_seq flow_seq flow_comp: 
       lemma_augment_fuel_mono scolor spred sdist cap_seq flow_seq flow' n source u bn (fuel1 - 1) (fuel2 - 1)
     end
 #pop-options
+
+(** One step of augment loop: AVP(fs, vc, n) == AVP(augment_edge(fs, ..., u, vc, bn), u, n)
+    when u = pred[vc] and pred_ok holds. *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let lemma_augment_step
+  (scolor spred sdist cap_seq flow_pred fs: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_pred == n * n /\
+          Seq.length fs == n * n /\ Seq.length spred == n /\ n > 0
+          /\ Seq.length scolor == n /\ Seq.length sdist == n})
+  (source: nat{source < n}) (current: nat{current < n /\ current <> source}) (bn: int)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_pred n source /\
+      seq_get scolor current <> 0)
+    (ensures (
+      let u = seq_get spred current in
+      u >= 0 /\ u < n /\
+      seq_get scolor u <> 0 /\
+      (let fs' = augment_edge fs cap_seq n u current bn in
+       Seq.length fs' == n * n /\
+       augment_via_pred spred fs cap_seq n source current bn n ==
+       augment_via_pred spred fs' cap_seq n source u bn n)))
+  = let u = seq_get spred current in
+    assert (u >= 0 /\ u < n /\ seq_get scolor u <> 0);
+    let fs' = augment_edge fs cap_seq n u current bn in
+    // By unfolding (fuel = n > 0, current ≠ source, u valid):
+    // AVP(fs, vc, n) = AVP(augment_edge(fs, ..., u, vc, bn), u, n-1)
+    // By fuel mono: AVP(fs', u, n-1) = AVP(fs', u, n)
+    lemma_augment_fuel_mono scolor spred sdist cap_seq flow_pred fs' n source u bn (n - 1) n
+#pop-options
+
+(** augment_edge when forward residual > 0: just Seq.upd at u*n+v *)
+let lemma_augment_edge_fwd (flow cap: Seq.seq int)
+  (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (u: nat{u < n}) (v: nat{v < n}) (delta: int)
+  : Lemma
+    (requires residual_capacity cap flow n u v > 0)
+    (ensures augment_edge flow cap n u v delta ==
+             Seq.upd flow (u * n + v) (Seq.index flow (u * n + v) + delta))
+  = ()
+
+(** augment_edge when forward residual <= 0: Seq.upd at v*n+u *)
+let lemma_augment_edge_bwd (flow cap: Seq.seq int)
+  (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (u: nat{u < n}) (v: nat{v < n}) (delta: int)
+  : Lemma
+    (requires residual_capacity cap flow n u v <= 0)
+    (ensures augment_edge flow cap n u v delta ==
+             Seq.upd flow (v * n + u) (Seq.index flow (v * n + u) - delta))
+  = ()
 
 (** init of (l ++ [x]) == l when l is non-empty *)
 let rec lemma_init_append_singleton (l: list nat{Cons? l}) (x: nat)
@@ -2217,13 +2351,15 @@ fn bfs_residual
    ================================================================ *)
 
 (** Find bottleneck: walk pred array from sink to source *)
-#push-options "--z3rlimit 160 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn find_bottleneck_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
   (#cap_seq: erased (Seq.seq int))
   (#flow_seq: erased (Seq.seq int))
   (#spred: erased (Seq.seq int))
+  (#scolor: erased (Seq.seq int))
+  (#sdist: erased (Seq.seq int))
   requires
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq **
@@ -2235,16 +2371,30 @@ fn find_bottleneck_imp
       SZ.v source <> SZ.v sink /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
+      Seq.length scolor == SZ.v n /\
+      Seq.length sdist == SZ.v n /\
       preds_in_range spred (SZ.v n) /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      pred_ok scolor spred sdist cap_seq flow_seq (SZ.v n) (SZ.v source) /\
+      seq_get scolor (SZ.v sink) <> 0
     )
   returns bn: int
   ensures
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq **
     A.pts_to pred spred **
-    pure (bn >= 0)
+    pure (
+      Seq.length cap_seq == SZ.v n * SZ.v n /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      Seq.length spred == SZ.v n /\
+      SZ.v n > 0 /\
+      SZ.v source < SZ.v n /\
+      SZ.v sink < SZ.v n /\
+      bn > 0 /\
+      bn == bottleneck_via_pred spred cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v sink) (SZ.v n)
+    )
 {
+  lemma_bottleneck_via_pred_le_int_max spred cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v sink) (SZ.v n);
   let mut current: SZ.t = sink;
   let mut bottleneck: int = int_max;
 
@@ -2261,27 +2411,37 @@ fn find_bottleneck_imp
     pure (
       SZ.v vc < SZ.v n /\
       vbn >= 0 /\
+      vbn <= int_max /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
       preds_in_range spred (SZ.v n) /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      // Ghost tracking: current vertex is discovered, bottleneck invariant
+      seq_get scolor (SZ.v vc) <> 0 /\
+      bottleneck_via_pred spred cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v sink) (SZ.v n) ==
+        (if vbn < bottleneck_via_pred spred cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v vc) (SZ.v n)
+         then vbn
+         else bottleneck_via_pred spred cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v vc) (SZ.v n))
     )
-  // TODO: decreases
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
-    // From preds_in_range: u_int >= -1 /\ u_int < SZ.v n
-    // On a valid BFS path, u_int >= 0 (only -1 for undiscovered vertices)
+    // From pred_ok: vc is discovered and vc ≠ source, so pred[vc] >= 0 and pred[vc] < n
     if (u_int >= 0)
     {
       let u: SZ.t = SZ.uint_to_t u_int;
+      assert (pure (SZ.v u < SZ.v n));
       let idx_fwd: SZ.t = u *^ n +^ vc;
       let idx_bwd: SZ.t = vc *^ n +^ u;
+      assert (pure (SZ.v idx_fwd < SZ.v n * SZ.v n /\ SZ.v idx_bwd < SZ.v n * SZ.v n));
       let cap_val: int = A.op_Array_Access capacity idx_fwd;
       let flow_fwd: int = A.op_Array_Access flow idx_fwd;
       let flow_bwd: int = A.op_Array_Access flow idx_bwd;
       let res_fwd: int = cap_val - flow_fwd;
       let vbn = !bottleneck;
+      // Pure lemma: does all the case analysis + fuel mono
+      lemma_bottleneck_step scolor spred sdist cap_seq flow_seq
+        (SZ.v n) (SZ.v source) (SZ.v sink) (SZ.v vc) vbn;
       if (res_fwd > 0)
       {
         if (res_fwd < vbn) { bottleneck := res_fwd } else { () }
@@ -2298,12 +2458,23 @@ fn find_bottleneck_imp
       current := source
     }
   };
+  // At loop exit: vc = source
+  // BVP(source, n) = int_max by definition (current = source)
+  assert (pure (
+    bottleneck_via_pred spred cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v source) (SZ.v n) == int_max
+  ));
+  // From invariant: BVP(sink, n) == min(vbn, int_max)
+  // Since vbn <= int_max: min(vbn, int_max) = vbn
+  // So BVP(sink, n) = vbn
+  // Also prove bn > 0
+  lemma_bottleneck_via_pred_positive scolor spred sdist cap_seq flow_seq
+    (SZ.v n) (SZ.v source) (SZ.v sink) (SZ.v n);
   !bottleneck
 }
 #pop-options
 
 (** Augment flow: walk pred array from sink to source, update flow *)
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn augment_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
@@ -2311,6 +2482,8 @@ fn augment_imp
   (#cap_seq: erased (Seq.seq int))
   (#flow_seq: erased (Seq.seq int))
   (#spred: erased (Seq.seq int))
+  (#scolor: erased (Seq.seq int))
+  (#sdist: erased (Seq.seq int))
   requires
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq **
@@ -2323,15 +2496,26 @@ fn augment_imp
       bn > 0 /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq == SZ.v n * SZ.v n /\
+      Seq.length scolor == SZ.v n /\
+      Seq.length sdist == SZ.v n /\
       preds_in_range spred (SZ.v n) /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      pred_ok scolor spred sdist cap_seq flow_seq (SZ.v n) (SZ.v source) /\
+      seq_get scolor (SZ.v sink) <> 0
     )
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
     A.pts_to pred spred **
     pure (
-      Seq.length flow_seq' == SZ.v n * SZ.v n
+      Seq.length flow_seq' == SZ.v n * SZ.v n /\
+      Seq.length cap_seq == SZ.v n * SZ.v n /\
+      Seq.length flow_seq == SZ.v n * SZ.v n /\
+      Seq.length spred == SZ.v n /\
+      SZ.v n > 0 /\
+      SZ.v source < SZ.v n /\
+      SZ.v sink < SZ.v n /\
+      flow_seq' == augment_via_pred spred flow_seq cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) bn (SZ.v n)
     )
 {
   let mut current: SZ.t = sink;
@@ -2350,28 +2534,39 @@ fn augment_imp
       Seq.length fs == SZ.v n * SZ.v n /\
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       preds_in_range spred (SZ.v n) /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      seq_get scolor (SZ.v vc) <> 0 /\
+      augment_via_pred spred flow_seq cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) bn (SZ.v n) ==
+      augment_via_pred spred fs cap_seq (SZ.v n) (SZ.v source) (SZ.v vc) bn (SZ.v n)
     )
-  // TODO: decreases
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
-    // From preds_in_range: u_int >= -1 /\ u_int < SZ.v n
     if (u_int >= 0)
     {
       let u: SZ.t = SZ.uint_to_t u_int;
+      assert (pure (SZ.v u < SZ.v n));
       let idx_fwd: SZ.t = u *^ n +^ vc;
       let idx_bwd: SZ.t = vc *^ n +^ u;
+      assert (pure (SZ.v idx_fwd < SZ.v n * SZ.v n /\ SZ.v idx_bwd < SZ.v n * SZ.v n));
       let cap_val: int = A.op_Array_Access capacity idx_fwd;
       let flow_fwd: int = A.op_Array_Access flow idx_fwd;
+      // Call step lemma to get: AVP(fs, vc, n) == AVP(augment_edge(fs, ..., u, vc, bn), u, n)
+      with _fs. assert (A.pts_to flow _fs);
+      lemma_augment_step scolor spred sdist cap_seq flow_seq _fs
+        (SZ.v n) (SZ.v source) (SZ.v vc) bn;
       if (cap_val - flow_fwd > 0)
       {
+        // residual_capacity > 0 → augment_edge = Seq.upd at u*n+v
+        lemma_augment_edge_fwd _fs cap_seq (SZ.v n) (SZ.v u) (SZ.v vc) bn;
         A.op_Array_Assignment flow idx_fwd (flow_fwd + bn);
         current := u
       }
       else
       {
         let flow_bwd: int = A.op_Array_Access flow idx_bwd;
+        // residual_capacity <= 0 → augment_edge = Seq.upd at v*n+u
+        lemma_augment_edge_bwd _fs cap_seq (SZ.v n) (SZ.v u) (SZ.v vc) bn;
         A.op_Array_Assignment flow idx_bwd (flow_bwd - bn);
         current := u
       }
@@ -2382,6 +2577,10 @@ fn augment_imp
       current := source
     }
   };
+  // At loop exit: vc = source
+  // AVP(flow_seq, ..., source, ..., n) = flow_seq (by definition, current = source)
+  // Wait no: AVP(spred, fs, ..., source, bn, n) = fs
+  // So: AVP(flow_seq, ..., sink, ..., n) = fs = flow_seq'
   ()
 }
 #pop-options
@@ -2932,9 +3131,19 @@ fn max_flow
 
     if found
     {
-      let bn = find_bottleneck_imp capacity flow pred n source sink;
+      // Bind ghost witnesses from bfs_residual to pass to find_bottleneck_imp
+      with _scolor' _spred' _sdist' _squeue'. assert (
+        A.pts_to color _scolor' **
+        A.pts_to pred _spred' **
+        A.pts_to dist _sdist' **
+        A.pts_to queue _squeue'
+      );
+      with _flow_s. assert (A.pts_to flow _flow_s);
+      let bn = find_bottleneck_imp capacity flow pred n source sink
+        #cap_seq #_flow_s #_spred' #_scolor' #_sdist';
       if (bn > 0) {
-        augment_imp capacity flow pred n source sink bn;
+        augment_imp capacity flow pred n source sink bn
+          #cap_seq #_flow_s #_spred' #_scolor' #_sdist';
         // Runtime validity check: verify augmentation preserved imp_valid_flow
         let valid = check_imp_valid_flow_fn flow capacity n source sink;
         if valid {
