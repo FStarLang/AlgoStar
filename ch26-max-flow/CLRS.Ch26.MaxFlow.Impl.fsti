@@ -73,11 +73,10 @@ fn check_valid_caps_fn
     Termination: proved without fuel. Each augmentation increases flow_value by ≥1,
     bounded by cap_sum = Σ cap[source][v]. Loop terminates in at most cap_sum + 1 iterations.
     
-    Returns completed = true when BFS found no augmenting path (natural termination).
-    
     Postcondition:
-    - Always: imp_valid_flow on the resulting flow array
-    - When completed: additionally no_augmenting_path, enabling the MFMC theorem *)
+    - imp_valid_flow on the resulting flow array
+    - no_augmenting_path: no residual source→sink path exists (max flow achieved)
+    - Combined with bridge lemma → enables the MFMC theorem *)
 //SNIPPET_START: max_flow_sig
 fn max_flow
   (capacity: A.array int)
@@ -112,6 +111,6 @@ fn max_flow
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      (completed ==> no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
+      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink)
     )
 //SNIPPET_END: max_flow_sig

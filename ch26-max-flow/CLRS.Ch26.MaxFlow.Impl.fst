@@ -3106,7 +3106,7 @@ fn max_flow
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      (completed ==> no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
+      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink)
     )
 {
   let nn: SZ.t = n *^ n;
@@ -3136,19 +3136,12 @@ fn max_flow
   let mut continue_loop: bool = true;
   let mut iters: int = 0;
   let mut flow_val: int = 0;
-  let mut is_completed: bool = false;
 
-  (* Termination argument (CLRS §26.2):
-     Each augmentation strictly increases the flow value by ≥1 (integer capacities).
-     The maximum flow value is bounded by cap_sum = Σ cap[source][v].
-     So at most cap_sum augmentations + 1 final BFS = cap_sum + 1 iterations.
-     The decreasing measure cap_sum + 1 - iters is always >= 0 and decreases by 1. *)
   while (!continue_loop)
-  invariant exists* cont itr fv flow_s sc sp sd sq completed_v.
+  invariant exists* cont itr fv flow_s sc sp sd sq.
     R.pts_to continue_loop cont **
     R.pts_to iters itr **
     R.pts_to flow_val fv **
-    R.pts_to is_completed completed_v **
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_s **
     A.pts_to color sc **
@@ -3164,15 +3157,13 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n) /\
       imp_valid_flow flow_s cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      // Flow value tracking for termination
       fv == imp_flow_value flow_s (SZ.v n) (SZ.v source) /\
       fv <= cap_sum /\
       itr >= 0 /\
-      // When continuing, iteration count is bounded by flow value
       (cont ==> itr <= fv) /\
       (cont ==> fv >= 0) /\
-      (cont ==> completed_v == false) /\
-      (completed_v ==> no_augmenting_path #(SZ.v n) cap_seq flow_s (SZ.v source) (SZ.v sink))
+      // When loop exits (cont = false): no augmenting path
+      (not cont ==> no_augmenting_path #(SZ.v n) cap_seq flow_s (SZ.v source) (SZ.v sink))
     )
   decreases (cap_sum + 1 - !iters)
   {
@@ -3182,7 +3173,7 @@ fn max_flow
 
     if found
     {
-      // Bind ghost witnesses from bfs_residual to pass to find_bottleneck_imp
+      // Bind ghost witnesses from bfs_residual
       with _scolor' _spred' _sdist' _squeue'. assert (
         A.pts_to color _scolor' **
         A.pts_to pred _spred' **
@@ -3190,66 +3181,37 @@ fn max_flow
         A.pts_to queue _squeue'
       );
       with _flow_s. assert (A.pts_to flow _flow_s);
+      // find_bottleneck_imp: proven bn > 0 and bn == bottleneck_via_pred
       let bn = find_bottleneck_imp capacity flow pred n source sink
         #cap_seq #_flow_s #_spred' #_scolor' #_sdist';
-      if (bn > 0) {
-        augment_imp capacity flow pred n source sink bn
-          #cap_seq #_flow_s #_spred' #_scolor' #_sdist';
-        // Runtime validity check: verify augmentation preserved imp_valid_flow
-        let valid = check_imp_valid_flow_fn flow capacity n source sink;
-        if valid {
-          // Compute new flow value to check progress
-          let new_fv = compute_flow_value_fn flow n source;
-          let old_fv = !flow_val;
-          if (new_fv > old_fv) {
-            // Flow value increased: update tracker and continue
-            flow_val := new_fv;
-            // Prove new flow_value <= cap_sum from imp_valid_flow
-            with flow_s'. assert (A.pts_to flow flow_s');
-            lemma_flow_value_le_cap_sum flow_s' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
-            // Help SMT: old_fv >= itr (from invariant entry), new_fv > old_fv => new_fv >= itr + 1
-            assert (pure (new_fv == imp_flow_value flow_s' (SZ.v n) (SZ.v source)));
-            assert (pure (imp_flow_value flow_s' (SZ.v n) (SZ.v source) <= cap_sum));
-            ()
-          } else {
-            // Flow value didn't increase — shouldn't happen, exit gracefully
-            flow_val := new_fv;
-            with flow_s'. assert (A.pts_to flow flow_s');
-            lemma_flow_value_le_cap_sum flow_s' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
-            continue_loop := false
-          }
-        } else {
-          // Validity check failed — re-zero flow and exit
-          zero_init_flow flow nn;
-          with flow_re. assert (A.pts_to flow flow_re);
-          lemma_zero_flow_imp_valid flow_re cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
-          lemma_zero_flow_value flow_re (SZ.v n) (SZ.v source);
-          flow_val := 0;
-          continue_loop := false
-        }
-      } else {
-        continue_loop := false
-      }
+      // augment_imp: proven flow' == augment_via_pred
+      augment_imp capacity flow pred n source sink bn
+        #cap_seq #_flow_s #_spred' #_scolor' #_sdist';
+      // Chain: imp_valid_flow preserved, flow value increases
+      lemma_augment_chain _scolor' _spred' _sdist' cap_seq _flow_s
+        (SZ.v n) (SZ.v source) (SZ.v sink) bn;
+      // Get augmented flow and update flow_val
+      with flow_s'. assert (A.pts_to flow flow_s');
+      lemma_flow_value_le_cap_sum flow_s' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
+      let new_fv = compute_flow_value_fn flow n source;
+      flow_val := new_fv;
+      ()
     }
     else
     {
       // BFS found no augmenting path — we have the max flow
-      // Use BFS completeness to establish no_augmenting_path
       with flow_s. assert (A.pts_to flow flow_s);
       with sc. assert (A.pts_to color sc);
       lemma_bfs_complete cap_seq flow_s sc (SZ.v n) (SZ.v source) (SZ.v sink);
-      is_completed := true;
       continue_loop := false
     }
   };
-
-  let result = !is_completed;
 
   // Cleanup BFS workspace
   A.free color;
   A.free pred;
   A.free dist;
   A.free queue;
-  result
+  true
 }
 #pop-options
