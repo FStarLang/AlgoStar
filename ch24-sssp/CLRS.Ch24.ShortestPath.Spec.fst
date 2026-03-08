@@ -91,6 +91,13 @@ let weights_in_range (weights: Seq.seq int) (n: nat) : prop =
      (n > 1 /\ w * (n - 1) < inf /\ w * (n - 1) > -inf)))
 //SNIPPET_END: weights_in_range
 
+//SNIPPET_START: all_weights_non_negative
+(* All weights are non-negative: every entry is either inf (no edge) or ≥ 0. *)
+let all_weights_non_negative (weights: Seq.seq int) : prop =
+  forall (i: nat). i < Seq.length weights ==>
+    Seq.index weights i >= 0
+//SNIPPET_END: all_weights_non_negative
+
 //SNIPPET_START: reachable
 (* A vertex v is reachable from s in a graph with n vertices and given weights
    if there exists a valid simple path from s to v using only existing edges. *)
@@ -715,8 +722,7 @@ let rec path_snoc_edges_exist (p: path) (v: nat) (weights: Seq.seq int) (n: nat)
 let rec path_weight_nonneg (p: path) (weights: Seq.seq int) (n: nat)
   : Lemma
     (requires path_all_edges_exist p weights n /\
-              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
-                Seq.index weights (i * n + j) >= 0))
+              all_weights_non_negative weights)
     (ensures path_weight p weights n >= 0)
     (decreases length p)
   = match p with
@@ -743,8 +749,7 @@ let rec sp_dist_k_le_path_weight_exact
               path_source p == s /\ path_dest p == v /\
               path_edges p == k /\
               path_valid p n /\ path_all_edges_exist p weights n /\
-              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
-                Seq.index weights (i * n + j) >= 0))
+              all_weights_non_negative weights)
     (ensures sp_dist_k weights n s v k <= path_weight p weights n)
     (decreases k)
   = if k = 0 then ()
@@ -779,8 +784,7 @@ let sp_dist_k_optimal
               path_source p == s /\ path_dest p == v /\
               path_edges p <= k /\
               path_valid p n /\ path_all_edges_exist p weights n /\
-              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
-                Seq.index weights (i * n + j) >= 0))
+              all_weights_non_negative weights)
     (ensures sp_dist_k weights n s v k <= path_weight p weights n)
   = sp_dist_k_le_path_weight_exact weights n s v (path_edges p) p;
     sp_dist_k_monotone_le weights n s v (path_edges p) k
@@ -794,8 +798,7 @@ let sp_dist_optimal
               path_source p == s /\ path_dest p == v /\
               path_edges p <= n - 1 /\
               path_valid p n /\ path_all_edges_exist p weights n /\
-              (forall (i j: nat). i < n /\ j < n /\ i * n + j < Seq.length weights ==>
-                Seq.index weights (i * n + j) >= 0))
+              all_weights_non_negative weights)
     (ensures sp_dist weights n s v <= path_weight p weights n)
   = sp_dist_k_optimal weights n s v (n - 1) p
 //SNIPPET_END: sp_dist_optimal
@@ -911,8 +914,7 @@ let rec path_weight_bounded_strong
       path_valid p n /\
       path_all_edges_exist p weights n /\
       path_edges p <= n - 1 /\
-      (forall (i: nat). i < Seq.length weights ==>
-        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+      all_weights_non_negative weights)
     (ensures
       0 <= path_weight p weights n /\
       (path_edges p == 0 ==> path_weight p weights n == 0) /\
@@ -956,8 +958,7 @@ let path_weight_bounded
       path_valid p n /\
       path_all_edges_exist p weights n /\
       path_edges p <= n - 1 /\
-      (forall (i: nat). i < Seq.length weights ==>
-        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+      all_weights_non_negative weights)
     (ensures 0 <= path_weight p weights n /\ path_weight p weights n < inf)
   = if n = 1
     then begin
@@ -996,8 +997,7 @@ let sp_dist_faithful
       path_source p == s /\ path_dest p == v /\
       path_edges p <= n - 1 /\
       path_valid p n /\ path_all_edges_exist p weights n /\
-      (forall (i: nat). i < Seq.length weights ==>
-        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+      all_weights_non_negative weights)
     (ensures sp_dist weights n s v < inf)
   = path_weight_bounded p weights n;
     sp_dist_optimal weights n s v p
@@ -1016,8 +1016,7 @@ let reachable_implies_sp_dist_finite
     (requires
       reachable weights n s v /\
       weights_in_range weights n /\
-      (forall (i: nat). i < Seq.length weights ==>
-        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+      all_weights_non_negative weights)
     (ensures sp_dist weights n s v < inf)
   = eliminate exists (p: path).
       path_source p == s /\ path_dest p == v /\
@@ -1048,8 +1047,7 @@ let not_reachable_implies_sp_dist_inf
     (requires
       n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
       weights_in_range weights n /\
-      (forall (i: nat). i < Seq.length weights ==>
-        Seq.index weights i == inf \/ Seq.index weights i >= 0) /\
+      all_weights_non_negative weights /\
       ~(reachable weights n s v))
     (ensures sp_dist weights n s v == inf)
   = if sp_dist weights n s v < inf
