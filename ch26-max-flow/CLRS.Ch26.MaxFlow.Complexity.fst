@@ -49,6 +49,7 @@ irreducible let shortest_path_distance
   : distance
   = if source = v then 0 else n
 
+//SNIPPET_START: complexity_assume_vals
 (** AXIOM: Distance from source to itself is always 0.
     Pending full BFS correctness proof (see task P3.1). *)
 assume val axiom_spd_source_zero
@@ -346,6 +347,7 @@ assume val axiom_edge_critical_bound
   (trace: augmentation_trace n)
   (u v: nat{u < n /\ v < n})
   : Lemma (criticality_count cap trace u v <= n / 2)
+//SNIPPET_END: complexity_assume_vals
 
 (** Upper bound on number of augmentations: O(VE)
     - Number of edges: at most V² (but typically E where E ≤ V²)
@@ -367,6 +369,7 @@ let lemma_max_augmentations_justified
   : Lemma (num_edges * (num_vertices / 2) <= max_augmentations num_vertices num_edges)
   = assert (num_vertices / 2 <= num_vertices)
 
+//SNIPPET_START: edmonds_karp_complexity
 (** Theorem 26.8 (CLRS): Edmonds-Karp runs in O(VE²) time *)
 let edmonds_karp_complexity
   (#n: nat)
@@ -398,6 +401,7 @@ let edmonds_karp_complexity
     
     // Multiplicative constant is 2, so total is O(VE²) ✓
     ()
+//SNIPPET_END: edmonds_karp_complexity
 
 (** Corollary: For dense graphs where E = Θ(V²), complexity is O(V⁵) *)
 let edmonds_karp_dense_graph_complexity

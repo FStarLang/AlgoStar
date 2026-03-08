@@ -4,11 +4,12 @@
 Number Theory: GCD & Modular Exponentiation
 ###############################################
 
-This chapter covers three algorithms from CLRS Chapter 31: Euclid's
-GCD algorithm (§31.2), the Extended Euclidean algorithm (§31.2), and
-modular exponentiation by repeated squaring (§31.6). All three are
-fully verified with **zero admits, assumes, or assume_ calls**. For
-each algorithm we prove:
+This chapter covers four algorithms from CLRS Chapter 31: Euclid's
+GCD algorithm (§31.2), the Extended Euclidean algorithm (§31.2),
+right-to-left modular exponentiation (Exercise 31.6-2), and
+left-to-right modular exponentiation (§31.6). All four are fully
+verified with **zero admits, assumes, or assume_ calls**. For each
+algorithm we prove:
 
 1. Functional correctness against a pure recursive specification.
 2. Key mathematical properties (Bézout's identity, divisibility).
@@ -28,7 +29,7 @@ Specification
 The pure recursive specification follows the textbook definition
 directly:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: gcd_spec
    :end-before: //SNIPPET_END: gcd_spec
@@ -43,14 +44,16 @@ Correctness Theorem
 
 The Pulse implementation iterates the same recurrence in a while loop:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: gcd_impl_sig
    :end-before: //SNIPPET_END: gcd_impl_sig
 
 Reading this signature: given two machine-sized integers ``a_init``
 and ``b_init`` with at least one positive, the function returns a
-value equal to ``gcd_spec (SZ.v a_init) (SZ.v b_init)``.
+value equal to ``gcd_spec (SZ.v a_init) (SZ.v b_init)``. The ghost
+counter ``ctr`` tracks the exact step count (``gcd_steps``) and
+satisfies the O(log b) upper bound ``2·num_bits(b) + 1``.
 
 Loop Invariant
 ~~~~~~~~~~~~~~
@@ -58,7 +61,7 @@ Loop Invariant
 The while loop maintains the GCD invariant — the GCD of the current
 pair equals the GCD of the original inputs:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: gcd_loop
    :end-before: //SNIPPET_END: gcd_loop
@@ -83,7 +86,7 @@ The cost model counts one ghost tick per mod operation.
 
 The step count and bit-width functions:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: gcd_steps
    :end-before: //SNIPPET_END: gcd_steps
@@ -102,17 +105,12 @@ the new second argument is at most half of the original ``b``, so
 ``num_bits`` decreases by at least one. This gives the bound
 ``gcd_steps a b ≤ 2 * num_bits(b) + 1``.
 
-The complexity-bounded predicate and instrumented signature:
+The complexity-bounded predicate:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: gcd_complexity_bounded
    :end-before: //SNIPPET_END: gcd_complexity_bounded
-
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: gcd_complexity_sig
-   :end-before: //SNIPPET_END: gcd_complexity_sig
 
 The Pulse implementation threads a ``GhostReference.ref nat`` counter,
 calling ``tick`` once per loop iteration. The loop invariant tracks
@@ -132,7 +130,7 @@ a pure recursive function in F* (no Pulse).
 Algorithm
 ~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: extended_gcd
    :end-before: //SNIPPET_END: extended_gcd
@@ -148,7 +146,7 @@ Bézout's Identity
 The central theorem is that the returned coefficients satisfy
 Bézout's identity:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: bezout_identity
    :end-before: //SNIPPET_END: bezout_identity
@@ -165,7 +163,7 @@ Complete Specification
 
 All four properties are packaged into a single correctness theorem:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: extended_gcd_correctness
    :end-before: //SNIPPET_END: extended_gcd_correctness
@@ -177,17 +175,30 @@ common divisor of ``a`` and ``b`` divides ``d`` (maximality). Property
 divides any linear combination ``a*x + b*y = d``, so ``c | d``. The
 divisibility lemmas come from ``FStar.Math.Euclid``.
 
-Modular Exponentiation
-======================
+Complexity
+~~~~~~~~~~
 
-CLRS §31.6 presents modular exponentiation by repeated squaring,
-computing ``b^e mod m`` in O(log e) squarings. Our formalization
-provides a pure specification and a Pulse implementation.
+The extended GCD has the same recursion structure as ``gcd_spec``:
+both recurse on ``(b, a%b)`` with base case ``b=0``. Therefore
+``gcd_steps`` counts the calls and the O(log b) bound applies:
+
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Complexity.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: extended_gcd_complexity
+   :end-before: //SNIPPET_END: extended_gcd_complexity
+
+Modular Exponentiation (Right-to-Left)
+======================================
+
+CLRS Exercise 31.6-2 presents right-to-left modular exponentiation
+by repeated squaring, computing ``b^e mod m`` in O(log e) squarings.
+Our formalization provides a pure specification and a Pulse
+implementation.
 
 Specification
 ~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: mod_exp_spec
    :end-before: //SNIPPET_END: mod_exp_spec
@@ -200,7 +211,7 @@ Step Lemma
 
 The key proof obligation for each loop iteration is captured by:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: mod_exp_step
    :end-before: //SNIPPET_END: mod_exp_step
@@ -216,7 +227,7 @@ exponent).
 Correctness Theorem
 ~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: mod_exp_impl_sig
    :end-before: //SNIPPET_END: mod_exp_impl_sig
@@ -227,7 +238,7 @@ The implementation takes a base, exponent, and modulus (with
 Loop Invariant
 ~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: mod_exp_loop
    :end-before: //SNIPPET_END: mod_exp_loop
@@ -248,21 +259,30 @@ Complexity
 The complexity module proves an O(log e) bound on the number of
 squaring operations:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Complexity.fst
+.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: modexp_complexity_bounded
    :end-before: //SNIPPET_END: modexp_complexity_bounded
-
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Complexity.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: mod_exp_complexity_sig
-   :end-before: //SNIPPET_END: mod_exp_complexity_sig
 
 The bound ``log2f(e) + 1`` counts the number of times the exponent
 can be halved before reaching zero. The loop invariant tracks
 ``(vc - c0) + log2f(ve) ≤ log2f(e_init)`` when ``ve > 0``: each
 tick increases ``vc - c0`` by one while ``log2f(ve)`` decreases by
 at least one (via ``lemma_log2f_halve_le``), keeping the sum bounded.
+
+Modular Exponentiation (Left-to-Right)
+======================================
+
+CLRS §31.6 presents the primary MODULAR-EXPONENTIATION algorithm,
+scanning bits from MSB to LSB (left-to-right). The algorithm maintains
+``d = b^c mod m`` where ``c`` is the prefix of the binary
+representation of ``e`` processed so far. At each step, square ``d``
+(doubling ``c``) and optionally multiply by ``b`` (incrementing ``c``
+by 1 if the current bit is 1).
+
+The Pulse implementation is in ``ModExpLR.Impl.fst`` with complexity
+bound ``num_bits(e)`` (equivalent to ⌊log₂(e)⌋ + 1). Both the
+correctness and complexity are fully proven with zero admits.
 
 Proof Techniques Summary
 =========================
@@ -293,3 +313,57 @@ This chapter demonstrates several techniques:
    mutable state, no Pulse. This is appropriate when the algorithm
    is naturally recursive and the proof obligations are algebraic
    rather than involving heap reasoning.
+
+Verification Status Summary
+============================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 20
+
+   * - Module
+     - Type
+     - Admits / Assumes
+   * - GCD.Spec
+     - Pure spec
+     - **0** ✅
+   * - GCD.Impl
+     - Pulse impl
+     - **0** ✅
+   * - GCD.Complexity
+     - Pure proof
+     - **0** ✅
+   * - ExtendedGCD.Spec
+     - Pure spec
+     - **0** ✅
+   * - ExtendedGCD.Lemmas
+     - Pure proof
+     - **0** ✅
+   * - ExtendedGCD.Complexity
+     - Pure proof
+     - **0** ✅
+   * - ModExp.Spec
+     - Pure spec
+     - **0** ✅
+   * - ModExp.Impl
+     - Pulse impl
+     - **0** ✅
+   * - ModExp.Lemmas
+     - Pure proof
+     - **0** ✅
+   * - ModExp.Complexity
+     - Pure proof
+     - **0** ✅
+   * - ModExpLR.Impl
+     - Pulse impl
+     - **0** ✅
+   * - ModExpLR.Lemmas
+     - Pure proof
+     - **0** ✅
+   * - ModExpLR.Complexity
+     - Pure proof
+     - **0** ✅
+
+All four number-theoretic algorithms are fully verified with zero
+admits in their implementations, specifications, and complexity
+analyses ✅.

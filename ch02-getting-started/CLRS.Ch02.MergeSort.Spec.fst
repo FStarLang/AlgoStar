@@ -35,9 +35,11 @@ let all_ge (v: int) (s: Seq.seq int) : prop =
 /// Comparison cost bound: 0 for trivial inputs, merge_sort_ops for n >= 1
 let ms_cost (len: int) : nat = if len <= 0 then 0 else merge_sort_ops len
 
+//SNIPPET_START: merge_sort_complexity_defs
 /// Complexity bound predicates (avoids BoundedIntegers issues in Pulse ensures)
 let merge_complexity_bounded (cf c0: nat) (lo hi: nat) : prop =
   lo <= hi /\ cf >= c0 /\ cf - c0 <= hi - lo
 
 let sort_complexity_bounded (cf c0: nat) (lo hi: nat) : prop =
   lo <= hi /\ cf >= c0 /\ cf - c0 <= ms_cost (hi - lo)
+//SNIPPET_END: merge_sort_complexity_defs

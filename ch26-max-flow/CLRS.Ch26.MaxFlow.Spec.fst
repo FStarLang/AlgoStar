@@ -51,6 +51,7 @@ let rec sum_flow_out (flow: Seq.seq int) (n: nat{Seq.length flow == n * n}) (v: 
     else if w - 1 < n then get flow n v (w - 1) + sum_flow_out flow n v (w - 1)
     else sum_flow_out flow n v (w - 1)
 
+//SNIPPET_START: valid_flow
 (** 4. Valid flow: satisfies capacity constraint and flow conservation (CLRS Definition 26.1) *)
 let valid_flow (#n: nat) (flow: flow_matrix n) (cap: capacity_matrix n) (source: nat{source < n}) (sink: nat{sink < n}) : prop =
   // Capacity constraint: 0 ≤ f(u,v) ≤ c(u,v) for all u,v
@@ -59,6 +60,7 @@ let valid_flow (#n: nat) (flow: flow_matrix n) (cap: capacity_matrix n) (source:
   // Flow conservation: Σ f(v,u) = Σ f(u,v) for all u ≠ source, sink
   (forall (u: nat{u < n /\ u <> source /\ u <> sink}).
     sum_flow_into flow n u n == sum_flow_out flow n u n)
+//SNIPPET_END: valid_flow
 
 (** 5. Flow value: |f| = Σ_v f(source,v) - Σ_v f(v,source) (CLRS page 710) *)
 let flow_value (flow: Seq.seq int) (n: nat{Seq.length flow == n * n}) (source: nat{source < n}) : int =
@@ -342,6 +344,7 @@ let rec net_flow_aux (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
 let net_flow_across_cut (#n: nat) (flow: flow_matrix n) (s_set: nat -> bool) : int =
   net_flow_aux flow n s_set n
 
+//SNIPPET_START: no_augmenting_path
 (** No augmenting path exists: every source-to-sink path has bottleneck ≤ 0.
     This is the key precondition of the max-flow min-cut theorem (CLRS Theorem 26.6). *)
 let no_augmenting_path (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
@@ -350,3 +353,4 @@ let no_augmenting_path (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
     Cons? path /\ L.hd path = source /\ L.last path = sink /\
     (forall (v: nat). L.mem v path ==> v < n) ==>
     bottleneck cap flow n path <= 0
+//SNIPPET_END: no_augmenting_path

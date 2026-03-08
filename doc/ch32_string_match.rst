@@ -10,10 +10,8 @@ the Knuth-Morris-Pratt algorithm (§32.4). Each algorithm is
 implemented in Pulse and verified against a common specification:
 count the number of positions where a pattern matches the text.
 
-The naive algorithm and Rabin-Karp are **fully verified with 0
-admits** in both their implementations and specifications. KMP is
-**fully verified with 0 admits** in both the implementation and the
-amortized O(n+m) complexity analysis ✅.
+All three algorithms are **fully verified with 0 admits** in
+their implementations, specifications, and complexity analyses ✅.
 
 Naive String Matching
 =====================
@@ -28,7 +26,7 @@ Specification
 
 The core predicate defines when a pattern matches at a given offset:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.NaiveStringMatch.fst
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.NaiveStringMatch.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: matches_at_spec
    :end-before: //SNIPPET_END: matches_at_spec
@@ -52,12 +50,23 @@ The postcondition guarantees that the returned count equals
 valid shifts where the pattern matches. The implementation has
 **0 admits and 0 assume_ calls**.
 
+Note: There is no separate ``Impl.fsti`` — the function is defined
+directly in ``NaiveStringMatch.fst``.
+
+Strongest Guarantee
+~~~~~~~~~~~~~~~~~~~
+
+The postcondition provides the exact match count (not just
+"found a match"), which is the strongest possible guarantee
+for a counting algorithm. The complexity bound ``(n-m+1)·m``
+is tight: it counts one ghost tick per character comparison.
+
 Complexity
 ~~~~~~~~~~
 
-The complexity bound is proved in a pure F* module:
+The complexity bound is defined in a pure F* module:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.NaiveStringMatch.Complexity.fst
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.NaiveStringMatch.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bound_naive
    :end-before: //SNIPPET_END: complexity_bound_naive
@@ -72,7 +81,7 @@ Rabin-Karp
 CLRS §32.2 presents Rabin-Karp, which uses a rolling hash to
 filter candidate positions before performing character-by-character
 verification. Our formalization covers the hash function, rolling
-update, and the matching algorithm.
+update, and the matching algorithm in both pure F* and Pulse.
 
 Hash Specification
 ~~~~~~~~~~~~~~~~~~
@@ -90,16 +99,30 @@ previous one in O(1):
 The key proof insight, adapted from
 ``FStar/examples/algorithms/StringMatching.fst``, is the
 ``hash_inversion`` lemma which extracts the most-significant digit
-from the hash.  This enables proving ``rolling_hash_step_correct``
-(that the imperative rolling hash step produces the correct hash
-for the next window) and ``hash_slice_lemma`` (that equal
-substrings produce equal hashes, for the no-false-negatives
-direction):
+(leftmost character) from the hash. This enables proving
+``rolling_hash_step_correct`` (that the imperative rolling hash
+step produces the correct hash for the next window) and
+``hash_slice_lemma`` (that equal substrings produce equal hashes,
+for the no-false-negatives direction):
 
 .. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: rolling_hash_step_correct
    :end-before: //SNIPPET_END: rolling_hash_step_correct
+
+Pure Algorithm
+~~~~~~~~~~~~~~
+
+The pure Rabin-Karp implementation scans the text with a rolling hash,
+verifying character-by-character on hash matches:
+
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: rabin_karp
+   :end-before: //SNIPPET_END: rabin_karp
+
+Correctness
+~~~~~~~~~~~
 
 The main correctness theorem combines no-false-positives (every
 returned position is a valid match) and no-false-negatives (every
@@ -132,16 +155,26 @@ property as the naive algorithm. The implementation module
 Complexity
 ~~~~~~~~~~
 
-The complexity analysis is done in a pure F* module:
+The complexity analysis distinguishes best and worst cases:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Complexity.fst
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: rk_complexity
    :end-before: //SNIPPET_END: rk_complexity
 
 The best case is O(n+m) when no spurious hash matches occur. The
-worst case is O(nm) when all hash values collide. The complexity
-module has **0 admits**.
+worst case is O(nm) when all hash values collide. Both bounds are
+proven; the expected-case analysis (O(n+m) depending on hash quality
+and prime choice) is not formalized. The complexity module has
+**0 admits**.
+
+Limitations
+~~~~~~~~~~~
+
+- **Pure implementation**: The core Rabin-Karp specification and
+  correctness proofs are in pure F*, not Pulse.
+- **Expected-case not formalized**: Only the worst-case O(nm) bound
+  is formally proven. The expected O(n+m) depends on hash quality.
 
 Knuth-Morris-Pratt
 ==================
@@ -159,12 +192,12 @@ Prefix Function Specification
 The prefix function π captures the longest proper prefix of the
 pattern that is also a suffix at each position:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.fst
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
    :language: fstar
    :start-after: //SNIPPET_START: is_prefix_suffix
    :end-before: //SNIPPET_END: is_prefix_suffix
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.fst
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
    :language: fstar
    :start-after: //SNIPPET_START: pi_correct
    :end-before: //SNIPPET_END: pi_correct
@@ -172,7 +205,8 @@ pattern that is also a suffix at each position:
 ``pi_correct pattern pi`` asserts that for every position *q* in
 the pattern, ``pi[q]`` gives a valid prefix-suffix length — the
 prefix of length ``pi[q]`` matches the suffix ending at position
-*q*.
+*q*. Maximality (``pi[q]`` is the *longest* such prefix-suffix)
+is proven separately in ``Bridge.pi_max_sz``.
 
 Prefix Function Implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -185,8 +219,9 @@ CLRS Compute-Prefix-Function:
    :start-after: //SNIPPET_START: compute_prefix_function_sig
    :end-before: //SNIPPET_END: compute_prefix_function_sig
 
-The postcondition guarantees that the output satisfies
-``pi_correct``. The implementation has **0 admits**.
+The postcondition guarantees that the output satisfies both
+``pi_correct`` (validity) and ``Bridge.pi_max_sz`` (maximality).
+The implementation has **0 admits**.
 
 KMP Matcher
 ~~~~~~~~~~~
@@ -199,36 +234,45 @@ backtracking in the text:
    :start-after: //SNIPPET_START: kmp_matcher_sig
    :end-before: //SNIPPET_END: kmp_matcher_sig
 
-The implementation has **0 admits and 0 assume_ calls**.
+The postcondition guarantees the returned count equals
+``Spec.count_matches_spec``, with the matcher complexity bound
+``cf - c0 ≤ 2·n``. The implementation has **0 admits and 0
+assume_ calls**.
 
-A separate module (``KMP.StrengthenedSpec``) provides a
-strengthened postcondition specification connecting the matcher
-result to the ``matches_at`` predicate, also with **0 admits**.
+Completeness is proven via the bridge from the Pulse
+``pi_correct``/``pi_max_sz`` to the pure specification's
+``Spec.pi_max``, and through ``Spec.kmp_count_step`` which
+shows each KMP step correctly updates the match count.
 
 Complexity
 ~~~~~~~~~~
 
 The amortized complexity analysis proves the O(n+m) bound:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.Complexity.fst
+.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
    :language: fstar
    :start-after: //SNIPPET_START: kmp_total_complexity
    :end-before: //SNIPPET_END: kmp_total_complexity
 
 The bound states that the total number of character comparisons
 across both the prefix-function computation and the matching phase
-is at most 2n + 2m. This follows the standard amortized argument:
-each comparison either advances the text pointer or decreases the
-match length, and each can happen at most O(n) times.
+is at most 2n + 2m. This is an **exact** bound, not just asymptotic.
+
+The proof follows the standard amortized argument with potential
+functions:
+
+- **Prefix computation**: potential Φ = k (current match length).
+  Each comparison either advances ``q`` (potential unchanged, no
+  tick) or decreases ``k`` (tick +1, potential −1, net ≤ 0).
+  Bound: ``vc - c0 + k ≤ 2·(q - 1)``.
+
+- **Matching**: potential Φ = q (current match position in pattern).
+  Each comparison either advances the text pointer (potential
+  unchanged or increases by 1) or decreases the match length
+  (tick +1, potential decrease ≥ 1, net ≤ 0).
+  Bound: ``vc - c0 + q ≤ 2·i``.
 
 The complexity module is **fully verified with 0 admits** ✅.
-The proof restructures inner loops to only ``tick`` for actual
-failure-chain follows (not exit iterations), tightening invariants
-to exact amortized potential bounds: ``vc - c0 + k ≤ 2*(q - 1)``
-for prefix computation and ``vc - c0 + q ≤ 2*i`` for matching.
-The amortized sum (comparisons + potential) never increases during
-inner loops (tick +1, potential decrease ≥1 → net ≤ 0), making all
-obligations trivially provable by Z3.
 
 Verification Status Summary
 ============================
@@ -242,28 +286,43 @@ Verification Status Summary
      - Admits / Assumes
    * - NaiveStringMatch
      - Pulse impl
-     - 0
+     - **0** ✅
+   * - NaiveStringMatch.Spec
+     - Pure spec
+     - **0** ✅
+   * - NaiveStringMatch.Lemmas
+     - Pure proof
+     - **0** ✅
    * - NaiveStringMatch.Complexity
      - Pure proof
-     - 0
-   * - KMP
-     - Pulse impl
-     - 0
-   * - KMP.StrengthenedSpec
-     - Pure spec
-     - 0
-   * - KMP.Complexity
+     - **0** ✅
+   * - RabinKarp.Spec
+     - Pure spec + proofs
+     - **0** ✅
+   * - RabinKarp.Lemmas
      - Pure proof
      - **0** ✅
    * - RabinKarp
      - Pulse impl
-     - 0
-   * - RabinKarp.Spec
-     - Pure spec
-     - 0
+     - **0** ✅
    * - RabinKarp.Complexity
      - Pure proof
-     - 0
+     - **0** ✅
+   * - KMP.PureDefs
+     - Pure spec
+     - **0** ✅
+   * - KMP.Spec
+     - Pure completeness
+     - **0** ✅
+   * - KMP.Bridge
+     - Bridging lemmas
+     - **0** ✅
+   * - KMP
+     - Pulse impl
+     - **0** ✅
+   * - KMP.Test
+     - Test
+     - **0** ✅
 
 All three string-matching implementations (naive, Rabin-Karp, KMP)
 are fully verified with 0 admits in their Pulse code, specifications,

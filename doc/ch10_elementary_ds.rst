@@ -76,7 +76,7 @@ delete-first-occurrence on plain F* lists:
    :start-after: //SNIPPET_START: list_spec
    :end-before: //SNIPPET_END: list_spec
 
-A separate module ``CLRS.Ch10.LinkedList.Spec`` proves additional
+A separate module ``CLRS.Ch10.SinglyLinkedList.Spec`` proves additional
 properties including: insert makes the element searchable, delete of a
 unique element removes it, and insert-then-delete is the identity.
 
@@ -89,7 +89,7 @@ index. Our Pulse implementation follows this design exactly.
 Data Structure and Invariant
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.fsti
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: stack_type
    :end-before: //SNIPPET_END: stack_type
@@ -100,7 +100,7 @@ underlying vector and the top-pointer box, and requires that the
 first ``top`` elements of the array match the logical list
 element-by-element:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.fsti
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: stack_inv
    :end-before: //SNIPPET_END: stack_inv
@@ -112,20 +112,51 @@ All operations are specified in terms of the ghost ``contents`` list.
 ``push`` appends to the end (the top of the stack), ``pop`` removes the
 last element and returns it, and ``peek`` reads without removing:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.fsti
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: stack_ops
    :end-before: //SNIPPET_END: stack_ops
 
+**Postcondition analysis:**
+
+- ``push``: ``contents' = L.append contents [x]`` — element is added
+  at the logical end (array top).
+- ``pop``: ``L.append xs [result] == contents`` — the popped element
+  was the last element; the remaining list ``xs`` is the new contents.
+- ``peek``: ``∃init. L.append init [result] == contents`` — the result
+  is the last element without modification.
+- ``stack_empty``: ``result ⟺ length contents == 0`` — faithful
+  emptiness check.
+
+**Strongest guarantee?** Yes. The ghost list fully specifies LIFO
+behaviour. The invariant is a complete abstraction — clients reason
+purely about lists.
+
 The ``push`` implementation writes the element at position ``top`` and
 increments the index. The proof calls
 ``lemma_array_update_preserves_prefix`` to show that updating the array
-at position ``n`` (where ``n`` equals the list length) extends the
-element-by-element correspondence by one.
+at position ``n`` extends the element-by-element correspondence by one.
 
 The ``pop`` implementation reads from ``top - 1`` and decrements. The
 proof uses ``lemma_init_last_append`` to show that the popped element
 equals ``L.last contents`` and the remaining list is ``L.init contents``.
+
+**Limitations:**
+
+- **Fixed capacity**: Stack size is bounded at creation time.
+- **No complexity ghost counter**: O(1) follows from single array
+  accesses but is not mechanized.
+
+LIFO Property
+~~~~~~~~~~~~~
+
+The stack lemmas module proves the core LIFO property at the
+imperative level:
+
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Lemmas.fsti
+   :language: fstar
+   :start-after: //SNIPPET_START: stack_lifo
+   :end-before: //SNIPPET_END: stack_lifo
 
 Circular-Buffer Queue
 ======================
@@ -137,15 +168,21 @@ wrap around modulo the capacity.
 Data Structure and Invariant
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.fsti
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: queue_type
    :end-before: //SNIPPET_END: queue_type
 
+**Design note:** CLRS uses a 2-field design (head + tail) where an
+empty slot distinguishes full from empty (at most n−1 elements in an
+n-slot array). We use a 3-field design (head + tail + size) which
+allows the full capacity to be used and simplifies the full/empty
+invariant at the cost of one extra field.
+
 The invariant maps circular indices to the logical list: element ``i``
 of the list lives at array position ``(head + i) % capacity``:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.fsti
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: queue_inv
    :end-before: //SNIPPET_END: queue_inv
@@ -158,15 +195,26 @@ arithmetic lemmas (``lemma_tail_update``, ``lemma_tail_dequeue``,
 Operations
 ~~~~~~~~~~
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.fsti
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: queue_ops
    :end-before: //SNIPPET_END: queue_ops
 
+**Postcondition analysis:**
+
+- ``enqueue q x``: ``queue_inv q (append contents [x])`` — element
+  added at the logical tail.
+- ``dequeue q``: ``contents == result :: xs`` — the dequeued element
+  was the first element (FIFO).
+- ``queue_empty``: ``result ⟺ length contents == 0``.
+
+**Strongest guarantee?** Yes. The ghost list fully specifies FIFO
+behaviour. ``enqueue`` appends to the back, ``dequeue`` returns
+from the front.
+
 ``enqueue`` writes at the tail position, then advances tail with
-wraparound (``if tail + 1 >= capacity then 0 else tail + 1``).
-The proof calls ``lemma_enqueue_invariant`` to show that the
-element-by-element correspondence extends by one index without
+wraparound. The proof calls ``lemma_enqueue_invariant`` to show that
+the element-by-element correspondence extends by one index without
 disturbing existing entries — the crucial step is proving that the
 new tail index differs from all existing indices via
 ``lemma_mod_index_ne``.
@@ -175,6 +223,21 @@ new tail index differs from all existing indices via
 calls ``lemma_dequeue_invariant`` and ``lemma_mod_index_shift`` to
 show that the remaining elements at positions
 ``(new_head + i) % capacity`` correspond to ``L.tl contents``.
+
+FIFO Property
+~~~~~~~~~~~~~
+
+The queue lemmas module proves the FIFO property:
+
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Lemmas.fsti
+   :language: fstar
+   :start-after: //SNIPPET_START: queue_fifo
+   :end-before: //SNIPPET_END: queue_fifo
+
+**Limitations:**
+
+- **Fixed capacity**: No dynamic resizing.
+- **3-field design**: One extra field vs CLRS.
 
 Linked Lists
 =============
@@ -191,12 +254,12 @@ The singly-linked list uses heap-allocated boxes for nodes, with a
 recursive separation-logic predicate ``is_dlist`` that matches on the
 logical list (decreasing) to ensure termination:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.fst
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Base.fst
    :language: fstar
    :start-after: //SNIPPET_START: sll_node
    :end-before: //SNIPPET_END: sll_node
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.fst
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Base.fst
    :language: fstar
    :start-after: //SNIPPET_START: sll_is_dlist
    :end-before: //SNIPPET_END: sll_is_dlist
@@ -207,32 +270,45 @@ predicate on the tail. Ghost helper functions (``intro_is_dlist_cons``,
 ``is_dlist_case_some``, etc.) handle fold/unfold of the recursive
 predicate.
 
-LIST-INSERT inserts at the head in O(1):
+Operations
+""""""""""
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.fst
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
    :language: pulse
-   :start-after: //SNIPPET_START: sll_list_insert
-   :end-before: //SNIPPET_END: sll_list_insert
+   :start-after: //SNIPPET_START: sll_ops
+   :end-before: //SNIPPET_END: sll_ops
 
-LIST-SEARCH traverses from head, returning a boolean indicating
-membership:
+**Postcondition analysis:**
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.fst
+- ``list_insert x head``: ``is_dlist new_head (x :: 'l)`` — element
+  prepended to the logical list.
+- ``list_search head k``: ``found ⟺ L.mem k 'l`` — faithful
+  membership test.
+- ``list_delete head k``: ``is_dlist new_head (remove_first k 'l)`` —
+  first occurrence removed.
+
+LIST-INSERT inserts at the head in O(1). LIST-SEARCH traverses from
+head, returning a boolean indicating membership. LIST-DELETE removes
+the first occurrence of a key, using ``remove_first`` as the pure
+specification.
+
+Complexity (Ghost-Tick Variants)
+""""""""""""""""""""""""""""""""
+
+The implementation includes ghost-tick instrumented variants that use a
+``GhostReference.ref nat`` counter:
+
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
    :language: pulse
-   :start-after: //SNIPPET_START: sll_list_search
-   :end-before: //SNIPPET_END: sll_list_search
+   :start-after: //SNIPPET_START: sll_tick_ops
+   :end-before: //SNIPPET_END: sll_tick_ops
 
-LIST-DELETE removes the first occurrence of a key, using ``remove_first``
-as the pure specification:
+Each node visit calls ``tick`` once, and the postcondition bounds the
+counter increment:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: sll_list_delete
-   :end-before: //SNIPPET_END: sll_list_delete
-
-The delete implementation is recursive: if the head matches, it frees
-the node and returns the tail; otherwise it recurses, then updates the
-current node's ``next`` pointer to the new tail.
+- ``list_insert_tick``: exactly 1 tick (O(1)).
+- ``list_search_tick``: at most ``search_cost(n)`` ticks (O(n)).
+- ``list_delete_tick``: at most ``delete_cost(n)`` ticks (O(n)).
 
 Doubly-Linked List
 ~~~~~~~~~~~~~~~~~~~
@@ -241,43 +317,45 @@ The DLL module (``CLRS.Ch10.DLL``) uses a *doubly-linked segment*
 predicate (``dls``) that tracks both forward and backward pointers.
 Nodes carry ``key``, ``prev``, and ``next`` fields:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.fst
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: dll_node
    :end-before: //SNIPPET_END: dll_node
 
-The ``dls`` predicate is parameterized by the head box, the logical
-list, the predecessor pointer, the tail box, and the successor
-pointer. The full ``dll`` wraps ``dls`` with ``None`` as both boundary
-pointers:
+The ``dll`` predicate is parameterized by head and tail pointers and
+the logical list. Internally, ``dls`` is a recursive predicate matching
+on the list (a single-element base case plus a cons case):
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.fst
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
    :language: fstar
-   :start-after: //SNIPPET_START: dll_dls
-   :end-before: //SNIPPET_END: dll_dls
+   :start-after: //SNIPPET_START: dll_predicate
+   :end-before: //SNIPPET_END: dll_predicate
 
-The DLL operations take mutable references to head and tail pointers,
-following the CLRS interface where the list object holds pointers to
-both ends:
+Operations
+""""""""""
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.fst
+The DLL provides eight verified operations through mutable references
+to head and tail pointers:
+
+.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
    :language: pulse
-   :start-after: //SNIPPET_START: dll_list_insert
-   :end-before: //SNIPPET_END: dll_list_insert
+   :start-after: //SNIPPET_START: dll_ops
+   :end-before: //SNIPPET_END: dll_ops
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: dll_list_search
-   :end-before: //SNIPPET_END: dll_list_search
+**Postcondition analysis:**
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: dll_list_delete
-   :end-before: //SNIPPET_END: dll_list_delete
+- ``list_insert``: ``dll hd' tl' (x :: l)`` — O(1) head insertion.
+- ``list_insert_tail``: ``dll hd' tl' (l @ [x])`` — O(1) tail insertion.
+- ``list_search``: ``found ⟺ L.mem k 'l`` — O(n) linear search.
+- ``list_search_back``: Same as ``list_search`` but traverses backwards.
+- ``list_search_ptr``: Returns ``Some _`` if found, ``None`` if not.
+- ``list_delete``: ``dll hd' tl' (remove_first k l)`` — O(n).
+- ``list_delete_last``: ``dll hd' tl' (remove_last k l)`` — O(n).
+- ``list_delete_node``: ``dll hd' tl' (remove_at i l)`` — O(n) indexed.
 
-The DLL also provides ``list_delete_node`` for O(n) indexed deletion
-(given an erased index ``i < length l``, remove the element at
-position ``i``).
+**Strongest guarantee?** Yes. Each operation specifies the exact effect
+on the ghost list. The ``dll`` predicate fully abstracts the pointer
+structure. Clients need never reason about nodes or pointers.
 
 A key proof challenge in the DLL is *factoring*: the ``dls`` predicate
 must be temporarily decomposed to read or modify the head node. The
@@ -285,6 +363,11 @@ helper predicates ``dls_factored`` and ``dls_factored_next`` split the
 ownership of the head node from the tail segment, and ghost functions
 ``factor_dls``/``unfactor_dls`` perform the conversion. The
 ``dls_append`` ghost function reassembles two adjacent segments.
+
+**Limitations:**
+
+- No complexity ghost counter for DLL operations (unlike the SLL).
+- Abstract node type: clients cannot inspect node fields directly.
 
 Complexity
 ==========
@@ -294,21 +377,13 @@ where it provides meaningful bounds. For stack and queue the operations
 are O(1) by construction (single array access / pointer update), so
 no separate complexity tracking is needed.
 
-For the singly-linked list, ``CLRS.Ch10.SinglyLinkedList.Impl``
-includes ghost-tick instrumented variants (``list_insert_tick``,
-``list_search_tick``, ``list_delete_tick``) that use a
-``GhostReference.ref nat`` counter. Each node visit calls ``tick``
-once, and the postcondition bounds the counter increment:
+For the singly-linked list, the ghost-tick instrumented variants
+(``list_insert_tick``, ``list_search_tick``, ``list_delete_tick``)
+provide concrete bounds:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
-   :language: pulse
-   :start-after: //SNIPPET_START: sll_tick_ops
-   :end-before: //SNIPPET_END: sll_tick_ops
-
-The complexity invariant in each loop or recursive call tracks
-``cf - c0 == number_of_iterations``. For insert this is exactly 1;
-for search and delete it is at most ``L.length 'l``, matching the
-CLRS worst-case bounds.
+- Insert: exactly 1 operation.
+- Search: at most ``n`` operations (length of the list).
+- Delete: at most ``n + 1`` operations.
 
 Proof Techniques Summary
 =========================
@@ -335,3 +410,9 @@ Proof Techniques Summary
    from Chapter 2 is reused here. The counter is erased at runtime
    but its value is constrained by the recursive structure or loop
    invariant.
+
+5. **Three-layer architecture**: All modules follow a consistent
+   pattern: pure spec (`.Spec.fst`) defines abstract properties as
+   F* lists/functions, imperative impl (`.Impl.fsti`/`.fst`) provides
+   Pulse code with separation-logic invariants, and complexity tracking
+   uses ghost tick counters for concrete bounds.

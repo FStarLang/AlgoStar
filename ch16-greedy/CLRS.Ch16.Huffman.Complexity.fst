@@ -99,6 +99,7 @@ let huffman_length_decreases (t1 t2: htree) (rest: list htree)
     ))
   = insert_sorted_length (merge t1 t2) rest
 
+//SNIPPET_START: huffman_ticks_bounded
 // Key lemma: Prove ticks bounded by n²
 let rec huffman_ticks_bounded (l: list htree{Cons? l})
   : Lemma (ensures huffman_ticks l <= square (length l))

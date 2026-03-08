@@ -12,6 +12,7 @@ module CLRS.Ch31.GCD.Complexity
 open FStar.Mul
 open CLRS.Ch31.GCD.Spec
 
+//SNIPPET_START: gcd_steps
 // Count the number of Euclidean steps (transparent for unfolding)
 let rec gcd_steps (a b: nat) : Tot nat (decreases b) =
   if b = 0 then 0
@@ -21,12 +22,15 @@ let rec gcd_steps (a b: nat) : Tot nat (decreases b) =
 let rec num_bits (n: nat) : Tot nat (decreases n) =
   if n = 0 then 0
   else 1 + num_bits (n / 2)
+//SNIPPET_END: gcd_steps
 
+//SNIPPET_START: gcd_complexity_bounded
 // Complexity bound predicate (transparent)
 let gcd_complexity_bounded (cf c0: nat) (a_init b_init: nat) : prop =
   cf >= c0 /\
   cf - c0 == gcd_steps a_init b_init /\
   (b_init > 0 ==> cf - c0 <= op_Multiply 2 (num_bits b_init) + 1)
+//SNIPPET_END: gcd_complexity_bounded
 
 // num_bits is monotone
 val lemma_num_bits_monotone (a b: nat)

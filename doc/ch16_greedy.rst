@@ -10,17 +10,17 @@ implementations are verified for memory safety and functional
 correctness, and the pure specifications formalize the greedy-choice
 property and optimal substructure arguments from the textbook.
 
-**Verification status.** The Pulse implementations (``ActivitySelection.fst``,
-``Huffman.fst``, ``ActivitySelection.Complexity.fst``,
-``Huffman.Complexity.fst``) contain **zero admits and zero assumes**.
+**Verification status.** The Pulse implementations (``ActivitySelection.Impl.fst``,
+``Huffman.Impl.fst``, ``ActivitySelection.Complexity.fst``,
+``Huffman.Complexity.fst``) contain **zero admits**.
 The pure specification layer for Activity Selection is **fully proven**:
 ``ActivitySelection.Spec`` and ``ActivitySelection.Lemmas`` have
 zero admits — the exchange argument, greedy optimality theorem, and
 implementation-to-spec bridge are all mechanically verified.
 
-Huffman's specification layer is now **fully verified**: ``Huffman.Spec``
+Huffman's specification layer is **fully verified**: ``Huffman.Spec``
 has **zero admits and zero assumes** — the greedy-choice and optimal-substructure
-properties are proven. The Pulse implementation (``Huffman.fst``) has **3
+properties are proven. The Pulse implementation (``Huffman.Impl.fst``) has **3
 ``assume_`` calls** for priority-queue distinctness invariants in the PQ
 extraction loop. ``Huffman.Complete`` is **fully verified with zero admits** ✅ —
 the optimal substructure lemma was corrected to use multiset equality
@@ -130,7 +130,7 @@ writing selected activity indices into an output array ``out`` of
 size *n*. The returned ``count`` indicates how many entries were
 written:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.fst
+.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: activity_selection_sig
    :end-before: //SNIPPET_END: activity_selection_sig
@@ -147,7 +147,7 @@ after the loop, bridging the Pulse output directly to the
 exchange-argument proof.  The loop invariant is captured
 by ``greedy_selection_inv``:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fst
+.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: greedy_selection_inv
    :end-before: //SNIPPET_END: greedy_selection_inv
@@ -164,19 +164,13 @@ the greedy specification ``is_greedy_selection``.
 Complexity
 ~~~~~~~~~~
 
-A separate complexity-instrumented version proves that the algorithm
-performs exactly *n* − 1 comparisons (one per candidate activity after
-the first):
+The complexity bound is defined and linked to the Pulse implementation.
+The predicate asserts exactly *n* − 1 comparisons:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Complexity.fst
+.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded_linear
    :end-before: //SNIPPET_END: complexity_bounded_linear
-
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Complexity.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: activity_selection_complexity_sig
-   :end-before: //SNIPPET_END: activity_selection_complexity_sig
 
 The ghost counter ``ctr`` is a ``GhostReference.ref nat`` — fully
 erased at runtime. Each comparison in the loop body calls ``tick``
@@ -274,22 +268,41 @@ for any valid pair. The ``huffman_correctness_theorem`` uses multiset
 preservation (~120 lines) proving ``∀x. count x (leaf_freqs (huffman_complete
 freqs)) = count x freqs``.
 
+.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Complete.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: huffman_complete_optimal
+   :end-before: //SNIPPET_END: huffman_complete_optimal
+
 Pulse Implementation
 ~~~~~~~~~~~~~~~~~~~~
 
-The Pulse implementation computes the total Huffman cost using an
-array-based simulation: it repeatedly finds and merges the two minimum
-elements, accumulating the merge cost:
+The Pulse implementation builds a heap-allocated Huffman tree
+using ``Pulse.Lib.PriorityQueue`` (binary heap). The postcondition
+proves WPL-optimality, frequency multiset preservation, and cost
+equality:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.fst
+.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Impl.fsti
    :language: pulse
-   :start-after: //SNIPPET_START: huffman_cost_sig
-   :end-before: //SNIPPET_END: huffman_cost_sig
+   :start-after: //SNIPPET_START: huffman_tree_iface
+   :end-before: //SNIPPET_END: huffman_tree_iface
 
-The postcondition proves the cost is non-negative, strictly positive
-when *n* > 1, and zero for a single element. This implementation
-has **zero admits** but **3 ``assume_`` calls** for priority-queue
-distinctness invariants.
+The implementation body (in ``Impl.fst``) matches this interface:
+
+.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Impl.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: huffman_tree_sig
+   :end-before: //SNIPPET_END: huffman_tree_sig
+
+.. warning::
+
+   The Pulse implementation has **3 ``assume_`` calls** for
+   priority-queue distinctness invariants. These occur in the PQ
+   extraction loop where ``pq_idx_unique`` must be re-established
+   after ``extract_min`` and ``insert`` operations. The PQ library's
+   ``extends`` predicate does not export sufficient uniqueness
+   properties. The specification layer (``Spec.fst``, ``Complete.fst``,
+   ``Optimality.fst``) has **zero assumes** — the gap is purely in
+   the Pulse-to-PQ bridge.
 
 Complexity
 ~~~~~~~~~~

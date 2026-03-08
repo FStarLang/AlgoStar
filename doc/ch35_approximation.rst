@@ -8,11 +8,9 @@ This chapter covers the 2-approximation vertex cover algorithm from
 CLRS Chapter 35, Section 35.1 (APPROX-VERTEX-COVER). The
 formalization proves that the greedy matching-based algorithm always
 produces a valid vertex cover and that its size is at most twice the
-optimum. The core approximation-ratio proof (CLRS Theorem 35.1) is
-fully verified with zero admits. The connection from the Pulse
-implementation to the pure theorem is also **fully verified with
-zero admits**, including the bridge from the algorithmic execution
-trace to the matching structure in ``CLRS.Ch35.VertexCover.Spec``.
+optimum. The implementation and all proofs — including CLRS
+Theorem 35.1 and the bridge from the Pulse implementation to the
+pure theorem — are **fully verified with zero admits**.
 
 Graph and Cover Definitions
 ============================
@@ -63,7 +61,7 @@ The proof of CLRS Theorem 35.1 proceeds in two steps:
 Matching Lower Bound
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst
+.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: matching_lower_bound
    :end-before: //SNIPPET_END: matching_lower_bound
@@ -77,7 +75,7 @@ edges use distinct vertices).
 Matching Cover Size
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst
+.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: matching_cover_size
    :end-before: //SNIPPET_END: matching_cover_size
@@ -94,7 +92,7 @@ Theorem 35.1
 
 Combining the two lemmas yields the 2-approximation guarantee:
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst
+.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: theorem_35_1
    :end-before: //SNIPPET_END: theorem_35_1
@@ -107,68 +105,147 @@ Pulse Implementation
 =====================
 
 The imperative implementation uses an adjacency-matrix representation
-and a mutable cover array initialized to zero.
-
-Cover Invariant
-~~~~~~~~~~~~~~~~
-
-The loop invariant tracks which edges have been examined so far:
-
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: is_cover
-   :end-before: //SNIPPET_END: is_cover
-
-``is_cover`` asserts that all edges ``(u, v)`` with ``u < v``
-examined before position ``(bound_u, bound_v)`` have at least one
-endpoint with a non-zero cover entry.
+and a mutable cover array initialized to zero. The algorithm scans
+the upper triangle of the adjacency matrix (pairs (u, v) with u < v),
+which is correct for undirected graphs.
 
 Algorithm Signature
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.fst
-   :language: pulse
+.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Impl.fsti
+   :language: fstar
    :start-after: //SNIPPET_START: approx_vertex_cover_sig
    :end-before: //SNIPPET_END: approx_vertex_cover_sig
 
-The postcondition guarantees three properties: the output is a valid
-cover (``is_cover``), all entries are binary (0 or 1), and the
-2-approximation bound holds for every possible ``opt``.
+The postcondition guarantees four properties:
 
-Outer Loop
-~~~~~~~~~~~
+1. **Correct length**: ``Seq.length s_cover == SZ.v n``.
+2. **Valid cover** (``is_cover``): all edges (u, v) with u < v have
+   at least one endpoint with a non-zero cover entry.
+3. **Binary output**: every cover entry is 0 or 1.
+4. **2-approximation**: for every possible optimal value ``opt``
+   satisfying ``min_vertex_cover_size``,
+   ``count_cover(cover) ≤ 2 × opt``.
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: outer_loop
-   :end-before: //SNIPPET_END: outer_loop
+Implementation with Ghost Matching
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The outer loop iterates over rows ``u`` of the adjacency matrix. The
-invariant maintains ``is_cover`` up to row ``vu`` and the binary
-property on all cover entries. The inner loop iterates over columns
-``v > u``, and for each uncovered edge ``(u, v)`` sets both
-``cover[u]`` and ``cover[v]`` to 1.
+The implementation maintains a ghost reference tracking the matching —
+the set of edges that triggered vertex additions during execution:
+
+.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Impl.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: approx_vertex_cover
+   :end-before: //SNIPPET_END: approx_vertex_cover
+
+The nested loops iterate over all vertex pairs (u, v) with u < v.
+For each uncovered edge, both endpoints are added to the cover and
+the edge is added to the ghost matching. The loop invariants ensure:
+
+- ``is_cover`` holds up to the current scan position
+- The cover is binary (all entries 0 or 1)
+- ``matching_inv``: the ghost matching is pairwise disjoint, and the
+  cover entries correspond exactly to the matching endpoints
+
+After the loops complete, ``apply_approximation_bound`` bridges from
+the Pulse state to the abstract ``theorem_35_1``.
+
+Approximation Ratio Bridge
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The connection from the Pulse implementation to the pure theorem
+is established by ``approximation_ratio_theorem``:
+
+.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
+   :language: fstar
+   :start-after: //SNIPPET_START: approximation_ratio_theorem
+   :end-before: //SNIPPET_END: approximation_ratio_theorem
+
+This lemma shows that the concrete cover array (converted to a
+``cover_fn`` via ``seq_to_cover_fn``) has the same counting behavior
+as the abstract matching-based cover function, and then applies
+``theorem_35_1`` to derive the 2-approximation bound.
 
 Complexity
 ==========
 
 The algorithm examines every entry in the upper triangle of the
-adjacency matrix:
+adjacency matrix, giving O(V²) time:
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Complexity.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: vertex_cover_ops
-   :end-before: //SNIPPET_END: vertex_cover_ops
+.. code-block:: fstar
 
-The total work is O(V²) for a graph with V vertices, matching the
-cost of a single pass over the adjacency matrix.
+   let vertex_cover_iterations (v: nat) : nat = v * (v - 1) / 2
 
-Proof Status
-=============
+   let vertex_cover_quadratic (v: nat)
+     : Lemma (ensures vertex_cover_iterations v <= v * v) = ()
 
-This chapter is **fully verified with zero admits**. All proofs are
-complete, including ``theorem_35_1``, all supporting lemmas in
-``CLRS.Ch35.VertexCover.Spec``, the Pulse loop invariants and
-cover-validity proof, the complexity analysis, and the
-``approximation_ratio_theorem`` connecting the Pulse algorithm's
-output to the matching structure.
+   let vertex_cover_tight_bound (v: nat)
+     : Lemma (ensures vertex_cover_iterations v <= v * v / 2) = ()
+
+**Limitation**: CLRS achieves O(V + E) using adjacency lists by
+maintaining a set of remaining edges. This implementation uses an
+adjacency matrix, requiring O(V²) even for sparse graphs. The
+complexity definitions are proven but are **not formally linked** to
+the Pulse implementation via ghost operation counters.
+
+Limitations
+============
+
+- **Adjacency matrix representation**: O(V²) space and time, even
+  for sparse graphs. CLRS uses adjacency lists for O(V + E).
+- **Upper-triangle scan** (u < v): correct for undirected graphs;
+  directed graphs would need full matrix scan.
+- **Graph size limited**: ``n × n`` must fit in ``SizeT``.
+- **No edge output**: the matching exists only as a ghost value.
+- **Tight ratio not proven**: the 2× bound is proven to be achieved,
+  but existence of graphs achieving ratio exactly 2 is not
+  formalized.
+
+Proof Techniques Summary
+=========================
+
+1. **Ghost matching**: A ghost reference tracks the set of edges
+   that triggered vertex additions. This is invisible at runtime
+   but enables the verification to reason about the matching
+   structure.
+
+2. **Loop invariant composition**: The nested loop invariants
+   compose three independent properties — ``is_cover``, binary
+   output, and ``matching_inv`` — that are maintained independently
+   at each step via separate step lemmas.
+
+3. **Matching-based lower bound**: The proof that any valid cover
+   has size ≥ |matching| uses a contribution counting argument:
+   each edge in a disjoint matching contributes ≥ 1 to any cover,
+   and disjointness prevents overlap. This mirrors the textbook
+   proof of CLRS Theorem 35.1.
+
+4. **Bridge from Pulse to pure**: ``seq_to_cover_fn`` converts the
+   concrete ``seq int`` to a ``cover_fn``, and ``count_cover_ext``
+   shows extensional equality of the counting functions, enabling
+   the pure theorem to apply to the imperative output.
+
+Verification Status Summary
+=============================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 20
+
+   * - Module
+     - Type
+     - Admits
+   * - VertexCover.Spec
+     - Pure spec
+     - 0
+   * - VertexCover.Lemmas
+     - Pure proof
+     - 0
+   * - VertexCover.Complexity
+     - Pure proof
+     - 0
+   * - VertexCover.Impl
+     - Pulse impl
+     - 0
+
+All modules are fully verified with 0 admits ✅.

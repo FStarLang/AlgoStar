@@ -6,7 +6,7 @@ Quicksort
 
 This chapter covers the quicksort algorithm from CLRS Chapter 7, including
 the Lomuto partition scheme (§7.1) and the recursive quicksort algorithm.
-The implementation is split across Spec/Lemmas/Complexity/Impl modules
+The implementation is split across Lemmas/Complexity/Impl modules
 following the canonical rubric structure. All modules are fully verified with
 **zero admits, assumes, or assume\_ calls**. For each component we prove:
 
@@ -24,12 +24,42 @@ implementation uses the Lomuto scheme with the last element as pivot.
 Specification
 ~~~~~~~~~~~~~
 
-The ``clrs_partition_pred`` predicate captures the partition postcondition:
+The shared Lemmas module defines the key predicates:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Partition.Spec.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: clrs_partition_pred
-   :end-before: //SNIPPET_END: clrs_partition_pred
+.. code-block:: fstar
+
+   let between_bounds (s: Seq.seq int) (lb rb: int) =
+     larger_than s lb /\ smaller_than s rb
+
+   let complexity_exact_linear (cf c0 n: nat) : prop =
+     cf >= c0 /\ cf - c0 == n
+
+Correctness Theorem
+~~~~~~~~~~~~~~~~~~~
+
+The partition wrapper splits array ownership into three regions
+(left, pivot, right) for use by recursive quicksort. The result
+is a permutation with the pivot in its final position, all left
+elements ≤ pivot, and all right elements > pivot.
+
+The cost is **exactly** ``hi - lo - 1`` comparisons — every
+non-pivot element is compared against the pivot exactly once.
+This is linked to the ghost counter via
+``complexity_exact_linear cf c0 (hi - lo - 1)``.
+
+Strongest Guarantee
+~~~~~~~~~~~~~~~~~~~
+
+The partition performs **exactly** n−1 comparisons (not just ≤ n−1).
+This is the tightest possible bound: every non-pivot element is
+compared against the pivot exactly once.
+
+Limitations
+~~~~~~~~~~~
+
+The Lomuto scheme always picks the **last element** as pivot. This
+leads to worst-case O(n²) on sorted/reverse-sorted input. CLRS §7.3
+discusses randomized pivot selection, which is NOT implemented here.
 
 Quicksort
 =========
@@ -38,18 +68,10 @@ The ``CLRS.Ch07.Quicksort.Impl`` module implements the recursive algorithm
 using ``pts_to_range`` to split array ownership at the pivot position for
 the two recursive calls.
 
-Specification
-~~~~~~~~~~~~~
+Correctness Theorem
+~~~~~~~~~~~~~~~~~~~
 
-The ``clrs_partition_pred`` defines the core specification used in the loop
-invariant. The partition function operates on a sub-range ``A[lo..hi)`` using
-``pts_to_range``.
-
-Recursive Sort
-~~~~~~~~~~~~~~
-
-The recursive quicksort threads a ghost tick counter through all calls,
-proving both correctness and the O(n²) worst-case bound:
+The recursive quicksort with ghost tick counter:
 
 .. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Impl.fst
    :language: pulse
@@ -74,6 +96,33 @@ the recursive sort, and converts back:
    :start-after: //SNIPPET_START: quicksort_sig
    :end-before: //SNIPPET_END: quicksort_sig
 
+Three variants are exported:
+
+1. **quicksort**: sorted + permutation (no complexity tracking).
+2. **quicksort_with_complexity**: adds ``complexity_bounded_quadratic``
+   via a ghost counter, proving the worst-case O(n²) bound.
+3. **quicksort_bounded**: sub-range sorting with caller-provided
+   ``lb``/``rb`` bounds, using ``pts_to_range``.
+
+Strongest Guarantee
+~~~~~~~~~~~~~~~~~~~
+
+The postcondition proves both sorted order and permutation — the
+standard correctness specification for comparison-based sorting.
+The O(n²) bound is the tightest *worst-case* bound for deterministic
+quicksort with any fixed pivot rule.
+
+Limitations
+~~~~~~~~~~~
+
+- **Only worst-case bound proven.** The average-case O(n log n) bound
+  from CLRS §7.4 is NOT proven. Proving it would require a
+  randomization analysis (expected value over random pivot choices),
+  which is outside the scope of this deterministic formalization.
+- **Worst case is tight.** For already-sorted or reverse-sorted input
+  with last-element pivot, partition always produces a maximally
+  unbalanced split (0 and n−1), giving exactly n(n−1)/2 comparisons.
+
 Complexity
 ==========
 
@@ -93,6 +142,13 @@ recurrence ``T(n) = T(n-1) + (n-1)`` and proves its closed form:
    :start-after: //SNIPPET_START: worst_case_bound
    :end-before: //SNIPPET_END: worst_case_bound
 
+The ``worst_case_bound`` lemma establishes
+``2 * worst_case_comparisons(n) == n * (n-1)``, giving the exact
+closed form T(n) = n(n−1)/2.
+
+Convexity
+~~~~~~~~~
+
 The maximality theorem shows that any partition split is bounded by the
 worst case:
 
@@ -101,13 +157,19 @@ worst case:
    :start-after: //SNIPPET_START: partition_split_bounded
    :end-before: //SNIPPET_END: partition_split_bounded
 
+This is the key insight: for any split point ``k``,
+``(n-1) + T(k) + T(n-1-k) ≤ T(n)``. The proof relies on
+``sum_of_parts_bound``: ``T(a) + T(b) ≤ T(a+b)`` by induction,
+establishing that the worst-case partition is always the most
+unbalanced split.
+
 Quadratic Bound
 ~~~~~~~~~~~~~~~
 
-The ``Quicksort.Spec`` module defines the quadratic complexity bound
+The ``Quicksort.Lemmas`` module defines the quadratic complexity bound
 predicate used in the postcondition:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Spec.fst
+.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded_quadratic
    :end-before: //SNIPPET_END: complexity_bounded_quadratic
@@ -135,3 +197,10 @@ Proof Techniques Summary
 4. **Convexity of the recurrence**: The ``sum_of_parts_bound`` lemma
    proves that ``T(a) + T(b) ≤ T(a+b)`` by induction, establishing
    that the worst-case partition is always the most unbalanced split.
+
+5. **Exact partition cost**: The Lomuto partition is proven to perform
+   **exactly** n−1 comparisons via ``complexity_exact_linear``,
+   not just bounded by n−1. This tight count feeds into the recursive
+   complexity analysis.
+
+All proofs in this chapter are fully verified with **zero admits**.

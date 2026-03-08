@@ -8,11 +8,47 @@ This chapter covers the disjoint-set (union-find) data structure from
 CLRS Chapter 21, implementing union by rank (§21.3) with full path
 compression. The formalization includes a pure F* specification of
 the forest model, a Pulse implementation with memory-safe mutable
-arrays, termination proofs, and rank-bound analysis.
+arrays, termination proofs, compression correctness, and rank-bound
+analysis establishing O(log n) worst-case find.
 
 **Verification status.** All four modules (``Spec.fst``,
 ``Lemmas.fst``, ``Impl.fsti``, ``Impl.fst``) contain **zero admits
 and zero assumes**.
+
+.. list-table:: Chapter 21 Summary
+   :header-rows: 1
+   :widths: 40 10 50
+
+   * - Property
+     - Status
+     - Notes
+   * - Functional correctness (all 3 ops)
+     - ✅
+     - All postconditions reference ``pure_find``
+   * - ``uf_inv`` preservation
+     - ✅
+     - Across all operations and compression
+   * - Merge (``pure_union_same_set``)
+     - ✅
+     - ``find(x) == find(y)`` after ``union(x,y)``
+   * - Stability (``pure_union_other_set``)
+     - ✅
+     - Unrelated elements unchanged
+   * - ``size ≥ 2^rank``
+     - ✅
+     - ``size_rank_invariant`` in Lemmas
+   * - ``rank ≤ ⌊log₂ n⌋``
+     - ✅
+     - ``rank_logarithmic_bound_sized``
+   * - O(log n) worst-case find
+     - ✅
+     - ``union_by_rank_logarithmic_find``
+   * - Amortized O(α(n))
+     - ❌
+     - Inverse Ackermann analysis not formalized
+   * - Admits / Assumes
+     - **0 / 0**
+     -
 
 Pure Specification
 ==================
@@ -24,7 +60,8 @@ The union-find forest is modeled as a record of parent and rank
 sequences. A valid forest has in-bounds parent pointers, and a root
 satisfies ``parent[i] = i``. The rank invariant (CLRS Lemma 21.4)
 states that for every non-root node *x*,
-``rank[x] < rank[parent[x]]``.
+``rank[x] < rank[parent[x]]``. The combined invariant ``uf_inv`` is
+the conjunction of ``is_valid_uf`` and ``rank_invariant``.
 
 Total Pure Find
 ~~~~~~~~~~~~~~~
@@ -35,9 +72,12 @@ that counts nodes with rank strictly above the current node's rank.
 Since rank strictly increases along parent pointers, this count
 decreases at each recursive step.
 
-``pure_find_is_root`` and ``pure_find_in_bounds`` prove that the
-result is always a valid root. ``rank_mono`` proves that
-``rank[x] ≤ rank[root]`` for any node *x* and its root.
+Key properties:
+
+- ``pure_find_is_root``: result is always a valid root.
+- ``pure_find_in_bounds``: result is in ``[0, n)``.
+- ``pure_find_idempotent``: ``pure_find(pure_find(x)) == pure_find(x)``.
+- ``pure_find_step``: for non-roots, ``pure_find(x) == pure_find(parent[x])``.
 
 Pure Union
 ~~~~~~~~~~
@@ -110,8 +150,11 @@ compression:
 
 The postcondition guarantees:
 
-- ``root == Spec.pure_find(original, x)``
+- ``root == Spec.pure_find(original, x)`` — functional correctness.
 - ``∀z < n. Spec.pure_find(compressed, z) == Spec.pure_find(original, z)``
+  — compression preserves all representatives.
+- ``Spec.uf_inv`` preserved before and after compression.
+- ``is_forest`` preserved — acyclicity maintained.
 
 Union
 ~~~~~
@@ -127,11 +170,75 @@ The postcondition guarantees:
   ``Spec.pure_find(result, z) == Spec.pure_find(original, z)``
 - ``Spec.uf_inv`` and ``is_forest`` are preserved.
 
+Strongest Guarantee
+~~~~~~~~~~~~~~~~~~~
+
+The postconditions fully characterize union-find semantics:
+
+1. Find returns the **exact** pure representative (not just "some root").
+2. Compression preserves **all** representatives, not just the queried one.
+3. Union's stability clause covers **all** disjoint elements via a
+   universal quantifier.
+4. The invariant ``uf_inv`` (rank invariant + validity) is maintained
+   through every operation, enabling arbitrary composition of operations.
+
+The only missing guarantee is amortized complexity.
+
 Complexity
 ==========
 
 With union-by-rank, the ``Lemmas`` module proves that tree height
-is O(log *n*), giving O(log *n*) worst-case find. With both
-union-by-rank and path compression, the amortized cost is
-O(*m* · α(*n*)) where α is the inverse Ackermann function
-(CLRS Theorem 21.14). The amortized analysis is not formalized.
+is O(log *n*), giving O(log *n*) worst-case find. The proof proceeds
+in three steps:
+
+1. ``size_rank_invariant``: every subtree has at least 2^rank nodes.
+2. ``rank_logarithmic_bound_sized``: since 2^rank ≤ size ≤ n, we get
+   rank ≤ ⌊log₂ n⌋.
+3. ``height_le_root_rank``: tree height ≤ rank[root].
+
+Combining these gives the final theorem:
+
+.. code-block:: fstar
+
+   val union_by_rank_logarithmic_find
+     (f: uf_forest_sized{...}) (x: nat{x < f.n})
+     : Lemma (ensures tree_height f x <= log2_floor f.n)
+
+.. list-table:: Complexity Summary
+   :header-rows: 1
+   :widths: 40 10 50
+
+   * - Aspect
+     - Proven
+     - Bound
+   * - Worst-case find (rank only)
+     - ✅
+     - O(log n) — ``tree_height ≤ ⌊log₂ n⌋``
+   * - Amortized find (rank + compression)
+     - ❌
+     - O(α(n)) — not formalized
+   * - Ghost tick counter
+     - N/A
+     - No complexity instrumentation file
+
+Limitations
+===========
+
+1. **Amortized O(α(n)) not proven.** The inverse Ackermann amortized
+   analysis (CLRS §21.4) is not formalized. Only the O(log n)
+   worst-case bound from union-by-rank alone is proven.
+
+2. **No ghost tick counter.** Unlike other chapters (e.g., Ch 25
+   Floyd-Warshall), there is no ``Complexity.fst`` module with
+   instrumented ghost ticks. The O(log n) bound is stated as a lemma
+   on tree height, not as a runtime counter.
+
+3. **Subtree sizes are specification-only.** The ``uf_forest_sized``
+   type in ``Lemmas.fst`` is a proof device — the imperative code does
+   not maintain size fields. This means the size-rank invariant cannot
+   be directly connected to the imperative state without additional
+   bridging.
+
+4. **Linked-list representation (§21.2) not implemented.** The
+   formalization uses the array-based forest representation (§21.3)
+   only.

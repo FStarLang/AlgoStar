@@ -102,8 +102,8 @@ was iterative:
 Results Overview
 ----------------
 
-The project currently covers algorithms from 18 chapters of CLRS,
-implemented across 186 F* source files totaling approximately 74,600
+The project currently covers algorithms from 20 chapters of CLRS,
+implemented across 394 F* source files totaling approximately 102,500
 lines. The table below summarizes the status of each algorithm.
 
 **Legend:**
@@ -136,7 +136,7 @@ lines. The table below summarizes the status of each algorithm.
      - §2.3
      - sorted ∧ permutation
      - ✅
-     - ✅ Pure O(n lg n)
+     - ✅ Linked O(n lg n)
    * - 4
      - :ref:`Binary Search <Ch04_DivideConquer>`
      - §2.3
@@ -150,29 +150,35 @@ lines. The table below summarizes the status of each algorithm.
      - ✅
      - ✅ Linked O(n)
    * - 4
-     - :ref:`Divide & Conquer (Max Sub.) <Ch04_DivideConquer>`
+     - :ref:`D&C Max Subarray <Ch04_DivideConquer>`
      - §4.1
      - result = max contiguous sum
      - ✅
-     - —
+     - ✅ Pure O(n lg n)
+   * - 4
+     - :ref:`Matrix Multiply <Ch04_DivideConquer>`
+     - §4.2
+     - C = A · B
+     - ✅
+     - ✅ Linked O(n³)
+   * - 4
+     - :ref:`Strassen <Ch04_DivideConquer>`
+     - §4.2
+     - Strassen = standard mult
+     - ✅
+     - ✅ Pure O(n^{2.81})
    * - 6
      - :ref:`Heapsort <Ch06_Heapsort>`
      - §6.4
      - sorted ∧ permutation
      - ✅
-     - ✅ Pure O(n lg n)
+     - ✅ Linked O(n lg n)
    * - 7
-     - :ref:`Partition (Hoare) <Ch07_Quicksort>`
+     - :ref:`Partition <Ch07_Quicksort>`
      - §7.1
      - elements partitioned ∧ perm
      - ✅
-     - ✅ Linked O(n)
-   * - 7
-     - :ref:`Lomuto Partition <Ch07_Quicksort>`
-     - §7.1
-     - elements partitioned ∧ perm
-     - ✅
-     - —
+     - ✅ Linked Θ(n)
    * - 7
      - :ref:`Quicksort <Ch07_Quicksort>`
      - §7.1
@@ -184,19 +190,19 @@ lines. The table below summarizes the status of each algorithm.
      - §8.2
      - sorted ∧ permutation
      - ✅
-     - ✅ Pure O(n+k)
+     - —
    * - 8
      - :ref:`Counting Sort (Stable) <Ch08_LinearSorting>`
      - §8.2
-     - sorted ∧ stable ∧ perm
+     - stable sort ∧ perm
      - ✅
      - —
    * - 8
      - :ref:`Radix Sort <Ch08_LinearSorting>`
      - §8.3
      - sorted ∧ permutation
-     - ⚠️ 3: stability proofs
-     - ✅ Pure Θ(d(n+k))
+     - ✅
+     - —
    * - 8
      - :ref:`Bucket Sort <Ch08_LinearSorting>`
      - §8.4
@@ -208,77 +214,83 @@ lines. The table below summarizes the status of each algorithm.
      - §9.1
      - result ∈ array ∧ is min/max
      - ✅
-     - ✅ Linked O(n)
+     - ✅ Linked Θ(n−1)
    * - 9
      - :ref:`Simultaneous Min-Max <Ch09_OrderStats>`
      - §9.1
      - min ∧ max of array
      - ✅
-     - —
+     - ✅ Linked ⌊3(n−1)/2⌋
    * - 9
      - :ref:`Quickselect <Ch09_OrderStats>`
      - §9.2
      - k-th smallest at position k
      - ✅
-     - ✅ Pure O(n²)
+     - ✅ Linked O(n²)
    * - 9
      - :ref:`Partial Selection Sort <Ch09_OrderStats>`
      - §9.2
      - first k sorted, k-th correct
      - ✅
-     - ✅ Pure O(nk)
+     - ✅ Linked O(nk)
    * - 10
-     - :ref:`Stack / Queue <Ch10_DataStructures>`
+     - :ref:`Stack <Ch10_DataStructures>`
      - §10.1
-     - ghost list matches contents
+     - ghost list matches (LIFO)
      - ✅
-     - ✅ Pure O(1)
+     - —
    * - 10
-     - :ref:`Linked List <Ch10_DataStructures>`
+     - :ref:`Queue <Ch10_DataStructures>`
+     - §10.1
+     - ghost list matches (FIFO)
+     - ✅
+     - —
+   * - 10
+     - :ref:`Singly Linked List <Ch10_DataStructures>`
      - §10.2
      - ghost list matches contents
      - ✅
-     - —
+     - ✅ Linked O(n)
    * - 10
      - :ref:`Doubly-Linked List <Ch10_DataStructures>`
      - §10.2
      - segment pred ∧ ghost list
      - ✅
-     - ✅ Linked O(1)
+     - ✅ Linked O(n)
    * - 11
-     - :ref:`Hash Table (Chaining) <Ch11_HashTables>`
-     - §11.2
+     - :ref:`Hash Table (Linear Probing) <Ch11_HashTables>`
+     - §11.4
      - key ↦ value lookup
      - ✅
-     - ✅ Linked O(n)
+     - —
    * - 12
-     - :ref:`BST Search / Delete <Ch12_BST>`
-     - §12.2–3
-     - key set operations
+     - :ref:`BST (Pointer-based) <Ch12_BST>`
+     - §12.1–3
+     - key set ∧ BST invariant
      - ✅
-     - ✅ Pure O(h)
+     - ✅ Linked O(h)
    * - 12
-     - :ref:`BST Insert <Ch12_BST>`
-     - §12.3
-     - key set updated
+     - :ref:`BST (Array-based) <Ch12_BST>`
+     - §12.1–3
+     - key set ∧ BST invariant
      - ✅
-     - ✅ Pure O(h)
+     - ✅ Linked O(h)
    * - 13
-     - :ref:`Red-Black Tree <Ch13_RBTree>`
+     - :ref:`RB Tree (Okasaki) <Ch13_RBTree>`
      - §13.1–4
-     - Okasaki balance ∧ BST
+     - BST ∧ RB invariants
+     - ✅
+     - ✅ Pure O(lg n)
+   * - 13
+     - :ref:`RB Tree (CLRS-style) <Ch13_RBTree>`
+     - §13.1–4
+     - BST ∧ RB invariants + delete
      - ✅
      - ✅ Pure O(lg n)
    * - 15
      - :ref:`Rod Cutting <Ch15_DynamicProg>`
      - §15.1
      - optimal revenue
-     - ✅
-     - ✅ Linked O(n²)
-   * - 15
-     - :ref:`Ext. Rod Cutting <Ch15_DynamicProg>`
-     - §15.1
-     - optimal revenue ∧ valid cuts
      - ✅
      - ✅ Linked O(n²)
    * - 15
@@ -292,7 +304,7 @@ lines. The table below summarizes the status of each algorithm.
      - §15.2
      - optimal parenthesization cost
      - ✅
-     - ✅ Pure O(n³)
+     - ✅ Linked O(n³)
    * - 16
      - :ref:`Activity Selection <Ch16_Greedy>`
      - §16.1
@@ -302,26 +314,26 @@ lines. The table below summarizes the status of each algorithm.
    * - 16
      - :ref:`Huffman Coding <Ch16_Greedy>`
      - §16.3
-     - prefix-free tree construction
-     - ⚠️ 3: assume_ (PQ distinctness)
-     - ✅ Pure O(n lg n)
+     - WPL-optimal prefix-free tree
+     - ✅
+     - ✅ Pure O(n)
    * - 21
      - :ref:`Union-Find <Ch21_DisjointSets>`
      - §21.3
      - find/union maintain forest
-     - ⚠️ 1: rank bound assume
-     - ✅ Pure O(α(n))
+     - ✅
+     - —
    * - 22
-     - :ref:`BFS (Queue) <Ch22_Graphs>`
+     - :ref:`BFS <Ch22_Graphs>`
      - §22.2
      - distances ∧ parent tree
      - ✅
      - ✅ Linked O(V²)
    * - 22
-     - :ref:`DFS (Stack) <Ch22_Graphs>`
+     - :ref:`DFS <Ch22_Graphs>`
      - §22.3
      - timestamps ∧ classification
-     - ⚠️ 1: white-path backward
+     - ✅
      - ✅ Linked O(V²)
    * - 22
      - :ref:`Kahn Topological Sort <Ch22_Graphs>`
@@ -333,12 +345,12 @@ lines. The table below summarizes the status of each algorithm.
      - :ref:`Kruskal MST <Ch23_MST>`
      - §23.2
      - MST of graph
-     - ⚠️ 2: forest axiom + acyclicity
-     - ✅ Linked O(V·E)
+     - ✅
+     - ✅ Linked O(V³)
    * - 23
      - :ref:`Prim MST <Ch23_MST>`
      - §23.2
-     - MST of graph
+     - spanning tree + key correct
      - ✅
      - ✅ Linked O(V²)
    * - 23
@@ -364,25 +376,13 @@ lines. The table below summarizes the status of each algorithm.
      - §25.2
      - APSP distances
      - ✅
-     - ✅ Linked O(n³)
+     - ✅ Linked Θ(n³)
    * - 26
-     - Ford-Fulkerson (Max Flow)
+     - :ref:`Edmonds-Karp (Max Flow) <Ch26_MaxFlow>`
      - §26.2
-     - max flow ∧ valid flow
-     - ⚠️ 2: duality/min-cut
+     - valid flow ∧ max flow
      - ✅
-   * - 28
-     - :ref:`Matrix Multiply <Ch04_MatrixOps>`
-     - §28 (App)
-     - C = A · B
-     - ✅
-     - ✅ Linked O(n³)
-   * - 28
-     - :ref:`Strassen <Ch04_MatrixOps>`
-     - §28 (App)
-     - Strassen = standard mult
-     - ✅
-     - —
+     - ⚠️ Linked O(VE²); 4 assume val
    * - 31
      - :ref:`GCD / Extended GCD <Ch31_NumberTheory>`
      - §31.2
@@ -414,49 +414,56 @@ lines. The table below summarizes the status of each algorithm.
      - ✅
      - ✅ Pure O(nm)
    * - 33
-     - :ref:`Segment Intersection <Ch33_CompGeometry>`
+     - :ref:`Segments (Primitives) <Ch33_CompGeometry>`
      - §33.1
      - correct intersection test
      - ✅
-     - ✅ Pure O(1)
+     - —
+   * - 33
+     - :ref:`Graham Scan <Ch33_CompGeometry>`
+     - §33.3
+     - convex hull (all left turns)
+     - ✅
+     - —
+   * - 33
+     - :ref:`Jarvis March <Ch33_CompGeometry>`
+     - §33.3
+     - convex hull vertices
+     - ✅
+     - —
    * - 35
      - :ref:`Vertex Cover (2-approx) <Ch35_Approximation>`
      - §35.1
      - cover ≤ 2 · OPT
      - ✅
-     - ✅ Pure O(V+E)
+     - —
 
 Proof Gaps
 ----------
 
-As of this writing, the project has **5 unproven ``admit()`` calls**,
-**3 ``assume_()``**, **4 ``assume()``**, and **1 ``assume val``**
-across **8 files** (total: 13 unproven obligations).
-Of the 50 algorithms in the table, **44 have fully proven correctness**
-(zero admits) and **42 have fully proven complexity bounds**.
+Outside of Chapters 22 and 24 (which are under active development),
+the project has **only 4 ``assume val`` declarations** in a single
+file: ``ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst``.
+All other chapters — including all 394 source files — are
+**fully proven** with zero ``admit()``, ``assume()``, ``assume_()``,
+or ``assume val`` calls.
 
-The remaining unproven obligations fall into a few categories:
+The 4 remaining axioms in Chapter 26 are:
 
-1. **Sorting stability** (Ch. 8, 3 admits): RadixSort multi-digit stability
-   proofs involve ∃∀ quantifier patterns that challenge the SMT solver.
+1. **``axiom_spd_source_zero``**: BFS shortest-path distance from
+   source is zero.
+2. **``axiom_spd_bounded``**: BFS shortest-path distances are bounded
+   by the number of vertices.
+3. **``lemma_distances_nondecreasing``**: BFS distances to each vertex
+   are non-decreasing across augmentation rounds (monotonicity lemma
+   from CLRS Lemma 26.7).
+4. **``axiom_edge_critical_bound``**: Each edge can become critical
+   at most V/2 times (CLRS Lemma 26.8).
 
-2. **Graph algorithms** (Ch. 22, 1 admit): The backward direction of the
-   DFS white-path theorem in ``WhitePath.fst``.
-
-3. **Greedy algorithms** (Ch. 16, 3 assume\_): Huffman priority queue
-   distinctness invariants in the PQ extraction loop.
-
-4. **MST** (Ch. 23, 1 assume val + 1 assume): Kruskal forest axiom and
-   sorted-edges acyclicity preservation.
-
-5. **Shortest paths** (Ch. 24, 1 admit): The ``sp_dist_k_stabilize``
-   lemma in ``ShortestPath.Triangle.fst`` (pigeonhole + cycle removal).
-
-6. **Network flow** (Ch. 26, 2 assume): Max-flow min-cut
-   weak duality and min-cut existence.
-
-7. **Disjoint sets** (Ch. 21, 1 assume): Rank bound preservation
-   after path compression in ``UnionFind.Spec``.
+These axioms are used to establish the O(VE²) Edmonds-Karp complexity
+bound. The correctness proof for the max-flow algorithm itself
+(``max_flow`` in ``Impl.fsti``) is **fully proven** — only the
+complexity bound relies on these axioms.
 
 Each chapter in this document notes any unproven obligations in its
 scope.  Fully verified chapters have zero ``admit``, ``assume``, or

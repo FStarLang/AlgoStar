@@ -5,16 +5,16 @@ Heapsort
 ########################################
 
 This chapter covers the heapsort algorithm from CLRS Chapter 6.
-The implementation follows the textbook structure: BUILD-MAX-HEAP
-(§6.3) followed by the extract-max loop (§6.4). The algorithm is
-fully verified in Pulse with **zero admits, assumes, or assume_
-calls**. We prove:
+The implementation follows the textbook structure: MAX-HEAPIFY
+(§6.2), BUILD-MAX-HEAP (§6.3), and the full HEAPSORT (§6.4). The
+algorithm is fully verified in Pulse with **zero admits, assumes,
+or assume\_ calls**. We prove:
 
 1. The output is sorted.
 2. The output is a permutation of the input.
 3. The number of comparisons is O(n log n).
 
-Additionally, an enhanced complexity module proves BUILD-MAX-HEAP
+Additionally, an enhanced Complexity module proves BUILD-MAX-HEAP
 runs in O(n) (CLRS Theorem 6.3) and that heapsort beats quadratic
 sorting for n ≥ 11.
 
@@ -24,7 +24,7 @@ Heap Predicates
 The formalization uses implicit (array-based) binary heaps. The
 standard index arithmetic maps parent-child relationships:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: heap_indices
    :end-before: //SNIPPET_END: heap_indices
@@ -32,7 +32,7 @@ standard index arithmetic maps parent-child relationships:
 The max-heap property and its relaxed variants are defined as
 predicates over a prefix of length ``len``:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: heap_predicates
    :end-before: //SNIPPET_END: heap_predicates
@@ -50,7 +50,7 @@ MAX-HEAPIFY
 ``max_heapify`` is a recursive Pulse function that restores the
 heap property at a single node by sifting it down:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: max_heapify_sig
    :end-before: //SNIPPET_END: max_heapify_sig
@@ -62,8 +62,9 @@ Reading this signature:
   *grandparent condition* ensures the parent of ``idx`` (if it
   exists and is in range) still dominates ``idx``'s children.
 - **Postcondition**: the heap property holds for all nodes from
-  ``start`` (``heaps_from``), the result is a permutation, and
-  elements outside the heap prefix are unchanged.
+  ``start`` (``heaps_from``), the result is a permutation, elements
+  outside the heap prefix are unchanged, and the cost is bounded by
+  ``max_heapify_bound(heap_size, idx) = 2·⌊log₂(heap_size/(idx+1))⌋``.
 
 The implementation examines the left and right children of ``idx``,
 swaps with the larger child if it exceeds the current node, and
@@ -72,33 +73,33 @@ after swapping parent ``p`` with child ``ch``:
 
 - ``heap_down_at`` holds at ``p`` (the parent now has the larger
   value).
-- ``heap_down_at`` is preserved at all other nodes (via case
-  analysis on whether their children overlap with ``{p, ch}``).
+- ``heap_down_at`` is preserved at all other nodes.
 - The defect moves to ``ch`` (giving ``almost_heaps_from`` with
   ``bad = ch``).
 
-Heapsort
-========
+Strongest Guarantee
+~~~~~~~~~~~~~~~~~~~
 
-The main ``heapsort`` function:
+The postcondition fully restores the heap property from ``start``
+onward (not just at ``idx``). The permutation guarantee chains
+through all recursive swap steps.
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.fst
-   :language: pulse
-   :start-after: //SNIPPET_START: heapsort_sig
-   :end-before: //SNIPPET_END: heapsort_sig
+Limitations
+~~~~~~~~~~~
 
-The postcondition guarantees both sortedness and that the result
-is a permutation of the input. The implementation proceeds in two
-phases.
+The ``start`` ghost parameter is not in CLRS — it tracks the lower
+bound of the ``heaps_from`` region. The ``SZ.fits(2n+2)``
+precondition prevents SizeT overflow in child index computation.
+The cost bound counts 2 comparisons per non-leaf level (finding
+the maximum of ``{parent, left, right}``).
 
-Phase 1: BUILD-MAX-HEAP
-~~~~~~~~~~~~~~~~~~~~~~~~
+BUILD-MAX-HEAP
+==============
 
-``build_max_heap`` is a standalone Pulse function (CLRS §6.3) that
-converts an arbitrary array into a max-heap via bottom-up
-heapification:
+``build_max_heap`` converts an arbitrary array into a max-heap via
+bottom-up heapification (CLRS §6.3):
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: build_max_heap_sig
    :end-before: //SNIPPET_END: build_max_heap_sig
@@ -106,10 +107,41 @@ heapification:
 The loop starts at ``⌊n/2⌋`` and calls ``max_heapify``
 on each node down to index 0. The invariant maintains
 ``heaps_from s_cur n vi`` — all nodes from ``vi`` onward satisfy
-the heap property. Initially ``vi = ⌊n/2⌋``, and leaves (indices
-≥ ⌊n/2⌋) trivially satisfy the property. Each iteration decrements
-``vi`` and calls ``max_heapify`` to establish the property at the
-new node. At loop exit, ``vi = 0`` gives ``is_max_heap``.
+the heap property. At loop exit, ``vi = 0`` gives ``is_max_heap``.
+
+Strongest Guarantee
+~~~~~~~~~~~~~~~~~~~
+
+A full ``is_max_heap`` is established over the entire prefix.
+The permutation guarantee chains through all max_heapify calls.
+
+Limitations
+~~~~~~~~~~~
+
+The linked cost bound ``build_cost_bound(n) = (n/2) × max_heapify_bound(n, 0)``
+is O(n log n), **not** the tight O(n) from CLRS Theorem 6.3. The
+O(n) analysis is proven separately in the pure Complexity module
+(see below) but uses a different cost model.
+
+HEAPSORT
+========
+
+The main ``heapsort`` function:
+
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
+   :language: pulse
+   :start-after: //SNIPPET_START: heapsort_sig
+   :end-before: //SNIPPET_END: heapsort_sig
+
+The postcondition guarantees ``sorted s``, ``permutation s0 s``,
+and the cost bound ``cf - c0 <= heapsort_cost_bound(n)``. The
+implementation proceeds in two phases.
+
+Phase 1: BUILD-MAX-HEAP
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Calls ``build_max_heap`` as a standalone function to establish
+``is_max_heap`` over the entire array.
 
 Phase 2: Extract-Max Loop
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,7 +150,7 @@ The extract-max loop repeatedly swaps the root (maximum) to the
 end of the heap, shrinks the heap, and calls ``max_heapify`` to
 restore the property:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: extract_max_loop
    :end-before: //SNIPPET_END: extract_max_loop
@@ -133,52 +165,72 @@ The invariant maintains three properties simultaneously:
 
 At each iteration, the root (the maximum of the prefix) is swapped
 to position ``vsz - 1``. Since it is ≥ all prefix elements and ≤
-all existing suffix elements (by ``prefix_le_suffix``), it extends
-the sorted suffix by one position.
+all existing suffix elements, it extends the sorted suffix by one.
 
 The lemma ``perm_preserves_sorted_suffix`` is the most intricate
-proof in this module: it shows that when ``max_heapify`` permutes
-the prefix, the suffix remains sorted and the cross-region ordering
-is preserved. This uses element counting (``SeqP.count``) to argue
-that every element in the new prefix also appeared in the old
-prefix, and hence is bounded by the suffix elements.
+proof: it shows that when ``max_heapify`` permutes the prefix, the
+suffix remains sorted and the cross-region ordering is preserved.
+
+Strongest Guarantee
+~~~~~~~~~~~~~~~~~~~
+
+Full functional correctness: ``sorted`` + ``permutation``. The cost
+is bounded by ``heapsort_cost_bound(n) = build_cost_bound(n) + extract_cost_bound(n)``.
+
+Limitations
+~~~~~~~~~~~
+
+The linked cost bound expands to ``(n/2 + n-1) × max_heapify_bound(n, 0)``.
+The CostBound module proves ``heapsort_cost_bound n <= 4n·log₂ n``.
+The pure Complexity module proves tighter bounds (6n(1+log₂ n), beats
+n² for n≥11) but these are for a different cost model.
 
 Complexity
 ==========
 
-The complexity module defines operation counts for each phase and proves
-O(n log n) bounds following CLRS §6.3–6.4.
+The Complexity module defines pure operation counts for each phase
+and proves O(n log n) bounds following CLRS §6.3–6.4.
 
-**BUILD-MAX-HEAP is O(n)** (CLRS Theorem 6.3): the sum
-∑ ⌈n/2^(h+1)⌉ · 2h over all heights h converges to at most 4n.
-The proof decomposes the ceiling into a floor term and a correction,
-bounds the floor sum using the identity
+BUILD-MAX-HEAP is O(n)
+~~~~~~~~~~~~~~~~~~~~~~~
+
+CLRS Theorem 6.3: the sum ∑ ⌈n/2^(h+1)⌉ · 2h over all heights h
+converges to at most 4n. The proof decomposes the ceiling into a
+floor term and a correction, bounds the floor sum using the identity
 ∑ h·2^(H−h) = 2^(H+1) − H − 2, and bounds the correction by
 h(h+1) ≤ 2·2^h ≤ 2n:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: build_heap_ops_linear
    :end-before: //SNIPPET_END: build_heap_ops_linear
 
-**Overall O(n log n)** with constant 6:
+HEAPSORT O(n log n)
+~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
+Overall bound with constant 6:
+
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: heapsort_ops_simplified
    :end-before: //SNIPPET_END: heapsort_ops_simplified
 
 The bound 6n(1 + ⌊log₂ n⌋) follows from combining the O(n)
 build-heap cost (≤ 4n) with the extract-max loop cost
-(≤ 2n·⌊log₂ n⌋), where each ``max_heapify`` call costs at most
-2⌊log₂ n⌋ comparisons.
+(≤ 2n·⌊log₂ n⌋).
 
-**Heapsort beats quadratic sorting** for n ≥ 11:
+Heapsort Beats Quadratic
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fst
+For n ≥ 11:
+
+.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: heapsort_better_than_quadratic
    :end-before: //SNIPPET_END: heapsort_better_than_quadratic
+
+The proof uses ``heapsort_practical_bound`` (≤ 2n·log₂ n + 4n)
+and then shows 2·log₂ n + 4 < n for n ≥ 11.
 
 Proof Techniques Summary
 =========================
@@ -200,10 +252,16 @@ Proof Techniques Summary
 4. **Permutation via element counting**: The
    ``perm_preserves_sorted_suffix`` lemma uses ``SeqP.count`` and
    ``SeqP.lemma_mem_count`` to show that permuting the prefix
-   preserves the cross-region ordering — a technique applicable
-   whenever one region is fixed and the other is permuted.
+   preserves the cross-region ordering.
 
 5. **Geometric series for BUILD-MAX-HEAP**: The O(n) proof
    evaluates the weighted power-of-two sum exactly
    (2^(H+1) − H − 2) and uses it to bound the floor-division
    terms, following the CLRS Theorem 6.3 argument.
+
+6. **Dual cost models**: The CostBound module provides ghost-counter-linked
+   bounds per max_heapify call. The Complexity module provides tighter
+   pure bounds by summing over heights. Both are proven correct; they
+   serve different purposes.
+
+All proofs in this chapter are fully verified with **zero admits**.

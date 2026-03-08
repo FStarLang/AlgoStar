@@ -6,9 +6,11 @@ module CLRS.Ch32.NaiveStringMatch.Complexity
 
 open FStar.Mul
 
+//SNIPPET_START: complexity_bound_naive
 /// Complexity bound: cf - c0 <= (n - m + 1) * m
 let string_match_complexity_bounded (cf c0 n m: nat) : prop =
   cf >= c0 /\ cf - c0 <= (n - m + 1) * m
+//SNIPPET_END: complexity_bound_naive
 
 /// Complexity is quadratic in the worst case
 val naive_worst_case_quadratic (n m: nat)

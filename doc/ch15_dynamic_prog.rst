@@ -41,32 +41,6 @@ revenue by looking up each piece length in the price table. The
 optimal revenue is the maximum of ``cutting_revenue`` over all valid
 cuttings.
 
-Recursive Specification
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Rather than working with the existential "max over all valid cuttings"
-directly (which would require reasoning about an unbounded set), we
-use the standard DP approach: define the optimal value recursively.
-
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: rod_cutting_spec
-   :end-before: //SNIPPET_END: rod_cutting_spec
-
-``accum_max prices r j limit`` computes the maximum of
-``prices[i-1] + r[j-i]`` for ``i`` from 1 to ``limit``. This is the
-inner loop of the DP: for a rod of length ``j``, try every possible
-first cut at position ``i``, adding the price of piece ``i`` to the
-optimal revenue for the remaining rod of length ``j-i`` (looked up
-in the table ``r``).
-
-``build_opt prices len`` constructs the DP table bottom-up:
-``build_opt prices len`` returns a sequence of length ``len+1``
-where entry ``k`` is the optimal revenue for a rod of length ``k``.
-
-``optimal_revenue prices j`` is simply ``build_opt prices j`` at
-index ``j``.
-
 Optimal Substructure
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -77,7 +51,7 @@ the optimal revenue satisfies the recurrence:
 
 This is proved as a theorem:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Spec.fst
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: optimal_substructure
    :end-before: //SNIPPET_END: optimal_substructure
@@ -100,8 +74,8 @@ Imperative Implementation
 The Pulse implementation fills the DP table bottom-up using a nested
 loop:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.fst
-   :language: fstar
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Impl.fst
+   :language: pulse
    :start-after: //SNIPPET_START: rod_cutting_sig
    :end-before: //SNIPPET_END: rod_cutting_sig
 
@@ -133,7 +107,9 @@ counter tracks ``triangle(vj - 1) + (vi - 1)`` during the inner loop,
 where ``triangle(k) = k(k+1)/2``. After the inner loop completes
 ``vj`` iterations, the identity
 ``triangle(vj - 1) + vj = triangle(vj)`` advances the outer invariant.
-This gives a tight O(n²) bound, matching CLRS's analysis.
+This gives a tight O(n²) bound, matching CLRS's analysis. The
+complexity is **linked**: proven inside the Pulse implementation via
+a ghost counter, not just in a separate pure module.
 
 Extended Rod Cutting
 ~~~~~~~~~~~~~~~~~~~~
@@ -216,7 +192,7 @@ Specification
 
 The pure specification defines LCS length recursively:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.fst
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: lcs_spec
    :end-before: //SNIPPET_END: lcs_spec
@@ -224,6 +200,10 @@ The pure specification defines LCS length recursively:
 This follows CLRS Eq. 15.9 directly: if the last characters match,
 the LCS length is 1 plus the LCS of the prefixes; otherwise, take
 the maximum of dropping one character from either sequence.
+
+The specification module also defines ``is_subsequence``,
+``is_common_subsequence`` and ``lcs_table_correct`` predicates.
+``lcs_length_nonneg`` proves the result is always non-negative.
 
 Implementation
 ~~~~~~~~~~~~~~
@@ -233,7 +213,7 @@ vector. The outer loop iterates over rows (index ``i`` into sequence
 ``x``), the inner loop over columns (index ``j`` into sequence ``y``).
 Each cell ``tbl[i * (n+1) + j]`` stores ``lcs_length x y i j``.
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.fst
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: lcs_sig
    :end-before: //SNIPPET_END: lcs_sig
@@ -247,7 +227,16 @@ recursive definition.
 The correctness proof is structurally identical to rod cutting:
 after filling each cell, we show its value matches
 ``lcs_length x y i j``. The complexity is O(mn), proved by counting
-exactly ``m × n`` cell evaluations via a ghost counter.
+exactly ``(m+1) × (n+1)`` cell evaluations via a ghost counter.
+The complexity is **linked** to the Pulse implementation.
+
+**Limitation.** The specification defines ``is_subsequence`` and
+``is_common_subsequence`` predicates but does not formally prove
+that ``lcs_length x y m n`` equals the length of any actual longest
+common subsequence. The CLRS recurrence is standard, but the bridge
+from the recurrence to the existential characterization ("there
+exists a common subsequence of this length, and no longer one exists")
+is not mechanized.
 
 
 Matrix Chain Multiplication
@@ -264,7 +253,7 @@ The recursive optimal substructure (CLRS Eq. 15.7) is defined as a
 pure, total function ``mc_cost``.  Given dimensions ``p[0..n]`` where
 matrix ``A_i`` has dimensions ``p[i] × p[i+1]``:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: mc_cost
    :end-before: //SNIPPET_END: mc_cost
@@ -281,7 +270,7 @@ Imperative Mirror Specification
 The bottom-up DP algorithm is captured by an imperative mirror — pure
 functions that exactly trace the three nested loops:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.fst
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: mc_spec
    :end-before: //SNIPPET_END: mc_spec
@@ -294,18 +283,10 @@ iterates over increasing chain lengths from 2 to ``n``.
 DP Correctness
 ~~~~~~~~~~~~~~
 
-The key predicate ``dp_correct_upto`` relates the flat DP table to the
-recursive specification:
-
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
-   :language: fstar
-   :start-after: //SNIPPET_START: dp_correct
-   :end-before: //SNIPPET_END: dp_correct
-
 The main equivalence theorem states that the bottom-up DP result
 equals the recursive optimum:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: mc_spec_equiv
    :end-before: //SNIPPET_END: mc_spec_equiv
@@ -334,7 +315,7 @@ The Pulse implementation fills a 2D table using the standard
 then length 2, length 3, and so on. This gives an O(n³) algorithm with
 three nested loops.
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.fst
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: mc_sig
    :end-before: //SNIPPET_END: mc_sig
@@ -343,8 +324,25 @@ The loop invariant asserts that all cells for chains shorter than
 the current length are correctly filled. Each cell computation reads
 O(n) previously computed cells to find the optimal split point.
 
-The complexity proof counts exactly ``n(n-1)(2n-1)/6`` operations
-(the sum of ``k(k-1)`` for ``k`` from 2 to ``n``), giving O(n³).
+The ``Extended`` module provides ``extended_matrix_chain_order``,
+which additionally returns the split-point array ``s`` and proves
+``cuts_are_optimal``:
+
+.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Extended.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: extended_mc_sig
+   :end-before: //SNIPPET_END: extended_mc_sig
+
+Complexity
+~~~~~~~~~~
+
+The complexity analysis is done in a separate pure module
+(``MatrixChain.Complexity``). It proves ``mc_iterations n ≤ n³``.
+Unlike rod cutting and LCS, the complexity is **not linked** to the
+Pulse implementation via a ghost counter — the Pulse function does
+not carry a complexity ghost reference. The bound is an upper bound
+(not tight): the exact count is ``Σ_{l=2..n} (n−l+1)(l−1)``, which
+is ``n(n−1)(2n−1)/6``.
 
 
 DP Proof Pattern Summary

@@ -37,6 +37,7 @@ val weak_duality (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
 
 (** CLRS Theorem 26.6: Max-flow min-cut theorem.
     When no augmenting path exists in the residual graph,
+//SNIPPET_START: max_flow_min_cut
     the flow value equals the capacity of some cut (strong duality). *)
 val max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
                               (source: nat{source < n}) (sink: nat{sink < n})
@@ -48,3 +49,4 @@ val max_flow_min_cut_theorem (#n: nat) (cap: capacity_matrix n) (flow: flow_matr
       (exists (s_set: nat -> bool).
         is_st_cut s_set n source sink /\
         flow_value flow n source == cut_capacity cap s_set))
+//SNIPPET_END: max_flow_min_cut

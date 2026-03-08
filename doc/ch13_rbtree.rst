@@ -11,9 +11,51 @@ together guarantee that no root-to-leaf path is more than twice as
 long as any other.  This ensures that search, insert, and delete all
 run in O(lg n) worst-case time.
 
+The formalization provides two independent Pulse implementations —
+Okasaki-style (functional balance) and CLRS-style (imperative rotations
+with parent pointers) — sharing a common pure specification.  All
+proofs are complete with **zero admits**.
+
 .. contents::
    :local:
    :depth: 2
+
+Summary
+=======
+
+.. list-table::
+   :header-rows: 1
+
+   * - Operation
+     - CLRS §
+     - Okasaki (``Impl``)
+     - CLRS (``CLRSImpl``)
+     - Complexity
+     - Admits
+   * - SEARCH
+     - §13.2
+     - ``rb_search``
+     - ``rb_search``
+     - O(lg n)
+     - 0
+   * - INSERT
+     - §13.3
+     - ``rb_insert``
+     - ``rb_clrs_insert``
+     - O(lg n)
+     - 0
+   * - DELETE
+     - §13.4
+     - ``rb_delete``
+     - ``rb_clrs_delete``
+     - O(lg n)
+     - 0
+   * - MINIMUM
+     - §12.2
+     - —
+     - ``rb_minimum``
+     - O(lg n)
+     - 0
 
 CLRS Coverage
 =============
@@ -34,30 +76,34 @@ Chapter 13 covers four topics:
   restores the RB properties by walking back up the tree performing
   recolorings and at most two rotations.
 
-- **§13.4 Deletion** — RB-DELETE and RB-DELETE-FIXUP (not implemented
-  in this formalization).
+- **§13.4 Deletion** — RB-DELETE and RB-DELETE-FIXUP.
 
-Our formalization covers §13.1–13.3 in full.  Deletion (§13.4) is not
-yet implemented.
+Our formalization covers §13.1–13.4 in full.
 
 Formalization Overview
 ======================
 
-The formalization has three layers, all with **zero admits**:
+The formalization has four layers, all with **zero admits**:
 
 1. **Pure functional specification** (``CLRS.Ch13.RBTree.Spec``) — an
    inductive ``rbtree`` type, RB invariant predicates, Okasaki-style
-   functional ``balance``/``ins``/``insert``, and correctness lemmas for
-   membership, BST ordering, RB invariant preservation, and the height
-   bound (Theorem 13.1).
+   functional ``balance``/``ins``/``insert``, Kahrs-style
+   ``del``/``delete``, and minimum/maximum/successor/predecessor.
 
-2. **Pointer-based Pulse implementation** (``CLRS.Ch13.RBTree``) —
-   heap-allocated nodes with mutable fields and nullable child pointers,
-   tied to the pure spec via a recursive separation-logic predicate
-   ``is_rbtree``.  Operations (search, insert, balance) each have a
-   postcondition proving equivalence to the pure spec.
+2. **Correctness lemmas** (``CLRS.Ch13.RBTree.Lemmas``) — Theorem
+   13.1 (height bound), membership preservation, BST/RB invariant
+   preservation for insert and delete.
 
-3. **Complexity analysis** (``CLRS.Ch13.RBTree.Complexity``) — pure
+3. **Pointer-based Pulse implementation** (``CLRS.Ch13.RBTree.Impl``) —
+   Okasaki-style: heap-allocated nodes with mutable fields and
+   nullable child pointers, tied to the pure spec via ``is_rbtree``.
+
+4. **CLRS-faithful Pulse implementation**
+   (``CLRS.Ch13.RBTree.CLRSImpl``) — parent pointers, explicit
+   LEFT-ROTATE/RIGHT-ROTATE, uncle-checking INSERT-FIXUP,
+   4-case DELETE-FIXUP, tied to the pure spec via ``rbtree_subtree``.
+
+5. **Complexity analysis** (``CLRS.Ch13.RBTree.Complexity``) — pure
    tick counters proving search and insert are O(lg n) via the height
    bound.
 
@@ -120,12 +166,27 @@ wraps ``ins`` and forces the root black:
 .. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
    :language: fstar
    :start-after: (*** Okasaki-style Balance (Insert Fixup) ***)
-   :end-before: // ========== Balance case classifier ==========
+   :end-before: (*** Balance Case Classifier ***)
 
 The four cases in ``balance`` correspond exactly to the three cases of
 RB-INSERT-FIXUP in CLRS (our four cases arise because CLRS treats the
 symmetric left/right sub-cases separately in the text, while Okasaki
 unifies them into pattern matches).
+
+Kahrs-Style Delete (§13.4)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Delete uses Kahrs' formulation:
+
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
+   :language: fstar
+   :start-after: (*** Delete — Kahrs-style functional deletion ***)
+
+- ``balL``/``balR``: rebalance after a black-height deficit on
+  left/right child.
+- ``fuse``: merge two subtrees when a node is deleted.
+- ``del``: recursive delete with color-aware rebalancing.
+- ``delete = make_black ∘ del``.
 
 Theorem 13.1: Height Bound
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,11 +206,6 @@ height at most 2·lg(n + 1).*  The proof follows CLRS:
 3. **Combining** (``height_bound_theorem``): from (1),
    n + 1 ≥ 2\ :sup:`bh`, so bh ≤ lg(n + 1), and from (2),
    height ≤ 2·bh ≤ 2·lg(n + 1).
-
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
-   :language: fstar
-   :start-after: // CLRS Theorem 13.1: height <= 2 * log2_floor(n + 1)
-   :end-before: (*** Insert Correctness ***)
 
 
 Insert Correctness
@@ -181,9 +237,21 @@ Three families of lemmas are proved, all with zero admits:
      ``ins`` preserves ``same_bh``, preserves ``bh``, and has
      ``almost_no_red_red``.
 
+Delete Correctness
+~~~~~~~~~~~~~~~~~~~
 
-Pointer-Based Pulse Implementation (``RBTree``)
-=================================================
+Delete correctness is proved analogously:
+
+- ``delete_mem``: ``mem x (delete t k) ⟺ (mem x t ∧ x ≠ k)``.
+- ``delete_preserves_bst``: BST ordering preserved.
+- ``delete_is_rbtree``: all RB + BST properties preserved.
+
+The proof requires lemmas for ``balL``, ``balR``, and ``fuse``
+showing they preserve both BST ordering and RB invariants.
+
+
+Okasaki-Style Pulse Implementation (``RBTree.Impl``)
+=====================================================
 
 The Pulse implementation uses heap-allocated nodes connected by
 mutable pointers, rather than a functional tree in a mutable
@@ -194,7 +262,7 @@ freed.
 Node Type and Recursive Predicate
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.fst
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_node_type
    :end-before: //SNIPPET_END: rb_node_type
@@ -206,10 +274,18 @@ defined by recursion on the ghost spec tree: a ``Leaf`` requires
 ``ct == Some p`` where ``p`` points to a heap-allocated node whose
 key, color, and child pointers recursively satisfy ``is_rbtree``:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.fst
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: is_rbtree
    :end-before: //SNIPPET_END: is_rbtree
+
+``valid_rbtree`` bundles the separation-logic predicate with the pure
+invariants:
+
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: valid_rbtree
+   :end-before: //SNIPPET_END: valid_rbtree
 
 Balance (§13.3 — Pointer Rotations)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,12 +315,9 @@ The implementation factors balance into three stages:
    concrete result to the spec.
 
 3. **Dispatcher** (``rb_balance``): calls the classifier, then
-   dispatches to the correct handler.  Each handler returns
-   ``is_rbtree y (S.balance S.Black lt v rt)``; the dispatcher
-   rewrites ``S.Black`` to the actual color ``c`` (which the
-   classifier already proved equals ``Black`` for rotation cases).
+   dispatches to the correct handler.
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.fst
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_balance
    :end-before: //SNIPPET_END: rb_balance
@@ -256,7 +329,7 @@ Search
 Search preserves ``is_rbtree`` (read-only) and returns exactly the
 pure spec's ``S.search`` result:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.fst
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_search
    :end-before: //SNIPPET_END: rb_search
@@ -271,7 +344,7 @@ exists, the existing node is returned unchanged.  Nodes that are no
 longer part of the tree (because ``rb_balance`` restructured pointers
 around them) are freed with ``Box.free``:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.fst
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_ins
    :end-before: //SNIPPET_END: rb_ins
@@ -279,7 +352,7 @@ around them) are freed with ``Box.free``:
 ``rb_insert`` wraps ``rb_ins`` and forces the root black, matching
 ``S.insert = make_black ∘ ins``:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.fst
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_insert
    :end-before: //SNIPPET_END: rb_insert
@@ -289,10 +362,105 @@ the resulting pointer tree represents exactly the pure-functional
 insert result — which, by the Spec lemmas, is a valid RB tree, a
 valid BST, and contains the new key plus all old keys.
 
-Proof Techniques
-~~~~~~~~~~~~~~~~~
+Free
+~~~~~
 
-Several Pulse-specific techniques were developed for this implementation:
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: free_rbtree
+   :end-before: //SNIPPET_END: free_rbtree
+
+
+Validated and Complexity-Aware APIs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The validated API (``rb_search_v``, ``rb_insert_v``, ``rb_delete_v``)
+bundles the RB + BST invariants:
+
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: rb_insert_v
+   :end-before: //SNIPPET_END: rb_insert_v
+
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+   :language: pulse
+   :start-after: //SNIPPET_START: rb_delete_v
+   :end-before: //SNIPPET_END: rb_delete_v
+
+CLRS-Style Pulse Implementation (``CLRSImpl``)
+================================================
+
+The CLRS-faithful implementation uses parent pointers and explicit
+LEFT-ROTATE/RIGHT-ROTATE, matching the pseudocode in §13.2–13.4.
+
+The pure specification (``CLRSSpec``) defines:
+
+- ``left_rotate``, ``right_rotate``: tree restructuring primitives.
+- ``clrs_fixup_left``, ``clrs_fixup_right``: uncle-checking fixup
+  (Case 1: uncle Red → recolor; Cases 2/3: uncle Black → rotate).
+- ``clrs_ins``, ``clrs_insert``: BST insert + fixup.
+- ``clrs_del_cases234_left/right``, ``clrs_resolve_left/right``:
+  4-case DELETE-FIXUP with symmetric handling.
+- ``clrs_del``, ``clrs_delete``: full delete with successor
+  replacement and fixup.
+
+The Pulse implementation (``CLRSImpl.fst``) uses a ``rbtree_subtree``
+predicate with parent-pointer tracking:
+
+.. code-block:: fstar
+
+   let rec rbtree_subtree (ct: rb_ptr) (ft: S.rbtree) (parent: rb_ptr)
+     : Tot slprop (decreases ft)
+     = match ft with
+       | S.Leaf -> pure (ct == None)
+       | S.Node c l v r ->
+         exists* (bp: rb_node_ptr) (node: rb_node).
+           pure (ct == Some bp) **
+           (bp |-> node) **
+           pure (node.key == v /\ node.color == c /\ node.p == parent) **
+           rbtree_subtree node.left l (Some bp) **
+           rbtree_subtree node.right r (Some bp)
+
+
+Complexity (``RBTree.Complexity``)
+===================================
+
+The complexity module defines tick counters that shadow the recursive
+structure of ``search``, ``ins``, and ``del``, proves they are bounded
+by the tree height plus a constant, and combines with Theorem 13.1 to
+obtain logarithmic bounds:
+
+- **Search**: ``search_ticks t k ≤ height t + 1 ≤ 2·lg(n + 1) + 1``
+- **Insert**: ``insert_ticks t k ≤ height t + 2 ≤ 2·lg(n + 1) + 2``
+- **Delete**: ``delete_ticks t k ≤ 2·height t + 2 ≤ 4·lg(n + 1) + 2``
+
+The balance operation contributes only O(1) to the cost since it
+examines a constant number of nodes and performs at most two pointer
+restructurings — this is reflected by not adding ticks inside
+``balance``.
+
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
+   :language: fstar
+   :start-after: //SNIPPET_START: search_complexity
+   :end-before: //SNIPPET_END: search_complexity
+
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
+   :language: fstar
+   :start-after: //SNIPPET_START: insert_complexity
+   :end-before: //SNIPPET_END: insert_complexity
+
+.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
+   :language: fstar
+   :start-after: //SNIPPET_START: delete_complexity
+   :end-before: //SNIPPET_END: delete_complexity
+
+All bounds are proven with **zero admits**.
+
+
+Proof Techniques
+=================
+
+Several Pulse-specific techniques were developed for these implementations:
 
 - **Option-match rewrite pattern**: After ``match x { None -> }``,
   Pulse rewrites slprops from ``is_rbtree x ft`` to
@@ -313,30 +481,25 @@ Several Pulse-specific techniques were developed for this implementation:
   safe use of ``Some?.v x`` in the rotation handlers.
 
 
-Complexity (``RBTree.Complexity``)
-===================================
+Limitations
+===========
 
-The complexity module defines tick counters that shadow the recursive
-structure of ``search`` and ``ins``, proves they are bounded by the
-tree height plus a constant, and combines with Theorem 13.1 to obtain
-logarithmic bounds:
-
-- **Search**: ``search_ticks t k ≤ height t + 1 ≤ 2·lg(n + 1) + 1``
-- **Insert**: ``insert_ticks t k ≤ height t + 2 ≤ 2·lg(n + 1) + 2``
-
-The balance operation contributes only O(1) to the cost since it
-examines a constant number of nodes and performs at most two pointer
-restructurings — this is reflected by not adding ticks inside
-``balance``.
-
-Both bounds are proven with **zero admits**.
-
+- **Delete tick bound is 4·lg(n+1) + 2, not 2·lg(n+1).** The
+  Kahrs-style ``fuse`` traverses both inner spines, doubling the
+  constant factor.
+- **No amortized analysis.** All bounds are worst-case per operation.
+- **Integer keys only.** No generic key type or comparator.
+- **Destructive operations.** Insert/delete consume the input tree.
+- **CLRS-style lacks complexity bounds.** O(lg n) is proven only for
+  the Okasaki-style operations.
 
 Remaining Admits
 ================
 
-**None.** All three modules (``Spec``, ``RBTree``, ``Complexity``)
-are fully verified with zero ``admit()``, ``assume()``, or
-``assume_`` calls.
+**None.** All modules (``Spec``, ``Lemmas``, ``Complexity``,
+``Impl``, ``CLRSSpec``, ``CLRSImpl``) are fully verified with zero
+``admit()``, ``assume()``, or ``assume_`` calls.
 
-Deletion (CLRS §13.4) is not yet implemented.
+Deletion (CLRS §13.4) is fully implemented in both the Okasaki-style
+(Kahrs formulation) and CLRS-style (rotation-based fixup)
+implementations.

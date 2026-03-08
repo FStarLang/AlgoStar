@@ -42,6 +42,7 @@ let earliest_compatible (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) 
                      z < n /\ z < Seq.length s /\ z < Seq.length f ==>
     Seq.index s z < Seq.index f (Seq.index sel (Seq.length sel - 1)))
 
+//SNIPPET_START: greedy_selection_inv
 (* The full greedy selection invariant *)
 let greedy_selection_inv (sel: seq nat) (s f: seq int) (n: nat) (processed: nat) (last_finish: int) : prop =
   Seq.length sel >= 1 /\
@@ -53,6 +54,7 @@ let greedy_selection_inv (sel: seq nat) (s f: seq int) (n: nat) (processed: nat)
   Seq.index f (Seq.index sel (Seq.length sel - 1)) == last_finish /\
   Seq.index sel 0 == 0 /\
   earliest_compatible sel s f n processed
+//SNIPPET_END: greedy_selection_inv
 
 (* A valid selection: a compatible set of activities *)
 let is_valid_selection (sel: seq nat) (s f: seq int) (n: nat) : prop =

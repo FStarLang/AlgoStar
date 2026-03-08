@@ -35,6 +35,7 @@ val valid_caps (cap_seq: Seq.seq int) (n: nat) : prop
 (** Imperative flow validity: capacity constraints + flow conservation *)
 val imp_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat) : prop
 
+//SNIPPET_START: imp_valid_flow_bridge
 (** Bridge lemma: imp_valid_flow implies Spec.valid_flow.
     Allows callers to use the MFMC theorem with the result of max_flow. *)
 val imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
@@ -44,6 +45,7 @@ val imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source 
       n > 0 /\ source < n /\ sink < n /\
       Seq.length flow_seq == n * n /\ Seq.length cap_seq == n * n /\
       valid_flow #n flow_seq cap_seq source sink)
+//SNIPPET_END: imp_valid_flow_bridge
 
 (** Runtime check for valid capacities *)
 fn check_valid_caps_fn
@@ -76,6 +78,7 @@ fn check_valid_caps_fn
     Postcondition:
     - Always: imp_valid_flow on the resulting flow array
     - When completed: additionally no_augmenting_path, enabling the MFMC theorem *)
+//SNIPPET_START: max_flow_sig
 fn max_flow
   (capacity: A.array int)
   (#cap_seq: Ghost.erased (Seq.seq int))
@@ -111,3 +114,4 @@ fn max_flow
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
       (completed ==> no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
     )
+//SNIPPET_END: max_flow_sig
