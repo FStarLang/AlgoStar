@@ -46,3 +46,21 @@ val lemma_dll_insert_delete (l: dll_spec) (x: int)
 /// Search in empty DLL returns false
 val lemma_dll_search_empty (x: int)
   : Lemma (dll_search dll_empty x == false)
+
+/// Insert at tail increases length by 1
+val lemma_dll_insert_tail_length (l: dll_spec) (x: int)
+  : Lemma (dll_length (dll_insert_tail l x) == dll_length l + 1)
+
+/// Insert at tail makes x searchable
+val lemma_dll_insert_tail_search (l: dll_spec) (x: int)
+  : Lemma (dll_search (dll_insert_tail l x) x == true)
+
+/// Delete-last of non-existent element is identity
+val lemma_dll_delete_last_not_found (l: dll_spec) (x: int)
+  : Lemma (requires ~(dll_search l x))
+          (ensures dll_delete_last l x == l)
+
+/// Delete-last of found element decreases length by 1
+val lemma_dll_delete_last_length (l: dll_spec) (x: int)
+  : Lemma (requires dll_search l x)
+          (ensures dll_length (dll_delete_last l x) == dll_length l - 1)

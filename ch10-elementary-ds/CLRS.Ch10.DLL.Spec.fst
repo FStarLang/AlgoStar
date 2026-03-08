@@ -42,3 +42,25 @@ let rec dll_delete_at (i: nat) (l: dll_spec) : dll_spec =
 /// Length of DLL
 let dll_length (l: dll_spec) : nat =
   length l
+
+/// Insert at tail (CLRS doubly-linked list advantage)
+let dll_insert_tail (l: dll_spec) (x: int) : dll_spec =
+  l @ [x]
+
+/// Delete last occurrence of element
+let rec dll_delete_last (l: dll_spec) (x: int) : dll_spec =
+  match l with
+  | [] -> []
+  | hd :: tl ->
+    if mem x tl then hd :: dll_delete_last tl x
+    else if hd = x then tl
+    else hd :: tl
+
+/// Remove last occurrence (standalone, matches dll_delete_last)
+let rec remove_last (k: int) (l: list int) : list int =
+  match l with
+  | [] -> []
+  | hd :: tl ->
+    if mem k tl then hd :: remove_last k tl
+    else if hd = k then tl
+    else hd :: tl
