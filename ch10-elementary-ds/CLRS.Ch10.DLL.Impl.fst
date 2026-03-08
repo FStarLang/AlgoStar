@@ -3,7 +3,8 @@ module CLRS.Ch10.DLL.Impl
 //
 // Nodes have {key, prev, next}. Segment predicate `dls` from Pulse.Lib.Deque.
 // Operations: LIST-INSERT (O(1)), LIST-INSERT-TAIL (O(1) runtime),
-//             LIST-SEARCH (O(n)), LIST-DELETE (O(n)),
+//             LIST-SEARCH (O(n)), LIST-SEARCH-BACK (O(n)),
+//             LIST-DELETE (O(n)), LIST-DELETE-LAST (O(n)),
 //             LIST-DELETE-NODE (O(n) traversal to index, O(1) pointer surgery)
 //
 // All operations fully verified with 0 admits.
@@ -15,7 +16,66 @@ open Pulse.Lib.Box { box, (:=), (!) }
 module L = FStar.List.Tot
 open FStar.List.Tot
 
-// Types node, dptr and predicates dls, dll are defined in CLRS.Ch10.DLL.Impl.fsti
+// === Internal types (hidden from .fsti) ===
+
+//SNIPPET_START: dll_node_internal
+noeq
+type node = {
+  key:  int;
+  prev: option (box node);
+  next: option (box node);
+}
+//SNIPPET_END: dll_node_internal
+
+// === Internal segment predicate ===
+
+//SNIPPET_START: dll_dls_internal
+let rec dls
+  ([@@@mkey] p: box node)
+  (l: list int {Cons? l})
+  (prev_ptr: dptr)
+  (tail: box node)
+  (last_ptr: dptr)
+  : Tot slprop (decreases l)
+  = match l with
+    | [k] ->
+      exists* (v: node).
+        pts_to p v **
+        pure (v.key == k /\ v.prev == prev_ptr /\
+              v.next == last_ptr /\ p == tail)
+    | k :: rest ->
+      exists* (v: node) (np: box node).
+        pts_to p v **
+        dls np rest (Some p) tail last_ptr **
+        pure (v.key == k /\ v.prev == prev_ptr /\
+              v.next == Some np)
+
+let dll (hd tl: dptr) (l: list int) : slprop =
+  match l with
+  | [] -> pure (hd == None /\ tl == None)
+  | k :: rest ->
+    exists* (hp tp: box node).
+      dls hp (k :: rest) None tp None **
+      pure (hd == Some hp /\ tl == Some tp)
+//SNIPPET_END: dll_dls_internal
+
+// === Ghost helpers for empty dll (exposed in .fsti) ===
+
+ghost
+fn dll_nil (hd tl: dptr)
+  requires pure (hd == None /\ tl == None)
+  ensures dll hd tl []
+{
+  fold (dll hd tl ([] #int))
+}
+
+ghost
+fn dll_nil_elim (hd tl: dptr)
+  requires dll hd tl []
+  ensures pure (hd == None /\ tl == None)
+{
+  unfold (dll hd tl ([] #int))
+}
 
 // dll hd==None ↔ l==[]
 ghost
@@ -490,6 +550,92 @@ fn unfactor_dls_rev
   }
 }
 
+// --- dls_rev factored_prev helpers (analogous to dls factored_next) ---
+
+// When v_prev==None and first_ptr==None: l is singleton
+ghost
+fn factored_prev_none_nil
+  (p: box node)
+  (#l: erased (list int) {Cons? l})
+  (#head: erased (box node))
+  preserves dls_rev_factored_prev p l head None None
+  ensures pure (L.tl l == ([] #int))
+{
+  let hd = L.hd l;
+  let tl = L.tl l;
+  match tl {
+    [] -> { () }
+    y :: ys -> {
+      rewrite each l as (hd :: y :: ys) in
+        (dls_rev_factored_prev p l head None None);
+      unfold (dls_rev_factored_prev p (hd :: y :: ys) head None None);
+      unreachable ()
+    }
+  }
+}
+
+// When v_prev==Some pp and first_ptr==None: multi-element
+ghost
+fn factored_prev_some_cons
+  (p: box node) (pp: box node)
+  (#l: erased (list int) {Cons? l})
+  (#head: erased (box node))
+  preserves dls_rev_factored_prev p l head None (Some pp)
+  ensures pure (Cons? (L.tl l))
+{
+  let hd = L.hd l;
+  let tl = L.tl l;
+  match tl {
+    [] -> {
+      rewrite each l as [hd] in
+        (dls_rev_factored_prev p l head None (Some pp));
+      unfold (dls_rev_factored_prev p [hd] head None (Some pp));
+      unreachable ()
+    }
+    y :: ys -> { () }
+  }
+}
+
+// Extract sub dls_rev from factored_prev (multi-element case)
+ghost
+fn elim_factored_prev
+  (p: box node) (pp: box node)
+  (#l: erased (list int) {Cons? l /\ Cons? (L.tl l)})
+  (#head: erased (box node))
+  (#first_ptr: erased dptr)
+  requires dls_rev_factored_prev p l head first_ptr (Some pp)
+  ensures dls_rev pp (L.tl l) (Some p) head first_ptr
+{
+  let hd = L.hd l;
+  let r0 = L.hd (L.tl l);
+  let rs = L.tl (L.tl l);
+  rewrite each l as (hd :: r0 :: rs) in
+    (dls_rev_factored_prev p l head first_ptr (Some pp));
+  unfold (dls_rev_factored_prev p (hd :: r0 :: rs) head first_ptr (Some pp));
+  with pp'. _;
+  rewrite each pp' as pp;
+  rewrite each (r0 :: rs) as (L.tl l);
+}
+
+// Reinsert sub dls_rev into factored_prev
+ghost
+fn intro_factored_prev
+  (p: box node) (pp: box node)
+  (#l: erased (list int) {Cons? l /\ Cons? (L.tl l)})
+  (#head: erased (box node))
+  (#first_ptr: erased dptr)
+  requires dls_rev pp (L.tl l) (Some p) head first_ptr
+  ensures dls_rev_factored_prev p l head first_ptr (Some pp)
+{
+  let hd = L.hd l;
+  let r0 = L.hd (L.tl l);
+  let rs = L.tl (L.tl l);
+  rewrite each (L.tl l) as (r0 :: rs) in
+    (dls_rev pp (L.tl l) (Some p) head first_ptr);
+  fold (dls_rev_factored_prev p (hd :: r0 :: rs) head first_ptr (Some pp));
+  rewrite each (hd :: r0 :: rs) as l
+}
+
 // --- fold_dls_rev_cons: analogous to fold_dls_cons ---
 ghost
 fn fold_dls_rev_cons
@@ -562,6 +708,17 @@ let rev_cons (#a:Type) (x:a) (rest:list a)
   : Lemma (L.rev (x :: rest) == L.rev rest @ [x])
   [SMTPat (L.rev (x :: rest))]
   = FStar.List.Tot.Properties.rev_append [x] rest
+#pop-options
+
+// mem is preserved by rev
+#push-options "--fuel 2"
+let rec mem_rev (#a:eqtype) (x: a) (l: list a)
+  : Lemma (L.mem x (L.rev l) == L.mem x l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      mem_rev x tl;
+      FStar.List.Tot.Properties.append_mem (L.rev tl) [hd] x
 #pop-options
 
 #push-options "--fuel 2"
@@ -888,6 +1045,90 @@ fn list_search_ptr (hd tl: dptr) (k: int)
     }
   }
 }
+
+// --- LIST-SEARCH-BACK: Search from tail to head ---
+
+// Search within dls_rev segment (first_ptr=None, full DLL reversed).
+fn rec search_dls_rev
+  (p: box node) (k: int)
+  (#rl: erased (list int) {Cons? rl})
+  (#next_ptr: erased dptr)
+  (#head: erased (box node))
+  preserves dls_rev p rl next_ptr head None
+  returns found: bool
+  ensures pure (found <==> L.mem k rl)
+{
+  factor_dls_rev p rl next_ptr head None;
+  unfold (dls_rev_factored p rl next_ptr head None);
+  with v. assert (pts_to p v);
+  let nd = Box.(!p);
+  let prv = nd.prev;
+  if (nd.key = k) {
+    fold (dls_rev_factored p rl next_ptr head None);
+    unfactor_dls_rev p rl next_ptr head None;
+    true
+  } else {
+    match prv {
+      norewrite None -> {
+        factored_prev_none_nil p;
+        fold (dls_rev_factored p rl next_ptr head None);
+        unfactor_dls_rev p rl next_ptr head None;
+        false
+      }
+      norewrite Some pp -> {
+        factored_prev_some_cons p pp;
+        elim_factored_prev p pp;
+        let r = search_dls_rev pp k;
+        intro_factored_prev p pp;
+        rewrite each (Some pp) as v.prev;
+        fold (dls_rev_factored p rl next_ptr head None);
+        unfactor_dls_rev p rl next_ptr head None;
+        r
+      }
+    }
+  }
+}
+
+#push-options "--fuel 2"
+fn list_search_back (hd tl: dptr) (k: int)
+  preserves dll hd tl 'l
+  returns found: bool
+  ensures pure (found <==> L.mem k 'l)
+{
+  match hd {
+    norewrite None -> {
+      dll_none_nil hd tl;
+      false
+    }
+    norewrite Some hp -> {
+      dll_some_cons hd tl;
+      let lk = hide (L.hd 'l);
+      let lr = hide (L.tl 'l);
+      rewrite each 'l as (reveal lk :: reveal lr) in (dll hd tl 'l);
+      unfold (dll hd tl (reveal lk :: reveal lr));
+      with hp' tp. _;
+      rewrite each hp' as hp;
+      let concrete_tp = Some?.v tl;
+      rewrite each tp as concrete_tp;
+      // dls hp (reveal lk :: reveal lr) None concrete_tp None
+      dls_to_dls_rev hp None concrete_tp None;
+      // dls_rev concrete_tp (L.rev ...) None hp None
+      mem_rev k (reveal lk :: reveal lr);
+      let r = search_dls_rev concrete_tp k;
+      // Convert back
+      dls_rev_to_dls concrete_tp None hp None;
+      FStar.List.Tot.Properties.rev_involutive (reveal lk :: reveal lr);
+      rewrite each (L.rev (L.rev (reveal lk :: reveal lr)))
+                as (reveal lk :: reveal lr);
+      fold (dll (Some hp) (Some concrete_tp) (reveal lk :: reveal lr));
+      rewrite each (Some hp) as hd;
+      rewrite each (Some concrete_tp) as tl;
+      rewrite each (reveal lk :: reveal lr) as 'l;
+      r
+    }
+  }
+}
+#pop-options
 
 // --- O(1) delete: see list_delete_node after list_delete ---
 
@@ -1296,4 +1537,168 @@ fn list_delete_node
   delete_result_to_dll new_hd new_tl;
   Pulse.Lib.Reference.(hd_ref := new_hd);
   Pulse.Lib.Reference.(tl_ref := new_tl)
+}
+
+// --- LIST-DELETE-LAST ---
+// Delete the last occurrence of key k from the DLL.
+// Uses forward search to determine whether k appears in the tail,
+// then either deletes at the current position or recurses.
+
+// remove_last is defined in CLRS.Ch10.DLL.Impl.fsti
+
+let remove_last_head (k: int) (l: list int)
+  : Lemma (requires Cons? l /\ L.hd l = k /\ not (L.mem k (L.tl l)))
+          (ensures remove_last k l == L.tl l) = ()
+
+let remove_last_skip (k: int) (l: list int)
+  : Lemma (requires Cons? l /\ L.mem k (L.tl l))
+          (ensures remove_last k l == L.hd l :: remove_last k (L.tl l)) = ()
+
+let remove_last_miss (k: int) (l: list int)
+  : Lemma (requires Cons? l /\ L.hd l <> k /\ not (L.mem k (L.tl l)))
+          (ensures remove_last k l == l) = ()
+
+fn rec delete_last_in_dls
+  (p: box node) (k: int) (prev_ptr: dptr) (tail_ptr: box node)
+  (#l: erased (list int) {Cons? l})
+  requires dls p l prev_ptr tail_ptr None
+  returns r: (dptr & dptr)
+  ensures delete_result (fst r) (snd r) prev_ptr (remove_last k l)
+{
+  factor_dls p l prev_ptr tail_ptr None;
+  unfold (dls_factored p l prev_ptr tail_ptr None);
+  with v. assert (pts_to p v);
+  let nd = Box.(!p);
+  let nxt = nd.next;
+  match nxt {
+    norewrite None -> {
+      // Singleton list
+      factored_next_none_nil p;
+      if (nd.key = k) {
+        // Only element matches — delete it
+        remove_last_head k l;
+        let hd_l = hide (L.hd l);
+        rewrite each l as [reveal hd_l] in (dls_factored_next p l tail_ptr None None);
+        unfold (dls_factored_next p [reveal hd_l] tail_ptr None None);
+        Box.free p;
+        let none_ptr : dptr = None;
+        fold_delete_result_nil none_ptr none_ptr prev_ptr;
+        rewrite each ([] #int) as (remove_last k l);
+        (none_ptr, none_ptr)
+      } else {
+        // Key not found
+        remove_last_miss k l;
+        fold (dls_factored p l prev_ptr tail_ptr None);
+        unfactor_dls p l prev_ptr tail_ptr None;
+        fold_delete_result_cons p tail_ptr prev_ptr l;
+        rewrite each l as (remove_last k l);
+        (Some p, Some tail_ptr)
+      }
+    }
+    norewrite Some np -> {
+      // Multi-element list
+      factored_next_some_cons p np;
+      elim_factored_next p np;
+      // dls np (L.tl l) (Some p) tail_ptr None
+      // Search the tail for k
+      let in_tail = search_dls np k;
+      if in_tail {
+        // k appears in tail — recurse (this is not the last occurrence)
+        remove_last_skip k l;
+        let r = delete_last_in_dls np k (Some p) tail_ptr;
+        let new_hd = fst r;
+        let new_tl = snd r;
+        rewrite each (fst r) as new_hd in
+          (delete_result (fst r) (snd r) (Some p) (remove_last k (L.tl l)));
+        rewrite each (snd r) as new_tl in
+          (delete_result new_hd (snd r) (Some p) (remove_last k (L.tl l)));
+        match new_hd {
+          norewrite None -> {
+            // Tail became empty after delete
+            unfold_delete_result_nil new_hd new_tl (Some p);
+            rewrite each (remove_last k (L.tl l))
+                      as ([] #int)
+                      in (delete_result new_hd new_tl (Some p) (remove_last k (L.tl l)));
+            unfold (delete_result new_hd new_tl (Some p) []);
+            Box.(p := { nd with next = None });
+            fold (dls p [nd.key] prev_ptr p None);
+            fold_delete_result_cons p p prev_ptr [nd.key];
+            rewrite each [nd.key] as (remove_last k l);
+            (Some p, Some p)
+          }
+          norewrite Some new_hp -> {
+            // Tail still has elements after delete
+            unfold_delete_result_cons new_hd new_tl (Some p);
+            extract_delete_result_cons new_hd new_tl (Some p);
+            with hp' tp'. _;
+            rewrite each hp' as new_hp;
+            let concrete_tp = Some?.v new_tl;
+            rewrite each tp' as concrete_tp;
+            Box.(p := { nd with next = Some new_hp });
+            let nd' = { nd with next = Some new_hp };
+            fold_dls_cons p nd.key (remove_last k (L.tl l)) prev_ptr concrete_tp None nd' new_hp;
+            fold_delete_result_cons p concrete_tp prev_ptr (nd.key :: remove_last k (L.tl l));
+            rewrite each (nd.key :: remove_last k (L.tl l)) as (remove_last k l);
+            (Some p, Some concrete_tp)
+          }
+        }
+      } else if (nd.key = k) {
+        // This IS the last occurrence — delete this node
+        remove_last_head k l;
+        Box.free p;
+        set_prev np prev_ptr;
+        fold_delete_result_cons np tail_ptr prev_ptr (L.tl l);
+        rewrite each (L.tl l) as (remove_last k l);
+        (Some np, Some tail_ptr)
+      } else {
+        // Key not found anywhere
+        remove_last_miss k l;
+        intro_factored_next p np;
+        rewrite each (Some np) as v.next;
+        fold (dls_factored p l prev_ptr tail_ptr None);
+        unfactor_dls p l prev_ptr tail_ptr None;
+        fold_delete_result_cons p tail_ptr prev_ptr l;
+        rewrite each l as (remove_last k l);
+        (Some p, Some tail_ptr)
+      }
+    }
+  }
+}
+
+fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int)
+  requires exists* hd tl l.
+    pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
+  ensures exists* hd' tl' l.
+    pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_last k l)
+{
+  let hd = Pulse.Lib.Reference.(!hd_ref);
+  let tl = Pulse.Lib.Reference.(!tl_ref);
+  with l. assert (dll hd tl l);
+  match hd {
+    norewrite None -> {
+      dll_none_nil hd tl;
+      rewrite each l as ([] #int) in (dll hd tl l);
+      rewrite each ([] #int) as (remove_last k ([] #int));
+      Pulse.Lib.Reference.(hd_ref := hd);
+      Pulse.Lib.Reference.(tl_ref := tl)
+    }
+    norewrite Some hp -> {
+      dll_some_cons hd tl;
+      unfold_dll_cons hd tl;
+      with hp' tp. _;
+      rewrite each hp' as hp;
+      let concrete_tp = Some?.v tl;
+      rewrite each tp as concrete_tp;
+      let r = delete_last_in_dls hp k None concrete_tp;
+      let new_hd = fst r;
+      let new_tl = snd r;
+      rewrite each (fst r) as new_hd in
+        (delete_result (fst r) (snd r) None (remove_last k l));
+      rewrite each (snd r) as new_tl in
+        (delete_result new_hd (snd r) None (remove_last k l));
+      delete_result_to_dll new_hd new_tl;
+      Pulse.Lib.Reference.(hd_ref := new_hd);
+      Pulse.Lib.Reference.(tl_ref := new_tl)
+    }
+  }
 }

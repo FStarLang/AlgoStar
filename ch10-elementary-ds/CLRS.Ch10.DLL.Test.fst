@@ -13,7 +13,7 @@ fn test_dll ()
   // Create head and tail refs, start with empty dll
   let hd_ref = R.alloc #dptr None;
   let tl_ref = R.alloc #dptr None;
-  fold (dll None None ([] #int));
+  dll_nil None None;
 
   // Insert 10, 20, 30 at head → list is [30; 20; 10]
   list_insert hd_ref tl_ref 10;

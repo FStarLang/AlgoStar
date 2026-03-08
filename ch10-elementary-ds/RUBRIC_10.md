@@ -49,11 +49,11 @@ Each data structure follows the rubric pattern: **Spec → Lemmas → Impl** (wi
 
 | # | File | Rubric Role | Notes |
 |---|------|-------------|-------|
-| 20 | `CLRS.Ch10.DLL.Spec.fst` | **Spec.fst** | Pure spec: `dll_insert`, `dll_search`, `dll_delete`, `dll_delete_at` |
-| 21 | `CLRS.Ch10.DLL.Lemmas.fsti` | **Lemmas.fsti** | Signatures for 8 DLL correctness lemmas |
-| 22 | `CLRS.Ch10.DLL.Lemmas.fst` | **Lemmas.fst** | Proofs of insert/search/delete/delete_at properties |
-| 23 | `CLRS.Ch10.DLL.Impl.fsti` | **Impl.fsti** | `node`, `dptr`, `dls`, `dll`, 6 operation signatures (incl. `list_insert_tail`) |
-| 24 | `CLRS.Ch10.DLL.Impl.fst` | **Impl.fst** | True DLL with `dls`/`dls_rev` predicates, all ops + delete-by-index + tail insertion |
+| 20 | `CLRS.Ch10.DLL.Spec.fst` | **Spec.fst** | Pure spec: `dll_insert`, `dll_search`, `dll_delete`, `dll_delete_at`, `dll_insert_tail`, `dll_delete_last`, `remove_last` |
+| 21 | `CLRS.Ch10.DLL.Lemmas.fsti` | **Lemmas.fsti** | Signatures for 12 DLL correctness lemmas (incl. tail-insert & delete-last) |
+| 22 | `CLRS.Ch10.DLL.Lemmas.fst` | **Lemmas.fst** | Proofs of insert/search/delete/delete_at/insert_tail/delete_last properties |
+| 23 | `CLRS.Ch10.DLL.Impl.fsti` | **Impl.fsti** | Abstract `node`/`dll`, `dptr`, 9 operation signatures (internal `dls`/`dls_rev` hidden) |
+| 24 | `CLRS.Ch10.DLL.Impl.fst` | **Impl.fst** | True DLL with `dls`/`dls_rev` predicates, all ops incl. reverse-traversal search & delete-last |
 | 25 | `CLRS.Ch10.DLL.Test.fst` | Test | Insert/search/delete round-trip test |
 
 ### Legacy / Combined Files (kept for backward compatibility)
@@ -141,11 +141,19 @@ Complexity is fused into Impl for SLL (ghost-tick tracked); Stack/Queue/DLL comp
 
 ## Recent Changes (2025-07-24)
 
-- **`list_insert_tail`** added to DLL Impl: O(1) runtime tail insertion using `dls_rev` ghost traversal
-- **`list_insert`** spec fixed: uses erased `#l` parameter instead of existentially bound `l`
-- **`list_delete_node`** cleaned: removed unused `x: box node` parameter
-- **`dls_rev` predicate** infrastructure added: reversed DLS for ghost-level bidirectional access
-- Pure helper lemmas: `rev_preserves_cons`, `rev_cons`, `rev_cons_rev`
+- **Interface abstraction**: `node` type made abstract (`val node : Type0`), `dls` predicate removed from .fsti, `dll` made abstract (`val dll ...`). Internal representation fully hidden from clients.
+- **`dll_nil` / `dll_nil_elim`** ghost helpers: Create/destroy empty DLL without exposing internal `fold`/`unfold`
+- **`list_search_back`** added: O(n) reverse-direction search using `dls_rev` ghost traversal
+- **`list_delete_last`** added: O(n) delete last occurrence using forward search + `remove_last` spec
+- **`search_dls_rev`** internal: Recursive search on `dls_rev` predicate (prev-pointer traversal)
+- **`delete_last_in_dls`** internal: Recursive delete-last within DLS segments, uses `search_dls` to find tail occurrences
+- **`factored_prev`** helpers: `factored_prev_none_nil`, `factored_prev_some_cons`, `elim_factored_prev`, `intro_factored_prev` — symmetric to `factored_next` for `dls_rev`
+- **`mem_rev`** lemma: `L.mem x (L.rev l) == L.mem x l`
+- **`remove_last`** pure function added to .fsti spec
+- **Spec.fst** extended: `dll_insert_tail`, `dll_delete_last`, `remove_last`
+- **Lemmas.fst/fsti** extended: `lemma_dll_insert_tail_length`, `lemma_dll_insert_tail_search`, `lemma_dll_delete_last_not_found`, `lemma_dll_delete_last_length` (12 total)
+- **Test.fst** updated: Uses `dll_nil` instead of `fold (dll ...)`
+- All files verified with 0 admits
 
 ---
 
