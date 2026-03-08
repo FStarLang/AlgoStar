@@ -2,7 +2,8 @@ module CLRS.Ch10.DLL.Impl
 // CLRS §10.2: True Doubly-Linked List
 //
 // Nodes have {key, prev, next}. Segment predicate `dls` from Pulse.Lib.Deque.
-// Operations: LIST-INSERT (O(1)), LIST-SEARCH (O(n)), LIST-DELETE (O(n)),
+// Operations: LIST-INSERT (O(1)), LIST-INSERT-TAIL (O(1) runtime),
+//             LIST-SEARCH (O(n)), LIST-DELETE (O(n)),
 //             LIST-DELETE-NODE (O(n) traversal to index, O(1) pointer surgery)
 //
 // All operations fully verified with 0 admits.
@@ -345,16 +346,15 @@ fn rec dls_append
 // --- LIST-INSERT ---
 
 //SNIPPET_START: dll_list_insert
-fn list_insert (hd_ref tl_ref: ref dptr) (x: int)
-  requires exists* hd tl l.
+fn list_insert (hd_ref tl_ref: ref dptr) (x: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (x :: l)
 //SNIPPET_END: dll_list_insert
 {
   let hd = Pulse.Lib.Reference.(!hd_ref);
   let tl = Pulse.Lib.Reference.(!tl_ref);
-  with l. assert (dll hd tl l);
   match hd {
     norewrite None -> {
       // Empty list: hd = None => l = []
@@ -364,6 +364,7 @@ fn list_insert (hd_ref tl_ref: ref dptr) (x: int)
       let nd = Box.alloc #node { key = x; prev = None; next = None };
       fold (dls nd [x] None nd None);
       fold (dll (Some nd) (Some nd) [x]);
+      rewrite each [x] as (x :: l) in (dll (Some nd) (Some nd) [x]);
       Pulse.Lib.Reference.(hd_ref := Some nd);
       Pulse.Lib.Reference.(tl_ref := Some nd)
     }
@@ -384,6 +385,346 @@ fn list_insert (hd_ref tl_ref: ref dptr) (x: int)
       Pulse.Lib.Reference.(hd_ref := Some nd);
       rewrite each (Some tp) as tl;
       rewrite each (reveal lk :: reveal lr) as l
+    }
+  }
+}
+
+// === dls_rev: Reversed DLS predicate (traverses prev pointers from tail to head) ===
+// Structurally symmetric to dls but traverses in the opposite direction.
+// Used internally by list_insert_tail to access the tail node in O(1) runtime.
+
+let rec dls_rev
+  ([@@@mkey] p: box node)
+  (l: list int {Cons? l})
+  (next_ptr: dptr)
+  (head: box node)
+  (first_ptr: dptr)
+  : Tot slprop (decreases l)
+  = match l with
+    | [k] ->
+      exists* (v: node).
+        pts_to p v **
+        pure (v.key == k /\ v.next == next_ptr /\
+              v.prev == first_ptr /\ p == head)
+    | k :: rest ->
+      exists* (v: node) (pp: box node).
+        pts_to p v **
+        dls_rev pp rest (Some p) head first_ptr **
+        pure (v.key == k /\ v.next == next_ptr /\
+              v.prev == Some pp)
+
+// --- dls_rev factor/unfactor (analogous to dls_factored) ---
+
+let dls_rev_factored_prev
+  ([@@@mkey] p: box node) (l: list int {Cons? l})
+  (head: box node) (first_ptr: dptr) (v_prev: dptr)
+  : Tot slprop
+  = match l with
+    | [_] -> pure (v_prev == first_ptr /\ p == head)
+    | _ :: r0 :: rs ->
+      exists* (pp: box node).
+        dls_rev pp (r0 :: rs) (Some p) head first_ptr **
+        pure (v_prev == Some pp)
+
+let dls_rev_factored
+  ([@@@mkey] p: box node) (l: list int {Cons? l})
+  (next_ptr: dptr) (head: box node) (first_ptr: dptr)
+  : Tot slprop
+  = exists* (v: node).
+      pts_to p v **
+      pure (v.key == L.hd l /\ v.next == next_ptr) **
+      dls_rev_factored_prev p l head first_ptr v.prev
+
+ghost
+fn factor_dls_rev
+  (p: box node) (l: list int {Cons? l})
+  (next_ptr: dptr) (head: box node) (first_ptr: dptr)
+  requires dls_rev p l next_ptr head first_ptr
+  ensures dls_rev_factored p l next_ptr head first_ptr
+{
+  let hd = L.hd l;
+  let tl = L.tl l;
+  match tl {
+    [] -> {
+      rewrite each l as [hd] in (dls_rev p l next_ptr head first_ptr);
+      unfold (dls_rev p [hd] next_ptr head first_ptr);
+      with v. assert (pts_to p v);
+      fold (dls_rev_factored_prev p [hd] head first_ptr v.prev);
+      fold (dls_rev_factored p [hd] next_ptr head first_ptr);
+      rewrite each [hd] as l
+    }
+    y :: ys -> {
+      rewrite each l as (hd :: y :: ys) in (dls_rev p l next_ptr head first_ptr);
+      unfold (dls_rev p (hd :: y :: ys) next_ptr head first_ptr);
+      with v. assert (pts_to p v);
+      fold (dls_rev_factored_prev p (hd :: y :: ys) head first_ptr v.prev);
+      fold (dls_rev_factored p (hd :: y :: ys) next_ptr head first_ptr);
+      rewrite each (hd :: y :: ys) as l
+    }
+  }
+}
+
+ghost
+fn unfactor_dls_rev
+  (p: box node) (l: list int {Cons? l})
+  (next_ptr: dptr) (head: box node) (first_ptr: dptr)
+  requires dls_rev_factored p l next_ptr head first_ptr
+  ensures dls_rev p l next_ptr head first_ptr
+{
+  unfold (dls_rev_factored p l next_ptr head first_ptr);
+  with v. assert (pts_to p v);
+  unfold (dls_rev_factored_prev p l head first_ptr v.prev);
+  let hd = L.hd l;
+  let tl = L.tl l;
+  match tl {
+    [] -> {
+      rewrite each l as [hd];
+      fold (dls_rev p [hd] next_ptr head first_ptr);
+      rewrite each [hd] as l
+    }
+    y :: ys -> {
+      rewrite each l as (hd :: y :: ys);
+      fold (dls_rev p (hd :: y :: ys) next_ptr head first_ptr);
+      rewrite each (hd :: y :: ys) as l
+    }
+  }
+}
+
+// --- fold_dls_rev_cons: analogous to fold_dls_cons ---
+ghost
+fn fold_dls_rev_cons
+  (p: box node) (k: int) (rest: list int {Cons? rest})
+  (next_ptr: dptr) (head: box node) (first_ptr: dptr)
+  (v: node) (pp: box node)
+  requires
+    pts_to p v **
+    dls_rev pp rest (Some p) head first_ptr **
+    pure (v.key == k /\ v.next == next_ptr /\ v.prev == Some pp)
+  ensures
+    dls_rev p (k :: rest) next_ptr head first_ptr
+{
+  let r0 = Cons?.hd rest;
+  let r1 = Cons?.tl rest;
+  rewrite each rest as (r0 :: r1);
+  fold (dls_rev p (k :: r0 :: r1) next_ptr head first_ptr);
+  rewrite each (k :: r0 :: r1) as (k :: rest)
+}
+
+// --- dls_rev_snoc: Append a node at the end of a dls_rev segment ---
+ghost
+fn rec dls_rev_snoc
+  (tail: box node)
+  (#rl: erased (list int) {Cons? rl})
+  (last_ptr: dptr) (np: box node)
+  (p: box node) (v: node) (prev_ptr: dptr)
+  requires
+    dls_rev tail rl last_ptr np (Some p) **
+    pts_to p v **
+    pure (v.prev == prev_ptr /\ v.next == Some np)
+  ensures
+    dls_rev tail (rl @ [v.key]) last_ptr p prev_ptr
+  decreases L.length rl
+{
+  let k0 = L.hd rl;
+  let rest = L.tl rl;
+  rewrite each rl as (k0 :: rest) in (dls_rev tail rl last_ptr np (Some p));
+  match rest {
+    [] -> {
+      unfold (dls_rev tail [k0] last_ptr np (Some p));
+      with v0. assert (pts_to tail v0);
+      rewrite each np as tail in (pure (v.prev == prev_ptr /\ v.next == Some np));
+      fold (dls_rev p [v.key] (Some tail) p prev_ptr);
+      fold (dls_rev tail [k0; v.key] last_ptr p prev_ptr);
+      rewrite each [k0; v.key] as ([k0] @ [v.key]);
+      rewrite each ([k0] @ [v.key]) as (rl @ [v.key])
+    }
+    k0' :: r0' -> {
+      unfold (dls_rev tail (k0 :: k0' :: r0') last_ptr np (Some p));
+      with v0 pp0. assert (pts_to tail v0);
+      rewrite each (k0' :: r0') as rest;
+      dls_rev_snoc pp0 (Some tail) np p v prev_ptr;
+      fold_dls_rev_cons tail k0 (rest @ [v.key]) last_ptr p prev_ptr v0 pp0
+    }
+  }
+}
+
+// --- dls_to_dls_rev: Convert dls to dls_rev ---
+
+// SMTPat: L.rev preserves non-emptiness
+let rev_preserves_cons (#a:Type) (l:list a {Cons? l})
+  : Lemma (Cons? (L.rev l))
+  [SMTPat (L.rev l)]
+  = FStar.List.Tot.Properties.rev_length l
+
+// One-step unfolding of L.rev for SMT
+#push-options "--fuel 2 --ifuel 2"
+let rev_cons (#a:Type) (x:a) (rest:list a)
+  : Lemma (L.rev (x :: rest) == L.rev rest @ [x])
+  [SMTPat (L.rev (x :: rest))]
+  = FStar.List.Tot.Properties.rev_append [x] rest
+#pop-options
+
+#push-options "--fuel 2"
+ghost
+fn rec dls_to_dls_rev
+  (p: box node)
+  (#l: erased (list int) {Cons? l})
+  (prev_ptr: dptr) (tail: box node) (last_ptr: dptr)
+  requires dls p l prev_ptr tail last_ptr
+  ensures dls_rev tail (L.rev l) last_ptr p prev_ptr
+  decreases L.length l
+{
+  let k = L.hd l;
+  let rest = L.tl l;
+  match rest {
+    [] -> {
+      rewrite each l as [k] in (dls p l prev_ptr tail last_ptr);
+      unfold (dls p [k] prev_ptr tail last_ptr);
+      with v. assert (pts_to p v);
+      rewrite (pts_to p v) as (pts_to tail v);
+      fold (dls_rev tail [k] last_ptr p prev_ptr);
+      rewrite each [k] as (L.rev l)
+    }
+    r0 :: rs -> {
+      rewrite each l as (k :: r0 :: rs) in (dls p l prev_ptr tail last_ptr);
+      unfold (dls p (k :: r0 :: rs) prev_ptr tail last_ptr);
+      with v np. assert (pts_to p v);
+      rewrite each (r0 :: rs) as rest;
+      dls_to_dls_rev np (Some p) tail last_ptr;
+      dls_rev_snoc tail last_ptr np p v prev_ptr;
+      rewrite each v.key as k;
+      rev_cons k rest;
+      rewrite each (L.rev rest @ [k]) as (L.rev (k :: rest));
+      rewrite each (k :: rest) as l
+    }
+  }
+}
+#pop-options
+
+// --- dls_rev_to_dls: Convert dls_rev back to dls ---
+#push-options "--fuel 2"
+ghost
+fn rec dls_rev_to_dls
+  (p: box node)
+  (#l: erased (list int) {Cons? l})
+  (next_ptr: dptr) (head: box node) (first_ptr: dptr)
+  requires dls_rev p l next_ptr head first_ptr
+  ensures dls head (L.rev l) first_ptr p next_ptr
+  decreases L.length l
+{
+  let k = L.hd l;
+  let rest = L.tl l;
+  match rest {
+    [] -> {
+      rewrite each l as [k] in (dls_rev p l next_ptr head first_ptr);
+      unfold (dls_rev p [k] next_ptr head first_ptr);
+      with v. assert (pts_to p v);
+      rewrite (pts_to p v) as (pts_to head v);
+      fold (dls head [k] first_ptr p next_ptr);
+      rewrite each [k] as (L.rev l)
+    }
+    r0 :: rs -> {
+      rewrite each l as (k :: r0 :: rs) in (dls_rev p l next_ptr head first_ptr);
+      unfold (dls_rev p (k :: r0 :: rs) next_ptr head first_ptr);
+      with v pp. assert (pts_to p v);
+      rewrite each (r0 :: rs) as rest;
+      dls_rev_to_dls pp (Some p) head first_ptr;
+      fold (dls p [k] (Some pp) p next_ptr);
+      dls_append head pp p p;
+      rev_cons k rest;
+      rewrite each (L.rev rest @ [k]) as (L.rev (k :: rest));
+      rewrite each (k :: rest) as l
+    }
+  }
+}
+#pop-options
+
+// --- LIST-INSERT-TAIL ---
+
+// Pure helper: rev (x :: rev l) == l @ [x]
+let rev_cons_rev (#a:Type) (x:a) (l:list a)
+  : Lemma (L.rev (x :: L.rev l) == l @ [x])
+  = FStar.List.Tot.Properties.rev_involutive l
+
+//SNIPPET_START: dll_list_insert_tail
+fn list_insert_tail (hd_ref tl_ref: ref dptr) (x: int) (#l: erased (list int))
+  requires exists* hd tl.
+    pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
+  ensures exists* hd' tl'.
+    pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (l @ [x])
+//SNIPPET_END: dll_list_insert_tail
+{
+  let hd = Pulse.Lib.Reference.(!hd_ref);
+  let tl = Pulse.Lib.Reference.(!tl_ref);
+  match hd {
+    norewrite None -> {
+      // Empty list: hd = None => l = []
+      dll_none_nil hd tl;
+      rewrite each l as ([] #int) in (dll hd tl l);
+      unfold (dll hd tl []);
+      let nd = Box.alloc #node { key = x; prev = None; next = None };
+      fold (dls nd [x] None nd None);
+      fold (dll (Some nd) (Some nd) [x]);
+      rewrite each [x] as (l @ [x]) in (dll (Some nd) (Some nd) [x]);
+      Pulse.Lib.Reference.(hd_ref := Some nd);
+      Pulse.Lib.Reference.(tl_ref := Some nd)
+    }
+    norewrite Some old_hp -> {
+      // Non-empty list: O(1) runtime tail insertion
+      dll_some_cons hd tl;
+      unfold_dll_cons hd tl;
+      with hp tp. _;
+      rewrite each hp as old_hp;
+      let concrete_tp = Some?.v tl;
+      rewrite each tp as concrete_tp;
+      // dls old_hp l None concrete_tp None
+
+      // Ghost: convert dls to dls_rev (O(n) ghost traversal)
+      dls_to_dls_rev old_hp None concrete_tp None;
+      // dls_rev concrete_tp (rev l) None old_hp None
+
+      // Ghost: factor to expose tail node's pts_to
+      let rl = hide (L.rev (reveal l));
+      rewrite each (L.rev (reveal l)) as (reveal rl)
+        in (dls_rev concrete_tp (L.rev (reveal l)) None old_hp None);
+      factor_dls_rev concrete_tp (reveal rl) None old_hp None;
+      unfold (dls_rev_factored concrete_tp (reveal rl) None old_hp None);
+      with v_tail. assert (pts_to concrete_tp v_tail);
+
+      // Runtime O(1): read tail, alloc new node, update tail's next
+      let nd = Box.alloc #node { key = x; prev = Some concrete_tp; next = None };
+      let v_tail_nd = Box.(!concrete_tp);
+      Box.(concrete_tp := { v_tail_nd with next = Some nd });
+
+      // Ghost: refold dls_rev_factored with new next_ptr
+      fold (dls_rev_factored concrete_tp (reveal rl) (Some nd) old_hp None);
+      unfactor_dls_rev concrete_tp (reveal rl) (Some nd) old_hp None;
+      // dls_rev concrete_tp (rev l) (Some nd) old_hp None
+
+      // Ghost: fold new node into dls_rev
+      let rl_hd = hide (L.hd (reveal rl));
+      let rl_tl = hide (L.tl (reveal rl));
+      rewrite each (reveal rl) as (reveal rl_hd :: reveal rl_tl)
+        in (dls_rev concrete_tp (reveal rl) (Some nd) old_hp None);
+      fold (dls_rev nd (x :: reveal rl_hd :: reveal rl_tl) None old_hp None);
+      rewrite each (x :: reveal rl_hd :: reveal rl_tl) as (x :: reveal rl);
+      rewrite each (reveal rl) as (L.rev (reveal l));
+      // dls_rev nd (x :: rev l) None old_hp None
+
+      // Ghost: convert back to dls (O(n) ghost traversal)
+      dls_rev_to_dls nd None old_hp None;
+      // dls old_hp (rev (x :: rev l)) None nd None
+
+      // Use lemma: rev (x :: rev l) == l @ [x]
+      rev_cons_rev x (reveal l);
+      rewrite each (L.rev (x :: L.rev (reveal l))) as (l @ [x])
+        in (dls old_hp (L.rev (x :: L.rev (reveal l))) None nd None);
+      // dls old_hp (l @ [x]) None nd None
+
+      dls_to_dll old_hp nd;
+      Pulse.Lib.Reference.(hd_ref := Some old_hp);
+      rewrite each (Some old_hp) as hd;
+      Pulse.Lib.Reference.(tl_ref := Some nd)
     }
   }
 }
@@ -924,7 +1265,7 @@ fn rec delete_at_in_dls
 }
 
 fn list_delete_node
-  (hd_ref tl_ref: ref dptr) (x: box node)
+  (hd_ref tl_ref: ref dptr)
   (#l: erased (list int) {Cons? l})
   (i: nat {i < L.length l})
   requires exists* hd tl.

@@ -8,6 +8,7 @@ module CLRS.Ch10.DLL.Impl
    
    Operations:
    - list_insert: Insert at head, O(1)
+   - list_insert_tail: Insert at tail, O(1) runtime
    - list_search: Search by key, O(n)
    - list_search_ptr: Search returning pointer, O(n)
    - list_delete: Delete by key, O(n)
@@ -89,12 +90,19 @@ let rec remove_at (i: nat) (l: list int) : list int =
   | hd :: tl -> if i = 0 then tl else hd :: remove_at (i - 1) tl
 
 //SNIPPET_START: dll_ops
-/// LIST-INSERT: Insert x at head of the DLL
-fn list_insert (hd_ref tl_ref: ref dptr) (x: int)
-  requires exists* hd tl l.
+/// LIST-INSERT: Insert x at head of the DLL, O(1)
+fn list_insert (hd_ref tl_ref: ref dptr) (x: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (x :: l)
+
+/// LIST-INSERT-TAIL: Insert x at tail of the DLL, O(1) runtime
+fn list_insert_tail (hd_ref tl_ref: ref dptr) (x: int) (#l: erased (list int))
+  requires exists* hd tl.
+    pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
+  ensures exists* hd' tl'.
+    pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (l @ [x])
 
 /// LIST-SEARCH: Search for key k in the DLL
 fn list_search (hd tl: dptr) (k: int)
@@ -121,7 +129,7 @@ fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
 
 /// LIST-DELETE-NODE: Delete element at index i
 fn list_delete_node
-  (hd_ref tl_ref: ref dptr) (x: box node)
+  (hd_ref tl_ref: ref dptr)
   (#l: erased (list int) {Cons? l})
   (i: nat {i < L.length l})
   requires exists* hd tl.
