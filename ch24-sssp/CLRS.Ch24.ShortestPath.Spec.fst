@@ -91,6 +91,17 @@ let weights_in_range (weights: Seq.seq int) (n: nat) : prop =
      (n > 1 /\ w * (n - 1) < inf /\ w * (n - 1) > -inf)))
 //SNIPPET_END: weights_in_range
 
+//SNIPPET_START: reachable
+(* A vertex v is reachable from s in a graph with n vertices and given weights
+   if there exists a valid simple path from s to v using only existing edges. *)
+let reachable (weights: Seq.seq int) (n: nat) (s v: nat) : prop =
+  n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+  (exists (p: path).
+    path_source p == s /\ path_dest p == v /\
+    path_edges p <= n - 1 /\
+    path_valid p n /\ path_all_edges_exist p weights n)
+//SNIPPET_END: reachable
+
 (* Shortest path distance: minimum weight among all paths from s to v with at most k edges.
    Returns inf if no such path exists. *)
 let rec sp_dist_k (weights: Seq.seq int) (n: nat) (s v: nat) (k: nat) 
@@ -991,4 +1002,61 @@ let sp_dist_faithful
   = path_weight_bounded p weights n;
     sp_dist_optimal weights n s v p
 //SNIPPET_END: sp_dist_faithful
+
+//SNIPPET_START: sp_dist_iff_reachable
+(* Under weights_in_range and non-negative weights:
+   sp_dist(s,v) < inf  ⟺  v is reachable from s.
+   Forward: sp_dist_faithful (above).
+   Backward: sp_dist_achievable gives a witnessing path. *)
+
+(* Forward: reachable ⟹ sp_dist < inf *)
+let reachable_implies_sp_dist_finite
+  (weights: Seq.seq int) (n: nat) (s v: nat)
+  : Lemma
+    (requires
+      reachable weights n s v /\
+      weights_in_range weights n /\
+      (forall (i: nat). i < Seq.length weights ==>
+        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+    (ensures sp_dist weights n s v < inf)
+  = eliminate exists (p: path).
+      path_source p == s /\ path_dest p == v /\
+      path_edges p <= n - 1 /\
+      path_valid p n /\ path_all_edges_exist p weights n
+    returns sp_dist weights n s v < inf
+    with _. sp_dist_faithful weights n s v p
+
+(* Backward: sp_dist < inf ⟹ reachable *)
+let sp_dist_finite_implies_reachable
+  (weights: Seq.seq int) (n: nat) (s v: nat)
+  : Lemma
+    (requires
+      n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+      sp_dist weights n s v < inf)
+    (ensures reachable weights n s v)
+  = let p = sp_dist_achievable weights n s v in
+    assert (path_source p == s);
+    assert (path_dest p == v);
+    assert (path_edges p <= n - 1);
+    assert (path_valid p n);
+    assert (path_all_edges_exist p weights n)
+
+(* Contrapositive: ¬reachable ⟹ sp_dist == inf *)
+let not_reachable_implies_sp_dist_inf
+  (weights: Seq.seq int) (n: nat) (s v: nat)
+  : Lemma
+    (requires
+      n > 0 /\ s < n /\ v < n /\ Seq.length weights == n * n /\
+      weights_in_range weights n /\
+      (forall (i: nat). i < Seq.length weights ==>
+        Seq.index weights i == inf \/ Seq.index weights i >= 0) /\
+      ~(reachable weights n s v))
+    (ensures sp_dist weights n s v == inf)
+  = if sp_dist weights n s v < inf
+    then begin
+      sp_dist_finite_implies_reachable weights n s v;
+      assert (reachable weights n s v) // contradiction
+    end
+    else sp_dist_k_bounded weights n s v (n - 1)
+//SNIPPET_END: sp_dist_iff_reachable
 //SNIPPET_END: path_weight_bounded

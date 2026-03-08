@@ -34,12 +34,6 @@ module Seq = FStar.Seq
 module SP = CLRS.Ch24.ShortestPath.Spec
 module D = CLRS.Ch24.Dijkstra
 
-let dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
-  (requires dijkstra_complexity_bounded cf c0 n)
-  (ensures cf - c0 <= 3 * n * n)
-  =
-  D.dijkstra_complexity_is_quadratic cf c0 n
-
 /// Bridge: pred_consistent + dist==sp_dist ⟹ shortest_path_tree
 let pred_consistent_implies_spt
   (spred: Seq.seq SZ.t) (sdist sweights: Seq.seq int) (n source: nat)
@@ -51,6 +45,26 @@ let pred_consistent_implies_spt
     (ensures shortest_path_tree spred sweights n source)
   = ()
 
+/// Converse: sp_dist == inf ⟹ not reachable (under weights_in_range)
+let sp_dist_inf_means_unreachable
+  (sweights: Seq.seq int) (n source v: nat)
+  : Lemma
+    (requires
+      weights_in_range sweights n /\
+      n > 0 /\ source < n /\ v < n /\
+      Seq.length sweights == n * n /\
+      all_weights_non_negative sweights /\
+      SP.sp_dist sweights n source v == SP.inf)
+    (ensures ~(SP.reachable sweights n source v))
+  = Classical.move_requires (SP.reachable_implies_sp_dist_finite sweights n source) v
+
+let dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
+  (requires dijkstra_complexity_bounded cf c0 n)
+  (ensures cf - c0 <= 3 * n * n)
+  =
+  D.dijkstra_complexity_is_quadratic cf c0 n
+
+#push-options "--z3rlimit 20"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)
@@ -104,3 +118,4 @@ fn dijkstra
   with spred'. assert (A.pts_to pred spred');
   pred_consistent_implies_spt spred' sdist' sweights (SZ.v n) (SZ.v source);
 }
+#pop-options

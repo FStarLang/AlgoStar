@@ -63,15 +63,13 @@ let pred_consistent = D.pred_consistent
 
 //SNIPPET_START: shortest_path_tree
 /// Shortest-path tree: pred encodes actual shortest-path predecessors.
-/// For every reachable vertex v ≠ source:
-///   δ(s,v) = δ(s, pred[v]) + w(pred[v], v)
-/// where δ = sp_dist. This is the definitive specification: following the
-/// predecessor chain from v to source yields a shortest path.
 ///
-/// Under the weights_in_range precondition, the guard sp_dist < inf is
-/// equivalent to "v is reachable from source via existing edges"
-/// (see sp_dist_faithful). The subsidiary facts (w(pred[v],v) < inf,
-/// sp_dist(s, pred[v]) < inf) follow from the equality + non-negative weights.
+/// Two-sided characterization (under weights_in_range + non-negative weights):
+///   Reachable (sp_dist < inf):  pred[v] < n ∧ δ(s,v) = δ(s, pred[v]) + w(pred[v], v)
+///   Unreachable (sp_dist = inf): no valid path from source to v exists
+///     (proved separately by sp_dist_inf_means_unreachable below)
+///
+/// Under weights_in_range, sp_dist < inf ⟺ reachable (see SP.sp_dist_iff_reachable).
 let shortest_path_tree (spred: Seq.seq SZ.t) (sweights: Seq.seq int)
   (n source: nat) : prop =
   Seq.length spred == n /\
@@ -84,6 +82,21 @@ let shortest_path_tree (spred: Seq.seq SZ.t) (sweights: Seq.seq int)
      SP.sp_dist sweights n source v ==
        SP.sp_dist sweights n source p + Seq.index sweights (p * n + v)))
 //SNIPPET_END: shortest_path_tree
+
+//SNIPPET_START: sp_dist_inf_means_unreachable
+/// Converse: if sp_dist(s,v) == inf under weights_in_range + non-negative weights,
+/// then no valid path from source to v exists.
+val sp_dist_inf_means_unreachable
+  (sweights: Seq.seq int) (n source v: nat)
+  : Lemma
+    (requires
+      weights_in_range sweights n /\
+      n > 0 /\ source < n /\ v < n /\
+      Seq.length sweights == n * n /\
+      all_weights_non_negative sweights /\
+      SP.sp_dist sweights n source v == SP.inf)
+    (ensures ~(SP.reachable sweights n source v))
+//SNIPPET_END: sp_dist_inf_means_unreachable
 
 // ========== Complexity Bounds ==========
 
