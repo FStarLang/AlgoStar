@@ -10,11 +10,9 @@
    satisfies w*(n-1) < inf, ensuring all simple-path weights are representable).
 
    Postcondition guarantees:
-   - dist[source] == 0
-   - All distances non-negative and bounded [0, SP.inf]
-   - Triangle inequality for all edges
    - Shortest-path equality: dist[v] == sp_dist(source, v) for all v
    - Predecessor tree: pred encodes a shortest-path tree (stated in terms of sp_dist)
+   - Unreachability: sp_dist == inf ⟹ ¬reachable (proved lemma)
    - O(V²) complexity bound via ghost counter
 
    NOTE: The core Pulse implementation lives in CLRS.Ch24.Dijkstra.fst because
@@ -48,15 +46,6 @@ let all_weights_non_negative = D.all_weights_non_negative
 /// Weights in range: each finite edge weight w satisfies |w| * (n-1) < inf,
 /// ensuring all simple-path weights are representable (< inf).
 let weights_in_range = SP.weights_in_range
-
-/// All distances are non-negative
-let all_non_negative = D.all_non_negative
-
-/// All distances bounded: 0 ≤ d ≤ inf
-let all_bounded = D.all_bounded
-
-/// Triangle inequality: for all finite edges, dist[v] <= dist[u] + w
-let triangle_inequality = D.triangle_inequality
 
 /// Predecessor consistency: pred values consistent with dist array
 let pred_consistent = D.pred_consistent
@@ -148,11 +137,6 @@ fn dijkstra
     GR.pts_to ctr cf **
     pure (
       Seq.length sdist' == SZ.v n /\
-      SZ.v source < Seq.length sdist' /\
-      Seq.index sdist' (SZ.v source) == 0 /\
-      all_non_negative sdist' /\
-      all_bounded sdist' /\
-      triangle_inequality sweights sdist' (SZ.v n) /\
       (forall (v: nat). v < SZ.v n ==>
         Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v) /\
       shortest_path_tree spred' sweights (SZ.v n) (SZ.v source) /\

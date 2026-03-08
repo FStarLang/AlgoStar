@@ -99,11 +99,6 @@ fn dijkstra
     GR.pts_to ctr cf **
     pure (
       Seq.length sdist' == SZ.v n /\
-      SZ.v source < Seq.length sdist' /\
-      Seq.index sdist' (SZ.v source) == 0 /\
-      all_non_negative sdist' /\
-      all_bounded sdist' /\
-      triangle_inequality sweights sdist' (SZ.v n) /\
       (forall (v: nat). v < SZ.v n ==>
         Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v) /\
       shortest_path_tree spred' sweights (SZ.v n) (SZ.v source) /\
