@@ -11,13 +11,19 @@ module CLRS.Ch24.ShortestPath.Spec
 
    Key properties proven:
    - sp_dist_k_monotone: more edges allowed ⟹ distance cannot increase
-   - sp_dist_k_bounded: sp_dist_k ≤ inf (1000000)
+   - sp_dist_k_bounded: sp_dist_k ≤ inf
    - sp_dist_source_nonpositive: sp_dist(s, s) ≤ 0
    - sp_dist_k_triangle: sp_dist_k(v, k) ≤ sp_dist_k(u, k−1) + w(u, v)
    - has_triangle_inequality: predicate on concrete distance arrays
    - triangle_ineq_implies_upper_bound (CLRS Cor 24.3):
        if dist satisfies triangle inequality and dist[s]=0,
        then dist[v] ≤ sp_dist(s, v) for all v — proven by induction on k
+
+   Soundness of the finite sentinel (inf):
+   - weights_in_range: each finite edge weight w satisfies |w|*(n-1) < inf,
+     ensuring any simple path (≤ n-1 edges) has representable weight.
+   - path_weight_bounded: under weights_in_range, path_weight < inf.
+   - sp_dist_faithful: under weights_in_range, reachable vertices have sp_dist < inf.
 
    This module provides the shared mathematical foundation used by both
    BellmanFord and Dijkstra correctness proofs.
@@ -70,6 +76,20 @@ let rec path_all_edges_exist (p: path) (weights: Seq.seq int) (n: nat) : bool =
       u < n && v < n && u * n + v < Seq.length weights &&
       Seq.index weights (u * n + v) < inf &&
       path_all_edges_exist tl weights n
+
+//SNIPPET_START: weights_in_range
+(* Weights-in-range: every finite edge weight w satisfies |w| * (n-1) < inf.
+   This guarantees that any simple path (≤ n-1 edges) has total weight in (-inf, inf),
+   so sp_dist faithfully represents shortest-path distances for all reachable vertices.
+   Without this, paths whose true weight ≥ inf are silently treated as unreachable. *)
+let weights_in_range (weights: Seq.seq int) (n: nat) : prop =
+  Seq.length weights == n * n /\ n > 0 /\
+  (forall (i: nat). i < Seq.length weights ==>
+    (let w = Seq.index weights i in
+     w == inf \/
+     (n == 1 /\ -inf < w /\ w < inf) \/
+     (n > 1 /\ w * (n - 1) < inf /\ w * (n - 1) > -inf)))
+//SNIPPET_END: weights_in_range
 
 (* Shortest path distance: minimum weight among all paths from s to v with at most k edges.
    Returns inf if no such path exists. *)
@@ -857,3 +877,118 @@ let sp_dist_achievable
       path_weight p weights n == sp_dist weights n s v)
   = sp_dist_k_achieving_path weights n s v (n - 1)
 //SNIPPET_END: sp_dist_achievable
+
+(* ---- Weights-in-range soundness ---- *)
+
+//SNIPPET_START: path_weight_bounded
+(* Key soundness lemma: under weights_in_range with non-negative weights,
+   any valid simple path has total weight in [0, inf). This ensures sp_dist
+   faithfully represents true shortest-path distances for reachable vertices.
+   Combined with sp_dist_optimal, guarantees sp_dist(s,v) < inf whenever
+   v is reachable from s via existing edges. *)
+
+(* Stronger inductive invariant: path_weight * (n-1) < path_edges * inf.
+   Since path_edges ≤ n-1, this gives path_weight * (n-1) < (n-1) * inf,
+   hence path_weight < inf. *)
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 30"
+let rec path_weight_bounded_strong
+  (p: path) (weights: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      weights_in_range weights n /\
+      n > 1 /\
+      path_valid p n /\
+      path_all_edges_exist p weights n /\
+      path_edges p <= n - 1 /\
+      (forall (i: nat). i < Seq.length weights ==>
+        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+    (ensures
+      0 <= path_weight p weights n /\
+      (path_edges p == 0 ==> path_weight p weights n == 0) /\
+      (path_edges p > 0 ==> path_weight p weights n * (n - 1) < path_edges p * inf))
+    (decreases (length p))
+  = match p with
+    | [_] -> ()
+    | u :: tl ->
+      match tl with
+      | v :: _ ->
+        path_weight_bounded_strong tl weights n;
+        let w = Seq.index weights (u * n + v) in
+        assert (w >= 0);
+        assert (w * (n - 1) < inf);
+        assert (path_weight tl weights n >= 0);
+        if path_edges tl = 0
+        then begin
+          assert (path_weight tl weights n == 0);
+          assert (path_weight p weights n == w);
+          assert (path_edges p == 1);
+          // w * (n-1) < inf = 1 * inf = path_edges p * inf
+          ()
+        end
+        else begin
+          assert (path_weight tl weights n * (n - 1) < path_edges tl * inf);
+          // path_weight p = w + path_weight tl
+          // (w + path_weight tl) * (n-1) = w*(n-1) + path_weight_tl*(n-1)
+          //   < inf + path_edges_tl * inf = (1 + path_edges_tl) * inf = path_edges_p * inf
+          assert (path_weight p weights n * (n - 1) ==
+                  w * (n - 1) + path_weight tl weights n * (n - 1));
+          assert (path_edges p == 1 + path_edges tl)
+        end
+#pop-options
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let path_weight_bounded
+  (p: path) (weights: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      weights_in_range weights n /\
+      path_valid p n /\
+      path_all_edges_exist p weights n /\
+      path_edges p <= n - 1 /\
+      (forall (i: nat). i < Seq.length weights ==>
+        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+    (ensures 0 <= path_weight p weights n /\ path_weight p weights n < inf)
+  = if n = 1
+    then begin
+      // n=1: path_edges p ≤ 0, so path_edges p = 0, path has 1 vertex, weight = 0
+      // Use path_weight_nonneg to get >= 0, and sp_dist_k_bounded for < inf
+      assert (path_edges p == 0);
+      // With 0 edges, p must be [v] for some v, path_weight = 0
+      assert (length p == 1);
+      // path_weight on any list of length 1 is 0 (by definition)
+      // SMT + fuel 2 handles this
+      ()
+    end
+    else begin
+      path_weight_bounded_strong p weights n;
+      if path_edges p = 0
+      then ()
+      else begin
+        // path_weight * (n-1) < path_edges * inf ≤ (n-1) * inf
+        // So path_weight < inf
+        assert (path_weight p weights n * (n - 1) < path_edges p * inf);
+        assert (path_edges p <= n - 1)
+      end
+    end
+#pop-options
+
+//SNIPPET_START: sp_dist_faithful
+(* Corollary: under weights_in_range and non-negative weights, if vertex v is
+   reachable from s (there exists a valid simple path), then sp_dist(s,v) < inf.
+   This shows sp_dist faithfully represents the shortest-path distance. *)
+let sp_dist_faithful
+  (weights: Seq.seq int) (n: nat) (s v: nat) (p: path)
+  : Lemma
+    (requires
+      weights_in_range weights n /\
+      s < n /\ v < n /\
+      path_source p == s /\ path_dest p == v /\
+      path_edges p <= n - 1 /\
+      path_valid p n /\ path_all_edges_exist p weights n /\
+      (forall (i: nat). i < Seq.length weights ==>
+        Seq.index weights i == inf \/ Seq.index weights i >= 0))
+    (ensures sp_dist weights n s v < inf)
+  = path_weight_bounded p weights n;
+    sp_dist_optimal weights n s v p
+//SNIPPET_END: sp_dist_faithful
+//SNIPPET_END: path_weight_bounded

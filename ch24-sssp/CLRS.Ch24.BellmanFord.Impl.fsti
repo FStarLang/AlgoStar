@@ -6,6 +6,8 @@
    in a single function via ghost tick counting.
 
    Uses adjacency matrix representation (n×n flat array, SP.inf = no edge/∞).
+   Requires weights_in_range: each finite edge weight w satisfies
+   |w|*(n-1) < inf, ensuring all simple-path weights are representable.
 
    Postcondition guarantees:
    - dist[source] == 0
@@ -44,6 +46,10 @@ let triangle_inequality (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : pr
      let d_v = Seq.index dist v in
      let w = Seq.index weights (u * n + v) in
      (w < SP.inf /\ d_u < SP.inf) ==> d_v <= d_u + w)
+
+/// Weights in range: each finite edge weight w satisfies |w| * (n-1) < inf,
+/// ensuring all simple-path weights are representable (< inf).
+let weights_in_range = SP.weights_in_range
 
 /// All distances are either finite (< inf) or equal to inf (unreachable)
 let valid_distances (dist: Seq.seq int) (n: nat) : prop =
@@ -112,7 +118,8 @@ fn bellman_ford
       SZ.v source < SZ.v n /\
       Seq.length sweights == SZ.v n * SZ.v n /\
       Seq.length sdist == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      weights_in_range sweights (SZ.v n)
     )
   ensures exists* sdist' no_neg_cycle (cf: nat).
     A.pts_to weights sweights **

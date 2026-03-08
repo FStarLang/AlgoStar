@@ -145,6 +145,20 @@ Helper infrastructure: `path_prefix`, `path_penult`, `path_snoc` with weight dec
 and validity preservation lemmas. The achievability proof constructs an explicit witnessing
 path via `sp_dist_k_achieving_path` (a Pure function).
 
+### Soundness of the Finite Sentinel (`weights_in_range`)
+
+The specification uses a finite sentinel `inf` to represent ∞. The `weights_in_range`
+predicate makes the representability constraint explicit: each finite edge weight w
+must satisfy `|w| * (n-1) < inf`. Under this precondition:
+
+- **`path_weight_bounded`**: any valid simple path (≤ n-1 edges) has total weight in [0, inf)
+  (proven by induction with the stronger invariant `path_weight * (n-1) < path_edges * inf`).
+- **`sp_dist_faithful`**: if vertex v is reachable from s via existing edges, then
+  `sp_dist(s,v) < inf` — the spec faithfully represents the true shortest-path distance.
+
+Both `Dijkstra.Impl` and `BellmanFord.Impl` now require `weights_in_range` as a precondition,
+ensuring the algorithms operate within the representable domain.
+
 ### Dijkstra Predecessor Array (CLRS π)
 
 The `dijkstra` function now outputs a predecessor array (`pred: A.array SZ.t`) in addition
@@ -230,5 +244,5 @@ relaxation round.
 | Specification Strength | ★★★★★ — d[v]=δ(s,v) proven; sp\_dist declaratively characterised (optimality + achievability) |
 | Complexity | ★★★★★ — exact tick counts; asymptotic bounds verified; integrated with implementations |
 | Proof Quality | ★★★★★ — zero admits/assumes across all files |
-| Documentation | ★★★★★ — comprehensive headers; sentinel documented |
+| Documentation | ★★★★★ — comprehensive headers; sentinel soundness proven |
 | **Rubric Structural Compliance** | **★★★★★** — all 14/14 rubric slots filled; tight interface files; complexity integrated with implementations |

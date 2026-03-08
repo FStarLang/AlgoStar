@@ -6,7 +6,8 @@
    in a single function via ghost tick counting.
 
    Uses adjacency matrix representation (n×n flat array, SP.inf = no edge/∞).
-   Requires non-negative weights.
+   Requires non-negative weights and weights_in_range (each finite weight w
+   satisfies w*(n-1) < inf, ensuring all simple-path weights are representable).
 
    Postcondition guarantees:
    - dist[source] == 0
@@ -43,6 +44,10 @@ module D = CLRS.Ch24.Dijkstra
 
 /// All weights are non-negative
 let all_weights_non_negative = D.all_weights_non_negative
+
+/// Weights in range: each finite edge weight w satisfies |w| * (n-1) < inf,
+/// ensuring all simple-path weights are representable (< inf).
+let weights_in_range = SP.weights_in_range
 
 /// All distances are non-negative
 let all_non_negative = D.all_non_negative
@@ -118,7 +123,8 @@ fn dijkstra
       Seq.length sdist == SZ.v n /\
       Seq.length spred == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      all_weights_non_negative sweights
+      all_weights_non_negative sweights /\
+      weights_in_range sweights (SZ.v n)
     )
   ensures exists* sdist' spred' (cf: nat).
     A.pts_to weights sweights **

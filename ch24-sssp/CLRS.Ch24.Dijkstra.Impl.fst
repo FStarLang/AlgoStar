@@ -75,7 +75,8 @@ fn dijkstra
       Seq.length sdist == SZ.v n /\
       Seq.length spred == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      all_weights_non_negative sweights
+      all_weights_non_negative sweights /\
+      weights_in_range sweights (SZ.v n)
     )
   ensures exists* sdist' spred' (cf: nat).
     A.pts_to weights sweights **

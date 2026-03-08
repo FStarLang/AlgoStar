@@ -322,7 +322,8 @@ fn bellman_ford
       SZ.v source < SZ.v n /\
       Seq.length sweights == SZ.v n * SZ.v n /\
       Seq.length sdist == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SP.weights_in_range sweights (SZ.v n)
     )
   ensures exists* sdist' no_neg_cycle (cf: nat).
     A.pts_to weights sweights **
