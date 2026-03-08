@@ -81,6 +81,9 @@ fn queue_bfs
       // witnessed by dist[w] steps in the adjacency graph
       (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
         reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist' w)) /\
+      // Completeness: every reachable vertex is discovered
+      (forall (v: nat) (k: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v k ==>
+        Seq.index scolor' v <> 0) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)

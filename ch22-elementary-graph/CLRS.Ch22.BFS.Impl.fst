@@ -111,6 +111,67 @@ let count_nonwhite_upd_single (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: n
 // product_strict_bound imported from CLRS.Ch22.Graph.Common
 
 (* ================================================================
+   COUNT_GRAY — counts vertices with color == 1 in [0..k)
+   ================================================================ *)
+
+let rec count_gray (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Tot nat (decreases k)
+  = if k = 0 then 0
+    else count_gray s (k - 1) + (if Seq.index s (k - 1) = 1 then 1 else 0)
+
+let rec count_gray_all_zero (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Lemma (requires forall (j:nat). j < k ==> Seq.index s j == 0)
+          (ensures count_gray s k == 0) (decreases k)
+  = if k = 0 then () else count_gray_all_zero s (k - 1)
+
+let rec count_gray_upd_to_gray (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat)
+  : Lemma (requires j < k /\ Seq.index s j == 0)
+          (ensures count_gray (Seq.upd s j 1) k == count_gray s k + 1) (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then begin
+      let rec aux (s: Seq.seq int) (k': nat{k' <= Seq.length s}) (j: nat{j >= k' /\ j < Seq.length s})
+        : Lemma (ensures count_gray (Seq.upd s j 1) k' == count_gray s k') (decreases k')
+        = if k' = 0 then ()
+          else (assert (Seq.index (Seq.upd s j 1) (k'-1) == Seq.index s (k'-1)); aux s (k'-1) j)
+      in aux s (k-1) j
+    end
+    else (assert (Seq.index (Seq.upd s j 1) (k-1) == Seq.index s (k-1));
+          count_gray_upd_to_gray s (k-1) j)
+
+let rec count_gray_upd_from_gray (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat)
+  : Lemma (requires j < k /\ Seq.index s j == 1)
+          (ensures count_gray (Seq.upd s j 2) k == count_gray s k - 1) (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then begin
+      let rec aux (s: Seq.seq int) (k': nat{k' <= Seq.length s}) (j: nat{j >= k' /\ j < Seq.length s})
+        : Lemma (ensures count_gray (Seq.upd s j 2) k' == count_gray s k') (decreases k')
+        = if k' = 0 then ()
+          else (assert (Seq.index (Seq.upd s j 2) (k'-1) == Seq.index s (k'-1)); aux s (k'-1) j)
+      in aux s (k-1) j
+    end
+    else (assert (Seq.index (Seq.upd s j 2) (k-1) == Seq.index s (k-1));
+          count_gray_upd_from_gray s (k-1) j)
+
+let rec count_gray_zero_no_gray (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Lemma (requires count_gray s k == 0)
+          (ensures forall (j:nat). j < k ==> Seq.index s j <> 1) (decreases k)
+  = if k = 0 then () else count_gray_zero_no_gray s (k - 1)
+
+let rec count_gray_upd_nonwhite_to_nonwhite (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat) (v: int)
+  : Lemma (requires j < k /\ Seq.index s j <> 1 /\ v <> 1)
+          (ensures count_gray (Seq.upd s j v) k == count_gray s k) (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then begin
+      let rec aux (s: Seq.seq int) (k': nat{k' <= Seq.length s}) (j: nat{j >= k' /\ j < Seq.length s}) (v: int)
+        : Lemma (ensures count_gray (Seq.upd s j v) k' == count_gray s k') (decreases k')
+        = if k' = 0 then ()
+          else (assert (Seq.index (Seq.upd s j v) (k'-1) == Seq.index s (k'-1)); aux s (k'-1) j v)
+      in aux s (k-1) j v
+    end
+    else (assert (Seq.index (Seq.upd s j v) (k-1) == Seq.index s (k-1));
+          count_gray_upd_nonwhite_to_nonwhite s (k-1) j v)
+
+(* ================================================================
    PREDICATES — Named abstractions for BFS invariant clusters
    ================================================================ *)
 
@@ -129,6 +190,31 @@ let queue_ok (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) : p
     i >= head /\ i < tail ==>
       SZ.v (Seq.index squeue i) < n /\
       Seq.index scolor (SZ.v (Seq.index squeue i)) <> 0)
+
+(* Queue entries are GRAY (color 1) and unique *)
+let queue_gray_unique (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) : prop =
+  Seq.length squeue >= n /\ Seq.length scolor >= n /\
+  head <= tail /\ tail <= n /\
+  (forall (i:nat). {:pattern (Seq.index squeue i)}
+    i >= head /\ i < tail ==>
+      SZ.v (Seq.index squeue i) < n /\
+      Seq.index scolor (SZ.v (Seq.index squeue i)) == 1) /\
+  (forall (i j: nat). {:pattern (Seq.index squeue i); (Seq.index squeue j)}
+    i >= head /\ i < tail /\ j >= head /\ j < tail /\
+    Seq.index squeue i == Seq.index squeue j ==> i == j)
+
+(* Scanned-all: every non-WHITE, non-GRAY vertex has all neighbors non-WHITE *)
+let scanned_all (sadj: Seq.seq int) (n: nat) (scolor: Seq.seq int) : prop =
+  Seq.length scolor >= n /\ Seq.length sadj >= n * n /\
+  (forall (u v: nat). {:pattern (Seq.index scolor u); (Seq.index sadj (u * n + v))}
+    u < n /\ v < n /\ Seq.index scolor u <> 0 /\ Seq.index scolor u <> 1 /\ Seq.index sadj (u * n + v) <> 0 ==>
+      Seq.index scolor v <> 0)
+
+(* Scanned partial: for vertex u, neighbors 0..k are non-WHITE *)
+let scanned_partial (sadj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (u k: nat) : prop =
+  Seq.length scolor >= n /\ Seq.length sadj >= n * n /\ u < n /\
+  (forall (v: nat). v < k /\ v < n /\ Seq.index sadj (u * n + v) <> 0 ==>
+    Seq.index scolor v <> 0)
 
 (* Distance soundness for discovered vertices *)
 let dist_ok (scolor sdist: Seq.seq int) (n: nat) : prop =
@@ -309,6 +395,165 @@ let init_dist_reachable
     ()
 
 (* ================================================================
+   SCANNED_ALL / SCANNED_PARTIAL PRESERVATION LEMMAS
+   ================================================================ *)
+
+let init_scanned_all (sadj scolor: Seq.seq int) (n: nat)
+  : Lemma (requires n <= Seq.length scolor /\ n * n <= Seq.length sadj /\
+                    (forall (j:nat). j < n ==> Seq.index scolor j == 0))
+          (ensures scanned_all sadj n scolor)
+  = ()
+
+let discover_preserves_scanned_all (sadj scolor: Seq.seq int) (n j: nat)
+  : Lemma (requires scanned_all sadj n scolor /\ j < n /\ Seq.index scolor j == 0)
+          (ensures scanned_all sadj n (Seq.upd scolor j 1))
+  = ()
+
+let blacken_preserves_scanned_all (sadj scolor: Seq.seq int) (n u: nat)
+  : Lemma (requires scanned_all sadj n scolor /\ u < n /\ n <= Seq.length scolor /\
+                    Seq.index scolor u <> 0 /\
+                    scanned_partial sadj n scolor u n)
+          (ensures scanned_all sadj n (Seq.upd scolor u 2))
+  = ()
+
+let init_scanned_partial (sadj scolor: Seq.seq int) (n u: nat)
+  : Lemma (requires n <= Seq.length scolor /\ n * n <= Seq.length sadj /\ u < n)
+          (ensures scanned_partial sadj n scolor u 0)
+  = ()
+
+let discover_preserves_scanned_partial (sadj scolor: Seq.seq int) (n u k j: nat)
+  : Lemma (requires scanned_partial sadj n scolor u k /\ j < n /\ Seq.index scolor j == 0)
+          (ensures scanned_partial sadj n (Seq.upd scolor j 1) u k)
+  = ()
+
+let extend_scanned_partial_discover (sadj scolor: Seq.seq int) (n u vv: nat)
+  : Lemma
+    (requires scanned_partial sadj n scolor u vv /\ vv < n /\ u < n /\
+              n <= Seq.length scolor /\ n * n <= Seq.length sadj /\ Seq.index scolor vv == 0)
+    (ensures scanned_partial sadj n (Seq.upd scolor vv 1) u (vv + 1))
+  = ()
+
+let extend_scanned_partial_skip (sadj scolor: Seq.seq int) (n u vv: nat)
+  : Lemma
+    (requires scanned_partial sadj n scolor u vv /\ vv < n /\ u < n /\
+              n <= Seq.length scolor /\ n * n <= Seq.length sadj /\
+              (Seq.index sadj (u * n + vv) = 0 \/ Seq.index scolor vv <> 0))
+    (ensures scanned_partial sadj n scolor u (vv + 1))
+  = ()
+
+let blacken_preserves_scanned_partial (sadj scolor: Seq.seq int) (n u k: nat)
+  : Lemma (requires scanned_partial sadj n scolor u k /\ u < n /\ n <= Seq.length scolor /\
+                    Seq.index scolor u <> 0)
+          (ensures scanned_partial sadj n (Seq.upd scolor u 2) u k)
+  = ()
+
+(* ================================================================
+   COMPLETENESS LEMMA — induction on reachability steps
+   ================================================================ *)
+
+let rec completeness_lemma
+  (sadj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source v: nat) (steps: nat)
+  : Lemma
+    (requires
+      scanned_all sadj n scolor /\
+      n <= Seq.length scolor /\ n * n <= Seq.length sadj /\
+      source < n /\ v < n /\
+      Seq.index scolor source <> 0 /\
+      (forall (u:nat). u < n ==> Seq.index scolor u <> 1) /\
+      reachable_in sadj n source v steps)
+    (ensures Seq.index scolor v <> 0)
+    (decreases steps)
+  = if steps = 0 then ()
+    else
+      let aux (u: nat)
+        : Lemma (requires u < n /\ reachable_in sadj n source u (steps - 1) /\ has_edge sadj n u v)
+                (ensures Seq.index scolor v <> 0)
+        = completeness_lemma sadj n scolor source u (steps - 1)
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+(* Wrapper for completeness: universally quantified version *)
+let bfs_completeness_all (sadj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source: nat)
+  : Lemma
+    (requires
+      scanned_all sadj n scolor /\
+      n <= Seq.length scolor /\ n * n <= Seq.length sadj /\
+      source < n /\
+      Seq.index scolor source <> 0 /\
+      (forall (u:nat). u < n ==> Seq.index scolor u <> 1))
+    (ensures
+      forall (v: nat) (k: nat). v < n /\ reachable_in sadj n source v k ==>
+        Seq.index scolor v <> 0)
+  = let aux (v: nat) (k: nat)
+      : Lemma (v < n /\ reachable_in sadj n source v k ==>
+                  Seq.index scolor v <> 0)
+      = if v < n then
+          FStar.Classical.move_requires (completeness_lemma sadj n scolor source v) k
+        else ()
+    in
+    FStar.Classical.forall_intro_2 aux
+
+(* ================================================================
+   QUEUE_GRAY_UNIQUE PRESERVATION LEMMAS
+   ================================================================ *)
+
+let discover_preserves_queue_gray_unique
+  (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail j: nat)
+  : Lemma
+    (requires queue_gray_unique scolor squeue n head tail /\ j < n /\
+             n <= Seq.length scolor /\ Seq.index scolor j == 0)
+    (ensures queue_gray_unique (Seq.upd scolor j 1) squeue n head tail)
+  = ()
+
+#push-options "--z3rlimit 80"
+let queue_gray_unique_after_discover
+  (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (v: SZ.t)
+  : Lemma
+    (requires queue_gray_unique scolor squeue n head tail /\
+             SZ.v v < n /\ Seq.index scolor (SZ.v v) == 0 /\ tail < n)
+    (ensures queue_gray_unique (Seq.upd scolor (SZ.v v) 1) (Seq.upd squeue tail v) n head (tail + 1))
+  = ()
+#pop-options
+
+let blacken_preserves_queue_gray_unique
+  (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail u: nat)
+  : Lemma
+    (requires queue_gray_unique scolor squeue n head tail /\
+             u < n /\ n <= Seq.length scolor /\
+             Seq.index scolor u == 1 /\
+             (forall (i:nat). i >= head /\ i < tail ==> SZ.v (Seq.index squeue i) <> u))
+    (ensures queue_gray_unique (Seq.upd scolor u 2) squeue n head tail)
+  = ()
+
+(* Helper: u-not-in-queue is preserved through maybe_discover *)
+let u_not_in_queue_after_discover
+  (scolor_pre: Seq.seq int)
+  (squeue_pre squeue_post: Seq.seq SZ.t)
+  (n vhead vtail_pre vtail_post u: nat)
+  : Lemma
+    (requires
+      Seq.length squeue_pre >= n /\ Seq.length squeue_post >= n /\
+      Seq.length scolor_pre >= n /\
+      vtail_pre <= n /\ vtail_post <= n /\ u < n /\
+      // u was not in old queue [vhead+1, vtail_pre)
+      (forall (i:nat). {:pattern (Seq.index squeue_pre i)}
+        i >= vhead + 1 /\ i < vtail_pre ==> SZ.v (Seq.index squeue_pre i) <> u) /\
+      // queue frame: old entries preserved
+      (forall (i:nat). {:pattern (Seq.index squeue_post i)}
+        i < vtail_pre ==> Seq.index squeue_post i == Seq.index squeue_pre i) /\
+      // new entry was WHITE, u was GRAY
+      (vtail_post > vtail_pre ==>
+        (vtail_pre < Seq.length squeue_post /\
+         SZ.v (Seq.index squeue_post vtail_pre) < Seq.length scolor_pre /\
+         Seq.index scolor_pre (SZ.v (Seq.index squeue_post vtail_pre)) == 0)) /\
+      Seq.index scolor_pre u == 1 /\
+      vtail_post >= vtail_pre /\ vtail_post <= vtail_pre + 1)
+    (ensures
+      forall (i:nat). {:pattern (Seq.index squeue_post i)}
+        i >= vhead + 1 /\ i < vtail_post ==> SZ.v (Seq.index squeue_post i) <> u)
+  = ()
+
+(* ================================================================
    GHOST TICK — for complexity tracking
    ================================================================ *)
 
@@ -436,7 +681,11 @@ fn maybe_discover
       count_nonwhite scolor (SZ.v n) == SZ.v vtail /\
       dist_ok scolor sdist (SZ.v n) /\
       dist_reachable sadj (SZ.v n) scolor sdist (SZ.v source) /\
-      queue_ok scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail)
+      queue_ok scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) /\
+      // Completeness predicates
+      queue_gray_unique scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) /\
+      scanned_all sadj (SZ.v n) scolor /\
+      scanned_partial sadj (SZ.v n) scolor (SZ.v u) (SZ.v vv)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
     A.pts_to adj sadj **
@@ -463,7 +712,20 @@ fn maybe_discover
       // Frame: non-WHITE vertices' dists preserved
       (forall (w:nat). {:pattern (Seq.index sdist w)}
         w < SZ.v n /\ Seq.index scolor w <> 0 ==>
-          Seq.index sdist' w == Seq.index sdist w)
+          Seq.index sdist' w == Seq.index sdist w) /\
+      // Completeness postconditions
+      queue_gray_unique scolor' squeue' (SZ.v n) (SZ.v head) (SZ.v vtail') /\
+      scanned_all sadj (SZ.v n) scolor' /\
+      scanned_partial sadj (SZ.v n) scolor' (SZ.v u) (SZ.v vv + 1) /\
+      count_gray scolor' (SZ.v n) == count_gray scolor (SZ.v n) + (SZ.v vtail' - SZ.v vtail) /\
+      // Queue frame: entries below vtail unchanged
+      (forall (i:nat). {:pattern (Seq.index squeue' i)}
+        i < SZ.v vtail ==> Seq.index squeue' i == Seq.index squeue i) /\
+      // New entry info: if a new entry was added, it was WHITE in pre-state
+      (SZ.v vtail' > SZ.v vtail ==>
+        Seq.index scolor (SZ.v (Seq.index squeue' (SZ.v vtail))) == 0) /\
+      // At most one new entry
+      SZ.v vtail' <= SZ.v vtail + 1
     )
 {
   if (has_edge_val <> 0 && cv = 0) {
@@ -472,19 +734,27 @@ fn maybe_discover
     // Edge exists and vv is WHITE: discover vv from u
     product_strict_bound (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vv);
     discover_preserves_dist_reachable sadj (SZ.v n) scolor sdist (SZ.v source) (SZ.v u) (SZ.v vv) du;
+
+    // Completeness lemma calls (before mutation)
+    discover_preserves_scanned_all sadj scolor (SZ.v n) (SZ.v vv);
+    extend_scanned_partial_discover sadj scolor (SZ.v n) (SZ.v u) (SZ.v vv);
+    count_gray_upd_to_gray scolor (SZ.v n) (SZ.v vv);
+    discover_preserves_queue_gray_unique scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) (SZ.v vv);
+    queue_gray_unique_after_discover scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) vv;
+
     discover_vertex color dist pred queue_data q_tail u vv du n;
     // Establish count_nonwhite and queue_ok for new state
     with scolor'. assert (A.pts_to color scolor');
     count_nonwhite_upd_white scolor (SZ.v n) (SZ.v vv) 1;
     queue_ok_after_discover scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) vv
   } else {
-    ()
+    // No discovery: extend scanned_partial
+    extend_scanned_partial_skip sadj scolor (SZ.v n) (SZ.v u) (SZ.v vv)
   }
 }
 #pop-options
 
-#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
-//SNIPPET_START: queue_bfs_sig
+#push-options "--z3rlimit 2400 --fuel 2 --ifuel 1"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)
@@ -546,6 +816,9 @@ fn queue_bfs
       // witnessed by dist[v] steps
       (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
         reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist' w)) /\
+      // Completeness: every reachable vertex is discovered
+      (forall (v: nat) (k: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v k ==>
+        Seq.index scolor' v <> 0) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
@@ -599,6 +872,12 @@ fn queue_bfs
   count_nonwhite_upd_single scolor_zeros (SZ.v n) (SZ.v source) 1;
   init_dist_reachable sadj (SZ.v n) scolor_zeros sdist_zeros (SZ.v source);
 
+  // Establish completeness predicates for main loop entry
+  init_scanned_all sadj scolor_zeros (SZ.v n);
+  discover_preserves_scanned_all sadj scolor_zeros (SZ.v n) (SZ.v source);
+  count_gray_all_zero scolor_zeros (SZ.v n);
+  count_gray_upd_to_gray scolor_zeros (SZ.v n) (SZ.v source);
+
   // Step 4: Main BFS loop
   while (
     let vh = !q_head;
@@ -626,6 +905,10 @@ fn queue_bfs
       dist_reachable sadj (SZ.v n) scolor_q sdist_q (SZ.v source) /\
       queue_ok scolor_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail) /\
       count_nonwhite scolor_q (SZ.v n) == SZ.v vtail /\
+      // Completeness predicates
+      queue_gray_unique scolor_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail) /\
+      scanned_all sadj (SZ.v n) scolor_q /\
+      count_gray scolor_q (SZ.v n) == SZ.v vtail - SZ.v vhead /\
       // Complexity: vhead * (n+1) ticks so far
       vc >= reveal c0 /\
       vc - reveal c0 <= SZ.v vhead * (SZ.v n + 1)
@@ -640,10 +923,12 @@ fn queue_bfs
     let u: SZ.t = A.op_Array_Access queue_data vhead;
 
     // By queue_ok invariant: u < n and color[u] <> 0
+    // By queue_gray_unique: color[u] == 1 (GRAY)
     with scolor_deq. assert (A.pts_to color scolor_deq);
     with squeue_deq. assert (A.pts_to queue_data squeue_deq);
     assert (pure (SZ.v u < SZ.v n));
     assert (pure (Seq.index scolor_deq (SZ.v u) <> 0));
+    assert (pure (Seq.index scolor_deq (SZ.v u) == 1));
     q_head := SZ.add vhead 1sz;
     
     let du: int = A.op_Array_Access dist u;
@@ -679,9 +964,17 @@ fn queue_bfs
         dist_ok scolor_v sdist_v (SZ.v n) /\
         dist_reachable sadj (SZ.v n) scolor_v sdist_v (SZ.v source) /\
         count_nonwhite scolor_v (SZ.v n) == SZ.v vtail2 /\
-        Seq.index scolor_v (SZ.v u) <> 0 /\
+        Seq.index scolor_v (SZ.v u) == 1 /\
         Seq.index sdist_v (SZ.v u) == du /\
         queue_ok scolor_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) /\
+        // Completeness predicates for inner loop
+        queue_gray_unique scolor_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) /\
+        scanned_all sadj (SZ.v n) scolor_v /\
+        scanned_partial sadj (SZ.v n) scolor_v (SZ.v u) (SZ.v vv) /\
+        count_gray scolor_v (SZ.v n) == SZ.v vtail2 - SZ.v vhead /\
+        // u not in active queue [vhead+1, vtail2)
+        (forall (i:nat). {:pattern (Seq.index squeue_v i)}
+          i >= SZ.v vhead + 1 /\ i < SZ.v vtail2 ==> SZ.v (Seq.index squeue_v i) <> SZ.v u) /\
         // Inner loop complexity:
         vc2 >= reveal c0 /\
         vc2 - reveal c0 <= SZ.v vhead * (SZ.v n + 1) + 1 + SZ.v vv
@@ -702,12 +995,37 @@ fn queue_bfs
       // Read color[v]
       let cv: int = A.op_Array_Access color vv;
 
+      // Capture pre-state for assertions after maybe_discover
+      with scolor_pre. assert (A.pts_to color scolor_pre);
+      with sdist_pre. assert (A.pts_to dist sdist_pre);
+      with squeue_pre. assert (A.pts_to queue_data squeue_pre);
+      with vtail_pre. assert (R.pts_to q_tail vtail_pre);
+
       // CLRS: if v.color == WHITE and edge (u,v) exists, discover v
       maybe_discover adj color dist pred queue_data q_tail u vv du n (SZ.add vhead 1sz) has_edge_val cv source;
 
-      // Restore source_ok and u's color from frame properties
+      // Witness post-state
       with scolor_post. assert (A.pts_to color scolor_post);
       with sdist_post. assert (A.pts_to dist sdist_post);
+      with squeue_post. assert (A.pts_to queue_data squeue_post);
+      with vtail_post. assert (R.pts_to q_tail vtail_post);
+
+      // Re-establish source_ok from frame
+      frame_preserves_source_ok scolor_pre scolor_post sdist_pre sdist_post (SZ.v source) (SZ.v n);
+
+      // Re-establish u's color from frame (u was non-WHITE, so color unchanged)
+      assert (pure (Seq.index scolor_post (SZ.v u) == Seq.index scolor_pre (SZ.v u)));
+      assert (pure (Seq.index scolor_post (SZ.v u) == 1));
+      assert (pure (Seq.index sdist_post (SZ.v u) == du));
+
+      // count_gray: from postcondition and invariant
+      assert (pure (count_gray scolor_post (SZ.v n) == count_gray scolor_pre (SZ.v n) + (SZ.v vtail_post - SZ.v vtail_pre)));
+      assert (pure (count_gray scolor_pre (SZ.v n) == SZ.v vtail_pre - SZ.v vhead));
+      assert (pure (count_gray scolor_post (SZ.v n) == SZ.v vtail_post - SZ.v vhead));
+
+      // u not in queue: helper lemma chains queue frame + new entry info
+      u_not_in_queue_after_discover scolor_pre squeue_pre squeue_post
+        (SZ.v n) (SZ.v vhead) (SZ.v vtail_pre) (SZ.v vtail_post) (SZ.v u);
 
       v := SZ.add vv 1sz
     };
@@ -724,6 +1042,16 @@ fn queue_bfs
     blacken_preserves_dist_reachable sadj (SZ.v n) scolor_pre_black sdist_pre_black (SZ.v source) (SZ.v u);
     blacken_preserves_queue_ok scolor_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (SZ.v u);
     count_nonwhite_upd_nonwhite scolor_pre_black (SZ.v n) (SZ.v u) 2;
+
+    // Completeness: blacken preserves queue_gray_unique, scanned_all, count_gray
+    // scolor_pre_black[u] == 1 from inner loop invariant
+    assert (pure (Seq.index scolor_pre_black (SZ.v u) == 1));
+    // scanned_partial at n from inner loop invariant
+    assert (pure (scanned_partial sadj (SZ.v n) scolor_pre_black (SZ.v u) (SZ.v n)));
+    // u not in active queue from inner loop invariant
+    blacken_preserves_queue_gray_unique scolor_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (SZ.v u);
+    blacken_preserves_scanned_all sadj scolor_pre_black (SZ.v n) (SZ.v u);
+    count_gray_upd_from_gray scolor_pre_black (SZ.v n) (SZ.v u);
     
     A.op_Array_Assignment color u 2;
 
@@ -746,6 +1074,20 @@ fn queue_bfs
   assert (pure (Seq.index sdist_final (SZ.v source) == 0));
   assert (pure (forall (w: nat). w < SZ.v n /\ Seq.index scolor_final w <> 0 ==> Seq.index sdist_final w >= 0));
   assert (pure (forall (w: nat). w < SZ.v n /\ Seq.index scolor_final w <> 0 ==>
-    reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist_final w)))
+    reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist_final w)));
+
+  // Completeness: at loop exit, head == tail so count_gray == 0, meaning no GRAY vertices
+  // Combined with scanned_all and source being non-WHITE, reachable vertices must be non-WHITE
+  assert (pure (count_gray scolor_final (SZ.v n) == 0));
+  count_gray_zero_no_gray scolor_final (SZ.v n);
+  assert (pure (forall (u:nat). u < SZ.v n ==> Seq.index scolor_final u <> 1));
+  assert (pure (scanned_all sadj (SZ.v n) scolor_final));
+  assert (pure (SZ.v n <= Seq.length scolor_final));
+  assert (pure (SZ.v n * SZ.v n <= Seq.length sadj));
+
+  // Apply completeness_lemma for all reachable vertices
+  bfs_completeness_all sadj (SZ.v n) scolor_final (SZ.v source);
+  assert (pure (forall (v: nat) (k: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v k ==>
+    Seq.index scolor_final v <> 0))
 }
 #pop-options
