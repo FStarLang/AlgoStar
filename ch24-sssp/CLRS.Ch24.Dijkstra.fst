@@ -644,6 +644,9 @@ fn dijkstra_relax_round
   {
     let vv = !v;
 
+    // Explicit fact about abstract inf for SMT
+    assert pure (SP.inf > 0);
+
     lemma_2d_index_fits (SZ.v u) (SZ.v vv) (SZ.v n);
     let w_idx = u *^ n +^ vv;
     let w = A.op_Array_Access weights w_idx;

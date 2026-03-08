@@ -147,9 +147,10 @@ path via `sp_dist_k_achieving_path` (a Pure function).
 
 ### Soundness of the Finite Sentinel (`weights_in_range`)
 
-The specification uses a finite sentinel `inf` to represent ∞. The `weights_in_range`
-predicate makes the representability constraint explicit: each finite edge weight w
-must satisfy `|w| * (n-1) < inf`. Under this precondition:
+The sentinel constant `inf` is defined in `ShortestPath.Inf` with an abstract interface
+that exposes only `val inf : i:int{i > 0}` — no proof can depend on the specific numeric
+value. The `weights_in_range` predicate makes the representability constraint explicit:
+each finite edge weight w must satisfy `|w| * (n-1) < inf`. Under this precondition:
 
 - **`path_weight_bounded`**: any valid simple path (≤ n-1 edges) has total weight in [0, inf)
   (proven by induction with the stronger invariant `path_weight * (n-1) < path_edges * inf`).
@@ -244,5 +245,5 @@ relaxation round.
 | Specification Strength | ★★★★★ — d[v]=δ(s,v) proven; sp\_dist declaratively characterised (optimality + achievability) |
 | Complexity | ★★★★★ — exact tick counts; asymptotic bounds verified; integrated with implementations |
 | Proof Quality | ★★★★★ — zero admits/assumes across all files |
-| Documentation | ★★★★★ — comprehensive headers; sentinel soundness proven |
+| Documentation | ★★★★★ — comprehensive headers; abstract inf; sentinel soundness proven |
 | **Rubric Structural Compliance** | **★★★★★** — all 14/14 rubric slots filled; tight interface files; complexity integrated with implementations |

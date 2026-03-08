@@ -12,7 +12,7 @@ module CLRS.Ch24.BellmanFord.TriangleInequality
 open FStar.Seq
 open FStar.Mul
 
-let inf : int = 1000000
+let inf : int = CLRS.Ch24.ShortestPath.Inf.inf
 
 (* Distance vector: current distance estimates *)
 type dist_vec (n: nat) = d:Seq.seq int{Seq.length d == n}

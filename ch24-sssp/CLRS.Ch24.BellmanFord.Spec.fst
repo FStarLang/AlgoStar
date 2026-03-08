@@ -10,7 +10,7 @@ module Seq = FStar.Seq
    Proving CLRS Lemma 24.2 (Path Relaxation Property)
    ============================================================ *)
 
-let inf : int = 1000000
+let inf : int = CLRS.Ch24.ShortestPath.Inf.inf
 
 (* ===== Graph Representation ===== *)
 

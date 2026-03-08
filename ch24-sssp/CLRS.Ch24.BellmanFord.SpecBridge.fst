@@ -3,7 +3,7 @@ module CLRS.Ch24.BellmanFord.SpecBridge
 (*
    Formal bridge between two shortest-path distance specifications:
 
-   - CLRS.Ch24.ShortestPath.Spec:  flat weight seq, int with sentinel (inf = 1000000)
+   - CLRS.Ch24.ShortestPath.Spec:  flat weight seq, int with abstract sentinel (inf > 0)
    - CLRS.Ch24.BellmanFord.Spec:   adjacency matrix, option int
 
    Main result: sp_dist_k_equiv shows both sp_dist_k definitions compute

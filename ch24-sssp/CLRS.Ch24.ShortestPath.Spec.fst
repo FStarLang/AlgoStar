@@ -32,7 +32,7 @@ module CLRS.Ch24.ShortestPath.Spec
 open FStar.Mul
 open FStar.List.Tot
 
-let inf : int = 1000000
+let inf : int = CLRS.Ch24.ShortestPath.Inf.inf
 
 (* A path is a non-empty list of vertices *)
 type path = l:list nat{Cons? l}
