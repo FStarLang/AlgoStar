@@ -2005,19 +2005,21 @@ fn bfs_explore_neighbors
 (** Main BFS: returns whether sink was reached *)
 #push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
 fn bfs_residual
-  (capacity flow color pred: A.array int)
+  (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
   (n source sink: SZ.t)
   (#cap_seq: erased (Seq.seq int))
   (#flow_seq: erased (Seq.seq int))
   (#scolor0: erased (Seq.seq int))
   (#spred0: erased (Seq.seq int))
+  (#sdist0: erased (Seq.seq int))
   (#squeue0: erased (Seq.seq SZ.t))
   requires
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq **
     A.pts_to color scolor0 **
     A.pts_to pred spred0 **
+    A.pts_to dist sdist0 **
     A.pts_to queue squeue0 **
     pure (
       SZ.v n > 0 /\
@@ -2028,19 +2030,22 @@ fn bfs_residual
       Seq.length flow_seq == SZ.v n * SZ.v n /\
       Seq.length scolor0 == SZ.v n /\
       Seq.length spred0 == SZ.v n /\
+      Seq.length sdist0 == SZ.v n /\
       Seq.length squeue0 == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n)
     )
   returns found: bool
-  ensures exists* scolor' spred' squeue'.
+  ensures exists* scolor' spred' sdist' squeue'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq **
     A.pts_to color scolor' **
     A.pts_to pred spred' **
+    A.pts_to dist sdist' **
     A.pts_to queue squeue' **
     pure (
       Seq.length scolor' == SZ.v n /\
       Seq.length spred' == SZ.v n /\
+      Seq.length sdist' == SZ.v n /\
       Seq.length squeue' == SZ.v n /\
       found == (seq_get scolor' (SZ.v sink) <> 0) /\
       preds_in_range spred' (SZ.v n) /\
@@ -2048,14 +2053,10 @@ fn bfs_residual
       seq_get scolor' (SZ.v source) <> 0 /\
       // BFS completeness: all residual neighbors of discovered vertices are discovered
       bfs_complete scolor' cap_seq flow_seq (SZ.v n) /\
-      // Predecessor tree correctness: enables path property proofs
-      (exists (sd: Seq.seq int). Seq.length sd == SZ.v n /\
-        pred_ok scolor' spred' sd cap_seq flow_seq (SZ.v n) (SZ.v source))
+      // Predecessor tree correctness with dist witness
+      pred_ok scolor' spred' sdist' cap_seq flow_seq (SZ.v n) (SZ.v source)
     )
 {
-  // Allocate dist array for BFS tree depth tracking
-  let dist = A.alloc (-1) n;
-
   bfs_init color pred dist n source;
   A.op_Array_Assignment queue 0sz source;
   // Establish invariant preconditions for the BFS loop
@@ -2141,16 +2142,13 @@ fn bfs_residual
   };
   let sink_color: int = A.op_Array_Access color sink;
 
-  // Extract pred_ok from bfs_pred_ok before freeing dist
+  // Extract pred_ok from bfs_pred_ok
   with sd_final. assert (A.pts_to dist sd_final);
   with sp_final. assert (A.pts_to pred sp_final);
-  with sc_pre_free. assert (A.pts_to color sc_pre_free);
+  with sc_pre. assert (A.pts_to color sc_pre);
   with vtail_final. assert (R.pts_to q_tail vtail_final);
-  elim_bfs_pred_ok sc_pre_free sp_final sd_final cap_seq flow_seq
+  elim_bfs_pred_ok sc_pre sp_final sd_final cap_seq flow_seq
     (SZ.v n) (SZ.v source) (SZ.v vtail_final);
-
-  // Free dist array (local to BFS)
-  A.free dist;
 
   // BFS completeness: at termination, queue is empty → count_color1 == 0 → no color-1 vertices
   // → processed_complete = bfs_complete
@@ -2829,6 +2827,7 @@ fn max_flow
   // Phase 2: Allocate BFS workspace
   let color = A.alloc 0 n;
   let pred = A.alloc (-1) n;
+  let dist = A.alloc (-1) n;
   let queue = A.alloc 0sz n;
 
   // Phase 3: Main Ford-Fulkerson loop
@@ -2843,7 +2842,7 @@ fn max_flow
      So at most cap_sum augmentations + 1 final BFS = cap_sum + 1 iterations.
      The decreasing measure cap_sum + 1 - iters is always >= 0 and decreases by 1. *)
   while (!continue_loop)
-  invariant exists* cont itr fv flow_s sc sp sq completed_v.
+  invariant exists* cont itr fv flow_s sc sp sd sq completed_v.
     R.pts_to continue_loop cont **
     R.pts_to iters itr **
     R.pts_to flow_val fv **
@@ -2852,11 +2851,13 @@ fn max_flow
     A.pts_to flow flow_s **
     A.pts_to color sc **
     A.pts_to pred sp **
+    A.pts_to dist sd **
     A.pts_to queue sq **
     pure (
       Seq.length flow_s == SZ.v n * SZ.v n /\
       Seq.length sc == SZ.v n /\
       Seq.length sp == SZ.v n /\
+      Seq.length sd == SZ.v n /\
       Seq.length sq == SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n) /\
@@ -2875,7 +2876,7 @@ fn max_flow
   {
     iters := !iters + 1;
 
-    let found = bfs_residual capacity flow color pred queue n source sink;
+    let found = bfs_residual capacity flow color pred dist queue n source sink;
 
     if found
     {
@@ -2935,6 +2936,7 @@ fn max_flow
   // Cleanup BFS workspace
   A.free color;
   A.free pred;
+  A.free dist;
   A.free queue;
   result
 }
