@@ -677,3 +677,211 @@ let zero_flow_valid (#n: nat) (cap: capacity_matrix n) (source: nat{source < n})
       (let flow = Seq.create (n * n) 0 in
        valid_flow flow cap source sink))
   = lemma_zero_flow_valid n cap source sink
+
+(* ================================================================
+   AUGMENT_EDGE COMMUTATIVITY AND ORDER INDEPENDENCE
+   Needed for proving augment_imp (backward walk) = augment_aux (forward walk)
+   ================================================================ *)
+
+(** augment_edge only modifies cell (u,v) or (v,u); all other cells unchanged *)
+let lemma_augment_edge_only_modifies
+  (flow cap: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (u v: nat{u < n /\ v < n}) (delta: int)
+  (a b: nat{a < n /\ b < n})
+  : Lemma
+    (requires (a <> u \/ b <> v) /\ (a <> v \/ b <> u))
+    (ensures get (augment_edge flow cap n u v delta) n a b == get flow n a b)
+  = lemma_get_set_other flow n u v (get flow n u v + delta) a b;
+    lemma_get_set_other flow n v u (get flow n v u - delta) a b
+
+(** residual_capacity at (a,b) is unchanged by augment_edge at (u,v) when
+    {a,b} is disjoint from {u,v} in the sense that neither (a,b) nor (b,a)
+    overlaps with the cell modified by augment_edge *)
+let lemma_augment_edge_residual_unchanged
+  (flow cap: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (u v: nat{u < n /\ v < n}) (delta: int)
+  (a b: nat{a < n /\ b < n})
+  : Lemma
+    (requires a <> u /\ a <> v /\ b <> u /\ b <> v)
+    (ensures
+      residual_capacity cap (augment_edge flow cap n u v delta) n a b ==
+      residual_capacity cap flow n a b)
+  = lemma_augment_edge_only_modifies flow cap n u v delta a b
+
+(** Commutativity of augment_edge: two edge augmentations can be swapped
+    when they modify disjoint matrix cells. This holds when the edges are 
+    different as undirected edges: {u1,v1} ≠ {u2,v2}. 
+    Adjacent path edges (u,v) and (v,w) satisfy this because u ≠ w. *)
+#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
+let lemma_augment_edge_commute
+  (flow cap: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (u1 v1 u2 v2: nat{u1 < n /\ v1 < n /\ u2 < n /\ v2 < n})
+  (delta: int)
+  : Lemma
+    (requires
+      // Edges are different as undirected edges: {u1,v1} ≠ {u2,v2}
+      ~(u1 = u2 /\ v1 = v2) /\ ~(u1 = v2 /\ v1 = u2))
+    (ensures
+      augment_edge (augment_edge flow cap n u1 v1 delta) cap n u2 v2 delta ==
+      augment_edge (augment_edge flow cap n u2 v2 delta) cap n u1 v1 delta)
+  = let f1 = augment_edge flow cap n u1 v1 delta in
+    let f2 = augment_edge flow cap n u2 v2 delta in
+    let f12 = augment_edge f1 cap n u2 v2 delta in
+    let f21 = augment_edge f2 cap n u1 v1 delta in
+    // ae1 modifies cell (u1,v1) or (v1,u1). ae2 modifies cell (u2,v2) or (v2,u2).
+    // Since {u1,v1} ≠ {u2,v2} as undirected edges, these cells are disjoint.
+    // So each ae sees the same flow values regardless of order.
+    let aux (i: nat{i < n * n})
+      : Lemma (Seq.index f12 i == Seq.index f21 i)
+      = let a = i / n in
+        let b = i % n in
+        if a < n && b < n then begin
+          if (a = u1 && b = v1) || (a = v1 && b = u1) then begin
+            // Cell (a,b) affected by ae1, NOT by ae2.
+            // ae2 doesn't modify (u1,v1) or (v1,u1):
+            lemma_augment_edge_only_modifies flow cap n u2 v2 delta u1 v1;
+            lemma_augment_edge_only_modifies flow cap n u2 v2 delta v1 u1;
+            // So f2[u1,v1] = flow[u1,v1] and f2[v1,u1] = flow[v1,u1]
+            // → residual(f2, u1, v1) = residual(flow, u1, v1) → same branch
+            // → f1[a,b] = ae1(flow)[a,b] = ae1(f2)[a,b] = f21[a,b]
+            // Also: ae2 doesn't modify (a,b), so f12[a,b] = f1[a,b]
+            lemma_augment_edge_only_modifies f1 cap n u2 v2 delta a b
+            // So f12[a,b] = f1[a,b] = f21[a,b]
+          end
+          else if (a = u2 && b = v2) || (a = v2 && b = u2) then begin
+            // Symmetric: cell (a,b) affected by ae2, NOT by ae1.
+            lemma_augment_edge_only_modifies flow cap n u1 v1 delta u2 v2;
+            lemma_augment_edge_only_modifies flow cap n u1 v1 delta v2 u2;
+            lemma_augment_edge_only_modifies f2 cap n u1 v1 delta a b
+          end
+          else begin
+            // Cell (a,b) not affected by either ae
+            lemma_augment_edge_only_modifies flow cap n u1 v1 delta a b;
+            lemma_augment_edge_only_modifies flow cap n u2 v2 delta a b;
+            lemma_augment_edge_only_modifies f1 cap n u2 v2 delta a b;
+            lemma_augment_edge_only_modifies f2 cap n u1 v1 delta a b
+          end
+        end
+    in
+    FStar.Classical.forall_intro aux;
+    Seq.lemma_eq_intro f12 f21
+#pop-options
+
+(** augment_edge at (u,v) commutes with augment_aux on a remaining path,
+    when u does not appear in the remaining path (simple path property).
+    v may appear in rest (as its head), but that's fine because
+    edges in rest don't involve u, so {u,v} ≠ {a,b} for any edge (a,b) in rest. *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec lemma_augment_edge_commutes_with_aux
+  (flow cap: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (u v: nat{u < n /\ v < n})
+  (delta: int)
+  (rest: list nat{Cons? rest /\ (forall (w: nat). L.mem w rest ==> w < n)})
+  : Lemma
+    (requires
+      not (L.mem u rest) /\
+      distinct_vertices rest)
+    (ensures
+      augment_aux (augment_edge flow cap n u v delta) cap n rest delta ==
+      augment_edge (augment_aux flow cap n rest delta) cap n u v delta)
+    (decreases rest)
+  = match rest with
+    | [_] -> ()
+    | a :: b :: tl ->
+      // Edge (a,b) in rest. u ∉ rest so u≠a and u≠b.
+      // {u,v} ≠ {a,b}: since u≠a and u≠b, neither (u=a∧v=b) nor (u=b∧v=a).
+      assert (~(u = a /\ v = b));
+      assert (~(u = b /\ v = a));
+      lemma_augment_edge_commute flow cap n u v a b delta;
+      let flow_ab = augment_edge flow cap n a b delta in
+      lemma_augment_edge_commutes_with_aux flow_ab cap n u v delta (b :: tl)
+#pop-options
+
+(** Key lemma: the first edge of augment_aux can be deferred to the end.
+    augment_aux [u, v, ...rest] = ae(augment_aux [v, ...rest], u, v, delta)
+    This follows from augment_edge at (u,v) commuting with augment_aux on rest,
+    since u does not appear in rest (simple path). *)
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let lemma_augment_aux_first_last
+  (flow cap: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
+  (delta: int)
+  : Lemma
+    (requires distinct_vertices path /\ L.length path >= 2)
+    (ensures
+      (match path with
+       | u :: v :: rest ->
+         augment_aux flow cap n path delta ==
+         augment_edge (augment_aux flow cap n (v :: rest) delta) cap n u v delta
+       | _ -> True))
+  = match path with
+    | u :: v :: rest ->
+      let tail = v :: rest in
+      if L.length tail >= 2 then
+        lemma_augment_edge_commutes_with_aux flow cap n u v delta tail
+      else ()
+    | _ -> ()
+#pop-options
+
+(** Helper: L.init preserves distinct_vertices and membership subset *)
+let rec lemma_init_preserves_distinct_vertices (l: list nat{Cons? l})
+  : Lemma (requires distinct_vertices l)
+          (ensures distinct_vertices (L.init l) /\
+                   (forall v. L.mem v (L.init l) ==> L.mem v l))
+          (decreases l)
+  = match l with
+    | [_] -> ()
+    | _ :: rest -> lemma_init_preserves_distinct_vertices rest
+
+(** Process the last edge first: for a simple path,
+    augment_aux flow path = augment_aux (ae flow last_edge) init_path.
+    This is the key for connecting augment_imp (backward walk) to augment_aux. *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec lemma_augment_aux_last_first
+  (flow cap: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
+  (delta: int)
+  : Lemma
+    (requires distinct_vertices path /\ L.length path >= 2)
+    (ensures
+      (let last = L.last path in
+       let init = L.init path in
+       L.length init >= 1 /\
+       Cons? init /\
+       (forall (v: nat). L.mem v init ==> v < n) /\
+       last < n /\
+       (L.length init >= 2 ==>
+         (let second_last = L.last init in
+          second_last < n /\
+          augment_aux flow cap n path delta ==
+          augment_aux (augment_edge flow cap n second_last last delta) cap n init delta))))
+    (decreases L.length path)
+  = L.append_init_last path;
+    L.append_mem (L.init path) [L.last path] (L.last path);
+    match path with
+    | [u; v] -> ()  // ae(flow, u, v) on both sides
+    | u :: v :: w :: rest ->
+      lemma_augment_aux_first_last flow cap n path delta;
+      lemma_augment_aux_last_first flow cap n (v :: w :: rest) delta;
+      let last = L.last path in
+      let inner_init = L.init (v :: w :: rest) in
+      L.append_init_last (v :: w :: rest);
+      lemma_init_preserves_distinct_vertices (v :: w :: rest);
+      L.append_init_last inner_init;
+      L.append_mem (L.init inner_init) [L.last inner_init] (L.last inner_init);
+      let sl = L.last inner_init in
+      let flow_sl_last = augment_edge flow cap n sl last delta in
+      assert (Cons? inner_init);
+      assert (L.hd inner_init = v);
+      // u :: inner_init = L.init path, which has distinct_vertices
+      lemma_init_preserves_distinct_vertices path;
+      lemma_augment_aux_first_last flow_sl_last cap n (u :: inner_init) delta;
+      ()
+    | _ -> ()
+#pop-options

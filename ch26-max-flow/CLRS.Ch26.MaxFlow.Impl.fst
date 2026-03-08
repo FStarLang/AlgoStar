@@ -138,6 +138,26 @@ let imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source 
     in
     FStar.Classical.forall_intro_2 aux_cap
 
+(** Reverse bridge: valid_flow implies imp_valid_flow.
+    Together with imp_valid_flow_implies_valid_flow, the two predicates are equivalent. *)
+[@"opaque_to_smt"]
+let valid_flow_implies_imp_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ sink < n /\
+      Seq.length flow_seq == n * n /\ Seq.length cap_seq == n * n /\
+      valid_flow #n flow_seq cap_seq source sink)
+    (ensures imp_valid_flow flow_seq cap_seq n source sink)
+  = let aux_cap (u: nat{u < n}) (v: nat{v < n})
+      : Lemma (0 <= seq_get flow_seq (u * n + v) /\
+               seq_get flow_seq (u * n + v) <= seq_get cap_seq (u * n + v))
+      = let idx = u * n + v in
+        assert (idx < n * n);
+        assert (seq_get flow_seq idx == Seq.index flow_seq idx);
+        assert (get flow_seq n u v == Seq.index flow_seq idx)
+    in
+    FStar.Classical.forall_intro_2 aux_cap
+
 (** Queue entries are valid vertices *)
 let queue_valid (squeue: Seq.seq SZ.t) (head tail: nat) (n: nat) : prop =
   forall (k: nat). k >= head /\ k < tail ==> SZ.v (seq_get_sz squeue k) < n
@@ -1222,6 +1242,7 @@ let elim_discover_delta
   = reveal_opaque (`%discover_delta) (discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
+#restart-solver
 #push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
