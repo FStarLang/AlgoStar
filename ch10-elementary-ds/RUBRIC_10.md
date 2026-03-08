@@ -52,8 +52,8 @@ Each data structure follows the rubric pattern: **Spec → Lemmas → Impl** (wi
 | 20 | `CLRS.Ch10.DLL.Spec.fst` | **Spec.fst** | Pure spec: `dll_insert`, `dll_search`, `dll_delete`, `dll_delete_at` |
 | 21 | `CLRS.Ch10.DLL.Lemmas.fsti` | **Lemmas.fsti** | Signatures for 8 DLL correctness lemmas |
 | 22 | `CLRS.Ch10.DLL.Lemmas.fst` | **Lemmas.fst** | Proofs of insert/search/delete/delete_at properties |
-| 23 | `CLRS.Ch10.DLL.Impl.fsti` | **Impl.fsti** | `node`, `dptr`, `dls`, `dll`, 5 operation signatures |
-| 24 | `CLRS.Ch10.DLL.Impl.fst` | **Impl.fst** | True DLL with `dls` segment predicate, all ops + delete-by-index |
+| 23 | `CLRS.Ch10.DLL.Impl.fsti` | **Impl.fsti** | `node`, `dptr`, `dls`, `dll`, 6 operation signatures (incl. `list_insert_tail`) |
+| 24 | `CLRS.Ch10.DLL.Impl.fst` | **Impl.fst** | True DLL with `dls`/`dls_rev` predicates, all ops + delete-by-index + tail insertion |
 | 25 | `CLRS.Ch10.DLL.Test.fst` | Test | Insert/search/delete round-trip test |
 
 ### Legacy / Combined Files (kept for backward compatibility)
@@ -130,12 +130,22 @@ Complexity is fused into Impl for SLL (ghost-tick tracked); Stack/Queue/DLL comp
 | Check | Result | Details |
 |-------|--------|---------|
 | **Zero admits/assumes** | ✅ Pass | All files verified with 0 admits, 0 assumes |
-| **Solver options** | ✅ Pass | Only `#push-options "--z3rlimit 40"` in `Queue.Impl.fst`; well-scoped |
+| **Solver options** | ✅ Pass | `#push-options "--z3rlimit 40"` in Queue.Impl; `#push-options "--fuel 2"` scoped in DLL.Impl for `L.rev` reasoning |
 | **SNIPPET markers** | ✅ Pass | Present in Impl.fsti files, Base.fst, Spec files |
 | **Code duplication** | ✅ Resolved | `SinglyLinkedList.Base.fst` extracts shared definitions |
 | **Test coverage** | ✅ Pass | Tests for all 4 data structures |
 | **Rubric naming** | ✅ Full | All files follow `CLRS.Ch10.AlgoName.{Spec,Lemmas,Impl}.fst/fsti` |
 | **All files verified** | ✅ Pass | 26 files pass `fstar.exe` verification |
+
+---
+
+## Recent Changes (2025-07-24)
+
+- **`list_insert_tail`** added to DLL Impl: O(1) runtime tail insertion using `dls_rev` ghost traversal
+- **`list_insert`** spec fixed: uses erased `#l` parameter instead of existentially bound `l`
+- **`list_delete_node`** cleaned: removed unused `x: box node` parameter
+- **`dls_rev` predicate** infrastructure added: reversed DLS for ghost-level bidirectional access
+- Pure helper lemmas: `rev_preserves_cons`, `rev_cons`, `rev_cons_rev`
 
 ---
 
