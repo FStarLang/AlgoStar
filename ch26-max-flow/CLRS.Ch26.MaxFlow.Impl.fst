@@ -1786,7 +1786,10 @@ fn bfs_residual
       // Source is always discovered by BFS
       seq_get scolor' (SZ.v source) <> 0 /\
       // BFS completeness: all residual neighbors of discovered vertices are discovered
-      bfs_complete scolor' cap_seq flow_seq (SZ.v n)
+      bfs_complete scolor' cap_seq flow_seq (SZ.v n) /\
+      // Predecessor tree correctness: enables path property proofs
+      (exists (sd: Seq.seq int). Seq.length sd == SZ.v n /\
+        pred_ok scolor' spred' sd cap_seq flow_seq (SZ.v n) (SZ.v source))
     )
 {
   // Allocate dist array for BFS tree depth tracking
@@ -1876,6 +1879,14 @@ fn bfs_residual
     ()
   };
   let sink_color: int = A.op_Array_Access color sink;
+
+  // Extract pred_ok from bfs_pred_ok before freeing dist
+  with sd_final. assert (A.pts_to dist sd_final);
+  with sp_final. assert (A.pts_to pred sp_final);
+  with sc_pre_free. assert (A.pts_to color sc_pre_free);
+  with vtail_final. assert (R.pts_to q_tail vtail_final);
+  elim_bfs_pred_ok sc_pre_free sp_final sd_final cap_seq flow_seq
+    (SZ.v n) (SZ.v source) (SZ.v vtail_final);
 
   // Free dist array (local to BFS)
   A.free dist;
