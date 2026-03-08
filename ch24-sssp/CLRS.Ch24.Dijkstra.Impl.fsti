@@ -67,6 +67,11 @@ let pred_consistent = D.pred_consistent
 ///   δ(s,v) = δ(s, pred[v]) + w(pred[v], v)
 /// where δ = sp_dist. This is the definitive specification: following the
 /// predecessor chain from v to source yields a shortest path.
+///
+/// Under the weights_in_range precondition, the guard sp_dist < inf is
+/// equivalent to "v is reachable from source via existing edges"
+/// (see sp_dist_faithful). The subsidiary facts (w(pred[v],v) < inf,
+/// sp_dist(s, pred[v]) < inf) follow from the equality + non-negative weights.
 let shortest_path_tree (spred: Seq.seq SZ.t) (sweights: Seq.seq int)
   (n source: nat) : prop =
   Seq.length spred == n /\
@@ -76,9 +81,6 @@ let shortest_path_tree (spred: Seq.seq SZ.t) (sweights: Seq.seq int)
   (forall (v: nat). v < n /\ v <> source /\ SP.sp_dist sweights n source v < SP.inf ==>
     (let p = SZ.v (Seq.index spred v) in
      p < n /\
-     p * n + v < Seq.length sweights /\
-     Seq.index sweights (p * n + v) < SP.inf /\
-     SP.sp_dist sweights n source p < SP.inf /\
      SP.sp_dist sweights n source v ==
        SP.sp_dist sweights n source p + Seq.index sweights (p * n + v)))
 //SNIPPET_END: shortest_path_tree
