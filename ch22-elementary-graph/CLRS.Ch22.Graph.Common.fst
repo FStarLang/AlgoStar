@@ -48,6 +48,21 @@ let rec reachable_in (adj: Seq.seq int) (n: nat) (source v: nat) (steps: nat)
   = if steps = 0 then v == source
     else (exists (u: nat). u < n /\ reachable_in adj n source u (steps - 1) /\ has_edge adj n u v)
 
+/// Predecessor tree validity: for every non-WHITE vertex v with pred[v] in [0,n),
+/// pred[v] is also non-WHITE, there is an edge from pred[v] to v, and d[pred[v]] < d[v].
+/// Vertices with pred[v] < 0 are DFS tree roots (unconstrained).
+[@"opaque_to_smt"]
+let pred_edge_ok (sadj: Seq.seq int) (n: nat) (scolor sd spred: Seq.seq int) : prop =
+  Seq.length scolor >= n /\ Seq.length sd >= n /\ Seq.length spred >= n /\ Seq.length sadj >= n * n /\
+  (forall (v:nat). v < n /\ Seq.index scolor v <> 0 /\ Seq.index spred v >= 0 ==>
+    Seq.index spred v < n) /\
+  (forall (v:nat). {:pattern (Seq.index spred v)}
+    v < n /\ Seq.index scolor v <> 0 /\ Seq.index spred v >= 0 /\ Seq.index spred v < n ==>
+    Seq.index scolor (Seq.index spred v) <> 0 /\
+    Seq.index sadj (Seq.index spred v * n + v) <> 0 /\
+    Seq.index sd (Seq.index spred v) > 0 /\
+    Seq.index sd (Seq.index spred v) < Seq.index sd v)
+
 (*** Arithmetic Helpers ***)
 
 /// Strict product bound: c < a ∧ d < b ⟹ c*b + d < a*b

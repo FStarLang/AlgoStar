@@ -88,6 +88,8 @@ fn stack_dfs
       (forall (u: nat). u < SZ.v n ==> Seq.index sf' u > 0) /\
       // Discovery time < finish time (parenthesis theorem)
       (forall (u: nat). u < SZ.v n ==> Seq.index sd' u < Seq.index sf' u) /\
+      // Predecessor tree: pred[v] >= 0 implies edge from pred[v] to v, d[pred[v]] < d[v]
+      pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)

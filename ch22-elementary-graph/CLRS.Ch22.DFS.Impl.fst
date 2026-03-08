@@ -258,6 +258,73 @@ let no_gray_implies_gray_ok
     (ensures gray_ok scolor sd n time)
   = count_ones_zero_no_gray scolor n
 
+(* Discovering from parent u preserves pred_edge_ok *)
+let discover_preserves_pred_edge_ok
+  (sadj scolor sd spred: Seq.seq int) (n j u: nat) (time: int)
+  : Lemma
+    (requires
+      j < n /\ u < n /\
+      n <= Seq.length scolor /\ n <= Seq.length sd /\ n <= Seq.length spred /\
+      n * n <= Seq.length sadj /\
+      Seq.index scolor j == 0 /\
+      Seq.index scolor u == 1 /\
+      Seq.index sadj (u * n + j) <> 0 /\
+      Seq.index sd u > 0 /\
+      Seq.index sd u <= time /\
+      time >= 0 /\
+      pred_edge_ok sadj n scolor sd spred)
+    (ensures
+      pred_edge_ok sadj n
+        (Seq.upd scolor j 1)
+        (Seq.upd sd j (time + 1))
+        (Seq.upd spred j u))
+  = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred);
+    reveal_opaque (`%pred_edge_ok)
+      (pred_edge_ok sadj n (Seq.upd scolor j 1) (Seq.upd sd j (time + 1)) (Seq.upd spred j u))
+
+(* Discovering source vertex (pred = -1) preserves pred_edge_ok *)
+let discover_source_preserves_pred_edge_ok
+  (sadj scolor sd spred: Seq.seq int) (n j: nat) (time: int)
+  : Lemma
+    (requires
+      j < n /\
+      n <= Seq.length scolor /\ n <= Seq.length sd /\ n <= Seq.length spred /\
+      n * n <= Seq.length sadj /\
+      Seq.index scolor j == 0 /\
+      pred_edge_ok sadj n scolor sd spred)
+    (ensures
+      pred_edge_ok sadj n
+        (Seq.upd scolor j 1)
+        (Seq.upd sd j (time + 1))
+        (Seq.upd spred j (-1)))
+  = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred);
+    reveal_opaque (`%pred_edge_ok)
+      (pred_edge_ok sadj n (Seq.upd scolor j 1) (Seq.upd sd j (time + 1)) (Seq.upd spred j (-1)))
+
+(* Finishing preserves pred_edge_ok (color 1→2, both non-zero; sd/spred unchanged) *)
+let finish_preserves_pred_edge_ok
+  (sadj scolor sd spred: Seq.seq int) (n j: nat)
+  : Lemma
+    (requires
+      j < n /\
+      n <= Seq.length scolor /\ n <= Seq.length sd /\ n <= Seq.length spred /\
+      n * n <= Seq.length sadj /\
+      Seq.index scolor j == 1 /\
+      pred_edge_ok sadj n scolor sd spred)
+    (ensures pred_edge_ok sadj n (Seq.upd scolor j 2) sd spred)
+  = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred);
+    reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n (Seq.upd scolor j 2) sd spred)
+
+(* All-WHITE state satisfies pred_edge_ok vacuously (all non-WHITE: vacuous) *)
+let init_pred_edge_ok (sadj scolor sd spred: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      n <= Seq.length scolor /\ n <= Seq.length sd /\ n <= Seq.length spred /\
+      n * n <= Seq.length sadj /\
+      (forall (j:nat). j < n ==> Seq.index scolor j == 0))
+    (ensures pred_edge_ok sadj n scolor sd spred)
+  = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred)
+
 (* Final postcondition: from dfs_ok + nonwhite_below n + count_ones==0,
    all BLACK with d > 0, f > 0, d < f *)
 let final_postcondition_lemma
@@ -485,7 +552,7 @@ fn finish_vertex
 
 (* Helper: perform DFS-VISIT for a single white vertex *)
 
-#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 800 --fuel 2 --ifuel 1"
 fn dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -533,6 +600,7 @@ fn dfs_visit
       dfs_ok scolor sd sf (SZ.v n) /\
       gray_ok scolor sd (SZ.v n) vtime /\
       nonwhite_below scolor (SZ.v vs) /\
+      pred_edge_ok sadj (SZ.v n) scolor sd spred /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
@@ -556,6 +624,7 @@ fn dfs_visit
       scan_ok sscan' (SZ.v n) /\
       dfs_ok scolor' sd' sf' (SZ.v n) /\
       nonwhite_below scolor' (SZ.v vs + 1) /\
+      pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       (* Complexity: ticks == scan work done *)
       vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
       (* WHITE vertices still have scan_idx == 0 *)
@@ -581,6 +650,7 @@ fn dfs_visit
   // Establish DFS tracking after inline discover
   discover_preserves_tracking scolor sd sf (SZ.v n) (SZ.v vs) t;
   discover_preserves_nonwhite scolor (SZ.v vs) (SZ.v vs);
+  discover_source_preserves_pred_edge_ok sadj scolor sd spred (SZ.v n) (SZ.v vs) t;
 
   // Process stack
   while (
@@ -611,6 +681,7 @@ fn dfs_visit
       gray_ok scolor_w sd_w (SZ.v n) vtime_w /\
       Seq.index scolor_w (SZ.v vs) <> 0 /\
       nonwhite_below scolor_w (SZ.v vs) /\
+      pred_edge_ok sadj (SZ.v n) scolor_w sd_w spred_w /\
       (* Complexity tracking *)
       vc_w + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan_w (SZ.v n) /\
       (* WHITE vertices have scan_idx == 0 *)
@@ -663,6 +734,7 @@ fn dfs_visit
         SZ.fits (SZ.v u * SZ.v n + SZ.v vscan) /\
         (vfound ==> SZ.v vnext < SZ.v n) /\
         (vfound ==> Seq.index scolor_scan (SZ.v vnext) == 0) /\
+        (vfound ==> Seq.index sadj (SZ.v u * SZ.v n + SZ.v vnext) <> 0) /\
         Seq.index scolor_scan (SZ.v u) == 1 /\
         SZ.v (Seq.index sstack_scan (SZ.v top - 1)) == SZ.v u /\
         stack_ok scolor_scan sstack_scan (SZ.v n) (SZ.v top) /\
@@ -671,6 +743,7 @@ fn dfs_visit
         gray_ok scolor_scan sd_scan (SZ.v n) vtime_scan /\
         Seq.index scolor_scan (SZ.v vs) <> 0 /\
         nonwhite_below scolor_scan (SZ.v vs) /\
+        pred_edge_ok sadj (SZ.v n) scolor_scan sd_scan spred_scan /\
         (* Complexity: scan ticks == scan position advancement *)
         vc_scan + sum_scan_idx sscan (SZ.v n) + SZ.v scan_pos ==
           reveal vc + sum_scan_idx sscan_scan (SZ.v n) + SZ.v vscan /\
@@ -716,10 +789,13 @@ fn dfs_visit
       // Found WHITE neighbor - discover it (inlined to preserve complexity facts)
       let vv = !next_v;
       assert (pure (SZ.v vv < SZ.v n));
+      // Edge fact from inner loop invariant
+      assert (pure (Seq.index sadj (SZ.v u * SZ.v n + SZ.v vv) <> 0));
       
       with scolor_now. assert (A.pts_to color scolor_now);
       with sd_now. assert (A.pts_to d sd_now);
       with sf_now. assert (A.pts_to f sf_now);
+      with spred_now. assert (A.pts_to pred spred_now);
       with vtime_now. assert (R.pts_to time_ref vtime_now);
       // count_ones == top, and scolor_now[vv] == 0 (WHITE, not GRAY)
       // so count_ones < n, hence top < n
@@ -741,12 +817,16 @@ fn dfs_visit
       stack_top := SZ.add topd 1sz;
       // Reestablish DFS tracking
       discover_preserves_tracking scolor_now sd_now sf_now (SZ.v n) (SZ.v vv) vtime_now;
-      discover_preserves_nonwhite scolor_now (SZ.v vv) (SZ.v vs)
+      discover_preserves_nonwhite scolor_now (SZ.v vv) (SZ.v vs);
+      // Preserve predecessor tree property
+      discover_preserves_pred_edge_ok sadj scolor_now sd_now spred_now (SZ.v n) (SZ.v vv) (SZ.v u) vtime_now;
+      ()
     } else {
       // No more WHITE neighbors - finish u (inlined)
       with scolor_now. assert (A.pts_to color scolor_now);
       with sd_now. assert (A.pts_to d sd_now);
       with sf_now. assert (A.pts_to f sf_now);
+      with spred_now. assert (A.pts_to pred spred_now);
       with vtime_now. assert (R.pts_to time_ref vtime_now);
       // Inline finish_vertex
       count_ones_upd_from_one scolor_now (SZ.v n) (SZ.v u) 2;
@@ -758,7 +838,10 @@ fn dfs_visit
       stack_top := SZ.sub topf 1sz;
       // Reestablish DFS tracking
       finish_preserves_tracking scolor_now sd_now sf_now (SZ.v n) (SZ.v u) vtime_now;
-      finish_preserves_nonwhite scolor_now (SZ.v u) (SZ.v vs)
+      finish_preserves_nonwhite scolor_now (SZ.v u) (SZ.v vs);
+      // Preserve predecessor tree property
+      finish_preserves_pred_edge_ok sadj scolor_now sd_now spred_now (SZ.v n) (SZ.v u);
+      ()
     }
   };
   
@@ -829,6 +912,7 @@ fn maybe_dfs_visit
       scan_ok sscan (SZ.v n) /\
       dfs_ok scolor sd sf (SZ.v n) /\
       nonwhite_below scolor (SZ.v vs) /\
+      pred_edge_ok sadj (SZ.v n) scolor sd spred /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
@@ -852,6 +936,7 @@ fn maybe_dfs_visit
       scan_ok sscan' (SZ.v n) /\
       dfs_ok scolor' sd' sf' (SZ.v n) /\
       nonwhite_below scolor' (SZ.v vs + 1) /\
+      pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       (* Complexity: ticks == scan work *)
       vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
       (* WHITE scan zero preserved *)
@@ -870,7 +955,7 @@ fn maybe_dfs_visit
    Main stack-based DFS — proves both correctness and complexity
    ================================================================ *)
 
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
 //SNIPPET_START: stack_dfs_sig
 fn stack_dfs
   (adj: A.array int)
@@ -940,6 +1025,8 @@ fn stack_dfs
       (forall (u: nat). u < SZ.v n ==> Seq.index sf' u > 0) /\
       // Discovery time < finish time (parenthesis theorem)
       (forall (u: nat). u < SZ.v n ==> Seq.index sd' u < Seq.index sf' u) /\
+      // Predecessor tree: pred[v] >= 0 implies edge from pred[v] to v, d[pred[v]] < d[v]
+      pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
@@ -1022,8 +1109,11 @@ fn stack_dfs
   // Establish count_ones == 0 (all vertices are WHITE) and sum_scan_idx == 0
   with scolor_init. assert (A.pts_to color scolor_init);
   with sscan_init. assert (A.pts_to scan_idx sscan_init);
+  with sd_init. assert (A.pts_to d sd_init);
+  with spred_init. assert (A.pts_to pred spred_init);
   count_ones_all_zero scolor_init (SZ.v n);
   sum_scan_idx_all_zero sscan_init (SZ.v n);
+  init_pred_edge_ok sadj scolor_init sd_init spred_init (SZ.v n);
 
   // Step 3: Main DFS loop - for each vertex s
   let mut s: SZ.t = 0sz;
@@ -1050,6 +1140,7 @@ fn stack_dfs
       scan_ok sscan_s (SZ.v n) /\
       dfs_ok scolor_s sd_s sf_s (SZ.v n) /\
       nonwhite_below scolor_s (SZ.v vs) /\
+      pred_edge_ok sadj (SZ.v n) scolor_s sd_s spred_s /\
       (* Complexity: vc_s == c0 + vs + sum_scan_idx *)
       vc_s == reveal c0 + SZ.v vs + sum_scan_idx sscan_s (SZ.v n) /\
       (* WHITE vertices have scan_idx == 0 *)
@@ -1100,6 +1191,8 @@ fn stack_dfs
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index scolor_final u == 2));
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u > 0));
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sf_final u > 0));
-  assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u < Seq.index sf_final u))
+  assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u < Seq.index sf_final u));
+  with spred_final. assert (A.pts_to pred spred_final);
+  assert (pure (pred_edge_ok sadj (SZ.v n) scolor_final sd_final spred_final))
 }
 #pop-options

@@ -136,6 +136,16 @@ let dist_ok (scolor sdist: Seq.seq int) (n: nat) : prop =
   (forall (w:nat). {:pattern (Seq.index scolor w)}
     w < n /\ Seq.index scolor w <> 0 ==> Seq.index sdist w >= 0)
 
+(* Reachability correctness: every discovered vertex is reachable from source,
+   and its distance is a witness — reachable_in adj n source v (dist[v]) *)
+let dist_reachable (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source: nat) : prop =
+  Seq.length scolor >= n /\ Seq.length sdist >= n /\
+  Seq.length adj == n * n /\
+  (forall (w:nat). {:pattern (Seq.index scolor w)}
+    w < n /\ Seq.index scolor w <> 0 ==>
+      Seq.index sdist w >= 0 /\
+      reachable_in adj n source w (Seq.index sdist w))
+
 (* ================================================================
    PREDICATE LEMMAS — Key reasoning steps for BFS proof
    ================================================================ *)
@@ -165,6 +175,40 @@ let discover_preserves_dist_ok
              n <= Seq.length sdist /\ Seq.index scolor j == 0 /\ dval >= 0)
     (ensures dist_ok (Seq.upd scolor j 1) (Seq.upd sdist j dval) n)
   = ()  // old non-WHITE: unchanged; j: new color 1, dist dval >= 0
+
+(* Discovering vertex j from u preserves dist_reachable.
+   Precondition: u is discovered (color[u] <> 0) with dist[u] = du,
+   edge (u, j) exists, j is WHITE, and we set dist[j] = du + 1.
+   Then reachable_in source j (du+1) follows from reachable_in source u du + has_edge u j. *)
+let discover_preserves_dist_reachable
+  (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source u j: nat) (du: int)
+  : Lemma
+    (requires
+      dist_reachable adj n scolor sdist source /\
+      j < n /\ u < n /\ n <= Seq.length scolor /\ n <= Seq.length sdist /\
+      Seq.length adj == n * n /\
+      Seq.index scolor j == 0 /\    // j is WHITE
+      Seq.index scolor u <> 0 /\    // u is discovered
+      Seq.index sdist u == du /\
+      du >= 0 /\
+      has_edge adj n u j)           // edge (u, j) exists
+    (ensures
+      dist_reachable adj n (Seq.upd scolor j 1) (Seq.upd sdist j (du + 1)) source)
+  = // For any w that was already non-WHITE: color and dist unchanged (w != j since j is WHITE)
+    // For w == j: new dist is du + 1, and reachable_in source j (du + 1)
+    //   because reachable_in source u du (from dist_reachable) and has_edge u j
+    assert (reachable_in adj n source u du);  // from dist_reachable, u is non-WHITE
+    assert (reachable_in adj n source j (du + 1))  // unfold: exists u. reachable_in source u du /\ has_edge u j
+
+(* Blackening preserves dist_reachable — only changes color, not dist *)
+let blacken_preserves_dist_reachable
+  (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source u: nat)
+  : Lemma
+    (requires
+      dist_reachable adj n scolor sdist source /\
+      u < n /\ n <= Seq.length scolor /\ Seq.index scolor u <> 0)
+    (ensures dist_reachable adj n (Seq.upd scolor u 2) sdist source)
+  = ()  // For w != u: unchanged. For w == u: was non-WHITE, dist unchanged, reachability unchanged.
 
 (* Blackening preserves dist_ok when u was non-WHITE *)
 let blacken_preserves_dist_ok
@@ -244,6 +288,25 @@ let queue_ok_after_discover
   = ()
 
 #pop-options
+
+(* Establishing dist_reachable after source initialization.
+   After init: only source is non-WHITE with dist=0.
+   reachable_in adj n source source 0 = (source == source) = True *)
+let init_dist_reachable
+  (adj: Seq.seq int) (n: nat) (scolor_zeros sdist_zeros: Seq.seq int) (source: nat)
+  : Lemma
+    (requires
+      source < n /\ n <= Seq.length scolor_zeros /\ n <= Seq.length sdist_zeros /\
+      Seq.length adj == n * n /\
+      (forall (j:nat). j < n ==> Seq.index scolor_zeros j == 0))
+    (ensures
+      dist_reachable adj n
+        (Seq.upd scolor_zeros source 1)
+        (Seq.upd sdist_zeros source 0)
+        source)
+  = // Only source is non-WHITE (color 1). All others are WHITE (color 0, unchanged by upd since j != source).
+    // For source: dist = 0, reachable_in adj n source source 0 = (source == source) = True.
+    ()
 
 (* ================================================================
    GHOST TICK — for complexity tracking
@@ -335,18 +398,22 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
 fn maybe_discover
+  (adj: A.array int)
   (color: A.array int) (dist: A.array int) (pred: A.array int)
   (queue_data: A.array SZ.t) (q_tail: ref SZ.t)
   (u: SZ.t) (vv: SZ.t) (du: int) (n: SZ.t)
   (head: SZ.t) (has_edge_val: int) (cv: int)
+  (#sadj: erased (Seq.seq int))
   (#scolor: erased (Seq.seq int))
   (#sdist: erased (Seq.seq int))
   (#spred: erased (Seq.seq int))
   (#squeue: erased (Seq.seq SZ.t))
   (#vtail: erased SZ.t)
+  (source: SZ.t)
   requires
+    A.pts_to adj sadj **
     A.pts_to color scolor **
     A.pts_to dist sdist **
     A.pts_to pred spred **
@@ -360,13 +427,19 @@ fn maybe_discover
       Seq.length sdist == SZ.v n /\
       Seq.length spred == SZ.v n /\
       Seq.length squeue == SZ.v n /\
+      Seq.length sadj == SZ.v n * SZ.v n /\
       du >= 0 /\
+      Seq.index sdist (SZ.v u) == du /\
+      Seq.index scolor (SZ.v u) <> 0 /\
       cv == Seq.index scolor (SZ.v vv) /\
+      (has_edge_val == Seq.index sadj (SZ.v u * SZ.v n + SZ.v vv)) /\
       count_nonwhite scolor (SZ.v n) == SZ.v vtail /\
       dist_ok scolor sdist (SZ.v n) /\
+      dist_reachable sadj (SZ.v n) scolor sdist (SZ.v source) /\
       queue_ok scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
+    A.pts_to adj sadj **
     A.pts_to color scolor' **
     A.pts_to dist sdist' **
     A.pts_to pred spred' **
@@ -381,6 +454,7 @@ fn maybe_discover
       SZ.v vtail' >= SZ.v vtail /\
       count_nonwhite scolor' (SZ.v n) == SZ.v vtail' /\
       dist_ok scolor' sdist' (SZ.v n) /\
+      dist_reachable sadj (SZ.v n) scolor' sdist' (SZ.v source) /\
       queue_ok scolor' squeue' (SZ.v n) (SZ.v head) (SZ.v vtail') /\
       // Frame: non-WHITE vertices' colors preserved
       (forall (w:nat). {:pattern (Seq.index scolor w)}
@@ -395,6 +469,9 @@ fn maybe_discover
   if (has_edge_val <> 0 && cv = 0) {
     // cv == 0 means WHITE: count_nonwhite < n, so vtail < n
     count_nonwhite_has_white scolor (SZ.v n) (SZ.v vv);
+    // Edge exists and vv is WHITE: discover vv from u
+    product_strict_bound (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vv);
+    discover_preserves_dist_reachable sadj (SZ.v n) scolor sdist (SZ.v source) (SZ.v u) (SZ.v vv) du;
     discover_vertex color dist pred queue_data q_tail u vv du n;
     // Establish count_nonwhite and queue_ok for new state
     with scolor'. assert (A.pts_to color scolor');
@@ -465,6 +542,10 @@ fn queue_bfs
       // Distance soundness: visited vertices have valid distances
       (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
         Seq.index sdist' w >= 0) /\
+      // Reachability: every discovered vertex is reachable from source,
+      // witnessed by dist[v] steps
+      (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
+        reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist' w)) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
@@ -503,6 +584,7 @@ fn queue_bfs
 
   // Step 2: Initialize source — witness all-zeros state first for count_nonwhite
   with scolor_zeros. assert (A.pts_to color scolor_zeros);
+  with sdist_zeros. assert (A.pts_to dist sdist_zeros);
   A.op_Array_Assignment color source 1;    // s.color = GRAY
   A.op_Array_Assignment dist source 0;     // s.d = 0
   A.op_Array_Assignment pred source (-1);  // s.pi = NIL
@@ -515,6 +597,7 @@ fn queue_bfs
 
   // Establish predicates for main loop entry
   count_nonwhite_upd_single scolor_zeros (SZ.v n) (SZ.v source) 1;
+  init_dist_reachable sadj (SZ.v n) scolor_zeros sdist_zeros (SZ.v source);
 
   // Step 4: Main BFS loop
   while (
@@ -540,6 +623,7 @@ fn queue_bfs
       // Predicates
       source_ok scolor_q sdist_q (SZ.v source) (SZ.v n) /\
       dist_ok scolor_q sdist_q (SZ.v n) /\
+      dist_reachable sadj (SZ.v n) scolor_q sdist_q (SZ.v source) /\
       queue_ok scolor_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail) /\
       count_nonwhite scolor_q (SZ.v n) == SZ.v vtail /\
       // Complexity: vhead * (n+1) ticks so far
@@ -593,8 +677,10 @@ fn queue_bfs
         // Predicates maintained through inner loop
         source_ok scolor_v sdist_v (SZ.v source) (SZ.v n) /\
         dist_ok scolor_v sdist_v (SZ.v n) /\
+        dist_reachable sadj (SZ.v n) scolor_v sdist_v (SZ.v source) /\
         count_nonwhite scolor_v (SZ.v n) == SZ.v vtail2 /\
         Seq.index scolor_v (SZ.v u) <> 0 /\
+        Seq.index sdist_v (SZ.v u) == du /\
         queue_ok scolor_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) /\
         // Inner loop complexity:
         vc2 >= reveal c0 /\
@@ -617,7 +703,7 @@ fn queue_bfs
       let cv: int = A.op_Array_Access color vv;
 
       // CLRS: if v.color == WHITE and edge (u,v) exists, discover v
-      maybe_discover color dist pred queue_data q_tail u vv du n (SZ.add vhead 1sz) has_edge_val cv;
+      maybe_discover adj color dist pred queue_data q_tail u vv du n (SZ.add vhead 1sz) has_edge_val cv source;
 
       // Restore source_ok and u's color from frame properties
       with scolor_post. assert (A.pts_to color scolor_post);
@@ -635,6 +721,7 @@ fn queue_bfs
     // Prove preservation lemmas for blackening
     blacken_preserves_source_ok scolor_pre_black sdist_pre_black (SZ.v source) (SZ.v n) (SZ.v u);
     blacken_preserves_dist_ok scolor_pre_black sdist_pre_black (SZ.v n) (SZ.v u);
+    blacken_preserves_dist_reachable sadj (SZ.v n) scolor_pre_black sdist_pre_black (SZ.v source) (SZ.v u);
     blacken_preserves_queue_ok scolor_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (SZ.v u);
     count_nonwhite_upd_nonwhite scolor_pre_black (SZ.v n) (SZ.v u) 2;
     
@@ -654,8 +741,11 @@ fn queue_bfs
   with sdist_final. assert (A.pts_to dist sdist_final);
   assert (pure (source_ok scolor_final sdist_final (SZ.v source) (SZ.v n)));
   assert (pure (dist_ok scolor_final sdist_final (SZ.v n)));
+  assert (pure (dist_reachable sadj (SZ.v n) scolor_final sdist_final (SZ.v source)));
   assert (pure (Seq.index scolor_final (SZ.v source) <> 0));
   assert (pure (Seq.index sdist_final (SZ.v source) == 0));
-  assert (pure (forall (w: nat). w < SZ.v n /\ Seq.index scolor_final w <> 0 ==> Seq.index sdist_final w >= 0))
+  assert (pure (forall (w: nat). w < SZ.v n /\ Seq.index scolor_final w <> 0 ==> Seq.index sdist_final w >= 0));
+  assert (pure (forall (w: nat). w < SZ.v n /\ Seq.index scolor_final w <> 0 ==>
+    reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist_final w)))
 }
 #pop-options

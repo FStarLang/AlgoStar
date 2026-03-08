@@ -77,6 +77,10 @@ fn queue_bfs
       // Distance soundness: visited vertices have valid distances
       (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
         Seq.index sdist' w >= 0) /\
+      // Reachability: every discovered vertex is reachable from source,
+      // witnessed by dist[w] steps in the adjacency graph
+      (forall (w: nat). w < SZ.v n /\ Seq.index scolor' w <> 0 ==>
+        reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist' w)) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
