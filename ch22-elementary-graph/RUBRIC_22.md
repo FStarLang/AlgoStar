@@ -12,8 +12,8 @@
 |------|------:|------|
 | `CLRS.Ch22.BFS.Spec.fst` | 166 | Pure level-set BFS specification. Graph as flat `seq int`. Proves CLRS Lemma 22.1 (edge ⟹ visited at next level), source distance = 0. |
 | `CLRS.Ch22.BFS.DistanceSpec.fst` | 1,116 | Shortest-path specification via BFS state machine. Graph as `seq bool`. Proves CLRS Thm 22.5 (`bfs_correctness`: BFS distances = shortest-path distances). |
-| `CLRS.Ch22.BFS.Impl.fst` | ~750 | Pulse queue-based BFS (CLRS §22.2 pseudocode). Graph as flat `seq int` via `Graph.Common`. Ghost tick counter proves ≤ 2V² operations. **Postcondition includes reachability: every discovered vertex v satisfies `reachable_in adj n source v dist[v]`.** |
-| `CLRS.Ch22.BFS.Impl.fsti` | ~88 | Interface exposing `queue_bfs` signature with pre/postconditions including reachability. |
+| `CLRS.Ch22.BFS.Impl.fst` | ~1,100 | Pulse queue-based BFS (CLRS §22.2 pseudocode). Graph as flat `seq int` via `Graph.Common`. Ghost tick counter proves ≤ 2V² operations. **Postconditions: (1) reachability — every discovered vertex v satisfies `reachable_in adj n source v dist[v]`; (2) completeness — every reachable vertex is discovered: `reachable_in adj n source v k ⟹ scolor[v] ≠ 0`.** |
+| `CLRS.Ch22.BFS.Impl.fsti` | ~91 | Interface exposing `queue_bfs` signature with pre/postconditions including reachability and completeness. |
 | `CLRS.Ch22.IterativeBFS.fst` | 265 | Alternative relaxation-based BFS (Bellman-Ford-like, O(V³)). Self-contained. |
 
 **Architecture note:** BFS.Spec, BFS.DistanceSpec, and BFS.Impl are three independent developments using different graph representations. Impl does not depend on Spec or DistanceSpec — it proves its own invariants inline. All three are fully proved (zero admits).
@@ -65,7 +65,9 @@
   - DFS-based topological sort correctness — `DFS.TopologicalSort`
   - Kahn's correctness + completeness — `TopologicalSort.Verified`
 - **Functional correctness (Impl ↔ graph structure):**
-  - BFS.Impl: discovered vertex v ⟹ `reachable_in adj n source v dist[v]`
+  - BFS.Impl: **complete characterization** — `scolor[v] ≠ 0 ⟺ ∃k. reachable_in adj n source v k`
+    - Forward: discovered vertex v ⟹ `reachable_in adj n source v dist[v]`
+    - Reverse (completeness): `reachable_in adj n source v k ⟹ scolor[v] ≠ 0`
   - DFS.Impl: `pred_edge_ok` — pred[v] ≥ 0 ⟹ edge(pred[v],v) ∧ d[pred[v]] < d[v]
 - **Complexity:** Ghost tick counters prove BFS.Impl ≤ 2V², DFS.Impl ≤ 2V², TopologicalSort.Impl ≤ V²
 
