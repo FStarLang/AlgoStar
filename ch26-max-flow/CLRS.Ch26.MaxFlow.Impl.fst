@@ -1502,6 +1502,57 @@ let rec lemma_augment_via_pred_eq (scolor spred sdist cap_seq flow_pred: Seq.seq
     end
 #pop-options
 
+(** Master augmentation lemma: chains all the pieces together.
+    Given imp_valid_flow + BFS pred_ok + bottleneck + augment results,
+    proves that the augmented flow is still imp_valid and flow value increased. *)
+#push-options "--z3rlimit 120 --fuel 2 --ifuel 1"
+let lemma_augment_chain
+  (scolor spred sdist cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0
+           /\ Seq.length scolor == n /\ Seq.length sdist == n})
+  (source: nat{source < n}) (sink: nat{sink < n /\ source <> sink}) (bn: int)
+  : Lemma
+    (requires
+      imp_valid_flow flow_seq cap_seq n source sink /\
+      valid_caps cap_seq n /\
+      pred_ok scolor spred sdist cap_seq flow_seq n source /\
+      seq_get scolor sink <> 0 /\
+      bn > 0 /\
+      bn == bottleneck_via_pred spred cap_seq flow_seq n source sink n)
+    (ensures (
+      let flow' = augment_via_pred spred flow_seq cap_seq n source sink bn n in
+      Seq.length flow' == n * n /\
+      imp_valid_flow flow' cap_seq n source sink /\
+      imp_flow_value flow' n source > imp_flow_value flow_seq n source))
+  = // 1. Bridge: imp_valid_flow → valid_flow
+    imp_valid_flow_implies_valid_flow flow_seq cap_seq n source sink;
+    // 2. Get the path and its properties
+    lemma_augment_via_pred_eq scolor spred sdist cap_seq flow_seq flow_seq n source sink bn n;
+    let path = path_from_preds_aux spred n source sink n in
+    assert (Cons? path /\ distinct_vertices path);
+    assert (forall (v: nat). L.mem v path ==> v < n);
+    // 3. Path starts at source, ends at sink
+    lemma_path_starts_source scolor spred sdist cap_seq flow_seq n source sink n;
+    lemma_path_ends_current spred n source sink n;
+    assert (L.hd path == source /\ L.last path == sink);
+    // 4. Bottleneck: bn == bottleneck_aux on path
+    lemma_bottleneck_via_pred_eq scolor spred sdist cap_seq flow_seq n source sink n;
+    assert (bn == bottleneck_aux cap_seq flow_seq n path);
+    // 5. augment_preserves_valid: valid_flow (augment_aux ...) 
+    Lemmas.augment_preserves_valid #n cap_seq flow_seq source sink path bn;
+    // 6. augment_via_pred == augment_aux
+    let flow' = augment_via_pred spred flow_seq cap_seq n source sink bn n in
+    assert (flow' == augment_aux flow_seq cap_seq n path bn);
+    assert (valid_flow #n flow' cap_seq source sink);
+    // 7. Reverse bridge: valid_flow → imp_valid_flow
+    valid_flow_implies_imp_valid_flow flow' cap_seq n source sink;
+    // 8. Flow value increases
+    assert (Seq.length flow' == n * n);
+    Lemmas.augment_increases_value #n cap_seq flow_seq source sink path bn;
+    lemma_imp_flow_value_eq flow_seq n source;
+    lemma_imp_flow_value_eq flow' n source
+#pop-options
+
 (** Zero flow satisfies imp_valid_flow when capacities are valid.
     Used to establish the loop invariant after zero_init_flow. *)
 #push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
