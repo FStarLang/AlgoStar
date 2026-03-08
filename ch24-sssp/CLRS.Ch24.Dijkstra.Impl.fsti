@@ -13,7 +13,7 @@
    - All distances non-negative and bounded [0, 1000000]
    - Triangle inequality for all edges
    - Shortest-path equality: dist[v] == sp_dist(source, v) for all v
-   - Predecessor tree: pred encodes a shortest-path tree
+   - Predecessor tree: pred encodes a shortest-path tree (stated in terms of sp_dist)
    - O(V²) complexity bound via ghost counter
 
    NOTE: The core Pulse implementation lives in CLRS.Ch24.Dijkstra.fst because
@@ -53,8 +53,30 @@ let all_bounded = D.all_bounded
 /// Triangle inequality: for all finite edges, dist[v] <= dist[u] + w
 let triangle_inequality = D.triangle_inequality
 
-/// Predecessor consistency: pred encodes a shortest-path tree
+/// Predecessor consistency: pred values consistent with dist array
 let pred_consistent = D.pred_consistent
+
+//SNIPPET_START: shortest_path_tree
+/// Shortest-path tree: pred encodes actual shortest-path predecessors.
+/// For every reachable vertex v ≠ source:
+///   δ(s,v) = δ(s, pred[v]) + w(pred[v], v)
+/// where δ = sp_dist. This is the definitive specification: following the
+/// predecessor chain from v to source yields a shortest path.
+let shortest_path_tree (spred: Seq.seq SZ.t) (sweights: Seq.seq int)
+  (n source: nat) : prop =
+  Seq.length spred == n /\
+  Seq.length sweights >= n * n /\
+  source < n /\
+  SZ.v (Seq.index spred source) == source /\
+  (forall (v: nat). v < n /\ v <> source /\ SP.sp_dist sweights n source v < 1000000 ==>
+    (let p = SZ.v (Seq.index spred v) in
+     p < n /\
+     p * n + v < Seq.length sweights /\
+     Seq.index sweights (p * n + v) < 1000000 /\
+     SP.sp_dist sweights n source p < 1000000 /\
+     SP.sp_dist sweights n source v ==
+       SP.sp_dist sweights n source p + Seq.index sweights (p * n + v)))
+//SNIPPET_END: shortest_path_tree
 
 // ========== Complexity Bounds ==========
 
@@ -72,7 +94,7 @@ val dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
 // ========== Algorithm: Correctness + Complexity ==========
 
 //SNIPPET_START: dijkstra_sig
-/// Dijkstra SSSP — correctness + O(V²) complexity + predecessor tree
+/// Dijkstra SSSP — correctness + O(V²) complexity + shortest-path predecessor tree
 fn dijkstra
   (weights: A.array int)
   (n: SZ.t)
@@ -112,7 +134,7 @@ fn dijkstra
       triangle_inequality sweights sdist' (SZ.v n) /\
       (forall (v: nat). v < SZ.v n ==>
         Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v) /\
-      pred_consistent spred' sdist' sweights (SZ.v n) (SZ.v source) /\
+      shortest_path_tree spred' sweights (SZ.v n) (SZ.v source) /\
       dijkstra_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: dijkstra_sig

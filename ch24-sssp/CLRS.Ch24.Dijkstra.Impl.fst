@@ -2,12 +2,16 @@
    Dijkstra's Single-Source Shortest Paths — Implementation
 
    Thin wrapper that re-exports CLRS.Ch24.Dijkstra.dijkstra under
-   the rubric-required Impl naming convention.
+   the rubric-required Impl naming convention, and strengthens the
+   postcondition from pred_consistent (relates pred to dist) to
+   shortest_path_tree (relates pred to sp_dist directly).
 
    The core Dijkstra algorithm in CLRS.Ch24.Dijkstra.fst provides both
    full functional correctness (dist[v] = δ(s,v) for all v), a predecessor
-   tree (pred encodes shortest-path predecessors), and O(V²) complexity
-   in a single function via ghost tick counting.
+   array (pred_consistent), and O(V²) complexity in a single function via
+   ghost tick counting.
+
+   This wrapper chains: pred_consistent + (dist == sp_dist) ⟹ shortest_path_tree.
 
    NO admits. NO assumes.
 *)
@@ -36,8 +40,18 @@ let dijkstra_complexity_is_quadratic (cf c0 n: nat) : Lemma
   =
   D.dijkstra_complexity_is_quadratic cf c0 n
 
+/// Bridge: pred_consistent + dist==sp_dist ⟹ shortest_path_tree
+let pred_consistent_implies_spt
+  (spred: Seq.seq SZ.t) (sdist sweights: Seq.seq int) (n source: nat)
+  : Lemma
+    (requires
+      pred_consistent spred sdist sweights n source /\
+      source < n /\
+      (forall (v: nat). v < n ==> Seq.index sdist v == SP.sp_dist sweights n source v))
+    (ensures shortest_path_tree spred sweights n source)
+  = ()
+
 //SNIPPET_START: dijkstra_sig
-/// Dijkstra SSSP — correctness + O(V²) complexity + predecessor tree
 fn dijkstra
   (weights: A.array int)
   (n: SZ.t)
@@ -77,10 +91,15 @@ fn dijkstra
       triangle_inequality sweights sdist' (SZ.v n) /\
       (forall (v: nat). v < SZ.v n ==>
         Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v) /\
-      pred_consistent spred' sdist' sweights (SZ.v n) (SZ.v source) /\
+      shortest_path_tree spred' sweights (SZ.v n) (SZ.v source) /\
       dijkstra_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: dijkstra_sig
 {
+  // Core Dijkstra: gives pred_consistent + dist == sp_dist
   D.dijkstra weights n source dist pred ctr;
+  // Chain: pred_consistent + dist == sp_dist ⟹ shortest_path_tree
+  with sdist'. assert (A.pts_to dist sdist');
+  with spred'. assert (A.pts_to pred spred');
+  pred_consistent_implies_spt spred' sdist' sweights (SZ.v n) (SZ.v source);
 }
