@@ -42,6 +42,7 @@ module MSTSpec = CLRS.Ch23.MST.Spec
 module KSpec = CLRS.Ch23.Kruskal.Spec
 module UF = CLRS.Ch23.Kruskal.UF
 module Helpers = CLRS.Ch23.Kruskal.Helpers
+module Bridge = CLRS.Ch23.Kruskal.Bridge
 
 let valid_parents (sparent: Seq.seq SZ.t) (n: nat) : prop =
   Seq.length sparent == n /\
@@ -721,3 +722,207 @@ let rec weighted_edges_from_arrays
       let v_int = Seq.index sev i in
       let w = Seq.index sadj (u_int * n + v_int) in
       {u = u_int; v = v_int; w = w} :: weighted_edges_from_arrays sadj seu sev n ec (i + 1)
+
+(*** Graph Properties for MST Bridge ***)
+
+/// Adjacency matrix is symmetric (undirected graph)
+let symmetric_adj (sadj: Seq.seq int) (n: nat) : prop =
+  Seq.length sadj == n * n /\
+  (forall (u v: nat). u < n /\ v < n ==>
+    Seq.index sadj (u * n + v) = Seq.index sadj (v * n + u))
+
+/// No self-loops: diagonal entries are zero
+let no_self_loops_adj (sadj: Seq.seq int) (n: nat) : prop =
+  Seq.length sadj == n * n /\
+  (forall (u: nat). u < n ==> Seq.index sadj (u * n + u) = 0)
+
+(*** Bridging Lemmas: adj_array_to_graph has valid edges ***)
+
+/// Each entry in adj_row_edges has endpoints u < v < n
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec adj_row_edges_props (sadj: Seq.seq int) (n: nat) (u: nat) (v: nat) (e: edge)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
+              mem_edge e (adj_row_edges sadj n u v))
+    (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
+    (decreases (n - v))
+  = if v >= n then ()
+    else
+      let w = Seq.index sadj (u * n + v) in
+      if w > 0 && u < v then begin
+        if edge_eq e {u = u; v = v; w = w} then
+          MSTSpec.edge_eq_endpoints e {u = u; v = v; w = w}
+        else
+          adj_row_edges_props sadj n u (v + 1) e
+      end
+      else
+        adj_row_edges_props sadj n u (v + 1) e
+#pop-options
+
+/// Each entry in adj_all_edges has valid endpoints
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec adj_all_edges_props (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ u <= n /\ n > 0 /\
+              mem_edge e (adj_all_edges sadj n u))
+    (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
+    (decreases (n - u))
+  = if u >= n then ()
+    else begin
+      MSTSpec.mem_edge_append e (adj_row_edges sadj n u 0) (adj_all_edges sadj n (u + 1));
+      if mem_edge e (adj_row_edges sadj n u 0) then
+        adj_row_edges_props sadj n u 0 e
+      else
+        adj_all_edges_props sadj n (u + 1) e
+    end
+#pop-options
+
+/// The graph produced by adj_array_to_graph has valid edges
+let adj_graph_valid_edges (sadj: Seq.seq int) (n: nat)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ n > 0)
+    (ensures
+      (forall (e: edge). mem_edge e (adj_array_to_graph sadj n).edges ==> 
+        e.u < n /\ e.v < n /\ e.u <> e.v))
+  = let aux (e: edge) : Lemma
+      (requires mem_edge e (adj_all_edges sadj n 0))
+      (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
+    = adj_all_edges_props sadj n 0 e
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+(*** Bridging Lemmas: weighted edges ⊆ graph edges ***)
+
+/// If u < v < n and adj[u*n+v] > 0, then {u,v,adj[u*n+v]} ∈ adj_row_edges
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec adj_row_edges_mem (sadj: Seq.seq int) (n: nat) (u: nat) (target_v: nat) (v: nat)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
+              v <= target_v /\ target_v < n /\
+              u < target_v /\ Seq.index sadj (u * n + target_v) > 0)
+    (ensures mem_edge ({u = u; v = target_v; w = Seq.index sadj (u * n + target_v)})
+                       (adj_row_edges sadj n u v))
+    (decreases (n - v))
+  = if v >= n then ()
+    else if v = target_v then
+      MSTSpec.edge_eq_reflexive ({u = u; v = target_v; w = Seq.index sadj (u * n + target_v)})
+    else
+      adj_row_edges_mem sadj n u target_v (v + 1)
+#pop-options
+
+/// Membership in a row's edges implies membership in all edges
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec adj_all_edges_row_mem (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge) (start_u: nat)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ n > 0 /\ u < n /\ start_u <= u /\ start_u <= n /\
+              mem_edge e (adj_row_edges sadj n u 0))
+    (ensures mem_edge e (adj_all_edges sadj n start_u))
+    (decreases (n - start_u))
+  = if start_u >= n then ()
+    else begin
+      MSTSpec.mem_edge_append e (adj_row_edges sadj n start_u 0) (adj_all_edges sadj n (start_u + 1));
+      if start_u = u then ()
+      else adj_all_edges_row_mem sadj n u e (start_u + 1)
+    end
+#pop-options
+
+/// Each weighted edge is a graph edge (inductive helper)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 50 --split_queries always"
+let rec weighted_edges_subset_graph_aux
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      symmetric_adj sadj n /\
+      no_self_loops_adj sadj n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n /\
+        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
+    (ensures
+      subset_edges (weighted_edges_from_arrays sadj seu sev n ec i) (adj_all_edges sadj n 0))
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else begin
+      weighted_edges_subset_graph_aux sadj seu sev n ec (i + 1);
+      let u_int = Seq.index seu i in
+      let v_int = Seq.index sev i in
+      let w = Seq.index sadj (u_int * n + v_int) in
+      if u_int = v_int then begin
+        // Contradiction: no_self_loops says adj[u*n+u] = 0, but w > 0
+        assert (Seq.index sadj (u_int * n + u_int) = 0);
+        assert false
+      end
+      else if u_int < v_int then begin
+        adj_row_edges_mem sadj n u_int v_int 0;
+        adj_all_edges_row_mem sadj n u_int ({u = u_int; v = v_int; w = w}) 0
+      end
+      else begin
+        // u_int > v_int: use symmetry
+        assert (Seq.index sadj (v_int * n + u_int) = Seq.index sadj (u_int * n + v_int));
+        let canonical : edge = {u = v_int; v = u_int; w = w} in
+        adj_row_edges_mem sadj n v_int u_int 0;
+        adj_all_edges_row_mem sadj n v_int canonical 0;
+        // edge_eq canonical {u_int, v_int, w} holds since canonical swaps endpoints
+        MSTSpec.mem_edge_eq canonical ({u = u_int; v = v_int; w = w}) (adj_all_edges sadj n 0)
+      end
+    end
+#pop-options
+
+/// Weighted edges are subset of graph edges
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let weighted_edges_subset_graph
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+                                    Seq.index seu k < n /\ Seq.index sev k < n) /\
+      edges_adj_pos sadj seu sev n ec /\
+      symmetric_adj sadj n /\
+      no_self_loops_adj sadj n)
+    (ensures
+      subset_edges (weighted_edges_from_arrays sadj seu sev n ec 0) (adj_array_to_graph sadj n).edges)
+  = edges_adj_pos_elim sadj seu sev n ec;
+    weighted_edges_subset_graph_aux sadj seu sev n ec 0
+#pop-options
+
+(*** Main MST Theorem for Kruskal's Implementation ***)
+
+/// If the weighted edges form a safe spanning tree, the result is an MST.
+///
+/// Preconditions from the Pulse function: result_is_forest_adj
+/// Additional preconditions (true for Kruskal's greedy selection, but
+/// not yet tracked by the Pulse loop invariant):
+///   - Graph is symmetric with no self-loops
+///   - Weighted edges form a spanning tree (connectivity + acyclicity)
+///   - Weighted edges are safe (⊆ some MST), from greedy_step_safe induction
+///   - No duplicate weighted edges
+///
+/// See Kruskal.Bridge for greedy_step_safe and safe_spanning_tree_is_mst.
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let kruskal_result_is_mst
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+                                    Seq.index seu k < n /\ Seq.index sev k < n) /\
+      result_is_forest_adj sadj seu sev n ec /\
+      symmetric_adj sadj n /\
+      no_self_loops_adj sadj n /\
+      is_spanning_tree (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0) /\
+      (exists (t: list edge). is_mst (adj_array_to_graph sadj n) t /\
+        subset_edges (weighted_edges_from_arrays sadj seu sev n ec 0) t) /\
+      Bridge.noRepeats_edge (weighted_edges_from_arrays sadj seu sev n ec 0) /\
+      (forall (e: edge). mem_edge e (adj_array_to_graph sadj n).edges ==>
+        e.u < n /\ e.v < n /\ e.u <> e.v))
+    (ensures
+      is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+  = Bridge.safe_spanning_tree_is_mst
+      (adj_array_to_graph sadj n)
+      (weighted_edges_from_arrays sadj seu sev n ec 0)
+#pop-options

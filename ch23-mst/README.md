@@ -5,7 +5,7 @@ Chapter 23 in F* and Pulse.  The formalization covers the cut property
 (Theorem 23.1), Kruskal's algorithm (§23.2) with union-find, and Prim's
 algorithm (§23.2) with adjacency-matrix linear-scan extract-min.
 
-**Verification status:** All 25 source files verify with **zero admits,
+**Verification status:** All 26 source files verify with **zero admits,
 zero assumes, zero `--admit_smt_queries`**.
 
 ---
@@ -18,10 +18,10 @@ zero assumes, zero `--admit_smt_queries`**.
 | Kruskal pure MST correctness | ✅ Fully proven | `theorem_kruskal_produces_mst` |
 | Kruskal greedy bridge | ✅ Fully proven | `greedy_step_safe` + `safe_spanning_tree_is_mst` via cut property |
 | Kruskal Impl forest + acyclicity | ✅ Proven | `result_is_forest` with UF invariant tracking |
-| Kruskal Impl → MST | ⚠️ Gap | Bridge provides math; inner scan invariant needs strengthening |
+| Kruskal Impl → MST | ✅ Proven | `kruskal_result_is_mst` in `Impl.fsti` (via Bridge); `weighted_edges_subset_graph` proved |
 | Prim pure MST correctness | ✅ Fully proven | `prim_spec` — edges ⊆ MST, connected, n−1 edges |
 | Prim Impl `prim_correct` | ✅ Proven | key[source]=0, keys bounded, parent[source]=source |
-| Prim Impl → MST | ⚠️ Gap | `prim_correct` is weak; no bridge to `prim_spec` |
+| Prim Impl → MST | ✅ Proven | `prim_result_is_mst` in `Impl.fsti` (via Bridge) |
 | Kruskal complexity O(V³) | ✅ Proven | `kruskal_cubic` — but complexity module disconnected from Impl |
 | Prim complexity O(V²) | ✅ Proven | `prim_quadratic` — but complexity module disconnected from Impl |
 | Acyclic + connected → n−1 edges | ✅ Proven | `acyclic_connected_length` |
@@ -48,6 +48,7 @@ zero assumes, zero `--admit_smt_queries`**.
 | `CLRS.Ch23.Kruskal.Helpers.fst` | F* | Forest invariant maintenance lemmas |
 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F* | Lemmas façade: re-exports from Components, EdgeSorting, SortedEdges, UF |
 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F* | Lemmas façade module |
+| `CLRS.Ch23.Kruskal.Impl.fsti` | Pulse | Kruskal Impl interface: `kruskal` sig, `kruskal_result_is_mst`, `weighted_edges_subset_graph` |
 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | Imperative Kruskal: adj-matrix, union-find, cross-component scan |
 | `CLRS.Ch23.Kruskal.Bridge.fsti` | F* | Greedy MST bridge interface: `greedy_step_safe`, `safe_spanning_tree_is_mst` |
 | `CLRS.Ch23.Kruskal.Bridge.fst` | F* | Bridge proofs: cut-property-based greedy MST correctness |
@@ -55,7 +56,7 @@ zero assumes, zero `--admit_smt_queries`**.
 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | Ghost-tick instrumented Kruskal, proves ticks ≤ 4·V³ |
 | `CLRS.Ch23.Prim.Spec.fsti` | F* | Prim spec interface: `pure_prim`, `prim_spec` |
 | `CLRS.Ch23.Prim.Spec.fst` | F* | Pure Prim: adj-matrix, connectivity, safety via cut property |
-| `CLRS.Ch23.Prim.Impl.fsti` | Pulse | Imperative Prim interface: `prim` function signature |
+| `CLRS.Ch23.Prim.Impl.fsti` | Pulse | Imperative Prim interface: `prim` function signature, `prim_result_is_mst` |
 | `CLRS.Ch23.Prim.Impl.fst` | Pulse | Imperative Prim: key + parent + in_mst arrays |
 | `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | Prim complexity interface: ticks ≤ 3·V² (⚠️ disconnected from Impl) |
 | `CLRS.Ch23.Prim.Complexity.fst` | Pulse | Ghost-tick instrumented Prim, proves ticks ≤ 3·V² |

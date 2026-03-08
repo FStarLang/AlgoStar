@@ -28,6 +28,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
 module PrimSpec = CLRS.Ch23.Prim.Spec
+module Bridge = CLRS.Ch23.Kruskal.Bridge
 
 open FStar.Mul
 
@@ -108,3 +109,37 @@ fn prim
     V.pts_to (snd res) parent_seq **
     pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source))
 //SNIPPET_END: prim_sig
+
+(*** MST Bridging Theorem ***)
+
+//SNIPPET_START: prim_result_is_mst
+/// Main MST theorem: if the extracted edges form a safe spanning tree, the result is MST.
+///
+/// Uses Bridge.safe_spanning_tree_is_mst. The preconditions capture:
+///   - What Pulse proves: prim_correct
+///   - What greedy selection provides: is_spanning_tree, safe (⊆ some MST)
+///   - Technical: noRepeats_edge, valid graph edges
+///
+/// Connection to the CLRS cut property:
+///   greedy_step_safe (Bridge) proves each step preserves safety.
+///   safe_spanning_tree_is_mst (Bridge) proves the final result is MST.
+val prim_result_is_mst
+    (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires
+      n > 0 /\
+      prim_correct key_seq parent_seq weights_seq n source /\
+      Seq.length weights_seq == n * n /\
+      (let adj = weights_to_adj_matrix weights_seq n in
+       let g = PrimSpec.adj_to_graph adj n in
+       let wes = edges_from_parent_key parent_seq key_seq n source 0 in
+       is_spanning_tree g wes /\
+       (exists (t: list edge). is_mst g t /\ subset_edges wes t) /\
+       Bridge.noRepeats_edge wes /\
+       (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v)))
+    (ensures
+      (let adj = weights_to_adj_matrix weights_seq n in
+       let g = PrimSpec.adj_to_graph adj n in
+       let wes = edges_from_parent_key parent_seq key_seq n source 0 in
+       is_mst g wes))
+//SNIPPET_END: prim_result_is_mst

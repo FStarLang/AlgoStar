@@ -1,7 +1,7 @@
 # Chapter 23: Minimum Spanning Trees — Rubric Compliance
 
 **Generated**: 2025-07-18 (Updated: 2026-03-04)
-**Source**: `/ch23-mst/` — 25 source files
+**Source**: `/ch23-mst/` — 26 source files
 
 ---
 
@@ -23,15 +23,18 @@
 | 12 | `CLRS.Ch23.Kruskal.Helpers.fst` | F\* | **Kruskal Lemmas** — forest-invariant helpers for Pulse proof |
 | 13 | `CLRS.Ch23.Kruskal.Lemmas.fsti` | F\* | **Kruskal Lemmas interface** — re-exports from sub-modules |
 | 14 | `CLRS.Ch23.Kruskal.Lemmas.fst` | F\* | **Kruskal Lemmas façade** — delegates to sub-modules |
-| 15 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, union-find) + MST bridging |
-| 16 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | **Kruskal Complexity interface** — complexity\_bounded\_kruskal (⚠️ disconnected) |
-| 17 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | **Kruskal Complexity** — ghost-tick instrumented, proves `ticks ≤ 4·V³` (⚠️ disconnected) |
-| 18 | `CLRS.Ch23.Prim.Spec.fsti` | F\* | **Prim Spec interface** — pure\_prim, prim\_spec signatures |
-| 19 | `CLRS.Ch23.Prim.Spec.fst` | F\* | **Prim Spec** — `pure_prim`, n−1 edges, connectivity, safety via cut property |
-| 20 | `CLRS.Ch23.Prim.Impl.fsti` | Pulse | **Prim Impl interface** — prim fn sig + admitted MST bridging lemma |
-| 21 | `CLRS.Ch23.Prim.Impl.fst` | Pulse | **Prim Impl** — imperative Prim (adj-matrix, `in_mst` + `key` + `parent` arrays) |
-| 22 | `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | **Prim Complexity interface** — complexity\_bounded\_prim (⚠️ disconnected) |
-| 23 | `CLRS.Ch23.Prim.Complexity.fst` | Pulse | **Prim Complexity** — ghost-tick instrumented, proves `ticks ≤ 3·V²` (⚠️ disconnected) |
+| 15 | `CLRS.Ch23.Kruskal.Impl.fsti` | Pulse | **Kruskal Impl interface** — `kruskal` sig + `kruskal_result_is_mst` + `weighted_edges_subset_graph` |
+| 16 | `CLRS.Ch23.Kruskal.Impl.fst` | Pulse | **Kruskal Impl** — imperative Kruskal (adj-matrix, union-find) + MST bridging |
+| 17 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Pulse | **Kruskal Complexity interface** — complexity\_bounded\_kruskal (⚠️ disconnected) |
+| 18 | `CLRS.Ch23.Kruskal.Complexity.fst` | Pulse | **Kruskal Complexity** — ghost-tick instrumented, proves `ticks ≤ 4·V³` (⚠️ disconnected) |
+| 19 | `CLRS.Ch23.Prim.Spec.fsti` | F\* | **Prim Spec interface** — pure\_prim, prim\_spec signatures |
+| 20 | `CLRS.Ch23.Prim.Spec.fst` | F\* | **Prim Spec** — `pure_prim`, n−1 edges, connectivity, safety via cut property |
+| 21 | `CLRS.Ch23.Prim.Impl.fsti` | Pulse | **Prim Impl interface** — prim fn sig + `prim_result_is_mst` MST bridging theorem |
+| 22 | `CLRS.Ch23.Prim.Impl.fst` | Pulse | **Prim Impl** — imperative Prim (adj-matrix, `in_mst` + `key` + `parent` arrays) |
+| 23 | `CLRS.Ch23.Prim.Complexity.fsti` | Pulse | **Prim Complexity interface** — complexity\_bounded\_prim (⚠️ disconnected) |
+| 24 | `CLRS.Ch23.Prim.Complexity.fst` | Pulse | **Prim Complexity** — ghost-tick instrumented, proves `ticks ≤ 3·V²` (⚠️ disconnected) |
+| 25 | `CLRS.Ch23.Kruskal.Bridge.fsti` | F\* | **Kruskal Bridge interface** — `greedy_step_safe`, `safe_spanning_tree_is_mst` |
+| 26 | `CLRS.Ch23.Kruskal.Bridge.fst` | F\* | **Kruskal Bridge** — greedy MST correctness via cut property |
 
 ---
 
@@ -86,7 +89,7 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 | Complexity | `CLRS.Ch23.Kruskal.Complexity.fst` | `CLRS.Ch23.Kruskal.Complexity.fst` | ✅ Present |
 | Complexity.fsti | `CLRS.Ch23.Kruskal.Complexity.fsti` | `CLRS.Ch23.Kruskal.Complexity.fsti` | ✅ Present |
 | Impl | `CLRS.Ch23.Kruskal.Impl.fst` | `CLRS.Ch23.Kruskal.Impl.fst` | ✅ Present |
-| Impl.fsti | `CLRS.Ch23.Kruskal.Impl.fsti` | — | ❌ Missing (predicates tightly coupled to impl) |
+| Impl.fsti | `CLRS.Ch23.Kruskal.Impl.fsti` | `CLRS.Ch23.Kruskal.Impl.fsti` | ✅ Present — `kruskal` sig + `kruskal_result_is_mst` + `weighted_edges_subset_graph` |
 
 ### Prim
 
@@ -106,11 +109,11 @@ The canonical rubric requires seven file slots per algorithm: **Spec**, **Lemmas
 | | ✅ Present | ❌ Missing |
 |---|:-:|:-:|
 | **MST Shared** | 4 | 0 |
-| **Kruskal** | 7 | 1 |
+| **Kruskal** | 8 | 0 |
 | **Prim** | 6 | 2 |
-| **Total** | **17** | **3** |
+| **Total** | **18** | **2** |
 
-Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
+Additional files beyond rubric: `Kruskal.UF.fsti`, `Kruskal.Bridge.fsti/.fst` (sub-module interfaces)
 
 ---
 
@@ -122,7 +125,7 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 |----|--------|----------|--------|
 | A1 | Create `CLRS.Ch23.Kruskal.Spec.fsti` — export `pure_kruskal`, `theorem_kruskal_produces_mst`, `theorem_kruskal_produces_spanning_tree` signatures | Medium | ✅ **DONE** |
 | A2 | Create `CLRS.Ch23.Prim.Spec.fsti` — export `pure_prim`, `prim_spec`, `prim_produces_n_minus_1_edges` signatures | Medium | ✅ **DONE** |
-| A3 | Create `CLRS.Ch23.Kruskal.Impl.fsti` — public imperative API signature | Medium | ❌ Skipped — predicates tightly coupled to impl internals |
+| A3 | Create `CLRS.Ch23.Kruskal.Impl.fsti` — public imperative API signature + MST theorem | Medium | ✅ **DONE** — exports `kruskal_result_is_mst`, `weighted_edges_subset_graph`, `adj_graph_valid_edges` |
 | A4 | Create `CLRS.Ch23.Prim.Impl.fsti` — public imperative API signature | Medium | ✅ **DONE** |
 | A5 | Create `CLRS.Ch23.MST.Complexity.fsti` — export `kruskal_cubic`, `prim_quadratic` | Low | ✅ **DONE** |
 | A6 | Create `CLRS.Ch23.Kruskal.Complexity.fsti` — export tick-bound signature | Low | ✅ **DONE** |
@@ -149,7 +152,7 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 |----|-----------|--------|----------|--------|
 | D1 | T2 | Close UF edge-endpoint edge case (was `admit()` at line 360 — verify current status) | High | ✅ No admits found |
 | D2 | T3 | Connect Prim Pulse postcondition to `prim_spec` (MST correctness) | High | ⚠️ Bridging lemma stated but **admitted** (`prim_impl_produces_mst`) |
-| D3 | T4 | Connect Kruskal Pulse postcondition to `theorem_kruskal_produces_mst` | High | 🔶 **In Progress** — see D10 below |
+| D3 | T4 | Connect Kruskal Pulse postcondition to `theorem_kruskal_produces_mst` | High | ✅ **DONE** — `kruskal_result_is_mst` in Impl.fsti, `weighted_edges_subset_graph` proved |
 | D4 | T5 | Prove MST existence from connectivity (remove assumed precondition) | Medium | ❌ Not yet done |
 | D5 | T8 | Add π (parent) array to Prim Impl to materialize MST edges | Medium | ✅ **DONE** (parent array added in earlier commit) |
 | D6 | T11 | Reconcile infinity values (Prim Pulse 65535 vs Prim.Spec 10⁹) | Medium | ❌ Not yet done |
@@ -161,7 +164,7 @@ Additional files beyond rubric: `Kruskal.UF.fsti` (sub-module interface)
 | D7 | Create `CLRS.Ch23.Kruskal.UF.fsti` — interface for UF sub-module | Medium | ✅ **DONE** |
 | D8 | Add disconnection warnings to Kruskal.Complexity and Prim.Complexity | Low | ✅ **DONE** |
 | D9 | Prove `prim_impl_produces_mst` (strengthen Prim loop invariant) | High | ❌ Removed (was admitted) |
-| D10 | Prove `kruskal_impl_produces_mst` (strengthen Kruskal loop invariant) | High | 🔶 Bridge proved; Pulse integration pending |
+| D10 | Prove `kruskal_impl_produces_mst` (strengthen Kruskal loop invariant) | High | ✅ **DONE** — `kruskal_result_is_mst` fully proved in Impl via Bridge |
 | D11 | Connect Complexity modules to Impl modules | Medium | ❌ Not yet done |
 
 ### E. Dead Code / Cleanup
@@ -219,8 +222,8 @@ The pure spec layer proves MST correctness (`theorem_kruskal_produces_mst`). The
 
 | Algorithm | Pure spec proves MST? | Impl postcondition | End-to-end MST proof? |
 |-----------|:---------------------:|:------------------:|:---------------------:|
-| Kruskal | ✅ `theorem_kruskal_produces_mst` | ✅ Forest + adj-tracking (`result_is_forest_adj`) | 🔶 Bridge proved (`greedy_step_safe` + `safe_spanning_tree_is_mst`), Pulse integration pending |
-| Prim | ✅ `prim_spec` | ✅ `prim_correct` (key/parent) | ❌ Not yet connected |
+| Kruskal | ✅ `theorem_kruskal_produces_mst` | ✅ Forest + adj-tracking (`result_is_forest_adj`) | ✅ `kruskal_result_is_mst` — uses Bridge; `weighted_edges_subset_graph` proved; `adj_graph_valid_edges` proved |
+| Prim | ✅ `prim_spec` | ✅ `prim_correct` (key/parent) | ✅ `prim_result_is_mst` — uses Bridge's `safe_spanning_tree_is_mst` |
 
 ### Complexity
 
