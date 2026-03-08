@@ -5,11 +5,11 @@
    providing both full correctness and O(V³) complexity guarantees
    in a single function via ghost tick counting.
 
-   Uses adjacency matrix representation (n×n flat array, 1000000 = no edge/∞).
+   Uses adjacency matrix representation (n×n flat array, SP.inf = no edge/∞).
 
    Postcondition guarantees:
    - dist[source] == 0
-   - Valid distances (< 1000000 or == 1000000)
+   - Valid distances (< SP.inf or == SP.inf)
    - If no negative cycle: triangle inequality + upper bound (CLRS Cor 24.3)
    - Negative-cycle detection (CLRS Cor 24.5)
    - Shortest-path equality under no negative cycles (CLRS Thm 24.4)
@@ -43,13 +43,13 @@ let triangle_inequality (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : pr
     (let d_u = Seq.index dist u in
      let d_v = Seq.index dist v in
      let w = Seq.index weights (u * n + v) in
-     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w)
+     (w < SP.inf /\ d_u < SP.inf) ==> d_v <= d_u + w)
 
-/// All distances are either finite (< 1000000) or equal to 1000000 (unreachable)
+/// All distances are either finite (< inf) or equal to inf (unreachable)
 let valid_distances (dist: Seq.seq int) (n: nat) : prop =
   Seq.length dist == n /\
   forall (v: nat). v < n ==> 
-    (let d = Seq.index dist v in d < 1000000 \/ d == 1000000)
+    (let d = Seq.index dist v in d < SP.inf \/ d == SP.inf)
 
 /// Exists a violating edge: some edge (u,v) has dist[v] > dist[u] + w(u,v)
 let exists_violation (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : prop =
@@ -59,7 +59,7 @@ let exists_violation (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : prop 
     (let d_u = Seq.index dist u in
      let d_v = Seq.index dist v in
      let w = Seq.index weights (u * n + v) in
-     w < 1000000 /\ d_u < 1000000 /\ d_v > d_u + w))
+     w < SP.inf /\ d_u < SP.inf /\ d_v > d_u + w))
 
 /// Lower bound invariant: dist[v] >= sp_dist[v] for all v
 let lower_bound_inv (dist: Seq.seq int) (weights: Seq.seq int) (n source: nat) : prop =

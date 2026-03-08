@@ -1,17 +1,17 @@
 (*
    Bellman-Ford Single-Source Shortest Paths — Verified in Pulse
 
-   Graph: weighted adjacency matrix (n×n flat array, 1000000 = no edge/infinity)
+   Graph: weighted adjacency matrix (n×n flat array, SP.inf = no edge/infinity)
    
-   Sentinel constraint: The constant 1000000 encodes infinity. Edge weights and
-   all valid shortest-path distances must be strictly less than 1000000. If any
-   true shortest-path distance reaches 1000000, it becomes indistinguishable
+   Sentinel constraint: The constant SP.inf encodes infinity. Edge weights and
+   all valid shortest-path distances must be strictly less than SP.inf. If any
+   true shortest-path distance reaches SP.inf, it becomes indistinguishable
    from "unreachable." F*'s int is mathematical (unbounded), so arithmetic
    overflow is not a concern—only the sentinel comparison matters.
    
    Postcondition:
    - dist[source] == 0
-   - All distances valid (< 1000000 or == 1000000)
+   - All distances valid (< SP.inf or == SP.inf)
    - If no negative cycle (result == true):
      * Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
      * Upper bound: dist[v] <= sp_dist(weights, n, source, v) for all v
@@ -54,7 +54,7 @@ let no_violations (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : prop =
     (let d_u = Seq.index dist u in
      let d_v = Seq.index dist v in
      let w = Seq.index weights (u * n + v) in
-     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w))
+     (w < SP.inf /\ d_u < SP.inf) ==> d_v <= d_u + w))
 
 /// no_violations implies triangle_inequality
 let no_violations_implies_triangle (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
@@ -71,7 +71,7 @@ let no_violations_partial (dist: Seq.seq int) (weights: Seq.seq int) (n u_bound 
     (let d_u = Seq.index dist u in
      let d_v = Seq.index dist v in
      let w = Seq.index weights (u * n + v) in
-     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w))
+     (w < SP.inf /\ d_u < SP.inf) ==> d_v <= d_u + w))
 
 /// Partial at (n, 0) implies full no_violations
 let partial_full (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
@@ -87,7 +87,7 @@ let check_edge_violation (dist: Seq.seq int) (weights: Seq.seq int) (n u v: nat)
             w == Seq.index weights (u * n + v) /\
             du == Seq.index dist u /\
             dv == Seq.index dist v /\
-            edge_ok == (w >= 1000000 || du >= 1000000 || dv <= du + w))
+            edge_ok == (w >= SP.inf || du >= SP.inf || dv <= du + w))
   (ensures (not edge_ok) ==> exists_violation dist weights n)
   = ()
 
@@ -101,7 +101,7 @@ let relax_step_lower_bound
     Seq.length weights == n * n /\
     w_uv == Seq.index weights (u_idx * n + v_idx) /\
     new_dist_v == (if should_update then dist_u + w_uv else old_dist_v) /\
-    (should_update ==> (w_uv < 1000000 /\ dist_u < 1000000 /\ dist_u + w_uv < old_dist_v)) /\
+    (should_update ==> (w_uv < SP.inf /\ dist_u < SP.inf /\ dist_u + w_uv < old_dist_v)) /\
     (SP.no_neg_cycles_flat weights n source ==>
       (dist_u >= SP.sp_dist weights n source u_idx /\
        old_dist_v >= SP.sp_dist weights n source v_idx)))
@@ -155,7 +155,7 @@ let init_satisfies_lower_bound (dist weights: Seq.seq int) (n source: nat) : Lem
             Seq.length weights == n * n /\
             (forall (j: nat). j < n ==>
               (if j = source then Seq.index dist j == 0
-               else Seq.index dist j == 1000000)))
+               else Seq.index dist j == SP.inf)))
   (ensures SP.no_neg_cycles_flat weights n source ==>
     lower_bound_inv dist weights n source)
   =
@@ -353,7 +353,7 @@ fn bellman_ford
     )
 //SNIPPET_END: bellman_ford_sig
 {
-  // Initialization: dist[source] = 0, all others = 1000000
+  // Initialization: dist[source] = 0, all others = inf
   let mut init_i: SZ.t = 0sz;
   
   while (
@@ -370,14 +370,14 @@ fn bellman_ford
       (forall (j: nat). j < SZ.v vi ==>
         (if j = SZ.v source 
          then Seq.index sdist_current j == 0 
-         else Seq.index sdist_current j == 1000000)) /\
+         else Seq.index sdist_current j == SP.inf)) /\
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi
     )
   decreases (SZ.v n - SZ.v !init_i)
   {
     let vi = !init_i;
-    let new_val: int = (if vi = source then 0 else 1000000);
+    let new_val: int = (if vi = source then 0 else SP.inf);
     A.op_Array_Assignment dist vi new_val;
     tick ctr;
     init_i := vi +^ 1sz;
@@ -439,7 +439,7 @@ fn bellman_ford
       let vu = !u;
       let dist_u = A.op_Array_Access dist vu;
       
-      assert pure (dist_u < 1000000 \/ dist_u == 1000000);
+      assert pure (dist_u < SP.inf \/ dist_u == SP.inf);
       
       let mut v: SZ.t = 0sz;
       
@@ -471,19 +471,19 @@ fn bellman_ford
         
         let old_dist_v = A.op_Array_Access dist vv;
         
-        let can_relax = (w_uv < 1000000 && dist_u < 1000000);
+        let can_relax = (w_uv < SP.inf && dist_u < SP.inf);
         let sum = dist_u + w_uv;
         let should_update = (can_relax && sum < old_dist_v && vv <> source);
         
         let new_dist_v: int = (if should_update then sum else old_dist_v);
         
-        assert pure (old_dist_v < 1000000 \/ old_dist_v == 1000000);
+        assert pure (old_dist_v < SP.inf \/ old_dist_v == SP.inf);
         
         if should_update {
-          assert pure (sum < 1000000);
+          assert pure (sum < SP.inf);
         };
         
-        assert pure (new_dist_v < 1000000 \/ new_dist_v == 1000000);
+        assert pure (new_dist_v < SP.inf \/ new_dist_v == SP.inf);
         
         if (vv = source) {
           assert pure (old_dist_v == 0);
@@ -573,7 +573,7 @@ fn bellman_ford
       let d_v = A.op_Array_Access dist vcv;
       
       // Check triangle inequality for this edge
-      let edge_ok = (w >= 1000000 || d_u >= 1000000 || d_v <= d_u + w);
+      let edge_ok = (w >= SP.inf || d_u >= SP.inf || d_v <= d_u + w);
       
       let vno = !no_neg;
       // Must call before the if — Pulse can't call lemmas inside if blocks

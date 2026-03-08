@@ -13,22 +13,24 @@ module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module SP = CLRS.Ch24.ShortestPath.Spec
+module SPT = CLRS.Ch24.ShortestPath.Triangle
 
 (*
    Dijkstra's Single-Source Shortest Paths — Verified in Pulse
 
-   Graph: weighted adjacency matrix (n×n flat array, 1000000 = no edge/infinity)
+   Graph: weighted adjacency matrix (n×n flat array, SP.inf = no edge/infinity)
    Requires non-negative weights.
    
-   Sentinel constraint: The constant 1000000 encodes infinity. Edge weights and
-   all valid shortest-path distances must be strictly less than 1000000. If any
-   true shortest-path distance reaches 1000000, it becomes indistinguishable
+   Sentinel constraint: The constant SP.inf encodes infinity. Edge weights and
+   all valid shortest-path distances must be strictly less than SP.inf. If any
+   true shortest-path distance reaches SP.inf, it becomes indistinguishable
    from "unreachable." F*'s int is mathematical (unbounded), so arithmetic
    overflow is not a concern—only the sentinel comparison matters.
    
    Postcondition:
    - dist[source] == 0
-   - All distances non-negative and bounded [0, 1000000]
+   - All distances non-negative and bounded [0, SP.inf]
    - Triangle inequality: for all edges (u,v), dist[v] <= dist[u] + w(u,v)
      (proven from edge relaxation — no separate verification pass needed)
    - Equality: dist[v] == sp_dist(source, v) for all v
@@ -48,10 +50,10 @@ let all_weights_non_negative (sweights: Seq.seq int) : prop =
 let all_non_negative (sdist: Seq.seq int) : prop =
   forall (i:nat). i < Seq.length sdist ==> Seq.index sdist i >= 0
 
-// All distances are bounded by 1000000
+// All distances are bounded by inf
 let all_bounded (sdist: Seq.seq int) : prop =
   forall (i:nat). i < Seq.length sdist ==> 
-    Seq.index sdist i >= 0 /\ Seq.index sdist i <= 1000000
+    Seq.index sdist i >= 0 /\ Seq.index sdist i <= SP.inf
 
 //SNIPPET_START: triangle_inequality
 // Triangle inequality: for all finite edges, dist[v] <= dist[u] + w
@@ -62,12 +64,8 @@ let triangle_inequality (sweights: Seq.seq int) (sdist: Seq.seq int) (n: nat) : 
     (let w = Seq.index sweights (u * n + v) in
      let dist_u = Seq.index sdist u in
      let dist_v = Seq.index sdist v in
-     (w < 1000000 /\ dist_u < 1000000) ==> dist_v <= dist_u + w))
+     (w < SP.inf /\ dist_u < SP.inf) ==> dist_v <= dist_u + w))
 //SNIPPET_END: triangle_inequality
-
-/// Import pure shortest-path specification
-module SP = CLRS.Ch24.ShortestPath.Spec
-module SPT = CLRS.Ch24.ShortestPath.Triangle
 
 /// Connect Dijkstra's triangle_inequality + all_bounded to SP.has_triangle_inequality
 let dijkstra_to_sp_triangle (sdist sweights: Seq.seq int) (n: nat) : Lemma
@@ -107,12 +105,12 @@ let pred_consistent (spred: Seq.seq SZ.t) (sdist sweights: Seq.seq int) (n sourc
   Seq.length sdist == n /\
   Seq.length sweights >= n * n /\
   (source < n ==> SZ.v (Seq.index spred source) == source) /\
-  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < 1000000 ==>
+  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < SP.inf ==>
     (let p = SZ.v (Seq.index spred v) in
      p < n /\
      p * n + v < Seq.length sweights /\
-     Seq.index sweights (p * n + v) < 1000000 /\
-     Seq.index sdist p < 1000000 /\
+     Seq.index sweights (p * n + v) < SP.inf /\
+     Seq.index sdist p < SP.inf /\
      Seq.index sdist v == Seq.index sdist p + Seq.index sweights (p * n + v)))
 //SNIPPET_END: pred_consistent
 
@@ -120,7 +118,7 @@ let pred_consistent (spred: Seq.seq SZ.t) (sdist sweights: Seq.seq int) (n sourc
 let pred_ok (spred: Seq.seq SZ.t) (sdist sweights svisited: Seq.seq int) (n source: nat) : prop =
   pred_consistent spred sdist sweights n source /\
   Seq.length svisited == n /\
-  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < 1000000 ==>
+  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < SP.inf ==>
     SZ.v (Seq.index spred v) < n /\
     Seq.index svisited (SZ.v (Seq.index spred v)) = 1)
 
@@ -138,13 +136,13 @@ let init_dist_ge_sp_dist (sdist sweights: Seq.seq int) (n source: nat)
              Seq.length sweights == n * n /\
              all_weights_non_negative sweights /\
              Seq.index sdist source == 0 /\
-             (forall (v: nat). v < n /\ v <> source ==> Seq.index sdist v == 1000000))
+             (forall (v: nat). v < n /\ v <> source ==> Seq.index sdist v == SP.inf))
     (ensures dist_ge_sp_dist sdist sweights n source)
   = let aux (v: nat{v < n}) : Lemma
       (ensures Seq.index sdist v >= SP.sp_dist sweights n source v) =
       SP.sp_dist_k_bounded sweights n source v (n - 1);
       if v = source then SPT.sp_dist_self_zero sweights n source
-      else assert (Seq.index sdist v == 1000000)
+      else assert (Seq.index sdist v == SP.inf)
     in
     FStar.Classical.forall_intro aux
 #pop-options
@@ -164,8 +162,8 @@ let relax_round_lb_post
       (forall (v: nat). v < n ==>
         Seq.index sdist_after v == Seq.index sdist_pre v \/
         (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
-         Seq.index sweights (u * n + v) < 1000000 /\
-         Seq.index sdist_pre u < 1000000)))
+         Seq.index sweights (u * n + v) < SP.inf /\
+         Seq.index sdist_pre u < SP.inf)))
     (ensures dist_ge_sp_dist sdist_after sweights n source)
   = let aux (v: nat{v < n}) : Lemma
       (ensures Seq.index sdist_after v >= SP.sp_dist sweights n source v) =
@@ -205,8 +203,8 @@ let relax_round_pred_ok
          Seq.index spred_after v == Seq.index spred_pre v) \/
         (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
          Seq.index sdist_after v < Seq.index sdist_pre v /\
-         Seq.index sweights (u * n + v) < 1000000 /\
-         Seq.index sdist_pre u < 1000000 /\
+         Seq.index sweights (u * n + v) < SP.inf /\
+         Seq.index sdist_pre u < SP.inf /\
          SZ.v (Seq.index spred_after v) == u))
     )
     (ensures pred_ok spred_after sdist_after sweights (Seq.upd svisited_pre u 1) n source)
@@ -215,12 +213,12 @@ let relax_round_pred_ok
     // (dist_u + w >= 0 = dist_pre[source], so no strict decrease is possible)
     assert (Seq.index sdist_after source == Seq.index sdist_pre source);
     assert (Seq.index spred_after source == Seq.index spred_pre source);
-    let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < 1000000}) : Lemma
+    let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf}) : Lemma
       (ensures (let p = SZ.v (Seq.index spred_after v) in
                 p < n /\
                 p * n + v < Seq.length sweights /\
-                Seq.index sweights (p * n + v) < 1000000 /\
-                Seq.index sdist_after p < 1000000 /\
+                Seq.index sweights (p * n + v) < SP.inf /\
+                Seq.index sdist_after p < SP.inf /\
                 Seq.index sdist_after v == Seq.index sdist_after p + Seq.index sweights (p * n + v) /\
                 Seq.index svisited_now p = 1))
       = if Seq.index sdist_after v = Seq.index sdist_pre v &&
@@ -252,7 +250,7 @@ let tri_from_visited (sweights sdist svisited: Seq.seq int) (n: nat) : prop =
     (let w = Seq.index sweights (u * n + v) in
      let d_u = Seq.index sdist u in
      let d_v = Seq.index sdist v in
-     (w < 1000000 /\ d_u < 1000000) ==> d_v <= d_u + w))
+     (w < SP.inf /\ d_u < SP.inf) ==> d_v <= d_u + w))
 
 // Ordering: visited distances <= unvisited distances
 let visited_le_unvisited (sdist svisited: Seq.seq int) (n: nat) : prop =
@@ -307,7 +305,7 @@ let extend_tri_after_relax
       (forall (v: nat). v < n /\ u * n + v < Seq.length sweights ==>
         (let w = Seq.index sweights (u * n + v) in
          let d_u = Seq.index sdist_new u in
-         (w < 1000000 /\ d_u < 1000000) ==> Seq.index sdist_new v <= d_u + w)))
+         (w < SP.inf /\ d_u < SP.inf) ==> Seq.index sdist_new v <= d_u + w)))
     (ensures
       (let svisited_new = Seq.upd svisited_old u 1 in
        tri_from_visited sweights sdist_new svisited_new n /\
@@ -440,7 +438,7 @@ fn find_min_unvisited
     pure (has_min_dist_unvisited sdist svisited (SZ.v n) (SZ.v min_idx))
 {
   let mut min_idx: SZ.t = 0sz;
-  let mut min_val: int = 1000001;
+  let mut min_val: int = SP.inf + 1;
   let mut i: SZ.t = 0sz;
   
   while (
@@ -462,11 +460,11 @@ fn find_min_unvisited
       (forall (j: nat). j < SZ.v vi /\ Seq.index svisited j = 0 ==>
         vmin_val <= Seq.index sdist j) /\
       // If we found an unvisited vertex, min_val = dist[vmin_idx] and vmin_idx is unvisited
-      (vmin_val <= 1000000 ==>
+      (vmin_val <= SP.inf ==>
         Seq.index svisited (SZ.v vmin_idx) = 0 /\
         vmin_val == Seq.index sdist (SZ.v vmin_idx)) /\
       // If no unvisited found, all j < vi are visited
-      (vmin_val > 1000000 ==>
+      (vmin_val > SP.inf ==>
         (forall (j: nat). j < SZ.v vi ==>
           Seq.index svisited j = 1))
     )
@@ -624,7 +622,7 @@ fn dijkstra_relax_round
         SZ.v u * SZ.v n + v' < Seq.length sweights ==>
         (let w = Seq.index sweights (SZ.v u * SZ.v n + v') in
          let d_u = Seq.index sdist_v (SZ.v u) in
-         (w < 1000000 /\ d_u < 1000000) ==> Seq.index sdist_v v' <= d_u + w)) /\
+         (w < SP.inf /\ d_u < SP.inf) ==> Seq.index sdist_v v' <= d_u + w)) /\
       (forall (j: nat). j < SZ.v n /\ Seq.index svisited_pre j = 0 ==>
         Seq.index sdist_v j >= Seq.index sdist_pre (SZ.v u)) /\
       (forall (v': nat). v' < SZ.v vv /\ v' < SZ.v n ==>
@@ -632,8 +630,8 @@ fn dijkstra_relax_round
          Seq.index spred_v v' == Seq.index spred_pre v') \/
         (Seq.index sdist_v v' == Seq.index sdist_pre (SZ.v u) + Seq.index sweights (SZ.v u * SZ.v n + v') /\
          Seq.index sdist_v v' < Seq.index sdist_pre v' /\
-         Seq.index sweights (SZ.v u * SZ.v n + v') < 1000000 /\
-         Seq.index sdist_pre (SZ.v u) < 1000000 /\
+         Seq.index sweights (SZ.v u * SZ.v n + v') < SP.inf /\
+         Seq.index sdist_pre (SZ.v u) < SP.inf /\
          SZ.v (Seq.index spred_v v') == SZ.v u)) /\
       (forall (v': nat). v' >= SZ.v vv /\ v' < SZ.v n ==>
         Seq.index sdist_v v' == Seq.index sdist_pre v' /\
@@ -654,7 +652,7 @@ fn dijkstra_relax_round
     let old_dist = A.op_Array_Access dist vv;
     let old_pred = A.op_Array_Access pred vv;
 
-    let can_relax = (visited_v = 0 && w < 1000000 && dist_u < 1000000);
+    let can_relax = (visited_v = 0 && w < SP.inf && dist_u < SP.inf);
     let sum = dist_u + w;
     let should_update = (can_relax && sum < old_dist);
     let new_dist: int = (if should_update then sum else old_dist);
@@ -742,7 +740,7 @@ fn dijkstra
     )
 //SNIPPET_END: dijkstra_sig
 {
-  // Initialization: dist[source] = 0, all others = 1000000; pred[v] = v
+  // Initialization: dist[source] = 0, all others = inf; pred[v] = v
   let mut init_i: SZ.t = 0sz;
   
   while (
@@ -760,16 +758,16 @@ fn dijkstra
       Seq.length spred_current == SZ.v n /\
       (SZ.v vi > SZ.v source ==> Seq.index sdist_current (SZ.v source) == 0) /\
       (forall (j:nat). j < SZ.v vi ==> 
-        Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= 1000000) /\
+        Seq.index sdist_current j >= 0 /\ Seq.index sdist_current j <= SP.inf) /\
       (forall (j:nat). j < SZ.v vi /\ j <> SZ.v source ==>
-        Seq.index sdist_current j == 1000000) /\
+        Seq.index sdist_current j == SP.inf) /\
       (forall (j:nat). j < SZ.v vi ==> SZ.v (Seq.index spred_current j) == j) /\
       vc == reveal c0 + SZ.v vi
     )
   decreases (SZ.v n - SZ.v !init_i)
   {
     let vi = !init_i;
-    let new_val: int = (if vi = source then 0 else 1000000);
+    let new_val: int = (if vi = source then 0 else SP.inf);
     A.op_Array_Assignment dist vi new_val;
     A.op_Array_Assignment pred vi vi;
     tick ctr;

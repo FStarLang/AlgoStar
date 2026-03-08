@@ -5,12 +5,12 @@
    providing both full correctness and O(V²) complexity guarantees
    in a single function via ghost tick counting.
 
-   Uses adjacency matrix representation (n×n flat array, 1000000 = no edge/∞).
+   Uses adjacency matrix representation (n×n flat array, SP.inf = no edge/∞).
    Requires non-negative weights.
 
    Postcondition guarantees:
    - dist[source] == 0
-   - All distances non-negative and bounded [0, 1000000]
+   - All distances non-negative and bounded [0, SP.inf]
    - Triangle inequality for all edges
    - Shortest-path equality: dist[v] == sp_dist(source, v) for all v
    - Predecessor tree: pred encodes a shortest-path tree (stated in terms of sp_dist)
@@ -47,7 +47,7 @@ let all_weights_non_negative = D.all_weights_non_negative
 /// All distances are non-negative
 let all_non_negative = D.all_non_negative
 
-/// All distances bounded: 0 ≤ d ≤ 1000000
+/// All distances bounded: 0 ≤ d ≤ inf
 let all_bounded = D.all_bounded
 
 /// Triangle inequality: for all finite edges, dist[v] <= dist[u] + w
@@ -68,12 +68,12 @@ let shortest_path_tree (spred: Seq.seq SZ.t) (sweights: Seq.seq int)
   Seq.length sweights >= n * n /\
   source < n /\
   SZ.v (Seq.index spred source) == source /\
-  (forall (v: nat). v < n /\ v <> source /\ SP.sp_dist sweights n source v < 1000000 ==>
+  (forall (v: nat). v < n /\ v <> source /\ SP.sp_dist sweights n source v < SP.inf ==>
     (let p = SZ.v (Seq.index spred v) in
      p < n /\
      p * n + v < Seq.length sweights /\
-     Seq.index sweights (p * n + v) < 1000000 /\
-     SP.sp_dist sweights n source p < 1000000 /\
+     Seq.index sweights (p * n + v) < SP.inf /\
+     SP.sp_dist sweights n source p < SP.inf /\
      SP.sp_dist sweights n source v ==
        SP.sp_dist sweights n source p + Seq.index sweights (p * n + v)))
 //SNIPPET_END: shortest_path_tree
