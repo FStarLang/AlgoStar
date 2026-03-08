@@ -1055,6 +1055,267 @@ let lemma_path_length_ge_2 (scolor spred sdist cap_seq flow_seq: Seq.seq int)
     assert (Cons? prefix);
     L.append_length prefix [sink]
 
+(* ================================================================
+   PRED-BASED BOTTLENECK AND AUGMENT: PURE FUNCTIONAL VERSIONS
+   These match the imperative find_bottleneck_imp / augment_imp logic.
+   ================================================================ *)
+
+(** Edge residual: effective residual capacity of edge (u,v).
+    Uses forward residual if positive, otherwise backward. *)
+let edge_residual (cap_seq flow_seq: Seq.seq int)
+                  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n})
+                  (u: nat{u < n}) (v: nat{v < n}) : int =
+  let fwd = residual_capacity cap_seq flow_seq n u v in
+  if fwd > 0 then fwd else residual_capacity_backward flow_seq n u v
+
+(** Pure bottleneck via pred walk: walks pred from current to source,
+    computing min of edge_residual along the path. Matches find_bottleneck_imp. *)
+let rec bottleneck_via_pred (spred cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
+  : Tot int (decreases fuel)
+  = if fuel = 0 || current = source then int_max
+    else
+      let u = seq_get spred current in
+      if u >= 0 && u < n then
+        let er = edge_residual cap_seq flow_seq n u current in
+        let rest = bottleneck_via_pred spred cap_seq flow_seq n source u (fuel - 1) in
+        if er < rest then er else rest
+      else int_max
+
+(** Bottleneck of (prefix ++ [x]) = min(bottleneck(prefix), edge_residual(last prefix, x)) *)
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec lemma_bottleneck_append
+  (cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ n > 0})
+  (prefix: list nat{Cons? prefix /\ (forall (v: nat). L.mem v prefix ==> v < n)})
+  (x: nat{x < n})
+  : Lemma
+    (ensures (
+      let path = L.append prefix [x] in
+      Cons? path /\
+      (forall (v: nat). L.mem v path ==> v < n) /\
+      L.last prefix < n /\
+      bottleneck_aux cap_seq flow_seq n path ==
+        (let last_v = L.last prefix in
+         let er = edge_residual cap_seq flow_seq n last_v x in
+         let br = bottleneck_aux cap_seq flow_seq n prefix in
+         if er < br then er else br)))
+    (decreases prefix)
+  = let aux (v: nat) : Lemma (L.mem v (L.append prefix [x]) ==> v < n)
+      = L.append_mem prefix [x] v in
+    FStar.Classical.forall_intro aux;
+    match prefix with
+    | [a] ->
+      // prefix ++ [x] = [a, x]
+      // bottleneck_aux [a, x] = min(edge_residual(a,x), bottleneck_aux [x]) = min(edge_residual(a,x), int_max)
+      // min(bottleneck_aux [a], edge_residual(a,x)) = min(int_max, edge_residual(a,x))
+      // Both equal edge_residual(a,x) (or int_max if edge_residual >= int_max)
+      ()
+    | a :: b :: rest ->
+      // prefix ++ [x] = a :: (b :: rest ++ [x])
+      let suffix = b :: rest in
+      let aux2 (v: nat) : Lemma (L.mem v suffix ==> v < n) = () in
+      FStar.Classical.forall_intro aux2;
+      lemma_bottleneck_append cap_seq flow_seq n suffix x;
+      // bottleneck_aux (a :: (suffix ++ [x])) = min(edge(a,b), bottleneck_aux (suffix ++ [x]))
+      // By IH: bottleneck_aux (suffix ++ [x]) = min(bottleneck_aux suffix, edge(last suffix, x))
+      // bottleneck_aux prefix = min(edge(a,b), bottleneck_aux suffix)
+      // Need: min(edge(a,b), min(bottleneck_aux suffix, edge(last,x)))
+      //      = min(min(edge(a,b), bottleneck_aux suffix), edge(last,x))
+      // This is min associativity — SMT should handle it
+      L.append_assoc [a] suffix [x];
+      // L.last of prefix = L.last of suffix (since prefix = a :: suffix and suffix is non-empty)
+      assert (L.last prefix == L.last suffix)
+#pop-options
+
+(** Bottleneck via pred equals bottleneck on the path from preds.
+    Requires pred_ok with sufficient fuel. *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec lemma_bottleneck_via_pred_eq (scolor spred sdist cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_seq n source /\
+      Seq.length scolor == n /\ Seq.length sdist == n /\
+      seq_get scolor current <> 0 /\ seq_get sdist current >= 0 /\
+      fuel > seq_get sdist current)
+    (ensures (
+      let path = path_from_preds_aux spred n source current fuel in
+      Cons? path /\
+      (forall (v: nat). L.mem v path ==> v < n) /\
+      bottleneck_via_pred spred cap_seq flow_seq n source current fuel ==
+      bottleneck_aux cap_seq flow_seq n path))
+    (decreases fuel)
+  = if current = source then ()
+    else begin
+      let u = seq_get spred current in
+      assert (u >= 0 /\ u < n);
+      assert (seq_get scolor u <> 0);
+      assert (seq_get sdist current == seq_get sdist u + 1);
+      lemma_bottleneck_via_pred_eq scolor spred sdist cap_seq flow_seq n source u (fuel - 1);
+      let prefix = path_from_preds_aux spred n source u (fuel - 1) in
+      lemma_path_ends_current spred n source u (fuel - 1);
+      assert (L.last prefix == u);
+      lemma_path_vertices_bounded scolor spred sdist cap_seq flow_seq n source u (fuel - 1);
+      lemma_path_starts_source scolor spred sdist cap_seq flow_seq n source u (fuel - 1);
+      lemma_bottleneck_append cap_seq flow_seq n prefix current;
+      // Prove path properties for the full path
+      let path = L.append prefix [current] in
+      let aux (v: nat) : Lemma (L.mem v path ==> v < n)
+        = L.append_mem prefix [current] v in
+      FStar.Classical.forall_intro aux
+    end
+#pop-options
+
+(** Each edge on path from preds has positive residual capacity *)
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let lemma_path_edges_positive (scolor spred sdist cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_seq n source /\
+      Seq.length scolor == n /\ Seq.length sdist == n /\
+      seq_get scolor current <> 0 /\ seq_get sdist current >= 0 /\
+      fuel > seq_get sdist current /\ current <> source)
+    (ensures edge_residual cap_seq flow_seq n (seq_get spred current) current > 0)
+  = let u = seq_get spred current in
+    assert (u >= 0 /\ u < n);
+    // From pred_ok: residual(u, current) > 0 or backward(u, current) > 0
+    // edge_residual uses forward if positive, else backward
+    ()
+#pop-options
+
+(** Bottleneck via pred is positive when pred_ok holds and current ≠ source *)
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+let rec lemma_bottleneck_via_pred_positive (scolor spred sdist cap_seq flow_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_seq n source /\
+      Seq.length scolor == n /\ Seq.length sdist == n /\
+      seq_get scolor current <> 0 /\ seq_get sdist current >= 0 /\
+      fuel > seq_get sdist current /\ current <> source)
+    (ensures bottleneck_via_pred spred cap_seq flow_seq n source current fuel > 0)
+    (decreases fuel)
+  = let u = seq_get spred current in
+    assert (u >= 0 /\ u < n);
+    lemma_path_edges_positive scolor spred sdist cap_seq flow_seq n source current fuel;
+    let er = edge_residual cap_seq flow_seq n u current in
+    assert (er > 0);
+    if u = source then ()
+    else begin
+      assert (seq_get scolor u <> 0);
+      assert (seq_get sdist current == seq_get sdist u + 1);
+      lemma_bottleneck_via_pred_positive scolor spred sdist cap_seq flow_seq n source u (fuel - 1);
+      let rest = bottleneck_via_pred spred cap_seq flow_seq n source u (fuel - 1) in
+      assert (rest > 0);
+      assert (if er < rest then er else rest) > 0
+    end
+#pop-options
+
+(** Pure augment via pred walk: walks pred from current to source,
+    augmenting each edge. Matches augment_imp. *)
+let rec augment_via_pred (spred: Seq.seq int) (flow_seq cap_seq: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (bn: int) (fuel: nat)
+  : Tot (s: Seq.seq int{Seq.length s == n * n}) (decreases fuel)
+  = if fuel = 0 || current = source then flow_seq
+    else
+      let u = seq_get spred current in
+      if u >= 0 && u < n then
+        let flow' = augment_edge flow_seq cap_seq n u current bn in
+        augment_via_pred spred flow' cap_seq n source u bn (fuel - 1)
+      else flow_seq
+
+(** init of (l ++ [x]) == l when l is non-empty *)
+let rec lemma_init_append_singleton (l: list nat{Cons? l}) (x: nat)
+  : Lemma (ensures L.init (L.append l [x]) == l)
+    (decreases l)
+  = match l with
+    | [_] -> ()
+    | _ :: b :: rest -> lemma_init_append_singleton (b :: rest) x
+
+(** Augment via pred equals augment_aux on the path from preds.
+    flow_pred is the original BFS flow (for pred_ok), flow_comp is the computation flow. *)
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+let rec lemma_augment_via_pred_eq (scolor spred sdist cap_seq flow_pred: Seq.seq int)
+  (flow_comp: Seq.seq int)
+  (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_pred == n * n /\
+          Seq.length flow_comp == n * n /\ Seq.length spred == n /\ n > 0})
+  (source: nat{source < n}) (current: nat{current < n}) (bn: int) (fuel: nat)
+  : Lemma
+    (requires
+      pred_ok scolor spred sdist cap_seq flow_pred n source /\
+      Seq.length scolor == n /\ Seq.length sdist == n /\
+      seq_get scolor current <> 0 /\ seq_get sdist current >= 0 /\
+      fuel > seq_get sdist current)
+    (ensures (
+      let path = path_from_preds_aux spred n source current fuel in
+      Cons? path /\
+      (forall (v: nat). L.mem v path ==> v < n) /\
+      distinct_vertices path /\
+      augment_via_pred spred flow_comp cap_seq n source current bn fuel ==
+      augment_aux flow_comp cap_seq n path bn))
+    (decreases fuel)
+  = lemma_path_starts_source scolor spred sdist cap_seq flow_pred n source current fuel;
+    lemma_path_vertices_bounded scolor spred sdist cap_seq flow_pred n source current fuel;
+    lemma_path_distinct scolor spred sdist cap_seq flow_pred n source current fuel;
+    if current = source then ()
+    else begin
+      let u = seq_get spred current in
+      assert (u >= 0 /\ u < n);
+      assert (seq_get scolor u <> 0);
+      assert (seq_get sdist current == seq_get sdist u + 1);
+      let prefix = path_from_preds_aux spred n source u (fuel - 1) in
+      let path = path_from_preds_aux spred n source current fuel in
+      let flow' = augment_edge flow_comp cap_seq n u current bn in
+      // IH: augment_via_pred with flow' for u
+      lemma_augment_via_pred_eq scolor spred sdist cap_seq flow_pred flow' n source u bn (fuel - 1);
+      // IH gives: augment_via_pred spred flow' cap n source u bn (fuel-1) == augment_aux flow' cap n prefix bn
+      // So: augment_via_pred spred flow_comp cap n source current bn fuel == augment_aux flow' cap n prefix bn
+      
+      // Now show: augment_aux flow_comp cap n path bn == augment_aux flow' cap n prefix bn
+      // Using lemma_augment_aux_last_first
+      lemma_path_ends_current spred n source current fuel;
+      lemma_path_ends_current spred n source u (fuel - 1);
+      assert (L.last prefix == u);
+      
+      let path_len = L.length path in
+      lemma_path_length_ge_2 scolor spred sdist cap_seq flow_pred n source current fuel;
+      assert (path_len >= 2);
+      
+      if path_len = 2 then begin
+        // path = prefix ++ [current], length = 2, so length prefix = 1
+        L.append_length prefix [current];
+        assert (L.length prefix == 1);
+        // prefix = [source] (starts at source and has length 1)
+        assert (L.hd prefix == source);
+        assert (L.last prefix == source);
+        assert (u = source);
+        ()
+      end
+      else begin
+        // path_len >= 3, so init has >= 2 elements
+        // Use lemma_augment_aux_last_first
+        Lemmas.lemma_augment_aux_last_first flow_comp cap_seq n path bn;
+        // Gives: augment_aux flow_comp cap n path bn ==
+        //   augment_aux (ae flow_comp cap n (L.last (L.init path)) (L.last path) bn) cap n (L.init path) bn
+        // L.last path = current, L.init path = prefix
+        lemma_init_append_singleton prefix current;
+        assert (L.init path == prefix);
+        // L.last (L.init path) = L.last prefix = u
+        assert (L.last (L.init path) == u);
+        // ae flow_comp cap n u current bn = flow'
+        // So: augment_aux flow_comp cap n path bn == augment_aux flow' cap n prefix bn ✓
+        ()
+      end
+    end
+#pop-options
+
 (** Zero flow satisfies imp_valid_flow when capacities are valid.
     Used to establish the loop invariant after zero_init_flow. *)
 #push-options "--z3rlimit 40 --fuel 1 --ifuel 0"

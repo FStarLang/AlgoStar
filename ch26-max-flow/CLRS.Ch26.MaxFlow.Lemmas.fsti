@@ -113,6 +113,27 @@ val augment_preserves_valid (#n: nat) (cap: capacity_matrix n) (flow: flow_matri
       L.last path == sink)
     (ensures valid_flow #n (augment_aux flow cap n path bn) cap source sink)
 
+(** Augmenting path edges can be reordered: process last edge first.
+    Key for relating augment_imp (reverse walk) to augment_aux (forward walk). *)
+val lemma_augment_aux_last_first
+  (flow cap: Seq.seq int)
+  (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
+  (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
+  (delta: int)
+  : Lemma
+    (requires distinct_vertices path /\ L.length path >= 2)
+    (ensures
+      (let last = L.last path in
+       let init = L.init path in
+       L.length init >= 1 /\ Cons? init /\
+       (forall (v: nat). L.mem v init ==> v < n) /\
+       last < n /\
+       (L.length init >= 2 ==>
+         (let second_last = L.last init in
+          second_last < n /\
+          augment_aux flow cap n path delta ==
+          augment_aux (augment_edge flow cap n second_last last delta) cap n init delta))))
+
 (** Augmentation strictly increases flow value. *)
 val augment_increases_value (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
                              (source: nat{source < n}) (sink: nat{sink < n})
