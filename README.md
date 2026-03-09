@@ -90,7 +90,6 @@ cd autoclrs/ch02-getting-started && make
 | `autoclrs/ch33-comp-geometry/` | Ch 33 | Convex Hull (Graham Scan) |
 | `autoclrs/ch35-approximation/` | Ch 35 | Vertex Cover (2-approximation) |
 | `autoclrs/common/` | — | Shared utilities |
-| `doc/` | — | Sphinx documentation book |
 
 ## Documentation
 
@@ -99,5 +98,4 @@ properties, complexity results, and known gaps) is available in:
 
 - **Per-algorithm reviews**: `autoclrs/<chapter>/<Module>.Review.md` files
 - **Chapter READMEs**: `autoclrs/<chapter>/README.md`
-- **Sphinx book**: `doc/` (build with `cd doc && make html`)
 
