@@ -1,7 +1,6 @@
 {
     "fstar_exe": "./FStar/bin/fstar.exe",
     "options": [
-        "--cmi",
         "--warn_error", "-321",
         "--warn_error", "@247"
     ],

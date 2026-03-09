@@ -19,7 +19,7 @@ OUTPUT_DIR="${1:-$AUTOCLRS/test/extracted}"
 
 FSTAR_OPTS="--cache_checked_modules \
   --already_cached Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore \
-  --cmi --warn_error -321 --warn_error @247 \
+  --warn_error -321 --warn_error @247 \
   --ext optimize_let_vc --ext fly_deps \
   --include $PULSE_ROOT/out/lib/pulse \
   --codegen krml"

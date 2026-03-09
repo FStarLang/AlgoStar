@@ -5,7 +5,9 @@
 #   make -j8        # parallel build
 
 PULSE_ROOT ?= ../pulse
-FSTAR_EXE  ?= $(CURDIR)/../FStar/bin/fstar.exe
+ifndef FSTAR_EXE
+FSTAR_EXE  := $(CURDIR)/../FStar/bin/fstar.exe
+endif
 export FSTAR_EXE
 
 SUBDIRS += ch02-getting-started

@@ -49,7 +49,7 @@ check_submodules() {
 build_fstar() {
   info "Building F* (this may take 10-20 minutes)..."
   cd "$FSTAR_DIR"
-  make -j"$NPROC"
+  ADMIT=1 make -j"$NPROC"
   if [ -x "$FSTAR_EXE" ]; then
     green "F* built successfully: $FSTAR_EXE"
     "$FSTAR_EXE" --version
@@ -66,7 +66,7 @@ build_pulse() {
   fi
   info "Building Pulse..."
   cd "$PULSE_DIR"
-  FSTAR_EXE="$FSTAR_EXE" make -j"$NPROC"
+  FSTAR_EXE="$FSTAR_EXE" ADMIT=1 make -j"$NPROC"
   green "Pulse built successfully."
 }
 
