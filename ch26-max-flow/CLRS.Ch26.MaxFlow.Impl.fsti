@@ -99,7 +99,6 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n)
     )
-  returns completed: bool
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **

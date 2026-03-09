@@ -80,12 +80,10 @@ fn max_flow
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_contents == SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\ valid_caps cap_seq (SZ.v n))
-  returns completed: bool
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
     pure (
-      ...
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
       no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink))
 ```
