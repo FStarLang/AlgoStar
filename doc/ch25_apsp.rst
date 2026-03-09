@@ -56,7 +56,7 @@ Specification
 The pure specification mirrors the three nested loops of the imperative
 algorithm as three recursive functions on sequences:
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: pure_spec
    :end-before: //SNIPPET_END: pure_spec
@@ -80,7 +80,7 @@ FW Recurrence
 
 The classic DP recurrence from CLRS Equation 25.5:
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: fw_entry
    :end-before: //SNIPPET_END: fw_entry
@@ -91,12 +91,12 @@ Here ``k`` counts how many vertices have been considered as intermediates:
 Infinity and Safety
 ~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: inf
    :end-before: //SNIPPET_END: inf
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: safety_predicates
    :end-before: //SNIPPET_END: safety_predicates
@@ -111,7 +111,7 @@ Length Preservation
 Three length-preservation lemmas are proved by structural induction
 mirroring the specification:
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: length_lemmas
    :end-before: //SNIPPET_END: length_lemmas
@@ -128,7 +128,7 @@ Correctness Theorem
 
 The main theorem is the type signature of ``floyd_warshall``:
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: floyd_warshall_sig
    :end-before: //SNIPPET_END: floyd_warshall_sig
@@ -164,7 +164,7 @@ same result as applying the *full* computation to the *original* state.
 
 **Outer loop** (over intermediate vertices ``k``):
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: outer_loop
    :end-before: //SNIPPET_END: outer_loop
@@ -177,7 +177,7 @@ recursion), so ``contents_k == fw_outer contents n 0``.
 
 **Middle loop** (over rows ``i``):
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: inner_i_loop
    :end-before: //SNIPPET_END: inner_i_loop
@@ -188,7 +188,7 @@ processing rows ``vi..n-1`` for vertex ``vk``, then processing vertices
 
 **Inner loop** (over columns ``j``):
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: inner_j_loop
    :end-before: //SNIPPET_END: inner_j_loop
@@ -204,7 +204,7 @@ Correctness Lemmas
 The main theorem connects the mirroring spec to the declarative
 recurrence:
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: floyd_warshall_correct
    :end-before: //SNIPPET_END: floyd_warshall_correct
@@ -219,7 +219,7 @@ Supporting lemmas prove that:
 
 The inductive ``fw_outer_computes_entry`` proof:
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: fw_outer_computes_entry
    :end-before: //SNIPPET_END: fw_outer_computes_entry
@@ -247,7 +247,7 @@ Complexity
 
 The complexity bound is **exact** (Θ(n³)), not merely asymptotic:
 
-.. literalinclude:: ../ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
+.. literalinclude:: ../autoclrs/ch25-apsp/CLRS.Ch25.FloydWarshall.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bound
    :end-before: //SNIPPET_END: complexity_bound

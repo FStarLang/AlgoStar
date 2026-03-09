@@ -34,7 +34,7 @@ defines shortest-path distance via bounded dynamic programming:
 from ``s`` to ``v`` using at most ``k`` edges, and ``sp_dist`` sets
 ``k = n − 1``.
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.ShortestPath.Spec.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.ShortestPath.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: sp_dist
    :end-before: //SNIPPET_END: sp_dist
@@ -44,12 +44,12 @@ upper bounds (CLRS Corollary 24.3): if ``dist[source] = 0`` and the
 triangle inequality holds, then ``dist[v] ≤ sp_dist(s,v)`` for every
 vertex ``v``.
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.ShortestPath.Spec.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.ShortestPath.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: has_triangle_inequality
    :end-before: //SNIPPET_END: has_triangle_inequality
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.ShortestPath.Spec.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.ShortestPath.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: triangle_ineq_upper_bound
    :end-before: //SNIPPET_END: triangle_ineq_upper_bound
@@ -71,12 +71,12 @@ non-negative.  The main function runs the standard priority-queue loop
 (implemented as a linear scan for simplicity), followed by a read-only
 triangle-inequality verification pass:
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.Dijkstra.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.Dijkstra.fst
    :language: fstar
    :start-after: //SNIPPET_START: triangle_inequality
    :end-before: //SNIPPET_END: triangle_inequality
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.Dijkstra.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.Dijkstra.fst
    :language: pulse
    :start-after: //SNIPPET_START: dijkstra_sig
    :end-before: //SNIPPET_END: dijkstra_sig
@@ -102,7 +102,7 @@ Greedy Choice Property (Theorem 24.6)
 when vertex ``u`` is extracted as the minimum-distance unvisited
 vertex, ``dist[u] = δ(s, u)``.
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.Dijkstra.Correctness.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.Dijkstra.Correctness.fst
    :language: fstar
    :start-after: //SNIPPET_START: greedy_choice
    :end-before: //SNIPPET_END: greedy_choice
@@ -139,12 +139,12 @@ The Pulse implementation performs ``n − 1`` rounds of edge
 relaxation on a flat weight matrix, followed by a read-only
 negative-cycle detection / triangle-inequality verification pass:
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.BellmanFord.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.BellmanFord.fst
    :language: fstar
    :start-after: //SNIPPET_START: bf_triangle_inequality
    :end-before: //SNIPPET_END: bf_triangle_inequality
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.BellmanFord.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.BellmanFord.fst
    :language: pulse
    :start-after: //SNIPPET_START: bellman_ford_sig
    :end-before: //SNIPPET_END: bellman_ford_sig
@@ -168,7 +168,7 @@ Pure Specification (CLRS Lemma 24.2)
 adjacency-matrix graphs with ``option int`` distance vectors.
 The main correctness theorem is the *path-relaxation property*:
 
-.. literalinclude:: ../ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst
+.. literalinclude:: ../autoclrs/ch24-sssp/CLRS.Ch24.BellmanFord.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bf_convergence
    :end-before: //SNIPPET_END: bf_convergence

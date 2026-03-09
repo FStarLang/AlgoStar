@@ -24,7 +24,7 @@ Heap Predicates
 The formalization uses implicit (array-based) binary heaps. The
 standard index arithmetic maps parent-child relationships:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Spec.fst
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: heap_indices
    :end-before: //SNIPPET_END: heap_indices
@@ -32,7 +32,7 @@ standard index arithmetic maps parent-child relationships:
 The max-heap property and its relaxed variants are defined as
 predicates over a prefix of length ``len``:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Spec.fst
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: heap_predicates
    :end-before: //SNIPPET_END: heap_predicates
@@ -50,7 +50,7 @@ MAX-HEAPIFY
 ``max_heapify`` is a recursive Pulse function that restores the
 heap property at a single node by sifting it down:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: max_heapify_sig
    :end-before: //SNIPPET_END: max_heapify_sig
@@ -99,7 +99,7 @@ BUILD-MAX-HEAP
 ``build_max_heap`` converts an arbitrary array into a max-heap via
 bottom-up heapification (CLRS §6.3):
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: build_max_heap_sig
    :end-before: //SNIPPET_END: build_max_heap_sig
@@ -128,7 +128,7 @@ HEAPSORT
 
 The main ``heapsort`` function:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: heapsort_sig
    :end-before: //SNIPPET_END: heapsort_sig
@@ -150,7 +150,7 @@ The extract-max loop repeatedly swaps the root (maximum) to the
 end of the heap, shrinks the heap, and calls ``max_heapify`` to
 restore the property:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Impl.fst
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: extract_max_loop
    :end-before: //SNIPPET_END: extract_max_loop
@@ -200,7 +200,7 @@ floor term and a correction, bounds the floor sum using the identity
 ∑ h·2^(H−h) = 2^(H+1) − H − 2, and bounds the correction by
 h(h+1) ≤ 2·2^h ≤ 2n:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: build_heap_ops_linear
    :end-before: //SNIPPET_END: build_heap_ops_linear
@@ -210,7 +210,7 @@ HEAPSORT O(n log n)
 
 Overall bound with constant 6:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: heapsort_ops_simplified
    :end-before: //SNIPPET_END: heapsort_ops_simplified
@@ -224,7 +224,7 @@ Heapsort Beats Quadratic
 
 For n ≥ 11:
 
-.. literalinclude:: ../ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch06-heapsort/CLRS.Ch06.Heap.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: heapsort_better_than_quadratic
    :end-before: //SNIPPET_END: heapsort_better_than_quadratic

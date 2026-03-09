@@ -29,7 +29,7 @@ A valid flow satisfies two properties from CLRS Definition 26.1:
 - **Flow conservation**: for every vertex except source and sink,
   the total flow in equals the total flow out.
 
-.. literalinclude:: ../ch26-max-flow/CLRS.Ch26.MaxFlow.Spec.fst
+.. literalinclude:: ../autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: valid_flow
    :end-before: //SNIPPET_END: valid_flow
@@ -38,7 +38,7 @@ The termination condition is ``no_augmenting_path``: every path from
 source to sink in the residual graph has non-positive bottleneck
 capacity. This is the exact precondition of the MFMC theorem.
 
-.. literalinclude:: ../ch26-max-flow/CLRS.Ch26.MaxFlow.Spec.fst
+.. literalinclude:: ../autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: no_augmenting_path
    :end-before: //SNIPPET_END: no_augmenting_path
@@ -48,7 +48,7 @@ Correctness Theorem
 
 The main entry point is ``max_flow`` in ``Impl.fsti``:
 
-.. literalinclude:: ../ch26-max-flow/CLRS.Ch26.MaxFlow.Impl.fsti
+.. literalinclude:: ../autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: max_flow_sig
    :end-before: //SNIPPET_END: max_flow_sig
@@ -74,7 +74,7 @@ Bridge Lemma
 The bridge lemma connects the imperative postcondition to the
 pure specification, enabling callers to use the MFMC theorem:
 
-.. literalinclude:: ../ch26-max-flow/CLRS.Ch26.MaxFlow.Impl.fsti
+.. literalinclude:: ../autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: imp_valid_flow_bridge
    :end-before: //SNIPPET_END: imp_valid_flow_bridge
@@ -89,7 +89,7 @@ Max-Flow Min-Cut Theorem
 CLRS Theorem 26.6 is fully proven with zero admits in
 ``Lemmas.MaxFlowMinCut``:
 
-.. literalinclude:: ../ch26-max-flow/CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti
+.. literalinclude:: ../autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti
    :language: fstar
    :start-after: //SNIPPET_START: max_flow_min_cut
    :end-before: //SNIPPET_END: max_flow_min_cut
@@ -133,7 +133,7 @@ Complexity Analysis
 The complexity module (``MaxFlow.Complexity``) formalizes the
 Edmonds-Karp analysis from CLRS §26.2:
 
-.. literalinclude:: ../ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst
+.. literalinclude:: ../autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: edmonds_karp_complexity
    :end-before: //SNIPPET_END: edmonds_karp_complexity
@@ -159,7 +159,7 @@ Limitations: Assume Val
 The complexity module contains **4 ``assume val``** declarations —
 the **only** assumes in the entire project outside ch22 and ch24:
 
-.. literalinclude:: ../ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst
+.. literalinclude:: ../autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: complexity_assume_vals
    :end-before: //SNIPPET_END: complexity_assume_vals

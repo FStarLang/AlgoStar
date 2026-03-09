@@ -53,7 +53,7 @@ The module ``CLRS.Ch11.HashTable.Spec`` models a hash table as an
 association list ``list (nat & int)``. Operations are defined
 functionally and their frame properties are proved by induction:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Spec.fst
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: ht_model
    :end-before: //SNIPPET_END: ht_model
@@ -66,7 +66,7 @@ reasoning.
 
 The key algebraic properties:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Spec.fst
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: ht_spec_lemmas
    :end-before: //SNIPPET_END: ht_spec_lemmas
@@ -101,7 +101,7 @@ Hash Function
 
 The hash function is division-method hashing with linear probing:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_hash
    :end-before: //SNIPPET_END: ht_hash
@@ -117,7 +117,7 @@ The correctness of search depends on the CLRS argument that no
 operation ever turns a slot back to NIL (``-1``) after a key was
 placed past it. The ``valid_ht`` predicate captures this:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_valid_ht
    :end-before: //SNIPPET_END: ht_valid_ht
@@ -132,7 +132,7 @@ Correctness Predicates
 The correctness of insertion is expressed via ``key_in_table``: the
 key exists at some position in the probe sequence:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_key_in_table
    :end-before: //SNIPPET_END: ht_key_in_table
@@ -140,7 +140,7 @@ key exists at some position in the probe sequence:
 The stronger ``key_findable`` predicate guarantees that search will
 reach the key — no empty slot blocks the probe path:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_key_findable
    :end-before: //SNIPPET_END: ht_key_findable
@@ -148,7 +148,7 @@ reach the key — no empty slot blocks the probe path:
 Hash Insert (§11.4)
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_hash_insert
    :end-before: //SNIPPET_END: ht_hash_insert
@@ -165,7 +165,7 @@ On failure (table full), ``s' == s`` — the table is unchanged.
 
 The implementation:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fst
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: ht_hash_insert_impl
    :end-before: //SNIPPET_END: ht_hash_insert_impl
@@ -173,7 +173,7 @@ The implementation:
 Hash Search (§11.4)
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_hash_search
    :end-before: //SNIPPET_END: ht_hash_search
@@ -192,7 +192,7 @@ wasn't found in the probe sequence.
 Hash Delete (§11.4)
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_hash_delete
    :end-before: //SNIPPET_END: ht_hash_delete
@@ -206,7 +206,7 @@ to ``-1`` (NIL) — so no probe chain is broken.
 Helper Operations
 ~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: ht_helpers
    :end-before: //SNIPPET_END: ht_helpers
@@ -230,7 +230,7 @@ tick per probe), and the loop exits when ``vi == size``, giving
 
 Internal hash functions used in the implementation:
 
-.. literalinclude:: ../ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fst
+.. literalinclude:: ../autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: ht_hash_internal
    :end-before: //SNIPPET_END: ht_hash_internal

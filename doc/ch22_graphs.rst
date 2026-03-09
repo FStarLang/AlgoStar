@@ -34,7 +34,7 @@ vertices at each distance from the source. The key lemma states
 that if a vertex is visited at level *k* and has an edge to an
 unvisited vertex, that neighbor will be visited at level *k+1*:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.BFS.Spec.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.BFS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: edge_implies_next_visited
    :end-before: //SNIPPET_END: edge_implies_next_visited
@@ -53,7 +53,7 @@ Pulse Implementation
 The Pulse implementation follows CLRS Figure 22.3, using a queue
 to schedule vertex processing. The main function signature:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.QueueBFS.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.QueueBFS.fst
    :language: pulse
    :start-after: //SNIPPET_START: queue_bfs_sig
    :end-before: //SNIPPET_END: queue_bfs_sig
@@ -97,7 +97,7 @@ Complexity
 The complexity-instrumented version (``QueueBFS.Complexity``) threads
 a ghost counter through the implementation and proves the bound:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.QueueBFS.Complexity.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.QueueBFS.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: bfs_complexity_bound
    :end-before: //SNIPPET_END: bfs_complexity_bound
@@ -125,7 +125,7 @@ Pure Specification
 
 The DFS state tracks vertex colors and timestamps:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.DFS.Spec.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.DFS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: dfs_state
    :end-before: //SNIPPET_END: dfs_state
@@ -147,7 +147,7 @@ biconditional: vertex *v* is a descendant of vertex *u* in the DFS
 forest if and only if at time ``d[u]`` there exists a path from *u*
 to *v* consisting entirely of white vertices:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.DFS.WhitePath.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.DFS.WhitePath.fst
    :language: fstar
    :start-after: //SNIPPET_START: white_path_theorem
    :end-before: //SNIPPET_END: white_path_theorem
@@ -162,7 +162,7 @@ Pulse Implementation
 The Pulse implementation follows CLRS Figure 22.4, using an explicit
 stack to emulate the recursive DFS-Visit procedure:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.StackDFS.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.StackDFS.fst
    :language: pulse
    :start-after: //SNIPPET_START: stack_dfs_sig
    :end-before: //SNIPPET_END: stack_dfs_sig
@@ -209,7 +209,7 @@ Pure Specification
 A topological order is a permutation of all vertices such that
 for every edge (u, v), vertex u appears before v:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.TopologicalSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.TopologicalSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: is_topological_order
    :end-before: //SNIPPET_END: is_topological_order
@@ -217,7 +217,7 @@ for every edge (u, v), vertex u appears before v:
 An important derived property: if a topological order exists, the
 graph must be a DAG:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.TopologicalSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.TopologicalSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: topo_order_implies_dag
    :end-before: //SNIPPET_END: topo_order_implies_dag
@@ -235,7 +235,7 @@ The Pulse implementation uses Kahn's algorithm: maintain in-degree
 counts, repeatedly extract zero-in-degree vertices, and update
 neighbor in-degrees:
 
-.. literalinclude:: ../ch22-elementary-graph/CLRS.Ch22.KahnTopologicalSort.fst
+.. literalinclude:: ../autoclrs/ch22-elementary-graph/CLRS.Ch22.KahnTopologicalSort.fst
    :language: pulse
    :start-after: //SNIPPET_START: topological_sort_sig
    :end-before: //SNIPPET_END: topological_sort_sig

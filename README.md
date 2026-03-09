@@ -60,36 +60,36 @@ make clean  # clean build artifacts
 Each chapter can also be verified independently:
 
 ```bash
-cd ch02-getting-started && make
+cd autoclrs/ch02-getting-started && make
 ```
 
 ## Repository Structure
 
 | Directory | CLRS Chapters | Topics |
 |-----------|--------------|--------|
-| `ch02-getting-started/` | Ch 2 | Insertion Sort, Merge Sort |
-| `ch04-divide-conquer/` | Ch 4 | Maximum Subarray |
-| `ch06-heapsort/` | Ch 6 | Binary Heaps, Heapsort |
-| `ch07-quicksort/` | Ch 7 | Quicksort, Lomuto/Hoare partition |
-| `ch08-linear-sorting/` | Ch 8 | Counting Sort, Radix Sort |
-| `ch09-order-statistics/` | Ch 9 | Randomized/Deterministic Select |
-| `ch10-elementary-ds/` | Ch 10 | Stacks, Queues, Linked Lists |
-| `ch11-hash-tables/` | Ch 11 | Chained Hash Tables |
-| `ch12-bst/` | Ch 12 | Binary Search Trees |
-| `ch13-rbtree/` | Ch 13 | Red-Black Trees |
-| `ch15-dynamic-programming/` | Ch 15 | Rod Cutting, Matrix Chain, LCS, Knapsack |
-| `ch16-greedy/` | Ch 16 | Activity Selection, Huffman Coding |
-| `ch21-disjoint-sets/` | Ch 21 | Union-Find with union by rank + path compression |
-| `ch22-elementary-graph/` | Ch 22 | BFS, DFS, Topological Sort |
-| `ch23-mst/` | Ch 23 | Kruskal's MST |
-| `ch24-sssp/` | Ch 24 | Bellman-Ford, Dijkstra, DAG Shortest Paths |
-| `ch25-apsp/` | Ch 25 | Floyd-Warshall |
-| `ch26-max-flow/` | Ch 26 | Edmonds-Karp Max Flow |
-| `ch31-number-theory/` | Ch 31 | GCD, Modular Exponentiation, Miller-Rabin |
-| `ch32-string-matching/` | Ch 32 | Naive, Rabin-Karp, KMP |
-| `ch33-comp-geometry/` | Ch 33 | Convex Hull (Graham Scan) |
-| `ch35-approximation/` | Ch 35 | Vertex Cover (2-approximation) |
-| `common/` | — | Shared utilities |
+| `autoclrs/ch02-getting-started/` | Ch 2 | Insertion Sort, Merge Sort |
+| `autoclrs/ch04-divide-conquer/` | Ch 4 | Maximum Subarray |
+| `autoclrs/ch06-heapsort/` | Ch 6 | Binary Heaps, Heapsort |
+| `autoclrs/ch07-quicksort/` | Ch 7 | Quicksort, Lomuto/Hoare partition |
+| `autoclrs/ch08-linear-sorting/` | Ch 8 | Counting Sort, Radix Sort |
+| `autoclrs/ch09-order-statistics/` | Ch 9 | Randomized/Deterministic Select |
+| `autoclrs/ch10-elementary-ds/` | Ch 10 | Stacks, Queues, Linked Lists |
+| `autoclrs/ch11-hash-tables/` | Ch 11 | Chained Hash Tables |
+| `autoclrs/ch12-bst/` | Ch 12 | Binary Search Trees |
+| `autoclrs/ch13-rbtree/` | Ch 13 | Red-Black Trees |
+| `autoclrs/ch15-dynamic-programming/` | Ch 15 | Rod Cutting, Matrix Chain, LCS, Knapsack |
+| `autoclrs/ch16-greedy/` | Ch 16 | Activity Selection, Huffman Coding |
+| `autoclrs/ch21-disjoint-sets/` | Ch 21 | Union-Find with union by rank + path compression |
+| `autoclrs/ch22-elementary-graph/` | Ch 22 | BFS, DFS, Topological Sort |
+| `autoclrs/ch23-mst/` | Ch 23 | Kruskal's MST |
+| `autoclrs/ch24-sssp/` | Ch 24 | Bellman-Ford, Dijkstra, DAG Shortest Paths |
+| `autoclrs/ch25-apsp/` | Ch 25 | Floyd-Warshall |
+| `autoclrs/ch26-max-flow/` | Ch 26 | Edmonds-Karp Max Flow |
+| `autoclrs/ch31-number-theory/` | Ch 31 | GCD, Modular Exponentiation, Miller-Rabin |
+| `autoclrs/ch32-string-matching/` | Ch 32 | Naive, Rabin-Karp, KMP |
+| `autoclrs/ch33-comp-geometry/` | Ch 33 | Convex Hull (Graham Scan) |
+| `autoclrs/ch35-approximation/` | Ch 35 | Vertex Cover (2-approximation) |
+| `autoclrs/common/` | — | Shared utilities |
 | `doc/` | — | Sphinx documentation book |
 
 ## Documentation
@@ -97,7 +97,7 @@ cd ch02-getting-started && make
 Detailed per-algorithm documentation (specification reviews, correctness
 properties, complexity results, and known gaps) is available in:
 
-- **Per-algorithm reviews**: `<chapter>/<Module>.Review.md` files
-- **Chapter READMEs**: `<chapter>/README.md`
+- **Per-algorithm reviews**: `autoclrs/<chapter>/<Module>.Review.md` files
+- **Chapter READMEs**: `autoclrs/<chapter>/README.md`
 - **Sphinx book**: `doc/` (build with `cd doc && make html`)
 

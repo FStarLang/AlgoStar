@@ -29,7 +29,7 @@ Stack (LIFO)
 
 A stack is modelled as a list where the head is the top:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: stack_spec
    :end-before: //SNIPPET_END: stack_spec
@@ -37,7 +37,7 @@ A stack is modelled as a list where the head is the top:
 The key LIFO property is that popping a freshly pushed element returns
 that element and restores the original stack:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: stack_lifo
    :end-before: //SNIPPET_END: stack_lifo
@@ -51,7 +51,7 @@ The queue specification uses a two-list representation (front and back)
 with a well-formedness invariant: if the front is empty, the back must
 also be empty. The abstract view is ``front @ rev back``:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: queue_spec
    :end-before: //SNIPPET_END: queue_spec
@@ -60,7 +60,7 @@ The FIFO property is expressed as: dequeuing from a non-empty queue
 returns the head of the abstract list view, and the remaining queue
 corresponds to the tail:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: queue_fifo
    :end-before: //SNIPPET_END: queue_fifo
@@ -71,7 +71,7 @@ Linked List
 The list specification defines insert-at-head, linear search, and
 delete-first-occurrence on plain F* lists:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: list_spec
    :end-before: //SNIPPET_END: list_spec
@@ -89,7 +89,7 @@ index. Our Pulse implementation follows this design exactly.
 Data Structure and Invariant
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: stack_type
    :end-before: //SNIPPET_END: stack_type
@@ -100,7 +100,7 @@ underlying vector and the top-pointer box, and requires that the
 first ``top`` elements of the array match the logical list
 element-by-element:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: stack_inv
    :end-before: //SNIPPET_END: stack_inv
@@ -112,7 +112,7 @@ All operations are specified in terms of the ghost ``contents`` list.
 ``push`` appends to the end (the top of the stack), ``pop`` removes the
 last element and returns it, and ``peek`` reads without removing:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Stack.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: stack_ops
    :end-before: //SNIPPET_END: stack_ops
@@ -153,7 +153,7 @@ LIFO Property
 The stack lemmas module proves the core LIFO property at the
 imperative level:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Stack.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Stack.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: stack_lifo
    :end-before: //SNIPPET_END: stack_lifo
@@ -168,7 +168,7 @@ wrap around modulo the capacity.
 Data Structure and Invariant
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: queue_type
    :end-before: //SNIPPET_END: queue_type
@@ -182,7 +182,7 @@ invariant at the cost of one extra field.
 The invariant maps circular indices to the logical list: element ``i``
 of the list lives at array position ``(head + i) % capacity``:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: queue_inv
    :end-before: //SNIPPET_END: queue_inv
@@ -195,7 +195,7 @@ arithmetic lemmas (``lemma_tail_update``, ``lemma_tail_dequeue``,
 Operations
 ~~~~~~~~~~
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Queue.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: queue_ops
    :end-before: //SNIPPET_END: queue_ops
@@ -229,7 +229,7 @@ FIFO Property
 
 The queue lemmas module proves the FIFO property:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.Queue.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.Queue.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: queue_fifo
    :end-before: //SNIPPET_END: queue_fifo
@@ -254,12 +254,12 @@ The singly-linked list uses heap-allocated boxes for nodes, with a
 recursive separation-logic predicate ``is_dlist`` that matches on the
 logical list (decreasing) to ensure termination:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Base.fst
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Base.fst
    :language: fstar
    :start-after: //SNIPPET_START: sll_node
    :end-before: //SNIPPET_END: sll_node
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Base.fst
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Base.fst
    :language: fstar
    :start-after: //SNIPPET_START: sll_is_dlist
    :end-before: //SNIPPET_END: sll_is_dlist
@@ -273,7 +273,7 @@ predicate.
 Operations
 """"""""""
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: sll_ops
    :end-before: //SNIPPET_END: sll_ops
@@ -298,7 +298,7 @@ Complexity (Ghost-Tick Variants)
 The implementation includes ghost-tick instrumented variants that use a
 ``GhostReference.ref nat`` counter:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.SinglyLinkedList.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: sll_tick_ops
    :end-before: //SNIPPET_END: sll_tick_ops
@@ -317,7 +317,7 @@ The DLL module (``CLRS.Ch10.DLL``) uses a *doubly-linked segment*
 predicate (``dls``) that tracks both forward and backward pointers.
 Nodes carry ``key``, ``prev``, and ``next`` fields:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: dll_node
    :end-before: //SNIPPET_END: dll_node
@@ -326,7 +326,7 @@ The ``dll`` predicate is parameterized by head and tail pointers and
 the logical list. Internally, ``dls`` is a recursive predicate matching
 on the list (a single-element base case plus a cons case):
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: dll_predicate
    :end-before: //SNIPPET_END: dll_predicate
@@ -337,7 +337,7 @@ Operations
 The DLL provides eight verified operations through mutable references
 to head and tail pointers:
 
-.. literalinclude:: ../ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
+.. literalinclude:: ../autoclrs/ch10-elementary-ds/CLRS.Ch10.DLL.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: dll_ops
    :end-before: //SNIPPET_END: dll_ops

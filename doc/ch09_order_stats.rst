@@ -30,12 +30,12 @@ CLRS §9.1 discusses finding the minimum or maximum of an array in
 array once, proving that the returned value both exists in the array
 and is a universal bound.
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.MinMax.Impl.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.MinMax.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: find_minimum
    :end-before: //SNIPPET_END: find_minimum
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.MinMax.Impl.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.MinMax.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: find_maximum
    :end-before: //SNIPPET_END: find_maximum
@@ -57,7 +57,7 @@ Complexity
 
 The complexity predicates from ``MinMax.Spec`` express exact bounds:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.MinMax.Spec.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.MinMax.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: minmax_complexity_bound
    :end-before: //SNIPPET_END: minmax_complexity_bound
@@ -78,14 +78,14 @@ Naïve Scan
 ``find_minmax`` processes each element against both the current min
 and max, using 2(n − 1) comparisons:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Impl.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: find_minmax
    :end-before: //SNIPPET_END: find_minmax
 
 The exact complexity bound:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Spec.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded_minmax
    :end-before: //SNIPPET_END: complexity_bounded_minmax
@@ -98,14 +98,14 @@ processes elements in pairs: compare the pair, then compare the smaller
 against the current min and the larger against the current max. This
 uses at most ⌊3n/2⌋ comparisons:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Impl.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: find_minmax_pairs
    :end-before: //SNIPPET_END: find_minmax_pairs
 
 The tighter complexity bound:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Spec.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.SimultaneousMinMax.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded_minmax_pairs
    :end-before: //SNIPPET_END: complexity_bounded_minmax_pairs
@@ -133,7 +133,7 @@ Partition
 The in-place partition rearranges ``a[lo..hi)`` around the pivot
 ``a[hi-1]`` and returns the pivot's final position:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.Quickselect.Impl.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.Quickselect.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: partition_in_range
    :end-before: //SNIPPET_END: partition_in_range
@@ -153,7 +153,7 @@ Main Algorithm
 ``quickselect`` iteratively narrows the search range ``[lo, hi)``
 around position *k*:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.Quickselect.Impl.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.Quickselect.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: quickselect
    :end-before: //SNIPPET_END: quickselect
@@ -195,7 +195,7 @@ Specification
 
 The pure functional reference answer:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.PartialSelectionSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.PartialSelectionSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: select_spec
    :end-before: //SNIPPET_END: select_spec
@@ -208,7 +208,7 @@ a partition-property characterization of the *k*-th order statistic.
 Correctness Theorem
 ~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.PartialSelectionSort.Impl.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.PartialSelectionSort.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: select
    :end-before: //SNIPPET_END: select
@@ -227,7 +227,7 @@ Sorted Permutations are Equal
 
 A key auxiliary result in the ``Lemmas`` module:
 
-.. literalinclude:: ../ch09-order-statistics/CLRS.Ch09.PartialSelectionSort.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch09-order-statistics/CLRS.Ch09.PartialSelectionSort.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: sorted_permutation_equal
    :end-before: //SNIPPET_END: sorted_permutation_equal

@@ -73,7 +73,7 @@ Correctness Theorem
 
 The recursive quicksort with ghost tick counter:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Impl.fst
+.. literalinclude:: ../autoclrs/ch07-quicksort/CLRS.Ch07.Quicksort.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: clrs_quicksort_with_ticks_sig
    :end-before: //SNIPPET_END: clrs_quicksort_with_ticks_sig
@@ -91,7 +91,7 @@ The user-facing ``quicksort`` function converts ``pts_to`` to
 ``pts_to_range``, computes ghost bounds via ``seq_min``/``seq_max``, calls
 the recursive sort, and converts back:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Impl.fsti
+.. literalinclude:: ../autoclrs/ch07-quicksort/CLRS.Ch07.Quicksort.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: quicksort_sig
    :end-before: //SNIPPET_END: quicksort_sig
@@ -132,12 +132,12 @@ Worst-Case Analysis
 The pure F\* module ``Quicksort.Complexity`` defines the worst-case
 recurrence ``T(n) = T(n-1) + (n-1)`` and proves its closed form:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.fst
+.. literalinclude:: ../autoclrs/ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: worst_case_comparisons
    :end-before: //SNIPPET_END: worst_case_comparisons
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.fst
+.. literalinclude:: ../autoclrs/ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: worst_case_bound
    :end-before: //SNIPPET_END: worst_case_bound
@@ -152,7 +152,7 @@ Convexity
 The maximality theorem shows that any partition split is bounded by the
 worst case:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.fst
+.. literalinclude:: ../autoclrs/ch07-quicksort/CLRS.Ch07.Quicksort.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: partition_split_bounded
    :end-before: //SNIPPET_END: partition_split_bounded
@@ -169,7 +169,7 @@ Quadratic Bound
 The ``Quicksort.Lemmas`` module defines the quadratic complexity bound
 predicate used in the postcondition:
 
-.. literalinclude:: ../ch07-quicksort/CLRS.Ch07.Quicksort.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch07-quicksort/CLRS.Ch07.Quicksort.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded_quadratic
    :end-before: //SNIPPET_END: complexity_bounded_quadratic

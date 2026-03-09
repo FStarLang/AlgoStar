@@ -108,7 +108,7 @@ Rank Bound
 The ``Lemmas`` module introduces ``uf_forest_sized`` (extending the
 forest with subtree sizes) and proves:
 
-.. literalinclude:: ../ch21-disjoint-sets/CLRS.Ch21.UnionFind.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch21-disjoint-sets/CLRS.Ch21.UnionFind.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: size_rank_invariant
    :end-before: //SNIPPET_END: size_rank_invariant

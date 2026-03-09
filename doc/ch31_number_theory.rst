@@ -29,7 +29,7 @@ Specification
 The pure recursive specification follows the textbook definition
 directly:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Spec.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.GCD.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: gcd_spec
    :end-before: //SNIPPET_END: gcd_spec
@@ -44,7 +44,7 @@ Correctness Theorem
 
 The Pulse implementation iterates the same recurrence in a while loop:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Impl.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.GCD.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: gcd_impl_sig
    :end-before: //SNIPPET_END: gcd_impl_sig
@@ -61,7 +61,7 @@ Loop Invariant
 The while loop maintains the GCD invariant — the GCD of the current
 pair equals the GCD of the original inputs:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Impl.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.GCD.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: gcd_loop
    :end-before: //SNIPPET_END: gcd_loop
@@ -86,14 +86,14 @@ The cost model counts one ghost tick per mod operation.
 
 The step count and bit-width functions:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.GCD.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: gcd_steps
    :end-before: //SNIPPET_END: gcd_steps
 
 The main complexity theorem:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.GCD.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: lemma_gcd_steps_log
    :end-before: //SNIPPET_END: lemma_gcd_steps_log
@@ -107,7 +107,7 @@ the new second argument is at most half of the original ``b``, so
 
 The complexity-bounded predicate:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.GCD.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.GCD.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: gcd_complexity_bounded
    :end-before: //SNIPPET_END: gcd_complexity_bounded
@@ -130,7 +130,7 @@ a pure recursive function in F* (no Pulse).
 Algorithm
 ~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Spec.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ExtendedGCD.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: extended_gcd
    :end-before: //SNIPPET_END: extended_gcd
@@ -146,7 +146,7 @@ Bézout's Identity
 The central theorem is that the returned coefficients satisfy
 Bézout's identity:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ExtendedGCD.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: bezout_identity
    :end-before: //SNIPPET_END: bezout_identity
@@ -163,7 +163,7 @@ Complete Specification
 
 All four properties are packaged into a single correctness theorem:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ExtendedGCD.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: extended_gcd_correctness
    :end-before: //SNIPPET_END: extended_gcd_correctness
@@ -182,7 +182,7 @@ The extended GCD has the same recursion structure as ``gcd_spec``:
 both recurse on ``(b, a%b)`` with base case ``b=0``. Therefore
 ``gcd_steps`` counts the calls and the O(log b) bound applies:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ExtendedGCD.Complexity.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ExtendedGCD.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: extended_gcd_complexity
    :end-before: //SNIPPET_END: extended_gcd_complexity
@@ -198,7 +198,7 @@ implementation.
 Specification
 ~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Spec.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ModExp.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: mod_exp_spec
    :end-before: //SNIPPET_END: mod_exp_spec
@@ -211,7 +211,7 @@ Step Lemma
 
 The key proof obligation for each loop iteration is captured by:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ModExp.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: mod_exp_step
    :end-before: //SNIPPET_END: mod_exp_step
@@ -227,7 +227,7 @@ exponent).
 Correctness Theorem
 ~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Impl.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ModExp.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: mod_exp_impl_sig
    :end-before: //SNIPPET_END: mod_exp_impl_sig
@@ -238,7 +238,7 @@ The implementation takes a base, exponent, and modulus (with
 Loop Invariant
 ~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Impl.fst
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ModExp.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: mod_exp_loop
    :end-before: //SNIPPET_END: mod_exp_loop
@@ -259,7 +259,7 @@ Complexity
 The complexity module proves an O(log e) bound on the number of
 squaring operations:
 
-.. literalinclude:: ../ch31-number-theory/CLRS.Ch31.ModExp.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch31-number-theory/CLRS.Ch31.ModExp.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: modexp_complexity_bounded
    :end-before: //SNIPPET_END: modexp_complexity_bounded

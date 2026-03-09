@@ -22,7 +22,7 @@ Specification
 
 The core predicates used by all counting sort variants:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.CountingSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.CountingSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: counting_sort_spec_defs
    :end-before: //SNIPPET_END: counting_sort_spec_defs
@@ -40,7 +40,7 @@ CLRS-Faithful Stable Sort
 The CLRS-faithful version uses a separate output array ``b`` and the
 backwards-traversal placement loop that preserves stability:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.CountingSort.Impl.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.CountingSort.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: counting_sort_impl_sig
    :end-before: //SNIPPET_END: counting_sort_impl_sig
@@ -102,7 +102,7 @@ Single-Digit (Pulse)
 For integers bounded by *k*, radix sort with base *k+1* reduces to a
 single pass of counting sort. The Pulse wrapper delegates directly:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.RadixSort.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.RadixSort.fst
    :language: pulse
    :start-after: //SNIPPET_START: radix_sort_sig
    :end-before: //SNIPPET_END: radix_sort_sig
@@ -116,7 +116,7 @@ Multi-Digit Pulse Implementation
 The full CLRS ``RADIX-SORT`` loops *d* times, calling
 ``counting_sort_by_digit`` at each digit position:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.RadixSort.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.RadixSort.fst
    :language: pulse
    :start-after: //SNIPPET_START: radix_sort_multidigit_sig
    :end-before: //SNIPPET_END: radix_sort_multidigit_sig
@@ -134,14 +134,14 @@ Multi-Digit Pure Specification
 The ``RadixSort.MultiDigit`` module provides a pure functional
 multi-digit radix sort using insertion sort as the stable subroutine:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.RadixSort.MultiDigit.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.RadixSort.MultiDigit.fst
    :language: fstar
    :start-after: //SNIPPET_START: radix_sort_multi
    :end-before: //SNIPPET_END: radix_sort_multi
 
 The main correctness theorem:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.RadixSort.MultiDigit.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.RadixSort.MultiDigit.fst
    :language: fstar
    :start-after: //SNIPPET_START: radix_sort_correct_multi
    :end-before: //SNIPPET_END: radix_sort_correct_multi
@@ -158,7 +158,7 @@ Stability Theory
 The ``RadixSort.Spec`` module defines the abstract stable-sort
 specification used in the radix sort correctness argument:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.RadixSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.RadixSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: is_stable_sort_by
    :end-before: //SNIPPET_END: is_stable_sort_by
@@ -169,7 +169,7 @@ keys preserve their input order (stability).
 
 The correctness lemmas in the ``Lemmas`` aggregation module:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.RadixSort.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.RadixSort.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: radix_sort_correct_lemmas
    :end-before: //SNIPPET_END: radix_sort_correct_lemmas
@@ -198,7 +198,7 @@ with insertion sort, and the sorted buckets are concatenated.
 The implementation is in pure F\* (not Pulse) and operates on lists.
 The sorted predicate:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.BucketSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.BucketSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bucket_sort_sorted
    :end-before: //SNIPPET_END: bucket_sort_sorted
@@ -207,7 +207,7 @@ The key correctness insight — appending two sorted lists where every
 element of the left list is ≤ every element of the right list produces
 a sorted list — is fully proven:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.BucketSort.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.BucketSort.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: append_sorted_disjoint
    :end-before: //SNIPPET_END: append_sorted_disjoint
@@ -215,7 +215,7 @@ a sorted list — is fully proven:
 The top-level ``bucket_sort`` function guarantees sortedness, length
 preservation, and permutation:
 
-.. literalinclude:: ../ch08-linear-sorting/CLRS.Ch08.BucketSort.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch08-linear-sorting/CLRS.Ch08.BucketSort.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: bucket_sort_sig
    :end-before: //SNIPPET_END: bucket_sort_sig

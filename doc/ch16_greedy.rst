@@ -46,7 +46,7 @@ Activities are modelled as two sequences of integers (start times and
 finish times). The core predicates define compatibility and mutual
 compatibility:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: activity_defs
    :end-before: //SNIPPET_END: activity_defs
@@ -59,7 +59,7 @@ pair to be compatible.
 An optimal selection is one whose cardinality equals the maximum
 over all mutually compatible subsets:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: is_optimal_selection
    :end-before: //SNIPPET_END: is_optimal_selection
@@ -74,7 +74,7 @@ given any optimal solution, replace its first activity with activity 0
 ``finish[0] ≤ finish[k]``, activity 0 is compatible with everything
 activity *k* was compatible with.
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: lemma_greedy_choice
    :end-before: //SNIPPET_END: lemma_greedy_choice
@@ -82,7 +82,7 @@ activity *k* was compatible with.
 The Lemmas module contains a fully verified variant of this exchange
 argument operating on sequences rather than lists:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: lemma_greedy_choice_seq
    :end-before: //SNIPPET_END: lemma_greedy_choice_seq
@@ -98,7 +98,7 @@ larger than the greedy selection. The chain culminates in
 ``lemma_greedy_is_optimal``, which proves the greedy count equals
 ``max_compatible_count``.
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: lemma_greedy_is_optimal
    :end-before: //SNIPPET_END: lemma_greedy_is_optimal
@@ -109,7 +109,7 @@ Main Theorem
 ``theorem_implementation_optimal`` connects the Pulse implementation's
 invariant to the list-level optimality definition:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: theorem_implementation_optimal
    :end-before: //SNIPPET_END: theorem_implementation_optimal
@@ -130,7 +130,7 @@ writing selected activity indices into an output array ``out`` of
 size *n*. The returned ``count`` indicates how many entries were
 written:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Impl.fsti
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: activity_selection_sig
    :end-before: //SNIPPET_END: activity_selection_sig
@@ -147,7 +147,7 @@ after the loop, bridging the Pulse output directly to the
 exchange-argument proof.  The loop invariant is captured
 by ``greedy_selection_inv``:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: greedy_selection_inv
    :end-before: //SNIPPET_END: greedy_selection_inv
@@ -167,7 +167,7 @@ Complexity
 The complexity bound is defined and linked to the Pulse implementation.
 The predicate asserts exactly *n* − 1 comparisons:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.ActivitySelection.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.ActivitySelection.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded_linear
    :end-before: //SNIPPET_END: complexity_bounded_linear
@@ -192,7 +192,7 @@ Tree Definition
 Huffman trees are an inductive type where every internal node has
 exactly two children (a full binary tree by construction):
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: htree_def
    :end-before: //SNIPPET_END: htree_def
@@ -204,12 +204,12 @@ The weighted path length (WPL) sums ``freq × depth`` over all leaves.
 The cost sums all internal-node frequencies. CLRS equation 16.4
 states these are equal; this is proved by induction:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: weighted_path_length
    :end-before: //SNIPPET_END: weighted_path_length
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: wpl_equals_cost
    :end-before: //SNIPPET_END: wpl_equals_cost
@@ -220,7 +220,7 @@ Pure Construction
 The pure functional Huffman construction repeatedly merges the two
 lowest-frequency trees, inserting the result back into a sorted list:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: huffman_from_sorted
    :end-before: //SNIPPET_END: huffman_from_sorted
@@ -235,7 +235,7 @@ Optimality
 The optimality definition requires minimal WPL among all trees with
 the same leaf frequencies:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: is_optimal
    :end-before: //SNIPPET_END: is_optimal
@@ -268,7 +268,7 @@ for any valid pair. The ``huffman_correctness_theorem`` uses multiset
 preservation (~120 lines) proving ``∀x. count x (leaf_freqs (huffman_complete
 freqs)) = count x freqs``.
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Complete.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Complete.fst
    :language: fstar
    :start-after: //SNIPPET_START: huffman_complete_optimal
    :end-before: //SNIPPET_END: huffman_complete_optimal
@@ -281,14 +281,14 @@ using ``Pulse.Lib.PriorityQueue`` (binary heap). The postcondition
 proves WPL-optimality, frequency multiset preservation, and cost
 equality:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Impl.fsti
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Impl.fsti
    :language: pulse
    :start-after: //SNIPPET_START: huffman_tree_iface
    :end-before: //SNIPPET_END: huffman_tree_iface
 
 The implementation body (in ``Impl.fst``) matches this interface:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Impl.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: huffman_tree_sig
    :end-before: //SNIPPET_END: huffman_tree_sig
@@ -311,12 +311,12 @@ The complexity analysis is done in pure F* by instrumenting
 ``huffman_from_sorted`` with a tick counter that tracks comparisons
 during sorted insertion:
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Complexity.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: huffman_ticks_bounded
    :end-before: //SNIPPET_END: huffman_ticks_bounded
 
-.. literalinclude:: ../ch16-greedy/CLRS.Ch16.Huffman.Complexity.fst
+.. literalinclude:: ../autoclrs/ch16-greedy/CLRS.Ch16.Huffman.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: huffman_complexity
    :end-before: //SNIPPET_END: huffman_complexity

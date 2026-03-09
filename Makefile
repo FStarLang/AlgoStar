@@ -1,5 +1,4 @@
 # Top-level Makefile for CLRS Pulse implementations
-# Builds all chapter directories incrementally via the Pulse test framework.
 #
 # Usage:
 #   make            # verify all chapters (parallel-safe with -j)
@@ -10,34 +9,11 @@
 # Prerequisites:
 #   1. git submodule update --init --recursive
 #   2. ./setup.sh   (builds FStar and Pulse from submodules)
-#
-# Each chapter has its own .depend for incremental builds.
-# Chapters are independent — no cross-chapter dependencies.
 
-PULSE_ROOT ?= pulse
-FSTAR_EXE  ?= $(CURDIR)/FStar/bin/fstar.exe
-export FSTAR_EXE
+.PHONY: all verify clean
 
-SUBDIRS += ch02-getting-started
-SUBDIRS += ch04-divide-conquer
-SUBDIRS += ch06-heapsort
-SUBDIRS += ch07-quicksort
-SUBDIRS += ch08-linear-sorting
-SUBDIRS += ch09-order-statistics
-SUBDIRS += ch10-elementary-ds
-SUBDIRS += ch11-hash-tables
-SUBDIRS += ch12-bst
-SUBDIRS += ch15-dynamic-programming
-SUBDIRS += ch16-greedy
-SUBDIRS += ch21-disjoint-sets
-SUBDIRS += ch22-elementary-graph
-SUBDIRS += ch23-mst
-SUBDIRS += ch24-sssp
-SUBDIRS += ch25-apsp
-SUBDIRS += ch26-max-flow
-SUBDIRS += ch31-number-theory
-SUBDIRS += ch32-string-matching
-SUBDIRS += ch33-comp-geometry
-SUBDIRS += ch35-approximation
+all verify:
+	$(MAKE) -C autoclrs $@
 
-include $(PULSE_ROOT)/mk/test.mk
+clean:
+	$(MAKE) -C autoclrs $@

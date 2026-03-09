@@ -63,7 +63,7 @@ property.
 Graph and MST Definitions
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.MST.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.MST.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: graph_defs
    :end-before: //SNIPPET_END: graph_defs
@@ -72,7 +72,7 @@ A graph is represented as a vertex count ``n`` and an edge list.
 Edges are undirected (``edge_eq`` treats ``(u,v)`` and ``(v,u)``
 as identical).
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.MST.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.MST.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: spanning_tree_mst
    :end-before: //SNIPPET_END: spanning_tree_mst
@@ -90,14 +90,14 @@ partitions vertices into two sets; a *light edge* is a minimum-weight
 edge crossing the cut; a cut *respects* edge set ``A`` when no edge
 in ``A`` crosses it.
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.MST.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.MST.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: cut_defs
    :end-before: //SNIPPET_END: cut_defs
 
 The main theorem:
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.MST.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.MST.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: cut_property
    :end-before: //SNIPPET_END: cut_property
@@ -118,7 +118,7 @@ Pure Specification
 edges by weight, then greedily adds edges that do not create a cycle
 (checked via a BFS-based ``same_component_dec``).
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.Kruskal.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.Kruskal.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: pure_kruskal
    :end-before: //SNIPPET_END: pure_kruskal
@@ -129,12 +129,12 @@ Correctness Theorem
 The top-level correctness theorems state that ``pure_kruskal``
 produces a spanning tree and an MST when the graph is connected:
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.Kruskal.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.Kruskal.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: theorem_kruskal_produces_spanning_tree
    :end-before: //SNIPPET_END: theorem_kruskal_produces_spanning_tree
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.Kruskal.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.Kruskal.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: theorem_kruskal_produces_mst
    :end-before: //SNIPPET_END: theorem_kruskal_produces_mst
@@ -174,7 +174,7 @@ Union-Find for Kruskal
 ``CLRS.Ch23.Kruskal.UF`` provides a union-find model that tracks
 component connectivity alongside the edge list:
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.Kruskal.UF.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.Kruskal.UF.fsti
    :language: fstar
    :start-after: //SNIPPET_START: uf_inv_union
    :end-before: //SNIPPET_END: uf_inv_union
@@ -213,14 +213,14 @@ Pure Specification
 matrix.  At each step, the algorithm finds the minimum-weight edge
 from tree vertices to non-tree vertices and adds it.
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.Prim.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.Prim.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: pure_prim
    :end-before: //SNIPPET_END: pure_prim
 
 The specification captures the full correctness goal:
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.Prim.Spec.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.Prim.Spec.fsti
    :language: fstar
    :start-after: //SNIPPET_START: prim_spec
    :end-before: //SNIPPET_END: prim_spec
@@ -247,7 +247,7 @@ The Pulse implementation processes an ``n × n`` weight matrix
 stored as a ``SZ.t`` array, using 64-bit index arithmetic to avoid
 overflow:
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.Prim.Impl.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.Prim.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: prim_sig
    :end-before: //SNIPPET_END: prim_sig
@@ -269,12 +269,12 @@ the MST theory.  This bridging is not yet implemented.
 Complexity
 ==========
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.MST.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.MST.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: kruskal_cubic
    :end-before: //SNIPPET_END: kruskal_cubic
 
-.. literalinclude:: ../ch23-mst/CLRS.Ch23.MST.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch23-mst/CLRS.Ch23.MST.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: prim_quadratic
    :end-before: //SNIPPET_END: prim_quadratic

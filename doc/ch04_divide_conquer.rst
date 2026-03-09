@@ -36,7 +36,7 @@ Correctness Theorem
 
 The main theorem is the type signature of ``binary_search``:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.BinarySearch.Impl.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.BinarySearch.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: binary_search_sig
    :end-before: //SNIPPET_END: binary_search_sig
@@ -114,7 +114,7 @@ Correctness Theorem
 
 The Pulse implementation signature:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MaxSubarray.Kadane.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.MaxSubarray.Kadane.fst
    :language: pulse
    :start-after: //SNIPPET_START: max_subarray_sig
    :end-before: //SNIPPET_END: max_subarray_sig
@@ -161,7 +161,7 @@ The main recursive function follows CLRS exactly — split, recurse
 on left and right, find the crossing subarray, and return the
 maximum of the three:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.fst
    :language: fstar
    :start-after: //SNIPPET_START: find_maximum_subarray_dc
    :end-before: //SNIPPET_END: find_maximum_subarray_dc
@@ -174,7 +174,7 @@ Two key theorems are proven:
 1. **Sum correctness** — ``lemma_dc_sum_correct``: the returned range
    ``[left, right)`` has the claimed sum:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: dc_sum_correct
    :end-before: //SNIPPET_END: dc_sum_correct
@@ -188,14 +188,14 @@ Complexity
 The recurrence ``T(n) = 2T(n/2) + n`` with ``T(1) = 1`` gives
 O(n log n):
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Complexity.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: dc_ops_count
    :end-before: //SNIPPET_END: dc_ops_count
 
 The bound ``T(n) ≤ 4n(⌈log₂ n⌉ + 1)`` is proved by induction:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Complexity.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: dc_complexity_bound
    :end-before: //SNIPPET_END: dc_complexity_bound
@@ -213,7 +213,7 @@ The equivalence between the divide-and-conquer result and Kadane's
 specification is fully proven — both algorithms compute the unique
 maximum over all contiguous subarrays:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.MaxSubarray.DivideConquer.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: dc_kadane_equivalence
    :end-before: //SNIPPET_END: dc_kadane_equivalence
@@ -263,7 +263,7 @@ Correctness Theorem
 
 The Pulse signature of ``matrix_multiply``:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.MatrixMultiply.Impl.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.MatrixMultiply.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: matrix_multiply_sig
    :end-before: //SNIPPET_END: matrix_multiply_sig
@@ -301,7 +301,7 @@ Matrix Representation
 
 The Strassen formalization uses a sequence-of-sequences representation:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: matrix_type
    :end-before: //SNIPPET_END: matrix_type
@@ -311,7 +311,7 @@ Standard Multiply (Specification)
 
 The reference specification against which Strassen is verified:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: standard_multiply
    :end-before: //SNIPPET_END: standard_multiply
@@ -321,21 +321,21 @@ Algorithm
 
 The recursive Strassen function requires square, power-of-2 matrices:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: strassen_multiply
    :end-before: //SNIPPET_END: strassen_multiply
 
 For n > 1, seven half-size products are computed:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: strassen_products
    :end-before: //SNIPPET_END: strassen_products
 
 The result quadrants are assembled from these products:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: strassen_combine
    :end-before: //SNIPPET_END: strassen_combine
@@ -346,7 +346,7 @@ Correctness Proof
 The main correctness theorem states that Strassen and standard
 multiplication agree element-wise:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: strassen_correct
    :end-before: //SNIPPET_END: strassen_correct
@@ -366,14 +366,14 @@ Complexity
 The number of scalar multiplications satisfies the recurrence
 T(n) = 7 T(n/2), T(1) = 1:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Complexity.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: strassen_complexity
    :end-before: //SNIPPET_END: strassen_complexity
 
 The closed form T(n) = 7\ :sup:`log₂ n` is proven:
 
-.. literalinclude:: ../ch04-divide-conquer/CLRS.Ch04.Strassen.Complexity.fst
+.. literalinclude:: ../autoclrs/ch04-divide-conquer/CLRS.Ch04.Strassen.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: strassen_closed_form
    :end-before: //SNIPPET_END: strassen_closed_form

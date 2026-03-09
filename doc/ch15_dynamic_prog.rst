@@ -30,7 +30,7 @@ Problem Specification
 
 The problem is formalized with two predicates:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Spec.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.RodCutting.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: cutting_defs
    :end-before: //SNIPPET_END: cutting_defs
@@ -51,7 +51,7 @@ the optimal revenue satisfies the recurrence:
 
 This is proved as a theorem:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.RodCutting.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: optimal_substructure
    :end-before: //SNIPPET_END: optimal_substructure
@@ -74,7 +74,7 @@ Imperative Implementation
 The Pulse implementation fills the DP table bottom-up using a nested
 loop:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Impl.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.RodCutting.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rod_cutting_sig
    :end-before: //SNIPPET_END: rod_cutting_sig
@@ -124,7 +124,7 @@ of size ``j``.
 The pure specification adds ``accum_argmax``, a companion to
 ``accum_max`` that tracks which index ``i`` achieves the maximum:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
    :language: fstar
    :start-after: //SNIPPET_START: extended_spec
    :end-before: //SNIPPET_END: extended_spec
@@ -136,7 +136,7 @@ argmax ``best_i`` — the index that achieves that maximum. After
 each inner loop completes, both ``r[j]`` and ``s_cuts[j]`` are
 written.
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
    :language: fstar
    :start-after: //SNIPPET_START: extended_sig
    :end-before: //SNIPPET_END: extended_sig
@@ -152,7 +152,7 @@ These predicates are defined before ``open Pulse.Lib.BoundedIntegers``
 ``[@@"opaque_to_smt"]`` to prevent Z3 context pollution during the
 Pulse proof:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.RodCutting.Extended.fst
    :language: fstar
    :start-after: //SNIPPET_START: cuts_are_optimal_def
    :end-before: //SNIPPET_END: cuts_are_optimal_def
@@ -192,7 +192,7 @@ Specification
 
 The pure specification defines LCS length recursively:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.Spec.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.LCS.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: lcs_spec
    :end-before: //SNIPPET_END: lcs_spec
@@ -213,7 +213,7 @@ vector. The outer loop iterates over rows (index ``i`` into sequence
 ``x``), the inner loop over columns (index ``j`` into sequence ``y``).
 Each cell ``tbl[i * (n+1) + j]`` stores ``lcs_length x y i j``.
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.LCS.Impl.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.LCS.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: lcs_sig
    :end-before: //SNIPPET_END: lcs_sig
@@ -253,7 +253,7 @@ The recursive optimal substructure (CLRS Eq. 15.7) is defined as a
 pure, total function ``mc_cost``.  Given dimensions ``p[0..n]`` where
 matrix ``A_i`` has dimensions ``p[i] × p[i+1]``:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: mc_cost
    :end-before: //SNIPPET_END: mc_cost
@@ -270,7 +270,7 @@ Imperative Mirror Specification
 The bottom-up DP algorithm is captured by an imperative mirror — pure
 functions that exactly trace the three nested loops:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: mc_spec
    :end-before: //SNIPPET_END: mc_spec
@@ -286,7 +286,7 @@ DP Correctness
 The main equivalence theorem states that the bottom-up DP result
 equals the recursive optimum:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: mc_spec_equiv
    :end-before: //SNIPPET_END: mc_spec_equiv
@@ -315,7 +315,7 @@ The Pulse implementation fills a 2D table using the standard
 then length 2, length 3, and so on. This gives an O(n³) algorithm with
 three nested loops.
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Impl.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: mc_sig
    :end-before: //SNIPPET_END: mc_sig
@@ -328,7 +328,7 @@ The ``Extended`` module provides ``extended_matrix_chain_order``,
 which additionally returns the split-point array ``s`` and proves
 ``cuts_are_optimal``:
 
-.. literalinclude:: ../ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Extended.fst
+.. literalinclude:: ../autoclrs/ch15-dynamic-programming/CLRS.Ch15.MatrixChain.Extended.fst
    :language: pulse
    :start-after: //SNIPPET_START: extended_mc_sig
    :end-before: //SNIPPET_END: extended_mc_sig

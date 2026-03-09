@@ -24,7 +24,7 @@ Common Sorting Specification
 Both algorithms share the core definitions from
 ``CLRS.Common.SortSpec``:
 
-.. literalinclude:: ../common/CLRS.Common.SortSpec.fst
+.. literalinclude:: ../autoclrs/common/CLRS.Common.SortSpec.fst
    :language: fstar
    :start-after: //SNIPPET_START: definitions
    :end-before: //SNIPPET_END: definitions
@@ -59,7 +59,7 @@ Specification
 
 The complexity bound predicate lives in ``CLRS.Ch02.InsertionSort.Spec``:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.InsertionSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.InsertionSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bounded
    :end-before: //SNIPPET_END: complexity_bounded
@@ -75,7 +75,7 @@ Correctness Theorem
 The main theorem is the type signature of ``insertion_sort`` from
 ``CLRS.Ch02.InsertionSort.Impl``:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.InsertionSort.Impl.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.InsertionSort.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: insertion_sort_sig
    :end-before: //SNIPPET_END: insertion_sort_sig
@@ -200,7 +200,7 @@ Pure Specification
 The merge function is defined as a pure, total function on sequences
 in ``CLRS.Ch02.MergeSort.Spec``:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.MergeSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.MergeSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: seq_merge
    :end-before: //SNIPPET_END: seq_merge
@@ -212,7 +212,7 @@ merge loop must produce the same sequence as ``seq_merge``.
 
 The same module also defines complexity-bridging predicates:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.MergeSort.Spec.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.MergeSort.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: merge_sort_complexity_defs
    :end-before: //SNIPPET_END: merge_sort_complexity_defs
@@ -243,7 +243,7 @@ Correctness Theorem — Merge
 
 The imperative merge signature from ``CLRS.Ch02.MergeSort.Impl``:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.MergeSort.Impl.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.MergeSort.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: merge_sig
    :end-before: //SNIPPET_END: merge_sig
@@ -270,7 +270,7 @@ Correctness Theorem — Merge Sort
 
 The top-level merge sort signature:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.MergeSort.Impl.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.MergeSort.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: merge_sort_sig
    :end-before: //SNIPPET_END: merge_sort_sig
@@ -318,7 +318,7 @@ closed-form bound.
 
 The recurrence:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.MergeSort.Complexity.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.MergeSort.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: merge_sort_ops
    :end-before: //SNIPPET_END: merge_sort_ops
@@ -330,7 +330,7 @@ T(⌈n/2⌉) each.
 
 The closed-form bound and final theorem:
 
-.. literalinclude:: ../ch02-getting-started/CLRS.Ch02.MergeSort.Complexity.fst
+.. literalinclude:: ../autoclrs/ch02-getting-started/CLRS.Ch02.MergeSort.Complexity.fst
    :language: fstar
    :start-after: //SNIPPET_START: merge_sort_bound
    :end-before: //SNIPPET_END: merge_sort_bound

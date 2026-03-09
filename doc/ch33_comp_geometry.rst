@@ -20,7 +20,7 @@ Pure Specifications
 The core geometry predicates are expressed as pure functions on
 integer coordinates:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: pure_specs
    :end-before: //SNIPPET_END: pure_specs
@@ -38,7 +38,7 @@ Orientation Type
 
 A formal type connects the cross-product sign to geometric meaning:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: orientation
    :end-before: //SNIPPET_END: orientation
@@ -50,7 +50,7 @@ The full intersection test follows CLRS's algorithm exactly: compute
 four direction values, check for the general straddling case, then
 handle the four collinear boundary cases:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: segments_intersect_spec
    :end-before: //SNIPPET_END: segments_intersect_spec
@@ -69,28 +69,28 @@ to express functional equivalence.
 
 **Cross Product:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: cross_product_sig
    :end-before: //SNIPPET_END: cross_product_sig
 
 **Direction:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: direction_sig
    :end-before: //SNIPPET_END: direction_sig
 
 **On-Segment:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: on_segment_sig
    :end-before: //SNIPPET_END: on_segment_sig
 
 **Segment Intersection:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: segments_intersect_sig
    :end-before: //SNIPPET_END: segments_intersect_sig
@@ -107,7 +107,7 @@ The ``Segments.Lemmas`` module proves algebraic properties of the
 cross product, useful as building blocks for the convex hull
 algorithms:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.Segments.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.Segments.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: cross_product_properties
    :end-before: //SNIPPET_END: cross_product_properties
@@ -136,7 +136,7 @@ Pure Specifications
 **find_bottom_spec** — Find the starting point (minimum y, tiebreak
 minimum x):
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: find_bottom_spec
    :end-before: //SNIPPET_END: find_bottom_spec
@@ -144,7 +144,7 @@ minimum x):
 **polar_cmp_spec** — Compare polar angles of two points w.r.t. a
 pivot, using the cross product:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: polar_cmp_spec
    :end-before: //SNIPPET_END: polar_cmp_spec
@@ -152,7 +152,7 @@ pivot, using the cross product:
 **Full scan specification** — pop-non-left, scan-step, loop, and
 the complete Graham scan on pre-sorted indices:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: scan_specs
    :end-before: //SNIPPET_END: scan_specs
@@ -160,7 +160,7 @@ the complete Graham scan on pre-sorted indices:
 **pop_while_spec** — SZ.t version for direct Pulse array
 compatibility:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: pop_while_spec
    :end-before: //SNIPPET_END: pop_while_spec
@@ -170,7 +170,7 @@ Pulse Implementations
 
 **find_bottom:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: find_bottom_sig
    :end-before: //SNIPPET_END: find_bottom_sig
@@ -181,7 +181,7 @@ result is the index of the bottom-most point — and
 
 **polar_cmp:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: polar_cmp_sig
    :end-before: //SNIPPET_END: polar_cmp_sig
@@ -191,7 +191,7 @@ product of the three indexed points.
 
 **pop_while:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: pop_while_sig
    :end-before: //SNIPPET_END: pop_while_sig
@@ -207,7 +207,7 @@ The ``all_left_turns`` predicate formalizes the convex hull invariant:
 every consecutive triple of hull vertices makes a strict left turn
 (cross product > 0):
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: correctness_defs
    :end-before: //SNIPPET_END: correctness_defs
@@ -218,7 +218,7 @@ new point make a left turn. This is the **CLRS Theorem 33.1
 maintenance step** — pushing the new point preserves the convex
 position of the stack:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.GrahamScan.Lemmas.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.GrahamScan.Lemmas.fsti
    :language: fstar
    :start-after: //SNIPPET_START: pop_while_left_turn
    :end-before: //SNIPPET_END: pop_while_left_turn
@@ -258,7 +258,7 @@ Pure Specifications
 **find_leftmost_spec** — Find the starting point (minimum x,
 tiebreak minimum y):
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: find_leftmost_spec
    :end-before: //SNIPPET_END: find_leftmost_spec
@@ -266,7 +266,7 @@ tiebreak minimum y):
 **find_next_spec** — Find the next hull vertex by scanning all points
 and selecting the one that makes the most clockwise turn:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: find_next_spec
    :end-before: //SNIPPET_END: find_next_spec
@@ -274,7 +274,7 @@ and selecting the one that makes the most clockwise turn:
 **jarvis_march_spec** — Full convex hull computation, returning the
 number of hull vertices:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: jarvis_march_spec
    :end-before: //SNIPPET_END: jarvis_march_spec
@@ -284,21 +284,21 @@ Pulse Implementations
 
 **find_leftmost:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: find_leftmost_sig
    :end-before: //SNIPPET_END: find_leftmost_sig
 
 **find_next:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: find_next_sig
    :end-before: //SNIPPET_END: find_next_sig
 
 **jarvis_march:**
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Impl.fsti
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: jarvis_march_sig
    :end-before: //SNIPPET_END: jarvis_march_sig
@@ -313,7 +313,7 @@ Correctness Properties
 
 The Jarvis march correctness definitions:
 
-.. literalinclude:: ../ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
+.. literalinclude:: ../autoclrs/ch33-comp-geometry/CLRS.Ch33.JarvisMarch.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: correctness_defs
    :end-before: //SNIPPET_END: correctness_defs

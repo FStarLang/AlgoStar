@@ -114,7 +114,7 @@ Pure Specification (``RBTree.Spec``)
 RB Tree Type (§13.1)
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
    :language: fstar
    :start-after: (*** Basic Definitions ***)
    :end-before: (*** Tree Metrics ***)
@@ -124,7 +124,7 @@ CLRS §13.1: the root is black, no red node has a red child
 ("Property 4"), and all root-to-leaf paths have the same number of
 black nodes ("Property 5", same black-height):
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
    :language: fstar
    :start-after: (*** RB Properties ***)
    :end-before: (*** Membership and BST ***)
@@ -133,7 +133,7 @@ The BST ordering predicate uses ``all_lt`` / ``all_gt`` bounds to
 ensure that all keys in the left subtree are less than the node key,
 and all keys in the right subtree are greater:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
    :language: fstar
    :start-after: (*** Membership and BST ***)
    :end-before: (*** Search ***)
@@ -145,7 +145,7 @@ Search (§13.2)
 Search follows the standard BST algorithm, descending left or right
 based on key comparison:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
    :language: fstar
    :start-after: (*** Search ***)
    :end-before: (*** Okasaki-style Balance (Insert Fixup) ***)
@@ -163,7 +163,7 @@ right-left, right-right) and a recursive ``ins`` that calls
 ``balance`` at each level on the way up.  The function ``insert``
 wraps ``ins`` and forces the root black:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
    :language: fstar
    :start-after: (*** Okasaki-style Balance (Insert Fixup) ***)
    :end-before: (*** Balance Case Classifier ***)
@@ -178,7 +178,7 @@ Kahrs-Style Delete (§13.4)
 
 Delete uses Kahrs' formulation:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Spec.fst
    :language: fstar
    :start-after: (*** Delete — Kahrs-style functional deletion ***)
 
@@ -262,7 +262,7 @@ freed.
 Node Type and Recursive Predicate
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_node_type
    :end-before: //SNIPPET_END: rb_node_type
@@ -274,7 +274,7 @@ defined by recursion on the ghost spec tree: a ``Leaf`` requires
 ``ct == Some p`` where ``p`` points to a heap-allocated node whose
 key, color, and child pointers recursively satisfy ``is_rbtree``:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: is_rbtree
    :end-before: //SNIPPET_END: is_rbtree
@@ -282,7 +282,7 @@ key, color, and child pointers recursively satisfy ``is_rbtree``:
 ``valid_rbtree`` bundles the separation-logic predicate with the pure
 invariants:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: valid_rbtree
    :end-before: //SNIPPET_END: valid_rbtree
@@ -317,7 +317,7 @@ The implementation factors balance into three stages:
 3. **Dispatcher** (``rb_balance``): calls the classifier, then
    dispatches to the correct handler.
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_balance
    :end-before: //SNIPPET_END: rb_balance
@@ -329,7 +329,7 @@ Search
 Search preserves ``is_rbtree`` (read-only) and returns exactly the
 pure spec's ``S.search`` result:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_search
    :end-before: //SNIPPET_END: rb_search
@@ -344,7 +344,7 @@ exists, the existing node is returned unchanged.  Nodes that are no
 longer part of the tree (because ``rb_balance`` restructured pointers
 around them) are freed with ``Box.free``:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_ins
    :end-before: //SNIPPET_END: rb_ins
@@ -352,7 +352,7 @@ around them) are freed with ``Box.free``:
 ``rb_insert`` wraps ``rb_ins`` and forces the root black, matching
 ``S.insert = make_black ∘ ins``:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_insert
    :end-before: //SNIPPET_END: rb_insert
@@ -365,7 +365,7 @@ valid BST, and contains the new key plus all old keys.
 Free
 ~~~~~
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: free_rbtree
    :end-before: //SNIPPET_END: free_rbtree
@@ -377,12 +377,12 @@ Validated and Complexity-Aware APIs
 The validated API (``rb_search_v``, ``rb_insert_v``, ``rb_delete_v``)
 bundles the RB + BST invariants:
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_insert_v
    :end-before: //SNIPPET_END: rb_insert_v
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: rb_delete_v
    :end-before: //SNIPPET_END: rb_delete_v
@@ -439,17 +439,17 @@ examines a constant number of nodes and performs at most two pointer
 restructurings — this is reflected by not adding ticks inside
 ``balance``.
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: search_complexity
    :end-before: //SNIPPET_END: search_complexity
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: insert_complexity
    :end-before: //SNIPPET_END: insert_complexity
 
-.. literalinclude:: ../ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch13-rbtree/CLRS.Ch13.RBTree.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: delete_complexity
    :end-before: //SNIPPET_END: delete_complexity

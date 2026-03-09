@@ -445,7 +445,7 @@ Outside of Chapters 22 and 24 (which are under active development),
 the project has **zero unproven obligations**. All ``assume val``,
 ``assume_``, ``assume``, and ``admit()`` calls have been eliminated
 from production code. The only remaining ``assume_`` is in
-``ch26-max-flow/CLRS.Ch26.MaxFlow.Test.fst`` (a test harness, not
+``autoclrs/ch26-max-flow/CLRS.Ch26.MaxFlow.Test.fst`` (a test harness, not
 production code).
 
 Each chapter in this document notes any unproven obligations in its

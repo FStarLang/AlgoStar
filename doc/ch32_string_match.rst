@@ -26,7 +26,7 @@ Specification
 
 The core predicate defines when a pattern matches at a given offset:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.NaiveStringMatch.Spec.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.NaiveStringMatch.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: matches_at_spec
    :end-before: //SNIPPET_END: matches_at_spec
@@ -40,7 +40,7 @@ Pulse Implementation
 
 The Pulse implementation follows the CLRS pseudocode directly:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.NaiveStringMatch.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.NaiveStringMatch.fst
    :language: pulse
    :start-after: //SNIPPET_START: naive_string_match_sig
    :end-before: //SNIPPET_END: naive_string_match_sig
@@ -66,7 +66,7 @@ Complexity
 
 The complexity bound is defined in a pure F* module:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.NaiveStringMatch.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.NaiveStringMatch.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: complexity_bound_naive
    :end-before: //SNIPPET_END: complexity_bound_naive
@@ -91,7 +91,7 @@ where the leftmost character gets the highest power of the radix.
 The rolling hash step computes the next window's hash from the
 previous one in O(1):
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: hash
    :end-before: //SNIPPET_END: hash
@@ -105,7 +105,7 @@ step produces the correct hash for the next window) and
 ``hash_slice_lemma`` (that equal substrings produce equal hashes,
 for the no-false-negatives direction):
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: rolling_hash_step_correct
    :end-before: //SNIPPET_END: rolling_hash_step_correct
@@ -116,7 +116,7 @@ Pure Algorithm
 The pure Rabin-Karp implementation scans the text with a rolling hash,
 verifying character-by-character on hash matches:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: rabin_karp
    :end-before: //SNIPPET_END: rabin_karp
@@ -128,7 +128,7 @@ The main correctness theorem combines no-false-positives (every
 returned position is a valid match) and no-false-negatives (every
 valid match is returned):
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: correctness
    :end-before: //SNIPPET_END: correctness
@@ -143,7 +143,7 @@ pattern hash and the initial text-window hash, then slide the
 window across the text, using the rolling hash to update and
 verifying character-by-character on hash matches:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.RabinKarp.fst
    :language: pulse
    :start-after: //SNIPPET_START: rabin_karp_sig
    :end-before: //SNIPPET_END: rabin_karp_sig
@@ -157,7 +157,7 @@ Complexity
 
 The complexity analysis distinguishes best and worst cases:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.RabinKarp.Complexity.fsti
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.RabinKarp.Complexity.fsti
    :language: fstar
    :start-after: //SNIPPET_START: rk_complexity
    :end-before: //SNIPPET_END: rk_complexity
@@ -192,12 +192,12 @@ Prefix Function Specification
 The prefix function π captures the longest proper prefix of the
 pattern that is also a suffix at each position:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
    :language: fstar
    :start-after: //SNIPPET_START: is_prefix_suffix
    :end-before: //SNIPPET_END: is_prefix_suffix
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
    :language: fstar
    :start-after: //SNIPPET_START: pi_correct
    :end-before: //SNIPPET_END: pi_correct
@@ -214,7 +214,7 @@ Prefix Function Implementation
 The Pulse implementation computes the prefix function following
 CLRS Compute-Prefix-Function:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.KMP.fst
    :language: pulse
    :start-after: //SNIPPET_START: compute_prefix_function_sig
    :end-before: //SNIPPET_END: compute_prefix_function_sig
@@ -229,7 +229,7 @@ KMP Matcher
 The matcher uses the precomputed prefix function to avoid
 backtracking in the text:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.KMP.fst
    :language: pulse
    :start-after: //SNIPPET_START: kmp_matcher_sig
    :end-before: //SNIPPET_END: kmp_matcher_sig
@@ -249,7 +249,7 @@ Complexity
 
 The amortized complexity analysis proves the O(n+m) bound:
 
-.. literalinclude:: ../ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
+.. literalinclude:: ../autoclrs/ch32-string-matching/CLRS.Ch32.KMP.PureDefs.fst
    :language: fstar
    :start-after: //SNIPPET_START: kmp_total_complexity
    :end-before: //SNIPPET_END: kmp_total_complexity

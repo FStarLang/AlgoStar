@@ -18,7 +18,7 @@ Graph and Cover Definitions
 Graphs are represented as adjacency matrices over ``n`` vertices.
 Covers are modeled as boolean functions on vertex indices:
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: type_defs
    :end-before: //SNIPPET_END: type_defs
@@ -35,7 +35,7 @@ Minimum Vertex Cover
 The optimization target is formalized as a standard min-cost
 predicate:
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: min_vertex_cover
    :end-before: //SNIPPET_END: min_vertex_cover
@@ -61,7 +61,7 @@ The proof of CLRS Theorem 35.1 proceeds in two steps:
 Matching Lower Bound
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: matching_lower_bound
    :end-before: //SNIPPET_END: matching_lower_bound
@@ -75,7 +75,7 @@ edges use distinct vertices).
 Matching Cover Size
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: matching_cover_size
    :end-before: //SNIPPET_END: matching_cover_size
@@ -92,7 +92,7 @@ Theorem 35.1
 
 Combining the two lemmas yields the 2-approximation guarantee:
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: theorem_35_1
    :end-before: //SNIPPET_END: theorem_35_1
@@ -112,7 +112,7 @@ which is correct for undirected graphs.
 Algorithm Signature
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Impl.fsti
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Impl.fsti
    :language: fstar
    :start-after: //SNIPPET_START: approx_vertex_cover_sig
    :end-before: //SNIPPET_END: approx_vertex_cover_sig
@@ -133,7 +133,7 @@ Implementation with Ghost Matching
 The implementation maintains a ghost reference tracking the matching —
 the set of edges that triggered vertex additions during execution:
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Impl.fst
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Impl.fst
    :language: fstar
    :start-after: //SNIPPET_START: approx_vertex_cover
    :end-before: //SNIPPET_END: approx_vertex_cover
@@ -156,7 +156,7 @@ Approximation Ratio Bridge
 The connection from the Pulse implementation to the pure theorem
 is established by ``approximation_ratio_theorem``:
 
-.. literalinclude:: ../ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
+.. literalinclude:: ../autoclrs/ch35-approximation/CLRS.Ch35.VertexCover.Lemmas.fst
    :language: fstar
    :start-after: //SNIPPET_START: approximation_ratio_theorem
    :end-before: //SNIPPET_END: approximation_ratio_theorem

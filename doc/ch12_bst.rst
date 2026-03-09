@@ -83,7 +83,7 @@ Pure Specification
 BST Data Structure
 ~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: pure_bst_type
    :end-before: //SNIPPET_END: pure_bst_type
@@ -92,7 +92,7 @@ The validity predicate checks, recursively, that all keys in the left
 subtree are strictly less than the node key and all keys in the right
 subtree are strictly greater:
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_valid
    :end-before: //SNIPPET_END: bst_valid
@@ -100,7 +100,7 @@ subtree are strictly greater:
 Search (§12.2)
 ~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_search
    :end-before: //SNIPPET_END: bst_search
@@ -108,7 +108,7 @@ Search (§12.2)
 Search correctness: ``bst_search t k`` returns ``true`` if and only
 if ``k`` appears in the inorder traversal:
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_search_correct
    :end-before: //SNIPPET_END: bst_search_correct
@@ -120,7 +120,7 @@ excludes ``k`` from the right subtree.
 Insert (§12.3)
 ~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_insert
    :end-before: //SNIPPET_END: bst_insert
@@ -128,7 +128,7 @@ Insert (§12.3)
 Insert preserves validity — proved by showing that the inserted key
 satisfies the ``all_less`` / ``all_greater`` bounds of every ancestor:
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_insert_valid
    :end-before: //SNIPPET_END: bst_insert_valid
@@ -139,7 +139,7 @@ Delete (§12.3)
 Delete handles three cases: no children, one child, and two children
 (replace with the in-order successor):
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_delete
    :end-before: //SNIPPET_END: bst_delete
@@ -148,14 +148,14 @@ Delete preserves validity. The two-children case relies on the
 minimum of the right subtree being greater than all left-subtree keys
 and less than the remaining right-subtree keys after its removal:
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_delete_valid
    :end-before: //SNIPPET_END: bst_delete_valid
 
 Inorder sortedness ties everything together:
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: bst_inorder_sorted
    :end-before: //SNIPPET_END: bst_inorder_sorted
@@ -168,7 +168,7 @@ possible correctness statements using ``FStar.FiniteSet``:
 
 **Insert key-set theorem:**
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Insert.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Insert.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: insert_key_set_lemma
    :end-before: //SNIPPET_END: insert_key_set_lemma
@@ -176,14 +176,14 @@ possible correctness statements using ``FStar.FiniteSet``:
 The full insert correctness combines validity, key-set algebra, and
 membership:
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Insert.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Insert.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: theorem_insert_preserves_bst
    :end-before: //SNIPPET_END: theorem_insert_preserves_bst
 
 **Delete key-set theorem:**
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Delete.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Delete.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: delete_key_set_lemma
    :end-before: //SNIPPET_END: delete_key_set_lemma
@@ -213,7 +213,7 @@ recursively satisfy ``bst_subtree``.
 Tree Search
 ~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_search
    :end-before: //SNIPPET_END: tree_search
@@ -227,7 +227,7 @@ The postcondition gives:
 Tree Insert
 ~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_insert
    :end-before: //SNIPPET_END: tree_insert
@@ -239,7 +239,7 @@ the ghost tree. Parent pointers are correctly maintained.
 Tree Minimum & Maximum
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_minimum
    :end-before: //SNIPPET_END: tree_minimum
@@ -250,7 +250,7 @@ The postcondition proves ``bst_minimum 'ft == Some result``.
 Tree Delete
 ~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_delete
    :end-before: //SNIPPET_END: tree_delete
@@ -262,7 +262,7 @@ two children with successor replacement). The result tree matches
 Free
 ~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BST.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BST.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: free_bst
    :end-before: //SNIPPET_END: free_bst
@@ -277,7 +277,7 @@ child at ``2*i + 1`` and right child at ``2*i + 2``, with separate
 Tree Search (Array)
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_search
    :end-before: //SNIPPET_END: tree_search
@@ -288,12 +288,12 @@ exist in the subtree.
 
 The pure spec provides the connection:
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: pure_search_sound
    :end-before: //SNIPPET_END: pure_search_sound
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Spec.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Spec.fst
    :language: fstar
    :start-after: //SNIPPET_START: pure_search_complete
    :end-before: //SNIPPET_END: pure_search_complete
@@ -301,7 +301,7 @@ The pure spec provides the connection:
 Tree Insert (Array)
 ~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_insert
    :end-before: //SNIPPET_END: tree_insert
@@ -312,7 +312,7 @@ exists at some index in the arrays.
 Inorder Walk (Array)
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Impl.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Impl.fst
    :language: pulse
    :start-after: //SNIPPET_START: inorder_walk
    :end-before: //SNIPPET_END: inorder_walk
@@ -320,17 +320,17 @@ Inorder Walk (Array)
 Tree Delete, Minimum, Successor, Predecessor (Array)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Delete.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Delete.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_minimum
    :end-before: //SNIPPET_END: tree_minimum
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Delete.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Delete.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_successor
    :end-before: //SNIPPET_END: tree_successor
 
-.. literalinclude:: ../ch12-bst/CLRS.Ch12.BSTArray.Delete.fst
+.. literalinclude:: ../autoclrs/ch12-bst/CLRS.Ch12.BSTArray.Delete.fst
    :language: pulse
    :start-after: //SNIPPET_START: tree_delete
    :end-before: //SNIPPET_END: tree_delete
