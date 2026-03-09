@@ -4,7 +4,7 @@
 
 A verified implementation of the **Edmonds-Karp algorithm** (BFS-based Ford-Fulkerson method) for computing maximum flow in a network, following CLRS §26.2.
 
-- **~7260 lines** across 6 verified F\*/Pulse modules + 4 interface files
+- **~7000 lines** across 6 verified F\*/Pulse modules + 4 interface files
 - **Zero admits, zero assume vals, zero runtime checks** in all production code (Spec, Lemmas, MFMC, Complexity, Impl)
 - **Max-Flow Min-Cut Theorem** (CLRS Theorem 26.6) fully proven
 - **Termination** proven without fuel (bounded by `cap_sum`)
@@ -223,7 +223,7 @@ The postcondition is the strongest functional guarantee achievable:
 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | 66 | Interface: complexity theorem signatures | 0 |
 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 1546 | O(VE²) complexity analysis with ghost tick counter | 0 |
 | `CLRS.Ch26.MaxFlow.Impl.fsti` | 116 | Interface: `max_flow` public API + bridge lemma | 0 |
-| `CLRS.Ch26.MaxFlow.Impl.fst` | 3217 | Pulse implementation: BFS + augmentation + BFS completeness + static correctness proof | 0 |
+| `CLRS.Ch26.MaxFlow.Impl.fst` | 2985 | Pulse implementation: BFS + augmentation + BFS completeness + static correctness proof | 0 |
 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Smoke test on a 3-vertex graph | 1 `assume_` (test) |
 
 ## Summary

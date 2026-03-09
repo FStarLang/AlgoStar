@@ -19,9 +19,9 @@
 | 6 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | 66 | **Complexity interface** — Public API for complexity theorems | ✅ |
 | 7 | `CLRS.Ch26.MaxFlow.Complexity.fst` | 1546 | **Complexity** — O(VE²) bound with ghost tick counter, BFS layer proofs | ✅ |
 | 8 | `CLRS.Ch26.MaxFlow.Impl.fsti` | 116 | **Impl interface** — Public API for `max_flow` + bridge lemma | ✅ |
-| 9 | `CLRS.Ch26.MaxFlow.Impl.fst` | 3217 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
+| 9 | `CLRS.Ch26.MaxFlow.Impl.fst` | 2985 | **Impl** — Imperative Pulse implementation: BFS-based Ford-Fulkerson (Edmonds-Karp) | ✅ |
 | 10 | `CLRS.Ch26.MaxFlow.Test.fst` | 61 | Test — Smoke test on 3-vertex graph | ✅ |
-| | **Total** | **~7260** | | |
+| | **Total** | **~7000** | | |
 
 ---
 

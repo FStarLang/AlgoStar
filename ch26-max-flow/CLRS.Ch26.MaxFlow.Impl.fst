@@ -24,7 +24,7 @@ module Lemmas = CLRS.Ch26.MaxFlow.Lemmas
    4. Repeat until no augmenting path exists
    
    Termination proved without fuel:
-   - Each augmentation increases flow_value by >= 1 (verified at runtime)
+   - Each augmentation increases flow_value by >= 1 (proved by lemma_augment_chain)
    - flow_value <= cap_sum = Σ cap[source][v] (proved from imp_valid_flow)
    - Decreasing measure: cap_sum + 1 - iteration_count
    
@@ -32,14 +32,13 @@ module Lemmas = CLRS.Ch26.MaxFlow.Lemmas
    - valid_flow maintained through augmentation (Lemmas.augment_preserves_valid)
    - MFMC theorem: no augmenting path => max flow
    
-   Postcondition guarantees imp_valid_flow (verified, no admits).
+   Postcondition guarantees imp_valid_flow and no_augmenting_path
+   (both unconditional, verified, no admits).
    
    Flow validity (imp_valid_flow) is maintained as a loop invariant:
    - Zero flow is valid (lemma_zero_flow_imp_valid)
-   - After each augmentation, validity is dynamically verified
-     via check_imp_valid_flow_fn (O(n²) runtime check)
-   - If a validity check ever fails, the flow is safely re-zeroed
-     (this case should not arise for correct BFS+augmentation)
+   - After each augmentation, lemma_augment_chain statically proves
+     validity is preserved (no runtime checks needed)
 *)
 
 (* ================================================================
@@ -2640,32 +2639,6 @@ fn augment_imp
    VALIDITY CHECK — dynamic verification of imp_valid_flow
    ================================================================ *)
 
-(** Helper: u*n+v < n*n when u < n and v < n *)
-let lemma_idx_lt_nn (n u v: nat)
-  : Lemma (requires u < n /\ v < n) (ensures u * n + v < n * n)
-  = FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1)
-
-(** Establish imp_valid_flow from capacity + conservation checks *)
-#push-options "--z3rlimit 40"
-let lemma_checks_imply_valid_flow 
-  (flow_s cap_s: Seq.seq int) (n source sink: nat)
-  : Lemma
-    (requires
-      n > 0 /\ source < n /\ sink < n /\
-      Seq.length flow_s == n * n /\ Seq.length cap_s == n * n /\
-      (forall (idx: nat). idx < n * n ==> 0 <= Seq.index flow_s idx /\ Seq.index flow_s idx <= Seq.index cap_s idx) /\
-      (forall (w: nat). w < n /\ w <> source /\ w <> sink ==>
-        sum_flow_into flow_s n w n == sum_flow_out flow_s n w n))
-    (ensures imp_valid_flow flow_s cap_s n source sink)
-  = let aux (u v: nat)
-        : Lemma (requires u < n /\ v < n)
-                (ensures u * n + v < n * n)
-        = FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1);
-          FStar.Math.Lemmas.distributivity_sub_left n 1 n
-    in
-    FStar.Classical.forall_intro_2 (fun u v -> FStar.Classical.move_requires_2 aux u v)
-#pop-options
-
 (** Check valid_caps: all capacity entries are non-negative *)
 #push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
 fn check_valid_caps_fn
@@ -2706,211 +2679,6 @@ fn check_valid_caps_fn
     i := vi +^ 1sz
   };
   !result
-}
-#pop-options
-
-(** Check capacity constraint: 0 <= flow[i] <= cap[i] for all i *)
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
-fn check_capacity_fn
-  (flow capacity: A.array int)
-  (nn: SZ.t)
-  (#flow_seq #cap_seq: erased (Seq.seq int))
-  requires
-    A.pts_to flow flow_seq **
-    A.pts_to capacity cap_seq **
-    pure (
-      Seq.length flow_seq == SZ.v nn /\
-      Seq.length cap_seq == SZ.v nn
-    )
-  returns ok: bool
-  ensures
-    A.pts_to flow flow_seq **
-    A.pts_to capacity cap_seq **
-    pure (
-      Seq.length flow_seq == SZ.v nn /\
-      Seq.length cap_seq == SZ.v nn /\
-      (ok ==> (forall (idx: nat). idx < SZ.v nn ==>
-        0 <= Seq.index flow_seq idx /\ Seq.index flow_seq idx <= Seq.index cap_seq idx)))
-{
-  let mut i = 0sz;
-  let mut result = true;
-  while (
-    let vi = !i;
-    let vr = !result;
-    vr && vi <^ nn
-  )
-  invariant exists* vi vr.
-    R.pts_to i vi **
-    R.pts_to result vr **
-    A.pts_to flow flow_seq **
-    A.pts_to capacity cap_seq **
-    pure (
-      SZ.v vi <= SZ.v nn /\
-      Seq.length flow_seq == SZ.v nn /\
-      Seq.length cap_seq == SZ.v nn /\
-      (vr ==> (forall (idx: nat). idx < SZ.v vi ==>
-        0 <= Seq.index flow_seq idx /\ Seq.index flow_seq idx <= Seq.index cap_seq idx))
-    )
-  decreases (SZ.v nn - SZ.v !i)
-  {
-    let vi = !i;
-    let f: int = A.op_Array_Access flow vi;
-    let c: int = A.op_Array_Access capacity vi;
-    if (f < 0 || f > c) { result := false } else { () };
-    i := vi +^ 1sz
-  };
-  !result
-}
-#pop-options
-
-(** Check conservation at a single vertex: sum_flow_into == sum_flow_out *)
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
-fn check_vertex_conservation
-  (flow: A.array int)
-  (n u: SZ.t)
-  (#flow_seq: erased (Seq.seq int))
-  requires
-    A.pts_to flow flow_seq **
-    pure (
-      SZ.v u < SZ.v n /\
-      SZ.v n > 0 /\
-      Seq.length flow_seq == SZ.v n * SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
-    )
-  returns ok: bool
-  ensures
-    A.pts_to flow flow_seq **
-    pure (
-      SZ.v u < SZ.v n /\ SZ.v n > 0 /\ Seq.length flow_seq == SZ.v n * SZ.v n /\
-      (ok ==> sum_flow_into flow_seq (SZ.v n) (SZ.v u) (SZ.v n) == sum_flow_out flow_seq (SZ.v n) (SZ.v u) (SZ.v n)))
-{
-  let mut sum_in: int = 0;
-  let mut sum_out: int = 0;
-  let mut v = 0sz;
-  while (!v <^ n)
-  invariant exists* vv si so.
-    R.pts_to v vv **
-    R.pts_to sum_in si **
-    R.pts_to sum_out so **
-    A.pts_to flow flow_seq **
-    pure (
-      SZ.v vv <= SZ.v n /\
-      SZ.v u < SZ.v n /\
-      SZ.v n > 0 /\
-      Seq.length flow_seq == SZ.v n * SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n) /\
-      si == sum_flow_into flow_seq (SZ.v n) (SZ.v u) (SZ.v vv) /\
-      so == sum_flow_out flow_seq (SZ.v n) (SZ.v u) (SZ.v vv)
-    )
-  decreases (SZ.v n - SZ.v !v)
-  {
-    let vv = !v;
-    let idx_in: SZ.t = vv *^ n +^ u;
-    let idx_out: SZ.t = u *^ n +^ vv;
-    let f_in: int = A.op_Array_Access flow idx_in;
-    let f_out: int = A.op_Array_Access flow idx_out;
-    let si = !sum_in;
-    let so = !sum_out;
-    sum_in := si + f_in;
-    sum_out := so + f_out;
-    v := vv +^ 1sz
-  };
-  let si = !sum_in;
-  let so = !sum_out;
-  (si = so)
-}
-#pop-options
-
-(** Check conservation for all non-source, non-sink vertices *)
-#push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
-fn check_all_conservation
-  (flow: A.array int)
-  (n source sink: SZ.t)
-  (#flow_seq: erased (Seq.seq int))
-  requires
-    A.pts_to flow flow_seq **
-    pure (
-      SZ.v n > 0 /\
-      SZ.v source < SZ.v n /\
-      SZ.v sink < SZ.v n /\
-      Seq.length flow_seq == SZ.v n * SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
-    )
-  returns ok: bool
-  ensures
-    A.pts_to flow flow_seq **
-    pure (
-      SZ.v n > 0 /\ Seq.length flow_seq == SZ.v n * SZ.v n /\
-      (ok ==> (forall (w: nat). w < SZ.v n /\ w <> SZ.v source /\ w <> SZ.v sink ==>
-        sum_flow_into flow_seq (SZ.v n) w (SZ.v n) == sum_flow_out flow_seq (SZ.v n) w (SZ.v n))))
-{
-  let mut u_idx = 0sz;
-  let mut result = true;
-  while (
-    let vu = !u_idx;
-    let vr = !result;
-    vr && vu <^ n
-  )
-  invariant exists* vu vr.
-    R.pts_to u_idx vu **
-    R.pts_to result vr **
-    A.pts_to flow flow_seq **
-    pure (
-      SZ.v vu <= SZ.v n /\
-      SZ.v n > 0 /\
-      SZ.v source < SZ.v n /\
-      SZ.v sink < SZ.v n /\
-      Seq.length flow_seq == SZ.v n * SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n) /\
-      (vr ==> (forall (w: nat). w < SZ.v vu /\ w <> SZ.v source /\ w <> SZ.v sink ==>
-        sum_flow_into flow_seq (SZ.v n) w (SZ.v n) == sum_flow_out flow_seq (SZ.v n) w (SZ.v n)))
-    )
-  decreases (SZ.v n - SZ.v !u_idx)
-  {
-    let vu = !u_idx;
-    let ok_v = check_vertex_conservation flow n vu;
-    if (not (vu = source) && not (vu = sink) && not ok_v)
-    {
-      result := false
-    } else { () };
-    u_idx := vu +^ 1sz
-  };
-  !result
-}
-#pop-options
-
-(** Combined validity check with imp_valid_flow postcondition *)
-#push-options "--z3rlimit 100 --fuel 0 --ifuel 0"
-fn check_imp_valid_flow_fn
-  (flow capacity: A.array int)
-  (n source sink: SZ.t)
-  (#flow_seq #cap_seq: erased (Seq.seq int))
-  requires
-    A.pts_to flow flow_seq **
-    A.pts_to capacity cap_seq **
-    pure (
-      SZ.v n > 0 /\
-      SZ.v source < SZ.v n /\
-      SZ.v sink < SZ.v n /\
-      Seq.length flow_seq == SZ.v n * SZ.v n /\
-      Seq.length cap_seq == SZ.v n * SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
-    )
-  returns valid: bool
-  ensures
-    A.pts_to flow flow_seq **
-    A.pts_to capacity cap_seq **
-    pure (valid ==> imp_valid_flow flow_seq cap_seq (SZ.v n) (SZ.v source) (SZ.v sink))
-{
-  let nn = n *^ n;
-  let cap_ok = check_capacity_fn flow capacity nn;
-  let cons_ok = check_all_conservation flow n source sink;
-  if (cap_ok && cons_ok) {
-    lemma_checks_imply_valid_flow flow_seq cap_seq (SZ.v n) (SZ.v source) (SZ.v sink);
-    true
-  } else {
-    false
-  }
 }
 #pop-options
 
