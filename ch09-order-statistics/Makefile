@@ -1,4 +1,4 @@
-PULSE_ROOT ?= ../../pulse
+PULSE_ROOT ?= ../pulse
 # Only include pure F* files in FSTAR_FILES for dependency analysis.
 # Pulse Impl files use #lang-pulse and require the Pulse plugin for parsing;
 # they are checked separately (deps are appended manually to .depend).

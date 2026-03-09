@@ -1,73 +1,103 @@
-# AutoCLRS
+# AlgoStar
 
-Verified implementations of algorithms from *Introduction to Algorithms* (CLRS)
-in [Pulse](https://github.com/FStarLang/pulse), a separation-logic language
-embedded in [F\*](https://github.com/FStarLang/FStar).
+This repository contains verified implementations of algorithms and data
+structures in [Pulse](https://github.com/FStarLang/pulse), a separation-logic
+language embedded in [F\*](https://github.com/FStarLang/FStar).
 
-Every algorithm is proven memory-safe and many carry full functional-correctness
-specifications. 163 files are fully verified with zero admits (~51,500 lines).
-14 files have 45 remaining unproven obligations (~7,800 lines).
-32 complexity proof files cover 21 of 23 chapters.
+All the code has been produced by agents driven by prompts and feedback on
+specifications from humans. 
 
-## Building
+## AutoCLRS
 
-Requires F\* and Pulse to be installed (expected at `../pulse` relative to this repo).
+This is an agent-generated implementation of algorithms and data structures from
+Cormen, Leiserson, Rivest, and Stein's *Introduction to Algorithms* (CLRS)
+textbook, available from [MIT
+press](https://mitpress.mit.edu/books/introduction-algorithms-third-edition).
+
+## Prerequisites
+
+- **OCaml** (>= 4.14) with [opam](https://opam.ocaml.org/doc/Install.html)
+- **Z3** (>= 4.8.5) — install via opam: `opam install z3` or your system package manager
+- **GNU Make**, **Git**
+
+## Getting Started
+
+### 1. Clone the repository with submodules
+
+```bash
+git clone --recurse-submodules git@github.com:FStarLang/AutoCLRS.git
+cd AutoCLRS
+```
+
+If you already cloned without `--recurse-submodules`:
+
+```bash
+git submodule update --init --recursive
+```
+
+### 2. Build F\* and Pulse
+
+```bash
+./setup.sh
+```
+
+This builds F\* and Pulse from the pinned submodule versions. It takes 10–20
+minutes on first run. You can also build them individually:
+
+```bash
+./setup.sh fstar   # build only F*
+./setup.sh pulse   # build only Pulse (requires F* already built)
+```
+
+### 3. Verify all chapters
 
 ```bash
 make        # verify all chapters
-make -j8    # parallel build
+make -j8    # parallel build (recommended)
 make clean  # clean build artifacts
 ```
 
-## Chapters
+Each chapter can also be verified independently:
 
-| Chapter | Algorithms | Functional Correctness | Complexity Proof |
-|---------|-----------|----------------------|-----------------|
-| ch02 | Insertion Sort, Merge Sort | sorted ∧ permutation | O(n²), O(n log n) |
-| ch04 | Binary Search, Maximum Subarray, Matrix Multiply, Strassen | found ⟺ key ∈ array, C == A × B, Strassen == standard | O(log n), O(n), O(n³), O(n^{lg 7}) |
-| ch06 | Heapsort | sorted ∧ permutation | O(n log n) |
-| ch07 | Quicksort, Partition | sorted ∧ permutation | O(n²) worst, O(n) partition |
-| ch08 | Counting Sort, Counting Sort (Stable), Radix Sort (d=1), Bucket Sort | sorted ∧ permutation | Θ(n+k) |
-| ch09 | Min/Max, Select, **Quickselect** | k-th smallest, partition ordering | O(nk), O(n²) worst |
-| ch10 | Stack, Queue, Linked List | list abstraction | O(1) push/pop, O(n) search |
-| ch11 | Hash Table (open addressing) | functional map spec | O(n) worst case |
-| ch12 | Binary Search Tree | key found ⟹ key at index | O(h) search |
-| ch13 | Red-Black Tree | Okasaki balance ∧ BST ∧ Thm 13.1 ∧ delete¹ | O(lg n) |
-| ch15 | Rod Cutting, Matrix Chain, LCS | result == optimal_spec | O(n²), O(n³), O(mn) |
-| ch16 | Activity Selection, Huffman, **Huffman.Spec** | greedy choice, CLRS Eq 16.4 | O(n log n) |
-| ch21 | Union-Find (path compression) | find returns root | O(n) find, O(1) union |
-| ch22 | BFS, DFS, Topological Sort | distance soundness, reachability | O(V²) |
-| ch23 | Kruskal, Prim | valid endpoints only | O(V³), O(V²) |
-| ch24 | Bellman-Ford, Dijkstra, **Dijkstra.Correctness** | dist[v] = δ(s,v) proven | O(V³), O(V²) |
-| ch25 | Floyd-Warshall | result == fw_spec | O(n³) with ghost ticks |
-| ch26 | Max Flow ⚠ | ⚠ returns zero flow | — |
-| ch31 | GCD, Extended GCD, Modular Exponentiation | gcd_spec, Bézout's identity, modexp_spec | O(log b), O(log e) |
-| ch32 | Naive, Rabin-Karp, KMP | match count == spec | O(nm), O(nm), O(n+m) amortized |
-| ch33 | Segment Intersection | cross product spec | O(1) |
-| ch35 | 2-Approximation Vertex Cover | valid cover | O(V²) |
+```bash
+cd ch02-getting-started && make
+```
 
-⚠ = Known limitations, see RESEARCH_DOC.md for details
-¹ = `delete_is_rbtree` admitted (see Known Limitations)
+## Repository Structure
 
-## Functional Correctness Highlights
+| Directory | CLRS Chapters | Topics |
+|-----------|--------------|--------|
+| `ch02-getting-started/` | Ch 2 | Insertion Sort, Merge Sort |
+| `ch04-divide-conquer/` | Ch 4 | Maximum Subarray |
+| `ch06-heapsort/` | Ch 6 | Binary Heaps, Heapsort |
+| `ch07-quicksort/` | Ch 7 | Quicksort, Lomuto/Hoare partition |
+| `ch08-linear-sorting/` | Ch 8 | Counting Sort, Radix Sort |
+| `ch09-order-statistics/` | Ch 9 | Randomized/Deterministic Select |
+| `ch10-elementary-ds/` | Ch 10 | Stacks, Queues, Linked Lists |
+| `ch11-hash-tables/` | Ch 11 | Chained Hash Tables |
+| `ch12-bst/` | Ch 12 | Binary Search Trees |
+| `ch13-rbtree/` | Ch 13 | Red-Black Trees |
+| `ch15-dynamic-programming/` | Ch 15 | Rod Cutting, Matrix Chain, LCS, Knapsack |
+| `ch16-greedy/` | Ch 16 | Activity Selection, Huffman Coding |
+| `ch21-disjoint-sets/` | Ch 21 | Union-Find with union by rank + path compression |
+| `ch22-elementary-graph/` | Ch 22 | BFS, DFS, Topological Sort |
+| `ch23-mst/` | Ch 23 | Kruskal's MST |
+| `ch24-sssp/` | Ch 24 | Bellman-Ford, Dijkstra, DAG Shortest Paths |
+| `ch25-apsp/` | Ch 25 | Floyd-Warshall |
+| `ch26-max-flow/` | Ch 26 | Edmonds-Karp Max Flow |
+| `ch31-number-theory/` | Ch 31 | GCD, Modular Exponentiation, Miller-Rabin |
+| `ch32-string-matching/` | Ch 32 | Naive, Rabin-Karp, KMP |
+| `ch33-comp-geometry/` | Ch 33 | Convex Hull (Graham Scan) |
+| `ch35-approximation/` | Ch 35 | Vertex Cover (2-approximation) |
+| `common/` | — | Shared utilities |
+| `doc/` | — | Sphinx documentation book |
 
-- **Sorting** (InsertionSort, MergeSort, Heapsort, Quicksort, CountingSort, BucketSort): `sorted ∧ permutation`
-- **DP** (Rod Cutting, Matrix Chain, LCS): `result == optimal_spec(input)`
-- **Floyd-Warshall**: `result == fw_outer(input)`
-- **String Matching** (Naive, Rabin-Karp, KMP): match count equals pure spec
-- **Binary Search**: found ⟺ key exists in sorted array
-- **Matrix Multiply**: `C[i][j] == Σ_k A[i][k] · B[k][j]`; Strassen == standard multiply
-- **GCD**: `result == gcd_spec(a, b)` with O(log b) via Lamé's theorem
-- **BFS**: distance soundness — `reachable_in(source, v, dist[v])`
+## Documentation
 
-## Known Limitations
+Detailed per-algorithm documentation (specification reviews, correctness
+properties, complexity results, and known gaps) is available in:
 
-- **MaxFlow (Ch26)**: Initializes flow to zero; does not implement augmenting path search
-- **Huffman (Ch16)**: Imperative Huffman.Complete has 0 admits; Huffman.Spec uses 4 `assume` axioms for greedy-choice/optimal-substructure (CLRS Lemma 16.2–16.3)
-- **Select (Ch09)**: New Quickselect (CLRS §9.2) with partition ordering; old O(nk) selection sort kept for comparison
-- **RadixSort (Ch08)**: Multi-digit radix sort has 10 admits in stability proofs; single-digit (d=1) fully verified
-- **Kruskal/Prim (Ch23)**: Kruskal is actively being worked on; Prim proves key bounds only, no full MST property
-- **DFS theorems (Ch22)**: DFS.Spec (5 admits) and DFS.WhitePath (3 admits) for parenthesis/white-path theorems remain open
-- **RB-Tree delete (Ch13)**: `delete_is_rbtree` is admitted — the internal color-dependent invariant for Kahrs-style `del` is complex; membership and BST preservation are fully proven
+- **Per-algorithm reviews**: `<chapter>/<Module>.Review.md` files
+- **Chapter READMEs**: `<chapter>/README.md`
+- **Sphinx book**: `doc/` (build with `cd doc && make html`)
 
-See `RESEARCH_DOC.md` for comprehensive audit and `PROGRESS_PLAN.md` for improvement roadmap.

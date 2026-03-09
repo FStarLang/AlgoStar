@@ -6,14 +6,17 @@
 #   make verify     # same as 'make'
 #   make clean      # clean all build artifacts
 #   make -j8        # parallel build across chapters
-#   make extract    # extract all modules to C via karamel
-#   make test       # extract, compile, and run C tests
+#
+# Prerequisites:
+#   1. git submodule update --init --recursive
+#   2. ./setup.sh   (builds FStar and Pulse from submodules)
 #
 # Each chapter has its own .depend for incremental builds.
 # Chapters are independent — no cross-chapter dependencies.
 
-PULSE_ROOT ?= ../pulse
-KRML_HOME  ?= ../karamel
+PULSE_ROOT ?= pulse
+FSTAR_EXE  ?= $(CURDIR)/FStar/bin/fstar.exe
+export FSTAR_EXE
 
 SUBDIRS += ch02-getting-started
 SUBDIRS += ch04-divide-conquer
@@ -38,40 +41,3 @@ SUBDIRS += ch33-comp-geometry
 SUBDIRS += ch35-approximation
 
 include $(PULSE_ROOT)/mk/test.mk
-
-# ---- C Extraction and Testing ----
-
-EXTRACTED_DIR = test/extracted
-TEST_BIN      = test/run_tests
-KRML_ABS      = $(abspath $(KRML_HOME))
-
-CC_FLAGS = -I $(KRML_ABS)/include \
-           -I $(KRML_ABS)/krmllib/dist/generic \
-           -I $(KRML_ABS)/krmllib/dist/minimal \
-           -I $(EXTRACTED_DIR) \
-           -Wno-parentheses -Wno-unused-variable -Wno-implicit-function-declaration \
-           -g -fwrapv -D_BSD_SOURCE -D_DEFAULT_SOURCE -std=c11
-
-# Extract all Pulse modules to C
-extract: verify
-	PULSE_ROOT=$(abspath $(PULSE_ROOT)) KRML_HOME=$(KRML_ABS) ./test/extract.sh
-
-# Compile the C test binary
-$(TEST_BIN): extract test/main.c test/krmlinit.c
-	cd $(EXTRACTED_DIR) && cc $(CC_FLAGS) -I . \
-	    -o $(CURDIR)/$(TEST_BIN) \
-	    $(CURDIR)/test/main.c \
-	    $(CURDIR)/test/krmlinit.c \
-	    $(CURDIR)/$(EXTRACTED_DIR)/CLRS_*.c \
-	    $(KRML_ABS)/krmllib/dist/generic/prims.c \
-	    $(KRML_ABS)/krmllib/dist/generic/fstar_int32.c
-
-# Run the tests
-test: $(TEST_BIN)
-	./$(TEST_BIN)
-
-# Clean extracted files and test binary
-test-clean:
-	rm -rf $(EXTRACTED_DIR) $(TEST_BIN)
-
-.PHONY: extract test test-clean
