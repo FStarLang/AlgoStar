@@ -382,7 +382,7 @@ lines. The table below summarizes the status of each algorithm.
      - §26.2
      - valid flow ∧ max flow
      - ✅
-     - ⚠️ Linked O(VE²); 4 assume val
+     - ✅ Linked O(VE²)
    * - 31
      - :ref:`GCD / Extended GCD <Ch31_NumberTheory>`
      - §31.2
@@ -442,32 +442,15 @@ Proof Gaps
 ----------
 
 Outside of Chapters 22 and 24 (which are under active development),
-the project has **only 4 ``assume val`` declarations** in a single
-file: ``ch26-max-flow/CLRS.Ch26.MaxFlow.Complexity.fst``.
-All other chapters — including all 394 source files — are
-**fully proven** with zero ``admit()``, ``assume()``, ``assume_()``,
-or ``assume val`` calls.
-
-The 4 remaining axioms in Chapter 26 are:
-
-1. **``axiom_spd_source_zero``**: BFS shortest-path distance from
-   source is zero.
-2. **``axiom_spd_bounded``**: BFS shortest-path distances are bounded
-   by the number of vertices.
-3. **``lemma_distances_nondecreasing``**: BFS distances to each vertex
-   are non-decreasing across augmentation rounds (monotonicity lemma
-   from CLRS Lemma 26.7).
-4. **``axiom_edge_critical_bound``**: Each edge can become critical
-   at most V/2 times (CLRS Lemma 26.8).
-
-These axioms are used to establish the O(VE²) Edmonds-Karp complexity
-bound. The correctness proof for the max-flow algorithm itself
-(``max_flow`` in ``Impl.fsti``) is **fully proven** — only the
-complexity bound relies on these axioms.
+the project has **zero unproven obligations**. All ``assume val``,
+``assume_``, ``assume``, and ``admit()`` calls have been eliminated
+from production code. The only remaining ``assume_`` is in
+``ch26-max-flow/CLRS.Ch26.MaxFlow.Test.fst`` (a test harness, not
+production code).
 
 Each chapter in this document notes any unproven obligations in its
-scope.  Fully verified chapters have zero ``admit``, ``assume``, or
-``assume_`` calls.
+scope.  All chapters outside ch22/ch24 have zero ``admit``,
+``assume``, or ``assume_`` calls in production code.
 
 Reading Guide
 -------------
