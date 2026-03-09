@@ -1,7 +1,0 @@
-* Error 19 at ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst(172,3-175,70):
-  - Could not prove post-condition
-  - The SMT solver could not prove the query. Use --query_stats for more
-    details.
-  - See also ch32-string-matching/CLRS.Ch32.RabinKarp.Spec.fst(170,69-170,77)
-
-1 error was reported (see above)
