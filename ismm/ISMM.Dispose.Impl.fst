@@ -42,6 +42,7 @@ fn dispose_process_field
   (parent: A.array SZ.t)
   (rank: A.array SZ.t)
   (adj: A.array SZ.t)
+  (refcount: A.array SZ.t)
   (dfs_stk: A.array SZ.t) (dfs_top: ref SZ.t)
   (scc_stk: A.array SZ.t) (scc_top: ref SZ.t)
   (field_node: SZ.t) (n: SZ.t)
@@ -49,6 +50,7 @@ fn dispose_process_field
   (#sparent: Ghost.erased (Seq.seq SZ.t))
   (#srank: Ghost.erased (Seq.seq SZ.t))
   (#sadj: Ghost.erased (Seq.seq SZ.t))
+  (#src: Ghost.erased (Seq.seq SZ.t))
   (#sdfs: Ghost.erased (Seq.seq SZ.t))
   (#sscc: Ghost.erased (Seq.seq SZ.t))
   (#vdt: Ghost.erased SZ.t)
@@ -58,6 +60,7 @@ fn dispose_process_field
     A.pts_to parent sparent **
     A.pts_to rank srank **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src **
     A.pts_to dfs_stk sdfs **
     R.pts_to dfs_top vdt **
     A.pts_to scc_stk sscc **
@@ -71,16 +74,18 @@ fn dispose_process_field
       SZ.v n <= Seq.length stag /\
       SZ.v n <= Seq.length sparent /\
       SZ.v n <= Seq.length srank /\
+      SZ.v n <= Seq.length src /\
       Seq.length sdfs == SZ.v n /\
       Seq.length sscc == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
     )
-  ensures exists* st' sp' sr' sdfs' sscc' vdt' vst'.
+  ensures exists* st' sp' sr' sdfs' sscc' vdt' vst' src'.
     A.pts_to tag st' **
     A.pts_to parent sp' **
     A.pts_to rank sr' **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src' **
     A.pts_to dfs_stk sdfs' **
     R.pts_to dfs_top vdt' **
     A.pts_to scc_stk sscc' **
@@ -91,6 +96,7 @@ fn dispose_process_field
       Seq.length st' == Seq.length stag /\
       Seq.length sp' == Seq.length sparent /\
       Seq.length sr' == Seq.length srank /\
+      Seq.length src' == Seq.length src /\
       SZ.v n <= Seq.length st' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
@@ -122,32 +128,24 @@ fn dispose_process_field
   } else {
     if (tag_f = 3sz) {
       // RC node in different SCC: decref
-      let rc = rank.(rep_f);
+      let rc = refcount.(rep_f);
       if (rc = 1sz) {
         // RC hits 0 — mark as PROCESSING and push to dfs for cascade
-        rank.(rep_f) <- 0sz;
+        refcount.(rep_f) <- 0sz;
+        with src1. assert (A.pts_to refcount src1);
         tag.(rep_f) <- 2sz;
         let dt = !dfs_top;
         assume_ (pure (SZ.v dt < SZ.v n));
         dfs_stk.(dt) <- rep_f;
         dfs_top := SZ.(dt +^ 1sz);
-        // Proof obligation: tag+rank update preserves uf_inv
         with st1. assert (A.pts_to tag st1);
-        with sr1. assert (A.pts_to rank sr1);
-        assume_ (pure (
-          Impl.is_forest sp1 (SZ.v n) /\
-          Spec.uf_inv (Impl.to_uf st1 sp1 sr1 (SZ.v n))
-        ));
+        UFL.tag_update_preserves_uf_inv stag sp1 srank (SZ.v n) (SZ.v rep_f) 2sz;
         ()
       } else {
         // RC > 1: just decrement
         assume_ (pure (SZ.v rc > 0 /\ SZ.fits (SZ.v rc - 1)));
-        rank.(rep_f) <- SZ.(rc -^ 1sz);
-        with sr1. assert (A.pts_to rank sr1);
-        assume_ (pure (
-          Impl.is_forest sp1 (SZ.v n) /\
-          Spec.uf_inv (Impl.to_uf stag sp1 sr1 (SZ.v n))
-        ));
+        refcount.(rep_f) <- SZ.(rc -^ 1sz);
+        with src1. assert (A.pts_to refcount src1);
         ()
       }
     } else { () }
@@ -168,6 +166,7 @@ fn dispose_process_scc
   (parent: A.array SZ.t)
   (rank: A.array SZ.t)
   (adj: A.array SZ.t)
+  (refcount: A.array SZ.t)
   (dfs_stk: A.array SZ.t) (dfs_top: ref SZ.t)
   (scc_stk: A.array SZ.t) (scc_top: ref SZ.t)
   (rep: SZ.t) (n: SZ.t)
@@ -175,6 +174,7 @@ fn dispose_process_scc
   (#sparent: Ghost.erased (Seq.seq SZ.t))
   (#srank: Ghost.erased (Seq.seq SZ.t))
   (#sadj: Ghost.erased (Seq.seq SZ.t))
+  (#src: Ghost.erased (Seq.seq SZ.t))
   (#sdfs: Ghost.erased (Seq.seq SZ.t))
   (#sscc: Ghost.erased (Seq.seq SZ.t))
   (#vdt: Ghost.erased SZ.t)
@@ -184,6 +184,7 @@ fn dispose_process_scc
     A.pts_to parent sparent **
     A.pts_to rank srank **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src **
     A.pts_to dfs_stk sdfs **
     R.pts_to dfs_top vdt **
     A.pts_to scc_stk sscc **
@@ -197,17 +198,19 @@ fn dispose_process_scc
       SZ.v n <= Seq.length stag /\
       SZ.v n <= Seq.length sparent /\
       SZ.v n <= Seq.length srank /\
+      SZ.v n <= Seq.length src /\
       SZ.v n * SZ.v n <= Seq.length sadj /\
       Seq.length sdfs == SZ.v n /\
       Seq.length sscc == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
     )
-  ensures exists* st' sp' sr' sdfs' sscc' vdt' vst'.
+  ensures exists* st' sp' sr' sdfs' sscc' vdt' vst' src'.
     A.pts_to tag st' **
     A.pts_to parent sp' **
     A.pts_to rank sr' **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src' **
     A.pts_to dfs_stk sdfs' **
     R.pts_to dfs_top vdt' **
     A.pts_to scc_stk sscc' **
@@ -218,6 +221,7 @@ fn dispose_process_scc
       Seq.length st' == Seq.length stag /\
       Seq.length sp' == Seq.length sparent /\
       Seq.length sr' == Seq.length srank /\
+      Seq.length src' == Seq.length src /\
       SZ.v n <= Seq.length st' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
@@ -247,7 +251,7 @@ fn dispose_process_scc
   // Process all nodes in SCC: walk scc stack, examine each node's fields
   let mut scc_idx: SZ.t = st0;
   while (!scc_idx <^ !scc_top)
-  invariant exists* vidx vst2 vdt2 vic st sp sr sdfs2 sscc2.
+  invariant exists* vidx vst2 vdt2 vic st sp sr sdfs2 sscc2 src2.
     R.pts_to scc_idx vidx **
     R.pts_to scc_top vst2 **
     R.pts_to dfs_top vdt2 **
@@ -256,6 +260,7 @@ fn dispose_process_scc
     A.pts_to parent sp **
     A.pts_to rank sr **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src2 **
     A.pts_to dfs_stk sdfs2 **
     A.pts_to scc_stk sscc2 **
     pure (
@@ -268,6 +273,7 @@ fn dispose_process_scc
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
+      Seq.length src2 == Seq.length src /\
       SZ.v n <= Seq.length st /\
       SZ.v n <= Seq.length sp /\
       SZ.v n <= Seq.length sr /\
@@ -286,12 +292,13 @@ fn dispose_process_scc
     // Process all fields of x (iterate through adj row)
     let mut field_idx: SZ.t = 0sz;
     while (!field_idx <^ n)
-    invariant exists* vfi st2 sp2 sr2 sdfs3 sscc3 vdt3 vst3.
+    invariant exists* vfi st2 sp2 sr2 sdfs3 sscc3 vdt3 vst3 src3.
       R.pts_to field_idx vfi **
       A.pts_to tag st2 **
       A.pts_to parent sp2 **
       A.pts_to rank sr2 **
       A.pts_to adj #0.5R sadj **
+      A.pts_to refcount src3 **
       A.pts_to dfs_stk sdfs3 **
       R.pts_to dfs_top vdt3 **
       A.pts_to scc_stk sscc3 **
@@ -307,6 +314,7 @@ fn dispose_process_scc
         Seq.length st2 == Seq.length stag /\
         Seq.length sp2 == Seq.length sparent /\
         Seq.length sr2 == Seq.length srank /\
+        Seq.length src3 == Seq.length src /\
         SZ.v n <= Seq.length st2 /\
         SZ.v n <= Seq.length sp2 /\
         SZ.v n <= Seq.length sr2 /\
@@ -325,7 +333,7 @@ fn dispose_process_scc
       let has_edge = adj.(edge_idx);
       
       if (has_edge <>^ 0sz) {
-        dispose_process_field tag parent rank adj dfs_stk dfs_top scc_stk scc_top fi n;
+        dispose_process_field tag parent rank adj refcount dfs_stk dfs_top scc_stk scc_top fi n;
         field_idx := SZ.(fi +^ 1sz);
         ()
       } else {
@@ -339,6 +347,7 @@ fn dispose_process_scc
     with st2. assert (A.pts_to tag st2);
     with sp2. assert (A.pts_to parent sp2);
     with sr2. assert (A.pts_to rank sr2);
+    with src2. assert (A.pts_to refcount src2);
     with sdfs2. assert (A.pts_to dfs_stk sdfs2);
     with sscc2. assert (A.pts_to scc_stk sscc2);
     
@@ -374,10 +383,12 @@ fn dispose
   (parent: A.array SZ.t)
   (rank: A.array SZ.t)
   (adj: A.array SZ.t)
+  (refcount: A.array SZ.t)
   (#stag: Ghost.erased (Seq.seq SZ.t))
   (#sparent: Ghost.erased (Seq.seq SZ.t))
   (#srank: Ghost.erased (Seq.seq SZ.t))
   (#sadj: Ghost.erased (Seq.seq SZ.t))
+  (#src: Ghost.erased (Seq.seq SZ.t))
   (n: SZ.t)
   (rep: SZ.t)
   requires
@@ -385,12 +396,14 @@ fn dispose
     A.pts_to parent sparent **
     A.pts_to rank srank **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src **
     pure (
       SZ.v n > 0 /\
       SZ.v rep < SZ.v n /\
       SZ.v n <= A.length tag /\
       SZ.v n <= A.length parent /\
       SZ.v n <= A.length rank /\
+      SZ.v n <= A.length refcount /\
       SZ.v n * SZ.v n <= A.length adj /\
       SZ.fits (SZ.v n * SZ.v n) /\
       SZ.fits (SZ.v n * (SZ.v n + 1)) /\
@@ -398,19 +411,22 @@ fn dispose
       Seq.length sparent == A.length parent /\
       Seq.length srank == A.length rank /\
       Seq.length sadj == A.length adj /\
+      Seq.length src == A.length refcount /\
       A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
     )
-  ensures exists* st sp sr.
+  ensures exists* st sp sr src'.
     A.pts_to tag st **
     A.pts_to parent sp **
     A.pts_to rank sr **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src' **
     pure (
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
+      Seq.length src' == Seq.length src /\
       Impl.is_forest sp (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
     )
@@ -430,7 +446,7 @@ fn dispose
   
   // Main loop: process SCC DAG
   while (!dfs_top >^ 0sz)
-  invariant exists* vdt vst vgc st sp sr sdfs sscc.
+  invariant exists* vdt vst vgc st sp sr sdfs sscc src2.
     R.pts_to dfs_top vdt **
     R.pts_to scc_top vst **
     R.pts_to ghost_ctr vgc **
@@ -438,6 +454,7 @@ fn dispose
     A.pts_to parent sp **
     A.pts_to rank sr **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src2 **
     A.pts_to dfs_stk sdfs **
     A.pts_to scc_stk sscc **
     pure (
@@ -449,6 +466,7 @@ fn dispose
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
+      Seq.length src2 == Seq.length src /\
       SZ.v n <= Seq.length st /\
       SZ.v n <= Seq.length sp /\
       SZ.v n <= Seq.length sr /\
@@ -472,7 +490,7 @@ fn dispose
     scc_top := 0sz;
     
     // Process the SCC
-    dispose_process_scc tag parent rank adj dfs_stk dfs_top scc_stk scc_top scc_rep n;
+    dispose_process_scc tag parent rank adj refcount dfs_stk dfs_top scc_stk scc_top scc_rep n;
     
     // Tick ghost counter
     let gc = !ghost_ctr;

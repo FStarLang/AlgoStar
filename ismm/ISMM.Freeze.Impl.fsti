@@ -25,7 +25,7 @@ open ISMM.Status
 open FStar.Mul
 
 (** FREEZE: Compute SCCs of the subgraph reachable from root.
-    Modifies tag, parent, rank arrays.
+    Modifies tag, parent, rank, refcount arrays.
     Adjacency matrix adj is read-only (n*n flat array).
     
     After freeze:
@@ -38,10 +38,12 @@ fn freeze
   (parent: A.array SZ.t)
   (rank: A.array SZ.t)
   (adj: A.array SZ.t)
+  (refcount: A.array SZ.t)
   (#stag: Ghost.erased (Seq.seq SZ.t))
   (#sparent: Ghost.erased (Seq.seq SZ.t))
   (#srank: Ghost.erased (Seq.seq SZ.t))
   (#sadj: Ghost.erased (Seq.seq SZ.t))
+  (#src: Ghost.erased (Seq.seq SZ.t))
   (n: SZ.t)
   (root: SZ.t)
   requires
@@ -49,12 +51,14 @@ fn freeze
     A.pts_to parent sparent **
     A.pts_to rank srank **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src **
     pure (
       SZ.v n > 0 /\
       SZ.v root < SZ.v n /\
       SZ.v n <= A.length tag /\
       SZ.v n <= A.length parent /\
       SZ.v n <= A.length rank /\
+      SZ.v n <= A.length refcount /\
       SZ.v n * SZ.v n <= A.length adj /\
       SZ.fits (SZ.v n * SZ.v n) /\
       SZ.fits (SZ.v n * (SZ.v n + 1)) /\
@@ -62,19 +66,22 @@ fn freeze
       Seq.length sparent == A.length parent /\
       Seq.length srank == A.length rank /\
       Seq.length sadj == A.length adj /\
+      Seq.length src == A.length refcount /\
       A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
     )
-  ensures exists* st sp sr.
+  ensures exists* st sp sr src'.
     A.pts_to tag st **
     A.pts_to parent sp **
     A.pts_to rank sr **
     A.pts_to adj #0.5R sadj **
+    A.pts_to refcount src' **
     pure (
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
+      Seq.length src' == Seq.length src /\
       Impl.is_forest sp (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
     )
