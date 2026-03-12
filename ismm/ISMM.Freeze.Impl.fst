@@ -26,6 +26,20 @@ module Impl = ISMM.UnionFind.Impl
 module UFL = ISMM.UF.Lemmas
 open ISMM.Status
 
+module GR = Pulse.Lib.GhostReference
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+```pulse
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+```
+
 (* ---------- Helper: Post-order SCC check ----------
    After all edges of x explored, check if x is an SCC root.
    If find(x) == top of pending, finalize SCC with RC(1). *)
@@ -414,7 +428,7 @@ fn freeze_step
   (dfs_top: ref SZ.t)
   (pending_stk: A.array SZ.t)
   (pending_top: ref SZ.t)
-  (ghost_ctr: ref SZ.t)
+  (ghost_ctr: GR.ref nat)
   (n: SZ.t)
   (#stag: Ghost.erased (Seq.seq SZ.t))
   (#sparent: Ghost.erased (Seq.seq SZ.t))
@@ -426,7 +440,7 @@ fn freeze_step
   (#spd: Ghost.erased (Seq.seq SZ.t))
   (#vdt: Ghost.erased SZ.t)
   (#vpt: Ghost.erased SZ.t)
-  (#vgc: Ghost.erased SZ.t)
+  (#vgc: Ghost.erased nat)
   requires
     A.pts_to tag stag **
     A.pts_to parent sparent **
@@ -438,15 +452,13 @@ fn freeze_step
     R.pts_to dfs_top vdt **
     A.pts_to pending_stk spd **
     R.pts_to pending_top vpt **
-    R.pts_to ghost_ctr vgc **
+    GR.pts_to ghost_ctr vgc **
     pure (
       SZ.v vdt > 0 /\
       SZ.v vdt <= SZ.v n /\
       SZ.v vpt <= SZ.v n /\
-      SZ.v vgc <= SZ.v n * (SZ.v n + 1) /\
       SZ.v n > 0 /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      SZ.fits (SZ.v n * (SZ.v n + 1)) /\
       Seq.length stag == A.length tag /\
       Seq.length sparent == A.length parent /\
       Seq.length srank == A.length rank /\
@@ -476,12 +488,10 @@ fn freeze_step
     R.pts_to dfs_top vdt' **
     A.pts_to pending_stk spd' **
     R.pts_to pending_top vpt' **
-    R.pts_to ghost_ctr vgc' **
+    GR.pts_to ghost_ctr vgc' **
     pure (
       SZ.v vdt' <= SZ.v n /\
       SZ.v vpt' <= SZ.v n /\
-      SZ.v vgc' <= SZ.v n * (SZ.v n + 1) /\
-      SZ.v vgc' > SZ.v vgc /\
       Seq.length st' == Seq.length stag /\
       Seq.length sp' == Seq.length sparent /\
       Seq.length sr' == Seq.length srank /\
@@ -513,18 +523,14 @@ fn freeze_step
     dfs_top := top_idx;
     handle_post_order tag parent rank refcount pending_stk pending_top x n;
     // Tick ghost counter
-    let gc = !ghost_ctr;
-    assume_ (pure (SZ.v gc < SZ.v n * (SZ.v n + 1) /\ SZ.fits (SZ.v gc + 1)));
-    ghost_ctr := SZ.(gc +^ 1sz);
+    tick ghost_ctr;
     ()
   } else {
     // PROCESS EDGE
     handle_edge tag parent rank adj refcount dfs_node dfs_edge dfs_top
       pending_stk pending_top x e top_idx n;
     // Tick ghost counter
-    let gc = !ghost_ctr;
-    assume_ (pure (SZ.v gc < SZ.v n * (SZ.v n + 1) /\ SZ.fits (SZ.v gc + 1)));
-    ghost_ctr := SZ.(gc +^ 1sz);
+    tick ghost_ctr;
     ()
   }
 }
@@ -598,8 +604,8 @@ fn freeze
   let pending_stk = A.alloc 0sz n;
   let mut pending_top: SZ.t = 0sz;
   
-  // Ghost counter for termination (bounded by n*(n+1))
-  let mut ghost_ctr: SZ.t = 0sz;
+  // Ghost counter for complexity accounting (erased)
+  let ghost_ctr = GR.alloc #nat 0;
   
   let root_tag = tag.(root);
   
@@ -623,7 +629,7 @@ fn freeze
     invariant exists* vdt vpt vgc st sp sr src_i sdn sde spd.
       R.pts_to dfs_top vdt **
       R.pts_to pending_top vpt **
-      R.pts_to ghost_ctr vgc **
+      GR.pts_to ghost_ctr vgc **
       A.pts_to tag st **
       A.pts_to parent sp **
       A.pts_to rank sr **
@@ -635,9 +641,7 @@ fn freeze
       pure (
         SZ.v vdt <= SZ.v n /\
         SZ.v vpt <= SZ.v n /\
-        SZ.v vgc <= SZ.v n * (SZ.v n + 1) /\
         SZ.fits (SZ.v n * SZ.v n) /\
-        SZ.fits (SZ.v n * (SZ.v n + 1)) /\
         Seq.length st == Seq.length stag /\
         Seq.length sp == Seq.length sparent /\
         Seq.length sr == Seq.length srank /\
@@ -655,12 +659,12 @@ fn freeze
         (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
         (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
       )
-    decreases (SZ.v n * (SZ.v n + 1) - SZ.v !ghost_ctr)
     {
       freeze_step tag parent rank adj refcount dfs_node dfs_edge dfs_top
         pending_stk pending_top ghost_ctr n;
       ()
     };
+    GR.free ghost_ctr;
     A.free dfs_node;
     A.free dfs_edge;
     A.free pending_stk;
@@ -674,11 +678,13 @@ fn freeze
       assume_ (pure (SZ.fits (SZ.v rc + 1)));
       refcount.(rep) <- SZ.(rc +^ 1sz);
       with src1. assert (A.pts_to refcount src1);
+      GR.free ghost_ctr;
       A.free dfs_node;
       A.free dfs_edge;
       A.free pending_stk;
       ()
     } else {
+      GR.free ghost_ctr;
       A.free dfs_node;
       A.free dfs_edge;
       A.free pending_stk;

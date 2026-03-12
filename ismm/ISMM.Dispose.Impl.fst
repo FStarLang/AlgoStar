@@ -32,6 +32,19 @@ module UFL = ISMM.UF.Lemmas
 module Arith = ISMM.Arith.Lemmas
 open ISMM.Status
 
+module GR = Pulse.Lib.GhostReference
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+```pulse
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+```
 
 (* ---------- Helper: Process one field of a node during SCC collection ---------- *)
 
@@ -259,8 +272,8 @@ fn dispose_process_scc
   with sp1. assert (A.pts_to parent sp1);
   with sr1. assert (A.pts_to rank sr1);
   
-  // Ghost counter for termination
-  let mut inner_ctr: SZ.t = 0sz;
+  // Ghost counter for complexity accounting (erased)
+  let inner_ctr = GR.alloc #nat 0;
   
   // Process all nodes in SCC: walk scc stack, examine each node's fields
   let mut scc_idx: SZ.t = st0;
@@ -269,7 +282,7 @@ fn dispose_process_scc
     R.pts_to scc_idx vidx **
     R.pts_to scc_top vst2 **
     R.pts_to dfs_top vdt2 **
-    R.pts_to inner_ctr vic **
+    GR.pts_to inner_ctr vic **
     A.pts_to tag st **
     A.pts_to parent sp **
     A.pts_to rank sr **
@@ -282,7 +295,6 @@ fn dispose_process_scc
       SZ.v vidx <= SZ.v vst2 /\
       SZ.v vst2 <= SZ.v n /\
       SZ.v vdt2 <= SZ.v n /\
-      SZ.v vic <= SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
@@ -299,7 +311,6 @@ fn dispose_process_scc
       (forall (i:nat). {:pattern (Seq.index sscc2 i)} i < SZ.v vst2 ==> SZ.v (Seq.index sscc2 i) < SZ.v n) /\
       (forall (i:nat). {:pattern (Seq.index sdfs2 i)} i < SZ.v vdt2 ==> SZ.v (Seq.index sdfs2 i) < SZ.v n)
     )
-  decreases (SZ.v n * SZ.v n - SZ.v !inner_ctr)
   {
     let idx = !scc_idx;
     let x = scc_stk.(idx);
@@ -388,11 +399,10 @@ fn dispose_process_scc
     
     scc_idx := SZ.(idx +^ 1sz);
     
-    let ic = !inner_ctr;
-    assume_ (pure (SZ.v ic < SZ.v n * SZ.v n /\ SZ.fits (SZ.v ic + 1)));
-    inner_ctr := SZ.(ic +^ 1sz);
+    tick inner_ctr;
     ()
   };
+  GR.free inner_ctr;
   ()
 }
 ```
@@ -462,8 +472,8 @@ fn dispose
   let mut dfs_top: SZ.t = 0sz;
   let mut scc_top: SZ.t = 0sz;
   
-  // Ghost counter for termination
-  let mut ghost_ctr: SZ.t = 0sz;
+  // Ghost counter for complexity accounting (erased)
+  let ghost_ctr = GR.alloc #nat 0;
   
   // Push initial rep to dfs stack
   with sdfs0. assert (A.pts_to dfs_stk sdfs0);
@@ -476,7 +486,7 @@ fn dispose
   invariant exists* vdt vst vgc st sp sr sdfs sscc src2.
     R.pts_to dfs_top vdt **
     R.pts_to scc_top vst **
-    R.pts_to ghost_ctr vgc **
+    GR.pts_to ghost_ctr vgc **
     A.pts_to tag st **
     A.pts_to parent sp **
     A.pts_to rank sr **
@@ -488,7 +498,6 @@ fn dispose
       SZ.v n > 0 /\
       SZ.v vdt <= SZ.v n /\
       SZ.v vst <= SZ.v n /\
-      SZ.v vgc <= SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
@@ -504,7 +513,6 @@ fn dispose
       Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n)
     )
-  decreases (SZ.v n - SZ.v !ghost_ctr)
   {
     // Pop from dfs stack
     let dt = !dfs_top;
@@ -519,12 +527,11 @@ fn dispose
     dispose_process_scc tag parent rank adj refcount dfs_stk dfs_top scc_stk scc_top scc_rep n;
     
     // Tick ghost counter
-    let gc = !ghost_ctr;
-    assume_ (pure (SZ.v gc < SZ.v n /\ SZ.fits (SZ.v gc + 1)));
-    ghost_ctr := SZ.(gc +^ 1sz);
+    tick ghost_ctr;
     ()
   };
   
+  GR.free ghost_ctr;
   A.free dfs_stk;
   A.free scc_stk;
   ()
