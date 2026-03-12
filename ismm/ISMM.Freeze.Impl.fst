@@ -1,0 +1,639 @@
+(*
+   ISMM Freeze — Imperative Pulse Implementation
+   
+   Implements the freeze algorithm from paper §3.1, Fig. 2.
+   Uses iterative DFS with pending stack for SCC detection, fused with union-find.
+   
+   Helpers factored out to avoid Pulse unification issues with conditional branches
+   (same pattern as CLRS.Ch22.DFS.Impl — see line 402 there).
+   
+   Proof obligations marked with assume_ are delegated to ISMM.Freeze.Lemmas.
+*)
+module ISMM.Freeze.Impl
+#lang-pulse
+open Pulse.Lib.Pervasives
+open Pulse.Lib.Array
+open Pulse.Lib.Reference
+open FStar.SizeT
+open FStar.Mul
+
+module A = Pulse.Lib.Array
+module R = Pulse.Lib.Reference
+module SZ = FStar.SizeT
+module Seq = FStar.Seq
+module Spec = ISMM.UnionFind.Spec
+module Impl = ISMM.UnionFind.Impl
+module UFL = ISMM.UF.Lemmas
+open ISMM.Status
+
+(* ---------- Helper: Post-order SCC check ----------
+   After all edges of x explored, check if x is an SCC root.
+   If find(x) == top of pending, finalize SCC with RC(1). *)
+
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+```pulse
+fn handle_post_order
+  (tag: A.array SZ.t)
+  (parent: A.array SZ.t)
+  (rank: A.array SZ.t)
+  (pending_stk: A.array SZ.t)
+  (pending_top: ref SZ.t)
+  (x: SZ.t) (n: SZ.t)
+  (#stag: Ghost.erased (Seq.seq SZ.t))
+  (#sparent: Ghost.erased (Seq.seq SZ.t))
+  (#srank: Ghost.erased (Seq.seq SZ.t))
+  (#spd: Ghost.erased (Seq.seq SZ.t))
+  (#vpt: Ghost.erased SZ.t)
+  requires
+    A.pts_to tag stag **
+    A.pts_to parent sparent **
+    A.pts_to rank srank **
+    A.pts_to pending_stk spd **
+    R.pts_to pending_top vpt **
+    pure (
+      SZ.v x < SZ.v n /\
+      SZ.v n > 0 /\
+      SZ.v vpt <= SZ.v n /\
+      SZ.v n <= Seq.length stag /\
+      SZ.v n <= Seq.length sparent /\
+      SZ.v n <= Seq.length srank /\
+      Seq.length spd == SZ.v n /\
+      Impl.is_forest sparent (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+    )
+  ensures exists* st' sp' sr' vpt'.
+    A.pts_to tag st' **
+    A.pts_to parent sp' **
+    A.pts_to rank sr' **
+    A.pts_to pending_stk spd **
+    R.pts_to pending_top vpt' **
+    pure (
+      SZ.v vpt' <= SZ.v n /\
+      Seq.length st' == Seq.length stag /\
+      Seq.length sp' == Seq.length sparent /\
+      Seq.length sr' == Seq.length srank /\
+      SZ.v n <= Seq.length st' /\
+      SZ.v n <= Seq.length sp' /\
+      SZ.v n <= Seq.length sr' /\
+      Impl.is_forest sp' (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+    )
+{
+  let pt = !pending_top;
+  if (pt >^ 0sz) {
+    let rep_x = Impl.find_set parent x n #sparent #stag #srank;
+    with sp1. assert (A.pts_to parent sp1);
+    
+    let top_p = pending_stk.(SZ.(pt -^ 1sz));
+    
+    // Read current values
+    let cur_tag = tag.(rep_x);
+    let cur_rank = rank.(rep_x);
+    
+    // Compute new values (conditionally, avoiding branching resource mismatch)
+    let is_scc_root = (top_p = rep_x);
+    let new_tag = (if is_scc_root then 3sz else cur_tag);
+    let new_rank = (if is_scc_root then 1sz else cur_rank);
+    let new_pt = (if is_scc_root then SZ.(pt -^ 1sz) else pt);
+    
+    // Always write
+    tag.(rep_x) <- new_tag;
+    rank.(rep_x) <- new_rank;
+    pending_top := new_pt;
+    
+    // Proof obligation: updates preserve uf_inv
+    with st1. assert (A.pts_to tag st1);
+    with sr1. assert (A.pts_to rank sr1);
+    assume_ (pure (
+      Impl.is_forest sp1 (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf st1 sp1 sr1 (SZ.v n))
+    ));
+    ()
+  } else { () }
+}
+```
+#pop-options
+
+
+(* ---------- Helper: Process a tree edge ----------
+   Mark y as RANK, push to pending and DFS stacks. *)
+
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+```pulse
+fn handle_tree_edge
+  (tag: A.array SZ.t)
+  (dfs_node: A.array SZ.t) (dfs_edge: A.array SZ.t)
+  (dfs_top: ref SZ.t)
+  (pending_stk: A.array SZ.t)
+  (pending_top: ref SZ.t)
+  (y: SZ.t) (n: SZ.t)
+  (#stag: Ghost.erased (Seq.seq SZ.t))
+  (#sdn: Ghost.erased (Seq.seq SZ.t))
+  (#sde: Ghost.erased (Seq.seq SZ.t))
+  (#spd: Ghost.erased (Seq.seq SZ.t))
+  (#vdt: Ghost.erased SZ.t)
+  (#vpt: Ghost.erased SZ.t)
+  (sp_ghost: Ghost.erased (Seq.seq SZ.t))
+  (sr_ghost: Ghost.erased (Seq.seq SZ.t))
+  requires
+    A.pts_to tag stag **
+    A.pts_to dfs_node sdn **
+    A.pts_to dfs_edge sde **
+    R.pts_to dfs_top vdt **
+    A.pts_to pending_stk spd **
+    R.pts_to pending_top vpt **
+    pure (
+      SZ.v y < SZ.v n /\
+      SZ.v n > 0 /\
+      SZ.v vdt <= SZ.v n /\
+      SZ.v vpt <= SZ.v n /\
+      SZ.v n <= Seq.length stag /\
+      SZ.v n <= Seq.length sp_ghost /\
+      SZ.v n <= Seq.length sr_ghost /\
+      Seq.length sdn == SZ.v n /\
+      Seq.length sde == SZ.v n /\
+      Seq.length spd == SZ.v n /\
+      Impl.is_forest sp_ghost (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf stag sp_ghost sr_ghost (SZ.v n))
+    )
+  ensures exists* st' sdn' sde' spd' vdt' vpt'.
+    A.pts_to tag st' **
+    A.pts_to dfs_node sdn' **
+    A.pts_to dfs_edge sde' **
+    R.pts_to dfs_top vdt' **
+    A.pts_to pending_stk spd' **
+    R.pts_to pending_top vpt' **
+    pure (
+      SZ.v vdt' <= SZ.v n /\
+      SZ.v vpt' <= SZ.v n /\
+      Seq.length st' == Seq.length stag /\
+      SZ.v n <= Seq.length st' /\
+      Impl.is_forest sp_ghost (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf st' sp_ghost sr_ghost (SZ.v n)) /\
+      Seq.length sdn' == SZ.v n /\
+      Seq.length sde' == SZ.v n /\
+      Seq.length spd' == SZ.v n
+    )
+{
+  tag.(y) <- 1sz;
+  // Tag-only update preserves uf_inv
+  UFL.tag_update_preserves_uf_inv stag sp_ghost sr_ghost (SZ.v n) (SZ.v y) 1sz;
+  
+  let pt2 = !pending_top;
+  // Stack not full (proof obligation from invariant: we only push fresh nodes)
+  assume_ (pure (SZ.v pt2 < SZ.v n));
+  pending_stk.(pt2) <- y;
+  pending_top := SZ.(pt2 +^ 1sz);
+  
+  let dt2 = !dfs_top;
+  assume_ (pure (SZ.v dt2 < SZ.v n));
+  dfs_node.(dt2) <- y;
+  dfs_edge.(dt2) <- 0sz;
+  dfs_top := SZ.(dt2 +^ 1sz);
+  ()
+}
+```
+#pop-options
+
+
+(* ---------- Helper: Handle back/cross/noop edge ----------
+   Called when tag_rep != 0 (not a tree edge).
+   Factored out to avoid Pulse conditional branch unification issues. *)
+
+#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+```pulse
+fn handle_non_tree_edge
+  (parent: A.array SZ.t)
+  (rank: A.array SZ.t)
+  (x: SZ.t) (y: SZ.t) (tag_rep: SZ.t) (rep_y: SZ.t) (n: SZ.t)
+  (#stag: Ghost.erased (Seq.seq SZ.t))
+  (#sp1: Ghost.erased (Seq.seq SZ.t))
+  (#srank: Ghost.erased (Seq.seq SZ.t))
+  requires
+    A.pts_to parent sp1 **
+    A.pts_to rank srank **
+    pure (
+      SZ.v x < SZ.v n /\
+      SZ.v y < SZ.v n /\
+      SZ.v rep_y < SZ.v n /\
+      SZ.v n > 0 /\
+      SZ.v n <= Seq.length sp1 /\
+      SZ.v n <= Seq.length srank /\
+      SZ.v n <= Seq.length stag /\
+      SZ.v rep_y < Seq.length srank /\
+      SZ.v (Seq.index sp1 (SZ.v rep_y)) == SZ.v rep_y /\
+      Impl.is_forest sp1 (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf stag sp1 srank (SZ.v n))
+    )
+  ensures exists* sp' sr'.
+    A.pts_to parent sp' **
+    A.pts_to rank sr' **
+    pure (
+      Seq.length sp' == Seq.length sp1 /\
+      Seq.length sr' == Seq.length srank /\
+      SZ.v n <= Seq.length sp' /\
+      SZ.v n <= Seq.length sr' /\
+      Impl.is_forest sp' (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf stag sp' sr' (SZ.v n))
+    )
+{
+  if (tag_rep = 1sz) {
+    // BACK EDGE: union x with y
+    assume_ (pure (Seq.length srank == Seq.length sp1));
+    Spec.rank_bounded_all (Impl.to_uf stag sp1 srank (SZ.v n));
+    Impl.union_set parent rank #sp1 #srank #stag x y n;
+    ()
+  } else {
+    if (tag_rep = 3sz) {
+      // CROSS EDGE: incref
+      let rc = rank.(rep_y);
+      assume_ (pure (SZ.fits (SZ.v rc + 1)));
+      rank.(rep_y) <- SZ.(rc +^ 1sz);
+      with sr1. assert (A.pts_to rank sr1);
+      // Rank increase on root preserves uf_inv
+      UFL.rank_increase_on_root_preserves_uf_inv stag sp1 srank (SZ.v n) (SZ.v rep_y) SZ.(rc +^ 1sz);
+      ()
+    } else { () }
+  }
+}
+```
+#pop-options
+
+
+(* ---------- Helper: Process an edge (tree/back/cross) ----------
+   Determines edge type and processes accordingly. *)
+
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+```pulse
+fn handle_edge
+  (tag: A.array SZ.t)
+  (parent: A.array SZ.t)
+  (rank: A.array SZ.t)
+  (adj: A.array SZ.t)
+  (dfs_node: A.array SZ.t) (dfs_edge: A.array SZ.t)
+  (dfs_top: ref SZ.t)
+  (pending_stk: A.array SZ.t)
+  (pending_top: ref SZ.t)
+  (x: SZ.t) (e: SZ.t) (top_idx: SZ.t) (n: SZ.t)
+  (#stag: Ghost.erased (Seq.seq SZ.t))
+  (#sparent: Ghost.erased (Seq.seq SZ.t))
+  (#srank: Ghost.erased (Seq.seq SZ.t))
+  (#sadj: Ghost.erased (Seq.seq SZ.t))
+  (#sdn: Ghost.erased (Seq.seq SZ.t))
+  (#sde: Ghost.erased (Seq.seq SZ.t))
+  (#spd: Ghost.erased (Seq.seq SZ.t))
+  (#vdt: Ghost.erased SZ.t)
+  (#vpt: Ghost.erased SZ.t)
+  requires
+    A.pts_to tag stag **
+    A.pts_to parent sparent **
+    A.pts_to rank srank **
+    A.pts_to adj #0.5R sadj **
+    A.pts_to dfs_node sdn **
+    A.pts_to dfs_edge sde **
+    R.pts_to dfs_top vdt **
+    A.pts_to pending_stk spd **
+    R.pts_to pending_top vpt **
+    pure (
+      SZ.v x < SZ.v n /\
+      SZ.v e < SZ.v n /\
+      SZ.v top_idx < SZ.v n /\
+      SZ.v n > 0 /\
+      SZ.v vdt <= SZ.v n /\
+      SZ.v vpt <= SZ.v n /\
+      SZ.v n <= Seq.length stag /\
+      SZ.v n <= Seq.length sparent /\
+      SZ.v n <= Seq.length srank /\
+      SZ.v n * SZ.v n <= Seq.length sadj /\
+      Seq.length sdn == SZ.v n /\
+      Seq.length sde == SZ.v n /\
+      Seq.length spd == SZ.v n /\
+      SZ.v top_idx < Seq.length sde /\
+      SZ.fits (SZ.v x * SZ.v n + SZ.v e) /\
+      SZ.v x * SZ.v n + SZ.v e < Seq.length sadj /\
+      Impl.is_forest sparent (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+    )
+  ensures exists* st' sp' sr' sdn' sde' spd' vdt' vpt'.
+    A.pts_to tag st' **
+    A.pts_to parent sp' **
+    A.pts_to rank sr' **
+    A.pts_to adj #0.5R sadj **
+    A.pts_to dfs_node sdn' **
+    A.pts_to dfs_edge sde' **
+    R.pts_to dfs_top vdt' **
+    A.pts_to pending_stk spd' **
+    R.pts_to pending_top vpt' **
+    pure (
+      SZ.v vdt' <= SZ.v n /\
+      SZ.v vpt' <= SZ.v n /\
+      Seq.length st' == Seq.length stag /\
+      Seq.length sp' == Seq.length sparent /\
+      Seq.length sr' == Seq.length srank /\
+      SZ.v n <= Seq.length st' /\
+      SZ.v n <= Seq.length sp' /\
+      SZ.v n <= Seq.length sr' /\
+      Seq.length sdn' == SZ.v n /\
+      Seq.length sde' == SZ.v n /\
+      Seq.length spd' == SZ.v n /\
+      Impl.is_forest sp' (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+    )
+{
+  // Advance edge pointer
+  dfs_edge.(top_idx) <- SZ.(e +^ 1sz);
+  with sde1. assert (A.pts_to dfs_edge sde1);
+  
+  let idx = SZ.(x *^ n +^ e);
+  let has_edge = adj.(idx);
+  
+  if (has_edge <>^ 0sz) {
+    let y = e;
+    
+    let rep_y = Impl.find_set parent y n #sparent #stag #srank;
+    with sp1. assert (A.pts_to parent sp1);
+    
+    let tag_rep = tag.(rep_y);
+    
+    if (tag_rep = 0sz) {
+      // TREE EDGE: mark y as RANK, push to stacks
+      handle_tree_edge tag dfs_node dfs_edge dfs_top pending_stk pending_top y n
+        #stag #sdn #sde1 #spd #vdt #vpt sp1 srank;
+      ()
+    } else {
+      // Not a tree edge — delegate to helper (avoids branch unification issues)
+      handle_non_tree_edge parent rank x y tag_rep rep_y n #stag #sp1 #srank;
+      ()
+    }
+  } else { () }
+}
+```
+#pop-options
+
+
+(* ---------- Helper: One step of the DFS loop ----------
+   Factored out to avoid Pulse branch unification issues between
+   post-order (handle_post_order) and edge processing (handle_edge). *)
+
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+```pulse
+fn freeze_step
+  (tag: A.array SZ.t)
+  (parent: A.array SZ.t)
+  (rank: A.array SZ.t)
+  (adj: A.array SZ.t)
+  (dfs_node: A.array SZ.t) (dfs_edge: A.array SZ.t)
+  (dfs_top: ref SZ.t)
+  (pending_stk: A.array SZ.t)
+  (pending_top: ref SZ.t)
+  (ghost_ctr: ref SZ.t)
+  (n: SZ.t)
+  (#stag: Ghost.erased (Seq.seq SZ.t))
+  (#sparent: Ghost.erased (Seq.seq SZ.t))
+  (#srank: Ghost.erased (Seq.seq SZ.t))
+  (#sadj: Ghost.erased (Seq.seq SZ.t))
+  (#sdn: Ghost.erased (Seq.seq SZ.t))
+  (#sde: Ghost.erased (Seq.seq SZ.t))
+  (#spd: Ghost.erased (Seq.seq SZ.t))
+  (#vdt: Ghost.erased SZ.t)
+  (#vpt: Ghost.erased SZ.t)
+  (#vgc: Ghost.erased SZ.t)
+  requires
+    A.pts_to tag stag **
+    A.pts_to parent sparent **
+    A.pts_to rank srank **
+    A.pts_to adj #0.5R sadj **
+    A.pts_to dfs_node sdn **
+    A.pts_to dfs_edge sde **
+    R.pts_to dfs_top vdt **
+    A.pts_to pending_stk spd **
+    R.pts_to pending_top vpt **
+    R.pts_to ghost_ctr vgc **
+    pure (
+      SZ.v vdt > 0 /\
+      SZ.v vdt <= SZ.v n /\
+      SZ.v vpt <= SZ.v n /\
+      SZ.v vgc <= SZ.v n * (SZ.v n + 1) /\
+      SZ.v n > 0 /\
+      Seq.length stag == A.length tag /\
+      Seq.length sparent == A.length parent /\
+      Seq.length srank == A.length rank /\
+      SZ.v n <= Seq.length stag /\
+      SZ.v n <= Seq.length sparent /\
+      SZ.v n <= Seq.length srank /\
+      SZ.v n * SZ.v n <= Seq.length sadj /\
+      Seq.length sdn == SZ.v n /\
+      Seq.length sde == SZ.v n /\
+      Seq.length spd == SZ.v n /\
+      Impl.is_forest sparent (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+    )
+  ensures exists* st' sp' sr' sdn' sde' spd' vdt' vpt' vgc'.
+    A.pts_to tag st' **
+    A.pts_to parent sp' **
+    A.pts_to rank sr' **
+    A.pts_to adj #0.5R sadj **
+    A.pts_to dfs_node sdn' **
+    A.pts_to dfs_edge sde' **
+    R.pts_to dfs_top vdt' **
+    A.pts_to pending_stk spd' **
+    R.pts_to pending_top vpt' **
+    R.pts_to ghost_ctr vgc' **
+    pure (
+      SZ.v vdt' <= SZ.v n /\
+      SZ.v vpt' <= SZ.v n /\
+      SZ.v vgc' <= SZ.v n * (SZ.v n + 1) /\
+      SZ.v vgc' > SZ.v vgc /\
+      Seq.length st' == Seq.length stag /\
+      Seq.length sp' == Seq.length sparent /\
+      Seq.length sr' == Seq.length srank /\
+      SZ.v n <= Seq.length st' /\
+      SZ.v n <= Seq.length sp' /\
+      SZ.v n <= Seq.length sr' /\
+      Seq.length sdn' == SZ.v n /\
+      Seq.length sde' == SZ.v n /\
+      Seq.length spd' == SZ.v n /\
+      Impl.is_forest sp' (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+    )
+{
+  let dt = !dfs_top;
+  let top_idx = SZ.(dt -^ 1sz);
+  let x = dfs_node.(top_idx);
+  let e = dfs_edge.(top_idx);
+  
+  // Stack validity (proof obligation from stack invariant)
+  assume_ (pure (
+    SZ.v x < SZ.v n /\
+    SZ.v e <= SZ.v n /\
+    SZ.v top_idx < SZ.v n /\
+    SZ.fits (SZ.v x * SZ.v n + SZ.v n) /\
+    (SZ.v e < SZ.v n ==> (SZ.fits (SZ.v x * SZ.v n + SZ.v e) /\
+                           SZ.v x * SZ.v n + SZ.v e < Seq.length sadj))
+  ));
+  
+  if (e >=^ n) {
+    // POST-ORDER: pop DFS stack, check pending
+    dfs_top := top_idx;
+    handle_post_order tag parent rank pending_stk pending_top x n;
+    // Tick ghost counter
+    let gc = !ghost_ctr;
+    assume_ (pure (SZ.v gc < SZ.v n * (SZ.v n + 1) /\ SZ.fits (SZ.v gc + 1)));
+    ghost_ctr := SZ.(gc +^ 1sz);
+    ()
+  } else {
+    // PROCESS EDGE
+    handle_edge tag parent rank adj dfs_node dfs_edge dfs_top
+      pending_stk pending_top x e top_idx n;
+    // Tick ghost counter
+    let gc = !ghost_ctr;
+    assume_ (pure (SZ.v gc < SZ.v n * (SZ.v n + 1) /\ SZ.fits (SZ.v gc + 1)));
+    ghost_ctr := SZ.(gc +^ 1sz);
+    ()
+  }
+}
+```
+#pop-options
+
+
+(* ---------- Main freeze function ---------- *)
+
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+```pulse
+fn freeze
+  (tag: A.array SZ.t)
+  (parent: A.array SZ.t)
+  (rank: A.array SZ.t)
+  (adj: A.array SZ.t)
+  (#stag: Ghost.erased (Seq.seq SZ.t))
+  (#sparent: Ghost.erased (Seq.seq SZ.t))
+  (#srank: Ghost.erased (Seq.seq SZ.t))
+  (#sadj: Ghost.erased (Seq.seq SZ.t))
+  (n: SZ.t)
+  (root: SZ.t)
+  requires
+    A.pts_to tag stag **
+    A.pts_to parent sparent **
+    A.pts_to rank srank **
+    A.pts_to adj #0.5R sadj **
+    pure (
+      SZ.v n > 0 /\
+      SZ.v root < SZ.v n /\
+      SZ.v n <= A.length tag /\
+      SZ.v n <= A.length parent /\
+      SZ.v n <= A.length rank /\
+      SZ.v n * SZ.v n <= A.length adj /\
+      Seq.length stag == A.length tag /\
+      Seq.length sparent == A.length parent /\
+      Seq.length srank == A.length rank /\
+      Seq.length sadj == A.length adj /\
+      Impl.is_forest sparent (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+    )
+  ensures exists* st sp sr.
+    A.pts_to tag st **
+    A.pts_to parent sp **
+    A.pts_to rank sr **
+    A.pts_to adj #0.5R sadj **
+    pure (
+      Seq.length st == Seq.length stag /\
+      Seq.length sp == Seq.length sparent /\
+      Seq.length sr == Seq.length srank /\
+      Impl.is_forest sp (SZ.v n) /\
+      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
+    )
+{
+  // Allocate DFS work stack
+  let dfs_node = A.alloc 0sz n;
+  let dfs_edge = A.alloc 0sz n;
+  let mut dfs_top: SZ.t = 0sz;
+  
+  // Allocate pending stack  
+  let pending_stk = A.alloc 0sz n;
+  let mut pending_top: SZ.t = 0sz;
+  
+  // Ghost counter for termination (bounded by n*(n+1))
+  let mut ghost_ctr: SZ.t = 0sz;
+  
+  let root_tag = tag.(root);
+  
+  if (root_tag = 0sz) {
+    // Root is UNMARKED — perform freeze DFS
+    tag.(root) <- 1sz;
+    pending_stk.(0sz) <- root;
+    pending_top := 1sz;
+    dfs_node.(0sz) <- root;
+    dfs_edge.(0sz) <- 0sz;
+    dfs_top := 1sz;
+    
+    // Tag-only update (UNMARKED→RANK): preserves uf_inv
+    UFL.tag_update_preserves_uf_inv stag sparent srank (SZ.v n) (SZ.v root) 1sz;
+    with st0. assert (A.pts_to tag st0);
+    with sp0. assert (A.pts_to parent sp0);
+    with sr0. assert (A.pts_to rank sr0);
+    
+    // Main DFS loop
+    while (!dfs_top >^ 0sz)
+    invariant exists* vdt vpt vgc st sp sr sdn sde spd.
+      R.pts_to dfs_top vdt **
+      R.pts_to pending_top vpt **
+      R.pts_to ghost_ctr vgc **
+      A.pts_to tag st **
+      A.pts_to parent sp **
+      A.pts_to rank sr **
+      A.pts_to adj #0.5R sadj **
+      A.pts_to dfs_node sdn **
+      A.pts_to dfs_edge sde **
+      A.pts_to pending_stk spd **
+      pure (
+        SZ.v vdt <= SZ.v n /\
+        SZ.v vpt <= SZ.v n /\
+        SZ.v vgc <= SZ.v n * (SZ.v n + 1) /\
+        Seq.length st == Seq.length stag /\
+        Seq.length sp == Seq.length sparent /\
+        Seq.length sr == Seq.length srank /\
+        SZ.v n <= Seq.length st /\
+        SZ.v n <= Seq.length sp /\
+        SZ.v n <= Seq.length sr /\
+        Seq.length sdn == SZ.v n /\
+        Seq.length sde == SZ.v n /\
+        Seq.length spd == SZ.v n /\
+        Impl.is_forest sp (SZ.v n) /\
+        Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
+      )
+    decreases (SZ.v n * (SZ.v n + 1) - SZ.v !ghost_ctr)
+    {
+      freeze_step tag parent rank adj dfs_node dfs_edge dfs_top
+        pending_stk pending_top ghost_ctr n;
+      ()
+    };
+    A.free dfs_node;
+    A.free dfs_edge;
+    A.free pending_stk;
+    ()
+  } else {
+    if (root_tag = 3sz) {
+      // Already RC: incref
+      let rep = Impl.find_set parent root n #sparent #stag #srank;
+      with sp1. assert (A.pts_to parent sp1);
+      let rc = rank.(rep);
+      assume_ (pure (SZ.fits (SZ.v rc + 1)));
+      rank.(rep) <- SZ.(rc +^ 1sz);
+      with st1. assert (A.pts_to tag st1);
+      with sr1. assert (A.pts_to rank sr1);
+      // Rank increase on root preserves uf_inv (find_set returns root)
+      UFL.rank_increase_on_root_preserves_uf_inv stag sp1 srank (SZ.v n) (SZ.v rep) SZ.(rc +^ 1sz);
+      A.free dfs_node;
+      A.free dfs_edge;
+      A.free pending_stk;
+      ()
+    } else {
+      A.free dfs_node;
+      A.free dfs_edge;
+      A.free pending_stk;
+      ()
+    }
+  }
+}
+```
+#pop-options
