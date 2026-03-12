@@ -118,7 +118,8 @@ fn find_set
       SZ.v root == Spec.pure_find (to_uf stag sparent srank (SZ.v n)) (SZ.v x) /\
       (forall (z: nat). z < SZ.v n ==>
         Spec.pure_find (to_uf stag sp srank (SZ.v n)) z ==
-        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z)
+        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z) /\
+      (forall (i: nat). i < SZ.v n /\ SZ.v (Seq.index sparent i) == i ==> SZ.v (Seq.index sp i) == i)
     )
 
 (** UNION: Union by rank.

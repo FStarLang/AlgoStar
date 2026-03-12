@@ -24,6 +24,7 @@ module Seq = FStar.Seq
 module Spec = ISMM.UnionFind.Spec
 module Impl = ISMM.UnionFind.Impl
 module UFL = ISMM.UF.Lemmas
+module Arith = ISMM.Arith.Lemmas
 open ISMM.Status
 
 module GR = Pulse.Lib.GhostReference
@@ -78,7 +79,8 @@ fn handle_post_order
       Seq.length sparent == Seq.length srank /\
       Seq.length spd == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      SZ.v vpt <= Arith.count_nonzero stag (SZ.v n)
     )
   ensures exists* st' sp' sr' src' vpt'.
     A.pts_to tag st' **
@@ -98,7 +100,9 @@ fn handle_post_order
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
       Impl.is_forest sp' (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
+      SZ.v vpt' <= Arith.count_nonzero st' (SZ.v n) /\
+      Arith.count_nonzero st' (SZ.v n) >= Arith.count_nonzero stag (SZ.v n)
     )
 {
   let pt = !pending_top;
@@ -127,6 +131,8 @@ fn handle_post_order
     with st1. assert (A.pts_to tag st1);
     with src1. assert (A.pts_to refcount src1);
     UFL.tag_update_preserves_uf_inv stag sp1 srank (SZ.v n) (SZ.v rep_x) new_tag;
+    // count_nonzero doesn't decrease: new_tag is either 3sz (nonzero) or cur_tag
+    Arith.count_nonzero_write_nondec stag (SZ.v n) (SZ.v rep_x) new_tag;
     ()
   } else { () }
 }
@@ -175,7 +181,10 @@ fn handle_tree_edge
       Impl.is_forest sp_ghost (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sp_ghost sr_ghost (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n) /\
+      SZ.v (Seq.index stag (SZ.v y)) == 0 /\
+      SZ.v vpt <= Arith.count_nonzero stag (SZ.v n) /\
+      SZ.v vdt <= Arith.count_nonzero stag (SZ.v n)
     )
   ensures exists* st' sdn' sde' spd' vdt' vpt'.
     A.pts_to tag st' **
@@ -195,24 +204,39 @@ fn handle_tree_edge
       Seq.length sde' == SZ.v n /\
       Seq.length spd' == SZ.v n /\
       (forall (i:nat). {:pattern (Seq.index sdn' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdn' i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n) /\
+      SZ.v vpt' <= Arith.count_nonzero st' (SZ.v n) /\
+      SZ.v vdt' <= Arith.count_nonzero st' (SZ.v n)
     )
 {
+  // Derive stack bounds from count_nonzero
+  Arith.count_nonzero_lt_when_zero stag (SZ.v n) (SZ.v y);
+  Arith.count_nonzero_set_nz stag (SZ.v n) (SZ.v y) 1sz;
+  
   tag.(y) <- 1sz;
   // Tag-only update preserves uf_inv
   UFL.tag_update_preserves_uf_inv stag sp_ghost sr_ghost (SZ.v n) (SZ.v y) 1sz;
   
   let pt2 = !pending_top;
-  // Stack not full (proof obligation from invariant: we only push fresh nodes)
-  assume_ (pure (SZ.v pt2 < SZ.v n));
+  // pt2 = vpt <= count_nonzero(stag, n) < n  (from lemma above)
   pending_stk.(pt2) <- y;
   pending_top := SZ.(pt2 +^ 1sz);
   
   let dt2 = !dfs_top;
-  assume_ (pure (SZ.v dt2 < SZ.v n));
+  // dt2 = vdt <= count_nonzero(stag, n) < n  (from lemma above)
   dfs_node.(dt2) <- y;
   dfs_edge.(dt2) <- 0sz;
   dfs_top := SZ.(dt2 +^ 1sz);
+  
+  // Postcondition count_nonzero:
+  // count_nonzero(Seq.upd stag y 1, n) == count_nonzero(stag, n) + 1
+  // vpt' = pt2 + 1 <= count_nonzero(stag, n) + 1 = count_nonzero(st', n)
+  // vdt' = dt2 + 1 <= count_nonzero(stag, n) + 1 = count_nonzero(st', n)
+  
+  with sdn'. assert (A.pts_to dfs_node sdn');
+  with sde'. assert (A.pts_to dfs_edge sde');
+  Arith.seq_upd_content_bound sdn (SZ.v vdt) (SZ.v n) y;
+  Arith.seq_upd_content_le_bound sde (SZ.v vdt) (SZ.v n) SZ.(0sz);
   ()
 }
 ```
@@ -348,7 +372,9 @@ fn handle_edge
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n) /\
+      SZ.v vpt <= Arith.count_nonzero stag (SZ.v n) /\
+      SZ.v vdt <= Arith.count_nonzero stag (SZ.v n)
     )
   ensures exists* st' sp' sr' src' sdn' sde' spd' vdt' vpt'.
     A.pts_to tag st' **
@@ -378,7 +404,9 @@ fn handle_edge
       Impl.is_forest sp' (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sdn' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdn' i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n) /\
+      SZ.v vpt' <= Arith.count_nonzero st' (SZ.v n) /\
+      SZ.v vdt' <= Arith.count_nonzero st' (SZ.v n)
     )
 {
   // Advance edge pointer
@@ -397,8 +425,9 @@ fn handle_edge
     let tag_rep = tag.(rep_y);
     
     if (tag_rep = 0sz) {
-      // TREE EDGE: mark y as RANK, push to stacks
-      handle_tree_edge tag dfs_node dfs_edge dfs_top pending_stk pending_top y n
+      // TREE EDGE: mark rep_y as RANK, push to stacks
+      // tag[rep_y] == 0 from the check above
+      handle_tree_edge tag dfs_node dfs_edge dfs_top pending_stk pending_top rep_y n
         #stag #sdn #sde1 #spd #vdt #vpt sp1 srank;
       ()
     } else {
@@ -475,7 +504,9 @@ fn freeze_step
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n) /\
+      SZ.v vpt <= Arith.count_nonzero stag (SZ.v n) /\
+      SZ.v vdt <= Arith.count_nonzero stag (SZ.v n)
     )
   ensures exists* st' sp' sr' src' sdn' sde' spd' vdt' vpt' vgc'.
     A.pts_to tag st' **
@@ -506,7 +537,9 @@ fn freeze_step
       Impl.is_forest sp' (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sdn' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdn' i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n) /\
+      SZ.v vpt' <= Arith.count_nonzero st' (SZ.v n) /\
+      SZ.v vdt' <= Arith.count_nonzero st' (SZ.v n)
     )
 {
   let dt = !dfs_top;
@@ -620,6 +653,8 @@ fn freeze
     
     // Tag-only update (UNMARKED→RANK): preserves uf_inv
     UFL.tag_update_preserves_uf_inv stag sparent srank (SZ.v n) (SZ.v root) 1sz;
+    // count_nonzero(st0, n) >= 1 since root was 0 and is now 1
+    Arith.count_nonzero_set_nz stag (SZ.v n) (SZ.v root) 1sz;
     with st0. assert (A.pts_to tag st0);
     with sp0. assert (A.pts_to parent sp0);
     with sr0. assert (A.pts_to rank sr0);
@@ -657,7 +692,9 @@ fn freeze
         Impl.is_forest sp (SZ.v n) /\
         Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
         (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
-        (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
+        (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n) /\
+        SZ.v vpt <= Arith.count_nonzero st (SZ.v n) /\
+        SZ.v vdt <= Arith.count_nonzero st (SZ.v n)
       )
     {
       freeze_step tag parent rank adj refcount dfs_node dfs_edge dfs_top

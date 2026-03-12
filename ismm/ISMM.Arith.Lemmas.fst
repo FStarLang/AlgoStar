@@ -177,3 +177,109 @@ let tag_upd_upgrades_rc_positive (stag src: Seq.seq SZ.t) (n idx: nat) (v: SZ.t)
       = if i = idx then (Seq.lemma_index_upd1 stag idx v; assert False)
         else Seq.lemma_index_upd2 stag idx v i
     in FStar.Classical.forall_intro aux
+
+(*** ========== count_nonzero: counting tagged nodes ========== ***)
+
+/// Count how many entries in s[0..n) are nonzero.
+let rec count_nonzero (s: Seq.seq SZ.t) (n: nat{n <= Seq.length s}) : Tot nat (decreases n)
+  = if n = 0 then 0
+    else (if SZ.v (Seq.index s (n - 1)) <> 0 then 1 else 0) + count_nonzero s (n - 1)
+
+/// count_nonzero is at most n
+let rec count_nonzero_le_n (s: Seq.seq SZ.t) (n: nat{n <= Seq.length s})
+  : Lemma (ensures count_nonzero s n <= n) (decreases n)
+  = if n = 0 then () else count_nonzero_le_n s (n - 1)
+
+/// If s[y] = 0 for some y < n, then count_nonzero < n
+let rec count_nonzero_lt_when_zero (s: Seq.seq SZ.t) (n: nat{n <= Seq.length s}) (y: nat)
+  : Lemma (requires y < n /\ SZ.v (Seq.index s y) == 0)
+          (ensures count_nonzero s n < n)
+          (decreases n)
+  = if n = 0 then ()
+    else if y = n - 1 then
+      count_nonzero_le_n s (n - 1)
+    else begin
+      count_nonzero_lt_when_zero s (n - 1) y
+    end
+
+/// Extensionality: sequences agreeing on [0..n) have equal count_nonzero
+let rec count_nonzero_ext (s1 s2: Seq.seq SZ.t) (n: nat{n <= Seq.length s1 /\ n <= Seq.length s2})
+  : Lemma (requires forall (i:nat). i < n ==> Seq.index s1 i == Seq.index s2 i)
+          (ensures count_nonzero s1 n == count_nonzero s2 n)
+          (decreases n)
+  = if n = 0 then () else count_nonzero_ext s1 s2 (n - 1)
+
+/// Setting a zero entry to nonzero increases count by 1
+let rec count_nonzero_set_nz (s: Seq.seq SZ.t) (n: nat{n <= Seq.length s}) (y: nat) (v: SZ.t)
+  : Lemma (requires y < n /\ SZ.v (Seq.index s y) == 0 /\ SZ.v v <> 0)
+          (ensures count_nonzero (Seq.upd s y v) n == count_nonzero s n + 1)
+          (decreases n)
+  = let s' = Seq.upd s y v in
+    if n = 0 then ()
+    else if y = n - 1 then begin
+      Seq.lemma_index_upd1 s y v;
+      // s' agrees with s on [0..n-1) since y = n-1
+      let aux (i:nat{i < n - 1}) : Lemma (Seq.index s' i == Seq.index s i)
+        = Seq.lemma_index_upd2 s y v i
+      in FStar.Classical.forall_intro aux;
+      count_nonzero_ext s' s (n - 1)
+    end else begin
+      Seq.lemma_index_upd2 s y v (n - 1);
+      count_nonzero_set_nz s (n - 1) y v
+    end
+
+/// Setting a nonzero entry to nonzero preserves count
+let rec count_nonzero_set_nz_nz (s: Seq.seq SZ.t) (n: nat{n <= Seq.length s}) (y: nat) (v: SZ.t)
+  : Lemma (requires y < n /\ SZ.v (Seq.index s y) <> 0 /\ SZ.v v <> 0)
+          (ensures count_nonzero (Seq.upd s y v) n == count_nonzero s n)
+          (decreases n)
+  = let s' = Seq.upd s y v in
+    if n = 0 then ()
+    else if y = n - 1 then begin
+      Seq.lemma_index_upd1 s y v;
+      let aux (i:nat{i < n - 1}) : Lemma (Seq.index s' i == Seq.index s i)
+        = Seq.lemma_index_upd2 s y v i
+      in FStar.Classical.forall_intro aux;
+      count_nonzero_ext s' s (n - 1)
+    end else begin
+      Seq.lemma_index_upd2 s y v (n - 1);
+      count_nonzero_set_nz_nz s (n - 1) y v
+    end
+
+/// Updating any entry with a nonzero value doesn't decrease count_nonzero.
+/// Covers: 0→nonzero (increases by 1) and nonzero→nonzero (unchanged).
+let count_nonzero_nondec (s: Seq.seq SZ.t) (n y: nat) (v: SZ.t)
+  : Lemma (requires y < n /\ n <= Seq.length s /\ SZ.v v <> 0)
+          (ensures count_nonzero (Seq.upd s y v) n >= count_nonzero s n)
+  = if SZ.v (Seq.index s y) = 0
+    then count_nonzero_set_nz s n y v
+    else count_nonzero_set_nz_nz s n y v
+
+/// Updating a zero entry with zero is a no-op for count_nonzero.
+let rec count_nonzero_set_zero_zero (s: Seq.seq SZ.t) (n y: nat) (v: SZ.t)
+  : Lemma (requires y < n /\ n <= Seq.length s /\ SZ.v (Seq.index s y) == 0 /\ SZ.v v == 0)
+          (ensures count_nonzero (Seq.upd s y v) n == count_nonzero s n)
+          (decreases n)
+  = let s' = Seq.upd s y v in
+    if n = 0 then ()
+    else if y = n - 1 then begin
+      Seq.lemma_index_upd1 s y v;
+      let aux (i:nat{i < n - 1}) : Lemma (Seq.index s' i == Seq.index s i)
+        = Seq.lemma_index_upd2 s y v i
+      in FStar.Classical.forall_intro aux;
+      count_nonzero_ext s' s (n - 1)
+    end else begin
+      Seq.lemma_index_upd2 s y v (n - 1);
+      count_nonzero_set_zero_zero s (n - 1) y v
+    end
+
+/// General: writing any value that doesn't turn nonzero to zero can't decrease count.
+/// This covers handle_post_order's tag write (tag[rep_x] <- new_tag where
+/// new_tag ∈ {3sz, cur_tag}).
+let count_nonzero_write_nondec (s: Seq.seq SZ.t) (n y: nat) (v: SZ.t)
+  : Lemma (requires y < n /\ n <= Seq.length s /\
+           (SZ.v (Seq.index s y) == 0 \/ SZ.v v <> 0))
+          (ensures count_nonzero (Seq.upd s y v) n >= count_nonzero s n)
+  = if SZ.v v <> 0
+    then count_nonzero_nondec s n y v
+    else count_nonzero_set_zero_zero s n y v

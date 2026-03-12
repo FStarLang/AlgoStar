@@ -272,6 +272,41 @@ let upd_preserves_is_forest
         upd_depth_increase parent n v root_sz idx (n - 1)
     in FStar.Classical.forall_intro aux
 
+// ========== Self-rooted preservation lemma ==========
+
+let roots_preserved_after_upd
+  (sparent sp_pre: Seq.seq SZ.t) (n vc: nat) (root: SZ.t)
+  (stag srank: Seq.seq SZ.t)
+  : Lemma
+    (requires
+      n <= Seq.length sparent /\
+      n <= Seq.length sp_pre /\
+      vc < n /\ vc < Seq.length sp_pre /\
+      SZ.v root < n /\
+      is_root_at sp_pre (SZ.v root) /\
+      Spec.uf_inv (to_uf stag sp_pre srank n) /\
+      SZ.v root == Spec.pure_find (to_uf stag sp_pre srank n) vc /\
+      (forall (i: nat). i < n /\ SZ.v (Seq.index sparent i) == i ==> SZ.v (Seq.index sp_pre i) == i)
+    )
+    (ensures
+      (forall (i: nat). i < n /\ SZ.v (Seq.index sparent i) == i ==>
+        SZ.v (Seq.index (Seq.upd sp_pre vc root) i) == i)
+    )
+  = let sp' = Seq.upd sp_pre vc root in
+    assert (Seq.length sp' == Seq.length sp_pre);
+    let aux (i: nat)
+      : Lemma (requires i < n /\ i < Seq.length sparent /\ SZ.v (Seq.index sparent i) == i)
+              (ensures i < Seq.length sp' /\ SZ.v (Seq.index sp' i) == i)
+      = if i = vc then begin
+          to_nat_seq_index sp_pre n vc;
+          Spec.pure_find_root (to_uf stag sp_pre srank n) vc;
+          Seq.lemma_index_upd1 sp_pre vc root
+        end else begin
+          Seq.lemma_index_upd2 sp_pre vc root i
+        end
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+
 // ========== MAKE-SET ==========
 
 let make_set_uf_inv (stag sp sr: Seq.seq SZ.t) (n: nat)
@@ -473,7 +508,8 @@ fn compress_path
       Spec.uf_inv (to_uf stag sp srank (SZ.v n)) /\
       (forall (z: nat). z < SZ.v n ==>
         Spec.pure_find (to_uf stag sp srank (SZ.v n)) z ==
-        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z)
+        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z) /\
+      (forall (i: nat). i < SZ.v n /\ SZ.v (Seq.index sparent i) == i ==> SZ.v (Seq.index sp i) == i)
     )
 {
   let mut curr = x;
@@ -498,7 +534,8 @@ fn compress_path
       SZ.v root == Spec.pure_find (to_uf stag sp srank (SZ.v n)) (SZ.v vc) /\
       (forall (z: nat). z < SZ.v n ==>
         Spec.pure_find (to_uf stag sp srank (SZ.v n)) z ==
-        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z)
+        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z) /\
+      (forall (i: nat). i < SZ.v n /\ SZ.v (Seq.index sparent i) == i ==> SZ.v (Seq.index sp i) == i)
     )
   decreases (SZ.v n - SZ.v !count)
   {
@@ -511,6 +548,7 @@ fn compress_path
     to_uf_upd_parent stag sp_pre srank (SZ.v n) (SZ.v vc) root;
     Compress.compress_preserves_find_all (to_uf stag sp_pre srank (SZ.v n)) (SZ.v vc);
     upd_preserves_is_forest sp_pre (SZ.v n) (SZ.v vc) root;
+    roots_preserved_after_upd sparent sp_pre (SZ.v n) (SZ.v vc) root stag srank;
     curr := par;
     let c = !count;
     count := SZ.add c 1sz
@@ -522,7 +560,7 @@ fn compress_path
   to_uf_upd_parent stag sp_pre2 srank (SZ.v n) (SZ.v x) root;
   Compress.compress_preserves_find_all (to_uf stag sp_pre2 srank (SZ.v n)) (SZ.v x);
   upd_preserves_is_forest sp_pre2 (SZ.v n) (SZ.v x) root;
-  with sp_final. assert (A.pts_to parent sp_final)
+  roots_preserved_after_upd sparent sp_pre2 (SZ.v n) (SZ.v x) root stag srank
 }
 ```
 #pop-options
@@ -558,7 +596,8 @@ fn find_set
       SZ.v root == Spec.pure_find (to_uf stag sparent srank (SZ.v n)) (SZ.v x) /\
       (forall (z: nat). z < SZ.v n ==>
         Spec.pure_find (to_uf stag sp srank (SZ.v n)) z ==
-        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z)
+        Spec.pure_find (to_uf stag sparent srank (SZ.v n)) z) /\
+      (forall (i: nat). i < SZ.v n /\ SZ.v (Seq.index sparent i) == i ==> SZ.v (Seq.index sp i) == i)
     )
 {
   let root = find_root_imp parent x n #stag #srank;
