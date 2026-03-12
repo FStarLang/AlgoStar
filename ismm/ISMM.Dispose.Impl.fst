@@ -93,7 +93,9 @@ fn dispose_process_field
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sscc i)} i < SZ.v vst ==> SZ.v (Seq.index sscc i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n) /\
+      // RC-positive: all RC-tagged nodes have positive refcount
+      (forall (i:nat). {:pattern (Seq.index stag i)} i < SZ.v n /\ SZ.v (Seq.index stag i) == 3 ==> SZ.v (Seq.index src i) > 0)
     )
   ensures exists* st' sp' sr' sdfs' sscc' vdt' vst' src'.
     A.pts_to tag st' **
@@ -115,6 +117,7 @@ fn dispose_process_field
       SZ.v n <= Seq.length st' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
+      SZ.v n <= Seq.length src' /\
       Seq.length sdfs' == SZ.v n /\
       Seq.length sscc' == SZ.v n /\
       Impl.is_forest sp' (SZ.v n) /\
@@ -122,7 +125,9 @@ fn dispose_process_field
       SZ.v vst' >= SZ.v vst /\
       SZ.v vdt' >= SZ.v vdt /\
       (forall (i:nat). {:pattern (Seq.index sscc' i)} i < SZ.v vst' ==> SZ.v (Seq.index sscc' i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sdfs' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdfs' i) < SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sdfs' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdfs' i) < SZ.v n) /\
+      // RC-positive maintained
+      (forall (i:nat). {:pattern (Seq.index st' i)} i < SZ.v n /\ SZ.v (Seq.index st' i) == 3 ==> SZ.v (Seq.index src' i) > 0)
     )
 {
   // Find representative of the field target
@@ -144,6 +149,7 @@ fn dispose_process_field
       // Tag-only update (→PROCESSING): preserves uf_inv
       with st1. assert (A.pts_to tag st1);
       UFL.tag_update_preserves_uf_inv stag sp1 srank (SZ.v n) (SZ.v field_node) 2sz;
+      Arith.tag_upd_preserves_rc_positive stag src (SZ.v n) (SZ.v field_node) 2sz;
       ()
     } else { () }
   } else {
@@ -163,10 +169,15 @@ fn dispose_process_field
         dfs_top := SZ.(dt +^ 1sz);
         with st1. assert (A.pts_to tag st1);
         UFL.tag_update_preserves_uf_inv stag sp1 srank (SZ.v n) (SZ.v rep_f) 2sz;
+        Arith.tag_rc_upd_preserves_rc_positive stag src (SZ.v n) (SZ.v rep_f) 2sz 0sz;
         ()
       } else {
         // RC > 1: just decrement
-        assume_ (pure (SZ.v rc > 0 /\ SZ.fits (SZ.v rc - 1)));
+        // From RC-positive invariant: tag[rep_f]=3 ∧ rep_f < n ⟹ rc[rep_f] > 0
+        // rc != 1 ∧ rc > 0 ⟹ rc ≥ 2 ⟹ fits(rc - 1)
+        assert (pure (SZ.v rc > 0));
+        Arith.rc_dec_fits (SZ.v rc);
+        Arith.rc_upd_preserves_rc_positive stag src (SZ.v n) (SZ.v rep_f) SZ.(rc -^ 1sz);
         refcount.(rep_f) <- SZ.(rc -^ 1sz);
         with src1. assert (A.pts_to refcount src1);
         ()
@@ -227,7 +238,9 @@ fn dispose_process_scc
       Seq.length sscc == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
-      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n) /\
+      // RC-positive: all RC-tagged nodes have positive refcount
+      (forall (i:nat). {:pattern (Seq.index stag i)} i < SZ.v n /\ SZ.v (Seq.index stag i) == 3 ==> SZ.v (Seq.index src i) > 0)
     )
   ensures exists* st' sp' sr' sdfs' sscc' vdt' vst' src'.
     A.pts_to tag st' **
@@ -249,11 +262,14 @@ fn dispose_process_scc
       SZ.v n <= Seq.length st' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
+      SZ.v n <= Seq.length src' /\
       Seq.length sdfs' == SZ.v n /\
       Seq.length sscc' == SZ.v n /\
       Impl.is_forest sp' (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
-      (forall (i:nat). {:pattern (Seq.index sdfs' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdfs' i) < SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sdfs' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdfs' i) < SZ.v n) /\
+      // RC-positive maintained
+      (forall (i:nat). {:pattern (Seq.index st' i)} i < SZ.v n /\ SZ.v (Seq.index st' i) == 3 ==> SZ.v (Seq.index src' i) > 0)
     )
 {
   // Push rep to scc stack and mark as PROCESSING
@@ -267,6 +283,7 @@ fn dispose_process_scc
   
   // Tag-only update (→PROCESSING): preserves uf_inv
   UFL.tag_update_preserves_uf_inv stag sparent srank (SZ.v n) (SZ.v rep) 2sz;
+  Arith.tag_upd_preserves_rc_positive stag src (SZ.v n) (SZ.v rep) 2sz;
   
   with st1. assert (A.pts_to tag st1);
   with sp1. assert (A.pts_to parent sp1);
@@ -309,7 +326,9 @@ fn dispose_process_scc
       Impl.is_forest sp (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
       (forall (i:nat). {:pattern (Seq.index sscc2 i)} i < SZ.v vst2 ==> SZ.v (Seq.index sscc2 i) < SZ.v n) /\
-      (forall (i:nat). {:pattern (Seq.index sdfs2 i)} i < SZ.v vdt2 ==> SZ.v (Seq.index sdfs2 i) < SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sdfs2 i)} i < SZ.v vdt2 ==> SZ.v (Seq.index sdfs2 i) < SZ.v n) /\
+      // RC-positive maintained
+      (forall (i:nat). {:pattern (Seq.index st i)} i < SZ.v n /\ SZ.v (Seq.index st i) == 3 ==> SZ.v (Seq.index src2 i) > 0)
     )
   {
     let idx = !scc_idx;
@@ -351,7 +370,9 @@ fn dispose_process_scc
         Impl.is_forest sp2 (SZ.v n) /\
         Spec.uf_inv (Impl.to_uf st2 sp2 sr2 (SZ.v n)) /\
         (forall (i:nat). {:pattern (Seq.index sscc3 i)} i < SZ.v vst3 ==> SZ.v (Seq.index sscc3 i) < SZ.v n) /\
-        (forall (i:nat). {:pattern (Seq.index sdfs3 i)} i < SZ.v vdt3 ==> SZ.v (Seq.index sdfs3 i) < SZ.v n)
+        (forall (i:nat). {:pattern (Seq.index sdfs3 i)} i < SZ.v vdt3 ==> SZ.v (Seq.index sdfs3 i) < SZ.v n) /\
+        // RC-positive maintained
+        (forall (i:nat). {:pattern (Seq.index st2 i)} i < SZ.v n /\ SZ.v (Seq.index st2 i) == 3 ==> SZ.v (Seq.index src3 i) > 0)
       )
     decreases (SZ.v n - SZ.v !field_idx)
     {
@@ -381,6 +402,7 @@ fn dispose_process_scc
     
     // Tag-only update (PROCESSING→UNMARKED) preserves uf_inv
     UFL.tag_update_preserves_uf_inv st_pre sp_pre sr_pre (SZ.v n) (SZ.v x) 0sz;
+    Arith.tag_upd_preserves_rc_positive st_pre src_pre (SZ.v n) (SZ.v x) 0sz;
     
     // "Free" this node: set tag to UNMARKED (0)
     tag.(x) <- 0sz;
@@ -449,7 +471,9 @@ fn dispose
       Seq.length src == A.length refcount /\
       A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      // RC-positive: all RC-tagged nodes (except rep) have positive refcount
+      (forall (i:nat). {:pattern (Seq.index stag i)} i < SZ.v n /\ SZ.v (Seq.index stag i) == 3 /\ i <> SZ.v rep ==> SZ.v (Seq.index src i) > 0)
     )
   ensures exists* st sp sr src'.
     A.pts_to tag st **
@@ -462,8 +486,12 @@ fn dispose
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
       Seq.length src' == Seq.length src /\
+      SZ.v n <= Seq.length st /\
+      SZ.v n <= Seq.length src' /\
       Impl.is_forest sp (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
+      // RC-positive maintained
+      (forall (i:nat). {:pattern (Seq.index st i)} i < SZ.v n /\ SZ.v (Seq.index st i) == 3 ==> SZ.v (Seq.index src' i) > 0)
     )
 {
   // Allocate stacks
@@ -480,6 +508,12 @@ fn dispose
   Arith.seq_upd_content_bound sdfs0 0 (SZ.v n) rep;
   dfs_stk.(0sz) <- rep;
   dfs_top := 1sz;
+  
+  // Mark rep as PROCESSING before entering the main loop,
+  // upgrading the exception-form RC-positive invariant to standard form
+  tag.(rep) <- 2sz;
+  UFL.tag_update_preserves_uf_inv stag sparent srank (SZ.v n) (SZ.v rep) 2sz;
+  Arith.tag_upd_upgrades_rc_positive stag src (SZ.v n) (SZ.v rep) 2sz;
   
   // Main loop: process SCC DAG
   while (!dfs_top >^ 0sz)
@@ -511,7 +545,9 @@ fn dispose
       Seq.length sscc == SZ.v n /\
       Impl.is_forest sp (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
-      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n)
+      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n) /\
+      // RC-positive maintained
+      (forall (i:nat). {:pattern (Seq.index st i)} i < SZ.v n /\ SZ.v (Seq.index st i) == 3 ==> SZ.v (Seq.index src2 i) > 0)
     )
   {
     // Pop from dfs stack

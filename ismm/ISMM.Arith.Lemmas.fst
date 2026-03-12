@@ -107,3 +107,73 @@ let seq_upd_existing_le_bound (s: Seq.seq SZ.t) (top: nat) (bound: nat) (idx: na
       = if i = idx then Seq.lemma_index_upd1 s idx v
         else Seq.lemma_index_upd2 s idx v i
     in FStar.Classical.forall_intro aux
+
+(*** RC-positive invariant preservation: tag update to non-3 preserves forall i. tag[i]=3 ==> rc[i]>0 ***)
+let tag_upd_preserves_rc_positive (stag src: Seq.seq SZ.t) (n idx: nat) (v: SZ.t)
+  : Lemma
+    (requires idx < n /\ n <= Seq.length stag /\ n <= Seq.length src /\
+     SZ.v v <> 3 /\
+     (forall (i:nat). {:pattern (Seq.index stag i)} i < n /\ SZ.v (Seq.index stag i) == 3 ==> SZ.v (Seq.index src i) > 0))
+    (ensures
+     (forall (i:nat). {:pattern (Seq.index (Seq.upd stag idx v) i)}
+       i < n /\ SZ.v (Seq.index (Seq.upd stag idx v) i) == 3 ==> SZ.v (Seq.index src i) > 0))
+  = let stag' = Seq.upd stag idx v in
+    let aux (i:nat{i < n /\ SZ.v (Seq.index stag' i) == 3})
+      : Lemma (SZ.v (Seq.index src i) > 0)
+      = if i = idx then (Seq.lemma_index_upd1 stag idx v; assert False)
+        else Seq.lemma_index_upd2 stag idx v i
+    in FStar.Classical.forall_intro aux
+
+(*** RC-positive invariant preservation: refcount update preserves forall i. tag[i]=3 ==> rc[i]>0 ***)
+let rc_upd_preserves_rc_positive (stag src: Seq.seq SZ.t) (n idx: nat) (v: SZ.t)
+  : Lemma
+    (requires idx < n /\ n <= Seq.length stag /\ n <= Seq.length src /\
+     (SZ.v (Seq.index stag idx) == 3 ==> SZ.v v > 0) /\
+     (forall (i:nat). {:pattern (Seq.index stag i)} i < n /\ SZ.v (Seq.index stag i) == 3 ==> SZ.v (Seq.index src i) > 0))
+    (ensures
+     (forall (i:nat). {:pattern (Seq.index stag i)}
+       i < n /\ SZ.v (Seq.index stag i) == 3 ==> SZ.v (Seq.index (Seq.upd src idx v) i) > 0))
+  = let src' = Seq.upd src idx v in
+    let aux (i:nat{i < n /\ SZ.v (Seq.index stag i) == 3})
+      : Lemma (SZ.v (Seq.index src' i) > 0)
+      = if i = idx then Seq.lemma_index_upd1 src idx v
+        else Seq.lemma_index_upd2 src idx v i
+    in FStar.Classical.forall_intro aux
+
+(*** Combined tag+rc update at same index: new_tag ≠ 3 preserves RC-positive ***)
+let tag_rc_upd_preserves_rc_positive (stag src: Seq.seq SZ.t) (n idx: nat) (new_tag new_rc: SZ.t)
+  : Lemma
+    (requires idx < n /\ n <= Seq.length stag /\ n <= Seq.length src /\
+     SZ.v new_tag <> 3 /\
+     (forall (i:nat). {:pattern (Seq.index stag i)} i < n /\ SZ.v (Seq.index stag i) == 3 ==> SZ.v (Seq.index src i) > 0))
+    (ensures
+     (let stag' = Seq.upd stag idx new_tag in
+      let src' = Seq.upd src idx new_rc in
+      forall (i:nat). {:pattern (Seq.index stag' i)}
+        i < n /\ SZ.v (Seq.index stag' i) == 3 ==> SZ.v (Seq.index src' i) > 0))
+  = let stag' = Seq.upd stag idx new_tag in
+    let src' = Seq.upd src idx new_rc in
+    let aux (i:nat{i < n /\ SZ.v (Seq.index stag' i) == 3})
+      : Lemma (SZ.v (Seq.index src' i) > 0)
+      = if i = idx then (Seq.lemma_index_upd1 stag idx new_tag; assert False)
+        else begin
+          Seq.lemma_index_upd2 stag idx new_tag i;
+          Seq.lemma_index_upd2 src idx new_rc i
+        end
+    in FStar.Classical.forall_intro aux
+
+(*** RC-positive: tag update at exception index upgrades exception-form to standard-form ***)
+let tag_upd_upgrades_rc_positive (stag src: Seq.seq SZ.t) (n idx: nat) (v: SZ.t)
+  : Lemma
+    (requires idx < n /\ n <= Seq.length stag /\ n <= Seq.length src /\
+     SZ.v v <> 3 /\
+     (forall (i:nat). {:pattern (Seq.index stag i)} i < n /\ SZ.v (Seq.index stag i) == 3 /\ i <> idx ==> SZ.v (Seq.index src i) > 0))
+    (ensures
+     (forall (i:nat). {:pattern (Seq.index (Seq.upd stag idx v) i)}
+       i < n /\ SZ.v (Seq.index (Seq.upd stag idx v) i) == 3 ==> SZ.v (Seq.index src i) > 0))
+  = let stag' = Seq.upd stag idx v in
+    let aux (i:nat{i < n /\ SZ.v (Seq.index stag' i) == 3})
+      : Lemma (SZ.v (Seq.index src i) > 0)
+      = if i = idx then (Seq.lemma_index_upd1 stag idx v; assert False)
+        else Seq.lemma_index_upd2 stag idx v i
+    in FStar.Classical.forall_intro aux

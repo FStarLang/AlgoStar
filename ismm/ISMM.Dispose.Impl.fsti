@@ -61,7 +61,9 @@ fn dispose
       Seq.length src == A.length refcount /\
       A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      // RC-positive: all RC-tagged nodes (except rep, whose RC may be 0) have positive refcount
+      (forall (i:nat). {:pattern (Seq.index stag i)} i < SZ.v n /\ SZ.v (Seq.index stag i) == 3 /\ i <> SZ.v rep ==> SZ.v (Seq.index src i) > 0)
     )
   ensures exists* st sp sr src'.
     A.pts_to tag st **
@@ -74,6 +76,10 @@ fn dispose
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
       Seq.length src' == Seq.length src /\
+      SZ.v n <= Seq.length st /\
+      SZ.v n <= Seq.length src' /\
       Impl.is_forest sp (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
+      // RC-positive maintained
+      (forall (i:nat). {:pattern (Seq.index st i)} i < SZ.v n /\ SZ.v (Seq.index st i) == 3 ==> SZ.v (Seq.index src' i) > 0)
     )

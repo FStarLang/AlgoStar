@@ -49,7 +49,8 @@ fn acquire
       Seq.length srank == A.length rank /\
       Seq.length src == A.length refcount /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index src i)} i < SZ.v n ==> SZ.fits (SZ.v (Seq.index src i) + 1))
     )
   ensures exists* sp sr src'.
     A.pts_to tag stag **
@@ -95,7 +96,11 @@ fn release
       Seq.length srank == A.length rank /\
       Seq.length src == A.length refcount /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      // Caller must ensure: representative of r has positive refcount
+      (let pf = Spec.pure_find (Impl.to_uf stag sparent srank (SZ.v n)) (SZ.v r) in
+       pf < SZ.v n /\ pf < Seq.length src /\
+       SZ.v (Seq.index src pf) > 0)
     )
   returns should_dispose: bool
   ensures exists* sp sr src'.
