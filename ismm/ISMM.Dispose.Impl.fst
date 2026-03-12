@@ -342,6 +342,17 @@ fn dispose_process_scc
       }
     };
     
+    // Capture state before tag write for uf_inv proof
+    with st_pre. assert (A.pts_to tag st_pre);
+    with sp_pre. assert (A.pts_to parent sp_pre);
+    with sr_pre. assert (A.pts_to rank sr_pre);
+    with src_pre. assert (A.pts_to refcount src_pre);
+    with sdfs_pre. assert (A.pts_to dfs_stk sdfs_pre);
+    with sscc_pre. assert (A.pts_to scc_stk sscc_pre);
+    
+    // Tag-only update (PROCESSING→UNMARKED) preserves uf_inv
+    UFL.tag_update_preserves_uf_inv st_pre sp_pre sr_pre (SZ.v n) (SZ.v x) 0sz;
+    
     // "Free" this node: set tag to UNMARKED (0)
     tag.(x) <- 0sz;
     with st2. assert (A.pts_to tag st2);
@@ -354,11 +365,11 @@ fn dispose_process_scc
     // idx+1 <= scc_top (since scc_top can only grow)
     let cur_scc_top = !scc_top;
     let cur_dfs_top = !dfs_top;
+    // is_forest: parent unchanged → preserved
+    // uf_inv: tag-only update → preserved by lemma above
     assume_ (pure (
       SZ.v idx < SZ.v cur_scc_top /\
-      SZ.fits (SZ.v idx + 1) /\
-      Impl.is_forest sp2 (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st2 sp2 sr2 (SZ.v n))
+      SZ.fits (SZ.v idx + 1)
     ));
     
     scc_idx := SZ.(idx +^ 1sz);
