@@ -35,7 +35,7 @@ open ISMM.Status
 
 (* ---------- Helper: Process one field of a node during SCC collection ---------- *)
 
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 800 --fuel 1 --ifuel 1"
 ```pulse
 fn dispose_process_field
   (tag: A.array SZ.t)
@@ -78,7 +78,9 @@ fn dispose_process_field
       Seq.length sdfs == SZ.v n /\
       Seq.length sscc == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sscc i)} i < SZ.v vst ==> SZ.v (Seq.index sscc i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n)
     )
   ensures exists* st' sp' sr' sdfs' sscc' vdt' vst' src'.
     A.pts_to tag st' **
@@ -103,7 +105,11 @@ fn dispose_process_field
       Seq.length sdfs' == SZ.v n /\
       Seq.length sscc' == SZ.v n /\
       Impl.is_forest sp' (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
+      SZ.v vst' >= SZ.v vst /\
+      SZ.v vdt' >= SZ.v vdt /\
+      (forall (i:nat). {:pattern (Seq.index sscc' i)} i < SZ.v vst' ==> SZ.v (Seq.index sscc' i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sdfs' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdfs' i) < SZ.v n)
     )
 {
   // Find representative of the field target
@@ -117,6 +123,8 @@ fn dispose_process_field
     if (field_node <>^ rep_f) {
       let st = !scc_top;
       assume_ (pure (SZ.v st < SZ.v n));
+      // Prove content invariant after push
+      Arith.seq_upd_content_bound sscc (SZ.v st) (SZ.v n) field_node;
       scc_stk.(st) <- field_node;
       tag.(field_node) <- 2sz;
       scc_top := SZ.(st +^ 1sz);
@@ -136,6 +144,8 @@ fn dispose_process_field
         tag.(rep_f) <- 2sz;
         let dt = !dfs_top;
         assume_ (pure (SZ.v dt < SZ.v n));
+        // Prove content invariant after push
+        Arith.seq_upd_content_bound sdfs (SZ.v dt) (SZ.v n) rep_f;
         dfs_stk.(dt) <- rep_f;
         dfs_top := SZ.(dt +^ 1sz);
         with st1. assert (A.pts_to tag st1);
@@ -203,7 +213,8 @@ fn dispose_process_scc
       Seq.length sdfs == SZ.v n /\
       Seq.length sscc == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n)
     )
   ensures exists* st' sp' sr' sdfs' sscc' vdt' vst' src'.
     A.pts_to tag st' **
@@ -228,12 +239,15 @@ fn dispose_process_scc
       Seq.length sdfs' == SZ.v n /\
       Seq.length sscc' == SZ.v n /\
       Impl.is_forest sp' (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdfs' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdfs' i) < SZ.v n)
     )
 {
   // Push rep to scc stack and mark as PROCESSING
   let st0 = !scc_top;
   // st0 == 0 (from precondition) and n > 0, so st0 < n
+  // Prove SCC content invariant after push (vacuously true precondition since st0=0)
+  Arith.seq_upd_content_bound sscc (SZ.v st0) (SZ.v n) rep;
   scc_stk.(st0) <- rep;
   tag.(rep) <- 2sz;
   scc_top := SZ.(st0 +^ 1sz);
@@ -281,13 +295,14 @@ fn dispose_process_scc
       Seq.length sdfs2 == SZ.v n /\
       Seq.length sscc2 == SZ.v n /\
       Impl.is_forest sp (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sscc2 i)} i < SZ.v vst2 ==> SZ.v (Seq.index sscc2 i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sdfs2 i)} i < SZ.v vdt2 ==> SZ.v (Seq.index sdfs2 i) < SZ.v n)
     )
   decreases (SZ.v n * SZ.v n - SZ.v !inner_ctr)
   {
     let idx = !scc_idx;
     let x = scc_stk.(idx);
-    assume_ (pure (SZ.v x < SZ.v n));
     
     // Process all fields of x (iterate through adj row)
     let mut field_idx: SZ.t = 0sz;
@@ -310,6 +325,7 @@ fn dispose_process_scc
         SZ.v vfi <= SZ.v n /\
         SZ.v vdt3 <= SZ.v n /\
         SZ.v vst3 <= SZ.v n /\
+        SZ.v idx < SZ.v vst3 /\
         SZ.fits (SZ.v n * SZ.v n) /\
         Seq.length st2 == Seq.length stag /\
         Seq.length sp2 == Seq.length sparent /\
@@ -322,7 +338,9 @@ fn dispose_process_scc
         Seq.length sdfs3 == SZ.v n /\
         Seq.length sscc3 == SZ.v n /\
         Impl.is_forest sp2 (SZ.v n) /\
-        Spec.uf_inv (Impl.to_uf st2 sp2 sr2 (SZ.v n))
+        Spec.uf_inv (Impl.to_uf st2 sp2 sr2 (SZ.v n)) /\
+        (forall (i:nat). {:pattern (Seq.index sscc3 i)} i < SZ.v vst3 ==> SZ.v (Seq.index sscc3 i) < SZ.v n) /\
+        (forall (i:nat). {:pattern (Seq.index sdfs3 i)} i < SZ.v vdt3 ==> SZ.v (Seq.index sdfs3 i) < SZ.v n)
       )
     decreases (SZ.v n - SZ.v !field_idx)
     {
@@ -367,10 +385,6 @@ fn dispose_process_scc
     let cur_dfs_top = !dfs_top;
     // is_forest: parent unchanged → preserved
     // uf_inv: tag-only update → preserved by lemma above
-    assume_ (pure (
-      SZ.v idx < SZ.v cur_scc_top /\
-      SZ.fits (SZ.v idx + 1)
-    ));
     
     scc_idx := SZ.(idx +^ 1sz);
     
@@ -452,6 +466,8 @@ fn dispose
   let mut ghost_ctr: SZ.t = 0sz;
   
   // Push initial rep to dfs stack
+  with sdfs0. assert (A.pts_to dfs_stk sdfs0);
+  Arith.seq_upd_content_bound sdfs0 0 (SZ.v n) rep;
   dfs_stk.(0sz) <- rep;
   dfs_top := 1sz;
   
@@ -485,7 +501,8 @@ fn dispose
       Seq.length sdfs == SZ.v n /\
       Seq.length sscc == SZ.v n /\
       Impl.is_forest sp (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdfs i)} i < SZ.v vdt ==> SZ.v (Seq.index sdfs i) < SZ.v n)
     )
   decreases (SZ.v n - SZ.v !ghost_ctr)
   {
@@ -494,8 +511,6 @@ fn dispose
     let top_idx = SZ.(dt -^ 1sz);
     let scc_rep = dfs_stk.(top_idx);
     dfs_top := top_idx;
-    
-    assume_ (pure (SZ.v scc_rep < SZ.v n));
     
     // Reset scc stack for this SCC
     scc_top := 0sz;

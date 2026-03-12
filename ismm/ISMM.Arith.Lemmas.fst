@@ -57,3 +57,53 @@ let adj_index_fits (n x fi: nat)
   : Lemma (requires x < n /\ fi < n /\ SZ.fits (n * n))
           (ensures SZ.fits (x * n + fi) /\ x * n + fi < n * n)
   = product_strict_bound n n x fi
+
+module Seq = FStar.Seq
+
+(*** Stack content invariant after push: upd preserves all-less-than bound ***)
+let seq_upd_content_bound (s: Seq.seq SZ.t) (top: nat) (bound: nat) (v: SZ.t)
+  : Lemma
+    (requires
+      top < Seq.length s /\
+      SZ.v v < bound /\
+      (forall (i:nat). i < top ==> SZ.v (Seq.index s i) < bound))
+    (ensures
+      (forall (i:nat). {:pattern (Seq.index (Seq.upd s top v) i)}
+        i < top + 1 ==> SZ.v (Seq.index (Seq.upd s top v) i) < bound))
+  = let aux (i:nat{i < top + 1})
+      : Lemma (SZ.v (Seq.index (Seq.upd s top v) i) < bound)
+      = if i = top then Seq.lemma_index_upd1 s top v
+        else Seq.lemma_index_upd2 s top v i
+    in FStar.Classical.forall_intro aux
+
+(*** Stack content after push: ≤ variant (for edge stacks) ***)
+let seq_upd_content_le_bound (s: Seq.seq SZ.t) (top: nat) (bound: nat) (v: SZ.t)
+  : Lemma
+    (requires
+      top < Seq.length s /\
+      SZ.v v <= bound /\
+      (forall (i:nat). i < top ==> SZ.v (Seq.index s i) <= bound))
+    (ensures
+      (forall (i:nat). {:pattern (Seq.index (Seq.upd s top v) i)}
+        i < top + 1 ==> SZ.v (Seq.index (Seq.upd s top v) i) <= bound))
+  = let aux (i:nat{i < top + 1})
+      : Lemma (SZ.v (Seq.index (Seq.upd s top v) i) <= bound)
+      = if i = top then Seq.lemma_index_upd1 s top v
+        else Seq.lemma_index_upd2 s top v i
+    in FStar.Classical.forall_intro aux
+
+(*** Edge update preserves content invariant: updating an existing entry ≤ bound ***)
+let seq_upd_existing_le_bound (s: Seq.seq SZ.t) (top: nat) (bound: nat) (idx: nat) (v: SZ.t)
+  : Lemma
+    (requires
+      idx < top /\ top <= Seq.length s /\
+      SZ.v v <= bound /\
+      (forall (i:nat). i < top ==> SZ.v (Seq.index s i) <= bound))
+    (ensures
+      (forall (i:nat). {:pattern (Seq.index (Seq.upd s idx v) i)}
+        i < top ==> SZ.v (Seq.index (Seq.upd s idx v) i) <= bound))
+  = let aux (i:nat{i < top})
+      : Lemma (SZ.v (Seq.index (Seq.upd s idx v) i) <= bound)
+      = if i = idx then Seq.lemma_index_upd1 s idx v
+        else Seq.lemma_index_upd2 s idx v i
+    in FStar.Classical.forall_intro aux
