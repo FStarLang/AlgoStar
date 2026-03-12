@@ -48,10 +48,13 @@ fn dispose
       SZ.v n <= A.length parent /\
       SZ.v n <= A.length rank /\
       SZ.v n * SZ.v n <= A.length adj /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SZ.fits (SZ.v n * (SZ.v n + 1)) /\
       Seq.length stag == A.length tag /\
       Seq.length sparent == A.length parent /\
       Seq.length srank == A.length rank /\
       Seq.length sadj == A.length adj /\
+      A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
     )

@@ -57,6 +57,7 @@ fn handle_post_order
       SZ.v n <= Seq.length stag /\
       SZ.v n <= Seq.length sparent /\
       SZ.v n <= Seq.length srank /\
+      Seq.length sparent == Seq.length srank /\
       Seq.length spd == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
@@ -72,6 +73,7 @@ fn handle_post_order
       Seq.length st' == Seq.length stag /\
       Seq.length sp' == Seq.length sparent /\
       Seq.length sr' == Seq.length srank /\
+      Seq.length sp' == Seq.length sr' /\
       SZ.v n <= Seq.length st' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
@@ -220,6 +222,7 @@ fn handle_non_tree_edge
       SZ.v n <= Seq.length sp1 /\
       SZ.v n <= Seq.length srank /\
       SZ.v n <= Seq.length stag /\
+      Seq.length sp1 == Seq.length srank /\
       SZ.v rep_y < Seq.length srank /\
       SZ.v (Seq.index sp1 (SZ.v rep_y)) == SZ.v rep_y /\
       Impl.is_forest sp1 (SZ.v n) /\
@@ -231,6 +234,7 @@ fn handle_non_tree_edge
     pure (
       Seq.length sp' == Seq.length sp1 /\
       Seq.length sr' == Seq.length srank /\
+      Seq.length sp' == Seq.length sr' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
       Impl.is_forest sp' (SZ.v n) /\
@@ -239,7 +243,7 @@ fn handle_non_tree_edge
 {
   if (tag_rep = 1sz) {
     // BACK EDGE: union x with y
-    assume_ (pure (Seq.length srank == Seq.length sp1));
+    // Seq.length sp1 == Seq.length srank (from precondition)
     Spec.rank_bounded_all (Impl.to_uf stag sp1 srank (SZ.v n));
     Impl.union_set parent rank #sp1 #srank #stag x y n;
     ()
@@ -304,6 +308,7 @@ fn handle_edge
       SZ.v n <= Seq.length stag /\
       SZ.v n <= Seq.length sparent /\
       SZ.v n <= Seq.length srank /\
+      Seq.length sparent == Seq.length srank /\
       SZ.v n * SZ.v n <= Seq.length sadj /\
       Seq.length sdn == SZ.v n /\
       Seq.length sde == SZ.v n /\
@@ -330,6 +335,7 @@ fn handle_edge
       Seq.length st' == Seq.length stag /\
       Seq.length sp' == Seq.length sparent /\
       Seq.length sr' == Seq.length srank /\
+      Seq.length sp' == Seq.length sr' /\
       SZ.v n <= Seq.length st' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
@@ -415,9 +421,12 @@ fn freeze_step
       SZ.v vpt <= SZ.v n /\
       SZ.v vgc <= SZ.v n * (SZ.v n + 1) /\
       SZ.v n > 0 /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SZ.fits (SZ.v n * (SZ.v n + 1)) /\
       Seq.length stag == A.length tag /\
       Seq.length sparent == A.length parent /\
       Seq.length srank == A.length rank /\
+      Seq.length sparent == Seq.length srank /\
       SZ.v n <= Seq.length stag /\
       SZ.v n <= Seq.length sparent /\
       SZ.v n <= Seq.length srank /\
@@ -447,6 +456,7 @@ fn freeze_step
       Seq.length st' == Seq.length stag /\
       Seq.length sp' == Seq.length sparent /\
       Seq.length sr' == Seq.length srank /\
+      Seq.length sp' == Seq.length sr' /\
       SZ.v n <= Seq.length st' /\
       SZ.v n <= Seq.length sp' /\
       SZ.v n <= Seq.length sr' /\
@@ -523,10 +533,13 @@ fn freeze
       SZ.v n <= A.length parent /\
       SZ.v n <= A.length rank /\
       SZ.v n * SZ.v n <= A.length adj /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SZ.fits (SZ.v n * (SZ.v n + 1)) /\
       Seq.length stag == A.length tag /\
       Seq.length sparent == A.length parent /\
       Seq.length srank == A.length rank /\
       Seq.length sadj == A.length adj /\
+      A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
     )
@@ -589,9 +602,12 @@ fn freeze
         SZ.v vdt <= SZ.v n /\
         SZ.v vpt <= SZ.v n /\
         SZ.v vgc <= SZ.v n * (SZ.v n + 1) /\
+        SZ.fits (SZ.v n * SZ.v n) /\
+        SZ.fits (SZ.v n * (SZ.v n + 1)) /\
         Seq.length st == Seq.length stag /\
         Seq.length sp == Seq.length sparent /\
         Seq.length sr == Seq.length srank /\
+        Seq.length sp == Seq.length sr /\
         SZ.v n <= Seq.length st /\
         SZ.v n <= Seq.length sp /\
         SZ.v n <= Seq.length sr /\

@@ -29,6 +29,7 @@ module Seq = FStar.Seq
 module Spec = ISMM.UnionFind.Spec
 module Impl = ISMM.UnionFind.Impl
 module UFL = ISMM.UF.Lemmas
+module Arith = ISMM.Arith.Lemmas
 open ISMM.Status
 
 
@@ -66,6 +67,7 @@ fn dispose_process_field
       SZ.v n > 0 /\
       SZ.v vdt <= SZ.v n /\
       SZ.v vst <= SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
       SZ.v n <= Seq.length stag /\
       SZ.v n <= Seq.length sparent /\
       SZ.v n <= Seq.length srank /\
@@ -190,7 +192,8 @@ fn dispose_process_scc
       SZ.v rep < SZ.v n /\
       SZ.v n > 0 /\
       SZ.v vdt <= SZ.v n /\
-      SZ.v vst <= SZ.v n /\
+      SZ.v vst == 0 /\
+      SZ.fits (SZ.v n * SZ.v n) /\
       SZ.v n <= Seq.length stag /\
       SZ.v n <= Seq.length sparent /\
       SZ.v n <= Seq.length srank /\
@@ -226,7 +229,7 @@ fn dispose_process_scc
 {
   // Push rep to scc stack and mark as PROCESSING
   let st0 = !scc_top;
-  assume_ (pure (SZ.v st0 < SZ.v n));
+  // st0 == 0 (from precondition) and n > 0, so st0 < n
   scc_stk.(st0) <- rep;
   tag.(rep) <- 2sz;
   scc_top := SZ.(st0 +^ 1sz);
@@ -256,10 +259,12 @@ fn dispose_process_scc
     A.pts_to dfs_stk sdfs2 **
     A.pts_to scc_stk sscc2 **
     pure (
+      SZ.v n > 0 /\
       SZ.v vidx <= SZ.v vst2 /\
       SZ.v vst2 <= SZ.v n /\
       SZ.v vdt2 <= SZ.v n /\
       SZ.v vic <= SZ.v n * SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
@@ -293,9 +298,12 @@ fn dispose_process_scc
       R.pts_to scc_top vst3 **
       R.pts_to scc_idx idx **
       pure (
+        SZ.v n > 0 /\
+        SZ.v x < SZ.v n /\
         SZ.v vfi <= SZ.v n /\
         SZ.v vdt3 <= SZ.v n /\
         SZ.v vst3 <= SZ.v n /\
+        SZ.fits (SZ.v n * SZ.v n) /\
         Seq.length st2 == Seq.length stag /\
         Seq.length sp2 == Seq.length sparent /\
         Seq.length sr2 == Seq.length srank /\
@@ -311,8 +319,8 @@ fn dispose_process_scc
     decreases (SZ.v n - SZ.v !field_idx)
     {
       let fi = !field_idx;
-      assume_ (pure (SZ.fits (SZ.v x * SZ.v n + SZ.v fi) /\
-                     SZ.v x * SZ.v n + SZ.v fi < Seq.length sadj));
+      // x < n (from invariant), fi < n (from loop guard), fits(n*n) → adj index valid
+      Arith.adj_index_fits (SZ.v n) (SZ.v x) (SZ.v fi);
       let edge_idx = SZ.(x *^ n +^ fi);
       let has_edge = adj.(edge_idx);
       
@@ -384,10 +392,13 @@ fn dispose
       SZ.v n <= A.length parent /\
       SZ.v n <= A.length rank /\
       SZ.v n * SZ.v n <= A.length adj /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      SZ.fits (SZ.v n * (SZ.v n + 1)) /\
       Seq.length stag == A.length tag /\
       Seq.length sparent == A.length parent /\
       Seq.length srank == A.length rank /\
       Seq.length sadj == A.length adj /\
+      A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
     )
@@ -430,9 +441,11 @@ fn dispose
     A.pts_to dfs_stk sdfs **
     A.pts_to scc_stk sscc **
     pure (
+      SZ.v n > 0 /\
       SZ.v vdt <= SZ.v n /\
       SZ.v vst <= SZ.v n /\
       SZ.v vgc <= SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length st == Seq.length stag /\
       Seq.length sp == Seq.length sparent /\
       Seq.length sr == Seq.length srank /\
