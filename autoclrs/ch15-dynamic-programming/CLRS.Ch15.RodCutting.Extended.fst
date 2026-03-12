@@ -31,7 +31,7 @@ module Seq = FStar.Seq
 
 // ========== Pure Specification ==========
 
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
 
 // Accumulated max: max over i in [1, limit] of (prices[i-1] + r[j-i])
 let rec accum_max (prices: Seq.seq nat) (r: Seq.seq nat) (j: nat) (limit: nat)

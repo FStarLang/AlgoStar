@@ -135,7 +135,7 @@ let stable_permutation (edges1 edges2: list edge) : prop =
 
 // If both edge lists are sorted and are stable permutations of each other,
 // Kruskal produces MSTs with equal weight
-#push-options "--z3rlimit 80"
+#push-options "--z3rlimit 160"
 let lemma_stable_permutation_equal_mst_weight
   (g1 g2: graph)
   (edges1 edges2: list edge)

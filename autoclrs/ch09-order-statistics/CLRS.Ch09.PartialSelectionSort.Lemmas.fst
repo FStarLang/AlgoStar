@@ -52,40 +52,47 @@ let rec sorted_head_le (s: seq int) (x: int)
     )
 
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 0"
+/// Helper: if head is same and whole-sequence counts match, tail counts match.
+/// Isolated to avoid is_sorted quantifier explosion.
+let perm_tail_count (min: int) (t1 t2: seq int) (s1 s2: seq int) (x: int)
+  : Lemma (requires Seq.length s1 > 0 /\ Seq.length s2 > 0 /\
+                    Seq.index s1 0 == min /\ Seq.index s2 0 == min /\
+                    Seq.tail s1 == t1 /\ Seq.tail s2 == t2 /\
+                    count_occ s1 x = count_occ s2 x)
+          (ensures count_occ t1 x = count_occ t2 x)
+  = count_occ_cons min t1 x;
+    count_occ_cons min t2 x
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
 //SNIPPET_START: sorted_permutation_equal
 let rec sorted_permutation_equal (s1 s2: seq int)
   : Lemma (requires is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
           (ensures Seq.equal s1 s2)
           (decreases Seq.length s1)
 //SNIPPET_END: sorted_permutation_equal
-  = if Seq.length s1 < 2 then ()
+  = if Seq.length s1 = 0 then ()
     else begin
       let min1 = Seq.index s1 0 in
       let min2 = Seq.index s2 0 in
-      count_occ_cons min1 (Seq.tail s1) min1;
-      assert (count_occ s1 min1 > 0);
-      sorted_head_le s2 min1;
-      assert (min2 <= min1);
-      count_occ_cons min2 (Seq.tail s2) min2;
-      assert (count_occ s2 min2 > 0);
-      sorted_head_le s1 min2;
-      assert (min1 <= min2);
       let t1 = Seq.tail s1 in
       let t2 = Seq.tail s2 in
-      sorted_tail s1;
-      sorted_tail s2;
-      let aux (x: int) : Lemma (count_occ t1 x = count_occ t2 x)
-        = count_occ_cons min1 t1 x;
-          count_occ_cons min2 t2 x;
-          Seq.lemma_head_append (Seq.create 1 min1) t1;
-          Seq.lemma_tail_append (Seq.create 1 min1) t1;
-          assert (Seq.cons min1 t1 == s1);
-          assert (Seq.cons min2 t2 == s2);
-          assert (count_occ s1 x = count_occ s2 x)
-      in
-      Classical.forall_intro aux;
-      sorted_permutation_equal t1 t2
+      count_occ_cons min1 t1 min1;
+      count_occ_cons min2 t2 min2;
+      sorted_head_le s2 min1;
+      sorted_head_le s1 min2;
+      if Seq.length s1 = 1 then ()
+      else begin
+        sorted_tail s1;
+        sorted_tail s2;
+        let aux (x: int) : Lemma (count_occ t1 x = count_occ t2 x)
+          = perm_tail_count min1 t1 t2 s1 s2 x
+        in
+        Classical.forall_intro aux;
+        sorted_permutation_equal t1 t2
+      end
     end
 #pop-options
 

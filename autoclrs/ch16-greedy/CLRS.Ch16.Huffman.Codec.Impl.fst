@@ -173,7 +173,7 @@ let decode_suffix_step
 
 // Full decoder: decode entire bitstring into an output array.
 // Postcondition: output matches pure decode.
-#push-options "--z3rlimit 80 --split_queries always"
+#push-options "--z3rlimit 160 --split_queries always"
 fn decode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (bits: A.array bool) (bit_len: SZ.t)
@@ -384,7 +384,7 @@ let rec append_index_right (l1 l2: list bool) (i: nat)
 #pop-options
 
 // After one encode step: remaining-suffix index invariant is maintained (list-only, no Seq)
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 80"
 let encode_suffix_step
   (ft: HSpec.htree)
   (msg_seq: Seq.seq nat)
@@ -433,7 +433,8 @@ let encode_suffix_step
 
 // Encode: for each symbol in msg, look up codeword and write to output.
 // Uses suffix-based invariant: tracks encode of remaining symbols.
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+#restart-solver
+#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
 fn encode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (msg: A.array nat) (msg_len: SZ.t)

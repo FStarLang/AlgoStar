@@ -277,7 +277,7 @@ ensures exists* sb'.
 
 open Pulse.Lib.BoundedIntegers
 
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 800 --fuel 1 --ifuel 1 --z3refresh"
 ```pulse
 fn counting_sort_inplace
   (a: A.array nat)

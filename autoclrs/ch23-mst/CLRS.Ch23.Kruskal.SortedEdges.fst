@@ -36,7 +36,8 @@ let sorted_edges_indices (es: list edge) : prop =
   forall (i j: nat). i < j /\ j < length es ==> 
     (index es i).w <= (index es j).w
 
-#push-options "--fuel 4 --ifuel 1 --z3rlimit 30"
+#restart-solver
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
 let rec sorted_edges_indices_helper (es: list edge)
   : Lemma (requires sorted_edges es)
           (ensures sorted_edges_indices es)
@@ -44,7 +45,18 @@ let rec sorted_edges_indices_helper (es: list edge)
   = match es with
     | [] | [_] -> ()
     | e1 :: e2 :: rest ->
-        sorted_edges_indices_helper (e2 :: rest)
+        sorted_edges_indices_helper (e2 :: rest);
+        introduce forall (i j: nat). i < j /\ j < length es ==> (index es i).w <= (index es j).w
+        with introduce _ ==> _
+        with _. (
+          if i = 0 then (
+            // e1.w <= e2.w from sorted_edges, and e2.w <= (index (e2::rest) (j-1)).w from IH
+            if j = 1 then ()
+            else assert ((index (e2 :: rest) 0).w <= (index (e2 :: rest) (j - 1)).w)
+          ) else
+            // Both in tail: follows directly from IH
+            assert ((index (e2 :: rest) (i - 1)).w <= (index (e2 :: rest) (j - 1)).w)
+        )
 #pop-options
 
 let sorted_edges_implies_indices (es: list edge)

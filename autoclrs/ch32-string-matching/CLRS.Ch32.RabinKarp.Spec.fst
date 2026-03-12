@@ -74,7 +74,7 @@ let lemma_mod_add_3 (a b c:int) (p:pos)
 
 /// Key lemma: extract the most-significant digit from the hash.
 ///   hash(i,j) == (hash(i+1,j) + d^(j-i-1) · x[i]) % q
-#push-options "--z3rlimit_factor 10 --ifuel 0 --fuel 2 --split_queries no"
+#push-options "--z3rlimit_factor 40 --ifuel 0 --fuel 2 --split_queries no"
 #restart-solver
 let rec hash_inversion (x:Seq.seq nat) (d:nat) (q:nat{q <> 0})
                        (i:nat) (j:nat{i < j /\ j <= Seq.length x})

@@ -114,7 +114,7 @@ let pq_forest_remove (pq: Seq.seq pq_entry) (forest: list forest_entry) (j: nat{
     Classical.forall_intro aux
 
 // pq_indices_in_forest after removing two entries (if no PQ entry has either removed index)
-#push-options "--z3rlimit 15"
+#push-options "--z3rlimit 30"
 let pq_forest_remove_two (pq: Seq.seq pq_entry) (forest: list forest_entry)
   (j1 j2: nat)
   : Lemma (requires j1 < L.length forest /\ j2 < L.length forest /\ j1 <> j2 /\
@@ -616,6 +616,7 @@ let rec forest_root_freqs_remove_at (entries: list forest_entry) (j: nat) (x: po
         if j = 0 then ()
         else forest_root_freqs_remove_at rest (j - 1) x
 
+#push-options "--z3rlimit 40"
 let forest_root_freqs_remove_two (entries: list forest_entry) (j1 j2: nat) (x: pos)
   : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2)
           (ensures L.count x (forest_root_freqs entries) ==
@@ -628,6 +629,7 @@ let forest_root_freqs_remove_two (entries: list forest_entry) (j1 j2: nat) (x: p
     let j2' = if j2 < j1 then j2 else j2 - 1 in
     list_remove_at_index entries j1 j2';
     forest_root_freqs_remove_at rem1 j2' x
+#pop-options
 
 // forest_root_freqs after merge: prepend (f1+f2) to remaining
 let forest_root_freqs_merge_step

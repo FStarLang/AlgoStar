@@ -757,7 +757,7 @@ let content_step_key_order
 #pop-options
 
 /// Main content step: reveals invariants, dispatches to sub-lemmas
-#push-options "--z3rlimit 80 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 160 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
 let phase4_content_step_multiset (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\

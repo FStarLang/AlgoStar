@@ -503,7 +503,7 @@ let lemma_2d_index_fits (u v n: nat)
     assert ((n - 1) * n + v < n * n)
 
 // Relax loop + bridge lemmas, extracted to its own scope for SMT tractability
-#push-options "--z3rlimit 60 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 120 --fuel 0 --ifuel 0 --split_queries always"
 fn dijkstra_relax_round
   (weights: A.array int)
   (n: SZ.t)

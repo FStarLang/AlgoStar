@@ -541,7 +541,7 @@ let rec lex_le_r_transitive (u v w: nat) (max_d base: nat)
     end else ()
 
 /// Extract lex_le_r for arbitrary index pairs from sorted_up_to_digit
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 20"
 let rec sorted_up_to_digit_elim (s: seq nat) (max_d base: nat) (i j: nat)
   : Lemma (requires sorted_up_to_digit s max_d base /\ i < j /\ j < length s)
           (ensures lex_le_r (index s i) (index s j) max_d base) (decreases j)
@@ -922,7 +922,8 @@ let digits_lexicographic_implies_value_le
 /// Helper: from ∀d<nd. digit x d ≤ digit y d, establish lexicographic ordering.
 /// Either all digits are equal, or the most significant differing digit has x<y
 /// and all higher digits are equal.
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
+#restart-solver
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
   : Lemma (requires base >= 2 /\
                     (forall (d:nat). d < nd ==> digit x d base <= digit y d base))

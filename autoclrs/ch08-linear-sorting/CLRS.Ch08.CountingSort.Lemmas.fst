@@ -181,6 +181,7 @@ let rec block_count (s:Seq.seq nat) (pos:nat) (cnt:nat) (val_w:nat) (v:nat)
 
 /// Final lemma: after all values 0..k are written with correct counts,
 /// the output has same counts as input => permutation
+#push-options "--z3rlimit 50"
 let final_perm (s0 sa:Seq.seq nat) (k:nat) (pos:nat)
   : Lemma (requires Seq.length sa >= Seq.length s0 /\
                     in_range s0 k /\
@@ -202,6 +203,7 @@ let final_perm (s0 sa:Seq.seq nat) (k:nat) (pos:nat)
     count_le_length_le prefix s0;
     count_le_length_le s0 prefix;
     equal_counts_perm s0 prefix
+#pop-options
 
 /// Combined phase 2 step: after writing cnt copies of cur_v at [pos, pos+cnt)
 /// Phase 2 invariant holds for cur_v+1

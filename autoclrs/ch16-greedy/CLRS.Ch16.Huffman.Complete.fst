@@ -1101,7 +1101,7 @@ let single_swap_wpl_le
 // The generalized exchange: make minimum-frequency leaves siblings
 // This adapts the CLRS greedy exchange argument to work for ANY tree (not just optimal ones)
 // Uses single_swap_wpl_le instead of single_swap_optimal to avoid requiring optimality.
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 200"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 400"
 let make_min_siblings (t: htree) (freqs: list pos{length freqs >= 2})
   : Lemma (requires same_frequency_multiset t freqs)
           (ensures (let (f1, f2) = find_two_mins freqs in

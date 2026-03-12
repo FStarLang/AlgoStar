@@ -261,7 +261,8 @@ let kmp_step_valid_lt (text pattern: seq int) (i q q': nat)
 #pop-options
 
 /// The KMP step result is a valid matched prefix
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always"
+#restart-solver
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
 let kmp_step_valid (text pattern pi: seq int) (i q: nat)
   : Lemma
     (requires pi_max pattern pi /\
@@ -378,7 +379,8 @@ let match_reset_valid_prefix (text pattern: seq int) (i m q': nat)
 #pop-options
 
 /// After match (q=m), pi[m-1] gives is_max_prefix_below at position i+1
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1 --split_queries always"
+#restart-solver
+#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
 let match_reset_max (text pattern pi: seq int) (i: nat)
   : Lemma
     (requires pi_max pattern pi /\

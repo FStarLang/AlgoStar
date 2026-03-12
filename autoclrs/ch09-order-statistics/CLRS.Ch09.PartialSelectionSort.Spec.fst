@@ -233,27 +233,83 @@ let rec insert_permutation (x: int) (s: seq int)
     in
     Classical.forall_intro aux
 
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#restart-solver
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+/// Helper: cons preserves sorting when head is <= all elements
+let sorted_cons (h: int) (t: seq int)
+  : Lemma (requires is_sorted t /\
+                    (Seq.length t = 0 \/ h <= Seq.index t 0))
+          (ensures is_sorted (Seq.cons h t))
+  = let r = Seq.cons h t in
+    introduce forall (i: nat) (j: nat). i < Seq.length r /\ j < Seq.length r /\ i <= j ==> Seq.index r i <= Seq.index r j
+    with introduce _ ==> _
+    with _. (
+      if i = 0 then (
+        if j = 0 then ()
+        else assert (Seq.index r j == Seq.index t (j - 1))
+      ) else (
+        assert (Seq.index r i == Seq.index t (i - 1));
+        assert (Seq.index r j == Seq.index t (j - 1))
+      )
+    )
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+/// Head of insert: the first element of (insert x s) is min(x, head s)
+let insert_head (x: int) (s: seq int)
+  : Lemma (requires Seq.length s > 0)
+          (ensures Seq.length (insert x s) > 0 /\
+                   Seq.index (insert x s) 0 == (if x <= Seq.index s 0 then x else Seq.index s 0))
+  = ()
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
+/// Extract: head of sorted sequence is <= any element
+let sorted_head_le_index (s: seq int) (j: nat)
+  : Lemma (requires is_sorted s /\ Seq.length s > 0 /\ j < Seq.length s)
+          (ensures Seq.index s 0 <= Seq.index s j)
+  = ()
+
+/// Tail of a sorted sequence is sorted
+#push-options "--z3rlimit 20"
+let sorted_tail_spec (s: seq int)
+  : Lemma (requires Seq.length s > 1 /\ is_sorted s)
+          (ensures is_sorted (Seq.tail s))
+  = let t = Seq.tail s in
+    let n = Seq.length t in
+    introduce forall (i: nat) (j: nat). i < n /\ j < n /\ i <= j ==> Seq.index t i <= Seq.index t j
+    with introduce _ ==> _
+    with _. (
+      assert (Seq.index t i == Seq.index s (i + 1));
+      assert (Seq.index t j == Seq.index s (j + 1));
+      assert (i + 1 <= j + 1)
+    )
+#pop-options
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec insert_sorted (x: int) (s: seq int)
   : Lemma (requires is_sorted s)
           (ensures is_sorted (insert x s))
           (decreases Seq.length s)
   = if Seq.length s = 0 then ()
-    else if x <= Seq.index s 0 then (
-      // insert x s == Seq.cons x s
-      // Need: is_sorted (Seq.cons x s)
-      // i.e., forall i j, i <= j ==> (Seq.cons x s)[i] <= (Seq.cons x s)[j]
-      let r = Seq.cons x s in
-      assert (Seq.length r == 1 + Seq.length s);
-      assert (Seq.index r 0 == x);
-      assert (forall (k:nat). k < Seq.length s ==> Seq.index r (k+1) == Seq.index s k);
-      // x <= s[0] and s is sorted, so x <= all elements of s
-      assert (forall (k:nat). k < Seq.length s ==> Seq.index s 0 <= Seq.index s k);
-      assert (forall (k:nat). k < Seq.length s ==> x <= Seq.index s k)
-    ) else (
+    else if x <= Seq.index s 0 then
+      sorted_cons x s
+    else (
+      let hd = Seq.index s 0 in
       let tl = Seq.tail s in
+      if Seq.length tl > 0 then sorted_tail_spec s else ();
       insert_sorted x tl;
-      insert_length x tl
+      insert_length x tl;
+      if Seq.length tl = 0 then ()
+      else begin
+        sorted_head_le_index s 1;
+        insert_head x tl
+      end;
+      sorted_cons hd (insert x tl)
     )
 #pop-options
 

@@ -1907,7 +1907,7 @@ let elim_discover_delta
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -2239,7 +2239,7 @@ fn bfs_explore_neighbors
 #pop-options
 
 (** Main BFS: returns whether sink was reached *)
-#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 100 --fuel 1 --ifuel 1 --split_queries always"
 fn bfs_residual
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2401,7 +2401,8 @@ fn bfs_residual
    ================================================================ *)
 
 (** Find bottleneck: walk pred array from sink to source *)
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#restart-solver
+#push-options "--z3rlimit 800 --fuel 2 --ifuel 1"
 fn find_bottleneck_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
@@ -2524,6 +2525,7 @@ fn find_bottleneck_imp
 #pop-options
 
 (** Augment flow: walk pred array from sink to source, update flow *)
+#restart-solver
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn augment_imp
   (capacity flow pred: A.array int)
