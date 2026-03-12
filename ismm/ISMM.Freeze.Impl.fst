@@ -159,7 +159,9 @@ fn handle_tree_edge
       Seq.length sde == SZ.v n /\
       Seq.length spd == SZ.v n /\
       Impl.is_forest sp_ghost (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sp_ghost sr_ghost (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sp_ghost sr_ghost (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
     )
   ensures exists* st' sdn' sde' spd' vdt' vpt'.
     A.pts_to tag st' **
@@ -177,7 +179,9 @@ fn handle_tree_edge
       Spec.uf_inv (Impl.to_uf st' sp_ghost sr_ghost (SZ.v n)) /\
       Seq.length sdn' == SZ.v n /\
       Seq.length sde' == SZ.v n /\
-      Seq.length spd' == SZ.v n
+      Seq.length spd' == SZ.v n /\
+      (forall (i:nat). {:pattern (Seq.index sdn' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdn' i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n)
     )
 {
   tag.(y) <- 1sz;
@@ -328,7 +332,9 @@ fn handle_edge
       SZ.fits (SZ.v x * SZ.v n + SZ.v e) /\
       SZ.v x * SZ.v n + SZ.v e < Seq.length sadj /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
     )
   ensures exists* st' sp' sr' src' sdn' sde' spd' vdt' vpt'.
     A.pts_to tag st' **
@@ -356,7 +362,9 @@ fn handle_edge
       Seq.length sde' == SZ.v n /\
       Seq.length spd' == SZ.v n /\
       Impl.is_forest sp' (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdn' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdn' i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n)
     )
 {
   // Advance edge pointer
@@ -453,7 +461,9 @@ fn freeze_step
       Seq.length sde == SZ.v n /\
       Seq.length spd == SZ.v n /\
       Impl.is_forest sparent (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n))
+      Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
     )
   ensures exists* st' sp' sr' src' sdn' sde' spd' vdt' vpt' vgc'.
     A.pts_to tag st' **
@@ -484,7 +494,9 @@ fn freeze_step
       Seq.length sde' == SZ.v n /\
       Seq.length spd' == SZ.v n /\
       Impl.is_forest sp' (SZ.v n) /\
-      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n))
+      Spec.uf_inv (Impl.to_uf st' sp' sr' (SZ.v n)) /\
+      (forall (i:nat). {:pattern (Seq.index sdn' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sdn' i) < SZ.v n) /\
+      (forall (i:nat). {:pattern (Seq.index sde' i)} i < SZ.v vdt' ==> SZ.v (Seq.index sde' i) <= SZ.v n)
     )
 {
   let dt = !dfs_top;
@@ -492,15 +504,9 @@ fn freeze_step
   let x = dfs_node.(top_idx);
   let e = dfs_edge.(top_idx);
   
-  // Stack validity (proof obligation from stack invariant)
-  assume_ (pure (
-    SZ.v x < SZ.v n /\
-    SZ.v e <= SZ.v n /\
-    SZ.v top_idx < SZ.v n /\
-    SZ.fits (SZ.v x * SZ.v n + SZ.v n) /\
-    (SZ.v e < SZ.v n ==> (SZ.fits (SZ.v x * SZ.v n + SZ.v e) /\
-                           SZ.v x * SZ.v n + SZ.v e < Seq.length sadj))
-  ));
+  // DFS stack content: x < n and e <= n from invariants; top_idx < n from dt > 0 /\ dt <= n
+  // fits(x*n + n) follows from x < n and fits(n*n)
+  // When e < n: fits(x*n + e) and x*n + e < n*n from adj_index_fits
   
   if (e >=^ n) {
     // POST-ORDER: pop DFS stack, check pending
@@ -645,7 +651,9 @@ fn freeze
         Seq.length sde == SZ.v n /\
         Seq.length spd == SZ.v n /\
         Impl.is_forest sp (SZ.v n) /\
-        Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n))
+        Spec.uf_inv (Impl.to_uf st sp sr (SZ.v n)) /\
+        (forall (i:nat). {:pattern (Seq.index sdn i)} i < SZ.v vdt ==> SZ.v (Seq.index sdn i) < SZ.v n) /\
+        (forall (i:nat). {:pattern (Seq.index sde i)} i < SZ.v vdt ==> SZ.v (Seq.index sde i) <= SZ.v n)
       )
     decreases (SZ.v n * (SZ.v n + 1) - SZ.v !ghost_ctr)
     {
