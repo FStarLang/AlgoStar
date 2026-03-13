@@ -48,7 +48,8 @@ ISMM_MODULES = \
   ISMM.Dispose.Impl \
   ISMM.RefCount.Spec \
   ISMM.RefCount.Impl \
-  ISMM.Test
+  ISMM.Test \
+  ISMM.Exports
 
 $(EXTRACT_DIR):
 	mkdir -p $@ $@/internal
@@ -70,6 +71,8 @@ extract-krml: all | $(EXTRACT_DIR)
 	@echo ".krml files written to $(OUTPUT_DIR)/"
 
 # Step 2: .krml → C via KaRaMeL
+#   Bundle all ISMM modules into a single ISMM.c, rooting at the four
+#   public API modules + test so nothing gets dead-code-eliminated.
 extract-c: extract-krml | $(EXTRACT_DIR)
 	@echo "=== Running KaRaMeL ==="
 	@rm -rf $(EXTRACT_DIR)/*
@@ -78,13 +81,18 @@ extract-c: extract-krml | $(EXTRACT_DIR)
 		-tmpdir $(EXTRACT_DIR) \
 		-skip-compilation \
 		-warn-error -2-9-11-15-17 \
-		-bundle 'ISMM.Test=ISMM.*[rename=ISMM]' \
-		-bundle 'FStar.*,Pulse.*,PulseCore.*,Prims' \
+		-bundle 'ISMM.Exports+ISMM.Test=ISMM.*,Prims,FStar.*,Pulse.*,PulseCore.*[rename=ISMM]' \
 		-no-prefix ISMM.UnionFind.Impl \
 		-no-prefix ISMM.Freeze.Impl \
 		-no-prefix ISMM.Dispose.Impl \
+		-no-prefix ISMM.Dispose.Helpers \
+		-no-prefix ISMM.Dispose.Setup \
+		-no-prefix ISMM.Dispose.Inner \
+		-no-prefix ISMM.Dispose.ProcessSCC \
+		-no-prefix ISMM.Dispose.Loop \
 		-no-prefix ISMM.RefCount.Impl \
 		-no-prefix ISMM.Test \
+		-no-prefix ISMM.Exports \
 		$(wildcard $(OUTPUT_DIR)/ISMM_*.krml) \
 		$(KRML_HOME)/krmllib/.extract/*.krml
 	@echo "C files written to $(EXTRACT_DIR)/"
