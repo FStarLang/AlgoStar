@@ -56,6 +56,217 @@ Each node carries a status field with one of four states:
 - Dispose: O(|E| · α(|N|)) — almost linear
 - Acquire/Release: O(α(|N|)) — almost constant (amortized)
 
+## The SCC Algorithm: Purdom's Path-Based Algorithm with Union-Find
+
+### Background: Tarjan vs. Purdom
+
+There are two classical families of linear-time SCC algorithms:
+
+1. **Tarjan's algorithm** (1972) maintains a single stack and annotates each node with
+   a *discovery time* and a *lowlink* value (the minimum discovery time reachable via
+   back edges). An SCC is finalized when a node's lowlink equals its own discovery
+   time — at that point, everything above it on the stack belongs to the same SCC.
+
+2. **Purdom's path-based algorithm** (1970, refined by Munro 1971, Cheriyan & Mehlhorn
+   1996) maintains a *pending stack* (also called a *path stack*) that tracks tentative
+   SCC boundaries along the current DFS path. When a back edge to an ancestor is
+   detected, all nodes between the current position and the target on the pending stack
+   are merged into a single SCC. An SCC is finalized when, at post-order time, the
+   current node is still the top of the pending stack — meaning no back edges merged
+   it with anything deeper.
+
+The paper's algorithm is a **Purdom-style path-based SCC algorithm fused with
+union-find**. The fusion is the key contribution: instead of maintaining an explicit
+set of nodes per tentative SCC, the algorithm uses union-find to implicitly track
+which nodes belong to the same SCC. This serves double duty — the same union-find
+structure is later used at runtime for `find`-based reference counting operations.
+
+### How the ISMM freeze algorithm works
+
+The implementation (`ISMM.Freeze.Impl.fst`, ~705 lines) converts the paper's
+recursive `freeze_inner` (Fig. 2) into an iterative DFS with explicit stacks:
+
+**Data structures during freeze:**
+```
+dfs_node[i]:    SZ.t   — DFS work stack: node being explored
+dfs_edge[i]:    SZ.t   — DFS work stack: next outgoing edge index to explore
+dfs_top:        ref     — current depth of DFS stack
+pending_stk[i]: SZ.t   — pending stack: tentative SCC boundaries
+pending_top:    ref     — current depth of pending stack
+```
+
+**Edge classification via tags.** The algorithm classifies each edge `(x, y)` by
+inspecting `tag[find(y)]`:
+
+| Tag of `find(y)` | Classification | Action |
+|-------------------|---------------|--------|
+| `UNMARKED` (0) | **Tree edge** — y is unvisited | Mark y as `RANK(1)`, push to both stacks |
+| `RANK` (1) | **Back edge** — y is on the pending path | `union(x, y)` — merge SCCs |
+| `RC` (3) | **Cross edge** — y's SCC is already finalized | `refcount[find(y)]++` |
+
+This three-way dispatch (lines 399–426 of `Freeze.Impl.fst`) replaces Tarjan's
+lowlink comparison with a simple tag check, made possible by the Purdom structure.
+
+**The main loop** iterates while `dfs_top > 0`. Each iteration pops the top of the
+DFS stack `(x, e)` where `x` is a node and `e` is the next edge to examine:
+
+- **If `e < n`**: Explore edge `(x, e)`. Classify it as tree/back/cross edge per the
+  table above. Advance `dfs_edge` to `e + 1` for the next iteration.
+
+- **If `e ≥ n`**: All edges of `x` have been explored. This is the **post-order** step.
+  Pop `x` from the DFS stack, then check: is `find(x)` the top of the pending stack?
+  - **Yes** → `x` is the root of a completed SCC. Set `tag[find(x)] := RC(1)`, pop
+    from pending. The SCC is finalized with an initial reference count of 1.
+  - **No** → `x` was merged into a deeper SCC via back edges. Do nothing.
+
+**SCC merging on back edges.** When a back edge `x → y` is found (both on the
+pending path), `union(x, y)` merges their equivalence classes. Because union-find
+is transitive, this effectively merges all nodes between `y` and `x` on the pending
+path into a single SCC. The paper's pseudo-code shows this as a while loop
+(`while union(x, pending.peek()) do pending.pop()`); our implementation achieves
+the same effect through the union-find structure itself — after `union(x, y)`,
+`find(x) == find(y)`, so at post-order time, the merged nodes are no longer the
+top of the pending stack and are correctly skipped.
+
+**Reference count accumulation.** Cross edges (to already-finalized SCCs) trigger
+`refcount[find(y)]++`. Since every cross-SCC edge increments the target's RC,
+and the root SCC starts with RC=1, the final RC equals 1 + (number of incoming
+cross-SCC edges). This is exactly the external reference count needed for
+correct memory management.
+
+### Comparison table
+
+| Aspect | Tarjan | Purdom (path-based) | ISMM (this implementation) |
+|--------|--------|---------------------|---------------------------|
+| Back edge detection | lowlink comparison | Target on pending stack | `tag[find(y)] == RANK` |
+| SCC finalization | `lowlink[v] == disc[v]` | `v == top(pending)` | `find(x) == top(pending)` |
+| Merge mechanism | Implicit (stack pop) | Explicit path merge | `union(x, y)` in union-find |
+| Post-freeze benefit | SCC sets computed | SCC sets computed | **Union-find reused for O(α(n)) find at runtime** |
+| Runtime overhead | Need separate structure | Need separate structure | Zero — same structure serves both phases |
+
+The key advantage of the Purdom + union-find fusion is that **the SCC computation
+and the runtime lookup structure are one and the same**. After freeze, any node's
+SCC representative is found via `find(r)` in amortized O(α(n)) time, with no
+additional data structures needed.
+
+## Top-Level Interface and Usage
+
+The ISMM library provides four operations meant to be used by a reference-counting
+runtime for deeply immutable data with potential cycles. The intended lifecycle is:
+
+```
+  ┌─────────┐     ┌────────┐     ┌─────────┐     ┌─────────┐
+  │  alloc   │────▶│ freeze │────▶│ acquire │◀───▶│ release │
+  │  (mutable│     │        │     │         │     │         │
+  │   graph) │     │(compute│     │(share   │     │(drop    │
+  │          │     │  SCCs) │     │  ref)   │     │  ref)   │
+  └─────────┘     └────────┘     └─────────┘     └────┬────┘
+                                                       │ RC=0
+                                                       ▼
+                                                 ┌─────────┐
+                                                 │ dispose  │
+                                                 │(free SCC,│
+                                                 │ cascade) │
+                                                 └─────────┘
+```
+
+### Phase 1: Construction (external to this library)
+
+The caller constructs a mutable graph as a set of nodes with an adjacency matrix
+`adj[n×n]` and allocates parallel arrays `tag[n]`, `parent[n]`, `rank[n]`,
+`refcount[n]`. All nodes start as `UNMARKED` (tag=0) with `parent[i]=i` (self-root),
+`rank[i]=0`, `refcount[i]=0`. The `make_set` function in `UnionFind.Impl` initializes
+the union-find structure and establishes `uf_inv`.
+
+### Phase 2: Freeze — `ISMM.Freeze.Impl.freeze`
+
+```
+freeze(tag, parent, rank, adj, refcount, n, root)
+```
+
+Called once per connected component when the graph becomes immutable. Computes the
+SCCs of all nodes reachable from `root`, sets each SCC's representative to `RC`-tagged,
+and assigns initial reference counts. After freeze:
+
+- Every reachable node has tag `REP` (non-representative) or `RC` (representative)
+- The union-find structure encodes SCC membership: `find(x) == find(y)` iff x and y
+  are in the same SCC
+- `refcount[find(x)]` = 1 + (number of incoming cross-SCC edges)
+- Unreachable nodes remain `UNMARKED`
+- The `uf_inv` invariant is maintained throughout
+
+**Precondition:** All nodes `UNMARKED`, `uf_inv` holds, adjacency matrix well-formed.
+**Postcondition:** `uf_inv` preserved, forest structure preserved.
+
+### Phase 3: Runtime reference counting
+
+**`ISMM.RefCount.Impl.acquire(tag, parent, rank, refcount, n, r)`**
+
+Called when a new external reference to node `r` is created (e.g., an actor receives
+a pointer to a frozen object). Performs `find(r)` to locate the SCC representative,
+then increments `refcount[rep]`. The caller must ensure no overflow (`SZ.fits`).
+
+**`ISMM.RefCount.Impl.release(tag, parent, rank, refcount, n, r) → bool`**
+
+Called when an external reference to node `r` is dropped. Performs `find(r)`,
+decrements `refcount[rep]`. Returns `true` if the refcount reached zero, signaling
+that the caller must invoke `dispose`.
+
+**Precondition:** `refcount[find(r)] > 0` (the SCC has at least one reference).
+**Postcondition:** `uf_inv` preserved. If returns true, the SCC is ready for disposal.
+
+### Phase 4: Disposal — `ISMM.Dispose.Impl.dispose`
+
+```
+dispose(tag, parent, rank, adj, refcount, n, rep)
+```
+
+Called when `release` returns `true` (an SCC's refcount hit zero). Uses a three-stack
+algorithm (paper §3.2, Fig. 4):
+
+1. **DFS stack** traverses the DAG of SCCs reachable from `rep`
+2. **SCC stack** collects all nodes within the current SCC (following REP parent pointers)
+3. For each node in the SCC, examines its adjacency row:
+   - If an edge leads to a node in the same SCC (tagged `REP`/`PROCESSING`): skip
+   - If an edge leads to a different SCC (tagged `RC`): decrement that SCC's refcount
+   - If the target SCC's refcount reaches zero: push it onto the DFS stack for cascading disposal
+4. After processing the SCC, marks all its nodes as `UNMARKED` (freed)
+
+**Precondition:** `tag[rep] == RC`, `refcount[rep] == 0` (implicitly, via the count
+invariant), all other RC-tagged nodes have positive refcount.
+**Postcondition:** All disposed nodes marked `UNMARKED`. All surviving RC-tagged nodes
+retain positive refcount. `uf_inv` maintained.
+
+### Putting it together: runtime integration
+
+A language runtime using this library would:
+
+```
+// 1. Build the graph
+let (tag, parent, rank, adj, rc) = allocate_arrays(n);
+make_set(tag, parent, rank, n);   // Initialize UF
+// ... populate adj with edges ...
+
+// 2. Freeze when graph becomes immutable
+freeze(tag, parent, rank, adj, rc, n, root);
+
+// 3. Share references between actors/threads
+acquire(tag, parent, rank, rc, n, node);  // when sharing a ref
+
+// 4. Drop references
+let should_free = release(tag, parent, rank, rc, n, node);
+if should_free then
+  dispose(tag, parent, rank, adj, rc, n, find(node));
+
+// After dispose, the freed SCCs' memory can be reclaimed.
+// Surviving SCCs still have valid refcounts.
+```
+
+The critical property is that **no backup garbage collector or cycle detector is
+needed**. The freeze operation computes exact SCC information once, and from that
+point forward, standard reference counting at the SCC level is sufficient for
+precise, prompt, deterministic memory reclamation — even in the presence of cycles.
+
 ## Implementation Architecture
 
 ### Data Representation
