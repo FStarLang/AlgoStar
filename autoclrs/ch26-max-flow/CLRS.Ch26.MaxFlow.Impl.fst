@@ -1907,7 +1907,7 @@ let elim_discover_delta
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 1 --ifuel 1 --split_queries always"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -2239,7 +2239,7 @@ fn bfs_explore_neighbors
 #pop-options
 
 (** Main BFS: returns whether sink was reached *)
-#push-options "--z3rlimit 100 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
 fn bfs_residual
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2402,7 +2402,7 @@ fn bfs_residual
 
 (** Find bottleneck: walk pred array from sink to source *)
 #restart-solver
-#push-options "--z3rlimit 800 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn find_bottleneck_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
@@ -2482,6 +2482,8 @@ fn find_bottleneck_imp
     {
       let u: SZ.t = SZ.uint_to_t u_int;
       assert (pure (SZ.v u < SZ.v n));
+      FStar.Math.Lemmas.lemma_mult_le_right (SZ.v n) (SZ.v u) (SZ.v n - 1);
+      FStar.Math.Lemmas.lemma_mult_le_right (SZ.v n) (SZ.v vc) (SZ.v n - 1);
       let idx_fwd: SZ.t = u *^ n +^ vc;
       let idx_bwd: SZ.t = vc *^ n +^ u;
       assert (pure (SZ.v idx_fwd < SZ.v n * SZ.v n /\ SZ.v idx_bwd < SZ.v n * SZ.v n));
@@ -2598,6 +2600,8 @@ fn augment_imp
     {
       let u: SZ.t = SZ.uint_to_t u_int;
       assert (pure (SZ.v u < SZ.v n));
+      FStar.Math.Lemmas.lemma_mult_le_right (SZ.v n) (SZ.v u) (SZ.v n - 1);
+      FStar.Math.Lemmas.lemma_mult_le_right (SZ.v n) (SZ.v vc) (SZ.v n - 1);
       let idx_fwd: SZ.t = u *^ n +^ vc;
       let idx_bwd: SZ.t = vc *^ n +^ u;
       assert (pure (SZ.v idx_fwd < SZ.v n * SZ.v n /\ SZ.v idx_bwd < SZ.v n * SZ.v n));
