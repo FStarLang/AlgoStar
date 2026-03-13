@@ -27,19 +27,6 @@ module UFL = ISMM.UF.Lemmas
 module Arith = ISMM.Arith.Lemmas
 open ISMM.Status
 
-module GR = Pulse.Lib.GhostReference
-
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-```pulse
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
-```
 
 (* ---------- Helper: Post-order SCC check ----------
    After all edges of x explored, check if x is an SCC root.
@@ -457,7 +444,6 @@ fn freeze_step
   (dfs_top: ref SZ.t)
   (pending_stk: A.array SZ.t)
   (pending_top: ref SZ.t)
-  (ghost_ctr: GR.ref nat)
   (n: SZ.t)
   (#stag: Ghost.erased (Seq.seq SZ.t))
   (#sparent: Ghost.erased (Seq.seq SZ.t))
@@ -469,7 +455,6 @@ fn freeze_step
   (#spd: Ghost.erased (Seq.seq SZ.t))
   (#vdt: Ghost.erased SZ.t)
   (#vpt: Ghost.erased SZ.t)
-  (#vgc: Ghost.erased nat)
   requires
     A.pts_to tag stag **
     A.pts_to parent sparent **
@@ -481,7 +466,6 @@ fn freeze_step
     R.pts_to dfs_top vdt **
     A.pts_to pending_stk spd **
     R.pts_to pending_top vpt **
-    GR.pts_to ghost_ctr vgc **
     pure (
       SZ.v vdt > 0 /\
       SZ.v vdt <= SZ.v n /\
@@ -508,7 +492,7 @@ fn freeze_step
       SZ.v vpt <= Arith.count_nonzero stag (SZ.v n) /\
       SZ.v vdt <= Arith.count_nonzero stag (SZ.v n)
     )
-  ensures exists* st' sp' sr' src' sdn' sde' spd' vdt' vpt' vgc'.
+  ensures exists* st' sp' sr' src' sdn' sde' spd' vdt' vpt'.
     A.pts_to tag st' **
     A.pts_to parent sp' **
     A.pts_to rank sr' **
@@ -519,7 +503,6 @@ fn freeze_step
     R.pts_to dfs_top vdt' **
     A.pts_to pending_stk spd' **
     R.pts_to pending_top vpt' **
-    GR.pts_to ghost_ctr vgc' **
     pure (
       SZ.v vdt' <= SZ.v n /\
       SZ.v vpt' <= SZ.v n /\
@@ -555,15 +538,11 @@ fn freeze_step
     // POST-ORDER: pop DFS stack, check pending
     dfs_top := top_idx;
     handle_post_order tag parent rank refcount pending_stk pending_top x n;
-    // Tick ghost counter
-    tick ghost_ctr;
     ()
   } else {
     // PROCESS EDGE
     handle_edge tag parent rank adj refcount dfs_node dfs_edge dfs_top
       pending_stk pending_top x e top_idx n;
-    // Tick ghost counter
-    tick ghost_ctr;
     ()
   }
 }
@@ -637,9 +616,6 @@ fn freeze
   let pending_stk = A.alloc 0sz n;
   let mut pending_top: SZ.t = 0sz;
   
-  // Ghost counter for complexity accounting (erased)
-  let ghost_ctr = GR.alloc #nat 0;
-  
   let root_tag = tag.(root);
   
   if (root_tag = 0sz) {
@@ -661,10 +637,9 @@ fn freeze
     
     // Main DFS loop
     while (!dfs_top >^ 0sz)
-    invariant exists* vdt vpt vgc st sp sr src_i sdn sde spd.
+    invariant exists* vdt vpt st sp sr src_i sdn sde spd.
       R.pts_to dfs_top vdt **
       R.pts_to pending_top vpt **
-      GR.pts_to ghost_ctr vgc **
       A.pts_to tag st **
       A.pts_to parent sp **
       A.pts_to rank sr **
@@ -698,10 +673,9 @@ fn freeze
       )
     {
       freeze_step tag parent rank adj refcount dfs_node dfs_edge dfs_top
-        pending_stk pending_top ghost_ctr n;
+        pending_stk pending_top n;
       ()
     };
-    GR.free ghost_ctr;
     A.free dfs_node;
     A.free dfs_edge;
     A.free pending_stk;
@@ -715,13 +689,11 @@ fn freeze
       assume_ (pure (SZ.fits (SZ.v rc + 1)));
       refcount.(rep) <- SZ.(rc +^ 1sz);
       with src1. assert (A.pts_to refcount src1);
-      GR.free ghost_ctr;
       A.free dfs_node;
       A.free dfs_edge;
       A.free pending_stk;
       ()
     } else {
-      GR.free ghost_ctr;
       A.free dfs_node;
       A.free dfs_edge;
       A.free pending_stk;

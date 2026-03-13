@@ -20,6 +20,7 @@ module Seq = FStar.Seq
 module Spec = ISMM.UnionFind.Spec
 module Impl = ISMM.UnionFind.Impl
 open ISMM.Status
+module Count = ISMM.Count
 
 (** DISPOSE: Deallocate the SCC rooted at rep, cascading to child SCCs.
     Modifies tag (marks freed nodes as UNMARKED=0) and refcount (decrements child RCs).
@@ -62,8 +63,9 @@ fn dispose
       A.length parent == A.length rank /\
       Impl.is_forest sparent (SZ.v n) /\
       Spec.uf_inv (Impl.to_uf stag sparent srank (SZ.v n)) /\
-      // RC-positive: all RC-tagged nodes (except rep, whose RC may be 0) have positive refcount
-      (forall (i:nat). {:pattern (Seq.index stag i)} i < SZ.v n /\ SZ.v (Seq.index stag i) == 3 /\ i <> SZ.v rep ==> SZ.v (Seq.index src i) > 0)
+      (forall (i:nat). {:pattern (Seq.index stag i)} i < SZ.v n /\ SZ.v (Seq.index stag i) == 3 /\ i <> SZ.v rep ==> SZ.v (Seq.index src i) > 0) /\
+      Count.count_eq stag 1 (SZ.v n) == 0 /\
+      SZ.v (Seq.index stag (SZ.v rep)) == 3
     )
   ensures exists* st sp sr src'.
     A.pts_to tag st **

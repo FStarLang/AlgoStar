@@ -283,3 +283,27 @@ let count_nonzero_write_nondec (s: Seq.seq SZ.t) (n y: nat) (v: SZ.t)
   = if SZ.v v <> 0
     then count_nonzero_nondec s n y v
     else count_nonzero_set_zero_zero s n y v
+
+
+(*** Helper lemmas for scan-based cleanup of tag-1 entries ***)
+
+/// After setting tag[scan] to a non-v value, all entries in [0..scan+1) are != v
+let all_ne_after_upd (stag: Seq.seq SZ.t) (v: nat) (scan n: nat) (w: SZ.t)
+  : Lemma (requires scan < n /\ n <= Seq.length stag /\ SZ.v w <> v /\
+           (forall (i:nat). {:pattern (Seq.index stag i)} i < scan ==> SZ.v (Seq.index stag i) <> v))
+          (ensures (let stag' = Seq.upd stag scan w in
+                    forall (i:nat). {:pattern (Seq.index stag' i)} i < scan + 1 ==> SZ.v (Seq.index stag' i) <> v))
+  = let stag' = Seq.upd stag scan w in
+    let aux (i:nat{i < scan + 1})
+      : Lemma (SZ.v (Seq.index stag' i) <> v)
+      = if i = scan then Seq.lemma_index_upd1 stag scan w
+        else Seq.lemma_index_upd2 stag scan w i
+    in FStar.Classical.forall_intro aux
+
+/// If all entries in [0..scan) are != v and tag[scan] != v, then all entries in [0..scan+1) are != v
+let all_ne_extend (stag: Seq.seq SZ.t) (v: nat) (scan: nat)
+  : Lemma (requires scan < Seq.length stag /\
+           (forall (i:nat). {:pattern (Seq.index stag i)} i < scan ==> SZ.v (Seq.index stag i) <> v) /\
+           SZ.v (Seq.index stag scan) <> v)
+          (ensures (forall (i:nat). {:pattern (Seq.index stag i)} i < scan + 1 ==> SZ.v (Seq.index stag i) <> v))
+  = ()

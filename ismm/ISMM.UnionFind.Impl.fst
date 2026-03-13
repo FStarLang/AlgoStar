@@ -322,7 +322,12 @@ let make_set_uf_inv (stag sp sr: Seq.seq SZ.t) (n: nat)
     let aux (i: nat{i < n}) : Lemma (Seq.index f.Spec.parent i < n)
       = () in FStar.Classical.forall_intro aux;
     let aux2 (x: nat{x < n}) : Lemma (Seq.index f.Spec.parent x == x)
-      = () in FStar.Classical.forall_intro aux2
+      = () in FStar.Classical.forall_intro aux2;
+    // size_rank_inv: all self-parent with rank 0, so comp_count = 1 >= pow2(0) = 1
+    let aux3 (root: nat{root < f.Spec.n /\ Seq.index f.Spec.parent root = root})
+      : Lemma (Spec.comp_count f root f.Spec.n >= Spec.pow2 (Seq.index f.Spec.rank root))
+      = Spec.comp_count_self_parent f root f.Spec.n
+    in FStar.Classical.forall_intro (FStar.Classical.move_requires aux3)
 
 ```pulse
 fn make_set
