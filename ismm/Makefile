@@ -99,7 +99,7 @@ extract-c: extract-krml | $(EXTRACT_DIR)
 	@ls $(EXTRACT_DIR)/*.c $(EXTRACT_DIR)/*.h 2>/dev/null || true
 
 # Shorthand
-.PHONY: extract extract-krml extract-c test-c
+.PHONY: extract extract-krml extract-c test-c update-snapshot
 
 extract: extract-c
 
@@ -118,3 +118,29 @@ test-c: extract-c
 		$(EXTRACT_DIR)/ISMM.c _extract_stubs.c
 	@echo "=== Running extracted test ==="
 	$(EXTRACT_DIR)/test_ismm
+
+# Step 4: Update snapshot directory with latest extracted C
+SNAPSHOT_DIR = snapshot
+
+update-snapshot: extract-c
+	@echo "=== Updating snapshot ==="
+	cp $(EXTRACT_DIR)/ISMM.c $(SNAPSHOT_DIR)/
+	cp $(EXTRACT_DIR)/ISMM.h $(SNAPSHOT_DIR)/
+	cp _extract_stubs.c $(SNAPSHOT_DIR)/stubs.c
+	cp $(KRML_HOME)/include/krmllib.h $(SNAPSHOT_DIR)/
+	cp $(KRML_HOME)/include/krml/fstar_int.h \
+	   $(KRML_HOME)/include/krml/lowstar_endianness.h \
+	   $(SNAPSHOT_DIR)/krml/
+	cp $(KRML_HOME)/include/krml/internal/builtin.h \
+	   $(KRML_HOME)/include/krml/internal/callconv.h \
+	   $(KRML_HOME)/include/krml/internal/compat.h \
+	   $(KRML_HOME)/include/krml/internal/debug.h \
+	   $(KRML_HOME)/include/krml/internal/target.h \
+	   $(KRML_HOME)/include/krml/internal/types.h \
+	   $(SNAPSHOT_DIR)/krml/internal/
+	cp $(KRML_HOME)/krmllib/dist/minimal/fstar_uint128_gcc64.h \
+	   $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt128.h \
+	   $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt_8_16_32_64.h \
+	   $(KRML_HOME)/krmllib/dist/minimal/LowStar_Endianness.h \
+	   $(SNAPSHOT_DIR)/
+	@echo "Snapshot updated in $(SNAPSHOT_DIR)/"
