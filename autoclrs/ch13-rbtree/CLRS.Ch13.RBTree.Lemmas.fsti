@@ -200,3 +200,21 @@ val delete_is_rbtree (t: rbtree) (k: int)
 val insert_node_count (t: rbtree) (k: int)
   : Lemma (requires is_bst t)
           (ensures node_count (insert t k) = (if mem k t then node_count t else node_count t + 1))
+
+// ========== Duplicate Key Handling ==========
+
+/// balance on a tree with no red-red violations is an identity
+val balance_no_red_red_id (c: color) (l: rbtree) (v: int) (r: rbtree)
+  : Lemma (requires no_red_red l /\ no_red_red r /\
+                    (c = Red ==> is_root_black l /\ is_root_black r))
+          (ensures balance c l v r == Node c l v r)
+
+/// Inserting a duplicate key into a BST leaves the tree unchanged (ins level)
+val ins_duplicate (t: rbtree) (k: int)
+  : Lemma (requires is_bst t /\ no_red_red t /\ mem k t)
+          (ensures ins t k == t)
+
+/// Inserting a duplicate key into a valid RB-BST leaves the tree unchanged
+val insert_duplicate (t: rbtree) (k: int)
+  : Lemma (requires is_rbtree t /\ is_bst t /\ mem k t)
+          (ensures insert t k == t)

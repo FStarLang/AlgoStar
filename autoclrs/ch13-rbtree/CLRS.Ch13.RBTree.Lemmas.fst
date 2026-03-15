@@ -1115,3 +1115,50 @@ let insert_node_count (t: rbtree) (k: int)
     (requires is_bst t)
     (ensures node_count (insert t k) = (if mem k t then node_count t else node_count t + 1))
   = ins_node_count t k
+
+(*** Duplicate Key Handling ***)
+
+// balance on a tree with no red-red violations is a no-op:
+// none of the four rotation cases can match.
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
+let balance_no_red_red_id (c: color) (l: rbtree) (v: int) (r: rbtree)
+  : Lemma
+    (requires no_red_red l /\ no_red_red r /\
+             (c = Red ==> is_root_black l /\ is_root_black r))
+    (ensures balance c l v r == Node c l v r)
+  = ()
+#pop-options
+
+// Inserting a duplicate key leaves the tree unchanged at the ins level.
+// When mem k t and is_bst t, ins recurses to the node where k = v and
+// returns it unchanged. balance gets the original subtrees and falls
+// through to the identity case.
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
+let rec ins_duplicate (t: rbtree) (k: int)
+  : Lemma
+    (requires is_bst t /\ no_red_red t /\ mem k t)
+    (ensures ins t k == t)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k = v then ()
+      else if k < v then begin
+        bst_lt_not_mem r v k;
+        ins_duplicate l k;
+        // ins l k == l, so balance c (ins l k) v r == balance c l v r
+        balance_no_red_red_id c l v r
+      end else begin
+        bst_gt_not_mem l v k;
+        ins_duplicate r k;
+        balance_no_red_red_id c l v r
+      end
+#pop-options
+
+// For a valid RB-BST, inserting a duplicate key is a complete no-op.
+// make_black on a tree with a Black root (is_rbtree guarantees this) is identity.
+let insert_duplicate (t: rbtree) (k: int)
+  : Lemma
+    (requires is_rbtree t /\ is_bst t /\ mem k t)
+    (ensures insert t k == t)
+  = ins_duplicate t k

@@ -1182,3 +1182,25 @@ let clrs_delete_is_rbtree (t: rbtree) (k: int)
   // is_rbtree t means is_root_black t, so t is Leaf or Node Black.
   // clrs_del_props gives same_bh t' and no_red_red t' (since Node? t ==> Black? c).
   // make_black preserves same_bh and strengthens no_red_red, adds is_root_black.
+
+(*** Membership Equivalence — Okasaki ↔ CLRS ***)
+
+// Both Okasaki insert and CLRS insert produce the same membership set:
+//   mem x (insert t k) <==> mem x (clrs_insert t k)
+// This follows from both satisfying: mem x (op t k) <==> (x = k \/ mem x t).
+let insert_clrs_insert_mem_equiv (t: rbtree) (k: int) (x: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures mem x (insert t k) <==> mem x (clrs_insert t k))
+  = insert_mem t k x;
+    clrs_insert_mem t k x
+
+// Both Okasaki delete and CLRS delete produce the same membership set:
+//   mem x (delete t k) <==> mem x (clrs_delete t k)
+// Both satisfy: mem x (op t k) <==> (mem x t /\ x <> k).
+let delete_clrs_delete_mem_equiv (t: rbtree) (k: int) (x: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures mem x (delete t k) <==> mem x (clrs_delete t k))
+  = delete_mem t k x;
+    clrs_delete_mem t k x
