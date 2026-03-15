@@ -104,3 +104,26 @@ let mc_iterations_positive (n: nat) : Lemma
  * The exact sum can be computed: Σ_{l=2}^{n} (n-l+1)(l-1) = (n³-n)/6
  * But our O(n³) bound is sufficient for complexity analysis
  *)
+
+(**
+ * mc_inner_sum at the start (l=2) equals mc_iterations
+ *)
+let mc_inner_sum_at_start (n: nat) : Lemma
+  (ensures mc_inner_sum n 2 == mc_iterations n)
+  = ()
+
+(**
+ * mc_inner_sum unfolds by one step when l is in range
+ *)
+let mc_inner_sum_step (n l: nat) : Lemma
+  (requires l >= 2 /\ l <= n)
+  (ensures mc_inner_sum n l == (n - l + 1) * (l - 1) + mc_inner_sum n (l + 1))
+  = ()
+
+(**
+ * mc_inner_sum is 0 past the end
+ *)
+let mc_inner_sum_zero (n l: nat) : Lemma
+  (requires l > n)
+  (ensures mc_inner_sum n l == 0)
+  = ()

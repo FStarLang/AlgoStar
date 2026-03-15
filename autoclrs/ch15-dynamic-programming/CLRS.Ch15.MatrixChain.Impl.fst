@@ -6,14 +6,12 @@
    
    Bottom-up dynamic programming approach from CLRS Chapter 15.
    
-   Proves: result == mc_outer (Seq.create (n*n) 0) s_dims n 2
-   i.e., the result equals the pure Floyd-Warshall-style imperative mirror spec.
+   Proves BOTH functional correctness AND O(n³) complexity:
+   - Correctness: result == mc_result dims n (the pure imperative mirror spec)
+   - Complexity: exactly mc_iterations n innermost-loop iterations,
+     where mc_iterations n ≤ n³ (proven in MatrixChain.Complexity)
    
-   Complexity: O(n³) — specifically exactly (n³-n)/6 innermost-loop iterations.
-   The bound is proven on the pure loop model in MatrixChain.Complexity.fst.
-   Unlike RodCutting.fst and LCS.fst, the Pulse implementation does not carry
-   a ghost tick counter; the loop structure is identical to the pure model,
-   so the O(n³) bound transfers directly.
+   Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
    
    NO admits. NO assumes.
 *)
@@ -27,15 +25,51 @@ open Pulse.Lib.Vec
 open FStar.SizeT
 open FStar.Mul
 
-#set-options "--z3rlimit 40"
+#set-options "--z3rlimit 80"
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
 module V = Pulse.Lib.Vec
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
 open CLRS.Ch15.MatrixChain.Spec
+open CLRS.Ch15.MatrixChain.Complexity
+
+// ========== Ghost tick ==========
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
+
+// ========== Complexity helpers ==========
+
+// Remaining k-loop iterations for chain length l, starting from position i
+let mc_remaining_i (n l i: nat) : nat =
+  if l >= 2 && l <= n && i + l <= n + 1 then (n - l + 1 - i) * (l - 1)
+  else 0
+
+let mc_remaining_i_step (n l i: nat)
+  : Lemma (requires l >= 2 /\ l <= n /\ i + l <= n)
+          (ensures mc_remaining_i n l i == (l - 1) + mc_remaining_i n l (i + 1))
+  = ()
+
+let mc_remaining_i_end (n l: nat)
+  : Lemma (requires l >= 2 /\ l <= n)
+          (ensures mc_remaining_i n l (n - l + 1) == 0)
+  = ()
+
+let mc_inner_sum_to_remaining (n l: nat)
+  : Lemma (requires l >= 2 /\ l <= n)
+          (ensures mc_inner_sum n l == mc_remaining_i n l 0 + mc_inner_sum n (l + 1))
+  = mc_inner_sum_step n l
 
 // ========== Main Implementation ==========
 
@@ -47,8 +81,11 @@ fn matrix_chain_order
   (dims: A.array int)
   (n: SZ.t)
   (#s_dims: erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to dims #p s_dims **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n + 1 == Seq.length s_dims /\
       SZ.v n + 1 == A.length dims /\
@@ -57,10 +94,12 @@ fn matrix_chain_order
       (forall (i: nat). i < Seq.length s_dims ==> Seq.index s_dims i > 0)
     )
   returns result: int
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to dims #p s_dims **
+    GR.pts_to ctr cf **
     pure (
-      result == mc_result s_dims (SZ.v n)
+      result == mc_result s_dims (SZ.v n) /\
+      mc_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: mc_sig
 {
@@ -72,20 +111,25 @@ fn matrix_chain_order
   
   // Main DP: iterate over chain lengths l from 2 to n
   let mut l: SZ.t = 2sz;
+
+  // Establish: mc_inner_sum n 2 == mc_iterations n
+  mc_inner_sum_at_start (SZ.v n);
   
   while (!l <=^ n)
-  invariant exists* vl sm.
+  invariant exists* vl sm (vc: nat).
     R.pts_to l vl **
     V.pts_to m sm **
+    GR.pts_to ctr vc **
     A.pts_to dims #p s_dims **
     pure (
       SZ.v vl <= SZ.v n + 1 /\
       SZ.v vl >= 2 /\
       Seq.length sm == op_Multiply (SZ.v n) (SZ.v n) /\
       V.length m == Seq.length sm /\
-      // Remaining work from current state = total work from initial state
       mc_outer sm s_dims (SZ.v n) (SZ.v vl) == 
-        mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
+        mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2 /\
+      vc >= reveal c0 /\
+      vc + mc_inner_sum (SZ.v n) (SZ.v vl) == reveal c0 + mc_iterations (SZ.v n)
     )
   decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !l)
   {
@@ -93,12 +137,16 @@ fn matrix_chain_order
     
     // For each starting position i
     let mut i: SZ.t = 0sz;
+
+    // Transition: outer invariant -> middle invariant
+    mc_inner_sum_to_remaining (SZ.v n) (SZ.v vl);
     
     while (!i <^ n - vl + 1sz)
-    invariant exists* vi sm_i.
+    invariant exists* vi sm_i (vc_i: nat).
       R.pts_to l vl **
       R.pts_to i vi **
       V.pts_to m sm_i **
+      GR.pts_to ctr vc_i **
       A.pts_to dims #p s_dims **
       pure (
         SZ.v vl <= SZ.v n + 1 /\
@@ -106,9 +154,10 @@ fn matrix_chain_order
         SZ.v vi <= SZ.v n - SZ.v vl + 1 /\
         Seq.length sm_i == op_Multiply (SZ.v n) (SZ.v n) /\
         V.length m == Seq.length sm_i /\
-        // Remaining i-work then remaining l-work = total
         mc_outer (mc_inner_i sm_i s_dims (SZ.v n) (SZ.v vl) (SZ.v vi)) s_dims (SZ.v n) (SZ.v vl + 1) ==
-          mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2
+          mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2 /\
+        vc_i >= reveal c0 /\
+        vc_i + mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi) + mc_inner_sum (SZ.v n) (SZ.v vl + 1) == reveal c0 + mc_iterations (SZ.v n)
       )
     decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
     {
@@ -122,17 +171,21 @@ fn matrix_chain_order
       
       // Capture the table state at i-loop entry for use after k-loop
       with sm_i_entry. assert (V.pts_to m sm_i_entry);
+
+      // Transition: middle invariant -> inner invariant
+      mc_remaining_i_step (SZ.v n) (SZ.v vl) (SZ.v vi);
       
       // Try all split points k from i to j-1
       let mut k: SZ.t = vi;
       
       while (!k <^ j)
-      invariant exists* vk vmin_cost sm_k.
+      invariant exists* vk vmin_cost sm_k (vc_k: nat).
         R.pts_to l vl **
         R.pts_to i vi **
         R.pts_to k vk **
         R.pts_to min_cost vmin_cost **
         V.pts_to m sm_k **
+        GR.pts_to ctr vc_k **
         A.pts_to dims #p s_dims **
         pure (
           SZ.v vl <= SZ.v n + 1 /\
@@ -144,11 +197,11 @@ fn matrix_chain_order
           SZ.v j < SZ.v n /\
           Seq.length sm_k == op_Multiply (SZ.v n) (SZ.v n) /\
           V.length m == Seq.length sm_k /\
-          // k-loop doesn't modify table
           sm_k == sm_i_entry /\
-          // accumulator tracks remaining k-work
           mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost ==
-            mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vi) 1000000000
+            mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vi) 1000000000 /\
+          vc_k >= reveal c0 /\
+          vc_k + (SZ.v j - SZ.v vk) + mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi + 1) + mc_inner_sum (SZ.v n) (SZ.v vl + 1) == reveal c0 + mc_iterations (SZ.v n)
         )
       decreases (SZ.v j `Prims.op_Subtraction` SZ.v !k)
       {
@@ -179,6 +232,9 @@ fn matrix_chain_order
         // Update min_cost = min(min_cost, q)
         let new_min = (if q < vmin_cost then q else vmin_cost);
         min_cost := new_min;
+
+        // Count the k-iteration — one ghost tick
+        tick ctr;
         
         k := vk + 1sz;
       };
@@ -192,9 +248,16 @@ fn matrix_chain_order
       
       i := vi + 1sz;
     };
+
+    // Transition: middle invariant back to outer invariant
+    mc_remaining_i_end (SZ.v n) (SZ.v vl);
     
     l := vl + 1sz;
   };
+  
+  // After outer loop: l > n, so mc_inner_sum n l == 0, hence vc == c0 + mc_iterations n
+  let vl_final = !l;
+  mc_inner_sum_zero (SZ.v n) (SZ.v vl_final);
   
   // Extract result: m[0][n-1]
   let result_idx = 0sz *^ n + (n - 1sz);

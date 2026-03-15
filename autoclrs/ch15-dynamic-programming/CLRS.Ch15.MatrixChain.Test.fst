@@ -18,6 +18,7 @@ open CLRS.Ch15.MatrixChain.Impl
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
@@ -43,7 +44,9 @@ fn test_matrix_chain ()
   let n = 6sz;
   
   // Compute optimal cost
-  let cost = matrix_chain_order dims n;
+  let ctr = GR.alloc #nat 0;
+  let cost = matrix_chain_order dims n ctr;
+  GR.free ctr;
   
   // Free the array
   with s. assert (A.pts_to dims s);
