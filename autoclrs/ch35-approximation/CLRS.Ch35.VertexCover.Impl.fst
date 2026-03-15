@@ -159,7 +159,8 @@ fn approx_vertex_cover
     pure (
       SZ.v n > 0 /\ 
       SZ.fits (SZ.v n * SZ.v n) /\
-      Seq.length s_adj == SZ.v n * SZ.v n
+      Seq.length s_adj == SZ.v n * SZ.v n /\
+      Spec.is_symmetric_adj s_adj (SZ.v n)
     )
   returns cover: V.vec int
   ensures exists* s_cover.

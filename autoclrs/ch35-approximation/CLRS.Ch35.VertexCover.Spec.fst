@@ -84,6 +84,12 @@ let rec sum_contributions (c: cover_fn) (m: list edge) : Tot nat (decreases m) =
 
 (*** Connection definitions ***)
 
+// Symmetry predicate: adjacency matrix represents an undirected graph
+let is_symmetric_adj (s_adj: seq int) (n: nat) : prop =
+  Seq.length s_adj == n * n /\
+  (forall (u v: nat). u < n /\ v < n ==>
+    Seq.index s_adj (u * n + v) == Seq.index s_adj (v * n + u))
+
 // The is_cover predicate used by the Pulse implementation.
 // Tracks which edges have been processed so far via (bound_u, bound_v).
 let is_cover (s_adj s_cover: seq int) (n: nat) (bound_u bound_v: nat) : prop =
