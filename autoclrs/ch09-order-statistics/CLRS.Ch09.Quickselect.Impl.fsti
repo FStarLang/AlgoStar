@@ -22,7 +22,10 @@ let permutation = QSpec.permutation
 let unchanged_outside = QSpec.unchanged_outside
 let partition_ordered = QSpec.partition_ordered
 
-val complexity_bounded_quickselect (cf c0 n: nat) : prop
+/// Quickselect worst-case complexity: at most qs_cost(n) comparisons.
+/// qs_cost(n) = n + (n-1) + ... + 2 = n(n+1)/2, i.e. O(n²).
+let complexity_bounded_quickselect (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 <= QC.qs_cost n
 
 fn partition_in_range
   (a: A.array int)

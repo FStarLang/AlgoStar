@@ -177,11 +177,6 @@ fn find_min_index_from
 
 // ========== select — single function, correctness + complexity ==========
 
-let complexity_bounded_select (cf c0 n k: nat) : prop =
-  k > 0 /\ k <= n /\ n > 0 /\
-  cf >= c0 /\
-  cf - c0 <= op_Multiply k (n - 1)
-
 #push-options "--z3rlimit 20 --ifuel 2 --fuel 2"
 //SNIPPET_START: select
 fn select

@@ -55,7 +55,12 @@ fn find_min_index_from
       cf - reveal c0 == SZ.v len - SZ.v start - 1
     )
 
-val complexity_bounded_select (cf c0 n k: nat) : prop
+/// Selection complexity: at most k × (n−1) comparisons.
+/// k rounds, each scanning up to n−1 elements. This is O(nk) worst case.
+let complexity_bounded_select (cf c0 n k: nat) : prop =
+  k > 0 /\ k <= n /\ n > 0 /\
+  cf >= c0 /\
+  cf - c0 <= op_Multiply k (n - 1)
 
 fn select
   (a: array int)

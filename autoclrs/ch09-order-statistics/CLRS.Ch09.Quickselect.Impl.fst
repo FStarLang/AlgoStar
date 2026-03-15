@@ -48,9 +48,6 @@ let swap_is_permutation = QSpec.swap_is_permutation
 let unchanged_outside = QSpec.unchanged_outside
 let partition_ordered = QSpec.partition_ordered
 
-let complexity_bounded_quickselect (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 <= QC.qs_cost n
-
 // ========== In-place partition — ticks once per comparison ==========
 
 #push-options "--z3rlimit 120 --ifuel 2 --fuel 2"
