@@ -6,6 +6,7 @@
    - Separation-logic predicates (rbtree_subtree, valid_rbtree)
    - Low-level API: rb_search, rb_minimum, rb_clrs_insert, rb_clrs_delete, free_rbtree
    - Validated API: rb_new, rb_search_v, rb_insert_v, rb_delete_v, free_valid_rbtree
+   - Complexity-aware API: rb_search_log, rb_clrs_insert_log, rb_clrs_delete_log
 
    Internal helpers (fixup, resolve, cases234, set_parent_ptr, etc.) are hidden.
 *)
@@ -19,6 +20,9 @@ open Pulse.Lib.Box { box, (:=), (!) }
 module S = CLRS.Ch13.RBTree.Spec
 module CS = CLRS.Ch13.RBTree.CLRSSpec
 module G = FStar.Ghost
+module C = CLRS.Ch13.RBTree.Complexity
+module CC = CLRS.Ch13.RBTree.CLRSComplexity
+open FStar.Mul
 
 // ========== Node type and pointers ==========
 
@@ -107,3 +111,26 @@ fn rb_delete_v (tree: rb_ptr) (k: int) (parent: rb_ptr)
 fn free_valid_rbtree (tree: rb_ptr)
   requires valid_rbtree tree 'ft 'parent
   ensures emp
+
+// ========== Complexity-aware API ==========
+
+fn rb_search_log (tree: rb_ptr) (k: int)
+  (#parent: G.erased rb_ptr)
+  preserves valid_rbtree tree 'ft parent
+  returns result: option int
+  ensures pure (result == S.search 'ft k /\
+                C.search_ticks 'ft k <= S.height 'ft + 1)
+
+fn rb_clrs_insert_log (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires valid_rbtree tree 'ft parent
+  returns y: rb_ptr
+  ensures valid_rbtree y (CS.clrs_insert 'ft k) parent **
+          pure (S.mem k (CS.clrs_insert 'ft k) = true /\
+                CC.clrs_insert_ticks 'ft k <= S.height 'ft + 2)
+
+fn rb_clrs_delete_log (tree: rb_ptr) (k: int) (parent: rb_ptr)
+  requires valid_rbtree tree 'ft parent
+  returns y: rb_ptr
+  ensures valid_rbtree y (CS.clrs_delete 'ft k) parent **
+          pure (S.mem k (CS.clrs_delete 'ft k) = false /\
+                CC.clrs_delete_ticks 'ft k <= 2 * S.height 'ft + 2)
