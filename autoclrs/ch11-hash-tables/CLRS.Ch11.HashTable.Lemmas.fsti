@@ -42,3 +42,47 @@ val lemma_probes_not_key_full_iff
 val lemma_array_to_model_mem_full
   (s: Seq.seq int) (k: nat)
   : Lemma (Spec.mem (array_to_model s) k <==> array_has_key s k)
+
+(** Lemma 5: If unique_key holds and delete removes the key (one slot from key
+    to -2, rest unchanged), then the key is absent from the table.
+    This closes Review.md limitation 7: delete now guarantees key absence
+    when uniqueness is maintained (e.g., via hash_insert_no_dup). *)
+val lemma_delete_unique_guarantees_absence
+  (s s': Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s})
+  (key: int{key >= 0})
+  (idx: nat{idx < Seq.length s /\ Seq.length s' == Seq.length s})
+  : Lemma
+    (requires
+      Impl.unique_key s key /\
+      Seq.index s idx == key /\
+      Seq.index s' idx == -2 /\
+      Impl.seq_modified_at s s' idx)
+    (ensures ~(Impl.key_in_table s' size key))
+
+(** Lemma 6: After a fresh insert (key was absent, inserted at one position),
+    the key is unique in the new table. *)
+val lemma_insert_fresh_unique_key
+  (s s': Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s})
+  (key: int{key >= 0})
+  (idx: nat{idx < Seq.length s /\ Seq.length s' == Seq.length s})
+  : Lemma
+    (requires
+      ~(Impl.key_in_table s size key) /\
+      Seq.index s' idx == key /\
+      Impl.seq_modified_at s s' idx)
+    (ensures Impl.unique_key s' key)
+
+(** Lemma 7: Spec model connection — after insert, key is present in the Spec model.
+    Bridges Review.md limitation 6: connects Impl postconditions to Spec model. *)
+val lemma_key_in_table_spec_mem
+  (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: nat)
+  : Lemma
+    (requires Impl.key_in_table s size key)
+    (ensures Spec.mem (array_to_model s) key)
+
+(** Lemma 8: Spec model connection — key absent from table means absent from Spec model. *)
+val lemma_key_absent_spec_not_mem
+  (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: nat)
+  : Lemma
+    (requires ~(Impl.key_in_table s size key))
+    (ensures ~(Spec.mem (array_to_model s) key))
