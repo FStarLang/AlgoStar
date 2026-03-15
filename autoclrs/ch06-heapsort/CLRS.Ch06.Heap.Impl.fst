@@ -214,6 +214,7 @@ ensures exists* s (cf: nat).
     SZ.v n <= Seq.length s /\
     is_max_heap s (SZ.v n) /\
     permutation s0 s /\
+    (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
     SZ.fits (op_Multiply 2 (Seq.length s) + 2) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.build_cost_bound (SZ.v n)
@@ -232,6 +233,7 @@ ensures exists* s (cf: nat).
       Seq.length s_cur == Seq.length s0 /\
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
+      (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
       SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
       heaps_from s_cur (SZ.v n) (SZ.v vi) /\
       vc >= reveal c0 /\
@@ -272,7 +274,6 @@ fn heapsort
   (ctr: GR.ref nat)
   (#s0: erased (Seq.seq int) {
     SZ.v n <= A.length a /\
-    SZ.v n == Seq.length s0 /\
     Seq.length s0 == A.length a /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
   })
@@ -285,14 +286,15 @@ ensures exists* s (cf: nat).
   GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
-    sorted s /\
+    sorted_upto s (SZ.v n) /\
     permutation s0 s /\
+    (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)
   )
 {
   if (n = 0sz) {
-    // Empty array: trivially sorted, identity permutation, zero cost
+    // Empty prefix: trivially sorted, identity permutation, zero cost
     ()
   } else {
   // Phase 1: BUILD-MAX-HEAP
@@ -313,10 +315,11 @@ ensures exists* s (cf: nat).
       Seq.length s_cur == Seq.length s0 /\
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
+      (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
       SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
       is_max_heap s_cur (SZ.v vsz) /\
-      suffix_sorted s_cur (SZ.v vsz) /\
-      prefix_le_suffix s_cur (SZ.v vsz) /\
+      suffix_sorted_upto s_cur (SZ.v vsz) (SZ.v n) /\
+      prefix_le_suffix_upto s_cur (SZ.v vsz) (SZ.v n) /\
       vc >= reveal c0 /\
       vc - reveal c0 <= CB.build_cost_bound (SZ.v n) +
                          op_Multiply (SZ.v n - SZ.v vsz) (CB.max_heapify_bound (SZ.v n) 0)
@@ -336,7 +339,7 @@ ensures exists* s (cf: nat).
     
     with s_swapped. assert (A.pts_to a s_swapped);
     swap_is_permutation s_cur 0 (SZ.v last);
-    extract_extends_sorted s_cur (SZ.v vsz);
+    extract_extends_sorted_upto s_cur (SZ.v vsz) (SZ.v n);
     
     let new_sz = vsz - 1sz;
     extract_almost_heaps s_cur (SZ.v vsz);
@@ -348,11 +351,13 @@ ensures exists* s (cf: nat).
     // Help SMT: (n-vsz)*m + m = (n-vsz+1)*m by distributivity
     FStar.Math.Lemmas.distributivity_add_left (SZ.v n - SZ.v vsz) 1 (CB.max_heapify_bound (SZ.v n) 0);
     heaps_from_zero s_heapified (SZ.v new_sz);
-    perm_preserves_sorted_suffix (swap_seq s_cur 0 (SZ.v last)) s_heapified (SZ.v new_sz);
+    perm_preserves_sorted_suffix_upto (swap_seq s_cur 0 (SZ.v last)) s_heapified (SZ.v new_sz) (SZ.v n);
     
     heap_sz := new_sz;
   };
   
+  with s_final. assert (A.pts_to a s_final);
+  sorted_upto_from_parts s_final (SZ.v n);
   ()
   } // else n > 0
 }

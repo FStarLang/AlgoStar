@@ -67,3 +67,22 @@ let permutation (s1 s2: Seq.seq int) : prop = (SeqP.permutation int s1 s2)
 
 let swap_seq (s:Seq.seq int) (i j:nat{i < Seq.length s /\ j < Seq.length s}) : Seq.seq int =
   Seq.upd (Seq.upd s i (Seq.index s j)) j (Seq.index s i)
+
+// ========== Range-bounded sorted and prefix predicates ==========
+// These extend suffix_sorted/prefix_le_suffix with an upper bound `n`,
+// enabling heapsort to sort a prefix of a larger array.
+
+// First n elements are sorted
+let sorted_upto (s: Seq.seq int) (n: nat) =
+  n <= Seq.length s /\
+  (forall (i j: nat). i <= j /\ j < n ==> Seq.index s i <= Seq.index s j)
+
+// Elements from k to n-1 are sorted
+let suffix_sorted_upto (s: Seq.seq int) (k: nat) (n: nat) : prop =
+  k <= n /\ n <= Seq.length s /\
+  (forall (i j: nat). k <= i /\ i <= j /\ j < n ==> Seq.index s i <= Seq.index s j)
+
+// Elements before k are <= elements from k to n-1
+let prefix_le_suffix_upto (s: Seq.seq int) (k: nat) (n: nat) : prop =
+  k <= n /\ n <= Seq.length s /\
+  (forall (i j: nat). i < k /\ k <= j /\ j < n ==> Seq.index s i <= Seq.index s j)

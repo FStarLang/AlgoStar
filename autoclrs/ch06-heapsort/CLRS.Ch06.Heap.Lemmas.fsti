@@ -160,3 +160,27 @@ val perm_preserves_sorted_suffix (s1 s2:Seq.seq int) (k:nat)
                     (forall (j:nat). k <= j /\ j < Seq.length s1 ==> Seq.index s2 j == Seq.index s1 j) /\
                     permutation s1 s2)
           (ensures suffix_sorted s2 k /\ prefix_le_suffix s2 k)
+
+// ========== Range-bounded extract/perm lemmas ==========
+
+val extract_extends_sorted_upto (s:Seq.seq int) (len n:nat)
+  : Lemma (requires n <= Seq.length s /\ len <= n /\ len > 1 /\
+                    is_max_heap s len /\
+                    suffix_sorted_upto s len n /\
+                    prefix_le_suffix_upto s len n)
+          (ensures (let s' = swap_seq s 0 (len - 1) in
+                    suffix_sorted_upto s' (len - 1) n /\
+                    prefix_le_suffix_upto s' (len - 1) n))
+
+val perm_preserves_sorted_suffix_upto (s1 s2:Seq.seq int) (k n:nat)
+  : Lemma (requires Seq.length s1 == Seq.length s2 /\
+                    k <= n /\ n <= Seq.length s1 /\
+                    suffix_sorted_upto s1 k n /\
+                    prefix_le_suffix_upto s1 k n /\
+                    (forall (j:nat). k <= j /\ j < Seq.length s1 ==> Seq.index s2 j == Seq.index s1 j) /\
+                    permutation s1 s2)
+          (ensures suffix_sorted_upto s2 k n /\ prefix_le_suffix_upto s2 k n)
+
+val sorted_upto_from_parts (s:Seq.seq int) (n:nat)
+  : Lemma (requires suffix_sorted_upto s 1 n /\ prefix_le_suffix_upto s 1 n)
+          (ensures sorted_upto s n)

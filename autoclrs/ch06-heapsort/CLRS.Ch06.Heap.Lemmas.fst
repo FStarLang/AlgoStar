@@ -377,3 +377,104 @@ let perm_preserves_sorted_suffix (s1 s2:Seq.seq int) (k:nat)
     in
     Classical.forall_intro_2 aux
 #pop-options
+
+// ========== Range-bounded lemmas for prefix sorting (Limitation 5) ==========
+
+#push-options "--split_queries always"
+let extract_extends_sorted_upto (s:Seq.seq int) (len n:nat)
+  : Lemma (requires n <= Seq.length s /\ len <= n /\ len > 1 /\
+                    is_max_heap s len /\
+                    suffix_sorted_upto s len n /\
+                    prefix_le_suffix_upto s len n)
+          (ensures (let s' = swap_seq s 0 (len - 1) in
+                    suffix_sorted_upto s' (len - 1) n /\
+                    prefix_le_suffix_upto s' (len - 1) n))
+  = let z : nat = 0 in
+    let nl : nat = len - 1 in
+    let s' = swap_seq s z nl in
+    swap_length s z nl;
+    swap_index_i s z nl;
+    swap_index_j s z nl;
+    let aux_root (i:nat{i < len})
+      : Lemma (Seq.index s z >= Seq.index s i)
+      = root_ge_element s len i
+    in
+    Classical.forall_intro (Classical.move_requires aux_root)
+#pop-options
+
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+private
+let perm_prefix_bounded_aux_upto (s1 s2:Seq.seq int) (k n:nat) (i:nat) (j:nat)
+  : Lemma (requires Seq.length s1 == Seq.length s2 /\
+                    k <= n /\ n <= Seq.length s1 /\
+                    suffix_sorted_upto s1 k n /\
+                    prefix_le_suffix_upto s1 k n /\
+                    (forall (m:nat). k <= m /\ m < Seq.length s1 ==> Seq.index s2 m == Seq.index s1 m) /\
+                    permutation s1 s2 /\
+                    i < k /\ j >= k /\ j < n)
+          (ensures Seq.index s2 i <= Seq.index s2 j)
+  = reveal_opaque (`%permutation) (permutation s1 s2);
+    assert (k <= Seq.length s2);
+    assert (Seq.index s2 j == Seq.index s1 j);
+    let len = Seq.length s1 in
+    Seq.lemma_len_slice s1 0 k;
+    Seq.lemma_len_slice s2 0 k;
+    Seq.lemma_len_slice s1 k len;
+    Seq.lemma_len_slice s2 k len;
+    let sl1 = Seq.slice s1 0 k in
+    let sl2 = Seq.slice s2 0 k in
+    let suf1 = Seq.slice s1 k len in
+    let suf2 = Seq.slice s2 k len in
+    let x = Seq.index sl2 i in
+    Seq.lemma_index_slice s2 0 k i;
+    index_mem_intro sl2 i;
+    slice_suffix_eq s1 s2 k;
+    Seq.lemma_eq_elim suf1 suf2;
+    assert (suf1 == suf2);
+    SeqP.lemma_count_slice s1 k;
+    SeqP.lemma_count_slice s2 k;
+    let cx_suf1 = SeqP.count x suf1 in
+    let cx_suf2 = SeqP.count x suf2 in
+    assert (cx_suf1 == cx_suf2);
+    let cx_s1 = SeqP.count x s1 in
+    let cx_s2 = SeqP.count x s2 in
+    assert (cx_s1 == cx_s2);
+    let cx_sl1 = SeqP.count x sl1 in
+    let cx_sl2 = SeqP.count x sl2 in
+    assert (cx_s1 == cx_sl1 + cx_suf1);
+    assert (cx_s2 == cx_sl2 + cx_suf2);
+    assert (cx_sl1 == cx_sl2);
+    let m = SeqP.index_mem x sl1 in
+    assert (m < k);
+    Seq.lemma_index_slice s1 0 k m;
+    assert (x == Seq.index s2 (i + 0));
+    assert (Seq.index s1 (m + 0) == x);
+    assert (m < k /\ k <= j /\ j < n);
+    assert (Seq.index s1 m <= Seq.index s1 j);
+    assert (Seq.index s1 j == Seq.index s2 j);
+    ()
+#pop-options
+
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
+let perm_preserves_sorted_suffix_upto (s1 s2:Seq.seq int) (k n:nat)
+  : Lemma (requires Seq.length s1 == Seq.length s2 /\
+                    k <= n /\ n <= Seq.length s1 /\
+                    suffix_sorted_upto s1 k n /\
+                    prefix_le_suffix_upto s1 k n /\
+                    (forall (j:nat). k <= j /\ j < Seq.length s1 ==> Seq.index s2 j == Seq.index s1 j) /\
+                    permutation s1 s2)
+          (ensures suffix_sorted_upto s2 k n /\ prefix_le_suffix_upto s2 k n)
+  = permutation_same_length s1 s2;
+    let aux (i:nat) (j:nat)
+      : Lemma (ensures (i < k /\ k <= j /\ j < n) ==> Seq.index s2 i <= Seq.index s2 j)
+      = if i < k && k <= j && j < n then
+          perm_prefix_bounded_aux_upto s1 s2 k n i j
+        else ()
+    in
+    Classical.forall_intro_2 aux
+#pop-options
+
+let sorted_upto_from_parts (s:Seq.seq int) (n:nat)
+  : Lemma (requires suffix_sorted_upto s 1 n /\ prefix_le_suffix_upto s 1 n)
+          (ensures sorted_upto s n)
+  = ()
