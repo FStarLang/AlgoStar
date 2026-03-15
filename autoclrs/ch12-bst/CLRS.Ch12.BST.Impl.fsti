@@ -89,20 +89,24 @@ fn rec tree_maximum (tree: bst_ptr) (bp: bst_node_ptr) (ticks: GR.ref nat)
           pure (bst_maximum 'ft == Some result)
 
 (** TREE-INSERT (§12.3): recursive insert with parent-pointer maintenance, O(h)
-    Postcondition: ticks incremented by bst_insert_ticks 'ft k *)
+    Postcondition: ticks incremented by bst_insert_ticks 'ft k
+    Validity: bst_valid is preserved (addresses Review limitation 1) *)
 fn rec tree_insert (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat)
   requires bst_subtree tree 'ft parent ** GR.pts_to ticks 'n
   returns y: bst_ptr
   ensures bst_subtree y (bst_insert 'ft k) parent **
-          GR.pts_to ticks ('n + bst_insert_ticks 'ft k)
+          GR.pts_to ticks ('n + bst_insert_ticks 'ft k) **
+          pure (bst_valid 'ft ==> bst_valid (bst_insert 'ft k))
 
 (** TREE-DELETE (§12.3): recursive key-based deletion, O(h)
-    Postcondition: ticks incremented by bst_delete_ticks 'ft k *)
+    Postcondition: ticks incremented by bst_delete_ticks 'ft k
+    Validity: bst_valid is preserved (addresses Review limitation 1) *)
 fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat)
   requires bst_subtree tree 'ft parent ** GR.pts_to ticks 'n
   returns result: bst_ptr
   ensures bst_subtree result (bst_delete 'ft k) parent **
-          GR.pts_to ticks ('n + bst_delete_ticks 'ft k)
+          GR.pts_to ticks ('n + bst_delete_ticks 'ft k) **
+          pure (bst_valid 'ft ==> bst_valid (bst_delete 'ft k))
 
 (** TREE-FREE: recursive deallocation of all nodes *)
 fn rec free_bst (tree: bst_ptr)

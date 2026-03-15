@@ -947,3 +947,27 @@ let rec bst_inorder_sorted (t: bst)
         bst_inorder_sorted left;
         bst_inorder_sorted right;
         lemma_sorted_concat (bst_inorder left) key (bst_inorder right)
+
+(* ------------------------------------------------------------------------
+   Lemma: inserting a duplicate key leaves the tree unchanged
+   
+   Addresses Review limitation 5: "Duplicate keys silently ignored."
+   This makes explicit that bst_insert is a no-op when the key already
+   exists in a valid BST.
+   ------------------------------------------------------------------------ *)
+
+//SNIPPET_START: bst_insert_noop_if_present
+let rec bst_insert_noop_if_present (t: bst) (k: int)
+  : Lemma
+    (requires bst_valid t /\ bst_search t k)
+    (ensures bst_insert t k == t)
+  = match t with
+    | Leaf -> ()
+    | Node left key right ->
+        if k = key then ()
+        else if k < key then begin
+          bst_insert_noop_if_present left k
+        end else begin
+          bst_insert_noop_if_present right k
+        end
+//SNIPPET_END: bst_insert_noop_if_present

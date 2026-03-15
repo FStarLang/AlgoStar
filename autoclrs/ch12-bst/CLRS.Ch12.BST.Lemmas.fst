@@ -75,3 +75,8 @@ let inorder_sorted (t: bst)
   : Lemma (requires bst_valid t)
           (ensures sorted (bst_inorder t))
   = bst_inorder_sorted t
+
+let insert_noop_if_present (t: bst) (k: int)
+  : Lemma (requires bst_valid t /\ bst_search t k)
+          (ensures bst_insert t k == t)
+  = bst_insert_noop_if_present t k

@@ -31,6 +31,18 @@ open CLRS.Ch12.BST.Spec
 open CLRS.Ch12.BST.Complexity
 
 // ============================================================
+// Validity-preservation implications (for postconditions)
+// ============================================================
+
+let insert_valid_implication (ft: bst) (k: int)
+  : Lemma (ensures bst_valid ft ==> bst_valid (bst_insert ft k))
+  = Classical.move_requires (bst_insert_valid ft) k
+
+let delete_valid_implication (ft: bst) (k: int)
+  : Lemma (ensures bst_valid ft ==> bst_valid (bst_delete ft k))
+  = Classical.move_requires (bst_delete_valid ft) k
+
+// ============================================================
 // Ghost fold/unfold helpers
 // ============================================================
 
@@ -320,8 +332,10 @@ fn rec tree_insert (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat
   requires bst_subtree tree 'ft parent ** GR.pts_to ticks 'n
   returns y: bst_ptr
   ensures bst_subtree y (bst_insert 'ft k) parent **
-          GR.pts_to ticks ('n + bst_insert_ticks 'ft k)
+          GR.pts_to ticks ('n + bst_insert_ticks 'ft k) **
+          pure (bst_valid 'ft ==> bst_valid (bst_insert 'ft k))
 {
+  insert_valid_implication 'ft k;
   match tree {
     None -> {
       // Leaf: allocate Node Leaf k Leaf with the given parent
@@ -466,9 +480,11 @@ fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat
   requires bst_subtree tree 'ft parent ** GR.pts_to ticks 'n
   returns result: bst_ptr
   ensures bst_subtree result (bst_delete 'ft k) parent **
-          GR.pts_to ticks ('n + bst_delete_ticks 'ft k)
+          GR.pts_to ticks ('n + bst_delete_ticks 'ft k) **
+          pure (bst_valid 'ft ==> bst_valid (bst_delete 'ft k))
   decreases 'ft
 {
+  delete_valid_implication 'ft k;
   match tree {
     None -> {
       // Leaf: nothing to delete, bst_delete_ticks Leaf k = 0

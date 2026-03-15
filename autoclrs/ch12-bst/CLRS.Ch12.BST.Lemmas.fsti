@@ -59,3 +59,8 @@ val delete_valid: t:bst -> k:int ->
 val inorder_sorted: t:bst ->
   Lemma (requires bst_valid t)
         (ensures sorted (bst_inorder t))
+
+(** Inserting a duplicate key is a no-op: the tree is unchanged *)
+val insert_noop_if_present: t:bst -> k:int ->
+  Lemma (requires bst_valid t /\ bst_search t k)
+        (ensures bst_insert t k == t)
