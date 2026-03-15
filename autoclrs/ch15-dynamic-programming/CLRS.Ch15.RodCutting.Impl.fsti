@@ -36,7 +36,6 @@ fn rod_cutting
     pure (
       SZ.v n == Seq.length s_prices /\
       SZ.v n == A.length prices /\
-      SZ.v n > 0 /\
       SZ.fits (SZ.v n + 1)
     )
   returns result: nat
