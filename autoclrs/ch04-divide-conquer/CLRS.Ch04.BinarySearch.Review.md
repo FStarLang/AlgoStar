@@ -7,6 +7,7 @@ Here is the top-level signature proven about Binary Search in
 
 ```fstar
 val binary_search
+  (#p: perm)
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
@@ -14,14 +15,13 @@ val binary_search
   (ctr: GR.ref nat)
   (#c0: erased nat)
   : stt SZ.t
-    (A.pts_to a s0 ** GR.pts_to ctr c0 **
+    (A.pts_to a #p s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
        Seq.length s0 <= A.length a /\
-       SZ.v len > 0 /\
        is_sorted s0
      ))
-    (fun result -> exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf **
+    (fun result -> exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
      pure (
        SZ.v result <= SZ.v len /\
        (SZ.v result < SZ.v len ==> (
@@ -37,9 +37,9 @@ val binary_search
 
 ### Parameters
 
-* `a` is a read-only array of `int`. The ghost variable `s0` captures the
-  contents of the array (which are not modified — the postcondition returns
-  `A.pts_to a s0` unchanged).
+* `a` is a read-only array of `int`, accessed with fractional permission
+  `#p`. The ghost variable `s0` captures the contents of the array (which
+  are not modified — the postcondition returns `A.pts_to a #p s0` unchanged).
 
 * `len` is the number of elements to search, of type `SZ.t`.
 
@@ -52,8 +52,6 @@ val binary_search
 * `SZ.v len == Seq.length s0`: Length parameter matches logical sequence.
 
 * `Seq.length s0 <= A.length a`: Logical sequence fits within the physical array.
-
-* `SZ.v len > 0`: The array must be non-empty.
 
 * `is_sorted s0`: The input array must be sorted.
 
@@ -128,19 +126,19 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`len > 0` precondition.** Searching an empty array should trivially
-   return "not found," but the implementation requires `len > 0`. A stronger
-   specification would accept `len >= 0`.
+1. ~~**`len > 0` precondition.**~~ **RESOLVED.** The implementation now
+   accepts `len >= 0`. Searching an empty array trivially returns
+   `len` (not found) with 0 comparisons.
 
 2. **No guarantee of returning the *first* occurrence.** If the key appears
    multiple times, the specification only guarantees *some* valid index is
    returned. CLRS does not require this either, but applications needing the
    leftmost match would need a stronger postcondition.
 
-3. **Array is not modified, but the interface does not use fractional permissions
-   on `a`.** The postcondition returns `A.pts_to a s0` (full permission),
-   meaning the caller must have exclusive ownership. A more flexible interface
-   would accept a fractional permission `#p`.
+3. ~~**Array is not modified, but the interface does not use fractional permissions
+   on `a`.**~~ **RESOLVED.** The interface now accepts a fractional permission
+   `#p`, allowing concurrent reads. The postcondition returns
+   `A.pts_to a #p s0`.
 
 4. **Local `is_sorted` definition.** The spec defines its own `is_sorted`
    rather than reusing `CLRS.Common.SortSpec.sorted`. The two are logically

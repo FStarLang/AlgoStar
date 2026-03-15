@@ -7,19 +7,20 @@ Here is the top-level signature proven about Kadane's algorithm in
 
 ```fstar
 val max_subarray
+  (#p: perm)
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
   (ctr: GR.ref nat)
   (#c0: erased nat)
   : stt int
-    (A.pts_to a s0 ** GR.pts_to ctr c0 **
+    (A.pts_to a #p s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
        Seq.length s0 <= A.length a /\
        SZ.v len > 0
      ))
-    (fun result -> exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf ** pure (
+    (fun result -> exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf ** pure (
        result == max_subarray_spec s0 /\
        complexity_bounded_linear cf (reveal c0) (SZ.v len)
      ))
@@ -27,8 +28,9 @@ val max_subarray
 
 ### Parameters
 
-* `a` is a read-only array of `int`. The ghost variable `s0` captures the
-  contents (returned unchanged in the postcondition).
+* `a` is a read-only array of `int`, accessed with fractional permission
+  `#p`. The ghost variable `s0` captures the contents (returned unchanged
+  in the postcondition).
 
 * `len` is the number of elements, of type `SZ.t`.
 
@@ -60,12 +62,12 @@ The function returns an `int` value `result` such that:
 ```fstar
 let max_subarray_spec (s: Seq.seq int) : Tot int =
   if Seq.length s = 0 then 0
-  else kadane_spec s 0 0 initial_min
+  else kadane_spec s 0 0 (Seq.index s 0)
 ```
 
 The top-level specification. For non-empty sequences, delegates to
 `kadane_spec` starting at position 0 with `current_sum = 0` and
-`best_sum = initial_min`.
+`best_sum = Seq.index s 0` (the first element).
 
 ### `kadane_spec` (from `CLRS.Ch04.MaxSubarray.Spec`)
 
@@ -95,8 +97,8 @@ best sum seen so far.
 let initial_min : int = -1000000000
 ```
 
-A sentinel value used as the initial `best_sum`. This is **not** negative
-infinity — it is a concrete integer `-10⁹`.
+A legacy sentinel value. No longer used by `max_subarray_spec`, which now
+uses `Seq.index s 0` as the initial `best_sum`.
 
 ### `max_int` (from `CLRS.Ch04.MaxSubarray.Spec`)
 
@@ -153,15 +155,11 @@ let rec max_sub_sum (s: Seq.seq int) (i: nat) : Pure int
 
 Maximum sum of any non-empty contiguous subarray in `s[0..i+1)`.
 
-### `elements_bounded` (from `CLRS.Ch04.MaxSubarray.Spec`)
+### ~~`elements_bounded`~~ (removed)
 
-```fstar
-let elements_bounded (s: Seq.seq int) : prop =
-  forall (k:nat). k < Seq.length s ==> Seq.index s k >= initial_min
-```
-
-Precondition required by the optimality theorems: all elements must be
-≥ `initial_min` (i.e., ≥ `-10⁹`).
+The `elements_bounded` predicate is no longer needed. By using
+`Seq.index s 0` instead of `initial_min` as the initial `best_sum`,
+all optimality theorems hold unconditionally for any integer sequence.
 
 ## What Is Proven
 
@@ -172,14 +170,15 @@ The optimality theorems in `CLRS.Ch04.MaxSubarray.Lemmas` strengthen this:
 
 * **`theorem_kadane_optimal`**: For any subarray `[i, j)`,
   `max_subarray_spec s >= sum_range s i j`. The result is at least as large
-  as every contiguous subarray sum.
+  as every contiguous subarray sum. **No `elements_bounded` precondition.**
 
 * **`theorem_kadane_witness`**: There exist indices `i < j` such that
   `max_subarray_spec s == sum_range s i j`. The result is achieved by some
-  contiguous subarray.
+  contiguous subarray. **No `elements_bounded` precondition.**
 
 Together, these prove that `max_subarray_spec` computes the **unique maximum
-non-empty subarray sum** — the same quantity that CLRS §4.1 targets.
+non-empty subarray sum** — the same quantity that CLRS §4.1 targets — for
+**any** integer sequence.
 
 The complexity bound `cf - c0 == n` is **exact** (not just an upper bound).
 
@@ -188,21 +187,14 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`initial_min` sentinel is not −∞.** The sentinel value `-10⁹` is a
-   concrete integer, not true negative infinity. The optimality theorems
-   (`theorem_kadane_optimal`, `theorem_kadane_witness`) require the
-   `elements_bounded` precondition: all elements must be ≥ `-10⁹`. If the
-   input contains elements smaller than `-10⁹`, the specification is still
-   well-defined but the optimality guarantees do not hold. A cleaner design
-   would use `Seq.index s 0` or a fold-based definition to avoid this
-   sentinel.
+1. ~~**`initial_min` sentinel is not −∞.**~~ **RESOLVED.** The specification
+   now uses `Seq.index s 0` (the first element) as the initial `best_sum`.
+   The optimality theorems hold unconditionally for any integer sequence.
 
-2. **`elements_bounded` precondition not in the interface.** The top-level
-   `max_subarray` signature in the `.fsti` does **not** require
-   `elements_bounded`. The postcondition only says `result == max_subarray_spec s0`.
-   The separate optimality theorems require `elements_bounded`, so the full
-   chain (imperative result = spec = true optimum) only works when the caller
-   independently knows `elements_bounded s0`.
+2. ~~**`elements_bounded` precondition not in the interface.**~~ **RESOLVED.**
+   The `elements_bounded` precondition has been eliminated entirely. The
+   full chain (imperative result = spec = true optimum) now works
+   unconditionally.
 
 3. **Only non-empty subarrays.** The specification considers non-empty
    subarrays only (`max_suffix_sum` and `max_sub_sum` are defined for
@@ -214,9 +206,9 @@ discharged by F\* and Z3.
 4. **`len > 0` precondition.** Kadane's algorithm on an empty array should
    return 0 (or handle trivially), but the implementation requires `len > 0`.
 
-5. **Array is not modified, but full permission is required.** The interface
-   takes `A.pts_to a s0` with full permission. A fractional permission would
-   allow concurrent reads.
+5. ~~**Array is not modified, but full permission is required.**~~ **RESOLVED.**
+   The interface now takes `A.pts_to a #p s0` with a fractional permission
+   `#p`, allowing concurrent reads.
 
 ## Complexity
 

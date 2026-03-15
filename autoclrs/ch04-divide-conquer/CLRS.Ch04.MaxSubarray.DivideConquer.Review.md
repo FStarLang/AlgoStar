@@ -106,20 +106,16 @@ Sum of elements in `[i, j)`. Used in the correctness lemmas.
 ```fstar
 let max_subarray_spec (s: Seq.seq int) : Tot int =
   if Seq.length s = 0 then 0
-  else kadane_spec s 0 0 initial_min
+  else kadane_spec s 0 0 (Seq.index s 0)
 ```
 
 The canonical max subarray specification (Kadane-based). The D&C algorithm
 is proven equivalent to this.
 
-### `elements_bounded` (from `CLRS.Ch04.MaxSubarray.Spec`)
+### ~~`elements_bounded`~~ (removed)
 
-```fstar
-let elements_bounded (s: Seq.seq int) : prop =
-  forall (k:nat). k < Seq.length s ==> Seq.index s k >= initial_min
-```
-
-Required for the equivalence theorem (due to Kadane's `-10⁹` sentinel).
+The `elements_bounded` predicate is no longer needed. The equivalence
+theorem between D&C and Kadane now holds unconditionally.
 
 ## What Is Proven
 
@@ -137,6 +133,7 @@ lemmas rather than in the type signature:
 
 4. **`dc_kadane_equivalence`**: `find_maximum_subarray_sum s == max_subarray_spec s`.
    The D&C and Kadane algorithms produce identical results.
+   **No `elements_bounded` precondition.**
 
 5. **`lemma_dc_complexity_bound`**:
    `dc_ops_count n <= 4 * n * (log2_ceil n + 1)`, i.e., O(n log n).
@@ -155,11 +152,11 @@ discharged by F\* and Z3.
    lemmas, which means a caller must invoke them explicitly. A stronger design
    would encode correctness in the return type.
 
-2. **Equivalence with Kadane requires `elements_bounded`.** The
-   `dc_kadane_equivalence` theorem requires `elements_bounded s` (all elements
-   ≥ `-10⁹`). This is inherited from the Kadane specification's use of
-   `initial_min`. The D&C algorithm itself has no such limitation — its
-   standalone optimality (`lemma_dc_optimal`) holds unconditionally.
+2. ~~**Equivalence with Kadane requires `elements_bounded`.**~~ **RESOLVED.**
+   The `dc_kadane_equivalence` theorem now holds unconditionally (requires
+   only `Seq.length s > 0`). The `initial_min` sentinel has been replaced
+   with `Seq.index s 0` in the Kadane specification, eliminating the
+   `elements_bounded` precondition.
 
 3. **Not imperative.** This is a pure functional implementation, not a Pulse
    (imperative) one. There is no ghost counter linked to the implementation.
