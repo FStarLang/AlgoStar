@@ -225,6 +225,16 @@ let all_left_of (xs ys: Seq.seq int) (p q: nat) : prop =
                (Seq.index xs q) (Seq.index ys q)
                (Seq.index xs k) (Seq.index ys k) >= 0)
 
+// Characterization of a valid Jarvis march hull output.
+let valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) : prop =
+  h >= 1 /\
+  h <= Seq.length hull /\
+  Seq.length ys == Seq.length xs /\
+  SZ.v (Seq.index hull 0) == find_leftmost_spec xs ys /\
+  (forall (i: nat). i < h ==> SZ.v (Seq.index hull i) < Seq.length xs) /\
+  (forall (i: nat). i >= 1 /\ i < h ==>
+    SZ.v (Seq.index hull i) == find_next_spec xs ys (SZ.v (Seq.index hull (i - 1))))
+
 //SNIPPET_END: correctness_defs
 
 //SNIPPET_START: correctness_lemmas
@@ -458,6 +468,24 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_spec_not_current xs ys current;
   find_next_aux_beats_all xs ys current current 0;
   find_next_spec_bounded xs ys current
+
+// Extending a valid Jarvis hull by one vertex preserves validity.
+#push-options "--z3rlimit 20 --split_queries always"
+let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
+  : Lemma
+    (requires
+      valid_jarvis_hull xs ys hull h /\
+      h < Seq.length hull /\
+      SZ.v next < Seq.length xs /\
+      h >= 1 /\
+      SZ.v next == find_next_spec xs ys (SZ.v (Seq.index hull (h - 1))))
+    (ensures
+      valid_jarvis_hull xs ys (Seq.upd hull h next) (h + 1)) =
+  let hull' = Seq.upd hull h next in
+  assert (forall (i: nat). i < h ==> Seq.index hull' i == Seq.index hull i);
+  assert (Seq.index hull' h == next);
+  assert (Seq.length hull' == Seq.length hull)
+#pop-options
 
 //SNIPPET_END: correctness_lemmas
 
