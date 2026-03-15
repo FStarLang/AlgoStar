@@ -192,10 +192,10 @@ let rec lemma_dc_optimal (s: Seq.seq int) (low high qi qj: nat)
 // Proved equivalence: D&C and Kadane compute the same result.
 // Both algorithms compute the unique maximum non-empty subarray sum.
 let dc_kadane_equivalence (s: Seq.seq int)
-  : Lemma (requires Seq.length s > 0 /\ elements_bounded s)
+  : Lemma (requires Seq.length s > 0)
           (ensures find_maximum_subarray_sum s == max_subarray_spec s) =
   let n = Seq.length s in
-  lemma_kadane_correct s 0 0 initial_min;
+  lemma_kadane_correct s 0 0 (Seq.index s 0);
   lemma_dc_sum_correct s 0 n;
   lemma_dc_nonempty s 0 n;
   let (_, l, r) = find_maximum_subarray_dc s 0 n in

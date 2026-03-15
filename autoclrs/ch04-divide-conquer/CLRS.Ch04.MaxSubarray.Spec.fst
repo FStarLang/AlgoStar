@@ -40,7 +40,7 @@ let rec kadane_spec (s: Seq.seq int) (i: nat)
 // The main spec: maximum subarray sum
 let max_subarray_spec (s: Seq.seq int) : Tot int =
   if Seq.length s = 0 then 0
-  else kadane_spec s 0 0 initial_min
+  else kadane_spec s 0 0 (Seq.index s 0)
 
 // ========== Sum Range ==========
 

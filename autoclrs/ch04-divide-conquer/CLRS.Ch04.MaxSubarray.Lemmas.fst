@@ -58,8 +58,8 @@ let rec max_sub_witness (s: Seq.seq int) (i: nat) : Pure (nat & nat)
 // Core: kadane_spec tracks max_suffix_sum and max_sub_sum
 let rec lemma_kadane_correct (s: Seq.seq int) (i: nat) (cur best: int)
   : Lemma
-    (requires i <= Seq.length s /\ Seq.length s > 0 /\ elements_bounded s /\
-              (i = 0 ==> cur == 0 /\ best == initial_min) /\
+    (requires i <= Seq.length s /\ Seq.length s > 0 /\
+              (i = 0 ==> cur == 0 /\ best == Seq.index s 0) /\
               (i > 0 ==> cur == max_suffix_sum s (Prims.op_Subtraction i 1) /\
                          best == max_sub_sum s (Prims.op_Subtraction i 1)))
     (ensures kadane_spec s i cur best == max_sub_sum s (Prims.op_Subtraction (Seq.length s) 1))
@@ -70,17 +70,17 @@ let rec lemma_kadane_correct (s: Seq.seq int) (i: nat) (cur best: int)
 // Theorem 1: Kadane's result is >= every contiguous subarray sum
 let theorem_kadane_optimal (s: Seq.seq int) (i j: nat)
   : Lemma
-    (requires Seq.length s > 0 /\ elements_bounded s /\ i < j /\ j <= Seq.length s)
+    (requires Seq.length s > 0 /\ i < j /\ j <= Seq.length s)
     (ensures max_subarray_spec s >= sum_range s i j) =
-  lemma_kadane_correct s 0 0 initial_min;
+  lemma_kadane_correct s 0 0 (Seq.index s 0);
   lemma_max_sub_ge s (Prims.op_Subtraction (Seq.length s) 1) i j
 
 // Theorem 2: Kadane's result is achieved by some contiguous subarray
 let theorem_kadane_witness (s: Seq.seq int)
   : Lemma
-    (requires Seq.length s > 0 /\ elements_bounded s)
+    (requires Seq.length s > 0)
     (ensures (let n = Seq.length s in
               exists (i j: nat). i < j /\ j <= n /\ max_subarray_spec s == sum_range s i j)) =
-  lemma_kadane_correct s 0 0 initial_min;
+  lemma_kadane_correct s 0 0 (Seq.index s 0);
   let (wi, wj) = max_sub_witness s (Prims.op_Subtraction (Seq.length s) 1) in
   assert (wi < wj /\ wj <= Seq.length s /\ max_subarray_spec s == sum_range s wi wj)

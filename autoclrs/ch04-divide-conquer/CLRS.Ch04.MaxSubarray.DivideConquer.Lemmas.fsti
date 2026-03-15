@@ -25,5 +25,5 @@ val lemma_dc_optimal (s: Seq.seq int) (low high qi qj: nat)
     (ensures (let (sum, _, _) = find_maximum_subarray_dc s low high in sum >= sum_range s qi qj))
 
 val dc_kadane_equivalence (s: Seq.seq int)
-  : Lemma (requires Seq.length s > 0 /\ elements_bounded s)
+  : Lemma (requires Seq.length s > 0)
           (ensures find_maximum_subarray_sum s == max_subarray_spec s)

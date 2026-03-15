@@ -47,26 +47,28 @@ let complexity_bounded_linear (cf c0 n: nat) : prop =
 
 //SNIPPET_START: max_subarray_sig
 fn max_subarray
+  (#p: perm)
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
   (ctr: GR.ref nat)
   (#c0: erased nat)
-  requires A.pts_to a s0 ** GR.pts_to ctr c0
+  requires A.pts_to a #p s0 ** GR.pts_to ctr c0
   requires pure (
     SZ.v len == Seq.length s0 /\
     Seq.length s0 <= A.length a /\
     SZ.v len > 0
   )
   returns result: int
-  ensures exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf ** pure (
+  ensures exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf ** pure (
     result == max_subarray_spec s0 /\
     complexity_bounded_linear cf (reveal c0) (SZ.v len)
   )
 //SNIPPET_END: max_subarray_sig
 {
+  let first_elem = a.(0sz);
   let mut current_sum: int = 0;
-  let mut best_sum: int = initial_min;
+  let mut best_sum: int = first_elem;
   let mut i: SZ.t = 0sz;
 
   while (!i <^ len)
@@ -75,10 +77,10 @@ fn max_subarray
     R.pts_to current_sum vcur **
     R.pts_to best_sum vbest **
     GR.pts_to ctr vc **
-    A.pts_to a s0 **
+    A.pts_to a #p s0 **
     pure (
       SZ.v vi <= SZ.v len /\
-      kadane_spec s0 (SZ.v vi) vcur vbest == kadane_spec s0 0 0 initial_min /\
+      kadane_spec s0 (SZ.v vi) vcur vbest == kadane_spec s0 0 0 (Seq.index (reveal s0) 0) /\
       // Complexity: exactly i ticks so far (relative to c0)
       vc == reveal c0 + SZ.v vi
     )
