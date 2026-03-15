@@ -1359,22 +1359,21 @@ fn rec delete_in_dls
 }
 
 //SNIPPET_START: dll_list_delete
-fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
-  requires exists* hd tl l.
+fn list_delete (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_first k l)
 //SNIPPET_END: dll_list_delete
 {
   let hd = Pulse.Lib.Reference.(!hd_ref);
   let tl = Pulse.Lib.Reference.(!tl_ref);
-  with l. assert (dll hd tl l);
   match hd {
     norewrite None -> {
       // Empty list: nothing to delete
       dll_none_nil hd tl;
-      rewrite each l as ([] #int) in (dll hd tl l);
-      rewrite each ([] #int) as (remove_first k ([] #int));
+      // l == [], so remove_first k l == remove_first k [] == [] == l
+      rewrite each l as (remove_first k l) in (dll hd tl l);
       Pulse.Lib.Reference.(hd_ref := hd);
       Pulse.Lib.Reference.(tl_ref := tl)
     }
@@ -1665,20 +1664,19 @@ fn rec delete_last_in_dls
   }
 }
 
-fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int)
-  requires exists* hd tl l.
+fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_last k l)
 {
   let hd = Pulse.Lib.Reference.(!hd_ref);
   let tl = Pulse.Lib.Reference.(!tl_ref);
-  with l. assert (dll hd tl l);
   match hd {
     norewrite None -> {
       dll_none_nil hd tl;
-      rewrite each l as ([] #int) in (dll hd tl l);
-      rewrite each ([] #int) as (remove_last k ([] #int));
+      // l == [], so remove_last k l == remove_last k [] == [] == l
+      rewrite each l as (remove_last k l) in (dll hd tl l);
       Pulse.Lib.Reference.(hd_ref := hd);
       Pulse.Lib.Reference.(tl_ref := tl)
     }

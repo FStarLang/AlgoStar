@@ -37,10 +37,10 @@ fn test_dll ()
   list_delete hd_ref tl_ref 30;
   list_delete hd_ref tl_ref 10;
 
-  // Clean up refs
-  with hd3 tl3 l3.
-    assert (pts_to hd_ref hd3 ** pts_to tl_ref tl3 ** dll hd3 tl3 l3);
-  drop_ (dll hd3 tl3 l3);
+  // Clean up refs — after deleting all elements the dll is empty
+  with hd3 tl3.
+    assert (pts_to hd_ref hd3 ** pts_to tl_ref tl3 ** dll hd3 tl3 _);
+  drop_ (dll hd3 tl3 _);
   R.free hd_ref;
   R.free tl_ref;
   ()

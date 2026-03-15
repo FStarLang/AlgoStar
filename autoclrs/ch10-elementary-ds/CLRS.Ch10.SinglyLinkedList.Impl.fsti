@@ -46,16 +46,16 @@ fn list_delete (head: dlist) (k: int)
 
 // ========== Complexity-tracked variants ==========
 
-val incr_nat (n: erased nat) : erased nat
+let incr_nat (n: erased nat) : erased nat = hide (reveal n + 1)
 
 /// INSERT cost: exactly 1 operation
-val insert_cost : nat
+let insert_cost : nat = 1
 
 /// SEARCH cost: at most n comparisons
-val search_cost (n: nat) : nat
+let search_cost (n: nat) : nat = n
 
 /// DELETE cost: at most n comparisons + 1 pointer surgery
-val delete_cost (n: nat) : nat
+let delete_cost (n: nat) : nat = n + 1
 
 //SNIPPET_START: sll_tick_ops
 /// LIST-INSERT with complexity tracking: exactly 1 tick (O(1))
@@ -84,11 +84,9 @@ fn list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
   returns new_head: dlist
-  ensures exists* l' (cf: erased nat).
-    is_dlist new_head l' ** GR.pts_to ctr cf **
+  ensures exists* (cf: erased nat).
+    is_dlist new_head (remove_first k 'l) ** GR.pts_to ctr cf **
     pure (
-      (L.mem k 'l ==> l' == remove_first k 'l) /\
-      (~(L.mem k 'l) ==> l' == 'l) /\
       reveal cf - reveal c0 <= delete_cost (L.length 'l)
     )
 //SNIPPET_END: sll_tick_ops

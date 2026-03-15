@@ -50,11 +50,9 @@ fn list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
   returns new_head: dlist
-  ensures exists* l' (cf: erased nat).
-    is_dlist new_head l' ** GR.pts_to ctr cf **
+  ensures exists* (cf: erased nat).
+    is_dlist new_head (remove_first k 'l) ** GR.pts_to ctr cf **
     pure (
-      (L.mem k 'l ==> l' == remove_first k 'l) /\
-      (~(L.mem k 'l) ==> l' == 'l) /\
       reveal cf - reveal c0 <= delete_cost (L.length 'l)
     )
 ```
@@ -137,8 +135,8 @@ let delete_cost (n: nat) : nat = n + 1
 * `search_cost n = n` — at most n comparisons (linear scan).
 * `delete_cost n = n + 1` — at most n comparisons + 1 pointer surgery.
 
-**Note:** These definitions are abstract (`val`) in the `.fsti` — clients cannot
-see the concrete values without accessing the `.fst` file.
+**Note:** These definitions are concrete (`let`) in the `.fsti` — clients can
+see and use the exact values.
 
 ## What Is Proven
 
@@ -161,15 +159,16 @@ by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **Cost functions are abstract in `.fsti`.** Clients see
-   `val insert_cost : nat`, `val search_cost (n: nat) : nat`, and
-   `val delete_cost (n: nat) : nat` — they cannot determine the concrete values.
+1. ~~**Cost functions are abstract in `.fsti`.**~~ **Fixed.** Cost functions
+   (`insert_cost`, `search_cost`, `delete_cost`, `incr_nat`) are now exposed as
+   concrete `let` definitions in the `.fsti`. Clients can see
+   `insert_cost = 1`, `search_cost n = n`, and `delete_cost n = n + 1`.
 
-2. **`list_delete_tick` has weaker postcondition than `list_delete`.** The tick
-   variant uses a conditional postcondition: `L.mem k 'l ==> l' ==
-   remove_first k 'l` and `~(L.mem k 'l) ==> l' == 'l`, while the non-tick
-   variant directly states `is_dlist new_head (remove_first k 'l)`. These are
-   logically equivalent but the tick variant requires the client to case-split.
+2. ~~**`list_delete_tick` has weaker postcondition than `list_delete`.**~~ **Fixed.**
+   The tick variant now directly states `is_dlist new_head (remove_first k 'l)`
+   in its postcondition, matching the non-tick variant. The conditional
+   postcondition (`L.mem k 'l ==> ...` / `~(L.mem k 'l) ==> ...`) has been
+   replaced by the stronger direct specification.
 
 3. **Only `int` keys.** The node type is hardcoded to `int`. A polymorphic
    version would require an `eqtype` constraint for search/delete.

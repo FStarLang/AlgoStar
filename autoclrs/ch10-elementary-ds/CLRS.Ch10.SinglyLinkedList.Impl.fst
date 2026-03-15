@@ -125,8 +125,7 @@ fn rec list_delete (head: dlist) (k: int)
 // ========== Complexity-tracked variants ==========
 // Ghost-tick instrumented operations with exact bounds.
 // Uses GhostReference.ref nat for the tick counter — fully erased at runtime.
-
-let incr_nat (n: erased nat) : erased nat = hide (reveal n + 1)
+// Cost functions (insert_cost, search_cost, delete_cost) are defined in the .fsti.
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -135,10 +134,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 {
   GR.(ctr := incr_nat n)
 }
-
-let insert_cost : nat = 1
-let search_cost (n: nat) : nat = n
-let delete_cost (n: nat) : nat = n + 1
 
 // LIST-INSERT with complexity: Insert x at head, exactly 1 tick (O(1))
 fn list_insert_tick (x: int) (head: dlist) (ctr: GR.ref nat)
@@ -195,11 +190,9 @@ fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
   (#c0: erased nat)
   requires is_dlist head 'l ** GR.pts_to ctr c0
   returns new_head: dlist
-  ensures exists* l' (cf: erased nat).
-    is_dlist new_head l' ** GR.pts_to ctr cf **
+  ensures exists* (cf: erased nat).
+    is_dlist new_head (remove_first k 'l) ** GR.pts_to ctr cf **
     pure (
-      (L.mem k 'l ==> l' == remove_first k 'l) /\
-      (~(L.mem k 'l) ==> l' == 'l) /\
       reveal cf - reveal c0 <= delete_cost (L.length 'l)
     )
 {
@@ -220,11 +213,11 @@ fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
         tail
       } else {
         let new_tail = list_delete_tick nd.next k ctr;
-        with l' cf1. assert (is_dlist new_tail l' ** GR.pts_to ctr cf1);
+        with cf1. assert (is_dlist new_tail (remove_first k _tl) ** GR.pts_to ctr cf1);
         vl := { key = nd.key; next = new_tail };
         rewrite each new_tail as ({ key = nd.key; next = new_tail }).next
-          in (is_dlist new_tail l');
-        fold (is_dlist (Some vl) (nd.key :: l'));
+          in (is_dlist new_tail (remove_first k _tl));
+        fold (is_dlist (Some vl) (nd.key :: remove_first k _tl));
         (Some vl)
       }
     }

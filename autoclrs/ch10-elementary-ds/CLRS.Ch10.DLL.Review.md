@@ -52,16 +52,16 @@ fn list_search_ptr (hd tl: dptr) (k: int)
     | Some _ -> L.mem k 'l
   )
 
-fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
-  requires exists* hd tl l.
+fn list_delete (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_first k l)
 
-fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int)
-  requires exists* hd tl l.
+fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_last k l)
 
 fn list_delete_node
@@ -238,10 +238,12 @@ the implementation: "All operations fully verified with 0 admits").
 
 3. **Only `int` keys.** The node key type is hardcoded to `int`.
 
-4. **`list_delete` and `list_delete_last` hide the input list.** The
-   `requires` clause uses `exists* ... l` rather than a named ghost parameter,
-   so the client does not control which list the operation starts from. This
-   is a weaker interface than the singly linked list's version.
+4. ~~**`list_delete` and `list_delete_last` hide the input list.**~~ **Fixed.**
+   Both functions now take a named ghost parameter `#l: erased (list int)`
+   instead of existentially quantifying the input list. The postcondition
+   directly relates the output to `remove_first k l` / `remove_last k l`,
+   matching the pattern used by `list_insert`, `list_insert_tail`, and
+   `list_delete_node`.
 
 5. **No `free`/`destroy` for the entire list.** Individual deletions consume
    nodes, but there is no bulk deallocation.

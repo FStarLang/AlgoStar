@@ -122,17 +122,17 @@ fn list_search_ptr (hd tl: dptr) (k: int)
   )
 
 /// LIST-DELETE: Delete first occurrence of key k
-fn list_delete (hd_ref tl_ref: ref dptr) (k: int)
-  requires exists* hd tl l.
+fn list_delete (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_first k l)
 
 /// LIST-DELETE-LAST: Delete last occurrence of key k
-fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int)
-  requires exists* hd tl l.
+fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
+  requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl' l.
+  ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_last k l)
 
 /// LIST-DELETE-NODE: Delete element at index i
