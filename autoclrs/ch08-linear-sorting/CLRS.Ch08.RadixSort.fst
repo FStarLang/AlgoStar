@@ -53,7 +53,6 @@ requires
     SZ.v len == Seq.length s0 /\
     Seq.length s0 == A.length a /\
     S.in_range s0 (SZ.v k_val) /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
@@ -92,7 +91,6 @@ requires
     Seq.length s0 == A.length a /\
     SZ.v base_val >= 2 /\
     SZ.v bigD > 0 /\
-    SZ.v len > 0 /\
     // All elements fit in bigD digits
     (forall (i: nat). i < Seq.length s0 ==> Seq.index s0 i < B.pow (SZ.v base_val) (SZ.v bigD)) /\
     SZ.fits (SZ.v base_val + 2) /\
@@ -107,6 +105,12 @@ ensures exists* s.
   )
 //SNIPPET_END: radix_sort_multidigit_sig
 {
+  if (len = 0sz) {
+    // Empty array: trivially sorted and a permutation of itself
+    Bridge.base_sorted_implies_l_sorted s0;
+    Bridge.base_perm_implies_s_perm s0 s0;
+    ()
+  } else {
   // Allocate temporary buffer b
   let b = A.alloc (0 <: nat) len;
 
@@ -192,5 +196,6 @@ ensures exists* s.
   A.free b;
   R.free d;
   ()
+  } // else len > 0
 }
 #pop-options
