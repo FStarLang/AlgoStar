@@ -234,7 +234,11 @@ discharged by F\* and Z3.
    counter or prove O(n+k) complexity. The linear-time property of
    counting sort is not formally verified.
 
-4. **`len > 0` precondition.** All variants require non-empty input.
+4. ~~**`len > 0` precondition.** All variants require non-empty input.~~
+   **RESOLVED.** All three variants now accept empty arrays (`len = 0`).
+   Empty arrays are trivially sorted and permutations of themselves.
+   Each function returns early when `len = 0`, using `empty_sorted_perm`
+   or `empty_is_stable_on_digit` helper lemmas.
 
 5. **`SZ.fits` constraints.** The `SZ.fits (SZ.v len + SZ.v k_val + 2)`
    constraint limits the combined size of input and value range.

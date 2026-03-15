@@ -154,8 +154,10 @@ discharged by F\* and Z3.
    The use of insertion sort per bucket gives O(n²) worst case when
    all elements fall into one bucket.
 
-3. **`Cons? xs` precondition.** The input must be non-empty. An empty
-   list is trivially sorted but is not handled.
+3. ~~**`Cons? xs` precondition.** The input must be non-empty. An empty
+   list is trivially sorted but is not handled.~~
+   **RESOLVED.** `bucket_sort` now accepts empty lists, returning `[]`
+   trivially. The empty list is sorted and a permutation of itself.
 
 4. **Uses `list_min`/`list_max` internally.** The algorithm computes
    `min_val = list_min xs` and `max_val = list_max xs`, then uses

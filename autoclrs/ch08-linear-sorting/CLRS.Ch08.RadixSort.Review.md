@@ -207,11 +207,16 @@ are mechanically discharged by F\* and Z3.
 
 1. **No `Impl.fsti`.** The signatures are defined directly in the
    `.fst` file. There is no separate interface for downstream consumers.
+   (A `.fsti` cannot currently be added due to a Pulse SMT limitation
+   with `forall`-quantified preconditions during interface checking.)
 
 2. **No complexity bounds.** Neither variant proves O(d·(n+k))
    complexity. No ghost counter is used.
 
-3. **`len > 0` precondition.** Both variants require non-empty input.
+3. ~~**`len > 0` precondition.** Both variants require non-empty input.~~
+   **RESOLVED.** Both variants now accept empty arrays (`len = 0`).
+   `radix_sort` delegates to `counting_sort_inplace` (which handles
+   empty); `radix_sort_multidigit` returns early using Bridge lemmas.
 
 4. **Multi-digit requires explicit bounds.** The caller must provide
    `bigD` and prove `forall i. s0[i] < pow base bigD`. The algorithm
