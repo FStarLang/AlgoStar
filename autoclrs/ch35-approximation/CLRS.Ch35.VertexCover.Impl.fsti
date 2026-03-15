@@ -40,6 +40,7 @@ fn approx_vertex_cover
       Seq.length s_cover == SZ.v n /\
       Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+      (exists (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt) /\
       (forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
         Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) <= 2 * opt)
     )

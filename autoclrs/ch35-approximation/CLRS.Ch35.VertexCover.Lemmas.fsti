@@ -90,6 +90,23 @@ val valid_cover_covers_matching (adj: seq int) (n: nat) (c: cover_fn) (m: list e
                       (let (u, v) = e in u < n /\ v < n /\ u < v /\ Seq.index adj (u * n + v) <> 0)))
           (ensures is_valid_cover_for_edges c m)
 
+(*** Existence of minimum vertex cover ***)
+
+// The trivial "all vertices" cover is valid for any graph
+val all_true_is_valid (adj: seq int) (n: nat)
+  : Lemma (requires Seq.length adj = n * n)
+          (ensures is_valid_graph_cover adj n (fun (_ : nat) -> true))
+
+// The count of the all-true cover is exactly n
+val count_all_true (n: nat)
+  : Lemma (ensures count_cover (fun (_ : nat) -> true) n = n)
+
+// Every finite graph has a minimum vertex cover.
+// This makes the 2-approximation guarantee non-vacuous.
+val min_cover_exists (adj: seq int) (n: nat)
+  : Lemma (requires Seq.length adj = n * n)
+          (ensures exists (opt: nat). min_vertex_cover_size adj n opt)
+
 (*** 2-Approximation Ratio Theorem ***)
 
 val approximation_ratio_theorem (s_adj s_cover: seq int) (n: nat) (m: list edge) (c_opt: cover_fn)

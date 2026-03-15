@@ -321,8 +321,48 @@ let rec valid_cover_covers_matching (adj: seq int) (n: nat) (c: cover_fn) (m: li
         valid_graph_cover_covers_edge adj n c u v;
         valid_cover_covers_matching adj n c rest
 
-(*** 2-Approximation Ratio Theorem — connecting Pulse cover to CLRS Theorem 35.1 ***)
+(*** Existence of minimum vertex cover ***)
 
+// The trivial "all vertices" cover is valid for any edge list
+let all_true_is_valid_for_edges (edges: list edge)
+  : Lemma (ensures is_valid_cover_for_edges (fun (_ : nat) -> true) edges)
+  = ()
+
+let all_true_is_valid (adj: seq int) (n: nat)
+  : Lemma (requires Seq.length adj = n * n)
+          (ensures is_valid_graph_cover adj n (fun (_ : nat) -> true))
+  = all_true_is_valid_for_edges (extract_edges adj n 0 1)
+
+let rec count_all_true (n: nat)
+  : Lemma (ensures count_cover (fun (_ : nat) -> true) n = n) (decreases n)
+  = if n = 0 then () else count_all_true (n - 1)
+
+// Well-ordering argument: if a valid cover exists with count ≤ bound,
+// then a minimum vertex cover exists.
+#push-options "--z3rlimit 30"
+let rec min_cover_exists_aux (adj: seq int) (n: nat) (bound: nat)
+  : Lemma 
+    (requires Seq.length adj = n * n /\
+              (exists (c: cover_fn). is_valid_graph_cover adj n c /\ count_cover c n <= bound))
+    (ensures exists (opt: nat). min_vertex_cover_size adj n opt)
+    (decreases bound)
+  = if bound = 0 then ()
+    else (
+      FStar.Classical.excluded_middle 
+        (exists (c: cover_fn). is_valid_graph_cover adj n c /\ count_cover c n <= bound - 1);
+      FStar.Classical.move_requires (min_cover_exists_aux adj n) (bound - 1)
+    )
+#pop-options
+
+// Every finite graph has a minimum vertex cover.
+let min_cover_exists (adj: seq int) (n: nat)
+  : Lemma (requires Seq.length adj = n * n)
+          (ensures exists (opt: nat). min_vertex_cover_size adj n opt)
+  = all_true_is_valid adj n;
+    count_all_true n;
+    min_cover_exists_aux adj n n
+
+(*** 2-Approximation Ratio Theorem — connecting Pulse cover to CLRS Theorem 35.1 ***)
 //SNIPPET_START: approximation_ratio_theorem
 let approximation_ratio_theorem (s_adj s_cover: seq int) (n: nat) (m: list edge) (c_opt: cover_fn)
   : Lemma (requires
