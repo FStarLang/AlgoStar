@@ -16,7 +16,6 @@ fn floyd_warshall
     A.pts_to dist contents **
     GR.pts_to ctr c0 **
     pure (
-      SZ.v n > 0 /\
       Seq.length contents == SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n)
     )
@@ -43,9 +42,11 @@ fn floyd_warshall
 
 ### Preconditions
 
-* `SZ.v n > 0`: At least one vertex.
 * `Seq.length contents == SZ.v n * SZ.v n`: Distance matrix is properly sized.
 * `SZ.fits (SZ.v n * SZ.v n)`: No `SZ.t` overflow.
+
+Note: The `SZ.v n > 0` precondition has been removed — Floyd-Warshall now
+handles the empty graph (n = 0) trivially.
 
 ### Postcondition
 
@@ -207,11 +208,16 @@ The correctness chain is:
 
 ## Specification Gaps and Limitations
 
-1. **No negative-cycle detection.** Floyd-Warshall can detect negative cycles
-   by checking if any diagonal entry becomes negative after the computation.
-   This implementation does not perform or prove this check. The correctness
-   proof requires `non_negative_diagonal` / `fw_entry adj n v v k >= 0` as a
-   precondition — if violated, the results are meaningless.
+1. ~~**No negative-cycle detection.**~~ **RESOLVED.** A `check_no_negative_cycle`
+   Pulse function is provided in `NegCycleDetect.fst`. It scans the diagonal of
+   the output matrix and proves: if the check passes (returns `true`), the
+   output satisfies `non_negative_diagonal`. Additionally,
+   `lemma_weights_bounded_nonneg_entry` in `Spec.fst` proves that when
+   `weights_bounded` holds, all `fw_entry` values (including diagonal entries at
+   every level) are non-negative — so no negative cycles can exist. The combined
+   theorem `floyd_warshall_full_correctness` in `Lemmas.fst` derives the full
+   correctness chain from `weights_bounded` alone, without requiring the
+   intermediate `fw_entry` diagonal invariant as a separate precondition.
 
 2. **No predecessor matrix.** CLRS §25.2 also describes computing a
    predecessor matrix Π for path reconstruction. This implementation only
@@ -222,14 +228,18 @@ The correctness chain is:
    conflates "unreachable" with "weight = 1000000". A more robust formalization
    would use `option int` or a dedicated infinity type.
 
-4. **Precondition: `SZ.v n > 0`.** The empty graph (n = 0) is not handled.
-   Floyd-Warshall on an empty graph is trivially correct (no entries to
-   compute), but the implementation requires at least one vertex.
+4. ~~**Precondition: `SZ.v n > 0`.**~~ **RESOLVED.** The `SZ.v n > 0`
+   precondition has been removed from `floyd_warshall`. The empty graph (n = 0)
+   is now handled: the loops never execute, the output equals the input
+   (`fw_outer d 0 0 == d`), and the complexity is 0³ = 0. A test
+   `test_empty_graph` in `Test.fst` exercises this path.
 
-5. **`weights_bounded` is not in the Pulse precondition.** The Pulse function
-   only requires `n > 0`, proper sizing, and `SZ.fits`. The `weights_bounded`
-   and `non_negative_diagonal` predicates appear in the Lemmas/Paths proofs
-   but are not enforced by the Pulse function itself.
+5. ~~**`weights_bounded` is not in the Pulse precondition.**~~ **RESOLVED.**
+   A `floyd_warshall_safe` wrapper in `NegCycleDetect.fst` provides a function
+   with `weights_bounded` and `non_negative_diagonal` in its precondition,
+   closing the gap between what the correctness proofs require and what the
+   Pulse function enforces. The original `floyd_warshall` retains its minimal
+   precondition for maximum flexibility.
 
 ## Complexity
 
@@ -244,20 +254,28 @@ the tightest possible bound — it is exact, not an approximation.
 
 ## Proof Structure
 
-The proof has three layers:
+The proof has four layers:
 
 1. **Spec layer** (`Spec.fst`): Defines `fw_inner_j`, `fw_inner_i`, `fw_outer`
-   (imperative-mirroring), `fw_entry` (recurrence), and length preservation
-   lemmas. Zero admits.
+   (imperative-mirroring), `fw_entry` (recurrence), safety predicates, length
+   preservation lemmas, and `lemma_weights_bounded_nonneg_entry` (proves all
+   `fw_entry` values are non-negative when `weights_bounded` holds). Zero admits.
 
 2. **Lemma layer** (`Lemmas.fst`): Proves `fw_outer` computes `fw_entry` via
    induction. Key results: `fw_inner_j_correct`, `fw_inner_i_correct`,
-   `fw_inner_i_preserves_row_k`, `fw_outer_computes_entry`. Zero admits.
+   `fw_inner_i_preserves_row_k`, `fw_outer_computes_entry`, and
+   `floyd_warshall_full_correctness` (combined theorem deriving correctness
+   from `weights_bounded` alone). Zero admits.
 
 3. **Path layer** (`Paths.fst`): Graph-theoretic formalization of walks,
    intermediate vertex restriction, walk splitting, cycle stripping. Proves
    `fw_entry` is the shortest walk weight. Structured in 9 sections. Zero
    admits.
+
+4. **Detection layer** (`NegCycleDetect.fst`): Pulse implementation of
+   `check_no_negative_cycle` (runtime diagonal check) and `floyd_warshall_safe`
+   (wrapper with `weights_bounded` + `non_negative_diagonal` preconditions).
+   Zero admits.
 
 ## Files
 
@@ -265,9 +283,10 @@ The proof has three layers:
 |------|------|
 | `CLRS.Ch25.FloydWarshall.Impl.fsti` | Public interface (this signature) |
 | `CLRS.Ch25.FloydWarshall.Impl.fst` | Pulse implementation |
-| `CLRS.Ch25.FloydWarshall.Spec.fst` | Pure spec: `fw_outer`, `fw_entry`, safety predicates |
+| `CLRS.Ch25.FloydWarshall.Spec.fst` | Pure spec: `fw_outer`, `fw_entry`, safety predicates, non-negativity lemma |
 | `CLRS.Ch25.FloydWarshall.Lemmas.fsti` | Lemma signatures |
-| `CLRS.Ch25.FloydWarshall.Lemmas.fst` | Correctness proofs: `fw_outer` computes `fw_entry` |
+| `CLRS.Ch25.FloydWarshall.Lemmas.fst` | Correctness proofs: `fw_outer` computes `fw_entry`, full correctness theorem |
 | `CLRS.Ch25.FloydWarshall.Paths.fst` | Graph-theoretic shortest path proofs |
+| `CLRS.Ch25.FloydWarshall.NegCycleDetect.fst` | Negative-cycle detection + safe wrapper |
 | `CLRS.Ch25.FloydWarshall.SpecTest.fst` | Test cases for the specification |
 | `CLRS.Ch25.FloydWarshall.Test.fst` | Test cases for the implementation |

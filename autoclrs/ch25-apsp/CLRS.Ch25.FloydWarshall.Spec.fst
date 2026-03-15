@@ -88,6 +88,25 @@ let rec fw_entry (adj: seq int) (n: nat) (i j k: nat)
       if via_k < without then via_k else without
 //SNIPPET_END: fw_entry
 
+(*** weights_bounded implies all fw_entry values are non-negative ***)
+
+//SNIPPET_START: nonneg_entry_lemma
+// If all initial weights are non-negative, then every fw_entry value is
+// non-negative. Proof by induction on k: at k=0, fw_entry = adj[i*n+j] >= 0;
+// at k>0, fw_entry = min(fw_entry(k-1), sum of two non-negative fw_entry(k-1)).
+let rec lemma_weights_bounded_nonneg_entry (adj: seq int) (n: nat) (i j k: nat)
+  : Lemma
+    (requires weights_bounded adj n /\ i < n /\ j < n /\ k <= n)
+    (ensures fw_entry adj n i j k >= 0)
+    (decreases k)
+  = if k = 0 then ()
+    else begin
+      lemma_weights_bounded_nonneg_entry adj n i j (k - 1);
+      lemma_weights_bounded_nonneg_entry adj n i (k - 1) (k - 1);
+      lemma_weights_bounded_nonneg_entry adj n (k - 1) j (k - 1)
+    end
+//SNIPPET_END: nonneg_entry_lemma
+
 //SNIPPET_START: length_lemmas
 // Length preservation lemmas
 let rec lemma_fw_inner_j_len (d: seq int) (n k i j: nat) (d_ik: int)

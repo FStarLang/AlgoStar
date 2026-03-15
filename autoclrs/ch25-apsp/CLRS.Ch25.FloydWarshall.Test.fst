@@ -5,6 +5,7 @@ open Pulse.Lib.Array
 open FStar.SizeT
 open CLRS.Ch25.FloydWarshall.Spec
 open CLRS.Ch25.FloydWarshall.Impl
+open CLRS.Ch25.FloydWarshall.NegCycleDetect
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -59,6 +60,72 @@ fn test_floyd_warshall ()
   GR.free ctr;
   
   // Clean up
+  with s. assert (A.pts_to dist s);
+  rewrite (A.pts_to dist s) as (A.pts_to (V.vec_to_array dv) s);
+  V.to_vec_pts_to dv;
+  V.free dv;
+}
+
+// Test: negative-cycle detection on the 3x3 test graph
+fn test_check_no_negative_cycle ()
+  requires emp
+  returns _:unit
+  ensures emp
+{
+  let n = 3sz;
+  
+  let dv = V.alloc 0 9sz;
+  V.to_array_pts_to dv;
+  let dist = V.vec_to_array dv;
+  rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0)) as (A.pts_to dist (Seq.create 9 0));
+  
+  // Initialize with same matrix as main test
+  A.op_Array_Assignment dist 0sz 0;
+  A.op_Array_Assignment dist 1sz 5;
+  A.op_Array_Assignment dist 2sz inf;
+  A.op_Array_Assignment dist 3sz 50;
+  A.op_Array_Assignment dist 4sz 0;
+  A.op_Array_Assignment dist 5sz 15;
+  A.op_Array_Assignment dist 6sz 30;
+  A.op_Array_Assignment dist 7sz inf;
+  A.op_Array_Assignment dist 8sz 0;
+  
+  let ctr = GR.alloc #nat 0;
+  
+  // Run Floyd-Warshall
+  floyd_warshall dist n ctr;
+  
+  // Check for negative cycles on the output
+  let ok = check_no_negative_cycle dist n;
+  
+  GR.free ctr;
+  
+  with s. assert (A.pts_to dist s);
+  rewrite (A.pts_to dist s) as (A.pts_to (V.vec_to_array dv) s);
+  V.to_vec_pts_to dv;
+  V.free dv;
+}
+
+// Test: Floyd-Warshall on empty graph (n = 0)
+fn test_empty_graph ()
+  requires emp
+  returns _:unit
+  ensures emp
+{
+  let n = 0sz;
+  
+  let dv = V.alloc 0 0sz;
+  V.to_array_pts_to dv;
+  let dist = V.vec_to_array dv;
+  rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 0 0)) as (A.pts_to dist (Seq.create 0 0));
+  
+  let ctr = GR.alloc #nat 0;
+  
+  // Floyd-Warshall on empty graph — trivially correct
+  floyd_warshall dist n ctr;
+  
+  GR.free ctr;
+  
   with s. assert (A.pts_to dist s);
   rewrite (A.pts_to dist s) as (A.pts_to (V.vec_to_array dv) s);
   V.to_vec_pts_to dv;
