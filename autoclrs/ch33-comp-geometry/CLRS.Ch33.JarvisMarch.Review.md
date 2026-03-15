@@ -106,6 +106,43 @@ means the arrays are read-only.
 
 All three functions return arrays unchanged (read-only access).
 
+### `jarvis_march_with_hull`
+
+```fstar
+fn jarvis_march_with_hull (#p: perm) (xs ys: array int)
+  (#sxs: Ghost.erased (Seq.seq int))
+  (#sys: Ghost.erased (Seq.seq int))
+  (len: SZ.t)
+  (hull_out: array SZ.t)
+  (#shull: Ghost.erased (Seq.seq SZ.t))
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    A.pts_to hull_out shull **
+    pure (
+      SZ.v len == Seq.length sxs /\
+      Seq.length sxs == Seq.length sys /\
+      SZ.v len > 1 /\
+      SZ.v len == A.length xs /\
+      SZ.v len == A.length ys /\
+      Seq.length shull == A.length hull_out /\
+      SZ.v len <= Seq.length shull
+    )
+  returns h: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    (exists* shull'.
+      A.pts_to hull_out shull' **
+      pure (
+        SZ.v h == jarvis_march_spec sxs sys /\
+        SZ.v h >= 1 /\
+        SZ.v h <= SZ.v len /\
+        valid_jarvis_hull sxs sys shull' (SZ.v h)
+      ))
+```
+
+This function computes the convex hull and **writes the hull vertex indices**
+to `hull_out`. The count matches `jarvis_march_spec`, and the output
+satisfies `valid_jarvis_hull`: hull[0] is the leftmost point, and each
+subsequent vertex is `find_next` of its predecessor.
+
 ## Auxiliary Definitions
 
 ### `find_leftmost_spec` (from `CLRS.Ch33.JarvisMarch.Spec`)
@@ -228,6 +265,13 @@ specification. Additionally, the lemma module proves:
 * `jarvis_march_spec_bounded`: Hull size is in `[1, n]`.
 * `jarvis_loop_step`: Unfolding one loop iteration when `next ≠ start`.
 
+**Hull output correctness:**
+* `valid_jarvis_hull`: Characterizes a correct hull output — `hull[0]` is
+  the leftmost point and each `hull[i]` = `find_next(hull[i-1])`.
+* `extend_valid_jarvis_hull`: Extending a valid hull by one vertex
+  preserves validity.
+* `jarvis_march_with_hull` proves its output satisfies `valid_jarvis_hull`.
+
 **Correctness lemmas:**
 * `find_leftmost_is_leftmost`: The result satisfies `is_leftmost`.
 * `cross_prod_swap23`: Swapping the last two points of a cross product
@@ -249,17 +293,12 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`jarvis_march` returns only the count, not the hull vertices.** The
-   Pulse implementation counts hull vertices but does not output the hull
-   itself (no hull array is written). A caller gets `h` but cannot identify
-   which points are on the hull without re-running the algorithm.
-
-2. **`len > 1` precondition.** Both `find_next` and `jarvis_march` require
+1. **`len > 1` precondition.** Both `find_next` and `jarvis_march` require
    at least 2 points. The degenerate case of a single point is handled at
    the spec level (`jarvis_march_spec` returns `n` when `n <= 1`) but not
    in the Pulse interface.
 
-3. **`find_next_all_left_of` requires general position.** The correctness
+2. **`find_next_all_left_of` requires general position.** The correctness
    theorem for `find_next` requires: (a) all non-current points are
    strictly above the current point (`y[k] > y[current]`), and (b) no two
    distinct non-current points have the same polar angle relative to
@@ -272,21 +311,22 @@ discharged by F\* and Z3.
    Without these assumptions, the correctness of `find_next` is proven
    only at the spec-equivalence level, not at the geometric level.
 
-4. **No end-to-end hull correctness.** There is no theorem stating "the
+3. **No end-to-end hull correctness.** There is no theorem stating "the
    output of `jarvis_march` is the correct convex hull." The proven
    properties are: (a) the count matches the spec, (b) `find_leftmost`
    returns the leftmost point, (c) `find_next` satisfies `all_left_of`
-   under general-position + upper-half-plane assumptions. These pieces are
-   not composed into a single end-to-end theorem.
+   under general-position + upper-half-plane assumptions, (d)
+   `jarvis_march_with_hull` outputs vertices satisfying `valid_jarvis_hull`.
+   These pieces are not composed into a single end-to-end theorem.
 
-5. **Fuel-based termination.** The outer loop uses `fuel = n - 1` to bound
+4. **Fuel-based termination.** The outer loop uses `fuel = n - 1` to bound
    iterations. This is correct (the hull has at most `n` vertices), but it
    means the algorithm silently stops after `n - 1` steps even if the hull
    is not complete. The `jarvis_march_spec_bounded` lemma proves the result
    is in `[1, n]`, but does not prove the loop always terminates by
    returning to the start before exhausting fuel.
 
-6. **No complexity linking.** The Spec file defines `jarvis_march_ops n h =
+5. **No complexity linking.** The Spec file defines `jarvis_march_ops n h =
    find_leftmost_ops n + h * find_next_ops n` and proves
    `jarvis_march_ops n h <= n * n` when `h <= n`, but these are not linked
    to the Pulse implementations via ghost counters.
@@ -340,3 +380,11 @@ not connected to the Pulse implementations via ghost counters.
 | `CLRS.Ch33.JarvisMarch.Lemmas.fst` | Lemma proofs |
 | `CLRS.Ch33.JarvisMarch.fst` | Standalone module (specs + proofs + Pulse, all-in-one) |
 | `CLRS.Ch33.Segments.Spec.fst` | `cross_product_spec` used by `cross_prod` alias |
+
+### New Definitions
+
+| Definition | Location |
+|------------|----------|
+| `valid_jarvis_hull` | `CLRS.Ch33.JarvisMarch.Spec` |
+| `extend_valid_jarvis_hull` | `CLRS.Ch33.JarvisMarch.Lemmas` |
+| `jarvis_march_with_hull` | `CLRS.Ch33.JarvisMarch.Impl` |

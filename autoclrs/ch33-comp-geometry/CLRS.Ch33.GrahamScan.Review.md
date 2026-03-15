@@ -114,6 +114,47 @@ Each function's result is proven equal to its pure specification:
 
 All three functions return arrays unchanged (read-only access).
 
+### `graham_scan_step`
+
+```fstar
+fn graham_scan_step (#p: perm) (xs ys: array int)
+  (#sxs: Ghost.erased (Seq.seq int))
+  (#sys: Ghost.erased (Seq.seq int))
+  (hull: array SZ.t)
+  (#shull: Ghost.erased (Seq.seq SZ.t))
+  (top_in: SZ.t) (p_idx: SZ.t) (len: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    A.pts_to hull shull **
+    pure (
+      SZ.v top_in >= 2 /\
+      SZ.v top_in < Seq.length shull /\
+      SZ.v p_idx < SZ.v len /\
+      SZ.v len == Seq.length sxs /\
+      Seq.length sxs == Seq.length sys /\
+      SZ.v len == A.length xs /\
+      SZ.v len == A.length ys /\
+      Seq.length shull == A.length hull /\
+      Seq.length shull <= SZ.v len /\
+      (forall (i: nat). i < SZ.v top_in ==> SZ.v (Seq.index shull i) < SZ.v len)
+    )
+  returns result: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    (exists* shull'.
+      A.pts_to hull shull' **
+      pure (
+        shull' == fst (scan_step_sz_spec sxs sys shull (SZ.v top_in) p_idx) /\
+        SZ.v result == snd (scan_step_sz_spec sxs sys shull (SZ.v top_in) p_idx) /\
+        SZ.v result >= 2 /\
+        SZ.v result <= Seq.length shull
+      ))
+```
+
+This function performs a complete scan step: calls `pop_while` to remove
+non-left-turn entries, then pushes `p_idx` onto the hull stack. Unlike the
+building-block functions, it takes the hull array with **full permission**
+and returns it modified. The result `scan_step_sz_spec` matches the pure
+specification.
+
 ## Auxiliary Definitions
 
 ### `find_bottom_spec` (from `CLRS.Ch33.GrahamScan.Spec`)
@@ -236,42 +277,42 @@ specification. Additionally, the lemma module proves:
   `top' >= 2`, the top two hull points and the new point form a left turn
   (`cross_prod > 0`). This is the key invariant maintenance step.
 
+* **`all_left_turns_sz_prefix`**: The `all_left_turns_sz` property is
+  monotone — reducing `top` preserves convex position.
+
+* **`pop_while_spec_ge_1`**: `pop_while_spec` returns at least 1 when
+  starting with `top >= 2`.
+
+* **`scan_step_preserves_left_turns`**: A full scan step (pop non-left-turns,
+  then push) preserves the `all_left_turns_sz` invariant. This is the
+  CLRS Theorem 33.1 maintenance step, now formally connected.
+
 The Spec file also provides pure specifications for the complete Graham scan
 algorithm (`pop_non_left`, `scan_step`, `graham_loop`, `graham_scan_sorted`),
-though no Pulse implementation of the full scan is provided.
+as well as `scan_step_sz_spec` (SZ.t-compatible scan step spec) and
+`all_left_turns_sz` (SZ.t-compatible convex position property).
 
 **Zero admits, zero assumes.** All proof obligations are mechanically
 discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **Building blocks only, not the full algorithm.** The three verified
-   functions are components of Graham scan, but the full algorithm
-   (sorting by polar angle, initializing the stack, running the scan loop)
-   is not implemented in Pulse. The pure spec `graham_scan_sorted` defines
-   the full algorithm but has no verified imperative counterpart.
-
-2. **No sorting implementation.** Graham scan requires sorting points by
+1. **No sorting implementation.** Graham scan requires sorting points by
    polar angle. No verified sort is provided in this module. A caller must
    supply a correct sort to assemble the full algorithm.
 
-3. **`pop_while` requires `top_in >= 2`.** The function cannot be called on
+2. **`pop_while` requires `top_in >= 2`.** The function cannot be called on
    a stack with fewer than 2 elements. The full scan handles this by
    initializing the stack with the first 3 points, but the precondition
    means `pop_while` alone cannot handle degenerate inputs.
 
-4. **No convex hull output correctness.** The `all_left_turns` property is
-   defined but never connected to the verified Pulse functions. There is no
-   end-to-end theorem stating "the output of the full scan satisfies
-   `all_left_turns`" in the Pulse code.
+3. **No end-to-end convex hull output correctness.** The `all_left_turns`
+   property is defined, and `scan_step_preserves_left_turns` proves that
+   each scan step maintains it, but there is no end-to-end theorem
+   stating "the output of the full scan satisfies `all_left_turns`" —
+   that would require composing the scan loop with sorting.
 
-5. **Read-only arrays.** All three functions take arrays with fractional
-   permission (`#p: perm`), meaning they are read-only. The `pop_while`
-   function reads but does not modify the hull array — it only returns the
-   new stack height. The actual stack modification (popping/pushing) would
-   need to be done by the caller.
-
-6. **No complexity linking.** The Spec file defines operation counts
+4. **No complexity linking.** The Spec file defines operation counts
    (`find_bottom_ops`, `pop_while_ops`, `graham_scan_ops`) and proves
    `graham_scan_ops n <= 4 * n * n`, but these are not linked to the Pulse
    implementations via ghost counters.
@@ -318,3 +359,14 @@ not connected to the Pulse implementations via ghost counters.
 | `CLRS.Ch33.GrahamScan.Lemmas.fst` | Lemma proofs |
 | `CLRS.Ch33.GrahamScan.fst` | Standalone module (specs + proofs + Pulse, all-in-one) |
 | `CLRS.Ch33.Segments.Spec.fst` | `cross_product_spec` used by `cross_prod` alias |
+
+### New Definitions
+
+| Definition | Location |
+|------------|----------|
+| `all_left_turns_sz` | `CLRS.Ch33.GrahamScan.Spec` |
+| `scan_step_sz_spec` | `CLRS.Ch33.GrahamScan.Spec` |
+| `all_left_turns_sz_prefix` | `CLRS.Ch33.GrahamScan.Lemmas` |
+| `pop_while_spec_ge_1` | `CLRS.Ch33.GrahamScan.Lemmas` |
+| `scan_step_preserves_left_turns` | `CLRS.Ch33.GrahamScan.Lemmas` |
+| `graham_scan_step` | `CLRS.Ch33.GrahamScan.Impl` |
