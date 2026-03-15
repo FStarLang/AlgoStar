@@ -105,9 +105,9 @@ discharged by F\* and Z3.
    verified artifact is a pure recursive function with lemma proofs. There is
    no ghost counter threading or mutable state.
 
-2. **Coefficients not bounded.** The specification does not prove bounds on
-   `|x|` and `|y|`. CLRS Theorem 31.8 states `|x| ≤ b/d` and `|y| ≤ a/d`,
-   but this is not formalized.
+2. ~~**Coefficients not bounded.**~~ **Resolved.** The lemma
+   `extended_gcd_coeff_bounds` proves that when `a > 0` and `b > 0`,
+   `|x| ≤ b/gcd(a,b)` and `|y| ≤ a/gcd(a,b)`, formalizing CLRS Theorem 31.8.
 
 3. **No uniqueness.** The specification does not prove that the Bézout
    coefficients are unique (they are not, in general — any solution

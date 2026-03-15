@@ -104,9 +104,10 @@ discharged by F\* and Z3.
    (In fact the exact count depends on leading zeros in the binary
    representation of `e`.)
 
-4. **No lower bound on result.** The postcondition does not assert
-   `result >= 0`, though this follows from the definition of `%` in F\* for
-   positive modulus.
+4. ~~**No lower bound on result.**~~ **Resolved.** The postcondition now
+   asserts `result >= 0 /\ result < m_init`, proven directly from the loop
+   invariant which maintains `vr >= 0 /\ vr < m_init`. The lemma
+   `mod_exp_spec_bounds` also proves this as a standalone property.
 
 ## Complexity
 

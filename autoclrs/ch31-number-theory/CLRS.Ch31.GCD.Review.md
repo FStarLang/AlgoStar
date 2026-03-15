@@ -117,10 +117,10 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **No "greatest" property.** The lemma `gcd_spec_divides` proves that
-   `gcd_spec a b` divides both inputs, but the codebase does not prove that it
-   is the *greatest* such divisor within the GCD module itself. (The Extended
-   GCD module proves this via Bézout's identity.)
+1. ~~**No "greatest" property.**~~ **Resolved.** The lemma `gcd_spec_is_greatest`
+   in `CLRS.Ch31.GCD.Lemmas` proves that any positive common divisor of `a` and
+   `b` divides `gcd_spec a b`, establishing that it is the *greatest* common
+   divisor. The proof delegates to Bézout's identity from the Extended GCD module.
 
 2. **Precondition excludes gcd(0, 0).** The precondition requires
    `a > 0 ∨ b > 0`. Mathematically gcd(0, 0) = 0, but the implementation
@@ -168,5 +168,5 @@ steps reduce `b` by at least one bit.
 | `CLRS.Ch31.GCD.Spec.fst` | `gcd_spec`, `gcd_spec_comm` |
 | `CLRS.Ch31.GCD.Complexity.fsti` | `gcd_steps`, `num_bits`, `gcd_complexity_bounded`, lemma signatures |
 | `CLRS.Ch31.GCD.Complexity.fst` | O(log b) proof (`lemma_gcd_steps_log`) |
-| `CLRS.Ch31.GCD.Lemmas.fsti` | `gcd_spec_divides` signature |
-| `CLRS.Ch31.GCD.Lemmas.fst` | Divisibility proof |
+| `CLRS.Ch31.GCD.Lemmas.fsti` | `gcd_spec_is_greatest` signature |
+| `CLRS.Ch31.GCD.Lemmas.fst` | Greatest-divisor proof (via Bézout) |

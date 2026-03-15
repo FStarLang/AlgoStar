@@ -94,7 +94,9 @@ discharged by F\* and Z3.
    `pow` defined in `ModExp.Spec`. The bridge between them is handled by
    lemmas in `ModExpLR.Lemmas`.
 
-4. **No lower bound on result.** Same limitation as the R-to-L variant.
+4. ~~**No lower bound on result.**~~ **Resolved.** The postcondition now
+   asserts `result >= 0 /\ result < m_init`, proven directly from the loop
+   invariant which maintains `vd >= 0 /\ vd < m_init`.
 
 ## Complexity
 
