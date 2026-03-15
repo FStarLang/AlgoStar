@@ -79,7 +79,6 @@ fn lcs
       SZ.v m == A.length x /\
       SZ.v n == Seq.length sy /\
       SZ.v n == A.length y /\
-      SZ.v m > 0 /\ SZ.v n > 0 /\
       SZ.fits (op_Multiply (SZ.v m + 1) (SZ.v n + 1))
     )
   returns result: int
@@ -93,6 +92,9 @@ fn lcs
     )
 //SNIPPET_END: lcs_sig
 {
+  if (m = 0sz || n = 0sz) {
+    0
+  } else {
   let m_plus_1 = m + 1sz;
   let n_plus_1 = n + 1sz;
   let table_size = m_plus_1 *^ n_plus_1;
@@ -187,4 +189,5 @@ fn lcs
   let result = V.op_Array_Access table result_idx;
   V.free table;
   result
+  }
 }
