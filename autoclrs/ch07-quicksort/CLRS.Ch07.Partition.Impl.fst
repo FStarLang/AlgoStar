@@ -214,6 +214,7 @@ fn clrs_partition_wrapper_with_ticks
       lb <= Seq.index s_pivot 0 /\ Seq.index s_pivot 0 <= rb /\
       between_bounds s1 lb (Seq.index s_pivot 0) /\
       between_bounds s2 (Seq.index s_pivot 0) rb /\
+      strictly_larger_than s2 (Seq.index s_pivot 0) /\
       permutation s0 (Seq.append s1 (Seq.append s_pivot s2)) /\
       complexity_exact_linear cf (reveal c0) (hi - lo - 1)
    ))
@@ -235,6 +236,7 @@ fn clrs_partition_wrapper_with_ticks
   
   transfer_smaller_slice s lo (p+1) hi rb;
   transfer_larger_slice s lo (p+1) hi (Seq.index s_pivot 0);
+  transfer_strictly_larger_slice s lo (p+1) hi (Seq.index s_pivot 0);
   
   p
 }

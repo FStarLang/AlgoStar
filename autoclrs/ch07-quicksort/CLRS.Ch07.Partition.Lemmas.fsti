@@ -24,6 +24,9 @@ let seq_swap (#a: Type) (s: Seq.seq a) (i j: nat_smaller (Seq.length s)) : GTot 
 let larger_than (s: Seq.seq int) (lb: int)
   = forall (k: int). 0 <= k /\ k < Seq.length s ==> lb <= Seq.index s k
 
+let strictly_larger_than (s: Seq.seq int) (lb: int)
+  = forall (k: int). 0 <= k /\ k < Seq.length s ==> lb < Seq.index s k
+
 let smaller_than (s: Seq.seq int) (rb: int)
   = forall (k: int). 0 <= k /\ k < Seq.length s ==> Seq.index s k <= rb
 
@@ -62,3 +65,13 @@ val transfer_smaller_slice
   : Lemma
     (requires forall (k: int). l <= k /\ k < r ==> (Seq.index s (k - shift) <= rb))
     (ensures smaller_than (Seq.slice s (l - shift) (r - shift)) rb)
+
+val transfer_strictly_larger_slice
+  (s : Seq.seq int)
+  (shift : nat)
+  (l : nat{shift <= l})
+  (r : nat{l <= r /\ r <= shift + Seq.length s})
+  (lb: int)
+  : Lemma
+    (requires forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)))
+    (ensures strictly_larger_than (Seq.slice s (l - shift) (r - shift)) lb)

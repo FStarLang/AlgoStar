@@ -54,3 +54,16 @@ let transfer_smaller_slice
   = assert (forall (k: int). l <= k /\ k < r ==> (Seq.index s (k - shift) <= rb));
     assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (Seq.index s ((k+shift) - shift) <= rb));
     assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (Seq.index s k <= rb))
+
+let transfer_strictly_larger_slice
+  (s : Seq.seq int)
+  (shift : nat)
+  (l : nat{shift <= l})
+  (r : nat{l <= r /\ r <= shift + Seq.length s})
+  (lb: int)
+  : Lemma
+    (requires forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)))
+    (ensures strictly_larger_than (Seq.slice s (l - shift) (r - shift)) lb)
+  = assert (forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)));
+    assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (lb < Seq.index s ((k+shift) - shift)));
+    assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (lb < Seq.index s k))
