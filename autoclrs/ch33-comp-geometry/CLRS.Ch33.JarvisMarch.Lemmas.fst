@@ -12,6 +12,7 @@ open CLRS.Ch33.JarvisMarch.Spec
 open FStar.Mul
 
 module Seq = FStar.Seq
+module SZ = FStar.SizeT
 
 // ========== Bounds Lemmas ==========
 
@@ -236,3 +237,21 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_spec_not_current xs ys current;
   find_next_aux_beats_all xs ys current current 0;
   find_next_spec_bounded xs ys current
+
+#push-options "--z3rlimit 20 --split_queries always"
+let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
+  : Lemma
+    (requires
+      valid_jarvis_hull xs ys hull h /\
+      h < Seq.length hull /\
+      SZ.v next < Seq.length xs /\
+      h >= 1 /\
+      SZ.v next == find_next_spec xs ys (SZ.v (Seq.index hull (h - 1))))
+    (ensures
+      valid_jarvis_hull xs ys (Seq.upd hull h next) (h + 1)) =
+  let hull' = Seq.upd hull h next in
+  // Seq.upd preserves other indices and sets position h to next
+  assert (forall (i: nat). i < h ==> Seq.index hull' i == Seq.index hull i);
+  assert (Seq.index hull' h == next);
+  assert (Seq.length hull' == Seq.length hull)
+#pop-options

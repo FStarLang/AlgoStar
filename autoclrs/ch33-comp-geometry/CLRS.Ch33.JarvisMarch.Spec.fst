@@ -112,4 +112,16 @@ let dy (ys: Seq.seq int) (current k: nat) : int =
   if current < Seq.length ys && k < Seq.length ys
   then Seq.index ys k - Seq.index ys current
   else 0
+
+// Characterization of a valid Jarvis march hull output.
+// hull[0] is the leftmost point, and each subsequent vertex is
+// the result of find_next applied to its predecessor.
+let valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) : prop =
+  h >= 1 /\
+  h <= Seq.length hull /\
+  Seq.length ys == Seq.length xs /\
+  SZ.v (Seq.index hull 0) == find_leftmost_spec xs ys /\
+  (forall (i: nat). i < h ==> SZ.v (Seq.index hull i) < Seq.length xs) /\
+  (forall (i: nat). i >= 1 /\ i < h ==>
+    SZ.v (Seq.index hull i) == find_next_spec xs ys (SZ.v (Seq.index hull (i - 1))))
 //SNIPPET_END: correctness_defs

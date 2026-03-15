@@ -81,3 +81,33 @@ fn jarvis_march (#p: perm) (xs ys: array int)
       SZ.v h <= SZ.v len
     )
 //SNIPPET_END: jarvis_march_sig
+
+//SNIPPET_START: jarvis_march_with_hull_sig
+fn jarvis_march_with_hull (#p: perm) (xs ys: array int)
+  (#sxs: Ghost.erased (Seq.seq int))
+  (#sys: Ghost.erased (Seq.seq int))
+  (len: SZ.t)
+  (hull_out: array SZ.t)
+  (#shull: Ghost.erased (Seq.seq SZ.t))
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    A.pts_to hull_out shull **
+    pure (
+      SZ.v len == Seq.length sxs /\
+      Seq.length sxs == Seq.length sys /\
+      SZ.v len > 1 /\
+      SZ.v len == A.length xs /\
+      SZ.v len == A.length ys /\
+      Seq.length shull == A.length hull_out /\
+      SZ.v len <= Seq.length shull
+    )
+  returns h: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    (exists* shull'.
+      A.pts_to hull_out shull' **
+      pure (
+        SZ.v h == jarvis_march_spec sxs sys /\
+        SZ.v h >= 1 /\
+        SZ.v h <= SZ.v len /\
+        valid_jarvis_hull sxs sys shull' (SZ.v h)
+      ))
+//SNIPPET_END: jarvis_march_with_hull_sig

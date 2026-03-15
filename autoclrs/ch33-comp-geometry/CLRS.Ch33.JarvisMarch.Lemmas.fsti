@@ -10,6 +10,7 @@ open CLRS.Ch33.JarvisMarch.Spec
 open FStar.Mul
 
 module Seq = FStar.Seq
+module SZ = FStar.SizeT
 
 // ========== Bounds Lemmas ==========
 
@@ -145,3 +146,15 @@ val find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
                    (Seq.index xs a) (Seq.index ys a)
                    (Seq.index xs b) (Seq.index ys b) <> 0))
     (ensures all_left_of xs ys current (find_next_spec xs ys current))
+
+// Extending a valid Jarvis hull by one vertex preserves validity.
+val extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
+  : Lemma
+    (requires
+      valid_jarvis_hull xs ys hull h /\
+      h < Seq.length hull /\
+      SZ.v next < Seq.length xs /\
+      h >= 1 /\
+      SZ.v next == find_next_spec xs ys (SZ.v (Seq.index hull (h - 1))))
+    (ensures
+      valid_jarvis_hull xs ys (Seq.upd hull h next) (h + 1))
