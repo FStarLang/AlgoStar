@@ -56,7 +56,6 @@ requires
     Seq.length sa == A.length a /\
     Seq.length sb == A.length b /\
     S.in_range sa (SZ.v k_val) /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
@@ -70,6 +69,10 @@ ensures exists* sb'.
   )
 //SNIPPET_END: counting_sort_impl_sig
 {
+  if (len = 0sz) {
+    L.empty_sorted_perm sb sa;
+    ()
+  } else {
   let k_plus_1 = k_val +^ 1sz;
   
   // Allocate count array C[0..k]
@@ -269,6 +272,7 @@ ensures exists* sb'.
   
   V.free c;
   ()
+  } // else len > 0
 }
 ```
 #pop-options
@@ -291,7 +295,6 @@ requires
     SZ.v len == Seq.length s0 /\
     Seq.length s0 == A.length a /\
     S.in_range s0 (SZ.v k_val) /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
@@ -303,6 +306,10 @@ ensures exists* s.
     S.permutation s0 s
   )
 {
+  if (len = 0sz) {
+    L.empty_sorted_perm s0 s0;
+    ()
+  } else {
   let n = len;
   let k = SZ.v k_val;
   let k1 = k_val + 1sz;
@@ -422,6 +429,7 @@ ensures exists* s.
   L.final_perm s0 sa_f k (SZ.v vpos_f);
   V.free c_arr;
   ()
+  } // else len > 0
 }
 ```
 #pop-options
@@ -449,7 +457,6 @@ requires
     Seq.length sa == A.length a /\
     Seq.length sb == A.length b /\
     SZ.v base_val >= 2 /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v base_val + 2) /\
     SZ.fits (SZ.v len + SZ.v base_val + 2)
   )
@@ -461,6 +468,10 @@ ensures exists* sb'.
     Stab.is_stable_sort_on_digit sa sb' d (SZ.v base_val)
   )
 {
+  if (len = 0sz) {
+    DL.empty_is_stable_on_digit sa sb d (SZ.v base_val);
+    ()
+  } else {
   // Allocate count array C[0..base-1]
   let c : V.vec int = V.alloc 0 base_val;
 
@@ -656,6 +667,7 @@ ensures exists* sb'.
 
   V.free c;
   ()
+  } // else len > 0
 }
 ```
 #pop-options

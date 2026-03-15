@@ -30,6 +30,11 @@ let equal_counts_perm (s1 s2:Seq.seq nat)
           (ensures permutation s1 s2)
   = reveal_opaque (`%Spec.permutation) (Spec.permutation s1 s2)
 
+let empty_sorted_perm (s1 s2: Seq.seq nat)
+  : Lemma (requires Seq.length s1 == 0 /\ Seq.length s2 == 0)
+          (ensures sorted s1 /\ permutation s1 s2)
+  = equal_counts_perm s1 s2
+
 // ========== Count lemmas ==========
 
 /// Count of any element is bounded by sequence length

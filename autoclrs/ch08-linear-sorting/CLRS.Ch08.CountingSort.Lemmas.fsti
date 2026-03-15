@@ -47,6 +47,10 @@ val equal_counts_perm (s1 s2:Seq.seq nat)
                     (forall (v:nat). SeqP.count v s1 == SeqP.count v s2))
           (ensures permutation s1 s2)
 
+val empty_sorted_perm (s1 s2: Seq.seq nat)
+  : Lemma (requires Seq.length s1 == 0 /\ Seq.length s2 == 0)
+          (ensures sorted s1 /\ permutation s1 s2)
+
 val count_bounded (s:Seq.seq nat) (v:nat)
   : Lemma (ensures SeqP.count v s <= Seq.length s)
 

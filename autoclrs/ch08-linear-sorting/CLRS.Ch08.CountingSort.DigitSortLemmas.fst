@@ -1405,3 +1405,9 @@ let phase4_final_is_stable (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n: nat
     Stab.pack_is_stable sa sb d base
       (fun j1 j2 -> stability_witness sc sa sb d base n j1 j2)
 #pop-options
+
+/// For empty sequences, is_stable_sort_on_digit holds trivially
+let empty_is_stable_on_digit (s1 s2: Seq.seq nat) (d base: nat)
+  : Lemma (requires Seq.length s1 == 0 /\ Seq.length s2 == 0 /\ base >= 2)
+          (ensures Stab.is_stable_sort_on_digit s1 s2 d base)
+  = reveal_opaque (`%Stab.is_stable_sort_on_digit) (Stab.is_stable_sort_on_digit s1 s2 d base)

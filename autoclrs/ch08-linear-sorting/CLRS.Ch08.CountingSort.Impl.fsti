@@ -36,7 +36,6 @@ requires
     Seq.length sa == A.length a /\
     Seq.length sb == A.length b /\
     S.in_range sa (SZ.v k_val) /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
@@ -62,7 +61,6 @@ requires
     SZ.v len == Seq.length s0 /\
     Seq.length s0 == A.length a /\
     S.in_range s0 (SZ.v k_val) /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
@@ -94,7 +92,6 @@ requires
     Seq.length sa == A.length a /\
     Seq.length sb == A.length b /\
     SZ.v base_val >= 2 /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v base_val + 2) /\
     SZ.fits (SZ.v len + SZ.v base_val + 2)
   )
