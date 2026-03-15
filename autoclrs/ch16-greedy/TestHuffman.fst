@@ -17,8 +17,10 @@ module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
+module GR = Pulse.Lib.GhostReference
 module HSpec = CLRS.Ch16.Huffman.Spec
 module HOpt = CLRS.Ch16.Huffman.Optimality
+module HCmplx = CLRS.Ch16.Huffman.Complexity
 
 #push-options "--z3rlimit 20"
 fn test_huffman_simple ()
@@ -39,12 +41,15 @@ fn test_huffman_simple ()
   A.op_Array_Assignment freqs 5sz 45;
   
   // Build Huffman tree (verified optimal) — drop result for test
-  let tree_ptr = huffman_tree freqs 6sz;
+  let ghost_ctr = GR.alloc #nat 0;
+  let tree_ptr = huffman_tree freqs 6sz ghost_ctr;
   with s_final. assert (A.pts_to freqs s_final);
-  drop_ (exists* ft. is_htree tree_ptr ft **
+  drop_ (exists* ft (cf: nat). is_htree tree_ptr ft **
+                   GR.pts_to ghost_ctr cf **
                    pure (HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list s_final 0) /\
                          HSpec.same_frequency_multiset ft (seq_to_pos_list s_final 0) /\
-                         HSpec.is_wpl_optimal ft (seq_to_pos_list s_final 0)));
+                         HSpec.is_wpl_optimal ft (seq_to_pos_list s_final 0) /\
+                         HCmplx.huffman_merge_bound cf 0 6));
   
   // Free the array
   rewrite (A.pts_to freqs s_final) as (A.pts_to (V.vec_to_array fv) s_final);

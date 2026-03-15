@@ -8,6 +8,7 @@
    - Functional correctness: same_frequency_multiset
    - Optimality: is_wpl_optimal (weighted path length)
    - Cost equality: cost == greedy_cost of input frequencies
+   - Complexity: exactly n-1 merge iterations (O(n log n) with min-heap PQ)
 *)
 module CLRS.Ch16.Huffman.Impl
 #lang-pulse
@@ -19,9 +20,13 @@ module A = Pulse.Lib.Array
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Box = Pulse.Lib.Box
+module GR = Pulse.Lib.GhostReference
 module HSpec = CLRS.Ch16.Huffman.Spec
 module HOpt = CLRS.Ch16.Huffman.Optimality
+module HCmplx = CLRS.Ch16.Huffman.Complexity
 open CLRS.Ch16.Huffman.Defs
+
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
 
 /// Recursive separation logic predicate: relates a heap-allocated tree to a spec tree.
 val is_htree (p: hnode_ptr) (ft: HSpec.htree) : Tot slprop
@@ -34,21 +39,28 @@ fn free_htree (p: hnode_ptr) (ft: HSpec.htree)
 //SNIPPET_START: huffman_tree_iface
 /// Build an optimal Huffman tree from an array of positive frequencies.
 /// The result is a heap-allocated tree satisfying WPL-optimality.
+/// A ghost counter tracks merge iterations: exactly n-1 merges.
 fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))
   (n: SZ.t)
-  requires A.pts_to freqs freq_seq ** pure (
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to freqs freq_seq **
+           GR.pts_to ctr c0 **
+           pure (
     SZ.v n == Seq.length freq_seq /\
     SZ.v n > 0 /\
     SZ.fits (2 * SZ.v n + 2) /\
     (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0))
   returns result: hnode_ptr
   ensures A.pts_to freqs freq_seq **
-          (exists* ft. is_htree result ft **
+          (exists* ft (cf: nat). is_htree result ft **
+                  GR.pts_to ctr cf **
                   pure (HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list freq_seq 0) /\
                         HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0) /\
-                        HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0)))
+                        HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0) /\
+                        HCmplx.huffman_merge_bound cf (reveal c0) (SZ.v n)))
 //SNIPPET_END: huffman_tree_iface
 
 // ========== Ghost fold/unfold helpers for is_htree ==========

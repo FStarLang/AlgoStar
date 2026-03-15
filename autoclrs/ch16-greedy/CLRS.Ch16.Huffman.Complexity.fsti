@@ -52,3 +52,10 @@ val huffman_with_ticks_correct (l: list htree{Cons? l})
       let tree_without_ticks = huffman_from_sorted l in
       tree_with_ticks == tree_without_ticks
     ))
+
+/// Merge-iteration complexity bound for the PQ-based imperative implementation.
+/// The Huffman algorithm performs exactly n-1 merge iterations (each merging
+/// two minimum-frequency trees). With a min-heap PQ, each iteration does
+/// O(log n) work, giving O(n log n) total.
+let huffman_merge_bound (cf c0 n: nat) : prop =
+  n > 0 /\ cf >= c0 /\ cf - c0 == n - 1

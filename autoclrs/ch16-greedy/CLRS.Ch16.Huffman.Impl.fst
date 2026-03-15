@@ -15,6 +15,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Box = Pulse.Lib.Box
 module PQ = Pulse.Lib.PriorityQueue
+module GR = Pulse.Lib.GhostReference
 module HSpec = CLRS.Ch16.Huffman.Spec
 module HOpt = CLRS.Ch16.Huffman.Optimality
 
@@ -29,6 +30,15 @@ open CLRS.Ch16.Huffman.Defs
 open CLRS.Ch16.Huffman.PQLemmas
 open CLRS.Ch16.Huffman.ForestLemmas
 open CLRS.Ch16.Huffman.PQForest
+
+// Ghost tick infrastructure for complexity counting
+ghost
+fn tick (ctr: GR.ref nat) (#n: erased nat)
+  requires GR.pts_to ctr n
+  ensures  GR.pts_to ctr (incr_nat n)
+{
+  GR.(ctr := incr_nat n)
+}
 
 // ========== Allocate an hnode on the heap ==========
 
@@ -255,7 +265,11 @@ fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))
   (n: SZ.t)
-  requires A.pts_to freqs freq_seq ** pure (
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to freqs freq_seq **
+           GR.pts_to ctr c0 **
+           pure (
     SZ.v n == Seq.length freq_seq /\
     SZ.v n > 0 /\
     SZ.fits (2 * SZ.v n + 2) /\
@@ -263,10 +277,12 @@ fn huffman_tree
   )
   returns result: hnode_ptr
   ensures A.pts_to freqs freq_seq **
-          (exists* ft. is_htree result ft **
+          (exists* ft (cf: nat). is_htree result ft **
+                  GR.pts_to ctr cf **
                   pure (HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list freq_seq 0) /\
                         HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0) /\
-                        HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0)))
+                        HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0) /\
+                        CLRS.Ch16.Huffman.Complexity.huffman_merge_bound cf (reveal c0) (SZ.v n)))
 //SNIPPET_END: huffman_tree_sig
 {
   // Allocate node pointer array and PQ
@@ -346,20 +362,24 @@ fn huffman_tree
     !iter <^ n_minus_1
   )
   invariant exists* viter nd_contents pq_contents
-                    (active: list forest_entry).
+                    (active: list forest_entry) (vc: nat).
     R.pts_to iter viter **
     V.pts_to nodes nd_contents **
     PQ.is_pqueue pq pq_contents (SZ.v n) **
     A.pts_to freqs freq_seq **
     Box.pts_to dummy ({ sym = 0; freq = 0; left = None #hnode_ptr; right = None #hnode_ptr } <: hnode) **
     forest_own active **
+    GR.pts_to ctr vc **
     pure (
       SZ.v viter <= SZ.v n - 1 /\
       Seq.length pq_contents == SZ.v n - SZ.v viter /\
       L.length active == SZ.v n - SZ.v viter /\
       L.length active > 0 /\
       SZ.fits (2 * Seq.length pq_contents + 2) /\
-      merge_bundle freq_seq nd_contents pq_contents active (SZ.v n)
+      merge_bundle freq_seq nd_contents pq_contents active (SZ.v n) /\
+      // Complexity: exactly viter merge iterations so far
+      vc >= reveal c0 /\
+      vc - reveal c0 == SZ.v viter
     )
   decreases (SZ.v n_minus_1 - SZ.v !iter)
   {
@@ -448,6 +468,9 @@ fn huffman_tree
       (freq1 <: pos) (freq2 <: pos) idx1 idx2 (sum_freq <: pos)
       (Some?.v (find_entry_by_idx active0 idx1))
       (Some?.v (find_entry_by_idx active0 idx2));
+    
+    // Count one merge iteration — ghost tick
+    tick ctr;
     
     let viter = !iter;
     iter := viter +^ 1sz;
