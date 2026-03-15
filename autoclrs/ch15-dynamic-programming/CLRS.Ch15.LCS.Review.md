@@ -174,9 +174,11 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`m > 0 /\ n > 0` precondition.** The implementation requires both
-   sequences to be non-empty. The LCS of any sequence with an empty
-   sequence is trivially 0, but this case is not handled.
+1. ~~**`m > 0 /\ n > 0` precondition.**~~ **RESOLVED.** The implementation
+   now handles empty sequences. When `m = 0` or `n = 0`, the function
+   returns 0 immediately (LCS with an empty sequence is trivially 0).
+   The complexity bound is conditional: exactly `(m+1)×(n+1)` cell
+   evaluations when both are non-empty, 0 when either is empty.
 
 2. **Returns length only, not the subsequence.** The implementation
    returns an `int` (the LCS length), not the actual longest common

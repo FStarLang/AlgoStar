@@ -163,9 +163,10 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`n > 0` precondition.** The implementation requires `n > 0`. The
-   optimal revenue for an empty rod is trivially 0, but this case is not
-   handled.
+1. ~~**`n > 0` precondition.**~~ **RESOLVED.** The implementation now
+   handles `n = 0` (empty rod). The outer loop naturally does not execute
+   when `n = 0`, and `r[0] = 0 = optimal_revenue prices 0`. The `n > 0`
+   precondition has been removed from both the basic and extended variants.
 
 2. **`n ≤ |prices|` implicit assumption.** The specification defines
    `optimal_revenue` for any `n`, but if `n > |prices|`, `build_opt`

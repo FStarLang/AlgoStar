@@ -153,10 +153,11 @@ discharged by F\* and Z3.
    precondition. This is discharged by `discharge_all_costs_bounded`, which
    requires all dimensions to be bounded by some `d` with
    `(n-1)·d³ ≤ 1000000000`. This is a **real limitation**: for large
-   dimensions or long chains, the sentinel may be too small. The
-   postcondition on the `.fsti` does NOT include this bound — the interface
-   is stated in terms of `mc_result`, which bakes in the sentinel. If the
-   sentinel is exceeded, `mc_result` may not equal the true optimum.
+   dimensions or long chains, the sentinel may be too small. **PARTIALLY
+   RESOLVED:** The `.fsti` now exports `mc_result_eq_mc_cost`, which
+   proves that under the sentinel bound (`all_costs_bounded`), `mc_result`
+   equals the true recursive optimum `mc_cost`. This makes the sentinel
+   dependency explicit and documented in the public interface.
 
 2. **Imperative mirror spec, not enumerative.** The top-level postcondition
    is `result == mc_result`, where `mc_result` is defined by replaying the
@@ -168,11 +169,12 @@ discharged by F\* and Z3.
    `A₀..Aₙ₋₁` with the same dimension array. The DP table stores
    `m[i][j]` for `0 ≤ i,j < n` in a flat array of size `n²`.
 
-4. **No complexity ghost counter in the Pulse code.** Unlike Rod Cutting
-   and LCS, the Pulse implementation does NOT carry a ghost tick counter.
-   The O(n³) complexity bound is proven separately in
-   `CLRS.Ch15.MatrixChain.Complexity`, but it is proven on the pure loop
-   model, not directly linked to the imperative code.
+4. ~~**No complexity ghost counter in the Pulse code.**~~ **RESOLVED.**
+   The Pulse implementation now carries a ghost tick counter (`GR.ref nat`)
+   that increments once per innermost k-loop iteration. The postcondition
+   proves `cf - c0 == mc_iterations n`, directly linking the O(n³)
+   complexity analysis to the imperative code. The invariant uses a 3-level
+   remaining-work formulation with `mc_inner_sum` and `mc_remaining_i`.
 
 5. **Extended variant has weaker split correctness.** The extended variant
    (`CLRS.Ch15.MatrixChain.Extended`) returns a split-point table and
@@ -183,7 +185,7 @@ discharged by F\* and Z3.
 
 | Metric | Bound | Linked? | Exact? |
 |--------|-------|---------|--------|
-| Inner-loop iterations | O(n³) ≤ n³ | ⚠️ Pure model only | Upper bound |
+| Inner-loop iterations | O(n³) ≤ n³ | ✅ Ghost counter | mc_iterations n |
 
 From `CLRS.Ch15.MatrixChain.Complexity`:
 
