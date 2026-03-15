@@ -51,3 +51,20 @@ let heapsort_cost_bound (n: nat) : nat = build_cost_bound n + extract_cost_bound
 /// Heapsort cost is O(n log n): bounded by 4 * n * log2_floor(n)
 val heapsort_cost_nlogn (n: pos)
   : Lemma (ensures heapsort_cost_bound n <= 4 * n * log2_floor n)
+
+// ========== Bridge: connect Complexity.heapsort_ops to CostBound.heapsort_cost_bound ==========
+
+/// Extract-max operations (Complexity) are bounded by the ghost-counter extract cost (CostBound)
+val extract_max_ops_le_extract_cost (n: pos)
+  : Lemma (ensures extract_max_ops n <= extract_cost_bound n)
+
+/// Build-heap operations (Complexity) are bounded by the ghost-counter build cost (CostBound)
+val build_heap_ops_le_build_cost (n: pos)
+  : Lemma (ensures build_heap_ops n <= build_cost_bound n)
+
+/// Bridge theorem: the pure operation count from Complexity is bounded by the
+/// ghost-counter cost bound from CostBound.  This connects the two cost models,
+/// so all tighter bounds proved in Complexity (O(n) build, beats-quadratic, etc.)
+/// are implied by the ghost-counter-linked bound.
+val heapsort_ops_le_cost_bound (n: pos)
+  : Lemma (ensures heapsort_ops n <= heapsort_cost_bound n)

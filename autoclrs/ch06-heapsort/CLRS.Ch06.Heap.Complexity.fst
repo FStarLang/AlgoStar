@@ -465,3 +465,44 @@ let heapsort_better_than_quadratic (n: pos{n >= 11})
     end
 
 
+
+// ========== Root-bound lemmas for bridging to CostBound module ==========
+
+// For small n, verify computationally
+#push-options "--fuel 20 --ifuel 5 --z3rlimit 300"
+private
+let build_heap_ops_le_root_bound_small (n: pos)
+  : Lemma (requires n < 32)
+          (ensures build_heap_ops n <= (n / 2) * 2 * log2_floor n)
+  = ()
+#pop-options
+
+#push-options "--z3rlimit 40"
+let build_heap_ops_le_root_bound (n: pos)
+  : Lemma (ensures build_heap_ops n <= (n / 2) * 2 * log2_floor n)
+  = if n < 32 then
+      build_heap_ops_le_root_bound_small n
+    else begin
+      build_heap_ops_linear n;
+      log2_floor_pow2 5;
+      log2_floor_monotonic 32 n;
+      assert (log2_floor n >= 5)
+    end
+#pop-options
+
+let rec extract_max_ops_le_root_bound (n: pos)
+  : Lemma (ensures extract_max_ops n <= (n - 1) * 2 * log2_floor n)
+          (decreases n)
+  = if n = 1 then ()
+    else begin
+      extract_max_ops_le_root_bound (n - 1);
+      log2_floor_monotonic (n - 1) n
+    end
+
+// ========== Definition-unfolding lemmas ==========
+
+let max_heapify_ops_def (h: nat) : Lemma (ensures max_heapify_ops h == 2 * h) = ()
+let extract_max_ops_base (n: nat{n <= 1}) : Lemma (ensures extract_max_ops n == 0) = ()
+let extract_max_ops_step (n: nat{n > 1})
+  : Lemma (ensures extract_max_ops n == max_heapify_ops (log2_floor n) + extract_max_ops (n - 1)) = ()
+let heapsort_ops_def (n: pos) : Lemma (ensures heapsort_ops n == build_heap_ops n + extract_max_ops n) = ()

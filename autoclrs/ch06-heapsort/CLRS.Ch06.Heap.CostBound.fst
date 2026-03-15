@@ -109,3 +109,24 @@ let heapsort_cost_nlogn (n: pos)
     assert (extract_cost_bound n == (n - 1) * (2 * lg));
     ()
 #pop-options
+
+// ========== Bridge: connect Complexity.heapsort_ops to CostBound.heapsort_cost_bound ==========
+
+// Extract-max: use the root-bound lemma from Complexity
+let extract_max_ops_le_extract_cost (n: pos)
+  : Lemma (ensures extract_max_ops n <= extract_cost_bound n)
+  = extract_max_ops_le_root_bound n;
+    heap_div_pos n 0
+
+// Build-heap: use the root-bound lemma from Complexity
+let build_heap_ops_le_build_cost (n: pos)
+  : Lemma (ensures build_heap_ops n <= build_cost_bound n)
+  = build_heap_ops_le_root_bound n;
+    heap_div_pos n 0
+
+// Bridge: combine build and extract bounds
+let heapsort_ops_le_cost_bound (n: pos)
+  : Lemma (ensures heapsort_ops n <= heapsort_cost_bound n)
+  = build_heap_ops_le_build_cost n;
+    extract_max_ops_le_extract_cost n;
+    heapsort_ops_def n

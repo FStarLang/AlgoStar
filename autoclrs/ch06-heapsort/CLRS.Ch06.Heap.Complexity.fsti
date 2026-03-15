@@ -88,3 +88,25 @@ val heapsort_asymptotic (n: pos{n >= 16})
 val heapsort_better_than_quadratic (n: pos{n >= 11})
   : Lemma (ensures heapsort_ops n < op_Multiply n n)
 //SNIPPET_END: heapsort_better_than_quadratic
+
+/// Build-heap ops bounded by (n/2) * 2 * log2_floor n (= CostBound.build_cost_bound n)
+val build_heap_ops_le_root_bound (n: pos)
+  : Lemma (ensures build_heap_ops n <= op_Multiply (op_Multiply (n / 2) 2) (log2_floor n))
+
+/// Extract-max ops bounded by (n-1) * 2 * log2_floor n (= CostBound.extract_cost_bound n)
+val extract_max_ops_le_root_bound (n: pos)
+  : Lemma (ensures extract_max_ops n <= op_Multiply (op_Multiply (n - 1) 2) (log2_floor n))
+
+// ========== Definition-unfolding lemmas (for cross-module reasoning) ==========
+
+val max_heapify_ops_def (h: nat)
+  : Lemma (ensures max_heapify_ops h == 2 * h)
+
+val extract_max_ops_base (n: nat{n <= 1})
+  : Lemma (ensures extract_max_ops n == 0)
+
+val extract_max_ops_step (n: nat{n > 1})
+  : Lemma (ensures extract_max_ops n == max_heapify_ops (log2_floor n) + extract_max_ops (n - 1))
+
+val heapsort_ops_def (n: pos)
+  : Lemma (ensures heapsort_ops n == build_heap_ops n + extract_max_ops n)
