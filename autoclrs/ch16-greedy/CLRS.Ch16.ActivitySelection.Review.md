@@ -48,14 +48,13 @@ let activity_selection_pre (n: SZ.t) (ss sf: Seq.seq int) (sout0: Seq.seq SZ.t)
   SZ.v n == Seq.length ss /\ SZ.v n == Seq.length sf /\
   SZ.v n == A.length start_times /\ SZ.v n == A.length finish_times /\
   SZ.v n == A.length out /\ SZ.v n == Seq.length sout0 /\
-  SZ.v n > 0 /\
   L.finish_sorted sf /\
   (forall (i:nat). i < Seq.length ss ==> L.valid_activity ss sf i)
 ```
 
 * Activities sorted by finish time (`finish_sorted`).
 * All activities valid: `start[i] < finish[i]`.
-* At least one activity.
+* No minimum activity count required — `n = 0` is handled.
 
 ### Postconditions (from `activity_selection_post`)
 
@@ -63,29 +62,36 @@ let activity_selection_pre (n: SZ.t) (ss sf: Seq.seq int) (sout0: Seq.seq SZ.t)
 let activity_selection_post
   (count: SZ.t) (n: SZ.t) (sout: Seq.seq SZ.t) (cf: nat) (c0: nat) (ss sf: Seq.seq int)
 : prop =
-  SZ.v count >= 1 /\ SZ.v count <= SZ.v n /\
+  SZ.v count <= SZ.v n /\
   Seq.length sout == SZ.v n /\
-  complexity_bounded_linear cf c0 (SZ.v n) /\
-  (exists (sel: Seq.seq nat).
-    Seq.length sel == SZ.v count /\
-    out_matches_sel sout sel (SZ.v count) (SZ.v n) /\
-    L.all_valid_indices sel (SZ.v n) /\
-    L.strictly_increasing sel /\
-    L.pairwise_compatible sel ss sf /\
-    Seq.index sel 0 == 0 /\
-    L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n) /\
-    SZ.v count == S.max_compatible_count ss sf (SZ.v n))
+  cf >= c0 /\
+  SZ.v count == S.max_compatible_count ss sf (SZ.v n) /\
+  (SZ.v n == 0 ==> SZ.v count == 0 /\ cf == c0) /\
+  (SZ.v n > 0 ==>
+    SZ.v count >= 1 /\
+    complexity_bounded_linear cf c0 (SZ.v n) /\
+    (exists (sel: Seq.seq nat).
+      Seq.length sel == SZ.v count /\
+      out_matches_sel sout sel (SZ.v count) (SZ.v n) /\
+      L.all_valid_indices sel (SZ.v n) /\
+      L.strictly_increasing sel /\
+      L.pairwise_compatible sel ss sf /\
+      Seq.index sel 0 == 0 /\
+      L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n)))
 ```
 
 The postcondition guarantees:
 
-* `1 ≤ count ≤ n` — at least one activity is selected.
-* `complexity_bounded_linear cf c0 n` — exactly `n-1` comparisons.
-* A ghost selection sequence `sel` witnessing:
-  - Selected indices are valid, strictly increasing, and pairwise compatible.
-  - Activity 0 is always selected first.
-  - Each selected activity is the **earliest compatible** one.
-  - `count == max_compatible_count` — **optimality**.
+* `count <= n` — never selects more activities than exist.
+* `count == max_compatible_count` — **optimality** (for all n, including 0).
+* When `n = 0`: `count == 0` and zero comparisons (`cf == c0`).
+* When `n > 0`:
+  - `count >= 1` — at least one activity is selected.
+  - `complexity_bounded_linear cf c0 n` — exactly `n-1` comparisons.
+  - A ghost selection sequence `sel` witnessing:
+    - Selected indices are valid, strictly increasing, and pairwise compatible.
+    - Activity 0 is always selected first.
+    - Each selected activity is the **earliest compatible** one.
 
 ## Auxiliary Definitions
 
@@ -167,9 +173,11 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`n > 0` precondition.** The algorithm requires at least one activity.
-   The empty case is trivially optimal (0 activities selected) but not
-   handled.
+1. ~~**`n > 0` precondition.**~~ **ADDRESSED.** The algorithm now handles
+   `n = 0` by returning 0 (trivially optimal). The precondition no longer
+   requires `SZ.v n > 0`, and the postcondition is structured conditionally:
+   for `n = 0`, it asserts `count == 0` with zero comparisons; for `n > 0`,
+   the full greedy optimality proof applies.
 
 2. **Pre-sorted input required.** The precondition requires
    `finish_sorted sf`. The algorithm itself is O(n) for sorted input, but

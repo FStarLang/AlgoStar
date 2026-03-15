@@ -10,17 +10,23 @@ fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))
   (n: SZ.t)
-  requires A.pts_to freqs freq_seq ** pure (
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires A.pts_to freqs freq_seq **
+           GR.pts_to ctr c0 **
+           pure (
     SZ.v n == Seq.length freq_seq /\
     SZ.v n > 0 /\
     SZ.fits (2 * SZ.v n + 2) /\
     (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0))
   returns result: hnode_ptr
   ensures A.pts_to freqs freq_seq **
-          (exists* ft. is_htree result ft **
+          (exists* ft (cf: nat). is_htree result ft **
+                  GR.pts_to ctr cf **
                   pure (HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list freq_seq 0) /\
                         HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0) /\
-                        HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0)))
+                        HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0) /\
+                        HCmplx.huffman_merge_bound cf (reveal c0) (SZ.v n)))
 ```
 
 ### Parameters
@@ -29,6 +35,8 @@ fn huffman_tree
   `n` symbols.
 
 * `n` is the number of symbols.
+
+* `ctr` is a ghost counter for merge iterations.
 
 ### Preconditions
 
@@ -54,6 +62,9 @@ The result is a heap-allocated Huffman tree `ft` satisfying:
 * `HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0)` — The tree
   minimizes weighted path length over all trees with the same frequency
   multiset.
+
+* `HCmplx.huffman_merge_bound cf (reveal c0) (SZ.v n)` — Exactly `n-1`
+  merge iterations were performed (linked via ghost counter).
 
 ## Auxiliary Definitions
 
@@ -172,10 +183,11 @@ files (`Impl.fst`, `Impl.fsti`, `Codec.fst`, `Codec.fsti`, `Codec.Impl.fst`,
 
 ## Specification Gaps and Limitations
 
-1. **No complexity ghost counter.** Unlike Rod Cutting, LCS, and Activity
-   Selection, the Huffman implementation does not carry a ghost tick counter.
-   The complexity module exists (`CLRS.Ch16.Huffman.Complexity`) but the
-   Pulse code does not link to it via a postcondition.
+1. ~~**No complexity ghost counter.**~~ **ADDRESSED.** The Huffman Pulse
+   implementation now carries a ghost tick counter (`ctr: GR.ref nat`)
+   that is incremented once per merge iteration. The postcondition includes
+   `huffman_merge_bound cf c0 n`, proving exactly `n-1` merge iterations.
+   With a min-heap PQ, each iteration is O(log n), giving O(n log n) total.
 
 2. **Priority queue abstraction.** The implementation uses
    `Pulse.Lib.PriorityQueue`, an external library. The PQ's correctness
@@ -210,12 +222,15 @@ files (`Impl.fst`, `Impl.fsti`, `Codec.fst`, `Codec.fsti`, `Codec.Impl.fst`,
 
 | Metric | Bound | Linked? | Exact? |
 |--------|-------|---------|--------|
-| PQ operations | O(n log n) | ⚠️ Not linked | — |
+| Merge iterations | O(n) = n−1 | ✅ Ghost counter | Exact count |
+| PQ operations | O(n log n) | ⚠️ PQ abstracted | — |
 
-The algorithm performs `n-1` extract-min + insert cycles on a priority
-queue, giving O(n log n) total with a binary heap. A complexity module
-exists but the bound is not linked to the Pulse implementation via a
-ghost counter postcondition.
+The merge iteration count is **fully linked** to the imperative
+implementation: the ghost counter `ctr` is incremented once per merge
+iteration (iterations 0 through n-2), giving exactly `n-1` merges.
+Each merge performs 3 PQ operations (2 extract-min + 1 insert), so with
+a binary heap the total is O(n log n). The PQ operation cost is not
+individually tracked since it depends on the PQ implementation.
 
 ## Proof Structure
 
