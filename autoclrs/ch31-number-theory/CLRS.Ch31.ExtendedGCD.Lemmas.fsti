@@ -42,3 +42,13 @@ val extended_gcd_correctness (a b: nat)
       divides d a /\ divides d b /\
       (forall (c: pos). divides c a /\ divides c b ==> divides c d)
     ))
+
+/// Coefficient bounds (CLRS Theorem 31.8):
+/// When a > 0 and b > 0, the Bézout coefficients satisfy
+/// |x| ≤ b/gcd(a,b) and |y| ≤ a/gcd(a,b).
+val extended_gcd_coeff_bounds (a b: nat)
+  : Lemma (requires a > 0 /\ b > 0)
+          (ensures (let (| d, x, y |) = extended_gcd a b in
+                    d > 0 /\
+                    abs x <= b / d /\
+                    abs y <= a / d))

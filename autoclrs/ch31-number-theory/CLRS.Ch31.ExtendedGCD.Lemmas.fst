@@ -3,6 +3,7 @@
 
    Proves correctness of the extended GCD algorithm:
    Bézout's identity, divisibility, greatest-divisor, and combined theorem.
+   Also proves coefficient bounds (CLRS Theorem 31.8).
    Includes example computations.
 
    NO admits. NO assumes.
@@ -115,3 +116,73 @@ let test_extended_gcd_99_78 ()
       d == 3 /\ 99 * x + 78 * y == 3
     ))
   = extended_gcd_correctness 99 78
+
+// ========== Coefficient Bounds (CLRS Theorem 31.8) ==========
+
+/// gcd_spec is positive when inputs are not both zero
+let rec gcd_spec_pos (a b: nat)
+  : Lemma (requires a > 0 \/ b > 0)
+          (ensures gcd_spec a b > 0)
+          (decreases b)
+  = if b = 0 then ()
+    else gcd_spec_pos b (a % b)
+
+/// When d divides x, x == (x/d) * d (exact division)
+let divides_div_exact (x: int) (d: pos)
+  : Lemma (requires divides d x)
+          (ensures x == (x / d) * d)
+  = divides_mod x d;
+    euclidean_division_definition x d
+
+/// Division distributes over sums of multiples:
+/// (q*b + r) / d == q*(b/d) + r/d when d divides both b and r
+#push-options "--z3rlimit 20"
+let div_sum_exact (r: nat) (b: nat) (q: nat) (d: pos)
+  : Lemma (requires divides d r /\ divides d b)
+          (ensures (q * b + r) / d == q * (b / d) + r / d)
+  = divides_div_exact r d;
+    divides_div_exact b d;
+    let kr = r / d in
+    let kb = b / d in
+    assert (r == kr * d);
+    assert (b == kb * d);
+    assert (q * b + r == (q * kb + kr) * d);
+    cancel_mul_div (q * kb + kr) d
+#pop-options
+
+//SNIPPET_START: extended_gcd_coeff_bounds
+/// Coefficient bounds (CLRS Theorem 31.8):
+/// When a > 0 and b > 0, the Bézout coefficients satisfy
+/// |x| ≤ b/gcd(a,b) and |y| ≤ a/gcd(a,b).
+#push-options "--z3rlimit 60"
+let rec extended_gcd_coeff_bounds (a b: nat)
+  : Lemma (requires a > 0 /\ b > 0)
+          (ensures (let (| d, x, y |) = extended_gcd a b in
+                    d > 0 /\
+                    abs x <= b / d /\
+                    abs y <= a / d))
+          (decreases b)
+//SNIPPET_END: extended_gcd_coeff_bounds
+  = gcd_spec_pos a b;
+    extended_gcd_computes_gcd a b;
+    let r = a % b in
+    let q = a / b in
+    euclidean_division_definition a b;
+    if r = 0 then (
+      // extended_gcd b 0 = (b, 1, 0), so x = 0, y = 1, d = b
+      // |x| = 0 ≤ b/d = 1 trivially
+      // |y| = 1 ≤ a/d = a/b, which holds since b | a and a > 0
+      mod_divides a b;
+      divides_div_exact a b
+    ) else (
+      // r > 0: use IH on extended_gcd b r
+      // IH gives: |x'| ≤ r/d and |y'| ≤ b/d
+      // Result: x = y', y = x' - q*y'
+      // |x| = |y'| ≤ b/d (from IH, direct)
+      // |y| = |x' - q*y'| ≤ |x'| + q*|y'| ≤ r/d + q*(b/d) = a/d
+      extended_gcd_coeff_bounds b r;
+      extended_gcd_divides_both b r;
+      let (| d, _x', _y' |) = extended_gcd b r in
+      div_sum_exact r b q d
+    )
+#pop-options
