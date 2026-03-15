@@ -17,7 +17,7 @@ val merge_sort
      GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\ 
-       SZ.v len == A.length a))
+       Seq.length s0 <= A.length a))
     (fun _ -> exists* s (cf: nat).
        A.pts_to a s **
        GR.pts_to ctr cf **
@@ -67,9 +67,9 @@ val merge
 * `SZ.v len == Seq.length s0`: The length parameter matches the logical
   sequence length.
 
-* `SZ.v len == A.length a`: The physical array length equals the logical
-  length (the entire array is used, unlike insertion sort which allows
-  `Seq.length s0 <= A.length a`).
+* `Seq.length s0 <= A.length a`: The logical sequence fits within the physical
+  array length, matching insertion sort's style. (Since `A.pts_to a s0`
+  implies `Seq.length s0 == A.length a`, this is always satisfied.)
 
 ### Postcondition
 
@@ -213,11 +213,10 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`len == A.length a` precondition.** Unlike insertion sort (which allows
-   `Seq.length s0 <= A.length a`), merge sort requires `len == A.length a`.
-   This means the caller must sort the entire array — sorting a prefix is not
-   supported from the top-level entry point (though the internal
-   `merge_sort_aux` works on sub-ranges).
+1. **~~`len == A.length a` precondition.~~** *(Addressed.)* The precondition now
+   uses `Seq.length s0 <= A.length a`, matching insertion sort's style. Since
+   `A.pts_to a s0` implies `Seq.length s0 == A.length a`, this is semantically
+   equivalent but removes the redundant explicit constraint.
 
 2. **Complexity constant is loose.** The closed-form bound
    `4n⌈log₂ n⌉ + 4n` is a deliberate overestimate. The actual merge sort

@@ -43,7 +43,7 @@ val merge_sort
      GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\ 
-       SZ.v len == A.length a))
+       Seq.length s0 <= A.length a))
     (fun _ -> exists* s (cf: nat).
        A.pts_to a s **
        GR.pts_to ctr cf **

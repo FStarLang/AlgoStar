@@ -39,8 +39,7 @@ fn insertion_sort
   requires A.pts_to a s0 ** GR.pts_to ctr c0
   requires pure (
     SZ.v len == Seq.length s0 /\
-    Seq.length s0 <= A.length a /\
-    SZ.v len > 0
+    Seq.length s0 <= A.length a
   )
   ensures exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf ** pure (
     Seq.length s == Seq.length s0 /\
@@ -50,6 +49,11 @@ fn insertion_sort
   )
 //SNIPPET_END: insertion_sort_sig
 {
+  if (len = 0sz) {
+    singl_sorted s0;
+    permutation_refl s0;
+    ()
+  } else {
   let mut j: SZ.t = 1sz;
   
   while (!j <^ len)
@@ -165,4 +169,5 @@ fn insertion_sort
   with s_final. assert (A.pts_to a s_final);
   assert (pure (prefix_sorted s_final (Seq.length s0)));
   ()
+  }
 }

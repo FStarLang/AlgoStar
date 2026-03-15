@@ -23,8 +23,7 @@ val insertion_sort
     (A.pts_to a s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
-       Seq.length s0 <= A.length a /\
-       SZ.v len > 0))
+       Seq.length s0 <= A.length a))
     (fun _ -> exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf ** pure (
        Seq.length s == Seq.length s0 /\
        sorted s /\

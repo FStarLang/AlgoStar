@@ -16,8 +16,7 @@ val insertion_sort
     (A.pts_to a s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
-       Seq.length s0 <= A.length a /\
-       SZ.v len > 0))
+       Seq.length s0 <= A.length a))
     (fun _ -> exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf ** pure (
        Seq.length s == Seq.length s0 /\
        sorted s /\
@@ -44,8 +43,6 @@ val insertion_sort
 
 * `Seq.length s0 <= A.length a`: The logical sequence fits within the physical
   array (the array may be larger than `len`).
-
-* `SZ.v len > 0`: The array must be non-empty.
 
 ### Postcondition
 
@@ -121,10 +118,10 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`len > 0` precondition.** The implementation requires `len > 0`. Sorting
-   an empty array is trivially correct (the empty sequence is sorted and is a
-   permutation of itself), but the implementation does not handle this case. A
-   stronger specification would accept `len >= 0`.
+1. **~~`len > 0` precondition.~~** *(Addressed.)* The implementation now accepts
+   `len >= 0`. When `len = 0`, the function returns immediately using
+   `singl_sorted` and `permutation_refl` — the empty sequence is trivially
+   sorted and a permutation of itself.
 
 2. **Swap-based vs. shift-based.** CLRS describes insertion sort using a
    shift-based approach (slide elements right to make room for the key). This

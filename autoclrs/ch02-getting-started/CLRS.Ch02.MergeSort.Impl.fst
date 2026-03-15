@@ -305,7 +305,7 @@ requires
   GR.pts_to ctr c0 **
   pure (
     SZ.v len == Seq.length s0 /\ 
-    SZ.v len == A.length a
+    Seq.length s0 <= A.length a
   )
 ensures exists* s (cf: nat).
   A.pts_to a s **
@@ -324,6 +324,7 @@ ensures exists* s (cf: nat).
     ()
   } else {
     pts_to_range_intro a 1.0R (reveal s0);
+    pts_to_range_prop a;
     
     merge_sort_aux a 0sz len ctr;
     
