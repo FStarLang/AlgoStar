@@ -47,6 +47,13 @@ val imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source 
       valid_flow #n flow_seq cap_seq source sink)
 //SNIPPET_END: imp_valid_flow_bridge
 
+(** Introduction lemma for valid_caps: allows callers to establish valid_caps
+    from its constituent parts (needed since valid_caps is abstract). *)
+val valid_caps_intro (cap_seq: Seq.seq int) (n: nat)
+  : Lemma
+    (requires Seq.length cap_seq == n * n /\ (forall (i: nat). i < n * n ==> Seq.index cap_seq i >= 0))
+    (ensures valid_caps cap_seq n)
+
 (** Runtime check for valid capacities *)
 fn check_valid_caps_fn
   (capacity: A.array int)

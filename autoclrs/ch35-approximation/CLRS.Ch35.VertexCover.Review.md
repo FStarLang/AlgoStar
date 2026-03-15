@@ -16,7 +16,8 @@ fn approx_vertex_cover
     pure (
       SZ.v n > 0 /\ 
       SZ.fits (SZ.v n * SZ.v n) /\
-      Seq.length s_adj == SZ.v n * SZ.v n
+      Seq.length s_adj == SZ.v n * SZ.v n /\
+      Spec.is_symmetric_adj s_adj (SZ.v n)
     )
   returns cover: V.vec int
   ensures exists* s_cover.
@@ -26,6 +27,7 @@ fn approx_vertex_cover
       Seq.length s_cover == SZ.v n /\
       Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+      (exists (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt) /\
       (forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
         Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) <= 2 * opt)
     )
@@ -49,6 +51,8 @@ fn approx_vertex_cover
 * `SZ.fits (SZ.v n * SZ.v n)`: The matrix size fits in machine arithmetic.
 * `Seq.length s_adj == SZ.v n * SZ.v n`: The adjacency matrix has the
   expected size.
+* `Spec.is_symmetric_adj s_adj (SZ.v n)`: The adjacency matrix is symmetric,
+  i.e., it represents an undirected graph where `adj[u*n+v] = adj[v*n+u]`.
 
 ### Postconditions
 
@@ -62,6 +66,10 @@ The `ensures` clause states that there exists a final cover sequence
 
 * `forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)` —
   Cover entries are binary (0 or 1).
+
+* `exists (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt` —
+  **Existence**: a minimum vertex cover exists for this graph (proven via
+  well-ordering argument in `Lemmas.min_cover_exists`).
 
 * `forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
   Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) <= 2 * opt` —
@@ -150,14 +158,19 @@ key structural property of the maximal matching built by the algorithm.
 
 ## What Is Proven
 
-The postcondition establishes three properties:
+The postcondition establishes four properties:
 
 1. **Valid cover** (`is_cover`): Every edge (u, v) with `u < v` and
    `adj[u*n+v] ≠ 0` has at least one endpoint marked in the cover.
 
 2. **Binary output**: All cover entries are exactly 0 or 1.
 
-3. **2-approximation guarantee**: `count_cover(cover) ≤ 2 × OPT`, where
+3. **Minimum cover existence** (`min_cover_exists`): A minimum vertex cover
+   exists for any finite graph. This is proven via a well-ordering argument
+   using `FStar.Classical.excluded_middle` and induction on the cover count
+   bound, making the 2-approximation guarantee non-vacuous.
+
+4. **2-approximation guarantee**: `count_cover(cover) ≤ 2 × OPT`, where
    OPT is the size of the minimum vertex cover.
 
 The 2-approximation proof follows the structure of CLRS Theorem 35.1:
@@ -192,6 +205,12 @@ The key lemmas in `CLRS.Ch35.VertexCover.Lemmas` are:
   `count_cover_ext` to equate the sequence-based cover with the
   matching-based cover.
 
+* **`min_cover_exists`**: Every finite graph has a minimum vertex cover.
+  Proven via well-ordering: the trivial "all vertices" cover is valid with
+  count n, and by induction on the count bound using excluded middle, a
+  cover with minimum count must exist. Uses `all_true_is_valid` and
+  `count_all_true` as helpers.
+
 **Zero admits, zero assumes.** All proof obligations are mechanically
 discharged by F\* and Z3.
 
@@ -206,23 +225,23 @@ discharged by F\* and Z3.
    graph trivially has an empty vertex cover, but this degenerate case is
    not handled.
 
-3. **Adjacency matrix must be symmetric.** The specification scans only
-   upper-triangular entries (`u < v`), which is correct for undirected
-   graphs where `adj[u*n+v] = adj[v*n+u]`. The precondition does not
-   enforce symmetry — if the matrix is asymmetric, edges in the lower
-   triangle are silently ignored.
+3. ~~**Adjacency matrix must be symmetric.**~~ **FIXED.** The precondition
+   now includes `Spec.is_symmetric_adj s_adj (SZ.v n)`, formally requiring
+   `adj[u*n+v] = adj[v*n+u]` for all `u, v < n`. This makes explicit that
+   the algorithm is correct only for undirected graphs.
 
 4. **No edge-weight or weighted cover.** The specification handles only
    unweighted vertex cover. CLRS §35.2 discusses weighted variants, which
    are not addressed.
 
-5. **`min_vertex_cover_size` is existentially quantified.** The
-   2-approximation bound is stated as: for all `opt` such that
-   `min_vertex_cover_size s_adj n opt`, the cover is ≤ `2 * opt`. The
-   predicate `min_vertex_cover_size` itself requires the existence of a
-   minimum cover function. This is logically correct but means the bound
-   is vacuously true if no minimum cover exists (which cannot happen for
-   finite graphs, but is not proven).
+5. ~~**`min_vertex_cover_size` is existentially quantified.**~~ **FIXED.**
+   The postcondition now includes
+   `exists (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt`,
+   proven by `Lemmas.min_cover_exists`. This establishes that a minimum
+   vertex cover always exists for finite graphs, making the 2-approximation
+   guarantee non-vacuous. The proof uses well-ordering: the trivial
+   "all vertices" cover is valid, and by excluded middle + induction on the
+   count bound, a minimum must exist.
 
 6. **Unconditional writes.** The Pulse implementation unconditionally writes
    `cover[u]` and `cover[v]` on every iteration (computing `new_cu` and
@@ -234,7 +253,7 @@ discharged by F\* and Z3.
 
 | Metric | Bound | Linked? | Exact? |
 |--------|-------|---------|--------|
-| Iterations | O(V²) = V(V−1)/2 | ❌ Not linked | Exact (spec only) |
+| Iterations | O(V²) = V(V−1)/2 | ✅ Linked via ghost counter | Exact |
 
 The complexity is defined in `CLRS.Ch35.VertexCover.Complexity`:
 
@@ -245,16 +264,33 @@ let vertex_cover_quadratic (v: nat)
   : Lemma (ensures vertex_cover_iterations v <= v * v) = ()
 ```
 
-This is correct for the adjacency-matrix implementation but is not linked
-to the Pulse code via ghost counters. The CLRS algorithm with adjacency
-lists achieves O(V+E).
+The implementation uses a ghost iteration counter `ghost_iters` that is
+incremented on each inner-loop iteration. The counter is tracked through
+both loop invariants using `partial_iterations`:
+
+```fstar
+let rec partial_iterations (n: nat) (rows_done: nat) : Tot nat (decreases rows_done) =
+  if rows_done = 0 || rows_done > n then 0
+  else partial_iterations n (rows_done - 1) + (n - rows_done)
+```
+
+* **Inner loop invariant**: `gi == partial_iterations(n, u) + (v - u - 1)`
+* **Outer loop invariant**: `gi == partial_iterations(n, u)`
+* **After loops**: `gi == partial_iterations(n, n) == vertex_cover_iterations(n)`
+
+The `partial_iterations_step` lemma connects row transitions, and
+`partial_iterations_total` proves equivalence to `vertex_cover_iterations`.
+The CLRS algorithm with adjacency lists achieves O(V+E).
 
 ## Proof Structure
 
-The proof uses a **ghost matching** technique:
+The proof uses a **ghost matching** technique with a **ghost iteration counter**:
 
 1. A `GR.ref (list Spec.edge)` ghost reference `matching_ref` tracks the
    set of edges whose endpoints were added to the cover during execution.
+
+2. A `GR.ref nat` ghost reference `ghost_iters` tracks the number of
+   inner-loop iterations, linked to `Complexity.vertex_cover_iterations`.
 
 2. The `matching_inv` invariant states:
    - The matching is pairwise disjoint (no shared vertices).

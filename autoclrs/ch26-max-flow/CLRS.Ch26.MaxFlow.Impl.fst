@@ -2645,6 +2645,13 @@ fn augment_imp
    VALIDITY CHECK — dynamic verification of imp_valid_flow
    ================================================================ *)
 
+(** Introduction lemma for valid_caps *)
+let valid_caps_intro (cap_seq: Seq.seq int) (n: nat)
+  : Lemma
+    (requires Seq.length cap_seq == n * n /\ (forall (i: nat). i < n * n ==> Seq.index cap_seq i >= 0))
+    (ensures valid_caps cap_seq n)
+  = ()
+
 (** Check valid_caps: all capacity entries are non-negative *)
 #push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
 fn check_valid_caps_fn

@@ -72,7 +72,8 @@ fn approx_vertex_cover
     pure (
       SZ.v n > 0 /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      Seq.length s_adj == SZ.v n * SZ.v n
+      Seq.length s_adj == SZ.v n * SZ.v n /\
+      Spec.is_symmetric_adj s_adj (SZ.v n)
     )
   returns cover: V.vec int
   ensures exists* s_cover.
@@ -83,22 +84,26 @@ fn approx_vertex_cover
       Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
       (forall (i: nat). i < SZ.v n ==>
         (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+      (exists (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt) /\
       (forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
         Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n)
           <= 2 * opt)
     )
 ```
 
-The postcondition guarantees **four** properties:
+The postcondition guarantees **five** properties:
 
 1. **Correct length**: `Seq.length s_cover == SZ.v n` — output has one entry per vertex.
 2. **Valid cover** (`is_cover`): for all edges (u, v) with u < v that have been
    examined (i.e., all of them, since bound_u = n), at least one of cover[u] or
    cover[v] is non-zero. This means every edge has at least one endpoint in the cover.
 3. **Binary output**: every cover entry is 0 or 1 (no arbitrary non-zero values).
-4. **2-approximation**: `count_cover(cover) ≤ 2 × OPT` for every possible optimal
+4. **Minimum cover existence**: a minimum vertex cover exists for this graph
+   (proven by `Lemmas.min_cover_exists` via well-ordering).
+5. **2-approximation**: `count_cover(cover) ≤ 2 × OPT` for every possible optimal
    value. This is universally quantified over all `opt` satisfying
-   `min_vertex_cover_size`, capturing CLRS Theorem 35.1.
+   `min_vertex_cover_size`, capturing CLRS Theorem 35.1. Combined with property 4,
+   this guarantee is non-vacuous.
 
 **Why this is the strongest guarantee**: The postcondition proves both *feasibility*
 (valid cover) and *optimality bound* (2-approximation ratio) simultaneously. The
@@ -165,11 +170,14 @@ let vertex_cover_tight_bound (v: nat)
   : Lemma (ensures vertex_cover_iterations v <= v * v / 2) = ()
 ```
 
+The complexity is **formally linked** to the Pulse implementation via a ghost
+iteration counter (`ghost_iters`). The counter tracks cumulative iterations
+through `partial_iterations`, and after the nested loops, an assertion
+establishes `ghost_iters == vertex_cover_iterations(n)`.
+
 **Limitation**: CLRS achieves O(V + E) using adjacency lists by maintaining a set
 of remaining edges and removing all edges incident on matched vertices. This
 implementation uses an adjacency matrix, requiring O(V²) even for sparse graphs.
-The complexity definitions are proven but are **not formally linked** to the Pulse
-implementation via ghost operation counters.
 
 ### Limitations
 
@@ -177,7 +185,8 @@ implementation via ghost operation counters.
   CLRS uses adjacency lists for O(V + E). This is a representation choice, not an
   algorithmic deficiency.
 - **Upper-triangle scan only** (u < v): Correct for undirected graphs where
-  `adj[u×n+v] = adj[v×n+u]`. Directed graphs would need full matrix scan.
+  `adj[u×n+v] = adj[v×n+u]`. The precondition now formally enforces symmetry
+  via `is_symmetric_adj`.
 - **Graph size limited**: `n × n` must fit in `SizeT` (`SZ.fits (n * n)`).
 - **No edge output**: Returns the cover array, not the matching. The matching exists
   only as a ghost value during verification.
@@ -231,7 +240,9 @@ include $(PULSE_ROOT)/mk/test.mk
 |---|---|---|
 | Valid vertex cover | ✅ Proven | `is_cover s_adj s_cover n n 0` — all edges covered |
 | Binary output | ✅ Proven | `∀i. cover[i] = 0 ∨ cover[i] = 1` |
-| 2-approximation (CLRS Thm 35.1) | ✅ Proven | `count_cover ≤ 2 × OPT` via ghost matching |
+| Min cover existence | ✅ Proven | `∃ opt. min_vertex_cover_size adj n opt` via well-ordering |
+| 2-approximation (CLRS Thm 35.1) | ✅ Proven | `count_cover ≤ 2 × OPT` via ghost matching (non-vacuous) |
+| Symmetry precondition | ✅ Enforced | `is_symmetric_adj` requires `adj[u*n+v] = adj[v*n+u]` |
 | Memory safety | ✅ Proven | Separation-logic framing via `pts_to` |
-| Complexity | O(V²) proven | `vertex_cover_iterations v ≤ v²`; not linked to Pulse |
+| Complexity | ✅ O(V²) linked | Ghost counter tracks `vertex_cover_iterations(n)` |
 | Admits | **0** | Fully verified |
