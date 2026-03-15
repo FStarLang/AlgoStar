@@ -282,6 +282,16 @@ let upd_root_preserves_other_roots
                       is_root_at (Seq.upd parent v root_sz) r))
   = ()
 
+// If pure_find(f, x) == x (x is a root in the spec), then is_root_at at the imperative level
+let pure_find_self_implies_root_at
+  (sp srank: Seq.seq SZ.t) (n: nat) (x: nat)
+  : Lemma (requires n <= Seq.length sp /\ x < n /\
+                    Spec.uf_inv (to_uf sp srank n) /\
+                    Spec.pure_find (to_uf sp srank n) x == x)
+          (ensures is_root_at sp x)
+  = Spec.pure_find_is_root (to_uf sp srank n) x;
+    to_nat_seq_index sp n x
+
 // ========== MAKE-SET ==========
 
 // Helper: after make_set initialization, the pure spec invariant holds
@@ -616,50 +626,58 @@ fn union
           Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
     )
 {
-  // Find roots (read-only — no compression during union)
-  let root_x = find_root_imp #_ parent #sparent x n #srank;
-  let root_y = find_root_imp #_ parent #sparent y n #srank;
+  // Find roots with path compression (CLRS §21.3)
+  let root_x = find_set parent x n #_ #srank;
+  with sp1. assert (A.pts_to parent sp1);
+
+  let root_y = find_set parent y n #_ #srank;
+  with sp2. assert (A.pts_to parent sp2);
+
   // Connect imperative rank reads to spec rank values
   to_nat_seq_index srank (SZ.v n) (SZ.v root_x);
   to_nat_seq_index srank (SZ.v n) (SZ.v root_y);
+
   if (root_x = root_y) {
-    // Same root: no change. pure_find(result, x) = root = pure_find(result, y).
-    Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-    Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-    Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+    // Same root: path compression already done by find_set.
+    // pure_find(sp2)(x) == root_x == root_y == pure_find(sp2)(y)
     ()
   } else {
     let rank_x = rank.(root_x);
     let rank_y = rank.(root_y);
+
+    // Establish root_x is still a root in sp2 (for cases linking root_y -> root_x)
+    Spec.pure_find_idempotent (to_uf sparent srank (SZ.v n)) (SZ.v x);
+    pure_find_self_implies_root_at sp2 srank (SZ.v n) (SZ.v root_x);
+
     if (rank_x <^ rank_y) {
       // Link root_x -> root_y (lower rank under higher)
       parent.(root_x) <- root_y;
-      upd_preserves_is_forest sparent (SZ.v n) (SZ.v root_x) root_y;
-      to_uf_upd_parent sparent srank (SZ.v n) (SZ.v root_x) root_y;
-      Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-      Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-      Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+      upd_preserves_is_forest sp2 (SZ.v n) (SZ.v root_x) root_y;
+      to_uf_upd_parent sp2 srank (SZ.v n) (SZ.v root_x) root_y;
+      Spec.pure_union_preserves_inv (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+      Spec.pure_union_same_set (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+      Spec.pure_union_stability (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
       ()
     } else {
       if (rank_x >^ rank_y) {
         // Link root_y -> root_x (lower rank under higher)
         parent.(root_y) <- root_x;
-        upd_preserves_is_forest sparent (SZ.v n) (SZ.v root_y) root_x;
-        to_uf_upd_parent sparent srank (SZ.v n) (SZ.v root_y) root_x;
-        Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-        Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-        Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        upd_preserves_is_forest sp2 (SZ.v n) (SZ.v root_y) root_x;
+        to_uf_upd_parent sp2 srank (SZ.v n) (SZ.v root_y) root_x;
+        Spec.pure_union_preserves_inv (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_same_set (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_stability (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       } else {
         // Equal rank: link root_y -> root_x and increment rank[root_x]
         parent.(root_y) <- root_x;
-        upd_preserves_is_forest sparent (SZ.v n) (SZ.v root_y) root_x;
+        upd_preserves_is_forest sp2 (SZ.v n) (SZ.v root_y) root_x;
         let new_rank = SZ.add rank_x 1sz;
         rank.(root_x) <- new_rank;
-        to_uf_upd_both sparent srank (SZ.v n) (SZ.v root_y) root_x (SZ.v root_x) new_rank;
-        Spec.pure_union_preserves_inv (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-        Spec.pure_union_same_set (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
-        Spec.pure_union_stability (to_uf sparent srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        to_uf_upd_both sp2 srank (SZ.v n) (SZ.v root_y) root_x (SZ.v root_x) new_rank;
+        Spec.pure_union_preserves_inv (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_same_set (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_stability (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       }
     }
