@@ -1594,11 +1594,18 @@ let connected_min_edges (n: nat) (es: list edge)
     count_all n;
     count_reachable_bound es 0 n
 
+// noRepeats_edge (Kruskal.Spec) and all_edges_distinct (MST.Spec) are identical definitions
+let rec noRepeats_is_all_edges_distinct (l: list edge)
+  : Lemma (ensures noRepeats_edge l = all_edges_distinct l)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | _ :: tl -> noRepeats_is_all_edges_distinct tl
+
 #push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
                     all_connected g.n g.edges /\
-                    (exists (mst: list edge). is_mst g mst) /\
                     (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n) /\
                     (forall (e: edge). mem_edge e g.edges ==> e.u <> e.v))
           (ensures (let result = pure_kruskal g in
@@ -1636,53 +1643,12 @@ let theorem_kruskal_produces_spanning_tree (g: graph)
     assert (all_connected g.n result);
     
     // Part 4: Result has g.n - 1 edges
-    // Use MST invariant to show result ⊆ some MST
-    sort_edges_sorted g.edges;
-    introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' sorted) /\
-      ~(mem_edge e' ([] #edge)) ==> same_component ([] #edge) e'.u e'.v
-    with introduce _ ==> _ with _. begin
-      sort_edges_mem e' g.edges
-    end;
-    lemma_kruskal_process_mst_invariant g sorted [];
-    // Now: exists mst'. is_mst g mst' /\ subset_edges result mst'
-    FStar.Classical.exists_elim (is_spanning_tree g result)
-      #_
-      #(fun (mst': list edge) -> is_mst g mst' /\ subset_edges result mst') ()
-      (fun (mst': list edge{is_mst g mst' /\ subset_edges result mst'}) ->
-        // result ⊆ mst'
-        assert (subset_edges result mst');
-        // result is connected and acyclic
-        assert (all_connected g.n result);
-        assert (acyclic g.n result);
-        // mst' is a spanning tree
-        assert (is_spanning_tree g mst');
-        // mst' edges have valid endpoints (from g.edges)
-        assert (subset_edges mst' g.edges);
-        // mst' edges inherit valid endpoints and no self-loops from g.edges
-        introduce forall (e: edge). mem_edge e mst' ==> e.u < g.n /\ e.v < g.n
-        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
-        introduce forall (e: edge). mem_edge e mst' ==> e.u <> e.v
-        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
-        // All mst' edges are in result (connected_subset_of_tree_is_tree)
-        connected_subset_of_tree_is_tree g result mst';
-        // forall e ∈ mst'. mem_edge e result
-        // noRepeats_edge result (from kruskal_process)
-        lemma_kruskal_process_no_repeats sorted [] g.n;
-        assert (noRepeats_edge result);
-        // |result| ≤ |mst'| from subset + noRepeats
-        subset_noRepeats_length_le result mst';
-        // |result| ≥ g.n - 1 from connected_min_edges
-        connected_min_edges g.n result;
-        // Together: is_spanning_tree g result
-        assert (subset_edges result g.edges);
-        assert (all_connected g.n result);
-        assert (acyclic g.n result);
-        assert (g.n > 0);
-        assert (length result <= length mst');
-        assert (length mst' = g.n - 1);
-        assert (length result >= g.n - 1);
-        assert (length result = g.n - 1)
-      )
+    // Direct proof via acyclic_connected_length (no MST existence needed)
+    lemma_kruskal_process_no_repeats sorted [] g.n;
+    noRepeats_is_all_edges_distinct result;
+    introduce forall (e: edge). mem_edge e result ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v
+    with introduce _ ==> _ with _. mem_edge_of_subset e result g.edges;
+    acyclic_connected_length g.n result
 #pop-options
 
 // total_weight of remove_edge_first

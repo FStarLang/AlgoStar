@@ -84,12 +84,11 @@ val lemma_kruskal_step_preserves_forest (e: edge) (forest: list edge) (n: nat)
 (*** Main Correctness Theorems ***)
 
 //SNIPPET_START: theorem_kruskal_produces_spanning_tree
-/// Kruskal produces a spanning tree
+/// Kruskal produces a spanning tree (no MST existence assumption needed)
 val theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\
                     all_connected g.n g.edges /\
-                    (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v) /\
-                    (exists (mst: list edge). is_mst g mst))
+                    (forall (e: edge). mem_edge e g.edges ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v))
           (ensures is_spanning_tree g (pure_kruskal g))
 //SNIPPET_END: theorem_kruskal_produces_spanning_tree
 
