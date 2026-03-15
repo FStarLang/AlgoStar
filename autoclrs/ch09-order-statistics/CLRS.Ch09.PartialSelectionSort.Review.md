@@ -144,7 +144,7 @@ let prefix_leq_suffix (s: Seq.seq int) (bound: nat) : prop =
 
 Every element in `[0, bound)` is ≤ every element in `[bound, n)`.
 
-### `complexity_bounded_select` (from `CLRS.Ch09.PartialSelectionSort.Impl.fst`)
+### `complexity_bounded_select` (from `CLRS.Ch09.PartialSelectionSort.Impl.fsti`)
 
 ```fstar
 let complexity_bounded_select (cf c0 n k: nat) : prop =
@@ -181,9 +181,9 @@ This is O(nk) worst case.
    function uses `k >= 1`. The result is `s_final[k-1]`. This mismatch could
    confuse users combining the two APIs.
 
-3. **`complexity_bounded_select` is abstract in the `.fsti`.** The definition
-   `cf - c0 <= k * (n - 1)` is only visible in the `.fst` file. Clients see
-   `val complexity_bounded_select (cf c0 n k: nat) : prop`.
+3. **~~`complexity_bounded_select` is abstract in the `.fsti`.~~**
+   *(Addressed.)* The definition `cf - c0 <= k * (n - 1)` is now exposed as a
+   transparent `let` in the `.fsti`, so clients can directly see the bound.
 
 4. **O(nk) not O(n) for median.** For k = n/2, this is O(n²). CLRS's
    RANDOMIZED-SELECT achieves O(n) expected. The Complexity module documents this

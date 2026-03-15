@@ -94,7 +94,7 @@ For `find_maximum`: symmetric, with `max_val >= Seq.index s0 k`.
 
 ## Auxiliary Definitions
 
-### `complexity_bounded_min` / `complexity_bounded_max` (from `CLRS.Ch09.MinMax.Spec`)
+### `complexity_bounded_min` / `complexity_bounded_max` / `complexity_bounded_n_minus_1` (from `CLRS.Ch09.MinMax.Spec`)
 
 ```fstar
 let complexity_bounded_min (cf c0 n: nat) : prop =
@@ -102,12 +102,14 @@ let complexity_bounded_min (cf c0 n: nat) : prop =
 
 let complexity_bounded_max (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == n - 1
+
+let complexity_bounded_n_minus_1 (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n - 1
 ```
 
-Both predicates state the **exact** number of comparisons: `cf - c0 == n - 1`.
-This is not merely an upper bound — it is a tight equality. Any algorithm that
-examines each element once must make exactly n−1 comparisons, which is the
-information-theoretic lower bound for finding a minimum or maximum.
+All three predicates state the **exact** number of comparisons: `cf - c0 == n - 1`.
+This is not merely an upper bound — it is a tight equality.
+`complexity_bounded_n_minus_1` is a unified name for the common bound.
 
 ## What Is Proven
 
@@ -136,11 +138,14 @@ by F\* and Z3.
 
 3. **No index returned.** The functions return the min/max *value* but not the
    *index* at which it occurs. For some applications (e.g., selection sort), the
-   index is needed.
+   index is needed. Note: `find_min_index_from` in `PartialSelectionSort.Impl`
+   provides this capability for a subrange.
 
-4. **Identical complexity predicates.** `complexity_bounded_min` and
-   `complexity_bounded_max` have identical definitions. They could be unified
-   into a single predicate.
+4. **~~Identical complexity predicates.~~** *(Addressed.)* A unified
+   `complexity_bounded_n_minus_1` predicate has been added to `Spec.fst`,
+   providing a single name for the common bound. The original
+   `complexity_bounded_min` and `complexity_bounded_max` are retained with their
+   direct definitions for backward compatibility.
 
 ## Complexity
 

@@ -161,7 +161,7 @@ The k-th smallest element is defined as the element at index k of the sorted
 sequence. `pure_sort` is a pure insertion sort on sequences (not the imperative
 one). This provides a reference definition independent of any algorithm.
 
-### `complexity_bounded_quickselect` (from `CLRS.Ch09.Quickselect.Impl.fst`)
+### `complexity_bounded_quickselect` (from `CLRS.Ch09.Quickselect.Impl.fsti`)
 
 ```fstar
 let complexity_bounded_quickselect (cf c0 n: nat) : prop =
@@ -212,11 +212,9 @@ This solves to `qs_cost n = n(n+1)/2 = O(n²)`. The module also proves:
 3. **`k` is 0-indexed.** CLRS uses 1-indexed ranks (the i-th order statistic).
    This implementation uses 0-indexing: `k = 0` is the minimum.
 
-4. **`complexity_bounded_quickselect` is abstract in the `.fsti`.** The
-   definition `cf - c0 <= qs_cost n` is only visible in the `.fst`
-   implementation file. Clients see only `val complexity_bounded_quickselect
-   (cf c0 n: nat) : prop` — an opaque predicate. They must trust or separately
-   verify that it implies O(n²).
+4. **~~`complexity_bounded_quickselect` is abstract in the `.fsti`.~~**
+   *(Addressed.)* The definition `cf - c0 <= qs_cost n` is now exposed as a
+   transparent `let` in the `.fsti`, so clients can directly see the bound.
 
 5. **Two permutation notions.** Quickselect uses `Seq.Properties.permutation`
    (wrapped in an opaque `permutation`), while `select_spec` uses

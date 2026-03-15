@@ -251,10 +251,14 @@ discharged by F\* and Z3.
    correct per CLRS (ranks are an upper bound on height, not exact heights),
    but means ranks may become stale upper bounds after compression.
 
-4. **`union` does not perform path compression.** The `union` function
-   calls `find_root_imp` (read-only root finding) rather than `find_set`
-   (with compression). This simplifies the proof but means that union does
-   not benefit from path compression on the find step.
+4. ~~**`union` does not perform path compression.**~~ **RESOLVED.** The
+   `union` function now calls `find_set` (with full path compression)
+   rather than `find_root_imp` (read-only). This matches CLRS §21.3
+   where UNION calls FIND-SET. A helper lemma
+   `pure_find_self_implies_root_at` bridges the pure spec root detection
+   back to the imperative `is_root_at` predicate, needed to prove that
+   a root found in the first `find_set` call remains a root after the
+   second `find_set` call's path compression.
 
 5. **Size-rank invariant not threaded through Pulse.** The
    `size_rank_invariant` and `size_correctness_invariant` are proven on the

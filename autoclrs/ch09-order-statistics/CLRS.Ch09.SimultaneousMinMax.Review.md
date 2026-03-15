@@ -120,18 +120,19 @@ exactly 2(n−1) comparisons. This is an **exact** count (equality).
 ### `complexity_bounded_minmax_pairs` (from `CLRS.Ch09.SimultaneousMinMax.Spec`)
 
 ```fstar
-/// Pair-processing: at most ⌊3n/2⌋ comparisons (expressed without division)
+/// Pair-processing: at most ⌊3(n−1)/2⌋ comparisons (expressed without division)
 let complexity_bounded_minmax_pairs (cf c0 n: nat) : prop =
   n >= 1 /\
   cf >= c0 /\
-  op_Multiply 2 (cf - c0) <= op_Multiply 3 n
+  op_Multiply 2 (cf - c0) <= op_Multiply 3 (n - 1)
 ```
 
 The pair-processing algorithm from CLRS §9.1 processes elements in pairs: first
 compare the pair against each other (1 comparison), then compare the smaller
 against the current min and the larger against the current max (2 comparisons) —
-3 comparisons per pair, giving ⌊3n/2⌋ total. The bound is expressed as
-`2 * (cf - c0) <= 3 * n` to avoid integer division. This is an **upper bound**.
+3 comparisons per pair, giving ⌊3(n−1)/2⌋ total. The bound is expressed as
+`2 * (cf - c0) <= 3 * (n - 1)` to avoid integer division. This is a **tight
+upper bound** — equality holds when n is odd.
 
 ## What Is Proven
 
@@ -142,9 +143,9 @@ The key contribution is proving two **different complexity bounds** for the
 same correctness property:
 
 1. `find_minmax`: 2(n−1) comparisons — the naïve approach.
-2. `find_minmax_pairs`: ⌊3n/2⌋ comparisons — the CLRS-optimal algorithm.
+2. `find_minmax_pairs`: ⌊3(n−1)/2⌋ comparisons — the CLRS-optimal algorithm.
 
-For large n, ⌊3n/2⌋ < 2(n−1), so `find_minmax_pairs` is strictly better.
+For large n, ⌊3(n−1)/2⌋ < 2(n−1), so `find_minmax_pairs` is strictly better.
 
 **Zero admits, zero assumes.** All proof obligations are mechanically discharged
 by F\* and Z3.
@@ -155,11 +156,10 @@ by F\* and Z3.
 
 2. **`len == A.length a` strictness.** Cannot operate on array prefixes.
 
-3. **Pair-processing bound is an upper bound, not exact.** The simple scan
-   proves an exact count (`==`), but the pair-processing algorithm proves only
-   `2 * (cf - c0) <= 3 * n`. The exact count is ⌊3(n−1)/2⌋ for odd n and
-   3(n−2)/2 + 1 for even n; the specification slightly overapproximates by
-   using `3n` instead of `3(n-1)`.
+3. **~~Pair-processing bound is an upper bound, not exact.~~** *(Addressed.)*
+   The pair-processing bound has been tightened from `2 * (cf - c0) <= 3 * n`
+   to `2 * (cf - c0) <= 3 * (n - 1)`. This matches the exact ⌊3(n−1)/2⌋
+   comparison count from CLRS §9.1 and is tight for odd n (equality holds).
 
 4. **No index returned.** The functions return values but not the indices at
    which the min and max occur.
@@ -169,7 +169,7 @@ by F\* and Z3.
 | Algorithm | Bound | Linked? | Exact? |
 |-----------|-------|---------|--------|
 | `find_minmax` | 2(n−1) | ✅ Ghost counter | ✅ Exact |
-| `find_minmax_pairs` | ⌊3n/2⌋ | ✅ Ghost counter | Upper bound only |
+| `find_minmax_pairs` | ⌊3(n−1)/2⌋ | ✅ Ghost counter | Tight upper bound (exact for odd n) |
 
 Both complexities are **fully linked** to the imperative implementations via
 ghost counters.
