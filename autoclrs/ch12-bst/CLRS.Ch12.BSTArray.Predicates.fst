@@ -250,6 +250,23 @@ let rec lemma_desc_split (root idx: nat)
       lemma_desc_split root parent
     end
 
+/// Transitivity: if b is a descendant of a, and c is a descendant of b,
+/// then c is a descendant of a.
+let rec lemma_desc_of_trans (a b c: nat)
+  : Lemma (requires is_desc_of a b /\ is_desc_of b c)
+          (ensures is_desc_of a c)
+          (decreases c)
+  = if b = c then ()
+    else lemma_desc_of_trans a b ((c - 1) / 2)
+
+/// is_desc_of implies desc >= root
+let rec lemma_desc_of_ge (root desc: nat)
+  : Lemma (requires is_desc_of root desc)
+          (ensures desc >= root)
+          (decreases desc)
+  = if root = desc then ()
+    else lemma_desc_of_ge root ((desc - 1) / 2)
+
 /// Frame: subtree_all_invalid unchanged by Seq.upd at non-descendant idx
 let rec lemma_sai_frame_desc (valid: seq bool) (cap j idx: nat) (v: bool)
   : Lemma (requires ~(is_desc_of j idx) /\ idx < length valid)
@@ -569,3 +586,348 @@ let rec lemma_leaf_delete_wfb
 let rec lemma_is_desc_of_root (n: nat)
   : Lemma (ensures is_desc_of 0 n) (decreases n)
   = if n = 0 then () else lemma_is_desc_of_root ((n - 1) / 2)
+
+(* ====================================================================
+   Additional lemmas for BST deletion (non-leaf cases)
+   ==================================================================== *)
+
+/// Any valid descendant in a well_formed_bst subtree has key within bounds.
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let rec lemma_wfb_valid_desc_in_bounds
+  (keys: seq int) (valid: seq bool) (cap: nat)
+  (i desc: nat) (lo hi: int)
+  : Lemma
+    (requires
+      well_formed_bst keys valid cap i lo hi /\
+      is_desc_of i desc /\
+      desc < cap /\ desc < length keys /\ desc < length valid /\
+      index valid desc == true)
+    (ensures lo < index keys desc /\ index keys desc < hi)
+    (decreases (if i < cap then cap - i else 0))
+  = if i = desc then ()
+    else begin
+      if not (index valid i) then
+        lemma_sai_desc valid cap i desc
+      else begin
+        let k_i = index keys i in
+        lemma_desc_split i desc;
+        if is_desc_of (2 * i + 1) desc then
+          lemma_wfb_valid_desc_in_bounds keys valid cap (2 * i + 1) desc lo k_i
+        else
+          lemma_wfb_valid_desc_in_bounds keys valid cap (2 * i + 2) desc k_i hi
+      end
+    end
+#pop-options
+
+/// Widening the upper bound preserves well_formed_bst.
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec lemma_wfb_widen_upper
+  (keys: seq int) (valid: seq bool) (cap: nat)
+  (i: nat) (lo hi1 hi2: int)
+  : Lemma
+    (requires well_formed_bst keys valid cap i lo hi1 /\ hi1 <= hi2)
+    (ensures well_formed_bst keys valid cap i lo hi2)
+    (decreases (if i < cap then cap - i else 0))
+  = if i >= cap || i >= length keys || i >= length valid then ()
+    else if not (index valid i) then ()
+    else begin
+      let k = index keys i in
+      lemma_wfb_widen_upper keys valid cap (2 * i + 2) k hi1 hi2
+    end
+#pop-options
+
+/// Widening the lower bound preserves well_formed_bst.
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec lemma_wfb_widen_lower
+  (keys: seq int) (valid: seq bool) (cap: nat)
+  (i: nat) (lo1 lo2: int) (hi: int)
+  : Lemma
+    (requires well_formed_bst keys valid cap i lo1 hi /\ lo2 <= lo1)
+    (ensures well_formed_bst keys valid cap i lo2 hi)
+    (decreases (if i < cap then cap - i else 0))
+  = if i >= cap || i >= length keys || i >= length valid then ()
+    else if not (index valid i) then ()
+    else begin
+      let k = index keys i in
+      lemma_wfb_widen_lower keys valid cap (2 * i + 1) lo1 lo2 k
+    end
+#pop-options
+
+(* ====================================================================
+   Left-spine predicate: min_idx is reachable from root by always
+   following left children, with all intermediate nodes valid.
+   This characterizes the path taken by tree_minimum.
+   ==================================================================== *)
+
+/// min_idx is on the left spine of the subtree rooted at root.
+let rec is_left_spine (root min_idx: nat) (valid: seq bool) (cap: nat)
+  : Tot bool (decreases (if root < cap then cap - root else 0))
+  = if root >= cap || root >= length valid then false
+    else root = min_idx ||
+         (index valid root && is_left_spine (2 * root + 1) min_idx valid cap)
+
+/// Extending a left spine by one left step.
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec lemma_left_spine_extend
+  (root mid: nat) (valid: seq bool) (cap: nat)
+  : Lemma
+    (requires
+      is_left_spine root mid valid cap /\
+      mid < cap /\ mid < length valid /\
+      index valid mid /\
+      2 * mid + 1 < cap /\ 2 * mid + 1 < length valid)
+    (ensures is_left_spine root (2 * mid + 1) valid cap)
+    (decreases (if root < cap then cap - root else 0))
+  = if root = mid then ()
+    else lemma_left_spine_extend (2 * root + 1) mid valid cap
+#pop-options
+
+/// A node on the left spine is a descendant of root.
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let rec lemma_left_spine_is_desc
+  (root min_idx: nat) (valid: seq bool) (cap: nat)
+  : Lemma
+    (requires is_left_spine root min_idx valid cap)
+    (ensures is_desc_of root min_idx)
+    (decreases (if root < cap then cap - root else 0))
+  = if root = min_idx then ()
+    else begin
+      lemma_left_spine_is_desc (2 * root + 1) min_idx valid cap;
+      lemma_desc_of_child root min_idx
+    end
+#pop-options
+
+/// On the left spine, min_idx is always in the left subtree of any ancestor.
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let lemma_left_spine_in_left
+  (root min_idx: nat) (valid: seq bool) (cap: nat)
+  : Lemma
+    (requires is_left_spine root min_idx valid cap /\ root <> min_idx)
+    (ensures
+      root < cap /\ root < length valid /\
+      index valid root /\
+      is_left_spine (2 * root + 1) min_idx valid cap)
+  = ()
+#pop-options
+
+(* ====================================================================
+   Successor swap + leaf delete preserves well_formed_bst
+   
+   This is the key lemma for the two-children delete case.
+   After finding the successor (minimum of right subtree), we:
+   1. Copy successor's key to the deleted position
+   2. Mark the successor as invalid (it's a leaf)
+   
+   We prove this preserves well_formed_bst by walking from the root:
+   - Above del_idx: frame both updates
+   - At del_idx: left subtree widens upper bound, right subtree
+     uses delete_min_narrow
+   - Below del_idx in right subtree: handled by delete_min_narrow
+   ==================================================================== *)
+
+/// After deleting the minimum (a leaf on the left spine) from a subtree,
+/// well_formed_bst holds with the lower bound narrowed to the minimum's key.
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+let rec lemma_delete_min_narrow_wfb
+  (keys: seq int) (valid: seq bool) (cap: nat)
+  (i: nat) (lo hi: int) (min_idx: nat)
+  : Lemma
+    (requires
+      well_formed_bst keys valid cap i lo hi /\
+      min_idx < cap /\ min_idx < length keys /\ min_idx < length valid /\
+      length keys == length valid /\ length keys >= cap /\
+      index valid min_idx == true /\
+      is_left_spine i min_idx valid cap /\
+      // min_idx is a leaf
+      (2 * min_idx + 1 >= cap \/ 2 * min_idx + 1 >= length valid \/
+       index valid (2 * min_idx + 1) == false) /\
+      (2 * min_idx + 2 >= cap \/ 2 * min_idx + 2 >= length valid \/
+       index valid (2 * min_idx + 2) == false) /\
+      lo < index keys min_idx /\ index keys min_idx < hi)
+    (ensures
+      well_formed_bst keys (upd valid min_idx false) cap i (index keys min_idx) hi)
+    (decreases (if i < cap then cap - i else 0))
+  = let valid' = upd valid min_idx false in
+    if i >= cap || i >= length keys || i >= length valid then ()
+    else if i = min_idx then begin
+      // After deletion: valid'[min_idx] = false → need subtree_all_invalid
+      let left_min = 2 * min_idx + 1 in
+      let right_min = 2 * min_idx + 2 in
+      if left_min < cap && left_min < length valid then
+        lemma_sai_frame_desc valid cap left_min min_idx false;
+      if right_min < cap && right_min < length valid then
+        lemma_sai_frame_desc valid cap right_min min_idx false
+    end else begin
+      // i ≠ min_idx: by is_left_spine, min_idx is in the LEFT subtree
+      // valid[i] must be true (from is_left_spine definition)
+      let k_i = index keys i in
+      let left = 2 * i + 1 in
+      let right = 2 * i + 2 in
+      // Derive bounds: keys[min_idx] is in (lo, k_i) since it's in the left subtree
+      lemma_left_spine_is_desc (2 * i + 1) min_idx valid cap;
+      lemma_wfb_valid_desc_in_bounds keys valid cap left min_idx lo k_i;
+      // Left subtree: recurse (min_idx is on the left spine of left child)
+      lemma_delete_min_narrow_wfb keys valid cap left lo k_i min_idx;
+      // Right subtree: min_idx is NOT in right subtree → frame
+      Classical.move_requires (lemma_desc_disjoint i) min_idx;
+      lemma_wfb_frame_valid_desc keys valid cap right min_idx k_i hi false
+    end
+#pop-options
+
+/// Explicitly construct well_formed_bst at a valid node from its components.
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let lemma_wfb_node
+  (keys: seq int) (valid: seq bool) (cap i: nat) (lo hi: int)
+  : Lemma
+    (requires
+      i < cap /\ i < length keys /\ i < length valid /\
+      index valid i == true /\
+      lo < index keys i /\ index keys i < hi /\
+      well_formed_bst keys valid cap (2 * i + 1) lo (index keys i) /\
+      well_formed_bst keys valid cap (2 * i + 2) (index keys i) hi)
+    (ensures well_formed_bst keys valid cap i lo hi)
+  = ()
+#pop-options
+
+/// Frame: keys-only update at non-descendant preserves well_formed_bst.
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+let lemma_wfb_frame_keys_desc
+  (keys: seq int) (valid: seq bool) (cap j: nat) (lo hi: int) (idx: nat) (k: int)
+  : Lemma
+    (requires ~(is_desc_of j idx) /\ idx < length keys /\ idx < length valid)
+    (ensures well_formed_bst keys valid cap j lo hi ==
+             well_formed_bst (upd keys idx k) valid cap j lo hi)
+  = lemma_wfb_frame_desc keys valid cap j lo hi idx k (index valid idx);
+    assert (Seq.equal (upd valid idx (index valid idx)) valid)
+#pop-options
+
+/// Combined successor swap and leaf deletion preserves well_formed_bst.
+///
+/// Given a well-formed BST, at position del_idx with two children:
+///   succ_idx = minimum of right subtree (on left spine of right child)
+///   After: keys[del_idx] := keys[succ_idx], valid[succ_idx] := false
+///   Proves: well_formed_bst is preserved
+#push-options "--z3rlimit 300 --fuel 3 --ifuel 2"
+let rec lemma_successor_swap_delete_wfb
+  (keys: seq int) (valid: seq bool) (cap: nat)
+  (i: nat) (lo hi: int) (del_idx succ_idx: nat)
+  : Lemma
+    (requires
+      well_formed_bst keys valid cap i lo hi /\
+      del_idx < cap /\ del_idx < length keys /\ del_idx < length valid /\
+      succ_idx < cap /\ succ_idx < length keys /\ succ_idx < length valid /\
+      length keys == length valid /\ length keys >= cap /\
+      index valid del_idx == true /\
+      index valid succ_idx == true /\
+      del_idx <> succ_idx /\
+      is_desc_of i del_idx /\
+      // succ_idx is the minimum of the right subtree of del_idx
+      is_left_spine (2 * del_idx + 2) succ_idx valid cap /\
+      // succ is a leaf
+      (2 * succ_idx + 1 >= cap \/ 2 * succ_idx + 1 >= length valid \/
+       index valid (2 * succ_idx + 1) == false) /\
+      (2 * succ_idx + 2 >= cap \/ 2 * succ_idx + 2 >= length valid \/
+       index valid (2 * succ_idx + 2) == false))
+    (ensures
+      well_formed_bst (upd keys del_idx (index keys succ_idx))
+                      (upd valid succ_idx false) cap i lo hi)
+    (decreases (if i < cap then cap - i else 0))
+  = let keys' = upd keys del_idx (index keys succ_idx) in
+    let valid' = upd valid succ_idx false in
+    let succ_key = index keys succ_idx in
+    if i >= cap || i >= length keys || i >= length valid then ()
+    else begin
+      // valid[i] must be true (otherwise sai gives valid[del_idx] = false)
+      if not (index valid i) then
+        lemma_sai_desc valid cap i del_idx
+      else begin
+        let k_i = index keys i in
+        let left = 2 * i + 1 in
+        let right = 2 * i + 2 in
+        if i = del_idx then begin
+          // === AT THE DELETION POINT ===
+          // keys'[del_idx] = succ_key, valid'[del_idx] = true (unchanged)
+
+          // Establish succ_key bounds: succ is in right subtree
+          lemma_left_spine_is_desc (2 * del_idx + 2) succ_idx valid cap;
+          lemma_desc_of_child del_idx succ_idx;
+          lemma_wfb_valid_desc_in_bounds keys valid cap right succ_idx k_i hi;
+          // Now: k_i < succ_key < hi, and lo < k_i, so lo < succ_key < hi
+
+          // succ_idx is in right subtree of del_idx, disjoint from left
+          Classical.move_requires (lemma_desc_disjoint del_idx) succ_idx;
+
+          // --- LEFT SUBTREE: wfb keys' valid' cap left lo succ_key ---
+          // Step 1: Frame valid update at succ_idx (not in left subtree)
+          lemma_wfb_frame_valid_desc keys valid cap left succ_idx lo k_i false;
+          // Now: wfb keys valid' cap left lo k_i
+          // Step 2: Widen upper bound from k_i to succ_key
+          lemma_wfb_widen_upper keys valid' cap left lo k_i succ_key;
+          // Now: wfb keys valid' cap left lo succ_key
+          // Step 3: Frame keys update at del_idx (del_idx not desc of left)
+          lemma_wfb_frame_keys_desc keys valid' cap left lo succ_key del_idx succ_key;
+          // Now: wfb keys' valid' cap left lo succ_key ✓
+
+          // --- RIGHT SUBTREE: wfb keys' valid' cap right succ_key hi ---
+          // Step 1: Delete min (succ) from right subtree and narrow lower bound
+          lemma_delete_min_narrow_wfb keys valid cap right k_i hi succ_idx;
+          // Now: wfb keys valid' cap right succ_key hi
+          // Step 2: Frame keys update at del_idx (del_idx not desc of right)
+          lemma_wfb_frame_keys_desc keys valid' cap right succ_key hi del_idx succ_key;
+          // Now: wfb keys' valid' cap right succ_key hi ✓
+
+          // Assemble: at del_idx, valid is still true and key is succ_key
+          assert (index valid' del_idx == true);
+          assert (index keys' del_idx == succ_key);
+          assert (lo < succ_key /\ succ_key < hi);
+          lemma_wfb_node keys' valid' cap del_idx lo hi
+        end else begin
+          // === ABOVE THE DELETION POINT ===
+          // i ≠ del_idx, so del_idx > i (from is_desc_of i del_idx)
+          // succ_idx > del_idx (succ is deeper in right subtree)
+          // Therefore i ≠ succ_idx, so valid'[i] = valid[i] = true, keys'[i] = keys[i] = k_i
+          lemma_desc_of_ge i del_idx;
+          lemma_left_spine_is_desc (2 * del_idx + 2) succ_idx valid cap;
+          lemma_desc_of_ge (2 * del_idx + 2) succ_idx;
+          assert (del_idx > i);
+          assert (succ_idx >= 2 * del_idx + 2);
+          assert (succ_idx > i);
+          assert (index valid' i == true);
+          assert (index keys' i == k_i);
+
+          // del_idx in exactly one child subtree; succ_idx is descendant of del_idx
+          lemma_desc_split i del_idx;
+          lemma_desc_of_child del_idx succ_idx;
+          if is_desc_of left del_idx then begin
+            // Recurse on left subtree
+            lemma_successor_swap_delete_wfb keys valid cap left lo k_i del_idx succ_idx;
+            // Frame right subtree: neither del_idx nor succ_idx is a descendant
+            Classical.move_requires (lemma_desc_disjoint i) del_idx;
+            lemma_desc_of_trans left del_idx succ_idx;
+            Classical.move_requires (lemma_desc_disjoint i) succ_idx;
+            // Step 1: Frame keys update on right subtree
+            lemma_wfb_frame_keys_desc keys valid cap right k_i hi del_idx succ_key;
+            // Now: wfb keys' valid cap right k_i hi
+            // Step 2: Frame valid update on right subtree (using keys')
+            lemma_wfb_frame_valid_desc keys' valid cap right succ_idx k_i hi false;
+            // Now: wfb keys' valid' cap right k_i hi
+            lemma_wfb_node keys' valid' cap i lo hi
+          end else begin
+            // Recurse on right subtree
+            lemma_successor_swap_delete_wfb keys valid cap right k_i hi del_idx succ_idx;
+            // Frame left subtree
+            Classical.move_requires (lemma_desc_disjoint i) del_idx;
+            lemma_desc_of_trans right del_idx succ_idx;
+            Classical.move_requires (lemma_desc_disjoint i) succ_idx;
+            // Step 1: Frame keys update on left subtree
+            lemma_wfb_frame_keys_desc keys valid cap left lo k_i del_idx succ_key;
+            // Now: wfb keys' valid cap left lo k_i
+            // Step 2: Frame valid update on left subtree (using keys')
+            lemma_wfb_frame_valid_desc keys' valid cap left succ_idx lo k_i false;
+            // Now: wfb keys' valid' cap left lo k_i
+            lemma_wfb_node keys' valid' cap i lo hi
+          end
+        end
+      end
+    end
+#pop-options
