@@ -94,6 +94,27 @@ let lemma_probes_not_key_full
 
 // ========== valid_ht lemmas ==========
 
+// Lemma: under valid_ht, if a key is at some array index, then key_findable holds.
+// This uses the surjectivity of linear probing (every index is reachable by some probe)
+// and the valid_ht invariant (no empty slot blocks an earlier probe position).
+#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+let lemma_valid_ht_key_at_index_findable
+  (s: Seq.seq int) (size: nat) (key: int{key >= 0}) (idx: nat)
+  : Lemma
+    (requires valid_ht s size /\ idx < size /\ Seq.index s idx == key)
+    (ensures key_findable s size key)
+  = // By surjectivity: exists p < size such that hash_probe_nat key p size == idx
+    let h = key % size in
+    let p = (idx + size - h) % size in
+    FStar.Math.Lemmas.lemma_mod_add_distr h (idx + size - h) size;
+    assert (h + (idx + size - h) == idx + size);
+    FStar.Math.Lemmas.lemma_mod_plus idx 1 size;
+    FStar.Math.Lemmas.modulo_lemma idx size;
+    assert (hash_probe_nat key p size == idx)
+    // Now Z3 can instantiate valid_ht to get the no-empty-before property,
+    // witnessing key_findable with probe = p
+#pop-options
+
 // Key lemma: under valid_ht, an empty slot in the probe sequence proves
 // the key is absent from the entire table.
 let lemma_valid_ht_search_not_found
@@ -321,6 +342,7 @@ fn hash_search
       SZ.v result <= SZ.v size /\
       SZ.v size > 0 /\
       Seq.length s == SZ.v size /\
+      valid_ht s (SZ.v size) /\
       key >= 0 /\
       // Functional correctness: found
       (SZ.v result < SZ.v size ==> (
@@ -353,7 +375,7 @@ fn hash_search
       SZ.v vi <= SZ.v size /\
       SZ.v vfound_idx <= SZ.v size /\
       Seq.length s == SZ.v size /\
-      // Functional invariants
+      valid_ht s (SZ.v size) /\
       (SZ.v vfound_idx < SZ.v size ==> Seq.index s (SZ.v vfound_idx) == key) /\
       (SZ.v vfound_idx == SZ.v size ==> probes_not_key s (SZ.v size) key (SZ.v vi)) /\
       (vdone /\ SZ.v vfound_idx == SZ.v size ==> ~(key_in_table s (SZ.v size) key)) /\
@@ -515,6 +537,72 @@ fn hash_delete
   
   let result_idx = !deleted_at;
   (result_idx <^ size)
+}
+#pop-options
+
+// Insert a key only if not already present (prevents duplicates)
+// Calls hash_search first, then hash_insert if the key was not found.
+// Complexity: at most 2 * size probes
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+//SNIPPET_START: ht_hash_insert_no_dup_impl
+fn hash_insert_no_dup
+  (table: A.array int)
+  (#s: erased (Seq.seq int))
+  (size: SZ.t)
+  (key: int{key >= 0 /\ SZ.fits key})
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires
+    A.pts_to table s **
+    GR.pts_to ctr c0 **
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\
+          valid_ht s (SZ.v size))
+  returns result: bool
+  ensures exists* s' cf.
+    A.pts_to table s' **
+    GR.pts_to ctr cf **
+    pure (
+      Seq.length s' == SZ.v size /\
+      Seq.length s' == Seq.length s /\
+      valid_ht s' (SZ.v size) /\
+      cf >= reveal c0 /\ cf - reveal c0 <= 2 * SZ.v size /\
+      (if result
+       then (key_in_table s' (SZ.v size) key /\
+             key_findable s' (SZ.v size) key /\
+             (s' == s \/
+              (exists (idx: nat). idx < SZ.v size /\
+                (Seq.index s idx == -1 \/ Seq.index s idx == -2) /\
+                Seq.index s' idx == key /\
+                seq_modified_at s s' idx /\
+                ~(key_in_table s (SZ.v size) key))))
+       else (s' == s /\ ~(key_in_table s (SZ.v size) key)))
+    )
+//SNIPPET_END: ht_hash_insert_no_dup_impl
+{
+  let search_result = hash_search table size key ctr;
+  if (search_result <^ size) {
+    // Key already exists — establish key_findable by inlining the surjectivity proof
+    // to give Z3 a concrete witness for the existential in key_findable.
+    // The witness p is the probe index such that hash_probe_nat key p size == search_result.
+    assert pure (
+      let idx = SZ.v search_result in
+      let sz = SZ.v size in
+      let h = key % sz in
+      let p = (idx + sz - h) % sz in
+      FStar.Math.Lemmas.lemma_mod_add_distr h (idx + sz - h) sz;
+      FStar.Math.Lemmas.lemma_mod_plus idx 1 sz;
+      FStar.Math.Lemmas.modulo_lemma idx sz;
+      // Now Z3 knows: hash_probe_nat key p sz == idx, and Seq.index s idx == key
+      // Combined with valid_ht, this witnesses key_findable
+      p < sz /\
+      hash_probe_nat key p sz == idx /\
+      Seq.index s (hash_probe_nat key p sz) == key
+    );
+    true
+  } else {
+    // Key not found, try to insert
+    hash_insert table size key ctr
+  }
 }
 #pop-options
 

@@ -68,6 +68,11 @@ let probes_not_key (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}
 let seq_modified_at (s s': Seq.seq int) (idx: nat{idx < Seq.length s /\ Seq.length s' == Seq.length s}) : prop =
   forall (j: nat). j < Seq.length s /\ j =!= idx ==> Seq.index s j == Seq.index s' j
 
+// Helper: key appears at most once in the table (no duplicates)
+let unique_key (s: Seq.seq int) (key: int{key >= 0}) : prop =
+  forall (i j: nat). i < Seq.length s /\ j < Seq.length s /\
+    Seq.index s i == key /\ Seq.index s j == key ==> i == j
+
 // ========== Table well-formedness invariant ==========
 
 //SNIPPET_START: ht_valid_ht
@@ -86,6 +91,14 @@ let valid_ht (s: Seq.seq int) (size: nat) : prop =
     (forall (p: nat). {:pattern (hash_probe_nat k p size)}
       p < probe ==> Seq.index s (hash_probe_nat k p size) =!= -1))
 //SNIPPET_END: ht_valid_ht
+
+// Lemma: under valid_ht, if a key is at some array index, then it is findable
+// by hash_search (key_findable holds)
+val lemma_valid_ht_key_at_index_findable
+  (s: Seq.seq int) (size: nat) (key: int{key >= 0}) (idx: nat)
+  : Lemma
+    (requires valid_ht s size /\ idx < size /\ Seq.index s idx == key)
+    (ensures key_findable s size key)
 
 // ========== Operations ==========
 
@@ -139,6 +152,48 @@ fn hash_insert
     )
 //SNIPPET_END: ht_hash_insert
 
+//SNIPPET_START: ht_hash_insert_no_dup
+// Insert a key only if it is not already present (prevents duplicates)
+// Returns true if the key is in the table after the call (either already
+// present or freshly inserted), false if the table is full and the key
+// was not already present.
+// Complexity: at most 2 * size probes (one search + one insert)
+fn hash_insert_no_dup
+  (table: A.array int)
+  (#s: erased (Seq.seq int))
+  (size: SZ.t)
+  (key: int{key >= 0 /\ SZ.fits key})
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires
+    A.pts_to table s **
+    GR.pts_to ctr c0 **
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\
+          valid_ht s (SZ.v size))
+  returns result: bool
+  ensures exists* s' cf.
+    A.pts_to table s' **
+    GR.pts_to ctr cf **
+    pure (
+      Seq.length s' == SZ.v size /\
+      Seq.length s' == Seq.length s /\
+      valid_ht s' (SZ.v size) /\
+      cf >= reveal c0 /\ cf - reveal c0 <= 2 * SZ.v size /\
+      (if result
+       then (key_in_table s' (SZ.v size) key /\
+             key_findable s' (SZ.v size) key /\
+             // No duplicate: either table unchanged (key was already there)
+             // or key was freshly inserted at one empty/deleted slot
+             (s' == s \/
+              (exists (idx: nat). idx < SZ.v size /\
+                (Seq.index s idx == -1 \/ Seq.index s idx == -2) /\
+                Seq.index s' idx == key /\
+                seq_modified_at s s' idx /\
+                ~(key_in_table s (SZ.v size) key))))
+       else (s' == s /\ ~(key_in_table s (SZ.v size) key)))
+    )
+//SNIPPET_END: ht_hash_insert_no_dup
+
 //SNIPPET_START: ht_hash_search
 // Search for a key in the hash table
 // Returns the index if found, or returns size (invalid index) if not found
@@ -163,6 +218,7 @@ fn hash_search
       SZ.v result <= SZ.v size /\
       SZ.v size > 0 /\
       Seq.length s == SZ.v size /\
+      valid_ht s (SZ.v size) /\
       key >= 0 /\
       // Functional correctness: found
       (SZ.v result < SZ.v size ==> (
