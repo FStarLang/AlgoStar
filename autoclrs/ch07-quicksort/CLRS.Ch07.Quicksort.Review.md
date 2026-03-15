@@ -13,7 +13,7 @@ fn quicksort
   (len: SZ.t)
   (#s0: Ghost.erased (Seq.seq int))
   requires A.pts_to a s0
-  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len /\ SZ.v len > 0)
+  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len)
   ensures exists* s. (A.pts_to a s ** pure (sorted s /\ permutation s0 s))
 ```
 
@@ -27,7 +27,7 @@ fn quicksort_with_complexity
   (ctr: GR.ref nat)
   (#c0: erased nat)
   requires A.pts_to a s0 ** GR.pts_to ctr c0
-  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len /\ SZ.v len > 0)
+  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len)
   ensures exists* s (cf: nat). (
     A.pts_to a s ** GR.pts_to ctr cf **
     pure (sorted s /\ permutation s0 s /\
@@ -73,10 +73,8 @@ fn quicksort_bounded
 
 ### Preconditions
 
-* `SZ.v len > 0` / `lo <= hi` — the array or sub-range is non-empty
-  (or empty for `quicksort_bounded` when `lo == hi`).
-
 * `Seq.length s0 == A.length a /\ A.length a == SZ.v len` — consistency.
+  No minimum length is required; empty arrays are accepted.
 
 * For `quicksort_bounded`: `between_bounds s0 lb rb /\ lb <= rb` —
   all elements within provided value bounds.
@@ -177,16 +175,17 @@ discharged by F\* and Z3.
    average-case analysis would require probabilistic reasoning not
    present in this framework.
 
-2. **`len > 0` precondition for top-level variants.** `quicksort` and
-   `quicksort_with_complexity` require `len > 0`. The
-   `quicksort_bounded` variant does handle `lo == hi` (empty range)
-   as a trivial base case.
+2. ~~**`len > 0` precondition for top-level variants.**~~ **FIXED.**
+   `quicksort` and `quicksort_with_complexity` now accept `len >= 0`
+   (including empty arrays). The `else` branch handles `len = 0` and
+   `len = 1` as trivial base cases (empty/singleton arrays are sorted
+   and are permutations of themselves).
 
 3. **Ghost bounds derived from `seq_min`/`seq_max`.** The top-level
    `quicksort` function internally computes `seq_min s0` and
-   `seq_max s0` as ghost bounds, which requires `len > 0`. This is
-   purely a specification mechanism with no runtime cost, but it
-   restricts the precondition.
+   `seq_max s0` as ghost bounds, which requires `len > 1` (the
+   `if` branch). This is purely a specification mechanism with no
+   runtime cost.
 
 4. **Lomuto partition (not Hoare).** The implementation uses Lomuto
    partition (last element as pivot), which has worse constant factors

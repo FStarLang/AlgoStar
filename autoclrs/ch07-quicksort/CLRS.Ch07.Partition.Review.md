@@ -35,6 +35,7 @@ fn clrs_partition_wrapper_with_ticks
       lb <= Seq.index s_pivot 0 /\ Seq.index s_pivot 0 <= rb /\
       between_bounds s1 lb (Seq.index s_pivot 0) /\
       between_bounds s2 (Seq.index s_pivot 0) rb /\
+      strictly_larger_than s2 (Seq.index s_pivot 0) /\
       permutation s0 (Seq.append s1 (Seq.append s_pivot s2)) /\
       complexity_exact_linear cf (reveal c0) (hi - lo - 1)
    ))
@@ -90,8 +91,10 @@ The pure postconditions state:
   are ≤ pivot.
 
 * `between_bounds s2 (Seq.index s_pivot 0) rb` — all right elements
-  are ≥ pivot (actually > pivot by the Lomuto scheme, but the
-  postcondition only states ≥ via `between_bounds`).
+  are ≥ pivot.
+
+* `strictly_larger_than s2 (Seq.index s_pivot 0)` — all right elements
+  are **strictly greater** than the pivot (the Lomuto guarantee).
 
 * `permutation s0 (Seq.append s1 (Seq.append s_pivot s2))` — the
   concatenation of the three regions is a permutation of the input.
@@ -107,6 +110,9 @@ The pure postconditions state:
 let larger_than (s: Seq.seq int) (lb: int)
   = forall (k: int). 0 <= k /\ k < Seq.length s ==> lb <= Seq.index s k
 
+let strictly_larger_than (s: Seq.seq int) (lb: int)
+  = forall (k: int). 0 <= k /\ k < Seq.length s ==> lb < Seq.index s k
+
 let smaller_than (s: Seq.seq int) (rb: int)
   = forall (k: int). 0 <= k /\ k < Seq.length s ==> Seq.index s k <= rb
 
@@ -115,6 +121,7 @@ let between_bounds (s: Seq.seq int) (lb rb: int)
 ```
 
 Every element in `s` lies in the closed interval `[lb, rb]`.
+`strictly_larger_than s lb` gives the strict lower bound `lb < s[k]`.
 
 ### `complexity_exact_linear` (from `CLRS.Ch07.Partition.Lemmas`)
 
@@ -157,13 +164,10 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`between_bounds` for the right partition uses ≥, not >.** The
-   Lomuto scheme guarantees right elements are **strictly greater** than
-   the pivot, but `between_bounds s2 (Seq.index s_pivot 0) rb` only
-   states `pivot ≤ s2[k]` (i.e., ≥). The strict inequality is proven
-   internally (`clrs_partition_with_ticks` postcondition says `> pivot`
-   for the right region) but is lost in the wrapper that splits
-   ownership.
+1. ~~**`between_bounds` for the right partition uses ≥, not >.**~~ **FIXED.**
+   The wrapper now exposes `strictly_larger_than s2 (Seq.index s_pivot 0)`
+   in addition to `between_bounds`, propagating the strict inequality
+   proven internally by `clrs_partition_with_ticks`.
 
 2. **Ghost bounds `lb` and `rb` must be provided by the caller.** The
    partition itself does not compute bounds; it requires them as ghost
