@@ -17,6 +17,7 @@ module Seq = FStar.Seq
 
 open CLRS.Ch15.MatrixChain.Spec
 open CLRS.Ch15.MatrixChain.Complexity
+module MCL = CLRS.Ch15.MatrixChain.Lemmas
 
 let mc_complexity_bounded (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == mc_iterations n
@@ -48,3 +49,11 @@ fn matrix_chain_order
       result == mc_result s_dims (SZ.v n) /\
       mc_complexity_bounded cf (reveal c0) (SZ.v n)
     )
+
+/// Bridge to enumerative optimum: when costs are bounded by the sentinel,
+/// mc_result equals the true recursive optimum mc_cost.
+/// Use after calling matrix_chain_order to obtain the stronger guarantee.
+val mc_result_eq_mc_cost (dims: Seq.seq int) (n: nat)
+  : Lemma (requires n > 0 /\ Seq.length dims == n + 1 /\
+                    MCL.all_costs_bounded dims n n 1000000000)
+          (ensures mc_result dims n == MCL.mc_cost dims 0 (n - 1))

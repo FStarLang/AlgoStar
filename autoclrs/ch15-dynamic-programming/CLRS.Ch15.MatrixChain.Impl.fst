@@ -36,6 +36,7 @@ module Seq = FStar.Seq
 
 open CLRS.Ch15.MatrixChain.Spec
 open CLRS.Ch15.MatrixChain.Complexity
+module MCL = CLRS.Ch15.MatrixChain.Lemmas
 
 // ========== Ghost tick ==========
 
@@ -70,6 +71,13 @@ let mc_inner_sum_to_remaining (n l: nat)
   : Lemma (requires l >= 2 /\ l <= n)
           (ensures mc_inner_sum n l == mc_remaining_i n l 0 + mc_inner_sum n (l + 1))
   = mc_inner_sum_step n l
+
+// Bridge: when sentinel is large enough, mc_result equals the true recursive optimum
+let mc_result_eq_mc_cost (dims: Seq.seq int) (n: nat)
+  : Lemma (requires n > 0 /\ Seq.length dims == n + 1 /\
+                    MCL.all_costs_bounded dims n n 1000000000)
+          (ensures mc_result dims n == MCL.mc_cost dims 0 (n - 1))
+  = MCL.mc_spec_equiv dims n
 
 // ========== Main Implementation ==========
 
