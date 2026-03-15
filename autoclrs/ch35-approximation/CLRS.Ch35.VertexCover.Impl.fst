@@ -17,6 +17,7 @@ module Seq = FStar.Seq
 module Spec = CLRS.Ch35.VertexCover.Spec
 module Lemmas = CLRS.Ch35.VertexCover.Lemmas
 module GR = Pulse.Lib.GhostReference
+module Complexity = CLRS.Ch35.VertexCover.Complexity
 
 // 2-approximation vertex cover algorithm from CLRS Chapter 35.
 // Given an adjacency matrix for an undirected graph with n vertices,
@@ -186,22 +187,29 @@ fn approx_vertex_cover
   // Ghost matching: tracks edges selected by the algorithm
   let matching_ref = GR.alloc #(list Spec.edge) [];
   
+  // Ghost iteration counter: linked to Complexity.vertex_cover_iterations
+  let ghost_iters = GR.alloc #nat 0;
+  
   // Outer loop: u from 0 to n-1
   let mut u: SZ.t = 0sz;
   
+  Complexity.partial_iterations_zero (SZ.v n);
+  
   while (!u <^ n)
-  invariant exists* vu s_cover vm.
+  invariant exists* vu s_cover vm gi.
     R.pts_to u vu **
     A.pts_to adj #p s_adj **
     A.pts_to cover_a s_cover **
     GR.pts_to matching_ref vm **
+    GR.pts_to ghost_iters gi **
     pure (
       SZ.v vu <= SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n) /\
       Seq.length s_cover == SZ.v n /\
       Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v vu) 0 /\
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
-      matching_inv s_adj s_cover (SZ.v n) vm
+      matching_inv s_adj s_cover (SZ.v n) vm /\
+      gi == Complexity.partial_iterations (SZ.v n) (SZ.v vu)
     )
   decreases (SZ.v n - SZ.v !u)
   {
@@ -215,12 +223,13 @@ fn approx_vertex_cover
     let mut v: SZ.t = vu +^ 1sz;
     
     while (!v <^ n)
-    invariant exists* vv s_cover_inner vm_inner.
+    invariant exists* vv s_cover_inner vm_inner gi_inner.
       R.pts_to u vu **
       R.pts_to v vv **
       A.pts_to adj #p s_adj **
       A.pts_to cover_a s_cover_inner **
       GR.pts_to matching_ref vm_inner **
+      GR.pts_to ghost_iters gi_inner **
       pure (
         SZ.v vv >= SZ.v vu + 1 /\
         SZ.v vv <= SZ.v n /\
@@ -230,7 +239,8 @@ fn approx_vertex_cover
         Seq.length s_cover_inner == SZ.v n /\
         Spec.is_cover s_adj s_cover_inner (SZ.v n) (SZ.v vu) (SZ.v vv) /\
         (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover_inner i = 0 \/ Seq.index s_cover_inner i = 1)) /\
-        matching_inv s_adj s_cover_inner (SZ.v n) vm_inner
+        matching_inv s_adj s_cover_inner (SZ.v n) vm_inner /\
+        gi_inner == Complexity.partial_iterations (SZ.v n) (SZ.v vu) + (SZ.v vv - SZ.v vu - 1)
       )
     decreases (SZ.v n - SZ.v !v)
     {
@@ -238,6 +248,7 @@ fn approx_vertex_cover
       
       with s_cov_before. assert (A.pts_to cover_a s_cov_before);
       with vm_cur. assert (GR.pts_to matching_ref vm_cur);
+      with gi_cur. assert (GR.pts_to ghost_iters gi_cur);
       
       // Calculate adjacency matrix index: u*n + v
       let u_times_n = vu *^ n;
@@ -272,6 +283,9 @@ fn approx_vertex_cover
                     else Ghost.reveal vm_cur);
       GR.op_Colon_Equals matching_ref new_vm;
       
+      // Ghost: increment iteration counter
+      GR.op_Colon_Equals ghost_iters (gi_cur + 1);
+      
       // Increment v
       v := vv +^ 1sz;
     };
@@ -280,6 +294,9 @@ fn approx_vertex_cover
     with s_cov_row. assert (A.pts_to cover_a s_cov_row);
     is_cover_next_row s_adj s_cov_row (SZ.v n) (SZ.v vu);
     
+    // Link iteration count: partial_iterations(n, vu) + (n-vu-1) = partial_iterations(n, vu+1)
+    Complexity.partial_iterations_step (SZ.v n) (SZ.v vu);
+    
     // Increment u
     u := vu +^ 1sz;
   };
@@ -287,6 +304,11 @@ fn approx_vertex_cover
   // Convert back to vec for return
   with s_final. assert (A.pts_to cover_a s_final);
   with vm_final. assert (GR.pts_to matching_ref vm_final);
+  with gi_final. assert (GR.pts_to ghost_iters gi_final);
+  
+  // Link total iteration count to complexity bound
+  Complexity.partial_iterations_total (SZ.v n);
+  assert pure (gi_final == Complexity.vertex_cover_iterations (SZ.v n));
   
   // Binary property is maintained by loop invariant
   assert pure (forall (i: nat). i < SZ.v n ==> (Seq.index s_final i = 0 \/ Seq.index s_final i = 1));
@@ -297,8 +319,9 @@ fn approx_vertex_cover
   // Prove existence of minimum vertex cover (makes 2-approx non-vacuous)
   Lemmas.min_cover_exists s_adj (SZ.v n);
   
-  // Free ghost matching reference
+  // Free ghost references
   GR.free matching_ref;
+  GR.free ghost_iters;
   
   assert pure (Spec.is_cover s_adj s_final (SZ.v n) (SZ.v n) 0);
   assert pure (Seq.length s_final == SZ.v n);
