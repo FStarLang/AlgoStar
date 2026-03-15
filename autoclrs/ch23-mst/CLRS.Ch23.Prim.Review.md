@@ -174,8 +174,9 @@ automatically established by `prim` alone.
    `is_spanning_tree`, safety, and `noRepeats_edge` — none of which are
    established by the `prim` function. A caller must independently prove these.
 
-4. **MST existence assumed.** The pure spec requires
-   `(exists (t: list edge). is_mst (adj_to_graph adj n) t)` as a precondition.
+4. ~~**MST existence assumed.**~~ **RESOLVED.** The pure spec requires
+   `(exists (t: list edge). is_mst (adj_to_graph adj n) t)` as a precondition,
+   but this is now dischargeable via `CLRS.Ch23.MST.Existence.mst_exists`.
 
 5. **Complexity not linked to implementation.** The complexity module
    (`Prim.Complexity`) is explicitly **disconnected** from `Prim.Impl` — it

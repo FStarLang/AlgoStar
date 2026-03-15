@@ -218,9 +218,12 @@ and `Lemmas.fst`.
    `subset_edges ... t` for some MST `t`, and `noRepeats_edge`. These are
    reasonable but not all automatically discharged.
 
-3. **MST existence assumed.** Both `theorem_kruskal_produces_mst` and
-   `greedy_step_safe` require `(exists (mst: list edge). is_mst g mst)` as a
-   precondition. There is no standalone MST existence proof.
+3. ~~**MST existence assumed.**~~ **PARTIALLY RESOLVED.**
+   `theorem_kruskal_produces_spanning_tree` no longer requires MST existence
+   (it now uses `acyclic_connected_length` directly for the edge count).
+   `theorem_kruskal_produces_mst` and `greedy_step_safe` still require MST
+   existence as a precondition, but this is now dischargeable via
+   `CLRS.Ch23.MST.Existence.mst_exists`.
 
 4. **Complexity not linked to implementation.** The complexity module
    (`Kruskal.Complexity`) is explicitly **disconnected** from `Kruskal.Impl` —

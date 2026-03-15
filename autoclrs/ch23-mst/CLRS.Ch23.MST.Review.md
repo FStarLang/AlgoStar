@@ -160,9 +160,12 @@ are discharged by F\* and Z3.
    edges are possible. The `all_edges_distinct` predicate is used where needed
    but is not enforced globally.
 
-4. **No MST existence proof.** The cut property *assumes* an MST exists
-   (`exists (t: list edge). is_mst g t`). There is no standalone proof that
-   every connected graph has an MST — this is assumed as a precondition.
+4. ~~**No MST existence proof.**~~ **RESOLVED.** The new module
+   `CLRS.Ch23.MST.Existence` proves both `spanning_tree_exists` and
+   `mst_exists` for connected graphs with valid edges. The spanning tree
+   existence follows from the strengthened `theorem_kruskal_produces_spanning_tree`
+   (which no longer requires MST existence). MST existence uses weight-based
+   strong induction. Zero admits, zero assumes.
 
 5. **Weight type is `int`.** Edge weights are signed integers. Negative weights
    are permitted, which is unusual for MST but mathematically valid.
@@ -173,5 +176,7 @@ are discharged by F\* and Z3.
 |------|------|
 | `CLRS.Ch23.MST.Spec.fsti` | All definitions, lemma signatures, cut property statement |
 | `CLRS.Ch23.MST.Spec.fst` | All proofs (~95 KB) |
+| `CLRS.Ch23.MST.Existence.fsti` | MST existence theorem: `spanning_tree_exists`, `mst_exists` |
+| `CLRS.Ch23.MST.Existence.fst` | MST existence proofs (weight-based strong induction) |
 | `CLRS.Ch23.MST.Complexity.fsti` | Asymptotic complexity signatures for Kruskal/Prim |
 | `CLRS.Ch23.MST.Complexity.fst` | Complexity proofs: Kruskal O(V³), Prim O(V²) |
