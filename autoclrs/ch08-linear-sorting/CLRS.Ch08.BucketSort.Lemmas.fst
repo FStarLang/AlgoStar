@@ -403,10 +403,13 @@ let rec create_all_buckets_perm
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 let bucket_sort (xs: list int) (k: pos)
   : Pure (list int)
-    (requires Cons? xs)
+    (requires True)
     (ensures fun ys -> sorted ys /\ List.length ys == List.length xs /\ is_permutation xs ys)
 //SNIPPET_END: bucket_sort_sig
-  = let min_val = list_min xs in
+  = match xs with
+    | [] -> []
+    | _ ->
+    let min_val = list_min xs in
     let max_val = list_max xs in
     
     if min_val = max_val then (
