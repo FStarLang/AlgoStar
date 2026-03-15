@@ -61,25 +61,25 @@ let lemma_log2f_step (old_range new_range: int)
 
 // ========== Binary Search with Complexity Bound ==========
 
-#set-options "--z3rlimit 50"
+#set-options "--z3rlimit 80"
 
 //SNIPPET_START: binary_search_sig
 fn binary_search
+  (#p: perm)
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
   (key: int)
   (ctr: GR.ref nat)
   (#c0: erased nat)
-  requires A.pts_to a s0 ** GR.pts_to ctr c0 **
+  requires A.pts_to a #p s0 ** GR.pts_to ctr c0 **
     pure (
       SZ.v len == Seq.length s0 /\
       Seq.length s0 <= A.length a /\
-      SZ.v len > 0 /\
       is_sorted s0
     )
   returns result: SZ.t
-  ensures exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf **
+  ensures exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
     pure (
       SZ.v result <= SZ.v len /\
       (SZ.v result < SZ.v len ==> (
@@ -94,6 +94,9 @@ fn binary_search
     )
 //SNIPPET_END: binary_search_sig
 {
+  if (len = 0sz) {
+    len
+  } else {
   let mut lo: SZ.t = 0sz;
   let mut hi: SZ.t = len;
   let mut found: bool = false;
@@ -106,7 +109,7 @@ fn binary_search
     R.pts_to found vfound **
     R.pts_to result_idx vresult **
     GR.pts_to ctr vc **
-    A.pts_to a s0 **
+    A.pts_to a #p s0 **
     pure (
       (forall (i j: nat). {:pattern Seq.index s0 i; Seq.index s0 j}
         i < j /\ j < Seq.length s0 ==> Seq.index s0 i <= Seq.index s0 j) /\
@@ -171,4 +174,5 @@ fn binary_search
   let vresult = !result_idx;
   
   vresult
+  }
 }

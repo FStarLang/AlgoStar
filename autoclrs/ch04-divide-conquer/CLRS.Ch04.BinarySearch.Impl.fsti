@@ -15,6 +15,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
 val binary_search
+  (#p: perm)
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
@@ -22,14 +23,13 @@ val binary_search
   (ctr: GR.ref nat)
   (#c0: erased nat)
   : stt SZ.t
-    (A.pts_to a s0 ** GR.pts_to ctr c0 **
+    (A.pts_to a #p s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
        Seq.length s0 <= A.length a /\
-       SZ.v len > 0 /\
        is_sorted s0
      ))
-    (fun result -> exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf **
+    (fun result -> exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
      pure (
        SZ.v result <= SZ.v len /\
        (SZ.v result < SZ.v len ==> (
