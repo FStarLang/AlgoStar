@@ -35,3 +35,7 @@ val mod_exp_step (vr vb: int) (ve: nat) (m: pos)
                     let new_b = (vb * vb) % m in
                     let new_e = ve / 2 in
                     (new_r * pow new_b new_e) % m == (vr * pow vb ve) % m))
+
+/// mod_exp_spec always returns a value in [0, m)
+val mod_exp_spec_bounds (b: int) (e: nat) (m: pos)
+  : Lemma (ensures mod_exp_spec b e m >= 0 /\ mod_exp_spec b e m < m)

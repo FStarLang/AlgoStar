@@ -33,6 +33,7 @@ fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
   returns result: int
   ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (
     result == mod_exp_spec b_init e_init m_init /\
+    result >= 0 /\ result < m_init /\
     modexp_complexity_bounded cf (reveal c0) e_init
   )
 //SNIPPET_END: mod_exp_impl_sig

@@ -93,3 +93,8 @@ let mod_exp_step (vr vb: int) (ve: nat) (m: pos)
     else mod_exp_step_odd vr vb ve m
 //SNIPPET_END: mod_exp_step
 #pop-options
+
+/// mod_exp_spec always returns a value in [0, m)
+let mod_exp_spec_bounds (b: int) (e: nat) (m: pos)
+  : Lemma (ensures mod_exp_spec b e m >= 0 /\ mod_exp_spec b e m < m)
+  = FStar.Math.Lemmas.lemma_mod_lt (pow b e) m
