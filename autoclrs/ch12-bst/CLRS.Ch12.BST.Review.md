@@ -254,11 +254,11 @@ by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **BST validity not in postconditions.** The Pulse signatures prove that the
-   imperative tree matches the pure spec (`bst_insert 'ft k`, `bst_delete 'ft k`),
-   and separate lemmas prove the pure spec preserves `bst_valid`. But the Pulse
-   postconditions themselves do not assert `bst_valid` on the result — callers
-   must invoke the lemmas explicitly.
+1. **~~BST validity not in postconditions.~~** *(Addressed.)* The Pulse
+   postconditions for `tree_insert` and `tree_delete` now include
+   `pure (bst_valid 'ft ==> bst_valid (bst_insert 'ft k))` (resp. delete).
+   Callers get BST validity preservation directly from the postcondition
+   without importing the Lemmas module.
 
 2. **No O(log n) bound for balanced trees.** The complexity bounds are all in
    terms of height `h`. For an unbalanced BST, `h` can be `n`. The
@@ -275,10 +275,10 @@ by F\* and Z3.
    CLRS §12.2's TREE-SUCCESSOR and TREE-PREDECESSOR operations (which require
    parent-pointer traversal) are not exposed as separate Pulse operations.
 
-5. **Duplicate keys silently ignored.** `bst_insert` returns the tree unchanged
-   when `k = key`. This matches CLRS behavior but is not explicitly stated in
-   the postcondition — the caller must deduce it from `bst_insert 'ft k`
-   being definitionally equal to `'ft` when `k` is already present.
+5. **~~Duplicate keys silently ignored.~~** *(Addressed.)* The new lemma
+   `bst_insert_noop_if_present` in `CLRS.Ch12.BST.Spec` (exported via
+   `Lemmas.fsti` as `insert_noop_if_present`) makes explicit that
+   `bst_valid t /\ bst_search t k ==> bst_insert t k == t`.
 
 6. **Parent pointers maintained but not separately verified.** The
    `bst_subtree` slprop asserts `node.p == parent`, so parent pointers are

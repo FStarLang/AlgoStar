@@ -281,13 +281,18 @@ has depth `⌊log₂(i+1)⌋`.
 
 ## Specification Gaps and Limitations
 
-1. **Delete is incomplete.** `tree_delete` in `CLRS.Ch12.BSTArray.Delete.fst`
-   handles only the **leaf case** (no children) with full `well_formed_bst`
-   preservation. One-child cases mark the node invalid but **orphan the child
-   subtree**, breaking the structural invariant. The two-children case is
-   described but not fully implemented — the comment states "key-swap approach
-   with admits for complex proofs." The `well_formed_bst` postcondition for
-   delete is conditional: only guaranteed for leaf deletion.
+1. **~~Delete is incomplete.~~** *(Partially addressed.)* `tree_delete` now
+   handles the **two-children case** using the CLRS successor key-swap
+   approach: find the successor (minimum of right subtree via `tree_minimum`),
+   copy its key to the deleted position, and mark the successor as invalid.
+   This is proven to preserve `well_formed_bst` when the successor is a leaf
+   (no valid children). The postcondition is strengthened from conditional to
+   unconditional: `well_formed_bst` is ALWAYS preserved on the result arrays,
+   whether the deletion succeeds or not. When the successor has a right child,
+   or when the node has only a left child, the function returns `false` (tree
+   unchanged) rather than orphaning subtrees. Supporting lemmas:
+   `lemma_successor_swap_delete_wfb`, `lemma_delete_min_narrow_wfb`,
+   `is_left_spine`, and several bound-widening/framing lemmas.
 
 2. **Capacity must be < 32768.** The `cap < 32768` precondition ensures child
    indices (`2*i+2`) fit in `pow2 16`. This is an implementation artifact of
@@ -312,6 +317,11 @@ has depth `⌊log₂(i+1)⌋`.
 7. **Height is O(log cap), not O(log n).** The complexity bound uses `cap` (total
    array capacity), not the number of valid nodes `n`. For a sparse tree with
    few valid nodes in a large array, the bound is loose.
+
+8. **Left-child-only deletion not handled.** When the node has only a left child
+   (no right child), `tree_delete` returns `false` without modifying the tree.
+   A predecessor-based key-swap (symmetric to the successor approach) would
+   handle this case but requires analogous lemmas.
 
 ## Complexity
 
