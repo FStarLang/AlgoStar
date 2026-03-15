@@ -307,6 +307,11 @@ let is_optimal_selection (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (se
   L.length selected == max_compatible_count start finish n
 //SNIPPET_END: is_optimal_selection
 
+(* Lemma: max_compatible_count is 0 when n is 0 — no activities to select *)
+let max_compatible_count_zero (start finish: Seq.seq int)
+  : Lemma (max_compatible_count start finish 0 == 0)
+  = reveal_opaque (`%max_compatible_count) (max_compatible_count start finish 0)
+
 (* Key property: if a compatible set of size m exists, then find_max_compatible >= m *)
 let rec find_max_compatible_lower_bound
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (k: nat) (m: nat)

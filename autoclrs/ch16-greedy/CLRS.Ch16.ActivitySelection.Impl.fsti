@@ -39,26 +39,28 @@ let activity_selection_pre (n: SZ.t) (ss sf: Seq.seq int) (sout0: Seq.seq SZ.t)
   SZ.v n == A.length finish_times /\
   SZ.v n == A.length out /\
   SZ.v n == Seq.length sout0 /\
-  SZ.v n > 0 /\
   L.finish_sorted sf /\
   (forall (i:nat). i < Seq.length ss ==> L.valid_activity ss sf i)
 
 let activity_selection_post
   (count: SZ.t) (n: SZ.t) (sout: Seq.seq SZ.t) (cf: nat) (c0: nat) (ss sf: Seq.seq int)
 : prop =
-  SZ.v count >= 1 /\ 
   SZ.v count <= SZ.v n /\
   Seq.length sout == SZ.v n /\
-  complexity_bounded_linear cf c0 (SZ.v n) /\
-  (exists (sel: Seq.seq nat).
-    Seq.length sel == SZ.v count /\
-    out_matches_sel sout sel (SZ.v count) (SZ.v n) /\
-    L.all_valid_indices sel (SZ.v n) /\
-    L.strictly_increasing sel /\
-    L.pairwise_compatible sel ss sf /\
-    Seq.index sel 0 == 0 /\
-    L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n) /\
-    SZ.v count == S.max_compatible_count ss sf (SZ.v n))
+  cf >= c0 /\
+  SZ.v count == S.max_compatible_count ss sf (SZ.v n) /\
+  (SZ.v n == 0 ==> SZ.v count == 0 /\ cf == c0) /\
+  (SZ.v n > 0 ==>
+    SZ.v count >= 1 /\
+    complexity_bounded_linear cf c0 (SZ.v n) /\
+    (exists (sel: Seq.seq nat).
+      Seq.length sel == SZ.v count /\
+      out_matches_sel sout sel (SZ.v count) (SZ.v n) /\
+      L.all_valid_indices sel (SZ.v n) /\
+      L.strictly_increasing sel /\
+      L.pairwise_compatible sel ss sf /\
+      Seq.index sel 0 == 0 /\
+      L.earliest_compatible sel ss sf (SZ.v n) (SZ.v n)))
 
 //SNIPPET_START: activity_selection_sig
 fn activity_selection 
