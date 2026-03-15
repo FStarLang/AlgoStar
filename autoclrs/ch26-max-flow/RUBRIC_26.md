@@ -147,7 +147,7 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 | P2.5 | Create `Impl.fsti` | Public interface for `max_flow`, `valid_caps`, `imp_valid_flow`, `check_valid_caps_fn`. | ✅ Done |
 | P2.6 | Strengthen main loop invariant | `max_flow` while-loop now carries `imp_valid_flow` as a loop invariant | ✅ Done |
 | P2.7 | Add termination proof for main loop | `max_flow` terminates without fuel: flow_value increases by ≥1 per augmentation, bounded by cap_sum = Σ cap[source][v]. Measure: `cap_sum + 1 - iters`. | ✅ Done |
-| P2.8 | Eliminate `assume_` in test | Test.fst:47 — either prove `valid_caps` from the array writes or replace with a runtime check that produces the proof | ⬜ Open |
+| P2.8 | Eliminate `assume_` in test | Test.fst — replaced `assume_` with `check_valid_caps_fn` + `valid_caps_intro` lemma; branches on runtime check result | ✅ Done |
 
 ---
 
@@ -157,7 +157,7 @@ The canonical rubric (`RUBRIC.md`) requires the following file structure per alg
 |----|------|--------|:------:|
 | P3.1 | Replace INT_MAX magic number | `find_bottleneck_imp` uses literal `2147483647`; replaced with named constant `int_max` | ✅ Done |
 | P3.2 | Rewrite README.md | Updated to document current 8-file Edmonds-Karp implementation with Lemmas/Impl naming | ✅ Done |
-| P3.3 | Add diverse test cases | Single 3-vertex smoke test; add edge cases (disconnected graph, zero-capacity edges, single edge, large fan-out) | ⬜ Open |
+| P3.3 | Add diverse test cases | Added: disconnected graph (no path), single edge, diamond (multiple paths), bottleneck (capacity-limited middle edge) | ✅ Done |
 
 ---
 

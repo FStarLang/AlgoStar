@@ -185,9 +185,8 @@ value equals the capacity of some s-t cut. Combined with weak duality
    `cap_sum = Σ cap[source][v]`.
 
 **Zero admits, zero assumes** across `Impl.fst`, `Spec.fst`, `Lemmas.fst`,
-`Lemmas.MaxFlowMinCut.fst`, and `Complexity.fst`. The only `assume_` in the
-project is in `Test.fst` (line 47), justified in a comment as a test
-simplification for `valid_caps`.
+`Lemmas.MaxFlowMinCut.fst`, `Complexity.fst`, and `Test.fst`. No `assume_`,
+`admit`, or `assume val` in any file.
 
 ## Specification Gaps and Limitations
 
@@ -205,7 +204,8 @@ simplification for `valid_caps`.
 
 4. **`valid_caps` is a runtime precondition.** The caller must ensure all
    capacities are non-negative. A `check_valid_caps_fn` is provided for
-   runtime validation.
+   runtime validation, and `valid_caps_intro` bridges the runtime check
+   result to the abstract `valid_caps` predicate.
 
 5. **`imp_valid_flow` is opaque.** The imperative validity predicate is a `val`
    without an exposed definition. Callers must use the bridge lemma to access
@@ -274,4 +274,4 @@ The proof has four layers:
 | `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fst` | MFMC proof |
 | `CLRS.Ch26.MaxFlow.Complexity.fsti` | Complexity interface |
 | `CLRS.Ch26.MaxFlow.Complexity.fst` | O(VE²) complexity proof |
-| `CLRS.Ch26.MaxFlow.Test.fst` | Test cases (contains 1 `assume_` for test setup) |
+| `CLRS.Ch26.MaxFlow.Test.fst` | Test cases (5 tests, zero assumes) |
