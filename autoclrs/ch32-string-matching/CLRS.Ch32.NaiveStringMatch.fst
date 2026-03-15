@@ -24,6 +24,7 @@ open FStar.SizeT
 open CLRS.Ch32.NaiveStringMatch.Spec
 open CLRS.Ch32.NaiveStringMatch.Lemmas
 open CLRS.Ch32.NaiveStringMatch.Complexity
+open CLRS.Common.Complexity
 
 #push-options "--z3rlimit 40 --ifuel 2 --fuel 2"
 
@@ -32,18 +33,6 @@ module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
-
-// ========== Ghost tick ==========
-
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
 
 // ========== Pulse Implementation ==========
 

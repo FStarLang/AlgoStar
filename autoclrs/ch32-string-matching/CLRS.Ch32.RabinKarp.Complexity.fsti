@@ -40,3 +40,13 @@ val rk_best_linear_in_n (m: nat) (n1 n2: nat)
 val rk_worst_quadratic_growth (m: nat) (n1 n2: nat)
   : Lemma (requires m >= 1 /\ m <= n1 /\ n1 < n2)
           (ensures rk_worst_case n2 m > rk_worst_case n1 m)
+
+/// Complexity bound predicate linked to the Pulse implementation:
+///   cf - c0 <= rk_worst_case n m
+let rk_complexity_bounded (cf c0 n m: nat) : prop =
+  cf >= c0 /\ cf - c0 <= rk_worst_case n m
+
+/// Unfolding: rk_worst_case n m = m + (n-m+1)*m when m <= n
+val rk_worst_case_unfold (n m: nat)
+  : Lemma (requires m <= n /\ m >= 1)
+          (ensures rk_worst_case n m == m + (n - m + 1) * m)

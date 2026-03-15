@@ -23,9 +23,13 @@ open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
+module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module RKSpec = CLRS.Ch32.RabinKarp.Spec
+
+open CLRS.Common.Complexity
+open CLRS.Ch32.RabinKarp.Complexity
 
 // ========== Pure Specification ==========
 
@@ -184,9 +188,12 @@ fn rabin_karp
   (m: SZ.t)
   (d: nat)
   (q: pos)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n == Seq.length s_text /\
       SZ.v m == Seq.length s_pat /\
@@ -198,17 +205,22 @@ fn rabin_karp
       SZ.fits (SZ.v n + 1)
     )
   returns result: int
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
+    GR.pts_to ctr cf **
     pure (result >= 0 /\ result <= SZ.v n - SZ.v m + 1 /\
-          result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1))
+          result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1) /\
+          rk_complexity_bounded cf (reveal c0) (SZ.v n) (SZ.v m))
 //SNIPPET_END: rabin_karp_sig
 {
   // Compute pattern hash and pow_mod for rolling hash
   let p_hash = compute_hash pattern #s_pat d q 0sz m;
   let t_hash_init = compute_hash text #s_text d q 0sz m;
   let h = compute_pow_mod d (if m = 1sz then 0sz else (m -^ 1sz)) q;
+
+  // Account for m operations in pattern hash preprocessing
+  ticks ctr (SZ.v m);
 
   let mut t_hash: int = t_hash_init;
   let mut count: int = 0;
@@ -218,10 +230,11 @@ fn rabin_karp
 
   // Main loop: try each starting position
   while (!s <=^ max_s)
-  invariant exists* vs vcount vt_hash.
+  invariant exists* vs vcount vt_hash (vc: nat).
     R.pts_to s vs **
     R.pts_to count vcount **
     R.pts_to t_hash vt_hash **
+    GR.pts_to ctr vc **
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
     pure (
@@ -232,7 +245,9 @@ fn rabin_karp
       vt_hash >= 0 /\
       (SZ.v vs <= SZ.v max_s ==> vt_hash == RKSpec.hash s_text d q (SZ.v vs) (SZ.v vs + SZ.v m)) /\
       p_hash == RKSpec.hash s_pat d q 0 (SZ.v m) /\
-      h == RKSpec.pow_mod d (SZ.v m - 1) q
+      h == RKSpec.pow_mod d (SZ.v m - 1) q /\
+      vc >= reveal c0 /\
+      vc - reveal c0 <= SZ.v m + SZ.v vs * SZ.v m
     )
   decreases (SZ.v n - SZ.v !s)
   {
@@ -251,12 +266,13 @@ fn rabin_karp
     let mut j: SZ.t = 0sz;
 
     while (!j <^ m && !verified = 1)
-    invariant exists* vj vverified vcount' vt_hash'.
+    invariant exists* vj vverified vcount' vt_hash' (vc_inner: nat).
       R.pts_to s vs **
       R.pts_to count vcount' **
       R.pts_to t_hash vt_hash' **
       R.pts_to j vj **
       R.pts_to verified vverified **
+      GR.pts_to ctr vc_inner **
       A.pts_to text #p_text s_text **
       A.pts_to pattern #p_pat s_pat **
       pure (
@@ -270,7 +286,10 @@ fn rabin_karp
           Seq.index s_text (SZ.v vs + k) <> Seq.index s_pat k) \/
           (not hash_match)) /\
         (hash_match /\ (forall (k: nat). k < SZ.v vj ==>
-          Seq.index s_text (SZ.v vs + k) == Seq.index s_pat k) ==> vverified == 1)
+          Seq.index s_text (SZ.v vs + k) == Seq.index s_pat k) ==> vverified == 1) /\
+        vc_inner >= reveal c0 /\
+        vc_inner - reveal c0 <= SZ.v m + SZ.v vs * SZ.v m + SZ.v vj /\
+        vc_inner - reveal c0 <= SZ.v m + SZ.v vs * SZ.v m + SZ.v m
       )
     decreases (SZ.v m - SZ.v !j)
     {
@@ -278,6 +297,9 @@ fn rabin_karp
 
       let text_char = A.op_Array_Access text (vs +^ vj);
       let pat_char = A.op_Array_Access pattern vj;
+
+      // Count the comparison — one ghost tick
+      tick ctr;
 
       let current_verified = !verified;
       let chars_match = (text_char = pat_char);
@@ -319,6 +341,8 @@ fn rabin_karp
       s := vs +^ 1sz
     }
   };
+
+  rk_worst_case_unfold (SZ.v n) (SZ.v m);
 
   !count
 }

@@ -146,10 +146,9 @@ discharged by F\* and Z3.
    worst-case. For inputs where mismatches occur early, far fewer comparisons
    are performed. The specification does not capture this.
 
-4. **Local ghost tick.** The `tick` function is defined locally within the
-   module rather than imported from `CLRS.Common.Complexity`. This is
-   functionally equivalent but means the ghost counter infrastructure is
-   duplicated.
+4. ~~**Local ghost tick.**~~ **(Resolved.)** The `tick` function is now
+   imported from `CLRS.Common.Complexity`, eliminating the duplicated
+   ghost counter infrastructure.
 
 5. **Generic over eqtype.** The implementation is polymorphic over any
    `eqtype`, not restricted to `int` or `char`. This is stronger than CLRS

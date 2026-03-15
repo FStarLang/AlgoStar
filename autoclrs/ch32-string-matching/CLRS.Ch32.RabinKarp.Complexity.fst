@@ -101,3 +101,9 @@ let rk_worst_quadratic_growth (m: nat) (n1 n2: nat) : Lemma
   assert (rk_worst_case n1 m == m + (n1 - m + 1) * m);
   assert (rk_worst_case n2 m == m + (n2 - m + 1) * m);
   assert ((n2 - m + 1) * m > (n1 - m + 1) * m)
+
+(** Unfolding: rk_worst_case n m = m + (n-m+1)*m when m <= n *)
+let rk_worst_case_unfold (n m: nat) : Lemma
+  (requires m <= n /\ m >= 1)
+  (ensures rk_worst_case n m == m + (n - m + 1) * m)
+  = ()

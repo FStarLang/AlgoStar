@@ -16,9 +16,12 @@ fn rabin_karp
   (m: SZ.t)
   (d: nat)
   (q: pos)
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n == Seq.length s_text /\
       SZ.v m == Seq.length s_pat /\
@@ -30,11 +33,13 @@ fn rabin_karp
       SZ.fits (SZ.v n + 1)
     )
   returns result: int
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to text #p_text s_text **
     A.pts_to pattern #p_pat s_pat **
+    GR.pts_to ctr cf **
     pure (result >= 0 /\ result <= SZ.v n - SZ.v m + 1 /\
-          result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1))
+          result == count_matches_up_to s_text s_pat (SZ.v n - SZ.v m + 1) /\
+          rk_complexity_bounded cf (reveal c0) (SZ.v n) (SZ.v m))
 ```
 
 ### Parameters
@@ -48,6 +53,9 @@ fn rabin_karp
   function. These are caller-supplied — the algorithm is parametric in the
   hash parameters.
 
+* `ctr` is a **ghost counter** tracking operations (preprocessing + character
+  comparisons).
+
 ### Preconditions
 
 * `SZ.v m > 0` and `SZ.v m <= SZ.v n` — non-empty pattern fits within text.
@@ -60,9 +68,8 @@ fn rabin_karp
 
 * `result >= 0 /\ result <= n - m + 1` — Bounds on the count.
 
-**Note:** Unlike GCD, ModExp, and Naive String Match, the Rabin-Karp Pulse
-implementation does **not** have a ghost counter or a complexity bound in its
-postcondition.
+* `rk_complexity_bounded cf (reveal c0) n m` — The number of operations
+  is at most `rk_worst_case n m = m + (n−m+1)·m`.
 
 ## Auxiliary Definitions
 
@@ -128,20 +135,25 @@ Defined locally in the Pulse module (not in Spec).
    `s`, `hash_match_lemma` proves the hashes must be equal, so verification
    always occurs and succeeds.
 
+4. **Worst-case complexity bound** (`rk_complexity_bounded`): The ghost
+   counter `ctr` is incremented `m` times for preprocessing (pattern hash)
+   and once per character comparison in the inner verification loop. The
+   postcondition proves `cf - c0 ≤ rk_worst_case n m = m + (n−m+1)·m`.
+
 ### Pure Specification (CLRS.Ch32.RabinKarp.Spec.fst)
 
-4. **No false positives** (`rabin_karp_matches_no_false_positives`): Every
+5. **No false positives** (`rabin_karp_matches_no_false_positives`): Every
    position returned by `rabin_karp_matches` satisfies `matches_at`.
 
-5. **No false negatives** (`rabin_karp_matches_no_false_negatives`): Every
+6. **No false negatives** (`rabin_karp_matches_no_false_negatives`): Every
    valid match position appears in the result list. The proof relies on
    `hash_match_lemma`: equal substrings produce equal hashes, so
    `verify_match` always succeeds for true matches.
 
-6. **Combined correctness** (`rabin_karp_find_all_correct`): The pure
+7. **Combined correctness** (`rabin_karp_find_all_correct`): The pure
    `rabin_karp_find_all` is proven both sound and complete.
 
-7. **Hash algebra**: `hash_inversion` (extracting the most-significant digit),
+8. **Hash algebra**: `hash_inversion` (extracting the most-significant digit),
    `remove_msd_lemma`, `rolling_hash_proven`, `hash_slice_lemma` (equal
    substrings → equal hashes), and `pow_mod_correct` (connecting `pow_mod` to
    mathematical `pow`).
@@ -151,14 +163,17 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **No ghost counter in Pulse implementation.** Unlike the other algorithms
-   in this project, the Pulse `rabin_karp` function does not thread a ghost
-   counter. The postcondition contains no complexity bound.
+1. ~~**No ghost counter in Pulse implementation.**~~ **(Resolved.)** The Pulse
+   `rabin_karp` function now threads a ghost counter `ctr`. The postcondition
+   proves `rk_complexity_bounded cf c0 n m`, bounding the operation count by
+   `rk_worst_case n m = m + (n−m+1)·m`.
 
-2. **Complexity analysis is separate and not linked.** The complexity bounds
-   in `CLRS.Ch32.RabinKarp.Complexity` define best-case O(n+m) and worst-case
-   O(nm) as pure functions, but these are **not connected** to the Pulse
-   implementation. They are standalone mathematical lemmas.
+2. ~~**Complexity analysis is separate and not linked.**~~ **(Resolved.)** The
+   complexity bound `rk_complexity_bounded` in the Pulse postcondition is
+   linked to `rk_worst_case` from `CLRS.Ch32.RabinKarp.Complexity`. The ghost
+   counter accounts for `m` preprocessing operations (via `ticks ctr m` after
+   pattern hash computation) and one `tick ctr` per character comparison in
+   the inner verification loop.
 
 3. **Worst-case O(nm).** When all hash values collide, every position requires
    full verification, yielding O((n−m+1)·m) = O(nm) comparisons. The
@@ -185,11 +200,12 @@ discharged by F\* and Z3.
 | Metric | Bound | Linked? | Exact? |
 |--------|-------|---------|--------|
 | Best case (pure) | O(n+m) = m + (n−m+1) | ❌ Not linked | Exact formula |
-| Worst case (pure) | O(nm) = m + (n−m+1)·m | ❌ Not linked | Exact formula |
-| Pulse implementation | — | ❌ No ghost counter | Not tracked |
+| Worst case (pure) | O(nm) = m + (n−m+1)·m | ✅ Linked via ghost counter | Exact formula |
+| **Pulse implementation** | **≤ m + (n−m+1)·m** | **✅ Ghost counter** | **Upper bound** |
 
 The complexity bounds in `CLRS.Ch32.RabinKarp.Complexity` are proven as pure
-mathematical lemmas:
+mathematical lemmas and are now **linked** to the Pulse implementation via
+`rk_complexity_bounded`:
 
 ```fstar
 let rk_best_case (n m: nat) : nat =
@@ -200,7 +216,8 @@ let rk_worst_case (n m: nat) : nat =
 ```
 
 Supporting lemmas include `rk_best_linear` (best case ≤ n+1),
-`rk_worst_quadratic` (worst case ≤ n·m+1), and `rk_best_le_worst`.
+`rk_worst_quadratic` (worst case ≤ n·m+1), `rk_best_le_worst`, and
+`rk_worst_case_unfold` (unfolds to `m + (n−m+1)·m` when `m ≤ n`).
 
 ## Proof Structure
 
@@ -214,9 +231,12 @@ position:
 2. If hashes match, verify character-by-character in an inner loop.
 3. Update the rolling hash for position `s+1` using `rolling_hash_step`.
 
-The loop invariant tracks `vt_hash == RKSpec.hash s_text d q s (s+m)` and
-`vcount == count_matches_up_to s_text s_pat s`. The key combined lemma
+The loop invariant tracks `vt_hash == RKSpec.hash s_text d q s (s+m)`,
+`vcount == count_matches_up_to s_text s_pat s`, and
+`vc - c0 <= m + s * m` (the ghost counter). The key combined lemma
 `should_count_correct` bridges the inner loop result to `matches_at_dec`.
+The inner verification loop increments the ghost counter once per character
+comparison via `tick ctr`.
 
 ### Pure Specification
 
@@ -230,9 +250,9 @@ s`, then `hash text d q s (s+m) == hash pattern d q 0 m`, so
 
 | File | Role |
 |------|------|
-| `CLRS.Ch32.RabinKarp.fst` | Pulse implementation + local `count_matches_up_to` |
+| `CLRS.Ch32.RabinKarp.fst` | Pulse implementation + ghost counter + local `count_matches_up_to` |
 | `CLRS.Ch32.RabinKarp.Spec.fst` | Hash function, pure RK, rolling hash, correctness proofs |
 | `CLRS.Ch32.RabinKarp.Lemmas.fsti` | Correctness lemma signatures |
 | `CLRS.Ch32.RabinKarp.Lemmas.fst` | Correctness lemma proofs (no false pos/neg) |
-| `CLRS.Ch32.RabinKarp.Complexity.fsti` | `rk_best_case`, `rk_worst_case` |
+| `CLRS.Ch32.RabinKarp.Complexity.fsti` | `rk_best_case`, `rk_worst_case`, `rk_complexity_bounded` |
 | `CLRS.Ch32.RabinKarp.Complexity.fst` | Complexity lemma proofs |
