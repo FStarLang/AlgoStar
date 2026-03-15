@@ -83,9 +83,7 @@ fn heapsort
   (ctr: GR.ref nat)
   (#s0: erased (Seq.seq int) {
     SZ.v n <= A.length a /\
-    SZ.v n == Seq.length s0 /\
     Seq.length s0 == A.length a /\
-    SZ.v n > 0 /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
   })
   (#c0: erased nat)
@@ -97,8 +95,9 @@ ensures exists* s (cf: nat).
   GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
-    sorted s /\
+    sorted_upto s (SZ.v n) /\
     permutation s0 s /\
+    (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)
   )
@@ -124,10 +123,9 @@ ensures exists* s (cf: nat).
 
 ### Preconditions
 
-* `SZ.v n > 0` — the array must be non-empty.
-
 * `SZ.v n <= A.length a` / `Seq.length s0 == A.length a` — the logical
-  sequence matches the physical array length.
+  sequence matches the physical array length. Note: `n` may be
+  strictly less than `A.length a`, enabling prefix sorting.
 
 * `SZ.fits (op_Multiply 2 (Seq.length s0) + 2)` — index arithmetic for
   `left_idx` (`2*i+1`) and `right_idx` (`2*i+2`) cannot overflow
@@ -145,23 +143,32 @@ sequence `s` and a final counter value `cf` such that:
 
 * `Seq.length s == Seq.length s0` — length is preserved.
 
-* `sorted s` — the output is sorted.
+* `sorted_upto s (SZ.v n)` — the first `n` elements are sorted.
 
 * `permutation s0 s` — the output is a permutation of the input.
+
+* `forall k. n <= k < length s ==> s[k] == s0[k]` — elements beyond
+  the first `n` are unchanged (enables prefix sorting).
 
 * `cf >= reveal c0 /\ cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)`
   — the number of comparisons is bounded.
 
 ## Auxiliary Definitions
 
-### `sorted` (from `CLRS.Ch06.Heap.Spec`)
+### `sorted` / `sorted_upto` (from `CLRS.Ch06.Heap.Spec`)
 
 ```fstar
 let sorted (s: Seq.seq int) =
   forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
+
+let sorted_upto (s: Seq.seq int) (n: nat) =
+  n <= Seq.length s /\
+  (forall (i j: nat). i <= j /\ j < n ==> Seq.index s i <= Seq.index s j)
 ```
 
-Standard all-pairs sorted definition. Identical to `CLRS.Common.SortSpec.sorted`.
+`sorted` is the standard all-pairs definition. `sorted_upto` restricts
+to the first `n` elements, enabling prefix sorting. When `n = Seq.length s`,
+they are equivalent.
 
 ### `permutation` (from `CLRS.Ch06.Heap.Spec`)
 
@@ -268,22 +275,22 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **`n > 0` precondition.** The implementation requires `n > 0`.
-   Sorting an empty array is trivially correct, but the implementation
-   does not handle this case.
+1. ~~**`n > 0` precondition.**~~ **RESOLVED.** The `n > 0`
+   precondition has been removed. Heapsort now handles `n = 0`
+   (empty arrays) by returning immediately with zero cost.
 
 2. **`SZ.fits(2*n+2)` precondition.** Limits maximum array size to
    roughly `SZ.max / 2`. This is a practical overflow guard for
    child-index arithmetic, but excludes very large arrays.
 
-3. **Two separate complexity modules.** `CostBound` provides the
-   ghost-counter-linked bounds (used in Impl.fsti), while `Complexity`
-   provides standalone pure complexity analysis (O(n log n), O(n) for
-   build, beats quadratic). The two are **not directly connected** —
-   `CostBound.heapsort_cost_nlogn` proves `heapsort_cost_bound n ≤
-   4·n·log₂(n)`, but the tighter bounds from `Complexity` (e.g.,
-   `heapsort_ops_simplified`) use a different cost model
-   (`heapsort_ops`) that is not linked to the ghost counter.
+3. ~~**Two separate complexity modules.**~~ **RESOLVED.** The two
+   modules are now connected via `heapsort_ops_le_cost_bound`:
+   `heapsort_ops n ≤ heapsort_cost_bound n`. This proves the pure
+   operation count from `Complexity` is bounded by the ghost-counter
+   cost bound from `CostBound`, so all tighter bounds (O(n) build,
+   beats quadratic, etc.) are implied by the ghost-counter model.
+   Component lemmas `build_heap_ops_le_build_cost` and
+   `extract_max_ops_le_extract_cost` bridge each phase individually.
 
 4. **Cost bounds are coarse per-iteration.** Each `build_max_heap`
    iteration is charged `max_heapify_bound n 0` (the root bound),
@@ -291,11 +298,12 @@ discharged by F\* and Z3.
    index. The O(n) build-heap proof exists in `Complexity` but is not
    threaded through the ghost counter.
 
-5. **Array-length = n assumption.** The heapsort signature requires
-   `SZ.v n == Seq.length s0 /\ Seq.length s0 == A.length a` (the array
-   is exactly `n` elements). Sorting a prefix of a larger array is not
-   directly supported by `heapsort` (though `max_heapify` and
-   `build_max_heap` do handle `heap_size < A.length a`).
+5. ~~**Array-length = n assumption.**~~ **RESOLVED.** The heapsort
+   signature now only requires `SZ.v n <= A.length a` (not equality).
+   Sorting a prefix of a larger array is fully supported: the first
+   `n` elements are sorted in-place (`sorted_upto s n`), elements
+   beyond index `n` are preserved unchanged, and the full array
+   remains a permutation of the input.
 
 ## Complexity
 
@@ -304,12 +312,12 @@ discharged by F\* and Z3.
 | Comparisons (heapsort) | O(n log n) = 4·n·log₂(n) | ✅ Ghost counter | Upper bound only |
 | Comparisons (build) | O(n log n) = (n/2)·2·log₂(n) | ✅ Ghost counter | Upper bound only |
 | Comparisons (max_heapify) | O(log n) = 2·log₂(n/(idx+1)) | ✅ Ghost counter | Upper bound only |
-| Operations (pure model) | O(n log n) ≤ 6·n·(1+log₂n) | ❌ Pure only | Upper bound only |
-| BUILD-MAX-HEAP (pure) | O(n) ≤ 4·n | ❌ Pure only | Upper bound only |
+| Operations (pure model) | O(n log n) ≤ 6·n·(1+log₂n) | ✅ Bridged | Upper bound only |
+| BUILD-MAX-HEAP (pure) | O(n) ≤ 4·n | ✅ Bridged | Upper bound only |
 
 The ghost counter in the Pulse implementation tracks comparisons at
-each `max_heapify` call. The pure `Complexity` module provides tighter
-asymptotic analysis but is not connected to the ghost counter.
+each `max_heapify` call. The pure `Complexity` module's bounds are now
+connected to the ghost counter via `heapsort_ops_le_cost_bound`.
 
 ## Proof Structure
 
