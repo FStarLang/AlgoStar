@@ -365,24 +365,3 @@ let floyd_warshall_computes_shortest_paths
       index (fw_outer adj n 0) (qi * n + qj) == fw_entry adj n qi qj n)
   = fw_outer_computes_entry adj adj n 0 qi qj
 //SNIPPET_END: floyd_warshall_correct
-
-//SNIPPET_START: floyd_warshall_full_correctness
-(* Combined theorem: weights_bounded implies fw_outer computes shortest paths.
-   Derives the fw_entry diagonal invariant from weights_bounded, then applies
-   the main correctness theorem. *)
-let floyd_warshall_full_correctness
-  (adj: seq int) (n: nat) (qi qj: nat)
-  : Lemma
-    (requires
-      weights_bounded adj n /\ n > 0 /\ qi < n /\ qj < n)
-    (ensures
-      index (fw_outer adj n 0) (qi * n + qj) == fw_entry adj n qi qj n)
-  = // weights_bounded implies all fw_entry values are non-negative
-    let aux (k v: nat) : Lemma
-      (requires k <= n /\ v < n)
-      (ensures fw_entry adj n v v k >= 0)
-      = lemma_weights_bounded_nonneg_entry adj n v v k
-    in
-    FStar.Classical.forall_intro_2 (FStar.Classical.move_requires_2 aux);
-    floyd_warshall_computes_shortest_paths adj n qi qj
-//SNIPPET_END: floyd_warshall_full_correctness

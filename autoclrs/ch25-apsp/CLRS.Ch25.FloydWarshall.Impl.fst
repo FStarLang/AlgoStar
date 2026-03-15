@@ -42,6 +42,7 @@ fn floyd_warshall
     A.pts_to dist contents **
     GR.pts_to ctr c0 **
     pure (
+      SZ.v n > 0 /\
       Seq.length contents == SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n)
     )

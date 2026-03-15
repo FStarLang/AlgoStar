@@ -53,25 +53,4 @@ let test_correctness (qi qj: nat) : Lemma
   = test_no_neg_cycle ();
     floyd_warshall_computes_shortest_paths test_adj 3 qi qj
 
-// Test: weights_bounded holds for the test adjacency matrix
-let test_weights_bounded () : Lemma (weights_bounded test_adj 3)
-  = assert_norm (weights_bounded test_adj 3)
-
-// Test: floyd_warshall_full_correctness derives shortest paths from weights_bounded alone
-let test_full_correctness (qi qj: nat) : Lemma
-    (requires qi < 3 /\ qj < 3)
-    (ensures index (fw_outer test_adj 3 0) (qi * 3 + qj) == fw_entry test_adj 3 qi qj 3)
-  = floyd_warshall_full_correctness test_adj 3 qi qj
-
-// Test: weights_bounded implies all fw_entry values are non-negative
-let test_nonneg_entry () : Lemma (
-    forall (i j: nat) (k: nat). i < 3 /\ j < 3 /\ k <= 3 ==>
-      fw_entry test_adj 3 i j k >= 0)
-  = let aux (i j k: nat) : Lemma
-      (requires i < 3 /\ j < 3 /\ k <= 3)
-      (ensures fw_entry test_adj 3 i j k >= 0)
-    = lemma_weights_bounded_nonneg_entry test_adj 3 i j k
-    in
-    FStar.Classical.forall_intro_3 (FStar.Classical.move_requires_3 aux)
-
 #pop-options

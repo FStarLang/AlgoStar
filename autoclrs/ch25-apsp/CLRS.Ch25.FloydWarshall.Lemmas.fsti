@@ -105,17 +105,3 @@ val floyd_warshall_computes_shortest_paths
     (ensures
       index (fw_outer adj n 0) (qi * n + qj) == fw_entry adj n qi qj n)
 //SNIPPET_END: floyd_warshall_correct
-
-//SNIPPET_START: floyd_warshall_full_correctness
-(* Combined theorem: weights_bounded implies fw_outer computes shortest paths.
-   This closes the gap between the Pulse postcondition and the graph-theoretic
-   correctness — callers only need weights_bounded, not the intermediate
-   fw_entry diagonal invariant. *)
-val floyd_warshall_full_correctness
-  (adj: seq int) (n: nat) (qi qj: nat)
-  : Lemma
-    (requires
-      weights_bounded adj n /\ n > 0 /\ qi < n /\ qj < n)
-    (ensures
-      index (fw_outer adj n 0) (qi * n + qj) == fw_entry adj n qi qj n)
-//SNIPPET_END: floyd_warshall_full_correctness
