@@ -55,38 +55,7 @@ module S = CLRS.Ch13.RBTree.Spec
 module L = CLRS.Ch13.RBTree.Lemmas
 module G = FStar.Ghost
 module C = CLRS.Ch13.RBTree.Complexity
-
-// ========== Node type and pointers ==========
-
-//SNIPPET_START: rb_node_type
-noeq
-type rb_node = {
-  key:   int;
-  color: S.color;
-  left:  rb_ptr;
-  right: rb_ptr;
-}
-
-and rb_node_ptr = box rb_node
-
-// Nullable pointer to a node
-and rb_ptr = option rb_node_ptr
-//SNIPPET_END: rb_node_type
-
-// ========== Recursive separation logic predicate ==========
-
-//SNIPPET_START: is_rbtree
-let rec is_rbtree (ct: rb_ptr) (ft: S.rbtree)
-  : Tot slprop (decreases ft)
-  = match ft with
-    | S.Leaf -> pure (ct == None)
-    | S.Node c l v r ->
-      exists* (p: rb_node_ptr) (lct: rb_ptr) (rct: rb_ptr).
-        pure (ct == Some p) **
-        (p |-> { key = v; color = c; left = lct; right = rct }) **
-        is_rbtree lct l **
-        is_rbtree rct r
-//SNIPPET_END: is_rbtree
+open FStar.Mul
 
 // ========== Ghost fold/unfold helpers ==========
 
@@ -1210,11 +1179,6 @@ fn rec free_rbtree (tree: rb_ptr)
 //
 // This validated API bundles invariants into the slprop, so users get BST
 // and RB properties automatically in postconditions — no manual lemma calls.
-
-//SNIPPET_START: valid_rbtree
-let valid_rbtree (ct: rb_ptr) (ft: S.rbtree) : slprop =
-  is_rbtree ct ft ** pure (S.is_rbtree ft /\ S.is_bst ft)
-//SNIPPET_END: valid_rbtree
 
 ghost fn elim_valid_rbtree (ct: rb_ptr) (#ft: G.erased S.rbtree)
   requires valid_rbtree ct ft

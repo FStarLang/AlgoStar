@@ -37,39 +37,6 @@ module CS = CLRS.Ch13.RBTree.CLRSSpec
 module G = FStar.Ghost
 
 // ============================================================
-// §12.1 Node type
-// ============================================================
-
-noeq
-type rb_node = {
-  key:   int;
-  color: S.color;
-  left:  rb_ptr;
-  right: rb_ptr;
-  p:     rb_ptr;     // parent pointer (CLRS §12.1)
-}
-
-and rb_node_ptr = box rb_node
-
-and rb_ptr = option rb_node_ptr
-
-// ============================================================
-// Separation logic predicate: rbtree_subtree
-// ============================================================
-
-let rec rbtree_subtree (ct: rb_ptr) (ft: S.rbtree) (parent: rb_ptr)
-  : Tot slprop (decreases ft)
-  = match ft with
-    | S.Leaf -> pure (ct == None)
-    | S.Node c l v r ->
-      exists* (bp: rb_node_ptr) (node: rb_node).
-        pure (ct == Some bp) **
-        (bp |-> node) **
-        pure (node.key == v /\ node.color == c /\ node.p == parent) **
-        rbtree_subtree node.left l (Some bp) **
-        rbtree_subtree node.right r (Some bp)
-
-// ============================================================
 // Ghost fold/unfold helpers
 // ============================================================
 
@@ -1246,9 +1213,6 @@ fn rec free_rbtree (tree: rb_ptr)
 // ============================================================
 // Validated API — bundles BST + RB invariants
 // ============================================================
-
-let valid_rbtree (ct: rb_ptr) (ft: S.rbtree) (parent: rb_ptr) : slprop =
-  rbtree_subtree ct ft parent ** pure (S.is_rbtree ft /\ S.is_bst ft)
 
 ghost fn elim_valid (ct: rb_ptr) (#ft: G.erased S.rbtree) (#parent: G.erased rb_ptr)
   requires valid_rbtree ct ft parent
