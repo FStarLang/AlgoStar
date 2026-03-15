@@ -235,18 +235,20 @@ by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. **No complexity bounds.** Unlike the Okasaki-style implementation
-   (`CLRS.Ch13.RBTree.Impl`), the CLRS-style implementation does not include
-   ghost tick counters or complexity-aware API variants. There is no
-   `CLRS.Ch13.RBTree.CLRSComplexity` module. The O(log n) bound can be inferred
-   from the shared Spec module's height bound (Theorem 13.1) but is not proven
-   for the CLRS-specific operations.
+1. **~~No complexity bounds.~~** *Addressed.* The `CLRS.Ch13.RBTree.CLRSComplexity`
+   module now provides ghost tick counters and proven bounds for CLRS-style
+   operations: `clrs_insert_ticks ≤ h+2 ≤ 2·lg(n+1)+2` and
+   `clrs_delete_ticks ≤ 2h+2 ≤ 4·lg(n+1)+2`. The CLRSImpl Pulse interface
+   exposes a complexity-aware API (`rb_search_log`, `rb_clrs_insert_log`,
+   `rb_clrs_delete_log`) with tick bounds in postconditions. Zero admits.
 
-2. **Shares pure spec types with Okasaki.** The `rbtree` type, `is_rbtree`,
-   `is_bst`, `search`, `mem`, etc. are imported from `CLRS.Ch13.RBTree.Spec`
-   (the Okasaki module). The CLRS operations (`clrs_insert`, `clrs_delete`) are
-   defined on the same type but are separate functions. No formal equivalence
-   between `insert` (Okasaki) and `clrs_insert` (CLRS) is proven.
+2. **~~Shares pure spec types with Okasaki — no formal equivalence.~~**
+   *Partially addressed.* Membership equivalence is now proven:
+   `insert_clrs_insert_mem_equiv` shows `mem x (insert t k) <==> mem x
+   (clrs_insert t k)` for any BST, and similarly for delete. Both operations
+   produce the same membership set. Structural equivalence (same tree shape)
+   is intentionally not claimed, as the algorithms use different rebalancing
+   strategies.
 
 3. **Delete postcondition uses different parent parameter.** The `rb_clrs_delete`
    signature has `requires rbtree_subtree tree 'ft 'old_parent` but
@@ -281,9 +283,10 @@ by F\* and Z3.
 | Insert fixup | Single `balance` function (4 rotation cases) | `clrs_fixup_left`/`right` (checks uncle color: Cases 1/2/3) |
 | Delete | Kahrs-style `fuse` + `balL`/`balR` | Successor replacement + `clrs_resolve_left`/`right` (Cases 1–4) |
 | Parent pointer | No | Yes (`p` field) |
-| Complexity proof | ✅ O(log n) with tick functions | ❌ Not included |
+| Complexity proof | ✅ O(log n) with tick functions | ✅ O(log n) with tick functions (CLRSComplexity) |
 | Minimum exposed | Via `S.minimum` (pure) | `rb_minimum` Pulse function |
 | Operations | search, insert, delete | search, minimum, insert, delete |
+| Membership equiv. | `insert_mem`, `delete_mem` | `clrs_insert_mem`, `clrs_delete_mem` + cross-equivalence |
 
 Both implementations share the same `rbtree` pure type and `is_rbtree`/`is_bst`
 predicates from `CLRS.Ch13.RBTree.Spec`.
@@ -315,6 +318,8 @@ predicates from `CLRS.Ch13.RBTree.Spec`.
 | `CLRS.Ch13.RBTree.CLRSImpl.fsti` | Public interface (types, slprop, signatures) |
 | `CLRS.Ch13.RBTree.CLRSImpl.fst` | Pulse implementation |
 | `CLRS.Ch13.RBTree.CLRSSpec.fst` | CLRS-style pure spec + full correctness proofs |
+| `CLRS.Ch13.RBTree.CLRSComplexity.fsti` | CLRS tick function signatures |
+| `CLRS.Ch13.RBTree.CLRSComplexity.fst` | CLRS tick function proofs |
 | `CLRS.Ch13.RBTree.Spec.fst` | Shared pure spec (types, properties, Okasaki operations) |
 | `CLRS.Ch13.RBTree.Lemmas.fsti` | Shared lemma signatures |
 | `CLRS.Ch13.RBTree.Lemmas.fst` | Shared lemma proofs (Theorem 13.1, etc.) |

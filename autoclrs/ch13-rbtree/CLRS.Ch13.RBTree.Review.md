@@ -285,7 +285,10 @@ by F\* and Z3.
    differently (top-down recursion in the pure spec).
 
 6. **Duplicate keys silently ignored.** `ins` returns the tree unchanged when
-   `k = v`. This is standard but not explicitly stated in the postcondition.
+   `k = v`. This is now formally proven: `insert_duplicate` shows that for a
+   valid RB-BST, `insert t k == t` when `mem k t`. The proof uses
+   `balance_no_red_red_id` to show that balance is an identity when no
+   red-red violations exist.
 
 7. **Height bound requires `node_count ≥ 1`.** The logarithmic complexity
    bounds require the tree to be non-empty. Empty trees are handled separately
