@@ -103,6 +103,7 @@ let heapsort_cost_nlogn (n: pos)
   : Lemma (ensures heapsort_cost_bound n <= 4 * n * log2_floor n)
   = max_heapify_bound_root n;
     let lg = log2_floor n in
+    assert (n > 0);
     assert (max_heapify_bound n 0 == 2 * lg);
     assert (build_cost_bound n == (n / 2) * (2 * lg));
     assert (extract_cost_bound n == (n - 1) * (2 * lg));

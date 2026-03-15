@@ -274,7 +274,6 @@ fn heapsort
     SZ.v n <= A.length a /\
     SZ.v n == Seq.length s0 /\
     Seq.length s0 == A.length a /\
-    SZ.v n > 0 /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
   })
   (#c0: erased nat)
@@ -292,6 +291,10 @@ ensures exists* s (cf: nat).
     cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)
   )
 {
+  if (n = 0sz) {
+    // Empty array: trivially sorted, identity permutation, zero cost
+    ()
+  } else {
   // Phase 1: BUILD-MAX-HEAP
   build_max_heap a n ctr;
   
@@ -351,5 +354,6 @@ ensures exists* s (cf: nat).
   };
   
   ()
+  } // else n > 0
 }
 #pop-options

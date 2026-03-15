@@ -38,13 +38,15 @@ val max_heapify_bound_le_root (heap_size: pos) (idx: nat{idx < heap_size})
   : Lemma (ensures max_heapify_bound heap_size idx <= max_heapify_bound heap_size 0)
 
 /// Cost bound for BUILD-MAX-HEAP: (n/2) iterations, each bounded by max_heapify_bound at root
-let build_cost_bound (n: pos) : nat = (n / 2) * max_heapify_bound n 0
+let build_cost_bound (n: nat) : nat =
+  if n = 0 then 0 else (n / 2) * max_heapify_bound n 0
 
 /// Cost bound for extract-max phase: (n-1) iterations, each bounded by max_heapify_bound at root
-let extract_cost_bound (n: pos) : nat = (n - 1) * max_heapify_bound n 0
+let extract_cost_bound (n: nat) : nat =
+  if n = 0 then 0 else (n - 1) * max_heapify_bound n 0
 
 /// Total HEAPSORT cost bound
-let heapsort_cost_bound (n: pos) : nat = build_cost_bound n + extract_cost_bound n
+let heapsort_cost_bound (n: nat) : nat = build_cost_bound n + extract_cost_bound n
 
 /// Heapsort cost is O(n log n): bounded by 4 * n * log2_floor(n)
 val heapsort_cost_nlogn (n: pos)

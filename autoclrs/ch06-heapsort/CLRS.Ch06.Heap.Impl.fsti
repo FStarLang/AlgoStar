@@ -98,7 +98,6 @@ fn heapsort
     SZ.v n <= A.length a /\
     SZ.v n == Seq.length s0 /\
     Seq.length s0 == A.length a /\
-    SZ.v n > 0 /\
     SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
   })
   (#c0: erased nat)
