@@ -60,3 +60,27 @@ val pop_while_ensures_left_turn
                     (Seq.index xs t1) (Seq.index ys t1)
                     (Seq.index xs p_idx) (Seq.index ys p_idx) > 0))))
 //SNIPPET_END: pop_while_left_turn
+
+// all_left_turns_sz is monotone: reducing top preserves the property.
+val all_left_turns_sz_prefix (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top top': nat)
+  : Lemma (requires all_left_turns_sz xs ys hull top /\ top' <= top)
+          (ensures all_left_turns_sz xs ys hull top')
+
+// pop_while_spec returns >= 1 when starting with top >= 2.
+val pop_while_spec_ge_1 (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: nat)
+  : Lemma (requires top >= 2)
+          (ensures pop_while_spec xs ys hull top p_idx >= 1)
+
+// scan_step preserves the all_left_turns_sz invariant (CLRS Theorem 33.1).
+val scan_step_preserves_left_turns
+  (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: SZ.t)
+  : Lemma
+    (requires
+      all_left_turns_sz xs ys hull top /\
+      top >= 2 /\ top <= Seq.length hull /\
+      SZ.v p_idx < Seq.length xs /\ Seq.length ys == Seq.length xs /\
+      (forall (i: nat). i < top ==> SZ.v (Seq.index hull i) < Seq.length xs) /\
+      pop_while_spec xs ys hull top (SZ.v p_idx) < Seq.length hull)
+    (ensures (
+      let top' = pop_while_spec xs ys hull top (SZ.v p_idx) in
+      all_left_turns_sz xs ys (Seq.upd hull top' p_idx) (top' + 1)))

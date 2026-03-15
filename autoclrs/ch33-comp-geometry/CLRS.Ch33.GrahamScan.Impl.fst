@@ -193,3 +193,43 @@ fn pop_while (#p: perm) (xs ys: array int)
 }
 #pop-options
 //SNIPPET_END: pop_while_impl
+
+//SNIPPET_START: graham_scan_step_impl
+fn graham_scan_step (#p: perm) (xs ys: array int)
+  (#sxs: Ghost.erased (Seq.seq int))
+  (#sys: Ghost.erased (Seq.seq int))
+  (hull: array SZ.t)
+  (#shull: Ghost.erased (Seq.seq SZ.t))
+  (top_in: SZ.t) (p_idx: SZ.t) (len: SZ.t)
+  requires A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    A.pts_to hull shull **
+    pure (
+      SZ.v top_in >= 2 /\
+      SZ.v top_in < Seq.length shull /\
+      SZ.v p_idx < SZ.v len /\
+      SZ.v len == Seq.length sxs /\
+      Seq.length sxs == Seq.length sys /\
+      SZ.v len == A.length xs /\
+      SZ.v len == A.length ys /\
+      Seq.length shull == A.length hull /\
+      Seq.length shull <= SZ.v len /\
+      (forall (i: nat). i < SZ.v top_in ==> SZ.v (Seq.index shull i) < SZ.v len)
+    )
+  returns result: SZ.t
+  ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
+    (exists* shull'.
+      A.pts_to hull shull' **
+      pure (
+        shull' == fst (scan_step_sz_spec sxs sys shull (SZ.v top_in) p_idx) /\
+        SZ.v result == snd (scan_step_sz_spec sxs sys shull (SZ.v top_in) p_idx) /\
+        SZ.v result >= 2 /\
+        SZ.v result <= Seq.length shull
+      ))
+{
+  pop_while_spec_bounded sxs sys shull (SZ.v top_in) (SZ.v p_idx);
+  pop_while_spec_ge_1 sxs sys shull (SZ.v top_in) (SZ.v p_idx);
+  let top' = pop_while xs ys hull top_in p_idx len;
+  hull.(top') <- p_idx;
+  SZ.add top' 1sz
+}
+//SNIPPET_END: graham_scan_step_impl

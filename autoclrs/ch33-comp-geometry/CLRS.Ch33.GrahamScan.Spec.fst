@@ -160,4 +160,26 @@ let is_bottommost (xs ys: Seq.seq int) (m: nat) : prop =
   (forall (k: nat). k < Seq.length xs ==>
     Seq.index ys m < Seq.index ys k \/
     (Seq.index ys m = Seq.index ys k /\ Seq.index xs m <= Seq.index xs k))
+
+// SZ.t version of all_left_turns for direct Pulse array compatibility.
+let all_left_turns_sz (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) : prop =
+  top <= Seq.length hull /\
+  Seq.length ys == Seq.length xs /\
+  (forall (i: nat). i + 2 < top ==>
+    SZ.v (Seq.index hull i) < Seq.length xs /\
+    SZ.v (Seq.index hull (i + 1)) < Seq.length xs /\
+    SZ.v (Seq.index hull (i + 2)) < Seq.length xs /\
+    cross_prod (Seq.index xs (SZ.v (Seq.index hull i)))
+               (Seq.index ys (SZ.v (Seq.index hull i)))
+               (Seq.index xs (SZ.v (Seq.index hull (i + 1))))
+               (Seq.index ys (SZ.v (Seq.index hull (i + 1))))
+               (Seq.index xs (SZ.v (Seq.index hull (i + 2))))
+               (Seq.index ys (SZ.v (Seq.index hull (i + 2)))) > 0)
+
+// One step of the Graham scan using SZ.t hull: pop non-left-turns, then push.
+let scan_step_sz_spec (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: SZ.t)
+  : (Seq.seq SZ.t & nat) =
+  let top' = pop_while_spec xs ys hull top (SZ.v p_idx) in
+  if top' >= Seq.length hull then (hull, top')
+  else (Seq.upd hull top' p_idx, top' + 1)
 //SNIPPET_END: correctness_defs

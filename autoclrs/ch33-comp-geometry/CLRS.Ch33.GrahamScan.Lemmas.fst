@@ -105,3 +105,53 @@ let rec pop_while_ensures_left_turn
     else
       pop_while_spec_bounded xs ys hull (top - 1) p_idx
   end else ()
+
+let all_left_turns_sz_prefix (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top top': nat)
+  : Lemma (requires all_left_turns_sz xs ys hull top /\ top' <= top)
+          (ensures all_left_turns_sz xs ys hull top') = ()
+
+let rec pop_while_spec_ge_1 (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: nat)
+  : Lemma (requires top >= 2)
+          (ensures pop_while_spec xs ys hull top p_idx >= 1)
+          (decreases top) =
+  if top < 2 || top > Seq.length hull then ()
+  else
+    let t1 = SZ.v (Seq.index hull (top - 1)) in
+    let t2 = SZ.v (Seq.index hull (top - 2)) in
+    if t1 >= Seq.length xs || t2 >= Seq.length xs || p_idx >= Seq.length xs ||
+       Seq.length ys <> Seq.length xs
+    then ()
+    else
+      let cp = cross_prod
+        (Seq.index xs t2) (Seq.index ys t2)
+        (Seq.index xs t1) (Seq.index ys t1)
+        (Seq.index xs p_idx) (Seq.index ys p_idx) in
+      if cp <= 0 then begin
+        if top - 1 >= 2 then pop_while_spec_ge_1 xs ys hull (top - 1) p_idx
+        else ()
+      end else ()
+
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+let scan_step_preserves_left_turns
+  (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: SZ.t)
+  : Lemma
+    (requires
+      all_left_turns_sz xs ys hull top /\
+      top >= 2 /\ top <= Seq.length hull /\
+      SZ.v p_idx < Seq.length xs /\ Seq.length ys == Seq.length xs /\
+      (forall (i: nat). i < top ==> SZ.v (Seq.index hull i) < Seq.length xs) /\
+      pop_while_spec xs ys hull top (SZ.v p_idx) < Seq.length hull)
+    (ensures (
+      let top' = pop_while_spec xs ys hull top (SZ.v p_idx) in
+      all_left_turns_sz xs ys (Seq.upd hull top' p_idx) (top' + 1))) =
+  pop_while_spec_bounded xs ys hull top (SZ.v p_idx);
+  pop_while_ensures_left_turn xs ys hull top (SZ.v p_idx);
+  let top' = pop_while_spec xs ys hull top (SZ.v p_idx) in
+  let hull' = Seq.upd hull top' p_idx in
+  // For i + 2 < top': hull'[i] == hull[i] for all positions < top',
+  // so all_left_turns_sz for the prefix follows from the original.
+  // For i + 2 == top' (when top' >= 2): pop_while_ensures_left_turn gives cp > 0.
+  assert (forall (i: nat). i < top' ==> Seq.index hull' i == Seq.index hull i);
+  assert (top' <= top);
+  ()
+#pop-options
