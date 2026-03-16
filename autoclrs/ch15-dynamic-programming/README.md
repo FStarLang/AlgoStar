@@ -234,18 +234,15 @@ inputs.
 ### Complexity
 
 O(n³) — proven. A separate `MatrixChain.Complexity` module proves
-`mc_iterations n ≤ n³`. The complexity is proven in *pure F\** (not linked to
-the Pulse implementation's ghost counter — the Pulse function does not carry
-a ghost counter). The proof shows `mc_iterations n ≤ n³` by bounding each
-chain-length iteration's work.
+`mc_iterations n ≤ n³`. The complexity is linked to the Pulse implementation
+via a ghost counter: the postcondition proves
+`mc_complexity_bounded cf c0 n`, i.e., `cf - c0 == mc_iterations n`.
 
 ### Limitations
 
 - The sentinel value 10⁹ creates a precondition (`all_costs_bounded`) that
   must be satisfied. For practical inputs this is trivially true, but it is
   not proven automatically.
-- The complexity proof is in a separate pure module, not linked to the Pulse
-  implementation via a ghost counter (unlike rod cutting and LCS).
 - No admits, no assumes.
 
 ---
@@ -296,11 +293,11 @@ chain-length iteration's work.
 |---|---|---|---|---|---|---|
 | Rod Cutting | §15.1 | O(n²) | Tight | ✅ | 0 | `result == optimal_revenue` |
 | LCS | §15.4 | O(mn) | Tight | ✅ | 0 | `result == lcs_length` |
-| Matrix Chain | §15.2 | O(n³) | Upper bound | ❌ (pure) | 0 | `mc_result == mc_cost` |
+| Matrix Chain | §15.2 | O(n³) | Upper bound | ✅ | 0 | `result == mc_result`, `mc_result == mc_cost` |
 
 **Linked** means the complexity bound is proven inside the Pulse implementation
 via a ghost counter, ensuring the imperative code's actual operation count
-matches the bound.
+matches the bound. All three algorithms now have linked complexity bounds.
 
 ---
 

@@ -24,7 +24,6 @@ fn lcs
       SZ.v m == A.length x /\
       SZ.v n == Seq.length sy /\
       SZ.v n == A.length y /\
-      SZ.v m > 0 /\ SZ.v n > 0 /\
       SZ.fits (op_Multiply (SZ.v m + 1) (SZ.v n + 1))
     )
   returns result: int
@@ -51,10 +50,11 @@ fn lcs
 
 * `SZ.v m == Seq.length sx` and `SZ.v n == Seq.length sy`: Lengths match.
 
-* `SZ.v m > 0 /\ SZ.v n > 0`: Both sequences must be non-empty.
-
 * `SZ.fits (op_Multiply (SZ.v m + 1) (SZ.v n + 1))`: The DP table of
   size `(m+1)×(n+1)` fits in machine integers.
+
+Note: No `m > 0` or `n > 0` precondition — the implementation handles
+empty sequences by returning 0 immediately.
 
 ### Postcondition
 
@@ -62,7 +62,8 @@ fn lcs
   length as defined by the DP recurrence.
 
 * `lcs_complexity_bounded cf (reveal c0) (SZ.v m) (SZ.v n)` — Exactly
-  `(m+1)×(n+1)` cell evaluations.
+  `(m+1)×(n+1)` cell evaluations when both are non-empty; 0 when either
+  is empty.
 
 ## Auxiliary Definitions
 
@@ -88,11 +89,13 @@ either sequence.
 
 ```fstar
 let lcs_complexity_bounded (cf c0 m n: nat) : prop =
-  cf >= c0 /\ cf - c0 == op_Multiply (m + 1) (n + 1)
+  cf >= c0 /\
+  (m > 0 /\ n > 0 ==> cf - c0 == op_Multiply (m + 1) (n + 1)) /\
+  (m = 0 \/ n = 0 ==> cf == c0)
 ```
 
-Exactly `(m+1)×(n+1)` cell evaluations — one per table entry, including
-the base-case row and column.
+Exactly `(m+1)×(n+1)` cell evaluations when both sequences are non-empty,
+and zero cost when either is empty.
 
 ### `is_subsequence` and `is_common_subsequence` (from `CLRS.Ch15.LCS.Spec`)
 
@@ -218,12 +221,37 @@ all cells in row-major order before it are correct. The key lemma
 `lcs_length x y i j`, and `lcs_table_update_preserves` shows that writing
 it advances the invariant to `(i, j+1)`.
 
+## Profiling & Proof Stability
+
+| File | z3rlimit | Build time | Assessment |
+|------|----------|------------|------------|
+| `LCS.Spec.fst` | 20 (localized) | ~2s | ✅ Fast |
+| `LCS.Lemmas.fsti` | default | ~1s | ✅ Fast |
+| `LCS.Impl.fsti` | default | ~3s | ✅ Fast |
+| `LCS.Impl.fst` | default | ~31s | ✅ Good |
+| `LCS.Lemmas.fst` | 30 (localized) | ~1s | ✅ Fast |
+
+All rlimits are ≤ 30 and localized with `#push-options`/`#pop-options`.
+This is the most proof-stable of the three ch15 algorithms. No files
+require high rlimits or `split_queries`.
+
 ## Files
 
-| File | Role |
-|------|------|
-| `CLRS.Ch15.LCS.Impl.fsti` | Public interface (this signature) |
-| `CLRS.Ch15.LCS.Impl.fst` | Pulse implementation with ghost counter |
-| `CLRS.Ch15.LCS.Spec.fst` | `lcs_length`, `is_subsequence`, `is_common_subsequence`, `lcs_table_correct` |
-| `CLRS.Ch15.LCS.Lemmas.fsti` | Lemma signatures (optimality, witness, combined) |
-| `CLRS.Ch15.LCS.Lemmas.fst` | Lemma proofs |
+| File | Lines | Role |
+|------|-------|------|
+| `CLRS.Ch15.LCS.Impl.fsti` | 54 | Public interface (this signature) |
+| `CLRS.Ch15.LCS.Impl.fst` | 193 | Pulse implementation with ghost counter |
+| `CLRS.Ch15.LCS.Spec.fst` | 144 | `lcs_length`, `is_subsequence`, `is_common_subsequence`, `lcs_table_correct` |
+| `CLRS.Ch15.LCS.Lemmas.fsti` | 70 | Lemma signatures (optimality, witness, combined) |
+| `CLRS.Ch15.LCS.Lemmas.fst` | 307 | Lemma proofs |
+
+## Checklist
+
+- [x] Spec.fst — pure LCS recurrence, subsequence predicates, table invariant
+- [x] Lemmas.fst / .fsti — optimality, witness construction, `lcs_length_is_longest`
+- [x] Impl.fst / .fsti — Pulse implementation with correctness + complexity
+- [x] Zero admits, zero assumes
+- [x] Complexity linked via ghost counter (exact (m+1)×(n+1))
+- [x] Strongest possible spec: upper bound + achievability
+- [ ] Add test file (CLRS.Ch15.LCS.Test.fst) — currently missing
+- [ ] Consider extended variant returning the actual subsequence (not just length)

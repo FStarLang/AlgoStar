@@ -31,7 +31,7 @@ module Seq = FStar.Seq
 
 // ========== Pure Specification ==========
 
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
 
 // Accumulated max: max over i in [1, limit] of (prices[i-1] + r[j-i])
 let rec accum_max (prices: Seq.seq nat) (r: Seq.seq nat) (j: nat) (limit: nat)
@@ -252,6 +252,7 @@ let cuts_upd_valid (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t)
     Classical.forall_intro_2 aux
 
 // Lemma: when dp_correct holds, cuts_achieve_optimal implies the postcondition property
+#push-options "--z3rlimit 200"
 let cuts_optimal_from_dp (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t) (n: nat)
   : Lemma (requires dp_correct prices sr n /\ 
                      cuts_achieve_optimal prices sr sc n /\
@@ -290,6 +291,7 @@ let cuts_optimal_from_dp (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ
         assert (Seq.index sr (j - s) == optimal_revenue prices (j - s))
     in
     Classical.forall_intro aux
+#pop-options
 
 // ========== Clean postcondition predicates ==========
 // These predicates summarize the correctness of the extended rod cutting output.
@@ -369,6 +371,9 @@ let cuts_are_optimal_intro (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq 
 // ========== Main Implementation ==========
 
 open Pulse.Lib.BoundedIntegers
+
+#pop-options
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
 
 //SNIPPET_START: extended_sig
 fn extended_rod_cutting

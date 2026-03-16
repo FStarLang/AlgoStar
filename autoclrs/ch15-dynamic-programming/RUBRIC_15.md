@@ -128,7 +128,7 @@ All 21 files (14 `.fst` + 7 `.fsti`) pass `make` (fstar.exe with Pulse) with **z
 | File | Setting | Assessment |
 |------|---------|------------|
 | `RodCutting.Impl.fst` | `--z3rlimit 50 --fuel 2 --ifuel 2` | ✅ Moderate |
-| `RodCutting.Extended.fst` | `--z3rlimit 80 --fuel 2 --ifuel 2` | ✅ Moderate |
+| `RodCutting.Extended.fst` | `--z3rlimit 80 --fuel 2 --ifuel 2` (base), `--z3rlimit 200` (localized) | ✅ Improved |
 | `MatrixChain.Impl.fst` | `--z3rlimit 40` | ✅ Low |
 | `MatrixChain.Lemmas.fst` | `--z3rlimit 60`, `--split_queries always` (localized) | ✅ Moderate |
 | `MatrixChain.Extended.fst` | `--z3rlimit 80` | ✅ Moderate |

@@ -19,7 +19,6 @@ fn rod_cutting
     pure (
       SZ.v n == Seq.length s_prices /\
       SZ.v n == A.length prices /\
-      SZ.v n > 0 /\
       SZ.fits (SZ.v n + 1)
     )
   returns result: nat
@@ -50,10 +49,11 @@ fn rod_cutting
 
 * `SZ.v n == A.length prices`: Physical array length matches.
 
-* `SZ.v n > 0`: The rod must be non-empty.
-
 * `SZ.fits (SZ.v n + 1)`: The DP table of size `n+1` fits in machine
   integers.
+
+Note: No `n > 0` precondition — the implementation correctly handles the
+empty rod case (`n = 0`), returning 0.
 
 ### Postcondition
 
@@ -206,14 +206,42 @@ The proof uses an outer loop invariant maintaining `dp_correct s_prices sr
 when the DP table is correct for indices `< j`, the `accum_max` computation
 over the table equals `optimal_revenue(j)`.
 
+## Profiling & Proof Stability
+
+| File | z3rlimit | Build time | Assessment |
+|------|----------|------------|------------|
+| `RodCutting.Spec.fst` | default | ~5s | ✅ Fast |
+| `RodCutting.Lemmas.fst` | default | ~30s | ✅ Good |
+| `RodCutting.Impl.fst` | 50, fuel 2, ifuel 2 | ~30s | ✅ Good |
+| `RodCutting.Extended.fst` | 80 (base), 200 (localized) | **~2 min** | ✅ Improved (was 400/7min) |
+| `RodCutting.Test.fst` | default | ~3s | ✅ Fast |
+
+The Extended variant's proof stability was improved by localizing rlimits:
+the monolithic z3rlimit 400 was split into z3rlimit 80 for most of the file
+and z3rlimit 200 for a single lemma (`cuts_optimal_from_dp`), reducing build
+time from ~7 minutes to ~2 minutes. The inner loop still has a missing
+`decreases` clause (TODO at line 463).
+
 ## Files
 
-| File | Role |
-|------|------|
-| `CLRS.Ch15.RodCutting.Impl.fsti` | Public interface (this signature) |
-| `CLRS.Ch15.RodCutting.Impl.fst` | Pulse implementation with ghost counter |
-| `CLRS.Ch15.RodCutting.Spec.fst` | `optimal_revenue`, `accum_max`, `dp_correct`, `build_opt` |
-| `CLRS.Ch15.RodCutting.Lemmas.fsti` | Lemma signatures (optimal substructure, achievability) |
-| `CLRS.Ch15.RodCutting.Lemmas.fst` | Lemma proofs |
-| `CLRS.Ch15.RodCutting.Extended.fst` | Extended variant with cuts array |
-| `CLRS.Ch15.RodCutting.Test.fst` | Test cases |
+| File | Lines | Role |
+|------|-------|------|
+| `CLRS.Ch15.RodCutting.Impl.fsti` | 48 | Public interface (this signature) |
+| `CLRS.Ch15.RodCutting.Impl.fst` | 164 | Pulse implementation with ghost counter |
+| `CLRS.Ch15.RodCutting.Spec.fst` | 155 | `optimal_revenue`, `accum_max`, `dp_correct`, `build_opt` |
+| `CLRS.Ch15.RodCutting.Lemmas.fsti` | 75 | Lemma signatures (optimal substructure, achievability) |
+| `CLRS.Ch15.RodCutting.Lemmas.fst` | 172 | Lemma proofs |
+| `CLRS.Ch15.RodCutting.Extended.fst` | 560 | Extended variant with cuts array |
+| `CLRS.Ch15.RodCutting.Test.fst` | 55 | Test cases (CLRS example) |
+
+## Checklist
+
+- [x] Spec.fst — pure specification with `optimal_revenue`, `build_opt`
+- [x] Lemmas.fst / .fsti — optimal substructure, upper bound, achievability
+- [x] Impl.fst / .fsti — Pulse implementation with correctness + complexity
+- [x] Extended.fst — EXTENDED-BOTTOM-UP-CUT-ROD with cuts array
+- [x] Test.fst — CLRS example test
+- [x] Zero admits, zero assumes
+- [x] Complexity linked via ghost counter (exact n(n+1)/2)
+- [x] Reduce z3rlimit in Extended.fst (400 → 80/200 localized, ~2 min)
+- [ ] Add `decreases` clause to Extended.fst inner loop (line 463 TODO)

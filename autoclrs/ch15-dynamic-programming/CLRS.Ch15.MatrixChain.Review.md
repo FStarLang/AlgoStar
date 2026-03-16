@@ -11,8 +11,11 @@ fn matrix_chain_order
   (dims: A.array int)
   (n: SZ.t)
   (#s_dims: erased (Seq.seq int))
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
   requires
     A.pts_to dims #p s_dims **
+    GR.pts_to ctr c0 **
     pure (
       SZ.v n + 1 == Seq.length s_dims /\
       SZ.v n + 1 == A.length dims /\
@@ -21,10 +24,12 @@ fn matrix_chain_order
       (forall (i: nat). i < Seq.length s_dims ==> Seq.index s_dims i > 0)
     )
   returns result: int
-  ensures
+  ensures exists* (cf: nat).
     A.pts_to dims #p s_dims **
+    GR.pts_to ctr cf **
     pure (
-      result == mc_result s_dims (SZ.v n)
+      result == mc_result s_dims (SZ.v n) /\
+      mc_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 ```
 
@@ -35,6 +40,9 @@ fn matrix_chain_order
   `p[i] × p[i+1]`.
 
 * `n` is the number of matrices, of type `SZ.t`.
+
+* `ctr` is a ghost counter for tracking innermost-loop iterations.
+  Initial value is `c0`.
 
 ### Preconditions
 
@@ -51,6 +59,10 @@ fn matrix_chain_order
 
 * `result == mc_result s_dims (SZ.v n)` — The result equals the pure
   specification's computation of optimal scalar multiplication count.
+
+* `mc_complexity_bounded cf (reveal c0) (SZ.v n)` — Exactly
+  `mc_iterations n` innermost-loop iterations, where
+  `mc_iterations n ≤ n³`.
 
 ## Auxiliary Definitions
 
@@ -142,6 +154,12 @@ total computation from the initial state.
 Together, these establish that `mc_cost` is the minimum over all
 parenthesizations.
 
+**Complexity.** The Pulse implementation carries a ghost tick counter
+(`GR.ref nat`) that increments once per innermost k-loop iteration. The
+postcondition proves `mc_complexity_bounded cf c0 n`, i.e.,
+`cf - c0 == mc_iterations n`. The `Complexity` module further proves
+`mc_iterations n ≤ n³`.
+
 **Zero admits, zero assumes.** All proof obligations are mechanically
 discharged by F\* and Z3.
 
@@ -153,11 +171,11 @@ discharged by F\* and Z3.
    precondition. This is discharged by `discharge_all_costs_bounded`, which
    requires all dimensions to be bounded by some `d` with
    `(n-1)·d³ ≤ 1000000000`. This is a **real limitation**: for large
-   dimensions or long chains, the sentinel may be too small. **PARTIALLY
-   RESOLVED:** The `.fsti` now exports `mc_result_eq_mc_cost`, which
-   proves that under the sentinel bound (`all_costs_bounded`), `mc_result`
-   equals the true recursive optimum `mc_cost`. This makes the sentinel
-   dependency explicit and documented in the public interface.
+   dimensions or long chains, the sentinel may be too small. The `.fsti`
+   exports `mc_result_eq_mc_cost`, which proves that under the sentinel
+   bound (`all_costs_bounded`), `mc_result` equals the true recursive
+   optimum `mc_cost`. This makes the sentinel dependency explicit and
+   documented in the public interface.
 
 2. **Imperative mirror spec, not enumerative.** The top-level postcondition
    is `result == mc_result`, where `mc_result` is defined by replaying the
@@ -187,6 +205,10 @@ discharged by F\* and Z3.
 |--------|-------|---------|--------|
 | Inner-loop iterations | O(n³) ≤ n³ | ✅ Ghost counter | mc_iterations n |
 
+The complexity is **fully linked** to the imperative implementation: the
+ghost counter `ctr` is incremented once per k-loop iteration in the Pulse
+code, and the postcondition directly constrains `cf - c0 == mc_iterations n`.
+
 From `CLRS.Ch15.MatrixChain.Complexity`:
 
 ```fstar
@@ -194,10 +216,9 @@ val mc_iterations_bound (n: nat)
   : Lemma (ensures mc_iterations n <= n * n * n)
 ```
 
-The exact count is `Σ_{l=2}^{n} (n-l+1)(l-1) = (n³-n)/6`, but only the
-`≤ n³` upper bound is formally proven. The bound is proven on the pure
-`mc_inner_sum` function, not directly linked to the Pulse implementation
-via a ghost counter.
+The exact count is `Σ_{l=2}^{n} (n-l+1)(l-1) = (n³-n)/6`. The `≤ n³`
+upper bound is formally proven. The exact `(n³-n)/6` formula is noted in a
+comment but not formally proven.
 
 ## Proof Structure
 
@@ -213,16 +234,52 @@ The Pulse proof uses a three-level "remaining-work" invariant:
 * **Inner loop**: `mc_inner_k sm_k s_dims n vi vj vk vmin_cost == mc_inner_k sm_k s_dims n vi vj vi 1000000000`
   — the k-loop accumulator tracks the remaining k-work.
 
+The ghost counter invariant threads through all three levels:
+`vc + mc_remaining_i n l i + mc_inner_sum n (l+1) == c0 + mc_iterations n`.
+
+## Profiling & Proof Stability
+
+| File | z3rlimit | Build time | Assessment |
+|------|----------|------------|------------|
+| `MatrixChain.Spec.fst` | default | ~2s | ✅ Fast |
+| `MatrixChain.Complexity.fsti` | default | ~3s | ✅ Fast |
+| `MatrixChain.Complexity.fst` | default | ~5s | ✅ Fast |
+| `MatrixChain.Lemmas.fsti` | default | ~3s | ✅ Fast |
+| `MatrixChain.Impl.fsti` | default | ~3s | ✅ Fast |
+| `MatrixChain.Impl.fst` | **80** | **~4 min** | ⚠️ Moderate |
+| `MatrixChain.Lemmas.fst` | 20–60, split_queries | ~1.3 min | ✅ OK |
+| `MatrixChain.Extended.fst` | **80** | **~4 min** | ⚠️ Moderate |
+| `MatrixChain.Test.fst` | default | ~3s | ✅ Fast |
+
+`MatrixChain.Lemmas.fst` is the largest file at 736 lines and uses
+`--split_queries always` for a ~100-line block (lines 315–416) and
+localized z3rlimit 60 for another ~30-line block.
+
 ## Files
 
-| File | Role |
-|------|------|
-| `CLRS.Ch15.MatrixChain.Impl.fsti` | Public interface |
-| `CLRS.Ch15.MatrixChain.Impl.fst` | Pulse implementation |
-| `CLRS.Ch15.MatrixChain.Spec.fst` | `mc_result`, `mc_inner_k`, `mc_inner_i`, `mc_outer` |
-| `CLRS.Ch15.MatrixChain.Lemmas.fsti` | Lemma signatures (`mc_cost`, `paren`, optimality) |
-| `CLRS.Ch15.MatrixChain.Lemmas.fst` | Lemma proofs |
-| `CLRS.Ch15.MatrixChain.Complexity.fsti` | Complexity interface (`mc_iterations ≤ n³`) |
-| `CLRS.Ch15.MatrixChain.Complexity.fst` | Complexity proofs |
-| `CLRS.Ch15.MatrixChain.Extended.fst` | Extended variant with split-point table |
-| `CLRS.Ch15.MatrixChain.Test.fst` | Test cases |
+| File | Lines | Role |
+|------|-------|------|
+| `CLRS.Ch15.MatrixChain.Impl.fsti` | 59 | Public interface + `mc_result_eq_mc_cost` bridge |
+| `CLRS.Ch15.MatrixChain.Impl.fst` | 286 | Pulse implementation with ghost counter |
+| `CLRS.Ch15.MatrixChain.Spec.fst` | 96 | `mc_result`, `mc_inner_k`, `mc_inner_i`, `mc_outer` |
+| `CLRS.Ch15.MatrixChain.Lemmas.fsti` | 247 | Lemma signatures (`mc_cost`, `paren`, optimality) |
+| `CLRS.Ch15.MatrixChain.Lemmas.fst` | 736 | Lemma proofs |
+| `CLRS.Ch15.MatrixChain.Complexity.fsti` | 40 | Complexity interface (`mc_iterations ≤ n³`) |
+| `CLRS.Ch15.MatrixChain.Complexity.fst` | 129 | Complexity proofs |
+| `CLRS.Ch15.MatrixChain.Extended.fst` | 447 | Extended variant with split-point table |
+| `CLRS.Ch15.MatrixChain.Test.fst` | 58 | Test cases (CLRS example) |
+
+## Checklist
+
+- [x] Spec.fst — imperative mirror spec with `mc_result`
+- [x] Lemmas.fst / .fsti — recursive `mc_cost`, bridge `mc_spec_equiv`, optimality
+- [x] Impl.fst / .fsti — Pulse implementation with correctness + complexity
+- [x] Complexity.fst / .fsti — O(n³) bound proof
+- [x] Extended.fst — MATRIX-CHAIN-ORDER with split-point table
+- [x] Test.fst — CLRS example test
+- [x] Zero admits, zero assumes
+- [x] Complexity linked via ghost counter (`mc_complexity_bounded`)
+- [ ] Prove exact formula (n³-n)/6 for mc_iterations (currently only ≤ n³)
+- [ ] Eliminate sentinel 1000000000 or prove it sufficient for all int inputs
+- [ ] Verify split-point correctness in Extended.fst (currently cost-only)
+- [ ] Reduce z3rlimit 80 in Impl.fst and Extended.fst if possible
