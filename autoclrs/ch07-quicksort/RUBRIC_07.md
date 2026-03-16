@@ -25,24 +25,6 @@
 | `README.md` | Documentation | |
 | `Makefile` | Build | |
 
-------|------:|------|-------|
-| `CLRS.Ch07.Partition.Spec.fst` | 44 | Pure predicates | `clrs_partition_pred`, `between_bounds`, `complexity_exact_linear` |
-| `CLRS.Ch07.Partition.Lemmas.fsti` | 39 | Lemma interface | `permutation_swap`, `transfer_larger_slice`, `transfer_smaller_slice` |
-| `CLRS.Ch07.Partition.Lemmas.fst` | 57 | Lemma proofs | `seq_swap_commute`, `permutation_swap`, bounds transfer |
-| `CLRS.Ch07.Partition.Complexity.fsti` | 14 | Complexity interface | Partition is Θ(n−1) |
-| `CLRS.Ch07.Partition.Complexity.fst` | 19 | Complexity proof | `partition_comparisons_linear` |
-| `CLRS.Ch07.Partition.Impl.fsti` | 50 | Impl interface (#lang-pulse) | `clrs_partition_wrapper_with_ticks` |
-| `CLRS.Ch07.Partition.Impl.fst` | 230 | Pulse implementation | `tick`, `swap`, `clrs_partition_with_ticks`, wrapper |
-| `CLRS.Ch07.Quicksort.Spec.fst` | 56 | Pure predicates | `seq_min/max`, `complexity_bounded_quadratic`, pre/post |
-| `CLRS.Ch07.Quicksort.Lemmas.fsti` | 62 | Lemma interface | All quicksort lemma signatures |
-| `CLRS.Ch07.Quicksort.Lemmas.fst` | 101 | Lemma proofs | `lemma_sorted_append`, `append_permutations_3`, complexity bound |
-| `CLRS.Ch07.Quicksort.Complexity.fsti` | 32 | Complexity interface | `worst_case_comparisons`, `sum_of_parts_bound`, etc. |
-| `CLRS.Ch07.Quicksort.Complexity.fst` | 97 | Complexity proofs | Recurrence T(n)=n(n−1)/2, convexity, monotonicity |
-| `CLRS.Ch07.Quicksort.Impl.fsti` | 56 | Impl interface (#lang-pulse) | `quicksort`, `quicksort_with_complexity`, `quicksort_bounded` |
-| `CLRS.Ch07.Quicksort.Impl.fst` | 202 | Pulse implementation | `quicksort_proof`, recursive sort, top-level API |
-| `README.md` | — | Documentation | |
-| `Makefile` | — | Build | |
-
 ---
 
 ## Algorithms Covered (CLRS References)
@@ -190,3 +172,27 @@ All 13 source files verify at default rlimits with zero retries.
 | README up-to-date | ✅ | Updated with full file inventory and structure |
 | Inline CLRS mapping comments | ✅ | SNIPPET markers present for key signatures |
 | Complexity module documented | ✅ | `Quicksort.Complexity.fst` listed in README |
+
+### Profiling (2026-03-16)
+
+| File | Time (ms) | Notes |
+|------|----------:|-------|
+| `Partition.Impl.fst` | 7038 | Heaviest — loop invariant + wrapper |
+| `Quicksort.Impl.fst` | 5354 | Recursive quicksort + top-level API |
+| `Partition.Lemmas.fst` | 2454 | Swap/bounds lemmas |
+| `Partition.Impl.fsti` | 1672 | Pulse interface |
+| `Quicksort.Impl.fsti` | 1478 | Pulse interface |
+| `Quicksort.Lemmas.fst` | 1325 | sorted_append + permutation |
+| `SortSpec.fst` | 1131 | Shared definitions |
+| Others | < 1000 | |
+
+**Full chapter:** ~23s sequential. All files verify at `--z3rlimit 5`.
+
+### Proof Stability
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Verifies at `--z3rlimit 5` | ✅ | All 12 source files |
+| No `#push-options` | ✅ | |
+| No `--retry` | ✅ | |
+| No `--z3rlimit_factor` | ✅ | |

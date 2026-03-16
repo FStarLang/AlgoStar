@@ -2,7 +2,7 @@ module CLRS.Ch07.Quicksort.Complexity
 
 (* 
    Worst-case complexity analysis for quicksort
-   Based on CLRS Chapter 7, Theorem 7.4
+   Based on CLRS Chapter 7, §7.2
    
    Key insight: Worst case occurs when partition is most unbalanced,
    i.e., when one side has 0 elements and the other has n-1 elements.

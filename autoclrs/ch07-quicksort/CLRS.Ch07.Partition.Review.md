@@ -192,6 +192,23 @@ ghost counter `ctr` is incremented once per loop iteration, and the
 loop runs exactly `hi - lo - 1` times (comparing each non-pivot
 element to the pivot).
 
+## Profiling (2026-03-16)
+
+Verification times (sequential, `--z3rlimit 5`):
+
+| File | Time (ms) | Notes |
+|------|----------:|-------|
+| `Partition.Impl.fst` | 7038 | Heaviest — loop invariant + wrapper |
+| `Partition.Lemmas.fst` | 2454 | Swap/bounds lemmas |
+| `Partition.Impl.fsti` | 1672 | Pulse interface |
+| `Partition.Lemmas.fsti` | 747 | Definitions + signatures |
+| `Partition.Complexity.fst` | 582 | Trivial proof |
+| `Partition.Complexity.fsti` | 576 | Interface |
+
+**Stability:** All files verify at `--z3rlimit 5` (minimum). No
+`#push-options`, no `--retry`, no `--z3rlimit_factor` needed. Proofs
+are fully stable.
+
 ## Proof Structure
 
 The internal `clrs_partition_with_ticks` maintains a loop invariant
@@ -205,6 +222,20 @@ tracking:
 After the loop, a final swap places the pivot at position `i_plus_1`.
 The wrapper `clrs_partition_wrapper_with_ticks` then splits ownership
 via `pts_to_range_split` and transfers bounds to the sub-regions.
+
+## Checklist
+
+Priority order of work items:
+
+- [x] Partition correctness (permutation + split) — **Done**
+- [x] Exact complexity (n-1 comparisons) — **Done**
+- [x] Ownership splitting (3-region pts_to_range) — **Done**
+- [x] strictly_larger_than for right partition — **Done**
+- [x] Zero admits, zero assumes — **Done**
+- [x] Proof stability (verifies at --z3rlimit 5) — **Done**
+- [x] No #push-options or --retry needed — **Done**
+- [ ] Reduce Partition.Impl.fst verification time (7s) — *Low priority, not blocking*
+- [ ] Randomized partition (CLRS §7.3) — *Deferred*
 
 ## Files
 

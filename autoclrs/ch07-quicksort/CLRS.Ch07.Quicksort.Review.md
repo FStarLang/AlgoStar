@@ -210,6 +210,25 @@ partition contributes exactly `n-1` ticks, and the recursive calls
 are bounded by `n_left(n_left-1)/2` and `n_right(n_right-1)/2`
 respectively.
 
+## Profiling (2026-03-16)
+
+Verification times (sequential, `--z3rlimit 5`):
+
+| File | Time (ms) | Notes |
+|------|----------:|-------|
+| `Quicksort.Impl.fst` | 5354 | Recursive quicksort + top-level API |
+| `Quicksort.Lemmas.fst` | 1325 | sorted_append + permutation composition |
+| `Quicksort.Impl.fsti` | 1478 | Pulse interface |
+| `Quicksort.Lemmas.fsti` | 705 | Definitions + signatures |
+| `Quicksort.Complexity.fst` | 524 | Recurrence + convexity |
+| `Quicksort.Complexity.fsti` | 324 | Interface |
+
+**Full chapter build:** ~23s sequential (all 12 source files + SortSpec).
+
+**Stability:** All files verify at `--z3rlimit 5` (minimum). No
+`#push-options`, no `--retry`, no `--z3rlimit_factor` needed. Proofs
+are fully stable.
+
 ## Proof Structure
 
 **`clrs_quicksort_with_ticks`** (internal recursive function):
@@ -231,6 +250,24 @@ Key lemmas in `CLRS.Ch07.Quicksort.Lemmas`:
 * `append_permutations_3`: 3-way permutation composition.
 * `lemma_quicksort_complexity_bound`: the convexity argument for
   recursive cost.
+
+## Checklist
+
+Priority order of work items:
+
+- [x] Quicksort correctness (sorted + permutation) — **Done**
+- [x] Worst-case O(n²) complexity bound with ghost counter — **Done**
+- [x] Standalone complexity module (recurrence, closed form, convexity, monotonicity) — **Done**
+- [x] Three top-level API variants (quicksort, with_complexity, bounded) — **Done**
+- [x] Empty/singleton array handling (len >= 0 accepted) — **Done**
+- [x] Zero admits, zero assumes — **Done**
+- [x] Proof stability (verifies at --z3rlimit 5) — **Done**
+- [x] No #push-options or --retry needed — **Done**
+- [x] Imports from CLRS.Common.SortSpec (no definition duplication) — **Done**
+- [ ] Reduce Quicksort.Impl.fst verification time (5.4s) — *Low priority, not blocking*
+- [ ] Randomized quicksort (CLRS §7.3) — *Deferred*
+- [ ] Expected O(n lg n) analysis (CLRS §7.4.2, Theorem 7.4) — *Deferred*
+- [ ] Tail-recursive quicksort / stack depth bounds — *Deferred*
 
 ## Files
 

@@ -99,7 +99,7 @@ fn quicksort
   (len: SZ.t)
   (#s0: Ghost.erased (Seq.seq int))
   requires A.pts_to a s0
-  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len /\ SZ.v len > 0)
+  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len)
   ensures exists* s. (A.pts_to a s ** pure (sorted s /\ permutation s0 s))
 ```
 
@@ -113,7 +113,7 @@ fn quicksort_with_complexity
   (ctr: GR.ref nat)
   (#c0: erased nat)
   requires A.pts_to a s0 ** GR.pts_to ctr c0
-  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len /\ SZ.v len > 0)
+  requires pure (Seq.length s0 == A.length a /\ A.length a == SZ.v len)
   ensures exists* s (cf: nat). (
     A.pts_to a s ** GR.pts_to ctr cf **
     pure (sorted s /\ permutation s0 s /\
