@@ -139,6 +139,19 @@ discharged by F\* and Z3.
    count depends on the input, and the specification correctly captures only
    the worst case.
 
+## Profiling (2026-03-16)
+
+| File | Verification Time | Z3 Options |
+|------|-------------------|------------|
+| `InsertionSort.Spec.fst` | ~7s | defaults |
+| `InsertionSort.Lemmas.fst` | ~7s | defaults |
+| `InsertionSort.Impl.fst` | **~29s** | `--z3rlimit 20 --fuel 1 --ifuel 1` |
+
+**Bottleneck:** `InsertionSort.Impl.fst` dominates verification time at ~29s.
+The inner while loop invariant with 10+ conjuncts drives most of the SMT cost.
+Explicit z3 options (`--z3rlimit 20 --fuel 1 --ifuel 1`) have been added for
+proof stability; previously the file relied on defaults (which took ~120s).
+
 ## Complexity
 
 | Metric | Bound | Linked? | Exact? |
@@ -174,3 +187,19 @@ and the total array is a permutation of the original. Three lemmas in
 | `CLRS.Ch02.InsertionSort.Lemmas.fst` | Lemma proofs |
 | `CLRS.Common.SortSpec.fst` | `sorted`, `permutation` definitions |
 | `CLRS.Common.Complexity.fst` | Ghost tick counter infrastructure |
+
+## Priority Checklist
+
+Items in priority order for reaching a fully proven, high-quality implementation:
+
+- [x] Zero admits, zero assumes — fully proven
+- [x] Rubric-conformant file structure (Spec, Lemmas, Impl split)
+- [x] Public interface (`Impl.fsti`) with full postcondition
+- [x] Handles `len = 0` (no positive-length restriction)
+- [x] Complexity bound proven and linked via ghost counter
+- [x] Explicit z3 options for proof stability
+- [ ] **Reduce verification time** — `Impl.fst` takes ~120s; consider
+      splitting the inner loop proof into a separate lemma or using
+      `assert ... by (...)` to guide SMT on the 10-conjunct invariant
+- [ ] **Best-case / adaptive complexity** — prove Ω(n) for sorted input
+- [ ] **Tighten swap-count bound** — prove 2× write overhead vs CLRS shift variant

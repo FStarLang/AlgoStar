@@ -86,7 +86,7 @@ fn copy_range
 // Merge Implementation
 // ================================================================
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 
 //SNIPPET_START: merge_sig
 fn merge
@@ -236,7 +236,7 @@ fn merge
 // Recursive Merge Sort
 // ================================================================
 
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 
 fn rec merge_sort_aux
   (a: array int)

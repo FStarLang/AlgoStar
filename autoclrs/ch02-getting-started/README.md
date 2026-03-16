@@ -72,8 +72,7 @@ val insertion_sort
     (A.pts_to a s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
-       Seq.length s0 <= A.length a /\
-       SZ.v len > 0))
+       Seq.length s0 <= A.length a))
     (fun _ -> exists* s (cf: nat). A.pts_to a s ** GR.pts_to ctr cf ** pure (
        Seq.length s == Seq.length s0 /\
        sorted s /\
@@ -95,7 +94,6 @@ val insertion_sort
 
 ### Limitations
 
-- **Positive length required**: The precondition requires `SZ.v len > 0`. Empty arrays are trivially sorted but the implementation's outer loop starts at index 1. Callers must guard against empty inputs.
 - **Swap vs. shift**: CLRS shifts elements rightward and inserts the key once; our implementation swaps adjacent elements to bubble the key leftward. The comparison count is identical, but the write count is 2× the textbook's shift variant. This does not affect the proven bound (which counts comparisons).
 
 ### Complexity
@@ -183,7 +181,7 @@ val merge_sort
      GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
-       SZ.v len == A.length a))
+       Seq.length s0 <= A.length a))
     (fun _ -> exists* s (cf: nat).
        A.pts_to a s **
        GR.pts_to ctr cf **
@@ -231,7 +229,7 @@ The complexity analysis is a pure F* proof in `CLRS.Ch02.MergeSort.Complexity` (
 | **Complexity bound** | n(n−1)/2 (tight) | 4n⌈log₂ n⌉ + 4n (loose, ~4× actual) |
 | **Asymptotic class** | O(n²) | O(n log n) |
 | **Ghost counter linked** | ✓ | ✓ |
-| **Empty input** | ✗ (requires len > 0) | ✓ |
+| **Empty input** | ✓ | ✓ |
 | **In-place** | ✓ (swaps) | ✗ (temp alloc per merge) |
 | **Admits/assumes** | 0 | 0 |
 | **Spec files** | InsertionSort.Spec | MergeSort.Spec + MergeSort.Complexity |

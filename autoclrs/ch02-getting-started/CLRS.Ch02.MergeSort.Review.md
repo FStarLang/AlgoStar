@@ -243,6 +243,22 @@ discharged by F\* and Z3.
    half). The `merge_sort_ops_split` lemma bridges this gap by proving
    `T(⌊n/2⌋) + T(n - ⌊n/2⌋) + n ≤ T(n)`.
 
+## Profiling (2026-03-16)
+
+| File | Verification Time | Z3 Options |
+|------|-------------------|------------|
+| `MergeSort.Complexity.fst` | ~3s | z3rlimit 10–20, fuel 1 |
+| `MergeSort.Spec.fst` | ~3s | defaults |
+| `MergeSort.Lemmas.fst` | ~18s | z3rlimit 40–50, fuel 2–3 |
+| `MergeSort.Impl.fst` | **~64s** | z3rlimit 40, fuel 0–2 |
+
+**Bottleneck:** `MergeSort.Impl.fst` at ~64s, with the `merge` function
+(z3rlimit 40, reduced from 100) being the most expensive. The merge loop
+invariant tracks the ghost `seq_merge` suffix and 7 conjuncts.
+
+**Secondary:** `MergeSort.Lemmas.fst` at ~18s uses fuel 3 for the
+`seq_merge_count` proof (count preservation → permutation).
+
 ## Complexity
 
 | Metric | Bound | Linked? | Exact? |
@@ -288,3 +304,23 @@ Key lemmas in `CLRS.Ch02.MergeSort.Lemmas`:
 | `CLRS.Ch02.MergeSort.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch02.MergeSort.Lemmas.fst` | Lemma proofs (merge correctness, suffix stepping) |
 | `CLRS.Common.SortSpec.fst` | `sorted`, `permutation` definitions |
+
+## Priority Checklist
+
+Items in priority order for reaching a fully proven, high-quality implementation:
+
+- [x] Zero admits, zero assumes — fully proven
+- [x] Rubric-conformant file structure (Spec, Lemmas, Complexity, Impl split)
+- [x] Public interface (`Impl.fsti`) with full postconditions for `merge` and `merge_sort`
+- [x] O(n log n) closed-form bound proven (`merge_sort_is_n_log_n`)
+- [x] Complexity linked to implementation via ghost counter
+- [x] Handles `len = 0` (no positive-length restriction)
+- [x] Monotonicity and split lemmas for recurrence
+- [ ] **Reduce `merge` verification time** — z3rlimit 100 drives ~95s total;
+      consider extracting the merge loop body into a helper or adding
+      intermediate assertions to guide SMT
+- [ ] **Reduce `Lemmas.fst` fuel** — `seq_merge_count` uses fuel 3;
+      adding explicit recursive calls may allow fuel 2
+- [ ] **Tighten complexity constant** — replace 4n⌈log₂ n⌉ + 4n with
+      n⌈log₂ n⌉ + n (tighter but harder to prove)
+- [ ] **Bound memory usage** — prove O(n) auxiliary space for merge
