@@ -7,14 +7,14 @@ open CLRS.Ch26.MaxFlow.Lemmas
 (*
    Interface for Edmonds-Karp complexity analysis (CLRS Theorem 26.8).
    
+   All results fully proven (zero admits, zero assume vals).
+   
    Key proven results:
    - O(VE²) total complexity bound
    - Each augmentation creates at least one critical edge
    - Dense graph: O(V⁵), sparse graph: O(V³)
-   
-   Explicit axioms (pending BFS correctness proof):
-   - lemma_distances_nondecreasing (CLRS Lemma 26.7)
-   - axiom_edge_critical_bound (CLRS Lemma 26.8)
+   - CLRS Lemma 26.7: BFS distances non-decreasing (proven)
+   - CLRS Lemma 26.8: Edge criticality bound (proven)
 *)
 
 (** Ghost tick counter: tracks computational cost *)

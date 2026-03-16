@@ -263,15 +263,116 @@ The proof has four layers:
 
 ## Files
 
-| File | Role |
-|------|------|
-| `CLRS.Ch26.MaxFlow.Impl.fsti` | Public interface (this signature) |
-| `CLRS.Ch26.MaxFlow.Impl.fst` | Pulse implementation |
-| `CLRS.Ch26.MaxFlow.Spec.fst` | Pure spec: flow validity, residual graphs, augmentation |
-| `CLRS.Ch26.MaxFlow.Lemmas.fsti` | Augmentation lemma signatures |
-| `CLRS.Ch26.MaxFlow.Lemmas.fst` | Augmentation proofs |
-| `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti` | MFMC theorem signature |
-| `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fst` | MFMC proof |
-| `CLRS.Ch26.MaxFlow.Complexity.fsti` | Complexity interface |
-| `CLRS.Ch26.MaxFlow.Complexity.fst` | O(VE²) complexity proof |
-| `CLRS.Ch26.MaxFlow.Test.fst` | Test cases (5 tests, zero assumes) |
+| File | Lines | Role |
+|------|------:|------|
+| `CLRS.Ch26.MaxFlow.Impl.fsti` | 122 | Public interface (this signature) |
+| `CLRS.Ch26.MaxFlow.Impl.fst` | 2996 | Pulse implementation |
+| `CLRS.Ch26.MaxFlow.Spec.fst` | 356 | Pure spec: flow validity, residual graphs, augmentation |
+| `CLRS.Ch26.MaxFlow.Lemmas.fsti` | 159 | Augmentation lemma signatures |
+| `CLRS.Ch26.MaxFlow.Lemmas.fst` | 887 | Augmentation proofs |
+| `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fsti` | 52 | MFMC theorem signature |
+| `CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut.fst` | 800 | MFMC proof |
+| `CLRS.Ch26.MaxFlow.Complexity.fsti` | 67 | Complexity interface |
+| `CLRS.Ch26.MaxFlow.Complexity.fst` | 1546 | O(VE²) complexity proof |
+| `CLRS.Ch26.MaxFlow.Test.fst` | 274 | 5 test cases, zero assumes |
+| **Total** | **~7260** | |
+
+## Proof Profiling and Stability
+
+### Solver Hint Summary
+
+| File | `#push-options` | `#restart-solver` | Max rlimit | Notes |
+|------|:-:|:-:|--:|-------|
+| `Impl.fst` | 30 | 3 | 300 | `maybe_discover_then_proof` (BFS discover step) |
+| `Complexity.fst` | 13 | 0 | 80 | Moderate; well-structured |
+| `Lemmas.MaxFlowMinCut.fst` | 11 | 0 | 200 | MFMC proof has 3 sections at 120 |
+| `Lemmas.fst` | 10 | 0 | 80 | Augmentation proofs |
+| `Spec.fst` | 0 | 0 | — | Pure definitions, no hints needed |
+| `Test.fst` | 0 | 0 | — | No hints needed |
+| **Total** | **~66** | **3** | **300** | |
+
+### High-Rlimit Hotspots (Stability Risks)
+
+| File | Line | Rlimit | Function | Risk |
+|------|-----:|-------:|----------|------|
+| `Impl.fst` | 1910 | 300 | `maybe_discover_then_proof` | 🟡 Medium — BFS discover step, uses `split_queries always` |
+| `MFMC.fst` | 556 | 200 | Net-flow expansion lemma | 🟡 Medium |
+| `Impl.fst` | 2242 | 100 | `bfs_residual` outer loop | 🟢 Acceptable |
+| `MFMC.fst` | 654,694,728 | 120 | MFMC theorem parts | 🟢 Acceptable |
+| `Impl.fst` | 2405,2531 | 80 | `find_bottleneck_imp`, `augment_imp` | 🟢 Acceptable |
+| `Impl.fst` | 2856 | 50 | `max_flow` (main entry) | 🟢 Acceptable |
+| `Complexity.fst` | 640 | 80 | Distance nondecreasing | 🟢 Acceptable |
+
+### Rlimit Optimization Results (2025-03-16)
+
+Significant rlimit reductions verified and committed:
+
+| Function | Before | After | Reduction |
+|----------|-------:|------:|----------:|
+| `max_flow` | 600 | 50 | **92%** |
+| `maybe_discover_then_proof` | 400 | 300 | **25%** |
+| `bfs_explore_neighbors` | 200 | 80 | **60%** |
+| `find_bottleneck_imp` | 200 | 80 | **60%** |
+| `augment_imp` | 200 | 80 | **60%** |
+
+Peak rlimit reduced from **600 → 300** across all files. The `max_flow`
+function (previously the highest at 600) now verifies at just 50.
+The remaining highest rlimit is `maybe_discover_then_proof` at 300, which
+uses `--split_queries always` and `#restart-solver` — the `queue_color1`
+assertion requires substantial solver effort.
+
+### Checked File Sizes (Proof Complexity Proxy)
+
+| File | `.checked` Size | Notes |
+|------|----------------:|-------|
+| `Impl.fst` | 2.95 MB | Largest — most complex proofs |
+| `Complexity.fst` | 1.67 MB | Substantial proof content |
+| `Lemmas.MaxFlowMinCut.fst` | 1.25 MB | MFMC theorem |
+| `Lemmas.fst` | 1.05 MB | Augmentation lemmas |
+| `Spec.fst` | 0.80 MB | Definitions + helper lemmas |
+
+## Prioritized Checklist
+
+### ✅ Completed
+
+- [x] Zero admits, zero assumes in all production code
+- [x] Zero admits, zero assumes in test code
+- [x] All CLRS theorems proven (26.4, 26.5, 26.6, 26.7, 26.8)
+- [x] Full rubric compliance (Spec, Lemmas, Complexity, Impl with .fsti interfaces)
+- [x] Termination proven without fuel
+- [x] BFS completeness proven
+- [x] Bridge lemmas (both directions) connecting Impl ↔ Spec
+- [x] 5 diverse test cases
+- [x] Comprehensive README.md
+
+### 🟡 Remaining Work (Priority Order)
+
+- [x] **P1: Proof stabilization — reduced max_flow rlimit from 600 to 50.** The
+  `max_flow` function was massively over-provisioned. After testing, it verifies
+  at rlimit 50 (92% reduction). All other high-rlimit functions also reduced.
+
+- [x] **P2: Proof stabilization — reduced maybe_discover_then_proof rlimit from 400
+  to 300.** The `queue_color1` assertion is the bottleneck. Reduced 25% while
+  retaining `--split_queries always` and `#restart-solver`. Further reduction
+  below 300 causes the assertion to fail.
+
+- [ ] **P3: Reduce total solver hint count.** Currently ~66 `#push-options` across
+  all files. Some may be overly conservative (set high during development, never
+  reduced). A sweep to tighten rlimits where possible would improve build times
+  and signal proof stability.
+
+- [ ] **P4: Link complexity proof to implementation.** The `Complexity.fst` module
+  proves O(VE²) algebraically over a ghost tick model. Unlike Floyd-Warshall,
+  it does not instrument the actual Pulse implementation with a ghost counter.
+  Adding a ghost counter to `max_flow` would provide an end-to-end verified
+  complexity bound.
+
+- [ ] **P5: Add antisymmetry constraint.** CLRS requires `f(u,v) > 0 ⟹ f(v,u) = 0`
+  (skew symmetry variant). The current `valid_flow` definition doesn't enforce
+  this. While the implementation naturally produces flows satisfying this
+  property, it is not explicitly proven.
+
+- [ ] **P6: Sparse graph representation.** The current adjacency matrix
+  representation uses Θ(V²) space. An adjacency-list representation would be
+  more practical for sparse graphs and would better match CLRS's graph
+  representation discussions.

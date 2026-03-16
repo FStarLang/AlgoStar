@@ -1907,7 +1907,7 @@ let elim_discover_delta
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 300 --fuel 1 --ifuel 1 --split_queries always"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -2087,7 +2087,7 @@ fn maybe_discover
 #pop-options
 
 (** Explore all neighbors of vertex u in the residual graph *)
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 fn bfs_explore_neighbors
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2402,7 +2402,7 @@ fn bfs_residual
 
 (** Find bottleneck: walk pred array from sink to source *)
 #restart-solver
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 fn find_bottleneck_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
@@ -2528,7 +2528,7 @@ fn find_bottleneck_imp
 
 (** Augment flow: walk pred array from sink to source, update flow *)
 #restart-solver
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 fn augment_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
@@ -2853,7 +2853,7 @@ fn zero_init_flow
     - Each augmentation where we continue increases flow_value by >= 1
     - Iteration counter iters is bounded by flow_value + 1
     - Measure: cap_sum + 1 - iters (non-negative, decreases by 1 each iteration) *)
-#push-options "--z3rlimit 600 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
 fn max_flow
   (capacity: A.array int)
   (#cap_seq: Ghost.erased (Seq.seq int))
