@@ -1,5 +1,7 @@
 # Naive String Matching (CLRS §32.1)
 
+**Last reviewed**: 2026-03-16
+
 ## Top-Level Signature
 
 Here is the top-level signature proven about the naive string matcher in
@@ -146,11 +148,7 @@ discharged by F\* and Z3.
    worst-case. For inputs where mismatches occur early, far fewer comparisons
    are performed. The specification does not capture this.
 
-4. ~~**Local ghost tick.**~~ **(Resolved.)** The `tick` function is now
-   imported from `CLRS.Common.Complexity`, eliminating the duplicated
-   ghost counter infrastructure.
-
-5. **Generic over eqtype.** The implementation is polymorphic over any
+4. **Generic over eqtype.** The implementation is polymorphic over any
    `eqtype`, not restricted to `int` or `char`. This is stronger than CLRS
    (which assumes characters) but the complexity bound is the same.
 
@@ -179,13 +177,38 @@ and tracking the index `j`. After the inner loop, `matches_at_dec_correct`
 bridges the loop result to the propositional specification, and
 `count_matches_up_to_unfold` extends the count by one position.
 
+## Profiling
+
+| File | Approx. time |
+|------|-------------|
+| `NaiveStringMatch.fst` | ~5s |
+| `NaiveStringMatch.Spec.fst` | <1s |
+| `NaiveStringMatch.Lemmas.fst` | ~1s |
+| `NaiveStringMatch.Complexity.fst` | <1s |
+
+No bottlenecks. All proofs are fast and stable.
+
 ## Files
 
 | File | Role |
 |------|------|
-| `CLRS.Ch32.NaiveStringMatch.fst` | Pulse implementation + local `tick` |
+| `CLRS.Ch32.NaiveStringMatch.fst` | Pulse implementation (uses `CLRS.Common.Complexity.tick`) |
 | `CLRS.Ch32.NaiveStringMatch.Spec.fst` | `matches_at`, `matches_at_dec`, `count_matches_up_to` |
 | `CLRS.Ch32.NaiveStringMatch.Complexity.fsti` | `string_match_complexity_bounded` |
 | `CLRS.Ch32.NaiveStringMatch.Complexity.fst` | `naive_worst_case_quadratic`, `complexity_nonneg` |
 | `CLRS.Ch32.NaiveStringMatch.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch32.NaiveStringMatch.Lemmas.fst` | `matches_at_dec_correct`, unfolding, bounded |
+
+## Checklist
+
+- [x] Functional correctness (count == spec)
+- [x] Complexity bound proven and linked via ghost counter
+- [x] Zero admits / assumes
+- [x] CLRS-faithful algorithm
+- [x] Spec/Impl separation (factored into Spec, Lemmas, Complexity)
+- [x] Interface (.fsti) files for Lemmas and Complexity
+- [x] Uses shared `CLRS.Common.Complexity.tick`
+- [x] Fast, stable proofs (<10s total)
+- [ ] Missing `Impl.fsti` — no public interface file for the Pulse implementation
+- [ ] No test file — only KMP has tests
+- [ ] `matches_at` / `count_matches_up_to` duplicated across Naive, RabinKarp, KMP

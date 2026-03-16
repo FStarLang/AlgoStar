@@ -32,7 +32,7 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
 
-#push-options "--z3rlimit 100 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 120 --ifuel 2 --fuel 2"
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -44,18 +44,7 @@ module Bridge = CLRS.Ch32.KMP.Bridge
 module Spec = CLRS.Ch32.KMP.Spec
 
 open CLRS.Ch32.KMP.PureDefs
-
-// ========== Ghost tick ==========
-
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-ghost
-fn tick (ctr: GR.ref nat) (#n: erased nat)
-  requires GR.pts_to ctr n
-  ensures  GR.pts_to ctr (incr_nat n)
-{
-  GR.(ctr := incr_nat n)
-}
+open CLRS.Common.Complexity
 
 // ========== Compute Prefix Function ==========
 
@@ -228,6 +217,7 @@ fn compute_prefix_function
 
 // ========== KMP Matcher ==========
 
+#restart-solver
 #push-options "--z3rlimit 100 --ifuel 1 --fuel 1"
 
 //SNIPPET_START: kmp_matcher_sig
@@ -425,6 +415,7 @@ fn kmp_matcher
 
 // ========== Combined KMP with Complexity ==========
 
+#restart-solver
 #push-options "--z3rlimit 50 --ifuel 1 --fuel 1"
 
 fn kmp_string_match

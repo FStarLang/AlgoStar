@@ -1,5 +1,7 @@
 # KMP String Matching (CLRS §32.4)
 
+**Last reviewed**: 2026-03-16
+
 ## Top-Level Signature
 
 The combined KMP entry point is `kmp_string_match` in `CLRS.Ch32.KMP.fst`:
@@ -166,6 +168,10 @@ discharged by F\* and Z3.
    `compute_prefix_function`, then `kmp_matcher`, and the ghost counter
    accumulates both phases.
 
+6. **Non-standard file naming.** `KMP.PureDefs.fst` serves as the Spec file
+   and `KMP.Spec.fst` serves as the Lemmas file. The naming doesn't follow
+   the RUBRIC convention. Renaming risks breaking all inter-module imports.
+
 ## Complexity
 
 | Metric | Bound | Linked? | Exact? |
@@ -204,6 +210,25 @@ of the pattern that matches a suffix of `text[0..i-1]`. On each text character:
 The connection to `count_matches_spec` goes through `Spec.kmp_count_step`,
 which proves that the KMP step correctly tracks the count.
 
+## Profiling
+
+| File | Approx. time |
+|------|-------------|
+| `KMP.fst` | ~700s ⚠️ **major bottleneck** |
+| `KMP.Spec.fst` | ~114s ⚠️ |
+| `KMP.Bridge.fst` | ~8s |
+| `KMP.PureDefs.fst` | ~1s |
+| `KMP.Test.fst` | ~2s |
+
+`KMP.fst` dominates the total build time (~700s / 12 minutes). The file
+contains three major Pulse functions with nested while loops and complex
+amortized invariants. The `compute_prefix_function` inner loop and `kmp_matcher`
+inner loop each require `--z3rlimit 120`. `#restart-solver` between major
+functions helps prevent solver state accumulation.
+
+`KMP.Spec.fst` (~114s) contains the completeness proof with recursive
+definitions and case-analysis lemmas. Uses `--z3refresh` for stability.
+
 ## Files
 
 | File | Role |
@@ -213,3 +238,22 @@ which proves that the KMP step correctly tracks the count.
 | `CLRS.Ch32.KMP.Spec.fst` | Completeness spec: `is_max_prefix_below`, `follow_fail`, `kmp_count_step` |
 | `CLRS.Ch32.KMP.Bridge.fst` | `pi_max_sz`, `pi_optimal_extension`, SZ↔int conversion |
 | `CLRS.Ch32.KMP.Test.fst` | Runtime test: text=[0,1,0,1,0], pattern=[0,1,0] |
+
+## Checklist
+
+- [x] Functional correctness (count == count_matches_spec)
+- [x] Prefix function correctness and maximality
+- [x] O(n+m) complexity proven and linked via ghost counter
+- [x] Amortized analysis with potential function
+- [x] Zero admits / assumes
+- [x] CLRS-faithful algorithm
+- [x] Uses shared `CLRS.Common.Complexity.tick` (resolved 2026-03-16)
+- [x] `#restart-solver` between major functions (added 2026-03-16)
+- [ ] `KMP.fst` proof time (~700s) — nested loops with amortized invariants are expensive; the `compute_prefix_function` section needed rlimit bump from 100→120 after switching to common tick
+- [ ] `KMP.Spec.fst` proof time (~114s) — recursive completeness proof is inherently complex
+- [ ] Missing `Impl.fsti` — no public interface file for the Pulse implementation
+- [ ] Non-standard file naming — `PureDefs` is Spec, `Spec` is Lemmas, `Bridge` is also Lemmas
+- [ ] Missing `Complexity.fst` / `Complexity.fsti` — bounds inline in `PureDefs.fst` and `KMP.fst`
+- [ ] Missing `Lemmas.fsti` — no interface file for the completeness/bridging lemmas
+- [ ] Restricted to `int` — matcher and Spec not generic over `eqtype`
+- [ ] `matches_at` defined locally — duplicates `NaiveStringMatch.Spec`

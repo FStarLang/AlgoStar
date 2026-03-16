@@ -1,5 +1,7 @@
 # Rabin-Karp String Matching (CLRS §32.2)
 
+**Last reviewed**: 2026-03-16
+
 ## Top-Level Signature
 
 The Pulse implementation signature is in `CLRS.Ch32.RabinKarp.fst`:
@@ -163,37 +165,29 @@ discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
-1. ~~**No ghost counter in Pulse implementation.**~~ **(Resolved.)** The Pulse
-   `rabin_karp` function now threads a ghost counter `ctr`. The postcondition
-   proves `rk_complexity_bounded cf c0 n m`, bounding the operation count by
-   `rk_worst_case n m = m + (n−m+1)·m`.
-
-2. ~~**Complexity analysis is separate and not linked.**~~ **(Resolved.)** The
-   complexity bound `rk_complexity_bounded` in the Pulse postcondition is
-   linked to `rk_worst_case` from `CLRS.Ch32.RabinKarp.Complexity`. The ghost
-   counter accounts for `m` preprocessing operations (via `ticks ctr m` after
-   pattern hash computation) and one `tick ctr` per character comparison in
-   the inner verification loop.
-
-3. **Worst-case O(nm).** When all hash values collide, every position requires
+1. **Worst-case O(nm).** When all hash values collide, every position requires
    full verification, yielding O((n−m+1)·m) = O(nm) comparisons. The
    specification makes no probabilistic argument about expected O(n+m) with
    a good hash function.
 
-4. **Elements restricted to `nat`.** The implementation uses `nat` arrays (not
+2. **Elements restricted to `nat`.** The implementation uses `nat` arrays (not
    generic `eqtype`), because the hash function requires arithmetic on
    character values. This is less general than the naive matcher's `eqtype`.
 
-5. **Two implementations.** The codebase contains both a Pulse implementation
+3. **Two implementations.** The codebase contains both a Pulse implementation
    (in `CLRS.Ch32.RabinKarp.fst`) and a pure recursive implementation (in
    `CLRS.Ch32.RabinKarp.Spec.fst`). Both are separately verified.
 
-6. **Returns count, not positions.** The Pulse version returns a count. The
+4. **Returns count, not positions.** The Pulse version returns a count. The
    pure version returns a `list nat` of positions.
 
-7. **Hash parameters are caller-supplied.** The algorithm is parametric in `d`
+5. **Hash parameters are caller-supplied.** The algorithm is parametric in `d`
    (radix) and `q` (modulus). The correctness proofs hold for any `d : nat`
    and `q : pos`. No guidance on choosing good parameters is formalized.
+
+6. **`count_matches_up_to` defined locally.** The Pulse module defines its own
+   `count_matches_up_to` using `RKSpec.matches_at_dec`, duplicating the
+   Naive matcher's version.
 
 ## Complexity
 
@@ -204,7 +198,7 @@ discharged by F\* and Z3.
 | **Pulse implementation** | **≤ m + (n−m+1)·m** | **✅ Ghost counter** | **Upper bound** |
 
 The complexity bounds in `CLRS.Ch32.RabinKarp.Complexity` are proven as pure
-mathematical lemmas and are now **linked** to the Pulse implementation via
+mathematical lemmas and are **linked** to the Pulse implementation via
 `rk_complexity_bounded`:
 
 ```fstar
@@ -246,6 +240,20 @@ no-false-negatives proof uses `hash_match_lemma`: if `matches_at text pattern
 s`, then `hash text d q s (s+m) == hash pattern d q 0 m`, so
 `verify_match` returns `true`.
 
+## Profiling
+
+| File | Approx. time |
+|------|-------------|
+| `RabinKarp.Spec.fst` | ~220s ⚠️ **bottleneck** |
+| `RabinKarp.fst` | ~24s |
+| `RabinKarp.Lemmas.fst` | ~23s |
+| `RabinKarp.Complexity.fst` | <1s |
+
+`RabinKarp.Spec.fst` is the major bottleneck (220s). The `hash_inversion`
+lemma uses `--z3rlimit_factor 40` and a `calc` proof. The correctness proofs
+(`no_false_positives`, `no_false_negatives`) also contribute. The proofs in
+`Spec.fst` are duplicated in `Lemmas.fst` — see checklist.
+
 ## Files
 
 | File | Role |
@@ -256,3 +264,22 @@ s`, then `hash text d q s (s+m) == hash pattern d q 0 m`, so
 | `CLRS.Ch32.RabinKarp.Lemmas.fst` | Correctness lemma proofs (no false pos/neg) |
 | `CLRS.Ch32.RabinKarp.Complexity.fsti` | `rk_best_case`, `rk_worst_case`, `rk_complexity_bounded` |
 | `CLRS.Ch32.RabinKarp.Complexity.fst` | Complexity lemma proofs |
+
+## Checklist
+
+- [x] Functional correctness (count == spec, Pulse + pure)
+- [x] Bidirectional correctness (no false positives, no false negatives)
+- [x] Rolling hash correctness (`rolling_hash_step_correct`)
+- [x] Complexity bound proven and linked via ghost counter
+- [x] Zero admits / assumes
+- [x] CLRS-faithful polynomial hash
+- [x] Spec/Impl separation (factored into Spec, Lemmas, Complexity)
+- [x] Interface (.fsti) files for Lemmas and Complexity
+- [x] Uses shared `CLRS.Common.Complexity.tick`
+- [ ] Missing `Impl.fsti` — no public interface file for the Pulse implementation
+- [ ] No test file — only KMP has tests
+- [ ] `RabinKarp.Spec.fst` proof time (~220s) — `hash_inversion` uses rlimit_factor 40
+- [ ] Correctness proofs duplicated between `Spec.fst` and `Lemmas.fst` — the Lemmas module re-proves the same theorems rather than re-exporting from Spec
+- [ ] `count_matches_up_to` defined locally in `RabinKarp.fst` — duplicates `NaiveStringMatch.Spec`
+- [ ] `matches_at` / `matches_at_dec` defined locally — duplicates `NaiveStringMatch.Spec`
+- [ ] Restricted to `nat` arrays — not generic over `eqtype`

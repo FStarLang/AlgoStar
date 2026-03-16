@@ -130,10 +130,11 @@ The rubric requires 7 files per algorithm. Status key: ✅ = present & conformin
 |-------|:-----:|:----------:|:---:|
 | Zero admits / assumes | ✅ | ✅ | ✅ |
 | Functional correctness (count == spec) | ✅ | ✅ | ✅ |
-| Complexity proven | ✅ O((n−m+1)m) | 🔶 Pure only | ✅ O(n+m) |
+| Complexity proven | ✅ O((n−m+1)m) | ✅ O(nm) linked | ✅ O(n+m) |
 | CLRS-faithful algorithm | ✅ | ✅ | ✅ |
 | Spec/Impl separation | ✅ (factored) | ✅ | ✅ (non-standard names) |
 | Interface (`.fsti`) files | ✅ Lemmas+Complexity | ✅ Lemmas+Complexity | ❌ |
+| Uses shared tick module | ✅ | ✅ | ✅ |
 | Tests | ❌ | ❌ | ✅ `KMP.Test.fst` |
 
 ### Changes since AUDIT_CH32.md
@@ -149,8 +150,17 @@ The audit (dated 2025-02-26) identified several critical gaps. Current status:
 | P1.2 | Fix KMP.StrengthenedSpec | ✅ **Closed** — file removed from directory. |
 | P2.3 | Delete backup files | ✅ **Closed** — no backup files in directory. |
 | P2.1 | Extract shared spec module | 🔶 Partial — `KMP.PureDefs.fst` shares KMP definitions; Naive/RK still have independent `matches_at`/`count_matches_up_to`. |
-| P2.4 | Add complexity to RabinKarp Pulse | ❌ Open — no ghost ticks in `RabinKarp.fst`. |
+| P2.4 | Add complexity to RabinKarp Pulse | ✅ **Closed** — ghost counter now linked via `rk_complexity_bounded`. |
 | P3.1 | Update README.md | ✅ **Closed** — README updated with full file inventory and rubric mapping. |
+
+### Changes in review pass (2026-03-16)
+
+| Change | Details |
+|--------|---------|
+| KMP uses shared tick | `KMP.fst` now imports `CLRS.Common.Complexity.tick` instead of defining a local duplicate. Required rlimit bump 100→120 for `compute_prefix_function`. |
+| `#restart-solver` added | Added between `compute_prefix_function`, `kmp_matcher`, and `kmp_string_match` for proof stability. |
+| RabinKarp complexity linked | Row updated: Pulse now has ghost counter linked to `rk_worst_case`. |
+| Review.md files updated | All three Review.md files now include profiling data and comprehensive checklists. |
 
 ### Changes in rubric compliance pass (2026-03-04)
 
