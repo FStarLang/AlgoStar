@@ -1,5 +1,7 @@
 # Prim's MST Algorithm (CLRS §23.2)
 
+**Last reviewed**: 2026-03-16
+
 ## Top-Level Signature
 
 Here is the top-level signature proven about Prim's algorithm in
@@ -141,7 +143,8 @@ val prim_result_is_mst
 
 Like Kruskal's bridge, this requires the caller to provide `is_spanning_tree`,
 safety (subset of MST), `noRepeats_edge`, and valid edges. These are not
-automatically established by `prim` alone.
+automatically established by `prim` alone. The proof body calls
+`Bridge.safe_spanning_tree_is_mst` — **fully proven, no admits**.
 
 ## What Is Proven
 
@@ -152,7 +155,8 @@ automatically established by `prim` alone.
    vertices, and is safe (subset of some MST).
 
 3. **Bridge to MST:** `prim_result_is_mst` proves MST given spanning tree +
-   safety + no duplicates preconditions.
+   safety + no duplicates preconditions. Fully proven via
+   `Bridge.safe_spanning_tree_is_mst`.
 
 **Zero admits, zero assumes** across `Impl.fst`, `Spec.fst`.
 
@@ -174,9 +178,9 @@ automatically established by `prim` alone.
    `is_spanning_tree`, safety, and `noRepeats_edge` — none of which are
    established by the `prim` function. A caller must independently prove these.
 
-4. ~~**MST existence assumed.**~~ **RESOLVED.** The pure spec requires
+4. **MST existence now dischargeable.** The pure spec requires
    `(exists (t: list edge). is_mst (adj_to_graph adj n) t)` as a precondition,
-   but this is now dischargeable via `CLRS.Ch23.MST.Existence.mst_exists`.
+   but this is now provable via `CLRS.Ch23.MST.Existence.mst_exists`.
 
 5. **Complexity not linked to implementation.** The complexity module
    (`Prim.Complexity`) is explicitly **disconnected** from `Prim.Impl` — it
@@ -184,8 +188,30 @@ automatically established by `prim` alone.
    `prim_correct` (the weak predicate) and `complexity_bounded_prim`, not MST
    properties.
 
-6. **Infinity sentinel.** `infinity = 65535sz` limits edge weights to < 65535.
-   This is a practical bound but constrains the input domain.
+6. **Infinity sentinel mismatch.** `Prim.Impl` uses `infinity = 65535sz`
+   (SizeT), while `Prim.Spec` uses `infinity = 1000000000` (int). These are
+   conceptually the same role but numerically different. The impl bound limits
+   edge weights to < 65535.
+
+7. ~~**Prim.Lemmas.fst/.fsti missing.**~~ **RESOLVED.** `Prim.Lemmas.fsti/.fst`
+   created as a façade re-exporting key lemmas from `Prim.Spec`.
+
+## Profiling & Proof Stability
+
+| File | Lines | Checked size | Max z3rlimit | Notes |
+|------|-------|-------------|-------------|-------|
+| `Prim.Spec.fst` | 1024 | 1060 KB | 60 | All pure proofs |
+| `Prim.Impl.fst` | 438 | 344 KB | 100 | Pulse loop, rlimit 100 at line 75 |
+| `Prim.Complexity.fst` | 449 | 202 KB | 100 | Ghost-tick instrumented |
+| `Prim.Impl.fsti` | 145 | 104 KB | — | Interface |
+| `Prim.Spec.fsti` | 77 | 75 KB | — | Interface |
+| `Prim.Complexity.fsti` | 40 | 10 KB | — | Interface |
+
+**Stability concerns:**
+- `Prim.Impl.fst` line 75: `z3rlimit 100` for the main Prim loop invariant.
+  Moderate; likely needs this for the `SZ.t` arithmetic and array indexing.
+- `Prim.Complexity.fst` line 78: `z3rlimit 100` for complexity loop invariant.
+- `Prim.Spec.fst` max rlimit is 60, which is reasonable.
 
 ## Complexity
 
@@ -211,6 +237,21 @@ The proof has three layers:
 
 3. **Bridge layer** (reuses `Kruskal.Bridge`): `safe_spanning_tree_is_mst`
    converts a safe spanning tree to an MST.
+
+## Checklist
+
+- [x] Pure spec `pure_prim` defined
+- [x] Pure spec proves n−1 edges (`lemma_prim_has_n_minus_1_edges`)
+- [x] Pure spec proves connectivity (`lemma_prim_all_connected`)
+- [x] Pure spec proves safety (`lemma_prim_result_is_safe`)
+- [x] Imperative Pulse implementation verified (`prim_correct`)
+- [x] Bridge theorem `prim_result_is_mst` fully proven (no admits)
+- [x] Zero admits / zero assumes
+- [ ] Strengthen `prim_correct` to include tree structure properties
+- [ ] Prove refinement: imperative output matches `pure_prim`
+- [x] Create `Prim.Lemmas.fsti/.fst` (rubric compliance)
+- [ ] Reconcile infinity values (65535 vs 10⁹)
+- [ ] Connect Complexity module to Impl (ghost ticks in main loop)
 
 ## Files
 

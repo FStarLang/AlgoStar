@@ -1452,7 +1452,7 @@ let rec subset_edges_t_to_erem_ft (p: list edge) (e_rem: edge) (t: list edge)
 // then T - {e_rem} + {e_add} is still a spanning tree.
 // Proof requires: (1) e_rem removal splits T into two components,
 // (2) e_add reconnects them (since it's on the path), (3) acyclicity is restored.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1 --split_queries always"
 let exchange_is_spanning_tree
     (g: graph) (t: list edge) (e_add e_rem: edge) (path: list edge)
   : Lemma (requires is_spanning_tree g t /\

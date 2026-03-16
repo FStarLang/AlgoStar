@@ -25,6 +25,11 @@ val adj_to_edges (adj: adj_matrix) (n: nat) : list edge
 
 val adj_to_graph (adj: adj_matrix) (n: nat) : graph
 
+/// All edges produced by adj_to_graph have valid endpoints
+val adj_to_graph_edges_valid (adj: adj_matrix) (n: nat) (e: edge)
+  : Lemma (requires mem_edge e (adj_to_graph adj n).edges)
+          (ensures e.u < n /\ e.v < n)
+
 (*** Vertex Set / Cut ***)
 
 type vertex_set = seq bool

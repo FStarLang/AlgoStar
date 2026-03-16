@@ -147,7 +147,7 @@ let rec edges_from_arrays_extend (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= e
       (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
       Seq.index seu ec == eu /\ Seq.index sev ec == ev)
     (ensures edges_from_arrays seu sev (ec + 1) i ==
-             edges_from_arrays seu sev ec i @ [{u = eu; v = ev; w = 1}])
+             FStar.List.Tot.append (edges_from_arrays seu sev ec i) [{u = eu; v = ev; w = 1}])
     (decreases (ec - i))
   = if i >= ec then ()
     else edges_from_arrays_extend seu sev ec (i + 1) eu ev
@@ -697,7 +697,7 @@ let rec adj_all_edges (sadj: Seq.seq int) (n: nat) (u: nat)
     (ensures fun _ -> True)
     (decreases (n - u))
   = if u >= n then []
-    else adj_row_edges sadj n u 0 @ adj_all_edges sadj n (u + 1)
+    else adj_row_edges sadj n u 0 `FStar.List.Tot.append` adj_all_edges sadj n (u + 1)
 
 let adj_array_to_graph (sadj: Seq.seq int) (n: nat{Seq.length sadj == n * n /\ n > 0}) : graph =
   { n = n; edges = adj_all_edges sadj n 0 }

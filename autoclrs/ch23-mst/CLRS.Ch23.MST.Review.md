@@ -1,9 +1,11 @@
 # MST Theory — Cut Property (CLRS §23.1)
 
+**Last reviewed**: 2026-03-16
+
 ## Overview
 
 This is **not an algorithm implementation** — it is the theoretical foundation
-for Chapters 23's MST algorithms. It formalizes graph definitions, spanning
+for Chapter 23's MST algorithms. It formalizes graph definitions, spanning
 trees, minimum spanning trees, cuts, light edges, and the **Cut Property**
 (CLRS Theorem 23.1). Both Kruskal and Prim rely on this module.
 
@@ -137,6 +139,13 @@ weight ≤ T's weight, hence an MST (`lemma_exchange_preserves_mst`).
 * `reachable_simple`: Any reachability witness can be refined to a simple
   (edge-distinct) path.
 
+### MST Existence (`CLRS.Ch23.MST.Existence`)
+
+* `spanning_tree_exists`: Every connected graph with valid edges has a spanning
+  tree. Follows from the strengthened `theorem_kruskal_produces_spanning_tree`.
+* `mst_exists`: Every connected graph with valid edges has a minimum spanning
+  tree. Uses weight-based strong induction over spanning trees.
+
 ## What Is Proven
 
 The **full cut property** (CLRS Theorem 23.1) is mechanically verified. This
@@ -144,8 +153,13 @@ is the foundational theorem underpinning both Kruskal's and Prim's correctness.
 The proof requires ~50 supporting lemmas covering path manipulation, cycle
 detection, edge exchange, and weight arithmetic.
 
-**Zero admits, zero assumes.** All proof obligations in `CLRS.Ch23.MST.Spec.fst`
-are discharged by F\* and Z3.
+**MST existence** is fully proven: `mst_exists` shows every connected graph
+with valid edges has an MST, closing the key gap that previously required MST
+existence as a precondition.
+
+**Zero admits, zero assumes.** All proof obligations in `CLRS.Ch23.MST.Spec.fst`,
+`CLRS.Ch23.MST.Existence.fst`, and `CLRS.Ch23.MST.Complexity.fst` are
+discharged by F\* and Z3.
 
 ## Specification Gaps and Limitations
 
@@ -160,22 +174,44 @@ are discharged by F\* and Z3.
    edges are possible. The `all_edges_distinct` predicate is used where needed
    but is not enforced globally.
 
-4. ~~**No MST existence proof.**~~ **RESOLVED.** The new module
-   `CLRS.Ch23.MST.Existence` proves both `spanning_tree_exists` and
-   `mst_exists` for connected graphs with valid edges. The spanning tree
-   existence follows from the strengthened `theorem_kruskal_produces_spanning_tree`
-   (which no longer requires MST existence). MST existence uses weight-based
-   strong induction. Zero admits, zero assumes.
-
-5. **Weight type is `int`.** Edge weights are signed integers. Negative weights
+4. **Weight type is `int`.** Edge weights are signed integers. Negative weights
    are permitted, which is unusual for MST but mathematically valid.
+
+## Profiling & Proof Stability
+
+| File | Size | Checked size | Max z3rlimit | Notes |
+|------|------|-------------|-------------|-------|
+| `MST.Spec.fst` | 2212 lines | 2467 KB | 400 | Largest file; `cut_property` proof at rlimit 400 |
+| `MST.Spec.fsti` | 458 lines | 439 KB | — | Interface only |
+| `MST.Existence.fst` | 215 lines | 217 KB | 80 | Clean, moderate rlimits |
+| `MST.Complexity.fst` | 102 lines | 65 KB | — | Arithmetic only, fast |
+
+**Stability concerns:**
+- `MST.Spec.fst` line 2053: `z3rlimit 400` for `cut_property` — high but
+  stable (the core exchange argument is complex). Consider `--split_queries`
+  to improve resilience.
+- `MST.Spec.fst` line 2185: `z3rlimit 200` for `exchange_is_spanning_tree` —
+  moderately high.
+- All other lemmas use rlimit ≤ 100.
+
+## Checklist
+
+- [x] Cut property (Theorem 23.1) fully proven
+- [x] MST existence proven (`mst_exists`)
+- [x] Spanning tree existence proven (`spanning_tree_exists`)
+- [x] Edge exchange argument verified
+- [x] Graph infrastructure lemmas (reachability, acyclicity, paths)
+- [x] Zero admits / zero assumes
+- [x] Complexity bounds proven (algebraic: Kruskal O(V³), Prim O(V²))
+- [ ] Reduce z3rlimit 400 in `cut_property` proof (stability)
+- [ ] Reduce z3rlimit 200 in `exchange_is_spanning_tree` (stability)
 
 ## Files
 
 | File | Role |
 |------|------|
 | `CLRS.Ch23.MST.Spec.fsti` | All definitions, lemma signatures, cut property statement |
-| `CLRS.Ch23.MST.Spec.fst` | All proofs (~95 KB) |
+| `CLRS.Ch23.MST.Spec.fst` | All proofs (~95 KB, 2212 lines) |
 | `CLRS.Ch23.MST.Existence.fsti` | MST existence theorem: `spanning_tree_exists`, `mst_exists` |
 | `CLRS.Ch23.MST.Existence.fst` | MST existence proofs (weight-based strong induction) |
 | `CLRS.Ch23.MST.Complexity.fsti` | Asymptotic complexity signatures for Kruskal/Prim |

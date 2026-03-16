@@ -1,5 +1,7 @@
 # Kruskal's MST Algorithm (CLRS §23.2)
 
+**Last reviewed**: 2026-03-16
+
 ## Top-Level Signature
 
 Here is the top-level signature proven about Kruskal's algorithm in
@@ -106,8 +108,8 @@ val theorem_kruskal_produces_mst (g: graph)
           (ensures is_mst g (pure_kruskal g))
 ```
 
-The pure spec is proven to produce an MST. This is the strongest possible
-correctness statement for the functional algorithm.
+The pure spec is proven to produce an MST. The MST existence precondition
+is now dischargeable via `CLRS.Ch23.MST.Existence.mst_exists`.
 
 ## MST Bridging
 
@@ -120,19 +122,18 @@ val kruskal_result_is_mst
     (requires
       n > 0 /\ Seq.length sadj == n * n /\
       ec <= Seq.length seu /\ ec <= Seq.length sev /\
-      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
-                                    Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==> ...) /\
       result_is_forest_adj sadj seu sev n ec /\
       symmetric_adj sadj n /\
       no_self_loops_adj sadj n /\
-      is_spanning_tree (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0) /\
+      is_spanning_tree (adj_array_to_graph sadj n) (weighted_edges_from_arrays ...) /\
       (exists (t: list edge). is_mst (adj_array_to_graph sadj n) t /\
-        subset_edges (weighted_edges_from_arrays sadj seu sev n ec 0) t) /\
-      Bridge.noRepeats_edge (weighted_edges_from_arrays sadj seu sev n ec 0) /\
+        subset_edges (weighted_edges_from_arrays ...) t) /\
+      Bridge.noRepeats_edge (weighted_edges_from_arrays ...) /\
       (forall (e: edge). mem_edge e (adj_array_to_graph sadj n).edges ==>
         e.u < n /\ e.v < n /\ e.u <> e.v))
     (ensures
-      is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+      is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays ...))
 ```
 
 This is the **end-to-end MST theorem** for the imperative implementation. It
@@ -146,17 +147,7 @@ some MST), and has no duplicate edges. The bridge uses
 ```fstar
 val greedy_step_safe (g: graph) (forest: list edge) (e: edge)
   : Lemma
-    (requires
-      g.n > 0 /\
-      (forall (e': edge). mem_edge e' g.edges ==> e'.u < g.n /\ e'.v < g.n) /\
-      (exists (t: list edge). is_mst g t /\ subset_edges forest t) /\
-      mem_edge e g.edges /\
-      e.u < g.n /\ e.v < g.n /\
-      ~(reachable forest e.u e.v) /\
-      (forall (e': edge). mem_edge e' g.edges ==>
-        e'.u < g.n /\ e'.v < g.n ==>
-        ~(reachable forest e'.u e'.v) ==>
-        e.w <= e'.w))
+    (requires ...)
     (ensures
       (exists (t: list edge). is_mst g t /\ subset_edges (e :: forest) t))
 ```
@@ -189,16 +180,19 @@ connected vertices have the same root. Key lemmas:
 1. **Pure correctness:** `pure_kruskal` produces an MST
    (`theorem_kruskal_produces_mst`). This is the strongest possible result.
 
-2. **Imperative forest:** The Pulse `kruskal` function produces a forest whose
+2. **Spanning tree without MST assumption:** `theorem_kruskal_produces_spanning_tree`
+   proves the pure spec produces a spanning tree without requiring MST existence.
+
+3. **Imperative forest:** The Pulse `kruskal` function produces a forest whose
    edges come from the adjacency matrix (`result_is_forest_adj`).
 
-3. **Bridge to MST:** `kruskal_result_is_mst` proves the imperative result is
+4. **Bridge to MST:** `kruskal_result_is_mst` proves the imperative result is
    an MST, given additional preconditions about spanning and safety.
 
-4. **Cut property link:** `greedy_step_safe` connects each greedy step to the
+5. **Cut property link:** `greedy_step_safe` connects each greedy step to the
    cut property (CLRS Theorem 23.1).
 
-5. **Union-find correctness:** `uf_inv_union` and `uf_inv_unreachable` prove
+6. **Union-find correctness:** `uf_inv_union` and `uf_inv_unreachable` prove
    the union-find correctly tracks connected components.
 
 **Zero admits, zero assumes** across `Impl.fst`, `Spec.fst`, `Bridge.fst`,
@@ -218,12 +212,8 @@ and `Lemmas.fst`.
    `subset_edges ... t` for some MST `t`, and `noRepeats_edge`. These are
    reasonable but not all automatically discharged.
 
-3. ~~**MST existence assumed.**~~ **PARTIALLY RESOLVED.**
-   `theorem_kruskal_produces_spanning_tree` no longer requires MST existence
-   (it now uses `acyclic_connected_length` directly for the edge count).
-   `theorem_kruskal_produces_mst` and `greedy_step_safe` still require MST
-   existence as a precondition, but this is now dischargeable via
-   `CLRS.Ch23.MST.Existence.mst_exists`.
+3. **MST existence now dischargeable.** `theorem_kruskal_produces_mst` requires
+   MST existence, but this is now provable via `CLRS.Ch23.MST.Existence.mst_exists`.
 
 4. **Complexity not linked to implementation.** The complexity module
    (`Kruskal.Complexity`) is explicitly **disconnected** from `Kruskal.Impl` —
@@ -233,6 +223,27 @@ and `Lemmas.fst`.
 
 5. **Adjacency matrix representation only.** The implementation uses a flat
    `n×n` array. No edge-list or adjacency-list variant is provided.
+
+## Profiling & Proof Stability
+
+| File | Lines | Checked size | Max z3rlimit | Notes |
+|------|-------|-------------|-------------|-------|
+| `Kruskal.Spec.fst` | 2054 | 1955 KB | 80 | Large; main correctness proofs |
+| `Kruskal.Impl.fst` | 928 | 1048 KB | 50 | Pulse impl; `split_queries` in places |
+| `Kruskal.Components.fst` | 836 | 830 KB | 50 | BFS reachability |
+| `Kruskal.UF.fst` | 330 | 521 KB | **400** | `uf_inv_union` at rlimit 400 |
+| `Kruskal.Bridge.fst` | 420 | 434 KB | — | Moderate |
+| `Kruskal.EdgeSorting.fst` | 339 | 255 KB | — | Sort permutation |
+| `Kruskal.Complexity.fst` | 540 | 296 KB | — | Disconnected |
+| `Kruskal.Helpers.fst` | 118 | 178 KB | — | Small helpers |
+| `Kruskal.SortedEdges.fst` | 142 | 106 KB | — | Small |
+
+**Stability concerns:**
+- `Kruskal.UF.fst` line 160: `z3rlimit 400` for `uf_inv_union` — the highest
+  rlimit in the Kruskal sub-module. The union-find proof involves complex
+  quantifier reasoning. Consider `--split_queries always` to improve resilience.
+- `Kruskal.Impl.fst` uses `--split_queries always` in several blocks (good).
+- `Kruskal.Spec.fst` max rlimit is 80, which is reasonable.
 
 ## Complexity
 
@@ -260,6 +271,19 @@ The proof has three layers:
 3. **Bridge layer** (`Kruskal.Bridge`): `greedy_step_safe` (cut property per
    step) and `safe_spanning_tree_is_mst` (safe spanning tree = MST) connect the
    imperative result to MST correctness.
+
+## Checklist
+
+- [x] Pure spec `pure_kruskal` defined and proven to produce MST
+- [x] Spanning tree proof without MST existence assumption
+- [x] Imperative Pulse implementation verified (forest + adj tracking)
+- [x] Bridge module: `greedy_step_safe` + `safe_spanning_tree_is_mst`
+- [x] Union-find correctness: init, union, soundness
+- [x] `kruskal_result_is_mst` end-to-end theorem stated and proven
+- [x] Zero admits / zero assumes
+- [ ] Strengthen Pulse postcondition to include `is_spanning_tree` directly
+- [ ] Connect Complexity module to Impl (ghost ticks in main loop)
+- [ ] Reduce z3rlimit 400 in `uf_inv_union` (UF.fst line 160)
 
 ## Files
 
