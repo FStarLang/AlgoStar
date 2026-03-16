@@ -150,8 +150,9 @@ ensures exists* s (cf: nat).
   GR.pts_to ctr cf **
   pure (
     Seq.length s == Seq.length s0 /\
-    sorted s /\
+    sorted_upto s (SZ.v n) /\
     permutation s0 s /\
+    (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n))
 ```
@@ -160,13 +161,13 @@ Postcondition conjuncts:
 
 | Conjunct | Meaning |
 |----------|---------|
-| `sorted s` | Output is sorted (∀ i ≤ j. s[i] ≤ s[j]) |
+| `sorted_upto s (SZ.v n)` | First `n` elements are sorted (∀ i ≤ j < n. s[i] ≤ s[j]) |
 | `permutation s0 s` | Output is a permutation of input |
+| Elements beyond `n` unchanged | Enables prefix sorting of larger arrays |
 | `cf - c0 <= heapsort_cost_bound n` | Cost bounded by build\_cost\_bound(n) + extract\_cost\_bound(n) |
 
-**Strongest Guarantee.** Full functional correctness: sorted + permutation. The
-cost bound `heapsort_cost_bound(n) = build_cost_bound(n) + extract_cost_bound(n)`
-is linked to the ghost counter.
+**Strongest Guarantee.** Full functional correctness: sorted + permutation. Supports
+prefix sorting (`n <= A.length a`): elements beyond index `n` are preserved unchanged.
 
 **Limitations.** The linked cost bound expands to
 `(n/2 + n-1) * max_heapify_bound(n, 0)`. The `CostBound` module proves
@@ -205,7 +206,7 @@ Complexity module additionally proves:
 |-----------|-------------|-------------|-------------------|-----------------|--------|
 | MAX-HEAPIFY | §6.2 | Restores heap + permutation | O(lg n): 2·⌊log₂(n/(i+1))⌋ | — | 0 |
 | BUILD-MAX-HEAP | §6.3 | `is_max_heap` + permutation | O(n log n) via root bound | O(n): ≤ 4n | 0 |
-| HEAPSORT | §6.4 | `sorted` + `permutation` | O(n log n): ≤ 4n·log₂ n | ≤ 6n(1+log₂ n), beats n² for n≥11 | 0 |
+| HEAPSORT | §6.4 | `sorted_upto` + `permutation` | O(n log n): ≤ 4n·log₂ n | ≤ 6n(1+log₂ n), beats n² for n≥11 | 0 |
 
 ## Building
 

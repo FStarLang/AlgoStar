@@ -191,6 +191,8 @@ ensures exists* s' (cf: nat).
 
 // ========== BUILD-MAX-HEAP ==========
 
+#restart-solver
+
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
 fn build_max_heap
   (a: A.array int)

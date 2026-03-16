@@ -358,3 +358,59 @@ Key lemmas in `CLRS.Ch06.Heap.Lemmas`:
 | `CLRS.Ch06.Heap.Complexity.fst` | Pure complexity proofs |
 | `CLRS.Ch06.Heap.Lemmas.fsti` | Correctness lemma signatures |
 | `CLRS.Ch06.Heap.Lemmas.fst` | Correctness lemma proofs |
+
+---
+
+## Verification Profiling (2026-03-16)
+
+Sequential verification times (each file checked individually):
+
+| File | Before (s) | After (s) | Change | z3rlimit (max) |
+|------|-----------|-----------|--------|---------------|
+| `Heap.Spec.fst` | 2.4 | 1.1 | — | default |
+| `Heap.Complexity.fsti` | 0.7 | 0.4 | — | — |
+| `Heap.Complexity.fst` | 69.0 | 47.0 | — | 300 (small-n norm) / 40 |
+| `Heap.CostBound.fsti` | 1.6 | 0.5 | — | — |
+| `Heap.CostBound.fst` | 2.9 | 1.1 | — | 20 |
+| `Heap.Lemmas.fsti` | 5.6 | 1.4 | — | — |
+| `Heap.Lemmas.fst` | 238.0 | 63.0 | **−74%** | 200 (was ×2, now ×1) |
+| `Heap.Impl.fsti` | 5.9 | 2.8 | — | — |
+| `Heap.Impl.fst` | 445.0 | 241.0 | **−46%** | 80 |
+| **Total (sequential)** | **771** | **359** | **−53%** | |
+| **Total (parallel, -j4)** | **324** | **246** | **−24%** | |
+
+### Optimization Applied
+
+Deduplicated `perm_prefix_bounded_aux` and `perm_prefix_bounded_aux_upto` in Lemmas.fst.
+The `_upto` versions (more general, working on arbitrary range `[0,n)`) are now defined
+first; the non-`_upto` versions delegate to them with `n = Seq.length s`. This eliminated
+one copy of the expensive z3rlimit 200 proof, cutting Lemmas.fst from 238s to 63s.
+The improvement propagated to Impl.fst (445s → 241s) due to simpler SMT context.
+
+### Remaining Bottleneck
+
+**Impl.fst (241s):** The Pulse `heapsort` function (z3rlimit 80) is the dominant cost.
+z3rlimit 60 was attempted but fails on the loop-exit postcondition. Further reduction
+would require splitting the proof or adding more intermediate assertions.
+
+---
+
+## Current Improvement Checklist (2026-03-16)
+
+### Proof Optimization & Stabilization
+
+- [x] **P1.** Deduplicate `_upto` lemma proofs in `Lemmas.fst` — `perm_preserves_sorted_suffix` and `extract_extends_sorted` now delegate to their `_upto` counterparts. Eliminated duplicate `perm_prefix_bounded_aux` (z3rlimit 200). Lemmas.fst: 238s → 63s (−74%).
+- [x] **P2.** Reduce z3rlimit 200 occurrences — removed one of two z3rlimit 200 proofs via deduplication. One instance remains (the general `_upto` version, which is unavoidable).
+- [x] **P3.** Optimize `Impl.fst` verification time — added `#restart-solver` before `build_max_heap`. Impl.fst: 445s → 241s (−46%). z3rlimit 80 on heapsort cannot be reduced further (60 fails).
+- [ ] **P4.** Reduce z3rlimit 300 / fuel 20 on `build_heap_ops_le_root_bound_small` in `Complexity.fst` (low priority)
+
+### Documentation Accuracy
+
+- [x] **D1.** Fix `README.md` — updated heapsort postcondition from `sorted s` to `sorted_upto s (SZ.v n)` with prefix-preservation; updated specification tables
+- [x] **D2.** Update `RUBRIC_06.md` z3rlimit table — updated to reflect heapsort z3rlimit 80, added Complexity.fst z3rlimit 300
+
+### Functional Improvements (deferred)
+
+- [ ] **F1.** Aggregate ghost-tick bounds: thread tighter per-index `max_heapify_bound` through `build_max_heap` instead of root bound
+- [ ] **F2.** Rename `bad` → `child` in `bad_is_child_of_parent` (Lemmas)
+- [ ] **F3.** Implement §6.5 priority-queue operations (HEAP-MAXIMUM, EXTRACT-MAX, INCREASE-KEY, INSERT)

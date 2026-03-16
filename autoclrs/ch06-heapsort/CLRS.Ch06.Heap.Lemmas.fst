@@ -252,29 +252,6 @@ let extract_almost_heaps (s:Seq.seq int) (len:nat{len <= Seq.length s /\ len > 1
     in
     Classical.forall_intro (Classical.move_requires aux)
 
-#push-options "--split_queries always"
-let extract_extends_sorted (s:Seq.seq int) (len:nat{len <= Seq.length s /\ len > 1})
-  : Lemma (requires is_max_heap s len /\
-                    suffix_sorted s len /\
-                    prefix_le_suffix s len)
-          (ensures (let nl : nat = len - 1 in
-                    let z : nat = 0 in
-                    let s' = swap_seq s z nl in
-                    suffix_sorted s' nl /\
-                    prefix_le_suffix s' nl))
-  = let z : nat = 0 in
-    let nl : nat = len - 1 in
-    let s' = swap_seq s z nl in
-    swap_length s z nl;
-    swap_index_i s z nl;
-    swap_index_j s z nl;
-    let aux_root (i:nat{i < len})
-      : Lemma (Seq.index s z >= Seq.index s i)
-      = root_ge_element s len i
-    in
-    Classical.forall_intro (Classical.move_requires aux_root)
-#pop-options
-
 let slice_suffix_eq (s1 s2:Seq.seq int) (k:nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
                     k <= Seq.length s1 /\
@@ -292,93 +269,8 @@ let index_mem_intro (s:Seq.seq int) (idx:nat{idx < Seq.length s})
     SeqP.lemma_mem_append (Seq.slice s 0 idx) suffix;
     Seq.lemma_split s idx
 
-// Helper: element at index i in s2 exists at some index in s1's prefix
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
-private
-let perm_prefix_bounded_aux (s1 s2:Seq.seq int) (k:nat) (i:nat) (j:nat)
-  : Lemma (requires Seq.length s1 == Seq.length s2 /\
-                    k <= Seq.length s1 /\
-                    suffix_sorted s1 k /\
-                    prefix_le_suffix s1 k /\
-                    (forall (m:nat). k <= m /\ m < Seq.length s1 ==> Seq.index s2 m == Seq.index s1 m) /\
-                    permutation s1 s2 /\
-                    i < k /\ j >= k /\ j < Seq.length s1)
-          (ensures Seq.index s2 i <= Seq.index s2 j)
-  = reveal_opaque (`%permutation) (permutation s1 s2);
-    assert (k <= Seq.length s2);
-    assert (Seq.index s2 j == Seq.index s1 j);
-    // Work with slices
-    let n = Seq.length s1 in
-    Seq.lemma_len_slice s1 0 k;
-    Seq.lemma_len_slice s2 0 k;
-    Seq.lemma_len_slice s1 k n;
-    Seq.lemma_len_slice s2 k n;
-    let sl1 = Seq.slice s1 0 k in
-    let sl2 = Seq.slice s2 0 k in
-    let suf1 = Seq.slice s1 k n in
-    let suf2 = Seq.slice s2 k n in
-    // Use index into the slice directly
-    let x = Seq.index sl2 i in
-    Seq.lemma_index_slice s2 0 k i;
-    // x appears in sl2
-    index_mem_intro sl2 i;
-    // Suffixes are Seq.equal, so propositionally equal
-    slice_suffix_eq s1 s2 k;
-    Seq.lemma_eq_elim suf1 suf2;
-    assert (suf1 == suf2);
-    // Count decomposition for specific x
-    SeqP.lemma_count_slice s1 k;
-    SeqP.lemma_count_slice s2 k;
-    // Force instantiation with explicit let-bindings
-    let cx_suf1 = SeqP.count x suf1 in
-    let cx_suf2 = SeqP.count x suf2 in
-    assert (cx_suf1 == cx_suf2);
-    let cx_s1 = SeqP.count x s1 in
-    let cx_s2 = SeqP.count x s2 in
-    assert (cx_s1 == cx_s2);
-    let cx_sl1 = SeqP.count x sl1 in
-    let cx_sl2 = SeqP.count x sl2 in
-    assert (cx_s1 == cx_sl1 + cx_suf1);
-    assert (cx_s2 == cx_sl2 + cx_suf2);
-    assert (cx_sl1 == cx_sl2);
-    // count x sl1 > 0, so x appears in sl1
-    let m = SeqP.index_mem x sl1 in
-    // m < length sl1 = k and sl1[m] = x
-    assert (m < k);
-    Seq.lemma_index_slice s1 0 k m;
-    // Explicit chain for postcondition
-    assert (x == Seq.index s2 (i + 0));  // from lemma_index_slice s2
-    assert (Seq.index s1 (m + 0) == x);  // from index_mem + lemma_index_slice s1
-    assert (m < k /\ k <= j /\ j < n);
-    // prefix_le_suffix gives s1[m] <= s1[j] since m < k and j >= k
-    assert (Seq.index s1 m <= Seq.index s1 j);
-    assert (Seq.index s1 j == Seq.index s2 j);
-    ()
-#pop-options
-
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
-let perm_preserves_sorted_suffix (s1 s2:Seq.seq int) (k:nat)
-  : Lemma (requires Seq.length s1 == Seq.length s2 /\
-                    k <= Seq.length s1 /\
-                    suffix_sorted s1 k /\
-                    prefix_le_suffix s1 k /\
-                    (forall (j:nat). k <= j /\ j < Seq.length s1 ==> Seq.index s2 j == Seq.index s1 j) /\
-                    permutation s1 s2)
-          (ensures suffix_sorted s2 k /\ prefix_le_suffix s2 k)
-  = permutation_same_length s1 s2;
-    // Part 1: suffix_sorted s2 k - suffix is identical
-    // s2[m] = s1[m] for m >= k, and suffix_sorted s1 k, so suffix_sorted s2 k
-    // Part 2: prefix_le_suffix s2 k - use helper
-    let aux (i:nat) (j:nat)
-      : Lemma (ensures (i < k /\ k <= j /\ j < Seq.length s2) ==> Seq.index s2 i <= Seq.index s2 j)
-      = if i < k && k <= j && j < Seq.length s2 then
-          perm_prefix_bounded_aux s1 s2 k i j
-        else ()
-    in
-    Classical.forall_intro_2 aux
-#pop-options
-
-// ========== Range-bounded lemmas for prefix sorting (Limitation 5) ==========
+// ========== Range-bounded lemmas for prefix sorting ==========
+// The _upto versions are the general form; non-_upto versions delegate to them.
 
 #push-options "--split_queries always"
 let extract_extends_sorted_upto (s:Seq.seq int) (len n:nat)
@@ -402,6 +294,7 @@ let extract_extends_sorted_upto (s:Seq.seq int) (len n:nat)
     Classical.forall_intro (Classical.move_requires aux_root)
 #pop-options
 
+// Helper: element at index i in s2 exists at some index in s1's prefix
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
 private
 let perm_prefix_bounded_aux_upto (s1 s2:Seq.seq int) (k n:nat) (i:nat) (j:nat)
@@ -478,3 +371,31 @@ let sorted_upto_from_parts (s:Seq.seq int) (n:nat)
   : Lemma (requires suffix_sorted_upto s 1 n /\ prefix_le_suffix_upto s 1 n)
           (ensures sorted_upto s n)
   = ()
+
+// ========== Non-_upto convenience wrappers ==========
+// These delegate to the _upto versions with n = Seq.length s.
+// suffix_sorted s k ≡ suffix_sorted_upto s k (Seq.length s)
+// prefix_le_suffix s k ≡ prefix_le_suffix_upto s k (Seq.length s)
+
+#push-options "--split_queries always"
+let extract_extends_sorted (s:Seq.seq int) (len:nat{len <= Seq.length s /\ len > 1})
+  : Lemma (requires is_max_heap s len /\
+                    suffix_sorted s len /\
+                    prefix_le_suffix s len)
+          (ensures (let nl : nat = len - 1 in
+                    let z : nat = 0 in
+                    let s' = swap_seq s z nl in
+                    suffix_sorted s' nl /\
+                    prefix_le_suffix s' nl))
+  = extract_extends_sorted_upto s len (Seq.length s)
+#pop-options
+
+let perm_preserves_sorted_suffix (s1 s2:Seq.seq int) (k:nat)
+  : Lemma (requires Seq.length s1 == Seq.length s2 /\
+                    k <= Seq.length s1 /\
+                    suffix_sorted s1 k /\
+                    prefix_le_suffix s1 k /\
+                    (forall (j:nat). k <= j /\ j < Seq.length s1 ==> Seq.index s2 j == Seq.index s1 j) /\
+                    permutation s1 s2)
+          (ensures suffix_sorted s2 k /\ prefix_le_suffix s2 k)
+  = perm_preserves_sorted_suffix_upto s1 s2 k (Seq.length s1)

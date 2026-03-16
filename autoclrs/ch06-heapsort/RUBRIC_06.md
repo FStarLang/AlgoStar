@@ -113,14 +113,16 @@ The monolithic `CLRS.Ch06.Heap.fst` has been split into rubric-compliant modules
 
 | File | Max z3rlimit | Locations | Assessment |
 |------|-------------|-----------|------------|
-| `Heap.Impl.fst` | 50 | `build_max_heap`, `heapsort` | Moderate — acceptable |
+| `Heap.Impl.fst` | 80 | `heapsort` | Elevated — optimization target |
+| `Heap.Impl.fst` | 50 | `build_max_heap` | Moderate — acceptable |
 | `Heap.Impl.fst` | 40 | `max_heapify` | Moderate — acceptable |
-| `Heap.Lemmas.fst` | 200 | `perm_prefix_bounded_aux` | Higher than original — needed for cross-module reasoning |
-| `Heap.Lemmas.fst` | 80 | `perm_preserves_sorted_suffix` | Moderate — acceptable |
+| `Heap.Lemmas.fst` | 200 | `perm_prefix_bounded_aux`, `perm_prefix_bounded_aux_upto` | High — optimization target |
+| `Heap.Lemmas.fst` | 80 | `perm_preserves_sorted_suffix`, `perm_preserves_sorted_suffix_upto` | Moderate — acceptable |
+| `Heap.Complexity.fst` | 300 | `build_heap_ops_le_root_bound_small` (fuel 20) | High — for small-n normalization |
 | `Heap.Complexity.fst` | 40 | `scaled_floor_sum_bound` region | Moderate — acceptable |
 | `Heap.CostBound.fst` | 20 | `max_heapify_bound_right` | Low — good |
 
-No extreme z3rlimits (all ≤ 50). No `z3seed`, `retry`, or `quake` options — no signs of proof fragility.
+No `z3seed`, `retry`, or `quake` options — no signs of proof fragility.
 
 ### Fuel / iFuel
 
@@ -157,7 +159,7 @@ The Complexity module proves bounds in isolation (pure math). `max_heapify` conn
 |----------|--------------|--------|
 | `max_heapify` | `heaps_from s' heap_size start`, `permutation s s'`, elements outside heap unchanged, length preserved, `cf - c0 <= max_heapify_bound(...)` | **Strong** |
 | `build_max_heap` | `is_max_heap s n`, `permutation s0 s`, length preserved | **Strong** |
-| `heapsort` | `sorted s`, `permutation s0 s`, length preserved | **Strong** |
+| `heapsort` | `sorted_upto s (SZ.v n)`, `permutation s0 s`, elements beyond `n` preserved | **Strong** |
 
 ### Documentation
 
