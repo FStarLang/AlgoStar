@@ -117,11 +117,17 @@ The following are all proven (zero admits):
 |----------|-------|--------|
 | Membership correctness | `delete_mem` | ✅ Proven |
 | BST preservation | `delete_preserves_bst` | ✅ Proven |
-| RB invariant preservation | `delete_is_rbtree` | ⚠️ Admitted |
+| RB invariant preservation | `delete_is_rbtree` | ✅ Proven |
 
-The membership and BST proofs for delete are fully verified, including helper lemmas for `balL_mem`, `balR_mem`, `fuse_mem`, `del_mem`, `balL_is_bst`, `balR_is_bst`, `fuse_is_bst`, `del_preserves_bst`.
+The membership, BST, and RB invariant proofs for delete are fully verified (zero admits),
+including helper lemmas for `balL_mem`, `balR_mem`, `fuse_mem`, `del_mem`, `balL_is_bst`,
+`balR_is_bst`, `fuse_is_bst`, `del_preserves_bst`, `balL_props`, `balR_props`, `fuse_props`,
+`del_props`, and `delete_is_rbtree`.
 
-The RB invariant proof (`delete_is_rbtree`) is admitted. The internal invariant of `del` involves a nuanced color-dependent property: `del` on a Black node preserves `no_red_red` while `del` on a Red node produces `almost_no_red_red`. The interaction between these cases through `balL`/`balR`/`fuse` makes the full proof complex. This is documented as future work.
+The `delete_is_rbtree` proof tracks a color-dependent invariant through `balL`/`balR`/`fuse`/`del`:
+`del` on a Black node yields `(bh-1, almost_no_red_red)`, while `del` on a Red node yields
+`(bh, no_red_red)`. The stronger property for Red parents follows because their children are
+always Black (by `no_red_red`), constraining which `balL`/`balR` cases fire.
 
 ### 2.4 Pulse ↔ Spec Linkage
 
@@ -147,7 +153,7 @@ Every Pulse operation's postcondition is stated in terms of the spec function:
 - ~~**No `predecessor`/`successor` operation.**~~ — ✅ Added with correctness proofs (`successor_is_next`, `predecessor_is_prev`).
 - ~~**Memory safety of deallocation**~~ — ✅ `free_rbtree` added in Pulse.
 - ~~**No set-theoretic specification**~~ — ✅ `insert_node_count` proven (insert preserves or increments node count).
-- **One admit remains:** `delete_is_rbtree` (RB invariant preservation for delete) — see §2.3b.
+- ~~**One admit remains:** `delete_is_rbtree`~~ — ✅ Now fully proven (zero admits). See §2.3b.
 
 ---
 
@@ -232,9 +238,9 @@ The Pulse code demonstrates several good patterns:
 
 ### 5.1 Admits and Assumes
 
-**One admit** in the Spec file: `delete_is_rbtree` (RB invariant preservation for delete). See §2.3b for details. All other proofs are fully verified — zero assumes.
-
-The Pulse implementation (`CLRS.Ch13.RBTree.fst`) has **zero admits, zero assumes**. The Complexity module has **zero admits, zero assumes**.
+**Zero admits, zero assumes** across all files: Spec, Lemmas, Complexity, CLRSSpec,
+CLRSComplexity, Impl, CLRSImpl, and all `.fsti` interface files. All proof
+obligations are mechanically discharged by F* and Z3.
 
 ### 5.2 Proof Strategies
 
@@ -243,7 +249,7 @@ The Pulse implementation (`CLRS.Ch13.RBTree.fst`) has **zero admits, zero assume
 | Structural induction | `ins_properties`, `ins_preserves_bst`, `min_nodes_for_bh`, `bh_height_bound` | ✅ Standard |
 | Normalization (`= ()`) | `classify_balance_lemma`, `balance_mem`, `balance_same_bh`, `balance_bh`, `balance_all_lt/gt` | ✅ Elegant — Z3 handles these by reduction |
 | Ghost rewriting | All Pulse functions (extensive `rewrite` usage) | ✅ Necessary for sep-logic |
-| Fuel/ifuel/rlimit tuning | Multiple `#push-options` blocks | ⚠️ See below |
+| Fuel/ifuel/rlimit tuning | Multiple `#push-options` blocks | ✅ Now well-controlled (see below) |
 
 ### 5.3 Z3 Resource Limits
 
@@ -252,15 +258,18 @@ The Pulse implementation (`CLRS.Ch13.RBTree.fst`) has **zero admits, zero assume
 | `min_nodes_for_bh` | 2 | 0 | 20 | Low |
 | `bh_height_bound` | 2 | 1 | 30 | Low |
 | `balance_mem` | 3 | 1 | 20 | Low |
-| `ins_preserves_bst` + `balance_is_bst` | 4 | 2 | 40 | Low |
-| `balance_restores_no_red_red_*` + `balance_red_almost` | 4 | 2 | 40 | Low |
+| `ins_preserves_bst` + `balance_is_bst` | 4 | 2 | 30 | Low |
+| `balance_restores_no_red_red_*` + `balance_red_almost` | 4 | 2 | 30 | Low |
 | `ins_properties` | 3 | 1 | 30 | Low |
-| `del_mem` | 5 | 3 | 50 | Moderate |
-| `balL_is_bst` / `balR_is_bst` | 5 | 3 | 80 | Moderate |
-| `fuse_is_bst` | 5 | 3 | 80 | Moderate |
-| `del_preserves_bst` | 4 | 2 | 80 | Moderate |
+| `del_mem` | 5 | 3 | 30 | Low |
+| `balL_is_bst` / `balR_is_bst` | 5 | 3 | 30 | Low |
+| `fuse_is_bst` | 5 | 3 | 30 | Low |
+| `del_preserves_bst` | 4 | 2 | 30 | Low |
+| Concrete examples (`log2_floor_1024`) | 1 | 0 | 20 | Low |
 
-The original fuel 8 / rlimit 200 proofs have been reduced: `balance_restores_no_red_red_*` now uses fuel 4 with explicit case analysis on `l`/`r` structure. Maximum rlimit across the codebase is 80 (was 200).
+Maximum resource usage across the entire codebase: **fuel 5, ifuel 3, z3rlimit 30**.
+Previous maxima were fuel 12, rlimit 100 — reduced by adding explicit lemma calls
+and using `assert_norm` for concrete normalization.
 
 ### 5.4 Pulse-Specific Proof Patterns
 
@@ -332,11 +341,11 @@ These are clean and idiomatic. The ghost helpers are well-factored and reusable.
 
 | Dimension | Grade | Notes |
 |-----------|-------|-------|
-| CLRS Fidelity | **A** | All of §13.1–13.4 implemented: search, insert, delete (Okasaki/Kahrs style). |
-| Specification Strength | **A** | All 5 RB properties, BST invariant, membership correctness, preservation proofs for insert and delete. One admit: `delete_is_rbtree`. |
+| CLRS Fidelity | **A** | All of §13.1–13.4 implemented: search, insert, delete (Okasaki/Kahrs + CLRS-style). |
+| Specification Strength | **A** | All 5 RB properties, BST invariant, membership correctness, preservation proofs for insert and delete. Zero admits. |
 | Complexity | **A** | O(log n) for search, insert, and delete proven with clean ghost tick approach. Theorem 13.1 fully verified. Complexity bounds in Pulse postconditions (`rb_*_log` API). |
 | Code Quality | **A** | Excellent module separation. Validated API (`valid_rbtree` slprop) bundles invariants for clean usage. |
-| Proof Quality | **A** | One admit (`delete_is_rbtree`). All other proofs fully machine-checked. Max rlimit reduced to 80. |
-| Documentation | **A** | Headers updated, Okasaki citation, API docs. Admit documented in README Known Limitations. REVIEW.md addressed. |
+| Proof Quality | **A** | Zero admits. All proofs fully machine-checked. Max rlimit reduced to 30 (from 100). Max fuel reduced to 5 (from 12). |
+| Documentation | **A** | Headers updated, Okasaki citation, API docs. Review files up to date. |
 
-**Overall: A** — A comprehensive verified implementation of Red-Black Trees covering all CLRS Ch13 operations, with strong correctness and complexity proofs. The single admitted lemma (`delete_is_rbtree`) is clearly documented and does not affect the Pulse implementation's functional correctness. The validated API (`valid_rbtree` slprop) provides a clean user experience where BST/RB invariants and complexity bounds are automatically maintained.
+**Overall: A** — A comprehensive verified implementation of Red-Black Trees covering all CLRS Ch13 operations, with strong correctness and complexity proofs. Zero admits across ~6,510 lines. The validated API (`valid_rbtree` slprop) provides a clean user experience where BST/RB invariants and complexity bounds are automatically maintained.

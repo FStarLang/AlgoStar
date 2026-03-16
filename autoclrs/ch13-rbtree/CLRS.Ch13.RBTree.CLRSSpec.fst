@@ -517,7 +517,7 @@ let ins_almost_no_red_red (t: rbtree) : bool =
    | Node Red l _ r -> not (is_red_node l && is_red_node r)
    | _ -> true)
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
 let clrs_fixup_left_same_bh (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l = bh r)
@@ -543,7 +543,7 @@ let clrs_fixup_right_bh (c: color) (l: rbtree) (v: int) (r: rbtree)
   = ()
 
 // Under Black parent with ins_almost child, fixup restores no_red_red
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 60"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
 let clrs_fixup_left_restores (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires c = Black /\ ins_almost_no_red_red l /\ no_red_red r)
@@ -659,7 +659,7 @@ let clrs_resolve_right_mem (c: color) (w: rbtree) (v: int) (x: rbtree) (k: int)
     | _ -> ()
 #pop-options
 
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 100"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
 let rec clrs_del_mem (t: rbtree) (k: int) (x: int)
   : Lemma
     (requires is_bst t)
@@ -782,7 +782,7 @@ let clrs_resolve_right_all_gt (c: color) (w: rbtree) (v: int) (x: rbtree) (bound
     | _ -> ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 60"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
 let clrs_del_cases234_left_is_bst (c: color) (x: rbtree) (v: int) (w: rbtree)
   : Lemma
     (requires is_bst x /\ is_bst w /\ all_lt x v /\ all_gt w v)
@@ -868,7 +868,7 @@ let clrs_resolve_right_is_bst (c: color) (w: rbtree) (v: int) (x: rbtree)
     | _ -> ()
 #pop-options
 
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
 let rec clrs_del_all_lt (t: rbtree) (k: int) (bound: int)
   : Lemma
     (requires is_bst t /\ all_lt t bound)
@@ -952,7 +952,7 @@ let rec all_gt_from_mem (t: rbtree) (bound: int)
       all_gt_from_mem r bound
 
 // After deleting sk from r (where sk = minimum r), all remaining elements > sk
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 40"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
 let clrs_del_minimum_all_gt (r: rbtree{Node? r}) 
   : Lemma
     (requires is_bst r)
@@ -970,7 +970,7 @@ let clrs_del_minimum_all_gt (r: rbtree{Node? r})
     all_gt_from_mem result sk
 #pop-options
 
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
 let rec clrs_del_preserves_bst (t: rbtree) (k: int)
   : Lemma
     (requires is_bst t)
@@ -1017,7 +1017,7 @@ let clrs_delete_preserves_bst (t: rbtree) (k: int)
 (*** DELETE — RB Property Preservation ***)
 
 // Helper: deficit tracking invariant for clrs_resolve_left/right
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 80 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 30 --split_queries always"
 let clrs_del_cases234_left_props (c: color) (x: rbtree) (v: int)
     (w: rbtree{Node? w /\ Black? (Node?.c w)})
   : Lemma
@@ -1038,7 +1038,7 @@ let clrs_del_cases234_left_props (c: color) (x: rbtree) (v: int)
     | _, _ -> ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 80 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 30 --split_queries always"
 let clrs_del_cases234_right_props (c: color) (w: rbtree{Node? w /\ Black? (Node?.c w)})
     (v: int) (x: rbtree)
   : Lemma
@@ -1059,7 +1059,7 @@ let clrs_del_cases234_right_props (c: color) (w: rbtree{Node? w /\ Black? (Node?
     | _, _ -> ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 80 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 30 --split_queries always"
 let clrs_resolve_left_props (c: color) (x: rbtree) (v: int) (w: rbtree)
   : Lemma
     (requires same_bh x /\ same_bh w /\ bh x + 1 = bh w /\
@@ -1104,7 +1104,7 @@ let clrs_resolve_right_props (c: color) (w: rbtree) (v: int) (x: rbtree)
 
 // Main delete RB preservation: clrs_del preserves same_bh and
 // tracks deficit/no_red_red depending on deficit flag
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 80 --split_queries always"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 30 --split_queries always"
 let rec clrs_del_props (t: rbtree) (k: int)
   : Lemma
     (requires same_bh t /\ no_red_red t /\ is_bst t)

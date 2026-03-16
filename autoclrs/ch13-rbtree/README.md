@@ -303,8 +303,6 @@ All lemmas are fully verified with zero admits:
 - **Integer keys only.** No generic key type or comparator function.
 - **No persistent/functional interface.** The Pulse implementation is
   destructive — insert/delete consume the input tree.
-- **CLRS-style does not yet have complexity bounds.** The O(lg n) bounds are
-  proven only for the Okasaki-style operations.
 
 ## File Inventory
 

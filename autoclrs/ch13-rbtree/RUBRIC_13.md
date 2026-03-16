@@ -110,7 +110,7 @@
 |--------|------:|------------|
 | Total admits | 0 | ✅ All proofs machine-checked |
 | Total assumes | 0 | ✅ |
-| Max Z3 rlimit | 80 | ✅ Moderate |
+| Max Z3 rlimit | 30 | ✅ Low (reduced from 100) |
 | Max fuel | 5 | ✅ Acceptable for tree proofs |
 | Max ifuel | 3 | ✅ |
 
