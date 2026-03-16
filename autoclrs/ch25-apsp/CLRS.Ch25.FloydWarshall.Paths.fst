@@ -389,7 +389,7 @@ let lemma_restricted_strengthen (w: list nat) (k: nat)
 let walk_concat (w1: list nat) (w2: list nat{is_walk w2}) : list nat =
   w1 @ (tl w2)
 
-let rec lemma_concat_is_walk (w1 w2: list nat)
+let lemma_concat_is_walk (w1 w2: list nat)
   : Lemma (requires is_walk w1 /\ is_walk w2)
           (ensures is_walk (walk_concat w1 w2))
   = assert (length (walk_concat w1 w2) == length w1 + length w2 - 1);

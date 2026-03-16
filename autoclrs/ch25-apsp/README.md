@@ -23,7 +23,7 @@ zero assumes**.
 | Length preservation across all loops | ✅ Proven | SMT-pattern auto-triggered |
 | Concrete test (3×3 graph, all 9 entries) | ✅ Proven | `SpecTest.fst` |
 | Pulse runtime test | ✅ | `Test.fst` |
-| Negative-cycle detection | ❌ | Assumed via `non_negative_diagonal` precondition |
+| Negative-cycle detection | ✅ | `NegCycleDetect.fst`: runtime check + safe wrapper |
 | Admits | **0** | |
 | Assumes | **0** | |
 
@@ -37,10 +37,11 @@ zero assumes**.
 | `CLRS.Ch25.FloydWarshall.Lemmas.fsti` | F* | ~107 | Interface for correctness lemma signatures |
 | `CLRS.Ch25.FloydWarshall.Lemmas.fst` | F* | ~367 | Correctness proofs: `fw_inner_j_correct`, `fw_inner_i_correct`, `fw_outer_computes_entry`, top-level `floyd_warshall_computes_shortest_paths` |
 | `CLRS.Ch25.FloydWarshall.Paths.fst` | F* | ~large | Walk formalism: walk definitions, splitting, concatenation, monotonicity, achievability, soundness, final theorem connecting `fw_entry` to shortest paths |
-| `CLRS.Ch25.FloydWarshall.Impl.fsti` | Pulse | ~47 | Interface: `floyd_warshall` signature with correctness + complexity postcondition |
-| `CLRS.Ch25.FloydWarshall.Impl.fst` | Pulse | ~156 | Implementation: three nested loops with ghost tick counter |
-| `CLRS.Ch25.FloydWarshall.SpecTest.fst` | F* | ~short | Concrete 3×3 test: verifies all 9 output entries |
-| `CLRS.Ch25.FloydWarshall.Test.fst` | Pulse | ~short | Pulse compilation/runtime test |
+| `CLRS.Ch25.FloydWarshall.Impl.fsti` | Pulse | ~45 | Interface: `floyd_warshall` signature with correctness + complexity postcondition |
+| `CLRS.Ch25.FloydWarshall.Impl.fst` | Pulse | ~154 | Implementation: three nested loops with ghost tick counter |
+| `CLRS.Ch25.FloydWarshall.NegCycleDetect.fst` | Pulse | ~107 | Runtime negative-cycle detection + safe wrapper |
+| `CLRS.Ch25.FloydWarshall.SpecTest.fst` | F* | ~77 | Concrete 3×3 test: verifies all 9 output entries |
+| `CLRS.Ch25.FloydWarshall.Test.fst` | Pulse | ~133 | Pulse compilation/runtime tests (3×3, neg-cycle, empty graph) |
 
 ---
 
@@ -131,7 +132,6 @@ fn floyd_warshall
     A.pts_to dist contents **
     GR.pts_to ctr c0 **
     pure (
-      SZ.v n > 0 /\
       Seq.length contents == SZ.v n * SZ.v n /\
       SZ.fits (SZ.v n * SZ.v n)
     )
@@ -249,11 +249,10 @@ The ghost tick counter (`GR.ref nat`) is completely erased at runtime.
 
 ## Limitations
 
-1. **Negative-cycle detection not implemented.** The precondition
-   `non_negative_diagonal` (and the stronger condition that `fw_entry`
-   diagonal entries remain non-negative at all levels) is assumed, not
-   checked at runtime.  If the input contains negative cycles, the
-   algorithm will silently produce incorrect results.
+1. ~~**Negative-cycle detection not implemented.**~~ **RESOLVED.**
+   `NegCycleDetect.fst` provides `check_no_negative_cycle` (runtime diagonal
+   scan) and `floyd_warshall_safe` (wrapper with `weights_bounded` +
+   `non_negative_diagonal` preconditions).
 
 2. **Fixed infinity sentinel.** The sentinel value `1000000` is
    hardcoded.  Graphs with edge weights approaching this value may

@@ -15,11 +15,12 @@
 | 2 | `CLRS.Ch25.FloydWarshall.Lemmas.fsti` | **Lemmas interface** | Signatures for all correctness lemmas |
 | 3 | `CLRS.Ch25.FloydWarshall.Lemmas.fst` | **Lemmas** | Correctness proofs: `fw_outer ≡ fw_entry` (main theorem) |
 | 4 | `CLRS.Ch25.FloydWarshall.Paths.fst` | **Lemmas (extended)** | Walk formalism; full APSP proof: achievability + soundness → fw_entry = δ(i,j) |
-| 5 | `CLRS.Ch25.FloydWarshall.Impl.fsti` | **Impl interface** | `floyd_warshall` signature with correctness + O(n³) complexity in postcondition |
+| 5 | `CLRS.Ch25.FloydWarshall.Impl.fsti` | **Impl interface** | `floyd_warshall` signature with correctness + Θ(n³) complexity in postcondition |
 | 6 | `CLRS.Ch25.FloydWarshall.Impl.fst` | **Impl** | Pulse implementation with merged ghost-tick complexity proof |
-| 7 | `CLRS.Ch25.FloydWarshall.SpecTest.fst` | _(test)_ | Concrete 3×3 output verification via `fw_entry` |
-| 8 | `CLRS.Ch25.FloydWarshall.Test.fst` | _(test)_ | Pulse runtime smoke test (3×3 graph) |
-| | **Total: 8 files** | | **Zero admits, zero assumes** |
+| 7 | `CLRS.Ch25.FloydWarshall.NegCycleDetect.fst` | **Impl (extension)** | Runtime negative-cycle detection + safe wrapper with `weights_bounded` precondition |
+| 8 | `CLRS.Ch25.FloydWarshall.SpecTest.fst` | _(test)_ | Concrete 3×3 output verification via `fw_entry` |
+| 9 | `CLRS.Ch25.FloydWarshall.Test.fst` | _(test)_ | Pulse runtime smoke tests (3×3 graph, neg-cycle check, empty graph) |
+| | **Total: 9 files** | | **Zero admits, zero assumes** |
 
 ---
 
@@ -35,7 +36,7 @@
 | Θ(V³) complexity | Ghost ticks in Impl.fst | ✅ Proven: exactly n³ relaxation ops |
 | fw_entry = δ(i,j) (APSP) | Paths.fst: `fw_entry_leq_any_walk` + `fw_entry_eq_some_walk` | ✅ Proven (under no-negative-cycle assumption) |
 | Predecessor matrix (Π) | — | ❌ Not implemented |
-| Negative-cycle detection | `non_negative_diagonal` precondition in Spec.fst | 🔶 Assumed, not detected at runtime |
+| Negative-cycle detection | `NegCycleDetect.fst`: `check_no_negative_cycle` + `floyd_warshall_safe` wrapper | ✅ Runtime check + safe wrapper proven |
 
 ---
 
