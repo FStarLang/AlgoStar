@@ -1,7 +1,7 @@
 # Chapter 08: Linear-Time Sorting — Rubric Compliance
 
-**Updated:** 2026-03-06
-**Source files:** 17 `.fst`/`.fsti` files — all verified ✅
+**Updated:** 2026-03-16
+**Source files:** 19 `.fst`/`.fsti` files — all verified ✅
 **Canonical rubric:** `RUBRIC.md` (root)
 
 ---
@@ -18,15 +18,17 @@
 | 6 | `CLRS.Ch08.CountingSort.Impl.fst` | Pulse | ✅ CLRS-faithful 4-phase stable + in-place + digit-keyed variant |
 | 7 | `CLRS.Ch08.CountingSort.Impl.fsti` | Pulse | ✅ Interface: counting_sort_impl, counting_sort_inplace, counting_sort_by_digit |
 | 8 | `CLRS.Ch08.RadixSort.Spec.fst` | F* | ✅ Abstract multi-digit correctness |
-| 9 | `CLRS.Ch08.RadixSort.Lemmas.fst` | F* | ✅ Aggregates Stability + FullSort |
-| 10 | `CLRS.Ch08.RadixSort.Base.fst` | F* | ✅ Shared definitions |
-| 11 | `CLRS.Ch08.RadixSort.Stability.fst` | F* | ✅ Core CLRS Lemma 8.3 stability proof + pack_is_stable |
-| 12 | `CLRS.Ch08.RadixSort.FullSort.fst` | F* | ✅ Digit decomposition → numeric bridge |
-| 13 | `CLRS.Ch08.RadixSort.Bridge.fst` | F* | ✅ CountingSort ↔ RadixSort.Base equivalences (both directions) |
-| 14 | `CLRS.Ch08.RadixSort.MultiDigit.fst` | F* | ✅ Pure multi-digit radix sort spec |
-| 15 | `CLRS.Ch08.RadixSort.fst` | Pulse | ✅ **Multi-digit radix sort** + single-digit variant |
-| 16 | `CLRS.Ch08.BucketSort.Spec.fst` | F* | ✅ Actual definitions: sorted, insert, bucket fns |
-| 17 | `CLRS.Ch08.BucketSort.Lemmas.fst` | F* | ✅ Actual proofs + bucket_sort main fn |
+| 9 | `CLRS.Ch08.RadixSort.Lemmas.fsti` | F* | ✅ Interface: key lemma signatures (new) |
+| 10 | `CLRS.Ch08.RadixSort.Lemmas.fst` | F* | ✅ Aggregates Stability + FullSort |
+| 11 | `CLRS.Ch08.RadixSort.Base.fst` | F* | ✅ Shared definitions |
+| 12 | `CLRS.Ch08.RadixSort.Stability.fst` | F* | ✅ Core CLRS Lemma 8.3 stability proof + pack_is_stable |
+| 13 | `CLRS.Ch08.RadixSort.FullSort.fst` | F* | ✅ Digit decomposition → numeric bridge |
+| 14 | `CLRS.Ch08.RadixSort.Bridge.fst` | F* | ✅ CountingSort ↔ RadixSort.Base equivalences (both directions) |
+| 15 | `CLRS.Ch08.RadixSort.MultiDigit.fst` | F* | ✅ Pure multi-digit radix sort spec |
+| 16 | `CLRS.Ch08.RadixSort.fst` | Pulse | ✅ **Multi-digit radix sort** + single-digit variant |
+| 17 | `CLRS.Ch08.BucketSort.Spec.fst` | F* | ✅ Actual definitions: sorted, insert, bucket fns |
+| 18 | `CLRS.Ch08.BucketSort.Lemmas.fsti` | F* | ✅ Interface: correctness lemma sigs + bucket_sort (new) |
+| 19 | `CLRS.Ch08.BucketSort.Lemmas.fst` | F* | ✅ Actual proofs + bucket_sort main fn |
 
 ---
 
@@ -52,9 +54,10 @@ Extra: `StableLemmas.fst`, `DigitSortLemmas.fst` — support modules.
 |-------------|------|:------:|
 | `Spec.fst` | `RadixSort.Spec.fst` | ✅ |
 | `Lemmas.fst` | `RadixSort.Lemmas.fst` | ✅ |
+| `Lemmas.fsti` | `RadixSort.Lemmas.fsti` | ✅ |
 | `Impl.fst` | `RadixSort.fst` | ✅ **Multi-digit** loop + single-digit variant |
 
-**3/3 core slots filled**
+**4/4 core slots filled** (Impl.fsti blocked by Pulse limitation)
 
 Extra: `Base.fst`, `Bridge.fst`, `Stability.fst`, `FullSort.fst`, `MultiDigit.fst`.
 
@@ -64,8 +67,9 @@ Extra: `Base.fst`, `Bridge.fst`, `Stability.fst`, `FullSort.fst`, `MultiDigit.fs
 |-------------|------|:------:|
 | `Spec.fst` | `BucketSort.Spec.fst` | ✅ |
 | `Lemmas.fst` | `BucketSort.Lemmas.fst` | ✅ |
+| `Lemmas.fsti` | `BucketSort.Lemmas.fsti` | ✅ |
 
-**2/2 core slots filled** (no Pulse impl)
+**3/3 core slots filled** (no Pulse impl)
 
 ---
 
@@ -75,7 +79,7 @@ Extra: `Base.fst`, `Bridge.fst`, `Stability.fst`, `FullSort.fst`, `MultiDigit.fs
 |-------|--------|
 | `admit()` calls | **0** across all verified files ✅ |
 | `assume` calls | **0** across all verified files ✅ |
-| `make -j4` | **✅** All 17 modules pass |
+| `make -j4` | **✅** All 19 modules pass |
 | DigitSortLemmas verified | ✅ All phase4 lemmas verified (~281s) |
 | Impl.fst verified | ✅ All 3 Pulse fns: counting_sort_impl, inplace, by_digit |
 | RadixSort.fst verified | ✅ Multi-digit: radix_sort + radix_sort_single_digit |

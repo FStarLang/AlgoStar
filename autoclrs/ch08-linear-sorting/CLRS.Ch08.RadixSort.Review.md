@@ -281,7 +281,59 @@ Key modules:
 | `CLRS.Ch08.RadixSort.FullSort.fst` | Full sort correctness (digit decomposition → numeric ordering) |
 | `CLRS.Ch08.RadixSort.MultiDigit.fst` | Pure multi-digit specifications and lemmas |
 | `CLRS.Ch08.RadixSort.Spec.fst` | Pure digit decomposition and helpers |
+| `CLRS.Ch08.RadixSort.Lemmas.fsti` | Public interface for key lemma results |
 | `CLRS.Ch08.RadixSort.Lemmas.fst` | Re-exports key results from Stability and FullSort |
 | `CLRS.Ch08.RadixSort.Bridge.fst` | Equivalences between CountingSort and RadixSort definitions |
 | `CLRS.Ch08.CountingSort.Impl.fsti` | Counting sort interface (used as subroutine) |
 | `CLRS.Ch08.CountingSort.DigitSortLemmas.fst` | Digit-keyed counting sort invariant lemmas |
+
+## Rubric Compliance (per `autoclrs/audit/RUBRIC.md`)
+
+| Rubric Slot | File | Status |
+|-------------|------|:------:|
+| `Spec.fst` | `RadixSort.Spec.fst` | ✅ |
+| `Lemmas.fst` | `RadixSort.Lemmas.fst` | ✅ |
+| `Lemmas.fsti` | `RadixSort.Lemmas.fsti` | ✅ (new) |
+| `Impl.fst` | `RadixSort.fst` | ✅ |
+| `Impl.fsti` | — | ❌ Blocked (Pulse SMT limitation with `forall` preconditions) |
+| `Complexity.fst` | — | ❌ Not present |
+| `Complexity.fsti` | — | ❌ Not present |
+
+## Profiling (Build from clean, -j4, wall-clock completion times)
+
+| File | Completion (s) | Max z3rlimit | z3refresh | split_queries |
+|------|---------------:|:------------:|:---------:|:-------------:|
+| Base.fst | 1 | — | 0 | 0 |
+| Stability.fst | 16 | 200 | 0 | 2 |
+| Spec.fst | 27 | 200 | 0 | 0 |
+| Bridge.fst | 196 | 40 | 0 | 0 |
+| MultiDigit.fst | 199 | 100 | 0 | 2 |
+| FullSort.fst | 202 | 50 | 0 | 0 |
+| Lemmas.fsti | 202 | — | — | — |
+| Lemmas.fst | 505 | — | 0 | 0 |
+| RadixSort.fst | 585 | 200 | 0 | 0 |
+
+## Checklist
+
+Priority-ordered items for reaching a fully proven, high-quality
+implementation:
+
+- [x] Zero admits, zero assumes across all files
+- [x] Rubric slots: Spec.fst, Lemmas.fst, Impl.fst
+- [x] Lemmas.fsti interface file created
+- [x] Multi-digit radix sort with full CLRS Lemma 8.3 stability proof
+- [x] Empty-array support (`len = 0`) for both variants
+- [x] Bridge module connecting CountingSort and RadixSort definitions
+- [ ] **P1 (Rubric)**: Create `Impl.fsti` — currently blocked by Pulse
+      SMT limitation with `forall`-quantified preconditions during
+      interface checking. Revisit when Pulse toolchain is updated.
+- [ ] **P2 (Warning)**: Address deprecated `Array.free` and
+      `Reference.free` warnings in `RadixSort.fst` (lines 196-198).
+- [ ] **P3 (Rubric)**: Add `Complexity.fst`/`.fsti` with O(d·(n+k))
+      complexity proof or ghost counter.
+- [ ] **P4 (Spec)**: Remove `distinct s` requirement from pure
+      `radix_sort_correct` in `MultiDigit.fst` to match the Pulse
+      implementation's generality.
+- [ ] **P5 (Optimization)**: Reduce memory usage — `radix_sort_multidigit`
+      currently allocates a temporary buffer `b` and copies back after
+      each pass. Consider ping-pong buffer strategy.

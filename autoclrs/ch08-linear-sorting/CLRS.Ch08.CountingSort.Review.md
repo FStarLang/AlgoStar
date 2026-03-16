@@ -296,3 +296,55 @@ for the stability proof.
 | `CLRS.Ch08.CountingSort.DigitSortLemmas.fst` | Phase invariant lemmas for digit-keyed variant |
 | `CLRS.Ch08.RadixSort.Stability.fst` | `is_stable_sort_on_digit` definition |
 | `CLRS.Ch08.RadixSort.Base.fst` | `digit`, `sorted_on_digit` definitions |
+
+## Rubric Compliance (per `autoclrs/audit/RUBRIC.md`)
+
+| Rubric Slot | File | Status |
+|-------------|------|:------:|
+| `Spec.fst` | `CountingSort.Spec.fst` | ✅ |
+| `Lemmas.fst` | `CountingSort.Lemmas.fst` | ✅ |
+| `Lemmas.fsti` | `CountingSort.Lemmas.fsti` | ✅ |
+| `Impl.fst` | `CountingSort.Impl.fst` | ✅ |
+| `Impl.fsti` | `CountingSort.Impl.fsti` | ✅ |
+| `Complexity.fst` | — | ❌ Not present |
+| `Complexity.fsti` | — | ❌ Not present |
+
+## Profiling (Build from clean, -j4, wall-clock completion times)
+
+| File | Completion (s) | Max z3rlimit | z3refresh | split_queries |
+|------|---------------:|:------------:|:---------:|:-------------:|
+| Spec.fst | 0 | — | — | — |
+| Lemmas.fsti | 2 | — | — | — |
+| Lemmas.fst | 195 | 100 | 0 | 0 |
+| StableLemmas.fst | 303 | 400 | 0 | 2 |
+| DigitSortLemmas.fst | 422 | 200 | 19 | 10 |
+| Impl.fsti | 201 | — | — | — |
+| **Impl.fst** | **1681** | **400** | **0** | **1** |
+
+**Critical path bottleneck**: `Impl.fst` is the slowest file (~21 min
+solo verification). The z3rlimit 800 in `counting_sort_inplace` is the
+highest in the chapter and a stability risk.
+
+## Checklist
+
+Priority-ordered items for reaching a fully proven, high-quality
+implementation:
+
+- [x] Zero admits, zero assumes across all files
+- [x] Rubric slots: Spec.fst, Lemmas.fst, Lemmas.fsti, Impl.fst, Impl.fsti
+- [x] Three variants proven: CLRS-faithful, in-place, digit-keyed
+- [x] Empty-array support (`len = 0`) for all three variants
+- [x] **P1 (Stabilization)**: Reduce z3rlimit 800 in `counting_sort_inplace`
+      (line 284 of Impl.fst). ✅ Reduced to 400 with `--split_queries always`
+      (removed `--z3refresh` dependency).
+- [ ] **P2 (Stabilization)**: Reduce z3refresh count (19) in
+      DigitSortLemmas.fst — indicates solver-state sensitivity.
+- [ ] **P3 (Stabilization)**: Reduce z3rlimit 400 in StableLemmas.fst
+      (line 328).
+- [ ] **P4 (Rubric)**: Add `Complexity.fst`/`.fsti` with O(n+k)
+      complexity proof or ghost counter.
+- [ ] **P5 (Warning)**: Address deprecated `Array.free`/`Reference.free`
+      warnings in Impl.fst (use non-deprecated alternatives when
+      available in Pulse).
+- [ ] **P6 (Spec)**: Generalize from `nat` to `int` (or parameterize
+      over ordered types) to align with `CLRS.Common.SortSpec`.

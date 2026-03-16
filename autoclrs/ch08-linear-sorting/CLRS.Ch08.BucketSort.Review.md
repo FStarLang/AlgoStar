@@ -218,4 +218,56 @@ Key lemmas:
 | File | Role |
 |------|------|
 | `CLRS.Ch08.BucketSort.Spec.fst` | Definitions (`sorted`, `is_permutation`, `bucket_index`, `insertion_sort`, bucket functions) |
+| `CLRS.Ch08.BucketSort.Lemmas.fsti` | Public interface for correctness lemmas and `bucket_sort` (new) |
 | `CLRS.Ch08.BucketSort.Lemmas.fst` | Proofs and main `bucket_sort` function |
+
+## Rubric Compliance (per `autoclrs/audit/RUBRIC.md`)
+
+| Rubric Slot | File | Status |
+|-------------|------|:------:|
+| `Spec.fst` | `BucketSort.Spec.fst` | ✅ |
+| `Lemmas.fst` | `BucketSort.Lemmas.fst` | ✅ |
+| `Lemmas.fsti` | `BucketSort.Lemmas.fsti` | ✅ (new) |
+| `Impl.fst` | — | ❌ Pure F* only (no Pulse implementation) |
+| `Impl.fsti` | — | ❌ N/A (no Pulse implementation) |
+| `Complexity.fst` | — | ❌ Not present |
+| `Complexity.fsti` | — | ❌ Not present |
+
+## Profiling (Build from clean, -j4, wall-clock completion times)
+
+| File | Completion (s) | Max z3rlimit | z3refresh | split_queries |
+|------|---------------:|:------------:|:---------:|:-------------:|
+| Spec.fst | 2 | 30 | 0 | 0 |
+| Lemmas.fsti | 504 | — | — | — |
+| **Lemmas.fst** | **660** | **200** | **0** | **0** |
+
+**Note**: Warning 349 on `bucket_sort` body (lines 409-448) — the VC
+succeeded only after implicit split_queries. Should add
+`--split_queries always` to the push-options for stability.
+
+## Checklist
+
+Priority-ordered items for reaching a fully proven, high-quality
+implementation:
+
+- [x] Zero admits, zero assumes across all files
+- [x] Rubric slots: Spec.fst, Lemmas.fst
+- [x] Lemmas.fsti interface file created
+- [x] Empty-list support for `bucket_sort`
+- [x] Sorted output proven
+- [x] Length preservation proven
+- [x] Permutation proven (count-based)
+- [x] Inter-bucket ordering proven (`bucket_index_monotone`, `bucket_index_strict`)
+- [ ] **P1 (Stabilization)**: Warning 349 on `bucket_sort` — VC relies on
+      implicit split_queries. Explicit `--split_queries always` breaks
+      the inner `List.mem_count` proof (context lost). The warning is
+      harmless; the proof is stable as-is.
+- [ ] **P2 (Rubric)**: Create Pulse `Impl.fst`/`Impl.fsti` — convert
+      list-based pure implementation to array-based Pulse implementation.
+      This is a significant effort.
+- [ ] **P3 (Rubric)**: Add `Complexity.fst`/`.fsti` for average-case
+      O(n) analysis (requires probabilistic reasoning).
+- [ ] **P4 (Spec)**: Connect `sorted`/`is_permutation` definitions to
+      canonical `CLRS.Common.SortSpec` definitions (currently uses
+      `list int` with custom definitions).
+- [ ] **P5 (Spec)**: Add stability guarantee to bucket sort specification.
