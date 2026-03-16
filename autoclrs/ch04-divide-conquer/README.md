@@ -25,6 +25,7 @@ let complexity_bounded_log (cf c0 n: nat) : prop =
 
 ```fstar
 val binary_search
+  (#p: perm)
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
@@ -32,14 +33,13 @@ val binary_search
   (ctr: GR.ref nat)
   (#c0: erased nat)
   : stt SZ.t
-    (A.pts_to a s0 ** GR.pts_to ctr c0 **
+    (A.pts_to a #p s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
        Seq.length s0 <= A.length a /\
-       SZ.v len > 0 /\
        is_sorted s0
      ))
-    (fun result -> exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf **
+    (fun result -> exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
      pure (
        SZ.v result <= SZ.v len /\
        (SZ.v result < SZ.v len ==> (
@@ -95,26 +95,27 @@ let rec kadane_spec (s: Seq.seq int) (i: nat) (current_sum: int) (best_sum: int)
 
 let max_subarray_spec (s: Seq.seq int) : Tot int =
   if Seq.length s = 0 then 0
-  else kadane_spec s 0 0 initial_min
+  else kadane_spec s 0 0 (Seq.index s 0)
 ```
 
 **Correctness Theorem.** The exact `Kadane.fsti` signature:
 
 ```fstar
 val max_subarray
+  (#p: perm)
   (a: array int)
   (#s0: Ghost.erased (Seq.seq int))
   (len: SZ.t)
   (ctr: GR.ref nat)
   (#c0: erased nat)
   : stt int
-    (A.pts_to a s0 ** GR.pts_to ctr c0 **
+    (A.pts_to a #p s0 ** GR.pts_to ctr c0 **
      pure (
        SZ.v len == Seq.length s0 /\
        Seq.length s0 <= A.length a /\
        SZ.v len > 0
      ))
-    (fun result -> exists* (cf: nat). A.pts_to a s0 ** GR.pts_to ctr cf ** pure (
+    (fun result -> exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf ** pure (
        result == max_subarray_spec s0 /\
        complexity_bounded_linear cf (reveal c0) (SZ.v len)
      ))
@@ -132,10 +133,9 @@ which the Lemmas module proves optimal: `theorem_kadane_optimal` shows
 `max_subarray_spec s >= sum_range s i j` for all subarrays `[i,j)`, and
 `theorem_kadane_witness` shows the max is achieved by some subarray.
 
-**Limitations.** The Kadane specification uses `initial_min = -10^9` as a
-sentinel. The `elements_bounded` precondition (all elements ≥ -10^9) is needed
-for the optimality/equivalence proofs but is not required by the Pulse implementation
-itself. This sentinel approach differs from CLRS which uses `-∞`.
+**Limitations.** The specification uses `Seq.index s 0` (the first element) as
+the initial `best_sum`. The optimality theorems hold unconditionally for any
+integer sequence — no bounded-element precondition is needed.
 
 **Complexity.** Exactly n operations, linked to ghost counter. The loop invariant
 tracks `vc == c0 + i`; at exit `i == n` gives `cf - c0 == n`.
@@ -153,8 +153,8 @@ of the three.
 - `lemma_dc_optimal`: for any subarray `[qi, qj)`, the D&C result is ≥ `sum_range s qi qj`.
 
 **Equivalence (Proven).** `dc_kadane_equivalence` proves that the D&C result
-equals `max_subarray_spec` (Kadane's answer) for non-empty arrays with bounded
-elements. This is the strongest possible result: both algorithms compute the
+equals `max_subarray_spec` (Kadane's answer) for non-empty arrays. This
+is the strongest possible result: both algorithms compute the
 *unique* maximum subarray sum.
 
 **Complexity.** The pure cost function `dc_ops_count` models T(n) = 2T(n/2) + n,

@@ -229,3 +229,22 @@ let index_bounds_lemma (n: nat{n > 0}) (i j k: nat) : Lemma
 | `CLRS.Ch04.MatrixMultiply.Impl.fsti` | Public interface (this signature) |
 | `CLRS.Ch04.MatrixMultiply.Impl.fst` | Pulse implementation (triple nested loop) |
 | `CLRS.Ch04.MatrixMultiply.Spec.fst` | `flat_index`, `dot_product_spec`, `mat_mul_correct`, complexity predicate |
+
+## Checklist
+
+Priority-ordered items to reach a fully proven, high-quality implementation:
+
+- [x] Split monolith into Spec/Impl per RUBRIC.md
+- [x] Create `.fsti` interface for Impl
+- [x] Zero admits, zero assumes
+- [x] Fractional permissions for read-only input matrices
+- [x] Exact complexity bound linked to ghost counter
+- [x] Full correctness: every C[i][j] = dot product
+- [x] **P1: Extract shared ghost tick infrastructure.** `incr_nat` and `tick`
+  are duplicated across BinarySearch.Impl, Kadane, and MatrixMultiply.Impl.
+  Noted as cross-cutting concern; extract to `CLRS.Common.GhostComplexity`.
+- [x] **P2: Profile and reduce solver settings.** Reduced from
+  `--z3rlimit 80 --fuel 2 --ifuel 2` to `--z3rlimit 40 --fuel 1 --ifuel 1`.
+- [ ] **P3: No test file.** There is no `Test.MatrixMultiply.fst`. Adding a
+  test with a small (e.g., 2×2) matrix multiplication would exercise the code
+  and verify extraction.

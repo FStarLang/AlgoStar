@@ -188,3 +188,26 @@ Two key lemmas in `CLRS.Ch04.BinarySearch.Lemmas`:
 | `CLRS.Ch04.BinarySearch.Spec.fst` | `is_sorted`, `log2f`, `complexity_bounded_log` |
 | `CLRS.Ch04.BinarySearch.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch04.BinarySearch.Lemmas.fst` | Lemma proofs (log2f monotonicity and halving) |
+
+## Checklist
+
+Priority-ordered items to reach a fully proven, high-quality implementation:
+
+- [x] Split monolith into Spec/Lemmas/Impl per RUBRIC.md
+- [x] Create `.fsti` interfaces for Impl and Lemmas
+- [x] Zero admits, zero assumes
+- [x] Fractional permissions for read-only array access
+- [x] Handles `len == 0` (empty array) correctly
+- [x] Complexity bound linked to ghost counter
+- [x] **P1: Remove duplicated lemmas from Impl.fst.** `lemma_log2f_mono` and
+  `lemma_log2f_step` were copy-pasted in `Impl.fst` instead of
+  importing from `CLRS.Ch04.BinarySearch.Lemmas`. Fixed: added
+  `open CLRS.Ch04.BinarySearch.Lemmas` and removed the duplicates.
+- [ ] **P2: Extract shared ghost tick infrastructure.** `incr_nat` and `tick`
+  are duplicated across BinarySearch.Impl, Kadane, and MatrixMultiply.Impl.
+  Extract to `CLRS.Common.GhostComplexity`.
+- [x] **P3: Profile and reduce `--z3rlimit`.** Reduced from 80 to 60.
+  rlimit 40 fails on the `hi := mid` branch invariant proof.
+- [ ] **P4: Local `is_sorted` definition.** Consider reusing
+  `CLRS.Common.SortSpec.sorted` to avoid friction when composing with sorting
+  algorithms from other chapters.

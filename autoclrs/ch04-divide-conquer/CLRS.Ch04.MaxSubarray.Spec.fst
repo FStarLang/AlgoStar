@@ -17,9 +17,6 @@ module Seq = FStar.Seq
 
 let max_int (a b: int) : Tot int = if a >= b then a else b
 
-// A very small integer to use as initial best_sum
-let initial_min : int = -1000000000
-
 // ========== Kadane Specification ==========
 
 // Kadane's algorithm specification: iterative maximum subarray
@@ -77,6 +74,3 @@ let rec max_sub_sum (s: Seq.seq int) (i: nat) : Pure int
   if i = 0 then Seq.index s 0
   else max_int (max_sub_sum s (Prims.op_Subtraction i 1)) (max_suffix_sum s i)
 
-// Kadane uses initial_min as a sentinel; correctness requires elements >= it
-let elements_bounded (s: Seq.seq int) : prop =
-  forall (k:nat). k < Seq.length s ==> Seq.index s k >= initial_min

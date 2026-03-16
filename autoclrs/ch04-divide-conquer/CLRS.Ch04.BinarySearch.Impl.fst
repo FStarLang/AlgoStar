@@ -19,6 +19,7 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
 open CLRS.Ch04.BinarySearch.Spec
+open CLRS.Ch04.BinarySearch.Lemmas
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -38,30 +39,9 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-// ========== Internal lemmas (helpers for complexity proof) ==========
-
-let rec lemma_log2f_mono (a b: int)
-  : Lemma (requires a >= 1 /\ b >= 1 /\ a <= b)
-          (ensures log2f a <= log2f b)
-          (decreases (if a > 0 then a else 0))
-  = if Prims.op_LessThanOrEqual a 1 then ()
-    else if Prims.op_LessThanOrEqual b 1 then ()
-    else (
-      FStar.Math.Lemmas.lemma_div_le a b 2;
-      lemma_log2f_mono (Prims.op_Division a 2) (Prims.op_Division b 2)
-    )
-
-let lemma_log2f_step (old_range new_range: int)
-  : Lemma (requires old_range >= 1 /\ new_range >= 0 /\ new_range <= old_range / 2)
-          (ensures (new_range >= 1 ==> log2f new_range + 1 <= log2f old_range) /\
-                   (new_range == 0 ==> 1 <= log2f old_range + 1))
-  = if new_range >= 1 then
-      lemma_log2f_mono new_range (Prims.op_Division old_range 2)
-    else ()
-
 // ========== Binary Search with Complexity Bound ==========
 
-#set-options "--z3rlimit 80"
+#set-options "--z3rlimit 60"
 
 //SNIPPET_START: binary_search_sig
 fn binary_search

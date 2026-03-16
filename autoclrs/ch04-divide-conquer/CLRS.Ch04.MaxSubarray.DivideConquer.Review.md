@@ -3,8 +3,7 @@
 ## Top-Level Signature
 
 This is a **pure** (non-imperative) implementation. The main function is in
-`CLRS.Ch04.MaxSubarray.DivideConquer.fst` (also re-exported via
-`CLRS.Ch04.MaxSubarray.DivideConquer.Spec`):
+`CLRS.Ch04.MaxSubarray.DivideConquer.Spec.fst`:
 
 ```fstar
 let rec find_maximum_subarray_dc (s: Seq.seq int) (low high: nat) 
@@ -48,7 +47,7 @@ as separate lemmas.
 
 ## Auxiliary Definitions
 
-### `find_max_crossing_subarray` (from `CLRS.Ch04.MaxSubarray.DivideConquer.fst`)
+### `find_max_crossing_subarray` (from `CLRS.Ch04.MaxSubarray.DivideConquer.Spec`)
 
 ```fstar
 let find_max_crossing_subarray (s: Seq.seq int) (low mid high: nat) 
@@ -111,11 +110,6 @@ let max_subarray_spec (s: Seq.seq int) : Tot int =
 
 The canonical max subarray specification (Kadane-based). The D&C algorithm
 is proven equivalent to this.
-
-### ~~`elements_bounded`~~ (removed)
-
-The `elements_bounded` predicate is no longer needed. The equivalence
-theorem between D&C and Kadane now holds unconditionally.
 
 ## What Is Proven
 
@@ -210,11 +204,26 @@ The correctness proof has three layers:
 
 | File | Role |
 |------|------|
-| `CLRS.Ch04.MaxSubarray.DivideConquer.fst` | Pure implementation + inline correctness/complexity proofs |
-| `CLRS.Ch04.MaxSubarray.DivideConquer.Spec.fst` | Re-exported specification (same functions) |
+| `CLRS.Ch04.MaxSubarray.DivideConquer.fst` | Original monolith (to be cleaned up — see checklist) |
+| `CLRS.Ch04.MaxSubarray.DivideConquer.Spec.fst` | Pure specification (same functions, extracted) |
 | `CLRS.Ch04.MaxSubarray.DivideConquer.Complexity.fsti` | Complexity interface (`dc_ops_count`, bound) |
 | `CLRS.Ch04.MaxSubarray.DivideConquer.Complexity.fst` | Complexity proofs (O(n log n) via Master Theorem) |
 | `CLRS.Ch04.MaxSubarray.DivideConquer.Lemmas.fsti` | Lemma signatures (correctness, optimality, equivalence) |
 | `CLRS.Ch04.MaxSubarray.DivideConquer.Lemmas.fst` | Lemma proofs |
 | `CLRS.Ch04.MaxSubarray.Spec.fst` | Shared spec: `kadane_spec`, `sum_range`, `max_sub_sum`, etc. |
 | `CLRS.Ch04.MaxSubarray.Lemmas.fst` | Kadane correctness lemmas (used in equivalence) |
+
+## Checklist
+
+Priority-ordered items to reach a fully proven, high-quality implementation:
+
+- [x] Split monolith into Spec/Lemmas/Complexity per RUBRIC.md
+- [x] Create `.fsti` interfaces for Lemmas and Complexity
+- [x] Zero admits, zero assumes
+- [x] Equivalence with Kadane holds unconditionally
+- [x] O(n log n) complexity bound proven
+- [x] **P1: Clean up monolith `DivideConquer.fst`.** Reduced to re-export
+  the split modules. Removed dead code: `min_int` and
+  `lemma_dc_equals_kadane`.
+- [x] **P2: Remove dead code from shared Spec.fst.** `initial_min` and
+  `elements_bounded` removed from `CLRS.Ch04.MaxSubarray.Spec.fst`.

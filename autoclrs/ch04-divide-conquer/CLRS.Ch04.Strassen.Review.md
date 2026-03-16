@@ -295,3 +295,24 @@ induction on `rows a`:
 | `CLRS.Ch04.Strassen.Lemmas.fst` | Correctness proofs (element-wise algebraic verification) |
 | `CLRS.Ch04.Strassen.Complexity.fsti` | Complexity interface (strassen_mult_count, bounds) |
 | `CLRS.Ch04.Strassen.Complexity.fst` | Complexity proofs (closed form, comparison with cubic) |
+
+## Checklist
+
+Priority-ordered items to reach a fully proven, high-quality implementation:
+
+- [x] Split monolith into Spec/Lemmas/Complexity per RUBRIC.md
+- [x] Create `.fsti` interfaces for Lemmas and Complexity
+- [x] Zero admits, zero assumes
+- [x] Element-wise correctness: Strassen == standard multiply
+- [x] Closed-form complexity: 7^(log₂ n) scalar multiplications
+- [x] Proven strictly better than cubic for n > 1
+- [ ] **P1: Profile and stabilize Strassen.Lemmas.fst solver settings.** This
+  file has 7 different `#push-options` blocks with varying z3rlimit (10–50),
+  fuel (1–2), and ifuel (0–1). One block uses `--split_queries always`.
+  Also has warning 361 (unpaired `#push-options`). Profile each block to
+  verify stability and minimize settings.
+- [ ] **P2: No test file.** There is no `Test.Strassen.fst`. A test with small
+  (e.g., 2×2 or 4×4) matrices would exercise the code.
+- [ ] **P3: Power-of-2 restriction.** The algorithm only works on 2^k × 2^k
+  matrices. CLRS discusses padding; implementing this would broaden
+  applicability.

@@ -91,15 +91,6 @@ Pure recursive encoding of Kadane's algorithm. At each position `i`, it
 decides whether to extend the current subarray or start fresh, and tracks the
 best sum seen so far.
 
-### `initial_min` (from `CLRS.Ch04.MaxSubarray.Spec`)
-
-```fstar
-let initial_min : int = -1000000000
-```
-
-A legacy sentinel value. No longer used by `max_subarray_spec`, which now
-uses `Seq.index s 0` as the initial `best_sum`.
-
 ### `max_int` (from `CLRS.Ch04.MaxSubarray.Spec`)
 
 ```fstar
@@ -154,12 +145,6 @@ let rec max_sub_sum (s: Seq.seq int) (i: nat) : Pure int
 ```
 
 Maximum sum of any non-empty contiguous subarray in `s[0..i+1)`.
-
-### ~~`elements_bounded`~~ (removed)
-
-The `elements_bounded` predicate is no longer needed. By using
-`Seq.index s 0` instead of `initial_min` as the initial `best_sum`,
-all optimality theorems hold unconditionally for any integer sequence.
 
 ## What Is Proven
 
@@ -224,7 +209,7 @@ asserts `cf - c0 == n` (equality, not inequality).
 
 The proof uses a single while loop with invariant:
 
-* `kadane_spec s (SZ.v vi) vcur vbest == kadane_spec s 0 0 initial_min` —
+* `kadane_spec s (SZ.v vi) vcur vbest == kadane_spec s 0 0 (Seq.index s 0)` —
   The remaining computation from position `vi` with accumulators `vcur` and
   `vbest` equals the full computation from the start.
 * `vc == reveal c0 + SZ.v vi` — Exactly `i` ticks have been counted.
@@ -250,3 +235,22 @@ The key lemmas in `CLRS.Ch04.MaxSubarray.Lemmas`:
 | `CLRS.Ch04.MaxSubarray.Spec.fst` | `kadane_spec`, `max_subarray_spec`, `sum_range`, `max_suffix_sum`, `max_sub_sum` |
 | `CLRS.Ch04.MaxSubarray.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch04.MaxSubarray.Lemmas.fst` | Correctness and optimality proofs |
+
+## Checklist
+
+Priority-ordered items to reach a fully proven, high-quality implementation:
+
+- [x] Split monolith into Spec/Lemmas/Impl per RUBRIC.md
+- [x] Create `.fsti` interface for Kadane
+- [x] Zero admits, zero assumes
+- [x] Fractional permissions for read-only array access
+- [x] Optimality theorems hold unconditionally (no `elements_bounded`)
+- [x] Exact complexity bound linked to ghost counter
+- [x] **P1: Remove dead code from Spec.fst.** `initial_min` and
+  `elements_bounded` were still defined but no longer used. Removed.
+- [ ] **P2: Extract shared ghost tick infrastructure.** `incr_nat` and `tick`
+  are duplicated across BinarySearch.Impl, Kadane, and MatrixMultiply.Impl.
+  Extract to `CLRS.Common.GhostComplexity`.
+- [ ] **P3: Test.MaxSubarray.fst is a stub.** The test file only prints
+  strings — it never calls `max_subarray`. Write an actual Pulse test that
+  calls the algorithm on a concrete array and verifies the result.
