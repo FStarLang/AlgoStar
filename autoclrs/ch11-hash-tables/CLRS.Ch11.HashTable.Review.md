@@ -1,5 +1,81 @@
 # Hash Table with Open Addressing (CLRS §11.4)
 
+## Review Summary (2026-03-16)
+
+**Status**: Fully verified, zero admits, rubric-compliant (7/7 files present).
+
+### Rubric Compliance
+
+| Artifact | Status |
+|----------|--------|
+| Spec.fst | ✅ |
+| Impl.fsti | ✅ |
+| Impl.fst | ✅ |
+| Lemmas.fsti | ✅ |
+| Lemmas.fst | ✅ |
+| Complexity.fsti | ✅ |
+| Complexity.fst | ✅ |
+
+### Proof Profiling
+
+z3rlimits have been profiled and optimized:
+
+| Region | Previous | Current | Function |
+|--------|----------|---------|----------|
+| `lemma_valid_ht_key_at_index_findable` | 40 | 40 | — |
+| `lemma_valid_ht_delete` | 50 | 50 | — |
+| `lemma_valid_ht_insert` | 80 | 60 | ↓ 25% |
+| `hash_insert` | 100 | 80 | ↓ 20% |
+| `hash_search` | 100 | 80 | ↓ 20% |
+| `hash_delete` | 100 | 80 | ↓ 20% |
+| `hash_insert_no_dup` | 200 | 120 | ↓ 40% |
+| `test_hash_table` | 100 | 60 | ↓ 40% |
+| Lemmas.fst (all blocks) | 20–50 | 20–50 | — |
+
+Maximum z3rlimit reduced from 200 to 120. All proofs pass at the
+reduced limits.
+
+## Priority Checklist
+
+### Completed ✅
+
+- [x] Implement `hash_delete` (P1-1)
+- [x] Prove search not-found → `¬key_in_table` (P1-2)
+- [x] Strengthen search to unconditional `¬key_in_table` via `valid_ht` (P1-5)
+- [x] Prove insert preserves existing keys via `seq_modified_at` (P1-3)
+- [x] Connect Spec ↔ Impl via refinement bridge (P1-4)
+- [x] `hash_insert_no_dup` with key uniqueness (P2-5)
+- [x] Delete + unique_key → guaranteed key absence (P2-5)
+- [x] Add `hash_table_create` / `hash_table_free` helpers (P3-2)
+- [x] Add collision test, insert-full test (P3-3, P3-4)
+- [x] Rubric file structure: Impl.fst/fsti, Lemmas.fst/fsti (A1–A5)
+- [x] Create Complexity.fst/fsti module (A3)
+- [x] Profile and optimize z3rlimits (max 200→120)
+
+### Remaining Work (Priority Order)
+
+- [ ] **P2-1**: Return slot index from `hash_insert` (match CLRS return type).
+      Currently returns `bool`; CLRS returns the slot index `j`. Would
+      require changing the return type to `SZ.t` and adjusting the
+      failure sentinel from `false` to `size`.
+
+- [ ] **P2-2**: Load factor tracking. Add ghost or concrete count of
+      occupied+deleted slots. Add precondition `count < size` for insert
+      to guarantee success, or prove insert succeeds iff a free slot
+      exists via `Complexity.count_available`.
+
+- [ ] **P2-4**: Key-value pair support. CLRS hash tables store satellite
+      data. Extend table to `array (int & int)` or a record type.
+      This is a significant refactor affecting all operations and proofs.
+
+- [ ] **P3-5**: Type-safe sentinels. Replace magic `-1`/`-2` with an
+      inductive type `slot = Empty | Deleted | Occupied (key: nat)`.
+      Eliminates the `key >= 0` restriction. Large refactor.
+
+- [ ] **Average-case complexity**: CLRS Theorem 11.6/11.8 give expected
+      O(1/(1−α)) probes under uniform hashing. Requires a probabilistic
+      model not currently formalized.
+
 ## Top-Level Signatures
 
 Here are the top-level signatures proven about the hash table operations in
@@ -415,4 +491,6 @@ is already present.
 | `CLRS.Ch11.HashTable.Spec.fst` | Pure association-list model + algebraic laws |
 | `CLRS.Ch11.HashTable.Lemmas.fsti` | Refinement bridge signatures |
 | `CLRS.Ch11.HashTable.Lemmas.fst` | Refinement bridge proofs |
+| `CLRS.Ch11.HashTable.Complexity.fsti` | Complexity bound definitions + signatures |
+| `CLRS.Ch11.HashTable.Complexity.fst` | Complexity proofs (slot counting, insert/delete balance) |
 | `CLRS.Ch11.HashTable.Test.fst` | Test harness |

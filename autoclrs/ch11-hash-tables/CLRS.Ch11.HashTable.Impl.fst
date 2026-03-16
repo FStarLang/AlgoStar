@@ -155,7 +155,7 @@ let lemma_valid_ht_delete
 
 // valid_ht is preserved by insert (replacing -1 or -2 with a key >= 0)
 // when the insertion point is the first empty/deleted slot in the probe sequence
-#push-options "--z3rlimit 80 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 60 --fuel 0 --ifuel 0"
 let lemma_valid_ht_insert
   (s: Seq.seq int) (size: nat)
   (key: int{key >= 0}) (probe_i: nat{probe_i < size})
@@ -209,7 +209,7 @@ fn hash_table_free (tv: V.vec int) (#s: erased (Seq.seq int))
 
 // Returns true if successful, false if table is full
 // Proves both correctness and O(n) complexity
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_insert_impl
 fn hash_insert
   (table: A.array int)
@@ -320,7 +320,7 @@ fn hash_insert
 // Search for a key in the hash table
 // Returns the index if found, or returns size (invalid index) if not found
 // Proves both correctness and O(n) complexity
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_search_impl
 fn hash_search
   (table: A.array int)
@@ -428,7 +428,7 @@ fn hash_search
 // Delete a key from the hash table using open addressing
 // Returns true if the key was found and deleted (marked with -2), false otherwise
 // Proves both correctness and O(n) complexity
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_delete_impl
 fn hash_delete
   (table: A.array int)
@@ -543,7 +543,7 @@ fn hash_delete
 // Insert a key only if not already present (prevents duplicates)
 // Calls hash_search first, then hash_insert if the key was not found.
 // Complexity: at most 2 * size probes
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 120 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_insert_no_dup_impl
 fn hash_insert_no_dup
   (table: A.array int)

@@ -2,7 +2,7 @@
 
 **Module**: `CLRS.Ch11.HashTable`
 **CLRS Scope**: §11.3–11.4 (Division-method hashing, Open addressing with linear probing)
-**Date**: 2025-07-15
+**Last updated**: 2026-03-16
 
 ---
 
@@ -11,8 +11,12 @@
 | File | Rubric Role | Status |
 |------|------------|--------|
 | `CLRS.Ch11.HashTable.Spec.fst` | `Spec.fst` — Pure specification | ✅ Present |
-| `CLRS.Ch11.HashTable.Refinement.fst` | `Lemmas.fst` — Refinement / correctness proofs | 🔶 Present (named `Refinement`, not `Lemmas`) |
-| `CLRS.Ch11.HashTable.fst` | `Impl.fst` — Pulse implementation | 🔶 Present (named `HashTable`, not `Impl`) |
+| `CLRS.Ch11.HashTable.Impl.fsti` | `Impl.fsti` — Public interface | ✅ Present |
+| `CLRS.Ch11.HashTable.Impl.fst` | `Impl.fst` — Pulse implementation | ✅ Present |
+| `CLRS.Ch11.HashTable.Lemmas.fsti` | `Lemmas.fsti` — Refinement bridge interface | ✅ Present |
+| `CLRS.Ch11.HashTable.Lemmas.fst` | `Lemmas.fst` — Refinement bridge proofs | ✅ Present |
+| `CLRS.Ch11.HashTable.Complexity.fsti` | `Complexity.fsti` — Complexity definitions | ✅ Present |
+| `CLRS.Ch11.HashTable.Complexity.fst` | `Complexity.fst` — Complexity proofs | ✅ Present |
 | `CLRS.Ch11.HashTable.Test.fst` | (extra) — Test harness | ✅ Present (not required by rubric) |
 
 ---
@@ -21,7 +25,7 @@
 
 | Algorithm | CLRS Reference | Operations |
 |-----------|---------------|------------|
-| Open-addressing hash table (linear probing) | §11.4, pp. 270–272 | `hash_insert`, `hash_search`, `hash_delete` |
+| Open-addressing hash table (linear probing) | §11.4, pp. 270–272 | `hash_insert`, `hash_search`, `hash_delete`, `hash_insert_no_dup` |
 | Division-method hash function | §11.3.1 | `h(k) = k % m` |
 | Linear probe function | §11.4, eq. on p. 272 | `h(k, i) = (h(k) + i) % m` |
 
@@ -29,73 +33,17 @@
 
 ## Rubric Compliance Matrix
 
-| Required Artifact | Expected Name | Actual | Status | Notes |
-|-------------------|---------------|--------|--------|-------|
-| **Spec.fst** | `CLRS.Ch11.HashTable.Spec.fst` | `CLRS.Ch11.HashTable.Spec.fst` | ✅ | Pure assoc-list model with 15+ proven lemmas |
-| **Lemmas.fst** | `CLRS.Ch11.HashTable.Lemmas.fst` | `CLRS.Ch11.HashTable.Refinement.fst` | 🔶 | Rename `Refinement` → `Lemmas`; content matches role |
-| **Lemmas.fsti** | `CLRS.Ch11.HashTable.Lemmas.fsti` | — | ❌ | Extract interface from Refinement.fst |
-| **Complexity.fst** | `CLRS.Ch11.HashTable.Complexity.fst` | — | ❌ | Bounds proven inline in `HashTable.fst` postconditions; no separate module |
-| **Complexity.fsti** | `CLRS.Ch11.HashTable.Complexity.fsti` | — | ❌ | No interface file for complexity definitions |
-| **Impl.fst** | `CLRS.Ch11.HashTable.Impl.fst` | `CLRS.Ch11.HashTable.fst` | 🔶 | Rename or split; contains impl + predicates + complexity |
-| **Impl.fsti** | `CLRS.Ch11.HashTable.Impl.fsti` | — | ❌ | No public interface file for the Pulse implementation |
+| Required Artifact | Expected Name | Status | Notes |
+|-------------------|---------------|--------|-------|
+| **Spec.fst** | `CLRS.Ch11.HashTable.Spec.fst` | ✅ | Pure assoc-list model with 15+ proven lemmas |
+| **Lemmas.fst** | `CLRS.Ch11.HashTable.Lemmas.fst` | ✅ | 8 refinement bridge lemmas connecting Spec ↔ Impl |
+| **Lemmas.fsti** | `CLRS.Ch11.HashTable.Lemmas.fsti` | ✅ | Interface with all 8 lemma signatures |
+| **Complexity.fst** | `CLRS.Ch11.HashTable.Complexity.fst` | ✅ | Slot counting, insert/delete slot-balance proofs |
+| **Complexity.fsti** | `CLRS.Ch11.HashTable.Complexity.fsti` | ✅ | Interface with complexity definitions and signatures |
+| **Impl.fst** | `CLRS.Ch11.HashTable.Impl.fst` | ✅ | Pulse implementation of all 4 operations |
+| **Impl.fsti** | `CLRS.Ch11.HashTable.Impl.fsti` | ✅ | Public interface: types, predicates, signatures |
 
-**Summary**: 1 ✅ / 3 🔶 / 4 ❌ → **closest chapter to compliance** but still needs restructuring.
-
----
-
-## Detailed Action Items
-
-### A1 — Rename `Refinement.fst` → `Lemmas.fst` (🔶 → ✅)
-
-`CLRS.Ch11.HashTable.Refinement.fst` already contains the correctness bridge between Spec and Impl (probe surjectivity, `key_in_table ⟺ array_has_key`, `array_to_model` correspondence). This is exactly the `Lemmas` role.
-
-- Rename file to `CLRS.Ch11.HashTable.Lemmas.fst`.
-- Update `module` declaration.
-- Update any `open` / dependency in other files (currently none import it).
-
-### A2 — Create `Lemmas.fsti` (❌ → ✅)
-
-Extract an interface file exposing the four main lemma signatures:
-
-1. `lemma_linear_probe_surjective`
-2. `lemma_key_in_table_iff_array_has_key`
-3. `lemma_probes_not_key_full_iff`
-4. `lemma_array_to_model_mem_full`
-
-Plus the `array_has_key` and `array_to_model` definitions needed by signatures.
-
-### A3 — Create `Complexity.fst` + `Complexity.fsti` (❌ → ✅)
-
-Extract complexity-related content from `HashTable.fst` into a dedicated module:
-
-- **Definitions** (move to `.fsti`):
-  - `hash_insert_complexity_bounded`
-  - `hash_search_complexity_bounded`
-  - `hash_delete_complexity_bounded`
-- **Proofs** (move to `.fst`):
-  - Any standalone complexity lemmas (currently the bounds are embedded in postconditions; consider adding wrapper lemmas that state the O(n) bound as free-standing theorems).
-
-The inline postcondition bounds (`cf - c0 <= SZ.v size`) should remain in the implementation but be proved equivalent to the definitions in `Complexity.fst`.
-
-### A4 — Rename / split `HashTable.fst` → `Impl.fst` (🔶 → ✅)
-
-Current `CLRS.Ch11.HashTable.fst` bundles:
-- Ghost tick primitives (lines 36–46)
-- Helper predicates: `key_in_table`, `key_findable`, `probes_not_key`, `valid_ht`, `seq_modified_at`
-- Pure lemmas about `valid_ht` preservation (lines 165–245)
-- Pulse functions: `hash_table_create`, `hash_table_free`, `hash_insert`, `hash_search`, `hash_delete`
-
-**Option A (minimal)**: Rename to `CLRS.Ch11.HashTable.Impl.fst`, keep all content.
-**Option B (clean)**: Move predicates and pure lemmas into `Lemmas.fst`; keep only Pulse code in `Impl.fst`.
-
-Recommendation: **Option A** first (unblocks compliance), refactor to Option B later.
-
-### A5 — Create `Impl.fsti` (❌ → ✅)
-
-Public interface exposing:
-- `hash_insert`, `hash_search`, `hash_delete` signatures
-- `hash_table_create`, `hash_table_free` signatures
-- Required predicates (`key_in_table`, `key_findable`, `valid_ht`, etc.)
+**Summary**: 7 ✅ / 0 🔶 / 0 ❌ → **fully compliant with rubric**
 
 ---
 
@@ -107,10 +55,11 @@ Public interface exposing:
 |-------|--------|
 | Zero `admit()` across all files | ✅ |
 | Zero `assume` across all files | ✅ |
-| All 3 operations proven correct | ✅ (insert, search, delete) |
+| All 4 operations proven correct | ✅ (insert, insert_no_dup, search, delete) |
 | `valid_ht` invariant preserved by all ops | ✅ (create, insert, delete) |
 | Refinement bridges Spec ↔ Impl | ✅ (`key_in_table ⟺ array_has_key ⟺ Spec.mem`) |
-| Proofs pass `--quake 3/3` | ✅ (per audit P1-5) |
+| Key uniqueness + delete guarantees absence | ✅ |
+| z3rlimits optimized (max 120, down from 200) | ✅ |
 
 ### Specification Completeness
 
@@ -118,13 +67,14 @@ Public interface exposing:
 |----------|--------|
 | Insert postcondition: `key_in_table` + `key_findable` | ✅ |
 | Insert postcondition: `seq_modified_at` (preserves others) | ✅ |
+| Insert-no-dup: search + conditional insert, uniqueness | ✅ |
 | Search found: slot contains key | ✅ |
 | Search not-found: `¬(key_in_table)` (unconditional under `valid_ht`) | ✅ |
 | Delete: marks slot `-2`, `seq_modified_at` | ✅ |
 | Delete preserves `valid_ht` | ✅ |
-| Worst-case O(n) complexity for all 3 ops | ✅ |
-| Average-case complexity | ❌ Not addressed |
-| Spec: 15 algebraic lemmas (insert/search/delete commutativity, idempotence, membership) | ✅ |
+| Worst-case O(n) complexity for all operations | ✅ |
+| Slot counting (empty/deleted/available) | ✅ |
+| Average-case complexity | ❌ Not addressed (requires probabilistic model) |
 
 ### CLRS Fidelity
 
@@ -137,7 +87,7 @@ Public interface exposing:
 | Division-method hash | ✅ `k % m` |
 | Key-value pairs | ❌ Keys only (no satellite data) |
 
-### Remaining Gaps (from Audit)
+### Remaining Gaps
 
 | ID | Item | Priority |
 |----|------|----------|

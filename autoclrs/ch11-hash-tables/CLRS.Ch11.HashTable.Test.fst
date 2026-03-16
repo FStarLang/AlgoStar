@@ -12,7 +12,7 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
 // Test: Create a small hash table, insert some values, and search for them
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
 fn test_hash_table ()
   requires emp
   ensures emp
