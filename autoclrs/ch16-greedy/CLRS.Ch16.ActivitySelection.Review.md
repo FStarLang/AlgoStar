@@ -243,3 +243,30 @@ theorem converts `earliest_compatible` into `max_compatible_count`.
 | `CLRS.Ch16.ActivitySelection.Lemmas.fst` | Invariant preservation proofs, greedy choice |
 | `CLRS.Ch16.ActivitySelection.Complexity.fsti` | `complexity_bounded_linear` definition |
 | `CLRS.Ch16.ActivitySelection.Complexity.fst` | (Module body, re-exports definition) |
+
+## Proof Stability
+
+| File | Max z3rlimit | Assessment |
+|------|:----------:|------------|
+| `ActivitySelection.Impl.fst` | 40 | Clean |
+| `ActivitySelection.Spec.fst` | 40 | Clean |
+| `ActivitySelection.Lemmas.fst` | default | Clean — no `#push-options` needed |
+| `ActivitySelection.Complexity.fst` | default | Clean |
+
+All Activity Selection proofs are stable: no `z3refresh`, no high
+rlimits, no `split_queries`. This is a model for proof hygiene.
+
+## Checklist (priority order)
+
+- [x] All files verified (`.checked` caches exist) — last verified 2026-03-16
+- [x] Zero admits across all files
+- [x] Zero assumes across all files
+- [x] Postcondition includes `count == max_compatible_count` (optimality)
+- [x] Postcondition includes `complexity_bounded_linear` (exactly n-1 comparisons)
+- [x] Handles n=0 edge case (returns 0, trivially optimal)
+- [x] Ghost selection sequence witnesses correctness
+- [x] Greedy choice property proven (CLRS Theorem 16.1)
+- [x] `Complexity.fsti` imports used by `Impl.fsti` — ~~no~~  definition imported
+- [x] Stable proofs (max z3rlimit 40, no z3refresh)
+- [ ] Add `TestActivitySelection.fst` smoke test
+- [x] `Impl.fsti` imports `complexity_bounded_linear` from `Complexity` module (fixed 2026-03-16)

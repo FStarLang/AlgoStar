@@ -183,8 +183,8 @@ now have `.checked` caches, and the `huffman_tree` postcondition includes `is_wp
 
 | Check | Result |
 |-------|--------|
-| `admit` / `Admit` in source | ✅ **Zero** across all 16 files |
-| `assume` in source | ✅ **Zero** (only in comments) |
+| `admit` / `Admit` in source | ✅ **Zero** across all 27 files |
+| `assume` / `assume_` in source | ✅ **Zero** (only in comments) |
 | `sorry` in source | ✅ **Zero** |
 | `StrongExcludedMiddle` | 🔶 Used in `ActivitySelection.Spec.fst` for ghost-level `find_max_compatible` — acceptable (GTot only) |
 
@@ -204,18 +204,30 @@ now have `.checked` caches, and the `huffman_tree` postcondition includes `is_wp
 
 ### z3rlimit Health
 
-| File | Max rlimit | Assessment |
-|------|:----------:|------------|
-| `ActivitySelection.Impl.fst` | 40 | Clean |
-| `Huffman.Impl.fst` | 8 | Clean (post-refactor) |
-| `Huffman.Defs.fst` | 8 | Clean |
-| `Huffman.PQLemmas.fst` | 8 | Clean |
-| `Huffman.ForestLemmas.fst` | 8 | Clean |
-| `Huffman.PQForest.fst` | 8 | Clean |
-| `TestHuffman.fst` | 20 | Acceptable |
+| File | Max rlimit | z3refresh? | Assessment |
+|------|:----------:|:----------:|------------|
+| `ActivitySelection.Impl.fst` | 40 | No | Clean |
+| `ActivitySelection.Spec.fst` | 40 | No | Clean |
+| `Huffman.Impl.fst` | 500 | No | **Moderate** — `merge_step_local` (reduced from 800) |
+| `Huffman.Spec.fst` | 600 | No | **High** — swap WPL lemma |
+| `Huffman.Complete.fst` | 400 | No | Moderate |
+| `Huffman.Codec.Impl.fst` | 400 | No | Moderate |
+| `Huffman.PQForest.fst` | 800 | Yes (3×) | **Fragile** |
+| `Huffman.ForestLemmas.fst` | 200 | No | Acceptable |
+| `Huffman.PQLemmas.fst` | 120 | No | Acceptable |
+| `Huffman.Optimality.fst` | 80 | No | Clean |
+| `Huffman.Defs.fst` | 8 | No | Clean |
+| `TestHuffman.fst` | 20 | No | Acceptable |
+
+**Stability concerns**: `PQForest.fst` uses `z3refresh` in 3 places
+(lines 211, 444, 751), indicating Z3 non-determinism. These proofs may
+fail on different Z3 seeds or versions. The high rlimits (800) in
+`PQForest.fst` and `Impl.fst` suggest that better intermediate
+assertions or proof restructuring could improve stability.
 
 > Post-refactoring, the prior audit's concern about `--z3rlimit 200` in `Huffman.fst`
-> is resolved. The split into smaller modules brought all rlimits to ≤ 20.
+> is resolved. The split into smaller modules brought most rlimits to ≤ 50,
+> though `PQForest.fst` and `Impl.fst` (merge-step wrapper) remain high.
 
 ### Postcondition Strength
 

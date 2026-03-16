@@ -173,13 +173,13 @@ for the imperative implementation.
    implementations of `decode_step_impl`, `decode_impl`, `codeword_impl`,
    and `encode_impl` are proven to match the pure codec specifications.
 
-**Zero admits, zero assumes.** A thorough search of all Huffman-related
-files (`Impl.fst`, `Impl.fsti`, `Codec.fst`, `Codec.fsti`, `Codec.Impl.fst`,
-`Codec.Impl.fsti`, `Optimality.fst`, `Optimality.fsti`, `PQForest.fst`,
-`PQForest.fsti`, `PQLemmas.fst`, `PQLemmas.fsti`, `ForestLemmas.fst`,
-`ForestLemmas.fsti`, `Defs.fst`, `Spec.fst`, `Complete.fst`,
-`Complexity.fst`, `Complexity.fsti`) found **zero** `admit`, `assume`, or
-`assume_` calls.
+**Zero admits, zero assumes.** A thorough search (last verified 2026-03-16)
+of all Huffman-related files (`Impl.fst`, `Impl.fsti`, `Codec.fst`,
+`Codec.fsti`, `Codec.Impl.fst`, `Codec.Impl.fsti`, `Optimality.fst`,
+`Optimality.fsti`, `PQForest.fst`, `PQForest.fsti`, `PQLemmas.fst`,
+`PQLemmas.fsti`, `ForestLemmas.fst`, `ForestLemmas.fsti`, `Defs.fst`,
+`Spec.fst`, `Complete.fst`, `Complexity.fst`, `Complexity.fsti`) found
+**zero** `admit`, `assume`, or `assume_` calls.
 
 ## Specification Gaps and Limitations
 
@@ -189,22 +189,27 @@ files (`Impl.fst`, `Impl.fsti`, `Codec.fst`, `Codec.fsti`, `Codec.Impl.fst`,
    `huffman_merge_bound cf c0 n`, proving exactly `n-1` merge iterations.
    With a min-heap PQ, each iteration is O(log n), giving O(n log n) total.
 
-2. **Priority queue abstraction.** The implementation uses
+2. ~~**3 `assume_` calls in PQ integration.**~~ **ADDRESSED.** As of
+   2026-03-16, grep confirms **zero** `assume_` calls across all Huffman
+   files. The PQ integration is fully proven through the `merge_bundle`
+   opaque predicate and its intro/elim lemmas in `PQForest.fst`.
+
+3. **Priority queue abstraction.** The implementation uses
    `Pulse.Lib.PriorityQueue`, an external library. The PQ's correctness
    is assumed via its own interface (`PQ.is_minimum`, `PQ.extends`). The
    Huffman proof trusts these PQ specifications.
 
-3. **`n > 0` only; no degenerate cases.** A single symbol (`n = 1`)
+4. **`n > 0` only; no degenerate cases.** A single symbol (`n = 1`)
    produces a Leaf, not an Internal node. The codec round-trip requires
    `Internal? t`, so encoding/decoding with a single-symbol tree is not
    supported. CLRS's algorithm also assumes `n ≥ 2` for the priority queue
    merge loop.
 
-4. **Symbol assignment.** The implementation assigns `sym = SZ.v idx`
+5. **Symbol assignment.** The implementation assigns `sym = SZ.v idx`
    (the array index) as the symbol for each leaf. This means symbol identity
    is determined by position in the input array, not by any external label.
 
-5. **`seq_to_pos_list` clamping.** The conversion from `Seq.seq int` to
+6. **`seq_to_pos_list` clamping.** The conversion from `Seq.seq int` to
    `list pos` clamps non-positive values to 1:
    ```fstar
    let v : pos = if Seq.index s k > 0 then Seq.index s k else 1 in
@@ -213,10 +218,32 @@ files (`Impl.fst`, `Impl.fsti`, `Codec.fst`, `Codec.fsti`, `Codec.Impl.fst`,
    clamping is never triggered in practice, but it is a defensive measure
    rather than a type-level guarantee.
 
-6. **Forest-based proof complexity.** The proof tracks a ghost forest of
+7. **Forest-based proof complexity.** The proof tracks a ghost forest of
    intermediate trees using `merge_bundle`, `init_bundle`, and extensive
    list/multiset reasoning via `PQForest` and `ForestLemmas`. This is
    among the most complex proofs in the repository.
+
+## Proof Stability
+
+Several Huffman files require high z3rlimits, indicating proof fragility:
+
+| File | Max z3rlimit | z3refresh? | Assessment |
+|------|:----------:|:----------:|------------|
+| `Huffman.PQForest.fst` | 800 | Yes (3×) | **Fragile** — `merge_bundle_step` and related lemmas |
+| `Huffman.Impl.fst` | 500 | No | **Moderate** — `merge_step_local` (reduced from 800) |
+| `Huffman.Spec.fst` | 600 | No | **High** — `swap_reduces_wpl` and related |
+| `Huffman.Complete.fst` | 400 | No | Moderate |
+| `Huffman.Codec.Impl.fst` | 400 | No | Moderate |
+| `Huffman.ForestLemmas.fst` | 200 | No | Acceptable |
+| `Huffman.PQLemmas.fst` | 120 | No | Clean |
+| `Huffman.Optimality.fst` | 80 | No | Clean |
+| `Huffman.Defs.fst` | 8 | No | Clean |
+| `TestHuffman.fst` | 20 | No | Clean |
+
+The `z3refresh` flag in `PQForest.fst` (lines 211, 444, 751) indicates
+Z3 non-determinism — proofs that may fail on different Z3 seeds or versions.
+These are candidates for proof stabilization via better intermediate
+assertions or `assert_norm`.
 
 ## Complexity
 
@@ -272,3 +299,22 @@ After the loop, a single tree remains. The bridge lemma
 | `CLRS.Ch16.Huffman.Codec.Impl.fst` | Pulse codec implementation |
 | `CLRS.Ch16.Huffman.Complexity.fsti` | Complexity interface |
 | `CLRS.Ch16.Huffman.Complexity.fst` | Complexity proofs |
+
+## Checklist (priority order)
+
+- [x] All files verified (`.checked` caches exist) — last verified 2026-03-16
+- [x] Zero admits across all files
+- [x] Zero assumes across all files (previously 3 in PQ integration, now resolved)
+- [x] Postcondition includes `is_wpl_optimal` (strongest optimality guarantee)
+- [x] Postcondition includes `same_frequency_multiset` (multiset preservation)
+- [x] Postcondition includes `cost == greedy_cost` (cost equality)
+- [x] Ghost counter tracks merge iterations (`huffman_merge_bound`)
+- [x] Codec round-trip proofs (encode→decode and decode→encode)
+- [x] Pulse codec implementation with spec connection
+- [ ] Stabilize `PQForest.fst` proofs — remove `z3refresh` (3 uses), reduce z3rlimit from 800
+- [x] Reduce `Impl.fst` `merge_step_local` z3rlimit from 800 → 500 (2026-03-16)
+- [x] Reduce `Impl.fst` `huffman_tree` z3rlimit from 400 → 200 (2026-03-16)
+- [ ] Reduce `Spec.fst` z3rlimit from 600
+- [ ] Prove O(n log n) complexity for PQ-based Pulse implementation
+- [ ] Add test cases for edge cases (1 symbol, 2 symbols, equal frequencies)
+- [ ] Consider facade `Huffman.Lemmas.fst/.fsti` re-exporting key lemma signatures

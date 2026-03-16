@@ -11,9 +11,9 @@ Activity Selection is **fully proven** with zero admits and zero assumes
 across all files. Huffman Coding is **fully proven** at the specification
 level (`Spec.fst`, `Complete.fst`, `Optimality.fst`, `Codec.fst`) with
 zero admits and zero assumes. The Pulse imperative implementation
-(`Huffman.Impl.fst`) has **zero admits** but the priority-queue integration
-relies on **3 `assume_` calls** for PQ distinctness invariants (see
-Limitations below).
+(`Huffman.Impl.fst`) has **zero admits** and **zero assumes** — the
+priority-queue integration is fully verified through opaque `merge_bundle`
+predicates.
 
 ---
 
@@ -210,23 +210,15 @@ that bound is **not formally proven**.
 
 ### Limitations
 
-**⚠️ 3 `assume_` calls in PQ integration.** The Pulse implementation
-(`Huffman.Impl.fst`) contains zero `admit` calls, but the priority-queue
-integration loop relies on properties of `Pulse.Lib.PriorityQueue` that
-are asserted via `assume_` rather than proven:
+None for correctness. Zero admits, zero assumes across all files.
 
-1. After `extract_min`, the remaining PQ entries still have distinct indices.
-2. After `insert`, the new PQ entries have distinct indices.
-3. The PQ's size relationship is maintained across extract/insert.
+**Complexity**: The O(n²) bound is for the sorted-list variant; the Pulse
+implementation uses a binary heap. Neither complexity bound is proven inside
+the Pulse implementation via a ghost counter for per-operation cost (only
+merge iteration count `n-1` is tracked).
 
-These are properties of the PQ library's `extends` predicate that should
-hold but are not exported by the PQ library's interface. The specification
-layer (`Spec.fst`, `Complete.fst`, `Optimality.fst`) has **zero assumes** —
-the gap is purely in the Pulse-to-PQ bridge.
-
-**Complexity not linked.** The O(n²) bound is for the sorted-list variant;
-the Pulse implementation uses a binary heap. Neither complexity bound is
-proven inside the Pulse implementation via a ghost counter.
+**Proof stability**: `PQForest.fst` uses `z3refresh` in 3 places with high
+z3rlimits (up to 800), indicating non-deterministic Z3 behavior.
 
 ---
 
@@ -257,7 +249,7 @@ proven inside the Pulse implementation via a ghost counter.
 | `CLRS.Ch16.Huffman.PQLemmas.fst/.fsti` | PQ invariant preservation lemmas | 0 |
 | `CLRS.Ch16.Huffman.ForestLemmas.fst/.fsti` | Forest–PQ structural lemmas | 0 |
 | `CLRS.Ch16.Huffman.PQForest.fst/.fsti` | Opaque predicate intro/elim, bundle management | 0 |
-| `CLRS.Ch16.Huffman.Impl.fst` | Pulse implementation (3 `assume_` for PQ) | 0 admits, 3 assumes |
+| `CLRS.Ch16.Huffman.Impl.fst` | Pulse implementation | 0 |
 | `CLRS.Ch16.Huffman.Impl.fsti` | Public API: `huffman_tree` signature, `is_htree` slprop | 0 |
 | `CLRS.Ch16.Huffman.Codec.fst` | Pure encode/decode with round-trip proofs | 0 |
 | `CLRS.Ch16.Huffman.Codec.fsti` | Codec interface: `encode`, `decode`, round-trip theorems | 0 |
@@ -272,7 +264,7 @@ proven inside the Pulse implementation via a ghost counter.
 | Algorithm | CLRS | Complexity | Proven | Linked | Admits | Assumes | Key Theorem |
 |---|---|---|---|---|---|---|---|
 | Activity Selection | §16.1 | O(n) | Tight (n−1) | ✅ | 0 | 0 | `count == max_compatible_count` |
-| Huffman Coding | §16.3 | O(n²) sorted / O(n log n) heap | Upper bound | ❌ (pure) | 0 | 3 (PQ) | `is_wpl_optimal` |
+| Huffman Coding | §16.3 | O(n²) sorted / O(n log n) heap | Upper bound | ⚠️ (merge count only) | 0 | 0 | `is_wpl_optimal` |
 
 ---
 

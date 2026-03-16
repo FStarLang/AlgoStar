@@ -19,11 +19,9 @@ module Seq = FStar.Seq
 module GR = Pulse.Lib.GhostReference
 module L = CLRS.Ch16.ActivitySelection.Lemmas
 module S = CLRS.Ch16.ActivitySelection.Spec
+open CLRS.Ch16.ActivitySelection.Complexity
 
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
-
-let complexity_bounded_linear (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 == n - 1
 
 let out_matches_sel (out_seq: Seq.seq SZ.t) (sel: Seq.seq nat) (count: nat) (n: nat) : prop =
   count <= Seq.length out_seq /\
