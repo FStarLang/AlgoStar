@@ -230,12 +230,33 @@ relaxation round.
 
 | File | Max rlimit | Notes |
 |------|-----------|-------|
-| ShortestPath.Spec.fst | 60 | `sp_dist_k_le_path_weight_exact`, `sp_dist_k_achieving_path`, `find_achieving_predecessor` |
-| BellmanFord.Impl.fst | 80 | Both `bellman_ford` and `bellman_ford_complexity` |
-| Dijkstra.fst | 60 | `fn dijkstra` and `fn dijkstra_relax_round` (split_queries always) |
-| Dijkstra.TriangleInequality.fst | 60 | `find_improving_predecessor` |
+| **Dijkstra.fst** | **120** | `dijkstra_relax_round` (split_queries always); `dijkstra` at 60 |
 | ShortestPath.Triangle.fst | 100 | `chain_B_property` |
+| BellmanFord.Impl.fst | 80 | `bellman_ford` main function |
+| ShortestPath.Spec.fst | 60 | `sp_dist_k_le_path_weight_exact`, `sp_dist_k_achieving_path`, `find_achieving_predecessor` |
+| Dijkstra.TriangleInequality.fst | 60 | `find_improving_predecessor` |
+| Dijkstra.Correctness.fst | 50 | `greedy_choice_invariant` |
 | BellmanFord.SpecBridge.fst | 10 | All queries well under limit |
+
+### Verification Time Profile (2026-03-16)
+
+| File | Time (s) | Notes |
+|------|----------|-------|
+| **Dijkstra.fst** | **187** | Bottleneck: dijkstra_relax_round + dijkstra main |
+| ShortestPath.Triangle.fst | 37 | Shared dependency: chain_B_property |
+| BellmanFord.Impl.fst | 36 | Three nested loops with ghost invariants |
+| ShortestPath.Spec.fst | 6 | |
+| BellmanFord.Spec.fst | 6 | |
+| Dijkstra.TriangleInequality.fst | 4 | |
+| Dijkstra.Impl.fst | 4 | |
+| Dijkstra.Complexity.fst | 4 | |
+| BellmanFord.TriangleInequality.fst | 3 | |
+| Dijkstra.Correctness.fst | 2 | |
+| BellmanFord.SpecBridge.fst | 2 | |
+| BellmanFord.Lemmas.fst | 2 | |
+| BellmanFord.Complexity.fst | 1 | |
+| Dijkstra.Lemmas.fst | 1 | |
+| **Total (sequential)** | **~295** | ~5 min sequential; ~7 min with overhead |
 
 ### Overall Assessment
 
