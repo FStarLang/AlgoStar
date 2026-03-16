@@ -359,17 +359,85 @@ The proof is organized in layers:
    maximum, successor, predecessor (all fully verified), and a partially
    complete delete.
 
+## Profiling and Proof Stability
+
+### Solver Settings
+
+| File | Max rlimit | Fuel | # push-options | Notes |
+|------|-----------|------|----------------|-------|
+| `BSTArray.Predicates.fst` | **80** | 2/1 | 18 | Stabilized (was 300/3/2) |
+| `BSTArray.Refinement.fst` | 40 | 2/1 | 1 | Stable |
+| `BSTArray.Impl.fst` | default | default | 0 | Stable |
+| `BSTArray.Delete.fst` | default | default | 0 | Stable |
+| `BSTArray.Spec.fst` | default | default | 0 | Stable |
+| `BSTArray.Complexity.fst` | default | default | 0 | Stable |
+| `BSTArray.Lemmas.fst` | default | default | 0 | Thin re-export |
+
+### Cache File Sizes (proxy for proof complexity)
+
+| File | .checked size | Notes |
+|------|--------------|-------|
+| `BSTArray.Predicates.fst` | **826 KB** | ⚠️ Largest in ch12; 933 LOC, 18 push-options |
+| `BSTArray.Impl.fst` | 555 KB | Moderate (680 LOC) |
+| `BSTArray.Delete.fst` | 263 KB | Moderate (786 LOC) |
+| `BSTArray.Refinement.fst` | 200 KB | Clean |
+| `BSTArray.Spec.fst` | 196 KB | Clean |
+| `BSTArray.Impl.fsti` | 174 KB | Interface |
+
+### Assessment
+
+**Overall stability: GOOD.** After stabilization, the maximum rlimit is 80
+(previously 300), and all proofs use fuel 2 / ifuel 1 (previously fuel 3 /
+ifuel 2 for the hotspot). The `lemma_successor_swap_delete_wfb` proof was
+reduced from `--z3rlimit 300 --fuel 3 --ifuel 2` to
+`--z3rlimit 80 --fuel 2 --ifuel 1` — a 3.75× rlimit reduction and fuel
+reduction from 3 to 2. All other modules use default or low settings.
+All 20 modules verify with zero errors on a clean build.
+
 ## Files
 
-| File | Role |
-|------|------|
-| `CLRS.Ch12.BSTArray.Impl.fsti` | Public interface (types, predicates, signatures) |
-| `CLRS.Ch12.BSTArray.Impl.fst` | Pulse implementation (search, insert, inorder) |
-| `CLRS.Ch12.BSTArray.Spec.fst` | Pure search/insert functions + soundness/completeness proofs |
-| `CLRS.Ch12.BSTArray.Predicates.fst` | Shared predicates, frame lemmas, descendant relation |
-| `CLRS.Ch12.BSTArray.Refinement.fst` | Abstraction function + refinement proofs |
-| `CLRS.Ch12.BSTArray.Complexity.fsti` | Complexity definitions + lemma signatures |
-| `CLRS.Ch12.BSTArray.Complexity.fst` | Complexity proofs |
-| `CLRS.Ch12.BSTArray.Lemmas.fsti` | Unified lemma interface |
-| `CLRS.Ch12.BSTArray.Lemmas.fst` | Lemma proofs (delegates to Refinement) |
-| `CLRS.Ch12.BSTArray.Delete.fst` | Delete + min/max/successor/predecessor |
+| File | LOC | Role |
+|------|-----|------|
+| `CLRS.Ch12.BSTArray.Impl.fsti` | 211 | Public interface (types, predicates, signatures) |
+| `CLRS.Ch12.BSTArray.Impl.fst` | 679 | Pulse implementation (search, insert, inorder) |
+| `CLRS.Ch12.BSTArray.Spec.fst` | 344 | Pure search/insert functions + soundness/completeness proofs |
+| `CLRS.Ch12.BSTArray.Predicates.fst` | 933 | Shared predicates, frame lemmas, descendant relation |
+| `CLRS.Ch12.BSTArray.Refinement.fst` | 249 | Abstraction function + refinement proofs |
+| `CLRS.Ch12.BSTArray.Complexity.fsti` | 76 | Complexity definitions + lemma signatures |
+| `CLRS.Ch12.BSTArray.Complexity.fst` | 97 | Complexity proofs |
+| `CLRS.Ch12.BSTArray.Lemmas.fsti` | 47 | Unified lemma interface |
+| `CLRS.Ch12.BSTArray.Lemmas.fst` | 83 | Lemma proofs (delegates to Refinement) |
+| `CLRS.Ch12.BSTArray.Delete.fst` | 786 | Delete + min/max/successor/predecessor |
+
+## Checklist (Priority Order)
+
+Items to address for a fully proven, high-quality implementation:
+
+- [x] **P0: Zero admits/assumes.** All modules fully verified.
+- [x] **P0: Rubric compliance.** All required files present (Spec, Lemmas,
+  Lemmas.fsti, Complexity, Complexity.fsti, Impl, Impl.fsti).
+- [x] **P0: Search/insert functional correctness.** Soundness, completeness,
+  and `well_formed_bst` preservation all proven.
+- [x] **P0: Refinement bridge.** `array_to_bst` connects array representation
+  to pure inductive BST. Validity, search, and inorder all refined.
+- [x] **P0: Complexity linked for search/insert.** Ghost tick counters with
+  O(log cap) bounds.
+- [ ] **P1: Complete delete for all cases.** Left-child-only deletion and
+  successor-with-right-child cases currently return `false`. Needs
+  predecessor-swap infrastructure (symmetric to successor approach) and
+  recursive successor deletion.
+- [x] **P1: Stabilize Predicates.fst high-rlimit proof.** *(Addressed.)* The
+  `lemma_successor_swap_delete_wfb` proof reduced from rlimit 300 / fuel 3 /
+  ifuel 2 to rlimit 80 / fuel 2 / ifuel 1. All other rlimit 80 blocks
+  reduced to 20. Max rlimit across all of ch12 is now 100 (in BST.Delete.Spec
+  and BST.Insert.Spec, inherent to FiniteSet library).
+- [ ] **P1: Strengthen inorder walk postcondition.** Currently only bounds
+  write position; should link output to `bst_inorder` via refinement.
+- [ ] **P2: Add ghost ticks to delete.** `tree_delete` in `Delete.fst` has
+  no complexity counter. Should track ticks bounded by `tree_height(cap)`.
+- [ ] **P2: Add ghost ticks to min/max/successor/predecessor.** These
+  operations in `Delete.fst` have no complexity counters.
+- [ ] **P3: Remove 32768 capacity limitation.** Use larger integer type or
+  parameterize by bit width.
+- [ ] **P3: Complexity in terms of n, not cap.** Current bounds use
+  `log2_floor(cap)` which is loose for sparse trees.

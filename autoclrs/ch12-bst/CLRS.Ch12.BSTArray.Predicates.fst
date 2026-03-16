@@ -213,7 +213,7 @@ let lemma_sai_implies_wfb
    Descendant relation and frame lemmas based on it
    ==================================================================== *)
 
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 
 /// Is `desc` a descendant of `root` in a binary heap layout?
 /// Bottom-up walk via parent pointers. Every position's parent is `(p-1)/2`.
@@ -391,7 +391,7 @@ let rec lemma_bsr_extend_right
 /// Key lemma for BST insert: if `idx` is reachable by BST search from `i`
 /// and `idx` is currently invalid, then writing `key_val` at `idx` and
 /// marking it valid preserves the `well_formed_bst` invariant.
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec lemma_insert_wfb
   (keys: seq int) (valid: seq bool) (cap: nat)
   (i: nat) (lo hi: int) (idx: nat) (key_val: int)
@@ -467,7 +467,7 @@ let rec lemma_insert_wfb
 /// Proof by top-down induction on the tree structure (decreasing cap - root).
 /// At each step, use lemma_desc_split to determine which child subtree
 /// the descendant belongs to, then recurse into that subtree.
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec lemma_sai_desc
   (valid: seq bool) (cap root desc: nat)
   : Lemma
@@ -521,7 +521,7 @@ let lemma_wfb_frame_valid_desc
 /// subtree_all_invalid at i and lemma_sai_desc give valid[del_idx] = false,
 /// contradiction). Then split into child subtrees: recurse on the subtree
 /// containing del_idx, frame the other using lemma_wfb_frame_valid_desc.
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec lemma_leaf_delete_wfb
   (keys: seq int) (valid: seq bool) (cap: nat)
   (i: nat) (lo hi: int) (del_idx: nat)
@@ -592,7 +592,7 @@ let rec lemma_is_desc_of_root (n: nat)
    ==================================================================== *)
 
 /// Any valid descendant in a well_formed_bst subtree has key within bounds.
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec lemma_wfb_valid_desc_in_bounds
   (keys: seq int) (valid: seq bool) (cap: nat)
   (i desc: nat) (lo hi: int)
@@ -727,7 +727,7 @@ let lemma_left_spine_in_left
 
 /// After deleting the minimum (a leaf on the left spine) from a subtree,
 /// well_formed_bst holds with the lower bound narrowed to the minimum's key.
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec lemma_delete_min_narrow_wfb
   (keys: seq int) (valid: seq bool) (cap: nat)
   (i: nat) (lo hi: int) (min_idx: nat)
@@ -807,7 +807,7 @@ let lemma_wfb_frame_keys_desc
 ///   succ_idx = minimum of right subtree (on left spine of right child)
 ///   After: keys[del_idx] := keys[succ_idx], valid[succ_idx] := false
 ///   Proves: well_formed_bst is preserved
-#push-options "--z3rlimit 300 --fuel 3 --ifuel 2"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
 let rec lemma_successor_swap_delete_wfb
   (keys: seq int) (valid: seq bool) (cap: nat)
   (i: nat) (lo hi: int) (del_idx succ_idx: nat)

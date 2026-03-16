@@ -324,17 +324,77 @@ Supporting lemma modules:
 * `CLRS.Ch12.BST.Lemmas.fsti`: Unified interface exposing all key theorems.
 * `CLRS.Ch12.BST.KeySet.fst`: `list_to_set`, `key_set`, membership lemmas.
 
+## Profiling and Proof Stability
+
+### Solver Settings
+
+| File | Max rlimit | Fuel | Notes |
+|------|-----------|------|-------|
+| `BST.Spec.fst` | 20 | default | Stable; 973 LOC |
+| `BST.Delete.Spec.fst` | 80 | 1/1 | FiniteSet algebra; reduced from 100 |
+| `BST.Insert.Spec.fst` | 80 | 1/1 | FiniteSet algebra; reduced from 100 |
+| `BST.Impl.fst` | 20 | 2/2 | Only for delete; reduced from 40 |
+| `BST.Complexity.fst` | default | default | No push-options needed |
+| `BST.Lemmas.fst` | default | default | Thin re-export layer |
+| `BST.KeySet.fst` | default | default | Small helper module |
+
+### Cache File Sizes (proxy for proof complexity)
+
+| File | .checked size | Notes |
+|------|--------------|-------|
+| `BST.Spec.fst` | 583 KB | Largest — 973 LOC with many lemmas |
+| `BST.Impl.fst` | 357 KB | Moderate |
+| `BST.Delete.Spec.fst` | 188 KB | FiniteSet algebra |
+| `BST.Complexity.fst` | 175 KB | Clean structural induction |
+| `BST.Impl.fsti` | 102 KB | Small |
+
+### Assessment
+
+**Overall stability: GOOD.** Maximum rlimit is 80 (in FiniteSet-based proofs,
+reduced from 100), which is moderate. No rlimit exceeds 80. No
+`restart_solver`, no `retry`, no `quake`. All proofs are structurally
+inductive with clean recursion patterns.
+
+The FiniteSet-based proofs (`Insert.Spec`, `Delete.Spec`) use rlimit 80
+because `all_finite_set_facts_lemma` triggers many Z3 quantifiers. This is
+inherent to the FiniteSet library and not a proof fragility issue.
+
 ## Files
 
-| File | Role |
-|------|------|
-| `CLRS.Ch12.BST.Impl.fsti` | Public interface (types, slprop, signatures) |
-| `CLRS.Ch12.BST.Impl.fst` | Pulse implementation |
-| `CLRS.Ch12.BST.Spec.fst` | Pure BST spec (type, valid, search, insert, delete, correctness lemmas) |
-| `CLRS.Ch12.BST.Complexity.fsti` | Tick functions + height bound signatures |
-| `CLRS.Ch12.BST.Complexity.fst` | Complexity bound proofs |
-| `CLRS.Ch12.BST.Insert.Spec.fst` | Insert key-set algebra proof |
-| `CLRS.Ch12.BST.Delete.Spec.fst` | Delete key-set algebra proof |
-| `CLRS.Ch12.BST.KeySet.fst` | `key_set`, `list_to_set` definitions |
-| `CLRS.Ch12.BST.Lemmas.fsti` | Unified lemma interface |
-| `CLRS.Ch12.BST.Lemmas.fst` | Lemma proofs (delegates to Insert.Spec, Delete.Spec) |
+| File | LOC | Role |
+|------|-----|------|
+| `CLRS.Ch12.BST.Impl.fsti` | 114 | Public interface (types, slprop, signatures) |
+| `CLRS.Ch12.BST.Impl.fst` | 593 | Pulse implementation |
+| `CLRS.Ch12.BST.Spec.fst` | 973 | Pure BST spec (type, valid, search, insert, delete, correctness lemmas) |
+| `CLRS.Ch12.BST.Complexity.fsti` | 114 | Tick functions + height bound signatures |
+| `CLRS.Ch12.BST.Complexity.fst` | 189 | Complexity bound proofs |
+| `CLRS.Ch12.BST.Insert.Spec.fst` | 78 | Insert key-set algebra proof |
+| `CLRS.Ch12.BST.Delete.Spec.fst` | 329 | Delete key-set algebra proof |
+| `CLRS.Ch12.BST.KeySet.fst` | 33 | `key_set`, `list_to_set` definitions |
+| `CLRS.Ch12.BST.Lemmas.fsti` | 66 | Unified lemma interface |
+| `CLRS.Ch12.BST.Lemmas.fst` | 82 | Lemma proofs (delegates to Insert.Spec, Delete.Spec) |
+
+## Checklist (Priority Order)
+
+Items to address for a fully proven, high-quality implementation:
+
+- [x] **P0: Zero admits/assumes.** All modules fully verified.
+- [x] **P0: Rubric compliance.** All required files present (Spec, Lemmas,
+  Lemmas.fsti, Complexity, Complexity.fsti, Impl, Impl.fsti).
+- [x] **P0: Functional correctness.** Key-set algebra (strongest guarantee),
+  search correctness, validity preservation all proven.
+- [x] **P0: Complexity linked.** Ghost tick counters in all Pulse operations,
+  O(h) bounds proven.
+- [x] **P0: BST validity in postconditions.** Insert and delete postconditions
+  include `bst_valid 'ft ==> bst_valid (bst_insert 'ft k)`.
+- [x] **P0: Duplicate-key behavior documented.** `insert_noop_if_present` lemma.
+- [x] **P1: Proof stability.** Max rlimit 80 (reduced from 100), no fragile
+  settings. GOOD.
+- [ ] **P2: Tighten delete complexity constant.** Current bound is `4h+1`;
+  could potentially be `3h+1` with a tighter analysis of the two-children case.
+- [ ] **P2: Successor/predecessor Pulse operations.** CLRS §12.2 defines these
+  but they are not in the Pulse interface. Requires parent-pointer traversal
+  (zipper or iterative walk).
+- [ ] **P3: Parent-pointer invariant as standalone lemma.** Currently only
+  verified structurally via `bst_subtree` slprop. A separate theorem would
+  make the guarantee explicit.

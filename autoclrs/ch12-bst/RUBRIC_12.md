@@ -103,6 +103,16 @@ these give **machine-checked O(log cap) bounds** since `tree_height(cap) = log2_
 
 ---
 
+## Proof Stability (updated 2026-03-16)
+
+All solver settings reduced and verified on clean rebuild:
+- **Max rlimit across all of ch12: 80** (was 300 in Predicates, 100 in FiniteSet proofs)
+- **Max fuel: 2** everywhere (was fuel 3 in Predicates)
+- No `restart_solver`, `retry`, or `quake` directives
+- All 20 modules verify with zero errors
+
+---
+
 ## Completeness Gaps (P2)
 
 | # | Action | Details |

@@ -20,7 +20,7 @@ open CLRS.Ch12.BST.KeySet
    Main Theorem: key_set(insert(t,k)) = key_set(t) ∪ {k}
    ======================================================================== *)
 
-#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 
 //SNIPPET_START: insert_key_set_lemma
 val insert_key_set_lemma: t:bst -> k:int ->
