@@ -378,6 +378,7 @@ let dy (ys: Seq.seq int) (current k: nat) : int =
 //              (general position — ensures strict ordering).
 // Under these conditions, find_next_spec returns the most-clockwise point.
 
+#push-options "--split_queries always"
 let rec find_next_aux_beats_all (xs ys: Seq.seq int) (current next: nat) (j: nat)
   : Lemma
     (requires
@@ -451,6 +452,7 @@ let rec find_next_aux_beats_all (xs ys: Seq.seq int) (current next: nat) (j: nat
     end else
       find_next_aux_beats_all xs ys current next (j + 1)
   end
+#pop-options
 
 let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   : Lemma
@@ -470,7 +472,7 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_spec_bounded xs ys current
 
 // Extending a valid Jarvis hull by one vertex preserves validity.
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 40 --split_queries always"
 let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
   : Lemma
     (requires

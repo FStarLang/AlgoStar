@@ -5,17 +5,17 @@
 | File | Lines | Pure Specs | Lemmas | Pulse Impl | Complexity | .fsti |
 |------|------:|:----------:|:------:|:----------:|:----------:|:-----:|
 | `CLRS.Ch33.Segments.Spec.fst` | 73 | ✅ 6 defs | — | — | — | — |
-| `CLRS.Ch33.Segments.Lemmas.fst` | 32 | — | ✅ 5 | — | — | ✅ |
-| `CLRS.Ch33.Segments.Complexity.fst` | 22 | — | — | — | ✅ 4 defs, 2 lemmas | ✅ |
-| `CLRS.Ch33.Segments.Impl.fst` | 97 | — | — | ✅ 4 fns | — | ✅ |
-| `CLRS.Ch33.GrahamScan.Spec.fst` | 159 | ✅ 11 defs | — | — | — | — |
-| `CLRS.Ch33.GrahamScan.Lemmas.fst` | 115 | — | ✅ 6 | — | — | ✅ |
-| `CLRS.Ch33.GrahamScan.Complexity.fst` | 34 | — | — | — | ✅ 6 defs, 2 lemmas | ✅ |
-| `CLRS.Ch33.GrahamScan.Impl.fst` | 183 | — | — | ✅ 3 fns | — | ✅ |
-| `CLRS.Ch33.JarvisMarch.Spec.fst` | 108 | ✅ 10 defs | — | — | — | — |
-| `CLRS.Ch33.JarvisMarch.Lemmas.fst` | 222 | — | ✅ 14 | — | — | ✅ |
+| `CLRS.Ch33.Segments.Lemmas.fst` | 30 | — | ✅ 5 | — | — | ✅ |
+| `CLRS.Ch33.Segments.Complexity.fst` | 35 | — | — | — | ✅ 4 defs, 2 lemmas | ✅ |
+| `CLRS.Ch33.Segments.Impl.fst` | 92 | — | — | ✅ 4 fns | — | ✅ |
+| `CLRS.Ch33.GrahamScan.Spec.fst` | 186 | ✅ 11 defs | — | — | — | — |
+| `CLRS.Ch33.GrahamScan.Lemmas.fst` | 157 | — | ✅ 8 | — | — | ✅ |
+| `CLRS.Ch33.GrahamScan.Complexity.fst` | 38 | — | — | — | ✅ 6 defs, 2 lemmas | ✅ |
+| `CLRS.Ch33.GrahamScan.Impl.fst` | 235 | — | — | ✅ 4 fns | — | ✅ |
+| `CLRS.Ch33.JarvisMarch.Spec.fst` | 128 | ✅ 10 defs | — | — | — | — |
+| `CLRS.Ch33.JarvisMarch.Lemmas.fst` | 258 | — | ✅ 14 | — | — | ✅ |
 | `CLRS.Ch33.JarvisMarch.Complexity.fst` | 30 | — | — | — | ✅ 3 defs, 2 lemmas | ✅ |
-| `CLRS.Ch33.JarvisMarch.Impl.fst` | 215 | — | — | ✅ 3 fns | — | ✅ |
+| `CLRS.Ch33.JarvisMarch.Impl.fst` | 355 | — | — | ✅ 4 fns | — | ✅ |
 
 All twelve files follow the rubric's 7-file decomposition per algorithm (Spec, Lemmas+fsti,
 Complexity+fsti, Impl+fsti). The original three monolithic files (`CLRS.Ch33.Segments.fst`,
@@ -200,9 +200,12 @@ Cross-product definitions are now shared from `Segments.Spec.cross_product_spec`
 
 | File | `#push-options` | rlimit | fuel/ifuel | Verdict |
 |---|---|---|---|---|
-| `Segments.fst` | 0 | — | — | ✅ Default settings |
-| `GrahamScan.fst` | 1 | — | `--fuel 2 --ifuel 0` (pop_while) | ✅ Modest |
-| `JarvisMarch.fst` | 3 | `--z3rlimit 10` (2×), `--fuel 2 --ifuel 0` (1×) | See left | ✅ Modest |
+| `Segments.*` | 0 | — | — | ✅ Default settings |
+| `GrahamScan.Impl.fst` | 1 | — | `--fuel 2 --ifuel 0` (pop_while) | ✅ Modest |
+| `GrahamScan.Lemmas.fst` | 1 | `--z3rlimit 20` | `--fuel 1 --ifuel 0` | ✅ Modest |
+| `JarvisMarch.Lemmas.fst` | 3 | `--z3rlimit 10` (2×), `--z3rlimit 20` (1×) | — | ✅ Modest |
+| `JarvisMarch.Impl.fst` | 2 | `--z3rlimit 120` (`jarvis_march_with_hull`) | `--fuel 2 --ifuel 0` | ⚠️ High rlimit |
+| `JarvisMarch.fst` | 5 | `--z3rlimit 40` (max) | `--fuel 2 --ifuel 0` | ✅ Modest |
 
 ### Functional Equivalence Postconditions
 
@@ -211,8 +214,8 @@ All Pulse functions have postconditions proving `result == <pure_spec>(...)`:
 | File | Pulse fns | All have spec-equivalence postcondition? |
 |---|---|---|
 | `Segments.fst` | `cross_product`, `direction`, `on_segment`, `segments_intersect` | ✅ Yes |
-| `GrahamScan.fst` | `find_bottom`, `polar_cmp`, `pop_while` | ✅ Yes |
-| `JarvisMarch.fst` | `find_leftmost`, `find_next`, `jarvis_march` | ✅ Yes |
+| `GrahamScan.fst` | `find_bottom`, `polar_cmp`, `pop_while`, `graham_scan_step` | ✅ Yes |
+| `JarvisMarch.fst` | `find_leftmost`, `find_next`, `jarvis_march`, `jarvis_march_with_hull` | ✅ Yes |
 
 ### Correctness Depth
 
@@ -224,12 +227,14 @@ All Pulse functions have postconditions proving `result == <pure_spec>(...)`:
 
 ### Summary
 
-**Chapter 33 is now fully rubric-compliant in file structure.** All three algorithms
+**Chapter 33 is fully rubric-compliant in file structure.** All three algorithms
 (Segments, Graham Scan, Jarvis March) have been decomposed into the rubric's 7-file
 structure (Spec, Lemmas, Lemmas.fsti, Complexity, Complexity.fsti, Impl, Impl.fsti).
-All 21 new files plus the 3 original monolithic files verify with zero admits, zero
-assumes, and zero warnings. Cross-product definitions in GrahamScan.Spec and
-JarvisMarch.Spec now alias Segments.Spec.cross_product_spec, eliminating duplication.
+All 24 files (21 decomposed + 3 monolithic) verify with zero admits, zero assumes,
+and zero warnings. Cross-product definitions in GrahamScan.Spec and JarvisMarch.Spec
+alias Segments.Spec.cross_product_spec, eliminating duplication.
+
+**Full build time**: ~2m30s (parallel, 4 jobs).
 
 | Metric | Current | Target |
 |---|---|---|
@@ -237,3 +242,5 @@ JarvisMarch.Spec now alias Segments.Spec.cross_product_spec, eliminating duplica
 | Algorithms with complete Pulse impl | 2 / 3 | 3 / 3 (+ §33.2, §33.4) |
 | .fsti interface files | 9 | 9 (3 × Lemmas + Complexity + Impl) |
 | Cross-product definitions | 1 (shared via alias) | 1 (shared from Segments.Spec) |
+| Max z3rlimit (decomposed) | 120 (`jarvis_march_with_hull`) | ≤ 40 |
+| Warnings | 0 | 0 |

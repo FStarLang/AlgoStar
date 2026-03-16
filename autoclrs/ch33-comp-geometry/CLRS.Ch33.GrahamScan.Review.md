@@ -348,6 +348,15 @@ not connected to the Pulse implementations via ghost counters.
   for the recursive spec unfolding. The `pop_while_spec_bounded` lemma
   is called to establish the bound.
 
+## Proof Robustness
+
+| File | `#push-options` | rlimit | fuel/ifuel | Verdict |
+|---|---|---|---|---|
+| `GrahamScan.Impl.fst` | 1 | — | `--fuel 2 --ifuel 0` (pop_while) | ✅ Modest |
+| `GrahamScan.Lemmas.fst` | 1 | `--z3rlimit 20` | `--fuel 1 --ifuel 0` (scan_step_preserves) | ✅ Modest |
+
+**Verification time**: ~30 seconds for decomposed files, ~50s for monolithic.
+
 ## Files
 
 | File | Role |
@@ -357,6 +366,8 @@ not connected to the Pulse implementations via ghost counters.
 | `CLRS.Ch33.GrahamScan.Spec.fst` | Pure specifications (including full scan spec) |
 | `CLRS.Ch33.GrahamScan.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch33.GrahamScan.Lemmas.fst` | Lemma proofs |
+| `CLRS.Ch33.GrahamScan.Complexity.fsti` | Complexity interface |
+| `CLRS.Ch33.GrahamScan.Complexity.fst` | Formal op counts: O(n²) with insertion sort |
 | `CLRS.Ch33.GrahamScan.fst` | Standalone module (specs + proofs + Pulse, all-in-one) |
 | `CLRS.Ch33.Segments.Spec.fst` | `cross_product_spec` used by `cross_prod` alias |
 
@@ -370,3 +381,20 @@ not connected to the Pulse implementations via ghost counters.
 | `pop_while_spec_ge_1` | `CLRS.Ch33.GrahamScan.Lemmas` |
 | `scan_step_preserves_left_turns` | `CLRS.Ch33.GrahamScan.Lemmas` |
 | `graham_scan_step` | `CLRS.Ch33.GrahamScan.Impl` |
+
+## Checklist (Priority Order)
+
+- [x] Pure specification matching CLRS §33.3 (find_bottom, polar_cmp, pop_while, full scan)
+- [x] Pulse implementation of building blocks (find_bottom, polar_cmp, pop_while, graham_scan_step)
+- [x] Impl.fsti interface file
+- [x] Lemmas module with correctness proofs (bottommost, left-turn invariant, scan_step_preserves)
+- [x] Lemmas.fsti interface file
+- [x] Complexity module with formal op counts and O(n²) bound
+- [x] Complexity.fsti interface file
+- [x] Zero admits, zero assumes
+- [x] Proof stability — modest solver settings (fuel 2, z3rlimit 20)
+- [ ] Full `graham_scan` Pulse fn composing sort + scan loop — **high priority**
+- [ ] Verified polar-angle sorting (or reuse existing sort infrastructure) — **high priority**
+- [ ] End-to-end `all_left_turns` invariant for full graham_scan — **medium priority**
+- [ ] Connect complexity to O(n lg n) with merge sort — **medium priority**
+- [ ] Link complexity analysis to Pulse impl via ghost counters — **low priority**

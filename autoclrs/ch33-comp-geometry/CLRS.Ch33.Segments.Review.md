@@ -202,6 +202,13 @@ type-checker verifies the postcondition without any auxiliary lemmas.
 The lemma module proves algebraic properties of the cross product
 (antisymmetry, translation invariance, degeneracy) by SMT alone.
 
+## Proof Robustness
+
+All proofs use default settings (no `#push-options`, no rlimit increases,
+no fuel/ifuel adjustments). All lemma proofs are trivial `= ()`.
+
+**Verification time**: < 5 seconds (all files combined).
+
 ## Files
 
 | File | Role |
@@ -211,4 +218,21 @@ The lemma module proves algebraic properties of the cross product
 | `CLRS.Ch33.Segments.Spec.fst` | Pure specifications and orientation type |
 | `CLRS.Ch33.Segments.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch33.Segments.Lemmas.fst` | Lemma proofs |
+| `CLRS.Ch33.Segments.Complexity.fsti` | Complexity interface |
+| `CLRS.Ch33.Segments.Complexity.fst` | Formal O(1) op counts and bounds |
 | `CLRS.Ch33.Segments.fst` | Standalone module (specs + proofs + Pulse, all-in-one) |
+
+## Checklist (Priority Order)
+
+- [x] Pure specification matching CLRS §33.1
+- [x] Pulse implementation with `result == *_spec` postconditions
+- [x] Impl.fsti interface file
+- [x] Lemmas module with algebraic properties (antisymmetry, translation, degeneracy)
+- [x] Lemmas.fsti interface file
+- [x] Complexity module with formal O(1) op counts
+- [x] Complexity.fsti interface file
+- [x] Zero admits, zero assumes
+- [x] Proof stability — all proofs use default solver settings
+- [ ] Geometric correctness theorem (intersection ↔ ∃ shared point in ℝ²) — **deferred** (would need real-number geometry formalization)
+- [ ] Enforce collinearity precondition on `on_segment_spec` — **low priority** (callers already check `d = 0`)
+- [ ] Introduce `type point = { x: int; y: int }` record — **low priority** (cross-cutting refactor)

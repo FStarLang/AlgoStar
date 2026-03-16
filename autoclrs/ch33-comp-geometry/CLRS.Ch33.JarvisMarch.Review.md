@@ -369,6 +369,20 @@ not connected to the Pulse implementations via ghost counters.
   that `j` also beats all predecessors. The `SMTPat` on
   `cross_prod_transitivity` fires automatically.
 
+## Proof Robustness
+
+| File | `#push-options` | rlimit | fuel/ifuel | Verdict |
+|---|---|---|---|---|
+| `JarvisMarch.Lemmas.fst` | 3 | `--z3rlimit 10` (2×), `--z3rlimit 20` (1×) | — | ✅ Modest |
+| `JarvisMarch.Impl.fst` | 2 | `--z3rlimit 120` (`jarvis_march_with_hull`) | `--fuel 2 --ifuel 0` | ⚠️ High rlimit |
+
+The `jarvis_march_with_hull` function requires `--z3rlimit 120 --split_queries always`,
+which is the highest rlimit in the chapter. The proof involves a complex loop invariant
+tracking hull validity, spec equivalence, and loop count simultaneously. Reducing below
+120 causes SMT timeouts on the invariant maintenance step.
+
+**Verification time**: ~90 seconds for decomposed files, ~40s for monolithic.
+
 ## Files
 
 | File | Role |
@@ -378,6 +392,8 @@ not connected to the Pulse implementations via ghost counters.
 | `CLRS.Ch33.JarvisMarch.Spec.fst` | Pure specifications and correctness definitions |
 | `CLRS.Ch33.JarvisMarch.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch33.JarvisMarch.Lemmas.fst` | Lemma proofs |
+| `CLRS.Ch33.JarvisMarch.Complexity.fsti` | Complexity interface |
+| `CLRS.Ch33.JarvisMarch.Complexity.fst` | Formal op counts: O(nh) ≤ O(n²) |
 | `CLRS.Ch33.JarvisMarch.fst` | Standalone module (specs + proofs + Pulse, all-in-one) |
 | `CLRS.Ch33.Segments.Spec.fst` | `cross_product_spec` used by `cross_prod` alias |
 
@@ -388,3 +404,23 @@ not connected to the Pulse implementations via ghost counters.
 | `valid_jarvis_hull` | `CLRS.Ch33.JarvisMarch.Spec` |
 | `extend_valid_jarvis_hull` | `CLRS.Ch33.JarvisMarch.Lemmas` |
 | `jarvis_march_with_hull` | `CLRS.Ch33.JarvisMarch.Impl` |
+
+## Checklist (Priority Order)
+
+- [x] Pure specification matching CLRS §33.3 (find_leftmost, find_next, jarvis_march)
+- [x] Complete Pulse implementation (find_leftmost, find_next, jarvis_march, jarvis_march_with_hull)
+- [x] Impl.fsti interface file
+- [x] Lemmas module with substantial correctness proofs (14 lemmas)
+- [x] Lemmas.fsti interface file
+- [x] Complexity module with formal O(nh) ≤ O(n²) bounds
+- [x] Complexity.fsti interface file
+- [x] Zero admits, zero assumes
+- [x] `valid_jarvis_hull` output correctness for `jarvis_march_with_hull`
+- [x] `find_next_all_left_of` core correctness (under general position)
+- [x] `find_leftmost_is_leftmost` starting point correctness
+- [ ] Reduce `--z3rlimit 120` in `jarvis_march_with_hull` — **medium priority** (proof refactoring)
+- [ ] Relax general-position assumption in `find_next_all_left_of` — **medium priority** (handle collinear cases)
+- [ ] Relax upper-half-plane assumption — **medium priority** (generalize to all hull vertices, not just bottom)
+- [ ] End-to-end convex hull correctness theorem — **high priority** (compose individual edge proofs)
+- [ ] Link complexity analysis to Pulse impl via ghost counters — **low priority**
+- [ ] Handle `len = 1` case in Pulse interface — **low priority** (spec handles it but Pulse requires `len > 1`)
