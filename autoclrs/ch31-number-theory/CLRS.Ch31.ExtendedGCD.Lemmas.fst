@@ -154,7 +154,7 @@ let div_sum_exact (r: nat) (b: nat) (q: nat) (d: pos)
 /// Coefficient bounds (CLRS Theorem 31.8):
 /// When a > 0 and b > 0, the Bézout coefficients satisfy
 /// |x| ≤ b/gcd(a,b) and |y| ≤ a/gcd(a,b).
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 20"
 let rec extended_gcd_coeff_bounds (a b: nat)
   : Lemma (requires a > 0 /\ b > 0)
           (ensures (let (| d, x, y |) = extended_gcd a b in

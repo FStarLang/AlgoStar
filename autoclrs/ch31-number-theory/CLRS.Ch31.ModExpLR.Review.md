@@ -12,6 +12,7 @@ val mod_exp_lr_impl (b_init: int) (e_init: nat) (m_init: pos)
     (GR.pts_to ctr c0)
     (fun result -> exists* (cf: nat). GR.pts_to ctr cf ** pure (
       result == mod_exp_spec b_init e_init m_init /\
+      result >= 0 /\ result < m_init /\
       modexp_lr_complexity_bounded cf (reveal c0) e_init
     ))
 ```
@@ -125,15 +126,16 @@ Key lemmas from `CLRS.Ch31.ModExpLR.Lemmas`:
 * `mod_exp_lr_step`: The algebraic step combining squaring and optional
   multiplication.
 
-## Files
+## Checklist
 
-| File | Role |
-|------|------|
-| `CLRS.Ch31.ModExpLR.Impl.fsti` | Public interface (this signature) |
-| `CLRS.Ch31.ModExpLR.Impl.fst` | Pulse implementation (left-to-right loop) |
-| `CLRS.Ch31.ModExp.Spec.fst` | `pow`, `mod_exp_spec` (shared with R-to-L) |
-| `CLRS.Ch31.ModExpLR.Complexity.fsti` | `modexp_lr_complexity_bounded` |
-| `CLRS.Ch31.ModExpLR.Complexity.fst` | (empty — bound fully defined in interface) |
-| `CLRS.Ch31.ModExpLR.Lemmas.fsti` | Lemma signatures (bit decomposition, step) |
-| `CLRS.Ch31.ModExpLR.Lemmas.fst` | Proofs (bit arithmetic, LR step correctness) |
-| `CLRS.Ch31.GCD.Complexity.fsti` | `num_bits` (reused) |
+- [x] Zero admits, zero assumes
+- [x] Functional correctness: `result == pow b e % m`
+- [x] Result bounds: `result >= 0 /\ result < m`
+- [x] O(log e) complexity bound: `cf - c0 ≤ num_bits(e)`
+- [x] Ghost counter linked to Pulse implementation
+- [x] CLRS primary algorithm (§31.6, Alg 31.6)
+- [x] Rubric compliance: Spec (shared), Lemmas, Complexity, Impl all present
+- [x] Proof stability: max z3rlimit 30
+- [x] `modexp_lr_complexity_bounded` defined in separate Complexity module
+- [ ] Exact iteration count (currently upper bound only)
+- [ ] Machine-integer overflow constraints

@@ -10,26 +10,32 @@
 | # | File | Language | Role | Verified | Admits |
 |---|------|----------|------|----------|--------|
 | 1 | `CLRS.Ch31.GCD.Spec.fst` | Pure F\* | Spec + divisibility lemma | ✅ | 0 |
-| 2 | `CLRS.Ch31.GCD.Complexity.fsti` | Pure F\* | Complexity interface | ✅ | 0 |
-| 3 | `CLRS.Ch31.GCD.Complexity.fst` | Pure F\* | Complexity | ✅ | 0 |
-| 4 | `CLRS.Ch31.GCD.Impl.fsti` | Pulse | Impl interface | ✅ | 0 |
-| 5 | `CLRS.Ch31.GCD.Impl.fst` | Pulse | Impl | ✅ | 0 |
-| 6 | `CLRS.Ch31.ExtendedGCD.Spec.fst` | Pure F\* | Spec | ✅ | 0 |
-| 7 | `CLRS.Ch31.ExtendedGCD.Lemmas.fsti` | Pure F\* | Lemmas interface | ✅ | 0 |
-| 8 | `CLRS.Ch31.ExtendedGCD.Lemmas.fst` | Pure F\* | Lemmas + tests | ✅ | 0 |
-| 9 | `CLRS.Ch31.ModExp.Spec.fst` | Pure F\* | Spec | ✅ | 0 |
-| 10 | `CLRS.Ch31.ModExp.Lemmas.fsti` | Pure F\* | Lemmas interface | ✅ | 0 |
-| 11 | `CLRS.Ch31.ModExp.Lemmas.fst` | Pure F\* | Lemmas | ✅ | 0 |
-| 12 | `CLRS.Ch31.ModExp.Complexity.fsti` | Pure F\* | Complexity interface | ✅ | 0 |
-| 13 | `CLRS.Ch31.ModExp.Complexity.fst` | Pure F\* | Complexity | ✅ | 0 |
-| 14 | `CLRS.Ch31.ModExp.Impl.fsti` | Pulse | Impl interface | ✅ | 0 |
-| 15 | `CLRS.Ch31.ModExp.Impl.fst` | Pulse | Impl | ✅ | 0 |
-| 16 | `CLRS.Ch31.ModExpLR.Lemmas.fsti` | Pure F\* | Lemmas interface | ✅ | 0 |
-| 17 | `CLRS.Ch31.ModExpLR.Lemmas.fst` | Pure F\* | Lemmas | ✅ | 0 |
-| 18 | `CLRS.Ch31.ModExpLR.Impl.fsti` | Pulse | Impl interface | ✅ | 0 |
-| 19 | `CLRS.Ch31.ModExpLR.Impl.fst` | Pulse | Impl | ✅ | 0 |
+| 2 | `CLRS.Ch31.GCD.Lemmas.fsti` | Pure F\* | Lemmas interface | ✅ | 0 |
+| 3 | `CLRS.Ch31.GCD.Lemmas.fst` | Pure F\* | Greatest-divisor proof | ✅ | 0 |
+| 4 | `CLRS.Ch31.GCD.Complexity.fsti` | Pure F\* | Complexity interface | ✅ | 0 |
+| 5 | `CLRS.Ch31.GCD.Complexity.fst` | Pure F\* | Complexity | ✅ | 0 |
+| 6 | `CLRS.Ch31.GCD.Impl.fsti` | Pulse | Impl interface | ✅ | 0 |
+| 7 | `CLRS.Ch31.GCD.Impl.fst` | Pulse | Impl | ✅ | 0 |
+| 8 | `CLRS.Ch31.ExtendedGCD.Spec.fst` | Pure F\* | Spec | ✅ | 0 |
+| 9 | `CLRS.Ch31.ExtendedGCD.Lemmas.fsti` | Pure F\* | Lemmas interface | ✅ | 0 |
+| 10 | `CLRS.Ch31.ExtendedGCD.Lemmas.fst` | Pure F\* | Lemmas + tests | ✅ | 0 |
+| 11 | `CLRS.Ch31.ExtendedGCD.Complexity.fsti` | Pure F\* | Complexity interface | ✅ | 0 |
+| 12 | `CLRS.Ch31.ExtendedGCD.Complexity.fst` | Pure F\* | Complexity | ✅ | 0 |
+| 13 | `CLRS.Ch31.ModExp.Spec.fst` | Pure F\* | Spec | ✅ | 0 |
+| 14 | `CLRS.Ch31.ModExp.Lemmas.fsti` | Pure F\* | Lemmas interface | ✅ | 0 |
+| 15 | `CLRS.Ch31.ModExp.Lemmas.fst` | Pure F\* | Lemmas | ✅ | 0 |
+| 16 | `CLRS.Ch31.ModExp.Complexity.fsti` | Pure F\* | Complexity interface | ✅ | 0 |
+| 17 | `CLRS.Ch31.ModExp.Complexity.fst` | Pure F\* | Complexity | ✅ | 0 |
+| 18 | `CLRS.Ch31.ModExp.Impl.fsti` | Pulse | Impl interface | ✅ | 0 |
+| 19 | `CLRS.Ch31.ModExp.Impl.fst` | Pulse | Impl | ✅ | 0 |
+| 20 | `CLRS.Ch31.ModExpLR.Lemmas.fsti` | Pure F\* | Lemmas interface | ✅ | 0 |
+| 21 | `CLRS.Ch31.ModExpLR.Lemmas.fst` | Pure F\* | Lemmas | ✅ | 0 |
+| 22 | `CLRS.Ch31.ModExpLR.Complexity.fsti` | Pure F\* | Complexity interface | ✅ | 0 |
+| 23 | `CLRS.Ch31.ModExpLR.Complexity.fst` | Pure F\* | Complexity | ✅ | 0 |
+| 24 | `CLRS.Ch31.ModExpLR.Impl.fsti` | Pulse | Impl interface | ✅ | 0 |
+| 25 | `CLRS.Ch31.ModExpLR.Impl.fst` | Pulse | Impl | ✅ | 0 |
 
-**Total:** 19 files, 0 admits, 0 assumes across all files.
+**Total:** 25 files, 0 admits, 0 assumes across all files.
 
 ---
 
@@ -52,24 +58,17 @@ files) have been folded into their natural homes to avoid needless indirection.
 
 | | Spec.fst | Lemmas.fst | Lemmas.fsti | Complexity.fst | Complexity.fsti | Impl.fst | Impl.fsti |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **GCD** | ✅¹ | — | — | ✅ | ✅ | ✅ | ✅ |
-| **ExtendedGCD** | ✅ | ✅ | ✅ | —² | —² | N/A³ | N/A³ |
+| **GCD** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **ExtendedGCD** | ✅ | ✅ | ✅ | ✅ | ✅ | N/A¹ | N/A¹ |
 | **ModExp (R→L)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **ModExpLR** | ✅⁴ | ✅ | ✅ | —⁵ | —⁵ | ✅ | ✅ |
+| **ModExpLR** | ✅² | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Legend:
 - ✅ = separate file exists
-- — = intentionally folded (see notes)
 - N/A = not applicable
 
-¹ GCD.Spec includes `gcd_spec_divides` (the single divisibility lemma); a
-  separate Lemmas module would be trivial.
-² ExtendedGCD complexity is trivially `O(log b)` via GCD's `lemma_gcd_steps_log`;
-  a separate module would just re-export that lemma.
-³ ExtendedGCD is pure F\*, so a Pulse Impl is not required.
-⁴ ModExpLR shares `Spec.fst` with `ModExp` — imports `mod_exp_spec`/`pow` from `ModExp.Spec`.
-⁵ ModExpLR complexity bound (`cf - c0 <= num_bits e_init`) is inlined in `Impl.fsti`;
-  a separate module would contain only that one-line definition.
+¹ ExtendedGCD is pure F\*, so a Pulse Impl is not required.
+² ModExpLR shares `Spec.fst` with `ModExp` — imports `mod_exp_spec`/`pow` from `ModExp.Spec`.
 
 ---
 
@@ -85,6 +84,8 @@ Only lemma signatures use `val` in `.fsti` files.
 
 - Ghost tick (`incr_nat`, `tick`) imported from `CLRS.Common.Complexity` (no duplication).
 - ModExpLR imports `pow`/`mod_exp_spec` from `CLRS.Ch31.ModExp.Spec` (no separate Spec file needed).
+- ModExpLR imports `num_bits` from `CLRS.Ch31.GCD.Complexity` for its complexity bound.
+- ExtendedGCD.Complexity delegates to `lemma_gcd_steps_log` from `CLRS.Ch31.GCD.Complexity`.
 
 ### 4.3  Content from Audit
 
@@ -110,7 +111,7 @@ All documentation issues from the audit have been addressed:
 | Complexity: ExtendedGCD | ✅ | Same recursion as GCD; bound from `lemma_gcd_steps_log` |
 | Complexity: ModExp (R→L) | ✅ | `⌊log₂ e⌋ + 1` iterations |
 | Complexity: ModExpLR | ✅ | `num_bits(e)` iterations |
-| Solver limits reasonable | ✅ | Max `z3rlimit 150` in one proof; all others ≤ 30 |
+| Solver limits reasonable | ✅ | Max `z3rlimit 30` in one proof; all others ≤ 20 |
 | No code duplication | ✅ | Ghost tick from common; ModExpLR shares Spec with ModExp |
 
 ### Overall Rubric Score
@@ -119,6 +120,6 @@ All documentation issues from the audit have been addressed:
 |-----------|-------|
 | **Correctness & Verification** | 10 / 10 |
 | **Specification Strength** | 9 / 10 |
-| **Complexity Analysis** | 9 / 10 |
+| **Complexity Analysis** | 10 / 10 |
 | **File Structure (rubric compliance)** | 10 / 10 |
-| **Documentation** | 9 / 10 |
+| **Documentation** | 10 / 10 |

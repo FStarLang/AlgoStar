@@ -23,6 +23,7 @@ open FStar.Math.Lemmas
 open CLRS.Ch31.ModExp.Spec
 open CLRS.Ch31.ModExpLR.Lemmas
 open CLRS.Ch31.GCD.Complexity
+open CLRS.Ch31.ModExpLR.Complexity
 open CLRS.Common.Complexity
 
 module R = Pulse.Lib.Reference
@@ -36,8 +37,7 @@ fn mod_exp_lr_impl (b_init: int) (e_init: nat) (m_init: pos)
   ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (
     result == mod_exp_spec b_init e_init m_init /\
     result >= 0 /\ result < m_init /\
-    cf >= reveal c0 /\
-    cf - reveal c0 <= num_bits e_init
+    modexp_lr_complexity_bounded cf (reveal c0) e_init
   )
 {
   lemma_prefix_zero e_init;

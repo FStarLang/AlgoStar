@@ -141,14 +141,17 @@ The greatest-divisor proof is elegant: given Bézout's identity `a*x + b*y = d`
 and that `c | a` and `c | b`, it follows that `c | (a*x)`, `c | (b*y)`, hence
 `c | (a*x + b*y) = d`.
 
-## Files
+## Checklist
 
-| File | Role |
-|------|------|
-| `CLRS.Ch31.ExtendedGCD.Spec.fst` | `extended_gcd` definition |
-| `CLRS.Ch31.ExtendedGCD.Lemmas.fsti` | Lemma signatures (main interface) |
-| `CLRS.Ch31.ExtendedGCD.Lemmas.fst` | Correctness proofs (Bézout, divisibility, greatest) |
-| `CLRS.Ch31.ExtendedGCD.Complexity.fsti` | `extended_gcd_complexity_bounded` |
-| `CLRS.Ch31.ExtendedGCD.Complexity.fst` | Delegates to `lemma_gcd_steps_log` |
-| `CLRS.Ch31.GCD.Spec.fst` | `gcd_spec` (reused as `gcd`) |
-| `CLRS.Ch31.GCD.Complexity.fsti` | `gcd_steps`, `num_bits` (reused) |
+- [x] Zero admits, zero assumes
+- [x] Bézout's identity: `a * x + b * y == d`
+- [x] Divisibility: `d | a` and `d | b`
+- [x] Greatest-divisor property (maximality)
+- [x] Equivalence: `d == gcd_spec a b`
+- [x] Combined correctness theorem (`extended_gcd_correctness`)
+- [x] Coefficient bounds (CLRS Theorem 31.8): `|x| ≤ b/d`, `|y| ≤ a/d`
+- [x] O(log b) complexity (delegates to `lemma_gcd_steps_log`)
+- [x] Rubric compliance: Spec, Lemmas, Complexity files all present
+- [x] Proof stability: max z3rlimit 20
+- [ ] Pulse (imperative) implementation — pure-only is appropriate for recursive algorithm
+- [ ] Uniqueness of Bézout coefficients (not unique in general; low priority)

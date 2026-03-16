@@ -54,7 +54,7 @@ let lemma_gcd_steps_bound_step (a b r r2: nat)
 
 //SNIPPET_START: lemma_gcd_steps_log
 // Main theorem: Euclid's algorithm takes at most 2*log2(b) + 1 steps (Lamé's theorem)
-#push-options "--z3rlimit 150 --fuel 3 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 3 --ifuel 2"
 let rec lemma_gcd_steps_log (a b: nat)
   : Lemma (requires b > 0)
           (ensures gcd_steps a b <= op_Multiply 2 (num_bits b) + 1)

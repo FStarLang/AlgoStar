@@ -13,6 +13,7 @@ open Pulse.Lib.Pervasives
 open FStar.Mul
 open CLRS.Ch31.ModExp.Spec
 open CLRS.Ch31.GCD.Complexity
+open CLRS.Ch31.ModExpLR.Complexity
 
 module GR = Pulse.Lib.GhostReference
 
@@ -23,6 +24,5 @@ val mod_exp_lr_impl (b_init: int) (e_init: nat) (m_init: pos)
     (fun result -> exists* (cf: nat). GR.pts_to ctr cf ** pure (
       result == mod_exp_spec b_init e_init m_init /\
       result >= 0 /\ result < m_init /\
-      cf >= reveal c0 /\
-      cf - reveal c0 <= num_bits e_init
+      modexp_lr_complexity_bounded cf (reveal c0) e_init
     ))
