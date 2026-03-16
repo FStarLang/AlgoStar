@@ -1,192 +1,67 @@
-# Simultaneous Min and Max (CLRS §9.1)
+# Simultaneous Min and Max (CLRS §9.1) — Review
 
-## Top-Level Signatures
+**Last reviewed:** 2026-03-16
+**Build status:** ✅ All files verified (zero admits, zero assumes)
+**Verification time:** ~18s for Impl.fst (the slowest file)
 
-Here are the top-level signatures proven about `find_minmax` and
-`find_minmax_pairs` in `CLRS.Ch09.SimultaneousMinMax.Impl.fsti`:
+## Checklist
 
-### `find_minmax` (simple scan)
+- [x] Rubric compliance: 7/7 required files present
+- [x] Zero admits / zero assumes
+- [x] Impl.fsti shows clear API with correctness + complexity postconditions
+- [x] `find_minmax`: exact 2(n−1) comparisons (equality)
+- [x] `find_minmax_pairs`: tight ⌊3(n−1)/2⌋ bound (CLRS Theorem 9.1)
+- [x] Correctness: existence + universality for both min and max
+- [x] Array is read-only (fractional permission `#p`)
+- [x] Build: Impl files included in Makefile and verified
+- [ ] *(Stability)* `find_minmax_pairs` uses `--z3rlimit 500 --ifuel 3 --fuel 3` — consider
+  reducing via proof restructuring
+- [ ] *(Nice-to-have)* Consider returning indices alongside values
 
-```fstar
-fn find_minmax
-  (#p: perm)
-  (a: array int)
-  (#s0: Ghost.erased (Seq.seq int))
-  (len: SZ.t)
-  (ctr: GR.ref nat)
-  (#c0: erased nat)
-  requires A.pts_to a #p s0 ** GR.pts_to ctr c0 **
-    pure (
-      SZ.v len == Seq.length s0 /\
-      SZ.v len >= 1 /\
-      SZ.v len == A.length a
-    )
-  returns result: minmax_result
-  ensures exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
-    pure (
-      (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.min_val) /\
-      (forall (k:nat). k < Seq.length s0 ==> result.min_val <= Seq.index s0 k) /\
-      (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.max_val) /\
-      (forall (k:nat). k < Seq.length s0 ==> result.max_val >= Seq.index s0 k) /\
-      complexity_bounded_minmax cf (reveal c0) (SZ.v len)
-    )
-```
+## Top-Level Signatures (`Impl.fsti`)
 
-### `find_minmax_pairs` (pair-processing, CLRS optimal)
+### `find_minmax` (simple scan — 2(n−1) comparisons)
 
 ```fstar
-fn find_minmax_pairs
-  (#p: perm)
-  (a: array int)
-  (#s0: Ghost.erased (Seq.seq int))
-  (len: SZ.t)
-  (ctr: GR.ref nat)
-  (#c0: erased nat)
-  requires A.pts_to a #p s0 ** GR.pts_to ctr c0 **
-    pure (
-      SZ.v len == Seq.length s0 /\
-      SZ.v len >= 1 /\
-      SZ.v len == A.length a
-    )
-  returns result: minmax_result
-  ensures exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
-    pure (
-      (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.min_val) /\
-      (forall (k:nat). k < Seq.length s0 ==> result.min_val <= Seq.index s0 k) /\
-      (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.max_val) /\
-      (forall (k:nat). k < Seq.length s0 ==> result.max_val >= Seq.index s0 k) /\
-      complexity_bounded_minmax_pairs cf (reveal c0) (SZ.v len)
-    )
+fn find_minmax (#p: perm) (a: array int) (#s0: Ghost.erased (Seq.seq int))
+  (len: SZ.t) (ctr: GR.ref nat) (#c0: erased nat)
+  ...
+returns result: minmax_result
+ensures exists* (cf: nat). A.pts_to a #p s0 ** GR.pts_to ctr cf **
+  pure (
+    (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.min_val) /\
+    (forall (k:nat). k < Seq.length s0 ==> result.min_val <= Seq.index s0 k) /\
+    (exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.max_val) /\
+    (forall (k:nat). k < Seq.length s0 ==> result.max_val >= Seq.index s0 k) /\
+    complexity_bounded_minmax cf (reveal c0) (SZ.v len))
 ```
 
-### Parameters
+### `find_minmax_pairs` (CLRS pair-processing — ⌊3(n−1)/2⌋ comparisons)
 
-* `a` is an array of `int` borrowed read-only via fractional permission `#p`.
-
-* `len` is the number of elements, of type `SZ.t`.
-
-* `ctr` is a ghost counter for comparison counting.
-
-* The return type is `minmax_result`, a record with `min_val` and `max_val`
-  fields.
-
-### Preconditions
-
-* `SZ.v len == Seq.length s0`: Length matches.
-* `SZ.v len >= 1`: Non-empty array.
-* `SZ.v len == A.length a`: Logical and physical lengths agree.
-
-### Postconditions (identical for both functions except complexity)
-
-* `exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.min_val` —
-  The minimum exists in the array.
-
-* `forall (k:nat). k < Seq.length s0 ==> result.min_val <= Seq.index s0 k` —
-  The minimum is ≤ every element.
-
-* `exists (k:nat). k < Seq.length s0 /\ Seq.index s0 k == result.max_val` —
-  The maximum exists in the array.
-
-* `forall (k:nat). k < Seq.length s0 ==> result.max_val >= Seq.index s0 k` —
-  The maximum is ≥ every element.
-
-* Complexity bound (differs between the two algorithms — see below).
-
-## Auxiliary Definitions
-
-### `minmax_result` (from `CLRS.Ch09.SimultaneousMinMax.Spec`)
-
-```fstar
-noeq
-type minmax_result = {
-  min_val: int;
-  max_val: int;
-}
-```
-
-### `complexity_bounded_minmax` (from `CLRS.Ch09.SimultaneousMinMax.Spec`)
-
-```fstar
-/// Simple scan: exactly 2(n-1) comparisons
-let complexity_bounded_minmax (cf c0 n: nat) : prop =
-  n >= 1 /\
-  cf >= c0 /\
-  cf - c0 == op_Multiply 2 (n - 1)
-```
-
-The simple scan compares each element against both the current min and max:
-exactly 2(n−1) comparisons. This is an **exact** count (equality).
-
-### `complexity_bounded_minmax_pairs` (from `CLRS.Ch09.SimultaneousMinMax.Spec`)
-
-```fstar
-/// Pair-processing: at most ⌊3(n−1)/2⌋ comparisons (expressed without division)
-let complexity_bounded_minmax_pairs (cf c0 n: nat) : prop =
-  n >= 1 /\
-  cf >= c0 /\
-  op_Multiply 2 (cf - c0) <= op_Multiply 3 (n - 1)
-```
-
-The pair-processing algorithm from CLRS §9.1 processes elements in pairs: first
-compare the pair against each other (1 comparison), then compare the smaller
-against the current min and the larger against the current max (2 comparisons) —
-3 comparisons per pair, giving ⌊3(n−1)/2⌋ total. The bound is expressed as
-`2 * (cf - c0) <= 3 * (n - 1)` to avoid integer division. This is a **tight
-upper bound** — equality holds when n is odd.
+Same correctness postcondition, with `complexity_bounded_minmax_pairs` instead.
 
 ## What Is Proven
 
-Both functions prove the **strongest possible correctness specification**: the
-returned min and max values exist in the array and are globally optimal.
+1. **Min correctness**: existence + universality.
+2. **Max correctness**: existence + universality.
+3. **Complexity**: `find_minmax` = exact 2(n−1); `find_minmax_pairs` ≤ ⌊3(n−1)/2⌋.
 
-The key contribution is proving two **different complexity bounds** for the
-same correctness property:
+## Proof Stability
 
-1. `find_minmax`: 2(n−1) comparisons — the naïve approach.
-2. `find_minmax_pairs`: ⌊3(n−1)/2⌋ comparisons — the CLRS-optimal algorithm.
+| File | Time | z3rlimit | Notes |
+|------|------|----------|-------|
+| SimultaneousMinMax.Spec.fst | <1s | default | |
+| SimultaneousMinMax.Impl.fsti | <1s | default | |
+| SimultaneousMinMax.Impl.fst | ~18s | 500 | `find_minmax_pairs` uses high fuel/ifuel |
+| SimultaneousMinMax.Lemmas.* | <1s | — | Intentionally empty |
+| SimultaneousMinMax.Complexity.* | <1s | — | Intentionally minimal |
 
-For large n, ⌊3(n−1)/2⌋ < 2(n−1), so `find_minmax_pairs` is strictly better.
+**`find_minmax_pairs`** requires `--z3rlimit 500 --ifuel 3 --fuel 3`. This is
+high but the proof is stable. The pair-processing loop has complex invariants
+tracking tick counts across even/odd cases.
 
-**Zero admits, zero assumes.** All proof obligations are mechanically discharged
-by F\* and Z3.
+## Limitations
 
-## Specification Gaps and Limitations
-
-1. **`len >= 1` precondition.** Same as MinMax — no handling of empty arrays.
-
-2. **`len == A.length a` strictness.** Cannot operate on array prefixes.
-
-3. **~~Pair-processing bound is an upper bound, not exact.~~** *(Addressed.)*
-   The pair-processing bound has been tightened from `2 * (cf - c0) <= 3 * n`
-   to `2 * (cf - c0) <= 3 * (n - 1)`. This matches the exact ⌊3(n−1)/2⌋
-   comparison count from CLRS §9.1 and is tight for odd n (equality holds).
-
-4. **No index returned.** The functions return values but not the indices at
-   which the min and max occur.
-
-## Complexity
-
-| Algorithm | Bound | Linked? | Exact? |
-|-----------|-------|---------|--------|
-| `find_minmax` | 2(n−1) | ✅ Ghost counter | ✅ Exact |
-| `find_minmax_pairs` | ⌊3(n−1)/2⌋ | ✅ Ghost counter | Tight upper bound (exact for odd n) |
-
-Both complexities are **fully linked** to the imperative implementations via
-ghost counters.
-
-## Proof Structure
-
-Correctness is proved directly in the implementation postconditions via loop
-invariants. The `CLRS.Ch09.SimultaneousMinMax.Lemmas` module is intentionally
-empty — the algorithms are simple enough that no separate lemmas are needed.
-
-## Files
-
-| File | Role |
-|------|------|
-| `CLRS.Ch09.SimultaneousMinMax.Impl.fsti` | Public interface (these signatures) |
-| `CLRS.Ch09.SimultaneousMinMax.Impl.fst` | Pulse implementation |
-| `CLRS.Ch09.SimultaneousMinMax.Spec.fst` | `minmax_result`, complexity predicates |
-| `CLRS.Ch09.SimultaneousMinMax.Complexity.fst` | Complexity module (intentionally minimal) |
-| `CLRS.Ch09.SimultaneousMinMax.Lemmas.fsti` | Lemma signatures (empty) |
-| `CLRS.Ch09.SimultaneousMinMax.Lemmas.fst` | Lemma proofs (empty) |
+1. **No indices returned** — values only.
+2. **`len >= 1`** — no empty array handling.
+3. **`len == A.length a`** — cannot operate on subrange.

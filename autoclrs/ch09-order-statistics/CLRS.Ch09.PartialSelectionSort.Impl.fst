@@ -30,21 +30,8 @@ module GR = Pulse.Lib.GhostReference
 
 // ========== Definitions ==========
 
-[@@"opaque_to_smt"]
-let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
-
-let is_min_in_range (s: Seq.seq int) (i: nat) (start: nat) (len: nat) : prop =
-  start <= i /\ i < len /\ len <= Seq.length s /\
-  (forall (j: nat). start <= j /\ j < len ==> Seq.index s i <= Seq.index s j)
-
-let sorted_prefix (s: Seq.seq int) (bound: nat) : prop =
-  bound <= Seq.length s /\
-  (forall (i j: nat). i < j /\ j < bound ==> Seq.index s i <= Seq.index s j)
-
-let prefix_leq_suffix (s: Seq.seq int) (bound: nat) : prop =
-  bound <= Seq.length s /\
-  (forall (i j: nat). i < bound /\ bound <= j /\ j < Seq.length s ==>
-    Seq.index s i <= Seq.index s j)
+// permutation, is_min_in_range, sorted_prefix, prefix_leq_suffix are already
+// defined in the .fsti — only the helper lemmas below need local definitions.
 
 let permutation_same_length (s1 s2 : Seq.seq int)
   : Lemma (requires permutation s1 s2)

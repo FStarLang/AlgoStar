@@ -476,7 +476,7 @@ let remove_preserves_permutation (s1 s2: seq int) (x: int)
 #pop-options
 
 // Helper: count_lt after removing an element
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 40 --fuel 4 --ifuel 2"
 let rec remove_element_count_lt (s: seq int) (x: int) (v: int)
                                   (i: nat{i < Seq.length s /\ Seq.index s i = x})
   : Lemma (ensures count_lt (remove_element s x i) v = 
@@ -528,7 +528,7 @@ let rec count_lt_permutation_invariant (s1 s2: seq int) (v: int)
 #pop-options
 
 // Helper: count_le after removing an element
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 40 --fuel 4 --ifuel 2"
 let rec remove_element_count_le (s: seq int) (x: int) (v: int)
                                   (i: nat{i < Seq.length s /\ Seq.index s i = x})
   : Lemma (ensures count_le (remove_element s x i) v = 

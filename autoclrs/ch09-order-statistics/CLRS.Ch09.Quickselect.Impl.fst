@@ -40,13 +40,11 @@ module PSSSpec = CLRS.Ch09.PartialSelectionSort.Spec
 module GR = Pulse.Lib.GhostReference
 module QC = CLRS.Ch09.Quickselect.Complexity
 
-let permutation = QSpec.permutation
+// permutation, unchanged_outside, partition_ordered are already defined in the .fsti
 let permutation_same_length = QSpec.permutation_same_length
 let permutation_refl = QSpec.permutation_refl
 let compose_permutations = QSpec.compose_permutations
 let swap_is_permutation = QSpec.swap_is_permutation
-let unchanged_outside = QSpec.unchanged_outside
-let partition_ordered = QSpec.partition_ordered
 
 // ========== In-place partition — ticks once per comparison ==========
 
