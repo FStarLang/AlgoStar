@@ -162,7 +162,6 @@ val lemma_zero_means_all_preds_output
     (ensures
       forall (u: nat). u < scan /\ u < n /\ u * n + v < Seq.length adj /\
         Seq.index adj (u * n + v) <> 0 ==> is_in_output output count u)
-    (decreases scan)
 
 val lemma_zero_indeg_all_preds_output
   (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) (v: nat)
@@ -175,27 +174,23 @@ val lemma_is_in_output_exists (output: seq int) (count: nat) (x: nat)
   : Lemma
     (requires count <= Seq.length output /\ is_in_output output count x)
     (ensures exists (k: nat). k < count /\ Seq.index output k == x)
-    (decreases count)
 
 val lemma_not_in_output_from_forall (output: seq int) (count: nat) (x: int)
   : Lemma
     (requires count <= Seq.length output /\
       (forall (k: nat). k < count ==> Seq.index output k <> x))
     (ensures not (is_in_output output count x))
-    (decreases count)
 
 val lemma_not_is_in_output_implies_forall (output: seq int) (count: nat) (x: int)
   : Lemma
     (requires count <= Seq.length output /\ not (is_in_output output count x))
     (ensures forall (k: nat). k < count ==> Seq.index output k <> x)
-    (decreases count)
 
 val lemma_exists_to_is_in_output (output: seq int) (count: nat) (x: int)
   : Lemma
     (requires count <= Seq.length output /\
       (exists (k: nat). k < count /\ Seq.index output k == x))
     (ensures is_in_output output count x)
-    (decreases count)
 
 val lemma_zero_crp_from_all_preds (adj: seq int) (n: nat) (output: seq int) (count: nat)
                                        (w: nat) (scan: nat)
@@ -206,7 +201,6 @@ val lemma_zero_crp_from_all_preds (adj: seq int) (n: nat) (output: seq int) (cou
       (forall (u: nat). u < n /\ u * n + w < n * n /\ Seq.index adj (u * n + w) <> 0 ==>
         is_in_output output count u))
     (ensures count_remaining_preds adj n output count w scan == 0)
-    (decreases scan)
 
 val lemma_queue_entry_zero_indeg
   (adj: seq int) (n: nat) (in_deg: seq int) (queue: seq FStar.SizeT.t)
@@ -254,7 +248,6 @@ val lemma_is_in_output_extend (output: seq int) (count: nat) (x: nat) (pos: nat)
     (requires count <= Seq.length output /\ pos >= count /\ pos < Seq.length output /\ 
              is_in_output output count x)
     (ensures is_in_output (Seq.upd output pos v) count x)
-    (decreases count)
 
 val lemma_is_in_output_new (output: seq int) (count: nat) (u_val: int)
   : Lemma
@@ -267,7 +260,6 @@ val lemma_is_in_output_extend_neg
     (requires count <= Seq.length output /\ pos >= count /\ pos < Seq.length output /\
              not (is_in_output output count x))
     (ensures not (is_in_output (Seq.upd output pos v) count x))
-    (decreases count)
 
 val lemma_not_in_output_upd_neq
   (output: seq int) (count: nat) (u_val: int) (x: int)
@@ -287,7 +279,6 @@ val lemma_crp_extend
       let delta = (if u_val < scan && u_val * n + v < n * n && Seq.index adj (u_val * n + v) <> 0 then 1 else 0) in
       count_remaining_preds adj n (Seq.upd output count u_val) (count + 1) v scan ==
         count_remaining_preds adj n output count v scan - delta))
-    (decreases scan)
 
 val lemma_indeg_transition
   (adj: seq int) (n: nat) (in_deg_old in_deg_new: seq int)
@@ -310,13 +301,11 @@ val lemma_exists_implies_is_in_output (output: seq int) (count: nat) (x: int) (k
   : Lemma
     (requires k < count /\ count <= Seq.length output /\ Seq.index output k == x)
     (ensures is_in_output output count x)
-    (decreases count)
 
 val lemma_is_in_output_monotone (output: seq int) (c1 c2: nat) (x: int)
   : Lemma
     (requires c1 <= c2 /\ c2 <= Seq.length output /\ is_in_output output c1 x)
     (ensures is_in_output output c2 x)
-    (decreases c2)
 
 val lemma_crp_zero_when_all_preds_in_output
   (adj: seq int) (n: nat) (output: seq int) (count: nat) (v: nat) (scan: nat)
@@ -326,7 +315,6 @@ val lemma_crp_zero_when_all_preds_in_output
       (forall (u: nat). u < scan /\ u < n /\ u * n + v < n * n /\
         Seq.index adj (u * n + v) <> 0 ==> is_in_output output count u))
     (ensures count_remaining_preds adj n output count v scan == 0)
-    (decreases scan)
 
 val lemma_output_vert_zero_indeg
   (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) (j: nat)
@@ -394,7 +382,6 @@ val lemma_crp_zero_output_independent
   : Lemma
     (ensures count_remaining_preds adj n output1 0 v scan ==
              count_remaining_preds adj n output2 0 v scan)
-    (decreases scan)
 
 val find_non_output_predecessor
   (adj: seq int) (n: nat) (output: seq int) (count: nat) (v: nat) (scan: nat)
@@ -406,7 +393,6 @@ val find_non_output_predecessor
       u < scan /\ u < n /\ u * n + v < n * n /\
       Seq.index adj (u * n + v) <> 0 /\
       not (is_in_output output count u))
-    (decreases scan)
 
 val find_non_output_predecessor_full
   (adj: seq int) (n: nat) (output: seq int) (count: nat) (v: nat)

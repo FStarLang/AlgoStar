@@ -552,7 +552,7 @@ fn finish_vertex
 
 (* Helper: perform DFS-VISIT for a single white vertex *)
 
-#push-options "--z3rlimit 800 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -955,7 +955,7 @@ fn maybe_dfs_visit
    Main stack-based DFS — proves both correctness and complexity
    ================================================================ *)
 
-#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 //SNIPPET_START: stack_dfs_sig
 fn stack_dfs
   (adj: A.array int)

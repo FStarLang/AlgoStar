@@ -643,7 +643,7 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn maybe_discover
   (adj: A.array int)
   (color: A.array int) (dist: A.array int) (pred: A.array int)
@@ -754,7 +754,7 @@ fn maybe_discover
 }
 #pop-options
 
-#push-options "--z3rlimit 2400 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)
