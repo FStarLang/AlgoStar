@@ -1,6 +1,44 @@
-# Union-Find / Disjoint Sets (CLRS §21.3)
+# Union-Find / Disjoint Sets — Review (CLRS §21.3)
 
-## Top-Level Signatures
+**Last reviewed:** 2026-03-16
+**Verification status:** ✅ All 4 source files verify — **zero admits, zero assumes**
+**Full rebuild time:** ~2 min 9 sec
+
+---
+
+## Checklist
+
+Priority-ordered items to address. Items marked ✅ are resolved.
+
+- [x] **P0 — Verify clean build.** All 4 source files verify with zero admits/assumes.
+- [x] **P1 — `union` calls `find_set` with path compression.** Confirmed:
+      `Impl.fst` lines 630–633 call `find_set` (not `find_root_imp`), matching CLRS §21.3.
+- [x] **P2 — Fix SMTPat warning in Lemmas.fst:443.** Warning 271: pattern
+      `[SMTPat ()]` on `check_size_bound` misses bound variable `i`.
+      Replaced with `[SMTPat (Seq.index f'.size i)]`. ✅ Fixed.
+- [x] **P3 — Fix stale README.md.** Line 167 said "union … uses
+      `find_root_imp` (read-only)" but `union` now calls `find_set`.
+      Updated to match current implementation. ✅ Fixed.
+- [x] **P4 — Fix RUBRIC_21.md: Complexity.fst/fsti claimed present but missing.**
+      Lines 38–39 said Complexity files are "✅ Present" but no such files
+      exist on disk. Corrected rubric to mark them as ❌ Missing. ✅ Fixed.
+- [x] **P5 — Proof optimization: tighten `--z3rlimit 100` in Impl.fst.**
+      `compress_path`, `find_set`, and `union` all reduced from
+      `--z3rlimit 100` to `--z3rlimit 40`. Full rebuild passes cleanly.
+      ✅ Fixed.
+
+### Out of scope (documented limitations)
+
+- Amortized O(α(n)) complexity (CLRS §21.4) — not formalized.
+- Ghost tick counter — O(log n) bound is on the pure model, not
+  instrumented in the Pulse implementation.
+- `size_rank_invariant` not threaded through imperative code.
+- `rank[i] < n` precondition on `union` — provably maintained but
+  caller must establish.
+
+---
+
+## Top-Level Signatures (`Impl.fsti`)
 
 Three operations are verified in `CLRS.Ch21.UnionFind.Impl.fsti`:
 
@@ -272,6 +310,22 @@ discharged by F\* and Z3.
    requires `forall i. rank[i] < n` as a precondition. This is provably
    maintained (since rank ≤ ⌊log₂ n⌋ < n for n > 0), but the caller must
    establish it.
+
+## Profiling & Proof Resource Usage
+
+| File | Lines | z3rlimit | Rebuild time | Notes |
+|------|-------|----------|-------------|-------|
+| `Spec.fst` | 375 | max 80 | ~25s | 4 `#restart-solver`; `compress_preserves_find` is heaviest |
+| `Lemmas.fst` | 676 | max 20 | ~40s | Warning 271 (SMTPat) at line 443 |
+| `Impl.fsti` | 150 | — | ~5s | Interface only |
+| `Impl.fst` | 686 | max 40 | ~60s | `compress_path`, `find_set`, `union` (reduced from 100) |
+| **Total** | **1887** | — | **~2m 6s** | |
+
+### Resource flags in use
+
+- `Spec.fst`: `--z3rlimit 80 --fuel 1 --ifuel 0` (heaviest block: `compress_preserves_find`)
+- `Lemmas.fst`: `--z3rlimit 20` (one block at `--fuel 2`)
+- `Impl.fst`: `--z3rlimit 40 --fuel 2 --ifuel 1` (3 blocks, tightened from 100)
 
 ## Complexity
 

@@ -440,7 +440,7 @@ let pure_union_sized_preserves_invariant
       // All other indices have unchanged size, so they still satisfy size[i] <= n
       let check_size_bound (i: nat{i < f.n})
         : Lemma (Seq.index f'.size i <= f'.n)
-        [SMTPat ()]
+        [SMTPat (Seq.index f'.size i)]
         = // First establish that unchanged sizes are still valid
           assert (forall (j: nat). j < f.n ==> Seq.index f.size j <= f.n);
           

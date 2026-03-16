@@ -380,7 +380,7 @@ let has_root_within_zero (parent: Seq.seq SZ.t) (i: nat)
   = ()
 
 // Compress path: set all nodes from x to root to point to root
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 fn compress_path
   (parent: A.array SZ.t) (x: SZ.t) (root: SZ.t) (n: SZ.t)
   (#sparent: erased (Seq.seq SZ.t))
@@ -542,7 +542,7 @@ fn find_root_imp
 }
 
 // FIND-SET: two-pass (find root, then compress)
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 fn find_set
   (parent: A.array SZ.t) (x: SZ.t) (n: SZ.t)
   (#sparent: erased (Seq.seq SZ.t))
@@ -584,7 +584,7 @@ fn find_set
 
 // ========== UNION: by rank, returns unit ==========
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 fn union
   (parent: array SZ.t)
   (rank: array SZ.t)

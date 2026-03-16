@@ -164,8 +164,8 @@ fn union (parent rank: array SZ.t) (...) (x y n: SZ.t)
     )
 ```
 
-Union by rank.  Uses `find_root_imp` (read-only) for both operands,
-then links roots by rank.
+Union by rank.  Uses `find_set` (with full path compression) for both
+operands, then links roots by rank.
 
 **Postcondition analysis:**
 - **Merge**: `pure_find(result, x) == pure_find(result, y)` — the two

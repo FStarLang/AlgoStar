@@ -35,8 +35,8 @@
 |---|---|---|---|
 | **Spec.fst** | `CLRS.Ch21.UnionFind.Spec.fst` | ✅ Present | Complete pure model: `uf_forest`, total `pure_find`, `pure_union`, partition correctness, compression lemmas |
 | **Lemmas.fst** | `CLRS.Ch21.UnionFind.Lemmas.fst` | ✅ Present | Rank bound proofs (renamed from `RankBound.fst`): `size ≥ 2^rank`, `rank ≤ ⌊log₂ n⌋`, `tree_height ≤ rank[root]` |
-| **Complexity.fst** | `CLRS.Ch21.UnionFind.Complexity.fst` | ✅ Present | Re-exports O(log n) worst-case bound from Lemmas |
-| **Complexity.fsti** | `CLRS.Ch21.UnionFind.Complexity.fsti` | ✅ Present | Interface with `find_worst_case_bound` and `log2_floor` properties |
+| **Complexity.fst** | `CLRS.Ch21.UnionFind.Complexity.fst` | ❌ Missing | O(log n) bound is in Lemmas.fst; standalone Complexity module not created |
+| **Complexity.fsti** | `CLRS.Ch21.UnionFind.Complexity.fsti` | ❌ Missing | Could expose `log2_floor`, `find_logarithmic_complexity` |
 | **Impl.fst** | `CLRS.Ch21.UnionFind.Impl.fst` | ✅ Present | Full Pulse implementation (renamed from `UnionFind.fst`) |
 | **Impl.fsti** | `CLRS.Ch21.UnionFind.Impl.fsti` | ✅ Present | Public interface for `make_set`, `find_set`, `union` with full postconditions |
 
@@ -44,8 +44,8 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ Fully compliant | 6 | Spec.fst, Lemmas.fst, Complexity.fst, Complexity.fsti, Impl.fst, Impl.fsti |
-| ❌ Missing | 0 | — |
+| ✅ Fully compliant | 4 | Spec.fst, Lemmas.fst, Impl.fst, Impl.fsti |
+| ❌ Missing | 2 | Complexity.fst, Complexity.fsti (O(log n) bound lives in Lemmas.fst) |
 
 > **Note:** `Lemmas.fsti` is not provided (the rubric lists it). The Lemmas module exports
 > a rich record type (`uf_forest_sized`) and many interdependent definitions; abstracting these
