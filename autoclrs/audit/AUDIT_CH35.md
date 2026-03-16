@@ -1,8 +1,9 @@
 # Audit Report — Chapter 35: Approximation Algorithms (Vertex Cover)
 
-**Date**: 2025-02-26
-**Scope**: `ch35-approximation/` — 2 files (816 lines total)
-**Verification cache**: Both `.checked` files present
+**Date**: 2026-03-16 (updated from 2025-02-26)
+**Scope**: `ch35-approximation/` — 7 files (1115 lines total)
+**Verification**: All 7 `.checked` files produced, ~48s clean build
+**Admits**: 0 | **Assumes**: 0
 
 ---
 
@@ -50,32 +51,34 @@ APPROX-VERTEX-COVER(G)
 | **2-approximation**: `|C| ≤ 2·OPT` | ✅ Proven | `count_cover(...) ≤ 2 * opt` for all `opt` satisfying `min_vertex_cover_size` |
 | **Memory safety**: separation-logic framing | ✅ Proven | Pulse pre/post with `pts_to` |
 
-### Proof architecture (Spec.fst, 451 lines)
+### Proof architecture (Lemmas.fst + Impl.fst)
 
 The approximation proof follows the CLRS Theorem 35.1 argument exactly:
 
-1. **Matching is pairwise-disjoint** (`pairwise_disjoint m`) — maintained as a ghost invariant. Each new edge `(u,v)` is added to matching `m` only when `cu = 0 ∧ cv = 0`, meaning neither endpoint appears in any prior matching edge. Proved in `matching_inv_step` (line 116).
+1. **Matching is pairwise-disjoint** (`pairwise_disjoint m`) — maintained as a ghost invariant. Each new edge `(u,v)` is added to matching `m` only when `cu = 0 ∧ cv = 0`, meaning neither endpoint appears in any prior matching edge. Proved in `matching_inv_step` (Impl.fst).
 
-2. **Cover = matching endpoints** (`matching_inv`, line 96) — cover[x] ≠ 0 iff x appears in some matching edge. Proved by `existsb`/`edge_uses_vertex` correspondence.
+2. **Cover = matching endpoints** (`matching_inv`, Impl.fst) — cover[x] ≠ 0 iff x appears in some matching edge. Proved by `existsb`/`edge_uses_vertex` correspondence.
 
-3. **|C| = 2|M|** (`matching_cover_size`, line 264) — by induction on the matching list, using `matching_cover_add_two` to account for each edge contributing exactly 2 vertices.
+3. **|C| = 2|M|** (`matching_cover_size`, Lemmas.fst) — by induction on the matching list, using `matching_cover_add_two` to account for each edge contributing exactly 2 vertices.
 
-4. **|C*| ≥ |M|** (`matching_lower_bound`, line 208) — any valid cover must include ≥1 endpoint of each disjoint matching edge, so OPT ≥ |M|.
+4. **|C*| ≥ |M|** (`matching_lower_bound`, Lemmas.fst) — any valid cover must include ≥1 endpoint of each disjoint matching edge, so OPT ≥ |M|.
 
-5. **Combining**: `|C| = 2|M| ≤ 2|C*|` (`theorem_35_1`, line 300, and `approximation_ratio_theorem`, line 431).
+5. **Combining**: `|C| = 2|M| ≤ 2|C*|` (`theorem_35_1` and `approximation_ratio_theorem`, Lemmas.fst).
 
-**Key bridge lemma**: `pulse_cover_is_valid` (Spec.fst:362) connects the Pulse `is_cover` predicate (which works on sequences and bounded quantifiers) to the pure `is_valid_graph_cover` predicate (which works on `extract_edges` lists). This is necessary because the Pulse implementation tracks coverage incrementally via `(bound_u, bound_v)` bounds, while the spec reasons about edge lists.
+**Key bridge lemma**: `pulse_cover_is_valid` (Lemmas.fst) connects the Pulse `is_cover` predicate (which works on sequences and bounded quantifiers) to the pure `is_valid_graph_cover` predicate (which works on `extract_edges` lists). This is necessary because the Pulse implementation tracks coverage incrementally via `(bound_u, bound_v)` bounds, while the spec reasons about edge lists.
 
 ### Specification completeness
 
-The `min_vertex_cover_size` definition (Spec.fst:66) is existentially quantified:
+The `min_vertex_cover_size` definition (Spec.fst) is existentially quantified:
 ```fstar
 let min_vertex_cover_size (adj: seq int) (n: nat) (opt: nat) : Type0 =
   exists (c_min: cover_fn). is_minimum_vertex_cover adj n c_min /\ count_cover c_min n = opt
 ```
 This is clean — the postcondition says "for all opt, if opt is the minimum cover size, then our cover is ≤ 2·opt." The universal quantification over `opt` is correct and standard.
 
-**No assumption is made about graph symmetry** (i.e., `adj[u*n+v] = adj[v*n+u]`). The algorithm only examines upper-triangular entries `u < v`. For symmetric graphs this is correct; for directed graphs the cover only covers edges `(u,v)` with `u < v`. This is consistent with CLRS's assumption of undirected graphs but could be stated more explicitly as a precondition.
+**Graph symmetry is formally required** via `Spec.is_symmetric_adj s_adj (SZ.v n)` in the precondition, requiring `adj[u*n+v] = adj[v*n+u]` for all `u, v < n`. This makes explicit that the algorithm is correct only for undirected graphs.
+
+**Minimum cover existence is proven** via `Lemmas.min_cover_exists`, using a well-ordering argument. This makes the 2-approximation guarantee non-vacuous.
 
 ---
 
@@ -85,25 +88,31 @@ This is clean — the postcondition says "for all opt, if opt is the minimum cov
 
 Using adjacency lists, CLRS achieves O(V + E) by removing edges incident on matched vertices.
 
-### Implementation complexity: O(V²)
+### Implementation complexity: O(V²) — formally linked
 
 The implementation uses a nested loop over all `(u, v)` pairs with `u < v`:
 - Outer loop: `u` from `0` to `n-1` → n iterations
 - Inner loop: `v` from `u+1` to `n-1` → up to n-1 iterations
 - Total iterations: `n*(n-1)/2 = O(V²)`
 
-The code at line 361 acknowledges this:
+The complexity is defined in `CLRS.Ch35.VertexCover.Complexity`:
 ```fstar
-let vertex_cover_iterations (v: nat) : nat = v * v
+let vertex_cover_iterations (v: nat) : nat = v * (v - 1) / 2
 let vertex_cover_quadratic (v: nat) : Lemma (ensures vertex_cover_iterations v <= v * v) = ()
+let vertex_cover_tight_bound (v: nat) : Lemma (ensures vertex_cover_iterations v <= v * v / 2) = ()
 ```
+
+The complexity is **formally linked** to the Pulse implementation via a ghost
+iteration counter (`ghost_iters`). The counter tracks cumulative iterations
+through `partial_iterations`, and after the nested loops, an assertion
+establishes `ghost_iters == vertex_cover_iterations(n)`.
 
 | Aspect | CLRS | Implementation | Gap |
 |--------|------|----------------|-----|
 | Time | O(V+E) | O(V²) | ⚠️ Quadratic regardless of edge density |
 | Space | O(V+E) for adj list + O(V) for cover | O(V²) for adj matrix + O(V) for cover | ⚠️ |
 
-**Assessment**: The O(V²) bound is correct for an adjacency-matrix representation and is stated/proven. For sparse graphs this is suboptimal vs. CLRS's O(V+E). The complexity "proof" (lines 361–366) is trivially `v*v ≤ v*v` — it asserts a bound but does not connect it to the actual loop structure or count of operations. This is a **weak complexity proof** — it's a statement about a standalone function, not about the imperative code.
+**Assessment**: The O(V²) bound is correct for an adjacency-matrix representation and is formally linked to the Pulse implementation via a ghost iteration counter. The `partial_iterations` function tracks cumulative iterations row-by-row, and `partial_iterations_total` proves equivalence to `vertex_cover_iterations`. For sparse graphs this is suboptimal vs. CLRS's O(V+E), which is a design choice (adjacency matrix vs. adjacency list).
 
 ---
 
@@ -111,21 +120,24 @@ let vertex_cover_quadratic (v: nat) : Lemma (ensures vertex_cover_iterations v <
 
 ### Strengths
 
-- **Clean separation**: Spec.fst (pure math) vs. VertexCover.fst (Pulse imperative code). The spec is 451 lines of pure F*, fully independent of Pulse.
+- **Clean separation**: Spec.fst (pure types/predicates), Lemmas.fst (proofs), Complexity.fst (complexity), Impl.fst (Pulse imperative code). Rubric-compliant 7-file structure.
 - **Ghost state**: The matching `m` is tracked via `GR.alloc`/`GR.pts_to` (ghost reference), introducing zero runtime overhead. This is an elegant encoding of the CLRS proof's "set A of edges picked in line 4."
 - **Incremental invariants**: `is_cover` uses `(bound_u, bound_v)` to track which edges have been processed so far — a natural inductive approach for the nested loop.
 - **Snippet markers**: `//SNIPPET_START` / `//SNIPPET_END` for documentation extraction.
-- **Modest solver settings**: Only `--z3rlimit 30` and `--z3rlimit 40` — no extreme resource limits.
+- **Modest solver settings**: Only `--z3rlimit 30` and `--z3rlimit 40` — no extreme resource limits. No z3refresh, no retry, no fuel/ifuel adjustments.
+- **Complexity linked**: Ghost iteration counter formally linked to `vertex_cover_iterations(n)`.
 
-### Issues
+### Issues (all resolved or low priority)
 
-| Issue | Severity | Location |
-|-------|----------|----------|
-| **README lists 5 nonexistent files**: `Complexity.fst`, `Test.fst`, `P2.7_SUMMARY.md`, `P2.7_API.md`, `P2.7_COMPLETE.md` | Medium | README.md:53–57 |
-| **Complexity.fst cached but missing**: `_cache/CLRS.Ch35.VertexCover.Complexity.fst.checked` exists but the source file does not | Low | `_cache/` |
-| **`cover_values_are_binary` is trivial**: Precondition restates the conclusion. The lemma (lines 145–151) is dead code — it does nothing the caller doesn't already know. | Low | `.fst:145–151` |
-| **n < 256 constraint**: Precondition requires `SZ.v n < 256` (line 181). This is conservative for `SizeT` — the real constraint is `n*n` fits in `SizeT`, which would allow n up to ~65535 on 32-bit or much more on 64-bit. The 256 limit appears to be an artifact. | Low | `.fst:181` |
-| **No undirected-graph precondition**: The algorithm assumes upper-triangular adjacency but does not require `adj[u*n+v] = adj[v*n+u]`. For non-symmetric matrices, edges `(v,u)` with `v > u` are silently ignored. | Low | — |
+| Issue | Severity | Status |
+|-------|----------|--------|
+| ~~README lists nonexistent files~~ | Medium | ✅ Fixed |
+| ~~Complexity proof disconnected from code~~ | Medium | ✅ Fixed — ghost counter links to `partial_iterations` |
+| ~~No graph symmetry precondition~~ | Medium | ✅ Fixed — `is_symmetric_adj` in precondition |
+| ~~`min_vertex_cover_size` vacuously true~~ | Medium | ✅ Fixed — `min_cover_exists` proves existence |
+| ~~Stale cache entries~~ | Low | ✅ Fixed |
+| Unconditional writes (O(n²) writes vs O(E)) | Low | Design choice, simplifies proof |
+| No n=0 support | Low | Trivial degenerate case |
 
 ---
 
@@ -141,76 +153,89 @@ let vertex_cover_quadratic (v: nat) : Lemma (ensures vertex_cover_iterations v <
 
 ### Verification status
 
-Both files have `.checked` cache entries:
-- `ch35-approximation/_cache/CLRS.Ch35.VertexCover.fst.checked` ✅
-- `ch35-approximation/_cache/CLRS.Ch35.VertexCover.Spec.fst.checked` ✅
+All 7 files have `.checked` cache entries (~48s clean build):
+- `CLRS.Ch35.VertexCover.Spec.fst.checked` ✅
+- `CLRS.Ch35.VertexCover.Lemmas.fsti.checked` ✅
+- `CLRS.Ch35.VertexCover.Lemmas.fst.checked` ✅
+- `CLRS.Ch35.VertexCover.Complexity.fsti.checked` ✅
+- `CLRS.Ch35.VertexCover.Complexity.fst.checked` ✅
+- `CLRS.Ch35.VertexCover.Impl.fsti.checked` ✅
+- `CLRS.Ch35.VertexCover.Impl.fst.checked` ✅
 
 ### Solver hints used
 
-| File | Line | Option |
-|------|------|--------|
-| `VertexCover.fst` | 52 | `#push-options "--z3rlimit 30"` (for `is_cover_step`) |
-| `VertexCover.fst` | 73 | `#pop-options` |
-| `VertexCover.fst` | 115 | `#push-options "--z3rlimit 40"` (for `matching_inv_step`) |
-| `VertexCover.fst` | 141 | `#pop-options` |
+| File | Location | Option |
+|------|----------|--------|
+| `Impl.fst` | `is_cover_step` | `#push-options "--z3rlimit 30"` |
+| `Impl.fst` | `matching_inv_step` | `#push-options "--z3rlimit 40"` |
+| `Lemmas.fst` | `min_cover_exists_aux` | `#push-options "--z3rlimit 30"` |
 
 No `z3refresh`, no `retry`, no `fuel`/`ifuel` adjustments. The solver limits are modest.
 
 ### Proof structure summary
 
-| Lemma / Function | File | Lines | Status |
-|-----------------|------|-------|--------|
-| `is_cover_skip_to` | .fst | 35–39 | ✅ Proven (trivial) |
-| `is_cover_next_row` | .fst | 42–46 | ✅ Proven (trivial) |
-| `is_cover_step` | .fst | 53–73 | ✅ Proven (z3rlimit 30) |
-| `is_cover_binary_step` | .fst | 76–93 | ✅ Proven |
-| `matching_inv_step` | .fst | 116–141 | ✅ Proven (z3rlimit 40) |
-| `cover_values_are_binary` | .fst | 145–151 | ✅ Proven (trivially) |
-| `apply_approximation_bound` | .fst | 154–169 | ✅ Proven |
-| `approx_vertex_cover` | .fst | 172–331 | ✅ Proven (Pulse fn) |
-| `count_cover_ext` | Spec | 74–78 | ✅ Proven (induction) |
-| `count_zero` | Spec | 80–82 | ✅ Proven (induction) |
-| `count_single` | Spec | 84–95 | ✅ Proven (induction) |
-| `count_cover_mono` | Spec | 97–101 | ✅ Proven (induction) |
-| `count_split_one` | Spec | 106–118 | ✅ Proven (induction) |
-| `count_split` | Spec | 120–135 | ✅ Proven |
-| `sum_ge_length` | Spec | 148–154 | ✅ Proven (induction) |
-| `sum_restricted` | Spec | 157–166 | ✅ Proven (induction) |
-| `sum_le_count` | Spec | 185–203 | ✅ Proven (induction) |
-| `matching_lower_bound` | Spec | 208–215 | ✅ Proven |
-| `matching_cover_add_one` | Spec | 220–234 | ✅ Proven (induction) |
-| `matching_cover_add_two` | Spec | 236–259 | ✅ Proven (induction) |
-| `matching_cover_size` | Spec | 264–295 | ✅ Proven (induction) |
-| `theorem_35_1` | Spec | 300–312 | ✅ Proven |
-| `extract_edges_complete` | Spec | 331–345 | ✅ Proven (induction) |
-| `extract_edges_valid` | Spec | 348–359 | ✅ Proven (induction) |
-| `pulse_cover_is_valid` | Spec | 362–380 | ✅ Proven |
-| `extract_edges_contains` | Spec | 385–400 | ✅ Proven (induction) |
-| `valid_graph_cover_covers_edge` | Spec | 403–408 | ✅ Proven |
-| `valid_cover_covers_matching` | Spec | 411–422 | ✅ Proven (induction) |
-| `approximation_ratio_theorem` | Spec | 431–449 | ✅ Proven |
+| Lemma / Function | File | Status |
+|-----------------|------|--------|
+| `is_cover_skip_to` | Impl.fst | ✅ Proven (trivial) |
+| `is_cover_next_row` | Impl.fst | ✅ Proven (trivial) |
+| `is_cover_step` | Impl.fst | ✅ Proven (z3rlimit 30) |
+| `is_cover_binary_step` | Impl.fst | ✅ Proven |
+| `matching_inv_step` | Impl.fst | ✅ Proven (z3rlimit 40) |
+| `apply_approximation_bound` | Impl.fst | ✅ Proven |
+| `approx_vertex_cover` | Impl.fst | ✅ Proven (Pulse fn) |
+| `count_cover_ext` | Lemmas.fst | ✅ Proven (induction) |
+| `count_zero` | Lemmas.fst | ✅ Proven (induction) |
+| `count_single` | Lemmas.fst | ✅ Proven (induction) |
+| `count_cover_mono` | Lemmas.fst | ✅ Proven (induction) |
+| `count_split_one` | Lemmas.fst | ✅ Proven (induction) |
+| `count_split` | Lemmas.fst | ✅ Proven |
+| `sum_ge_length` | Lemmas.fst | ✅ Proven (induction) |
+| `sum_restricted` | Lemmas.fst | ✅ Proven (induction) |
+| `sum_le_count` | Lemmas.fst | ✅ Proven (induction) |
+| `matching_lower_bound` | Lemmas.fst | ✅ Proven |
+| `matching_cover_add_one` | Lemmas.fst | ✅ Proven (induction) |
+| `matching_cover_add_two` | Lemmas.fst | ✅ Proven (induction) |
+| `matching_cover_size` | Lemmas.fst | ✅ Proven (induction) |
+| `theorem_35_1` | Lemmas.fst | ✅ Proven |
+| `extract_edges_complete` | Lemmas.fst | ✅ Proven (induction) |
+| `extract_edges_valid` | Lemmas.fst | ✅ Proven (induction) |
+| `pulse_cover_is_valid` | Lemmas.fst | ✅ Proven |
+| `extract_edges_contains` | Lemmas.fst | ✅ Proven (induction) |
+| `valid_graph_cover_covers_edge` | Lemmas.fst | ✅ Proven |
+| `valid_cover_covers_matching` | Lemmas.fst | ✅ Proven (induction) |
+| `all_true_is_valid` | Lemmas.fst | ✅ Proven |
+| `count_all_true` | Lemmas.fst | ✅ Proven (induction) |
+| `min_cover_exists_aux` | Lemmas.fst | ✅ Proven (z3rlimit 30) |
+| `min_cover_exists` | Lemmas.fst | ✅ Proven |
+| `approximation_ratio_theorem` | Lemmas.fst | ✅ Proven |
+| `vertex_cover_iterations` | Complexity.fst | ✅ Definition |
+| `vertex_cover_quadratic` | Complexity.fst | ✅ Proven (trivial) |
+| `vertex_cover_tight_bound` | Complexity.fst | ✅ Proven (trivial) |
+| `partial_iterations` | Complexity.fst | ✅ Definition |
+| `partial_iterations_zero` | Complexity.fst | ✅ Proven (trivial) |
+| `partial_iterations_step` | Complexity.fst | ✅ Proven (trivial) |
+| `partial_iterations_formula` | Complexity.fst | ✅ Proven (induction) |
+| `partial_iterations_total` | Complexity.fst | ✅ Proven |
 
-**Total: 0 admits, 0 assumes, ~30 lemmas all fully proven.**
+**Total: 0 admits, 0 assumes, ~40 lemmas/definitions all fully proven.**
 
 ---
 
 ## 6. Documentation Accuracy
 
-### README.md issues
+### README.md
 
 | Claim | Accurate? | Notes |
 |-------|-----------|-------|
-| "No `admit()` calls" | ✅ Correct | Verified by grep |
-| "No `assume` statements" | ✅ Correct | Verified by grep |
-| "Proper resource management (no memory leaks)" | ✅ Correct | Ghost ref is freed (line 322); Vec returned to caller |
-| Files: `Complexity.fst`, `Test.fst` | ❌ **Do not exist** | README:53–54 references phantom files |
-| Files: `P2.7_SUMMARY.md`, `P2.7_API.md`, `P2.7_COMPLETE.md` | ❌ **Do not exist** | README:55–57 references phantom files |
-| `verify_all.sh` | ❌ **Does not exist** | README:87 |
-| Verification commands | ⚠️ Unverified | The `fstar.exe` invocations reference paths that may not resolve |
+| "Zero admits. Zero assumes." | ✅ Correct | Verified by grep |
+| "All proofs complete" | ✅ Correct | All 7 files verify |
+| File inventory table | ✅ Correct | All 7 listed files exist and match |
+| Build instructions | ✅ Correct | `make verify` works |
+| Summary table | ✅ Correct | All properties accurately described |
 
 ### In-code documentation
 
-The block comment at lines 333–356 of `.fst` is accurate and clearly explains the proof technique. The `(* CLRS Theorem 35.1 *)` comment in Spec.fst accurately describes what is proven.
+The block comment at lines 335–358 of Impl.fst is accurate and clearly explains the proof technique. The `(* CLRS Theorem 35.1 *)` section in Lemmas.fst accurately describes what is proven.
 
 ---
 
@@ -245,22 +270,27 @@ CLRS Chapter 35 contains **5 sections**:
 | Dimension | Rating | Notes |
 |-----------|--------|-------|
 | **CLRS Fidelity** | ★★★★★ | Faithful to APPROX-VERTEX-COVER; deterministic scan is valid instantiation |
-| **Specification Strength** | ★★★★★ | All 3 key properties proven: valid cover, binary output, 2-approximation |
-| **Complexity** | ★★★☆☆ | O(V²) vs CLRS's O(V+E); complexity "proof" is trivial and disconnected from code |
-| **Code Quality** | ★★★★☆ | Clean architecture; ghost matching is elegant; one dead lemma; README references 5 nonexistent files |
-| **Proof Quality** | ★★★★★ | 0 admits, 0 assumes, ~30 lemmas fully proven, modest solver limits |
-| **Documentation** | ★★★☆☆ | In-code docs excellent; README has 6 phantom file/script references |
+| **Specification Strength** | ★★★★★ | All 5 key properties proven: length, valid cover, binary output, min cover existence, 2-approximation |
+| **Complexity** | ★★★★☆ | O(V²) vs CLRS's O(V+E); formally linked via ghost counter |
+| **Code Quality** | ★★★★★ | Clean 7-file rubric structure; ghost matching is elegant; all prior issues resolved |
+| **Proof Quality** | ★★★★★ | 0 admits, 0 assumes, ~40 lemmas fully proven, modest solver limits |
+| **Documentation** | ★★★★★ | README, Review.md, RUBRIC_35.md all accurate and comprehensive |
+| **Proof Stability** | ★★★★★ | Modest z3rlimits (≤40), no z3refresh/retry/fuel tweaks, ~48s clean build |
 | **Ch35 Coverage** | ★★☆☆☆ | 1 of 5 sections implemented (APPROX-VERTEX-COVER only) |
 
-### Task list
+### Remaining items (low priority)
 
-1. **Fix README.md**: Remove references to 5 nonexistent files and `verify_all.sh`.
-2. **Delete dead lemma**: `cover_values_are_binary` (line 145) has its conclusion in its precondition.
-3. **Strengthen complexity proof**: Connect `vertex_cover_iterations` to the actual loop structure, or remove the misleading standalone function.
-4. **Add graph symmetry precondition**: Explicitly require `adj[u*n+v] = adj[v*n+u]` for undirected graphs, or document the upper-triangular convention.
-5. **Relax n < 256**: The constraint could be `n*n < SZ.bound` to support larger graphs.
-6. **Clean stale cache**: Remove `_cache/CLRS.Ch35.VertexCover.Complexity.fst.checked` (source file deleted).
+1. **Unconditional writes**: Cover array written O(n²) times; could guard behind branch (simplifies proof, low priority).
+2. **No n=0 support**: Precondition requires n > 0; degenerate case excluded.
+3. **O(V²) vs O(V+E)**: Adjacency-matrix representation; design choice, not correctness issue.
+4. **Tight ratio not proven**: 2-approx bound proven achieved but not proven tight.
 
+### Deferred: Additional Ch35 algorithms
 
-## Defer
-7. **Implement remaining Ch35 algorithms**: Prioritise GREEDY-SET-COVER (medium difficulty, high pedagogical value) and APPROX-TSP-TOUR (leverages existing Ch23 MST work).
+| CLRS Section | Algorithm | Priority | Difficulty |
+|--------------|-----------|----------|------------|
+| §35.2 | APPROX-TSP-TOUR (2-approx TSP) | Low | Hard (needs Ch23 MST + Euler tour) |
+| §35.3 | GREEDY-SET-COVER (H(n)-approx) | Medium | Medium |
+| §35.4 | MAX-3-CNF randomised (8/7-approx) | Low | Medium (probabilistic reasoning) |
+| §35.4 | LP-relaxation vertex cover (2-approx) | Low | Hard (needs Ch29 LP infra) |
+| §35.5 | APPROX-SUBSET-SUM (FPTAS) | Low | Medium |

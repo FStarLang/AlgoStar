@@ -1,18 +1,20 @@
 # Chapter 35: Approximation Algorithms — Rubric Compliance
 
+**Last updated**: 2026-03-16
+
 ## Current File Inventory
 
 | # | File | Lines | Status | Description |
 |---|------|------:|--------|-------------|
-| 1 | `CLRS.Ch35.VertexCover.Spec.fst` | 100 | ✅ Verified | Pure specification: types, graph predicates, counting functions |
-| 2 | `CLRS.Ch35.VertexCover.Lemmas.fsti` | 103 | ✅ Verified | Interface for lemma signatures |
-| 3 | `CLRS.Ch35.VertexCover.Lemmas.fst` | 280 | ✅ Verified | Proofs: counting lemmas, Theorem 35.1, approximation ratio |
-| 4 | `CLRS.Ch35.VertexCover.Complexity.fsti` | 22 | ✅ Verified | Interface for complexity definitions |
-| 5 | `CLRS.Ch35.VertexCover.Complexity.fst` | 25 | ✅ Verified | O(V²) time bound proof |
-| 6 | `CLRS.Ch35.VertexCover.Impl.fsti` | 44 | ✅ Verified | Public signature for Pulse implementation |
-| 7 | `CLRS.Ch35.VertexCover.Impl.fst` | 280 | ✅ Verified | Pulse implementation with correctness proof |
+| 1 | `CLRS.Ch35.VertexCover.Spec.fst` | 105 | ✅ Verified | Pure specification: types, graph predicates, counting functions |
+| 2 | `CLRS.Ch35.VertexCover.Lemmas.fsti` | 122 | ✅ Verified | Interface for lemma signatures |
+| 3 | `CLRS.Ch35.VertexCover.Lemmas.fst` | 383 | ✅ Verified | Proofs: counting lemmas, Theorem 35.1, approximation ratio |
+| 4 | `CLRS.Ch35.VertexCover.Complexity.fsti` | 41 | ✅ Verified | Interface for complexity definitions |
+| 5 | `CLRS.Ch35.VertexCover.Complexity.fst` | 58 | ✅ Verified | O(V²) time bound proof |
+| 6 | `CLRS.Ch35.VertexCover.Impl.fsti` | 48 | ✅ Verified | Public signature for Pulse implementation |
+| 7 | `CLRS.Ch35.VertexCover.Impl.fst` | 358 | ✅ Verified | Pulse implementation with correctness proof |
 
-**Total: 7 files, ~854 lines. 0 admits, 0 assumes.**
+**Total: 7 files, 1115 lines. 0 admits, 0 assumes. ~48s clean verification.**
 
 ## Algorithms Covered
 
@@ -98,10 +100,11 @@ The canonical rubric requires **7 files** per algorithm. Current status for `Ver
 |-----------|--------|--------|
 | **Zero admits** | ✅ | Confirmed: 0 `admit()` in all files |
 | **Zero assumes** | ✅ | Confirmed: 0 `assume` in all files |
-| **Verified** | ✅ | All 7 `.checked` files present in `_cache/` |
+| **Verified** | ✅ | All 7 `.checked` files produced; ~48s clean build |
 | **Solver limits** | ✅ | Modest: `--z3rlimit 30` and `--z3rlimit 40` only |
 | **CLRS fidelity** | ✅ | Faithful to APPROX-VERTEX-COVER pseudocode |
-| **Spec strength** | ✅ | All 3 key properties proven (valid cover, binary, 2-approx) |
+| **Spec strength** | ✅ | All 5 key properties proven (length, valid cover, binary, min exists, 2-approx) |
 | **Rubric file structure** | ✅ | 7 of 7 required files present and verified |
-| **Complexity proof** | ✅ | Standalone complexity file with O(V²) bound |
-| **Documentation** | ✅ | README accurate, no phantom references |
+| **Complexity proof** | ✅ | Standalone complexity file with O(V²) bound linked via ghost counter |
+| **Documentation** | ✅ | README accurate, Review.md comprehensive |
+| **Proof stability** | ✅ | No z3refresh, no retry, no fuel/ifuel adjustments |
