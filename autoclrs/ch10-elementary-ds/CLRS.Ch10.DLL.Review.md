@@ -292,3 +292,43 @@ structure. Key challenges:
 | `CLRS.Ch10.DLL.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch10.DLL.Lemmas.fst` | Lemma proofs |
 | `CLRS.Ch10.DLL.Test.fst` | Tests |
+
+## Profiling (2026-03-16)
+
+| File | Cache size | Notes |
+|------|-----------|-------|
+| `CLRS.Ch10.DLL.Impl.fst` | 1016 KB | Largest file in ch10 (1702 lines) |
+| `CLRS.Ch10.DLL.Impl.fsti` | 114 KB | Interface |
+| `CLRS.Ch10.DLL.Spec.fst` | 58 KB | Pure spec |
+| `CLRS.Ch10.DLL.Lemmas.fst` | 98 KB | Lemma proofs |
+| `CLRS.Ch10.DLL.Lemmas.fsti` | 37 KB | Lemma signatures |
+| `CLRS.Ch10.DLL.Test.fst` | 19 KB | Tests |
+
+Solver options: 5 scoped `#push-options "--fuel 2"` blocks in DLL.Impl.fst
+(for `L.rev` reasoning). All properly balanced with `#pop-options`.
+
+## Build Warnings (2026-03-16)
+
+~~1. **DLL.Test.fst**: 8 deprecation warnings for `Pulse.Lib.Reference.alloc`
+   and `Pulse.Lib.Reference.free`.~~ **Fixed:** Migrated to `let mut` local refs.
+
+~~2. **DLL.Impl.fst line 1521**: "No rewrites performed" warning.~~
+   **Fixed:** Removed redundant `with l_orig`/`rewrite` in `list_delete_node`.
+
+## Checklist
+
+- [x] Rubric compliance: Spec.fst, Lemmas.fst/fsti, Impl.fst/fsti all present
+- [x] Zero admits, zero assumes
+- [x] Solver options scoped and balanced (5 `--fuel 2` blocks)
+- [x] Test coverage present
+- [x] SNIPPET markers present
+- [x] Functional correctness: 8 operations specified via ghost list
+- [x] Abstract interface: `node` type and `dll` predicate fully abstract
+- [x] Ghost helpers for clients (`dll_nil`, `dll_nil_elim`, `dll_none_nil`, `dll_some_cons`)
+- [x] Rich operation set (insert head/tail, search forward/backward, delete first/last/at-index)
+- [x] **Fix DLL.Test.fst deprecated API** — migrated from `Reference.alloc`/`free` to `let mut` (2026-03-16)
+- [x] **Fix no-op rewrite warning** at DLL.Impl.fst:1518-1521 — removed redundant `with`/`rewrite` (2026-03-16)
+- [ ] Complexity tracking: not formally tracked via ghost ticks (unlike SLL)
+- [ ] `list_delete_node` takes index (O(n)), not pointer (O(1) as in CLRS)
+- [ ] Only `int` keys — not polymorphic
+- [ ] No `free`/`destroy` for entire list

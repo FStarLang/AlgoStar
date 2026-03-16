@@ -212,3 +212,31 @@ by F\* and Z3.
 | `CLRS.Ch10.SinglyLinkedList.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch10.SinglyLinkedList.Lemmas.fst` | Lemma proofs |
 | `CLRS.Ch10.SinglyLinkedList.Test.fst` | Tests |
+
+## Profiling (2026-03-16)
+
+| File | Cache size | Notes |
+|------|-----------|-------|
+| `CLRS.Ch10.SinglyLinkedList.Impl.fst` | 173 KB | Pulse implementation |
+| `CLRS.Ch10.SinglyLinkedList.Impl.fsti` | 58 KB | Interface |
+| `CLRS.Ch10.SinglyLinkedList.Spec.fst` | 211 KB | Pure spec (17 lemmas + theorem) |
+| `CLRS.Ch10.SinglyLinkedList.Base.fst` | 103 KB | Shared definitions |
+| `CLRS.Ch10.SinglyLinkedList.Lemmas.fst` | 76 KB | Lemma proofs |
+| `CLRS.Ch10.SinglyLinkedList.Lemmas.fsti` | 34 KB | Lemma signatures |
+| `CLRS.Ch10.SinglyLinkedList.Test.fst` | 17 KB | Tests |
+
+No solver options needed. All proofs go through with defaults.
+
+## Checklist
+
+- [x] Rubric compliance: Spec.fst, Lemmas.fst/fsti, Impl.fst/fsti all present
+- [x] Zero admits, zero assumes
+- [x] No solver option overrides needed
+- [x] Test coverage present (insert/search/delete round-trip)
+- [x] SNIPPET markers present
+- [x] Clean build (no warnings)
+- [x] Functional correctness: insert/search/delete specified via ghost list
+- [x] Complexity tracked: insert O(1), search O(n), delete O(n) via ghost ticks
+- [x] Cost functions exposed as concrete `let` definitions in .fsti
+- [ ] Only `int` keys — not polymorphic
+- [ ] No tail pointer (insert at head only)

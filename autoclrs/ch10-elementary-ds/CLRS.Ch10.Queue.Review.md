@@ -182,3 +182,32 @@ the pure specification level, including the critical
 | `CLRS.Ch10.Queue.Lemmas.fst` | FIFO property proofs |
 | `CLRS.Ch10.Queue.Test.fst` | Tests |
 | `CLRS.Ch10.DS.Spec.fst` | Shared pure specs for Ch10 data structures |
+
+## Profiling (2026-03-16)
+
+| File | Cache size | Notes |
+|------|-----------|-------|
+| `CLRS.Ch10.Queue.Impl.fst` | 327 KB | Main implementation |
+| `CLRS.Ch10.Queue.Impl.fsti` | 142 KB | Interface |
+| `CLRS.Ch10.Queue.Spec.fst` | 96 KB | Pure spec |
+| `CLRS.Ch10.Queue.Lemmas.fst` | 112 KB | Lemma proofs |
+| `CLRS.Ch10.Queue.Lemmas.fsti` | 48 KB | Lemma signatures |
+| `CLRS.Ch10.Queue.Test.fst` | 36 KB | Tests |
+
+Solver options: `#push-options "--z3rlimit 40"` for `dequeue` only.
+
+## Checklist
+
+- [x] Rubric compliance: Spec.fst, Lemmas.fst/fsti, Impl.fst/fsti all present
+- [x] Zero admits, zero assumes
+- [x] Solver options scoped and minimal (`--z3rlimit 40` for `dequeue` only)
+- [x] Test coverage present (includes wraparound test)
+- [x] SNIPPET markers present
+- [x] Clean build (no warnings)
+- [x] Functional correctness: enqueue/dequeue specified via ghost list (FIFO)
+- [x] FIFO property proven in pure spec and lemmas
+- [x] Circular buffer arithmetic verified
+- [ ] Complexity tracking: O(1) enqueue/dequeue not formally tracked via ghost ticks
+- [ ] No `free`/`destroy` operation for the queue
+- [ ] Fixed capacity — no dynamic resizing
+- [ ] 3-field design (head+tail+size) differs from CLRS 2-field design

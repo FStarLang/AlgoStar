@@ -1515,10 +1515,6 @@ fn list_delete_node
 {
   let hd = Pulse.Lib.Reference.(!hd_ref);
   let tl = Pulse.Lib.Reference.(!tl_ref);
-  with l_orig. assert (dll hd tl l_orig);
-  
-  // l is Cons? so hd is Some
-  rewrite each l_orig as l in (dll hd tl l_orig);
   unfold_dll_cons hd tl;
   with hp tp. _;
   let concrete_hp = Some?.v hd;

@@ -179,3 +179,30 @@ pure specification level.
 | `CLRS.Ch10.Stack.Lemmas.fst` | LIFO property proofs |
 | `CLRS.Ch10.Stack.Test.fst` | Tests |
 | `CLRS.Ch10.DS.Spec.fst` | Shared pure specs for Ch10 data structures |
+
+## Profiling (2026-03-16)
+
+| File | Cache size | Notes |
+|------|-----------|-------|
+| `CLRS.Ch10.Stack.Impl.fst` | 229 KB | Main implementation |
+| `CLRS.Ch10.Stack.Impl.fsti` | 100 KB | Interface |
+| `CLRS.Ch10.Stack.Spec.fst` | 36 KB | Pure spec |
+| `CLRS.Ch10.Stack.Lemmas.fst` | 42 KB | Lemma proofs |
+| `CLRS.Ch10.Stack.Lemmas.fsti` | 21 KB | Lemma signatures |
+| `CLRS.Ch10.Stack.Test.fst` | 17 KB | Tests |
+
+No solver options needed. All proofs go through with defaults.
+
+## Checklist
+
+- [x] Rubric compliance: Spec.fst, Lemmas.fst/fsti, Impl.fst/fsti all present
+- [x] Zero admits, zero assumes
+- [x] No solver option overrides needed
+- [x] Test coverage present
+- [x] SNIPPET markers present in Impl.fsti
+- [x] Clean build (no warnings)
+- [x] Functional correctness: push/pop/peek specified via ghost list
+- [x] LIFO property proven in pure spec and lemmas
+- [ ] Complexity tracking: O(1) push/pop/peek not formally tracked via ghost ticks
+- [ ] No `free`/`destroy` operation for the stack
+- [ ] Fixed capacity — no dynamic resizing
