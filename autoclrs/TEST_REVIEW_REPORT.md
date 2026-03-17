@@ -1,5 +1,34 @@
 # AutoCLRS ImplTest Review Report
 
+This is a report summarizing the results of automating the testing of verified
+libraries in AutoCLRS.
+
+The main idea can be seen from a variety of angles:
+
+* API Client Samples: For every verified library (algorithm or data structure),
+  implement a client program to check that the library is actually usable, i.e.,
+  its preconditions can be satisfied and its postconditions are strong enough to
+  prove the expected results. Such client programs are also instructive API
+  usage samples. 
+
+* Two-sided Specifications: An old idea, popularized in the last decade
+  especially by the [DeepSpec project](https://deepspec.org/page/Research/), is
+  for specifications of verified components to be "two-sided". That is, a
+  component sppecification should not only be strong enough to prove the
+  correctness of the implementation, but also be strong enough to conduct proofs
+  of clients of that component.  In other words, specifications of components
+  should be "precise" enough to be used in client proofs.
+
+* Intent formalization: Shuvendu Lahiri's work on [intent
+  formalization](https://arxiv.org/abs/2406.09757) and [this
+  repository](https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs)
+  in particular, is especially relevant. Lahiri proposes a framework for
+  classifying the precision of specifications, and used agents to to apply it to
+  the AutoCLRS proofs. The tests in this repository derive from Lahiri's
+  framework.
+
+The rest of this report is an AI authored summary of test results.
+
 > Comprehensive review of all `ImplTest.fst` and `ImplTest.md` files across the AutoCLRS project.
 > Generated 2025-03-17.
 
