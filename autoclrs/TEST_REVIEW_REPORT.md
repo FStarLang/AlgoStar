@@ -23,14 +23,130 @@ The main idea can be seen from a variety of angles:
   formalization](https://arxiv.org/abs/2406.09757) and [this
   repository](https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs)
   in particular, is especially relevant. Lahiri proposes a framework for
-  classifying the precision of specifications, and used agents to to apply it to
-  the AutoCLRS proofs. The tests in this repository derive from Lahiri's
-  framework.
+  classifying the precision of specifications, and used agents to apply it to
+  the AutoCLRS proofs. The tests in this repository were produced by agents
+  referencing Lahiri's eval-autoclrs-specs repo.
+
+### A First Example
+
+A useful first example is here: https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst
+
+The idea is to write a test case (highly simplified) such as this:
+
+```
+fn test_quicksort() 
+{
+  let mut a = [| 0; 3sz |];
+  a.(0sz) := 3; a.(1sz) := 2; a.(2sz) := 1;
+  quicksort a;
+  assert pure (value_of a `Seq.equal` Seq.of_list [1;2;3]);
+}
+```
+
+This checks, on a small concrete instance, that:
+
+* `quicksort` preconditions can be satisfied
+* that its postcondition is strong enough to prove the expected result (the output is `[1;2;3]`)
+
+In many cases, however (including for quicksort), actually proving the
+precondition at the postcondition requires some additional proof effort. For
+instance, the postcondition of `quicksort` is that the output array is a sorted
+permutation of the input. From this, concluding that the output array is exactly
+`[1;2;3]` requires some proof steps. In the general case, one would want to show
+that a sorted permutation of the input uniquely determines the output (e.g., as
+shown in `sorted_permutation_equal` in CLRS.Ch09PartialSelectionSort.Lemmas),
+though for this particular example, a specific proof for the input `[3;1;2]`
+would be sufficient.
+
+Such tests provide a practical check on concrete instances that the
+specifications are strong enough, though it is not fool proof. One could imagine
+poorly specified libraries with specifications that are overspecialized to the
+test cases only. However, in practice, this does not seem to be a problem in
+AutoCLRS---the specifications are general, but sometimes miss important corner
+cases, like fully specifying the error behavior of a library.
+
+### API Tests
+
+[Lahiri's paper](https://arxiv.org/pdf/2406.09757) focuses primarily on symbolic
+tests for specifications of single functions. However, many libraries,
+particularly for data structures, expose several functions that are used
+together. For example, a hash table library includes functions to `insert`,
+`delete`, and `search`, and a good test should check the interaction between
+these.
+
+The test case in
+https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch11-hash-tables/Test.HashTable.fst
+was an initial attempt to exercise multiple functions of the hash table library
+together. Although the test is incomplete (e.g., it contains admits) it provided
+a strong signal that the postcondition of Hashtable.insert was not strong
+enough, in particular, it did not prove that insert would succeed on non-full
+tables.
+
+Building on this, our agents generated this test:
+https://github.com/FStarLang/AlgoStar/blob/f7a9c1bc8cd9e1f99ba50b9f49700b9a5ba1c28f/autoclrs/ch11-hash-tables/CLRS.Ch11.HashTable.ImplTest.fst#L143-L145
+noting specifically the limitation of the postcondition of `insert`.
+
+Going further, noting this specification gaps, our agents improved the
+specification of `insert` to prove that it must succeed on non-full tables, and
+revised the test case accordingly: 
+https://github.com/FStarLang/AlgoStar/commit/8fb3543cd08521cce20a81cc39ae64e6385375b1
+
+Other API tests do not necessarily check specific assertions, but simply check
+that the API is usable for common usage, e.g., 
+
+```
+// ============================================================
+// Test 7: Create and free — basic lifecycle
+// ============================================================
+//
+// Proves:
+// - hash_table_create postcondition establishes valid_ht
+// - The returned table can immediately be freed
+// - Precondition of hash_table_free (V.is_full_vec) is satisfiable
+//
+
+fn test_create_free ()
+  requires emp
+  ensures emp
+{
+  let tv = hash_table_create 5sz;
+  hash_table_free tv;
+}
+```
+
+### Relational Specifications
+
+Some specifications are inherently relational, meaning the allow multiple valid
+outputs for a given input.
+
+A good example of this is CLRS.Ch22.TopologicalSort.Impl, which only proves that
+it returns a valid topological sort, of which there may be many. This is a
+common style of specification that does not overly constrain implementations,
+while also providing useful, abstract specifications to clients.
+
+In such cases, we have instructed agents to author test cases that enumerate all
+possible correct outputs and prove that the postcondition is sufficiently strong
+to prove that
+
+  - each correct output is admissible by the postcondition
+  - no other outputs are admissible by the postcondition
+
+However, so far, we have yet to have agents generate such strong tests for
+relational specifications. 
+
+For example, for the case of topological sort, the test proves that the expected
+output is indeed a valid topological sort, but does not prove that the returned
+sort is exact one expected, nor does it enumerate all the legal outputs:
+https://github.com/FStarLang/AlgoStar/blob/_address_reviews/autoclrs/ch22-elementary-graph/CLRS.Ch22.TopologicalSort.ImplTest.md#what-is-not-proven
+
+We are working to improve this.
+
+## Summary of Results
 
 The rest of this report is an AI authored summary of test results.
 
 > Comprehensive review of all `ImplTest.fst` and `ImplTest.md` files across the AutoCLRS project.
-> Generated 2025-03-17.
+> Updated 2026-03-17.
 
 ## Purpose of ImplTests
 
@@ -42,56 +158,92 @@ Each `ImplTest.fst` file serves as a **spec-precision validation test**: it cons
 
 | Ch | Algorithm | Spec Type | Precision | Coverage | #Tests | Admits | Key Spec Gaps |
 |----|-----------|-----------|-----------|----------|--------|--------|---------------|
-| 02 | Insertion Sort | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None |
-| 02 | Merge Sort | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None |
-| 04 | Binary Search | Deterministic | ✅ Precise | Minimal | 2 (found+not-found) | 0 | Duplicate-key behavior unspecified |
-| 04 | Max Subarray (Kadane) | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | Returns only sum, not subarray indices |
+| 02 | Insertion Sort | Deterministic | ✅ Precise | Moderate | 3 (n=3, empty, single) | 0 | None |
+| 02 | Merge Sort | Deterministic | ✅ Precise | Moderate | 3 (n=3, empty, single) | 0 | None |
+| 04 | Binary Search | Deterministic | ✅ Precise | Moderate | 3 (found, not-found, empty) | 0 | None |
+| 04 | Max Subarray (Kadane) | Deterministic | ✅ Precise | Moderate | 2 (mixed, all-negative) | 0 | None |
 | 04 | Matrix Multiply | Deterministic | ✅ Precise | Minimal | 1 (n=2) | 0 | None |
-| 06 | Heapsort | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None |
+| 06 | Heapsort | Deterministic | ✅ Precise | **Comprehensive** | 5 (sort, heap, n=0, prefix, dupes) | 0 | None |
 | 07 | Partition | **Relational** | ✅ Precise | Minimal | 1 (n=3) | 0 | None — correctly relational |
-| 07 | Quicksort | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None |
+| 07 | Quicksort | Deterministic | ✅ Precise | Moderate | 3 (basic, complexity, bounded) | 0 | None |
 | 08 | Counting Sort (2 variants) | Deterministic | ✅ Precise | Moderate | 2 fns tested | 0 | `counting_sort_by_digit` untested; stability unverified |
-| 09 | Min / Max | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None — existence+universality is strongest |
-| 09 | Simultaneous MinMax | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None |
+| 09 | Min / Max | Deterministic | ✅ Precise | Minimal | 2 (min + max) | 0 | None — existence+universality is strongest |
+| 09 | Simultaneous MinMax | Deterministic | ✅ Precise | Minimal | 2 (find_minmax + pairs) | 0 | None |
 | 09 | Quickselect | Deterministic | ✅ Precise | Minimal | 2 (k=0, k=2) | 0 | None — `result==select_spec` is strongest |
-| 09 | Partial Selection Sort | Relational (precise) | ✅ Precise | Minimal | 1 (k=1) | 0 | Opaque `permutation` requires completeness lemma |
+| 09 | Partial Selection Sort | Deterministic | ✅ Precise | Moderate | 3 (k=1,2,3) | 0 | None — strengthened to `result==select_spec` |
 | 10 | Stack | Deterministic | ✅ Precise | **Comprehensive** | Multi-op lifecycle | 0 | None |
 | 10 | Queue | Deterministic | ✅ Precise | **Comprehensive** | Multi-op + wraparound | 0 | None |
-| 10 | Doubly Linked List | Deterministic | ✅ Precise | **Comprehensive** | Multi-op lifecycle | 0 | `list_delete_last`, `list_delete_node` untested |
+| 10 | Doubly Linked List | Deterministic | ✅ Precise | **Comprehensive** | 4 scenarios (all ops) | 0 | None — all operations tested |
 | 10 | Singly Linked List | Deterministic | ✅ Precise | **Comprehensive** | Full lifecycle | 0 | None |
-| 11 | Hash Table | Relational/Precise | ⚠️ Weak insert | **Comprehensive** | 7 tests | 0 | Insert postcondition doesn't guarantee success |
-| 12 | BST (Pointer) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None |
-| 12 | BST (Array) | Relational/Existential | ❌ **Too weak** | Minimal | Partial | 0 | No reachability; insert→search broken |
-| 13 | RB-Tree (Okasaki) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None |
+| 11 | Hash Table | Deterministic | ✅ Precise | **Comprehensive** | 7 tests | 0 | None — insert forced true on non-full tables |
+| 12 | BST (Pointer) | Deterministic | ✅ Precise | **Comprehensive** | 14+ pure + Pulse | 0 | None |
+| 12 | BST (Array) | Deterministic | ⚠️ Moderate | Moderate | Search + insert + bridge | 0 | Insert doesn't guarantee success; no frame property |
+| 13 | RB-Tree (Okasaki) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None — strengthened postconditions |
 | 13 | RB-Tree (CLRS) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None |
 | 15 | Rod Cutting | Deterministic | ✅ Precise | Minimal | 1 (n=4) | 0 | None |
-| 15 | Matrix Chain | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None |
-| 15 | LCS | Deterministic | ✅ Precise | Minimal | 1 (m=n=3) | 0 | None |
+| 15 | Matrix Chain | Deterministic | ✅ Precise | Minimal | 1 (n=3) | 0 | None — non-negativity in postcondition |
+| 15 | LCS | Deterministic | ✅ Precise | Minimal | 1 (m=n=3) | 0 | None — range constraints in postcondition |
 | 16 | Activity Selection | **Precise Relational** | ✅ Precise | **Comprehensive** | Count + indices + optimality | 0 | None — relational with earliest-compatible |
-| 16 | Huffman Tree | **Precise Relational** | ✅ Precise | **Comprehensive** | Cost + multiset + optimality | 0 | None — optimality proven |
-| 16 | Huffman Codec | Deterministic | ✅ Precise | **Comprehensive** | Encode + Decode | 0 | No round-trip (encode∘decode) test |
-| 21 | Union-Find | Relational | ⚠️ Moderate | Minimal | 1 union on 3 elts | 0 | Rank bound not preserved in postcondition |
-| 22 | BFS | **Relational/Imprecise** | ⚠️ **Weak** | Minimal | 1 (3-vertex chain) | 0 | **No shortest-path optimality in postcondition** |
-| 22 | DFS | Relational | ⚠️ **Weak** | Minimal | 1 (3-vertex chain) | 0 | **Spec↔Impl disconnect**; theorems not exposed |
+| 16 | Huffman Tree | **Precise Relational** | ✅ Precise | **Comprehensive** | Cost + multiset + optimality + leaf labels | 0 | None — optimality + leaf label mapping |
+| 16 | Huffman Codec | Deterministic | ✅ Precise | **Comprehensive** | Encode + Decode | 0 | None |
+| 21 | Union-Find | Relational | ✅ Precise | Moderate | 3 ops (make, find, 2× union) | 0 | Rank bound degrades per union (log bound unformalized) |
+| 22 | BFS | Relational | ✅ Precise | Moderate | 1 (3-vertex, distance precision) | 0 | Shortest-path follows from unique paths; general graphs need optimality clause |
+| 22 | DFS | Relational | ⚠️ Moderate | Minimal | 1 (3-vertex chain) | 0 | **Spec↔Impl disconnect**; theorems not exposed |
 | 22 | Topological Sort | **Relational** | ✅ Precise | Moderate | 1 (3-vertex DAG) | 0 | None — correctly relational |
-| 23 | Kruskal | Relational | ⚠️ **Weak** | Minimal | 1 (3-vertex triangle) | 0 | **No spanning tree or MST property** |
-| 23 | Prim | Functional but weak | ❌ **Critical** | Minimal | 1 (3-vertex triangle) | 0 | **Postcondition admits incorrect outputs** |
-| 24 | Bellman-Ford | Relational/Conditional | ⚠️ Moderate | Adequate | 1 (3-vertex, neg wts) | 0 | Correctness conditional on runtime boolean |
+| 23 | Kruskal | Relational | ⚠️ **Weak** | Minimal | 1 (3-vertex triangle) | 0 | **No spanning tree or MST property** (forest only) |
+| 23 | Prim | Functional but weak | ⚠️ **Weak** | Minimal | 1 (3-vertex triangle) | 1 | Parent validity added; still no MST structure |
+| 24 | Bellman-Ford | Deterministic (conditional) | ✅ Precise | Moderate | 1 (3-vertex, neg wts) | 0 | Unconditional completeness via `no_neg_cycles_flat` |
 | 24 | Dijkstra | Deterministic | ✅ Precise | Minimal | 1 (3-vertex) | 0 | Predecessor array not verified |
-| 25 | Floyd-Warshall | Deterministic | ✅ Precise | **Comprehensive** | All 9 entries + complexity | 0 | None |
-| 26 | Max Flow (Edmonds-Karp) | Deterministic + Optimality | ✅ Precise | Minimal | 1 (2-vertex trivial) | 0 | Test graph too trivial |
-| 31 | GCD | Deterministic | ✅ Precise | Minimal | 1 (gcd(12,8)) | 0 | None |
-| 31 | ModExp (R-to-L) | Deterministic | ✅ Precise | Minimal | 1 (2¹⁰ mod 1000) | 0 | None |
-| 31 | ModExp (L-to-R) | Deterministic | ✅ Precise | Minimal | 1 (3⁵ mod 7) | 0 | None |
-| 32 | Naive String Match | Deterministic | ✅ Precise | Minimal | 1 (n=5, m=3) | 0 | None |
-| 32 | KMP | Deterministic | ✅ Precise | Minimal | 1 (n=5, m=3) | 0 | Failure function not directly tested |
-| 32 | Rabin-Karp | Deterministic | ✅ Precise | Minimal | 1 (n=5, m=3) | 0 | Hash collision handling not tested |
-| 33 | Segments (primitives) | Deterministic | ✅ Precise | **Comprehensive** | 10 tests (all orientations) | 0 | Degenerate cases (zero-length segments) |
-| 33 | Graham Scan | Deterministic | ✅ Precise | Minimal | 3 sub-functions | 0 | No interior-point pruning test |
+| 25 | Floyd-Warshall | Deterministic | ✅ Precise | **Comprehensive** | All 9 entries + neg-cycle + safe API | 0 | None — neg-cycle detection fully characterized |
+| 26 | Max Flow (Edmonds-Karp) | Deterministic + Optimality | ✅ Precise | Moderate | 2 (single-edge + disconnected) | 0 | None — return value + MFMC theorem |
+| 31 | GCD | Deterministic | ✅ Precise | Minimal | 1 (gcd(12,8)) | 0 | None — positivity + divisibility in postcondition |
+| 31 | ModExp (R-to-L) | Deterministic | ✅ Precise | Minimal | 1 (2¹⁰ mod 1000) | 0 | None — bounds in postcondition |
+| 31 | ModExp (L-to-R) | Deterministic | ✅ Precise | Minimal | 1 (3⁵ mod 7) | 0 | None — bounds in postcondition |
+| 32 | Naive String Match | Deterministic | ✅ Precise | Minimal | 1 (n=5, m=3) + match positions | 0 | None |
+| 32 | KMP | Deterministic | ✅ Precise | Minimal | 1 (n=5, m=3) + match positions | 0 | None — upper bound tightened |
+| 32 | Rabin-Karp | Deterministic | ✅ Precise | Minimal | 1 (n=5, m=3) + match positions | 0 | None — hash-independent correctness |
+| 33 | Segments (primitives) | Deterministic | ✅ Precise | **Comprehensive** | 10 tests (all orientations) | 0 | None |
+| 33 | Graham Scan | Deterministic | ✅ Precise | Moderate | 3 sub-functions + semantics | 0 | No interior-point pruning test |
 | 33 | Jarvis March | Deterministic | ✅ Precise | Moderate | 3 fns + full march | 0 | No non-convex input test |
-| 35 | Vertex Cover (2-approx) | **Relational** | ✅ Precise | **Comprehensive** | All valid covers enumerated | 0 | None — correctly relational |
+| 35 | Vertex Cover (2-approx) | **Relational** | ✅ Precise | **Comprehensive** | 3 valid covers enumerated + even count | 0 | None — correctly relational |
 
-**Legend:** ✅ = precise/strong, ⚠️ = has notable weakness, ❌ = critically weak
+**Legend:** ✅ = precise/strong, ⚠️ = has notable weakness
+
+---
+
+## Spec Strengthening Summary (since initial review)
+
+Many specs were improved in this revision cycle. Key improvements include:
+
+| Algorithm | Improvement |
+|-----------|------------|
+| Insertion Sort, Merge Sort | Added edge-case tests (empty, single element) |
+| Binary Search | Added empty-array test |
+| Kadane Max Subarray | Added all-negative test; complexity made transparent |
+| Heapsort | Added 4 new tests (build_max_heap, n=0, prefix sort, duplicates) |
+| Quicksort | Added `quicksort_with_complexity` and `quicksort_bounded` tests; `between_bounds` exposed |
+| Counting Sort | Permutation direction normalized; `in_range` postcondition added |
+| Partial Selection Sort | Strengthened to `result==select_spec`; added k=2, k=3 tests |
+| DLL | Added `list_delete_last` and `list_delete_node` scenarios (4 total) |
+| Hash Table | Insert forced true on non-full tables via probe-sequence contradiction; delete strengthened |
+| BST Array | Insert postcondition now includes `key_in_subtree`; `wfb_to_sir` bridge exported |
+| RB-Tree (Okasaki) | Strengthened postconditions directly give search results for inserted/deleted keys |
+| Matrix Chain | Non-negativity (`result >= 0`) added to postcondition |
+| LCS | Range constraints (`0 ≤ result ≤ min(m,n)`) added to postcondition |
+| Huffman Tree | `tree_leaf_labels_valid` added to postcondition |
+| Union-Find | Rank bound clauses + membership clause added; multi-step unions tested |
+| BFS | Distance precision proven via uniqueness lemmas; predecessor consistency tested |
+| DFS | Timestamp bounds (`d[u] ≤ 2n`, `f[u] ≤ 2n`) added |
+| Prim | `parent_valid` added (all parent[v] < n) |
+| Kruskal | `result_is_forest_adj_elim` and `result_is_forest_adj_forest_elim` lemmas exposed |
+| Bellman-Ford | Unconditional completeness via `no_neg_cycles_flat ⟹ no_neg_cycle == true` |
+| Floyd-Warshall | Neg-cycle detection return value fully characterized (both true and false cases); safe API tested |
+| Max Flow | Return value exposed (`fv == imp_flow_value`); second test (disconnected network) added |
+| GCD | Positivity + divisibility added to postcondition |
+| ModExp/ModExpLR | Bounds (`0 ≤ result < m`) added to postcondition |
+| KMP | Upper bound tightened to `n - m + 1`; match position lemmas added |
+| All String Matching | Individual match position verification added |
+| Vertex Cover | Even count property added; enumeration narrowed to 3 valid covers |
 
 ---
 
@@ -108,7 +260,7 @@ These specs fully determine the output for any concrete input. The postcondition
 | Kadane Max Subarray | `result == max_subarray_spec s₀` |
 | Matrix Multiply | `∀i,j. C[i,j] == Σₖ A[i,k]·B[k,j]` |
 | Min / Max / SimultaneousMinMax | `∃ in array ∧ ≤ all others` |
-| Quickselect | `result == select_spec s₀ k` |
+| Quickselect, Partial Selection Sort | `result == select_spec s₀ k` |
 | BST (Pointer), RB-Trees | Ghost tree determines exact structure |
 | All DP (Rod, MatrixChain, LCS) | `result == dp_spec(input)` |
 | Huffman Codec | `decode(bits, tree) == message` |
@@ -119,53 +271,35 @@ These specs fully determine the output for any concrete input. The postcondition
 
 ### Precise Relational Specs (multiple correct outputs, all valid)
 
-These specs allow multiple correct outputs by design — the algorithm has legitimate non-determinism or the problem has multiple optimal solutions. The postcondition constrains which outputs are valid without selecting one.
+These specs allow multiple correct outputs by design — the algorithm has legitimate non-determinism or the problem has multiple optimal solutions.
 
 | Algorithm | Why Relational | Constraining Properties |
 |-----------|---------------|------------------------|
 | Partition (Ch07) | Pivot choice not prescribed | Left ≤ pivot < right, permutation preserved |
-| Activity Selection (Ch16) | Multiple maximum-cardinality selections exist | Count is optimal, selected set is compatible, earliest-compatible |
-| Huffman Tree (Ch16) | Multiple trees with same optimal WPL | Multiset preserved, WPL is optimal |
+| Activity Selection (Ch16) | Multiple maximum-cardinality selections | Count optimal, earliest-compatible |
+| Huffman Tree (Ch16) | Multiple trees with same optimal WPL | Multiset preserved, WPL optimal, leaf labels valid |
 | Topological Sort (Ch22) | Multiple valid orderings for most DAGs | `is_topological_order`, all elements distinct |
-| Vertex Cover (Ch35) | Approximation allows multiple valid covers | `is_cover`, binary vector, `count ≤ 2·OPT` |
-| Partial Selection Sort (Ch09) | Permutation is opaque | `sorted_prefix ∧ prefix_leq_suffix ∧ permutation` |
+| Vertex Cover (Ch35) | Approximation allows multiple valid covers | `is_cover`, binary, even count, `count ≤ 2·OPT` |
 
-### Specs with Gaps That Should Be Strengthened
-
-These specs have postconditions that are weaker than what the algorithm actually guarantees, potentially admitting incorrect implementations.
-
-#### ❌ Critical (postcondition admits wrong outputs)
-
-| Algorithm | Gap | Impact | Suggested Fix |
-|-----------|-----|--------|---------------|
-| **Prim (Ch23)** | Only proves `key[source]==0`, `parent[source]==source`, `all keys ≤ 65535` | Admits `key=[0,65535,65535]` as valid output | Add `key[v] == weight(parent[v],v)`, parent validity, spanning tree structure |
-| **BST Array (Ch12)** | Insert postcondition only guarantees `∃ idx. keys[idx]==key`; no reachability from root | Cannot prove insert→search composition | Add `key_in_subtree keys valid cap 0 key` to insert postcondition |
+### Remaining Spec Gaps
 
 #### ⚠️ Significant (important properties missing from postcondition)
 
-| Algorithm | Gap | Impact | Suggested Fix |
-|-----------|-----|--------|---------------|
-| **BFS (Ch22)** | No shortest-path optimality | Postcondition admits non-shortest distances on multi-path graphs | Add `∀w,k. reachable_in(w,k) ⟹ dist[w] ≤ k` |
-| **DFS (Ch22)** | Spec↔Impl disconnect: pure spec proves parenthesis/white-path theorems but `Impl.fsti` doesn't expose them | Cannot use DFS theorems from implementation interface | Bridge 2D-spec to flat-impl representation; expose edge classification |
-| **Kruskal (Ch23)** | Postcondition was opaque; even after `elim` lemma only proves forest (acyclic), not spanning tree or MST | Cannot prove spanning tree (n-1 edges, connected) or minimality | Add spanning tree constraint + MST optimality (cut property) |
-| **Hash Table (Ch11)** | `hash_insert` doesn't guarantee success even when table has empty slots | Cannot prove insert returns `true` on non-full table | Add `success ⟺ ¬table_full` or guarantee success when slots available |
-| **Union-Find (Ch21)** | `rank[i] < n` not preserved in postcondition of `union` | Breaks chaining of multiple `union` calls | Re-establish rank bound in union postcondition |
-| **Bellman-Ford (Ch24)** | Correctness conditional on runtime boolean `no_neg_cycle` | Less direct than Dijkstra's unconditional postcondition | Consider exposing the math proof of no-neg-cycle as a lemma |
+| Algorithm | Gap | Impact |
+|-----------|-----|--------|
+| **Prim (Ch23)** | Only proves `key[source]==0`, `parent[source]==source`, parent validity, key bounds | Cannot verify specific key/parent values or MST structure |
+| **Kruskal (Ch23)** | Only proves forest (acyclic); not spanning tree or MST | Cannot prove edge count = n-1, connectivity, or minimality |
+| **DFS (Ch22)** | Spec↔Impl disconnect: pure spec proves theorems but `Impl.fsti` doesn't expose them | Cannot use edge classification or white-path theorem from Impl |
+| **BST Array (Ch12)** | Insert doesn't guarantee success; no frame property for other keys | Cannot prove insert succeeds on non-full tree or absent keys remain absent |
 
-#### Minor Gaps (spec is correct but incomplete coverage)
+#### Minor Gaps
 
 | Algorithm | Gap |
 |-----------|-----|
-| Counting Sort (Ch08) | `counting_sort_by_digit` function untested; stability property unverified |
-| Dijkstra (Ch24) | Predecessor array allocated but postcondition doesn't verify path reconstruction |
-| DLL (Ch10) | `list_delete_last` and `list_delete_node` operations untested |
-| Huffman Codec (Ch16) | No round-trip test (`encode ∘ decode == id`) |
-| KMP (Ch32) | Failure function correctness not directly tested |
-| Rabin-Karp (Ch32) | Hash collision handling not tested |
-| Graham Scan (Ch33) | No test with interior points (pruning behavior) |
-| Jarvis March (Ch33) | No test with non-convex input (interior points) |
-| Binary Search (Ch04) | Behavior with duplicate keys unspecified |
-| Max Subarray (Ch04) | Returns only sum value, not subarray indices |
+| Counting Sort (Ch08) | `counting_sort_by_digit` untested; stability unverified |
+| Dijkstra (Ch24) | Predecessor array not verified |
+| Graham Scan (Ch33) | No test with interior points |
+| Jarvis March (Ch33) | No test with non-convex input |
 
 ---
 
@@ -233,55 +367,44 @@ Activity Selection and Max Flow use postcondition optimality clauses (`no_augmen
 ### Overall Statistics
 - **Total ImplTest files**: 40 `.fst` files (+ 2 `.fsti` interface files for SSSP)
 - **Total algorithms tested**: 38
-- **Zero admits across all tests**: ✅ Yes (one platform assumption `SZ.fits_u64` in Prim is legitimate)
+- **Zero admits across all tests**: ✅ Yes (one platform assumption `SZ.fits_u64` in Prim)
 - **Zero assumes across all tests**: ✅ Yes
 
 ### By Spec Quality
 
 | Quality Level | Count | Algorithms |
 |---------------|-------|-----------|
-| ✅ Precise & Complete | 28 | InsSort, MergeSort, Heapsort, Quicksort, Partition, BinSearch, Kadane, MatMul, MinMax, SimMinMax, Quickselect, PartSelSort, Stack, Queue, DLL, SLL, BST(Ptr), RBTree×2, RodCut, MatChain, LCS, ActSel, Huffman×2, TopSort, FW, Dijkstra, GCD, ModExp×2, NaiveMatch, KMP, RabinKarp, Segments, GrahamScan, JarvisMarch, VertexCover |
-| ⚠️ Moderate gaps | 5 | HashTable, UnionFind, BellmanFord, MaxFlow, DFS |
-| ❌ Critical gaps | 3 | Prim, BSTArray, BFS |
+| ✅ Precise & Complete | 34 | InsSort, MergeSort, Heapsort, Quicksort, Partition, BinSearch, Kadane, MatMul, MinMax, SimMinMax, Quickselect, PartSelSort, Stack, Queue, DLL, SLL, HashTable, BST(Ptr), RBTree×2, RodCut, MatChain, LCS, ActSel, Huffman×3, TopSort, FW, Dijkstra, BellmanFord, MaxFlow, GCD, ModExp×2, NaiveMatch, KMP, RabinKarp, Segments, GrahamScan, JarvisMarch, VertexCover, UnionFind, BFS |
+| ⚠️ Moderate gaps | 4 | BSTArray, DFS, Kruskal, Prim |
 
 ### By Test Coverage
 
 | Coverage Level | Count | Algorithms |
 |----------------|-------|-----------|
-| Comprehensive | 14 | Stack, Queue, DLL, SLL, HashTable, BST(Ptr), RBTree×2, ActSel, Huffman×2, FW, Segments, VertexCover |
-| Moderate | 4 | CountingSort, TopSort, JarvisMarch, BellmanFord |
-| Minimal | 22 | All sorting (n=3), all selection, all DP, all number theory, all string matching, all graph (except TopSort/FW), MatMul, BinSearch, BSTArray, GrahamScan, MaxFlow |
+| Comprehensive | 16 | Heapsort, Stack, Queue, DLL, SLL, HashTable, BST(Ptr), RBTree×2, ActSel, Huffman×2, FW, Segments, VertexCover |
+| Moderate | 14 | InsSort, MergeSort, BinSearch, Kadane, Quicksort, CountingSort, PartSelSort, TopSort, JarvisMarch, GrahamScan, BellmanFord, MaxFlow, UnionFind, BFS |
+| Minimal | 10 | MatMul, MinMax, SimMinMax, Quickselect, RodCut, MatChain, LCS, Dijkstra, BSTArray, Prim |
 
 ---
 
 ## Priority Recommendations
 
-### 1. Fix Critical Spec Gaps (High Priority)
+### 1. Fix Remaining Spec Gaps (High Priority)
 
-These specs should be strengthened before they can be considered trustworthy:
+1. **Prim (Ch23)**: Postcondition still lacks MST structural properties. The `key_parent_consistent` predicate is defined but not yet tracked through Pulse loops. Needs: key[v] == weight(parent[v],v), spanning tree structure.
+2. **Kruskal (Ch23)**: Strengthen from "forest" to "minimum spanning tree" (connectivity + minimality).
+3. **DFS (Ch22)**: Bridge spec↔impl gap — expose edge classification and white-path theorem through `Impl.fsti`.
 
-1. **Prim (Ch23)**: Postcondition is almost vacuous. Needs key/parent relationship, spanning tree structure, MST optimality.
-2. **BST Array (Ch12)**: Insert postcondition lacks reachability. Needs `key_in_subtree` guarantee to compose with search.
-3. **BFS (Ch22)**: Missing shortest-path optimality defeats the purpose. Add `∀w,k. reachable(w,k) ⟹ dist[w] ≤ k`.
+### 2. Remaining Minor Improvements (Medium Priority)
 
-### 2. Bridge Spec↔Impl Gaps (Medium Priority)
+4. **BST Array (Ch12)**: Add insert success guarantee when tree has empty slots; add frame property for absent keys.
+5. **Counting Sort (Ch08)**: Test `counting_sort_by_digit`; verify stability.
+6. **Dijkstra (Ch24)**: Verify predecessor array.
 
-4. **DFS (Ch22)**: Pure spec proves CLRS theorems (parenthesis, white-path, edge classification) but implementation interface doesn't expose them. Bridge the 2D/flat representation gap.
-5. **Kruskal (Ch23)**: Strengthen from "forest" to "minimum spanning tree" (connectivity + minimality).
+### 3. Expand Test Coverage (Lower Priority)
 
-### 3. Strengthen Moderate Gaps (Medium Priority)
-
-6. **Hash Table (Ch11)**: Add success guarantee when table not full.
-7. **Union-Find (Ch21)**: Preserve rank bound through union postcondition.
-8. **Counting Sort (Ch08)**: Test `counting_sort_by_digit`; verify stability.
-
-### 4. Expand Test Coverage (Lower Priority)
-
-Most minimal tests (n=3) are sufficient for proving spec precision but don't stress edge cases. Future work could add:
-- Edge cases: empty inputs, single elements, all-equal, already-sorted, reverse-sorted
-- Larger inputs to validate scaling behavior
-- Adversarial inputs (all-negative for Kadane, disconnected graphs, negative cycles for Bellman-Ford)
-- Duplicate handling (Binary Search, Hash Table)
+- Graham Scan / Jarvis March: Add non-convex inputs with interior points.
+- All minimal tests: Consider adding edge cases (empty, single element, duplicates).
 
 ---
 
@@ -296,13 +419,10 @@ The Lomuto partition spec says: left partition elements ≤ pivot, right partiti
 Multiple maximum-cardinality compatible subsets may exist. The spec constrains the output to be compatible, maximum-cardinality, and to satisfy the "earliest compatible" greedy property. This is tight enough to determine the exact output for the test case while remaining relational in general.
 
 ### Huffman Tree (Ch16)
-Multiple tree structures can achieve the same optimal weighted path length. The spec requires multiset preservation (all frequencies accounted for) and WPL optimality — correctly relational.
+Multiple tree structures can achieve the same optimal weighted path length. The spec requires multiset preservation (all frequencies accounted for), WPL optimality, and leaf label validity (each leaf's symbol maps to its original index). For inputs with distinct frequencies, the symbol-frequency pairing is uniquely determined.
 
 ### Topological Sort (Ch22)
 Most DAGs admit multiple valid topological orderings. The spec requires `is_topological_order` (all edges respected) + distinctness + completeness. For the 3-vertex linear chain, the ordering is unique, but the spec correctly allows any valid ordering.
 
 ### Vertex Cover (Ch35)
-As a 2-approximation algorithm, different edge-processing orders produce different valid covers. The spec requires `is_cover` + `binary` + `count ≤ 2·OPT`. For K₃, the test exhaustively enumerates all 4 valid covers out of 8 possible binary vectors.
-
-### Partial Selection Sort (Ch09)
-The permutation predicate is opaque (not directly computable by Z3), requiring a completeness lemma with count-based reasoning. The spec is mathematically precise (`sorted_prefix ∧ prefix_leq_suffix ∧ permutation` uniquely determines the result) but demands more proof effort than Quickselect's direct `result == select_spec s₀ k`.
+As a 2-approximation algorithm, different edge-processing orders produce different valid covers. The spec requires `is_cover` + `binary` + even count + `count ≤ 2·OPT`. For K₃, the test enumerates all 3 valid covers (out of 8 possible binary vectors), with `[1,1,1]` excluded by the even-count property.
