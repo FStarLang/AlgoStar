@@ -15,22 +15,27 @@ postcondition is precise enough to determine the expected output.
 | # | Test | What is proven |
 |---|------|----------------|
 | 1 | `test_search_empty` | Search on empty table returns exactly `size` (not found). Postcondition of `hash_search` is precise: from `SZ.v r < size ==> Seq.index s r == key` and `Seq.create n (-1)` having only `-1` elements, Z3 derives `SZ.v r == size`. |
-| 2 | `test_insert_then_search` | After successful insert, search finds the key (`SZ.v r < size`). Postcondition is precise: `key_in_table` from insert contradicts the `~key_in_table` in the not-found branch of search. |
-| 3 | `test_insert_search_absent` | After inserting key 0, searching for key 1 returns `size` (not found). Postcondition is precise: `seq_modified_at` constrains the table so that only key 0 and `-1` values exist; Z3 derives that no slot contains key 1. |
-| 4 | `test_delete_then_search` | After insert + delete, search returns `size` (not found). Z3 reasons through the composition of insert and delete postconditions. |
-| 5 | `test_insert_no_dup_existing` | After plain insert of key 0, `hash_insert_no_dup` with the same key returns `true`. **This is proven from the postcondition alone**: the else branch of `insert_no_dup` asserts `~(key_in_table s 3 0)`, contradicting `key_in_table` from the first insert. So `b2 == true` is forced. |
-| 6 | `test_insert_no_dup_fresh` | `hash_insert_no_dup` on empty table: if it succeeds, the `~(key_in_table s size key)` clause in the postcondition correctly identifies it as a fresh insert. |
+| 2 | `test_insert_then_search` | **Insert on empty table MUST succeed** (`b == true` forced by postcondition). The false branch's probe-sequence constraint contradicts the fresh table (probe 0 hits an empty slot). After insert, search finds the key (`SZ.v r < size`). |
+| 3 | `test_insert_search_absent` | **Insert on empty table succeeds.** After inserting key 0, searching for key 1 returns `size` (not found). `seq_modified_at` constrains the table so only key 0 and `-1` values exist. |
+| 4 | `test_delete_then_search` | **Insert succeeds. Delete after insert MUST succeed** (`b2 == true` forced). Insert establishes `key_in_table`; delete's false branch asserts `~key_in_table`, a contradiction. After insert + delete, search returns `size` (not found). |
+| 5 | `test_insert_no_dup_existing` | **Insert succeeds.** After plain insert of key 0, `hash_insert_no_dup` with the same key returns `true`. The else branch of `insert_no_dup` asserts `~(key_in_table s 3 0)`, contradicting `key_in_table` from the first insert. So `b2 == true` is forced. |
+| 6 | `test_insert_no_dup_fresh` | **`hash_insert_no_dup` on empty table MUST succeed** (same contradiction as hash_insert). The `~(key_in_table s size key)` clause correctly identifies it as a fresh insert. |
 | 7 | `test_create_free` | Basic lifecycle: create a table and immediately free it. Proves preconditions of both `hash_table_create` and `hash_table_free` are satisfiable. |
 
 ## Auxiliary Lemmas
 
-Two pure helper lemmas were needed:
+Three pure helper lemmas were needed:
 
 - **`lemma_create_index`**: `Seq.index (Seq.create n v) i == v` for `i < n`.
   Trivial but gives Z3 an explicit trigger for reasoning about fresh tables.
 
 - **`lemma_create_no_key`**: `~(key_in_table (Seq.create n (-1)) n key)` for
   any `key >= 0`. Proves that a fresh table contains no valid keys.
+
+- **`trigger_insert_empty`**: Generates the term `hash_probe_nat key 0 n` in
+  the Z3 context and proves `Seq.index (Seq.create n (-1)) (hash_probe_nat key 0 n) == -1`.
+  This triggers the pattern in the insert postcondition's false-branch universal
+  quantifier, letting Z3 derive the contradiction that forces `result == true`.
 
 ## Spec Findings
 
@@ -57,45 +62,51 @@ Two pure helper lemmas were needed:
    contains the key. The search postcondition correctly derives not-found
    (Test 4).
 
-### ⚠️ Spec Weakness: Insert Does Not Guarantee Success
+### ✅ Insert Guarantees Success on Non-Full Tables (FIXED)
 
-**Issue**: The postcondition of `hash_insert` (and `hash_insert_no_dup`) does
-not guarantee success when empty slots are available. The postcondition is:
+**Previous issue**: The postcondition of `hash_insert` did not guarantee
+success when empty slots were available. Tests had to branch on the insert
+result, with the `false` branch handled vacuously.
 
+**Fix**: The false branch now includes a probe-sequence constraint:
 ```
-if result
-then (key_in_table s' size key /\ ...)
-else s' == s
+else (s' == s /\
+      (forall (q: nat). {:pattern (hash_probe_nat key q (SZ.v size))}
+        q < SZ.v size ==>
+          Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -1 /\
+          Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -2))
 ```
 
-The `else` branch (`s' == s`, table unchanged) is always consistent — it does
-not lead to a contradiction even when the table has available slots. This means
-we **cannot prove** that inserting into an empty table returns `true`.
+This says: if insert fails, every position in the probe sequence is occupied
+(not empty and not deleted). For a concrete empty table, probe 0 hits an
+empty slot (value `-1`), making the false branch contradictory. Z3 derives
+`result == true`.
 
-**Impact**: Tests 2–6 must branch on the insert result. The `true` branch is
-where the interesting assertions live; the `false` branch is vacuously handled.
-This pattern works but is less ergonomic than a guaranteed-success insert.
+**Impact**: Tests 2–6 no longer need `if b { ... } else { ... }` branching.
+They directly assert `b == true` (or `b1 == true`), eliminating boilerplate
+and proving that the spec is precise enough to determine insert success on
+non-full tables.
 
-**Attempted fix**: We attempted to strengthen the postcondition to include
-`forall (j: nat). j < size ==> Seq.index s j =!= -1 /\ Seq.index s j =!= -2`
-in the false branch (meaning: if insert fails, the table is truly full). The
-implementation proof requires surjectivity of linear probing (converting from
-"all probes checked" to "all slots occupied"). While the standalone surjectivity
-lemma verifies, embedding it in the Pulse function body proved difficult due to
-Z3's inability to handle multi-step quantifier instantiation (the loop invariant
-quantifies over probe indices, and the postcondition quantifies over slot
-indices). The `Complexity.count_available` function provides an alternative
-mechanism for callers to reason about slot availability.
+### ✅ Delete Guarantees Key Absence on Failure (FIXED)
 
-### ✅ No Other Spec Issues Found
+**Previous issue**: The false branch of `hash_delete` said only
+`Seq.equal s' s` — it didn't state the key was absent.
 
-All other postconditions are precise enough for concrete test instances:
+**Fix**: The false branch now includes `~(key_in_table s (SZ.v size) key)`:
+```
+else (Seq.equal s' s /\ ~(key_in_table s (SZ.v size) key))
+```
 
-- Search correctly reports found vs. not-found
-- Delete correctly marks the slot and preserves `valid_ht`
-- `insert_no_dup` correctly distinguishes fresh vs. existing
-- `seq_modified_at` is strong enough for reasoning about other keys
-- `valid_ht` is correctly maintained across all operations
+**Impact**: Test 4 now proves `b2 == true` (delete must succeed after insert).
+Previously, the delete-failed branch could not be eliminated because the spec
+didn't connect delete failure to key absence.
+
+### ✅ Delete Simplified via hash_search
+
+The `hash_delete` implementation was restructured to call `hash_search`
+internally, followed by a single slot write if found. This naturally provides
+`~(key_in_table s size key)` from `hash_search`'s not-found postcondition,
+simplifying both the implementation and the proof.
 
 ## Verification Details
 
@@ -103,4 +114,4 @@ All other postconditions are precise enough for concrete test instances:
 - **Max z3rlimit used**: 120 (in `test_delete_then_search` and
   `test_insert_no_dup_existing`)
 - **Fuel/ifuel**: 2/1 throughout
-- **Total verification time**: ~15 seconds
+- **Total verification time**: ~20 seconds

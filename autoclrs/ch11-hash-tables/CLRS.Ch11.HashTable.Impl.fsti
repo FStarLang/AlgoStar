@@ -147,7 +147,11 @@ fn hash_insert
                (Seq.index s idx == -1 \/ Seq.index s idx == -2) /\
                Seq.index s' idx == key /\
                seq_modified_at s s' idx))
-       else s' == s) /\
+       else (s' == s /\
+             (forall (q: nat). {:pattern (hash_probe_nat key q (SZ.v size))}
+               q < SZ.v size ==>
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -1 /\
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -2))) /\
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
 //SNIPPET_END: ht_hash_insert
@@ -190,7 +194,11 @@ fn hash_insert_no_dup
                 Seq.index s' idx == key /\
                 seq_modified_at s s' idx /\
                 ~(key_in_table s (SZ.v size) key))))
-       else (s' == s /\ ~(key_in_table s (SZ.v size) key)))
+       else (s' == s /\ ~(key_in_table s (SZ.v size) key) /\
+             (forall (q: nat). {:pattern (hash_probe_nat key q (SZ.v size))}
+               q < SZ.v size ==>
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -1 /\
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -2)))
     )
 //SNIPPET_END: ht_hash_insert_no_dup
 
@@ -263,6 +271,6 @@ fn hash_delete
                Seq.index s idx == key /\
                Seq.index s' idx == -2 /\
                seq_modified_at s s' idx)
-       else Seq.equal s' s)
+       else (Seq.equal s' s /\ ~(key_in_table s (SZ.v size) key)))
     )
 //SNIPPET_END: ht_hash_delete

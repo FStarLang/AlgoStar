@@ -445,17 +445,20 @@ by F\* and Z3.
    key uniqueness as an invariant, ensuring delete always guarantees
    absence.
 
-8. **Insert does not guarantee success when slots are available.**
-   ⚠️ **FOUND VIA SPEC VALIDATION (ImplTest.fst).** The postcondition
-   of `hash_insert` (and `hash_insert_no_dup`) uses `if result then ...
-   else s' == s`. The `else` branch is always satisfiable, even when the
-   table has empty slots. This means callers cannot prove that insert
-   succeeds on a non-full table from the postcondition alone. Strengthening
-   the postcondition to include a "table is full" clause in the false branch
-   was attempted but proved difficult in Pulse/Z3 due to multi-step quantifier
-   instantiation between probe-indexed and slot-indexed universal quantifiers.
-   The `Complexity.count_available` function provides an alternative mechanism
-   for callers to reason about slot availability. See `ImplTest.md` for details.
+8. **~~Insert does not guarantee success when slots are available.~~**
+   ✅ **ADDRESSED.** The `else` branch of `hash_insert` (and
+   `hash_insert_no_dup`) now includes a probe-sequence occupancy constraint:
+   `forall q < size. s[hash_probe(key, q, size)] ≠ -1 ∧ s[hash_probe(key, q, size)] ≠ -2`.
+   For concrete non-full tables, this contradicts the presence of empty/deleted
+   slots, forcing `result == true`. Tests 2–6 in `ImplTest.fst` now directly
+   assert insert success without branching. See `ImplTest.md` for details.
+
+9. **~~Delete does not report key absence on failure.~~**
+   ✅ **ADDRESSED.** The `else` branch of `hash_delete` now includes
+   `~(key_in_table s size key)`. This was achieved by restructuring
+   `hash_delete` to call `hash_search` internally — when search reports
+   not-found, its postcondition naturally provides key absence. Test 4
+   in `ImplTest.fst` now asserts delete success after insert.
 
 ## Complexity
 

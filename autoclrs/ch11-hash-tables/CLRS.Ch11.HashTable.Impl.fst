@@ -183,6 +183,29 @@ let lemma_valid_ht_insert
     )
 #pop-options
 
+// When all size probes found non-empty/non-deleted slots, all slots are full.
+// Uses surjectivity of linear probing: every slot is visited by some probe.
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+let lemma_all_probes_full_implies_all_slots_full
+  (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: int{key >= 0})
+  : Lemma
+    (requires forall (q: nat). {:pattern (hash_probe_nat key q size)}
+      q < size ==> Seq.index s (hash_probe_nat key q size) =!= -1 /\
+                   Seq.index s (hash_probe_nat key q size) =!= -2)
+    (ensures forall (j: nat). j < size ==> Seq.index s j =!= -1 /\ Seq.index s j =!= -2)
+  = introduce forall (j: nat). j < size ==> Seq.index s j =!= -1 /\ Seq.index s j =!= -2
+    with introduce _ ==> _
+    with _. (
+      let h = key % size in
+      let p = (j + size - h) % size in
+      FStar.Math.Lemmas.lemma_mod_add_distr h (j + size - h) size;
+      assert (h + (j + size - h) == j + size);
+      FStar.Math.Lemmas.lemma_mod_plus j 1 size;
+      FStar.Math.Lemmas.modulo_lemma j size;
+      assert (hash_probe_nat key p size == j)
+    )
+#pop-options
+
 // ========== Operations ==========
 
 //SNIPPET_START: ht_helpers_impl
@@ -209,7 +232,7 @@ fn hash_table_free (tv: V.vec int) (#s: erased (Seq.seq int))
 
 // Returns true if successful, false if table is full
 // Proves both correctness and O(n) complexity
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 120 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_insert_impl
 fn hash_insert
   (table: A.array int)
@@ -238,24 +261,26 @@ fn hash_insert
                (Seq.index s idx == -1 \/ Seq.index s idx == -2) /\
                Seq.index s' idx == key /\
                seq_modified_at s s' idx))
-       else s' == s) /\
+       else (s' == s /\
+             (forall (q: nat). {:pattern (hash_probe_nat key q (SZ.v size))}
+               q < SZ.v size ==>
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -1 /\
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -2))) /\
       cf >= reveal c0 /\ cf - reveal c0 <= SZ.v size
     )
 //SNIPPET_END: ht_hash_insert_impl
 {
   let mut i: SZ.t = 0sz;
   let mut inserted: bool = false;
-  let mut done: bool = false;
   
   while (
-    let vdone = !done;
+    let vinserted = !inserted;
     let vi = !i;
-    (not vdone && vi <^ size)
+    (not vinserted && vi <^ size)
   )
-  invariant exists* vi vinserted vdone st vc.
+  invariant exists* vi vinserted st vc.
     R.pts_to i vi **
     R.pts_to inserted vinserted **
-    R.pts_to done vdone **
     A.pts_to table st **
     GR.pts_to ctr vc **
     pure (
@@ -263,7 +288,6 @@ fn hash_insert
       Seq.length st == SZ.v size /\
       valid_ht st (SZ.v size) /\
       // Correctness invariants
-      (vinserted == true ==> vdone == true) /\
       (vinserted == true ==>
         key_in_table st (SZ.v size) key /\
         key_findable st (SZ.v size) key /\
@@ -301,14 +325,10 @@ fn hash_insert
     assert pure (lemma_hash_probe_consistent key vi size; 
                  SZ.v idx == hash_probe_nat key (SZ.v vi) (SZ.v size));
     
-    // Update flags
+    // Update inserted flag
     let vinserted = !inserted;
     let new_inserted = (if can_insert then true else vinserted);
     inserted := new_inserted;
-    
-    let vdone_inner = !done;
-    let new_done = (if can_insert then true else vdone_inner);
-    done := new_done;
     
     i := SZ.add vi 1sz;
   };
@@ -457,86 +477,21 @@ fn hash_delete
                Seq.index s idx == key /\
                Seq.index s' idx == -2 /\
                seq_modified_at s s' idx)
-       else Seq.equal s' s)
+       else (Seq.equal s' s /\ ~(key_in_table s (SZ.v size) key)))
     )
 //SNIPPET_END: ht_hash_delete_impl
 {
-  let mut i: SZ.t = 0sz;
-  let mut deleted_at: SZ.t = size;
-  let mut done: bool = false;
-  
-  while (
-    let vdone = !done;
-    let vi = !i;
-    (not vdone && vi <^ size)
-  )
-  invariant exists* vi vdel vdone st vc.
-    R.pts_to i vi **
-    R.pts_to deleted_at vdel **
-    R.pts_to done vdone **
-    A.pts_to table st **
-    GR.pts_to ctr vc **
-    pure (
-      SZ.v vi <= SZ.v size /\
-      SZ.v vdel <= SZ.v size /\
-      Seq.length st == SZ.v size /\
-      valid_ht st (SZ.v size) /\
-      // Link deletion and done flag: once deleted, done is set
-      (SZ.v vdel < SZ.v size ==> vdone == true) /\
-      // When key was found and deleted
-      (SZ.v vdel < SZ.v size ==> (
-        Seq.index s (SZ.v vdel) == key /\
-        Seq.index st (SZ.v vdel) == -2 /\
-        seq_modified_at s st (SZ.v vdel)
-      )) /\
-      // When key not yet found
-      (SZ.v vdel == SZ.v size ==> Seq.equal st s) /\
-      // Complexity invariant: exactly vi probes so far
-      vc >= reveal c0 /\
-      vc - reveal c0 == SZ.v vi
-    )
-  decreases (SZ.v size - SZ.v !i)
-  {
-    let vi = !i;
-    let idx = hash_probe key vi size;
-    
-    // Tick: one probe operation (array access + comparisons)
-    tick ctr;
-    
-    let slot = A.op_Array_Access table idx;
-    
-    // Found the key — will mark as DELETED (-2)
-    let is_found = (slot = key);
-    
-    // Hit an empty slot — stop searching
-    let is_empty = (slot = -1);
-    
-    // Compute new value: -2 (DELETED) if found, otherwise keep slot unchanged
-    let new_val = (if is_found then -2 else slot);
-    A.op_Array_Assignment table idx new_val;
-    
-    // Preserve valid_ht when deleting
-    assert pure (
-      if is_found
-      then (lemma_valid_ht_delete s (SZ.v size) (SZ.v idx); true)
-      else true
-    );
-    
-    // Update deleted_at if we found the key
-    let vdel = !deleted_at;
-    let new_del = (if is_found then idx else vdel);
-    deleted_at := new_del;
-    
-    // Stop if found or empty
-    let vdone_inner = !done;
-    let new_done = (if (is_found || is_empty) then true else vdone_inner);
-    done := new_done;
-    
-    i := SZ.add vi 1sz;
-  };
-  
-  let result_idx = !deleted_at;
-  (result_idx <^ size)
+  // Use hash_search to find the key, then mark as DELETED if found
+  let search_result = hash_search table size key ctr;
+  if (search_result <^ size) {
+    // Key found at search_result — mark as DELETED (-2)
+    assert pure (lemma_valid_ht_delete s (SZ.v size) (SZ.v search_result); true);
+    A.op_Array_Assignment table search_result (-2);
+    true
+  } else {
+    // Key not found — table unchanged
+    false
+  }
 }
 #pop-options
 
@@ -575,7 +530,11 @@ fn hash_insert_no_dup
                 Seq.index s' idx == key /\
                 seq_modified_at s s' idx /\
                 ~(key_in_table s (SZ.v size) key))))
-       else (s' == s /\ ~(key_in_table s (SZ.v size) key)))
+       else (s' == s /\ ~(key_in_table s (SZ.v size) key) /\
+             (forall (q: nat). {:pattern (hash_probe_nat key q (SZ.v size))}
+               q < SZ.v size ==>
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -1 /\
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -2)))
     )
 //SNIPPET_END: ht_hash_insert_no_dup_impl
 {
