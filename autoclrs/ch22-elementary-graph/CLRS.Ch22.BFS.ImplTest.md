@@ -23,27 +23,37 @@ Adjacency matrix (flat 3×3):
 | Source distance = 0 (`sdist'[0] == 0`) | ✅ | Direct from postcondition |
 | All 3 vertices discovered | ✅ | Reachability witnesses + completeness postcondition |
 | Distance soundness (`sdist'[w] ≥ 0`) | ✅ | Direct from postcondition (universal ∀w) |
+| **dist[1] == 1** | ✅ | Distance uniqueness lemma + postcondition reachability |
+| **dist[2] == 2** | ✅ | Distance uniqueness lemma + postcondition reachability |
 | Complexity bound (`cf ≤ 2·n²`) | ✅ | Direct from postcondition |
 
-### Reachability Witnesses
+### Distance Uniqueness Proofs
 
-Three auxiliary lemmas prove each vertex is reachable from source 0:
+Three auxiliary lemmas prove that for our concrete graph, each vertex's
+distance from source 0 is uniquely determined by the `reachable_in` predicate:
 
-- **Vertex 0:** `reachable_in adj 3 0 0 0` — trivial (base case, 0 steps)
-- **Vertex 1:** `reachable_in adj 3 0 1 1` — via edge 0→1 (1 step)
-- **Vertex 2:** `reachable_in adj 3 0 2 2` — via 0→1→2 (2 steps)
+- **`lemma_only_0_steps_to_0`:** `reachable_in adj 3 0 0 k ⟹ k == 0`
+  No vertex has an edge to vertex 0, so 0 is unreachable from itself in >0 steps.
 
-The completeness postcondition (`∀v k. reachable_in ⟹ scolor'[v] ≠ 0`) then
-implies all three vertices are discovered.
+- **`lemma_only_1_step_to_1`:** `reachable_in adj 3 0 1 k ⟹ k == 1`
+  Only vertex 0 has an edge to 1. A k≥2 step path would require returning
+  to 0 (impossible by the first lemma).
+
+- **`lemma_only_2_steps_to_2`:** `reachable_in adj 3 0 2 k ⟹ k == 2`
+  Only vertex 1 has an edge to 2. A k=1 path requires edge 0→2 (absent).
+  A k≥3 path would require a path of length k-1 to vertex 1 with k-1≥2
+  (impossible by the second lemma).
+
+Combined with the postcondition's `reachable_in sadj 3 0 w (dist[w])`, these
+prove `dist[0]=0, dist[1]=1, dist[2]=2` exactly.
 
 ## What Is NOT Proven
 
 | Property | Status | Reason |
 |----------|--------|--------|
-| `dist[1] == 1` | ❌ Not provable | Postcondition lacks shortest-path guarantee |
-| `dist[2] == 2` | ❌ Not provable | Same: no shortest-path in Impl.fsti |
+| (all target properties proven) | ✅ | — |
 
-### FINDING: Missing Shortest-Path Property
+## Spec Precision Analysis
 
 The BFS postcondition states:
 ```
@@ -56,12 +66,21 @@ is the **minimum** path length. The shortest-path property is:
 ```
 
 This property **is** proven in `BFS.DistanceSpec.fst` (Theorem 22.5) but is
-**not** exposed through `BFS.Impl.fsti`. This is a spec weakness: the
-implementation interface does not capture BFS's fundamental guarantee of
-computing shortest-path distances.
+**not** exposed through `BFS.Impl.fsti`.
 
-**Impact:** For our concrete test graph (unique shortest paths: 0→1 length 1,
-0→1→2 length 2), the postcondition cannot determine exact distance values.
+### Why Distance Precision Succeeds for This Test
+
+For our specific graph (linear chain 0→1→2), each vertex has a **unique**
+path from source 0. The `reachable_in` predicate determines a unique path
+length, so the postcondition IS precise enough to determine exact distances.
+
+However, for graphs with **multiple paths** (e.g., 0→1 and 0→2→1), the
+postcondition would admit `dist[1] = 1` or `dist[1] = 2` — it couldn't
+determine the shortest-path distance.
+
+**Impact:** The BFS spec is precise for DAGs with unique paths but imprecise
+for general graphs. Adding shortest-path optimality to `BFS.Impl.fsti` would
+make the spec universally precise.
 
 **Recommendation:** Add a shortest-path postcondition clause to `BFS.Impl.fsti`:
 ```

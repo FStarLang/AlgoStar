@@ -180,7 +180,7 @@ All tests use the same 3-vertex DAG: 0→1, 1→2. See individual
 
 | Algorithm | Precondition | Postcondition Precision | Spec Issue |
 |-----------|-------------|------------------------|------------|
-| **BFS** | ✅ Satisfiable | ⚠️ Partial — proves completeness, dist[source]=0, but NOT shortest-path distances | **Missing shortest-path guarantee in Impl.fsti** |
+| **BFS** | ✅ Satisfiable | ✅ Strong for unique-path graphs — proves completeness, dist[0]=0, dist[1]=1, dist[2]=2 | Missing shortest-path guarantee for general graphs |
 | **DFS** | ✅ Satisfiable | ⚠️ Partial — proves all BLACK, timestamps, pred_edge_ok, but no graph-theoretic properties | Spec↔Impl disconnect (known) |
 | **TopologicalSort** | ✅ Satisfiable (DAG proof via witness) | ✅ Strong — proves valid topo order, distinct, valid indices | Minor: exact output not determinable |
 
