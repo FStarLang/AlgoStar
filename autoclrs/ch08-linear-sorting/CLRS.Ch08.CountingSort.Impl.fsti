@@ -45,10 +45,9 @@ ensures exists* sb'.
   pure (
     Seq.length sb' == Seq.length sa /\
     S.sorted sb' /\
-    S.permutation sb' sa
+    S.permutation sa sb' /\
+    S.in_range sb' (SZ.v k_val)
   )
-
-// In-place counting sort (simpler 2-phase variant used by RadixSort)
 fn counting_sort_inplace
   (a: A.array nat)
   (len: SZ.t)
@@ -69,7 +68,8 @@ ensures exists* s.
   pure (
     Seq.length s == Seq.length s0 /\
     S.sorted s /\
-    S.permutation s0 s
+    S.permutation s0 s /\
+    S.in_range s (SZ.v k_val)
   )
 
 // Digit-keyed counting sort (for multi-digit radix sort)

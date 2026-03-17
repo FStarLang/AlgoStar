@@ -65,12 +65,14 @@ ensures exists* sb'.
   pure (
     Seq.length sb' == Seq.length sa /\
     S.sorted sb' /\
-    S.permutation sb' sa
+    S.permutation sa sb' /\
+    S.in_range sb' (SZ.v k_val)
   )
 //SNIPPET_END: counting_sort_impl_sig
 {
   if (len = 0sz) {
     L.empty_sorted_perm sb sa;
+    L.empty_sorted_perm sa sb;
     ()
   } else {
   let k_plus_1 = k_val +^ 1sz;
@@ -269,6 +271,10 @@ ensures exists* sb'.
   // Prove sorted and permutation from completed invariants
   SL.phase4_final_sorted sc_final sa sb_final (SZ.v k_val) (SZ.v len);
   SL.phase4_final_perm sc_final sa sb_final (SZ.v k_val) (SZ.v len);
+  // Flip permutation direction (phase4_final_perm proves sb'→sa, we need sa→sb')
+  L.permutation_symmetric sb_final sa;
+  // Prove output in_range from permutation + input in_range
+  L.permutation_preserves_in_range sa sb_final (SZ.v k_val);
   
   V.free c;
   ()
@@ -303,7 +309,8 @@ ensures exists* s.
   pure (
     Seq.length s == Seq.length s0 /\
     S.sorted s /\
-    S.permutation s0 s
+    S.permutation s0 s /\
+    S.in_range s (SZ.v k_val)
   )
 {
   if (len = 0sz) {
@@ -427,6 +434,8 @@ ensures exists* s.
     assert (R.pts_to j n ** R.pts_to cur_v vcv_f ** R.pts_to cur_v_nat vcvn_f **
             R.pts_to pos vpos_f ** V.pts_to c_arr sc_f ** A.pts_to a sa_f);
   L.final_perm s0 sa_f k (SZ.v vpos_f);
+  // Prove output in_range from permutation + input in_range
+  L.permutation_preserves_in_range s0 sa_f (SZ.v k_val);
   V.free c_arr;
   ()
   } // else len > 0

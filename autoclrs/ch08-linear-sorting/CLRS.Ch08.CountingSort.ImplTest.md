@@ -23,6 +23,8 @@ Two of the three functions in `CLRS.Ch08.CountingSort.Impl.fsti`:
      the unique arrangement.
   3. **Concrete verification**: Each output element is read back and
      asserted equal to the expected value.
+  4. **In-range verification**: The `S.in_range s 4` postcondition is
+     verified, confirming all output elements are ≤ `k_val`.
 
 ### Test 2: `counting_sort_impl` (CLRS-faithful, separate I/O)
 
@@ -32,14 +34,15 @@ Two of the three functions in `CLRS.Ch08.CountingSort.Impl.fsti`:
   1. **Precondition satisfiability**: Concrete inputs satisfy all
      preconditions including half-permission sharing (`#0.5R`) for the
      read-only input array.
-  2. **Postcondition precision**: Given `S.sorted sb' ∧ S.permutation sb' sa`
-     (note: permutation direction is output→input here, opposite from the
-     inplace variant), the output is uniquely `[1; 2; 3]`. The completeness
-     lemma handles the reversed permutation direction correctly since
-     `SeqP.permutation` is symmetric.
+  2. **Postcondition precision**: Given `S.sorted sb' ∧ S.permutation sa sb'`
+     (permutation direction: input→output, consistent with `counting_sort_inplace`),
+     the output is uniquely `[1; 2; 3]`. The completeness lemma handles the
+     permutation correctly since `SeqP.permutation` is symmetric.
   3. **Concrete verification**: Each element of the output array `b` is
      read and verified.
-  4. **Resource management**: Demonstrates correct half-permission
+  4. **In-range verification**: The `S.in_range sb' 3` postcondition is
+     verified, confirming all output elements are ≤ `k_val`.
+  5. **Resource management**: Demonstrates correct half-permission
      sharing (`A.share`/`A.gather`) for the read-only input array, and
      proper cleanup of both input and output arrays.
 
@@ -51,6 +54,28 @@ digit-level stability properties that would require substantial auxiliary
 lemma work to verify in a concrete test. This function is primarily a
 subroutine for radix sort and is exercised through the radix sort
 implementation.
+
+## Spec Strengthening (2026-03-17)
+
+The following spec improvements were made to `Impl.fsti`:
+
+1. **Permutation direction normalized**: `counting_sort_impl` previously
+   used `S.permutation sb' sa` (output→input) while `counting_sort_inplace`
+   used `S.permutation s0 s` (input→output). The `counting_sort_impl`
+   postcondition was changed to `S.permutation sa sb'` (input→output)
+   for consistency across the API. This is semantically equivalent since
+   `SeqP.permutation` is symmetric, but makes the API uniform.
+
+2. **`in_range` postcondition added**: Both `counting_sort_impl` and
+   `counting_sort_inplace` now include `S.in_range <output> (SZ.v k_val)`
+   in their postconditions. This is derivable from `permutation + in_range(input)`
+   but stating it explicitly saves callers from needing to prove it themselves.
+   Two supporting lemmas were added to `Lemmas.fsti`/`.fst`:
+   - `permutation_symmetric`: `permutation s1 s2 → permutation s2 s1`
+   - `permutation_preserves_in_range`: `permutation s1 s2 ∧ in_range s1 k → in_range s2 k`
+
+3. **Tests updated**: Both tests now verify the `in_range` postcondition
+   in addition to the existing sorted/permutation checks.
 
 ## Proof Technique
 
@@ -70,25 +95,22 @@ implementation.
 
 - **NO admits. NO assumes.** All proof obligations fully discharged.
 - **Preconditions**: Satisfiable for the tested inputs. No issues found.
-- **Postconditions**: Fully precise — `sorted ∧ permutation` uniquely
-  determines the output for the tested input `[3;1;2]`.
-- **Permutation direction**: `counting_sort_impl` uses
-  `S.permutation sb' sa` (output→input) while `counting_sort_inplace`
-  uses `S.permutation s0 s` (input→output). Both are correct since
-  `SeqP.permutation` is symmetric, but this inconsistency is a minor
-  API style concern.
+- **Postconditions**: Fully precise — `sorted ∧ permutation ∧ in_range`
+  uniquely determines the output for the tested input `[3;1;2]`.
+- **Permutation direction**: Both `counting_sort_impl` and
+  `counting_sort_inplace` now use `S.permutation <input> <output>`
+  (input→output) consistently.
+- **In-range**: Both tests verify the output satisfies
+  `S.in_range <output> k_val`.
 
-## Spec Issues Found
+## Spec Issues Resolved
 
-1. **Permutation direction inconsistency** (minor): `counting_sort_impl`
-   states `S.permutation sb' sa` while `counting_sort_inplace` states
-   `S.permutation s0 s`. This is semantically equivalent but stylistically
-   inconsistent. Not a correctness issue.
+1. **Permutation direction inconsistency** (resolved): Both variants
+   now use `S.permutation <input> <output>` consistently.
 
-2. **No issues with precondition strength**: Preconditions are satisfiable
+2. **Missing `in_range` postcondition** (resolved): Both variants now
+   explicitly guarantee `S.in_range <output> (SZ.v k_val)`.
+
+3. **No issues with precondition strength**: Preconditions are satisfiable
    for reasonable inputs. The `SZ.fits` constraints are non-restrictive
    for practical input sizes.
-
-3. **No issues with postcondition weakness**: `sorted ∧ permutation` is
-   the strongest functional specification for sorting. The postcondition
-   uniquely determines the output.

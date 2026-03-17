@@ -83,7 +83,7 @@ let completeness_inplace (s0 s: Seq.seq nat)
   std_sort3_nat s
 
 (* Completeness for counting_sort_impl:
-   postcondition gives S.permutation sb' sa (output → input) *)
+   postcondition gives S.permutation sa sb' (input → output) *)
 let completeness_impl (sa sb': Seq.seq nat)
   : Lemma
     (requires Seq.length sa == 3 /\
@@ -92,11 +92,11 @@ let completeness_impl (sa sb': Seq.seq nat)
               Seq.index sa 2 == 2 /\
               Seq.length sb' == 3 /\
               S.sorted sb' /\
-              S.permutation sb' sa)
+              S.permutation sa sb')
     (ensures Seq.index sb' 0 == 1 /\ Seq.index sb' 1 == 2 /\ Seq.index sb' 2 == 3)
 = input_is_sort3 sa;
   Seq.lemma_eq_elim sa (Seq.seq_of_list [3; 1; 2]);
-  reveal_opaque (`%S.permutation) (S.permutation sb' sa);
+  reveal_opaque (`%S.permutation) (S.permutation sa sb');
   assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
   assert (forall (x y:nat). (x <= y) == Prims.op_LessThanOrEqual x y);
   std_sort3_nat sb'
@@ -139,6 +139,10 @@ fn test_counting_sort_inplace ()
   assert (pure (v0 == 1));
   assert (pure (v1 == 2));
   assert (pure (v2 == 3));
+
+  // Verify in_range postcondition: all output elements ≤ k_val=4
+  assert (pure (S.in_range s 4));
+  assert (pure (v0 <= 4 /\ v1 <= 4 /\ v2 <= 4));
 
   // Cleanup
   with s2. assert (A.pts_to arr s2);
@@ -198,6 +202,10 @@ fn test_counting_sort_impl ()
   assert (pure (v0 == 1));
   assert (pure (v1 == 2));
   assert (pure (v2 == 3));
+
+  // Verify in_range postcondition: all output elements ≤ k_val=3
+  assert (pure (S.in_range sb' 3));
+  assert (pure (v0 <= 3 /\ v1 <= 3 /\ v2 <= 3));
 
   // Cleanup: free both arrays
   with sa2. assert (A.pts_to a sa2);

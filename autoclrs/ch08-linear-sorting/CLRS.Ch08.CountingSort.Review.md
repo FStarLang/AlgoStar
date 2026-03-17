@@ -26,7 +26,6 @@ requires
     Seq.length sa == A.length a /\
     Seq.length sb == A.length b /\
     S.in_range sa (SZ.v k_val) /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
@@ -36,7 +35,8 @@ ensures exists* sb'.
   pure (
     Seq.length sb' == Seq.length sa /\
     S.sorted sb' /\
-    S.permutation sb' sa
+    S.permutation sa sb' /\
+    S.in_range sb' (SZ.v k_val)
   )
 ```
 
@@ -55,7 +55,6 @@ requires
     SZ.v len == Seq.length s0 /\
     Seq.length s0 == A.length a /\
     S.in_range s0 (SZ.v k_val) /\
-    SZ.v len > 0 /\
     SZ.fits (SZ.v k_val + 2) /\
     SZ.fits (SZ.v len + SZ.v k_val + 2)
   )
@@ -64,7 +63,8 @@ ensures exists* s.
   pure (
     Seq.length s == Seq.length s0 /\
     S.sorted s /\
-    S.permutation s0 s
+    S.permutation s0 s /\
+    S.in_range s (SZ.v k_val)
   )
 ```
 
@@ -334,12 +334,11 @@ the `Impl.fsti` API for `counting_sort_inplace` and `counting_sort_impl`.
 
 - **Preconditions**: Satisfiable for concrete inputs (`[3;1;2]`).
   No overly-strong preconditions found.
-- **Postconditions**: Fully precise — `sorted ∧ permutation` uniquely
-  determines the output for the tested input.
-- **Minor issue**: Permutation argument order is inconsistent between
-  `counting_sort_impl` (`S.permutation sb' sa`, output→input) and
-  `counting_sort_inplace` (`S.permutation s0 s`, input→output). This
-  is semantically equivalent but stylistically inconsistent.
+- **Postconditions**: Fully precise — `sorted ∧ permutation ∧ in_range`
+  uniquely determines the output for the tested input.
+- **Permutation direction**: Both variants now use
+  `S.permutation <input> <output>` (input→output) consistently.
+- **In-range**: Both tests verify `S.in_range <output> k_val`.
 - **`counting_sort_by_digit`**: Not tested (requires opaque stability
   lemma work); exercised via radix sort.
 
@@ -357,6 +356,10 @@ implementation:
 - [x] **P1 (Stabilization)**: Reduce z3rlimit 800 in `counting_sort_inplace`
       (line 284 of Impl.fst). ✅ Reduced to 400 with `--split_queries always`
       (removed `--z3refresh` dependency).
+- [x] **P7 (Spec)**: Normalize permutation direction to input→output
+      across `counting_sort_impl` and `counting_sort_inplace`.
+- [x] **P8 (Spec)**: Add `in_range` postcondition to both
+      `counting_sort_impl` and `counting_sort_inplace`.
 - [ ] **P2 (Stabilization)**: Reduce z3refresh count (19) in
       DigitSortLemmas.fst — indicates solver-state sensitivity.
 - [ ] **P3 (Stabilization)**: Reduce z3rlimit 400 in StableLemmas.fst

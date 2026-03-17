@@ -210,6 +210,32 @@ let final_perm (s0 sa:Seq.seq nat) (k:nat) (pos:nat)
     equal_counts_perm s0 prefix
 #pop-options
 
+/// Permutation is symmetric: permutation s1 s2 → permutation s2 s1
+let permutation_symmetric (s1 s2: Seq.seq nat)
+  : Lemma (requires permutation s1 s2)
+          (ensures permutation s2 s1)
+  = reveal_opaque (`%Spec.permutation) (Spec.permutation s1 s2);
+    reveal_opaque (`%Spec.permutation) (Spec.permutation s2 s1)
+
+/// Permutation preserves in_range: if s1 is in_range k and s2 is a permutation, then s2 is in_range k
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+let permutation_preserves_in_range (s1 s2: Seq.seq nat) (k: nat)
+  : Lemma (requires permutation s1 s2 /\ in_range s1 k)
+          (ensures in_range s2 k)
+  = reveal_opaque (`%Spec.permutation) (Spec.permutation s1 s2);
+    SeqP.lemma_mem_count s1 (fun x -> x <= k);
+    let aux (i:nat{i < Seq.length s2})
+      : Lemma (Seq.index s2 i <= k)
+      = let v = Seq.index s2 i in
+        SeqP.seq_mem_k s2 i;
+        assert (SeqP.mem v s2);
+        assert (SeqP.count v s2 > 0);
+        assert (SeqP.count v s1 > 0);
+        assert (SeqP.mem v s1)
+    in
+    Classical.forall_intro aux
+#pop-options
+
 /// Combined phase 2 step: after writing cnt copies of cur_v at [pos, pos+cnt)
 /// Phase 2 invariant holds for cur_v+1
 #push-options "--z3rlimit 100"

@@ -119,6 +119,14 @@ val final_perm (s0 sa:Seq.seq nat) (k:nat) (pos:nat)
                    permutation s0 (Seq.slice sa 0 pos) /\
                    sorted (Seq.slice sa 0 pos))
 
+val permutation_symmetric (s1 s2: Seq.seq nat)
+  : Lemma (requires permutation s1 s2)
+          (ensures permutation s2 s1)
+
+val permutation_preserves_in_range (s1 s2: Seq.seq nat) (k: nat)
+  : Lemma (requires permutation s1 s2 /\ in_range s1 k)
+          (ensures in_range s2 k)
+
 val phase2_step (sa_before sa_after s0:Seq.seq nat) (pos:nat) (cnt:nat) (cur_v:nat) (k:nat)
   : Lemma (requires phase2_inv sa_before s0 pos cur_v k /\
                     Seq.length sa_after == Seq.length s0 /\
