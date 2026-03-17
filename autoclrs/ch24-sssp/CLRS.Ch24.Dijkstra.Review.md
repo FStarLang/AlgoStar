@@ -301,6 +301,8 @@ Items in priority order for reaching a fully proven, high-quality implementation
 - [x] Tight interface files hiding internal lemmas
 - [x] Inner relax loop extracted for SMT tractability
 - [x] Profiling data recorded (2026-03-16)
+- [x] **Spec validation test** (`Dijkstra.ImplTest.fst`) — 3-vertex graph,
+      postcondition uniquely determines output dist=[0,3,5]. No admits/assumes.
 - [ ] **Reduce Dijkstra.fst verification time** (~144-187s) — the dominant
       bottleneck for the entire chapter; `dijkstra_relax_round` at z3rlimit 120
       with split_queries always is the main cost. Attempted optimizations:
@@ -317,3 +319,10 @@ Items in priority order for reaching a fully proven, high-quality implementation
       `count_ones` utilities noted as "also available in CLRS.Common.CountOnes";
       consider importing from the common module to reduce duplication
 - [ ] **Priority queue variant** — implement O((V+E) log V) with binary heap
+
+## Spec Validation (2026-03-17)
+
+The Dijkstra `Impl.fsti` postcondition was validated against a concrete 3-vertex
+graph (see `Dijkstra.ImplTest.fst` and `Dijkstra.ImplTest.md`). The postcondition
+`forall v. dist[v] == sp_dist(source, v)` is **fully precise** — it uniquely
+determines the output for any input. No spec incompleteness or imprecision found.

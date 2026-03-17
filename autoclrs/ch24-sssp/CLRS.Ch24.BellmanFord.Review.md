@@ -280,6 +280,9 @@ Items in priority order for reaching a fully proven, high-quality implementation
 - [x] `weights_in_range` precondition with sentinel soundness proof
 - [x] Tight interface files hiding internal lemmas
 - [x] Profiling data recorded (2026-03-16)
+- [x] **Spec validation test** (`BellmanFord.ImplTest.fst`) — 3-vertex graph
+      with negative-weight edge (-2), postcondition conditionally determines
+      output dist=[0,4,2]. No admits/assumes.
 - [ ] **Add predecessor array** — output `pred` array with `pred_consistent`
       postcondition, matching Dijkstra's interface and CLRS's π output
 - [ ] **Reduce ShortestPath.Triangle.fst verification time** (~37s) — the
@@ -287,3 +290,23 @@ Items in priority order for reaching a fully proven, high-quality implementation
       bottleneck; consider splitting or adding intermediate assertions
 - [ ] **Best-case / adaptive analysis** — prove early termination when no
       relaxation occurs in a round (CLRS exercise)
+
+## Spec Validation (2026-03-17)
+
+The Bellman-Ford `Impl.fsti` postcondition was validated against a concrete
+3-vertex graph with a negative-weight edge (see `BellmanFord.ImplTest.fst` and
+`BellmanFord.ImplTest.md`). Under the conditions `no_neg_cycles_flat` (proven
+for the test graph) and `no_neg_cycle == true` (runtime), the postcondition
+uniquely determines `dist = [0, 4, 2]`. No spec incompleteness or imprecision
+found.
+
+### Observations
+
+- The postcondition's exact-equality clause requires two conditions:
+  `no_neg_cycles_flat` (external mathematical property) and `no_neg_cycle == true`
+  (algorithm output). This is inherent to Bellman-Ford's correctness theorem but
+  makes testing slightly more complex than Dijkstra's unconditional equality.
+
+- The abstract `inf` sentinel (`val inf : i:int{i > 0}`) prevents proving
+  `weights_in_range` for non-trivial graphs without `friend`-ing the Inf module.
+  The test uses `friend CLRS.Ch24.ShortestPath.Inf` to access `inf = 1000000`.
