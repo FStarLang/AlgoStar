@@ -75,6 +75,25 @@ let post_implies_cost_8 (ft: HSpec.htree) (cf: nat)
     (ensures HSpec.cost ft == 8 /\ cf == 1)
   = greedy_cost_input_8 ()
 
+(* The new tree_leaf_labels_valid postcondition constrains leaf symbols:
+   for any leaf (s, f) in the tree, s < 2 and freq_seq2[s] == f.
+   Since freq_seq2 = [3; 5], this means:
+     - any leaf with freq 3 has sym 0
+     - any leaf with freq 5 has sym 1
+   This proves the tree correctly maps symbols to frequencies. *)
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
+let leaf_labels_constrain_syms (ft: HSpec.htree) (s: nat) (f: pos)
+  : Lemma
+    (requires tree_leaf_labels_valid ft freq_seq2 /\
+             FStar.List.Tot.mem (s, f) (HSpec.leaf_labels ft))
+    (ensures s < 2 /\ Seq.index freq_seq2 s == f /\
+             (f == 3 ==> s == 0) /\
+             (f == 5 ==> s == 1))
+  = assert_norm (Seq.length freq_seq2 == 2);
+    assert_norm (Seq.index freq_seq2 0 == 3);
+    assert_norm (Seq.index freq_seq2 1 == 5)
+#pop-options
+
 (* ---------- Main Test ---------- *)
 
 #push-options "--z3rlimit 40 --fuel 4 --ifuel 2"
@@ -109,13 +128,21 @@ fn test_huffman_2 ()
     pure (HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list s0 0) /\
           HSpec.same_frequency_multiset ft (seq_to_pos_list s0 0) /\
           HSpec.is_wpl_optimal ft (seq_to_pos_list s0 0) /\
-          HCmplx.huffman_merge_bound cf 0 2)
+          HCmplx.huffman_merge_bound cf 0 2 /\
+          tree_leaf_labels_valid ft s0)
   );
 
   // --- Prove cost == 8 and merge count == 1 ---
   post_implies_cost_8 ft cf;
   assert (pure (HSpec.cost ft == 8));
   assert (pure (cf == 1));
+
+  // --- Prove leaf symbol mapping is correct ---
+  // The new tree_leaf_labels_valid postcondition guarantees:
+  // for any leaf (s, f) in the tree, s < 2 and s0[s] == f
+  // Since s0 == freq_seq2 == [3; 5], this constrains:
+  //   sym 0 -> freq 3, sym 1 -> freq 5
+  assert (pure (tree_leaf_labels_valid ft s0));
   
   // --- Drop tree (free_htree takes non-ghost arg; drop is simpler for test) ---
   drop_ (is_htree tree_ptr ft);

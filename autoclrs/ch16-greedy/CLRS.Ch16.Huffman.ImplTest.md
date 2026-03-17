@@ -28,12 +28,21 @@ The test calls `huffman_tree` from `CLRS.Ch16.Huffman.Impl.fsti` on a
 4. **Complexity**: The ghost counter satisfies `huffman_merge_bound cf 0 2`,
    proving exactly `n-1 = 1` merge iteration. Verified: `cf == 1`.
 
+5. **Leaf symbol mapping** (NEW): The postcondition `tree_leaf_labels_valid ft s0`
+   guarantees that every leaf `(s, f)` in the tree satisfies `s < n` and
+   `freq_seq[s] == f`. For the test instance `[3; 5]`, this means:
+   - Any leaf with frequency 3 must have symbol 0
+   - Any leaf with frequency 5 must have symbol 1
+   - Proven via `leaf_labels_constrain_syms` using `assert_norm` on the
+     concrete frequency array
+
 ## Proof Techniques
 
 - `greedy_cost_sorted_unfold` to unfold greedy cost for a 2-element list
 - `greedy_cost_singleton` for base case
 - `greedy_cost_multiset_invariant` to bridge `seq_to_pos_list` and `[3; 5]`
 - `seq_to_pos_list_length` and element-by-element count equality
+- `assert_norm` for concrete `Seq.index` computations on the frequency array
 
 ## Result
 
@@ -43,6 +52,7 @@ The postcondition of `huffman_tree` is precise enough to:
 - Determine the exact cost of the tree (via `greedy_cost` equality)
 - Determine the exact number of merge iterations (via complexity bound)
 - Guarantee WPL optimality (strongest possible statement)
+- Constrain each leaf's symbol to its original array index (via `tree_leaf_labels_valid`)
 
 ## Specification Quality Assessment
 
@@ -52,12 +62,15 @@ The `Impl.fsti` specification for Huffman tree construction is **excellent**:
 - `same_frequency_multiset` ensures the tree uses exactly the right frequencies
 - `cost == greedy_cost` ties the imperative output to the pure algorithm
 - `huffman_merge_bound` provides exact complexity tracking
+- `tree_leaf_labels_valid` (NEW) guarantees each leaf's `sym` field correctly
+  maps to its original index in the input frequency array, enabling
+  verified encoding/decoding of specific symbols
 
-The only limitation is that the tree structure is not uniquely determined
-(multiple trees can have the same WPL), but this is by design — the spec
-correctly captures the relational nature of the output.
-
-No specification improvements needed.
+The tree structure is not uniquely determined (multiple trees can have the
+same WPL), but this is by design — the spec correctly captures the relational
+nature of the output. For inputs with distinct frequencies (like the test case),
+the combination of `same_frequency_multiset` and `tree_leaf_labels_valid`
+uniquely determines the symbol-frequency pairing.
 
 ## Attribution
 

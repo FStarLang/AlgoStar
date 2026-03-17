@@ -368,6 +368,65 @@ let rec all_leaf_freqs_remove_at (entries: list forest_entry) (j: nat) (x: pos)
         all_leaf_freqs_cons e (list_remove_at rest (j - 1)) x
       end
 
+// ========== Leaf label validity ==========
+
+// Per-tree property: every leaf has a valid sym mapping to the input array
+let tree_leaf_labels_valid (ft: HSpec.htree) (freq_seq: Seq.seq int) : prop =
+  forall (sf: (nat & pos)). L.mem sf (HSpec.leaf_labels ft) ==>
+    fst sf < Seq.length freq_seq /\ Seq.index freq_seq (fst sf) == snd sf
+
+// Forest-level: all trees satisfy leaf label validity (recursive definition)
+let rec forest_leaf_labels_valid (active: list forest_entry) (freq_seq: Seq.seq int) : prop =
+  match active with
+  | [] -> True
+  | e :: rest -> tree_leaf_labels_valid (entry_tree e) freq_seq /\
+                 forest_leaf_labels_valid rest freq_seq
+
+// Index-based accessor for forest_leaf_labels_valid
+let rec forest_leaf_labels_valid_index
+  (active: list forest_entry) (j: nat) (freq_seq: Seq.seq int)
+  : Lemma (requires forest_leaf_labels_valid active freq_seq /\ j < L.length active)
+          (ensures tree_leaf_labels_valid (entry_tree (L.index active j)) freq_seq)
+          (decreases j)
+  = match active with
+    | _ :: rest -> if j = 0 then () else forest_leaf_labels_valid_index rest (j - 1) freq_seq
+
+// Merging two trees preserves leaf label validity
+let tree_leaf_labels_valid_internal (l r: HSpec.htree) (f: pos) (freq_seq: Seq.seq int)
+  : Lemma (requires tree_leaf_labels_valid l freq_seq /\ tree_leaf_labels_valid r freq_seq)
+          (ensures tree_leaf_labels_valid (HSpec.Internal f l r) freq_seq)
+  = LP.append_mem_forall (HSpec.leaf_labels l) (HSpec.leaf_labels r)
+
+// Adding a valid tree to the front preserves forest validity
+let forest_leaf_labels_valid_cons
+  (idx: SZ.t) (p: hnode_ptr) (ft: HSpec.htree) (active: list forest_entry) (freq_seq: Seq.seq int)
+  : Lemma (requires tree_leaf_labels_valid ft freq_seq /\
+                    forest_leaf_labels_valid active freq_seq)
+          (ensures forest_leaf_labels_valid ((idx, p, ft) :: active) freq_seq)
+  = ()
+
+// Removing one element preserves forest validity
+let rec forest_leaf_labels_valid_remove_at
+  (active: list forest_entry) (j: nat) (freq_seq: Seq.seq int)
+  : Lemma (requires forest_leaf_labels_valid active freq_seq /\ j < L.length active)
+          (ensures forest_leaf_labels_valid (list_remove_at active j) freq_seq)
+          (decreases j)
+  = match active with
+    | _ :: rest ->
+      if j = 0 then ()
+      else forest_leaf_labels_valid_remove_at rest (j - 1) freq_seq
+
+// Removing two elements preserves forest validity
+let forest_leaf_labels_valid_remove_two
+  (active: list forest_entry) (j1 j2: nat) (freq_seq: Seq.seq int)
+  : Lemma (requires forest_leaf_labels_valid active freq_seq /\
+                    j1 < L.length active /\ j2 < L.length active /\ j1 <> j2)
+          (ensures forest_leaf_labels_valid (list_remove_two active j1 j2) freq_seq)
+  = forest_leaf_labels_valid_remove_at active j1 freq_seq;
+    list_remove_at_length active j1;
+    let j2' : nat = if j2 < j1 then j2 else j2 - 1 in
+    forest_leaf_labels_valid_remove_at (list_remove_at active j1) j2' freq_seq
+
 // ========== Cost tracking infrastructure ==========
 
 // Sum of HSpec.cost of all trees in the active forest

@@ -60,7 +60,8 @@ fn huffman_tree
                   pure (HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list freq_seq 0) /\
                         HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0) /\
                         HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0) /\
-                        HCmplx.huffman_merge_bound cf (reveal c0) (SZ.v n)))
+                        HCmplx.huffman_merge_bound cf (reveal c0) (SZ.v n) /\
+                        tree_leaf_labels_valid ft freq_seq))
 //SNIPPET_END: huffman_tree_iface
 
 // ========== Ghost fold/unfold helpers for is_htree ==========

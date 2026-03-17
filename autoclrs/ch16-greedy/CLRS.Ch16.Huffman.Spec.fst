@@ -216,6 +216,12 @@ let rec leaf_freqs (t: htree) : list pos =
   | Leaf _ f -> [f]
   | Internal _ l r -> leaf_freqs l @ leaf_freqs r
 
+// Definition: Get the list of (sym, freq) pairs from leaves (in order)
+let rec leaf_labels (t: htree) : list (nat & pos) =
+  match t with
+  | Leaf s f -> [(s, f)]
+  | Internal _ l r -> leaf_labels l @ leaf_labels r
+
 //SNIPPET_START: is_optimal
 // Definition: A tree is optimal if its WPL is minimal among all trees with the same leaf frequencies
 let is_optimal (t: htree) (freqs: list pos) : prop =

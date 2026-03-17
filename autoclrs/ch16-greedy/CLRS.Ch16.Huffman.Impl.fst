@@ -282,7 +282,8 @@ fn huffman_tree
                   pure (HSpec.cost ft == HOpt.greedy_cost (seq_to_pos_list freq_seq 0) /\
                         HSpec.same_frequency_multiset ft (seq_to_pos_list freq_seq 0) /\
                         HSpec.is_wpl_optimal ft (seq_to_pos_list freq_seq 0) /\
-                        CLRS.Ch16.Huffman.Complexity.huffman_merge_bound cf (reveal c0) (SZ.v n)))
+                        CLRS.Ch16.Huffman.Complexity.huffman_merge_bound cf (reveal c0) (SZ.v n) /\
+                        tree_leaf_labels_valid ft freq_seq))
 //SNIPPET_END: huffman_tree_sig
 {
   // Allocate node pointer array and PQ
@@ -315,7 +316,8 @@ fn huffman_tree
       SZ.fits (2 * SZ.v n + 2) /\
       Seq.length freq_seq == SZ.v n /\
       (forall (i: nat). i < Seq.length freq_seq ==> Seq.index freq_seq i > 0) /\
-      init_bundle freq_seq nd_contents pq_contents active (SZ.v vi) (SZ.v n)
+      init_bundle freq_seq nd_contents pq_contents active (SZ.v vi) (SZ.v n) /\
+      forest_leaf_labels_valid active freq_seq
     )
   decreases (SZ.v n - SZ.v !i)
   {
@@ -343,6 +345,9 @@ fn huffman_tree
     // Single bundle step maintains ALL invariants
     init_bundle_step freq_seq nd_old (Seq.upd nd_old (SZ.v vi) leaf)
                      pq_old pq_new active_old vi n (freq_val <: pos) leaf;
+    
+    // Leaf label validity: Leaf(vi, freq_val) has valid sym mapping
+    forest_leaf_labels_valid_cons vi leaf (HSpec.Leaf (SZ.v vi) freq_val) active_old freq_seq;
     
     i := vi +^ 1sz;
   };
@@ -377,6 +382,7 @@ fn huffman_tree
       L.length active > 0 /\
       SZ.fits (2 * Seq.length pq_contents + 2) /\
       merge_bundle freq_seq nd_contents pq_contents active (SZ.v n) /\
+      forest_leaf_labels_valid active freq_seq /\
       // Complexity: exactly viter merge iterations so far
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v viter
@@ -469,6 +475,31 @@ fn huffman_tree
       (Some?.v (find_entry_by_idx active0 idx1))
       (Some?.v (find_entry_by_idx active0 idx2));
     
+    // Leaf label validity preservation through merge:
+    // 1. Extract subtree validity from forest
+    forest_leaf_labels_valid_index active0
+      (Some?.v (find_entry_by_idx active0 idx1)) freq_seq;
+    forest_leaf_labels_valid_index active0
+      (Some?.v (find_entry_by_idx active0 idx2)) freq_seq;
+    // 2. Merged tree inherits label validity from both subtrees
+    tree_leaf_labels_valid_internal
+      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+      (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2))))
+      (sum_freq <: pos) freq_seq;
+    // 3. Remaining forest (after removing two) still valid
+    forest_leaf_labels_valid_remove_two active0
+      (Some?.v (find_entry_by_idx active0 idx1))
+      (Some?.v (find_entry_by_idx active0 idx2)) freq_seq;
+    // 4. Cons merged tree onto remaining forest
+    forest_leaf_labels_valid_cons idx1 merged
+      (HSpec.Internal (sum_freq <: pos)
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx1))))
+        (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2)))))
+      (list_remove_two active0
+        (Some?.v (find_entry_by_idx active0 idx1))
+        (Some?.v (find_entry_by_idx active0 idx2)))
+      freq_seq;
+    
     // Count one merge iteration — ghost tick
     tick ctr;
     
@@ -535,6 +566,9 @@ fn huffman_tree
   HOpt.greedy_cost_implies_optimal
     (entry_tree (L.index active_final 0))
     (seq_to_pos_list freq_seq 0);
+  
+  // Prove tree_leaf_labels_valid from forest invariant
+  forest_leaf_labels_valid_index active_final 0 freq_seq;
   
   // Clean up
   PQ.free pq;
