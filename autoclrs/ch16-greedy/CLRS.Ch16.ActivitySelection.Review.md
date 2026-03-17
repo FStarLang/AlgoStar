@@ -268,5 +268,22 @@ rlimits, no `split_queries`. This is a model for proof hygiene.
 - [x] Greedy choice property proven (CLRS Theorem 16.1)
 - [x] `Complexity.fsti` imports used by `Impl.fsti` — ~~no~~  definition imported
 - [x] Stable proofs (max z3rlimit 40, no z3refresh)
-- [ ] Add `TestActivitySelection.fst` smoke test
+- [x] Add `TestActivitySelection.fst` smoke test
+- [x] `CLRS.Ch16.ActivitySelection.ImplTest.fst` — spec validation test (verified 2026-03-16)
+- [x] Postcondition precision verified: count, selection indices, complexity all uniquely determined
 - [x] `Impl.fsti` imports `complexity_bounded_linear` from `Complexity` module (fixed 2026-03-16)
+
+## Spec Validation Summary
+
+**ImplTest result: PASS** — The `Impl.fsti` specification is maximally precise.
+
+- **Precondition**: Satisfiable for n=3 with sorted finish times and valid activities.
+  Not overly restrictive (handles n=0).
+- **Postcondition — count**: `max_compatible_count` uniquely determines count=2
+  for the test instance `{(1,4),(3,5),(5,7)}`. Verified via `reveal_opaque`,
+  `compatible_0_2` (lower bound), and `no_compatible_3` (upper bound).
+- **Postcondition — selection**: Output indices uniquely determined as `{0, 2}`.
+  `sel[0]=0` from greedy choice; `sel[1]=2` from `pairwise_compatible` and
+  `earliest_compatible` (activity 1 is incompatible with activity 0).
+- **Postcondition — complexity**: `cf - c0 == n - 1 = 2`, exactly 2 comparisons.
+- **No spec issues found.** No assumes or admits in the test.

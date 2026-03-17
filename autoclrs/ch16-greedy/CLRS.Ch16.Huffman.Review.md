@@ -317,4 +317,36 @@ After the loop, a single tree remains. The bridge lemma
 - [ ] Reduce `Spec.fst` z3rlimit from 600
 - [ ] Prove O(n log n) complexity for PQ-based Pulse implementation
 - [ ] Add test cases for edge cases (1 symbol, 2 symbols, equal frequencies)
+- [x] `CLRS.Ch16.Huffman.ImplTest.fst` — spec validation test for tree construction (verified 2026-03-16)
+- [x] `CLRS.Ch16.Huffman.Codec.ImplTest.fst` — spec validation test for codec (verified 2026-03-16)
+- [x] Postcondition precision verified: cost, optimality, multiset, complexity all precise
 - [ ] Consider facade `Huffman.Lemmas.fst/.fsti` re-exporting key lemma signatures
+
+## Spec Validation Summary
+
+### Huffman Tree (ImplTest)
+
+**ImplTest result: PASS** — The `Impl.fsti` specification is maximally precise.
+
+- **Precondition**: Satisfiable for n=2 with frequencies [3, 5].
+- **Postcondition — cost**: `cost ft == greedy_cost([3,5]) == 8` uniquely determined
+  via `greedy_cost_sorted_unfold` and `greedy_cost_singleton`.
+- **Postcondition — optimality**: `is_wpl_optimal ft [3,5]` — strongest possible
+  statement (minimizes WPL over all trees with same multiset).
+- **Postcondition — multiset**: `same_frequency_multiset ft [3,5]` — verified.
+- **Postcondition — complexity**: `huffman_merge_bound cf 0 2` gives `cf == 1`
+  (exactly n-1=1 merge iteration).
+- **No spec issues found.** No assumes or admits in the test.
+
+### Huffman Codec (Codec.ImplTest)
+
+**ImplTest result: PASS** — The `Codec.Impl.fsti` specifications are maximally precise.
+
+- **decode_impl**: Postcondition ties output to `HCodec.decode` pure result.
+  For `[true; false]` on tree `Internal 8 (Leaf 0 3) (Leaf 1 5)`,
+  uniquely determines decoded message `[0; 1]`.
+- **encode_impl**: Postcondition ties output to `HCodec.encode` pure result.
+  For message `[0; 1]`, uniquely determines encoding `[true; false]`.
+- Both tests construct the tree manually via `Box.alloc` + `intro_is_htree_*`
+  ghost operations, demonstrating `is_htree` satisfiability.
+- **No spec issues found.** No assumes or admits in the tests.
