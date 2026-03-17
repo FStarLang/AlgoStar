@@ -55,3 +55,9 @@ val pulse_correctness_hint (s0 s_final: seq int) (k: nat)
                     (forall (i: nat). k < i /\ i < Seq.length s_final ==>
                       Seq.index s_final k <= Seq.index s_final i))
           (ensures Seq.index s_final k == select_spec s0 k)
+
+/// Bridge: Seq.Properties.permutation ==> Spec.is_permutation (given equal lengths)
+val seq_perm_implies_is_perm (s1 s2: seq int)
+  : Lemma (requires Seq.Properties.permutation int s1 s2 /\
+                    Seq.length s1 == Seq.length s2)
+          (ensures is_permutation s1 s2)

@@ -3,68 +3,69 @@
 ## Overview
 
 Tests `select` from `CLRS.Ch09.PartialSelectionSort.Impl` on a concrete
-3-element array `[5, 2, 8]` with k=1 (1-indexed), expecting result == 2.
+3-element array `[5, 2, 8]` with k=1, k=2, k=3 (1-indexed), expecting
+results 2, 5, 8 respectively.
 
 **Source:** Adapted from
 [Test.PartialSelectionSort.fst](https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch09-order-statistics/Test.PartialSelectionSort.fst)
 
 ## What is tested
 
-| Test function  | Input     | k  | Expected |
-|----------------|-----------|---:|----------|
-| `test_select`  | [5, 2, 8] | 1  | 2        |
+| Test function    | Input     | k  | Expected |
+|------------------|-----------|---:|----------|
+| `test_select_k1` | [5, 2, 8] | 1  | 2        |
+| `test_select_k2` | [5, 2, 8] | 2  | 5        |
+| `test_select_k3` | [5, 2, 8] | 3  | 8        |
 
 ## What is proven
 
 1. **Precondition satisfiability**: `select` can be called with `n > 0`,
    `k > 0`, `k <= n` (k is 1-indexed).
 
-2. **Postcondition precision**: The postcondition provides:
-   - `permutation s0 s_final` (opaque to SMT)
-   - `sorted_prefix s_final k` — first k elements are sorted
-   - `prefix_leq_suffix s_final k` — first k elements ≤ remaining
-   - `result == s_final[k-1]` — result is the last sorted element
+2. **Postcondition precision**: The strengthened postcondition includes
+   `result == select_spec s0 (k-1)`, which directly links the result to the
+   k-th smallest element of the sorted input. This is verified via
+   `assert_norm` for each concrete input:
+   - `select_spec [5;2;8] 0 = (pure_sort [5;2;8])[0] = [2;5;8][0] = 2`
+   - `select_spec [5;2;8] 1 = (pure_sort [5;2;8])[1] = [2;5;8][1] = 5`
+   - `select_spec [5;2;8] 2 = (pure_sort [5;2;8])[2] = [2;5;8][2] = 8`
 
-   For k=1, `prefix_leq_suffix s_final 1` means `s_final[0] ≤ s_final[j]`
-   for all `j ≥ 1`. Combined with the permutation, this uniquely determines
-   `s_final[0] == 2` (the minimum of {5, 2, 8}).
+3. **No admits, no assumes**: All assertions are proven by SMT + `assert_norm`.
 
-3. **No admits, no assumes**: All assertions are proven by SMT.
+## Spec strengthening
 
-## Proof technique
+The `select` postcondition was strengthened to include
+`result == PSSSpec.select_spec s0 (SZ.v k - 1)`, matching the approach used by
+`quickselect`. This was achieved by:
 
-The `permutation` predicate in `CLRS.Ch09.PartialSelectionSort.Impl` is
-marked `[@@"opaque_to_smt"]`, so Z3 cannot directly reason about element
-counts. The test uses:
+1. Adding a `seq_perm_implies_is_perm` bridge lemma to
+   `PartialSelectionSort.Lemmas` that converts from `Seq.Properties.permutation`
+   to the `count_occ`-based `is_permutation` used by `pulse_correctness_hint`.
 
-1. **`with s_final cf.`** to bind the existential output sequence
-2. **`reveal_opaque`** to expose `Seq.Properties.permutation int s0 s_final`
-3. **`completeness_select_k1`** — a pure lemma that uses count-based reasoning:
-   - `SP.count 2 [5;2;8] == 1`, `SP.count 5 ... == 1`, `SP.count 8 ... == 1`
-   - Boundary counts: `SP.count 0 ... == 0`, `SP.count 1 ... == 0`, etc.
-   - With permutation + minimum property, Z3 determines `s_final[0] == 2`
+2. Adding a `select_correctness` helper in `Impl.fst` that:
+   - Reveals the opaque `permutation` predicate
+   - Bridges to `is_permutation`
+   - Calls `pulse_correctness_hint` to establish `s_final[k-1] == select_spec s0 (k-1)`
 
-This pattern mirrors the completeness lemma used in `CLRS.Ch07.Quicksort.ImplTest`.
+**Previous approach**: The test required a custom `completeness_select_k1` lemma
+using `reveal_opaque` and count-based reasoning (`SP.count`) to determine the
+output from the opaque permutation. This was complex and only covered k=1.
+
+**New approach**: The `result == select_spec s0 (k-1)` postcondition clause
+is directly computable via `assert_norm`, making test validation trivial for
+any value of k. No `reveal_opaque` or completeness lemmas needed in tests.
 
 ## Proof details
 
 - `--z3rlimit 400 --fuel 8 --ifuel 4`
-- Total verification time: ~6s
-- The completeness lemma takes ~1.8s; the `completeness_select_k1 s_final`
-  call inside the Pulse function takes ~2.7s.
+- The `select_spec_*` helper lemmas use `assert_norm` to normalize `select_spec`
+  (via `pure_sort`, an insertion sort on sequences) for concrete inputs.
 
 ## Spec assessment
 
-**Postcondition quality: PRECISE but requires effort** — The postcondition
-is mathematically precise (sorted prefix + prefix ≤ suffix + permutation
-uniquely determines the result), but the opaque `permutation` requires
-`reveal_opaque` and a completeness lemma to prove precision.
-
-**Comparison with Quickselect**: The Quickselect postcondition includes
-`result == select_spec s0 k`, which is directly computable via `assert_norm`
-and does not require revealing the opaque permutation. The PartialSelectionSort
-postcondition lacks this functional characterization, making spec validation
-harder but not impossible.
-
-**No spec weakness found**: The postcondition is strong enough to determine
-the result for any concrete input, given sufficient proof effort.
+**Postcondition quality: PRECISE** — The `result == select_spec s0 (k-1)` clause
+is the strongest possible specification for a selection algorithm. It directly
+states that the result is the (k-1)-th element of the sorted input (k is
+1-indexed in `select`). The sorted_prefix, prefix_leq_suffix, and permutation
+properties are also maintained. This matches the precision of the Quickselect
+specification.

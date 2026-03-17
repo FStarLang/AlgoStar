@@ -207,3 +207,24 @@ let pulse_correctness_hint (s0 s_final: seq int) (k: nat)
           (ensures Seq.index s_final k == select_spec s0 k)
   = partition_pivot_is_kth s0 s_final k 0 k (Seq.length s0)
 #pop-options
+
+// ========== Bridge: Seq.Properties.permutation ==> count_occ-based is_permutation ==========
+
+let rec count_eq (s: seq int) (x: int)
+  : Lemma (ensures Seq.Properties.count x s = count_occ s x)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else (
+      assert (Seq.head s == Seq.index s 0);
+      count_eq (Seq.tail s) x
+    )
+
+let seq_perm_implies_is_perm (s1 s2: seq int)
+  : Lemma (requires Seq.Properties.permutation int s1 s2 /\
+                    Seq.length s1 == Seq.length s2)
+          (ensures is_permutation s1 s2)
+  = let aux (x: int) : Lemma (count_occ s1 x = count_occ s2 x) =
+      count_eq s1 x;
+      count_eq s2 x
+    in
+    Classical.forall_intro aux

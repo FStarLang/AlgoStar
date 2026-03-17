@@ -27,6 +27,8 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Classical = FStar.Classical
 module GR = Pulse.Lib.GhostReference
+module PSSSpec = CLRS.Ch09.PartialSelectionSort.Spec
+module PSSLemmas = CLRS.Ch09.PartialSelectionSort.Lemmas
 
 // ========== Definitions ==========
 
@@ -162,6 +164,31 @@ fn find_min_index_from
 }
 #pop-options
 
+// ========== select correctness bridge ==========
+
+/// Bridge from opaque permutation + sorted_prefix + prefix_leq_suffix
+/// to select_spec, using pulse_correctness_hint.
+#push-options "--z3rlimit 40"
+let select_correctness (s0 s_final: Seq.seq int) (k: nat)
+  : Lemma
+    (requires k > 0 /\ k <= Seq.length s0 /\
+              Seq.length s_final == Seq.length s0 /\
+              permutation s0 s_final /\
+              sorted_prefix s_final k /\
+              prefix_leq_suffix s_final k)
+    (ensures Seq.index s_final (k `Prims.op_Subtraction` 1) ==
+             PSSSpec.select_spec s0 (k `Prims.op_Subtraction` 1))
+  = let p = k `Prims.op_Subtraction` 1 in
+    // From sorted_prefix: ∀ i < p. s_final[i] ≤ s_final[p] (since i < k-1 < k)
+    assert (forall (i: nat). i < p ==> Seq.index s_final i <= Seq.index s_final p);
+    // From prefix_leq_suffix: ∀ j ≥ k. s_final[k-1] ≤ s_final[j]
+    assert (forall (i: nat). p < i /\ i < Seq.length s_final ==>
+              Seq.index s_final p <= Seq.index s_final i);
+    reveal_opaque (`%permutation) (permutation s0 s_final);
+    PSSLemmas.seq_perm_implies_is_perm s0 s_final;
+    PSSLemmas.pulse_correctness_hint s0 s_final p
+#pop-options
+
 // ========== select — single function, correctness + complexity ==========
 
 #push-options "--z3rlimit 20 --ifuel 2 --fuel 2"
@@ -191,6 +218,7 @@ fn select
       prefix_leq_suffix s_final (SZ.v k) /\
       SZ.v k > 0 /\
       result == Seq.index s_final (SZ.v k `Prims.op_Subtraction` 1) /\
+      result == PSSSpec.select_spec s0 (SZ.v k `Prims.op_Subtraction` 1) /\
       complexity_bounded_select cf (reveal c0) (SZ.v n) (SZ.v k)
     )
 //SNIPPET_END: select
@@ -234,6 +262,7 @@ fn select
   with s_arr. assert (A.pts_to a s_arr);
   let value = a.(idx);
   assert (pure (value == Seq.index s_arr (SZ.v idx)));
+  select_correctness s0 s_arr (SZ.v k);
   value
 }
 #pop-options
