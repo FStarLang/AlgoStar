@@ -53,15 +53,38 @@ evaluate the recursive spec functions on the concrete inputs:
 Each lemma verifies with `= ()` (trivial proof body), meaning SMT evaluates
 the recursive spec fully on the concrete instance.
 
-## Spec Weaknesses Found
+### Semantic Properties (Strengthened Postconditions)
 
-**None.** All postconditions are fully precise for the tested inputs:
-- `find_bottom`: correctly identifies the bottom-most point
-- `polar_cmp`: correctly computes the polar angle comparison
-- `pop_while`: correctly pops non-left-turn entries and stops at a left turn
+The following properties are now proven directly from the strengthened
+postconditions, without needing to invoke separate lemmas:
 
-The postconditions are as strong as possible: each result equals its pure
-specification counterpart, which evaluates to a unique value.
+| Property | Function | Test Assertion |
+|----------|----------|----------------|
+| `is_bottommost sxs sys (SZ.v result)` | `find_bottom` | Point 0 is lexicographically minimum (y, then x) among all points |
+| `SZ.v result >= 1` | `pop_while` | Stack is never emptied — at least 1 element remains |
+| `ensures_left_turn sxs sys shull (SZ.v result) 3` | `pop_while` | When result ≥ 2, the top two hull elements with the new point form a left turn (cp > 0) |
+
+These properties were previously only available via explicit lemma invocation
+(`find_bottom_is_bottommost`, `pop_while_spec_ge_1`, `pop_while_ensures_left_turn`).
+Now they are part of the Impl.fsti postconditions, making them available to
+all clients automatically.
+
+## Spec Weaknesses Found and Addressed
+
+Three weaknesses were identified and fixed:
+
+1. **`find_bottom` lacked geometric meaning.** The postcondition only said
+   `result == find_bottom_spec sxs sys` without asserting that the result
+   is the bottom-most point. **Fixed:** Added `is_bottommost sxs sys (SZ.v result)`.
+
+2. **`pop_while` lacked stack-size lower bound.** The postcondition said
+   `result <= top_in` but not `result >= 1`. Callers (e.g., `graham_scan_step`)
+   needed this to index into the hull array. **Fixed:** Added `result >= 1`.
+
+3. **`pop_while` lacked left-turn guarantee.** The key geometric invariant —
+   that popping stops at a left turn — was not in the postcondition.
+   **Fixed:** Added `ensures_left_turn` predicate (defined in Spec.fst with
+   bounds-safe guards for Pulse compatibility).
 
 ## Verification
 

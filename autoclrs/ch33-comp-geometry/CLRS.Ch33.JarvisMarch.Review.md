@@ -97,10 +97,12 @@ means the arrays are read-only.
 
 ### Postconditions
 
-* **`find_leftmost`**: `result == find_leftmost_spec sxs sys` and
-  `result < len`.
-* **`find_next`**: `result == find_next_spec sxs sys current` and
-  `result < len`.
+* **`find_leftmost`**: `result == find_leftmost_spec sxs sys`,
+  `result < len`, and `is_leftmost sxs sys result` (the result is the
+  lexicographic minimum by x then y).
+* **`find_next`**: `result == find_next_spec sxs sys current`,
+  `result < len`, and `result <> current` (always advances to a
+  different point, guaranteeing progress in the Jarvis march loop).
 * **`jarvis_march`**: `h == jarvis_march_spec sxs sys`, `h >= 1`, and
   `h <= len`. The result is the number of hull vertices.
 

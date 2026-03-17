@@ -106,11 +106,15 @@ parameter means the arrays are read-only (fractional permission).
 
 Each function's result is proven equal to its pure specification:
 
-* **`find_bottom`**: `result == find_bottom_spec sxs sys` and
-  `result < len` (in-bounds).
+* **`find_bottom`**: `result == find_bottom_spec sxs sys`,
+  `result < len` (in-bounds), and `is_bottommost sxs sys result`
+  (the result is the lexicographic minimum by y then x).
 * **`polar_cmp`**: `result == polar_cmp_spec sxs sys p0 a b`.
-* **`pop_while`**: `result == pop_while_spec sxs sys shull top_in p_idx`
-  and `result <= top_in` (stack can only shrink).
+* **`pop_while`**: `result == pop_while_spec sxs sys shull top_in p_idx`,
+  `result <= top_in` (stack can only shrink), `result >= 1` (stack is
+  never emptied), and `ensures_left_turn sxs sys shull result p_idx`
+  (when result ≥ 2, the top two hull elements with the new point form
+  a left turn — the key geometric invariant).
 
 All three functions return arrays unchanged (read-only access).
 

@@ -4,6 +4,10 @@
    Tests that the Impl.fsti postconditions are:
    1. Satisfiable — each function's precondition can be met with concrete arrays.
    2. Precise — the postcondition uniquely determines the output.
+   3. Semantically strong — postconditions expose key properties:
+      - find_bottom: is_bottommost (the result truly is the bottom-most point)
+      - pop_while: result >= 1 (stack is never emptied) and
+        ensures_left_turn (when result >= 2, a left turn is guaranteed)
 
    Test instances:
    - find_bottom, polar_cmp: triangle (0,0), (2,0), (1,2)
@@ -104,6 +108,9 @@ fn test_find_bottom ()
   // Helper lemma evaluates the spec to 0
   find_bottom_triangle_lemma sxs sys;
   assert (pure (SZ.v result == 0));
+
+  // Strengthened postcondition: result is truly the bottom-most point
+  assert (pure (is_bottommost sxs sys (SZ.v result)));
 
   // Cleanup
   with sx. assert (A.pts_to xs sx);
@@ -222,6 +229,12 @@ fn test_pop_while ()
   // Postcondition: SZ.v result == pop_while_spec sxs sys shull 3 3
   pop_while_concrete_lemma sxs sys shull;
   assert (pure (SZ.v result == 2));
+
+  // Strengthened postcondition: stack is never emptied
+  assert (pure (SZ.v result >= 1));
+
+  // Strengthened postcondition: left-turn guarantee at the new top
+  assert (pure (ensures_left_turn sxs sys shull (SZ.v result) 3));
 
   // Cleanup
   with sx. assert (A.pts_to xs sx);

@@ -4,10 +4,14 @@
    Tests that the Impl.fsti postconditions are:
    1. Satisfiable — each function's precondition can be met with concrete arrays.
    2. Precise — the postcondition uniquely determines the output.
+   3. Semantically strong — postconditions expose key properties:
+      - find_leftmost: is_leftmost (the result truly is the leftmost point)
+      - find_next: result <> current (always advances to a different point)
 
    Test instance: triangle (0,0), (2,0), (1,2) — all 3 points on the convex hull.
    - find_leftmost returns 0 (minimum x-coordinate)
    - find_next from 0 returns 1 (most clockwise from (0,0) is (2,0))
+   - find_next from 1 returns 2, from 2 returns 0 (full cycle)
    - jarvis_march returns 3 (all 3 points are hull vertices)
 
    Zero admits. Zero assumes. All assertions proven by SMT.
@@ -112,6 +116,9 @@ fn test_find_leftmost ()
   find_leftmost_triangle_lemma sxs sys;
   assert (pure (SZ.v result == 0));
 
+  // Strengthened postcondition: result is truly the leftmost point
+  assert (pure (is_leftmost sxs sys (SZ.v result)));
+
   // Cleanup
   with sx. assert (A.pts_to xs sx);
   rewrite (A.pts_to xs sx) as (A.pts_to (V.vec_to_array vx) sx);
@@ -157,11 +164,25 @@ fn test_find_next ()
   with sys. assert (A.pts_to ys sys);
 
   // find_next from vertex 0: the most clockwise point from (0,0) is (2,0) = index 1
-  let result = find_next xs ys 3sz 0sz;
-
-  // Postcondition: SZ.v result == find_next_spec sxs sys 0
+  let r0 = find_next xs ys 3sz 0sz;
   find_next_from_0_lemma sxs sys;
-  assert (pure (SZ.v result == 1));
+  assert (pure (SZ.v r0 == 1));
+  // Strengthened postcondition: result always advances
+  assert (pure (SZ.v r0 <> 0));
+
+  // find_next from vertex 1: the most clockwise from (2,0) is (1,2) = index 2
+  let r1 = find_next xs ys 3sz 1sz;
+  find_next_from_1_lemma sxs sys;
+  assert (pure (SZ.v r1 == 2));
+  assert (pure (SZ.v r1 <> 1));
+
+  // find_next from vertex 2: the most clockwise from (1,2) is (0,0) = index 0
+  let r2 = find_next xs ys 3sz 2sz;
+  find_next_from_2_lemma sxs sys;
+  assert (pure (SZ.v r2 == 0));
+  assert (pure (SZ.v r2 <> 2));
+
+  // Full cycle: 0 → 1 → 2 → 0 (all three hull edges tested)
 
   // Cleanup
   with sx. assert (A.pts_to xs sx);

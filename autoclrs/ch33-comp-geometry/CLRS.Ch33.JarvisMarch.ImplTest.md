@@ -9,6 +9,8 @@
 |----------|---------------|-----------------|---------|
 | `find_leftmost` | Triangle (0,0),(2,0),(1,2) | 0 (min x-coordinate) | ✅ |
 | `find_next` | From vertex 0 of triangle | 1 (most clockwise from origin) | ✅ |
+| `find_next` | From vertex 1 of triangle | 2 (most clockwise from (2,0)) | ✅ |
+| `find_next` | From vertex 2 of triangle | 0 (most clockwise from (1,2)) | ✅ |
 | `jarvis_march` | Triangle (0,0),(2,0),(1,2) | 3 (all points on hull) | ✅ |
 
 `jarvis_march_with_hull` is not tested separately because it shares the same
@@ -60,15 +62,37 @@ helper lemmas evaluate the recursive spec functions:
 The composed lemma demonstrates that the postconditions are precise enough to
 determine the exact hull vertex count for a concrete triangle.
 
-## Spec Weaknesses Found
+### Semantic Properties (Strengthened Postconditions)
 
-**None.** All postconditions are fully precise for the tested inputs:
-- `find_leftmost`: correctly identifies the leftmost point
-- `find_next`: correctly selects the most clockwise next vertex
-- `jarvis_march`: correctly counts all hull vertices
+The following properties are now proven directly from the strengthened
+postconditions, without needing to invoke separate lemmas:
 
-The postconditions are as strong as possible: each result equals its pure
-specification counterpart, which evaluates to a unique value on concrete inputs.
+| Property | Function | Test Assertion |
+|----------|----------|----------------|
+| `is_leftmost sxs sys (SZ.v result)` | `find_leftmost` | Point 0 is lexicographically leftmost (min x, tiebreak min y) |
+| `SZ.v result <> SZ.v current` | `find_next` | Result always advances to a different point (guarantees progress) |
+
+The `find_next` progress property is tested from all three vertices:
+- From 0: result is 1 ≠ 0 ✅
+- From 1: result is 2 ≠ 1 ✅
+- From 2: result is 0 ≠ 2 ✅
+
+This confirms the full cycle 0→1→2→0 and that the strengthened postcondition
+correctly reflects the progress guarantee at every step.
+
+## Spec Weaknesses Found and Addressed
+
+Two weaknesses were identified and fixed:
+
+1. **`find_leftmost` lacked geometric meaning.** The postcondition only said
+   `result == find_leftmost_spec sxs sys` without asserting that the result
+   is the leftmost point. **Fixed:** Added `is_leftmost sxs sys (SZ.v result)`.
+
+2. **`find_next` lacked progress guarantee.** The postcondition did not assert
+   `result <> current`, which is critical for Jarvis march termination. Without
+   this, a caller could not prove the loop always advances. The lemma
+   `find_next_spec_not_current` proved this, but it wasn't exposed in the spec.
+   **Fixed:** Added `SZ.v result <> SZ.v current` to the postcondition.
 
 ### Note on `find_next_all_left_of` (from Lemmas module)
 The `find_next_all_left_of` correctness lemma in `CLRS.Ch33.JarvisMarch.Lemmas`
