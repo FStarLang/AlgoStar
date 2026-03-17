@@ -305,6 +305,20 @@ Key lemmas in `CLRS.Ch02.MergeSort.Lemmas`:
 | `CLRS.Ch02.MergeSort.Lemmas.fst` | Lemma proofs (merge correctness, suffix stepping) |
 | `CLRS.Common.SortSpec.fst` | `sorted`, `permutation` definitions |
 
+## Spec Validation (2026-03-17)
+
+A spec validation test (`CLRS.Ch02.MergeSort.ImplTest.fst`) was written
+following the methodology from
+[arXiv:2406.09757](https://arxiv.org/abs/2406.09757). The test calls
+`merge_sort` on the concrete input `[3; 1; 2]` and proves, using only the
+postcondition, that the output is exactly `[1; 2; 3]`.
+
+**Result: PASS.** The postcondition `sorted s ∧ permutation s0 s` is
+sufficiently precise to uniquely determine the output. No admits, no assumes.
+No spec incompleteness or imprecision issues were found.
+
+See `CLRS.Ch02.MergeSort.ImplTest.md` for full details.
+
 ## Priority Checklist
 
 Items in priority order for reaching a fully proven, high-quality implementation:
