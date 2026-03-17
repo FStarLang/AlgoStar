@@ -251,6 +251,8 @@ Priority-ordered items to reach a fully proven, high-quality implementation:
 - [ ] **P2: Extract shared ghost tick infrastructure.** `incr_nat` and `tick`
   are duplicated across BinarySearch.Impl, Kadane, and MatrixMultiply.Impl.
   Extract to `CLRS.Common.GhostComplexity`.
-- [ ] **P3: Test.MaxSubarray.fst is a stub.** The test file only prints
-  strings — it never calls `max_subarray`. Write an actual Pulse test that
-  calls the algorithm on a concrete array and verifies the result.
+- [x] **P3: Spec validation test.** `CLRS.Ch04.MaxSubarray.Kadane.ImplTest.fst`
+  proves postcondition precision on concrete input `[-1, 3, -2]`:
+  result == 3 (max subarray is [3] at index 1). Zero admits, zero assumes.
+  See `CLRS.Ch04.MaxSubarray.Kadane.ImplTest.md` for details.
+  **No spec weaknesses found.**

@@ -211,3 +211,9 @@ Priority-ordered items to reach a fully proven, high-quality implementation:
 - [ ] **P4: Local `is_sorted` definition.** Consider reusing
   `CLRS.Common.SortSpec.sorted` to avoid friction when composing with sorting
   algorithms from other chapters.
+- [x] **P5: Spec validation test.** `CLRS.Ch04.BinarySearch.ImplTest.fst`
+  proves postcondition precision on concrete input `[1, 3, 5]`:
+  - Found case (key=3): postcondition uniquely determines `result == 1`
+  - Not found case (key=2): postcondition uniquely determines `result == 3`
+  - Zero admits, zero assumes. See `CLRS.Ch04.BinarySearch.ImplTest.md`
+  for details. **No spec weaknesses found.**

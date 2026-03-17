@@ -245,6 +245,9 @@ Priority-ordered items to reach a fully proven, high-quality implementation:
   Noted as cross-cutting concern; extract to `CLRS.Common.GhostComplexity`.
 - [x] **P2: Profile and reduce solver settings.** Reduced from
   `--z3rlimit 80 --fuel 2 --ifuel 2` to `--z3rlimit 40 --fuel 1 --ifuel 1`.
-- [ ] **P3: No test file.** There is no `Test.MatrixMultiply.fst`. Adding a
-  test with a small (e.g., 2×2) matrix multiplication would exercise the code
-  and verify extraction.
+- [x] **P3: Spec validation test.** `CLRS.Ch04.MatrixMultiply.ImplTest.fst`
+  proves postcondition precision on a 2×2 instance:
+  A=[[1,2],[3,4]], B=[[5,6],[7,8]] → C=[[19,22],[43,50]].
+  All four output entries verified exactly. Zero admits, zero assumes.
+  See `CLRS.Ch04.MatrixMultiply.ImplTest.md` for details.
+  **No spec weaknesses found.**
