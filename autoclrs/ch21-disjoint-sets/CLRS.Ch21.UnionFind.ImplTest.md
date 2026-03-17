@@ -7,7 +7,7 @@
 | Parameter | Value |
 |-----------|-------|
 | `n`       | `3` (elements: {0, 1, 2}) |
-| Operations | `make_set(3)`, `find_set(0..2)`, `union(0,1)`, `find_set(0..2)` |
+| Operations | `make_set(3)`, `find_set(0..2)`, `union(0,1)`, `find_set(0..2)`, `union(1,2)`, `find_set(0..2)` |
 
 ## What Is Proven
 
@@ -59,22 +59,65 @@ This follows from:
 - Element 2 satisfies both conditions (`pure_find(old, 2) == 2 ≠ 0` and `2 ≠ 1`)
 - So `pure_find(new, 2) == pure_find(old, 2) == 2`
 
-### 5. No admits, no assumes
+### 5. Chained union — transitivity via rank bounds
+
+After `union(0, 1)`, the test calls `union(1, 2)` and then proves all three
+elements end up in the same equivalence class: `find(0) == find(1) == find(2)`.
+
+**Rank bound chaining:** The second `union` call requires the precondition
+`rank[i] < n` for all `i`. This is proven using the rank bound postcondition
+added to `union`:
+
+- `rank[i] <= rank_old[i] + 1` (rank increases by at most 1)
+- `rank_old[i] == 0` (from make_set, ranks unchanged by find_set)
+- Therefore `rank[i] <= 1 < 3 = n` ✓
+
+**Transitivity via membership:** After `union(1, 2)`:
+
+- **Merge:** `find(new, 1) == find(new, 2)` — direct from merge clause.
+- **Membership:** Element 0 was in element 1's class after the first union
+  (`pure_find(old, 0) == pure_find(old, 1)`). By the membership clause,
+  `find(new, 0) == find(new, 1)`.
+- **Transitivity:** `find(0) == find(1) == find(2)` — all three in one class.
+
+This test validates:
+1. The rank bound postcondition enables chaining multiple `union` calls.
+2. The membership clause enables reasoning about elements that were already
+   merged by prior unions.
+3. Together, they enable multi-step union-find reasoning on concrete instances.
+
+### 6. No admits, no assumes
 
 The test is fully verified by F* and Z3 with no admits or assumes.
 
 ## Specification Improvements Made
 
-### Union membership clause (FIXED)
+### Union rank bound clauses (NEW)
 
-**Problem:** The original `union` postcondition only guaranteed:
-1. **Merge:** `pure_find(new, x) == pure_find(new, y)`
-2. **Stability:** For `z` not in `x`'s or `y`'s class:
-   `pure_find(new, z) == pure_find(old, z)`
+**Problem:** The original `union` postcondition said nothing about output ranks.
+This prevented chaining multiple `union` calls because the caller could not
+re-establish the `rank[i] < n` precondition for the next union.
 
-It said nothing about elements *already in* `x`'s or `y`'s class. This
-prevented multi-step union reasoning (e.g., after `union(0,1)` then
-`union(1,2)`, could not prove `find(new, 0) == find(new, 2)`).
+**Fix:** Added two rank bound clauses to `union`'s postcondition in `Impl.fsti`:
+
+```fstar
+// Rank monotonicity: output ranks >= input ranks
+(forall (i: nat). i < SZ.v n /\ i < Seq.length sr /\ i < Seq.length srank ==>
+  SZ.v (Seq.index sr i) >= SZ.v (Seq.index srank i)) /\
+// Rank bound: output ranks increase by at most 1
+(forall (i: nat). i < SZ.v n /\ i < Seq.length sr /\ i < Seq.length srank ==>
+  SZ.v (Seq.index sr i) <= SZ.v (Seq.index srank i) + 1)
+```
+
+The proof in `Impl.fst` is automatic: in each case of the union (same root,
+different rank, equal rank), the rank changes are straightforward:
+- Same root or different rank: no rank changes.
+- Equal rank: exactly one rank increases by 1; all others unchanged.
+
+### Union membership clause (prior improvement)
+
+**Problem:** The original `union` postcondition only guaranteed merge and stability.
+It said nothing about elements *already in* `x`'s or `y`'s class.
 
 **Fix:** Added a membership clause to both the pure spec (`Spec.fst`) and
 the imperative interface (`Impl.fsti`):
@@ -87,30 +130,23 @@ the imperative interface (`Impl.fsti`):
   pure_find(new, z) == pure_find(new, x))
 ```
 
-New lemmas in `Spec.fst`:
-- `pure_union_membership`: per-element version
-- `pure_union_membership_all`: universally quantified version
-
-The proof uses `pure_find_after_link` to show that linking root_a under
-root_b maps all elements in either tree to root_b.
-
 ## Remaining Specification Gap
 
-### Rank bound not preserved (postcondition weakness)
+### Rank bound not fully preserved (postcondition weakness)
 
-The `union` **precondition** requires `rank[i] < n` for all `i`. However,
-the **postcondition** does not re-establish this bound for the output rank
-array. In the equal-rank case, one rank is incremented (`rank[root_x] + 1`),
-and proving `rank[root_x] + 1 < n` requires the logarithmic rank bound
-from `Lemmas.fst` (which uses the size-rank invariant on `uf_forest_sized`,
-not currently threaded through the imperative code).
+The rank bound clauses show that each rank increases by at most 1, but do NOT
+re-establish the `rank[i] < n` precondition directly. For a sequence of `k`
+unions starting from a fresh forest (all ranks 0), the maximum rank after `k`
+unions is at most `k`. Since at most `n-1` unions are meaningful (after which
+all elements are in one class), the maximum rank is at most `n-1 < n`, so the
+precondition is re-establishable in practice.
 
-**Impact:** The client cannot chain multiple `union` calls without
-independently establishing the rank bound between calls. For a single
-`union` on a fresh forest (as in this test), the bound follows trivially
-from all-zero initial ranks.
+However, proving the tighter bound `rank[i] <= ⌊log₂ n⌋` (which is always
+maintained by union-by-rank) requires threading the size-rank invariant from
+`Lemmas.fst` through the imperative code. This stronger bound remains
+unformalized at the imperative level.
 
-**Severity:** Medium. The rank bound IS maintained in practice (proven in
-the pure model in `Lemmas.fst`), but the imperative postcondition doesn't
-expose it. Fixing this would require connecting the `uf_forest_sized` model
-from `Lemmas.fst` to the imperative code.
+**Impact:** Clients can chain unions on fresh forests (as demonstrated by the
+test), but the proof effort grows with the number of unions because the rank
+bound degrades by 1 per union. The logarithmic bound would eliminate this
+degradation.

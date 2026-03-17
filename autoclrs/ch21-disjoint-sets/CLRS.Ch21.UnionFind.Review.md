@@ -47,12 +47,15 @@ Priority-ordered items to address. Items marked ✅ are resolved.
       `pure_union_membership_all`. Enables multi-step union reasoning:
       elements previously in x's or y's class remain in the merged
       class. ✅ Fixed.
-- [ ] **SV5 — Rank bound not preserved by union.** The `union`
-      postcondition does not re-establish `rank[i] < n` for the output
-      ranks. In the equal-rank case, proving `rank_x + 1 < n` requires
-      the logarithmic bound from `Lemmas.fst` (not threaded through
-      imperative code). This prevents chaining multiple union calls
-      without independent rank bound proofs.
+- [x] **SV5 — Union rank bound clauses added.** Added rank monotonicity
+      (`rank'[i] >= rank[i]`) and rank +1 bound (`rank'[i] <= rank[i] + 1`)
+      to `union` postcondition. Enables chaining unions: with all-zero
+      initial ranks and n=3, after first union ranks ≤ 1 < 3, satisfying
+      the next union's `rank[i] < n` precondition. Proof is automatic
+      from the case analysis in union's implementation. ✅ Fixed.
+- [x] **SV6 — Chained union test added.** After `union(0,1)`, calls
+      `union(1,2)` and proves `find(0)==find(1)==find(2)`. Validates
+      rank bound chaining, membership clause, and transitivity. ✅
 
 ### Out of scope (documented limitations)
 
@@ -60,8 +63,9 @@ Priority-ordered items to address. Items marked ✅ are resolved.
 - Ghost tick counter — O(log n) bound is on the pure model, not
   instrumented in the Pulse implementation.
 - `size_rank_invariant` not threaded through imperative code.
-- `rank[i] < n` precondition on `union` — provably maintained but
-  caller must establish.
+- Logarithmic rank bound (`rank[i] <= ⌊log₂ n⌋`) not exposed at the
+  imperative level; the weaker `rank'[i] <= rank[i] + 1` bound enables
+  chaining but degrades linearly.
 
 ---
 
@@ -182,7 +186,20 @@ fn union
         Spec.pure_find (to_uf sparent srank (SZ.v n)) z <>
           Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y) ==>
         Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
-          Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) z) /\
+      // Membership
+      (forall (z: nat). z < SZ.v n ==>
+        (Spec.pure_find (to_uf sparent srank (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x) \/
+         Spec.pure_find (to_uf sparent srank (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y)) ==>
+        Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
+          Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x)) /\
+      // Rank bounds
+      (forall (i: nat). i < SZ.v n /\ i < Seq.length sr /\ i < Seq.length srank ==>
+        SZ.v (Seq.index sr i) >= SZ.v (Seq.index srank i)) /\
+      (forall (i: nat). i < SZ.v n /\ i < Seq.length sr /\ i < Seq.length srank ==>
+        SZ.v (Seq.index sr i) <= SZ.v (Seq.index srank i) + 1)
     )
 ```
 
@@ -190,6 +207,9 @@ Union by rank. The postcondition guarantees:
 
 * **Merge**: `pure_find(new, x) == pure_find(new, y)`.
 * **Stability**: Elements not in x's or y's class are unchanged.
+* **Membership**: Elements in x's or y's class join the merged class.
+* **Rank monotonicity**: Output ranks ≥ input ranks.
+* **Rank bound**: Output ranks increase by at most 1.
 
 ## Auxiliary Definitions
 
@@ -333,10 +353,13 @@ discharged by F\* and Z3.
    in the pure model and could in principle be connected to the imperative
    code, but this connection is not formalized.
 
-6. **`rank[i] < n` precondition on `union`.** The `union` function
-   requires `forall i. rank[i] < n` as a precondition. This is provably
-   maintained (since rank ≤ ⌊log₂ n⌋ < n for n > 0), but the caller must
-   establish it.
+6. ~~**`rank[i] < n` precondition on `union`.**~~ **PARTIALLY RESOLVED.**
+   The `union` postcondition now includes rank monotonicity
+   (`rank'[i] >= rank[i]`) and a +1 bound (`rank'[i] <= rank[i] + 1`).
+   Combined with the `rank[i] < n` precondition, clients can re-establish
+   the precondition for subsequent unions when starting from a fresh forest.
+   The tighter logarithmic bound (`rank ≤ ⌊log₂ n⌋`) remains unformalized
+   at the imperative level.
 
 ## Profiling & Proof Resource Usage
 

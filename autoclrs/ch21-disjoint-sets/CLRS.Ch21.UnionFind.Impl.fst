@@ -630,7 +630,13 @@ fn union
          Spec.pure_find (to_uf sparent srank (SZ.v n)) z ==
           Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y)) ==>
         Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
-          Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x))
+          Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x)) /\
+      // Rank monotonicity: output ranks >= input ranks
+      (forall (i: nat). i < SZ.v n /\ i < Seq.length sr /\ i < Seq.length srank ==>
+        SZ.v (Seq.index sr i) >= SZ.v (Seq.index srank i)) /\
+      // Rank bound: output ranks increase by at most 1
+      (forall (i: nat). i < SZ.v n /\ i < Seq.length sr /\ i < Seq.length srank ==>
+        SZ.v (Seq.index sr i) <= SZ.v (Seq.index srank i) + 1)
     )
 {
   // Find roots with path compression (CLRS §21.3)

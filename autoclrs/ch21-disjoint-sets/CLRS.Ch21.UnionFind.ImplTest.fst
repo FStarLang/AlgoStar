@@ -8,6 +8,8 @@
    2. After make_set, find_set returns self for each element (postcondition precision)
    3. After union(0,1), find(0)==find(1) (merge correctness)
    4. After union(0,1), find(2)==2 (stability of disjoint elements)
+   5. Chained union: union(0,1) then union(1,2), proves find(0)==find(1)==find(2)
+      (requires rank bound postcondition to chain unions)
 
    No admits. No assumes. Fully verified by F* and Z3.
 *)
@@ -129,12 +131,40 @@ fn test_union_find ()
   with sp7. assert (A.pts_to parent sp7);
   assert (pure (SZ.v r2' == 2));
 
+  // ===== Test 3: chained union — union(1, 2) after union(0, 1) =====
+
+  // The rank bound postcondition from the first union, combined with
+  // make_set's all-zero ranks, ensures sr4[i] <= 0 + 1 = 1 < 3 = n.
+  // This satisfies the second union's rank precondition.
+  union parent rank 1sz 2sz n;
+  with sp8 sr8. assert (A.pts_to parent sp8 ** A.pts_to rank sr8);
+
+  // --- Transitivity: find(0) == find(1) == find(2) ---
+  let r0'' = find_set parent 0sz n #_ #sr8;
+  with sp9. assert (A.pts_to parent sp9);
+
+  let r1'' = find_set parent 1sz n #_ #sr8;
+  with sp10. assert (A.pts_to parent sp10);
+
+  let r2'' = find_set parent 2sz n #_ #sr8;
+  with sp11. assert (A.pts_to parent sp11);
+
+  // Merge from second union: find(1) == find(2)
+  assert (pure (SZ.v r1'' == SZ.v r2''));
+
+  // Membership from second union: 0 was in 1's class (from first union),
+  // so find(0) == find(1) in the merged forest
+  assert (pure (SZ.v r0'' == SZ.v r1''));
+
+  // Transitivity: all three elements in the same equivalence class
+  assert (pure (SZ.v r0'' == SZ.v r2''));
+
   // ===== Cleanup =====
-  rewrite (A.pts_to parent sp7) as (A.pts_to (V.vec_to_array vp) sp7);
+  rewrite (A.pts_to parent sp11) as (A.pts_to (V.vec_to_array vp) sp11);
   V.to_vec_pts_to vp;
   V.free vp;
 
-  rewrite (A.pts_to rank sr4) as (A.pts_to (V.vec_to_array vr) sr4);
+  rewrite (A.pts_to rank sr8) as (A.pts_to (V.vec_to_array vr) sr8);
   V.to_vec_pts_to vr;
   V.free vr;
   ()
