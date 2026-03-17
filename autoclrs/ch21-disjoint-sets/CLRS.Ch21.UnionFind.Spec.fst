@@ -354,6 +354,56 @@ let pure_union_other_set (f: uf_forest{uf_inv f}) (x y z: nat{x < f.n /\ y < f.n
     end
 #pop-options
 
+// Membership: elements already in x's or y's class join the merged class
+#restart-solver
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+let pure_union_membership (f: uf_forest{uf_inv f}) (x y z: nat{x < f.n /\ y < f.n /\ z < f.n})
+  : Lemma (requires pure_find f z == pure_find f x \/ pure_find f z == pure_find f y)
+          (ensures (pure_union_preserves_inv f x y;
+                    pure_find (pure_union f x y) z == pure_find (pure_union f x y) x))
+  = pure_union_preserves_inv f x y;
+    pure_find_in_bounds f x; pure_find_in_bounds f y;
+    pure_find_is_root f x; pure_find_is_root f y;
+    let root_x = pure_find f x in
+    let root_y = pure_find f y in
+    if root_x = root_y then ()
+    else begin
+      let f' = pure_union f x y in
+      let rx = Seq.index f.rank root_x in
+      let ry = Seq.index f.rank root_y in
+      if rx < ry then begin
+        pure_find_after_link f f' root_x root_y z;
+        pure_find_after_link f f' root_x root_y x
+      end
+      else if rx > ry then begin
+        pure_find_after_link f f' root_y root_x z;
+        pure_find_after_link f f' root_y root_x x
+      end
+      else begin
+        pure_find_after_link f f' root_y root_x z;
+        pure_find_after_link f f' root_y root_x x
+      end
+    end
+#pop-options
+
+// Membership (universal): all elements in x's or y's class join the merged class
+#restart-solver
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+let pure_union_membership_all (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n})
+  : Lemma (ensures (pure_union_preserves_inv f x y;
+                    let f' = pure_union f x y in
+                    forall (z: nat). z < f.n ==>
+                      (pure_find f z == pure_find f x \/ pure_find f z == pure_find f y) ==>
+                      pure_find f' z == pure_find f' x))
+  = pure_union_preserves_inv f x y;
+    let aux (z: nat{z < f.n})
+      : Lemma (requires pure_find f z == pure_find f x \/ pure_find f z == pure_find f y)
+              (ensures pure_find (pure_union f x y) z == pure_find (pure_union f x y) x)
+      = pure_union_membership f x y z
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
 // Stability (universal): union does not merge any unrelated set
 #restart-solver
 #push-options "--fuel 0 --ifuel 0 --z3rlimit 30"

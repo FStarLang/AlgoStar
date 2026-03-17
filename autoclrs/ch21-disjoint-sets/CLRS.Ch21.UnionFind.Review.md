@@ -27,6 +27,33 @@ Priority-ordered items to address. Items marked ✅ are resolved.
       `--z3rlimit 100` to `--z3rlimit 40`. Full rebuild passes cleanly.
       ✅ Fixed.
 
+### Spec validation
+
+- [x] **SV1 — ImplTest.fst written and verified.**
+      `CLRS.Ch21.UnionFind.ImplTest.fst` tests a 3-element instance:
+      make_set, find_set on fresh forest (returns self), union(0,1)
+      merge (find(0)==find(1)), and stability (find(2)==2).
+      Zero admits, zero assumes. ✅
+- [x] **SV2 — Preconditions satisfiable.** All three API preconditions
+      (make_set, find_set, union) are proven satisfiable on the test
+      instance. ✅
+- [x] **SV3 — Postconditions precise for single operations.** After
+      make_set, the postcondition (uf_inv + zero ranks) is strong enough
+      to determine pure_find(x)==x. After union, merge and stability
+      clauses fully determine outputs. ✅
+- [x] **SV4 — Union membership clause added.** Added missing membership
+      clause to `union` postcondition in `Impl.fsti` and proven in
+      `Impl.fst`. New `Spec.fst` lemmas: `pure_union_membership`,
+      `pure_union_membership_all`. Enables multi-step union reasoning:
+      elements previously in x's or y's class remain in the merged
+      class. ✅ Fixed.
+- [ ] **SV5 — Rank bound not preserved by union.** The `union`
+      postcondition does not re-establish `rank[i] < n` for the output
+      ranks. In the equal-rank case, proving `rank_x + 1 < n` requires
+      the logarithmic bound from `Lemmas.fst` (not threaded through
+      imperative code). This prevents chaining multiple union calls
+      without independent rank bound proofs.
+
 ### Out of scope (documented limitations)
 
 - Amortized O(α(n)) complexity (CLRS §21.4) — not formalized.

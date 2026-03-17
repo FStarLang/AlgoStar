@@ -146,5 +146,13 @@ fn union
         Spec.pure_find (to_uf sparent srank (SZ.v n)) z <>
           Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y) ==>
         Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
-          Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) z) /\
+      // Membership: elements in x's or y's class join the merged class
+      (forall (z: nat). z < SZ.v n ==>
+        (Spec.pure_find (to_uf sparent srank (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x) \/
+         Spec.pure_find (to_uf sparent srank (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y)) ==>
+        Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
+          Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x))
     )

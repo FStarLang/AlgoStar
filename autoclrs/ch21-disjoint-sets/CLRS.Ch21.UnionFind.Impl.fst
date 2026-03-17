@@ -623,7 +623,14 @@ fn union
         Spec.pure_find (to_uf sparent srank (SZ.v n)) z <>
           Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y) ==>
         Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
-          Spec.pure_find (to_uf sparent srank (SZ.v n)) z)
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) z) /\
+      (forall (z: nat). z < SZ.v n ==>
+        (Spec.pure_find (to_uf sparent srank (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v x) \/
+         Spec.pure_find (to_uf sparent srank (SZ.v n)) z ==
+          Spec.pure_find (to_uf sparent srank (SZ.v n)) (SZ.v y)) ==>
+        Spec.pure_find (to_uf sp sr (SZ.v n)) z ==
+          Spec.pure_find (to_uf sp sr (SZ.v n)) (SZ.v x))
     )
 {
   // Find roots with path compression (CLRS §21.3)
@@ -657,6 +664,7 @@ fn union
       Spec.pure_union_preserves_inv (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
       Spec.pure_union_same_set (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
       Spec.pure_union_stability (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+      Spec.pure_union_membership_all (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
       ()
     } else {
       if (rank_x >^ rank_y) {
@@ -667,6 +675,7 @@ fn union
         Spec.pure_union_preserves_inv (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_same_set (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_stability (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_membership_all (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       } else {
         // Equal rank: link root_y -> root_x and increment rank[root_x]
@@ -678,6 +687,7 @@ fn union
         Spec.pure_union_preserves_inv (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_same_set (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_stability (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
+        Spec.pure_union_membership_all (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         ()
       }
     }
