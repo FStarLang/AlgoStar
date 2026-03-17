@@ -12,6 +12,9 @@ val gcd_impl (a_init b_init: SZ.t)
     (GR.pts_to ctr c0 ** pure (SZ.v a_init > 0 \/ SZ.v b_init > 0))
     (fun result -> exists* (cf: nat). GR.pts_to ctr cf ** pure (
       SZ.v result == gcd_spec (SZ.v a_init) (SZ.v b_init) /\
+      SZ.v result > 0 /\
+      divides (SZ.v result) (SZ.v a_init) /\
+      divides (SZ.v result) (SZ.v b_init) /\
       cf >= reveal c0 /\
       cf - reveal c0 == gcd_steps (SZ.v a_init) (SZ.v b_init) /\
       (SZ.v b_init > 0 ==> cf - reveal c0 <= op_Multiply 2 (num_bits (SZ.v b_init)) + 1)
@@ -39,6 +42,11 @@ that:
 
 * `SZ.v result == gcd_spec (SZ.v a_init) (SZ.v b_init)` — The result equals
   the pure recursive GCD specification.
+
+* `SZ.v result > 0` — The result is always positive when the precondition holds.
+
+* `divides (SZ.v result) (SZ.v a_init) /\ divides (SZ.v result) (SZ.v b_init)` —
+  The result divides both inputs, establishing the core GCD property.
 
 * `cf >= reveal c0` — The counter is non-decreasing.
 
@@ -100,17 +108,25 @@ The postcondition establishes:
 1. **Functional correctness**: `result == gcd_spec a b`. The imperative loop
    computes the same value as the pure recursive specification.
 
-2. **Exact step count**: `cf - c0 == gcd_steps a b`. The ghost counter tracks
+2. **Result positivity**: `result > 0`. The GCD is always positive when at
+   least one input is positive.
+
+3. **Divisibility**: `divides result a /\ divides result b`. The result divides
+   both inputs — the defining property of a common divisor.
+
+4. **Exact step count**: `cf - c0 == gcd_steps a b`. The ghost counter tracks
    the precise number of Euclidean steps — not just an upper bound.
 
-3. **O(log b) complexity**: When `b > 0`, the step count satisfies
+5. **O(log b) complexity**: When `b > 0`, the step count satisfies
    `gcd_steps a b ≤ 2 * num_bits(b) + 1`. This captures the same O(log b)
    bound as CLRS Theorem 31.11 (Lamé's theorem). The proof uses the
    mod-halving argument: `a % b ≤ a / 2` when `a ≥ b`, so every two steps
    halve the larger argument.
 
-4. **Divisibility**: A separate lemma `gcd_spec_divides` in
-   `CLRS.Ch31.GCD.Lemmas` proves that `gcd_spec a b` divides both `a` and `b`.
+6. **Greatest-divisor (external)**: A separate lemma `gcd_spec_is_greatest` in
+   `CLRS.Ch31.GCD.Lemmas` proves that any positive common divisor of `a` and `b`
+   divides `gcd_spec a b`, establishing that it is the *greatest* common
+   divisor. The proof delegates to Bézout's identity from the Extended GCD module.
 
 **Zero admits, zero assumes.** All proof obligations are mechanically
 discharged by F\* and Z3.
@@ -163,6 +179,8 @@ steps reduce `b` by at least one bit.
 
 - [x] Zero admits, zero assumes
 - [x] Functional correctness: `result == gcd_spec(a, b)`
+- [x] Result positivity: `result > 0` (in postcondition)
+- [x] Divisibility: `divides result a /\ divides result b` (in postcondition)
 - [x] Exact step count: `cf - c0 == gcd_steps(a, b)`
 - [x] O(log b) complexity bound (Lamé's theorem)
 - [x] Divisibility: `gcd_spec a b` divides both `a` and `b`
@@ -184,7 +202,10 @@ steps reduce `b` by at least one bit.
 - ✅ Precondition `SZ.v a > 0 ∨ SZ.v b > 0` is satisfiable for (12, 8).
 - ✅ Postcondition uniquely determines result: `gcd_spec 12 8 == 4` by
   normalization, proving `SZ.v result == 4`.
+- ✅ Result positivity `SZ.v result > 0` proven directly from postcondition.
+- ✅ Divisibility `divides result 12 /\ divides result 8` proven from postcondition.
 - ✅ Complexity spec `gcd_steps 12 8 == 2` is computable by normalization.
 - ✅ No admits, no assumes in the test.
 
-**Spec issues found:** None. The specification is precise and complete.
+**Spec issues found:** None. The specification is precise and complete, with
+result positivity and divisibility directly in the postcondition.

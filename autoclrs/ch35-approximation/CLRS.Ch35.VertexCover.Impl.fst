@@ -149,6 +149,20 @@ let apply_approximation_bound (s_adj s_cover: Seq.seq int) (n: nat) (m: list Spe
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires bound)
 
+// Lemma: The cover size is even (= 2 * matching size), since vertices are added in pairs
+let derive_even_count (s_adj s_cover: Seq.seq int) (n: nat) (m: list Spec.edge)
+  : Lemma (requires
+            Seq.length s_cover = n /\
+            Seq.length s_adj = n * n /\
+            (forall (i: nat). i < n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+            matching_inv s_adj s_cover n m)
+          (ensures
+            exists (k: nat). Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n = 2 * k)
+  = let c_alg = Spec.seq_to_cover_fn s_cover n in
+    let c_m : Spec.cover_fn = fun (x:nat) -> existsb (fun (e: Spec.edge) -> Spec.edge_uses_vertex e x) m in
+    Lemmas.count_cover_ext c_alg c_m n;
+    Lemmas.matching_cover_size m n
+
 //SNIPPET_START: approx_vertex_cover
 fn approx_vertex_cover
   (#p: perm)
@@ -174,7 +188,8 @@ fn approx_vertex_cover
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
       (exists (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt) /\
       (forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
-        Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) <= 2 * opt)
+        Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) <= 2 * opt) /\
+      (exists (k: nat). Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) = 2 * k)
     )
 //SNIPPET_END: approx_vertex_cover
 {
@@ -318,6 +333,9 @@ fn approx_vertex_cover
   
   // Apply 2-approximation theorem using ghost matching
   apply_approximation_bound s_adj s_final (SZ.v n) vm_final;
+  
+  // Derive that cover size is even (vertices added in pairs)
+  derive_even_count s_adj s_final (SZ.v n) vm_final;
   
   // Prove existence of minimum vertex cover (makes 2-approx non-vacuous)
   Lemmas.min_cover_exists s_adj (SZ.v n);

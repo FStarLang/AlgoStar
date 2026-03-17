@@ -15,6 +15,7 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
+open FStar.Math.Euclid
 open FStar.Math.Lemmas
 open CLRS.Ch31.GCD.Spec
 open CLRS.Ch31.GCD.Complexity
@@ -34,6 +35,9 @@ fn gcd_impl (a_init b_init: SZ.t)
   returns result: SZ.t
   ensures exists* (cf: nat). GR.pts_to ctr cf ** pure (
     SZ.v result == gcd_spec (SZ.v a_init) (SZ.v b_init) /\
+    SZ.v result > 0 /\
+    divides (SZ.v result) (SZ.v a_init) /\
+    divides (SZ.v result) (SZ.v b_init) /\
     cf >= reveal c0 /\
     cf - reveal c0 == gcd_steps (SZ.v a_init) (SZ.v b_init) /\
     (SZ.v b_init > 0 ==> cf - reveal c0 <= op_Multiply 2 (num_bits (SZ.v b_init)) + 1)
@@ -76,6 +80,7 @@ fn gcd_impl (a_init b_init: SZ.t)
   assert pure (gcd_steps (SZ.v va) 0 == 0);
   
   Classical.move_requires (lemma_gcd_steps_log (SZ.v a_init)) (SZ.v b_init);
+  gcd_spec_divides (SZ.v a_init) (SZ.v b_init);
   
   va
 }

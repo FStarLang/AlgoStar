@@ -5,17 +5,19 @@
    https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst
 
    Tests that the approx_vertex_cover API's postcondition
-   (is_cover + binary + 2-approximation) is satisfiable and sufficiently
-   precise to constrain the output for a concrete triangle graph K₃.
+   (is_cover + binary + 2-approximation + even count) is satisfiable
+   and sufficiently precise to constrain the output for a concrete
+   triangle graph K₃.
 
    Test instance: K₃ (complete graph on 3 vertices)
      Vertices: {0, 1, 2}
      Edges: {(0,1), (0,2), (1,2)}
      Adjacency matrix (row-major, 3×3): [0,1,1, 1,0,1, 1,1,0]
 
-   The postcondition proves the output is one of exactly 4 admissible
-   binary covers: [1,1,0], [1,0,1], [0,1,1], [1,1,1] — ruling out
-   all 0-vertex and 1-vertex covers.
+   The postcondition proves the output is one of exactly 3 admissible
+   binary covers: [1,1,0], [1,0,1], [0,1,1] — ruling out all 0-vertex,
+   1-vertex covers AND the all-vertices cover [1,1,1] (which has odd
+   count 3, contradicting the even-count property).
 *)
 module CLRS.Ch35.VertexCover.ImplTest
 #lang-pulse
@@ -69,10 +71,14 @@ let triangle_cover_at_least_two
     is_cover_edge s_adj s_cover 3 0 2;
     is_cover_edge s_adj s_cover 3 1 2
 
-(* Completeness: the postcondition (is_cover + binary) admits exactly 4 covers
-   for K₃ and excludes the other 4.
-   Admissible:  [1,1,0], [1,0,1], [0,1,1], [1,1,1]
-   Excluded:    [0,0,0], [1,0,0], [0,1,0], [0,0,1] *)
+(* Completeness: the postcondition (is_cover + binary + even count) admits exactly
+   3 covers for K₃ and excludes the other 5.
+   Admissible:  [1,1,0], [1,0,1], [0,1,1]
+   Excluded:    [0,0,0], [1,0,0], [0,1,0], [0,0,1], [1,1,1]
+   
+   The strengthened spec rules out [1,1,1] because count_cover = 3 is odd,
+   contradicting the even count property (exists k. count = 2*k). *)
+#push-options "--fuel 4 --ifuel 2"
 let triangle_cover_enumeration
   (s_adj s_cover: Seq.seq int)
   : Lemma
@@ -83,13 +89,14 @@ let triangle_cover_enumeration
       Seq.index s_adj 2 <> 0 /\
       Seq.index s_adj 5 <> 0 /\
       Spec.is_cover s_adj s_cover 3 3 0 /\
-      (forall (i: nat). i < 3 ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)))
+      (forall (i: nat). i < 3 ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
+      (exists (k: nat). Spec.count_cover (Spec.seq_to_cover_fn s_cover 3) 3 = 2 * k))
     (ensures
       (Seq.index s_cover 0 = 1 /\ Seq.index s_cover 1 = 1 /\ Seq.index s_cover 2 = 0) \/
       (Seq.index s_cover 0 = 1 /\ Seq.index s_cover 1 = 0 /\ Seq.index s_cover 2 = 1) \/
-      (Seq.index s_cover 0 = 0 /\ Seq.index s_cover 1 = 1 /\ Seq.index s_cover 2 = 1) \/
-      (Seq.index s_cover 0 = 1 /\ Seq.index s_cover 1 = 1 /\ Seq.index s_cover 2 = 1))
+      (Seq.index s_cover 0 = 0 /\ Seq.index s_cover 1 = 1 /\ Seq.index s_cover 2 = 1))
   = triangle_cover_at_least_two s_adj s_cover
+#pop-options
 
 (*** Pulse test: triangle graph K₃ ***)
 
@@ -138,7 +145,7 @@ fn test_vertex_cover_triangle ()
   // Prove: at least 2 vertices must be in the cover
   triangle_cover_at_least_two s_adj s_cover;
 
-  // Prove: output is one of exactly 4 valid covers
+  // Prove: output is one of exactly 3 valid covers (even count rules out [1,1,1])
   triangle_cover_enumeration s_adj s_cover;
 
   // --- Cleanup ---

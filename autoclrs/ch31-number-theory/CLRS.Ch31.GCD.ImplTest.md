@@ -17,15 +17,28 @@
    `SZ.v result == gcd_spec (SZ.v a) (SZ.v b)`. Combined with the normalization
    lemma `gcd_spec 12 8 == 4`, this uniquely determines `SZ.v result == 4`.
 
-3. **Postcondition precision (complexity)**: The postcondition provides the exact
+3. **Result positivity**: The postcondition directly states `SZ.v result > 0`.
+   This is verified without normalization, purely from the strengthened
+   postcondition. This property is essential for callers that use the GCD
+   result in division or as a modulus.
+
+4. **Divisibility**: The postcondition directly states
+   `divides (SZ.v result) (SZ.v a_init) /\ divides (SZ.v result) (SZ.v b_init)`.
+   The test verifies `divides (SZ.v result) 12` and `divides (SZ.v result) 8`,
+   confirming that the GCD result divides both inputs — the defining property
+   of the greatest common divisor.
+
+5. **Postcondition precision (complexity)**: The postcondition provides the exact
    step count `cf - c0 == gcd_steps a b`. By normalization, `gcd_steps 12 8 == 2`,
    confirming the complexity spec is computable on concrete inputs.
 
-4. **No admits, no assumes.**
+6. **No admits, no assumes.**
 
 ### Spec Assessment
 
 The GCD specification is **precise and complete**:
 - The postcondition uniquely determines the output for any valid input.
+- Result positivity (`SZ.v result > 0`) is directly stated in the postcondition.
+- Divisibility (`divides result a /\ divides result b`) is directly stated.
 - The complexity bound includes both exact step count and O(log b) upper bound.
 - No issues found with the specification.

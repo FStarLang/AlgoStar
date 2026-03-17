@@ -12,8 +12,10 @@
    1. The precondition (a > 0 ∨ b > 0) is satisfiable for (12, 8).
    2. The postcondition uniquely determines the result: gcd_spec 12 8 == 4,
       and we can prove SZ.v result == 4 using only the postcondition.
-   3. The complexity spec gcd_steps 12 8 == 2 can be computed by normalization.
-   4. No admits, no assumes.
+   3. The result is positive (SZ.v result > 0) — directly from postcondition.
+   4. The result divides both inputs — directly from postcondition.
+   5. The complexity spec gcd_steps 12 8 == 2 can be computed by normalization.
+   6. No admits, no assumes.
 *)
 module CLRS.Ch31.GCD.ImplTest
 #lang-pulse
@@ -21,6 +23,7 @@ module CLRS.Ch31.GCD.ImplTest
 open Pulse.Lib.Pervasives
 open FStar.SizeT
 open FStar.Mul
+open FStar.Math.Euclid
 open CLRS.Ch31.GCD.Impl
 open CLRS.Ch31.GCD.Spec
 open CLRS.Ch31.GCD.Complexity
@@ -57,6 +60,13 @@ fn test_gcd ()
   // Normalize spec to determine: gcd_spec 12 8 == 4
   gcd_expected ();
   assert (pure (SZ.v result == 4));
+
+  // Result positivity — directly from strengthened postcondition
+  assert (pure (SZ.v result > 0));
+
+  // Divisibility — directly from strengthened postcondition
+  assert (pure (divides (SZ.v result) 12));
+  assert (pure (divides (SZ.v result) 8));
 
   // Cleanup ghost counter
   with cf. assert (GR.pts_to ctr cf);

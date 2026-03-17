@@ -11,14 +11,14 @@
 - [x] **P0: Rubric compliance** — 7/7 required files present and verified
 - [x] **P0: Zero admits** — Confirmed: 0 `admit()`, 0 `assume` in all files
 - [x] **P0: Verification** — All 8 files verify cleanly (including ImplTest)
-- [x] **P0: Spec strength** — Valid cover + binary output + 2-approximation + min cover existence
+- [x] **P0: Spec strength** — Valid cover + binary output + 2-approximation + min cover existence + even count
 - [x] **P0: CLRS fidelity** — Faithful to APPROX-VERTEX-COVER pseudocode
-- [x] **P0: Spec validation** — ImplTest proves postcondition precision on K₃ (see below)
+- [x] **P0: Spec validation** — ImplTest proves postcondition precision on K₃ (3 of 8 covers, see below)
 - [x] **P1: Symmetry precondition** — `is_symmetric_adj` formally enforced
 - [x] **P1: Min cover existence** — `min_cover_exists` makes 2-approx non-vacuous
 - [x] **P1: Complexity linked** — Ghost counter tracks `vertex_cover_iterations(n)`
 - [x] **P1: Proof stability** — Modest solver limits (z3rlimit 30, 40 only)
-- [x] **P1: V.is_full_vec exposed** — Fixed: postcondition now exposes `is_full_vec` for returned Vec
+- [x] **P1: Even count exposed** — Postcondition includes `∃ k. count = 2k` (vertices added in pairs)
 - [ ] **P2: Unconditional writes** — Cover array written O(n²) times; could guard writes behind a branch (low priority, simplifies proof)
 - [ ] **P2: No n=0 support** — Precondition requires n > 0; degenerate case not handled
 - [ ] **P3: O(V²) vs O(V+E)** — Adjacency-matrix representation; CLRS uses adjacency lists for O(V+E) on sparse graphs
@@ -48,6 +48,7 @@ fn approx_vertex_cover
     A.pts_to adj #p s_adj **
     V.pts_to cover s_cover **
     pure (
+      V.is_full_vec cover /\
       Seq.length s_cover == SZ.v n /\
       Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
       (forall (i: nat). i < SZ.v n ==>
@@ -55,7 +56,9 @@ fn approx_vertex_cover
       (exists (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt) /\
       (forall (opt: nat). Spec.min_vertex_cover_size s_adj (SZ.v n) opt ==>
         Spec.count_cover (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n)
-          <= 2 * opt)
+          <= 2 * opt) /\
+      (exists (k: nat). Spec.count_cover
+        (Spec.seq_to_cover_fn s_cover (SZ.v n)) (SZ.v n) = 2 * k)
     )
 ```
 
@@ -76,13 +79,15 @@ fn approx_vertex_cover
 | `Seq.length s_adj == SZ.v n * SZ.v n` | Adjacency matrix has expected size |
 | `Spec.is_symmetric_adj s_adj (SZ.v n)` | Undirected graph: `adj[u*n+v] = adj[v*n+u]` |
 
-### Postconditions (5 properties)
+### Postconditions (6 properties)
 
-1. **Correct length**: `Seq.length s_cover == SZ.v n`
-2. **Valid cover**: `is_cover s_adj s_cover n n 0` — every edge has ≥1 endpoint covered
-3. **Binary output**: `∀ i < n. cover[i] = 0 ∨ cover[i] = 1`
-4. **Min cover existence**: `∃ opt. min_vertex_cover_size adj n opt` (non-vacuous guarantee)
-5. **2-approximation**: `count_cover(cover) ≤ 2 × OPT` (CLRS Theorem 35.1)
+1. **Full vec**: `V.is_full_vec cover` — caller can free the returned Vec
+2. **Correct length**: `Seq.length s_cover == SZ.v n`
+3. **Valid cover**: `is_cover s_adj s_cover n n 0` — every edge has ≥1 endpoint covered
+4. **Binary output**: `∀ i < n. cover[i] = 0 ∨ cover[i] = 1`
+5. **Min cover existence**: `∃ opt. min_vertex_cover_size adj n opt` (non-vacuous guarantee)
+6. **2-approximation**: `count_cover(cover) ≤ 2 × OPT` (CLRS Theorem 35.1)
+7. **Even count**: `∃ k. count_cover(cover) = 2 × k` (vertices added in pairs)
 
 ---
 
@@ -118,6 +123,7 @@ The proof uses a **ghost matching** technique with a **ghost iteration counter**
 | `min_cover_exists` | Lemmas.fst | Every finite graph has a minimum vertex cover |
 | `is_cover_step` | Impl.fst | Processing one edge preserves `is_cover` |
 | `matching_inv_step` | Impl.fst | Updating cover+matching preserves `matching_inv` |
+| `derive_even_count` | Impl.fst | Cover size = 2 × matching size (even count) |
 
 ---
 
@@ -173,7 +179,12 @@ representation is a design choice, not a correctness issue.
    freeing the returned Vec. Fixed by adding `V.is_full_vec cover` to the
    postcondition and both loop invariants. Zero admits.
 
-2. **O(V²) vs O(V+E)** — Adjacency-matrix scan vs. CLRS adjacency lists.
+2. ~~**Missing even count property**~~ — **FIXED.** The postcondition did not
+   expose that cover size is always even. Added `∃ k. count = 2k` via
+   `derive_even_count` lemma. This narrowed the K₃ test from 4 to 3 admissible
+   covers.
+
+3. **O(V²) vs O(V+E)** — Adjacency-matrix scan vs. CLRS adjacency lists.
    Asymptotically slower for sparse graphs. Design choice.
 
 3. **No n=0 support** — Precondition requires `n > 0`. Trivial case excluded.
@@ -204,17 +215,20 @@ Complete graph K₃ (triangle on 3 vertices, all edges present).
 | Aspect | Result |
 |--------|--------|
 | Precondition satisfiable | ✅ All 4 preconditions proven for K₃ |
-| Postcondition constrains output | ✅ Output narrowed to 4 of 8 possible binary vectors |
-| Invalid outputs excluded | ✅ All 4 invalid covers (0-vertex, 1-vertex) excluded |
-| Spec fix needed | ✅ Fixed: added `V.is_full_vec cover` to postcondition |
-| 2-approx bound useful | ⚠️ For K₃, `is_cover + binary` is strictly stronger than 2·OPT bound |
+| Postcondition constrains output | ✅ Output narrowed to 3 of 8 possible binary vectors |
+| Invalid outputs excluded | ✅ All 5 invalid covers (0-vertex, 1-vertex, 3-vertex) excluded |
+| Spec fix needed | ✅ Fixed: added `V.is_full_vec cover` and even count to postcondition |
+| 2-approx bound useful | ⚠️ For K₃, `is_cover + binary + even count` is strictly stronger than 2·OPT bound |
 
-### Spec Issue Found and Fixed
+### Spec Issues Found and Fixed
 
-The postcondition was missing `V.is_full_vec cover`, making it impossible
-for callers to free the returned Vec. This was a genuine spec weakness (not
-a test issue). Fixed by adding `V.is_full_vec cover` to the postcondition
-and both loop invariants in `Impl.fst`. The fix verifies cleanly.
+1. The postcondition was missing `V.is_full_vec cover`, making it impossible
+   for callers to free the returned Vec. Fixed.
+
+2. The postcondition was missing the even count property (`∃ k. count = 2k`).
+   This prevented ruling out `[1,1,1]` for K₃, since count=3 is odd but the
+   algorithm only adds vertices in pairs. Fixed by `derive_even_count` lemma,
+   narrowing K₃ admissible covers from 4 to 3.
 
 ---
 
@@ -227,7 +241,7 @@ and both loop invariants in `Impl.fst`. The fix verifies cleanly.
 | `CLRS.Ch35.VertexCover.Lemmas.fst` | 383 | All proofs: counting, Thm 35.1, bridge | 0 |
 | `CLRS.Ch35.VertexCover.Complexity.fsti` | 41 | Complexity definitions | 0 |
 | `CLRS.Ch35.VertexCover.Complexity.fst` | 58 | O(V²) bound, partial_iterations | 0 |
-| `CLRS.Ch35.VertexCover.Impl.fsti` | 49 | Public Pulse interface | 0 |
-| `CLRS.Ch35.VertexCover.Impl.fst` | 361 | Pulse implementation + proof | 0 |
-| `CLRS.Ch35.VertexCover.ImplTest.fst` | 157 | Spec validation test | 0 |
-| **Total** | **1276** | | **0** |
+| `CLRS.Ch35.VertexCover.Impl.fsti` | 50 | Public Pulse interface | 0 |
+| `CLRS.Ch35.VertexCover.Impl.fst` | 379 | Pulse implementation + proof | 0 |
+| `CLRS.Ch35.VertexCover.ImplTest.fst` | 162 | Spec validation test | 0 |
+| **Total** | **1300** | | **0** |
