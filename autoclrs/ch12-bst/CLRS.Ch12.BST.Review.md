@@ -388,6 +388,9 @@ Items to address for a fully proven, high-quality implementation:
 - [x] **P0: BST validity in postconditions.** Insert and delete postconditions
   include `bst_valid 'ft ==> bst_valid (bst_insert 'ft k)`.
 - [x] **P0: Duplicate-key behavior documented.** `insert_noop_if_present` lemma.
+- [x] **P0: Spec validation test.** `CLRS.Ch12.BST.ImplTest.fst` exercises
+  all six Impl.fsti operations. All postconditions are precise enough to
+  determine concrete outputs. Zero admits, zero assumes.
 - [x] **P1: Proof stability.** Max rlimit 80 (reduced from 100), no fragile
   settings. GOOD.
 - [ ] **P2: Tighten delete complexity constant.** Current bound is `4h+1`;
