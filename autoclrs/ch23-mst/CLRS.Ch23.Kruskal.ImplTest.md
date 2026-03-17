@@ -29,58 +29,58 @@ preconditions are satisfiable:
 | `Seq.length sedge_v == n` | 3 == 3 | ✅ From V.alloc |
 | `SZ.fits (n * n)` | `SZ.fits 9` | ✅ Via `fits_at_least_16` (9 < 2¹⁶) |
 
-### ❌ Postcondition Precision
+### ✅ Partial Postcondition Verification (via elim lemma)
 
-The postcondition `result_is_forest_adj` is declared as an **opaque `val`**
-in `CLRS.Ch23.Kruskal.Impl.fsti`:
+We added `result_is_forest_adj_elim` to the `.fsti` to expose concrete
+facts from the previously opaque postcondition:
+
+| Property | Status | How |
+|----------|:------:|-----|
+| Edge count ≤ n-1 = 2 | ✅ | `result_is_forest_adj_elim` |
+| Output array lengths correct | ✅ | `result_is_forest_adj_elim` |
+| All endpoints valid (< n) | ✅ | `result_is_forest_adj_elim` |
+| Edges from positive adj entries | ✅ | `result_is_forest_adj_elim` |
+| Edge count = 2 exactly | ❌ | Forest, not spanning tree |
+| Specific edge endpoints | ❌ | Multiple valid forests exist |
+| Result is spanning tree | ❌ | Not in postcondition |
+| Result is MST | ❌ | Not in postcondition |
+
+## Spec Improvement Made
+
+### Added: `result_is_forest_adj_elim` (Impl.fsti)
 
 ```fstar
-val result_is_forest_adj (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
+val result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires result_is_forest_adj sadj seu sev n ec)
+    (ensures
+      ec <= n - 1 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      Seq.length sadj == n * n /\ n > 0 /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index seu k < n /\
+        Seq.index sev k >= 0 /\ Seq.index sev k < n /\
+        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
 ```
 
-Since this is opaque to external consumers, the test **cannot verify**:
+This lemma exposes array-level facts from the previously completely opaque
+`result_is_forest_adj` postcondition. It gives consumers:
+- Edge count bound (forest has at most n-1 edges)
+- Endpoint validity (all selected vertices are valid indices)
+- Edge provenance (each selected edge has a positive adjacency matrix entry)
 
-| Property | Verifiable? | Reason |
-|----------|:-----------:|--------|
-| Edge count = 2 | ❌ | `ec` is existentially quantified, opaque prop |
-| Edge endpoints correct | ❌ | `sedge_u'`, `sedge_v'` are existential, no info extractable |
-| Result is spanning tree | ❌ | Not part of postcondition at all |
-| Result is MST | ❌ | Not part of postcondition at all |
-| Result is a forest | ❌ | Buried inside opaque prop |
+## Remaining Spec Weakness
 
-## Spec Weakness Analysis
+The postcondition proves the result is a **forest** (acyclic subgraph)
+but not a **spanning tree** (connected + n-1 edges). The edge count is
+bounded by n-1 but could be less (e.g., 0 edges is a valid forest).
 
-### Root Cause: Opaque Postcondition
-
-The Kruskal API's postcondition is completely opaque to external consumers.
-While the implementation (`Impl.fst`) defines `result_is_forest_adj` as:
-```
-result_is_forest seu sev n ec ∧ edges_adj_pos sadj seu sev n ec
-```
-this definition is hidden behind the `val` declaration in `Impl.fsti`.
-
-### Impact
-
-A caller of `kruskal` receives a proof of an opaque proposition but cannot
-extract any useful information from it. The caller cannot:
-
-1. Determine how many edges were selected
-2. Determine which specific edges were selected
-3. Verify that the result is a spanning tree
-4. Verify that the result is an MST
-
-### Suggested Fix
-
-To make the postcondition useful to external consumers, either:
-
-1. **Expose the definition** by changing `val result_is_forest_adj ...` to
-   `let result_is_forest_adj ...` in the `.fsti`
-2. **Export intro/elim lemmas** that allow consumers to unfold and inspect
-   the postcondition components
-3. **Strengthen the postcondition** to include `is_spanning_tree` and
-   `is_mst` directly (requires strengthening the loop invariant)
+To prove the exact output for a concrete instance, the postcondition
+would need to include `is_spanning_tree` or `is_mst`, which requires
+strengthening the Pulse loop invariant to track connectivity/safety.
 
 ## Conclusion
 
 **Satisfiability**: ✓ proven
-**Completeness**: ✗ postcondition too opaque — no output information extractable
+**Partial verification**: ✓ edge count bounded, endpoints valid, edge provenance
+**Completeness**: ✗ postcondition too weak — admits empty forests

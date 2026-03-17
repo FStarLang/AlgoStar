@@ -252,6 +252,20 @@ let result_is_forest_adj (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) 
   result_is_forest seu sev n ec /\
   edges_adj_pos sadj seu sev n ec
 
+// Elim lemma for external consumers
+let result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires result_is_forest_adj sadj seu sev n ec)
+    (ensures
+      ec <= n - 1 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      Seq.length sadj == n * n /\ n > 0 /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index seu k < n /\
+        Seq.index sev k >= 0 /\ Seq.index sev k < n /\
+        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
+  = edges_adj_pos_elim sadj seu sev n ec
+
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn find
   (#p: perm)

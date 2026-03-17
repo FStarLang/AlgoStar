@@ -56,6 +56,23 @@ val edges_adj_pos (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
 /// Strengthened postcondition: forest + edges come from adjacency matrix
 val result_is_forest_adj (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
 
+/// Elim lemma: extract concrete array-level facts from result_is_forest_adj.
+/// This exposes the key properties to external consumers:
+///   - Edge count is bounded by n-1
+///   - All selected edge endpoints are valid vertex indices (< n)
+///   - Each selected edge corresponds to a positive adjacency matrix entry
+val result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires result_is_forest_adj sadj seu sev n ec)
+    (ensures
+      ec <= n - 1 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      Seq.length sadj == n * n /\ n > 0 /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index seu k < n /\
+        Seq.index sev k >= 0 /\ Seq.index sev k < n /\
+        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
+
 (*** Kruskal Function ***)
 
 //SNIPPET_START: kruskal_sig

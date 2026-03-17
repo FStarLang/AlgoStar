@@ -14,10 +14,15 @@
      Expected MST: edges {(0,1) w=1, (1,2) w=2}, total weight = 3
 
    Result: The postcondition `result_is_forest_adj` is declared as an
-   opaque `val` in the .fsti, so external consumers cannot extract any
-   information about the selected edges. The test proves:
+   opaque `val` in the .fsti. However, we added an elim lemma
+   `result_is_forest_adj_elim` that exposes concrete facts:
      ✓ Precondition is satisfiable
-     ✗ Cannot verify edge count, endpoints, or MST property from postcondition
+     ✓ Edge count bounded by n-1 (ec <= 2 for n=3)
+     ✓ All selected endpoints are valid vertices (< n)
+     ✓ Each selected edge has a positive adjacency matrix entry
+     ✗ Cannot verify exact edge count (could be 0, 1, or 2)
+     ✗ Cannot verify specific edge endpoints
+     ✗ Cannot verify spanning tree or MST property
 
    Attribution: Pattern inspired by
    https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst
@@ -125,33 +130,62 @@ fn test_kruskal_satisfiability ()
   // We now have (existentially quantified):
   //   result_is_forest_adj sadj sedge_u' sedge_v' 3 (SZ.v vec)
   //
-  // Since result_is_forest_adj is an opaque val in the .fsti,
-  // we CANNOT unfold it. We have no way to determine:
-  //   - The value of vec (edge count)
-  //   - The contents of sedge_u' or sedge_v'
-  //   - Whether the result is a spanning tree or MST
+  // Using the elim lemma result_is_forest_adj_elim, we CAN extract:
+  //   - ec <= n - 1 = 2 (edge count bound)
+  //   - All selected edge endpoints are valid (< n = 3)
+  //   - Each selected edge has a positive adjacency matrix entry
   //
-  // The postcondition is satisfied but provides no usable information
-  // to the external consumer.
+  // We still CANNOT determine:
+  //   - The exact value of ec (could be 0, 1, or 2)
+  //   - Which specific edges were selected
+  //   - Whether the result is a spanning tree or MST
 
-  // We CAN still read the actual values at runtime:
+  // Read edge count
   let ec_val = !ec_ref;
-  // But we CANNOT prove ec_val == 2 or any other specific value,
-  // because result_is_forest_adj is opaque.
+
+  // Apply the elim lemma to extract concrete facts
+  with sadj sedge_u' sedge_v'.
+    assert (A.pts_to adj sadj **
+            A.pts_to edge_u sedge_u' **
+            A.pts_to edge_v sedge_v' **
+            pure (result_is_forest_adj sadj sedge_u' sedge_v' 3 (SZ.v ec_val)));
+  result_is_forest_adj_elim sadj sedge_u' sedge_v' 3 (SZ.v ec_val);
+
+  // ✓ PROVEN: edge count bounded by n-1 = 2
+  assert (pure (SZ.v ec_val <= 2));
+
+  // ✓ PROVEN: output arrays have correct length
+  assert (pure (Seq.length sedge_u' == 3));
+  assert (pure (Seq.length sedge_v' == 3));
+
+  // ✓ PROVEN: all selected endpoints are valid vertices
+  assert (pure (forall (k:nat). k < SZ.v ec_val ==>
+    Seq.index sedge_u' k >= 0 /\ Seq.index sedge_u' k < 3 /\
+    Seq.index sedge_v' k >= 0 /\ Seq.index sedge_v' k < 3));
+
+  // ✓ PROVEN: each selected edge has a positive adjacency matrix entry
+  assert (pure (forall (k:nat). k < SZ.v ec_val ==>
+    Seq.index sadj (Seq.index sedge_u' k * 3 + Seq.index sedge_v' k) > 0));
+
+  // ✗ STILL UNPROVABLE: exact edge count
+  //   assert (pure (SZ.v ec_val == 2));     -- could be 0 or 1
+  //
+  // ✗ STILL UNPROVABLE: specific edge endpoints
+  //   (postcondition doesn't determine which edges are selected)
+  //
+  // ✗ STILL UNPROVABLE: spanning tree or MST property
+  //   (postcondition only says "forest", not "spanning tree")
 
   // --- Cleanup ---
-  with sadj. assert (A.pts_to adj sadj);
   rewrite (A.pts_to adj sadj) as (A.pts_to (V.vec_to_array adj_v) sadj);
   V.to_vec_pts_to adj_v;
   V.free adj_v;
 
-  with seu. assert (A.pts_to edge_u seu);
-  rewrite (A.pts_to edge_u seu) as (A.pts_to (V.vec_to_array eu_v) seu);
+  rewrite (A.pts_to edge_u sedge_u') as (A.pts_to (V.vec_to_array eu_v) sedge_u');
   V.to_vec_pts_to eu_v;
   V.free eu_v;
 
-  with sev. assert (A.pts_to edge_v sev);
-  rewrite (A.pts_to edge_v sev) as (A.pts_to (V.vec_to_array ev_v) sev);
+  rewrite (A.pts_to edge_v sedge_v') as (A.pts_to (V.vec_to_array ev_v) sedge_v');
   V.to_vec_pts_to ev_v;
   V.free ev_v;
 

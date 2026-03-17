@@ -294,25 +294,29 @@ The proof has three layers:
 3-vertex triangle graph with edges (0,1) w=1, (1,2) w=2, (0,2) w=3.
 Expected MST: {(0,1), (1,2)}, total weight = 3.
 
+### Spec Improvement
+Added `result_is_forest_adj_elim` to `Impl.fsti` — an elim lemma that
+exposes edge count bound, endpoint validity, and edge provenance from the
+previously opaque `result_is_forest_adj` postcondition.
+
 ### Results
 
 | Property | Status |
 |----------|:------:|
 | Precondition satisfiable | ✅ |
-| Postcondition verifies output | ❌ |
+| Edge count ≤ n-1 | ✅ (via elim lemma) |
+| All endpoints valid (< n) | ✅ (via elim lemma) |
+| Edges from positive adj entries | ✅ (via elim lemma) |
+| Exact edge count = 2 | ❌ |
+| Specific edge endpoints | ❌ |
+| Result is spanning tree | ❌ |
+| Result is MST | ❌ |
 
-**Finding**: The postcondition `result_is_forest_adj` is declared as an
-opaque `val` in `Impl.fsti`. External consumers cannot unfold it, making
-the postcondition **completely uninformative** — the caller cannot determine
-how many edges were selected, which edges they are, or whether the result
-is a spanning tree or MST.
-
-**Severity**: High. The API consumer gets a proof of an opaque proposition
-from which no useful information can be extracted.
-
-**Suggested fix**: Export the `result_is_forest_adj` definition (or
-intro/elim lemmas) in the `.fsti`, and strengthen the postcondition to
-include `is_spanning_tree` and/or `is_mst` directly.
+**Finding**: Even with the elim lemma, the postcondition is fundamentally
+weak: it proves "forest" (acyclic subgraph) not "spanning tree" (connected
++ n-1 edges). The edge count could be 0. To verify the exact output,
+the postcondition needs `is_spanning_tree` or `is_mst`, which requires
+strengthening the Pulse loop invariant.
 
 ## Files
 
