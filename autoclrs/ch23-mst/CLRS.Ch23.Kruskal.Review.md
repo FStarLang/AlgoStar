@@ -285,6 +285,35 @@ The proof has three layers:
 - [ ] Connect Complexity module to Impl (ghost ticks in main loop)
 - [ ] Reduce z3rlimit 400 in `uf_inv_union` (UF.fst line 160)
 
+## Spec Validation (ImplTest)
+
+**Test file**: `CLRS.Ch23.Kruskal.ImplTest.fst` — ✅ Verified, no admits, no assumes
+**Documentation**: `CLRS.Ch23.Kruskal.ImplTest.md`
+
+### Test Instance
+3-vertex triangle graph with edges (0,1) w=1, (1,2) w=2, (0,2) w=3.
+Expected MST: {(0,1), (1,2)}, total weight = 3.
+
+### Results
+
+| Property | Status |
+|----------|:------:|
+| Precondition satisfiable | ✅ |
+| Postcondition verifies output | ❌ |
+
+**Finding**: The postcondition `result_is_forest_adj` is declared as an
+opaque `val` in `Impl.fsti`. External consumers cannot unfold it, making
+the postcondition **completely uninformative** — the caller cannot determine
+how many edges were selected, which edges they are, or whether the result
+is a spanning tree or MST.
+
+**Severity**: High. The API consumer gets a proof of an opaque proposition
+from which no useful information can be extracted.
+
+**Suggested fix**: Export the `result_is_forest_adj` definition (or
+intro/elim lemmas) in the `.fsti`, and strengthen the postcondition to
+include `is_spanning_tree` and/or `is_mst` directly.
+
 ## Files
 
 | File | Role |
@@ -305,4 +334,5 @@ The proof has three layers:
 | `CLRS.Ch23.Kruskal.Lemmas.fst` | Lemma proof delegations |
 | `CLRS.Ch23.Kruskal.Complexity.fsti` | Complexity interface (disconnected) |
 | `CLRS.Ch23.Kruskal.Complexity.fst` | Complexity proofs (disconnected) |
+| `CLRS.Ch23.Kruskal.ImplTest.fst` | Spec validation test |
 | `CLRS.Ch23.MST.Spec.fsti` | Graph defs, cut property, MST defs |

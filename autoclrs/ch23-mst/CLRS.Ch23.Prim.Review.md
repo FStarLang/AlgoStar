@@ -253,6 +253,46 @@ The proof has three layers:
 - [ ] Reconcile infinity values (65535 vs 10⁹)
 - [ ] Connect Complexity module to Impl (ghost ticks in main loop)
 
+## Spec Validation (ImplTest)
+
+**Test file**: `CLRS.Ch23.Prim.ImplTest.fst` — ✅ Verified (1 admit for
+platform assumption `SZ.fits_u64`)
+**Documentation**: `CLRS.Ch23.Prim.ImplTest.md`
+
+### Test Instance
+3-vertex triangle graph with edges (0,1) w=1, (1,2) w=2, (0,2) w=3.
+Source = vertex 0. Expected MST: {(0,1), (1,2)}, total weight = 3.
+
+### Results
+
+| Property | Status |
+|----------|:------:|
+| Precondition satisfiable | ✅ (with `SZ.fits_u64` assumed) |
+| `key[source] == 0` | ✅ Proven |
+| `parent[source] == source` | ✅ Proven |
+| All keys bounded by infinity | ✅ Proven |
+| `key[1] == 1` (correct MST weight) | ❌ Unprovable |
+| `parent[1] == 0` (correct MST parent) | ❌ Unprovable |
+| Result is spanning tree | ❌ Not in postcondition |
+| Result is MST | ❌ Not in postcondition |
+
+**Finding**: `prim_correct` is transparent but only captures array shapes
+and boundary values. It admits infinitely many incorrect outputs. For the
+test instance, `prim_correct` is satisfied by both the correct output
+(`key=[0,1,2], parent=[0,0,1]`) and incorrect outputs (e.g.,
+`key=[0,65535,65535], parent=[0,0,0]`).
+
+**Additional API gap**: `prim` returns freshly allocated vecs but its
+postcondition does not include `is_full_vec`, preventing callers from
+freeing them.
+
+**Severity**: High. The postcondition cannot distinguish correct from
+incorrect MST computations.
+
+**Suggested fix**: Strengthen `prim_correct` to include structural tree
+properties: parent validity, key-weight correspondence, tree connectivity,
+and MST optimality (via the existing bridge theorem).
+
 ## Files
 
 | File | Role |
@@ -263,6 +303,7 @@ The proof has three layers:
 | `CLRS.Ch23.Prim.Spec.fst` | Pure spec proofs |
 | `CLRS.Ch23.Prim.Complexity.fsti` | Complexity interface (disconnected) |
 | `CLRS.Ch23.Prim.Complexity.fst` | Complexity proofs (disconnected) |
+| `CLRS.Ch23.Prim.ImplTest.fst` | Spec validation test |
 | `CLRS.Ch23.Kruskal.Bridge.fsti` | `safe_spanning_tree_is_mst` (shared) |
 | `CLRS.Ch23.MST.Spec.fsti` | Graph defs, cut property, MST defs |
 | `CLRS.Ch23.MST.Complexity.fsti` | Prim O(V²) algebraic proof |
