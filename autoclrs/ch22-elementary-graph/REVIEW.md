@@ -160,6 +160,55 @@ flag — proofs should be robust to these optimizations.
 
 ---
 
+## Spec Validation (ImplTest)
+
+Three spec validation tests were written and verified (zero admits, zero
+assumes) following the methodology from https://arxiv.org/abs/2406.09757.
+
+### Test Files
+
+| File | Status | Lines |
+|------|--------|------:|
+| `CLRS.Ch22.BFS.ImplTest.fst` | ✅ Verified | ~190 |
+| `CLRS.Ch22.DFS.ImplTest.fst` | ✅ Verified | ~190 |
+| `CLRS.Ch22.TopologicalSort.ImplTest.fst` | ✅ Verified | ~190 |
+
+All tests use the same 3-vertex DAG: 0→1, 1→2. See individual
+`ImplTest.md` files for detailed analysis.
+
+### Summary of Findings
+
+| Algorithm | Precondition | Postcondition Precision | Spec Issue |
+|-----------|-------------|------------------------|------------|
+| **BFS** | ✅ Satisfiable | ⚠️ Partial — proves completeness, dist[source]=0, but NOT shortest-path distances | **Missing shortest-path guarantee in Impl.fsti** |
+| **DFS** | ✅ Satisfiable | ⚠️ Partial — proves all BLACK, timestamps, pred_edge_ok, but no graph-theoretic properties | Spec↔Impl disconnect (known) |
+| **TopologicalSort** | ✅ Satisfiable (DAG proof via witness) | ✅ Strong — proves valid topo order, distinct, valid indices | Minor: exact output not determinable |
+
+### Spec Incompleteness Issues Found
+
+1. **BFS Impl.fsti — Missing shortest-path property (P1)**
+   - The postcondition says `reachable_in sadj n source w dist[w]` (path EXISTS
+     of dist[w] steps) but does NOT say `∀k. reachable_in ⟹ dist[w] ≤ k`
+     (dist is SHORTEST).
+   - This property IS proven in `BFS.DistanceSpec.fst` (Theorem 22.5) but is
+     not exposed through the implementation interface.
+   - **Fix:** Add shortest-path clause to `BFS.Impl.fsti` postcondition.
+
+2. **DFS Impl.fsti — Missing graph-theoretic properties (P2)**
+   - Edge classification, white-path theorem, cycle⟺back-edge are all proven
+     in `DFS.Spec.fst` but not exposed through `DFS.Impl.fsti`.
+   - The Spec uses 2D `seq (seq int)` while Impl uses flat `seq int`, making
+     bridging difficult without representation-conversion lemmas.
+   - **Fix:** Add bridging lemmas connecting DFS.Spec to DFS.Impl.
+
+3. **TopologicalSort Impl.fsti — Output determinism (P3, minor)**
+   - For graphs with a unique topological order, the postcondition does not
+     uniquely determine the output. This requires a combinatorial argument
+     combining distinctness + topological constraints.
+   - **Impact:** Minor; the postcondition is sufficient for practical uses.
+
+---
+
 ## Checklist — Priority Items
 
 ### P0 — Immediate (correctness/hygiene)
