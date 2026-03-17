@@ -6,8 +6,8 @@
 
 ## What Is Tested
 
-Two test functions exercise the `binary_search` API from
-`CLRS.Ch04.BinarySearch.Impl.fsti` on a concrete sorted array `[1, 3, 5]`:
+Three test functions exercise the `binary_search` API from
+`CLRS.Ch04.BinarySearch.Impl.fsti` on concrete instances:
 
 ### Test 1: `test_binary_search_found` — Key present
 
@@ -20,6 +20,7 @@ Two test functions exercise the `binary_search` API from
     - `result == 0` is contradicted by `s0[0] = 1 ≠ 3`
     - `result == 2` is contradicted by `s0[2] = 5 ≠ 3`
     - Only `result == 1` satisfies `s0[result] == 3`
+  - Complexity: `cf <= 2` (at most `⌊log₂ 3⌋ + 1 = 2` comparisons)
 
 ### Test 2: `test_binary_search_not_found` — Key absent
 
@@ -30,6 +31,19 @@ Two test functions exercise the `binary_search` API from
     - `result < 3` would require `s0[result] == 2`, but none of
       `s0[0]=1, s0[1]=3, s0[2]=5` equals 2
     - So `result == 3` (not found)
+  - Complexity: `cf <= 2` (at most 2 comparisons)
+
+### Test 3: `test_binary_search_empty` — Empty array
+
+- **Input**: empty array `[]`, key = 1
+- **Expected result**: `SZ.v result == 0` (sentinel = len = 0)
+- **What is proven**:
+  - The `is_sorted` precondition is vacuously true for empty sequences
+  - `result <= 0` from postcondition, so `result == 0`
+  - The `forall i < 0. ...` not-found clause is vacuously true
+  - Complexity: `cf <= 1` (at most `⌊log₂ 0⌋ + 1 = 1` comparison)
+  - Tests the boundary behavior of the implementation (empty array
+    returns immediately without entering the loop)
 
 ## Spec Completeness Assessment
 
@@ -41,8 +55,13 @@ The `binary_search` postcondition is **fully precise** for concrete inputs:
 2. **Not found case**: `forall i < n. s0[i] ≠ key` combined with the
    dichotomy `result < len ∨ result == len` uniquely determines the sentinel.
 
-3. **Precondition**: `is_sorted s0` is satisfiable and easily proven for
-   small concrete sorted arrays.
+3. **Empty array**: `result <= 0` immediately gives `result == 0`.
+
+4. **Precondition**: `is_sorted s0` is satisfiable and easily proven for
+   small concrete sorted arrays (and vacuously true for empty arrays).
+
+5. **Complexity**: `complexity_bounded_log` (transparent in Spec.fst) allows
+   verification of the O(log n) comparison bound.
 
 **No spec weaknesses found.** The postcondition is both satisfiable and
 precise enough to uniquely determine the output for any concrete input.

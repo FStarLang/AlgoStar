@@ -40,6 +40,10 @@ One test function exercises the `matrix_multiply` API from
 3. **Concrete value verification**: The test reads each output element from
    the array and asserts the expected value (`c00 == 19`, etc.).
 
+4. **Complexity exactness**: The test asserts `cf == 8` (exactly `n³ = 2³ = 8`
+   multiply-add operations). The `complexity_bounded_cubic` predicate is
+   transparent (defined in `Spec.fst`), allowing this verification.
+
 ### Proof Technique
 
 A helper lemma `mm_dot_products` connects the ghost sequences (from array

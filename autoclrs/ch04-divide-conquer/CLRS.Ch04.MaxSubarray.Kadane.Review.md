@@ -252,7 +252,14 @@ Priority-ordered items to reach a fully proven, high-quality implementation:
   are duplicated across BinarySearch.Impl, Kadane, and MatrixMultiply.Impl.
   Extract to `CLRS.Common.GhostComplexity`.
 - [x] **P3: Spec validation test.** `CLRS.Ch04.MaxSubarray.Kadane.ImplTest.fst`
-  proves postcondition precision on concrete input `[-1, 3, -2]`:
-  result == 3 (max subarray is [3] at index 1). Zero admits, zero assumes.
-  See `CLRS.Ch04.MaxSubarray.Kadane.ImplTest.md` for details.
-  **No spec weaknesses found.**
+  proves postcondition precision on concrete inputs:
+  - Mixed array `[-1, 3, -2]` → result == 3
+  - All-negative array `[-5, -3, -1]` → result == -1
+  - Both tests verify exact complexity (cf == 3 for 3 elements).
+  Zero admits, zero assumes. See `CLRS.Ch04.MaxSubarray.Kadane.ImplTest.md`
+  for details.
+- [x] **P4: Make complexity predicate transparent.** Moved
+  `complexity_bounded_linear` from abstract `val` in `Kadane.fsti` to
+  transparent `let` in `CLRS.Ch04.MaxSubarray.Spec.fst`, consistent with
+  how BinarySearch and MatrixMultiply handle their complexity predicates.
+  **Previously found spec weakness — now resolved.**

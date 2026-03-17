@@ -9,9 +9,12 @@
      A = [[1,2],[3,4]], B = [[5,6],[7,8]]
      Expected C = [[19,22],[43,50]]
 
+   Also verifies the exact complexity bound: 2³ = 8 multiply-add operations.
+
    Validates:
    - Precondition (n>0, SZ.fits, lengths match) is satisfiable
    - Postcondition (mat_mul_correct) uniquely determines all output entries
+   - Complexity bound (cf == c0 + n³) is exact and verifiable
    - No admits. No assumes.
 *)
 
@@ -158,6 +161,8 @@ fn test_matrix_multiply_2x2 ()
 
   // Cleanup
   with cf. assert (GR.pts_to ctr cf);
+  // Complexity: exactly n³ = 2³ = 8 multiply-add operations
+  assert (pure (cf == 8));
   GR.free ctr;
 
   with sc2. assert (A.pts_to c_arr sc2);

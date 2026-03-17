@@ -14,8 +14,6 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-val complexity_bounded_linear (cf c0 n: nat) : prop
-
 val max_subarray
   (#p: perm)
   (a: array int)

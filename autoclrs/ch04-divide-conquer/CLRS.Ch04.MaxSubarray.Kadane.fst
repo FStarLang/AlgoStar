@@ -38,11 +38,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-// ========== Complexity bound predicate ==========
-
-let complexity_bounded_linear (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 == n
-
 // ========== Main Algorithm with Complexity ==========
 
 //SNIPPET_START: max_subarray_sig

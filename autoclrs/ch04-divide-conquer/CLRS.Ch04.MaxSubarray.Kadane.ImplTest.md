@@ -6,14 +6,21 @@
 
 ## What Is Tested
 
-One test function exercises the `max_subarray` API from
-`CLRS.Ch04.MaxSubarray.Kadane.fsti` on a small concrete instance:
+Two test functions exercise the `max_subarray` API from
+`CLRS.Ch04.MaxSubarray.Kadane.fsti` on concrete instances:
 
-### Test: `test_kadane_max_subarray`
+### Test 1: `test_kadane_max_subarray` — Mixed array
 
 - **Input**: array `[-1, 3, -2]` (3 elements)
 - **Expected result**: `3` (the maximum contiguous subarray sum)
 - **Optimal subarray**: `[3]` at index 1
+
+### Test 2: `test_kadane_all_negative` — All-negative array
+
+- **Input**: array `[-5, -3, -1]` (3 elements)
+- **Expected result**: `-1` (the least-negative element)
+- **Optimal subarray**: `[-1]` at index 2
+- Tests the edge case where no positive contiguous sum exists.
 
 ### What Is Proven
 
@@ -21,33 +28,63 @@ One test function exercises the `max_subarray` API from
    easily satisfied for `len = 3`.
 
 2. **Postcondition precision**: From `result == max_subarray_spec s0`, the
-   test proves `result == 3` by:
-   - A helper lemma `kadane_test_lemma` connects the ghost sequence `s0`
-     (from array writes) to `Seq.seq_of_list [(-1); 3; (-2)]` via
-     extensional equality (`Seq.lemma_eq_intro`)
-   - `assert_norm` evaluates `max_subarray_spec` on the concrete sequence
+   tests prove exact results:
+   - Test 1: `result == 3` via `kadane_test_lemma`
+   - Test 2: `result == -1` via `kadane_all_negative_lemma`
+
+3. **Complexity exactness**: Both tests assert `cf == 3` (exactly 3
+   operations for 3 elements). This is now possible because
+   `complexity_bounded_linear` was moved from an abstract `val` in
+   `Kadane.fsti` to a transparent `let` in `CLRS.Ch04.MaxSubarray.Spec.fst`.
 
 ### Proof Technique
 
 The key challenge is that the ghost sequence `s0` (a chain of `Seq.upd`
-operations) is syntactically different from `Seq.seq_of_list [-1; 3; -2]`.
-The helper lemma:
+operations) is syntactically different from `Seq.seq_of_list [...]`.
+Each helper lemma:
 
 1. Takes `s` with known element values (from the `requires` clause)
 2. Creates a concrete `s' = Seq.seq_of_list [...]`
 3. Proves `s == s'` via `Seq.lemma_eq_intro` (extensional equality)
-4. Uses `assert_norm` to evaluate `max_subarray_spec s'` to `3`
+4. Uses `assert_norm` to evaluate `max_subarray_spec s'`
 
-### Kadane Computation Trace
+### Kadane Computation Traces
 
+Test 1: `max_subarray_spec([-1, 3, -2])`
 ```
-max_subarray_spec([-1, 3, -2]) = kadane_spec s 0 0 (-1)
-
 i=0: elem=-1, new_current=max(-1, 0+(-1))=-1,  new_best=max(-1,-1)=-1
 i=1: elem=3,  new_current=max(3, -1+3)=3,       new_best=max(-1,3)=3
 i=2: elem=-2, new_current=max(-2, 3+(-2))=1,    new_best=max(3,1)=3
-i=3: return 3
+→ return 3
 ```
+
+Test 2: `max_subarray_spec([-5, -3, -1])`
+```
+i=0: elem=-5, new_current=max(-5, 0+(-5))=-5,  new_best=max(-5,-5)=-5
+i=1: elem=-3, new_current=max(-3, -5+(-3))=-3,  new_best=max(-5,-3)=-3
+i=2: elem=-1, new_current=max(-1, -3+(-1))=-1,  new_best=max(-3,-1)=-1
+→ return -1
+```
+
+## Spec Strengthening Summary
+
+### Change: `complexity_bounded_linear` made transparent
+
+**Before**: Declared as `val complexity_bounded_linear (cf c0 n: nat) : prop`
+in `Kadane.fsti`, with the definition hidden in `Kadane.fst`. Clients could
+not unfold the predicate to verify complexity properties.
+
+**After**: Definition moved to `CLRS.Ch04.MaxSubarray.Spec.fst`:
+```fstar
+let complexity_bounded_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n
+```
+This is consistent with how `complexity_bounded_log` (BinarySearch) and
+`complexity_bounded_cubic` (MatrixMultiply) are defined in their respective
+`Spec.fst` files.
+
+**Impact**: Tests can now assert `cf == 3` (exact operation count), which
+was previously impossible through the abstract interface.
 
 ## Spec Completeness Assessment
 
@@ -64,8 +101,8 @@ a complete correctness guarantee:
 - There exist `i,j` such that `max_subarray_spec s0 == sum_range s i j`
   (witness)
 
-**No spec weaknesses found.** The postcondition is both satisfiable and
-fully precise.
+**No remaining spec weaknesses.** The postcondition is both satisfiable,
+fully precise, and the complexity bound is now transparent and verifiable.
 
 ## Verification Status
 

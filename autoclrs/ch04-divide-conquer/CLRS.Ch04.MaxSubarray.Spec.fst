@@ -74,3 +74,8 @@ let rec max_sub_sum (s: Seq.seq int) (i: nat) : Pure int
   if i = 0 then Seq.index s 0
   else max_int (max_sub_sum s (Prims.op_Subtraction i 1)) (max_suffix_sum s i)
 
+// ========== Complexity bound predicate (Kadane) ==========
+
+let complexity_bounded_linear (cf c0 n: nat) : prop =
+  cf >= c0 /\ cf - c0 == n
+
