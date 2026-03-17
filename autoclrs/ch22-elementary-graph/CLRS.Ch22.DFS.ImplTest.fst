@@ -193,6 +193,16 @@ fn test_dfs_3 ()
   // -- (F) Complexity bound --
   assert (pure (cf - 0 <= 2 * (3 * 3)));
 
+  // -- (G) Timestamp bounds (NEW) --
+  // From the strengthened postcondition: d[u] ≤ 2*n and f[u] ≤ 2*n
+  assert (pure (Seq.index sd' 0 <= 2 * 3));
+  assert (pure (Seq.index sd' 1 <= 2 * 3));
+  assert (pure (Seq.index sd' 2 <= 2 * 3));
+  assert (pure (Seq.index sf' 0 <= 2 * 3));
+  assert (pure (Seq.index sf' 1 <= 2 * 3));
+  assert (pure (Seq.index sf' 2 <= 2 * 3));
+  // Combined with d[u] > 0: d[u] ∈ [1, 6] and f[u] ∈ [1, 6]
+
   (* ---- Phase 4: Cleanup ---- *)
   with s1. assert (A.pts_to adj s1);
   rewrite (A.pts_to adj s1) as (A.pts_to (V.vec_to_array adj_v) s1);

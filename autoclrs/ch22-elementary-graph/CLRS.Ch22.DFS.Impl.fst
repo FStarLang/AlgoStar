@@ -155,6 +155,66 @@ let rec count_ones_zero_no_gray (s: Seq.seq int) (k: nat{k <= Seq.length s})
   = if k = 0 then ()
     else count_ones_zero_no_gray s (k - 1)
 
+(* Count BLACK (==2) vertices in s[0..k) *)
+let rec count_twos (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Tot (r: nat{r <= k}) (decreases k)
+  = if k = 0 then 0
+    else (if Seq.index s (k - 1) = 2 then 1 else 0) + count_twos s (k - 1)
+
+(* If all elements in [0..k) are 0, count_twos is 0 *)
+let rec count_twos_all_zero (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Lemma (requires forall (j:nat). j < k ==> Seq.index s j == 0)
+          (ensures count_twos s k == 0)
+          (decreases k)
+  = if k = 0 then ()
+    else count_twos_all_zero s (k - 1)
+
+(* Updating from non-2 to non-2 preserves count_twos *)
+let rec count_twos_upd_non_two (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat) (v: int)
+  : Lemma (requires j < k /\ Seq.index s j <> 2 /\ v <> 2)
+          (ensures Seq.length (Seq.upd s j v) == Seq.length s /\
+                   count_twos (Seq.upd s j v) k == count_twos s k)
+          (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then begin
+      let rec aux (s: Seq.seq int) (k': nat{k' <= Seq.length s}) (j: nat{j >= k' /\ j < Seq.length s}) (v: int)
+        : Lemma (ensures Seq.length (Seq.upd s j v) == Seq.length s /\
+                         count_twos (Seq.upd s j v) k' == count_twos s k')
+                (decreases k')
+        = if k' = 0 then ()
+          else (assert (Seq.index (Seq.upd s j v) (k'-1) == Seq.index s (k'-1)); aux s (k'-1) j v)
+      in aux s (k-1) j v
+    end
+    else (assert (Seq.index (Seq.upd s j v) (k-1) == Seq.index s (k-1));
+          count_twos_upd_non_two s (k-1) j v)
+
+(* Updating from non-2 to 2 increases count_twos by 1 *)
+let rec count_twos_upd_to_two (s: Seq.seq int) (k: nat{k <= Seq.length s}) (j: nat)
+  : Lemma (requires j < k /\ Seq.index s j <> 2)
+          (ensures Seq.length (Seq.upd s j 2) == Seq.length s /\
+                   count_twos (Seq.upd s j 2) k == count_twos s k + 1)
+          (decreases k)
+  = if k = 0 then ()
+    else if j = k - 1 then begin
+      let rec aux (s: Seq.seq int) (k': nat{k' <= Seq.length s}) (j: nat{j >= k' /\ j < Seq.length s})
+        : Lemma (ensures Seq.length (Seq.upd s j 2) == Seq.length s /\
+                         count_twos (Seq.upd s j 2) k' == count_twos s k')
+                (decreases k')
+        = if k' = 0 then ()
+          else (assert (Seq.index (Seq.upd s j 2) (k'-1) == Seq.index s (k'-1)); aux s (k'-1) j)
+      in aux s (k-1) j
+    end
+    else (assert (Seq.index (Seq.upd s j 2) (k-1) == Seq.index s (k-1));
+          count_twos_upd_to_two s (k-1) j)
+
+(* If all colors in {0,1,2}, then count_ones + count_twos <= k *)
+let rec count_ones_twos_le (s: Seq.seq int) (k: nat{k <= Seq.length s})
+  : Lemma (requires forall (i:nat). i < k ==> (Seq.index s i == 0 \/ Seq.index s i == 1 \/ Seq.index s i == 2))
+          (ensures count_ones s k + count_twos s k <= k)
+          (decreases k)
+  = if k = 0 then ()
+    else count_ones_twos_le s (k - 1)
+
 // product_strict_bound imported from CLRS.Ch22.Graph.Common
 
 (* ================================================================
@@ -200,6 +260,14 @@ let scan_ok (sscan: Seq.seq SZ.t) (n: nat)
   : prop
   = Seq.length sscan >= n /\
     (forall (uu:nat). {:pattern (Seq.index sscan uu)} uu < n ==> SZ.v (Seq.index sscan uu) <= n)
+
+(* Timestamp bound: all timestamps of discovered vertices are bounded by current time *)
+let timestamps_bounded (scolor sd sf: Seq.seq int) (n: nat) (time: int)
+  : prop
+  = Seq.length scolor >= n /\ Seq.length sd >= n /\ Seq.length sf >= n /\
+    (forall (i:nat). {:pattern (Seq.index scolor i)} i < n ==>
+      (Seq.index scolor i == 1 ==> Seq.index sd i <= time) /\
+      (Seq.index scolor i == 2 ==> Seq.index sd i <= time /\ Seq.index sf i <= time))
 
 (* ================================================================
    PREDICATE LEMMAS — Key reasoning steps isolated as lemmas
@@ -315,6 +383,35 @@ let finish_preserves_pred_edge_ok
   = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred);
     reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n (Seq.upd scolor j 2) sd spred)
 
+(* Discovering preserves timestamps_bounded *)
+let discover_preserves_timestamps_bounded
+  (scolor sd sf: Seq.seq int) (n j: nat) (time: int)
+  : Lemma
+    (requires timestamps_bounded scolor sd sf n time /\
+             j < n /\ n <= Seq.length scolor /\ n <= Seq.length sd /\
+             Seq.index scolor j == 0)
+    (ensures timestamps_bounded (Seq.upd scolor j 1) (Seq.upd sd j (time + 1)) sf n (time + 1))
+  = ()
+
+(* Finishing preserves timestamps_bounded *)
+let finish_preserves_timestamps_bounded
+  (scolor sd sf: Seq.seq int) (n j: nat) (time: int)
+  : Lemma
+    (requires timestamps_bounded scolor sd sf n time /\
+             j < n /\ n <= Seq.length scolor /\ n <= Seq.length sd /\ n <= Seq.length sf /\
+             Seq.index scolor j == 1)
+    (ensures timestamps_bounded (Seq.upd scolor j 2) sd (Seq.upd sf j (time + 1)) n (time + 1))
+  = ()
+
+(* All-WHITE state satisfies timestamps_bounded vacuously *)
+let init_timestamps_bounded
+  (scolor sd sf: Seq.seq int) (n: nat) (time: int)
+  : Lemma
+    (requires n <= Seq.length scolor /\ n <= Seq.length sd /\ n <= Seq.length sf /\
+             (forall (j:nat). j < n ==> Seq.index scolor j == 0))
+    (ensures timestamps_bounded scolor sd sf n time)
+  = ()
+
 (* All-WHITE state satisfies pred_edge_ok vacuously (all non-WHITE: vacuous) *)
 let init_pred_edge_ok (sadj scolor sd spred: Seq.seq int) (n: nat)
   : Lemma
@@ -341,6 +438,22 @@ let final_postcondition_lemma
       (forall (u:nat). {:pattern (Seq.index sf u)} u < n ==> Seq.index sf u > 0) /\
       (forall (u:nat). {:pattern (Seq.index sd u); (Seq.index sf u)} u < n ==> Seq.index sd u < Seq.index sf u))
   = count_ones_zero_no_gray scolor n
+
+(* Derive timestamp bounds ≤ 2*n from timestamps_bounded + count invariant *)
+let final_timestamps_lemma
+  (scolor sd sf: Seq.seq int) (n: nat) (vtime: int)
+  : Lemma
+    (requires
+      n <= Seq.length scolor /\ n <= Seq.length sd /\ n <= Seq.length sf /\
+      dfs_ok scolor sd sf n /\
+      timestamps_bounded scolor sd sf n vtime /\
+      vtime == count_ones scolor n + 2 * count_twos scolor n /\
+      (forall (u:nat). u < n ==> Seq.index scolor u == 2))
+    (ensures
+      vtime <= 2 * n /\
+      (forall (u:nat). u < n ==> Seq.index sd u <= 2 * n) /\
+      (forall (u:nat). u < n ==> Seq.index sf u <= 2 * n))
+  = count_ones_twos_le scolor n
 
 (* ================================================================
    GHOST TICK — for complexity tracking
@@ -599,6 +712,8 @@ fn dfs_visit
       scan_ok sscan (SZ.v n) /\
       dfs_ok scolor sd sf (SZ.v n) /\
       gray_ok scolor sd (SZ.v n) vtime /\
+      timestamps_bounded scolor sd sf (SZ.v n) vtime /\
+      vtime == count_ones scolor (SZ.v n) + 2 * count_twos scolor (SZ.v n) /\
       nonwhite_below scolor (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor sd spred /\
       (* WHITE vertices have scan_idx == 0 *)
@@ -623,6 +738,8 @@ fn dfs_visit
       stack_ok scolor' sstack' (SZ.v n) (SZ.v vtop') /\
       scan_ok sscan' (SZ.v n) /\
       dfs_ok scolor' sd' sf' (SZ.v n) /\
+      timestamps_bounded scolor' sd' sf' (SZ.v n) vtime' /\
+      vtime' == count_ones scolor' (SZ.v n) + 2 * count_twos scolor' (SZ.v n) /\
       nonwhite_below scolor' (SZ.v vs + 1) /\
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       (* Complexity: ticks == scan work done *)
@@ -651,6 +768,8 @@ fn dfs_visit
   discover_preserves_tracking scolor sd sf (SZ.v n) (SZ.v vs) t;
   discover_preserves_nonwhite scolor (SZ.v vs) (SZ.v vs);
   discover_source_preserves_pred_edge_ok sadj scolor sd spred (SZ.v n) (SZ.v vs) t;
+  discover_preserves_timestamps_bounded scolor sd sf (SZ.v n) (SZ.v vs) t;
+  count_twos_upd_non_two scolor (SZ.v n) (SZ.v vs) 1;
 
   // Process stack
   while (
@@ -679,6 +798,8 @@ fn dfs_visit
       scan_ok sscan_w (SZ.v n) /\
       dfs_ok scolor_w sd_w sf_w (SZ.v n) /\
       gray_ok scolor_w sd_w (SZ.v n) vtime_w /\
+      timestamps_bounded scolor_w sd_w sf_w (SZ.v n) vtime_w /\
+      vtime_w == count_ones scolor_w (SZ.v n) + 2 * count_twos scolor_w (SZ.v n) /\
       Seq.index scolor_w (SZ.v vs) <> 0 /\
       nonwhite_below scolor_w (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor_w sd_w spred_w /\
@@ -741,6 +862,8 @@ fn dfs_visit
         scan_ok sscan_scan (SZ.v n) /\
         dfs_ok scolor_scan sd_scan sf_scan (SZ.v n) /\
         gray_ok scolor_scan sd_scan (SZ.v n) vtime_scan /\
+        timestamps_bounded scolor_scan sd_scan sf_scan (SZ.v n) vtime_scan /\
+        vtime_scan == count_ones scolor_scan (SZ.v n) + 2 * count_twos scolor_scan (SZ.v n) /\
         Seq.index scolor_scan (SZ.v vs) <> 0 /\
         nonwhite_below scolor_scan (SZ.v vs) /\
         pred_edge_ok sadj (SZ.v n) scolor_scan sd_scan spred_scan /\
@@ -820,6 +943,8 @@ fn dfs_visit
       discover_preserves_nonwhite scolor_now (SZ.v vv) (SZ.v vs);
       // Preserve predecessor tree property
       discover_preserves_pred_edge_ok sadj scolor_now sd_now spred_now (SZ.v n) (SZ.v vv) (SZ.v u) vtime_now;
+      discover_preserves_timestamps_bounded scolor_now sd_now sf_now (SZ.v n) (SZ.v vv) vtime_now;
+      count_twos_upd_non_two scolor_now (SZ.v n) (SZ.v vv) 1;
       ()
     } else {
       // No more WHITE neighbors - finish u (inlined)
@@ -841,6 +966,8 @@ fn dfs_visit
       finish_preserves_nonwhite scolor_now (SZ.v u) (SZ.v vs);
       // Preserve predecessor tree property
       finish_preserves_pred_edge_ok sadj scolor_now sd_now spred_now (SZ.v n) (SZ.v u);
+      finish_preserves_timestamps_bounded scolor_now sd_now sf_now (SZ.v n) (SZ.v u) vtime_now;
+      count_twos_upd_to_two scolor_now (SZ.v n) (SZ.v u);
       ()
     }
   };
@@ -911,6 +1038,8 @@ fn maybe_dfs_visit
       stack_ok scolor sstack (SZ.v n) (SZ.v vtop) /\
       scan_ok sscan (SZ.v n) /\
       dfs_ok scolor sd sf (SZ.v n) /\
+      timestamps_bounded scolor sd sf (SZ.v n) vtime /\
+      vtime == count_ones scolor (SZ.v n) + 2 * count_twos scolor (SZ.v n) /\
       nonwhite_below scolor (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor sd spred /\
       (* WHITE vertices have scan_idx == 0 *)
@@ -935,6 +1064,8 @@ fn maybe_dfs_visit
       stack_ok scolor' sstack' (SZ.v n) (SZ.v vtop') /\
       scan_ok sscan' (SZ.v n) /\
       dfs_ok scolor' sd' sf' (SZ.v n) /\
+      timestamps_bounded scolor' sd' sf' (SZ.v n) vtime' /\
+      vtime' == count_ones scolor' (SZ.v n) + 2 * count_twos scolor' (SZ.v n) /\
       nonwhite_below scolor' (SZ.v vs + 1) /\
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       (* Complexity: ticks == scan work *)
@@ -1025,6 +1156,9 @@ fn stack_dfs
       (forall (u: nat). u < SZ.v n ==> Seq.index sf' u > 0) /\
       // Discovery time < finish time (parenthesis theorem)
       (forall (u: nat). u < SZ.v n ==> Seq.index sd' u < Seq.index sf' u) /\
+      // Timestamp bounds: all timestamps ≤ 2*n
+      (forall (u: nat). u < SZ.v n ==> Seq.index sd' u <= 2 * SZ.v n) /\
+      (forall (u: nat). u < SZ.v n ==> Seq.index sf' u <= 2 * SZ.v n) /\
       // Predecessor tree: pred[v] >= 0 implies edge from pred[v] to v, d[pred[v]] < d[v]
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       // Complexity: at most 2 * n² ticks
@@ -1114,6 +1248,9 @@ fn stack_dfs
   count_ones_all_zero scolor_init (SZ.v n);
   sum_scan_idx_all_zero sscan_init (SZ.v n);
   init_pred_edge_ok sadj scolor_init sd_init spred_init (SZ.v n);
+  with sf_init. assert (A.pts_to f sf_init);
+  count_twos_all_zero scolor_init (SZ.v n);
+  init_timestamps_bounded scolor_init sd_init sf_init (SZ.v n) 0;
 
   // Step 3: Main DFS loop - for each vertex s
   let mut s: SZ.t = 0sz;
@@ -1139,6 +1276,8 @@ fn stack_dfs
       stack_ok scolor_s sstack_s (SZ.v n) (SZ.v vtop) /\
       scan_ok sscan_s (SZ.v n) /\
       dfs_ok scolor_s sd_s sf_s (SZ.v n) /\
+      timestamps_bounded scolor_s sd_s sf_s (SZ.v n) vtime /\
+      vtime == count_ones scolor_s (SZ.v n) + 2 * count_twos scolor_s (SZ.v n) /\
       nonwhite_below scolor_s (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor_s sd_s spred_s /\
       (* Complexity: vc_s == c0 + vs + sum_scan_idx *)
@@ -1192,6 +1331,11 @@ fn stack_dfs
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u > 0));
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sf_final u > 0));
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u < Seq.index sf_final u));
+  // Derive timestamp bounds: vtime <= 2*n => d[u] <= 2*n, f[u] <= 2*n
+  with vtime_final. assert (R.pts_to time_ref vtime_final);
+  final_timestamps_lemma scolor_final sd_final sf_final (SZ.v n) vtime_final;
+  assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u <= 2 * SZ.v n));
+  assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sf_final u <= 2 * SZ.v n));
   with spred_final. assert (A.pts_to pred spred_final);
   assert (pure (pred_edge_ok sadj (SZ.v n) scolor_final sd_final spred_final))
 }

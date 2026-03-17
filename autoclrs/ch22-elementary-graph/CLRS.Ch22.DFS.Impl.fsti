@@ -88,6 +88,9 @@ fn stack_dfs
       (forall (u: nat). u < SZ.v n ==> Seq.index sf' u > 0) /\
       // Discovery time < finish time (parenthesis theorem)
       (forall (u: nat). u < SZ.v n ==> Seq.index sd' u < Seq.index sf' u) /\
+      // Timestamp bounds: all timestamps ≤ 2*n
+      (forall (u: nat). u < SZ.v n ==> Seq.index sd' u <= 2 * SZ.v n) /\
+      (forall (u: nat). u < SZ.v n ==> Seq.index sf' u <= 2 * SZ.v n) /\
       // Predecessor tree: pred[v] >= 0 implies edge from pred[v] to v, d[pred[v]] < d[v]
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       // Complexity: at most 2 * n² ticks
