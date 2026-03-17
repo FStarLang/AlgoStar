@@ -325,6 +325,26 @@ for the stability proof.
 solo verification). The z3rlimit 800 in `counting_sort_inplace` is the
 highest in the chapter and a stability risk.
 
+## Spec Validation (ImplTest)
+
+Spec validation tests in `CLRS.Ch08.CountingSort.ImplTest.fst` verify
+the `Impl.fsti` API for `counting_sort_inplace` and `counting_sort_impl`.
+
+**Results**: Both tests pass with **zero admits, zero assumes**.
+
+- **Preconditions**: Satisfiable for concrete inputs (`[3;1;2]`).
+  No overly-strong preconditions found.
+- **Postconditions**: Fully precise — `sorted ∧ permutation` uniquely
+  determines the output for the tested input.
+- **Minor issue**: Permutation argument order is inconsistent between
+  `counting_sort_impl` (`S.permutation sb' sa`, output→input) and
+  `counting_sort_inplace` (`S.permutation s0 s`, input→output). This
+  is semantically equivalent but stylistically inconsistent.
+- **`counting_sort_by_digit`**: Not tested (requires opaque stability
+  lemma work); exercised via radix sort.
+
+See `CLRS.Ch08.CountingSort.ImplTest.md` for detailed analysis.
+
 ## Checklist
 
 Priority-ordered items for reaching a fully proven, high-quality
