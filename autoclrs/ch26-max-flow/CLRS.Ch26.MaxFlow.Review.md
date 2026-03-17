@@ -376,3 +376,41 @@ assertion requires substantial solver effort.
   representation uses Θ(V²) space. An adjacency-list representation would be
   more practical for sparse graphs and would better match CLRS's graph
   representation discussions.
+
+## Spec Validation (ImplTest)
+
+**Date**: 2026-03-17
+
+A spec validation test (`ImplTest.fst`) was added following the methodology from
+[microsoft/intent-formalization](https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/).
+
+### Test Case
+2-vertex single-edge network: n=2, source=0, sink=1, cap[0→1]=7.
+
+### Results
+
+| Validation | Result | Notes |
+|-----------|--------|-------|
+| Precondition satisfiable | ✅ | `valid_caps_intro` bridges runtime check |
+| Postcondition complete | ✅ | Uniquely determines all 4 flow values |
+| Flow value provable | ✅ | flow_value = 7 |
+| MFMC applicable | ✅ | flow_value = cut_capacity for some cut |
+| Zero admits/assumes | ✅ | Fully proven |
+
+### Spec Completeness Assessment
+
+The postcondition (`imp_valid_flow` + `no_augmenting_path`) is **fully precise**:
+
+1. **`imp_valid_flow`** (via bridge lemma → `valid_flow`): Capacity constraints
+   at zero-capacity edges uniquely determine those flow values to 0.
+
+2. **`no_augmenting_path`**: Instantiating with concrete source-to-sink paths
+   gives lower bounds on flow via the bottleneck computation. For the single-edge
+   network, this proves `flow[0→1] ≥ 7`, which combined with the capacity
+   constraint `≤ 7` gives exact equality.
+
+3. **MFMC theorem**: Successfully applied to conclude flow_value equals the
+   min-cut capacity.
+
+**No spec weaknesses found.** The postcondition is the strongest possible
+functional guarantee — equivalent to proving max flow optimality.
