@@ -1,8 +1,8 @@
 # Vertex Cover 2-Approximation — Review (CLRS §35.1)
 
-**Last reviewed**: 2026-03-16
+**Last reviewed**: 2026-03-17
 **Reviewer**: Copilot audit
-**Verdict**: ✅ Fully proven, rubric-compliant, high quality
+**Verdict**: ✅ Fully proven, rubric-compliant, spec-validated
 
 ---
 
@@ -10,13 +10,15 @@
 
 - [x] **P0: Rubric compliance** — 7/7 required files present and verified
 - [x] **P0: Zero admits** — Confirmed: 0 `admit()`, 0 `assume` in all files
-- [x] **P0: Verification** — All 7 files verify cleanly (~48s total)
+- [x] **P0: Verification** — All 8 files verify cleanly (including ImplTest)
 - [x] **P0: Spec strength** — Valid cover + binary output + 2-approximation + min cover existence
 - [x] **P0: CLRS fidelity** — Faithful to APPROX-VERTEX-COVER pseudocode
+- [x] **P0: Spec validation** — ImplTest proves postcondition precision on K₃ (see below)
 - [x] **P1: Symmetry precondition** — `is_symmetric_adj` formally enforced
 - [x] **P1: Min cover existence** — `min_cover_exists` makes 2-approx non-vacuous
 - [x] **P1: Complexity linked** — Ghost counter tracks `vertex_cover_iterations(n)`
 - [x] **P1: Proof stability** — Modest solver limits (z3rlimit 30, 40 only)
+- [x] **P1: V.is_full_vec exposed** — Fixed: postcondition now exposes `is_full_vec` for returned Vec
 - [ ] **P2: Unconditional writes** — Cover array written O(n²) times; could guard writes behind a branch (low priority, simplifies proof)
 - [ ] **P2: No n=0 support** — Precondition requires n > 0; degenerate case not handled
 - [ ] **P3: O(V²) vs O(V+E)** — Adjacency-matrix representation; CLRS uses adjacency lists for O(V+E) on sparse graphs
@@ -166,19 +168,53 @@ representation is a design choice, not a correctness issue.
 
 ## Specification Gaps and Limitations
 
-1. **O(V²) vs O(V+E)** — Adjacency-matrix scan vs. CLRS adjacency lists.
+1. ~~**Missing `V.is_full_vec` in postcondition**~~ — **FIXED.** The original
+   postcondition did not expose `V.is_full_vec cover`, preventing callers from
+   freeing the returned Vec. Fixed by adding `V.is_full_vec cover` to the
+   postcondition and both loop invariants. Zero admits.
+
+2. **O(V²) vs O(V+E)** — Adjacency-matrix scan vs. CLRS adjacency lists.
    Asymptotically slower for sparse graphs. Design choice.
 
-2. **No n=0 support** — Precondition requires `n > 0`. Trivial case excluded.
+3. **No n=0 support** — Precondition requires `n > 0`. Trivial case excluded.
 
-3. **Unconditional writes** — Cover array written O(n²) times (simplifies
+4. **Unconditional writes** — Cover array written O(n²) times (simplifies
    proof but adds redundant writes). Low priority.
 
-4. **No weighted cover** — Only unweighted vertex cover. CLRS §35.2
+5. **No weighted cover** — Only unweighted vertex cover. CLRS §35.2
    discusses weighted variants.
 
-5. **Tight ratio not proven** — 2-approx bound is proven achieved but not
+6. **Tight ratio not proven** — 2-approx bound is proven achieved but not
    proven tight (no worst-case graph construction formalized).
+
+---
+
+## Spec Validation (ImplTest)
+
+**Test file:** `CLRS.Ch35.VertexCover.ImplTest.fst`
+**Documentation:** `CLRS.Ch35.VertexCover.ImplTest.md`
+**Status:** ✅ Fully verified — zero admits, zero assumes
+
+### Test Instance
+
+Complete graph K₃ (triangle on 3 vertices, all edges present).
+
+### Results
+
+| Aspect | Result |
+|--------|--------|
+| Precondition satisfiable | ✅ All 4 preconditions proven for K₃ |
+| Postcondition constrains output | ✅ Output narrowed to 4 of 8 possible binary vectors |
+| Invalid outputs excluded | ✅ All 4 invalid covers (0-vertex, 1-vertex) excluded |
+| Spec fix needed | ✅ Fixed: added `V.is_full_vec cover` to postcondition |
+| 2-approx bound useful | ⚠️ For K₃, `is_cover + binary` is strictly stronger than 2·OPT bound |
+
+### Spec Issue Found and Fixed
+
+The postcondition was missing `V.is_full_vec cover`, making it impossible
+for callers to free the returned Vec. This was a genuine spec weakness (not
+a test issue). Fixed by adding `V.is_full_vec cover` to the postcondition
+and both loop invariants in `Impl.fst`. The fix verifies cleanly.
 
 ---
 
@@ -191,6 +227,7 @@ representation is a design choice, not a correctness issue.
 | `CLRS.Ch35.VertexCover.Lemmas.fst` | 383 | All proofs: counting, Thm 35.1, bridge | 0 |
 | `CLRS.Ch35.VertexCover.Complexity.fsti` | 41 | Complexity definitions | 0 |
 | `CLRS.Ch35.VertexCover.Complexity.fst` | 58 | O(V²) bound, partial_iterations | 0 |
-| `CLRS.Ch35.VertexCover.Impl.fsti` | 48 | Public Pulse interface | 0 |
-| `CLRS.Ch35.VertexCover.Impl.fst` | 358 | Pulse implementation + proof | 0 |
-| **Total** | **1115** | | **0** |
+| `CLRS.Ch35.VertexCover.Impl.fsti` | 49 | Public Pulse interface | 0 |
+| `CLRS.Ch35.VertexCover.Impl.fst` | 361 | Pulse implementation + proof | 0 |
+| `CLRS.Ch35.VertexCover.ImplTest.fst` | 157 | Spec validation test | 0 |
+| **Total** | **1276** | | **0** |

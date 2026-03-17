@@ -38,6 +38,7 @@ fn approx_vertex_cover
     A.pts_to adj #p s_adj **
     V.pts_to cover s_cover **
     pure (
+      V.is_full_vec cover /\
       Seq.length s_cover == SZ.v n /\
       Spec.is_cover s_adj s_cover (SZ.v n) (SZ.v n) 0 /\
       (forall (i: nat). i < SZ.v n ==> (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
