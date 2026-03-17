@@ -49,6 +49,7 @@ fn bellman_ford
       (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) /\ no_neg_cycle == true ==>
         (forall (v: nat). v < SZ.v n ==>
           Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==> no_neg_cycle == true) /\
       bellman_ford_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 ```
@@ -96,6 +97,8 @@ The `ensures` clause guarantees:
 * **Lower bound** (unconditional, under no-neg-cycles): `dist[v] ≥ sp_dist(s,v)`.
 * **Shortest-path equality** (no negative cycle + result true):
   `dist[v] == sp_dist(s,v)` for all v — CLRS Theorem 24.4.
+* **No-neg-cycles implies true** (no negative cycle ⟹ result true):
+  `no_neg_cycles_flat ==> no_neg_cycle == true`.
 * **O(V³) complexity**: `bellman_ford_complexity_bounded cf c0 n`.
 
 ## Auxiliary Definitions
@@ -166,7 +169,13 @@ Bellman-Ford on dense graphs:
 3. **CLRS Corollary 24.3** (Upper bound): When triangle inequality holds,
    `dist[v] ≤ δ(s,v)` for all v.
 
-4. **O(V³) complexity**: Exact tick count `n + n³` proven via ghost counter
+4. **No-neg-cycles implies true**: `no_neg_cycles_flat ==> no_neg_cycle == true`.
+   Proven by tracking `upper_bound_k` (dist[v] ≤ sp_dist_k(v, k)) through
+   the n−1 relaxation rounds, advancing the bound after each round. Combined
+   with the lower bound, this gives `dist[v] == sp_dist(v)` under nncf, from
+   which `sp_dist_triangle_flat` implies no violations in the check phase.
+
+5. **O(V³) complexity**: Exact tick count `n + n³` proven via ghost counter
    threaded through all loop invariants. The asymptotic bound `n + n³ ≤ 2n³`
    is proven separately.
 
@@ -250,6 +259,14 @@ The implementation is a single `fn bellman_ford` with three phases:
 * `bf_sp_equality_cond`: Upper + lower bound → dist[v] == sp_dist(v).
 * `init_satisfies_lower_bound`: Initial distances satisfy lower bound.
 * `bellman_ford_cubic_bound`: n + n³ ≤ 2n³ for n ≥ 1.
+* `sp_dist_source_zero_nncf`: sp_dist(source) == 0 under nncf + wir.
+* `sp_dist_chain`: Chains sp_dist_triangle_flat along a path from source.
+* `upper_bound_k`, `edges_relaxed_sp`, `current_u_relaxed`: Invariants for
+  tracking dist[v] ≤ sp_dist_k(v, k) through the relaxation loops.
+* `advance_upper_bound_k`: After processing all edges, upper_bound_k advances
+  from k to k+1.
+* `nncf_implies_no_violations`: Under nncf + upper/lower bounds, no edge
+  violations exist.
 
 ## Files
 
@@ -302,11 +319,13 @@ found.
 
 ### Observations
 
-- The postcondition's exact-equality clause requires two conditions:
-  `no_neg_cycles_flat` (external mathematical property) and `no_neg_cycle == true`
-  (algorithm output). This is inherent to Bellman-Ford's correctness theorem but
-  makes testing slightly more complex than Dijkstra's unconditional equality.
+- The postcondition now includes `no_neg_cycles_flat ==> no_neg_cycle == true`,
+  which allows the test to make unconditional assertions about dist values.
+  This eliminates the previous dependence on the runtime boolean `no_neg_cycle`
+  for testing exact equality.
 
-- The abstract `inf` sentinel (`val inf : i:int{i > 0}`) prevents proving
-  `weights_in_range` for non-trivial graphs without `friend`-ing the Inf module.
-  The test uses `friend CLRS.Ch24.ShortestPath.Inf` to access `inf = 1000000`.
+- The proof tracks `upper_bound_k` (dist[v] ≤ sp_dist_k(v, k)) through the
+  relaxation loops, advancing after each round. Key helper lemmas include
+  `sp_dist_source_zero_nncf` (sp_dist(source) = 0 under nncf, proven via a
+  chain lemma that derives a contradiction from a negative cycle) and
+  `advance_upper_bound_k` (advancement from k to k+1 after processing all edges).

@@ -42,14 +42,16 @@ Expected shortest paths from source 0:
 - **`no_neg_cycles_flat`**: Proven with high fuel/rlimit, establishing that an
   extra relaxation pass doesn't improve any distance.
 - **Unconditional properties**: `dist[source] == 0` verified by reading dist[0].
-- **Conditional completeness**: The postcondition says
-  `no_neg_cycles_flat ∧ no_neg_cycle == true ⟹ dist[v] == sp_dist(v)`.
-  The test proves the conditional assertion:
+- **Unconditional completeness**: The new postcondition guarantees
+  `no_neg_cycles_flat ==> no_neg_cycle == true`. Since we proved
+  `no_neg_cycles_flat` for the test graph, `no_neg_cycle == true` follows
+  unconditionally. Combined with the equality clause, the test now asserts
+  unconditional dist equality:
   ```
-  no_neg_cycle == true ==> dist[0]==0 ∧ dist[1]==4 ∧ dist[2]==2
+  no_neg_cycle == true
+  dist[0]==0 ∧ dist[1]==4 ∧ dist[2]==2
   ```
-  This shows the postcondition is **sufficiently precise** when no negative
-  cycle exists: it uniquely determines the output.
+  This is a strict improvement over the previous conditional assertion.
 
 ### Summary
 
@@ -59,7 +61,8 @@ Expected shortest paths from source 0:
 | sp_dist computed for all vertices | ✅ |
 | no_neg_cycles_flat proven | ✅ |
 | dist[source] == 0 verified | ✅ |
-| Conditional completeness (dist == expected when no_neg_cycle) | ✅ |
+| no_neg_cycle == true verified (unconditional) | ✅ |
+| Unconditional completeness (dist == expected) | ✅ |
 | No admits | ✅ |
 | No assumes | ✅ |
 
@@ -68,33 +71,19 @@ Expected shortest paths from source 0:
 - **`friend CLRS.Ch24.ShortestPath.Inf`**: Same as Dijkstra — required to see
   `inf = 1000000` for normalization. An empty `.fsti` is required.
 
-- **sp_dist(2) normalization challenge**: The normalizer struggles with
-  `sp_dist tw 3 0 2 == 2` because the computation involves the negative weight
-  −2 in `sp_dist_k`'s mutual recursion. The proof works by providing Z3 with
-  intermediate `sp_dist_k` values and concrete sequence element values via
-  `assert_norm`, then using `--fuel 8 --ifuel 4 --z3rlimit 200` for Z3 to
-  unfold and verify the final computation.
-
-- **Conditional vs unconditional completeness**: The BF postcondition conditions
-  exact equality (`dist[v] == sp_dist(v)`) on two things:
-  1. `no_neg_cycles_flat` — a mathematical property we prove for our graph
-  2. `no_neg_cycle == true` — a runtime boolean the algorithm computes
-
-  Since `no_neg_cycle` is existentially bound in the Pulse postcondition (a ghost
-  variable), we cannot branch on it. Instead, the test asserts the implication
-  `no_neg_cycle == true ==> dist == expected`. This is a limitation of the
-  testing methodology in Pulse, not of the specification.
-
-- **`R.alloc` deprecation warning**: The BF API takes `result: R.ref bool` as a
-  parameter, requiring the test to allocate a mutable reference. `R.alloc` is
-  deprecated in Pulse (marked unsound for model implementations). This produces
-  warnings but does not affect verification correctness of the test.
+- **Unconditional vs conditional completeness**: With the new postcondition
+  `no_neg_cycles_flat ==> no_neg_cycle == true`, the test can now make
+  unconditional assertions. Since we prove `no_neg_cycles_flat` for our test
+  graph, we derive `no_neg_cycle == true` and therefore `dist == sp_dist`
+  unconditionally. This eliminates the previous limitation where the test
+  could only assert the implication `no_neg_cycle == true ==> dist == expected`.
 
 ## Spec Assessment
 
-The Bellman-Ford `Impl.fsti` specification is **sufficiently precise**: under
-`no_neg_cycles_flat ∧ no_neg_cycle == true`, the postcondition uniquely
-determines the output. No spec incompleteness or imprecision issues found.
+The Bellman-Ford `Impl.fsti` specification is **fully precise**: under
+`no_neg_cycles_flat`, the postcondition guarantees `no_neg_cycle == true`
+and uniquely determines `dist = [0, 4, 2]`. No spec incompleteness or
+imprecision issues found.
 
 ### Minor Observation
 

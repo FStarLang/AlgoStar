@@ -141,6 +141,7 @@ fn bellman_ford
       (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) /\ no_neg_cycle == true ==>
         (forall (v: nat). v < SZ.v n ==>
           Seq.index sdist' v == SP.sp_dist sweights (SZ.v n) (SZ.v source) v)) /\
+      (SP.no_neg_cycles_flat sweights (SZ.v n) (SZ.v source) ==> no_neg_cycle == true) /\
       bellman_ford_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: bellman_ford_sig

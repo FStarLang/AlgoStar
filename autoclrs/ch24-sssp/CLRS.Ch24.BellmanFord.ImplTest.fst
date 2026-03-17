@@ -223,17 +223,19 @@ fn test_bellman_ford_3 ()
   tw_no_neg_cycles ();
   sp_dist_v0 (); sp_dist_v1 (); sp_dist_v2 ();
 
-  // --- Conditional completeness (no runtime branch needed) ---
-  // The postcondition guarantees:
+  // --- Unconditional completeness ---
+  // The new postcondition guarantees:
+  //   no_neg_cycles_flat ==> no_neg_cycle == true
+  // We proved no_neg_cycles_flat, so no_neg_cycle == true.
+  // Combined with the equality clause:
   //   no_neg_cycles_flat /\ no_neg_cycle == true ==>
   //     forall v < 3. dist[v] == sp_dist(0, v)
-  // We proved no_neg_cycles_flat and computed sp_dist values,
-  // so Z3 can derive the conditional:
+  // We get unconditional dist equality:
+  assert (pure (no_neg_cycle == true));
   assert (pure (
-    no_neg_cycle == true ==>
-      (Seq.index sdist' 0 == 0 /\
-       Seq.index sdist' 1 == 4 /\
-       Seq.index sdist' 2 == 2)));
+    Seq.index sdist' 0 == 0 /\
+    Seq.index sdist' 1 == 4 /\
+    Seq.index sdist' 2 == 2));
 
   // --- Cleanup ---
   with sw'. assert (A.pts_to weights sw');
