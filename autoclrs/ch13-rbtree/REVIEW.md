@@ -142,5 +142,15 @@ small concrete instance (insert keys 3, 1, 2 into empty tree; search; delete).
 
 | File | Purpose |
 |------|---------|
-| `CLRS.Ch13.RBTree.ImplTest.fst` | Spec validation test (zero admits) |
-| `CLRS.Ch13.RBTree.ImplTest.md` | Detailed test documentation |
+| `CLRS.Ch13.RBTree.ImplTest.fst` | Spec validation test for Okasaki Impl.fsti (zero admits) |
+| `CLRS.Ch13.RBTree.ImplTest.md` | Detailed test documentation for Okasaki API |
+| `CLRS.Ch13.RBTree.CLRSImplTest.fst` | Spec validation test for CLRS CLRSImpl.fsti (zero admits) |
+| `CLRS.Ch13.RBTree.CLRSImplTest.md` | Detailed test documentation for CLRS API |
+
+### Notable Finding
+
+Both Okasaki and CLRS insert implementations produce valid RB trees but with
+different colorings for the same input sequence (3, 1, 2). Okasaki's balance
+produces Black children at the balanced node, while CLRS's rotation-based fixup
+produces Red children. Both are correct; the difference is in how each algorithm
+distributes colors during rebalancing.
