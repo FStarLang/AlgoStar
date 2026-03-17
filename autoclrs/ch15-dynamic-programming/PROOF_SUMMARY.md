@@ -52,3 +52,30 @@ The bounds checking issues could be resolved by:
 4. Using F*'s new proof automation features
 
 The core mathematical proofs (sentinel bridge and table correctness) are sound and admit-free.
+
+## Spec Validation (ImplTest) Results
+
+Spec validation tests were added for all three ch15 algorithms following the
+methodology from https://arxiv.org/abs/2406.09757. Each test uses a small
+concrete input, calls the Impl.fsti API, and proves the result matches the
+expected output — verifying both precondition satisfiability and postcondition
+precision.
+
+| Algorithm | Input | Expected | Result | Status |
+|-----------|-------|----------|--------|--------|
+| Rod Cutting | prices=[1,5,8,9], n=4 | 10 | 10 ✓ | **Passed** — no admits/assumes |
+| Matrix Chain | dims=[10,30,5,60], n=3 | 4500 | 4500 ✓ | **Passed** — no admits/assumes |
+| LCS | x=[1,2,3], y=[2,3,4], m=n=3 | 2 | 2 ✓ | **Passed** — no admits/assumes |
+
+### Spec Incompleteness / Imprecision Issues Found
+
+**None.** All three specifications are precise enough to determine exact
+outputs for concrete inputs:
+
+- **Rod Cutting**: `result == optimal_revenue s_prices n` — fully precise.
+- **Matrix Chain**: `result == mc_result s_dims n` — fully precise for the
+  imperative mirror spec. The bridge to `mc_cost` (enumerative optimum)
+  requires `all_costs_bounded` (sentinel-dependent), which is a known
+  design limitation but not a postcondition weakness.
+- **LCS**: `result == lcs_length sx sy m n` — fully precise, further
+  strengthened by `lcs_length_is_longest` (upper bound + achievability).
