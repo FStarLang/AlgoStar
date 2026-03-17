@@ -203,6 +203,23 @@ No solver options needed. All proofs go through with defaults.
 - [x] Clean build (no warnings)
 - [x] Functional correctness: push/pop/peek specified via ghost list
 - [x] LIFO property proven in pure spec and lemmas
+- [x] Spec validation: ImplTest.fst passes with 0 admits, 0 assumes (2026-03-17)
 - [ ] Complexity tracking: O(1) push/pop/peek not formally tracked via ghost ticks
 - [ ] No `free`/`destroy` operation for the stack
 - [ ] Fixed capacity — no dynamic resizing
+
+## Spec Validation (2026-03-17)
+
+**File:** `CLRS.Ch10.Stack.ImplTest.fst` — see `CLRS.Ch10.Stack.ImplTest.md`
+for details.
+
+**Result: All specs validated. No issues found.**
+
+- Preconditions for all five operations are satisfiable.
+- Pop postcondition (`L.append xs [x] == contents`) is precise: Z3 determines
+  concrete popped values without helper lemmas.
+- Peek postcondition (`exists init. L.append init [x] == contents`) is precise
+  but requires a small helper lemma to eliminate the `Prims.exists`. Not a spec
+  weakness — just an ergonomic observation.
+- stack_empty postcondition is precise (iff).
+- LIFO ordering verified: push `1,2,3` → pop `3,2,1`.

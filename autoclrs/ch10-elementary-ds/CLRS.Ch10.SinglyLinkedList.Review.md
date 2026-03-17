@@ -238,5 +238,22 @@ No solver options needed. All proofs go through with defaults.
 - [x] Functional correctness: insert/search/delete specified via ghost list
 - [x] Complexity tracked: insert O(1), search O(n), delete O(n) via ghost ticks
 - [x] Cost functions exposed as concrete `let` definitions in .fsti
+- [x] Spec validation: ImplTest.fst passes with 0 admits, 0 assumes (2026-03-17)
 - [ ] Only `int` keys — not polymorphic
 - [ ] No tail pointer (insert at head only)
+
+## Spec Validation (2026-03-17)
+
+**File:** `CLRS.Ch10.SinglyLinkedList.ImplTest.fst` — see
+`CLRS.Ch10.SinglyLinkedList.ImplTest.md` for details.
+
+**Result: All specs validated. No issues found.**
+
+- Preconditions for all three core operations are satisfiable.
+- list_insert postcondition (`is_dlist new_head (x :: 'l)`) is maximally
+  precise — directly gives the new list.
+- list_search postcondition (`found <==> L.mem k 'l`) is precise (iff).
+- list_delete postcondition (`is_dlist new_head (remove_first k 'l)`) is
+  precise — Z3 normalizes `remove_first` for concrete inputs.
+- Full round-trip verified: insert 3 elements, delete all, recover `emp`.
+- No auxiliary lemmas needed — all postconditions are directly usable.

@@ -207,7 +207,24 @@ Solver options: `#push-options "--z3rlimit 40"` for `dequeue` only.
 - [x] Functional correctness: enqueue/dequeue specified via ghost list (FIFO)
 - [x] FIFO property proven in pure spec and lemmas
 - [x] Circular buffer arithmetic verified
+- [x] Spec validation: ImplTest.fst passes with 0 admits, 0 assumes (2026-03-17)
 - [ ] Complexity tracking: O(1) enqueue/dequeue not formally tracked via ghost ticks
 - [ ] No `free`/`destroy` operation for the queue
 - [ ] Fixed capacity — no dynamic resizing
 - [ ] 3-field design (head+tail+size) differs from CLRS 2-field design
+
+## Spec Validation (2026-03-17)
+
+**File:** `CLRS.Ch10.Queue.ImplTest.fst` — see `CLRS.Ch10.Queue.ImplTest.md`
+for details.
+
+**Result: All specs validated. No issues found.**
+
+- Preconditions for all four operations are satisfiable.
+- Dequeue postcondition (`contents == x :: xs`) is precise: Z3 directly
+  determines the dequeued value. The cons-based decomposition is cleaner than
+  the stack's append-based pop spec.
+- Enqueue postcondition (`L.append contents [x]`) is precise.
+- queue_empty postcondition is precise (iff).
+- FIFO ordering verified: enqueue `10,20,30` → dequeue `10,20,30`.
+- Circular buffer wraparound verified with interleaved enqueue/dequeue.

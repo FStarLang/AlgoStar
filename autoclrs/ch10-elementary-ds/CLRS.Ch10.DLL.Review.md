@@ -328,7 +328,28 @@ Solver options: 5 scoped `#push-options "--fuel 2"` blocks in DLL.Impl.fst
 - [x] Rich operation set (insert head/tail, search forward/backward, delete first/last/at-index)
 - [x] **Fix DLL.Test.fst deprecated API** — migrated from `Reference.alloc`/`free` to `let mut` (2026-03-16)
 - [x] **Fix no-op rewrite warning** at DLL.Impl.fst:1518-1521 — removed redundant `with`/`rewrite` (2026-03-16)
+- [x] Spec validation: ImplTest.fst passes with 0 admits, 0 assumes (2026-03-17)
 - [ ] Complexity tracking: not formally tracked via ghost ticks (unlike SLL)
 - [ ] `list_delete_node` takes index (O(n)), not pointer (O(1) as in CLRS)
 - [ ] Only `int` keys — not polymorphic
 - [ ] No `free`/`destroy` for entire list
+
+## Spec Validation (2026-03-17)
+
+**File:** `CLRS.Ch10.DLL.ImplTest.fst` — see `CLRS.Ch10.DLL.ImplTest.md`
+for details.
+
+**Result: All tested specs validated. No issues found.**
+
+- Preconditions for 7 of 8 runtime operations are satisfiable (all except
+  `list_delete_last` and `list_delete_node`, which were not tested).
+- list_insert postcondition (`x :: l`) is precise.
+- list_insert_tail postcondition (`l @ [x]`) is precise.
+- list_search / list_search_back postconditions (`found <==> L.mem k 'l`)
+  are precise (iff).
+- list_search_ptr postcondition (Some/None ↔ membership) is precise.
+- list_delete postcondition (`remove_first k l`) is precise.
+- Ghost helpers (`dll_nil`, `dll_nil_elim`) work correctly.
+- Full round-trip verified for both head-insert and tail-insert scenarios.
+- No auxiliary lemmas needed.
+- `list_delete_last` and `list_delete_node` not tested (future work).
