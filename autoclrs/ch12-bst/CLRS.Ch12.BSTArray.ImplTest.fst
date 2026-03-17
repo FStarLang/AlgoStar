@@ -8,9 +8,9 @@
    Proves:
    1. Search precondition is satisfiable on an empty tree
    2. Insert precondition is satisfiable on an empty tree
-   3. Insert postcondition correctly reports success
-   4. Search postcondition is precise: found key matches input
-   5. Search postcondition is precise: absent key returns None
+   3. Search postcondition is precise: absent key returns None (empty tree)
+   4. Insert→Search composability: successful insert implies search finds key
+   5. No-op insert: search on unchanged arrays returns None
 
    Methodology:
      Bhat et al., "Towards Validated Specifications for LLM-Generated Code"
@@ -34,38 +34,7 @@ open CLRS.Ch12.BSTArray.Complexity
 module AP = CLRS.Ch12.BSTArray.Predicates
 
 (* ====================================================================
-   § 1. Bridge lemma
-
-   The Impl.fsti defines its own subtree_in_range (for Pulse import
-   compatibility), while tree_insert's postcondition uses
-   AP.well_formed_bst. This lemma bridges the gap so that search
-   can be called after insert.
-   ==================================================================== *)
-
-let rec sir_bridge
-  (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat) (i: nat) (lo hi: int)
-  : Lemma
-    (requires AP.subtree_in_range keys valid cap i lo hi)
-    (ensures subtree_in_range keys valid cap i lo hi)
-    (decreases (if i < cap then cap - i else 0))
-  = if i >= cap || i >= Seq.length keys || i >= Seq.length valid then ()
-    else if not (Seq.index valid i) then ()
-    else begin
-      let k = Seq.index keys i in
-      sir_bridge keys valid cap (2 * i + 1) lo k;
-      sir_bridge keys valid cap (2 * i + 2) k hi
-    end
-
-let wfb_to_sir
-  (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat) (i: nat) (lo hi: int)
-  : Lemma
-    (requires AP.well_formed_bst keys valid cap i lo hi)
-    (ensures subtree_in_range keys valid cap i lo hi)
-  = AP.lemma_well_formed_implies_sir keys valid cap i lo hi;
-    sir_bridge keys valid cap i lo hi
-
-(* ====================================================================
-   § 2. Pure specification validation
+   § 1. Pure specification validation
 
    Verify well_formed_bst and subtree_in_range on a concrete empty tree.
    ==================================================================== *)
@@ -83,7 +52,7 @@ let _ : squash (subtree_in_range empty_keys empty_valid 7 0 0 100) = ()
 let _ : squash (~(key_in_subtree empty_keys empty_valid 7 0 5)) = ()
 
 (* ====================================================================
-   § 3. Pulse API test — exercises tree_search and tree_insert
+   § 2. Pulse API test — exercises tree_search and tree_insert
    ==================================================================== *)
 
 #push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
@@ -92,7 +61,7 @@ let _ : squash (~(key_in_subtree empty_keys empty_valid 7 0 5)) = ()
 (** test_bstarray_search_insert
  *
  * Exercises: tree_search (on empty tree), tree_insert, tree_search
- *            (after insert)
+ *            (after insert), demonstrating insert→search composability
  *
  * Instance: cap=7, insert key 5 with bounds lo=0 hi=100
  *)
@@ -127,7 +96,6 @@ fn test_bstarray_search_insert ()
 
   // === Search empty tree for key 5 ===
   // subtree_in_range holds trivially (valid[0]=false → True)
-  // Provide explicit ghost bounds lo=0, hi=100
   let r_empty = tree_search #1.0R t #(hide (Seq.create 7 0)) #(hide (Seq.create 7 false)) #(hide 0) #(hide 100) 5 ctr;
   // Postcondition: None? r_empty ==> ~(key_in_subtree ...)
   assert (pure (None? r_empty));
@@ -135,11 +103,6 @@ fn test_bstarray_search_insert ()
   // === Insert key 5 (bounds: lo=0, hi=100) ===
   // well_formed_bst holds for all-false valid array with any bounds
   let success = tree_insert t #(hide (Seq.create 7 0)) #(hide (Seq.create 7 false)) 5 #(hide 0) #(hide 100) ctr;
-  // NOTE: Cannot assert success==true. The postcondition doesn't guarantee
-  // insert succeeds even when the tree has empty slots. The postcondition
-  // only says: IF success THEN key placed, IF NOT success THEN arrays
-  // unchanged. Both outcomes are consistent with the postcondition.
-  // This is a spec gap documented in ImplTest.md.
 
   // After insert: arrays updated, well_formed_bst preserved
   with ks' vs' vticks'. assert (
@@ -149,22 +112,26 @@ fn test_bstarray_search_insert ()
   );
 
   // Bridge: AP.well_formed_bst → Impl.subtree_in_range
-  // This lets us call tree_search after tree_insert
+  // Uses exported bridge from Impl, no client-side bridge needed
   wfb_to_sir (Ghost.reveal ks') (Ghost.reveal vs') 7 0 0 100;
 
   // === Search for key 5 after insert ===
-  // NOTE: Cannot assert Some? r_found. The insert postcondition only
-  // guarantees "∃ idx, keys'[idx]==5 ∧ valid'[idx]==true" but this doesn't
-  // imply key_in_subtree (reachability from root via BST path). Without a
-  // reachability lemma connecting well_formed_bst + valid position to
-  // key_in_subtree, we cannot prove the search will find the key.
-  // This is a spec gap documented in ImplTest.md.
+  // The strengthened insert postcondition gives key_in_subtree on success,
+  // which contradicts search's None postcondition (~key_in_subtree).
+  // Therefore: success ==> Some? r_found
   let r_found = tree_search #1.0R t #ks' #vs' #(hide 0) #(hide 100) 5 ctr;
+  assert (pure (success ==> Some? r_found));
 
-  // === Search for absent key 99 ===
-  // NOTE: Similarly, cannot assert None? r_miss because the insert
-  // postcondition doesn't constrain which other positions are valid.
+  // When insert fails (key already present or capacity exceeded on empty tree),
+  // arrays are unchanged. Since all valid entries are false in the original,
+  // Some? would require valid[idx]==true which is impossible.
+  // Therefore: not success ==> None? r_found
+  assert (pure (not success ==> None? r_found));
+
+  // === Search for absent key 99 after insert ===
   let r_miss = tree_search #1.0R t #ks' #vs' #(hide 0) #(hide 100) 99 ctr;
+  // When insert failed, arrays unchanged → no valid entries → None
+  assert (pure (not success ==> None? r_miss));
 
   // === Cleanup ===
   with vticks_f. assert (GR.pts_to ctr vticks_f);

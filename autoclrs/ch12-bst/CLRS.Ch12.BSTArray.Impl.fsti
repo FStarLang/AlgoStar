@@ -170,6 +170,7 @@ fn tree_insert
                     idx < Seq.length valid_seq' /\
                     Seq.index keys_seq' idx == key /\
                     Seq.index valid_seq' idx == true)) /\
+      (success ==> key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 key) /\
       AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
     )
 
@@ -209,3 +210,18 @@ fn inorder_walk
         Seq.length out_seq' == A.length output /\
         SZ.v wp' <= SZ.v out_len
       ))
+
+// ============================================================
+// Bridge lemmas
+//
+// Convert between AP.well_formed_bst (from tree_insert postcondition)
+// and local subtree_in_range (for tree_search precondition).
+// Eliminates the need for client-side bridge lemmas.
+// ============================================================
+
+val wfb_to_sir
+  (keys: Seq.seq int) (valid: Seq.seq bool)
+  (cap: nat) (i: nat) (lo hi: int)
+  : Lemma
+    (requires AP.well_formed_bst keys valid cap i lo hi)
+    (ensures subtree_in_range keys valid cap i lo hi)

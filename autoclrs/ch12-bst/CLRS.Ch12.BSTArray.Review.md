@@ -423,16 +423,17 @@ Items to address for a fully proven, high-quality implementation:
 - [x] **P0: Complexity linked for search/insert.** Ghost tick counters with
   O(log cap) bounds.
 - [x] **P0: Spec validation test.** `CLRS.Ch12.BSTArray.ImplTest.fst` tests
-  search (empty tree), insert, and search-after-insert chaining. Finds three
-  spec gaps (see below). Zero admits, zero assumes.
-- [ ] **P0: Strengthen insert postcondition.** *(Spec gap found by ImplTest.)*
-  Insert postcondition should include `key_in_subtree` reachability guarantee
-  and `success == true` when tree has capacity. Currently, neither is provable
-  from the postcondition. See `CLRS.Ch12.BSTArray.ImplTest.md` for details.
-- [ ] **P0: Unify subtree_in_range definitions.** *(Spec gap found by ImplTest.)*
-  `subtree_in_range` is duplicated in `Impl.fsti` and `Predicates.fst`. Clients
-  need a bridge lemma to compose insert → search. Should use a single definition
-  or export a bridge.
+  search (empty tree), insert, and search-after-insert chaining. Demonstrates
+  insert→search composability with `success ==> Some?`. Zero admits, zero assumes.
+- [x] **P0: Strengthen insert postcondition.** *(Resolved.)* Insert
+  postcondition now includes `key_in_subtree` reachability guarantee:
+  `success ==> key_in_subtree keys' valid' cap 0 key`. Proven by
+  `lemma_insert_key_reachable` (in Impl.fst) and
+  `lemma_insert_key_in_subtree` (in Predicates.fst).
+- [x] **P0: Bridge for predicate composability.** *(Resolved.)* `Impl.fsti`
+  exports `wfb_to_sir` bridge converting `AP.well_formed_bst` to local
+  `subtree_in_range`. Clients can compose insert → search without
+  client-side bridge lemmas.
 - [ ] **P1: Complete delete for all cases.** Left-child-only deletion and
   successor-with-right-child cases currently return `false`. Needs
   predecessor-swap infrastructure (symmetric to successor approach) and

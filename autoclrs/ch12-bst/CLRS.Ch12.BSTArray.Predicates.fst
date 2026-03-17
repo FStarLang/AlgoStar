@@ -459,6 +459,39 @@ let rec lemma_insert_wfb
     end
 #pop-options
 
+/// After inserting key_val at position idx (reached by BST search from i),
+/// key_val is in the subtree rooted at i.
+///
+/// Proof: structural induction on the BST search path.
+/// Base case (i = idx): valid'[idx] = true and keys'[idx] = key_val,
+///   so key_in_subtree holds trivially.
+/// Inductive case (i <> idx): bst_search_reaches gives valid[i] = true
+///   and routes to left or right child. By induction, key_val is in the
+///   child subtree. Since valid'[i] = valid[i] = true, key_in_subtree
+///   at i follows from the disjunction in its definition.
+let rec lemma_insert_key_in_subtree
+  (keys: seq int) (valid: seq bool) (cap: nat)
+  (i idx: nat) (key_val: int)
+  : Lemma
+    (requires
+      bst_search_reaches keys valid cap i idx key_val /\
+      idx < length keys /\ idx < length valid /\
+      length keys == length valid /\ length keys >= cap /\
+      index valid idx == false)
+    (ensures
+      key_in_subtree (upd keys idx key_val) (upd valid idx true) cap i key_val)
+    (decreases (if i < cap then cap - i else 0))
+  = if i = idx then ()
+    else begin
+      // bst_search_reaches with i <> idx gives: valid[i] = true
+      // and (key_val < keys[i] ==> bsr (2i+1) idx) || (key_val > keys[i] ==> bsr (2i+2) idx)
+      let k_i = index keys i in
+      if key_val < k_i then
+        lemma_insert_key_in_subtree keys valid cap (2 * i + 1) idx key_val
+      else
+        lemma_insert_key_in_subtree keys valid cap (2 * i + 2) idx key_val
+    end
+
 (* ====================================================================
    Lemmas for BST deletion
    ==================================================================== *)

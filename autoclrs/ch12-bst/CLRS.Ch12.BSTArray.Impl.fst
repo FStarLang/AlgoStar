@@ -397,6 +397,29 @@ fn tree_search
   }
 }
 
+// After inserting key_val at position idx (reached by BST search from i),
+// key_val is reachable from i. Uses local key_in_subtree.
+let rec lemma_insert_key_reachable
+  (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat)
+  (i idx: nat) (key_val: int)
+  : Lemma
+    (requires
+      AP.bst_search_reaches keys valid cap i idx key_val /\
+      idx < Seq.length keys /\ idx < Seq.length valid /\
+      Seq.length keys == Seq.length valid /\ Seq.length keys >= cap /\
+      Seq.index valid idx == false)
+    (ensures
+      key_in_subtree (Seq.upd keys idx key_val) (Seq.upd valid idx true) cap i key_val)
+    (decreases (if i < cap then cap - i else 0))
+  = if i = idx then ()
+    else begin
+      let k_i = Seq.index keys i in
+      if key_val < k_i then
+        lemma_insert_key_reachable keys valid cap (op_Multiply 2 i + 1) idx key_val
+      else
+        lemma_insert_key_reachable keys valid cap (op_Multiply 2 i + 2) idx key_val
+    end
+
 // Tree insert
 //SNIPPET_START: tree_insert
 fn tree_insert
@@ -437,6 +460,7 @@ fn tree_insert
                     idx < Seq.length valid_seq' /\
                     Seq.index keys_seq' idx == key /\
                     Seq.index valid_seq' idx == true)) /\
+      (success ==> key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 key) /\
       AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
     )
 //SNIPPET_END: tree_insert
@@ -464,6 +488,8 @@ fn tree_insert
                  idx < Seq.length ks /\ idx < Seq.length vs' /\
                  Seq.index ks idx == key /\
                  Seq.index vs' idx == true)) /\
+        // If successful, key is reachable from root
+        (vs ==> key_in_subtree ks vs' (SZ.v t.cap) 0 key) /\
         // BST invariant preserved
         AP.well_formed_bst ks vs' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
       )) **
@@ -494,6 +520,8 @@ fn tree_insert
       // Prove well_formed_bst preserved after insertion
       AP.lemma_insert_wfb keys_seq valid_seq (SZ.v t.cap) 0
         (Ghost.reveal lo) (Ghost.reveal hi) (SZ.v idx) key;
+      // Prove key is reachable from root after insertion
+      lemma_insert_key_reachable keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v idx) key;
       success_flag := true;
       done := true;
     } else {
@@ -677,3 +705,34 @@ fn inorder_walk
   inorder_helper #p t #keys_seq #valid_seq 0sz output write_pos out_len
 }
 //SNIPPET_END: inorder_walk
+
+// ============================================================
+// Bridge: AP.well_formed_bst → local subtree_in_range
+//
+// Two-step bridge:
+// 1. AP.lemma_well_formed_implies_sir: AP.well_formed_bst → AP.subtree_in_range
+// 2. sir_bridge: AP.subtree_in_range → local subtree_in_range
+// ============================================================
+
+let rec sir_bridge
+  (keys: Seq.seq int) (valid: Seq.seq bool) (cap: nat) (i: nat) (lo hi: int)
+  : Lemma
+    (requires AP.subtree_in_range keys valid cap i lo hi)
+    (ensures subtree_in_range keys valid cap i lo hi)
+    (decreases (if i < cap then cap - i else 0))
+  = if i >= cap || i >= Seq.length keys || i >= Seq.length valid then ()
+    else if not (Seq.index valid i) then ()
+    else begin
+      let k = Seq.index keys i in
+      sir_bridge keys valid cap (op_Multiply 2 i + 1) lo k;
+      sir_bridge keys valid cap (op_Multiply 2 i + 2) k hi
+    end
+
+let wfb_to_sir
+  (keys: Seq.seq int) (valid: Seq.seq bool)
+  (cap: nat) (i: nat) (lo hi: int)
+  : Lemma
+    (requires AP.well_formed_bst keys valid cap i lo hi)
+    (ensures subtree_in_range keys valid cap i lo hi)
+  = AP.lemma_well_formed_implies_sir keys valid cap i lo hi;
+    sir_bridge keys valid cap i lo hi
