@@ -107,3 +107,40 @@ and using `assert_norm` for concrete normalization.
 | Complexity bounds in Pulse postconditions | ✅ |
 
 **Overall Grade: A** — Fully verified, rubric-compliant, proof-optimized
+
+---
+
+## Spec Validation (2026-03-17)
+
+### Methodology
+
+Following the spec-validation approach from [arXiv:2406.09757](https://arxiv.org/abs/2406.09757),
+we wrote `CLRS.Ch13.RBTree.ImplTest.fst` to validate the `Impl.fsti` API on a
+small concrete instance (insert keys 3, 1, 2 into empty tree; search; delete).
+
+### Results
+
+| Test | Status |
+|------|:------:|
+| Pure spec normalization (tree shapes, search, mem, delete) | ✅ zero admits |
+| Pulse API test (new → insert → search → delete → free) | ✅ zero admits |
+| Preconditions satisfiable | ✅ all verified |
+| Postconditions precise (concrete outputs match expected) | ✅ all verified |
+
+### Spec Quality Assessment
+
+- **No spec incompleteness found**: All preconditions are satisfiable in natural usage.
+- **No spec imprecision found**: All postconditions uniquely determine the output
+  for any concrete input. `rb_search_v` returns the exact result of `S.search`,
+  `rb_insert_v` and `rb_delete_v` return the exact tree produced by `S.insert`
+  and `S.delete`.
+- **Duplicate insert**: `S.insert t k` when `mem k t` is an identity (proven
+  by `insert_duplicate` lemma in Lemmas.fst); the test verifies this on concrete input.
+- **Delete non-existing key**: `S.delete t 99` preserves all keys; verified on concrete input.
+
+### Files Added
+
+| File | Purpose |
+|------|---------|
+| `CLRS.Ch13.RBTree.ImplTest.fst` | Spec validation test (zero admits) |
+| `CLRS.Ch13.RBTree.ImplTest.md` | Detailed test documentation |
