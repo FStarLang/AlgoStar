@@ -138,6 +138,22 @@ let rec pop_while_spec (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_i
 // ========== Convex Hull Correctness Definitions ==========
 
 //SNIPPET_START: correctness_defs
+
+// Whether pop_while leaves a left-turn at the top of the hull stack.
+// Defined as a total function with explicit bounds checking to ensure
+// well-typedness in Pulse postconditions.
+let ensures_left_turn (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top p_idx: nat) : prop =
+  if top >= 2 && top <= Seq.length hull && p_idx < Seq.length xs &&
+     Seq.length ys = Seq.length xs then
+    let t1 = SZ.v (Seq.index hull (top - 1)) in
+    let t2 = SZ.v (Seq.index hull (top - 2)) in
+    if t1 < Seq.length xs && t2 < Seq.length xs then
+      cross_prod (Seq.index xs t2) (Seq.index ys t2)
+                 (Seq.index xs t1) (Seq.index ys t1)
+                 (Seq.index xs p_idx) (Seq.index ys p_idx) > 0
+    else True
+  else True
+
 // A sequence of hull indices makes all left turns (convex position).
 let all_left_turns (xs ys: Seq.seq int) (hull: Seq.seq nat) (top: nat) : prop =
   top <= Seq.length hull /\

@@ -41,10 +41,12 @@ fn find_leftmost (#p: perm) (xs ys: array int)
   ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
     pure (
       SZ.v result == find_leftmost_spec sxs sys /\
-      SZ.v result < SZ.v len
+      SZ.v result < SZ.v len /\
+      is_leftmost sxs sys (SZ.v result)
     )
 {
   find_leftmost_spec_bounded sxs sys;
+  find_leftmost_is_leftmost sxs sys;
   let mut best: SZ.t = 0sz;
   let mut i: SZ.t = 1sz;
 
@@ -100,10 +102,12 @@ fn find_next (#p: perm) (xs ys: array int)
   ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
     pure (
       SZ.v result == find_next_spec sxs sys (SZ.v current) /\
-      SZ.v result < SZ.v len
+      SZ.v result < SZ.v len /\
+      SZ.v result <> SZ.v current
     )
 {
   find_next_spec_bounded sxs sys (SZ.v current);
+  find_next_spec_not_current sxs sys (SZ.v current);
   let mut next: SZ.t = current;
   let mut j: SZ.t = 0sz;
 

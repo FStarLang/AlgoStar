@@ -41,10 +41,12 @@ fn find_bottom (#p: perm) (xs ys: array int)
   ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
     pure (
       SZ.v result == find_bottom_spec sxs sys /\
-      SZ.v result < SZ.v len
+      SZ.v result < SZ.v len /\
+      is_bottommost sxs sys (SZ.v result)
     )
 {
   find_bottom_spec_bounded sxs sys;
+  find_bottom_is_bottommost sxs sys;
   let mut best: SZ.t = 0sz;
   let mut i: SZ.t = 1sz;
 
@@ -137,10 +139,14 @@ fn pop_while (#p: perm) (xs ys: array int)
     A.pts_to hull #ph shull **
     pure (
       SZ.v result == pop_while_spec sxs sys shull (SZ.v top_in) (SZ.v p_idx) /\
-      SZ.v result <= SZ.v top_in
+      SZ.v result <= SZ.v top_in /\
+      SZ.v result >= 1 /\
+      ensures_left_turn sxs sys shull (SZ.v result) (SZ.v p_idx)
     )
 {
   pop_while_spec_bounded sxs sys shull (SZ.v top_in) (SZ.v p_idx);
+  pop_while_spec_ge_1 sxs sys shull (SZ.v top_in) (SZ.v p_idx);
+  pop_while_ensures_left_turn sxs sys shull (SZ.v top_in) (SZ.v p_idx);
   let mut t: SZ.t = top_in;
   let mut keep_going: bool = true;
 

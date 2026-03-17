@@ -34,7 +34,8 @@ fn find_leftmost (#p: perm) (xs ys: array int)
   ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
     pure (
       SZ.v result == find_leftmost_spec sxs sys /\
-      SZ.v result < SZ.v len
+      SZ.v result < SZ.v len /\
+      is_leftmost sxs sys (SZ.v result)
     )
 //SNIPPET_END: find_leftmost_sig
 
@@ -56,7 +57,8 @@ fn find_next (#p: perm) (xs ys: array int)
   ensures A.pts_to xs #p sxs ** A.pts_to ys #p sys **
     pure (
       SZ.v result == find_next_spec sxs sys (SZ.v current) /\
-      SZ.v result < SZ.v len
+      SZ.v result < SZ.v len /\
+      SZ.v result <> SZ.v current
     )
 //SNIPPET_END: find_next_sig
 
