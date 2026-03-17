@@ -253,5 +253,7 @@ require high rlimits or `split_queries`.
 - [x] Zero admits, zero assumes
 - [x] Complexity linked via ghost counter (exact (m+1)×(n+1))
 - [x] Strongest possible spec: upper bound + achievability
-- [ ] Add test file (CLRS.Ch15.LCS.Test.fst) — currently missing
+- [x] ImplTest.fst — Spec validation test (precondition satisfiable, postcondition precise)
+- [x] **Spec validation passed**: postcondition `result == lcs_length sx sy m n`
+      is precise enough to prove `result == 2` for input `x=[1,2,3], y=[2,3,4]` (no admits/assumes)
 - [ ] Consider extended variant returning the actual subsequence (not just length)

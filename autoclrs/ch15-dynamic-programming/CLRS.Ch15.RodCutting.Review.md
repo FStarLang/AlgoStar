@@ -241,7 +241,10 @@ time from ~7 minutes to ~2 minutes. The inner loop still has a missing
 - [x] Impl.fst / .fsti — Pulse implementation with correctness + complexity
 - [x] Extended.fst — EXTENDED-BOTTOM-UP-CUT-ROD with cuts array
 - [x] Test.fst — CLRS example test
+- [x] ImplTest.fst — Spec validation test (precondition satisfiable, postcondition precise)
 - [x] Zero admits, zero assumes
 - [x] Complexity linked via ghost counter (exact n(n+1)/2)
 - [x] Reduce z3rlimit in Extended.fst (400 → 80/200 localized, ~2 min)
+- [x] **Spec validation passed**: postcondition `result == optimal_revenue s_prices n`
+      is precise enough to prove `result == 10` for input `[1,5,8,9]` (no admits/assumes)
 - [ ] Add `decreases` clause to Extended.fst inner loop (line 463 TODO)

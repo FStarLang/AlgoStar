@@ -277,8 +277,11 @@ localized z3rlimit 60 for another ~30-line block.
 - [x] Complexity.fst / .fsti — O(n³) bound proof
 - [x] Extended.fst — MATRIX-CHAIN-ORDER with split-point table
 - [x] Test.fst — CLRS example test
+- [x] ImplTest.fst — Spec validation test (precondition satisfiable, postcondition precise)
 - [x] Zero admits, zero assumes
 - [x] Complexity linked via ghost counter (`mc_complexity_bounded`)
+- [x] **Spec validation passed**: postcondition `result == mc_result s_dims n`
+      is precise enough to prove `result == 4500` for input `[10,30,5,60]` (no admits/assumes)
 - [ ] Prove exact formula (n³-n)/6 for mc_iterations (currently only ≤ n³)
 - [ ] Eliminate sentinel 1000000000 or prove it sufficient for all int inputs
 - [ ] Verify split-point correctness in Extended.fst (currently cost-only)
