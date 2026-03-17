@@ -152,6 +152,69 @@ let rec edges_from_arrays_extend (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= e
   = if i >= ec then ()
     else edges_from_arrays_extend seu sev ec (i + 1) eu ev
 
+(*** Scan Minimality Tracking ***)
+
+// Tracks that vbw is the minimum weight among all cross-component edges
+// scanned so far (cells with linearized index < scan_pos).
+// When vbw = 0, no cross-component edge has been found yet.
+[@@"opaque_to_smt"]
+let scan_min_inv (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat) (scan_pos: nat) (vbw: int) : prop =
+  n > 0 /\ Seq.length sadj == n * n /\ Seq.length sparent >= n /\
+  (vbw > 0 ==>
+    (forall (u' v': nat). u' < n /\ v' < n /\ u' * n + v' < scan_pos ==>
+      (Seq.index sadj (u' * n + v') > 0 /\
+       UF.find_pure sparent u' n n <> UF.find_pure sparent v' n n) ==>
+      Seq.index sadj (u' * n + v') >= vbw)) /\
+  (vbw = 0 ==>
+    (forall (u' v': nat). u' < n /\ v' < n /\ u' * n + v' < scan_pos ==>
+      Seq.index sadj (u' * n + v') <= 0 \/
+      UF.find_pure sparent u' n n = UF.find_pure sparent v' n n))
+
+let scan_min_inv_init (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat)
+  : Lemma (requires n > 0 /\ Seq.length sadj == n * n /\ Seq.length sparent >= n)
+          (ensures scan_min_inv sparent sadj n 0 0)
+  = reveal_opaque (`%scan_min_inv) (scan_min_inv sparent sadj n 0 0)
+
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+let scan_min_inv_step
+    (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n u0 v0: nat)
+    (old_vbw new_vbw w: int) (diff_comp take_it: bool)
+  : Lemma
+    (requires
+      scan_min_inv sparent sadj n (u0 * n + v0) old_vbw /\
+      u0 < n /\ v0 < n /\ n > 0 /\
+      Seq.length sadj == n * n /\
+      Seq.length sparent >= n /\
+      w == Seq.index sadj (u0 * n + v0) /\
+      (diff_comp <==> UF.find_pure sparent u0 n n <> UF.find_pure sparent v0 n n) /\
+      take_it == (w > 0 && diff_comp && (old_vbw = 0 || w < old_vbw)) /\
+      new_vbw == (if take_it then w else old_vbw))
+    (ensures scan_min_inv sparent sadj n (u0 * n + v0 + 1) new_vbw)
+  = reveal_opaque (`%scan_min_inv) (scan_min_inv sparent sadj n (u0 * n + v0) old_vbw);
+    reveal_opaque (`%scan_min_inv) (scan_min_inv sparent sadj n (u0 * n + v0 + 1) new_vbw)
+#pop-options
+
+let scan_min_inv_complete (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat) (vbw: int)
+    (vbu vbv: nat)
+  : Lemma
+    (requires
+      scan_min_inv sparent sadj n (n * n) vbw /\
+      n > 0 /\ Seq.length sadj == n * n /\
+      (vbw > 0 ==> vbu < n /\ vbv < n /\
+        UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
+        Seq.index sadj (vbu * n + vbv) = vbw))
+    (ensures
+      (vbw > 0 ==>
+        (forall (u' v': nat). u' < n /\ v' < n ==>
+          (Seq.index sadj (u' * n + v') > 0 /\
+           UF.find_pure sparent u' n n <> UF.find_pure sparent v' n n) ==>
+          Seq.index sadj (u' * n + v') >= vbw)) /\
+      (vbw = 0 ==>
+        (forall (u' v': nat). u' < n /\ v' < n ==>
+          Seq.index sadj (u' * n + v') <= 0 \/
+          UF.find_pure sparent u' n n = UF.find_pure sparent v' n n)))
+  = reveal_opaque (`%scan_min_inv) (scan_min_inv sparent sadj n (n * n) vbw)
+
 // Opaque bundled invariant — prevents quantifier pollution in Pulse VCs.
 // Bundles valid_parents, valid_endpoints, uf_inv, and is_forest behind an
 // opaque wall so that ~8 forall quantifiers don't leak into every split query.
@@ -553,6 +616,9 @@ fn kruskal
     let mut best_v: SZ.t = 0sz;
     let mut best_w: int = 0;
     
+    // Initialize scan minimality tracking
+    scan_min_inv_init sparent_cur sadj (SZ.v n);
+    
     let mut ui: SZ.t = 0sz;
     while (!ui <^ n)
     invariant exists* vui vbu vbv vbw.
@@ -574,7 +640,8 @@ fn kruskal
         (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
         (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
                       UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n)) /\
-        (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw)
+        (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw) /\
+        scan_min_inv sparent_cur sadj (SZ.v n) (SZ.v vui * SZ.v n) vbw
       )
     decreases (SZ.v n - SZ.v !ui)
     {
@@ -602,7 +669,8 @@ fn kruskal
           (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
           (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
                         UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n)) /\
-          (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw)
+          (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw) /\
+          scan_min_inv sparent_cur sadj (SZ.v n) (SZ.v vui * SZ.v n + SZ.v vvi) vbw
         )
       decreases (SZ.v n - SZ.v !vi)
       {
@@ -624,6 +692,10 @@ fn kruskal
         best_u := (if take_it then vui else vbu_old);
         best_v := (if take_it then vvi else vbv_old);
         best_w := (if take_it then w else vbw);
+        
+        // Maintain scan minimality invariant
+        scan_min_inv_step sparent_cur sadj (SZ.v n) (SZ.v vui) (SZ.v vvi)
+          vbw (if take_it then w else vbw) w diff_comp take_it;
         
         vi := vvi +^ 1sz;
       };
