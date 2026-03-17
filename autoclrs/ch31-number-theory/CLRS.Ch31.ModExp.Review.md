@@ -146,3 +146,18 @@ invariant modulo `m`.
 - [x] `log2f` uses standard F\* operators (cleaned up from Prims.op\_\*)
 - [ ] Exact iteration count (currently upper bound only)
 - [ ] Machine-integer overflow constraints (intermediate values bounded by m)
+- [x] Spec validation test (`CLRS.Ch31.ModExp.ImplTest.fst`)
+
+## Spec Validation (ImplTest)
+
+**Test:** `2^10 mod 1000 = 24` — see `CLRS.Ch31.ModExp.ImplTest.fst` and
+`CLRS.Ch31.ModExp.ImplTest.md` for details.
+
+**Results:**
+- ✅ Precondition (ghost counter only) is trivially satisfiable.
+- ✅ Postcondition uniquely determines result: `mod_exp_spec 2 10 1000 == 24`
+  by normalization, proving `result == 24`.
+- ✅ Bounds postcondition verified: `0 ≤ 24 < 1000`.
+- ✅ No admits, no assumes in the test.
+
+**Spec issues found:** None. The specification is precise and complete.

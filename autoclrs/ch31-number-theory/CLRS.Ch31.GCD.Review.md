@@ -173,3 +173,18 @@ steps reduce `b` by at least one bit.
 - [x] Proof stability: max z3rlimit 20 (reduced from 150)
 - [ ] Handle `gcd(0, 0)` degenerate case (currently excluded by precondition)
 - [ ] Best-case complexity (lower bound on step count)
+- [x] Spec validation test (`CLRS.Ch31.GCD.ImplTest.fst`)
+
+## Spec Validation (ImplTest)
+
+**Test:** `gcd(12, 8) = 4` — see `CLRS.Ch31.GCD.ImplTest.fst` and
+`CLRS.Ch31.GCD.ImplTest.md` for details.
+
+**Results:**
+- ✅ Precondition `SZ.v a > 0 ∨ SZ.v b > 0` is satisfiable for (12, 8).
+- ✅ Postcondition uniquely determines result: `gcd_spec 12 8 == 4` by
+  normalization, proving `SZ.v result == 4`.
+- ✅ Complexity spec `gcd_steps 12 8 == 2` is computable by normalization.
+- ✅ No admits, no assumes in the test.
+
+**Spec issues found:** None. The specification is precise and complete.

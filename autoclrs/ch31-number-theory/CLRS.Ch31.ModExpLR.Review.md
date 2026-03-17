@@ -139,3 +139,18 @@ Key lemmas from `CLRS.Ch31.ModExpLR.Lemmas`:
 - [x] `modexp_lr_complexity_bounded` defined in separate Complexity module
 - [ ] Exact iteration count (currently upper bound only)
 - [ ] Machine-integer overflow constraints
+- [x] Spec validation test (`CLRS.Ch31.ModExpLR.ImplTest.fst`)
+
+## Spec Validation (ImplTest)
+
+**Test:** `3^5 mod 7 = 5` — see `CLRS.Ch31.ModExpLR.ImplTest.fst` and
+`CLRS.Ch31.ModExpLR.ImplTest.md` for details.
+
+**Results:**
+- ✅ Precondition (ghost counter only) is trivially satisfiable.
+- ✅ Postcondition uniquely determines result: `mod_exp_spec 3 5 7 == 5`
+  by normalization, proving `result == 5`.
+- ✅ Bounds postcondition verified: `0 ≤ 5 < 7`.
+- ✅ No admits, no assumes in the test.
+
+**Spec issues found:** None. The specification is precise and complete.
