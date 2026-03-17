@@ -34,11 +34,13 @@ module SS = CLRS.Common.SortSpec
 
 (* Lemma: for input [3; 1; 2], the partition postcondition determines
    that the three sub-sequences form a valid split of exactly these elements.
-   Specifically, from permutation s0 (s1 ++ s_pivot ++ s2) with
-   between_bounds s1 lb pivot, strictly_larger_than s2 pivot, and
-   1 <= pivot <= 3, we can derive:
-   - The multiset of s1 ++ [pivot] ++ s2 equals {1, 2, 3}
-   - No element is duplicated or lost
+   From permutation s0 (s1 ++ s_pivot ++ s2) with bounds constraints,
+   we derive:
+   - Total length is preserved
+   - All output elements are within the input bounds [1, 3]
+   - The partition ordering invariant constrains element placement:
+     left elements ≤ pivot, right elements > pivot
+   - For each possible pivot value, the sub-array sizes are forced
 *)
 let partition_permutation_valid
   (s1 s_pivot s2: Seq.seq int)
@@ -54,9 +56,24 @@ let partition_permutation_valid
       SP.permutation int (Seq.seq_of_list [3; 1; 2])
                          (Seq.append s1 (Seq.append s_pivot s2)))
     (ensures
-      Seq.length s1 + 1 + Seq.length s2 == 3)
+      Seq.length s1 + 1 + Seq.length s2 == 3 /\
+      // All left elements are within [1, pivot]
+      (forall (k:nat). k < Seq.length s1 ==> 1 <= Seq.index s1 k /\ Seq.index s1 k <= pivot) /\
+      // All right elements are within (pivot, 3]
+      (forall (k:nat). k < Seq.length s2 ==> pivot < Seq.index s2 k /\ Seq.index s2 k <= 3) /\
+      // Pivot value constrains sub-array sizes:
+      // pivot=1 => |s1|=0, pivot=2 => |s1|=1, pivot=3 => |s1|=2
+      (pivot == 1 ==> Seq.length s1 == 0 /\ Seq.length s2 == 2) /\
+      (pivot == 2 ==> Seq.length s1 == 1 /\ Seq.length s2 == 1) /\
+      (pivot == 3 ==> Seq.length s1 == 2 /\ Seq.length s2 == 0))
 = SP.perm_len (Seq.seq_of_list [3; 1; 2])
-              (Seq.append s1 (Seq.append s_pivot s2))
+              (Seq.append s1 (Seq.append s_pivot s2));
+  // Count-based reasoning: the permutation preserves element counts
+  assert_norm (SP.count 1 (Seq.seq_of_list [3; 1; 2]) == 1);
+  assert_norm (SP.count 2 (Seq.seq_of_list [3; 1; 2]) == 1);
+  assert_norm (SP.count 3 (Seq.seq_of_list [3; 1; 2]) == 1);
+  assert_norm (SP.count 0 (Seq.seq_of_list [3; 1; 2]) == 0);
+  assert_norm (SP.count 4 (Seq.seq_of_list [3; 1; 2]) == 0)
 
 (* Completeness: calling partition proves satisfiability;
    postcondition constraints are verified in-line *)

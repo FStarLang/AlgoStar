@@ -57,5 +57,5 @@ fn quicksort_bounded
   )
   ensures exists* s. (
     A.pts_to_range a lo hi s **
-    pure (sorted s /\ permutation s0 s)
+    pure (sorted s /\ permutation s0 s /\ between_bounds s lb rb)
   )

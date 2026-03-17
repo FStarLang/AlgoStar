@@ -234,13 +234,22 @@ via `pts_to_range_split` and transfers bounds to the sub-regions.
 | No admits/assumes in test | ✅ |
 | Spec issues found | None (relational postcondition is intentional) |
 
-The partition postcondition is **intentionally relational**: it does not
-prescribe which element becomes the pivot. This is by design — the `Impl.fsti`
-should be usable with any partition strategy (Lomuto, Hoare, randomized).
+### Test Strengthening
 
-The test verifies: pivot index in range, sub-array lengths consistent,
-pivot value in bounds, left elements ≤ pivot, right elements > pivot,
-exact complexity (2 comparisons), and permutation preservation.
+The `partition_permutation_valid` lemma was strengthened to prove tighter
+element-level properties beyond basic length preservation:
+
+1. **Left elements bounded:** all s1 elements are within `[1, pivot]`
+2. **Right elements bounded:** all s2 elements are within `(pivot, 3]`
+3. **Pivot constrains sub-array sizes:** for each possible pivot value
+   (1, 2, or 3), the sub-array sizes are uniquely determined:
+   - pivot=1 ⟹ |s1|=0, |s2|=2
+   - pivot=2 ⟹ |s1|=1, |s2|=1
+   - pivot=3 ⟹ |s1|=2, |s2|=0
+
+This demonstrates that the partition spec, combined with the permutation
+constraint on a concrete input, tightly constrains the output: the pivot
+value uniquely determines the sizes of the left and right sub-arrays.
 
 ## Checklist
 

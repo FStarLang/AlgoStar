@@ -6,19 +6,31 @@
 
 ## What Is Tested
 
-The test calls `quicksort` on the concrete input `[3; 1; 2]` and proves
-that the postcondition (`sorted s /\ permutation s0 s`) is:
+Three API variants are tested, all on the concrete input `[3; 1; 2]`:
 
-1. **Satisfiable** — the function can be called with a valid 3-element array.
-2. **Precise** — the postcondition uniquely determines the output as `[1; 2; 3]`.
+### `test_quicksort_3` — Basic `quicksort`
 
-After `quicksort arr 3sz` returns, the test:
+Calls `quicksort` and proves the postcondition (`sorted s /\ permutation s0 s`)
+is satisfiable and fully precise: the output is uniquely determined as `[1; 2; 3]`.
 
-- Reveals the opaque `permutation` to expose `FStar.Seq.Properties.permutation`.
-- Bridges `BoundedIntegers` typeclass operators (`<=`, `<`) to `Prims` operators
-  so Z3 can reason about integer ordering in conjunction with permutation counts.
-- Uses `SP.count` normalization to establish element multiplicities.
-- Reads all three array elements and asserts `v0 == 1 /\ v1 == 2 /\ v2 == 3`.
+### `test_quicksort_with_complexity` — `quicksort_with_complexity`
+
+Calls `quicksort_with_complexity` with a ghost counter starting at 0 and verifies:
+- **Sorted output:** `sorted s`
+- **Permutation:** `permutation s0 s`
+- **Complexity bound:** `complexity_bounded_quadratic cf 0 3` — at most 3
+  comparisons for a 3-element array (n(n-1)/2 = 3·2/2 = 3)
+- **Completeness:** output is uniquely `[1; 2; 3]`
+
+### `test_quicksort_bounded` — `quicksort_bounded`
+
+Calls `quicksort_bounded` on the sub-range `a[0..3)` with ghost bounds
+`lb=1, rb=3` and verifies:
+- **Sorted output:** `sorted s`
+- **Permutation:** `permutation s0 s`
+- **Bounds preservation:** `between_bounds s 1 3` — all output elements
+  remain within `[1, 3]` (strengthened postcondition from Impl.fsti)
+- **Completeness:** output is uniquely `[1; 2; 3]`
 
 ## Key Lemmas
 
@@ -36,17 +48,6 @@ constraint, this uniquely determines the sequence.
 Bridges `CLRS.Common.SortSpec.sorted` (which uses `Pulse.Lib.BoundedIntegers`
 typeclass operators) to the `Prims` operators used by `std_sort3`.
 
-The bridge consists of four assertions:
-```fstar
-assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
-assert (forall (i j:nat). (i < j) == Prims.op_LessThan i j);
-assert (forall (x y:int). (x <= y) == Prims.op_LessThanOrEqual x y);
-assert (forall (x y:int). (x < y) == Prims.op_LessThan x y);
-```
-
-These are provable because `bounded_int_int` and `bounded_int_nat` define
-their comparison operators directly as the corresponding `Prims` operators.
-
 ## Spec Precision Result
 
 **The quicksort postcondition is fully precise for this test case.**
@@ -55,12 +56,33 @@ Given `sorted s /\ permutation [3; 1; 2] s`, the output is uniquely
 determined as `[1; 2; 3]`. This is because all three input elements are
 distinct, so there is exactly one sorted permutation.
 
-No assumptions or admits were needed. The postcondition is sufficient to
-determine the exact output for any input with distinct elements.
+**The complexity bound is validated:** `quicksort_with_complexity` exposes
+`complexity_bounded_quadratic cf 0 3`, confirming at most 3 comparisons.
+
+**Bounds preservation is validated:** `quicksort_bounded` now exposes
+`between_bounds s lb rb` in its postcondition (spec strengthened from
+original), confirming output elements stay within caller-provided bounds.
+
+## Spec Strengthening (2026-03-17)
+
+The `quicksort_bounded` postcondition was strengthened to expose
+`between_bounds s lb rb`. This property was already proven internally
+(in `pure_post_quicksort`) but was not exposed in the `Impl.fsti`
+interface. The strengthening:
+
+1. Added `between_bounds s lb rb` to `quicksort_bounded` postcondition
+   in `CLRS.Ch07.Quicksort.Impl.fsti`
+2. No proof changes needed in `Impl.fst` — the property was already
+   established by the internal `clrs_quicksort` function
+3. Added `test_quicksort_bounded` to validate the strengthened spec
+
+This enables callers of `quicksort_bounded` to directly assert that
+output elements remain within the provided bounds, without needing
+a separate permutation-preserves-bounds lemma.
 
 ## Verification
 
 - **Z3 options:** `--z3rlimit 400 --fuel 8 --ifuel 4`
 - **Admits:** 0
 - **Assumes:** 0
-- **Spec issues found:** None
+- **Spec issues found:** `quicksort_bounded` was missing `between_bounds` — now fixed

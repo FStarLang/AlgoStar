@@ -262,7 +262,35 @@ Adapted from the [intent-formalization](https://github.com/microsoft/intent-form
 | Precondition satisfiable | ✅ Called on `[3; 1; 2]` |
 | Postcondition precise | ✅ Uniquely determines output `[1; 2; 3]` |
 | No admits/assumes in test | ✅ |
-| Spec issues found | None |
+| Spec issues found | `quicksort_bounded` missing `between_bounds` — **fixed** |
+
+### Spec Strengthening
+
+**`quicksort_bounded` postcondition strengthened** to expose `between_bounds s lb rb`.
+This property was already proven internally by `clrs_quicksort` (via
+`pure_post_quicksort`) but was not exposed in the `Impl.fsti` interface.
+
+Before:
+```fstar
+ensures exists* s. (A.pts_to_range a lo hi s ** pure (sorted s /\ permutation s0 s))
+```
+
+After:
+```fstar
+ensures exists* s. (A.pts_to_range a lo hi s ** pure (sorted s /\ permutation s0 s /\ between_bounds s lb rb))
+```
+
+No proof changes were needed in `Impl.fst`.
+
+### Tests Added
+
+- **`test_quicksort_with_complexity`**: Validates the `quicksort_with_complexity`
+  API variant, proving sorted output, permutation, complexity bound
+  (`cf <= 3` for n=3), and completeness.
+
+- **`test_quicksort_bounded`**: Validates the `quicksort_bounded` API variant
+  with the strengthened postcondition, proving sorted output, permutation,
+  bounds preservation (`between_bounds s 1 3`), and completeness.
 
 The postcondition `sorted s /\ permutation s0 s` is the strongest possible
 specification for a sorting algorithm — it uniquely determines the output for

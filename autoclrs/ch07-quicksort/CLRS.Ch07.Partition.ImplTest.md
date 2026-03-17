@@ -23,15 +23,29 @@ After the partition call returns, the test verifies:
 - **Exact complexity:** `complexity_exact_linear cf 0 2` (exactly 2 comparisons)
 - **Permutation preserved:** the concatenation `s1 ++ s_pivot ++ s2` is a
   permutation of the input `[3; 1; 2]`
-- **Length preservation:** `|s1| + 1 + |s2| == 3`
 
 ## Key Lemma
 
 ### `partition_permutation_valid`
 
 Proves that given the postcondition constraints (bounds, strict ordering,
-permutation), the total length `|s1| + 1 + |s2| == 3` is preserved. This
-follows directly from `SP.perm_len`.
+permutation), the following properties hold:
+
+1. **Length preservation:** `|s1| + 1 + |s2| == 3`
+2. **Left elements bounded:** all elements in s1 are within `[1, pivot]`
+3. **Right elements bounded:** all elements in s2 are within `(pivot, 3]`
+4. **Pivot constrains sub-array sizes:**
+   - pivot = 1 ⟹ |s1| = 0, |s2| = 2 (no elements ≤ 1 other than pivot)
+   - pivot = 2 ⟹ |s1| = 1, |s2| = 1 (one element ≤ 2, one element > 2)
+   - pivot = 3 ⟹ |s1| = 2, |s2| = 0 (all non-pivot elements ≤ 3)
+
+This demonstrates that the partition spec, combined with the permutation
+constraint on a concrete input, tightly constrains the output: the pivot
+value uniquely determines the sizes of the left and right sub-arrays.
+
+The proof uses `SP.count`-based reasoning via `assert_norm` to establish
+element multiplicities, combined with the bounds constraints to force
+sub-array sizes.
 
 ## Spec Precision Result
 
@@ -59,6 +73,8 @@ The partition spec is precise enough for its intended use in quicksort:
 - All left elements are ≤ pivot, all right elements are > pivot
 - The split preserves the multiset
 - Complexity is exactly `n - 1` comparisons
+- **The pivot value uniquely determines sub-array sizes** (proven by
+  `partition_permutation_valid`)
 
 This is exactly what `quicksort_bounded` needs to recurse correctly. The
 relational nature does NOT weaken the quicksort postcondition, which only

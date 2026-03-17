@@ -7,6 +7,9 @@
    Tests that the quicksort API's postcondition (sorted + permutation)
    is satisfiable and sufficiently precise to determine the output
    for a concrete 3-element input [3; 1; 2] -> [1; 2; 3].
+
+   Also tests quicksort_with_complexity (O(n²) bound) and
+   quicksort_bounded (sub-range sorting with bounds preservation).
 *)
 module CLRS.Ch07.Quicksort.ImplTest
 #lang-pulse
@@ -16,10 +19,13 @@ open Pulse.Lib.Array
 open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch07.Quicksort.Impl
+open CLRS.Ch07.Partition.Lemmas
+open CLRS.Ch07.Quicksort.Lemmas
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
+module GR = Pulse.Lib.GhostReference
 module Seq = FStar.Seq
 module SP = FStar.Seq.Properties
 module SS = CLRS.Common.SortSpec
@@ -92,6 +98,116 @@ fn test_quicksort_3 ()
   assert (pure (v2 == 3));
 
   // cleanup
+  with s2. assert (A.pts_to arr s2);
+  rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
+  V.to_vec_pts_to v;
+  V.free v;
+  ()
+}
+```
+
+(* Completeness: quicksort_with_complexity exposes O(n²) bound via ghost counter *)
+```pulse
+fn test_quicksort_with_complexity ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  // Input: [3; 1; 2]
+  let v = V.alloc 0 3sz;
+  V.to_array_pts_to v;
+  let arr = V.vec_to_array v;
+  rewrite (A.pts_to (V.vec_to_array v) (Seq.create 3 0)) as (A.pts_to arr (Seq.create 3 0));
+  arr.(0sz) <- 3;
+  arr.(1sz) <- 1;
+  arr.(2sz) <- 2;
+
+  with s0. assert (A.pts_to arr s0);
+
+  // Create ghost counter starting at 0
+  let ctr = GR.alloc #nat 0;
+
+  // y = quicksort_with_complexity(x)
+  quicksort_with_complexity arr 3sz ctr #(hide 0);
+
+  // Bind existential witnesses
+  with s. assert (A.pts_to arr s);
+  with cf. assert (GR.pts_to ctr cf);
+
+  // === Verify postcondition properties ===
+
+  // 1. Sorted output
+  assert (pure (SS.sorted s));
+
+  // 2. Permutation of input
+  assert (pure (SS.permutation s0 s));
+
+  // 3. Complexity bound: cf <= n*(n-1)/2 = 3*2/2 = 3
+  assert (pure (complexity_bounded_quadratic cf 0 3));
+
+  // 4. Completeness: output is uniquely [1; 2; 3]
+  reveal_opaque (`%SS.permutation) (SS.permutation s0 s);
+  completeness_sort3 s;
+  let v0 = arr.(0sz);
+  let v1 = arr.(1sz);
+  let v2 = arr.(2sz);
+  assert (pure (v0 == 1));
+  assert (pure (v1 == 2));
+  assert (pure (v2 == 3));
+
+  // Cleanup
+  GR.free ctr;
+  with s2. assert (A.pts_to arr s2);
+  rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
+  V.to_vec_pts_to v;
+  V.free v;
+  ()
+}
+```
+
+(* Completeness: quicksort_bounded preserves between_bounds in postcondition *)
+```pulse
+fn test_quicksort_bounded ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  // Input: [3; 1; 2]
+  let v = V.alloc 0 3sz;
+  V.to_array_pts_to v;
+  let arr = V.vec_to_array v;
+  rewrite (A.pts_to (V.vec_to_array v) (Seq.create 3 0)) as (A.pts_to arr (Seq.create 3 0));
+  arr.(0sz) <- 3;
+  arr.(1sz) <- 1;
+  arr.(2sz) <- 2;
+
+  // Convert pts_to -> pts_to_range for bounded API
+  with s0. assert (A.pts_to arr s0);
+  A.pts_to_range_intro arr 1.0R s0;
+
+  // Call quicksort_bounded: lo=0, hi=3, bounds [1, 3]
+  quicksort_bounded arr 0 3 (hide 1) (hide 3);
+
+  // Bind existential witnesses
+  with s. assert (A.pts_to_range arr 0 3 s);
+
+  // === Verify postcondition properties ===
+
+  // 1. Sorted output
+  assert (pure (SS.sorted s));
+
+  // 2. Permutation of input
+  assert (pure (SS.permutation s0 s));
+
+  // 3. Bounds preservation: output elements remain in [1, 3]
+  assert (pure (between_bounds s 1 3));
+
+  // 4. Completeness: output is [1; 2; 3]
+  reveal_opaque (`%SS.permutation) (SS.permutation s0 s);
+  completeness_sort3 s;
+
+  // Convert back and cleanup
+  A.pts_to_range_elim arr 1.0R s;
   with s2. assert (A.pts_to arr s2);
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
