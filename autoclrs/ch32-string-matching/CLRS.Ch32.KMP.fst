@@ -259,8 +259,7 @@ fn kmp_matcher
     V.pts_to pi #p_pi s_pi **
     GR.pts_to ctr cf **
     pure (
-      SZ.v count >= 0 /\
-      SZ.v count <= SZ.v n + 1 /\
+      SZ.v count <= SZ.v n - SZ.v m + 1 /\
       SZ.v count == Spec.count_matches_spec (reveal s_text) (reveal s_pat) (SZ.v n) (SZ.v m) /\
       matcher_complexity_bound cf (reveal c0) (SZ.v n)
     )
@@ -406,6 +405,7 @@ fn kmp_matcher
   
   // After loop: convert count_before to count_matches_spec
   Spec.count_before_eq_spec (reveal s_text) (reveal s_pat) (SZ.v n) (SZ.v m);
+  Spec.count_matches_spec_bounded (reveal s_text) (reveal s_pat) (SZ.v n) (SZ.v m);
   
   let final_count = !count_matches;
   final_count
@@ -451,8 +451,7 @@ fn kmp_string_match
     A.pts_to pattern #p_pat s_pat **
     GR.pts_to ctr cf **
     pure (
-      SZ.v count >= 0 /\
-      SZ.v count <= SZ.v n + 1 /\
+      SZ.v count <= SZ.v n - SZ.v m + 1 /\
       SZ.v count == Spec.count_matches_spec (reveal s_text) (reveal s_pat) (SZ.v n) (SZ.v m) /\
       kmp_total_complexity_bound cf (reveal c0) (SZ.v n) (SZ.v m)
     )

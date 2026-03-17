@@ -9,6 +9,7 @@
    - Precondition satisfiability: constructs a valid call with
      text=[0,1,0,1,0], pattern=[0,1,0]
    - Postcondition precision: proves the result is uniquely determined (count=2)
+   - Match position verification: proves matches at positions 0 and 2 only
 
    NO admits. NO assumes.
 *)
@@ -61,6 +62,33 @@ let kmp_count_matches_is_2 (text pat: Seq.seq int)
   = ()
 #pop-options
 
+(* Match position verification: each position individually *)
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 50"
+let kmp_match_at_0 (text pat: Seq.seq int)
+  : Lemma
+    (requires Seq.length text == 5 /\ Seq.length pat == 3 /\
+              Seq.index text 0 == 0 /\ Seq.index text 1 == 1 /\ Seq.index text 2 == 0 /\
+              Seq.index pat 0 == 0 /\ Seq.index pat 1 == 1 /\ Seq.index pat 2 == 0)
+    (ensures matches_at text pat 0)
+  = ()
+
+let kmp_no_match_at_1 (text pat: Seq.seq int)
+  : Lemma
+    (requires Seq.length text == 5 /\ Seq.length pat == 3 /\
+              Seq.index text 1 == 1 /\
+              Seq.index pat 0 == 0)
+    (ensures ~(matches_at text pat 1))
+  = ()
+
+let kmp_match_at_2 (text pat: Seq.seq int)
+  : Lemma
+    (requires Seq.length text == 5 /\ Seq.length pat == 3 /\
+              Seq.index text 2 == 0 /\ Seq.index text 3 == 1 /\ Seq.index text 4 == 0 /\
+              Seq.index pat 0 == 0 /\ Seq.index pat 1 == 1 /\ Seq.index pat 2 == 0)
+    (ensures matches_at text pat 2)
+  = ()
+#pop-options
+
 #push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
 
 ```pulse
@@ -109,6 +137,11 @@ fn test_kmp_string_match ()
   // Prove postcondition precision: count must be 2
   kmp_count_matches_is_2 s_text s_pat;
   assert (pure (SZ.v count == 2));
+
+  // Verify individual match positions
+  kmp_match_at_0 s_text s_pat;
+  kmp_match_at_2 s_text s_pat;
+  kmp_no_match_at_1 s_text s_pat;
 
   // Cleanup
   GR.free ctr;

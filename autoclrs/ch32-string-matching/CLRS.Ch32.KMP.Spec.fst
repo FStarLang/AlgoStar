@@ -98,6 +98,45 @@ let rec count_before (text pattern: seq int) (limit: nat)
   else count_before text pattern (limit - 1) +
        (if matches_at_dec text pattern (limit - 1) then 1 else 0)
 
+// ========== Decidable ↔ Propositional Bridge ==========
+
+/// check_match_at is correct w.r.t. universal quantifier over indices
+#push-options "--fuel 2 --ifuel 1"
+let rec check_match_at_correct (text pattern: seq int) (s: nat) (j: nat{j <= length pattern})
+  : Lemma (requires s + length pattern <= length text)
+          (ensures check_match_at text pattern s j <==>
+                   (forall (k: nat). j <= k /\ k < length pattern ==>
+                     index text (s + k) == index pattern k))
+          (decreases (length pattern - j))
+  = if j >= length pattern then ()
+    else check_match_at_correct text pattern s (j + 1)
+#pop-options
+
+/// matches_at_dec is equivalent to PureDefs.matches_at
+let matches_at_dec_correct (text pattern: seq int) (s: nat)
+  : Lemma (requires s + length pattern <= length text)
+          (ensures matches_at_dec text pattern s <==> matches_at text pattern s)
+  = check_match_at_correct text pattern s 0
+
+// ========== Count Bounding Lemmas ==========
+
+/// count_matches_up_to is bounded by the number of remaining positions
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec count_matches_up_to_bounded (text pattern: seq int) (n m s: nat)
+  : Lemma (requires m > 0 /\ n >= m)
+          (ensures count_matches_up_to text pattern n m s <=
+                   (if s <= n - m then n - m + 1 - s else 0))
+          (decreases (if s <= n - m + 1 && m > 0 && n >= m then n - m + 1 - s else 0))
+  = if s > n - m then ()
+    else count_matches_up_to_bounded text pattern n m (s + 1)
+#pop-options
+
+/// count_matches_spec is bounded by n - m + 1
+let count_matches_spec_bounded (text pattern: seq int) (n m: nat)
+  : Lemma (requires m > 0 /\ n >= m)
+          (ensures count_matches_spec text pattern n m <= n - m + 1)
+  = count_matches_up_to_bounded text pattern n m 0
+
 // ========== Forward Direction ==========
 
 /// matched_prefix_at with length m implies matches_at

@@ -273,12 +273,14 @@ lemma uses `--z3rlimit_factor 40` and a `calc` proof. The correctness proofs
 |-------|--------|
 | Precondition satisfiable | ✅ Proven (text=[1,2,1,2,1], pat=[1,2,1], d=10, q=13) |
 | Postcondition precise | ✅ count=2 uniquely determined |
+| Match positions verified | ✅ pos 0 ✓, pos 1 ✗, pos 2 ✓ |
 | Hash param independence | ✅ count is independent of d, q |
 | No admits/assumes in test | ✅ |
 
 **Finding**: The postcondition is precise — `count_matches_up_to` uniquely
 determines the output for any concrete input, regardless of hash parameters.
-No specification weaknesses found.
+Match position verification now parallels the Naive test, using
+`RKSpec.matches_at` to prove individual positions.
 
 ## Checklist
 

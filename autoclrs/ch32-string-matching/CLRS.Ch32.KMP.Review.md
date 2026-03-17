@@ -247,14 +247,15 @@ definitions and case-analysis lemmas. Uses `--z3refresh` for stability.
 |-------|--------|
 | Precondition satisfiable | ✅ Proven (text=[0,1,0,1,0], pat=[0,1,0]) |
 | Postcondition precise | ✅ count=2 uniquely determined |
+| Match positions verified | ✅ pos 0 ✓, pos 1 ✗, pos 2 ✓ |
+| Upper bound tightened | ✅ count ≤ n−m+1 (was count ≤ n+1) |
+| matches_at_dec_correct added | ✅ Bridges Spec.matches_at_dec ↔ PureDefs.matches_at |
 | No admits/assumes in test | ✅ |
 
-**Finding**: The postcondition is precise — `count_matches_spec` uniquely
-determines the output for any concrete input. No specification weaknesses found.
-
-**Note**: The existing `KMP.Test.fst` only tests precondition satisfiability
-(calls the function without verifying the output). The new `KMP.ImplTest.fst`
-proves postcondition precision.
+**Finding**: The postcondition upper bound was tightened from `n+1` to `n-m+1`,
+matching the Naive matcher's bound. New `matches_at_dec_correct` lemma bridges
+the decidable and propositional match predicates. Match position verification
+now parallels the Naive test.
 
 ## Checklist
 

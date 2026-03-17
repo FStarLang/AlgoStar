@@ -14,6 +14,14 @@
 | q (modulus) | 13 |
 | Expected count | 2 |
 
+### Match positions
+
+| Position | Text slice | Match? |
+|----------|-----------|--------|
+| 0 | `[1,2,1]` | ✅ Proven via `rk_match_at_0` |
+| 1 | `[2,1,2]` | ❌ Proven via `rk_no_match_at_1` (text[1]=2 ≠ pat[0]=1) |
+| 2 | `[1,2,1]` | ✅ Proven via `rk_match_at_2` |
+
 ## What Is Proven
 
 ### 1. Precondition satisfiability
@@ -45,7 +53,16 @@ Note: The Rabin-Karp `count_matches_up_to` is defined locally in
 `CLRS.Ch32.RabinKarp.fst` and uses `RKSpec.matches_at_dec` — the count
 is independent of the hash parameters `d` and `q`.
 
-### 3. Hash parameter independence
+### 3. Match position verification
+
+Three auxiliary lemmas verify the individual match positions using
+`RKSpec.matches_at` from `CLRS.Ch32.RabinKarp.Spec`:
+
+- `rk_match_at_0`: proves `RKSpec.matches_at text pat 0` (match at position 0)
+- `rk_no_match_at_1`: proves `~(RKSpec.matches_at text pat 1)` (no match at position 1)
+- `rk_match_at_2`: proves `RKSpec.matches_at text pat 2` (match at position 2)
+
+### 4. Hash parameter independence
 
 The correctness of the count is proven for specific hash parameters (`d=10`,
 `q=13`), but the postcondition guarantees `result == count_matches_up_to ...`
@@ -65,6 +82,9 @@ postcondition is precise.
 
 - **Pure helper lemma** (`rk_count_matches_is_2`): Takes abstract `nat`
   sequences with known element values and proves the count via Z3 evaluation.
+- **Match position lemmas**: `rk_match_at_0`, `rk_no_match_at_1`,
+  `rk_match_at_2` use Z3 with `--fuel 4 --ifuel 2` to evaluate the
+  `matches_at` propositional predicate on concrete data.
 - **`A.op_Array_Assignment`**: Used for array writes (the `.(idx) <- val`
   sugar is not used to avoid potential type inference issues with `nat`).
 - **Z3 evaluation**: `--fuel 8 --ifuel 4 --z3rlimit 100` is sufficient for

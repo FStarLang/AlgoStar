@@ -9,6 +9,7 @@
    - Precondition satisfiability: constructs a valid call with
      text=[1,2,1,2,1], pattern=[1,2,1], d=10, q=13
    - Postcondition precision: proves the result is uniquely determined (count=2)
+   - Match position verification: proves matches at positions 0 and 2 only
 
    NO admits. NO assumes.
 *)
@@ -52,6 +53,33 @@ let rk_count_matches_is_2 (text pat: Seq.seq nat)
               Seq.index text 3 == 2 /\ Seq.index text 4 == 1 /\
               Seq.index pat 0 == 1 /\ Seq.index pat 1 == 2 /\ Seq.index pat 2 == 1)
     (ensures RK.count_matches_up_to text pat 3 == 2)
+  = ()
+#pop-options
+
+(* Match position verification: each position individually *)
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 50"
+let rk_match_at_0 (text pat: Seq.seq nat)
+  : Lemma
+    (requires Seq.length text == 5 /\ Seq.length pat == 3 /\
+              Seq.index text 0 == 1 /\ Seq.index text 1 == 2 /\ Seq.index text 2 == 1 /\
+              Seq.index pat 0 == 1 /\ Seq.index pat 1 == 2 /\ Seq.index pat 2 == 1)
+    (ensures RKSpec.matches_at text pat 0)
+  = ()
+
+let rk_no_match_at_1 (text pat: Seq.seq nat)
+  : Lemma
+    (requires Seq.length text == 5 /\ Seq.length pat == 3 /\
+              Seq.index text 1 == 2 /\
+              Seq.index pat 0 == 1)
+    (ensures ~(RKSpec.matches_at text pat 1))
+  = ()
+
+let rk_match_at_2 (text pat: Seq.seq nat)
+  : Lemma
+    (requires Seq.length text == 5 /\ Seq.length pat == 3 /\
+              Seq.index text 2 == 1 /\ Seq.index text 3 == 2 /\ Seq.index text 4 == 1 /\
+              Seq.index pat 0 == 1 /\ Seq.index pat 1 == 2 /\ Seq.index pat 2 == 1)
+    (ensures RKSpec.matches_at text pat 2)
   = ()
 #pop-options
 
@@ -103,6 +131,11 @@ fn test_rabin_karp ()
   // Prove postcondition precision: count must be 2
   rk_count_matches_is_2 s_text s_pat;
   assert (pure (count == 2));
+
+  // Verify individual match positions
+  rk_match_at_0 s_text s_pat;
+  rk_match_at_2 s_text s_pat;
+  rk_no_match_at_1 s_text s_pat;
 
   // Cleanup
   GR.free ctr;
