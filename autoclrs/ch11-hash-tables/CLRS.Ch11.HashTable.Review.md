@@ -1,8 +1,9 @@
 # Hash Table with Open Addressing (CLRS §11.4)
 
-## Review Summary (2026-03-16)
+## Review Summary (2026-03-17)
 
 **Status**: Fully verified, zero admits, rubric-compliant (7/7 files present).
+Spec validation tests added (ImplTest.fst, 7 tests, zero admits).
 
 ### Rubric Compliance
 
@@ -444,6 +445,18 @@ by F\* and Z3.
    key uniqueness as an invariant, ensuring delete always guarantees
    absence.
 
+8. **Insert does not guarantee success when slots are available.**
+   ⚠️ **FOUND VIA SPEC VALIDATION (ImplTest.fst).** The postcondition
+   of `hash_insert` (and `hash_insert_no_dup`) uses `if result then ...
+   else s' == s`. The `else` branch is always satisfiable, even when the
+   table has empty slots. This means callers cannot prove that insert
+   succeeds on a non-full table from the postcondition alone. Strengthening
+   the postcondition to include a "table is full" clause in the false branch
+   was attempted but proved difficult in Pulse/Z3 due to multi-step quantifier
+   instantiation between probe-indexed and slot-indexed universal quantifiers.
+   The `Complexity.count_available` function provides an alternative mechanism
+   for callers to reason about slot availability. See `ImplTest.md` for details.
+
 ## Complexity
 
 | Metric | Bound | Linked? | Exact? |
@@ -494,3 +507,5 @@ is already present.
 | `CLRS.Ch11.HashTable.Complexity.fsti` | Complexity bound definitions + signatures |
 | `CLRS.Ch11.HashTable.Complexity.fst` | Complexity proofs (slot counting, insert/delete balance) |
 | `CLRS.Ch11.HashTable.Test.fst` | Test harness |
+| `CLRS.Ch11.HashTable.ImplTest.fst` | Spec validation tests (7 tests, zero admits) |
+| `CLRS.Ch11.HashTable.ImplTest.md` | Spec validation documentation |
