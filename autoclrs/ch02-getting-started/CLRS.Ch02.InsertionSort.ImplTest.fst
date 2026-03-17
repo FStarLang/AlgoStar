@@ -108,7 +108,72 @@ fn test_insertion_sort_3 ()
   assert (pure (v1 == 2));
   assert (pure (v2 == 3));
 
+  // Verify complexity bound: at most n*(n-1)/2 = 3 comparisons
+  assert (pure (cf <= 3));
+
   // Cleanup
+  GR.free ctr;
+  with s2. assert (A.pts_to arr s2);
+  rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
+  V.to_vec_pts_to v;
+  V.free v;
+  ()
+}
+```
+
+```pulse
+(* Edge case: insertion_sort on empty array (len=0) does zero comparisons *)
+fn test_insertion_sort_empty ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  let v = V.alloc 0 0sz;
+  V.to_array_pts_to v;
+  let arr = V.vec_to_array v;
+  rewrite (A.pts_to (V.vec_to_array v) (Seq.create 0 0)) as (A.pts_to arr (Seq.create 0 0));
+
+  let ctr = GR.alloc #nat 0;
+  with s0. assert (A.pts_to arr s0);
+  insertion_sort arr 0sz ctr;
+
+  with s. assert (A.pts_to arr s);
+  with cf. assert (GR.pts_to ctr cf);
+
+  // Zero comparisons for empty input
+  assert (pure (cf == 0));
+
+  GR.free ctr;
+  with s2. assert (A.pts_to arr s2);
+  rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
+  V.to_vec_pts_to v;
+  V.free v;
+  ()
+}
+```
+
+```pulse
+(* Edge case: insertion_sort on single element (len=1) does zero comparisons *)
+fn test_insertion_sort_single ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  let v = V.alloc 42 1sz;
+  V.to_array_pts_to v;
+  let arr = V.vec_to_array v;
+  rewrite (A.pts_to (V.vec_to_array v) (Seq.create 1 42)) as (A.pts_to arr (Seq.create 1 42));
+
+  let ctr = GR.alloc #nat 0;
+  with s0. assert (A.pts_to arr s0);
+  insertion_sort arr 1sz ctr;
+
+  with s. assert (A.pts_to arr s);
+  with cf. assert (GR.pts_to ctr cf);
+
+  // Zero comparisons for single-element input
+  assert (pure (cf == 0));
+
   GR.free ctr;
   with s2. assert (A.pts_to arr s2);
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);

@@ -23,17 +23,6 @@ let rec log2_ceil (n: pos) : nat =
   if n = 1 then 0
   else 1 + log2_ceil ((n + 1) / 2)
 
-/// Ceiling division: ⌈n/2⌉
-let ceil_div2 (n: pos) : pos = (n + 1) / 2
-
-//SNIPPET_START: merge_sort_ops
-/// The actual recurrence for merge sort operations
-/// T(n) = 2·T(⌈n/2⌉) + n for n > 1, T(1) = 0
-let rec merge_sort_ops (n: pos) : Tot nat (decreases n)
-  = if n = 1 then 0
-    else 2 * merge_sort_ops (ceil_div2 n) + n
-//SNIPPET_END: merge_sort_ops
-
 /// ========== Properties of ceil_div2 and log2_ceil ==========
 
 /// Helper: ceil_div2 n < n for n > 1

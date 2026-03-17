@@ -11,10 +11,12 @@ open FStar.Mul
 val log2_ceil (n: pos) : nat
 
 /// Ceiling division: ⌈n/2⌉
-val ceil_div2 (n: pos) : pos
+let ceil_div2 (n: pos) : pos = (n + 1) / 2
 
 /// The merge sort recurrence: T(n) = 2·T(⌈n/2⌉) + n for n > 1, T(1) = 0
-val merge_sort_ops (n: pos) : nat
+let rec merge_sort_ops (n: pos) : Tot nat (decreases n)
+  = if n = 1 then 0
+    else 2 * merge_sort_ops (ceil_div2 n) + n
 
 /// The closed-form upper bound: 4n⌈log₂ n⌉ + 4n
 val merge_sort_bound (n: pos) : nat
