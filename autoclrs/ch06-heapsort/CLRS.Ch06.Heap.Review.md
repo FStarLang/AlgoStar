@@ -358,6 +358,7 @@ Key lemmas in `CLRS.Ch06.Heap.Lemmas`:
 | `CLRS.Ch06.Heap.Complexity.fst` | Pure complexity proofs |
 | `CLRS.Ch06.Heap.Lemmas.fsti` | Correctness lemma signatures |
 | `CLRS.Ch06.Heap.Lemmas.fst` | Correctness lemma proofs |
+| `CLRS.Ch06.Heap.ImplTest.fst` | Spec validation test (sorted_upto + permutation completeness) |
 
 ---
 
@@ -408,6 +409,12 @@ would require splitting the proof or adding more intermediate assertions.
 
 - [x] **D1.** Fix `README.md` — updated heapsort postcondition from `sorted s` to `sorted_upto s (SZ.v n)` with prefix-preservation; updated specification tables
 - [x] **D2.** Update `RUBRIC_06.md` z3rlimit table — updated to reflect heapsort z3rlimit 80, added Complexity.fst z3rlimit 300
+
+### Spec Validation (2026-03-17)
+
+- [x] **S1.** Write `ImplTest.fst` — spec validation test for `heapsort` sorting [3;1;2] → [1;2;3]. Proves precondition satisfiable and postcondition precise (uniquely determines output). Zero admits, zero assumes.
+- [x] **S2.** Write `ImplTest.md` — documents test methodology, what is proven, and specification assessment.
+- [x] **S3.** Spec assessment: `sorted_upto + permutation` is the strongest possible functional correctness spec for in-place sorting. No specification gaps or weaknesses found.
 
 ### Functional Improvements (deferred)
 
