@@ -382,6 +382,25 @@ not connected to the Pulse implementations via ghost counters.
 | `scan_step_preserves_left_turns` | `CLRS.Ch33.GrahamScan.Lemmas` |
 | `graham_scan_step` | `CLRS.Ch33.GrahamScan.Impl` |
 
+## Spec Validation (ImplTest)
+
+Spec validation tests in `CLRS.Ch33.GrahamScan.ImplTest.fst` exercise three
+of four functions with small concrete inputs. **All tests pass with zero
+admits and zero assumes.**
+
+| Function | Test Instance | Expected | Proven? |
+|----------|---------------|----------|---------|
+| `find_bottom` | Triangle (0,0),(2,0),(1,2) | 0 | ✅ |
+| `polar_cmp` | Pivot=0, a=1, b=2 | 4 | ✅ |
+| `pop_while` | 4 points, hull=[0,1,2], p=3 | 2 | ✅ |
+
+Helper lemmas evaluate the recursive specs (`find_bottom_spec`,
+`polar_cmp_spec`, `pop_while_spec`) on concrete sequences. Each verifies
+with `= ()` (trivial proof), confirming SMT can fully evaluate the specs.
+
+**Findings**: All postconditions are fully precise — no specification
+weaknesses found. See `CLRS.Ch33.GrahamScan.ImplTest.md` for details.
+
 ## Checklist (Priority Order)
 
 - [x] Pure specification matching CLRS §33.3 (find_bottom, polar_cmp, pop_while, full scan)

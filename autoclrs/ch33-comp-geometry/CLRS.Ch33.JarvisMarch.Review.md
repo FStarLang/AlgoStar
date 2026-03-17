@@ -405,6 +405,31 @@ tracking hull validity, spec equivalence, and loop count simultaneously. Reducin
 | `extend_valid_jarvis_hull` | `CLRS.Ch33.JarvisMarch.Lemmas` |
 | `jarvis_march_with_hull` | `CLRS.Ch33.JarvisMarch.Impl` |
 
+## Spec Validation (ImplTest)
+
+Spec validation tests in `CLRS.Ch33.JarvisMarch.ImplTest.fst` exercise three
+of four functions with a triangle instance. **All tests pass with zero admits
+and zero assumes.**
+
+| Function | Test Instance | Expected | Proven? |
+|----------|---------------|----------|---------|
+| `find_leftmost` | Triangle (0,0),(2,0),(1,2) | 0 | ✅ |
+| `find_next` | From vertex 0 | 1 | ✅ |
+| `jarvis_march` | Full triangle hull | 3 | ✅ |
+
+The test uses composable helper lemmas that evaluate each recursive spec
+function independently (`find_leftmost_spec`, `find_next_spec` from each
+vertex, `jarvis_march_spec`). The composed `jarvis_march_triangle_lemma`
+proves the complete algorithm returns the correct hull size.
+
+**Findings**: All postconditions are fully precise — no specification
+weaknesses found. The functional-equivalence postconditions (`result == spec`)
+are unconditional and uniquely determine outputs. The geometric correctness
+assumptions in `find_next_all_left_of` (general position, upper half-plane)
+are a separate concern from spec precision.
+
+See `CLRS.Ch33.JarvisMarch.ImplTest.md` for details.
+
 ## Checklist (Priority Order)
 
 - [x] Pure specification matching CLRS §33.3 (find_leftmost, find_next, jarvis_march)

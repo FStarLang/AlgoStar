@@ -152,7 +152,29 @@ All 7 rubric artifacts present. Complexity merged into Impl.
 
 ---
 
-## Files (9 total)
+## Spec Validation (ImplTest)
+
+**File:** `CLRS.Ch25.FloydWarshall.ImplTest.fst`
+**Status:** ✅ Fully proven — zero admits, zero assumes
+
+Validates the `floyd_warshall` API from `Impl.fsti` on a concrete 3×3
+graph. Proves:
+
+1. **Precondition satisfiability** — array-size and `SZ.fits` constraints
+   are met.
+2. **Postcondition precision** — `contents' == fw_outer contents n 0` is
+   strong enough to determine all 9 output entries exactly (0, 5, 20,
+   45, 0, 15, 30, 35, 0).
+3. **Complexity precision** — ghost tick counter gives exactly n³ = 27
+   relaxation operations.
+
+**No spec weaknesses found.** The postcondition is maximally precise
+(full functional refinement), the precondition is minimal, and no
+admits or assumes were needed. See `ImplTest.md` for details.
+
+---
+
+## Files (11 total)
 
 | File | LOC | Role |
 |------|-----|------|
@@ -165,3 +187,5 @@ All 7 rubric artifacts present. Complexity merged into Impl.
 | `NegCycleDetect.fst` | 107 | Runtime neg-cycle check + safe wrapper |
 | `SpecTest.fst` | 77 | Concrete 3×3 verification |
 | `Test.fst` | 133 | Pulse runtime tests (3×3, neg-cycle, empty graph) |
+| `ImplTest.fst` | ~180 | **Spec validation test** — Impl.fsti API test with output assertions |
+| `ImplTest.md` | — | Spec validation report |

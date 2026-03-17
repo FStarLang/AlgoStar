@@ -222,6 +222,23 @@ no fuel/ifuel adjustments). All lemma proofs are trivial `= ()`.
 | `CLRS.Ch33.Segments.Complexity.fst` | Formal O(1) op counts and bounds |
 | `CLRS.Ch33.Segments.fst` | Standalone module (specs + proofs + Pulse, all-in-one) |
 
+## Spec Validation (ImplTest)
+
+Spec validation tests in `CLRS.Ch33.Segments.ImplTest.fst` exercise all four
+functions with small concrete inputs. **All tests pass with zero admits and
+zero assumes.**
+
+| Function | Test | Result | Precision |
+|----------|------|--------|-----------|
+| `cross_product` | CCW/CW/Collinear | ✅ | Unique value determined |
+| `direction` | CCW case | ✅ | Unique value determined |
+| `on_segment` | Inside/outside/endpoints | ✅ | true/false determined |
+| `segments_intersect` | Crossing/non-crossing | ✅ | true/false determined |
+
+**Findings**: All postconditions of the form `result == spec(args)` are fully
+precise — the spec evaluates to a unique value for any concrete input.
+No specification weaknesses found. See `CLRS.Ch33.Segments.ImplTest.md` for details.
+
 ## Checklist (Priority Order)
 
 - [x] Pure specification matching CLRS §33.1
