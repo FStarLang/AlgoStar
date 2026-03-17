@@ -71,5 +71,6 @@ fn peek (#t:Type0) (s: stack t) (#contents: erased (list t))
   requires pure (Cons? (reveal contents))
   returns x: t
   ensures stack_inv s contents **
-          pure (exists (init:list t). L.append init [x] == reveal contents)
+          pure (Cons? (reveal contents) /\
+                (if Cons? (reveal contents) then x == L.last (reveal contents) else True))
 //SNIPPET_END: stack_ops

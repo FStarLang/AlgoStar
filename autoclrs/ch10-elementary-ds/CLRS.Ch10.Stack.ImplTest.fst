@@ -20,24 +20,6 @@ open CLRS.Ch10.Stack.Impl
 module SZ = FStar.SizeT
 module L  = FStar.List.Tot
 
-// Peek lemma: if exists init. L.append init [x] == [a;b;c], then x == c.
-// Since peek returns a Prims.exists, we need to eliminate it.
-let peek_last_3 (x: int)
-  : Lemma (requires exists (init:list int). L.append init [x] == [1; 2; 3])
-          (ensures  x == 3)
-  = let aux (init:list int) : Lemma (requires L.append init [x] == [1;2;3]) (ensures x == 3)
-      = L.append_length init [x]
-    in
-    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
-
-let peek_last_2 (x: int)
-  : Lemma (requires exists (init:list int). L.append init [x] == [1; 2])
-          (ensures  x == 2)
-  = let aux (init:list int) : Lemma (requires L.append init [x] == [1;2]) (ensures x == 2)
-      = L.append_length init [x]
-    in
-    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
-
 ```pulse
 (** Main spec-validation test for Stack.
 
@@ -74,26 +56,30 @@ fn test_stack_spec_validation ()
   let b1 = stack_empty s;
   assert (pure (b1 == false));
 
-  // 7. Pop — postcondition: exists* xs. stack_inv s xs ** pure (L.append xs [x] == [1;2;3])
+  // 7. Peek — postcondition: x == L.last [1;2;3] == 3
+  //    Direct assertion, no helper lemma needed
+  let top3 = peek s;
+  assert (pure (top3 == 3));
+
+  // 8. Pop — postcondition: exists* xs. stack_inv s xs ** pure (L.append xs [x] == [1;2;3])
   //    Z3 determines x3 == 3 and xs == [1;2]
   let x3 = pop s;
   assert (pure (x3 == 3));
 
-  // 8. Peek — postcondition: pure (exists init. L.append init [x] == [1;2])
-  //    Our lemma eliminates the Prims.exists to conclude top == 2
+  // 9. Peek — postcondition: x == L.last [1;2] == 2
+  //    Direct assertion, no helper lemma needed
   let top2 = peek s;
-  peek_last_2 top2;
   assert (pure (top2 == 2));
 
-  // 9. Pop — should be 2
+  // 10. Pop — should be 2
   let x2 = pop s;
   assert (pure (x2 == 2));
 
-  // 10. Pop — should be 1
+  // 11. Pop — should be 1
   let x1 = pop s;
   assert (pure (x1 == 1));
 
-  // 11. Stack should now be empty
+  // 12. Stack should now be empty
   let b2 = stack_empty s;
   assert (pure (b2 == true));
 

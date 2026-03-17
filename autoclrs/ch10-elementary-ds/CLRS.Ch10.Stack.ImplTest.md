@@ -23,11 +23,12 @@ then verifies all operations against concrete expected outputs.
 | 2 | `stack_empty` | `true` | ✅ |
 | 3–5 | `push 1`, `push 2`, `push 3` | Contents = `[1; 2; 3]` | ✅ |
 | 6 | `stack_empty` | `false` | ✅ |
-| 7 | `pop` | Returns `3` (LIFO) | ✅ |
-| 8 | `peek` | Returns `2` | ✅ |
-| 9 | `pop` | Returns `2` | ✅ |
-| 10 | `pop` | Returns `1` | ✅ |
-| 11 | `stack_empty` | `true` | ✅ |
+| 7 | `peek` | Returns `3` (LIFO top) | ✅ |
+| 8 | `pop` | Returns `3` (LIFO) | ✅ |
+| 9 | `peek` | Returns `2` | ✅ |
+| 10 | `pop` | Returns `2` | ✅ |
+| 11 | `pop` | Returns `1` | ✅ |
+| 12 | `stack_empty` | `true` | ✅ |
 
 ### What is proven
 
@@ -41,11 +42,12 @@ then verifies all operations against concrete expected outputs.
    successive pops. The append-based decomposition uniquely identifies the
    popped element.
 
-3. **Peek postcondition precision**: The peek postcondition
-   `pure (exists init. L.append init [x] == contents)` uses a `Prims.exists`
-   (not a sep-logic existential). An auxiliary lemma (`peek_last_2`) eliminates
-   the pure existential to prove `x == 2`. This demonstrates the postcondition
-   is precise but requires a small proof effort to extract the concrete value.
+3. **Peek postcondition precision**: The strengthened peek postcondition
+   `pure (Cons? contents /\ (if Cons? contents then x == L.last contents else True))`
+   directly identifies the top element as `L.last contents`. Z3 normalizes
+   `L.last [1;2;3]` to `3` and `L.last [1;2]` to `2` without any auxiliary
+   lemmas. This is a significant improvement over the original `Prims.exists`
+   formulation which required helper lemmas for classical elimination.
 
 4. **stack_empty precision**: Returns `true` iff the contents list is empty.
    Verified at both empty and non-empty states.
@@ -55,21 +57,21 @@ then verifies all operations against concrete expected outputs.
 
 ### Auxiliary lemmas needed
 
-- `peek_last_3`: Eliminates `Prims.exists` from peek on `[1;2;3]` → `x == 3`
-- `peek_last_2`: Eliminates `Prims.exists` from peek on `[1;2]` → `x == 2`
+**None.** The strengthened `peek` postcondition eliminates the need for helper
+lemmas. Previously, `peek_last_3` and `peek_last_2` were required to eliminate
+`Prims.exists` from the old `peek` postcondition. With the new direct `L.last`
+formulation, Z3 handles everything automatically.
 
-These are needed because `peek`'s postcondition uses `Prims.exists` rather than
-`exists*`. Z3 can handle the sep-logic `exists*` from `pop` directly, but the
-pure `exists` from `peek` requires explicit classical elimination.
+### Spec changes made
 
-### Spec issues found
-
-**None.** All preconditions are satisfiable and all postconditions are precise
-enough to determine concrete outputs. The specification is complete.
-
-**Minor observation**: The `peek` postcondition uses `Prims.exists` instead of
-returning the witness directly. This is a minor inconvenience (requires a helper
-lemma) but not a spec weakness — the postcondition is still precise.
+**peek postcondition strengthened** (2026-03-17):
+- **Before:** `pure (exists (init:list t). L.append init [x] == reveal contents)`
+  — Used `Prims.exists` (pure existential), requiring helper lemmas for
+  classical elimination in tests.
+- **After:** `pure (Cons? (reveal contents) /\ (if Cons? (reveal contents) then x == L.last (reveal contents) else True))`
+  — Directly specifies the return value as `L.last contents`, usable by Z3
+  without helper lemmas. The `if Cons?` guard makes the expression well-typed
+  even though `L.last` has a `{Cons? l}` refinement.
 
 ### Verification
 

@@ -25,6 +25,7 @@ concrete assertions.
 | 5 | `list_search hd 2` | `true` | ✅ |
 | 6 | `list_search hd 99` | `false` | ✅ |
 | 7 | `list_delete hd 2` | Contents = `[1; 3]` | ✅ |
+| 7a | `list_delete hd 99` (not found) | Contents = `[1; 3]` (unchanged) | ✅ |
 | 8 | `list_search hd 2` | `false` (after delete) | ✅ |
 | 9 | `list_search hd 1` | `true` | ✅ |
 | 10 | `list_search hd 3` | `true` | ✅ |
@@ -56,6 +57,11 @@ concrete assertions.
 6. **remove_first correctness**: The test indirectly validates that
    `remove_first k l` correctly removes only the first occurrence — after
    deleting 2 from `[1;2;3]`, elements 1 and 3 are still present.
+
+7. **Delete-not-found correctness** (added 2026-03-17): Deleting key 99 (not in
+   list) from `[1;3]` leaves the list unchanged (`remove_first 99 [1;3] == [1;3]`).
+   Subsequent searches confirm the list is unmodified. This validates that the
+   delete spec handles the "key not found" error case correctly.
 
 ### Auxiliary lemmas needed
 

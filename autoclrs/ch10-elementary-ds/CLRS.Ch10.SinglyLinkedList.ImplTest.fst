@@ -96,6 +96,10 @@ fn test_sll_spec_validation ()
   //    remove_first 2 [1;2;3] == [1;3]
   let hd = list_delete hd 2;
 
+  // 7a. Delete 99 (not in list) — list should be unchanged [1;3]
+  //     remove_first 99 [1;3] == [1;3]
+  let hd = list_delete hd 99;
+
   // 8. Search for 2 after delete — should be false
   let gone = list_search hd 2;
   assert (pure (gone == false));

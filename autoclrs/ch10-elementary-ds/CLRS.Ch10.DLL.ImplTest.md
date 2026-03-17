@@ -14,12 +14,17 @@ repository (spec-validation methodology from
 
 **File:** `CLRS.Ch10.DLL.ImplTest.fst`
 
-The test exercises two scenarios:
+The test exercises four scenarios:
 
 1. **Insert at head + search + delete**: Insert 3, 2, 1 at head → `[1;2;3]`.
-   Search (forward and backward), search_ptr, delete 2 → `[1;3]`. Delete all.
+   Search (forward and backward), search_ptr, delete 2 → `[1;3]`. Delete
+   non-existent key 99 → `[1;3]` unchanged. Delete all.
 2. **Insert at tail**: Insert 10 at head, 20 and 30 at tail → `[10;20;30]`.
    Verify via search, delete all.
+3. **list_delete_last**: Build `[1;2;1;3]` (duplicate keys), delete last
+   occurrence of 1 → `[1;2;3]`. Delete last of non-existent 99 → unchanged.
+4. **list_delete_node (by index)**: Build `[10;20;30]`, delete at index 1 →
+   `[10;30]`, delete at index 0 → `[30]`, delete at index 0 → empty.
 
 ### Operations tested
 
@@ -34,6 +39,7 @@ The test exercises two scenarios:
 | 8 | `list_search_ptr hd tl 1` | `Some?` | ✅ |
 | 9 | `list_search_ptr hd tl 42` | `None?` | ✅ |
 | 10 | `list_delete 2` | Contents = `[1; 3]` | ✅ |
+| 10a | `list_delete 99` (not found) | Contents = `[1; 3]` (unchanged) | ✅ |
 | 11 | `list_search hd tl 2` (after delete) | `false` | ✅ |
 | 12 | `list_search hd tl 1` | `true` | ✅ |
 | 13 | `list_search hd tl 3` | `true` | ✅ |
@@ -43,12 +49,22 @@ The test exercises two scenarios:
 | 18–20 | Search for 10, 20, 30 | All `true` | ✅ |
 | 21 | Search for 99 | `false` | ✅ |
 | 22–24 | Delete 10, 20, 30 | Contents = `[]` | ✅ |
+| 25–28 | Build `[1;2;1;3]`, `list_delete_last 1` | `[1;2;3]` | ✅ |
+| 29 | Search 1, 2, 3 in result | All `true` | ✅ |
+| 30 | `list_delete_last 99` (not found) | Unchanged | ✅ |
+| 31–33 | Delete all, build `[10;20;30]` | — | ✅ |
+| 34 | `list_delete_node 1` | `[10; 30]` | ✅ |
+| 35–37 | Search 10, 30 (`true`), 20 (`false`) | Correct | ✅ |
+| 38 | `list_delete_node 0` | `[30]` | ✅ |
+| 39 | `list_delete_node 0` | `[]` | ✅ |
+| 40 | `dll_nil_elim` | `hd == None /\ tl == None` | ✅ |
 
 ### What is proven
 
 1. **Precondition satisfiability**: All tested operations are successfully
    called: `dll_nil`, `list_insert`, `list_insert_tail`, `list_search`,
-   `list_search_back`, `list_search_ptr`, `list_delete`, `dll_nil_elim`.
+   `list_search_back`, `list_search_ptr`, `list_delete`, `list_delete_last`,
+   `list_delete_node`, `dll_nil_elim`.
 
 2. **list_insert postcondition precision**: Contents become `x :: l`. Directly
    precise.
@@ -66,24 +82,25 @@ The test exercises two scenarios:
    deleting 2 from `[1;2;3]`, the list is `[1;3]`. Confirmed by subsequent
    searches.
 
-7. **Ghost helpers**: `dll_nil` creates an empty DLL from `None/None` pointers.
-   `dll_nil_elim` recovers the pointer-is-None facts from an empty DLL. Both
-   work correctly.
+7. **Delete-not-found correctness**: Deleting key 99 (not in list) from
+   `[1;3]` leaves the list unchanged (`remove_first 99 [1;3] == [1;3]`).
+   Validates the error case where the key is absent.
 
-8. **Full round-trip**: Insert all elements, delete all elements, verify empty.
-   Works for both head-insert and tail-insert scenarios.
+8. **list_delete_last precision**: After deleting the last occurrence of 1
+   from `[1;2;1;3]`, the result is `[1;2;3]` — the first occurrence of 1 is
+   preserved while the second is removed. Also validates delete-last of a
+   non-existent key (99) leaves the list unchanged.
 
-### Operations NOT tested
+9. **list_delete_node precision**: Deleting at index 1 from `[10;20;30]`
+   removes the middle element (20), giving `[10;30]`. Successive deletions
+   at index 0 correctly remove elements until the list is empty.
 
-- `list_delete_last` (delete last occurrence) — not tested in this file.
-  The reference tests from intent-formalization did not include it. Could be
-  added in a follow-up.
-- `list_delete_node` (delete by index) — not tested. Requires passing a `nat`
-  index with `Cons? l` and `i < L.length l` preconditions, which requires
-  ghost-level knowledge of the current list length. Could be tested with
-  additional ghost tracking.
-- `dll_none_nil`, `dll_some_cons` ghost helpers — not explicitly tested but
-  available for client use.
+10. **Ghost helpers**: `dll_nil` creates an empty DLL from `None/None` pointers.
+    `dll_nil_elim` recovers the pointer-is-None facts from an empty DLL. Both
+    work correctly.
+
+11. **Full round-trip**: Insert all elements, delete all elements, verify empty.
+    Works for head-insert, tail-insert, delete-last, and delete-node scenarios.
 
 ### Auxiliary lemmas needed
 

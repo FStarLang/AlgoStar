@@ -91,6 +91,10 @@ fn test_dll_spec_validation ()
   // Delete 2 → list is [1; 3] (remove_first 2 [1;2;3] == [1;3])
   list_delete hd_ref tl_ref 2;
 
+  // Delete-not-found: delete 99 from [1;3] → list unchanged
+  //   remove_first 99 [1;3] == [1;3]
+  list_delete hd_ref tl_ref 99;
+
   // Search for 2 after delete — should be false
   let hd2 = !hd_ref;
   let tl2 = !tl_ref;
@@ -151,6 +155,92 @@ fn test_dll_spec_validation ()
   with hd_fin tl_fin.
     assert (pts_to hd_ref hd_fin ** pts_to tl_ref tl_fin ** dll hd_fin tl_fin _);
   drop_ (dll hd_fin tl_fin _);
+
+  // --- Scenario 3: list_delete_last ---
+  dll_nil None None;
+  hd_ref := None;
+  tl_ref := None;
+
+  // Build [1; 2; 1; 3] — note 1 appears twice
+  list_insert hd_ref tl_ref 3;
+  list_insert hd_ref tl_ref 1;
+  list_insert hd_ref tl_ref 2;
+  list_insert hd_ref tl_ref 1;
+
+  // delete_last 1 from [1;2;1;3] → removes the LAST 1 → [1;2;3]
+  //   remove_last 1 [1;2;1;3]: mem 1 [2;1;3] = true, so 1 :: remove_last 1 [2;1;3]
+  //     remove_last 1 [2;1;3]: mem 1 [1;3] = true, so 2 :: remove_last 1 [1;3]
+  //       remove_last 1 [1;3]: mem 1 [3] = false, hd=1=k, so [3]
+  //     → 2 :: [3] = [2;3]
+  //   → 1 :: [2;3] = [1;2;3]
+  list_delete_last hd_ref tl_ref 1;
+
+  // Verify: 1 still present (first occurrence preserved), 2 and 3 present
+  let hd4 = !hd_ref;
+  let tl4 = !tl_ref;
+  let f1_s3 = list_search hd4 tl4 1;
+  assert (pure (f1_s3 == true));
+  let f2_s3 = list_search hd4 tl4 2;
+  assert (pure (f2_s3 == true));
+  let f3_s3 = list_search hd4 tl4 3;
+  assert (pure (f3_s3 == true));
+
+  // delete_last of non-existent key — list unchanged
+  //   remove_last 99 [1;2;3] == [1;2;3]
+  list_delete_last hd_ref tl_ref 99;
+
+  // Still [1;2;3]
+  let hd4b = !hd_ref;
+  let tl4b = !tl_ref;
+  let f1_s3b = list_search hd4b tl4b 1;
+  assert (pure (f1_s3b == true));
+
+  // Clean up scenario 3
+  list_delete hd_ref tl_ref 1;
+  list_delete hd_ref tl_ref 2;
+  list_delete hd_ref tl_ref 3;
+
+  // --- Scenario 4: list_delete_node (delete by index) ---
+  // Build [10; 20; 30]
+  list_insert hd_ref tl_ref 30;
+  list_insert hd_ref tl_ref 20;
+  list_insert hd_ref tl_ref 10;
+
+  // Delete at index 1 → removes 20 → [10; 30]
+  //   remove_at 1 [10;20;30] = 10 :: remove_at 0 [20;30] = 10 :: [30] = [10;30]
+  list_delete_node hd_ref tl_ref 1;
+
+  // Verify: 10 and 30 present, 20 absent
+  let hd5 = !hd_ref;
+  let tl5 = !tl_ref;
+  let f10_s4 = list_search hd5 tl5 10;
+  assert (pure (f10_s4 == true));
+  let f30_s4 = list_search hd5 tl5 30;
+  assert (pure (f30_s4 == true));
+  let f20_s4 = list_search hd5 tl5 20;
+  assert (pure (f20_s4 == false));
+
+  // Delete at index 0 → removes 10 → [30]
+  //   remove_at 0 [10;30] = [30]
+  list_delete_node hd_ref tl_ref 0;
+
+  // Verify: only 30 remains
+  let hd6 = !hd_ref;
+  let tl6 = !tl_ref;
+  let f30_s4b = list_search hd6 tl6 30;
+  assert (pure (f30_s4b == true));
+  let f10_s4b = list_search hd6 tl6 10;
+  assert (pure (f10_s4b == false));
+
+  // Delete last element at index 0 → empty
+  list_delete_node hd_ref tl_ref 0;
+
+  // Verify empty
+  with hd_e tl_e.
+    assert (pts_to hd_ref hd_e ** pts_to tl_ref tl_e ** dll hd_e tl_e _);
+  dll_nil_elim hd_e tl_e;
+  assert (pure (hd_e == None /\ tl_e == None));
+
   ()
 }
 ```

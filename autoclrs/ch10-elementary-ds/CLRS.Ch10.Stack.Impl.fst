@@ -248,7 +248,8 @@ fn peek (#t:Type0) (s: stack t) (#contents: erased (list t))
   requires pure (Cons? (reveal contents))
   returns x: t
   ensures stack_inv s contents **
-          pure (exists (init:list t). L.append init [x] == reveal contents)
+          pure (Cons? (reveal contents) /\
+                (if Cons? (reveal contents) then x == L.last (reveal contents) else True))
 {
   unfold (stack_inv s contents);
   with arr_seq top_v. _;
@@ -264,7 +265,6 @@ fn peek (#t:Type0) (s: stack t) (#contents: erased (list t))
   assert (pure (SZ.v idx == L.length (reveal contents) - 1));
   assert (pure (elem == L.index (reveal contents) (L.length (reveal contents) - 1)));
   lemma_last_index (reveal contents);
-  lemma_init_last_append (reveal contents);
   assert (pure (elem == L.last (reveal contents)));
   
   // Restore invariant
