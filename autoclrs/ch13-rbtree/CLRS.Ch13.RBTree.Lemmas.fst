@@ -456,7 +456,54 @@ let rec bst_gt_not_mem (t: rbtree) (bound: int) (k: int)
     | Leaf -> ()
     | Node _ l v r -> bst_gt_not_mem l bound k; bst_gt_not_mem r bound k
 
+(*** Search Correctness ***)
+
+// BST search finds a member: search t k == Some k when mem k t
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+let rec search_mem (t: rbtree) (k: int)
+  : Lemma
+    (requires is_bst t /\ mem k t)
+    (ensures search t k == Some k)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k = v then ()
+      else if k < v then begin
+        bst_lt_not_mem r v k;
+        search_mem l k
+      end else begin
+        bst_gt_not_mem l v k;
+        search_mem r k
+      end
+#pop-options
+
+// BST search returns None for non-members (does not require is_bst)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+let rec search_not_mem (t: rbtree) (k: int)
+  : Lemma
+    (requires ~(mem k t))
+    (ensures search t k == None)
+    (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+      if k < v then search_not_mem l k
+      else if k > v then search_not_mem r k
+      else ()
+#pop-options
+
+// Combined search correctness: relates search to mem for a BST
+let search_correct (t: rbtree) (k: int)
+  : Lemma
+    (requires is_bst t)
+    (ensures (mem k t ==> search t k == Some k) /\
+             (~(mem k t) ==> search t k == None))
+  = FStar.Classical.move_requires (search_mem t) k;
+    FStar.Classical.move_requires (search_not_mem t) k
+
 (*** Successor / Predecessor Correctness ***)
+
 
 // Successor correctness: if successor returns Some s, then s > k and s is in the tree
 let rec successor_mem (t: rbtree) (k: int)

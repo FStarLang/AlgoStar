@@ -37,20 +37,60 @@ Normalizes the pure spec (`CLRS.Ch13.RBTree.Spec`) on concrete inputs using
 Exercises the full Pulse separation-logic API in sequence:
 
 1. **`rb_new()`** — creates empty tree with `valid_rbtree y S.Leaf`
-2. **`rb_insert_v tree 3`** — inserts 3; postcondition gives `valid_rbtree y (S.insert S.Leaf 3)` and `S.mem 3 ... = true`
+2. **`rb_insert_v tree 3`** — inserts 3; postcondition gives `valid_rbtree y (S.insert S.Leaf 3)`, `S.mem 3 ... = true`, and `S.search ... 3 == Some 3`
 3. **`rb_insert_v tree 1`** — inserts 1 into tree with 3
-4. **`rb_insert_v tree 2`** — inserts 2; triggers Okasaki rotation (RL case)
-5. **`rb_search_v tree 2`** — returns `r2`; asserts `r2 == Some 2` (postcondition precision)
-6. **`rb_search_v tree 4`** — returns `r4`; asserts `r4 == None` (negative case)
-7. **`rb_delete_v tree 1`** — deletes key 1; postcondition gives `S.mem 1 ... = false`
-8. **`rb_search_v tree 1`** — asserts result is `None` after deletion
-9. **`rb_search_v tree 3`** — asserts result is `Some 3` (remaining key)
+4. **`rb_insert_v tree 2`** — inserts 2; triggers Okasaki rotation (RL case). Postcondition directly establishes `S.search 'ft 2 == Some 2`
+5. **`rb_search_v tree 2`** — returns `r2`; asserts `r2 == Some 2` **directly from insert postcondition** (no helper lemma needed)
+6. **`rb_search_v tree 4`** — returns `r4`; asserts `r4 == None` via membership chain (`insert_mem` × 3) + search postcondition
+7. **`rb_delete_v tree 1`** — deletes key 1; postcondition gives `S.mem 1 ... = false` and `S.search ... 1 == None`
+8. **`rb_search_v tree 1`** — asserts `r1_after == None` **directly from delete postcondition** (no helper lemma needed)
+9. **`rb_search_v tree 3`** — asserts `r3_after == Some 3` via membership chain (`insert_mem` × 3 + `delete_mem`) + search postcondition
 10. **`free_valid_rbtree tree`** — frees all memory
 
-Each assertion is proven via helper lemmas that normalize the spec functions on
-concrete inputs using `assert_norm`, bridging the gap between the ghost tree
-expressions (compound terms like `S.insert (S.insert (S.insert S.Leaf 3) 1) 2`)
-and concrete expected values.
+---
+
+## Spec Strengthening (2026-03-17)
+
+### Problem Identified
+
+The original `Impl.fsti` postconditions had a gap: `rb_search_v` returned
+`result == S.search 'ft k`, and `rb_insert_v`/`rb_delete_v` returned
+membership facts (`S.mem k ... = true/false`), but there was **no lemma
+connecting `search` and `mem`** in the Lemmas module. This forced the test
+to rely on concrete `assert_norm` helper lemmas for every search assertion.
+
+### Changes Made
+
+1. **Added `search_mem` and `search_not_mem` lemmas to `Lemmas.fsti`/`Lemmas.fst`:**
+   - `search_mem`: `is_bst t /\ mem k t ==> search t k == Some k`
+   - `search_not_mem`: `~(mem k t) ==> search t k == None`
+   - `search_correct`: Combined form requiring only `is_bst t`
+
+2. **Strengthened `rb_search_v` postcondition:**
+   - Added: `(S.mem k 'ft ==> result == Some k) /\ (~(S.mem k 'ft) ==> result == None)`
+   - Clients can now determine the search result from membership alone
+
+3. **Strengthened `rb_insert_v` postcondition:**
+   - Added: `S.search (S.insert 'ft k) k == Some k`
+   - After inserting k, searching for k is guaranteed to return Some k
+
+4. **Strengthened `rb_delete_v` postcondition:**
+   - Added: `S.search (S.delete 'ft k) k == None`
+   - After deleting k, searching for k is guaranteed to return None
+
+5. **Same strengthening applied to complexity-aware API** (`rb_search_log`, `rb_insert_log`, `rb_delete_log`)
+
+### Impact on Test
+
+| Test Case | Before | After |
+|-----------|--------|-------|
+| Search for inserted key 2 | Required `assert_norm` helper | **Direct from postcondition** ✅ |
+| Search for non-existing key 4 | Required `assert_norm` helper | Uses `insert_mem` chain + postcondition ✅ |
+| Search for deleted key 1 | Required `assert_norm` helper | **Direct from postcondition** ✅ |
+| Search for remaining key 3 | Required `assert_norm` helper | Uses `delete_mem` chain + postcondition ✅ |
+
+The key improvement: for same-key operations (insert-then-search, delete-then-search),
+the postconditions are now **self-sufficient** — no normalization or helper lemmas needed.
 
 ---
 
@@ -68,19 +108,19 @@ All preconditions are satisfiable in natural usage. **No issues found.**
 
 ### Postconditions
 - **`rb_insert_v`**: Returns `valid_rbtree y (S.insert 'ft k)` and
-  `S.mem k (S.insert 'ft k) = true`. The tree shape is completely determined
-  by the spec function `S.insert`, which is deterministic. **Fully precise.**
-- **`rb_search_v`**: Returns `result == S.search 'ft k`. The result is
-  uniquely determined. **Fully precise.**
+  `S.mem k (S.insert 'ft k) = true` and `S.search (S.insert 'ft k) k == Some k`.
+  The tree shape is completely determined by `S.insert`, and the search
+  connection is directly established. **Fully precise.**
+- **`rb_search_v`**: Returns `result == S.search 'ft k` with explicit
+  membership implications. **Fully precise.**
 - **`rb_delete_v`**: Returns `valid_rbtree y (S.delete 'ft k)` and
-  `S.mem k (S.delete 'ft k) = false`. The tree shape is completely determined
-  by `S.delete`. **Fully precise.**
+  `S.mem k (S.delete 'ft k) = false` and `S.search (S.delete 'ft k) k == None`.
+  **Fully precise.**
 
 ### Verdict
 
-The `Impl.fsti` specification is **complete and precise**:
+The strengthened `Impl.fsti` specification is **complete and precise**:
 - All preconditions are satisfiable
 - All postconditions uniquely determine the output for any concrete input
-- No spec imprecision or incompleteness issues found
-- The functional spec (`Spec.fst`) correctly implements Okasaki-style insertion
-  with rotation and Kahrs-style deletion with rebalancing
+- The search↔membership connection is directly exposed in postconditions
+- Same-key insert/search and delete/search patterns require zero helper lemmas

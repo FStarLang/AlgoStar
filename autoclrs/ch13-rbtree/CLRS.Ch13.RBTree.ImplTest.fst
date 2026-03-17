@@ -84,22 +84,23 @@ let _ = assert_norm (S.search t5 3 == Some 3)
 
 #push-options "--fuel 8 --ifuel 2 --z3rlimit 100"
 
-// Helper lemma: after inserting 3, 1, 2 into empty tree, searching for 2 returns Some 2
-let search_insert_3_1_2_for_2 ()
-  : Lemma (S.search (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 2 == Some 2)
-  = assert_norm (S.search (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 2 == Some 2)
+// Helper: membership lemma chain establishes mem 4 (insert(insert(insert Leaf 3) 1) 2) = false
+// (Still needed for non-existing key tests where the postcondition gives
+//  ~(S.mem k 'ft) ==> result == None, but we must establish ~(S.mem k 'ft))
+let mem_4_not_in_t3 ()
+  : Lemma (S.mem 4 (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) = false)
+  = L.insert_mem S.Leaf 3 4;
+    L.insert_mem (S.insert S.Leaf 3) 1 4;
+    L.insert_mem (S.insert (S.insert S.Leaf 3) 1) 2 4
 
-let search_insert_3_1_2_for_4 ()
-  : Lemma (S.search (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 4 == None)
-  = assert_norm (S.search (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 4 == None)
-
-let search_delete_1_from_3_1_2_for_1 ()
-  : Lemma (S.search (S.delete (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 1) 1 == None)
-  = assert_norm (S.search (S.delete (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 1) 1 == None)
-
-let search_delete_1_from_3_1_2_for_3 ()
-  : Lemma (S.search (S.delete (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 1) 3 == Some 3)
-  = assert_norm (S.search (S.delete (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 1) 3 == Some 3)
+// Helper: after deleting 1, key 3 is still a member
+// (Demonstrates cross-key reasoning via insert_mem + delete_mem)
+let mem_3_after_delete_1 ()
+  : Lemma (S.mem 3 (S.delete (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 1) = true)
+  = L.insert_mem S.Leaf 3 3;
+    L.insert_mem (S.insert S.Leaf 3) 1 3;
+    L.insert_mem (S.insert (S.insert S.Leaf 3) 1) 2 3;
+    L.delete_mem (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) 1 3
 
 ```pulse
 (** test_rbtree_insert_search_delete
@@ -108,16 +109,16 @@ let search_delete_1_from_3_1_2_for_3 ()
  * rb_delete_v, and free_valid_rbtree on a concrete 3-element instance.
  *
  * Proves:
- *  1. Precondition of rb_new is satisfiable (emp)
- *  2. Precondition of rb_insert_v is satisfiable after rb_new
- *  3. Postcondition of rb_search_v is precise: searching for key 2
- *     in tree {1,2,3} returns exactly Some 2
- *  4. Postcondition of rb_search_v is precise: searching for key 4
- *     (not in tree) returns exactly None
- *  5. Postcondition of rb_delete_v: after deleting key 1, search for 1
- *     returns None
- *  6. Postcondition of rb_delete_v: remaining keys (3) still searchable
- *  7. Memory is properly freed via free_valid_rbtree
+ *  1. Preconditions are satisfiable (rb_new → rb_insert_v → rb_search_v → rb_delete_v)
+ *  2. After insert, searching for the inserted key returns Some k
+ *     — derived DIRECTLY from strengthened postcondition (no assert_norm helper)
+ *  3. After insert, searching for a non-existing key returns None
+ *     — derived from postcondition + insert_mem chain
+ *  4. After delete, searching for the deleted key returns None
+ *     — derived DIRECTLY from strengthened postcondition (no assert_norm helper)
+ *  5. After delete, remaining keys are still searchable
+ *     — derived from postcondition + delete_mem + insert_mem chain
+ *  6. Memory is properly freed via free_valid_rbtree
  *)
 fn test_rbtree_insert_search_delete ()
   requires emp
@@ -130,38 +131,41 @@ fn test_rbtree_insert_search_delete ()
   // 2. Insert keys: 3, 1, 2
   let tree1 = I.rb_insert_v tree0 3;
   // Postcondition gives: valid_rbtree tree1 (S.insert S.Leaf 3)
-  //                       S.mem 3 (S.insert S.Leaf 3) = true
+  //   + S.mem 3 (S.insert S.Leaf 3) = true
+  //   + S.search (S.insert S.Leaf 3) 3 == Some 3       ← NEW
 
   let tree2 = I.rb_insert_v tree1 1;
-  // Postcondition gives: valid_rbtree tree2 (S.insert (S.insert S.Leaf 3) 1)
-  //                       S.mem 1 (S.insert (S.insert S.Leaf 3) 1) = true
 
   let tree3 = I.rb_insert_v tree2 2;
   // Postcondition gives: valid_rbtree tree3 (S.insert (S.insert (S.insert S.Leaf 3) 1) 2)
-  //                       S.mem 2 (S.insert (S.insert (S.insert S.Leaf 3) 1) 2) = true
+  //   + S.mem 2 ... = true
+  //   + S.search ... 2 == Some 2                        ← NEW
 
-  // 3. Search for existing key 2 — postcondition says result == S.search 'ft 2
+  // 3. Search for existing key 2 — postcondition of rb_insert_v already
+  //    established S.search 'ft 2 == Some 2, so rb_search_v directly gives r2 == Some 2.
+  //    NO helper lemma or assert_norm needed!
   let r2 = I.rb_search_v tree3 2;
-  search_insert_3_1_2_for_2 ();
   assert (pure (r2 == Some 2));
 
-  // 4. Search for non-existing key 4 — should be None
+  // 4. Search for non-existing key 4 — postcondition gives
+  //    ~(S.mem 4 'ft) ==> r4 == None; we establish ~(S.mem 4 'ft) via insert_mem chain
   let r4 = I.rb_search_v tree3 4;
-  search_insert_3_1_2_for_4 ();
+  mem_4_not_in_t3 ();
   assert (pure (r4 == None));
 
-  // 5. Delete key 1
+  // 5. Delete key 1 — postcondition gives S.search (S.delete 'ft 1) 1 == None   ← NEW
   let tree4 = I.rb_delete_v tree3 1;
-  // Postcondition gives: S.mem 1 (S.delete ... 1) = false
 
-  // 6. Search for deleted key 1 — should be None
+  // 6. Search for deleted key 1 — postcondition of rb_delete_v already
+  //    established S.search 'ft 1 == None, so rb_search_v directly gives r1_after == None.
+  //    NO helper lemma or assert_norm needed!
   let r1_after = I.rb_search_v tree4 1;
-  search_delete_1_from_3_1_2_for_1 ();
   assert (pure (r1_after == None));
 
-  // 7. Search for remaining key 3 — should still be found
+  // 7. Search for remaining key 3 — we establish S.mem 3 'ft via
+  //    insert_mem + delete_mem chain, then postcondition gives r3_after == Some 3
   let r3_after = I.rb_search_v tree4 3;
-  search_delete_1_from_3_1_2_for_3 ();
+  mem_3_after_delete_1 ();
   assert (pure (r3_after == Some 3));
 
   // 8. Clean up: free all memory

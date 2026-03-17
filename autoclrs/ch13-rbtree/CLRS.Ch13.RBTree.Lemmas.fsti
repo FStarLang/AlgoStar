@@ -156,6 +156,24 @@ val bst_gt_not_mem (t: rbtree) (bound: int) (k: int)
   : Lemma (requires all_lt t bound /\ k >= bound)
           (ensures mem k t = false)
 
+// ========== Search Correctness ==========
+
+/// BST search finds a member: search t k == Some k when mem k t
+val search_mem (t: rbtree) (k: int)
+  : Lemma (requires is_bst t /\ mem k t)
+          (ensures search t k == Some k)
+
+/// BST search returns None for non-members
+val search_not_mem (t: rbtree) (k: int)
+  : Lemma (requires ~(mem k t))
+          (ensures search t k == None)
+
+/// Combined search correctness: relates search to mem for a BST
+val search_correct (t: rbtree) (k: int)
+  : Lemma (requires is_bst t)
+          (ensures (mem k t ==> search t k == Some k) /\
+                   (~(mem k t) ==> search t k == None))
+
 // ========== Successor / Predecessor Correctness ==========
 
 val successor_mem (t: rbtree) (k: int)

@@ -1211,9 +1211,12 @@ fn rb_new ()
 fn rb_search_v (tree: rb_ptr) (k: int)
   preserves valid_rbtree tree 'ft
   returns result: option int
-  ensures pure (result == S.search 'ft k)
+  ensures pure (result == S.search 'ft k /\
+                (S.mem k 'ft ==> result == Some k) /\
+                (~(S.mem k 'ft) ==> result == None))
 {
   unfold valid_rbtree;
+  L.search_correct 'ft k;
   let result = rb_search tree k;
   fold (valid_rbtree tree 'ft);
   result
@@ -1226,12 +1229,14 @@ fn rb_insert_v (tree: rb_ptr) (k: int)
   requires valid_rbtree tree 'ft
   returns y: rb_ptr
   ensures valid_rbtree y (S.insert 'ft k) **
-          pure (S.mem k (S.insert 'ft k) = true)
+          pure (S.mem k (S.insert 'ft k) = true /\
+                S.search (S.insert 'ft k) k == Some k)
 {
   unfold valid_rbtree;
   L.insert_preserves_bst 'ft k;
   L.insert_is_rbtree 'ft k;
   L.insert_mem 'ft k k;
+  L.search_correct (S.insert 'ft k) k;
   let y = rb_insert tree k;
   fold (valid_rbtree y (S.insert 'ft k));
   y
@@ -1244,12 +1249,14 @@ fn rb_delete_v (tree: rb_ptr) (k: int)
   requires valid_rbtree tree 'ft
   returns y: rb_ptr
   ensures valid_rbtree y (S.delete 'ft k) **
-          pure (S.mem k (S.delete 'ft k) = false)
+          pure (S.mem k (S.delete 'ft k) = false /\
+                S.search (S.delete 'ft k) k == None)
 {
   unfold valid_rbtree;
   L.delete_preserves_bst 'ft k;
   L.delete_is_rbtree 'ft k;
   L.delete_mem 'ft k k;
+  L.search_correct (S.delete 'ft k) k;
   let y = rb_delete tree k;
   fold (valid_rbtree y (S.delete 'ft k));
   y
@@ -1276,9 +1283,12 @@ fn rb_search_log (tree: rb_ptr) (k: int)
   preserves valid_rbtree tree 'ft
   returns result: option int
   ensures pure (result == S.search 'ft k /\
+                (S.mem k 'ft ==> result == Some k) /\
+                (~(S.mem k 'ft) ==> result == None) /\
                 C.search_ticks 'ft k <= S.height 'ft + 1)
 {
   unfold valid_rbtree;
+  L.search_correct 'ft k;
   C.search_ticks_bounded 'ft k;
   let result = rb_search tree k;
   fold (valid_rbtree tree 'ft);
@@ -1291,12 +1301,14 @@ fn rb_insert_log (tree: rb_ptr) (k: int)
   returns y: rb_ptr
   ensures valid_rbtree y (S.insert 'ft k) **
           pure (S.mem k (S.insert 'ft k) = true /\
+                S.search (S.insert 'ft k) k == Some k /\
                 C.insert_ticks 'ft k <= S.height 'ft + 2)
 {
   unfold valid_rbtree;
   L.insert_preserves_bst 'ft k;
   L.insert_is_rbtree 'ft k;
   L.insert_mem 'ft k k;
+  L.search_correct (S.insert 'ft k) k;
   C.insert_ticks_bounded 'ft k;
   let y = rb_insert tree k;
   fold (valid_rbtree y (S.insert 'ft k));
@@ -1309,12 +1321,14 @@ fn rb_delete_log (tree: rb_ptr) (k: int)
   returns y: rb_ptr
   ensures valid_rbtree y (S.delete 'ft k) **
           pure (S.mem k (S.delete 'ft k) = false /\
+                S.search (S.delete 'ft k) k == None /\
                 C.delete_ticks 'ft k <= 2 * S.height 'ft + 2)
 {
   unfold valid_rbtree;
   L.delete_preserves_bst 'ft k;
   L.delete_is_rbtree 'ft k;
   L.delete_mem 'ft k k;
+  L.search_correct (S.delete 'ft k) k;
   C.delete_ticks_bounded 'ft k;
   let y = rb_delete tree k;
   fold (valid_rbtree y (S.delete 'ft k));

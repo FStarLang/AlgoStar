@@ -127,25 +127,46 @@ small concrete instance (insert keys 3, 1, 2 into empty tree; search; delete).
 | Preconditions satisfiable | ✅ all verified |
 | Postconditions precise (concrete outputs match expected) | ✅ all verified |
 
+### Spec Strengthening
+
+The initial review identified a gap: the `Impl.fsti` postconditions lacked
+a direct connection between `search` and `mem`. The test relied on ad-hoc
+`assert_norm` helpers for every search assertion. Strengthening addressed this:
+
+1. **New lemmas** in `Lemmas.fsti`/`Lemmas.fst`:
+   - `search_mem`: `is_bst t ∧ mem k t ⟹ search t k == Some k`
+   - `search_not_mem`: `¬(mem k t) ⟹ search t k == None`
+   - `search_correct`: Combined form requiring only `is_bst t`
+
+2. **Stronger postconditions** in `Impl.fsti`:
+   - `rb_search_v`: Adds `(mem k 'ft ==> result == Some k) ∧ (¬(mem k 'ft) ==> result == None)`
+   - `rb_insert_v`: Adds `search (insert 'ft k) k == Some k`
+   - `rb_delete_v`: Adds `search (delete 'ft k) k == None`
+   - Same strengthening applied to complexity-aware API
+
+3. **Improved test**: Same-key insert/search and delete/search patterns now
+   require **zero helper lemmas** — the postconditions are self-sufficient.
+
 ### Spec Quality Assessment
 
-- **No spec incompleteness found**: All preconditions are satisfiable in natural usage.
-- **No spec imprecision found**: All postconditions uniquely determine the output
-  for any concrete input. `rb_search_v` returns the exact result of `S.search`,
-  `rb_insert_v` and `rb_delete_v` return the exact tree produced by `S.insert`
-  and `S.delete`.
+- **Spec gap found and fixed**: Missing `search`↔`mem` connection in Lemmas.
+  Postconditions now directly expose this relationship.
+- **No remaining spec incompleteness**: All preconditions satisfiable,
+  all postconditions uniquely determine outputs.
 - **Duplicate insert**: `S.insert t k` when `mem k t` is an identity (proven
   by `insert_duplicate` lemma in Lemmas.fst); the test verifies this on concrete input.
 - **Delete non-existing key**: `S.delete t 99` preserves all keys; verified on concrete input.
 
-### Files Added
+### Files Added/Modified
 
 | File | Purpose |
 |------|---------|
-| `CLRS.Ch13.RBTree.ImplTest.fst` | Spec validation test for Okasaki Impl.fsti (zero admits) |
-| `CLRS.Ch13.RBTree.ImplTest.md` | Detailed test documentation for Okasaki API |
-| `CLRS.Ch13.RBTree.CLRSImplTest.fst` | Spec validation test for CLRS CLRSImpl.fsti (zero admits) |
-| `CLRS.Ch13.RBTree.CLRSImplTest.md` | Detailed test documentation for CLRS API |
+| `CLRS.Ch13.RBTree.Lemmas.fsti` | Added `search_mem`, `search_not_mem`, `search_correct` |
+| `CLRS.Ch13.RBTree.Lemmas.fst` | Proofs for search correctness lemmas |
+| `CLRS.Ch13.RBTree.Impl.fsti` | Strengthened postconditions for search/insert/delete |
+| `CLRS.Ch13.RBTree.Impl.fst` | Updated proofs to call `search_correct` |
+| `CLRS.Ch13.RBTree.ImplTest.fst` | Updated test leveraging stronger postconditions |
+| `CLRS.Ch13.RBTree.ImplTest.md` | Updated documentation |
 
 ### Notable Finding
 
