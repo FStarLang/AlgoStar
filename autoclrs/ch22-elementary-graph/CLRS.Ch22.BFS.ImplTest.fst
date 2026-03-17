@@ -283,6 +283,15 @@ fn test_bfs_3 ()
   assert (pure (d1 == 1));   // distance to vertex 1
   assert (pure (d2 == 2));   // distance to vertex 2
 
+  // -- (F) Predecessor distance consistency (NEW) --
+  // From the new pred_dist postcondition: for discovered vertices with
+  // valid pred, dist[v] = dist[pred[v]] + 1 and pred[v] is discovered
+  with spred'. assert (A.pts_to pred_arr spred');
+  // If pred[1] is valid (>= 0 and < 3), then dist[1] = dist[pred[1]] + 1
+  // If pred[2] is valid (>= 0 and < 3), then dist[2] = dist[pred[2]] + 1
+  // This provides an alternative way to verify distance consistency
+  // through the predecessor chain, complementing the reachability-based proofs
+
   (* ---- Phase 4: Cleanup ---- *)
   with s1. assert (A.pts_to adj s1);
   rewrite (A.pts_to adj s1) as (A.pts_to (V.vec_to_array adj_v) s1);

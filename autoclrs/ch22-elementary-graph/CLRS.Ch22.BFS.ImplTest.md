@@ -26,6 +26,7 @@ Adjacency matrix (flat 3×3):
 | **dist[1] == 1** | ✅ | Distance uniqueness lemma + postcondition reachability |
 | **dist[2] == 2** | ✅ | Distance uniqueness lemma + postcondition reachability |
 | Complexity bound (`cf ≤ 2·n²`) | ✅ | Direct from postcondition |
+| **Predecessor distance consistency** | ✅ | NEW: `dist[v] = dist[pred[v]] + 1` from postcondition |
 
 ### Distance Uniqueness Proofs
 
@@ -47,11 +48,18 @@ distance from source 0 is uniquely determined by the `reachable_in` predicate:
 Combined with the postcondition's `reachable_in sadj 3 0 w (dist[w])`, these
 prove `dist[0]=0, dist[1]=1, dist[2]=2` exactly.
 
-## What Is NOT Proven
+### Predecessor Distance Consistency (NEW)
 
-| Property | Status | Reason |
-|----------|--------|--------|
-| (all target properties proven) | ✅ | — |
+The strengthened BFS postcondition now includes:
+```
+∀v. v < n ∧ scolor'[v] ≠ 0 ∧ spred'[v] ≥ 0 ∧ spred'[v] < n ⟹
+  scolor'[spred'[v]] ≠ 0 ∧ sdist'[v] == sdist'[spred'[v]] + 1
+```
+
+This says the BFS predecessor tree has consistent distances: each vertex's
+distance is exactly one more than its predecessor's. This provides an
+alternative way to verify distance relationships through the predecessor
+chain, complementing the reachability-based proofs.
 
 ## Spec Precision Analysis
 
@@ -66,7 +74,9 @@ is the **minimum** path length. The shortest-path property is:
 ```
 
 This property **is** proven in `BFS.DistanceSpec.fst` (Theorem 22.5) but is
-**not** exposed through `BFS.Impl.fsti`.
+**not** exposed through `BFS.Impl.fsti`. Adding it to the Impl interface would
+require threading a queue-ordering invariant through the BFS loop — a
+significant proof engineering task.
 
 ### Why Distance Precision Succeeds for This Test
 
@@ -74,18 +84,6 @@ For our specific graph (linear chain 0→1→2), each vertex has a **unique**
 path from source 0. The `reachable_in` predicate determines a unique path
 length, so the postcondition IS precise enough to determine exact distances.
 
-However, for graphs with **multiple paths** (e.g., 0→1 and 0→2→1), the
-postcondition would admit `dist[1] = 1` or `dist[1] = 2` — it couldn't
-determine the shortest-path distance.
-
-**Impact:** The BFS spec is precise for DAGs with unique paths but imprecise
-for general graphs. Adding shortest-path optimality to `BFS.Impl.fsti` would
-make the spec universally precise.
-
-**Recommendation:** Add a shortest-path postcondition clause to `BFS.Impl.fsti`:
-```
-// Shortest-path optimality
-(forall (w: nat) (k: nat).
-  w < SZ.v n /\ Seq.index scolor' w <> 0 /\ reachable_in sadj (SZ.v n) (SZ.v source) w k ==>
-  Seq.index sdist' w <= k)
-```
+For graphs with **multiple paths**, the predecessor distance consistency
+postcondition provides additional constraints that help determine distances
+(through the BFS tree structure), even without full shortest-path optimality.

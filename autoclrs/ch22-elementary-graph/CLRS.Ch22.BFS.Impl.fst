@@ -232,6 +232,49 @@ let dist_reachable (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (sour
       Seq.index sdist w >= 0 /\
       reachable_in adj n source w (Seq.index sdist w))
 
+(* Predecessor distance consistency: dist[v] = dist[pred[v]] + 1 for discovered vertices with valid preds *)
+let pred_dist_ok (scolor sdist spred: Seq.seq int) (n: nat) : prop =
+  Seq.length scolor >= n /\ Seq.length sdist >= n /\ Seq.length spred >= n /\
+  (forall (v:nat). {:pattern (Seq.index spred v)}
+    v < n /\ Seq.index scolor v <> 0 /\ Seq.index spred v >= 0 /\ Seq.index spred v < n ==>
+    Seq.index scolor (Seq.index spred v) <> 0 /\
+    Seq.index sdist v == Seq.index sdist (Seq.index spred v) + 1)
+
+(* Source initialization preserves pred_dist_ok (no non-WHITE vertex has valid pred yet) *)
+let init_pred_dist_ok (scolor sdist spred: Seq.seq int) (n source: nat)
+  : Lemma
+    (requires n <= Seq.length scolor /\ n <= Seq.length sdist /\ n <= Seq.length spred /\
+              source < n /\
+              (forall (j:nat). j < n ==> Seq.index scolor j == 0) /\
+              (forall (j:nat). j < n ==> Seq.index spred j == (-1)))
+    (ensures pred_dist_ok (Seq.upd scolor source 1) (Seq.upd sdist source 0)
+                          (Seq.upd spred source (-1)) n)
+  = ()  // source has pred = -1 (< 0), so the implication is vacuously true for source.
+        // All other vertices are WHITE, so the implication is vacuously true for them.
+
+(* Discovering vertex j from u preserves pred_dist_ok *)
+let discover_preserves_pred_dist_ok
+  (scolor sdist spred: Seq.seq int) (n u j: nat) (du: int)
+  : Lemma
+    (requires
+      pred_dist_ok scolor sdist spred n /\
+      j < n /\ u < n /\ n <= Seq.length scolor /\ n <= Seq.length sdist /\ n <= Seq.length spred /\
+      Seq.index scolor j == 0 /\ Seq.index scolor u <> 0 /\
+      Seq.index sdist u == du /\ du >= 0)
+    (ensures
+      pred_dist_ok (Seq.upd scolor j 1) (Seq.upd sdist j (du + 1)) (Seq.upd spred j u) n)
+  = ()  // For w != j: color, dist, pred unchanged. Pred's color unchanged. All equalities preserved.
+        // For w == j: pred[j] = u (non-WHITE), dist[j] = du+1 = dist[u]+1 = dist[pred[j]]+1. ✓
+
+(* Blackening preserves pred_dist_ok — only changes color, not dist or pred *)
+let blacken_preserves_pred_dist_ok
+  (scolor sdist spred: Seq.seq int) (n u: nat)
+  : Lemma
+    (requires pred_dist_ok scolor sdist spred n /\ u < n /\ n <= Seq.length scolor /\
+              Seq.index scolor u <> 0)
+    (ensures pred_dist_ok (Seq.upd scolor u 2) sdist spred n)
+  = ()
+
 (* ================================================================
    PREDICATE LEMMAS — Key reasoning steps for BFS proof
    ================================================================ *)
@@ -622,6 +665,7 @@ fn discover_vertex
       SZ.v vtail' == SZ.v vtail + 1 /\
       scolor' == Seq.upd scolor (SZ.v vv) 1 /\
       sdist' == Seq.upd sdist (SZ.v vv) (du + 1) /\
+      spred' == Seq.upd spred (SZ.v vv) (SZ.v u) /\
       squeue' == Seq.upd squeue (SZ.v vtail) vv /\
       dist_ok scolor' sdist' (SZ.v n)
     )
@@ -685,7 +729,8 @@ fn maybe_discover
       // Completeness predicates
       queue_gray_unique scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) /\
       scanned_all sadj (SZ.v n) scolor /\
-      scanned_partial sadj (SZ.v n) scolor (SZ.v u) (SZ.v vv)
+      scanned_partial sadj (SZ.v n) scolor (SZ.v u) (SZ.v vv) /\
+      pred_dist_ok scolor sdist spred (SZ.v n)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
     A.pts_to adj sadj **
@@ -717,6 +762,7 @@ fn maybe_discover
       queue_gray_unique scolor' squeue' (SZ.v n) (SZ.v head) (SZ.v vtail') /\
       scanned_all sadj (SZ.v n) scolor' /\
       scanned_partial sadj (SZ.v n) scolor' (SZ.v u) (SZ.v vv + 1) /\
+      pred_dist_ok scolor' sdist' spred' (SZ.v n) /\
       count_gray scolor' (SZ.v n) == count_gray scolor (SZ.v n) + (SZ.v vtail' - SZ.v vtail) /\
       // Queue frame: entries below vtail unchanged
       (forall (i:nat). {:pattern (Seq.index squeue' i)}
@@ -734,6 +780,7 @@ fn maybe_discover
     // Edge exists and vv is WHITE: discover vv from u
     product_strict_bound (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vv);
     discover_preserves_dist_reachable sadj (SZ.v n) scolor sdist (SZ.v source) (SZ.v u) (SZ.v vv) du;
+    discover_preserves_pred_dist_ok scolor sdist spred (SZ.v n) (SZ.v u) (SZ.v vv) du;
 
     // Completeness lemma calls (before mutation)
     discover_preserves_scanned_all sadj scolor (SZ.v n) (SZ.v vv);
@@ -819,6 +866,12 @@ fn queue_bfs
       // Completeness: every reachable vertex is discovered
       (forall (v: nat) (k: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v k ==>
         Seq.index scolor' v <> 0) /\
+      // Predecessor distance consistency: for discovered non-source vertices,
+      // dist[v] = dist[pred[v]] + 1 and pred[v] is also discovered
+      (forall (v: nat). v < SZ.v n /\ Seq.index scolor' v <> 0 /\
+        Seq.index spred' v >= 0 /\ Seq.index spred' v < SZ.v n ==>
+        Seq.index scolor' (Seq.index spred' v) <> 0 /\
+        Seq.index sdist' v == Seq.index sdist' (Seq.index spred' v) + 1) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
@@ -858,6 +911,7 @@ fn queue_bfs
   // Step 2: Initialize source — witness all-zeros state first for count_nonwhite
   with scolor_zeros. assert (A.pts_to color scolor_zeros);
   with sdist_zeros. assert (A.pts_to dist sdist_zeros);
+  with spred_zeros. assert (A.pts_to pred spred_zeros);
   A.op_Array_Assignment color source 1;    // s.color = GRAY
   A.op_Array_Assignment dist source 0;     // s.d = 0
   A.op_Array_Assignment pred source (-1);  // s.pi = NIL
@@ -877,6 +931,7 @@ fn queue_bfs
   discover_preserves_scanned_all sadj scolor_zeros (SZ.v n) (SZ.v source);
   count_gray_all_zero scolor_zeros (SZ.v n);
   count_gray_upd_to_gray scolor_zeros (SZ.v n) (SZ.v source);
+  init_pred_dist_ok scolor_zeros sdist_zeros spred_zeros (SZ.v n) (SZ.v source);
 
   // Step 4: Main BFS loop
   while (
@@ -908,6 +963,7 @@ fn queue_bfs
       // Completeness predicates
       queue_gray_unique scolor_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail) /\
       scanned_all sadj (SZ.v n) scolor_q /\
+      pred_dist_ok scolor_q sdist_q spred_q (SZ.v n) /\
       count_gray scolor_q (SZ.v n) == SZ.v vtail - SZ.v vhead /\
       // Complexity: vhead * (n+1) ticks so far
       vc >= reveal c0 /\
@@ -971,6 +1027,7 @@ fn queue_bfs
         queue_gray_unique scolor_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) /\
         scanned_all sadj (SZ.v n) scolor_v /\
         scanned_partial sadj (SZ.v n) scolor_v (SZ.v u) (SZ.v vv) /\
+        pred_dist_ok scolor_v sdist_v spred_v (SZ.v n) /\
         count_gray scolor_v (SZ.v n) == SZ.v vtail2 - SZ.v vhead /\
         // u not in active queue [vhead+1, vtail2)
         (forall (i:nat). {:pattern (Seq.index squeue_v i)}
@@ -1034,6 +1091,7 @@ fn queue_bfs
     with scolor_pre_black. assert (A.pts_to color scolor_pre_black);
     with sdist_pre_black. assert (A.pts_to dist sdist_pre_black);
     with squeue_pre_black. assert (A.pts_to queue_data squeue_pre_black);
+    with spred_pre_black. assert (A.pts_to pred spred_pre_black);
     with vtail_pre_black. assert (R.pts_to q_tail vtail_pre_black);
 
     // Prove preservation lemmas for blackening
@@ -1052,6 +1110,7 @@ fn queue_bfs
     blacken_preserves_queue_gray_unique scolor_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (SZ.v u);
     blacken_preserves_scanned_all sadj scolor_pre_black (SZ.v n) (SZ.v u);
     count_gray_upd_from_gray scolor_pre_black (SZ.v n) (SZ.v u);
+    blacken_preserves_pred_dist_ok scolor_pre_black sdist_pre_black spred_pre_black (SZ.v n) (SZ.v u);
     
     A.op_Array_Assignment color u 2;
 
@@ -1070,6 +1129,8 @@ fn queue_bfs
   assert (pure (source_ok scolor_final sdist_final (SZ.v source) (SZ.v n)));
   assert (pure (dist_ok scolor_final sdist_final (SZ.v n)));
   assert (pure (dist_reachable sadj (SZ.v n) scolor_final sdist_final (SZ.v source)));
+  with spred_final. assert (A.pts_to pred spred_final);
+  assert (pure (pred_dist_ok scolor_final sdist_final spred_final (SZ.v n)));
   assert (pure (Seq.index scolor_final (SZ.v source) <> 0));
   assert (pure (Seq.index sdist_final (SZ.v source) == 0));
   assert (pure (forall (w: nat). w < SZ.v n /\ Seq.index scolor_final w <> 0 ==> Seq.index sdist_final w >= 0));
@@ -1088,6 +1149,10 @@ fn queue_bfs
   // Apply completeness_lemma for all reachable vertices
   bfs_completeness_all sadj (SZ.v n) scolor_final (SZ.v source);
   assert (pure (forall (v: nat) (k: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v k ==>
-    Seq.index scolor_final v <> 0))
+    Seq.index scolor_final v <> 0));
+  assert (pure (forall (v: nat). v < SZ.v n /\ Seq.index scolor_final v <> 0 /\
+    Seq.index spred_final v >= 0 /\ Seq.index spred_final v < SZ.v n ==>
+    Seq.index scolor_final (Seq.index spred_final v) <> 0 /\
+    Seq.index sdist_final v == Seq.index sdist_final (Seq.index spred_final v) + 1))
 }
 #pop-options

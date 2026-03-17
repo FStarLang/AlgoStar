@@ -84,6 +84,12 @@ fn queue_bfs
       // Completeness: every reachable vertex is discovered
       (forall (v: nat) (k: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v k ==>
         Seq.index scolor' v <> 0) /\
+      // Predecessor distance consistency: for discovered non-source vertices,
+      // dist[v] = dist[pred[v]] + 1 and pred[v] is also discovered
+      (forall (v: nat). v < SZ.v n /\ Seq.index scolor' v <> 0 /\
+        Seq.index spred' v >= 0 /\ Seq.index spred' v < SZ.v n ==>
+        Seq.index scolor' (Seq.index spred' v) <> 0 /\
+        Seq.index sdist' v == Seq.index sdist' (Seq.index spred' v) + 1) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
