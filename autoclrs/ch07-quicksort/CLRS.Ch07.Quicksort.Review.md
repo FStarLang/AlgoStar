@@ -251,6 +251,27 @@ Key lemmas in `CLRS.Ch07.Quicksort.Lemmas`:
 * `lemma_quicksort_complexity_bound`: the convexity argument for
   recursive cost.
 
+## Spec Validation (2026-03-17)
+
+**Test file:** `CLRS.Ch07.Quicksort.ImplTest.fst` (see `ImplTest.md` for details)
+
+Adapted from the [intent-formalization](https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst) reference test.
+
+| Check | Result |
+|-------|--------|
+| Precondition satisfiable | ✅ Called on `[3; 1; 2]` |
+| Postcondition precise | ✅ Uniquely determines output `[1; 2; 3]` |
+| No admits/assumes in test | ✅ |
+| Spec issues found | None |
+
+The postcondition `sorted s /\ permutation s0 s` is the strongest possible
+specification for a sorting algorithm — it uniquely determines the output for
+any input with distinct elements.
+
+**Technique:** The test bridges `BoundedIntegers` typeclass operators to `Prims`
+operators, then uses `FStar.Seq.Properties.count` to reason about element
+multiplicities under the permutation constraint.
+
 ## Checklist
 
 Priority order of work items:
@@ -264,6 +285,7 @@ Priority order of work items:
 - [x] Proof stability (verifies at --z3rlimit 5) — **Done**
 - [x] No #push-options or --retry needed — **Done**
 - [x] Imports from CLRS.Common.SortSpec (no definition duplication) — **Done**
+- [x] Spec validation test (ImplTest.fst) — **Done**
 - [ ] Reduce Quicksort.Impl.fst verification time (5.4s) — *Low priority, not blocking*
 - [ ] Randomized quicksort (CLRS §7.3) — *Deferred*
 - [ ] Expected O(n lg n) analysis (CLRS §7.4.2, Theorem 7.4) — *Deferred*
@@ -275,6 +297,8 @@ Priority order of work items:
 |------|------|
 | `CLRS.Ch07.Quicksort.Impl.fsti` | Public interface (three signatures) |
 | `CLRS.Ch07.Quicksort.Impl.fst` | Pulse implementation |
+| `CLRS.Ch07.Quicksort.ImplTest.fst` | Spec validation test |
+| `CLRS.Ch07.Quicksort.ImplTest.md` | Test documentation |
 | `CLRS.Ch07.Quicksort.Lemmas.fsti` | Definitions (`complexity_bounded_quadratic`, `seq_min`, `seq_max`) and lemma signatures |
 | `CLRS.Ch07.Quicksort.Lemmas.fst` | Lemma proofs |
 | `CLRS.Ch07.Quicksort.Complexity.fsti` | Standalone complexity signatures |

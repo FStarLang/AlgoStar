@@ -223,6 +223,25 @@ After the loop, a final swap places the pivot at position `i_plus_1`.
 The wrapper `clrs_partition_wrapper_with_ticks` then splits ownership
 via `pts_to_range_split` and transfers bounds to the sub-regions.
 
+## Spec Validation (2026-03-17)
+
+**Test file:** `CLRS.Ch07.Partition.ImplTest.fst` (see `ImplTest.md` for details)
+
+| Check | Result |
+|-------|--------|
+| Precondition satisfiable | ✅ Called on `[3; 1; 2]` with bounds `[1, 3]` |
+| Postcondition meaningful | ✅ All constraints verified in-line |
+| No admits/assumes in test | ✅ |
+| Spec issues found | None (relational postcondition is intentional) |
+
+The partition postcondition is **intentionally relational**: it does not
+prescribe which element becomes the pivot. This is by design — the `Impl.fsti`
+should be usable with any partition strategy (Lomuto, Hoare, randomized).
+
+The test verifies: pivot index in range, sub-array lengths consistent,
+pivot value in bounds, left elements ≤ pivot, right elements > pivot,
+exact complexity (2 comparisons), and permutation preservation.
+
 ## Checklist
 
 Priority order of work items:
@@ -234,6 +253,7 @@ Priority order of work items:
 - [x] Zero admits, zero assumes — **Done**
 - [x] Proof stability (verifies at --z3rlimit 5) — **Done**
 - [x] No #push-options or --retry needed — **Done**
+- [x] Spec validation test (ImplTest.fst) — **Done**
 - [ ] Reduce Partition.Impl.fst verification time (7s) — *Low priority, not blocking*
 - [ ] Randomized partition (CLRS §7.3) — *Deferred*
 
@@ -243,6 +263,8 @@ Priority order of work items:
 |------|------|
 | `CLRS.Ch07.Partition.Impl.fsti` | Public interface (partition wrapper) |
 | `CLRS.Ch07.Partition.Impl.fst` | Pulse implementation (inner + wrapper) |
+| `CLRS.Ch07.Partition.ImplTest.fst` | Spec validation test |
+| `CLRS.Ch07.Partition.ImplTest.md` | Test documentation |
 | `CLRS.Ch07.Partition.Lemmas.fsti` | Definitions (`between_bounds`, `complexity_exact_linear`) and lemma signatures |
 | `CLRS.Ch07.Partition.Lemmas.fst` | Lemma proofs (swap, bounds transfer) |
 | `CLRS.Ch07.Partition.Complexity.fsti` | Complexity signature |
