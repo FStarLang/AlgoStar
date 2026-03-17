@@ -269,6 +269,25 @@ Two key results:
 | Matrix Multiply | §4.2 | Pulse | `mat_mul_correct` (∀ i,j dot product) | Θ(n³): exactly n³ ops | Yes (ghost ctr) | 0 |
 | Strassen | §4.2 | Pure F\* | Element-wise == `standard_multiply` | O(n^{lg 7}): 7^{log₂ n} mults | No (pure) | 0 |
 
+## Spec Validation Tests
+
+Each imperative algorithm (with an `Impl.fsti`) has a corresponding
+`ImplTest.fst` that proves the postcondition is precise on a small concrete
+instance. All tests have **zero admits and zero assumes**.
+
+| Algorithm | Test File | Input | Expected | Result |
+|-----------|-----------|-------|----------|--------|
+| Binary Search | `CLRS.Ch04.BinarySearch.ImplTest.fst` | `[1,3,5]`, key=3 | `result==1` (found) | ✅ Precise |
+| Binary Search | `CLRS.Ch04.BinarySearch.ImplTest.fst` | `[1,3,5]`, key=2 | `result==3` (not found) | ✅ Precise |
+| Matrix Multiply | `CLRS.Ch04.MatrixMultiply.ImplTest.fst` | 2×2: A×B | `[19,22,43,50]` | ✅ Precise |
+| Kadane | `CLRS.Ch04.MaxSubarray.Kadane.ImplTest.fst` | `[-1,3,-2]` | `result==3` | ✅ Precise |
+
+**No spec incompleteness or imprecision issues were found** in any of the
+three Impl.fsti specifications. All postconditions uniquely determine the
+output for concrete inputs.
+
+See `*.ImplTest.md` files for detailed documentation of each test.
+
 ## Building
 
 ```bash
