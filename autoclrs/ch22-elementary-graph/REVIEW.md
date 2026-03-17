@@ -180,11 +180,26 @@ All tests use the same 3-vertex DAG: 0→1, 1→2. See individual
 
 | Algorithm | Precondition | Postcondition Precision | Spec Issue |
 |-----------|-------------|------------------------|------------|
-| **BFS** | ✅ Satisfiable | ✅ Strong for unique-path graphs — proves completeness, dist[0]=0, dist[1]=1, dist[2]=2 | Missing shortest-path guarantee for general graphs |
-| **DFS** | ✅ Satisfiable | ⚠️ Partial — proves all BLACK, timestamps, pred_edge_ok, but no graph-theoretic properties | Spec↔Impl disconnect (known) |
+| **BFS** | ✅ Satisfiable | ✅ Strong — proves completeness, distances, **pred_dist consistency** | Shortest-path for general graphs requires queue-ordering invariant |
+| **DFS** | ✅ Satisfiable | ✅ Improved — proves all BLACK, timestamps **bounded [1,2n]**, pred_edge_ok | Spec↔Impl disconnect for graph-theoretic properties (known) |
 | **TopologicalSort** | ✅ Satisfiable (DAG proof via witness) | ✅ Strong — proves valid topo order, distinct, valid indices | Minor: exact output not determinable |
 
-### Spec Incompleteness Issues Found
+### Spec Strengthening (Completed)
+
+1. **BFS Impl.fsti — Predecessor distance consistency (DONE)**
+   - Added `pred_dist_ok`: for discovered vertices with valid predecessors,
+     `dist[v] = dist[pred[v]] + 1` and `pred[v]` is also discovered.
+   - This exposes the BFS predecessor tree's distance structure.
+   - +67 lines in Impl.fst, +6 lines in Impl.fsti. Zero admits.
+
+2. **DFS Impl.fsti — Timestamp bounds (DONE)**
+   - Added `d[u] ≤ 2n` and `f[u] ≤ 2n` postconditions.
+   - Combined with `d[u] > 0`, gives tight range `[1, 2n]`.
+   - Proved via `timestamps_bounded` predicate tracking
+     `time == count_ones + 2·count_twos` through all nested DFS functions.
+   - +144 lines in Impl.fst, +3 lines in Impl.fsti. Zero admits.
+
+### Remaining Spec Incompleteness
 
 1. **BFS Impl.fsti — Missing shortest-path property (P1)**
    - The postcondition says `reachable_in sadj n source w dist[w]` (path EXISTS
@@ -192,14 +207,15 @@ All tests use the same 3-vertex DAG: 0→1, 1→2. See individual
      (dist is SHORTEST).
    - This property IS proven in `BFS.DistanceSpec.fst` (Theorem 22.5) but is
      not exposed through the implementation interface.
-   - **Fix:** Add shortest-path clause to `BFS.Impl.fsti` postcondition.
+   - **Status:** Requires queue-ordering invariant (pigeonhole argument for
+     GRAY=queue-entries). Significant proof engineering, deferred.
 
 2. **DFS Impl.fsti — Missing graph-theoretic properties (P2)**
    - Edge classification, white-path theorem, cycle⟺back-edge are all proven
      in `DFS.Spec.fst` but not exposed through `DFS.Impl.fsti`.
    - The Spec uses 2D `seq (seq int)` while Impl uses flat `seq int`, making
      bridging difficult without representation-conversion lemmas.
-   - **Fix:** Add bridging lemmas connecting DFS.Spec to DFS.Impl.
+   - **Status:** Requires representation bridging, deferred.
 
 3. **TopologicalSort Impl.fsti — Output determinism (P3, minor)**
    - For graphs with a unique topological order, the postcondition does not
