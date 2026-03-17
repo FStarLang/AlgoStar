@@ -266,6 +266,18 @@ let result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: 
         Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
   = edges_adj_pos_elim sadj seu sev n ec
 
+// Structural elim: expose is_forest from result_is_forest_adj
+let result_is_forest_adj_forest_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires result_is_forest_adj sadj seu sev n ec)
+    (ensures
+      ec <= n - 1 /\ n > 0 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
+  = ()
+
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn find
   (#p: perm)

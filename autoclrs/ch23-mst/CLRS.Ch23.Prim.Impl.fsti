@@ -46,6 +46,23 @@ let valid_weights (weights_seq: Seq.seq SZ.t) (n: nat) : prop =
 let all_keys_bounded (s: Seq.seq SZ.t) : prop =
   forall (i:nat). i < Seq.length s ==> SZ.v (Seq.index s i) <= SZ.v infinity
 
+/// All parent values are valid vertex indices
+let parent_valid (parent_seq: Seq.seq SZ.t) (n: nat) : prop =
+  forall (v:nat). v < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq v) < n
+
+/// For non-source vertices with finite key, key equals the edge weight to the parent.
+/// This links the imperative output to the graph structure: key[v] is the actual
+/// weight of the edge connecting v to its parent in the MST.
+let key_parent_consistent
+    (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat) : prop =
+  forall (v:nat). (v < n /\ v <> source /\
+    v < Seq.length key_seq /\
+    v < Seq.length parent_seq /\
+    SZ.v (Seq.index key_seq v) < SZ.v infinity /\
+    SZ.v (Seq.index parent_seq v) < n /\
+    SZ.v (Seq.index parent_seq v) * n + v < Seq.length weights_seq) ==>
+    SZ.v (Seq.index key_seq v) == SZ.v (Seq.index weights_seq (SZ.v (Seq.index parent_seq v) * n + v))
+
 /// Predicate for correctness of Prim's output
 let prim_correct 
     (key_seq: Seq.seq SZ.t)
@@ -60,7 +77,8 @@ let prim_correct
     Seq.length weights_seq == n * n /\
     SZ.v (Seq.index key_seq source) == 0 /\
     all_keys_bounded key_seq /\
-    SZ.v (Seq.index parent_seq source) == source
+    SZ.v (Seq.index parent_seq source) == source /\
+    parent_valid parent_seq n
 
 /// Convert weight matrix from SizeT array to adjacency matrix spec
 val weights_to_adj_matrix (weights_seq: Seq.seq SZ.t) (n: nat) 

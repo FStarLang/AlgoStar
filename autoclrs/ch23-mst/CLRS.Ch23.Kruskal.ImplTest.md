@@ -29,10 +29,10 @@ preconditions are satisfiable:
 | `Seq.length sedge_v == n` | 3 == 3 | ✅ From V.alloc |
 | `SZ.fits (n * n)` | `SZ.fits 9` | ✅ Via `fits_at_least_16` (9 < 2¹⁶) |
 
-### ✅ Partial Postcondition Verification (via elim lemma)
+### ✅ Partial Postcondition Verification (via elim lemmas)
 
-We added `result_is_forest_adj_elim` to the `.fsti` to expose concrete
-facts from the previously opaque postcondition:
+We use `result_is_forest_adj_elim` and `result_is_forest_adj_forest_elim`
+to expose concrete facts from the opaque postcondition:
 
 | Property | Status | How |
 |----------|:------:|-----|
@@ -40,12 +40,13 @@ facts from the previously opaque postcondition:
 | Output array lengths correct | ✅ | `result_is_forest_adj_elim` |
 | All endpoints valid (< n) | ✅ | `result_is_forest_adj_elim` |
 | Edges from positive adj entries | ✅ | `result_is_forest_adj_elim` |
+| Result is a forest (acyclic) | ✅ | `result_is_forest_adj_forest_elim` |
 | Edge count = 2 exactly | ❌ | Forest, not spanning tree |
 | Specific edge endpoints | ❌ | Multiple valid forests exist |
 | Result is spanning tree | ❌ | Not in postcondition |
 | Result is MST | ❌ | Not in postcondition |
 
-## Spec Improvement Made
+## Spec Improvements Made
 
 ### Added: `result_is_forest_adj_elim` (Impl.fsti)
 
@@ -64,10 +65,27 @@ val result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: 
 ```
 
 This lemma exposes array-level facts from the previously completely opaque
-`result_is_forest_adj` postcondition. It gives consumers:
-- Edge count bound (forest has at most n-1 edges)
-- Endpoint validity (all selected vertices are valid indices)
-- Edge provenance (each selected edge has a positive adjacency matrix entry)
+`result_is_forest_adj` postcondition.
+
+### Added: `result_is_forest_adj_forest_elim` (Impl.fsti)
+
+```fstar
+val result_is_forest_adj_forest_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires result_is_forest_adj sadj seu sev n ec)
+    (ensures
+      ec <= n - 1 /\ n > 0 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
+```
+
+This lemma exposes the **structural forest property**: the selected edges
+form an acyclic subgraph. This is the key structural invariant maintained
+by Kruskal's algorithm. Previously, external consumers could only see
+array-level facts; now they can access the graph-theoretic `is_forest`
+predicate directly.
 
 ## Remaining Spec Weakness
 

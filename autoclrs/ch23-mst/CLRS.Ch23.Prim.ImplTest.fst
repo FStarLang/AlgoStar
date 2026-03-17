@@ -205,6 +205,13 @@ fn test_prim_3 ()
   let p0 = parent_arr.(0sz);
   assert (pure (SZ.v p0 == 0));
 
+  // ✓ PROVEN (NEW): all parent values are valid vertex indices (< n)
+  let p1 = parent_arr.(1sz);
+  let p2 = parent_arr.(2sz);
+  assert (pure (SZ.v p0 < 3));
+  assert (pure (SZ.v p1 < 3));
+  assert (pure (SZ.v p2 < 3));
+
   // Convert parent array back to vec for cleanup
   with ps2. assert (A.pts_to parent_arr ps2);
   rewrite (A.pts_to parent_arr ps2) as (A.pts_to (V.vec_to_array (snd res)) ps2);

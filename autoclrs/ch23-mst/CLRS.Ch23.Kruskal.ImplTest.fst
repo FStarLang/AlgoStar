@@ -167,6 +167,11 @@ fn test_kruskal_satisfiability ()
   assert (pure (forall (k:nat). k < SZ.v ec_val ==>
     Seq.index sadj (Seq.index sedge_u' k * 3 + Seq.index sedge_v' k) > 0));
 
+  // ✓ PROVEN (NEW): the selected edges form a forest (acyclic subgraph)
+  result_is_forest_adj_forest_elim sadj sedge_u' sedge_v' 3 (SZ.v ec_val);
+  assert (pure (CLRS.Ch23.Kruskal.Spec.is_forest
+    (edges_from_arrays sedge_u' sedge_v' (SZ.v ec_val) 0) 3));
+
   // ✗ STILL UNPROVABLE: exact edge count
   //   assert (pure (SZ.v ec_val == 2));     -- could be 0 or 1
   //
@@ -174,7 +179,7 @@ fn test_kruskal_satisfiability ()
   //   (postcondition doesn't determine which edges are selected)
   //
   // ✗ STILL UNPROVABLE: spanning tree or MST property
-  //   (postcondition only says "forest", not "spanning tree")
+  //   (postcondition says "forest" = acyclic, not "spanning tree")
 
   // --- Cleanup ---
   rewrite (A.pts_to adj sadj) as (A.pts_to (V.vec_to_array adj_v) sadj);
