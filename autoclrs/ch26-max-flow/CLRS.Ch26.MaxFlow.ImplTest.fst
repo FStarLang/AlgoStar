@@ -110,7 +110,47 @@ let single_edge_mfmc (flow_seq cap_seq: Seq.seq int)
 #pop-options
 
 (* ================================================================
-   Pulse test function
+   Disconnected graph lemmas
+   ================================================================ *)
+
+#push-options "--z3rlimit 100 --fuel 4 --ifuel 2"
+
+(* Completeness lemma for disconnected 2-vertex network.
+   Network: n=2, s=0, t=1, all capacities=0.
+   Proves: valid_flow + no_augmenting_path uniquely determine all flows = 0. *)
+let disconnected_completeness (flow_seq cap_seq: Seq.seq int)
+  : Lemma
+    (requires
+      Seq.length flow_seq == 4 /\ Seq.length cap_seq == 4 /\
+      valid_flow #2 flow_seq cap_seq 0 1 /\
+      Seq.index cap_seq 0 == 0 /\
+      Seq.index cap_seq 1 == 0 /\
+      Seq.index cap_seq 2 == 0 /\
+      Seq.index cap_seq 3 == 0)
+    (ensures
+      get flow_seq 2 0 0 == 0 /\
+      get flow_seq 2 0 1 == 0 /\
+      get flow_seq 2 1 0 == 0 /\
+      get flow_seq 2 1 1 == 0)
+= ()
+
+(* Flow value for disconnected network: |f| = 0 *)
+let disconnected_flow_value (flow_seq cap_seq: Seq.seq int)
+  : Lemma
+    (requires
+      Seq.length flow_seq == 4 /\ Seq.length cap_seq == 4 /\
+      valid_flow #2 flow_seq cap_seq 0 1 /\
+      Seq.index cap_seq 0 == 0 /\
+      Seq.index cap_seq 1 == 0 /\
+      Seq.index cap_seq 2 == 0 /\
+      Seq.index cap_seq 3 == 0)
+    (ensures flow_value flow_seq 2 0 == 0)
+= disconnected_completeness flow_seq cap_seq
+
+#pop-options
+
+(* ================================================================
+   Pulse test functions
    ================================================================ *)
 
 #push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
@@ -159,7 +199,7 @@ fn test_max_flow_completeness ()
     valid_caps_intro cap_seq (SZ.v n);
 
     // ========== CALL MAX_FLOW ==========
-    max_flow capacity flow n 0sz 1sz;
+    let flow_val = max_flow capacity flow n 0sz 1sz;
 
     // ========== POSTCONDITION VALIDATION ==========
     // Bind flow result
@@ -183,8 +223,10 @@ fn test_max_flow_completeness ()
     assert (pure (f10 == 0));  // flow[1→0] = 0 (reverse edge, cap=0)
     assert (pure (f11 == 0));  // flow[1→1] = 0 (self-loop, cap=0)
 
-    // Verify flow value |f| = 7
+    // Verify return value equals expected flow value
     single_edge_flow_value flow_seq cap_seq;
+    lemma_imp_flow_value_eq flow_seq 2 0;
+    assert (pure (flow_val == 7));
 
     // Verify MFMC theorem is applicable: flow_value = min-cut capacity
     single_edge_mfmc flow_seq cap_seq;
@@ -200,6 +242,104 @@ fn test_max_flow_completeness ()
     V.free fv;
   } else {
     // Unreachable: capacities [0;7;0;0] are non-negative
+    with sc2. assert (A.pts_to capacity sc2);
+    rewrite (A.pts_to capacity sc2) as (A.pts_to (V.vec_to_array cv) sc2);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+  }
+}
+```
+
+#pop-options
+
+(* ================================================================
+   Pulse test: Disconnected graph (flow_value = 0)
+   ================================================================ *)
+
+#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+
+```pulse
+(* Completeness test: 2-vertex disconnected network.
+   s=0, t=1, all capacities=0.
+
+   Validates:
+   1. Precondition satisfiable: valid_caps for all-zero capacities
+   2. Postcondition complete: proves all flow values = 0
+   3. Return value correct: fv = 0
+   4. Flow value correct: |f| = 0 *)
+fn test_max_flow_disconnected_completeness ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  let n : SZ.t = 2sz;
+  let nn : SZ.t = n *^ n;
+
+  // Allocate capacity matrix (2×2 = 4 elements, all zeros)
+  let cv = V.alloc 0 nn;
+  V.to_array_pts_to cv;
+  let capacity = V.vec_to_array cv;
+  with sc. assert (A.pts_to (V.vec_to_array cv) sc);
+  rewrite (A.pts_to (V.vec_to_array cv) sc) as (A.pts_to capacity sc);
+
+  // Allocate flow matrix (2×2 = 4 elements, all zeros)
+  let fv = V.alloc 0 nn;
+  V.to_array_pts_to fv;
+  let flow = V.vec_to_array fv;
+  with sf. assert (A.pts_to (V.vec_to_array fv) sf);
+  rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
+
+  // No edges — all capacities remain 0
+  with cap_seq. assert (A.pts_to capacity cap_seq);
+
+  // Establish valid_caps via runtime check + intro lemma
+  let caps_ok = check_valid_caps_fn capacity nn;
+  if caps_ok {
+    valid_caps_intro cap_seq (SZ.v n);
+
+    // ========== CALL MAX_FLOW ==========
+    let flow_val = max_flow capacity flow n 0sz 1sz;
+
+    // ========== POSTCONDITION VALIDATION ==========
+    with flow_seq. assert (A.pts_to flow flow_seq);
+
+    // Bridge: imp_valid_flow → Spec.valid_flow
+    imp_valid_flow_implies_valid_flow flow_seq cap_seq 2 0 1;
+
+    // Completeness: all-zero capacities force all flows to 0
+    disconnected_completeness flow_seq cap_seq;
+
+    // Read back all flow values and verify
+    let f00 = flow.(0sz);
+    let f01 = flow.(1sz);
+    let f10 = flow.(2sz);
+    let f11 = flow.(3sz);
+
+    assert (pure (f00 == 0));
+    assert (pure (f01 == 0));
+    assert (pure (f10 == 0));
+    assert (pure (f11 == 0));
+
+    // Verify return value equals expected flow value (0)
+    disconnected_flow_value flow_seq cap_seq;
+    lemma_imp_flow_value_eq flow_seq 2 0;
+    assert (pure (flow_val == 0));
+
+    // Cleanup
+    with sc2. assert (A.pts_to capacity sc2);
+    rewrite (A.pts_to capacity sc2) as (A.pts_to (V.vec_to_array cv) sc2);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+  } else {
+    // Unreachable: all-zero capacities are non-negative
     with sc2. assert (A.pts_to capacity sc2);
     rewrite (A.pts_to capacity sc2) as (A.pts_to (V.vec_to_array cv) sc2);
     V.to_vec_pts_to cv;

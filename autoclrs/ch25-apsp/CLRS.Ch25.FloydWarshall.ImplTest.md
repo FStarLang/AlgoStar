@@ -2,7 +2,9 @@
 
 **File:** `CLRS.Ch25.FloydWarshall.ImplTest.fst`
 **Algorithm:** Floyd-Warshall All-Pairs Shortest Paths (CLRS §25.2)
-**API under test:** `floyd_warshall` from `CLRS.Ch25.FloydWarshall.Impl.fsti`
+**API under test:** `floyd_warshall` from `CLRS.Ch25.FloydWarshall.Impl.fsti`,
+  `check_no_negative_cycle` and `floyd_warshall_safe` from
+  `CLRS.Ch25.FloydWarshall.NegCycleDetect`
 **Status:** ✅ Fully proven — zero admits, zero assumes
 
 ---
@@ -11,8 +13,9 @@
 
 Spec validation following the methodology of
 [arXiv:2406.09757](https://arxiv.org/abs/2406.09757). The test calls the
-Pulse API on a concrete 3×3 graph and proves that the postcondition is
-precise enough to determine all output values exactly.
+Pulse APIs on concrete inputs and proves that the postconditions are
+precise enough to determine all output values exactly, including both
+success and error cases.
 
 ---
 
@@ -34,6 +37,15 @@ precise enough to determine all output values exactly.
 0 [ 0   5   20 ]
 1 [ 45  0   15 ]
 2 [ 30  35  0  ]
+```
+
+**Error-case input** — matrix with negative diagonal d[0][0] = -1:
+
+```
+    0   1   2
+0 [-1   5  inf ]
+1 [ 50  0   15 ]
+2 [ 30 inf  0  ]
 ```
 
 ---
@@ -84,7 +96,36 @@ The Pulse test function asserts `cf == 27` after the call, verifying
 the complexity postcondition is precise enough to determine the exact
 operation count.
 
-### 4. Determinism
+### 4. Negative-Cycle Detection — Return Value Precision
+
+The `check_no_negative_cycle` function's strengthened postcondition:
+
+```
+(b == true  ==>  non_negative_diagonal contents n) /\
+(b == false ==> ~(non_negative_diagonal contents n))
+```
+
+fully characterizes the return value. Two tests verify this:
+
+**4a. Success case** (`test_neg_cycle_check_true`):
+- Input: `test_adj` with non-negative diagonal (0, 0, 0)
+- `lemma_test_adj_non_negative_diagonal ()` proves `non_negative_diagonal test_adj 3`
+- From the false-case conjunct: `ok == false` would imply
+  `~(non_negative_diagonal ...)`, contradicting the lemma
+- Therefore `ok == true` is provable ✅
+
+**4b. Error case** (`test_neg_cycle_check_false`):
+- Input: `neg_diag_adj` with d[0][0] = -1
+- `lemma_neg_diag_not_nonneg ()` proves `~(non_negative_diagonal neg_diag_adj 3)`
+- From the true-case conjunct: `ok == true` would imply
+  `non_negative_diagonal ...`, contradicting the lemma
+- Therefore `ok == false` is provable ✅
+
+**Previous spec weakness:** Before strengthening, the postcondition only
+constrained the `true` case. The `false` case was vacuously true,
+making it impossible to prove `ok == false` from the spec alone.
+
+### 5. Determinism
 
 The postcondition `contents' == fw_outer contents n 0` is fully
 deterministic — there is exactly one admissible output for any given
@@ -92,15 +133,27 @@ input. No enumeration of equivalent outputs is needed (unlike
 algorithms with non-unique valid outputs such as sorting with equal
 keys).
 
-### 5. End-to-End Pulse Test
+### 6. floyd_warshall_safe API
 
-The `test_floyd_warshall_impl` Pulse function:
-1. Allocates and initializes the 3×3 matrix
-2. Proves the concrete array equals `test_adj` (via `lemma_seq_eq_test_adj`)
-3. Calls `floyd_warshall` (the Impl.fsti API)
-4. Asserts all 9 output values using the precision lemmas
-5. Asserts the complexity bound (cf == 27)
-6. Cleans up all resources
+`test_floyd_warshall_safe_impl` tests the safe wrapper with full
+preconditions (`weights_bounded` + `non_negative_diagonal`):
+
+- `lemma_test_adj_weights_bounded ()` proves `weights_bounded test_adj 3`
+- `lemma_test_adj_non_negative_diagonal ()` proves `non_negative_diagonal test_adj 3`
+- Calls `floyd_warshall_safe` (requires both preconditions)
+- Verifies 4 representative output entries using `fw_safe_entry_connection`
+  (a helper lemma that connects `fw_outer` to `fw_entry` for callers
+  of the safe API)
+- Verifies complexity (cf == 27) ✅
+
+### 7. End-to-End Pulse Tests
+
+| Test | API Tested | What Is Proven | Status |
+|------|-----------|----------------|--------|
+| `test_floyd_warshall_impl` | `floyd_warshall` | All 9 outputs + complexity | ✅ |
+| `test_neg_cycle_check_true` | `check_no_negative_cycle` | `ok == true` determined by spec | ✅ |
+| `test_neg_cycle_check_false` | `check_no_negative_cycle` | `ok == false` determined by spec | ✅ |
+| `test_floyd_warshall_safe_impl` | `floyd_warshall_safe` | 4 outputs + complexity via safe API | ✅ |
 
 ---
 
@@ -118,15 +171,18 @@ The `test_floyd_warshall_impl` Pulse function:
 - **Precondition is minimal:** Only requires the array to be properly sized
   and `SZ.fits`. No unnecessary constraints.
 
-### No Spec Weaknesses Found
+- **Negative-cycle detection return value is fully determined:** The
+  strengthened postcondition makes `b` a perfect characterization of
+  `non_negative_diagonal`, enabling proofs of both success and error cases.
 
-- **Precondition:** Not too strong — satisfiable for all valid inputs.
-- **Postcondition:** Not too weak — determines the output uniquely.
-- **No admits or assumes needed** in the test.
+### Previous Spec Weakness (Now Resolved)
 
-The specification in `Impl.fsti` is well-designed for this algorithm.
-The layered approach (Impl → Spec → Lemmas → Paths) cleanly separates
-the imperative refinement from the graph-theoretic correctness.
+- **`check_no_negative_cycle` false case was unconstrained.** The original
+  postcondition `(b == true ==> non_negative_diagonal ...)` said nothing
+  when `b == false`. This made it impossible to prove that `false` correctly
+  indicates a negative diagonal entry. The spec has been strengthened to
+  include `(b == false ==> ~(non_negative_diagonal ...))`, making the
+  return value fully determined by the input.
 
 ---
 
@@ -137,4 +193,6 @@ the imperative refinement from the graph-theoretic correctness.
 ```
 
 These are used for the `fw_entry` evaluation and `fw_outer` connection
-lemmas. The Pulse test function uses default settings.
+lemmas. The Pulse test functions use default settings. The
+`lemma_neg_diag_not_nonneg` and `lemma_test_adj_non_negative_diagonal`
+lemmas use `--z3rlimit 40`.

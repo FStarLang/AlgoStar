@@ -42,7 +42,10 @@ fn check_no_negative_cycle
   returns b:bool
   ensures
     A.pts_to dist contents **
-    pure (b == true ==> non_negative_diagonal contents (SZ.v n))
+    pure (
+      (b == true ==> non_negative_diagonal contents (SZ.v n)) /\
+      (b == false ==> ~(non_negative_diagonal contents (SZ.v n)))
+    )
 {
   let mut v : SZ.t = 0sz;
   let mut ok : bool = true;
@@ -58,7 +61,9 @@ fn check_no_negative_cycle
       SZ.fits (SZ.v n * SZ.v n) /\
       (vok == true ==>
         (forall (v': nat). v' < SZ.v vv ==>
-          Seq.index contents (v' * SZ.v n + v') >= 0))
+          Seq.index contents (v' * SZ.v n + v') >= 0)) /\
+      (vok == false ==>
+        ~(non_negative_diagonal contents (SZ.v n)))
     )
   {
     let vv = !v;
@@ -75,6 +80,17 @@ fn check_no_negative_cycle
 //SNIPPET_END: check_no_negative_cycle
 
 // ========== Safe wrapper with full precondition ==========
+
+// Helper: derive fw_entry connection from weights_bounded + fw_outer equality.
+// Callers of floyd_warshall_safe can use this lemma to connect the output
+// to fw_entry values for specific vertex pairs.
+open CLRS.Ch25.FloydWarshall.Lemmas
+
+let fw_safe_entry_connection (adj: Seq.seq int) (n qi qj: nat)
+  : Lemma
+    (requires weights_bounded adj n /\ n > 0 /\ qi < n /\ qj < n)
+    (ensures Seq.index (fw_outer adj n 0) (qi * n + qj) == fw_entry adj n qi qj n)
+  = floyd_warshall_full_correctness adj n qi qj
 
 //SNIPPET_START: floyd_warshall_safe
 fn floyd_warshall_safe

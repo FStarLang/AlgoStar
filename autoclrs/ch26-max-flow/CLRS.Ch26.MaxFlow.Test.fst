@@ -47,7 +47,7 @@ fn test_max_flow_3v ()
   let caps_ok = check_valid_caps_fn capacity nn;
   if caps_ok {
     valid_caps_intro sc2 (SZ.v n);
-    max_flow capacity flow n 0sz 2sz;
+    let _ = max_flow capacity flow n 0sz 2sz;
     // Clean up
     with sc. assert (A.pts_to capacity sc);
     rewrite (A.pts_to capacity sc) as (A.pts_to (V.vec_to_array cv) sc);
@@ -97,7 +97,7 @@ fn test_max_flow_disconnected ()
   let caps_ok = check_valid_caps_fn capacity nn;
   if caps_ok {
     valid_caps_intro sc2 (SZ.v n);
-    max_flow capacity flow n 0sz 2sz;
+    let _ = max_flow capacity flow n 0sz 2sz;
     with sc. assert (A.pts_to capacity sc);
     rewrite (A.pts_to capacity sc) as (A.pts_to (V.vec_to_array cv) sc);
     V.to_vec_pts_to cv;
@@ -147,7 +147,7 @@ fn test_max_flow_single_edge ()
   let caps_ok = check_valid_caps_fn capacity nn;
   if caps_ok {
     valid_caps_intro sc2 (SZ.v n);
-    max_flow capacity flow n 0sz 1sz;
+    let _ = max_flow capacity flow n 0sz 1sz;
     with sc. assert (A.pts_to capacity sc);
     rewrite (A.pts_to capacity sc) as (A.pts_to (V.vec_to_array cv) sc);
     V.to_vec_pts_to cv;
@@ -201,7 +201,7 @@ fn test_max_flow_diamond ()
   let caps_ok = check_valid_caps_fn capacity nn;
   if caps_ok {
     valid_caps_intro sc2 (SZ.v n);
-    max_flow capacity flow n 0sz 3sz;
+    let _ = max_flow capacity flow n 0sz 3sz;
     with sc. assert (A.pts_to capacity sc);
     rewrite (A.pts_to capacity sc) as (A.pts_to (V.vec_to_array cv) sc);
     V.to_vec_pts_to cv;
@@ -252,7 +252,7 @@ fn test_max_flow_bottleneck ()
   let caps_ok = check_valid_caps_fn capacity nn;
   if caps_ok {
     valid_caps_intro sc2 (SZ.v n);
-    max_flow capacity flow n 0sz 2sz;
+    let _ = max_flow capacity flow n 0sz 2sz;
     with sc. assert (A.pts_to capacity sc);
     rewrite (A.pts_to capacity sc) as (A.pts_to (V.vec_to_array cv) sc);
     V.to_vec_pts_to cv;

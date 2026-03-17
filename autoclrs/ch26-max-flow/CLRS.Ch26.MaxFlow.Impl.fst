@@ -2875,6 +2875,7 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n)
     )
+  returns fv: int
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
@@ -2886,7 +2887,9 @@ fn max_flow
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink)
+      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink) /\
+      fv == imp_flow_value flow_seq' (SZ.v n) (SZ.v source) /\
+      fv >= 0
     )
 {
   let nn: SZ.t = n *^ n;
@@ -2938,10 +2941,10 @@ fn max_flow
       valid_caps cap_seq (SZ.v n) /\
       imp_valid_flow flow_s cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
       fv == imp_flow_value flow_s (SZ.v n) (SZ.v source) /\
+      fv >= 0 /\
       fv <= cap_sum /\
       itr >= 0 /\
       (cont ==> itr <= fv) /\
-      (cont ==> fv >= 0) /\
       // When loop exits (cont = false): no augmenting path
       (not cont ==> no_augmenting_path #(SZ.v n) cap_seq flow_s (SZ.v source) (SZ.v sink))
     )
@@ -2987,10 +2990,15 @@ fn max_flow
     }
   };
 
+  // Read the final flow value to return
+  let result = !flow_val;
+
   // Cleanup BFS workspace
   A.free color;
   A.free pred;
   A.free dist;
-  A.free queue
+  A.free queue;
+
+  result
 }
 #pop-options

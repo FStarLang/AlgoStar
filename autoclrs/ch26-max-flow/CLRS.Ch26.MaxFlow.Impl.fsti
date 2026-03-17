@@ -35,6 +35,15 @@ val valid_caps (cap_seq: Seq.seq int) (n: nat) : prop
 (** Imperative flow validity: capacity constraints + flow conservation *)
 val imp_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat) : prop
 
+(** Total wrapper for flow_value — avoids refinement types in Pulse ensures clauses *)
+val imp_flow_value (s: Seq.seq int) (n source: nat) : int
+
+(** imp_flow_value agrees with flow_value when constraints hold *)
+val lemma_imp_flow_value_eq (s: Seq.seq int) (n source: nat)
+  : Lemma
+    (requires n > 0 /\ source < n /\ Seq.length s == n * n)
+    (ensures imp_flow_value s n source == flow_value s n source)
+
 //SNIPPET_START: imp_valid_flow_bridge
 (** Bridge lemma: imp_valid_flow implies Spec.valid_flow.
     Allows callers to use the MFMC theorem with the result of max_flow. *)
@@ -80,9 +89,13 @@ fn check_valid_caps_fn
     Termination: proved without fuel. Each augmentation increases flow_value by ≥1,
     bounded by cap_sum = Σ cap[source][v]. Loop terminates in at most cap_sum + 1 iterations.
     
+    Returns: the maximum flow value (== imp_flow_value of the result flow matrix).
+    
     Postcondition:
     - imp_valid_flow on the resulting flow array
     - no_augmenting_path: no residual source→sink path exists (max flow achieved)
+    - fv == imp_flow_value: return value equals the flow value of the result
+    - fv >= 0: flow value is non-negative
     - Combined with bridge lemma → enables the MFMC theorem *)
 //SNIPPET_START: max_flow_sig
 fn max_flow
@@ -106,6 +119,7 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n)
     )
+  returns fv: int
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
@@ -117,6 +131,8 @@ fn max_flow
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink)
+      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink) /\
+      fv == imp_flow_value flow_seq' (SZ.v n) (SZ.v source) /\
+      fv >= 0
     )
 //SNIPPET_END: max_flow_sig

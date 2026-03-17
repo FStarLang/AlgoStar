@@ -27,7 +27,7 @@ fn max_flow
       SZ.fits (SZ.v n * SZ.v n) /\
       valid_caps cap_seq (SZ.v n)
     )
-  returns completed: bool
+  returns fv: int
   ensures exists* flow_seq'.
     A.pts_to capacity cap_seq **
     A.pts_to flow flow_seq' **
@@ -39,7 +39,9 @@ fn max_flow
       Seq.length cap_seq == SZ.v n * SZ.v n /\
       Seq.length flow_seq' == SZ.v n * SZ.v n /\
       imp_valid_flow flow_seq' cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) /\
-      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink)
+      no_augmenting_path #(SZ.v n) cap_seq flow_seq' (SZ.v source) (SZ.v sink) /\
+      fv == imp_flow_value flow_seq' (SZ.v n) (SZ.v source) /\
+      fv >= 0
     )
 ```
 
@@ -76,6 +78,11 @@ such that:
   No augmenting path exists in the residual graph. This is the optimality
   condition: by the max-flow min-cut theorem, this implies the flow is maximum.
 
+* `fv == imp_flow_value flow_seq' (SZ.v n) (SZ.v source)` —
+  The returned integer equals the mathematical flow value of the result.
+
+* `fv >= 0` — The flow value is non-negative.
+
 ## Auxiliary Definitions
 
 ### `valid_flow` (from `CLRS.Ch26.MaxFlow.Spec`)
@@ -107,10 +114,17 @@ let no_augmenting_path (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
 Every source-to-sink path has non-positive bottleneck in the residual graph.
 This is the key precondition of the max-flow min-cut theorem.
 
-### `imp_valid_flow` and Bridge Lemma (from `CLRS.Ch26.MaxFlow.Impl`)
+### `imp_valid_flow`, `imp_flow_value`, and Bridge Lemmas (from `CLRS.Ch26.MaxFlow.Impl`)
 
 ```fstar
 val imp_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat) : prop
+
+val imp_flow_value (s: Seq.seq int) (n source: nat) : int
+
+val lemma_imp_flow_value_eq (s: Seq.seq int) (n source: nat)
+  : Lemma
+    (requires n > 0 /\ source < n /\ Seq.length s == n * n)
+    (ensures imp_flow_value s n source == flow_value s n source)
 
 val imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
   : Lemma
@@ -122,6 +136,8 @@ val imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source 
 ```
 
 `imp_valid_flow` is the imperative-level flow validity predicate.
+`imp_flow_value` is the total wrapper for `flow_value` (returns 0 for invalid inputs).
+`lemma_imp_flow_value_eq` connects `imp_flow_value` to `Spec.flow_value`.
 `imp_valid_flow_implies_valid_flow` is the **bridge lemma** connecting the
 imperative postcondition to the spec-level `valid_flow`. This enables callers
 to invoke the max-flow min-cut theorem on the output of `max_flow`.
@@ -381,36 +397,36 @@ assertion requires substantial solver effort.
 
 **Date**: 2026-03-17
 
-A spec validation test (`ImplTest.fst`) was added following the methodology from
-[microsoft/intent-formalization](https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/).
+A spec validation test (`ImplTest.fst`) validates that the postcondition of
+`max_flow` is precise enough to uniquely determine flow values for concrete
+networks.
 
-### Test Case
-2-vertex single-edge network: n=2, source=0, sink=1, cap[0→1]=7.
+### Spec Strengthening
+
+The `max_flow` signature was strengthened to return the flow value:
+
+| Change | Before | After |
+|--------|--------|-------|
+| Return type | `unit` | `returns fv: int` |
+| Flow value in postcondition | Not exposed | `fv == imp_flow_value flow_seq' n source` |
+| Non-negativity | Conditional on loop continuing | `fv >= 0` (unconditional) |
+| `imp_flow_value` exported | No | Yes (via `Impl.fsti`) |
+| `lemma_imp_flow_value_eq` exported | No | Yes (connects to `Spec.flow_value`) |
+
+### Test Cases
+
+| Test | Network | Expected fv | Validates |
+|------|---------|-------------|-----------|
+| Single-edge | n=2, cap[0→1]=7 | 7 | Completeness + return value + MFMC |
+| Disconnected | n=2, all caps=0 | 0 | Zero-flow case + return value |
 
 ### Results
 
 | Validation | Result | Notes |
 |-----------|--------|-------|
 | Precondition satisfiable | ✅ | `valid_caps_intro` bridges runtime check |
-| Postcondition complete | ✅ | Uniquely determines all 4 flow values |
-| Flow value provable | ✅ | flow_value = 7 |
+| Postcondition complete | ✅ | Uniquely determines all flow values |
+| Return value constrained | ✅ | `fv == 7` (single-edge), `fv == 0` (disconnected) |
+| Flow value provable | ✅ | flow_value = 7 and 0 respectively |
 | MFMC applicable | ✅ | flow_value = cut_capacity for some cut |
 | Zero admits/assumes | ✅ | Fully proven |
-
-### Spec Completeness Assessment
-
-The postcondition (`imp_valid_flow` + `no_augmenting_path`) is **fully precise**:
-
-1. **`imp_valid_flow`** (via bridge lemma → `valid_flow`): Capacity constraints
-   at zero-capacity edges uniquely determine those flow values to 0.
-
-2. **`no_augmenting_path`**: Instantiating with concrete source-to-sink paths
-   gives lower bounds on flow via the bottleneck computation. For the single-edge
-   network, this proves `flow[0→1] ≥ 7`, which combined with the capacity
-   constraint `≤ 7` gives exact equality.
-
-3. **MFMC theorem**: Successfully applied to conclude flow_value equals the
-   min-cut capacity.
-
-**No spec weaknesses found.** The postcondition is the strongest possible
-functional guarantee — equivalent to proving max flow optimality.

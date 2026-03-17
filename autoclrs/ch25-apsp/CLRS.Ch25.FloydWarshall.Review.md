@@ -157,8 +157,8 @@ All 7 rubric artifacts present. Complexity merged into Impl.
 **File:** `CLRS.Ch25.FloydWarshall.ImplTest.fst`
 **Status:** ✅ Fully proven — zero admits, zero assumes
 
-Validates the `floyd_warshall` API from `Impl.fsti` on a concrete 3×3
-graph. Proves:
+Validates the `floyd_warshall` API from `Impl.fsti`, `check_no_negative_cycle`
+and `floyd_warshall_safe` from `NegCycleDetect` on concrete inputs. Proves:
 
 1. **Precondition satisfiability** — array-size and `SZ.fits` constraints
    are met.
@@ -167,10 +167,18 @@ graph. Proves:
    45, 0, 15, 30, 35, 0).
 3. **Complexity precision** — ghost tick counter gives exactly n³ = 27
    relaxation operations.
+4. **Negative-cycle detection return value precision** — the strengthened
+   `check_no_negative_cycle` postcondition determines the return value
+   in both success (`ok == true`) and error (`ok == false`) cases.
+5. **Safe API** — `floyd_warshall_safe` with `weights_bounded` +
+   `non_negative_diagonal` preconditions, output verified via
+   `fw_safe_entry_connection` helper.
 
-**No spec weaknesses found.** The postcondition is maximally precise
-(full functional refinement), the precondition is minimal, and no
-admits or assumes were needed. See `ImplTest.md` for details.
+**Previous spec weakness (resolved):** `check_no_negative_cycle` had a
+weak false-case postcondition — when returning `false`, the spec said
+nothing useful. Strengthened to include
+`(b == false ==> ~(non_negative_diagonal ...))`, making the return value
+a perfect characterization of diagonal non-negativity.
 
 ---
 

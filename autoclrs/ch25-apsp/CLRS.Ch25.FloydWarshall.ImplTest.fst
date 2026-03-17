@@ -16,6 +16,14 @@ module CLRS.Ch25.FloydWarshall.ImplTest
  * 3. Complexity — the ghost tick counter proves exactly n³ = 27
  *    relaxation operations.
  *
+ * 4. Negative-cycle detection — the strengthened `check_no_negative_cycle`
+ *    spec determines both success (non_negative_diagonal) and error
+ *    (~non_negative_diagonal) cases precisely.
+ *
+ * 5. Safe API — `floyd_warshall_safe` with `weights_bounded` +
+ *    `non_negative_diagonal` preconditions; output connected to `fw_entry`
+ *    via `fw_safe_entry_connection`.
+ *
  * Methodology from: https://arxiv.org/abs/2406.09757
  * Testing pattern adapted from:
  *   https://github.com/microsoft/intent-formalization/blob/main/
@@ -32,6 +40,7 @@ open FStar.Mul
 open CLRS.Ch25.FloydWarshall.Spec
 open CLRS.Ch25.FloydWarshall.Impl
 open CLRS.Ch25.FloydWarshall.Lemmas
+open CLRS.Ch25.FloydWarshall.NegCycleDetect
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -224,6 +233,243 @@ fn test_floyd_warshall_impl ()
   assert (pure (cf == 27));
 
   // Clean up
+  GR.free ctr;
+  rewrite (A.pts_to dist contents')
+       as (A.pts_to (V.vec_to_array dv) contents');
+  V.to_vec_pts_to dv;
+  V.free dv;
+}
+```
+
+(*** 4. Negative-cycle detection — return value precision ***)
+
+// The strengthened check_no_negative_cycle postcondition fully characterizes
+// the return value:
+//   b == true  ==>  non_negative_diagonal contents n
+//   b == false ==> ~(non_negative_diagonal contents n)
+// This means the return value is DETERMINED by the input: given concrete
+// knowledge of the diagonal entries, we can prove which value b must take.
+
+// Prove test_adj has non-negative diagonal (d[0][0]=0, d[1][1]=0, d[2][2]=0)
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 40"
+let lemma_test_adj_non_negative_diagonal ()
+  : Lemma (non_negative_diagonal test_adj 3)
+  = assert_norm (Seq.length test_adj == 3 * 3);
+    assert_norm (Seq.index test_adj 0 == 0);
+    assert_norm (Seq.index test_adj 4 == 0);
+    assert_norm (Seq.index test_adj 8 == 0)
+#pop-options
+
+// Test: check_no_negative_cycle returns true on test_adj (success case).
+// The strengthened postcondition lets us PROVE the return value.
+```pulse
+fn test_neg_cycle_check_true ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  let n = 3sz;
+  let dv = V.alloc 0 9sz;
+  V.to_array_pts_to dv;
+  let dist = V.vec_to_array dv;
+  rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
+       as (A.pts_to dist (Seq.create 9 0));
+
+  A.op_Array_Assignment dist 0sz 0;
+  A.op_Array_Assignment dist 1sz 5;
+  A.op_Array_Assignment dist 2sz inf;
+  A.op_Array_Assignment dist 3sz 50;
+  A.op_Array_Assignment dist 4sz 0;
+  A.op_Array_Assignment dist 5sz 15;
+  A.op_Array_Assignment dist 6sz 30;
+  A.op_Array_Assignment dist 7sz inf;
+  A.op_Array_Assignment dist 8sz 0;
+
+  with s_in. assert (A.pts_to dist s_in);
+  lemma_seq_eq_test_adj s_in;
+
+  // --- Call check_no_negative_cycle ---
+  let ok = check_no_negative_cycle dist n;
+
+  // Postcondition:
+  //   (ok == true  ==> non_negative_diagonal test_adj 3) /\
+  //   (ok == false ==> ~(non_negative_diagonal test_adj 3))
+
+  // We independently know non_negative_diagonal test_adj 3 holds
+  lemma_test_adj_non_negative_diagonal ();
+
+  // Therefore ok cannot be false (it would imply ~(non_negative_diagonal ...),
+  // contradicting what we just proved), so ok must be true
+  assert (pure (ok == true));
+
+  with s. assert (A.pts_to dist s);
+  rewrite (A.pts_to dist s) as (A.pts_to (V.vec_to_array dv) s);
+  V.to_vec_pts_to dv;
+  V.free dv;
+}
+```
+
+(*** 5. Negative-cycle detection — error case ***)
+
+// Matrix with negative diagonal entry d[0][0] = -1
+let neg_diag_adj : Seq.seq int = Seq.seq_of_list [-1; 5; 1000000; 50; 0; 15; 30; 1000000; 0]
+
+let lemma_seq_eq_neg_diag_adj (s: Seq.seq int)
+  : Lemma
+    (requires Seq.length s == 9 /\
+              Seq.index s 0 == -1 /\ Seq.index s 1 == 5 /\ Seq.index s 2 == inf /\
+              Seq.index s 3 == 50 /\ Seq.index s 4 == 0 /\ Seq.index s 5 == 15 /\
+              Seq.index s 6 == 30 /\ Seq.index s 7 == inf /\ Seq.index s 8 == 0)
+    (ensures s == neg_diag_adj)
+  = assert_norm (Seq.length neg_diag_adj == 9);
+    assert_norm (Seq.index neg_diag_adj 0 == -1);
+    assert_norm (Seq.index neg_diag_adj 1 == 5);
+    assert_norm (Seq.index neg_diag_adj 2 == inf);
+    assert_norm (Seq.index neg_diag_adj 3 == 50);
+    assert_norm (Seq.index neg_diag_adj 4 == 0);
+    assert_norm (Seq.index neg_diag_adj 5 == 15);
+    assert_norm (Seq.index neg_diag_adj 6 == 30);
+    assert_norm (Seq.index neg_diag_adj 7 == inf);
+    assert_norm (Seq.index neg_diag_adj 8 == 0);
+    assert (Seq.equal s neg_diag_adj)
+
+// The negative diagonal entry at [0][0] = -1 violates non_negative_diagonal
+let lemma_neg_diag_not_nonneg ()
+  : Lemma (~(non_negative_diagonal neg_diag_adj 3))
+  = assert_norm (Seq.length neg_diag_adj == 3 * 3);
+    assert_norm (Seq.index neg_diag_adj 0 == -1)
+
+// Test: check_no_negative_cycle returns false on neg_diag_adj (error case).
+// The strengthened postcondition lets us prove the return value is false.
+```pulse
+fn test_neg_cycle_check_false ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  let n = 3sz;
+  let dv = V.alloc 0 9sz;
+  V.to_array_pts_to dv;
+  let dist = V.vec_to_array dv;
+  rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
+       as (A.pts_to dist (Seq.create 9 0));
+
+  A.op_Array_Assignment dist 0sz (-1);
+  A.op_Array_Assignment dist 1sz 5;
+  A.op_Array_Assignment dist 2sz inf;
+  A.op_Array_Assignment dist 3sz 50;
+  A.op_Array_Assignment dist 4sz 0;
+  A.op_Array_Assignment dist 5sz 15;
+  A.op_Array_Assignment dist 6sz 30;
+  A.op_Array_Assignment dist 7sz inf;
+  A.op_Array_Assignment dist 8sz 0;
+
+  with s_in. assert (A.pts_to dist s_in);
+  lemma_seq_eq_neg_diag_adj s_in;
+
+  // --- Call check_no_negative_cycle ---
+  let ok = check_no_negative_cycle dist n;
+
+  // Postcondition:
+  //   (ok == true  ==> non_negative_diagonal neg_diag_adj 3) /\
+  //   (ok == false ==> ~(non_negative_diagonal neg_diag_adj 3))
+
+  // We independently know ~(non_negative_diagonal neg_diag_adj 3)
+  lemma_neg_diag_not_nonneg ();
+
+  // Therefore ok cannot be true (it would imply non_negative_diagonal ...,
+  // but we just proved its negation), so ok must be false
+  assert (pure (ok == false));
+
+  with s. assert (A.pts_to dist s);
+  rewrite (A.pts_to dist s) as (A.pts_to (V.vec_to_array dv) s);
+  V.to_vec_pts_to dv;
+  V.free dv;
+}
+```
+
+(*** 6. floyd_warshall_safe API — weights_bounded + non_negative_diagonal ***)
+
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 40"
+let lemma_test_adj_weights_bounded ()
+  : Lemma (weights_bounded test_adj 3)
+  = assert_norm (Seq.length test_adj == 3 * 3);
+    assert_norm (inf == 1000000);
+    assert_norm (inf / 3 == 333333);
+    assert_norm (Seq.index test_adj 0 == 0);
+    assert_norm (Seq.index test_adj 1 == 5);
+    assert_norm (Seq.index test_adj 2 == inf);
+    assert_norm (Seq.index test_adj 3 == 50);
+    assert_norm (Seq.index test_adj 4 == 0);
+    assert_norm (Seq.index test_adj 5 == 15);
+    assert_norm (Seq.index test_adj 6 == 30);
+    assert_norm (Seq.index test_adj 7 == inf);
+    assert_norm (Seq.index test_adj 8 == 0)
+#pop-options
+
+// Test: floyd_warshall_safe with full preconditions (weights_bounded +
+// non_negative_diagonal) and output verification via fw_safe_entry_connection
+```pulse
+fn test_floyd_warshall_safe_impl ()
+  requires emp
+  returns _: unit
+  ensures emp
+{
+  let n = 3sz;
+  let dv = V.alloc 0 9sz;
+  V.to_array_pts_to dv;
+  let dist = V.vec_to_array dv;
+  rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
+       as (A.pts_to dist (Seq.create 9 0));
+
+  A.op_Array_Assignment dist 0sz 0;
+  A.op_Array_Assignment dist 1sz 5;
+  A.op_Array_Assignment dist 2sz inf;
+  A.op_Array_Assignment dist 3sz 50;
+  A.op_Array_Assignment dist 4sz 0;
+  A.op_Array_Assignment dist 5sz 15;
+  A.op_Array_Assignment dist 6sz 30;
+  A.op_Array_Assignment dist 7sz inf;
+  A.op_Array_Assignment dist 8sz 0;
+
+  with s_in. assert (A.pts_to dist s_in);
+  lemma_seq_eq_test_adj s_in;
+
+  // Establish preconditions for floyd_warshall_safe
+  lemma_test_adj_weights_bounded ();
+  lemma_test_adj_non_negative_diagonal ();
+
+  let ctr = GR.alloc #nat 0;
+
+  // --- Call floyd_warshall_safe (the safe API) ---
+  floyd_warshall_safe dist n ctr;
+
+  // Postcondition: contents' == fw_outer test_adj 3 0
+  with contents'. assert (A.pts_to dist contents');
+
+  // Verify output via fw_safe_entry_connection (from NegCycleDetect)
+  // This connects fw_outer to fw_entry without needing floyd_warshall_full_correctness
+  fw_safe_entry_connection test_adj 3 0 0;
+  fw_val_00 ();
+  assert (pure (Seq.index contents' 0 == 0));
+
+  fw_safe_entry_connection test_adj 3 0 2;
+  fw_val_02 ();
+  assert (pure (Seq.index contents' 2 == 20));
+
+  fw_safe_entry_connection test_adj 3 1 0;
+  fw_val_10 ();
+  assert (pure (Seq.index contents' 3 == 45));
+
+  fw_safe_entry_connection test_adj 3 2 1;
+  fw_val_21 ();
+  assert (pure (Seq.index contents' 7 == 35));
+
+  // Verify complexity
+  with cf. assert (GR.pts_to ctr cf);
+  complexity_bound ();
+  assert (pure (cf == 27));
+
   GR.free ctr;
   rewrite (A.pts_to dist contents')
        as (A.pts_to (V.vec_to_array dv) contents');
