@@ -7,33 +7,47 @@ in the intent-formalization repository.
 
 ## Test Description
 
-`CLRS.Ch02.InsertionSort.ImplTest.fst` contains a single Pulse test function
-`test_insertion_sort_3` that:
+`CLRS.Ch02.InsertionSort.ImplTest.fst` contains three Pulse test functions:
+
+### `test_insertion_sort_3` (main test)
 
 1. Allocates a 3-element array with contents `[3; 1; 2]`
 2. Allocates a ghost comparison counter initialized to 0
 3. Calls `insertion_sort arr 3sz ctr`
 4. Proves the output is exactly `[1; 2; 3]` using only the postcondition
+5. Asserts `cf <= 3` (at most n*(n-1)/2 = 3 comparisons)
+
+### `test_insertion_sort_empty` (edge case)
+
+1. Allocates a 0-element array
+2. Calls `insertion_sort arr 0sz ctr`
+3. Asserts `cf == 0` (zero comparisons for empty input)
+
+### `test_insertion_sort_single` (edge case)
+
+1. Allocates a 1-element array with contents `[42]`
+2. Calls `insertion_sort arr 1sz ctr`
+3. Asserts `cf == 0` (zero comparisons for single-element input)
 
 ## What Is Proven
 
 ### Precondition satisfiability
 
-The test constructs a valid call site, proving that:
-- `SZ.v 3sz == Seq.length s0` (length matches)
+All three tests construct valid call sites, proving that:
+- `SZ.v len == Seq.length s0` (length matches)
 - `Seq.length s0 <= A.length a` (array fits)
 
-These are the only preconditions of `insertion_sort`, and both are trivially
-satisfied by the test setup.
+These are the only preconditions of `insertion_sort`, and all are trivially
+satisfied by the test setups.
 
 ### Postcondition precision (completeness)
 
 The postcondition of `insertion_sort` provides:
 - `sorted s` — the output is sorted
 - `permutation s0 s` — the output is a permutation of the input
-- `complexity_bounded cf 0 3` — at most 3 comparisons
+- `complexity_bounded cf 0 n` — at most n*(n-1)/2 comparisons
 
-The test proves that `sorted s ∧ permutation [3;1;2] s` **uniquely determines**
+The main test proves that `sorted s ∧ permutation [3;1;2] s` **uniquely determines**
 `s = [1;2;3]`. This is done via:
 
 1. **`reveal_opaque`** on the opaque `SS.permutation` to expose
@@ -53,11 +67,16 @@ assert (pure (v1 == 2));
 assert (pure (v2 == 3));
 ```
 
-### Complexity bound
+### Complexity bound (explicit)
 
-The postcondition also provides `complexity_bounded cf 0 3`, which means
-`cf <= 3` (at most 3 comparisons for a 3-element input, since
-`n*(n-1)/2 = 3*2/2 = 3`). This bound is available in the proof context.
+The main test explicitly asserts `cf <= 3`, verifying that the complexity
+bound `n*(n-1)/2 = 3*2/2 = 3` is concrete and usable from the postcondition.
+
+The edge-case tests assert `cf == 0`, verifying that:
+- Empty input (n=0): `complexity_bounded cf 0 0` implies `cf == 0`
+  (since 0*(0-1)/2 = 0, and `cf >= 0`)
+- Single element (n=1): `complexity_bounded cf 0 1` implies `cf == 0`
+  (since 1*(1-1)/2 = 0, and `cf >= 0`)
 
 ## Spec Issues Found
 
@@ -67,7 +86,8 @@ precise:
 - The precondition is satisfiable and minimal (no unnecessary restrictions).
 - The postcondition (`sorted ∧ permutation`) uniquely determines the output
   for any given input (up to equal elements).
-- The complexity bound is tight for the worst case.
+- The complexity bound is tight for the worst case and concretely evaluable.
+- Edge cases (len=0, len=1) are correctly handled with zero comparisons.
 
 ## Verification
 

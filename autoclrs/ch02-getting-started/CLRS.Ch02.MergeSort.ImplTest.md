@@ -7,33 +7,47 @@ in the intent-formalization repository.
 
 ## Test Description
 
-`CLRS.Ch02.MergeSort.ImplTest.fst` contains a single Pulse test function
-`test_merge_sort_3` that:
+`CLRS.Ch02.MergeSort.ImplTest.fst` contains three Pulse test functions:
+
+### `test_merge_sort_3` (main test)
 
 1. Allocates a 3-element array with contents `[3; 1; 2]`
 2. Allocates a ghost comparison counter initialized to 0
 3. Calls `merge_sort arr 3sz ctr`
 4. Proves the output is exactly `[1; 2; 3]` using only the postcondition
+5. Asserts `cf <= 7` (at most `ms_cost(3) = merge_sort_ops(3) = 7` comparisons)
+
+### `test_merge_sort_empty` (edge case)
+
+1. Allocates a 0-element array
+2. Calls `merge_sort arr 0sz ctr`
+3. Asserts `cf == 0` (zero comparisons for empty input)
+
+### `test_merge_sort_single` (edge case)
+
+1. Allocates a 1-element array with contents `[42]`
+2. Calls `merge_sort arr 1sz ctr`
+3. Asserts `cf == 0` (zero comparisons for single-element input)
 
 ## What Is Proven
 
 ### Precondition satisfiability
 
-The test constructs a valid call site, proving that:
-- `SZ.v 3sz == Seq.length s0` (length matches)
+All three tests construct valid call sites, proving that:
+- `SZ.v len == Seq.length s0` (length matches)
 - `Seq.length s0 <= A.length a` (array fits)
 
-These are the only preconditions of `merge_sort`, and both are trivially
-satisfied by the test setup.
+These are the only preconditions of `merge_sort`, and all are trivially
+satisfied by the test setups.
 
 ### Postcondition precision (completeness)
 
 The postcondition of `merge_sort` provides:
 - `sorted s` — the output is sorted
 - `permutation s0 s` — the output is a permutation of the input
-- `sort_complexity_bounded cf 0 0 3` — comparisons bounded by `ms_cost(3)`
+- `sort_complexity_bounded cf 0 0 n` — comparisons bounded by `ms_cost(n)`
 
-The test proves that `sorted s ∧ permutation [3;1;2] s` **uniquely determines**
+The main test proves that `sorted s ∧ permutation [3;1;2] s` **uniquely determines**
 `s = [1;2;3]`. This is done via:
 
 1. **`reveal_opaque`** on the opaque `SS.permutation` to expose
@@ -53,21 +67,31 @@ assert (pure (v1 == 2));
 assert (pure (v2 == 3));
 ```
 
-### Complexity bound
+### Complexity bound (explicit)
 
-The postcondition also provides `sort_complexity_bounded cf 0 0 3`, which means
-`cf <= ms_cost(3) = merge_sort_ops(3) = 7` (at most 7 comparisons for a
-3-element input). This bound is available in the proof context.
+The main test explicitly asserts `cf <= 7`, verifying that the complexity
+bound `merge_sort_ops(3) = 7` is concrete and usable from the postcondition.
+This was previously impossible because `merge_sort_ops` was hidden behind a
+`val` in `Complexity.fsti`; the definitions of `ceil_div2` and
+`merge_sort_ops` are now exposed as `let` definitions, allowing Z3 to
+normalize `ms_cost(3)` to 7 with sufficient fuel.
 
-## Spec Issues Found
+The edge-case tests assert `cf == 0`, verifying that:
+- Empty input (n=0): `sort_complexity_bounded cf 0 0 0` implies `cf == 0`
+  (since `ms_cost(0) = 0`, and `cf >= 0`)
+- Single element (n=1): `sort_complexity_bounded cf 0 0 1` implies `cf == 0`
+  (since `ms_cost(1) = merge_sort_ops(1) = 0`, and `cf >= 0`)
 
-**None.** The specification in `CLRS.Ch02.MergeSort.Impl.fsti` is fully
-precise:
+## Spec Issues Found and Resolved
 
-- The precondition is satisfiable and minimal (no unnecessary restrictions).
-- The postcondition (`sorted ∧ permutation`) uniquely determines the output
-  for any given input (up to equal elements).
-- The complexity bound is correct for the O(n log n) recurrence.
+**Issue:** `merge_sort_ops` was declared as an opaque `val` in
+`Complexity.fsti`, preventing clients from computing concrete complexity
+bounds like `ms_cost(3) = 7`. The postcondition `sort_complexity_bounded cf 0
+0 3` was in the proof context but could not be resolved to `cf <= 7`.
+
+**Resolution:** Exposed `ceil_div2` and `merge_sort_ops` as `let`
+definitions in `Complexity.fsti`. All 16 ch02 modules still verify. The test
+now explicitly asserts `cf <= 7`.
 
 ## Verification
 

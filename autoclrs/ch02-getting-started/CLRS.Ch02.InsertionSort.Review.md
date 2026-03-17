@@ -192,13 +192,23 @@ and the total array is a permutation of the original. Three lemmas in
 
 A spec validation test (`CLRS.Ch02.InsertionSort.ImplTest.fst`) was written
 following the methodology from
-[arXiv:2406.09757](https://arxiv.org/abs/2406.09757). The test calls
-`insertion_sort` on the concrete input `[3; 1; 2]` and proves, using only the
-postcondition, that the output is exactly `[1; 2; 3]`.
+[arXiv:2406.09757](https://arxiv.org/abs/2406.09757). Three test functions:
+
+1. **`test_insertion_sort_3`**: Calls `insertion_sort` on `[3; 1; 2]` and
+   proves, using only the postcondition, that the output is exactly
+   `[1; 2; 3]`. Explicitly asserts `cf <= 3` (complexity bound).
+
+2. **`test_insertion_sort_empty`**: Calls `insertion_sort` on an empty array
+   and proves `cf == 0` (zero comparisons).
+
+3. **`test_insertion_sort_single`**: Calls `insertion_sort` on `[42]` and
+   proves `cf == 0` (zero comparisons).
 
 **Result: PASS.** The postcondition `sorted s ∧ permutation s0 s` is
-sufficiently precise to uniquely determine the output. No admits, no assumes.
-No spec incompleteness or imprecision issues were found.
+sufficiently precise to uniquely determine the output. The complexity bound
+`complexity_bounded cf c0 n` is concretely evaluable and tight for all tested
+cases. No admits, no assumes. No spec incompleteness or imprecision issues
+were found.
 
 See `CLRS.Ch02.InsertionSort.ImplTest.md` for full details.
 

@@ -309,13 +309,25 @@ Key lemmas in `CLRS.Ch02.MergeSort.Lemmas`:
 
 A spec validation test (`CLRS.Ch02.MergeSort.ImplTest.fst`) was written
 following the methodology from
-[arXiv:2406.09757](https://arxiv.org/abs/2406.09757). The test calls
-`merge_sort` on the concrete input `[3; 1; 2]` and proves, using only the
-postcondition, that the output is exactly `[1; 2; 3]`.
+[arXiv:2406.09757](https://arxiv.org/abs/2406.09757). Three test functions:
+
+1. **`test_merge_sort_3`**: Calls `merge_sort` on `[3; 1; 2]` and proves,
+   using only the postcondition, that the output is exactly `[1; 2; 3]`.
+   Explicitly asserts `cf <= 7` (complexity bound). This required exposing
+   `ceil_div2` and `merge_sort_ops` as definitions in `Complexity.fsti`
+   (previously opaque `val` declarations that prevented concrete evaluation).
+
+2. **`test_merge_sort_empty`**: Calls `merge_sort` on an empty array and
+   proves `cf == 0` (zero comparisons).
+
+3. **`test_merge_sort_single`**: Calls `merge_sort` on `[42]` and proves
+   `cf == 0` (zero comparisons).
 
 **Result: PASS.** The postcondition `sorted s ∧ permutation s0 s` is
-sufficiently precise to uniquely determine the output. No admits, no assumes.
-No spec incompleteness or imprecision issues were found.
+sufficiently precise to uniquely determine the output. The complexity bound
+`sort_complexity_bounded cf c0 lo hi` is now concretely evaluable (after
+exposing `merge_sort_ops`) and correct for all tested cases. No admits, no
+assumes.
 
 See `CLRS.Ch02.MergeSort.ImplTest.md` for full details.
 
