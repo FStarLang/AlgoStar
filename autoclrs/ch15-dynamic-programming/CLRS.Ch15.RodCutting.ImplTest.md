@@ -48,4 +48,7 @@ The test is fully verified by F* and Z3 with no admits or assumes.
 
 **The Rod Cutting specification is fully precise.** The postcondition
 `result == optimal_revenue s_prices n` directly computes to the correct
-concrete value. No spec weaknesses were found.
+concrete value. Non-negativity is guaranteed by the return type (`nat`),
+which is stronger than what LCS and MatrixChain achieve through
+postcondition constraints — it is enforced at the type level.
+No spec weaknesses were found.

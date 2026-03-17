@@ -107,10 +107,13 @@ fn matrix_chain_order
     GR.pts_to ctr cf **
     pure (
       result == mc_result s_dims (SZ.v n) /\
+      result >= 0 /\
       mc_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 //SNIPPET_END: mc_sig
 {
+  // Prove non-negativity of the pure spec result
+  mc_result_nonneg s_dims (SZ.v n);
   // Allocate DP table m[0..n-1][0..n-1] as flat array of size n*n
   let table_size = n *^ n;
   lemma_table_size_positive (SZ.v n);

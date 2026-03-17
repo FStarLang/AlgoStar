@@ -47,6 +47,7 @@ fn matrix_chain_order
     GR.pts_to ctr cf **
     pure (
       result == mc_result s_dims (SZ.v n) /\
+      result >= 0 /\
       mc_complexity_bounded cf (reveal c0) (SZ.v n)
     )
 

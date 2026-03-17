@@ -13,7 +13,9 @@
    2. The postcondition is precise: after calling lcs, we can prove
       result == 2 using only the postcondition
       (result == lcs_length sx sy m n) and a normalization lemma.
-   3. No admits, no assumes.
+   3. Non-negativity: result >= 0 is proven directly from the postcondition.
+   4. Upper bounds: result <= m and result <= n are proven from the postcondition.
+   5. No admits, no assumes.
 *)
 
 module CLRS.Ch15.LCS.ImplTest
@@ -84,6 +86,11 @@ fn test_lcs ()
   // Prove the result is exactly 2 using the postcondition
   lcs_expected ();
   assert (pure (result == 2));
+
+  // Verify range properties directly from postcondition (no extra lemmas needed)
+  assert (pure (result >= 0));
+  assert (pure (result <= 3));  // result <= m
+  assert (pure (result <= 3));  // result <= n
 
   // Cleanup
   with cf. assert (GR.pts_to ctr cf);

@@ -88,10 +88,15 @@ fn lcs
     GR.pts_to ctr cf **
     pure (
       result == lcs_length sx sy (SZ.v m) (SZ.v n) /\
+      result >= 0 /\
+      result <= SZ.v m /\
+      result <= SZ.v n /\
       lcs_complexity_bounded cf (reveal c0) (SZ.v m) (SZ.v n)
     )
 //SNIPPET_END: lcs_sig
 {
+  lcs_length_nonneg sx sy (SZ.v m) (SZ.v n);
+  lcs_length_upper_bound sx sy (SZ.v m) (SZ.v n);
   if (m = 0sz || n = 0sz) {
     0
   } else {

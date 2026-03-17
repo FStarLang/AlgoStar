@@ -46,6 +46,19 @@ let rec lcs_length_nonneg (x y: seq int) (i j: nat)
       lcs_length_nonneg x y i (j - 1)
     end
 
+// Lemma: lcs_length is bounded above by both i and j
+let rec lcs_length_upper_bound (x y: seq int) (i j: nat)
+  : Lemma (ensures lcs_length x y i j <= i /\ lcs_length x y i j <= j)
+          (decreases i + j)
+  = if i = 0 || j = 0 then ()
+    else if i <= length x && j <= length y &&
+            index x (i - 1) = index y (j - 1) then
+      lcs_length_upper_bound x y (i - 1) (j - 1)
+    else begin
+      lcs_length_upper_bound x y (i - 1) j;
+      lcs_length_upper_bound x y i (j - 1)
+    end
+
 // Lemma: relating DP recurrence to lcs_length  
 let lcs_recurrence_correct (x y: seq int) (i j: nat) 
   (val_diag val_up val_left: int)

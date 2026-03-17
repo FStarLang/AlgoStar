@@ -41,16 +41,56 @@ lcs_length (Seq.seq_of_list [1; 2; 3]) (Seq.seq_of_list [2; 3; 4]) 3 3 == 2
 Together these establish `result == 2` with full proof — the postcondition
 is **precise enough** to determine the exact output for a concrete input.
 
-### 3. No admits, no assumes
+### 3. Non-negativity (from strengthened spec)
+
+The postcondition now includes `result >= 0`, proven directly by the
+implementation calling `lcs_length_nonneg`. The test verifies:
+```fstar
+assert (pure (result >= 0))
+```
+This succeeds without any additional lemma calls — the property flows
+directly from the postcondition.
+
+### 4. Upper bounds (from strengthened spec)
+
+The postcondition now includes `result <= SZ.v m /\ result <= SZ.v n`,
+proven by the implementation calling `lcs_length_upper_bound`. The test
+verifies:
+```fstar
+assert (pure (result <= 3))   // result <= m
+assert (pure (result <= 3))   // result <= n
+```
+
+### 5. No admits, no assumes
 
 The test is fully verified by F* and Z3 with no admits or assumes.
 
+## Spec Strengthening Summary
+
+The `Impl.fsti` postcondition was strengthened from:
+```
+result == lcs_length sx sy m n
+```
+to:
+```
+result == lcs_length sx sy m n /\
+result >= 0 /\
+result <= SZ.v m /\
+result <= SZ.v n
+```
+
+This allows callers (including this test) to derive range properties
+directly from the postcondition without importing additional lemmas.
+The proofs use `lcs_length_nonneg` and `lcs_length_upper_bound` from
+`CLRS.Ch15.LCS.Spec`.
+
 ## Findings
 
-**The LCS specification is fully precise.** The postcondition
-`result == lcs_length sx sy m n` directly computes to the correct
-concrete value. This is further strengthened by the lemma
-`lcs_length_is_longest` (in Lemmas.fst), which proves that `lcs_length`
-is both an upper bound on all common subsequences and is achieved by
-a constructive witness — the **strongest possible correctness specification**.
-No spec weaknesses were found.
+**The LCS specification is fully precise with complete range constraints.**
+The postcondition `result == lcs_length sx sy m n` directly computes to
+the correct concrete value, and the range properties `result >= 0`,
+`result <= m`, `result <= n` are proven as part of the postcondition.
+This is further strengthened by the lemma `lcs_length_is_longest`
+(in Lemmas.fst), which proves that `lcs_length` is both an upper bound
+on all common subsequences and is achieved by a constructive witness —
+the **strongest possible correctness specification**.

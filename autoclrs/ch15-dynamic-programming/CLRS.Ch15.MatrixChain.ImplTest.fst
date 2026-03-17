@@ -15,7 +15,8 @@
    2. The postcondition is precise: after calling matrix_chain_order, we can
       prove result == 4500 using only the postcondition
       (result == mc_result s_dims n) and a normalization lemma.
-   3. No admits, no assumes.
+   3. Non-negativity: result >= 0 is proven directly from the postcondition.
+   4. No admits, no assumes.
 *)
 
 module CLRS.Ch15.MatrixChain.ImplTest
@@ -47,6 +48,8 @@ let mc_pre_satisfiable ()
   = assert_norm (SZ.v 3sz > 0 /\
                  SZ.fits (op_Multiply (SZ.v 3sz) (SZ.v 3sz)))
 
+#push-options "--z3rlimit 20"
+
 fn test_matrix_chain ()
   requires emp
   returns _: unit
@@ -77,6 +80,9 @@ fn test_matrix_chain ()
   mc_expected ();
   assert (pure (result == 4500));
 
+  // Verify non-negativity directly from postcondition (no extra lemmas needed)
+  assert (pure (result >= 0));
+
   // Cleanup
   with cf. assert (GR.pts_to ctr cf);
   GR.free ctr;
@@ -86,3 +92,5 @@ fn test_matrix_chain ()
   V.to_vec_pts_to dv;
   V.free dv;
 }
+
+#pop-options

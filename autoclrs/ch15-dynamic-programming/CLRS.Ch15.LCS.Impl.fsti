@@ -50,5 +50,8 @@ fn lcs
     GR.pts_to ctr cf **
     pure (
       result == lcs_length sx sy (SZ.v m) (SZ.v n) /\
+      result >= 0 /\
+      result <= SZ.v m /\
+      result <= SZ.v n /\
       lcs_complexity_bounded cf (reveal c0) (SZ.v m) (SZ.v n)
     )
