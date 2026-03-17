@@ -1,6 +1,6 @@
 # Simultaneous Min and Max (CLRS §9.1) — Review
 
-**Last reviewed:** 2026-03-16
+**Last reviewed:** 2026-03-17
 **Build status:** ✅ All files verified (zero admits, zero assumes)
 **Verification time:** ~18s for Impl.fst (the slowest file)
 
@@ -14,6 +14,8 @@
 - [x] Correctness: existence + universality for both min and max
 - [x] Array is read-only (fractional permission `#p`)
 - [x] Build: Impl files included in Makefile and verified
+- [x] **Spec validation**: ImplTest.fst verified — postcondition is precise
+  enough to determine exact output for concrete inputs (no admits/assumes)
 - [ ] *(Stability)* `find_minmax_pairs` uses `--z3rlimit 500 --ifuel 3 --fuel 3` — consider
   reducing via proof restructuring
 - [ ] *(Nice-to-have)* Consider returning indices alongside values
@@ -65,3 +67,12 @@ tracking tick counts across even/odd cases.
 1. **No indices returned** — values only.
 2. **`len >= 1`** — no empty array handling.
 3. **`len == A.length a`** — cannot operate on subrange.
+
+## Spec Validation (ImplTest)
+
+The `ImplTest.fst` tests both `find_minmax` and `find_minmax_pairs` on
+`[5, 2, 8]` and proves `min_val == 2` and `max_val == 8` from the
+postcondition alone.
+
+**Result:** ✅ PASS — No spec weaknesses found. Postcondition uniquely
+determines both min and max for any concrete input.

@@ -1,6 +1,6 @@
 # Partial Selection Sort — Review
 
-**Last reviewed:** 2026-03-16
+**Last reviewed:** 2026-03-17
 **Build status:** ✅ All files verified (zero admits, zero assumes)
 **Verification time:** ~29s for Spec.fst (optimized from 317s)
 
@@ -16,6 +16,9 @@
 - [x] No duplicate top-level definitions between .fsti and .fst
 - [x] Complexity module proves both simple and tight closed forms
 - [x] Spec.fst verification optimized: 317s → 29s (set --fuel 4 on bottleneck lemmas)
+- [x] **Spec validation**: ImplTest.fst verified — postcondition is precise
+  enough to determine exact output, though requires `reveal_opaque` for the
+  opaque `permutation` and a completeness lemma (no admits/assumes)
 - [ ] *(Nice-to-have)* Unify `permutation` definition with Quickselect.Spec
 
 ## Top-Level Signatures (`Impl.fsti`)
@@ -91,3 +94,17 @@ Potential optimizations:
 2. **O(nk) worst-case** — worse than quickselect for large k.
 3. **k is 1-indexed** — unlike quickselect's 0-indexed k.
 4. **Own permutation definition** — separate from Quickselect.Spec.permutation.
+
+## Spec Validation (ImplTest)
+
+The `ImplTest.fst` tests `select` on `[5, 2, 8]` with k=1, proving
+`result == 2`. Because `permutation` is `[@@"opaque_to_smt"]`, the test
+uses `reveal_opaque` and a `completeness_select_k1` lemma with count-based
+reasoning to establish the result.
+
+**Result:** ✅ PASS — The postcondition is precise but requires extra proof
+effort due to the opaque permutation. Unlike Quickselect's postcondition
+(which includes `result == select_spec s0 k`), PartialSelectionSort's
+postcondition relies on the combination of `sorted_prefix +
+prefix_leq_suffix + permutation` which is equivalent but harder to use
+directly.

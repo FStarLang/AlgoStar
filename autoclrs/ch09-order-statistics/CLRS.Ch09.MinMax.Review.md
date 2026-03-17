@@ -1,6 +1,6 @@
 # Minimum and Maximum (CLRS §9.1) — Review
 
-**Last reviewed:** 2026-03-16
+**Last reviewed:** 2026-03-17
 **Build status:** ✅ All files verified (zero admits, zero assumes)
 **Verification time:** <10s total
 
@@ -15,6 +15,8 @@
 - [x] Array is read-only (fractional permission `#p`)
 - [x] Build: Impl files included in Makefile and verified
 - [x] Impl.fsti has correct `open` statements for Pulse compatibility
+- [x] **Spec validation**: ImplTest.fst verified — postcondition is precise
+  enough to determine exact output for concrete inputs (no admits/assumes)
 - [ ] *(Nice-to-have)* Consider returning index alongside value
 - [ ] *(Nice-to-have)* Consider `len <= A.length a` for subrange operation
 
@@ -60,3 +62,11 @@ Symmetric: replaces `<=` with `>=`, uses `complexity_bounded_max`.
 1. **`len > 0` precondition** — natural for min/max (undefined on empty arrays).
 2. **No index returned** — `find_min_index_from` in PartialSelectionSort provides this.
 3. **`len == A.length a`** — cannot operate on a subrange.
+
+## Spec Validation (ImplTest)
+
+The `ImplTest.fst` tests `find_minimum` and `find_maximum` on `[5, 2, 8]` and
+proves `min_val == 2` and `max_val == 8` from the postcondition alone.
+
+**Result:** ✅ PASS — No spec weaknesses found. The existence + universality
+postcondition uniquely determines the output for any concrete input.

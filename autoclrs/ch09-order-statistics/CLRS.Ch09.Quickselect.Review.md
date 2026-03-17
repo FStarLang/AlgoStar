@@ -1,6 +1,6 @@
 # Quickselect (CLRS §9.2) — Review
 
-**Last reviewed:** 2026-03-16
+**Last reviewed:** 2026-03-17
 **Build status:** ✅ All files verified (zero admits, zero assumes)
 **Verification time:** ~34s for Impl.fst (the slowest file)
 
@@ -16,6 +16,8 @@
 - [x] Permutation preservation
 - [x] Build: Impl files included in Makefile and verified
 - [x] No duplicate top-level definitions between .fsti and .fst
+- [x] **Spec validation**: ImplTest.fst verified — postcondition's `select_spec`
+  clause uniquely determines result for concrete inputs (no admits/assumes)
 - [ ] *(Nice-to-have)* Expected O(n) analysis for randomized pivot
 - [ ] *(Nice-to-have)* Randomized pivot selection
 
@@ -74,3 +76,12 @@ ensures exists* s_final (cf: nat). A.pts_to a s_final ** GR.pts_to ctr cf **
 1. **Only worst-case O(n²)** — expected O(n) for randomized pivot not mechanized.
 2. **Deterministic pivot** — always picks last element; adversarial inputs hit worst case.
 3. **k is 0-indexed** — CLRS uses 1-indexed ranks.
+
+## Spec Validation (ImplTest)
+
+The `ImplTest.fst` tests `quickselect` on `[5, 2, 8]` with k=0 (min) and k=2
+(max), proving `result == 2` and `result == 8` respectively. The proof uses
+`assert_norm` to evaluate `select_spec` for concrete inputs.
+
+**Result:** ✅ PASS — No spec weaknesses found. The `result == select_spec s0 k`
+clause is the strongest possible specification and directly computable.
