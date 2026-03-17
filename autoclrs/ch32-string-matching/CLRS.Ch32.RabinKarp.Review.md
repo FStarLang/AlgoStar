@@ -265,6 +265,21 @@ lemma uses `--z3rlimit_factor 40` and a `calc` proof. The correctness proofs
 | `CLRS.Ch32.RabinKarp.Complexity.fsti` | `rk_best_case`, `rk_worst_case`, `rk_complexity_bounded` |
 | `CLRS.Ch32.RabinKarp.Complexity.fst` | Complexity lemma proofs |
 
+## Spec Validation (2026-03-17)
+
+**Test file**: `CLRS.Ch32.RabinKarp.ImplTest.fst`
+
+| Check | Result |
+|-------|--------|
+| Precondition satisfiable | ✅ Proven (text=[1,2,1,2,1], pat=[1,2,1], d=10, q=13) |
+| Postcondition precise | ✅ count=2 uniquely determined |
+| Hash param independence | ✅ count is independent of d, q |
+| No admits/assumes in test | ✅ |
+
+**Finding**: The postcondition is precise — `count_matches_up_to` uniquely
+determines the output for any concrete input, regardless of hash parameters.
+No specification weaknesses found.
+
 ## Checklist
 
 - [x] Functional correctness (count == spec, Pulse + pure)
@@ -276,8 +291,8 @@ lemma uses `--z3rlimit_factor 40` and a `calc` proof. The correctness proofs
 - [x] Spec/Impl separation (factored into Spec, Lemmas, Complexity)
 - [x] Interface (.fsti) files for Lemmas and Complexity
 - [x] Uses shared `CLRS.Common.Complexity.tick`
+- [x] Spec validation test (`ImplTest.fst`) — postcondition precision verified
 - [ ] Missing `Impl.fsti` — no public interface file for the Pulse implementation
-- [ ] No test file — only KMP has tests
 - [ ] `RabinKarp.Spec.fst` proof time (~220s) — `hash_inversion` uses rlimit_factor 40
 - [ ] Correctness proofs duplicated between `Spec.fst` and `Lemmas.fst` — the Lemmas module re-proves the same theorems rather than re-exporting from Spec
 - [ ] `count_matches_up_to` defined locally in `RabinKarp.fst` — duplicates `NaiveStringMatch.Spec`

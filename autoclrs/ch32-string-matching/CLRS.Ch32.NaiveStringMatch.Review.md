@@ -199,6 +199,20 @@ No bottlenecks. All proofs are fast and stable.
 | `CLRS.Ch32.NaiveStringMatch.Lemmas.fsti` | Lemma signatures |
 | `CLRS.Ch32.NaiveStringMatch.Lemmas.fst` | `matches_at_dec_correct`, unfolding, bounded |
 
+## Spec Validation (2026-03-17)
+
+**Test file**: `CLRS.Ch32.NaiveStringMatch.ImplTest.fst`
+
+| Check | Result |
+|-------|--------|
+| Precondition satisfiable | ✅ Proven (text=[1,2,1,2,1], pat=[1,2,1]) |
+| Postcondition precise | ✅ count=2 uniquely determined |
+| Match positions verified | ✅ pos 0 ✓, pos 1 ✗, pos 2 ✓ |
+| No admits/assumes in test | ✅ |
+
+**Finding**: The postcondition is precise — `count_matches_up_to` uniquely
+determines the output for any concrete input. No specification weaknesses found.
+
 ## Checklist
 
 - [x] Functional correctness (count == spec)
@@ -209,6 +223,6 @@ No bottlenecks. All proofs are fast and stable.
 - [x] Interface (.fsti) files for Lemmas and Complexity
 - [x] Uses shared `CLRS.Common.Complexity.tick`
 - [x] Fast, stable proofs (<10s total)
+- [x] Spec validation test (`ImplTest.fst`) — postcondition precision verified
 - [ ] Missing `Impl.fsti` — no public interface file for the Pulse implementation
-- [ ] No test file — only KMP has tests
 - [ ] `matches_at` / `count_matches_up_to` duplicated across Naive, RabinKarp, KMP

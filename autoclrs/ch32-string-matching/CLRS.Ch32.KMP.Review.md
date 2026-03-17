@@ -239,6 +239,23 @@ definitions and case-analysis lemmas. Uses `--z3refresh` for stability.
 | `CLRS.Ch32.KMP.Bridge.fst` | `pi_max_sz`, `pi_optimal_extension`, SZ↔int conversion |
 | `CLRS.Ch32.KMP.Test.fst` | Runtime test: text=[0,1,0,1,0], pattern=[0,1,0] |
 
+## Spec Validation (2026-03-17)
+
+**Test file**: `CLRS.Ch32.KMP.ImplTest.fst`
+
+| Check | Result |
+|-------|--------|
+| Precondition satisfiable | ✅ Proven (text=[0,1,0,1,0], pat=[0,1,0]) |
+| Postcondition precise | ✅ count=2 uniquely determined |
+| No admits/assumes in test | ✅ |
+
+**Finding**: The postcondition is precise — `count_matches_spec` uniquely
+determines the output for any concrete input. No specification weaknesses found.
+
+**Note**: The existing `KMP.Test.fst` only tests precondition satisfiability
+(calls the function without verifying the output). The new `KMP.ImplTest.fst`
+proves postcondition precision.
+
 ## Checklist
 
 - [x] Functional correctness (count == count_matches_spec)
@@ -249,6 +266,7 @@ definitions and case-analysis lemmas. Uses `--z3refresh` for stability.
 - [x] CLRS-faithful algorithm
 - [x] Uses shared `CLRS.Common.Complexity.tick` (resolved 2026-03-16)
 - [x] `#restart-solver` between major functions (added 2026-03-16)
+- [x] Spec validation test (`ImplTest.fst`) — postcondition precision verified
 - [ ] `KMP.fst` proof time (~700s) — nested loops with amortized invariants are expensive; the `compute_prefix_function` section needed rlimit bump from 100→120 after switching to common tick
 - [ ] `KMP.Spec.fst` proof time (~114s) — recursive completeness proof is inherently complex
 - [ ] Missing `Impl.fsti` — no public interface file for the Pulse implementation

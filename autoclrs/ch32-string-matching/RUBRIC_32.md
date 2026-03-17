@@ -135,7 +135,8 @@ The rubric requires 7 files per algorithm. Status key: ✅ = present & conformin
 | Spec/Impl separation | ✅ (factored) | ✅ | ✅ (non-standard names) |
 | Interface (`.fsti`) files | ✅ Lemmas+Complexity | ✅ Lemmas+Complexity | ❌ |
 | Uses shared tick module | ✅ | ✅ | ✅ |
-| Tests | ❌ | ❌ | ✅ `KMP.Test.fst` |
+| Tests | ✅ `ImplTest.fst` | ✅ `ImplTest.fst` | ✅ `KMP.Test.fst` + `ImplTest.fst` |
+| Spec validation (postcondition precision) | ✅ count=2 proven | ✅ count=2 proven | ✅ count=2 proven |
 
 ### Changes since AUDIT_CH32.md
 
