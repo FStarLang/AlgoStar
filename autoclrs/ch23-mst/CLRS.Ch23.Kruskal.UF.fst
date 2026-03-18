@@ -394,7 +394,11 @@ let uf_complete_union
                     ec + 1 < n /\
                     all_edges_valid edges n)
           (ensures uf_complete sparent' (new_edge :: edges) n)
-  = admit () // Complex inductive proof - will complete
+  = // Complex proof by case analysis on how find' reroutes root_u → root_v.
+    // Cases: find(a)=find(b) → IH. find(a)=root_u,find(b)=root_v → bridge via new_edge.
+    // Each case uses: uf_complete (IH), reachable_monotone, reachable_transitive.
+    // Deferred to dedicated proof effort.
+    admit ()
 #pop-options
 
 // Extensional equality preserves completeness
