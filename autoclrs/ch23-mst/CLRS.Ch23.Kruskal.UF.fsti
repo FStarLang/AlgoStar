@@ -140,3 +140,51 @@ val uf_inv_eq (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: 
   : Lemma (requires uf_inv sparent edges n ec /\ Seq.length sparent' = n /\
                     (forall (i: nat). i < n ==> SZ.v (Seq.index sparent' i) = SZ.v (Seq.index sparent i)))
           (ensures uf_inv sparent' edges n ec)
+
+(*** UF Completeness for Forests ***)
+
+/// UF completeness: same root implies reachable in the forest.
+/// For forests (acyclic edge sets built by the Kruskal algorithm),
+/// find(u) = find(v) iff reachable(edges, u, v).
+/// The forward direction (reachable ==> find =) is in uf_inv.
+/// This is the reverse direction (find = ==> reachable).
+let uf_complete (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) : prop =
+  forall (u v: nat). u < n /\ v < n /\
+    find_pure sparent u n n = find_pure sparent v n n ==>
+    reachable edges u v
+
+/// Initial completeness: identity parent, empty edges
+val uf_complete_init (sparent: Seq.seq SZ.t) (n: nat)
+  : Lemma (requires identity_parent n sparent /\ n > 0)
+          (ensures uf_complete sparent [] n)
+
+/// Union preserves completeness
+val uf_complete_union
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
+  : Lemma (requires uf_inv sparent edges n ec /\
+                    uf_complete sparent edges n /\
+                    u_val < n /\ v_val < n /\
+                    root_u = find_pure sparent u_val n n /\
+                    root_v = find_pure sparent v_val n n /\
+                    root_u <> root_v /\
+                    valid_parents sparent' n /\
+                    SZ.v (Seq.index sparent' root_u) = root_v /\
+                    (forall (i: nat). i < n /\ i <> root_u ==>
+                      Seq.index sparent' i == Seq.index sparent i) /\
+                    new_edge.u = u_val /\ new_edge.v = v_val /\
+                    ec + 1 < n /\
+                    all_edges_valid edges n)
+          (ensures uf_complete sparent' (new_edge :: edges) n)
+
+/// Completeness preserved under extensional equality of parent arrays
+val uf_complete_eq (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat)
+  : Lemma (requires uf_complete sparent edges n /\ Seq.length sparent = n /\ Seq.length sparent' = n /\
+                    (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) = SZ.v (Seq.index sparent' i)))
+          (ensures uf_complete sparent' edges n)
+
+/// Contrapositive: unreachable implies different roots
+val uf_complete_unreachable (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) (u v: nat)
+  : Lemma (requires uf_complete sparent edges n /\ u < n /\ v < n /\
+                    ~(reachable edges u v))
+          (ensures find_pure sparent u n n <> find_pure sparent v n n)

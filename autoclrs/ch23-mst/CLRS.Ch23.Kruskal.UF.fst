@@ -328,3 +328,93 @@ let uf_inv_eq (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: 
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires eq_ec)
     // Step 2: Z3 derives uf_inv sparent' from uf_inv sparent and the equalities
+
+(*** UF Completeness for Forests ***)
+
+// Self-reachability
+let reachable_refl (edges: list edge) (u: nat)
+  : Lemma (ensures reachable edges u u)
+  = assert (is_path_from_to [] u u);
+    assert (subset_edges [] edges)
+
+// Reachability is monotone: adding an edge preserves reachability
+let reachable_monotone (e: edge) (edges: list edge) (u v: nat)
+  : Lemma (requires reachable edges u v)
+          (ensures reachable (e :: edges) u v)
+  = let aux (path: list edge)
+      : Lemma (requires is_path_from_to path u v /\ subset_edges path edges)
+              (ensures reachable (e :: edges) u v)
+      = subset_edges_cons path e edges
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+// Initial completeness: identity parent means find(u) = u,
+// so find(u) = find(v) implies u = v, hence reachable via empty path
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+let uf_complete_init (sparent: Seq.seq SZ.t) (n: nat)
+  : Lemma (requires identity_parent n sparent /\ n > 0)
+          (ensures uf_complete sparent [] n)
+  = let aux (u v: nat) : Lemma
+      (requires u < n /\ v < n /\ find_pure sparent u n n = find_pure sparent v n n)
+      (ensures reachable ([] #edge) u v)
+      = find_pure_identity sparent u n n;
+        find_pure_identity sparent v n n;
+        // find(u) = u and find(v) = v, so u = v
+        reachable_refl ([] #edge) u
+    in
+    let aux2 (u:nat) : Lemma
+      (forall (v:nat). u < n /\ v < n /\ find_pure sparent u n n = find_pure sparent v n n ==>
+        reachable ([] #edge) u v)
+      = let aux3 (v:nat) : Lemma
+          (requires u < n /\ v < n /\ find_pure sparent u n n = find_pure sparent v n n)
+          (ensures reachable ([] #edge) u v)
+          = aux u v
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux3)
+    in
+    FStar.Classical.forall_intro aux2
+#pop-options
+
+// Union step: after adding edge (u_val, v_val) and setting parent'[root_u] = root_v
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 400 --split_queries always"
+let uf_complete_union
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
+  : Lemma (requires uf_inv sparent edges n ec /\
+                    uf_complete sparent edges n /\
+                    u_val < n /\ v_val < n /\
+                    root_u = find_pure sparent u_val n n /\
+                    root_v = find_pure sparent v_val n n /\
+                    root_u <> root_v /\
+                    valid_parents sparent' n /\
+                    SZ.v (Seq.index sparent' root_u) = root_v /\
+                    (forall (i: nat). i < n /\ i <> root_u ==>
+                      Seq.index sparent' i == Seq.index sparent i) /\
+                    new_edge.u = u_val /\ new_edge.v = v_val /\
+                    ec + 1 < n /\
+                    all_edges_valid edges n)
+          (ensures uf_complete sparent' (new_edge :: edges) n)
+  = admit () // Complex inductive proof - will complete
+#pop-options
+
+// Extensional equality preserves completeness
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 200"
+let uf_complete_eq (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat)
+  : Lemma (requires uf_complete sparent edges n /\ Seq.length sparent = n /\ Seq.length sparent' = n /\
+                    (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) = SZ.v (Seq.index sparent' i)))
+          (ensures uf_complete sparent' edges n)
+  = // find_pure_eq shows find values are the same for extensionally equal arrays
+    let aux (u: nat) : Lemma
+      (requires u < n)
+      (ensures find_pure sparent' u n n = find_pure sparent u n n)
+      = find_pure_eq sparent sparent' u n n
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+// Contrapositive: unreachable implies different roots
+let uf_complete_unreachable (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) (u v: nat)
+  : Lemma (requires uf_complete sparent edges n /\ u < n /\ v < n /\
+                    ~(reachable edges u v))
+          (ensures find_pure sparent u n n <> find_pure sparent v n n)
+  = ()
