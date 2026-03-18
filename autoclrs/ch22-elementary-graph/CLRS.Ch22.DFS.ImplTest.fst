@@ -11,6 +11,7 @@
    4. Finish times positive (f[u] > 0).
    5. Parenthesis theorem: d[u] < f[u] for all u.
    6. pred_edge_ok — predecessor tree is a valid subgraph.
+   7. pred_finish_ok — children finish before parents: f[v] < f[pred[v]].
 
    NO admits. NO assumes.
 
@@ -71,6 +72,32 @@ let lemma_seq_eq_test_adj (s: Seq.seq int)
     assert_norm (Seq.index test_adj 7 == 0);
     assert_norm (Seq.index test_adj 8 == 0);
     assert (Seq.equal s test_adj)
+#pop-options
+
+(*** 2. Predecessor derivation from pred_edge_ok ***)
+
+// From pred_edge_ok: if pred[v] >= 0 and pred[v] < n, then adj[pred[v]*n+v] <> 0.
+// For our graph: only adj[0*3+1]=1 and adj[1*3+2]=1 are nonzero.
+// So pred[1] must be 0 (only vertex with edge to 1) and pred[2] must be 1.
+
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 60"
+let derive_pred_values
+  (scolor sd spred: Seq.seq int)
+  : Lemma
+    (requires
+      Seq.length scolor >= 3 /\ Seq.length sd >= 3 /\ Seq.length spred >= 3 /\
+      pred_edge_ok test_adj 3 scolor sd spred /\
+      (forall (u:nat). u < 3 ==> Seq.index scolor u == 2))
+    (ensures
+      (Seq.index spred 1 >= 0 ==> Seq.index spred 1 == 0) /\
+      (Seq.index spred 2 >= 0 ==> Seq.index spred 2 == 1))
+  = reveal_opaque (`%pred_edge_ok) (pred_edge_ok test_adj 3 scolor sd spred);
+    assert_norm (Seq.index test_adj (0 * 3 + 1) <> 0);
+    assert_norm (Seq.index test_adj (1 * 3 + 1) == 0);
+    assert_norm (Seq.index test_adj (2 * 3 + 1) == 0);
+    assert_norm (Seq.index test_adj (0 * 3 + 2) == 0);
+    assert_norm (Seq.index test_adj (1 * 3 + 2) <> 0);
+    assert_norm (Seq.index test_adj (2 * 3 + 2) == 0)
 #pop-options
 
 (*** Main test ***)
@@ -193,15 +220,43 @@ fn test_dfs_3 ()
   // -- (F) Complexity bound --
   assert (pure (cf - 0 <= 2 * (3 * 3)));
 
-  // -- (G) Timestamp bounds (NEW) --
-  // From the strengthened postcondition: d[u] ≤ 2*n and f[u] ≤ 2*n
+  // -- (G) Timestamp bounds --
   assert (pure (Seq.index sd' 0 <= 2 * 3));
   assert (pure (Seq.index sd' 1 <= 2 * 3));
   assert (pure (Seq.index sd' 2 <= 2 * 3));
   assert (pure (Seq.index sf' 0 <= 2 * 3));
   assert (pure (Seq.index sf' 1 <= 2 * 3));
   assert (pure (Seq.index sf' 2 <= 2 * 3));
-  // Combined with d[u] > 0: d[u] ∈ [1, 6] and f[u] ∈ [1, 6]
+
+  // -- (H) pred_finish_ok — children finish before parents --
+  // For any v with valid pred[v], f[v] < f[pred[v]]
+  assert (pure (Seq.index spred' 0 >= 0 /\ Seq.index spred' 0 < 3 ==>
+    Seq.index sf' 0 < Seq.index sf' (Seq.index spred' 0)));
+  assert (pure (Seq.index spred' 1 >= 0 /\ Seq.index spred' 1 < 3 ==>
+    Seq.index sf' 1 < Seq.index sf' (Seq.index spred' 1)));
+  assert (pure (Seq.index spred' 2 >= 0 /\ Seq.index spred' 2 < 3 ==>
+    Seq.index sf' 2 < Seq.index sf' (Seq.index spred' 2)));
+
+  // -- (I) Derive predecessor values and full timestamp ordering --
+  // pred_edge_ok + concrete graph ⟹ pred[1]=0, pred[2]=1
+  derive_pred_values scolor' sd' spred';
+
+  // From pred_edge_ok: d[pred[v]] < d[v]
+  // With pred[1]=0 (if valid): d[0] < d[1]
+  // With pred[2]=1 (if valid): d[1] < d[2]
+  // From pred_finish_ok: f[v] < f[pred[v]]
+  // With pred[2]=1: f[2] < f[1]
+  // With pred[1]=0: f[1] < f[0]
+  // Combined with d[u] < f[u]: d[0] < d[1] < d[2] < f[2] < f[1] < f[0]
+  // All 6 values in [1,6], strictly ordered ⟹ d[0]=1,d[1]=2,d[2]=3,f[2]=4,f[1]=5,f[0]=6
+
+  // The postcondition gives d[0] < d[1] directly from pred_edge_ok (pred[1]=0 if valid)
+  // and f[2] < f[1] from pred_finish_ok (pred[2]=1 if valid)
+  // For both to trigger, we need pred[1] >= 0 and pred[2] >= 0.
+  // DFS discovers vertex 1 from 0 (sets pred[1]=0≥0) and vertex 2 from 1 (sets pred[2]=1≥0).
+  // This is a semantic property — the postcondition doesn't explicitly guarantee pred >= 0
+  // for non-root vertices, but the discovery ordering d[0]<d[1]<d[2] + d[u]<f[u]
+  // + timestamp bounds [1,6] already constrains the timestamps significantly.
 
   (* ---- Phase 4: Cleanup ---- *)
   with s1. assert (A.pts_to adj s1);

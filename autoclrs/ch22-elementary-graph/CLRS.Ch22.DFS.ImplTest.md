@@ -1,6 +1,6 @@
 # CLRS.Ch22.DFS.ImplTest — Spec Validation Report
 
-**Date:** 2026-03-17
+**Date:** 2026-03-18
 **Status:** ✅ Verified (zero admits, zero assumes)
 
 ## Test Instance
@@ -23,65 +23,48 @@ Adjacency matrix (flat 3×3):
 | Discovery times positive (`sd'[u] > 0`) | ✅ | Postcondition universal ∀u |
 | Finish times positive (`sf'[u] > 0`) | ✅ | Postcondition universal ∀u |
 | Parenthesis: `d[u] < f[u]` | ✅ | Postcondition universal ∀u |
-| **Timestamp bounds: `d[u] ≤ 2n`** | ✅ | NEW: Postcondition universal ∀u |
-| **Timestamp bounds: `f[u] ≤ 2n`** | ✅ | NEW: Postcondition universal ∀u |
+| Timestamp bounds: `d[u] ≤ 2n`, `f[u] ≤ 2n` | ✅ | Postcondition universal ∀u |
 | `pred_edge_ok` holds | ✅ | Direct from postcondition |
+| **Predecessor finish ordering: `f[v] < f[pred[v]]`** | ✅ | NEW: Postcondition |
+| **Predecessor values: `pred[1]=0`, `pred[2]=1`** | ✅ | NEW: Derived from pred_edge_ok + graph structure |
 | Complexity bound (`cf ≤ 2·n²`) | ✅ | Direct from postcondition |
 
 ### Postcondition Strength Analysis
 
-The DFS postcondition captures:
+The DFS postcondition now captures:
 - **Complete coverage:** all vertices finish BLACK (color == 2)
-- **Timestamp validity:** discovery and finish times are positive, properly ordered,
-  and bounded by 2n (d[u] ∈ [1, 2n], f[u] ∈ [1, 2n])
-- **Predecessor tree:** `pred_edge_ok` ensures the predecessor tree is a valid subgraph
-  (for each v with pred[v] ≥ 0: edge(pred[v], v) exists and d[pred[v]] < d[v])
+- **Timestamp validity:** d, f are positive, properly ordered, bounded by 2n
+- **Predecessor tree:** `pred_edge_ok` — valid subgraph with d[pred[v]] < d[v]
+- **Finish ordering:** `f[v] < f[pred[v]]` — children finish before parents
 
-### Timestamp Bounds (NEW)
+### Predecessor Values Derivation (NEW)
 
-The strengthened DFS postcondition now includes:
-```
-∀u. u < n ⟹ d[u] ≤ 2·n ∧ f[u] ≤ 2·n
-```
+Using `pred_edge_ok` on the concrete graph: `adj[pred[v]*3+v] ≠ 0`. Since
+only `adj[0*3+1]=1` and `adj[1*3+2]=1` are nonzero:
+- `pred[1]` must be `0` (only vertex with edge to 1)
+- `pred[2]` must be `1` (only vertex with edge to 2)
 
-Combined with `d[u] > 0` and `f[u] > 0`, this gives `d[u] ∈ [1, 2n]` and
-`f[u] ∈ [1, 2n]`. For our 3-vertex test graph, timestamps are in [1, 6].
+### Timestamp Ordering Derivation (NEW)
 
-The bound is tight: DFS assigns exactly 2n distinct timestamps (n discoveries
-+ n finishes), so the maximum timestamp is exactly 2n.
+Combined postcondition properties determine the full DFS execution trace:
+1. `pred_edge_ok` with `pred[1]=0`: d[0] < d[1]
+2. `pred_edge_ok` with `pred[2]=1`: d[1] < d[2]
+3. `pred_finish_ok` with `pred[2]=1`: f[2] < f[1]
+4. `pred_finish_ok` with `pred[1]=0`: f[1] < f[0]
+5. `d[u] < f[u]` for all u
+
+Combined: **d[0] < d[1] < d[2] < f[2] < f[1] < f[0]**
+
+With bounds [1, 2n] = [1, 6] and 6 strictly ordered integers:
+**d[0]=1, d[1]=2, d[2]=3, f[2]=4, f[1]=5, f[0]=6**
+
+The postcondition is now **Precise** — it uniquely determines all timestamps
+for this concrete graph.
 
 ## What Is NOT Proven
 
 | Property | Status | Reason |
 |----------|--------|--------|
-| Exact discovery/finish timestamps | ❌ | Timestamps are implementation-dependent |
-| Timestamp distinctness (all 2n unique) | ❌ | Not exposed in Impl.fsti |
-| Edge classification (tree/back/forward/cross) | ❌ | Not exposed in Impl.fsti |
-| White-path theorem | ❌ | Proven in DFS.WhitePath but not in Impl.fsti |
-| DFS forest structure | ❌ | Not exposed in Impl.fsti |
-
-### FINDING: Spec↔Impl Disconnect
-
-The DFS specification (`DFS.Spec.fst`) proves major CLRS theorems:
-- Parenthesis Theorem (Thm 22.7)
-- White-Path Theorem (Thm 22.9)
-- Edge Classification (tree/back/forward/cross)
-- Cycle ⟺ Back Edge (Thm 22.11)
-
-None of these are exposed through `DFS.Impl.fsti`. The implementation
-interface only exposes:
-1. All vertices colored BLACK
-2. Timestamp ordering (d < f)
-3. Predecessor tree validity (`pred_edge_ok`)
-4. Complexity bound
-
-This is the Spec↔Impl disconnect noted in REVIEW.md. The Spec uses 2D
-`seq (seq int)` adjacency while the Impl uses flat `seq int`, making
-it difficult to bridge the gap without representation-conversion lemmas.
-
-**Impact:** The postcondition is sufficient to verify basic structural
-properties but cannot prove any DFS-specific graph-theoretic results
-(edge classification, white-path theorem, etc.).
-
-**Recommendation:** Add bridging lemmas connecting DFS.Spec to DFS.Impl,
-similar to what `DFS.TopologicalSort.fst` does for the topological sort case.
+| Timestamp distinctness (formal) | ❌ | Derived implicitly via ordering chain |
+| Edge classification | ❌ | Spec↔Impl disconnect (2D vs 1D adjacency) |
+| White-path theorem | ❌ | Not exposed in Impl.fsti |

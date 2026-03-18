@@ -269,6 +269,28 @@ let timestamps_bounded (scolor sd sf: Seq.seq int) (n: nat) (time: int)
       (Seq.index scolor i == 1 ==> Seq.index sd i <= time) /\
       (Seq.index scolor i == 2 ==> Seq.index sd i <= time /\ Seq.index sf i <= time))
 
+(* Stack forms a DFS tree path: bottom element has pred < 0 (root),
+   each non-bottom element's predecessor is the element below.
+   Requires stack_ok-compatible bounds: stack elements are < n. *)
+[@"opaque_to_smt"]
+let stack_is_path (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n top: nat)
+  : prop
+  = Seq.length sstack >= n /\ Seq.length spred >= n /\ top <= n /\
+    (forall (i:nat). i < top ==> SZ.v (Seq.index sstack i) < n) /\
+    (top > 0 /\ SZ.v (Seq.index sstack 0) < n ==>
+      Seq.index spred (SZ.v (Seq.index sstack 0)) < 0) /\
+    (forall (i:nat). {:pattern (Seq.index sstack i)}
+      0 < i /\ i < top /\ SZ.v (Seq.index sstack i) < n ==>
+      Seq.index spred (SZ.v (Seq.index sstack i)) == SZ.v (Seq.index sstack (i - 1)))
+
+(* Predecessor finish ordering: children finish before parents in DFS tree *)
+let pred_finish_ok (scolor sf spred: Seq.seq int) (n: nat) : prop =
+  Seq.length scolor >= n /\ Seq.length sf >= n /\ Seq.length spred >= n /\
+  (forall (v:nat). {:pattern (Seq.index spred v)}
+    v < n /\ Seq.index scolor v == 2 /\ Seq.index spred v >= 0 /\ Seq.index spred v < n /\
+    Seq.index scolor (Seq.index spred v) == 2 ==>
+    Seq.index sf v < Seq.index sf (Seq.index spred v))
+
 (* ================================================================
    PREDICATE LEMMAS — Key reasoning steps isolated as lemmas
    ================================================================ *)
@@ -422,6 +444,126 @@ let init_pred_edge_ok (sadj scolor sd spred: Seq.seq int) (n: nat)
     (ensures pred_edge_ok sadj n scolor sd spred)
   = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred)
 
+(* Top-of-stack vertex has no BLACK predecessor *)
+#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
+let stack_top_pred_not_black
+  (scolor: Seq.seq int) (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n top: nat)
+  : Lemma
+    (requires
+      stack_ok scolor sstack n top /\
+      stack_is_path sstack spred n top /\
+      top > 0 /\ n <= Seq.length scolor /\ n <= Seq.length spred /\
+      Seq.length sstack >= n)
+    (ensures (
+      let u = SZ.v (Seq.index sstack (top - 1)) in
+      u < n /\
+      (Seq.index spred u < 0 \/ Seq.index spred u >= n \/
+       Seq.index scolor (Seq.index spred u) <> 2)))
+  = reveal_opaque (`%stack_is_path) (stack_is_path sstack spred n top);
+    let u = SZ.v (Seq.index sstack (top - 1)) in
+    if top = 1 then
+      // Root at bottom: pred < 0 from stack_is_path
+      assert (Seq.index spred u < 0)
+    else begin
+      // Non-root: pred[u] = sstack[top-2], which is GRAY (from stack_ok)
+      let below = SZ.v (Seq.index sstack (top - 2)) in
+      assert (Seq.index spred u == below);
+      assert (safe_index_int scolor below == 1);
+      assert (below < n);
+      assert (Seq.index scolor below == 1)
+    end
+#pop-options
+
+(* stack_is_path with top=0 is vacuously true *)
+let stack_is_path_empty (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n: nat)
+  : Lemma
+    (requires Seq.length sstack >= n /\ Seq.length spred >= n)
+    (ensures stack_is_path sstack spred n 0)
+  = reveal_opaque (`%stack_is_path) (stack_is_path sstack spred n 0)
+
+(* stack_is_path for a single element with pred < 0 *)
+let stack_is_path_singleton
+  (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n: nat) (vs: nat)
+  : Lemma
+    (requires
+      Seq.length sstack >= n /\ Seq.length spred >= n /\ 1 <= n /\
+      vs < n /\ SZ.v (Seq.index sstack 0) == vs /\
+      Seq.index spred vs < 0)
+    (ensures stack_is_path sstack spred n 1)
+  = reveal_opaque (`%stack_is_path) (stack_is_path sstack spred n 1)
+
+(* Popping preserves stack_is_path *)
+let stack_is_path_pop (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n top: nat)
+  : Lemma
+    (requires stack_is_path sstack spred n top /\ top > 0)
+    (ensures stack_is_path sstack spred n (top - 1))
+  = reveal_opaque (`%stack_is_path) (stack_is_path sstack spred n top);
+    reveal_opaque (`%stack_is_path) (stack_is_path sstack spred n (top - 1))
+
+(* Pushing preserves stack_is_path when pred[new] = stack[top-1] *)
+#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+let stack_is_path_push
+  (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n top: nat) (vv_sz: SZ.t) (u: nat)
+  : Lemma
+    (requires (
+      let vv = SZ.v vv_sz in
+      stack_is_path sstack spred n top /\
+      top > 0 /\ top < n /\ vv < n /\ u < n /\
+      Seq.length sstack >= n /\ Seq.length spred >= n /\
+      SZ.v (Seq.index sstack (top - 1)) == u /\
+      (forall (i:nat). i < top ==> SZ.v (Seq.index sstack i) <> vv)))
+    (ensures (
+      let vv = SZ.v vv_sz in
+      stack_is_path (Seq.upd sstack top vv_sz) (Seq.upd spred vv u) n (top + 1)))
+  = let vv = SZ.v vv_sz in
+    reveal_opaque (`%stack_is_path) (stack_is_path sstack spred n top);
+    reveal_opaque (`%stack_is_path)
+      (stack_is_path (Seq.upd sstack top vv_sz) (Seq.upd spred vv u) n (top + 1));
+    // New entry: pred[vv] = u = sstack[top-1]. For i = top: pred[sstack'[top]] = pred[vv] = u = sstack[top-1] = sstack'[top-1]. ✓
+    // Old entries i < top: sstack'[i] = sstack[i], pred'[sstack[i]] = pred[sstack[i]] (since sstack[i] <> vv). ✓
+    // Root: sstack'[0] = sstack[0], pred'[sstack[0]] = pred[sstack[0]] < 0 (since sstack[0] <> vv). ✓
+    assert (Seq.index (Seq.upd spred vv u) vv == u)
+#pop-options
+
+(* Discovering preserves pred_finish_ok — no new BLACK vertex *)
+let discover_preserves_pred_finish_ok
+  (scolor sf spred: Seq.seq int) (n j: nat)
+  : Lemma
+    (requires pred_finish_ok scolor sf spred n /\ j < n /\ n <= Seq.length scolor /\
+              Seq.index scolor j == 0)
+    (ensures pred_finish_ok (Seq.upd scolor j 1) sf spred n)
+  = ()
+
+(* Finishing vertex u preserves pred_finish_ok.
+   PRECONDITION: u's predecessor (if valid) is not BLACK.
+   In DFS, u's parent is still GRAY on the stack below u. *)
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1"
+let finish_preserves_pred_finish_ok
+  (sadj scolor sd sf spred: Seq.seq int) (n u: nat) (time: int)
+  : Lemma
+    (requires
+      pred_finish_ok scolor sf spred n /\
+      timestamps_bounded scolor sd sf n time /\
+      pred_edge_ok sadj n scolor sd spred /\
+      u < n /\ Seq.index scolor u == 1 /\
+      n <= Seq.length scolor /\ n <= Seq.length sf /\ n <= Seq.length spred /\
+      n <= Seq.length sd /\ n * n <= Seq.length sadj /\
+      (Seq.index spred u >= 0 /\ Seq.index spred u < n ==>
+        Seq.index scolor (Seq.index spred u) <> 2))
+    (ensures
+      pred_finish_ok (Seq.upd scolor u 2) (Seq.upd sf u (time + 1)) spred n)
+  = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred);
+    ()
+#pop-options
+
+(* All-WHITE state satisfies pred_finish_ok vacuously *)
+let init_pred_finish_ok (scolor sf spred: Seq.seq int) (n: nat)
+  : Lemma
+    (requires n <= Seq.length scolor /\ n <= Seq.length sf /\ n <= Seq.length spred /\
+              (forall (j:nat). j < n ==> Seq.index scolor j == 0))
+    (ensures pred_finish_ok scolor sf spred n)
+  = ()
+
 (* Final postcondition: from dfs_ok + nonwhite_below n + count_ones==0,
    all BLACK with d > 0, f > 0, d < f *)
 let final_postcondition_lemma
@@ -454,6 +596,19 @@ let final_timestamps_lemma
       (forall (u:nat). u < n ==> Seq.index sd u <= 2 * n) /\
       (forall (u:nat). u < n ==> Seq.index sf u <= 2 * n))
   = count_ones_twos_le scolor n
+
+(* When all vertices are BLACK, pred_finish_ok simplifies: color checks are automatic *)
+let final_pred_finish_lemma
+  (scolor sf spred: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      n <= Seq.length scolor /\ n <= Seq.length sf /\ n <= Seq.length spred /\
+      pred_finish_ok scolor sf spred n /\
+      (forall (u:nat). u < n ==> Seq.index scolor u == 2))
+    (ensures
+      (forall (v:nat). v < n /\ Seq.index spred v >= 0 /\ Seq.index spred v < n ==>
+        Seq.index sf v < Seq.index sf (Seq.index spred v)))
+  = ()
 
 (* ================================================================
    GHOST TICK — for complexity tracking
@@ -665,7 +820,7 @@ fn finish_vertex
 
 (* Helper: perform DFS-VISIT for a single white vertex *)
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
 fn dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -701,7 +856,7 @@ fn dfs_visit
     R.pts_to time_ref vtime **
     GR.pts_to ctr vc **
     with_pure (
-      SZ.v vs < SZ.v n /\ SZ.v n > 0 /\ SZ.v vtop < SZ.v n /\
+      SZ.v vs < SZ.v n /\ SZ.v n > 0 /\ SZ.v vtop == 0 /\
       Seq.length sadj == SZ.v n * SZ.v n /\
       Seq.length scolor == SZ.v n /\ Seq.length sd == SZ.v n /\
       Seq.length sf == SZ.v n /\ Seq.length spred == SZ.v n /\
@@ -716,6 +871,7 @@ fn dfs_visit
       vtime == count_ones scolor (SZ.v n) + 2 * count_twos scolor (SZ.v n) /\
       nonwhite_below scolor (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor sd spred /\
+      pred_finish_ok scolor sf spred (SZ.v n) /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
@@ -742,6 +898,7 @@ fn dfs_visit
       vtime' == count_ones scolor' (SZ.v n) + 2 * count_twos scolor' (SZ.v n) /\
       nonwhite_below scolor' (SZ.v vs + 1) /\
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
+      pred_finish_ok scolor' sf' spred' (SZ.v n) /\
       (* Complexity: ticks == scan work done *)
       vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
       (* WHITE vertices still have scan_idx == 0 *)
@@ -769,7 +926,13 @@ fn dfs_visit
   discover_preserves_nonwhite scolor (SZ.v vs) (SZ.v vs);
   discover_source_preserves_pred_edge_ok sadj scolor sd spred (SZ.v n) (SZ.v vs) t;
   discover_preserves_timestamps_bounded scolor sd sf (SZ.v n) (SZ.v vs) t;
+  discover_preserves_pred_finish_ok scolor sf spred (SZ.v n) (SZ.v vs);
   count_twos_upd_non_two scolor (SZ.v n) (SZ.v vs) 1;
+
+  // Establish stack_is_path after pushing root vs with pred[vs] = -1
+  with sstack_post_push. assert (A.pts_to stack_data sstack_post_push);
+  with spred_post_push. assert (A.pts_to pred spred_post_push);
+  stack_is_path_singleton sstack_post_push spred_post_push (SZ.v n) (SZ.v vs);
 
   // Process stack
   while (
@@ -803,7 +966,8 @@ fn dfs_visit
       Seq.index scolor_w (SZ.v vs) <> 0 /\
       nonwhite_below scolor_w (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor_w sd_w spred_w /\
-      (* Complexity tracking *)
+      pred_finish_ok scolor_w sf_w spred_w (SZ.v n) /\
+      stack_is_path sstack_w spred_w (SZ.v n) (SZ.v vtop_w) /\
       vc_w + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan_w (SZ.v n) /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_w j == 0 ==> SZ.v (Seq.index sscan_w j) == 0))
@@ -867,7 +1031,8 @@ fn dfs_visit
         Seq.index scolor_scan (SZ.v vs) <> 0 /\
         nonwhite_below scolor_scan (SZ.v vs) /\
         pred_edge_ok sadj (SZ.v n) scolor_scan sd_scan spred_scan /\
-        (* Complexity: scan ticks == scan position advancement *)
+        pred_finish_ok scolor_scan sf_scan spred_scan (SZ.v n) /\
+        stack_is_path sstack_scan spred_scan (SZ.v n) (SZ.v top) /\
         vc_scan + sum_scan_idx sscan (SZ.v n) + SZ.v scan_pos ==
           reveal vc + sum_scan_idx sscan_scan (SZ.v n) + SZ.v vscan /\
         SZ.v (Seq.index sscan_scan (SZ.v u)) == SZ.v scan_pos /\
@@ -935,6 +1100,8 @@ fn dfs_visit
       with sscan_pre_disc. assert (A.pts_to scan_idx sscan_pre_disc);
       sum_scan_idx_upd sscan_pre_disc (SZ.v n) (SZ.v vv) 0sz;
       A.op_Array_Assignment scan_idx vv 0sz;
+      // Capture stack state BEFORE push
+      with sstack_pre_push. assert (A.pts_to stack_data sstack_pre_push);
       let topd = !stack_top;
       A.op_Array_Assignment stack_data topd vv;
       stack_top := SZ.add topd 1sz;
@@ -944,6 +1111,9 @@ fn dfs_visit
       // Preserve predecessor tree property
       discover_preserves_pred_edge_ok sadj scolor_now sd_now spred_now (SZ.v n) (SZ.v vv) (SZ.v u) vtime_now;
       discover_preserves_timestamps_bounded scolor_now sd_now sf_now (SZ.v n) (SZ.v vv) vtime_now;
+      discover_preserves_pred_finish_ok scolor_now sf_now spred_now (SZ.v n) (SZ.v vv);
+      // Preserve stack_is_path: push vv with pred[vv] = u = sstack[topd-1]
+      stack_is_path_push sstack_pre_push spred_now (SZ.v n) (SZ.v topd) vv (SZ.v u);
       count_twos_upd_non_two scolor_now (SZ.v n) (SZ.v vv) 1;
       ()
     } else {
@@ -953,6 +1123,7 @@ fn dfs_visit
       with sf_now. assert (A.pts_to f sf_now);
       with spred_now. assert (A.pts_to pred spred_now);
       with vtime_now. assert (R.pts_to time_ref vtime_now);
+      with sstack_now. assert (A.pts_to stack_data sstack_now);
       // Inline finish_vertex
       count_ones_upd_from_one scolor_now (SZ.v n) (SZ.v u) 2;
       A.op_Array_Assignment color u 2;
@@ -967,6 +1138,11 @@ fn dfs_visit
       // Preserve predecessor tree property
       finish_preserves_pred_edge_ok sadj scolor_now sd_now spred_now (SZ.v n) (SZ.v u);
       finish_preserves_timestamps_bounded scolor_now sd_now sf_now (SZ.v n) (SZ.v u) vtime_now;
+      // Derive pred[u] not BLACK from stack structure
+      stack_top_pred_not_black scolor_now sstack_now spred_now (SZ.v n) (SZ.v topf);
+      finish_preserves_pred_finish_ok sadj scolor_now sd_now sf_now spred_now (SZ.v n) (SZ.v u) vtime_now;
+      // Preserve stack_is_path after pop
+      stack_is_path_pop sstack_now spred_now (SZ.v n) (SZ.v topf);
       count_twos_upd_to_two scolor_now (SZ.v n) (SZ.v u);
       ()
     }
@@ -1042,6 +1218,7 @@ fn maybe_dfs_visit
       vtime == count_ones scolor (SZ.v n) + 2 * count_twos scolor (SZ.v n) /\
       nonwhite_below scolor (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor sd spred /\
+      pred_finish_ok scolor sf spred (SZ.v n) /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
@@ -1068,6 +1245,7 @@ fn maybe_dfs_visit
       vtime' == count_ones scolor' (SZ.v n) + 2 * count_twos scolor' (SZ.v n) /\
       nonwhite_below scolor' (SZ.v vs + 1) /\
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
+      pred_finish_ok scolor' sf' spred' (SZ.v n) /\
       (* Complexity: ticks == scan work *)
       vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
       (* WHITE scan zero preserved *)
@@ -1161,6 +1339,9 @@ fn stack_dfs
       (forall (u: nat). u < SZ.v n ==> Seq.index sf' u <= 2 * SZ.v n) /\
       // Predecessor tree: pred[v] >= 0 implies edge from pred[v] to v, d[pred[v]] < d[v]
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
+      // Predecessor finish ordering: children finish before parents
+      (forall (v: nat). v < SZ.v n /\ Seq.index spred' v >= 0 /\ Seq.index spred' v < SZ.v n ==>
+        Seq.index sf' v < Seq.index sf' (Seq.index spred' v)) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
@@ -1251,6 +1432,7 @@ fn stack_dfs
   with sf_init. assert (A.pts_to f sf_init);
   count_twos_all_zero scolor_init (SZ.v n);
   init_timestamps_bounded scolor_init sd_init sf_init (SZ.v n) 0;
+  init_pred_finish_ok scolor_init sf_init spred_init (SZ.v n);
 
   // Step 3: Main DFS loop - for each vertex s
   let mut s: SZ.t = 0sz;
@@ -1280,7 +1462,7 @@ fn stack_dfs
       vtime == count_ones scolor_s (SZ.v n) + 2 * count_twos scolor_s (SZ.v n) /\
       nonwhite_below scolor_s (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor_s sd_s spred_s /\
-      (* Complexity: vc_s == c0 + vs + sum_scan_idx *)
+      pred_finish_ok scolor_s sf_s spred_s (SZ.v n) /\
       vc_s == reveal c0 + SZ.v vs + sum_scan_idx sscan_s (SZ.v n) /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_s j == 0 ==> SZ.v (Seq.index sscan_s j) == 0))
@@ -1337,6 +1519,7 @@ fn stack_dfs
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sd_final u <= 2 * SZ.v n));
   assert (pure (forall (u: nat). u < SZ.v n ==> Seq.index sf_final u <= 2 * SZ.v n));
   with spred_final. assert (A.pts_to pred spred_final);
-  assert (pure (pred_edge_ok sadj (SZ.v n) scolor_final sd_final spred_final))
+  assert (pure (pred_edge_ok sadj (SZ.v n) scolor_final sd_final spred_final));
+  final_pred_finish_lemma scolor_final sf_final spred_final (SZ.v n)
 }
 #pop-options

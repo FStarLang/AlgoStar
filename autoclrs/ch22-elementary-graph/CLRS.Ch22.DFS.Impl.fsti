@@ -93,6 +93,9 @@ fn stack_dfs
       (forall (u: nat). u < SZ.v n ==> Seq.index sf' u <= 2 * SZ.v n) /\
       // Predecessor tree: pred[v] >= 0 implies edge from pred[v] to v, d[pred[v]] < d[v]
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
+      // Predecessor finish ordering: children finish before parents
+      (forall (v: nat). v < SZ.v n /\ Seq.index spred' v >= 0 /\ Seq.index spred' v < SZ.v n ==>
+        Seq.index sf' v < Seq.index sf' (Seq.index spred' v)) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
       cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
