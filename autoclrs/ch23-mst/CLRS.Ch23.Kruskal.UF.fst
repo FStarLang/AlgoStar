@@ -394,11 +394,66 @@ let uf_complete_union
                     ec + 1 < n /\
                     all_edges_valid edges n)
           (ensures uf_complete sparent' (new_edge :: edges) n)
-  = // Complex proof by case analysis on how find' reroutes root_u → root_v.
-    // Cases: find(a)=find(b) → IH. find(a)=root_u,find(b)=root_v → bridge via new_edge.
-    // Each case uses: uf_complete (IH), reachable_monotone, reachable_transitive.
-    // Deferred to dedicated proof effort.
-    admit ()
+  = find_pure_bounded sparent u_val n n;
+    find_pure_bounded sparent v_val n n;
+    // Characterize find' for each vertex
+    let route (v: nat) : Lemma (requires v < n)
+      (ensures find_pure sparent' v n n =
+               (if find_pure sparent v n n = root_u then root_v
+                else find_pure sparent v n n)) =
+      if find_pure sparent v n n = root_u then begin
+        find_pure_rerouted sparent sparent' v ec n root_u root_v;
+        find_pure_split sparent' v (ec + 1) (n - ec - 1) n;
+        find_pure_fixed sparent' root_v (n - ec - 1) n
+      end else
+        find_pure_unchanged sparent sparent' v n n root_u
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires route);
+    // new_edge is reachable in new_edge :: edges
+    edge_eq_reflexive new_edge;
+    assert (mem_edge new_edge (new_edge :: edges));
+    // Main proof: case analysis on find values
+    let new_edges = new_edge :: edges in
+    let prove_pair (a b: nat) : Lemma
+      (requires a < n /\ b < n /\ find_pure sparent' a n n = find_pure sparent' b n n)
+      (ensures reachable new_edges a b) =
+      route a; route b;
+      let fa = find_pure sparent a n n in
+      let fb = find_pure sparent b n n in
+      if fa = root_u && fb = root_u then
+        // Both in old root_u component: find(a)=find(b), use uf_complete + monotonicity
+        (reachable_monotone new_edge edges a b)
+      else if fa = root_u && fb <> root_u then begin
+        // find(a)=root_u=find(u_val), find(b)=root_v=find(v_val)
+        // chain: a ~~ u_val ~~ v_val ~~ b
+        reachable_monotone new_edge edges a u_val;
+        mem_edge_reachable new_edge new_edges;
+        reachable_transitive new_edges a u_val v_val;
+        reachable_monotone new_edge edges b v_val;
+        reachable_symmetric new_edges b v_val;
+        reachable_transitive new_edges a v_val b
+      end
+      else if fa <> root_u && fb = root_u then begin
+        // find(a)=root_v=find(v_val), find(b)=root_u=find(u_val)
+        // chain: a ~~ v_val ~~ u_val ~~ b
+        reachable_monotone new_edge edges a v_val;
+        mem_edge_reachable new_edge new_edges;
+        reachable_symmetric new_edges u_val v_val;
+        reachable_transitive new_edges a v_val u_val;
+        reachable_monotone new_edge edges b u_val;
+        reachable_symmetric new_edges b u_val;
+        reachable_transitive new_edges a u_val b
+      end
+      else
+        // Both NOT root_u: find(a)=find(b), use uf_complete + monotonicity
+        (reachable_monotone new_edge edges a b)
+    in
+    let wrap_b (a: nat) : Lemma (requires a < n)
+      (ensures forall (b: nat). b < n /\ find_pure sparent' a n n = find_pure sparent' b n n ==>
+                 reachable new_edges a b) =
+      FStar.Classical.forall_intro (FStar.Classical.move_requires (prove_pair a))
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires wrap_b)
 #pop-options
 
 // Extensional equality preserves completeness
