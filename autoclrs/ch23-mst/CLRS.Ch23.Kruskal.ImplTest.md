@@ -87,18 +87,33 @@ by Kruskal's algorithm. Previously, external consumers could only see
 array-level facts; now they can access the graph-theoretic `is_forest`
 predicate directly.
 
-## Remaining Spec Weakness
+## MST Infrastructure Status
 
-The postcondition proves the result is a **forest** (acyclic subgraph)
-but not a **spanning tree** (connected + n-1 edges). The edge count is
-bounded by n-1 but could be less (e.g., 0 edges is a valid forest).
+The Pulse postcondition proves the result is a **forest** (acyclic subgraph)
+with edges from the adjacency matrix. Extensive infrastructure is now proven
+(zero admits) for connecting to MST via the `kruskal_result_is_mst` bridge:
 
-To prove the exact output for a concrete instance, the postcondition
-would need to include `is_spanning_tree` or `is_mst`, which requires
-strengthening the Pulse loop invariant to track connectivity/safety.
+**Proven (7 of 10 bridge preconditions):**
+
+| Precondition | Lemma |
+|---|---|
+| `result_is_forest_adj` | Kruskal postcondition |
+| `subset_edges wes g.edges` | `weighted_edges_subset_graph` |
+| `acyclic g.n wes` | `acyclic_transfer` |
+| `noRepeats_edge wes` | `noRepeats_transfer` |
+| Valid graph edges | `adj_graph_valid_edges` |
+| UF completeness | `uf_complete_init/union/eq/unreachable` |
+| Scan minimality | `scan_min_inv` + `scan_min_inv_complete` |
+
+**Remaining for MST (3 preconditions need loop invariant changes):**
+- `length wes = n-1` (needs `ec == n-1` tracking for connected graphs)
+- `all_connected g.n wes` (follows from ec=n-1 + acyclic)
+- Safety `⊆ some MST` (needs `greedy_step_safe` at each loop step)
 
 ## Conclusion
 
 **Satisfiability**: ✓ proven
-**Partial verification**: ✓ edge count bounded, endpoints valid, edge provenance
-**Completeness**: ✗ postcondition too weak — admits empty forests
+**Forest verification**: ✓ edge count bounded, endpoints valid, acyclicity, edge provenance
+**MST infrastructure**: ✓ all pure lemmas proven (UF completeness, transfer, scan min)
+**MST (pure spec)**: ✓ `pure_kruskal_is_mst` proves MST for connected graphs
+**MST (Pulse postcondition)**: pending loop invariant integration
