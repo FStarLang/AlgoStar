@@ -168,6 +168,39 @@ val weighted_edges_subset_graph
     (ensures
       subset_edges (weighted_edges_from_arrays sadj seu sev n ec 0) (adj_array_to_graph sadj n).edges)
 
+(*** Transfer Lemmas ***)
+
+/// Transfer noRepeats from w=1 edges to weighted edges
+val noRepeats_transfer
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      Bridge.noRepeats_edge (edges_from_arrays seu sev ec i))
+    (ensures Bridge.noRepeats_edge (weighted_edges_from_arrays sadj seu sev n ec i))
+
+/// Transfer acyclicity from w=1 edges to weighted edges (requires symmetric adj)
+val acyclic_transfer
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      symmetric_adj sadj n /\
+      MSTSpec.acyclic n (edges_from_arrays seu sev ec 0) /\
+      (forall (e: edge). mem_edge e (adj_array_to_graph sadj n).edges ==>
+        e.u < n /\ e.v < n /\ e.u <> e.v))
+    (ensures MSTSpec.acyclic n (weighted_edges_from_arrays sadj seu sev n ec 0))
+
 //SNIPPET_START: kruskal_result_is_mst
 /// Main MST theorem: if the weighted edges form a safe spanning tree, the result is MST.
 ///
@@ -200,3 +233,17 @@ val kruskal_result_is_mst
     (ensures
       is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
 //SNIPPET_END: kruskal_result_is_mst
+
+
+(*** Pure Spec MST Theorem ***)
+
+/// The pure Kruskal spec produces an MST for any connected graph.
+val pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      symmetric_adj sadj n /\
+      no_self_loops_adj sadj n /\
+      all_connected n (adj_array_to_graph sadj n).edges)
+    (ensures
+      is_mst (adj_array_to_graph sadj n) (KSpec.pure_kruskal (adj_array_to_graph sadj n)))

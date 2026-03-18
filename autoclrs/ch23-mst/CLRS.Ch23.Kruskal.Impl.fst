@@ -987,6 +987,287 @@ let weighted_edges_subset_graph
     weighted_edges_subset_graph_aux sadj seu sev n ec 0
 #pop-options
 
+(*** Transfer Lemmas: edges_from_arrays ↔ weighted_edges_from_arrays ***)
+
+/// Both lists share endpoints: edges_from_arrays uses w=1, weighted uses adj weight.
+/// mem_edge in weighted list implies corresponding w=1 edge is in the w=1 list.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec mem_edge_weighted_to_unweighted
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+    (e: edge)
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      mem_edge e (weighted_edges_from_arrays sadj seu sev n ec i))
+    (ensures mem_edge ({u = e.u; v = e.v; w = 1}) (edges_from_arrays seu sev ec i))
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else
+      let wu = Seq.index seu i in
+      let wv = Seq.index sev i in
+      let ww = Seq.index sadj (wu * n + wv) in
+      let w_hd : edge = {u = wu; v = wv; w = ww} in
+      if edge_eq e w_hd then
+        edge_eq_endpoints e w_hd
+      else
+        mem_edge_weighted_to_unweighted sadj seu sev n ec (i + 1) e
+#pop-options
+
+/// Transfer noRepeats from w=1 edges to weighted edges.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec noRepeats_transfer
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      Bridge.noRepeats_edge (edges_from_arrays seu sev ec i))
+    (ensures Bridge.noRepeats_edge (weighted_edges_from_arrays sadj seu sev n ec i))
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else begin
+      noRepeats_transfer sadj seu sev n ec (i + 1);
+      let wu = Seq.index seu i in
+      let wv = Seq.index sev i in
+      let ww = Seq.index sadj (wu * n + wv) in
+      let w_hd : edge = {u = wu; v = wv; w = ww} in
+      FStar.Classical.move_requires
+        (mem_edge_weighted_to_unweighted sadj seu sev n ec (i + 1)) w_hd
+    end
+#pop-options
+
+/// map_to_w1: replace weight with 1 in each edge
+let rec map_to_w1 (cycle: list edge) : list edge =
+  match cycle with
+  | [] -> []
+  | e :: tl -> {u = e.u; v = e.v; w = 1} :: map_to_w1 tl
+
+/// map_to_w1 preserves is_path_from_to (only uses .u/.v)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec map_to_w1_path (cycle: list edge) (s f: nat)
+  : Lemma (ensures is_path_from_to (map_to_w1 cycle) s f <==> is_path_from_to cycle s f)
+          (decreases cycle)
+  = match cycle with
+    | [] -> ()
+    | e :: tl ->
+      if e.u = s then map_to_w1_path tl e.v f
+      else if e.v = s then map_to_w1_path tl e.u f
+      else ()
+#pop-options
+
+/// map_to_w1 subset: if cycle ⊆ weighted edges, map_to_w1 cycle ⊆ w=1 edges
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+let rec map_to_w1_subset
+    (cycle: list edge) (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      subset_edges cycle (weighted_edges_from_arrays sadj seu sev n ec i))
+    (ensures subset_edges (map_to_w1 cycle) (edges_from_arrays seu sev ec i))
+    (decreases cycle)
+  = match cycle with
+    | [] -> ()
+    | e :: tl ->
+      map_to_w1_subset tl sadj seu sev n ec i;
+      mem_edge_weighted_to_unweighted sadj seu sev n ec i e
+#pop-options
+
+/// Extract weight from mem_edge: edge weight = adj[u*n+v] or adj[v*n+u]
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+let rec weighted_edge_weight_from_mem
+    (e: edge) (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      e.u < n /\ e.v < n /\
+      mem_edge e (weighted_edges_from_arrays sadj seu sev n ec i))
+    (ensures
+      (e.w = Seq.index sadj (e.u * n + e.v)) \/
+      (e.w = Seq.index sadj (e.v * n + e.u)))
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else
+      let wu = Seq.index seu i in
+      let wv = Seq.index sev i in
+      let ww = Seq.index sadj (wu * n + wv) in
+      let w_hd : edge = {u = wu; v = wv; w = ww} in
+      if edge_eq e w_hd then
+        edge_eq_endpoints e w_hd
+      else
+        weighted_edge_weight_from_mem e sadj seu sev n ec (i + 1)
+
+/// Valid endpoints from mem_edge: edges in the weighted list have u,v < n
+let rec weighted_edge_valid_endpoints
+    (e: edge) (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      mem_edge e (weighted_edges_from_arrays sadj seu sev n ec i))
+    (ensures e.u < n /\ e.v < n)
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else
+      let wu = Seq.index seu i in
+      let wv = Seq.index sev i in
+      let ww = Seq.index sadj (wu * n + wv) in
+      let w_hd : edge = {u = wu; v = wv; w = ww} in
+      if edge_eq e w_hd then
+        edge_eq_endpoints e w_hd
+      else
+        weighted_edge_valid_endpoints e sadj seu sev n ec (i + 1)
+#pop-options
+
+/// Same endpoints + symmetric adj implies same weight → edge_eq
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+let weighted_edge_eq_from_endpoints
+    (e1 e2: edge)
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      symmetric_adj sadj n /\
+      mem_edge e1 (weighted_edges_from_arrays sadj seu sev n ec i) /\
+      mem_edge e2 (weighted_edges_from_arrays sadj seu sev n ec i) /\
+      e1.u < n /\ e1.v < n /\ e2.u < n /\ e2.v < n /\
+      ((e1.u = e2.u /\ e1.v = e2.v) \/ (e1.u = e2.v /\ e1.v = e2.u)))
+    (ensures edge_eq e1 e2)
+  = weighted_edge_weight_from_mem e1 sadj seu sev n ec i;
+    weighted_edge_weight_from_mem e2 sadj seu sev n ec i
+#pop-options
+
+/// ~(mem_edge e tl) on weighted ==> ~(mem_edge {e.u,e.v,1} (map_to_w1 tl))
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+let rec map_to_w1_not_mem_weighted
+    (e: edge) (tl: list edge)
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      symmetric_adj sadj n /\
+      mem_edge e (weighted_edges_from_arrays sadj seu sev n ec i) /\
+      e.u < n /\ e.v < n /\
+      subset_edges tl (weighted_edges_from_arrays sadj seu sev n ec i) /\
+      not (mem_edge e tl))
+    (ensures not (mem_edge ({u=e.u; v=e.v; w=1}) (map_to_w1 tl)))
+    (decreases tl)
+  = match tl with
+    | [] -> ()
+    | hd :: rest ->
+      map_to_w1_not_mem_weighted e rest sadj seu sev n ec i;
+      // If {e.u,e.v,1} edge_eq {hd.u,hd.v,1}, endpoints match.
+      // Then weighted_edge_eq_from_endpoints gives edge_eq e hd.
+      // But ~(edge_eq e hd). So endpoints must differ.
+      FStar.Classical.move_requires
+        (weighted_edge_eq_from_endpoints e hd sadj seu sev n ec) i
+#pop-options
+
+/// all_edges_distinct transfer
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+let rec map_to_w1_distinct_from_weighted
+    (cycle: list edge)
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      symmetric_adj sadj n /\
+      subset_edges cycle (weighted_edges_from_arrays sadj seu sev n ec i) /\
+      all_edges_distinct cycle /\
+      (forall (e:edge). mem_edge e cycle ==> e.u < n /\ e.v < n))
+    (ensures all_edges_distinct (map_to_w1 cycle))
+    (decreases cycle)
+  = match cycle with
+    | [] -> ()
+    | e :: tl ->
+      map_to_w1_distinct_from_weighted tl sadj seu sev n ec i;
+      map_to_w1_not_mem_weighted e tl sadj seu sev n ec i
+#pop-options
+
+/// Main acyclicity transfer: acyclic(w=1) + symmetric ==> acyclic(weighted)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 80"
+let acyclic_transfer
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      symmetric_adj sadj n /\
+      MSTSpec.acyclic n (edges_from_arrays seu sev ec 0) /\
+      (forall (e: edge). mem_edge e (adj_array_to_graph sadj n).edges ==>
+        e.u < n /\ e.v < n /\ e.u <> e.v))
+    (ensures MSTSpec.acyclic n (weighted_edges_from_arrays sadj seu sev n ec 0))
+  = let wes = weighted_edges_from_arrays sadj seu sev n ec 0 in
+    let ues = edges_from_arrays seu sev ec 0 in
+    let aux (v: nat) (cycle: list edge)
+      : Lemma
+          (requires v < n /\ subset_edges cycle wes /\ Cons? cycle /\
+                    all_edges_distinct cycle)
+          (ensures ~(is_path_from_to cycle v v))
+      = map_to_w1_path cycle v v;
+        map_to_w1_subset cycle sadj seu sev n ec 0;
+        // Prove all cycle edges have valid endpoints
+        let valid_ep (e:edge) : Lemma
+          (requires mem_edge e cycle)
+          (ensures e.u < n /\ e.v < n)
+          = MSTSpec.mem_edge_subset e cycle wes;
+            weighted_edge_valid_endpoints e sadj seu sev n ec 0
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires valid_ep);
+        map_to_w1_distinct_from_weighted cycle sadj seu sev n ec 0
+    in
+    FStar.Classical.forall_intro_2 (fun v cycle ->
+      FStar.Classical.move_requires (aux v) cycle)
+#pop-options
+
 (*** Main MST Theorem for Kruskal's Implementation ***)
 
 /// If the weighted edges form a safe spanning tree, the result is an MST.
@@ -1023,4 +1304,24 @@ let kruskal_result_is_mst
   = Bridge.safe_spanning_tree_is_mst
       (adj_array_to_graph sadj n)
       (weighted_edges_from_arrays sadj seu sev n ec 0)
+#pop-options
+
+(*** Pure Spec MST Theorem ***)
+
+module Existence = CLRS.Ch23.MST.Existence
+
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      symmetric_adj sadj n /\
+      no_self_loops_adj sadj n /\
+      all_connected n (adj_array_to_graph sadj n).edges)
+    (ensures
+      is_mst (adj_array_to_graph sadj n) (KSpec.pure_kruskal (adj_array_to_graph sadj n)))
+  = let g = adj_array_to_graph sadj n in
+    adj_graph_valid_edges sadj n;
+    Existence.mst_exists g;
+    KSpec.theorem_kruskal_produces_mst g
 #pop-options
