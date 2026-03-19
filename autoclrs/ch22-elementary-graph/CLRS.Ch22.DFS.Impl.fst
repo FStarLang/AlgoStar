@@ -872,6 +872,7 @@ fn dfs_visit
       nonwhite_below scolor (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor sd spred /\
       pred_finish_ok scolor sf spred (SZ.v n) /\
+      stack_is_path sstack spred (SZ.v n) (SZ.v vtop) /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
@@ -899,6 +900,7 @@ fn dfs_visit
       nonwhite_below scolor' (SZ.v vs + 1) /\
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       pred_finish_ok scolor' sf' spred' (SZ.v n) /\
+      stack_is_path sstack' spred' (SZ.v n) (SZ.v vtop') /\
       (* Complexity: ticks == scan work done *)
       vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
       (* WHITE vertices still have scan_idx == 0 *)
@@ -1167,7 +1169,7 @@ fn dfs_visit
 (* Helper: conditionally perform DFS-VISIT if vertex is WHITE.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
 fn maybe_dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -1219,6 +1221,7 @@ fn maybe_dfs_visit
       nonwhite_below scolor (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor sd spred /\
       pred_finish_ok scolor sf spred (SZ.v n) /\
+      stack_is_path sstack spred (SZ.v n) (SZ.v vtop) /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor j == 0 ==> SZ.v (Seq.index sscan j) == 0))
     )
@@ -1246,6 +1249,7 @@ fn maybe_dfs_visit
       nonwhite_below scolor' (SZ.v vs + 1) /\
       pred_edge_ok sadj (SZ.v n) scolor' sd' spred' /\
       pred_finish_ok scolor' sf' spred' (SZ.v n) /\
+      stack_is_path sstack' spred' (SZ.v n) (SZ.v vtop') /\
       (* Complexity: ticks == scan work *)
       vc' + sum_scan_idx sscan (SZ.v n) == reveal vc + sum_scan_idx sscan' (SZ.v n) /\
       (* WHITE scan zero preserved *)
@@ -1264,7 +1268,7 @@ fn maybe_dfs_visit
    Main stack-based DFS — proves both correctness and complexity
    ================================================================ *)
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
 //SNIPPET_START: stack_dfs_sig
 fn stack_dfs
   (adj: A.array int)
@@ -1433,6 +1437,8 @@ fn stack_dfs
   count_twos_all_zero scolor_init (SZ.v n);
   init_timestamps_bounded scolor_init sd_init sf_init (SZ.v n) 0;
   init_pred_finish_ok scolor_init sf_init spred_init (SZ.v n);
+  with sstack_init. assert (A.pts_to stack_data sstack_init);
+  stack_is_path_empty sstack_init spred_init (SZ.v n);
 
   // Step 3: Main DFS loop - for each vertex s
   let mut s: SZ.t = 0sz;
@@ -1463,6 +1469,7 @@ fn stack_dfs
       nonwhite_below scolor_s (SZ.v vs) /\
       pred_edge_ok sadj (SZ.v n) scolor_s sd_s spred_s /\
       pred_finish_ok scolor_s sf_s spred_s (SZ.v n) /\
+      stack_is_path sstack_s spred_s (SZ.v n) (SZ.v vtop) /\
       vc_s == reveal c0 + SZ.v vs + sum_scan_idx sscan_s (SZ.v n) /\
       (* WHITE vertices have scan_idx == 0 *)
       (forall (j:nat). j < SZ.v n ==> (Seq.index scolor_s j == 0 ==> SZ.v (Seq.index sscan_s j) == 0))
