@@ -1385,6 +1385,81 @@ let rec mem_edge_unweighted_to_weighted
       else
         mem_edge_unweighted_to_weighted sadj seu sev n ec (i + 1) e
 
+/// mem_edge implies reachable via single-edge path
+let mem_edge_reachable (e: edge) (es: list edge)
+  : Lemma (requires mem_edge e es)
+          (ensures reachable es e.u e.v /\ reachable es e.v e.u)
+  = edge_eq_reflexive e;
+    assert (is_path_from_to [e] e.u e.v);
+    assert (is_path_from_to [e] e.v e.u);
+    mem_edge_hd e [];
+    assert (subset_edges [e] es)
+
+/// Map a path from w=1 edges to weighted edges via transitivity.
+/// For each edge e in the path, find the weighted counterpart with same endpoints.
+/// The weighted edge has w = adj[u*n+v] where u,v are the endpoints from seu/sev.
+/// Since edges_from_arrays entry at index k has u=seu[k], v=sev[k], w=1,
+/// the corresponding weighted entry has u=seu[k], v=sev[k], w=adj[seu[k]*n+sev[k]].
+/// We find this entry using mem_edge_unweighted_to_weighted and extract a concrete edge.
+///
+/// Key insight: edges_from_arrays and weighted_edges_from_arrays have entries at
+/// the same positions with the same .u/.v. So if a w=1 edge matches entry k
+/// (by edge_eq), the weighted entry k has the same .u/.v and is mem_edge in the
+/// weighted list. We can construct the weighted path by replacing weights.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+let rec path_to_weighted
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+    (path: list edge) (s f: nat)
+  : Lemma
+    (requires
+      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      Seq.length sadj == n * n /\
+      (forall (k:nat). i <= k /\ k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      subset_edges path (edges_from_arrays seu sev ec i) /\
+      is_path_from_to path s f)
+    (ensures reachable (weighted_edges_from_arrays sadj seu sev n ec i) s f)
+    (decreases path)
+  = match path with
+    | [] -> // s = f, reachable by empty path
+      assert (s = f);
+      assert (is_path_from_to [] s s);
+      assert (subset_edges [] (weighted_edges_from_arrays sadj seu sev n ec i))
+    | e :: rest ->
+      let wes = weighted_edges_from_arrays sadj seu sev n ec i in
+      let next = if e.u = s then e.v else e.u in
+      // Recursive call: reachable(weighted, next, f)
+      path_to_weighted sadj seu sev n ec i rest next f;
+      // Need: reachable(weighted, s, next)
+      // e is mem_edge in w=1 list. Its weighted counterpart is mem_edge in weighted list.
+      // From mem_edge_unweighted_to_weighted: exists e' with matching endpoints in weighted list
+      // Use mem_edge_reachable to get reachable from any member edge
+      // The existential gives us e' with e'.u matching e.u (or swapped) and mem_edge e' wes
+      // Since e connects s to next, e' connects s to next too (same endpoints)
+      mem_edge_unweighted_to_weighted sadj seu sev n ec i e;
+      // Z3 now has: exists e'. matching_endpoints /\ mem_edge e' wes
+      // For any such e': reachable wes e'.u e'.v (via [e'])
+      // and e'.u = s, e'.v = next (or swapped)
+      // So reachable wes s next
+      // Help Z3: provide the key fact that any single mem_edge gives reachability
+      let helper (e': edge) : Lemma
+        (requires ((e'.u = e.u /\ e'.v = e.v) \/ (e'.u = e.v /\ e'.v = e.u)) /\
+                  mem_edge e' wes)
+        (ensures reachable wes s next)
+        = mem_edge_reachable e' wes;
+          // e' connects e.u↔e.v. e connects s↔next. Same endpoints.
+          if e'.u = s then ()     // e'.u=s, e'.v=next: reachable wes s next ✓
+          else ()                  // e'.u=next, e'.v=s: reachable wes next s, need wes s next
+                                   // mem_edge_reachable gives both directions
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires helper);
+      // Now Z3 can eliminate the existential and derive reachable wes s next
+      reachable_transitive wes s next f
+#pop-options
+
 let reachable_unweighted_to_weighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
     (u v: nat)
@@ -1397,34 +1472,13 @@ let reachable_unweighted_to_weighted
         Seq.index seu k < n /\ Seq.index sev k < n) /\
       reachable (edges_from_arrays seu sev ec 0) u v)
     (ensures reachable (weighted_edges_from_arrays sadj seu sev n ec 0) u v)
-  = // For each edge {a,b,1} in the w=1 path, mem_edge_unweighted_to_weighted
-    // gives an edge {a,b,w'} in the weighted list. Since is_path_from_to only
-    // uses .u/.v, we can replace each edge. But constructing the actual path
-    // is hard due to the existential in mem_edge_unweighted_to_weighted.
-    // Instead: use the SAME path but show subset_edges holds for weighted list.
-    // This fails because edge_eq compares weights.
-    // Alternative: use reachable_transitive + single-edge reachability.
-    // For each w=1 edge {a,b,1} that is mem_edge in w=1 list,
-    // mem_edge_unweighted_to_weighted gives exists e'. e'.u=a/\e'.v=b/\mem_edge e' weighted
-    // So mem_edge {a,b,w'} in weighted, giving reachable(weighted, a, b) via [e'].
-    // Then chain: reachable(weighted, u, a) + reachable(weighted, a, b) = reachable(weighted, u, b)
-    // by transitivity.
-    // This requires decomposing the path edge by edge — similar to map_to_w1 approach.
-    let ues = edges_from_arrays seu sev ec 0 in
-    let wes = weighted_edges_from_arrays sadj seu sev n ec 0 in
-    // Prove: for any e in ues, reachable(wes, e.u, e.v)
-    let single_edge_reachable (e: edge) : Lemma
-      (requires mem_edge e ues)
-      (ensures reachable wes e.u e.v)
-      = mem_edge_unweighted_to_weighted sadj seu sev n ec 0 e
-        // This gives: exists e'. e'.u=e.u /\ e'.v=e.v /\ mem_edge e' wes
-        // From mem_edge e' wes: path [e'] from e'.u to e'.v = from e.u to e.v
+  = let aux (path: list edge) : Lemma
+      (requires subset_edges path (edges_from_arrays seu sev ec 0) /\
+               is_path_from_to path u v)
+      (ensures reachable (weighted_edges_from_arrays sadj seu sev n ec 0) u v)
+      = path_to_weighted sadj seu sev n ec 0 path u v
     in
-    FStar.Classical.forall_intro (FStar.Classical.move_requires single_edge_reachable);
-    // Now: forall e in ues. reachable(wes, e.u, e.v)
-    // Combined with reachable(ues, u, v) and transitivity over the path:
-    // This needs a path decomposition lemma. For now, use the structural argument.
-    admit () // TODO: path decomposition + transitivity chain
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 #pop-options
 
 /// Reachability transfer: reachable via weighted ⟹ reachable via w=1
@@ -1513,6 +1567,11 @@ let greedy_unreachable
       (reachable_weighted_to_unweighted sadj seu sev n ec vbu) vbv
 #pop-options
 
+/// adj_weight: safe indexing into adj matrix (avoids Seq.index typing issues)
+[@@"unfold_for_smt"]
+let adj_weight (sadj: Seq.seq int) (n: nat{n > 0}) (u: nat{u < n}) (v: nat{v < n /\ Seq.length sadj == n * n}) : int
+  = Seq.index sadj (u * n + v)
+
 /// Graph edge weight matches adj matrix
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
 let rec adj_row_edges_weight (sadj: Seq.seq int) (n u v: nat) (e: edge)
@@ -1520,8 +1579,8 @@ let rec adj_row_edges_weight (sadj: Seq.seq int) (n u v: nat) (e: edge)
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
               mem_edge e (adj_row_edges sadj n u v))
     (ensures e.u < n /\ e.v < n /\
-             (e.w = Seq.index sadj (e.u * n + e.v) \/
-              e.w = Seq.index sadj (e.v * n + e.u)))
+             (e.w = adj_weight sadj n e.u e.v \/
+              e.w = adj_weight sadj n e.v e.u))
     (decreases (n - v))
   = if v >= n then ()
     else begin
@@ -1538,8 +1597,8 @@ let rec adj_all_edges_weight (sadj: Seq.seq int) (n u: nat) (e: edge)
     (requires Seq.length sadj == n * n /\ u <= n /\ n > 0 /\
               mem_edge e (adj_all_edges sadj n u))
     (ensures e.u < n /\ e.v < n /\
-             (e.w = Seq.index sadj (e.u * n + e.v) \/
-             e.w = Seq.index sadj (e.v * n + e.u)))
+             (e.w = adj_weight sadj n e.u e.v \/
+              e.w = adj_weight sadj n e.v e.u))
     (decreases (n - u))
   = if u >= n then ()
     else begin
@@ -1554,13 +1613,38 @@ let adj_graph_edge_weight (sadj: Seq.seq int) (n: nat) (e: edge)
     (requires Seq.length sadj == n * n /\ n > 0 /\
               mem_edge e (adj_array_to_graph sadj n).edges)
     (ensures e.u < n /\ e.v < n /\
-             (e.w = Seq.index sadj (e.u * n + e.v) \/
-              e.w = Seq.index sadj (e.v * n + e.u)))
+             (e.w = adj_weight sadj n e.u e.v \/
+              e.w = adj_weight sadj n e.v e.u))
   = adj_all_edges_weight sadj n 0 e
 #pop-options
 
-/// Helper 2: minimum weight among unreachable graph edges
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
+/// Specialized: graph edge weight >= scan minimum when find ≠
+/// Takes edge weight from adj matrix as precondition (avoids Seq.index typing in body)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 100 --z3refresh"
+let adj_graph_edge_ge_scanmin
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (n: nat) (e: edge)
+    (vbw: int) (vbu vbv: nat)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ n > 0 /\ Seq.length sparent >= n /\
+              e.u < n /\ e.v < n /\
+              // Edge weight = adj entry (provided by caller via adj_graph_edge_weight)
+              (e.w = Seq.index sadj (e.u * n + e.v) \/
+               e.w = Seq.index sadj (e.v * n + e.u)) /\
+              UF.find_pure sparent e.u n n <> UF.find_pure sparent e.v n n /\
+              vbw > 0 /\ vbu < n /\ vbv < n /\
+              UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
+              Seq.index sadj (vbu * n + vbv) = vbw /\
+              scan_min_inv sparent sadj n (n * n) vbw)
+    (ensures e.w >= vbw)
+  = scan_min_inv_complete sparent sadj n vbw vbu vbv;
+    let idx_uv : nat = e.u * n + e.v in
+    let idx_vu : nat = e.v * n + e.u in
+    // These should be provable: u < n /\ v < n ==> u*n+v < n*n
+    assert (e.u * n < n * n);  // u < n ==> u * n < n * n (NL arithmetic)
+    assert (idx_uv < n * n);   // u*n + v < n*n
+    assert (idx_vu < n * n)
+#pop-options
+#push-options "--z3rlimit 300 --fuel 1 --ifuel 0"
 let greedy_min_weight
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int)
     (n ec: nat) (new_w_edge: edge)
@@ -1587,15 +1671,11 @@ let greedy_min_weight
                e'.u < n /\ e'.v < n /\
                ~(reachable (weighted_edges_from_arrays sadj seu sev n ec 0) e'.u e'.v))
       (ensures new_w_edge.w <= e'.w)
-      = // ~(reachable weighted e'.u e'.v) from requires
-        // ==> ~(reachable w=1 e'.u e'.v) by reverse transfer contrapositive
-        FStar.Classical.move_requires
+      = FStar.Classical.move_requires
           (reachable_unweighted_to_weighted sadj seu sev n ec e'.u) e'.v;
-        // Now ~(reachable w=1 e'.u e'.v)
-        // ==> find(e'.u) ≠ find(e'.v) by uf_complete_unreachable
         UF.uf_complete_unreachable sparent (edges_from_arrays seu sev ec 0) n e'.u e'.v;
-        // adj_graph_edge_weight: e'.w = adj[e'.u*n+e'.v] or adj[e'.v*n+e'.u]
-        adj_graph_edge_weight sadj n e'
+        adj_graph_edge_weight sadj n e';
+        adj_graph_edge_ge_scanmin sadj sparent n e' new_w_edge.w new_w_edge.u new_w_edge.v
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 #pop-options
@@ -1652,7 +1732,7 @@ let greedy_safety_step
     adj_graph_valid_edges sadj n;
     adj_graph_mem_edge sadj n vbu vbv;
     greedy_unreachable sadj sparent seu sev n ec vbu vbv;
-    greedy_min_weight sadj sparent seu sev n ec new_w_edge;
+    greedy_min_weight sadj sparent seu sev n ec new_w_edge ();
     Bridge.greedy_step_safe (adj_array_to_graph sadj n)
       (weighted_edges_from_arrays sadj seu sev n ec 0) new_w_edge;
     greedy_convert_safety sadj seu sev n ec new_w_edge
