@@ -400,7 +400,7 @@ fn do_union
 #pop-options
 
 // Lemma for when we add an edge: proves uf_inv, is_forest, valid_endpoints for new state.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 "
 let kruskal_add_edge_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int)
@@ -475,7 +475,7 @@ let kruskal_noop_proof
 #pop-options
 
 // Unified step lemma — dispatches to add_edge or noop proof.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 "
 let kruskal_step_maintains_inv
   (sparent sparent': Seq.seq SZ.t)
   (seu sev seu' sev': Seq.seq int)
@@ -514,7 +514,7 @@ let kruskal_step_maintains_inv
     kruskal_inv_intro sparent' seu' sev' n ec'
 #pop-options
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 50 --ifuel 2 --fuel 2 "
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
@@ -925,7 +925,7 @@ let rec adj_all_edges_row_mem (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge) (s
 #pop-options
 
 /// Each weighted edge is a graph edge (inductive helper)
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 50 --split_queries always"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 50 "
 let rec weighted_edges_subset_graph_aux
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -991,7 +991,7 @@ let weighted_edges_subset_graph
 
 /// Both lists share endpoints: edges_from_arrays uses w=1, weighted uses adj weight.
 /// mem_edge in weighted list implies corresponding w=1 edge is in the w=1 list.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let rec mem_edge_weighted_to_unweighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
     (e: edge)
@@ -1020,7 +1020,7 @@ let rec mem_edge_weighted_to_unweighted
 #pop-options
 
 /// Transfer noRepeats from w=1 edges to weighted edges.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let rec noRepeats_transfer
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -1054,7 +1054,7 @@ let rec map_to_w1 (cycle: list edge) : list edge =
   | e :: tl -> {u = e.u; v = e.v; w = 1} :: map_to_w1 tl
 
 /// map_to_w1 preserves is_path_from_to (only uses .u/.v)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let rec map_to_w1_path (cycle: list edge) (s f: nat)
   : Lemma (ensures is_path_from_to (map_to_w1 cycle) s f <==> is_path_from_to cycle s f)
           (decreases cycle)
@@ -1329,7 +1329,7 @@ let pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
 (*** Safety Step ***)
 
 /// Helper: if adj[u*n+v] > 0 and u <> v, edge {u,v,adj[u*n+v]} is in the graph
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let adj_graph_mem_edge (sadj: Seq.seq int) (n u v: nat)
   : Lemma
     (requires Seq.length sadj == n * n /\ n > 0 /\ u < n /\ v < n /\ u <> v /\
@@ -1350,7 +1350,7 @@ let adj_graph_mem_edge (sadj: Seq.seq int) (n u v: nat)
 
 /// Reverse transfer: reachable via w=1 ⟹ reachable via weighted
 /// (map w=1 edge to weighted edge with same endpoints — different from map_to_w1)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let rec mem_edge_unweighted_to_weighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
     (e: edge)
@@ -1482,7 +1482,7 @@ let reachable_unweighted_to_weighted
 #pop-options
 
 /// Reachability transfer: reachable via weighted ⟹ reachable via w=1
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let reachable_weighted_to_unweighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
     (u v: nat)
@@ -1506,7 +1506,7 @@ let reachable_weighted_to_unweighted
 #pop-options
 
 /// Weighted edges extend by one edge
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let rec weighted_edges_from_arrays_extend
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -1567,13 +1567,37 @@ let greedy_unreachable
       (reachable_weighted_to_unweighted sadj seu sev n ec vbu) vbv
 #pop-options
 
+/// scan_min_inv_complete but using adj_weight (avoids Seq.index typing issues at call sites)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 50"
+let scan_min_complete_adj_weight
+    (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat) (vbw: int)
+    (vbu vbv eu ev: nat)
+    (idx1: nat{idx1 == eu * n + ev /\ idx1 < Seq.length sadj})
+    (idx2: nat{idx2 == ev * n + eu /\ idx2 < Seq.length sadj})
+  : Lemma
+    (requires
+      scan_min_inv sparent sadj n (n * n) vbw /\
+      n > 0 /\ Seq.length sadj == n * n /\ Seq.length sparent >= n /\
+      vbw > 0 /\ vbu < n /\ vbv < n /\ eu < n /\ ev < n /\
+      UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
+      Seq.index sadj (vbu * n + vbv) = vbw /\
+      UF.find_pure sparent eu n n <> UF.find_pure sparent ev n n)
+    (ensures
+      Seq.index sadj idx1 >= vbw /\
+      Seq.index sadj idx2 >= vbw)
+  = let n_pos : pos = n in
+    FStar.Math.Lemmas.lemma_mult_lt_right n_pos eu n;
+    FStar.Math.Lemmas.lemma_mult_lt_right n_pos ev n;
+    scan_min_inv_complete sparent sadj n vbw vbu vbv
+#pop-options
+
 /// adj_weight: safe indexing into adj matrix (avoids Seq.index typing issues)
 [@@"unfold_for_smt"]
 let adj_weight (sadj: Seq.seq int) (n: nat{n > 0}) (u: nat{u < n}) (v: nat{v < n /\ Seq.length sadj == n * n}) : int
   = Seq.index sadj (u * n + v)
 
 /// Graph edge weight matches adj matrix
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let rec adj_row_edges_weight (sadj: Seq.seq int) (n u v: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
@@ -1618,16 +1642,19 @@ let adj_graph_edge_weight (sadj: Seq.seq int) (n: nat) (e: edge)
   = adj_all_edges_weight sadj n 0 e
 #pop-options
 
+/// Helper: u < n /\ v < n ==> u * n + v < n * n
+let index_bound (u v n: nat) 
+  : Lemma (requires u < n /\ v < n /\ n > 0) (ensures u * n + v < n * n)
+  = FStar.Math.Lemmas.lemma_mult_lt_right n u n
+
 /// Specialized: graph edge weight >= scan minimum when find ≠
-/// Takes edge weight from adj matrix as precondition (avoids Seq.index typing in body)
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 100 --z3refresh"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 800 "
 let adj_graph_edge_ge_scanmin
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (n: nat) (e: edge)
     (vbw: int) (vbu vbv: nat)
   : Lemma
     (requires Seq.length sadj == n * n /\ n > 0 /\ Seq.length sparent >= n /\
               e.u < n /\ e.v < n /\
-              // Edge weight = adj entry (provided by caller via adj_graph_edge_weight)
               (e.w = Seq.index sadj (e.u * n + e.v) \/
                e.w = Seq.index sadj (e.v * n + e.u)) /\
               UF.find_pure sparent e.u n n <> UF.find_pure sparent e.v n n /\
@@ -1636,13 +1663,10 @@ let adj_graph_edge_ge_scanmin
               Seq.index sadj (vbu * n + vbv) = vbw /\
               scan_min_inv sparent sadj n (n * n) vbw)
     (ensures e.w >= vbw)
-  = scan_min_inv_complete sparent sadj n vbw vbu vbv;
-    let idx_uv : nat = e.u * n + e.v in
-    let idx_vu : nat = e.v * n + e.u in
-    // These should be provable: u < n /\ v < n ==> u*n+v < n*n
-    assert (e.u * n < n * n);  // u < n ==> u * n < n * n (NL arithmetic)
-    assert (idx_uv < n * n);   // u*n + v < n*n
-    assert (idx_vu < n * n)
+  = adj_graph_edge_weight sadj n e;
+    index_bound e.u e.v n;
+    index_bound e.v e.u n;
+    scan_min_complete_adj_weight sparent sadj n vbw vbu vbv e.u e.v (e.u * n + e.v) (e.v * n + e.u)
 #pop-options
 #push-options "--z3rlimit 300 --fuel 1 --ifuel 0"
 let greedy_min_weight
@@ -1674,7 +1698,6 @@ let greedy_min_weight
       = FStar.Classical.move_requires
           (reachable_unweighted_to_weighted sadj seu sev n ec e'.u) e'.v;
         UF.uf_complete_unreachable sparent (edges_from_arrays seu sev ec 0) n e'.u e'.v;
-        adj_graph_edge_weight sadj n e';
         adj_graph_edge_ge_scanmin sadj sparent n e' new_w_edge.w new_w_edge.u new_w_edge.v
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
