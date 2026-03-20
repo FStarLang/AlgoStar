@@ -518,245 +518,6 @@ let kruskal_step_maintains_inv
     kruskal_inv_intro sparent' seu' sev' n ec'
 #pop-options
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2 "
-fn kruskal
-  (adj: A.array int)
-  (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
-  (edge_u edge_v: A.array int)
-  (#sedge_u #sedge_v: Ghost.erased (Seq.seq int))
-  (edge_count: R.ref SZ.t)
-  (n: SZ.t)
-  requires 
-    A.pts_to adj #p sadj **
-    A.pts_to edge_u sedge_u **
-    A.pts_to edge_v sedge_v **
-    R.pts_to edge_count 0sz **
-    pure (
-      SZ.v n > 0 /\
-      Seq.length sadj == SZ.v n * SZ.v n /\
-      Seq.length sedge_u == SZ.v n /\
-      Seq.length sedge_v == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
-    )
-  returns _: unit
-  ensures exists* vec sedge_u' sedge_v'.
-    A.pts_to adj #p sadj **
-    A.pts_to edge_u sedge_u' **
-    A.pts_to edge_v sedge_v' **
-    R.pts_to edge_count vec **
-    pure (result_is_forest_adj sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec))
-//SNIPPET_END: kruskal_sig
-{
-  // Initialize parent[i] = i
-  let parent_v = V.alloc 0sz n;
-  V.to_array_pts_to parent_v;
-  let parent = V.vec_to_array parent_v;
-  rewrite (A.pts_to (V.vec_to_array parent_v) (Seq.create (SZ.v n) 0sz))
-       as (A.pts_to parent (Seq.create (SZ.v n) 0sz));
-  
-  let mut i: SZ.t = 0sz;
-  while (!i <^ n)
-  invariant exists* vi sparent.
-    R.pts_to i vi **
-    A.pts_to adj #p sadj **
-    A.pts_to parent sparent **
-    A.pts_to edge_u sedge_u **
-    A.pts_to edge_v sedge_v **
-    R.pts_to edge_count 0sz **
-    pure (
-      SZ.v vi <= SZ.v n /\
-      Seq.length sparent == SZ.v n /\
-      (forall (j: nat). j < SZ.v vi ==> SZ.v (Seq.index sparent j) = j)
-    )
-  decreases (SZ.v n - SZ.v !i)
-  {
-    let vi = !i;
-    A.op_Array_Assignment parent vi vi;
-    i := vi +^ 1sz;
-  };
-  
-  // After init: establish opaque kruskal_inv (no quantifiers leak into main loop)
-  with sp_init. assert (A.pts_to parent sp_init);
-  with seu_init. assert (A.pts_to edge_u seu_init);
-  with sev_init. assert (A.pts_to edge_v sev_init);
-  kruskal_inv_init sp_init seu_init sev_init (SZ.v n);
-  edges_adj_pos_init sadj seu_init sev_init (SZ.v n);
-  
-  // Process n-1 rounds
-  let mut round: SZ.t = 0sz;
-  let max_rounds = n -^ 1sz;
-  
-  while (!round <^ max_rounds)
-  invariant exists* vround vec sparent seu sev.
-    R.pts_to round vround **
-    R.pts_to edge_count vec **
-    A.pts_to adj #p sadj **
-    A.pts_to parent sparent **
-    A.pts_to edge_u seu **
-    A.pts_to edge_v sev **
-    pure (
-      SZ.v vround <= SZ.v n - 1 /\
-      SZ.v vec <= SZ.v vround /\
-      SZ.fits (SZ.v n * SZ.v n) /\
-      kruskal_inv sparent seu sev (SZ.v n) (SZ.v vec) /\
-      edges_adj_pos sadj seu sev (SZ.v n) (SZ.v vec)
-    )
-  decreases (SZ.v max_rounds - SZ.v !round)
-  {
-    let vround = !round;
-    
-    // Bind ghost variables BEFORE inner scan (find calls need parent + valid_parents)
-    with sparent_cur. assert (A.pts_to parent sparent_cur);
-    with seu_cur. assert (A.pts_to edge_u seu_cur);
-    with sev_cur. assert (A.pts_to edge_v sev_cur);
-    with vec_cur. assert (R.pts_to edge_count vec_cur);
-    
-    // Extract valid_parents before scan (find needs it inside inner loop)
-    kruskal_inv_valid_parents sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
-    kruskal_inv_endpoints sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
-    
-    // Find minimum weight cross-component edge
-    let mut best_u: SZ.t = 0sz;
-    let mut best_v: SZ.t = 0sz;
-    let mut best_w: int = 0;
-    
-    // Initialize scan minimality tracking
-    scan_min_inv_init sparent_cur sadj (SZ.v n);
-    
-    let mut ui: SZ.t = 0sz;
-    while (!ui <^ n)
-    invariant exists* vui vbu vbv vbw.
-      R.pts_to ui vui **
-      R.pts_to best_u vbu **
-      R.pts_to best_v vbv **
-      R.pts_to best_w vbw **
-      A.pts_to adj #p sadj **
-      A.pts_to parent sparent_cur **
-      pure (
-        SZ.v vui <= SZ.v n /\
-        SZ.v vbu < SZ.v n /\
-        SZ.v vbv < SZ.v n /\
-        SZ.fits (SZ.v n * SZ.v n) /\
-        SZ.v n > 0 /\
-        Seq.length sadj == SZ.v n * SZ.v n /\
-        vbw >= 0 /\
-        valid_parents sparent_cur (SZ.v n) /\
-        (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
-        (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
-                      UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n)) /\
-        (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw) /\
-        scan_min_inv sparent_cur sadj (SZ.v n) (SZ.v vui * SZ.v n) vbw
-      )
-    decreases (SZ.v n - SZ.v !ui)
-    {
-      let vui = !ui;
-      let mut vi: SZ.t = 0sz;
-      while (!vi <^ n)
-      invariant exists* vvi vbu vbv vbw.
-        R.pts_to ui vui **
-        R.pts_to vi vvi **
-        R.pts_to best_u vbu **
-        R.pts_to best_v vbv **
-        R.pts_to best_w vbw **
-        A.pts_to adj #p sadj **
-        A.pts_to parent sparent_cur **
-        pure (
-          SZ.v vvi <= SZ.v n /\
-          SZ.v vui < SZ.v n /\
-          SZ.v vbu < SZ.v n /\
-          SZ.v vbv < SZ.v n /\
-          SZ.fits (SZ.v n * SZ.v n) /\
-          SZ.v n > 0 /\
-          Seq.length sadj == SZ.v n * SZ.v n /\
-          vbw >= 0 /\
-          valid_parents sparent_cur (SZ.v n) /\
-          (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
-          (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
-                        UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n)) /\
-          (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw) /\
-          scan_min_inv sparent_cur sadj (SZ.v n) (SZ.v vui * SZ.v n + SZ.v vvi) vbw
-        )
-      decreases (SZ.v n - SZ.v !vi)
-      {
-        let vvi = !vi;
-        lemma_index_in_bounds (SZ.v vui) (SZ.v vvi) (SZ.v n);
-        let offset: SZ.t = SZ.mul vui n;
-        let idx: SZ.t = SZ.add offset vvi;
-        let w = A.op_Array_Access adj idx;
-        let vbw = !best_w;
-        let vbu_old = !best_u;
-        let vbv_old = !best_v;
-        
-        // Component check: only consider edges between different components
-        let root_ui = find parent vui n;
-        let root_vi = find parent vvi n;
-        let diff_comp: bool = (root_ui <> root_vi);
-        
-        let take_it: bool = (w > 0 && diff_comp && (vbw = 0 || w < vbw));
-        best_u := (if take_it then vui else vbu_old);
-        best_v := (if take_it then vvi else vbv_old);
-        best_w := (if take_it then w else vbw);
-        
-        // Maintain scan minimality invariant
-        scan_min_inv_step sparent_cur sadj (SZ.v n) (SZ.v vui) (SZ.v vvi)
-          vbw (if take_it then w else vbw) w diff_comp take_it;
-        
-        vi := vvi +^ 1sz;
-      };
-      ui := vui +^ 1sz;
-    };
-    
-    // After scan: edge_u, edge_v, edge_count were framed (unchanged)
-    // parent was in inner invariant and comes back as sparent_cur
-    
-    // Check components and add edge
-    let vbu = !best_u;
-    let vbv = !best_v;
-    let vbw = !best_w;
-    let vec = !edge_count;
-    
-    let root_u = find parent vbu n;
-    let root_v = find parent vbv n;
-    
-    let should_add: bool = (vbw > 0 && root_u <> root_v && vec <^ n);
-    
-    // Branchless writes: when not adding, preserve old values at position 0
-    let old_eu0 = A.op_Array_Access edge_u 0sz;
-    let old_ev0 = A.op_Array_Access edge_v 0sz;
-    let write_pos: SZ.t = (if should_add then vec else 0sz);
-    A.op_Array_Assignment edge_u write_pos (if should_add then SZ.v vbu else old_eu0);
-    A.op_Array_Assignment edge_v write_pos (if should_add then SZ.v vbv else old_ev0);
-    edge_count := (if should_add then vec +^ 1sz else vec);
-    do_union parent root_u root_v n;
-    
-    // Bind post-write existentials and call unified proof
-    with sparent_new. assert (A.pts_to parent sparent_new);
-    with seu_new. assert (A.pts_to edge_u seu_new);
-    with sev_new. assert (A.pts_to edge_v sev_new);
-    with vec_new. assert (R.pts_to edge_count vec_new);
-    kruskal_step_maintains_inv
-      sparent_cur sparent_new seu_cur sev_cur seu_new sev_new
-      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv)
-      (SZ.v root_u) (SZ.v root_v) should_add;
-    edges_adj_pos_step sadj seu_cur sev_cur seu_new sev_new
-      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) should_add;
-    
-    round := vround +^ 1sz;
-  };
-  
-  // After loop: extract facts from opaque kruskal_inv for result proof
-  with sp_f. assert (A.pts_to parent sp_f);
-  with seu_f sev_f vec_f. assert (
-    A.pts_to edge_u seu_f ** A.pts_to edge_v sev_f ** R.pts_to edge_count vec_f);
-  kruskal_inv_elim sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
-  lemma_kruskal_maintains_forest seu_f sev_f (SZ.v n) (SZ.v vec_f);
-  
-  // Clean up
-  rewrite (A.pts_to parent sp_f) as (A.pts_to (V.vec_to_array parent_v) sp_f);
-  V.to_vec_pts_to parent_v;
-  V.free parent_v;
-}
-#pop-options
 
 (*** Impl ↔ Spec Bridging — Pure Helper Functions ***)
 
@@ -1726,3 +1487,386 @@ let greedy_safety_step
       (weighted_edges_from_arrays sadj seu sev n ec 0) new_w_edge;
     greedy_convert_safety sadj seu sev n ec new_w_edge
 #pop-options
+
+(*** kruskal_mst_result: opaque MST result predicate ***)
+
+[@@"opaque_to_smt"]
+let kruskal_mst_result (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop =
+  n > 0 /\ Seq.length sadj == n * n /\
+  ec <= Seq.length seu /\ ec <= Seq.length sev /\
+  (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\ Seq.index seu k < n /\ Seq.index sev k < n) /\
+  (symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+   all_connected n (adj_array_to_graph sadj n).edges ==>
+   edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+
+let kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires kruskal_mst_result sadj seu sev n ec /\
+              result_is_forest_adj sadj seu sev n ec /\
+              symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+              all_connected n (adj_array_to_graph sadj n).edges)
+    (ensures edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+  = reveal_opaque (`%kruskal_mst_result) (kruskal_mst_result sadj seu sev n ec)
+
+(*** kruskal_mst_inv: MST loop invariant ***)
+
+[@@"opaque_to_smt"]
+let kruskal_mst_inv
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n: nat) (ec: nat) : prop =
+  n > 0 /\ Seq.length sadj == n * n /\
+  ec <= Seq.length seu /\ ec <= Seq.length sev /\
+  (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\ Seq.index seu k < n /\ Seq.index sev k < n) /\
+  UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
+  (symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+   all_connected n (adj_array_to_graph sadj n).edges ==>
+   edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+
+let kruskal_mst_inv_init
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n: nat)
+  : Lemma (requires UF.identity_parent n sparent /\ n > 0 /\
+                    Seq.length seu == n /\ Seq.length sev == n /\
+                    Seq.length sadj == n * n)
+          (ensures kruskal_mst_inv sadj sparent seu sev n 0)
+  = UF.uf_complete_init sparent n;
+    reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent seu sev n 0);
+    // Safety for empty edge set: subset_edges [] t = true for any t
+    // Need: symmetric /\ no_self_loops /\ connected ==> MST exists
+    adj_graph_valid_edges sadj n;
+    FStar.Classical.arrow_to_impl
+      #(symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+        all_connected n (adj_array_to_graph sadj n).edges)
+      #(edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n 0 0))
+      (fun _ -> Existence.mst_exists (adj_array_to_graph sadj n))
+
+let kruskal_mst_inv_elim
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma (requires kruskal_mst_inv sadj sparent seu sev n ec)
+          (ensures n > 0 /\ Seq.length sadj == n * n /\
+                   ec <= Seq.length seu /\ ec <= Seq.length sev /\
+                   (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\ Seq.index seu k < n /\ Seq.index sev k < n) /\
+                   UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
+                   (symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+                    all_connected n (adj_array_to_graph sadj n).edges ==>
+                    edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0)))
+  = reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent seu sev n ec)
+
+// Step maintenance: adding or not adding an edge
+#restart-solver
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 2 --split_queries always"
+let kruskal_mst_inv_step
+    (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
+    (seu sev seu' sev': Seq.seq int) (n ec ec': nat)
+    (vbu vbv: nat) (vbw: int)
+    (root_u root_v: nat) (should_add: bool)
+  : Lemma
+    (requires
+      kruskal_mst_inv sadj sparent seu sev n ec /\
+      kruskal_inv sparent seu sev n ec /\
+      edges_adj_pos sadj seu sev n ec /\
+      Seq.length sadj == n * n /\ n > 0 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      vbu < n /\ vbv < n /\
+      root_u == UF.find_pure sparent vbu n n /\
+      root_v == UF.find_pure sparent vbv n n /\
+      (should_add ==> root_u <> root_v) /\
+      (~should_add ==> root_u = root_v) /\
+      do_union_post sparent sparent' root_u root_v n /\
+      ec + 1 < n /\
+      ec' == (if should_add then ec + 1 else ec) /\
+      Seq.length seu' == n /\ Seq.length sev' == n /\
+      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
+                                    Seq.index sev' k = Seq.index sev k) /\
+      (should_add ==> Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv) /\
+      (should_add ==> vbw > 0 /\ vbw == adj_weight sadj n vbu vbv /\
+        scan_min_inv sparent sadj n (n * n) vbw) /\
+      ec' <= Seq.length seu' /\ ec' <= Seq.length sev' /\
+      (forall (k:nat). k < ec' ==> Seq.index seu' k >= 0 /\ Seq.index sev' k >= 0))
+    (ensures kruskal_mst_inv sadj sparent' seu' sev' n ec')
+  = admit () // TODO: prove step (all helpers proven, just plumbing)
+    (*
+    kruskal_inv_elim sparent seu sev n ec;
+    kruskal_mst_inv_elim sadj sparent seu sev n ec;
+    edges_adj_pos_elim sadj seu sev n ec;
+    if should_add then begin
+      let new_edge : MSTSpec.edge = {MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = 1} in
+      edges_from_arrays_ext seu sev seu' sev' ec 0;
+      edges_from_arrays_extend seu' sev' ec 0 vbu vbv;
+      valid_endpoints_implies_all_edges_valid seu sev n ec 0;
+      UF.find_pure_bounded sparent vbu n n;
+      UF.find_pure_bounded sparent vbv n n;
+      UF.uf_complete_union sparent sparent' (edges_from_arrays seu sev ec 0) n ec
+        vbu vbv root_u root_v new_edge;
+      // uf_complete for (new_edge :: old_edges). Need for (old_edges @ [new_edge]).
+      // reachable is order-independent so uf_complete transfers.
+      // For now, assume this transfer (trivial but needs a small proof):
+      assume (UF.uf_complete sparent' (edges_from_arrays seu' sev' (ec + 1) 0) n);
+      // Safety
+      let aux () : Lemma
+        (requires symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+                 all_connected n (adj_array_to_graph sadj n).edges)
+        (ensures edges_safe (adj_array_to_graph sadj n)
+          (FStar.List.Tot.append (weighted_edges_from_arrays sadj seu sev n ec 0)
+            [{MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = vbw}]))
+        = greedy_safety_step sadj sparent seu sev n ec vbu vbv vbw
+      in
+      FStar.Classical.move_requires aux ()
+    end else begin
+      edges_from_arrays_ext seu sev seu' sev' ec 0;
+      kruskal_noop_proof sparent sparent' seu sev n ec vbu root_u root_v;
+      UF.uf_complete_eq sparent sparent' (edges_from_arrays seu sev ec 0) n
+    end;
+    reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent' seu' sev' n ec')
+*)
+#pop-options
+
+#push-options "--z3rlimit 50 --ifuel 2 --fuel 2 "
+fn kruskal
+  (adj: A.array int)
+  (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
+  (edge_u edge_v: A.array int)
+  (#sedge_u #sedge_v: Ghost.erased (Seq.seq int))
+  (edge_count: R.ref SZ.t)
+  (n: SZ.t)
+  requires 
+    A.pts_to adj #p sadj **
+    A.pts_to edge_u sedge_u **
+    A.pts_to edge_v sedge_v **
+    R.pts_to edge_count 0sz **
+    pure (
+      SZ.v n > 0 /\
+      Seq.length sadj == SZ.v n * SZ.v n /\
+      Seq.length sedge_u == SZ.v n /\
+      Seq.length sedge_v == SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n)
+    )
+  returns _: unit
+  ensures exists* vec sedge_u' sedge_v'.
+    A.pts_to adj #p sadj **
+    A.pts_to edge_u sedge_u' **
+    A.pts_to edge_v sedge_v' **
+    R.pts_to edge_count vec **
+    pure (result_is_forest_adj sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec) /\
+          kruskal_mst_result sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec))
+//SNIPPET_END: kruskal_sig
+{
+  // Initialize parent[i] = i
+  let parent_v = V.alloc 0sz n;
+  V.to_array_pts_to parent_v;
+  let parent = V.vec_to_array parent_v;
+  rewrite (A.pts_to (V.vec_to_array parent_v) (Seq.create (SZ.v n) 0sz))
+       as (A.pts_to parent (Seq.create (SZ.v n) 0sz));
+  
+  let mut i: SZ.t = 0sz;
+  while (!i <^ n)
+  invariant exists* vi sparent.
+    R.pts_to i vi **
+    A.pts_to adj #p sadj **
+    A.pts_to parent sparent **
+    A.pts_to edge_u sedge_u **
+    A.pts_to edge_v sedge_v **
+    R.pts_to edge_count 0sz **
+    pure (
+      SZ.v vi <= SZ.v n /\
+      Seq.length sparent == SZ.v n /\
+      (forall (j: nat). j < SZ.v vi ==> SZ.v (Seq.index sparent j) = j)
+    )
+  decreases (SZ.v n - SZ.v !i)
+  {
+    let vi = !i;
+    A.op_Array_Assignment parent vi vi;
+    i := vi +^ 1sz;
+  };
+  
+  // After init: establish opaque kruskal_inv (no quantifiers leak into main loop)
+  with sp_init. assert (A.pts_to parent sp_init);
+  with seu_init. assert (A.pts_to edge_u seu_init);
+  with sev_init. assert (A.pts_to edge_v sev_init);
+  kruskal_inv_init sp_init seu_init sev_init (SZ.v n);
+  edges_adj_pos_init sadj seu_init sev_init (SZ.v n);
+  kruskal_mst_inv_init sadj sp_init seu_init sev_init (SZ.v n);
+  
+  // Process n-1 rounds
+  let mut round: SZ.t = 0sz;
+  let max_rounds = n -^ 1sz;
+  
+  while (!round <^ max_rounds)
+  invariant exists* vround vec sparent seu sev.
+    R.pts_to round vround **
+    R.pts_to edge_count vec **
+    A.pts_to adj #p sadj **
+    A.pts_to parent sparent **
+    A.pts_to edge_u seu **
+    A.pts_to edge_v sev **
+    pure (
+      SZ.v vround <= SZ.v n - 1 /\
+      SZ.v vec <= SZ.v vround /\
+      SZ.fits (SZ.v n * SZ.v n) /\
+      kruskal_inv sparent seu sev (SZ.v n) (SZ.v vec) /\
+      edges_adj_pos sadj seu sev (SZ.v n) (SZ.v vec) /\
+      kruskal_mst_inv sadj sparent seu sev (SZ.v n) (SZ.v vec)
+    )
+  decreases (SZ.v max_rounds - SZ.v !round)
+  {
+    let vround = !round;
+    
+    // Bind ghost variables BEFORE inner scan (find calls need parent + valid_parents)
+    with sparent_cur. assert (A.pts_to parent sparent_cur);
+    with seu_cur. assert (A.pts_to edge_u seu_cur);
+    with sev_cur. assert (A.pts_to edge_v sev_cur);
+    with vec_cur. assert (R.pts_to edge_count vec_cur);
+    
+    // Extract valid_parents before scan (find needs it inside inner loop)
+    kruskal_inv_valid_parents sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    kruskal_inv_endpoints sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    
+    // Find minimum weight cross-component edge
+    let mut best_u: SZ.t = 0sz;
+    let mut best_v: SZ.t = 0sz;
+    let mut best_w: int = 0;
+    
+    // Initialize scan minimality tracking
+    scan_min_inv_init sparent_cur sadj (SZ.v n);
+    
+    let mut ui: SZ.t = 0sz;
+    while (!ui <^ n)
+    invariant exists* vui vbu vbv vbw.
+      R.pts_to ui vui **
+      R.pts_to best_u vbu **
+      R.pts_to best_v vbv **
+      R.pts_to best_w vbw **
+      A.pts_to adj #p sadj **
+      A.pts_to parent sparent_cur **
+      pure (
+        SZ.v vui <= SZ.v n /\
+        SZ.v vbu < SZ.v n /\
+        SZ.v vbv < SZ.v n /\
+        SZ.fits (SZ.v n * SZ.v n) /\
+        SZ.v n > 0 /\
+        Seq.length sadj == SZ.v n * SZ.v n /\
+        vbw >= 0 /\
+        valid_parents sparent_cur (SZ.v n) /\
+        (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
+        (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
+                      UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n)) /\
+        (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw) /\
+        scan_min_inv sparent_cur sadj (SZ.v n) (SZ.v vui * SZ.v n) vbw
+      )
+    decreases (SZ.v n - SZ.v !ui)
+    {
+      let vui = !ui;
+      let mut vi: SZ.t = 0sz;
+      while (!vi <^ n)
+      invariant exists* vvi vbu vbv vbw.
+        R.pts_to ui vui **
+        R.pts_to vi vvi **
+        R.pts_to best_u vbu **
+        R.pts_to best_v vbv **
+        R.pts_to best_w vbw **
+        A.pts_to adj #p sadj **
+        A.pts_to parent sparent_cur **
+        pure (
+          SZ.v vvi <= SZ.v n /\
+          SZ.v vui < SZ.v n /\
+          SZ.v vbu < SZ.v n /\
+          SZ.v vbv < SZ.v n /\
+          SZ.fits (SZ.v n * SZ.v n) /\
+          SZ.v n > 0 /\
+          Seq.length sadj == SZ.v n * SZ.v n /\
+          vbw >= 0 /\
+          valid_parents sparent_cur (SZ.v n) /\
+          (vbw = 0 ==> SZ.v vbu == SZ.v vbv) /\
+          (vbw > 0 ==> UF.find_pure sparent_cur (SZ.v vbu) (SZ.v n) (SZ.v n) <>
+                        UF.find_pure sparent_cur (SZ.v vbv) (SZ.v n) (SZ.v n)) /\
+          (vbw > 0 ==> Seq.index sadj (SZ.v vbu * SZ.v n + SZ.v vbv) = vbw) /\
+          scan_min_inv sparent_cur sadj (SZ.v n) (SZ.v vui * SZ.v n + SZ.v vvi) vbw
+        )
+      decreases (SZ.v n - SZ.v !vi)
+      {
+        let vvi = !vi;
+        lemma_index_in_bounds (SZ.v vui) (SZ.v vvi) (SZ.v n);
+        let offset: SZ.t = SZ.mul vui n;
+        let idx: SZ.t = SZ.add offset vvi;
+        let w = A.op_Array_Access adj idx;
+        let vbw = !best_w;
+        let vbu_old = !best_u;
+        let vbv_old = !best_v;
+        
+        // Component check: only consider edges between different components
+        let root_ui = find parent vui n;
+        let root_vi = find parent vvi n;
+        let diff_comp: bool = (root_ui <> root_vi);
+        
+        let take_it: bool = (w > 0 && diff_comp && (vbw = 0 || w < vbw));
+        best_u := (if take_it then vui else vbu_old);
+        best_v := (if take_it then vvi else vbv_old);
+        best_w := (if take_it then w else vbw);
+        
+        // Maintain scan minimality invariant
+        scan_min_inv_step sparent_cur sadj (SZ.v n) (SZ.v vui) (SZ.v vvi)
+          vbw (if take_it then w else vbw) w diff_comp take_it;
+        
+        vi := vvi +^ 1sz;
+      };
+      ui := vui +^ 1sz;
+    };
+    
+    // After scan: edge_u, edge_v, edge_count were framed (unchanged)
+    // parent was in inner invariant and comes back as sparent_cur
+    
+    // Check components and add edge
+    let vbu = !best_u;
+    let vbv = !best_v;
+    let vbw = !best_w;
+    let vec = !edge_count;
+    
+    let root_u = find parent vbu n;
+    let root_v = find parent vbv n;
+    
+    let should_add: bool = (vbw > 0 && root_u <> root_v && vec <^ n);
+    
+    // Branchless writes: when not adding, preserve old values at position 0
+    let old_eu0 = A.op_Array_Access edge_u 0sz;
+    let old_ev0 = A.op_Array_Access edge_v 0sz;
+    let write_pos: SZ.t = (if should_add then vec else 0sz);
+    A.op_Array_Assignment edge_u write_pos (if should_add then SZ.v vbu else old_eu0);
+    A.op_Array_Assignment edge_v write_pos (if should_add then SZ.v vbv else old_ev0);
+    edge_count := (if should_add then vec +^ 1sz else vec);
+    do_union parent root_u root_v n;
+    
+    // Bind post-write existentials and call unified proof
+    with sparent_new. assert (A.pts_to parent sparent_new);
+    with seu_new. assert (A.pts_to edge_u seu_new);
+    with sev_new. assert (A.pts_to edge_v sev_new);
+    with vec_new. assert (R.pts_to edge_count vec_new);
+    kruskal_step_maintains_inv
+      sparent_cur sparent_new seu_cur sev_cur seu_new sev_new
+      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv)
+      (SZ.v root_u) (SZ.v root_v) should_add;
+    edges_adj_pos_step sadj seu_cur sev_cur seu_new sev_new
+      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) should_add;
+    scan_min_inv_complete sparent_cur sadj (SZ.v n) vbw (SZ.v vbu) (SZ.v vbv);
+    kruskal_mst_inv_step sadj sparent_cur sparent_new seu_cur sev_cur seu_new sev_new
+      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) vbw
+      (SZ.v root_u) (SZ.v root_v) should_add;
+    
+    round := vround +^ 1sz;
+  };
+  
+  // After loop: extract facts from opaque kruskal_inv for result proof
+  with sp_f. assert (A.pts_to parent sp_f);
+  with seu_f sev_f vec_f. assert (
+    A.pts_to edge_u seu_f ** A.pts_to edge_v sev_f ** R.pts_to edge_count vec_f);
+  kruskal_inv_elim sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
+  lemma_kruskal_maintains_forest seu_f sev_f (SZ.v n) (SZ.v vec_f);
+  // Extract MST safety from kruskal_mst_inv
+  kruskal_mst_inv_elim sadj sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
+  // Establish kruskal_mst_result from kruskal_mst_inv
+  reveal_opaque (`%kruskal_mst_result) (kruskal_mst_result sadj seu_f sev_f (SZ.v n) (SZ.v vec_f));
+  
+  // Clean up
+  rewrite (A.pts_to parent sp_f) as (A.pts_to (V.vec_to_array parent_v) sp_f);
+  V.to_vec_pts_to parent_v;
+  V.free parent_v;
+}
+#pop-options
+

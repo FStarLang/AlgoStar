@@ -87,37 +87,6 @@ val result_is_forest_adj_forest_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) 
         Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
       KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
 
-(*** Kruskal Function ***)
-
-//SNIPPET_START: kruskal_sig
-fn kruskal
-  (adj: A.array int)
-  (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
-  (edge_u edge_v: A.array int)
-  (#sedge_u #sedge_v: Ghost.erased (Seq.seq int))
-  (edge_count: R.ref SZ.t)
-  (n: SZ.t)
-  requires
-    A.pts_to adj #p sadj **
-    A.pts_to edge_u sedge_u **
-    A.pts_to edge_v sedge_v **
-    R.pts_to edge_count 0sz **
-    pure (
-      SZ.v n > 0 /\
-      Seq.length sadj == SZ.v n * SZ.v n /\
-      Seq.length sedge_u == SZ.v n /\
-      Seq.length sedge_v == SZ.v n /\
-      SZ.fits (SZ.v n * SZ.v n)
-    )
-  returns _: unit
-  ensures exists* vec sedge_u' sedge_v'.
-    A.pts_to adj #p sadj **
-    A.pts_to edge_u sedge_u' **
-    A.pts_to edge_v sedge_v' **
-    R.pts_to edge_count vec **
-    pure (result_is_forest_adj sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec))
-//SNIPPET_END: kruskal_sig
-
 (*** Impl ↔ Spec Bridging ***)
 
 /// Convert flat adjacency matrix to graph
@@ -262,6 +231,7 @@ val kruskal_result_is_mst
 
 
 (*** Pure Spec MST Theorem ***)
+
 (*** Safety Infrastructure ***)
 
 /// Safety predicate: edges ⊆ some MST
@@ -279,3 +249,49 @@ val pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
       all_connected n (adj_array_to_graph sadj n).edges)
     (ensures
       is_mst (adj_array_to_graph sadj n) (KSpec.pure_kruskal (adj_array_to_graph sadj n)))
+
+
+
+/// Result predicate: for connected graphs, the imperative output is safe (⊆ some MST)
+val kruskal_mst_result (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
+
+/// The MST result predicate implies: for connected symmetric graphs, the output is MST.
+/// Use kruskal_result_is_mst (from the bridging section) to derive is_mst
+/// from edges_safe + forest + spanning tree properties.
+///
+/// Usage in tests:
+///   1. Call kruskal → get result_is_forest_adj + kruskal_mst_result
+///   2. Call kruskal_mst_result_elim → get edges_safe (for connected graphs)
+///   3. With forest + safety → prove is_mst via bridge lemma
+
+(*** Kruskal Function ***)
+
+//SNIPPET_START: kruskal_sig
+fn kruskal
+  (adj: A.array int)
+  (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
+  (edge_u edge_v: A.array int)
+  (#sedge_u #sedge_v: Ghost.erased (Seq.seq int))
+  (edge_count: R.ref SZ.t)
+  (n: SZ.t)
+  requires
+    A.pts_to adj #p sadj **
+    A.pts_to edge_u sedge_u **
+    A.pts_to edge_v sedge_v **
+    R.pts_to edge_count 0sz **
+    pure (
+      SZ.v n > 0 /\
+      Seq.length sadj == SZ.v n * SZ.v n /\
+      Seq.length sedge_u == SZ.v n /\
+      Seq.length sedge_v == SZ.v n /\
+      SZ.fits (SZ.v n * SZ.v n)
+    )
+  returns _: unit
+  ensures exists* vec sedge_u' sedge_v'.
+    A.pts_to adj #p sadj **
+    A.pts_to edge_u sedge_u' **
+    A.pts_to edge_v sedge_v' **
+    R.pts_to edge_count vec **
+    pure (result_is_forest_adj sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec) /\
+          kruskal_mst_result sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec))
+//SNIPPET_END: kruskal_sig

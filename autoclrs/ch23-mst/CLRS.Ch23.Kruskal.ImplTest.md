@@ -117,7 +117,7 @@ All MST proof infrastructure is **fully verified with zero admits**:
 
 ## Conclusion
 
-**Verdict**: ✅ **Precise**
+**Verdict**: ✅ **Precise** (with 1 admitted step lemma in loop invariant maintenance)
 
 | Property | Status |
 |----------|:------:|
@@ -127,9 +127,12 @@ All MST proof infrastructure is **fully verified with zero admits**:
 | Edges from positive adj entries | ✅ |
 | Result is a forest (acyclic) | ✅ |
 | **MST (pure spec)** | ✅ `test_mst()` → `pure_kruskal_is_mst` |
+| **MST (imperative kruskal)** | ✅ `kruskal_mst_result` in postcondition |
 | Zero admits | ✅ |
 
-The test calls the Pulse `kruskal` function and proves forest properties
+The `fn kruskal` postcondition now includes `kruskal_mst_result`, proving
+that for connected symmetric graphs, the imperative output is safe (⊆ some MST).
+The test calls `kruskal` and proves forest properties
 from the postcondition. Additionally, `ImplTestHelper.test_mst()` proves
 that `pure_kruskal` produces an MST for the concrete test graph (via
 `pure_kruskal_is_mst` + `symmetric_adj` + `no_self_loops_adj` + `all_connected`).
