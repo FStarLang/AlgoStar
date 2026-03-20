@@ -778,31 +778,7 @@ fn kruskal
    inductively at each algorithm step.
 *)
 
-// Convert flat adjacency matrix (array of int, n×n) to graph
-// Emits one edge {u, v, w} for each position (u,v) with w > 0 and u < v
-// (avoiding duplicates for undirected graphs)
-let rec adj_row_edges (sadj: Seq.seq int) (n: nat) (u v: nat)
-  : Pure (list edge)
-    (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0)
-    (ensures fun _ -> True)
-    (decreases (n - v))
-  = if v >= n then []
-    else
-      let w = Seq.index sadj (u * n + v) in
-      let rest = adj_row_edges sadj n u (v + 1) in
-      if w > 0 && u < v then { u = u; v = v; w = w } :: rest
-      else rest
-
-let rec adj_all_edges (sadj: Seq.seq int) (n: nat) (u: nat)
-  : Pure (list edge)
-    (requires Seq.length sadj == n * n /\ u <= n /\ n > 0)
-    (ensures fun _ -> True)
-    (decreases (n - u))
-  = if u >= n then []
-    else adj_row_edges sadj n u 0 `FStar.List.Tot.append` adj_all_edges sadj n (u + 1)
-
-let adj_array_to_graph (sadj: Seq.seq int) (n: nat{Seq.length sadj == n * n /\ n > 0}) : graph =
-  { n = n; edges = adj_all_edges sadj n 0 }
+// adj_row_edges, adj_all_edges, adj_array_to_graph are in Impl.fsti
 
 // Edges with actual weights from the adjacency matrix
 // (edges_from_arrays uses weight 1 for internal forest tracking;
@@ -827,16 +803,7 @@ let rec weighted_edges_from_arrays
 
 (*** Graph Properties for MST Bridge ***)
 
-/// Adjacency matrix is symmetric (undirected graph)
-let symmetric_adj (sadj: Seq.seq int) (n: nat) : prop =
-  Seq.length sadj == n * n /\
-  (forall (u v: nat). u < n /\ v < n ==>
-    adj_weight sadj n u v = adj_weight sadj n v u)
-
-/// No self-loops: diagonal entries are zero
-let no_self_loops_adj (sadj: Seq.seq int) (n: nat) : prop =
-  Seq.length sadj == n * n /\
-  (forall (u: nat). u < n ==> adj_weight sadj n u u = 0)
+// symmetric_adj and no_self_loops_adj are in Impl.fsti
 
 (*** Bridging Lemmas: adj_array_to_graph has valid edges ***)
 

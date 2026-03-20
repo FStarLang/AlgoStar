@@ -121,7 +121,28 @@ fn kruskal
 (*** Impl ↔ Spec Bridging ***)
 
 /// Convert flat adjacency matrix to graph
-val adj_array_to_graph (sadj: Seq.seq int) (n: nat{Seq.length sadj == n * n /\ n > 0}) : graph
+let rec adj_row_edges (sadj: Seq.seq int) (n: nat) (u v: nat)
+  : Pure (list MSTSpec.edge)
+    (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0)
+    (ensures fun _ -> True)
+    (decreases (n - v))
+  = if v >= n then []
+    else
+      let w = Seq.index sadj (u * n + v) in
+      let rest = adj_row_edges sadj n u (v + 1) in
+      if w > 0 && u < v then { MSTSpec.u = u; MSTSpec.v = v; MSTSpec.w = w } :: rest
+      else rest
+
+let rec adj_all_edges (sadj: Seq.seq int) (n: nat) (u: nat)
+  : Pure (list MSTSpec.edge)
+    (requires Seq.length sadj == n * n /\ u <= n /\ n > 0)
+    (ensures fun _ -> True)
+    (decreases (n - u))
+  = if u >= n then []
+    else adj_row_edges sadj n u 0 `FStar.List.Tot.append` adj_all_edges sadj n (u + 1)
+
+let adj_array_to_graph (sadj: Seq.seq int) (n: nat{Seq.length sadj == n * n /\ n > 0}) : MSTSpec.graph =
+  { MSTSpec.n = n; MSTSpec.edges = adj_all_edges sadj n 0 }
 
 /// Edges with actual weights from the adjacency matrix
 val weighted_edges_from_arrays
@@ -138,10 +159,15 @@ val weighted_edges_from_arrays
 (*** Graph Properties ***)
 
 /// Adjacency matrix is symmetric (undirected graph)
-val symmetric_adj (sadj: Seq.seq int) (n: nat) : prop
+let symmetric_adj (sadj: Seq.seq int) (n: nat) : prop =
+  Seq.length sadj == n * n /\
+  (forall (u v: nat). u < n /\ v < n ==>
+    Seq.index sadj (u * n + v) = Seq.index sadj (v * n + u))
 
 /// No self-loops: diagonal entries are zero
-val no_self_loops_adj (sadj: Seq.seq int) (n: nat) : prop
+let no_self_loops_adj (sadj: Seq.seq int) (n: nat) : prop =
+  Seq.length sadj == n * n /\
+  (forall (u: nat). u < n ==> Seq.index sadj (u * n + u) = 0)
 
 (*** MST Bridging Theorems ***)
 

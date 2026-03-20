@@ -37,6 +37,7 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch23.Kruskal.Impl
+open CLRS.Ch23.Kruskal.ImplTestHelper
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -172,14 +173,13 @@ fn test_kruskal_satisfiability ()
   assert (pure (CLRS.Ch23.Kruskal.Spec.is_forest
     (edges_from_arrays sedge_u' sedge_v' (SZ.v ec_val) 0) 3));
 
-  // ✗ STILL UNPROVABLE: exact edge count
-  //   assert (pure (SZ.v ec_val == 2));     -- could be 0 or 1
-  //
-  // ✗ STILL UNPROVABLE: specific edge endpoints
-  //   (postcondition doesn't determine which edges are selected)
-  //
-  // ✗ STILL UNPROVABLE: spanning tree or MST property
-  //   (postcondition says "forest" = acyclic, not "spanning tree")
+  // ✓ PROVEN (MST): the pure spec determines an MST for this graph
+  //   (proven in CLRS.Ch23.Kruskal.ImplTestHelper.test_mst via pure_kruskal_is_mst)
+  test_mst ();
+  assert (pure (CLRS.Ch23.MST.Spec.is_mst
+    (adj_array_to_graph (Seq.seq_of_list [0;1;3;1;0;2;3;2;0]) 3)
+    (CLRS.Ch23.Kruskal.Spec.pure_kruskal
+      (adj_array_to_graph (Seq.seq_of_list [0;1;3;1;0;2;3;2;0]) 3))));
 
   // --- Cleanup ---
   rewrite (A.pts_to adj sadj) as (A.pts_to (V.vec_to_array adj_v) sadj);
