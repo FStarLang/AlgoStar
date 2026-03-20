@@ -44,6 +44,10 @@ module UF = CLRS.Ch23.Kruskal.UF
 module Helpers = CLRS.Ch23.Kruskal.Helpers
 module Bridge = CLRS.Ch23.Kruskal.Bridge
 
+/// Safe indexing into adjacency matrix — bundles the nonlinear index bound
+let adj_weight (sadj: Seq.seq int) (n: nat{n > 0}) (u: nat{u < n}) (v: nat{v < n /\ Seq.length sadj == n * n}) : int
+  = Seq.index sadj (u * n + v)
+
 let valid_parents (sparent: Seq.seq SZ.t) (n: nat) : prop =
   Seq.length sparent == n /\
   (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) < n)
@@ -162,12 +166,12 @@ let scan_min_inv (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat) (scan_pos:
   n > 0 /\ Seq.length sadj == n * n /\ Seq.length sparent >= n /\
   (vbw > 0 ==>
     (forall (u' v': nat). u' < n /\ v' < n /\ u' * n + v' < scan_pos ==>
-      (Seq.index sadj (u' * n + v') > 0 /\
+      (adj_weight sadj n u' v' > 0 /\
        UF.find_pure sparent u' n n <> UF.find_pure sparent v' n n) ==>
-      Seq.index sadj (u' * n + v') >= vbw)) /\
+      adj_weight sadj n u' v' >= vbw)) /\
   (vbw = 0 ==>
     (forall (u' v': nat). u' < n /\ v' < n /\ u' * n + v' < scan_pos ==>
-      Seq.index sadj (u' * n + v') <= 0 \/
+      adj_weight sadj n u' v' <= 0 \/
       UF.find_pure sparent u' n n = UF.find_pure sparent v' n n))
 
 let scan_min_inv_init (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat)
@@ -185,7 +189,7 @@ let scan_min_inv_step
       u0 < n /\ v0 < n /\ n > 0 /\
       Seq.length sadj == n * n /\
       Seq.length sparent >= n /\
-      w == Seq.index sadj (u0 * n + v0) /\
+      w == adj_weight sadj n u0 v0 /\
       (diff_comp <==> UF.find_pure sparent u0 n n <> UF.find_pure sparent v0 n n) /\
       take_it == (w > 0 && diff_comp && (old_vbw = 0 || w < old_vbw)) /\
       new_vbw == (if take_it then w else old_vbw))
@@ -202,16 +206,16 @@ let scan_min_inv_complete (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat) (
       n > 0 /\ Seq.length sadj == n * n /\
       (vbw > 0 ==> vbu < n /\ vbv < n /\
         UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
-        Seq.index sadj (vbu * n + vbv) = vbw))
+        adj_weight sadj n vbu vbv = vbw))
     (ensures
       (vbw > 0 ==>
         (forall (u' v': nat). u' < n /\ v' < n ==>
-          (Seq.index sadj (u' * n + v') > 0 /\
+          (adj_weight sadj n u' v' > 0 /\
            UF.find_pure sparent u' n n <> UF.find_pure sparent v' n n) ==>
-          Seq.index sadj (u' * n + v') >= vbw)) /\
+          adj_weight sadj n u' v' >= vbw)) /\
       (vbw = 0 ==>
         (forall (u' v': nat). u' < n /\ v' < n ==>
-          Seq.index sadj (u' * n + v') <= 0 \/
+          adj_weight sadj n u' v' <= 0 \/
           UF.find_pure sparent u' n n = UF.find_pure sparent v' n n)))
   = reveal_opaque (`%scan_min_inv) (scan_min_inv sparent sadj n (n * n) vbw)
 
@@ -273,7 +277,7 @@ let edges_adj_pos (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop 
   (forall (k:nat). k < ec ==> 
     Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
     Seq.index seu k < n /\ Seq.index sev k < n /\
-    Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0)
+    adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0)
 
 let edges_adj_pos_init (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat)
   : Lemma (requires Seq.length sadj == n * n /\ n > 0 /\
@@ -288,7 +292,7 @@ let edges_adj_pos_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
                    (forall (k:nat). k < ec ==> 
                      Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
                      Seq.index seu k < n /\ Seq.index sev k < n /\
-                     Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
+                     adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0))
   = reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu sev n ec)
 
 let edges_adj_pos_step
@@ -305,7 +309,7 @@ let edges_adj_pos_step
       (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
                                    Seq.index sev' k = Seq.index sev k) /\
       (should_add ==> Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv /\
-                       Seq.index sadj (vbu * n + vbv) > 0))
+                       adj_weight sadj n vbu vbv > 0))
     (ensures edges_adj_pos sadj seu' sev' n ec')
   = reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu sev n ec);
     reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu' sev' n ec')
@@ -326,7 +330,7 @@ let result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: 
       (forall (k:nat). k < ec ==>
         Seq.index seu k >= 0 /\ Seq.index seu k < n /\
         Seq.index sev k >= 0 /\ Seq.index sev k < n /\
-        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
+        adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0))
   = edges_adj_pos_elim sadj seu sev n ec
 
 // Structural elim: expose is_forest from result_is_forest_adj
@@ -827,12 +831,12 @@ let rec weighted_edges_from_arrays
 let symmetric_adj (sadj: Seq.seq int) (n: nat) : prop =
   Seq.length sadj == n * n /\
   (forall (u v: nat). u < n /\ v < n ==>
-    Seq.index sadj (u * n + v) = Seq.index sadj (v * n + u))
+    adj_weight sadj n u v = adj_weight sadj n v u)
 
 /// No self-loops: diagonal entries are zero
 let no_self_loops_adj (sadj: Seq.seq int) (n: nat) : prop =
   Seq.length sadj == n * n /\
-  (forall (u: nat). u < n ==> Seq.index sadj (u * n + u) = 0)
+  (forall (u: nat). u < n ==> adj_weight sadj n u u = 0)
 
 (*** Bridging Lemmas: adj_array_to_graph has valid edges ***)
 
@@ -897,13 +901,13 @@ let rec adj_row_edges_mem (sadj: Seq.seq int) (n: nat) (u: nat) (target_v: nat) 
   : Lemma
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
               v <= target_v /\ target_v < n /\
-              u < target_v /\ Seq.index sadj (u * n + target_v) > 0)
-    (ensures mem_edge ({u = u; v = target_v; w = Seq.index sadj (u * n + target_v)})
+              u < target_v /\ adj_weight sadj n u target_v > 0)
+    (ensures mem_edge ({u = u; v = target_v; w = adj_weight sadj n u target_v})
                        (adj_row_edges sadj n u v))
     (decreases (n - v))
   = if v >= n then ()
     else if v = target_v then
-      MSTSpec.edge_eq_reflexive ({u = u; v = target_v; w = Seq.index sadj (u * n + target_v)})
+      MSTSpec.edge_eq_reflexive ({u = u; v = target_v; w = adj_weight sadj n u target_v})
     else
       adj_row_edges_mem sadj n u target_v (v + 1)
 #pop-options
@@ -937,7 +941,7 @@ let rec weighted_edges_subset_graph_aux
       (forall (k:nat). i <= k /\ k < ec ==>
         Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
         Seq.index seu k < n /\ Seq.index sev k < n /\
-        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
+        adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0))
     (ensures
       subset_edges (weighted_edges_from_arrays sadj seu sev n ec i) (adj_all_edges sadj n 0))
     (decreases (ec - i))
@@ -1105,8 +1109,8 @@ let rec weighted_edge_weight_from_mem
       e.u < n /\ e.v < n /\
       mem_edge e (weighted_edges_from_arrays sadj seu sev n ec i))
     (ensures
-      (e.w = Seq.index sadj (e.u * n + e.v)) \/
-      (e.w = Seq.index sadj (e.v * n + e.u)))
+      (e.w = adj_weight sadj n e.u e.v) \/
+      (e.w = adj_weight sadj n e.v e.u))
     (decreases (ec - i))
   = if i >= ec then ()
     else
@@ -1333,8 +1337,8 @@ let pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
 let adj_graph_mem_edge (sadj: Seq.seq int) (n u v: nat)
   : Lemma
     (requires Seq.length sadj == n * n /\ n > 0 /\ u < n /\ v < n /\ u <> v /\
-              symmetric_adj sadj n /\ Seq.index sadj (u * n + v) > 0)
-    (ensures mem_edge ({u = u; v = v; w = Seq.index sadj (u * n + v)})
+              symmetric_adj sadj n /\ adj_weight sadj n u v > 0)
+    (ensures mem_edge ({u = u; v = v; w = adj_weight sadj n u v})
                        (adj_array_to_graph sadj n).edges)
   = let w = Seq.index sadj (u * n + v) in
     if u < v then begin
@@ -1509,10 +1513,12 @@ let reachable_weighted_to_unweighted
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
 let rec weighted_edges_from_arrays_extend
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
+    (eu: nat{eu < n}) (ev: nat{ev < n})
   : Lemma
     (requires
       n > 0 /\ ec < Seq.length seu /\ ec < Seq.length sev /\
       Seq.length sadj == n * n /\
+      Seq.index seu ec == eu /\ Seq.index sev ec == ev /\
       (forall (k:nat). i <= k /\ k < ec + 1 ==>
         Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
         Seq.index seu k < n /\ Seq.index sev k < n))
@@ -1520,11 +1526,10 @@ let rec weighted_edges_from_arrays_extend
       weighted_edges_from_arrays sadj seu sev n (ec + 1) i ==
         FStar.List.Tot.append
           (weighted_edges_from_arrays sadj seu sev n ec i)
-          [{u = Seq.index seu ec; v = Seq.index sev ec;
-            w = Seq.index sadj (Seq.index seu ec * n + Seq.index sev ec)}])
+          [{u = eu; v = ev; w = adj_weight sadj n eu ev}])
     (decreases (ec - i))
   = if i >= ec then ()
-    else weighted_edges_from_arrays_extend sadj seu sev n ec (i + 1)
+    else weighted_edges_from_arrays_extend sadj seu sev n ec (i + 1) eu ev
 #pop-options
 
 /// subset_edges (hd :: tl) s ⟹ subset_edges (tl @ [hd]) s
@@ -1541,14 +1546,10 @@ let rec subset_edges_cons_to_append (hd: edge) (tl: list edge) (s: list edge)
 /// Named predicate: weighted edges are safe (⊆ some MST).
 /// Bundles all preconditions for weighted_edges_from_arrays to avoid
 /// Seq.index typing issues in ensures clauses.
-let weighted_edges_safe (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop =
-  n > 0 /\ Seq.length sadj == n * n /\
-  ec <= Seq.length seu /\ ec <= Seq.length sev /\
-  (forall (k:nat). k < ec ==>
-    Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
-    Seq.index seu k < n /\ Seq.index sev k < n) /\
-  (exists (t: list edge). is_mst (adj_array_to_graph sadj n) t /\
-    subset_edges (weighted_edges_from_arrays sadj seu sev n ec 0) t)
+/// Safety predicate: the given edges are subset of some MST
+/// Takes the edge list directly to avoid Pure typing issues with weighted_edges_from_arrays
+let edges_safe (g: graph) (es: list edge) : prop =
+  exists (t: list edge). is_mst g t /\ subset_edges es t
 
 /// Helper 1: unreachable in weighted edges from UF find inequality
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
@@ -1568,33 +1569,25 @@ let greedy_unreachable
 #pop-options
 
 /// scan_min_inv_complete but using adj_weight (avoids Seq.index typing issues at call sites)
+#restart-solver
 #push-options "--fuel 1 --ifuel 0 --z3rlimit 50"
 let scan_min_complete_adj_weight
     (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat) (vbw: int)
     (vbu vbv eu ev: nat)
-    (idx1: nat{idx1 == eu * n + ev /\ idx1 < Seq.length sadj})
-    (idx2: nat{idx2 == ev * n + eu /\ idx2 < Seq.length sadj})
   : Lemma
     (requires
       scan_min_inv sparent sadj n (n * n) vbw /\
       n > 0 /\ Seq.length sadj == n * n /\ Seq.length sparent >= n /\
       vbw > 0 /\ vbu < n /\ vbv < n /\ eu < n /\ ev < n /\
       UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
-      Seq.index sadj (vbu * n + vbv) = vbw /\
-      UF.find_pure sparent eu n n <> UF.find_pure sparent ev n n)
+      adj_weight sadj n vbu vbv = vbw /\
+      UF.find_pure sparent eu n n <> UF.find_pure sparent ev n n /\
+      adj_weight sadj n eu ev > 0)
     (ensures
-      Seq.index sadj idx1 >= vbw /\
-      Seq.index sadj idx2 >= vbw)
-  = let n_pos : pos = n in
-    FStar.Math.Lemmas.lemma_mult_lt_right n_pos eu n;
-    FStar.Math.Lemmas.lemma_mult_lt_right n_pos ev n;
-    scan_min_inv_complete sparent sadj n vbw vbu vbv
+      adj_weight sadj n eu ev >= vbw)
+  = reveal_opaque (`%scan_min_inv) (scan_min_inv sparent sadj n (n * n) vbw)
 #pop-options
 
-/// adj_weight: safe indexing into adj matrix (avoids Seq.index typing issues)
-[@@"unfold_for_smt"]
-let adj_weight (sadj: Seq.seq int) (n: nat{n > 0}) (u: nat{u < n}) (v: nat{v < n /\ Seq.length sadj == n * n}) : int
-  = Seq.index sadj (u * n + v)
 
 /// Graph edge weight matches adj matrix
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
@@ -1602,7 +1595,7 @@ let rec adj_row_edges_weight (sadj: Seq.seq int) (n u v: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
               mem_edge e (adj_row_edges sadj n u v))
-    (ensures e.u < n /\ e.v < n /\
+    (ensures e.u < n /\ e.v < n /\ e.w > 0 /\
              (e.w = adj_weight sadj n e.u e.v \/
               e.w = adj_weight sadj n e.v e.u))
     (decreases (n - v))
@@ -1620,7 +1613,7 @@ let rec adj_all_edges_weight (sadj: Seq.seq int) (n u: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u <= n /\ n > 0 /\
               mem_edge e (adj_all_edges sadj n u))
-    (ensures e.u < n /\ e.v < n /\
+    (ensures e.u < n /\ e.w > 0 /\ e.v < n /\
              (e.w = adj_weight sadj n e.u e.v \/
               e.w = adj_weight sadj n e.v e.u))
     (decreases (n - u))
@@ -1636,7 +1629,7 @@ let adj_graph_edge_weight (sadj: Seq.seq int) (n: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ n > 0 /\
               mem_edge e (adj_array_to_graph sadj n).edges)
-    (ensures e.u < n /\ e.v < n /\
+    (ensures e.u < n /\ e.v < n /\ e.w > 0 /\
              (e.w = adj_weight sadj n e.u e.v \/
               e.w = adj_weight sadj n e.v e.u))
   = adj_all_edges_weight sadj n 0 e
@@ -1648,6 +1641,7 @@ let index_bound (u v n: nat)
   = FStar.Math.Lemmas.lemma_mult_lt_right n u n
 
 /// Specialized: graph edge weight >= scan minimum when find ≠
+#restart-solver
 #push-options "--fuel 1 --ifuel 0 --z3rlimit 800 "
 let adj_graph_edge_ge_scanmin
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (n: nat) (e: edge)
@@ -1655,25 +1649,28 @@ let adj_graph_edge_ge_scanmin
   : Lemma
     (requires Seq.length sadj == n * n /\ n > 0 /\ Seq.length sparent >= n /\
               e.u < n /\ e.v < n /\
-              (e.w = Seq.index sadj (e.u * n + e.v) \/
-               e.w = Seq.index sadj (e.v * n + e.u)) /\
               UF.find_pure sparent e.u n n <> UF.find_pure sparent e.v n n /\
               vbw > 0 /\ vbu < n /\ vbv < n /\
               UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
-              Seq.index sadj (vbu * n + vbv) = vbw /\
-              scan_min_inv sparent sadj n (n * n) vbw)
+              adj_weight sadj n vbu vbv = vbw /\
+              scan_min_inv sparent sadj n (n * n) vbw /\
+              mem_edge e (adj_array_to_graph sadj n).edges)
     (ensures e.w >= vbw)
   = adj_graph_edge_weight sadj n e;
-    index_bound e.u e.v n;
-    index_bound e.v e.u n;
-    scan_min_complete_adj_weight sparent sadj n vbw vbu vbv e.u e.v (e.u * n + e.v) (e.v * n + e.u)
+    // e.w > 0, e.u < n, e.v < n, e.w = adj_weight sadj n e.u e.v \/ adj_weight sadj n e.v e.u
+    // Case split on which adj_weight equals e.w
+    if adj_weight sadj n e.u e.v > 0 then
+      scan_min_complete_adj_weight sparent sadj n vbw vbu vbv e.u e.v
+    else ();
+    if adj_weight sadj n e.v e.u > 0 then
+      scan_min_complete_adj_weight sparent sadj n vbw vbu vbv e.v e.u
+    else ()
 #pop-options
+#restart-solver
 #push-options "--z3rlimit 300 --fuel 1 --ifuel 0"
 let greedy_min_weight
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int)
     (n ec: nat) (new_w_edge: edge)
-    (_: squash (new_w_edge.u * n + new_w_edge.v < Seq.length sadj /\
-               new_w_edge.w = Seq.index sadj (new_w_edge.u * n + new_w_edge.v)))
   : Lemma
     (requires
       n > 0 /\ Seq.length sadj == n * n /\
@@ -1682,6 +1679,7 @@ let greedy_min_weight
       UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
       scan_min_inv sparent sadj n (n * n) new_w_edge.w /\
       new_w_edge.w > 0 /\ new_w_edge.u < n /\ new_w_edge.v < n /\
+      new_w_edge.w == adj_weight sadj n new_w_edge.u new_w_edge.v /\
       UF.find_pure sparent new_w_edge.u n n <> UF.find_pure sparent new_w_edge.v n n)
     (ensures
       (let g = adj_array_to_graph sadj n in
@@ -1704,58 +1702,64 @@ let greedy_min_weight
 #pop-options
 
 /// Helper 3: convert greedy_step_safe result from cons to append form
+#restart-solver
 #push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
 let greedy_convert_safety
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (new_w_edge: edge)
   : Lemma
     (requires
       n > 0 /\ Seq.length sadj == n * n /\
-      valid_endpoints seu sev n ec /\
       ec < Seq.length seu /\ ec < Seq.length sev /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
       Seq.index seu ec == new_w_edge.u /\ Seq.index sev ec == new_w_edge.v /\
+      new_w_edge.u >= 0 /\ new_w_edge.v >= 0 /\
       new_w_edge.u < n /\ new_w_edge.v < n /\
       (exists (t: list edge). is_mst (adj_array_to_graph sadj n) t /\
         subset_edges (new_w_edge :: weighted_edges_from_arrays sadj seu sev n ec 0) t))
-    (ensures weighted_edges_safe sadj seu sev n (ec + 1))
-  = weighted_edges_from_arrays_extend sadj seu sev n ec 0;
-    let aux (t: list edge) : Lemma
-      (requires is_mst (adj_array_to_graph sadj n) t /\
-        subset_edges (new_w_edge :: weighted_edges_from_arrays sadj seu sev n ec 0) t)
-      (ensures is_mst (adj_array_to_graph sadj n) t /\
-        subset_edges (weighted_edges_from_arrays sadj seu sev n (ec + 1) 0) t)
-      = subset_edges_cons_to_append new_w_edge (weighted_edges_from_arrays sadj seu sev n ec 0) t
+    (ensures edges_safe (adj_array_to_graph sadj n) (FStar.List.Tot.append (weighted_edges_from_arrays sadj seu sev n ec 0) [new_w_edge]))
+  = let old = weighted_edges_from_arrays sadj seu sev n ec 0 in
+    let convert (t: list edge) : Lemma
+      (requires subset_edges (new_w_edge :: old) t)
+      (ensures subset_edges (FStar.List.Tot.append old [new_w_edge]) t)
+      = subset_edges_cons_to_append new_w_edge old t
     in
-    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+    FStar.Classical.forall_intro (FStar.Classical.move_requires convert)
 #pop-options
 
 /// Greedy safety step: composed from helpers
+#restart-solver
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
 let greedy_safety_step
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
     (seu sev: Seq.seq int) (n ec: nat)
     (vbu: nat) (vbv: nat) (vbw: int)
-    (idx_bound: squash (vbu < n /\ vbv < n /\ vbu * n + vbv < Seq.length sadj /\ vbw = Seq.index sadj (vbu * n + vbv)))
   : Lemma
     (requires
       n > 0 /\ Seq.length sadj == n * n /\
+      vbu < n /\ vbv < n /\ vbw > 0 /\
+      vbw == adj_weight sadj n vbu vbv /\
       valid_endpoints seu sev n ec /\
       UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
       UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
       KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
       edges_adj_pos sadj seu sev n ec /\
       symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
-      weighted_edges_safe sadj seu sev n ec /\
-      vbw > 0 /\
+      edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0) /\
       scan_min_inv sparent sadj n (n * n) vbw /\
       UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
       ec < Seq.length seu /\ ec < Seq.length sev /\
       Seq.index seu ec == vbu /\ Seq.index sev ec == vbv)
-    (ensures weighted_edges_safe sadj seu sev n (ec + 1))
+    (ensures edges_safe (adj_array_to_graph sadj n)
+      (FStar.List.Tot.append (weighted_edges_from_arrays sadj seu sev n ec 0)
+        [{u = vbu; v = vbv; w = vbw}]))
   = let new_w_edge : edge = {u = vbu; v = vbv; w = vbw} in
     adj_graph_valid_edges sadj n;
     adj_graph_mem_edge sadj n vbu vbv;
     greedy_unreachable sadj sparent seu sev n ec vbu vbv;
-    greedy_min_weight sadj sparent seu sev n ec new_w_edge ();
+    greedy_min_weight sadj sparent seu sev n ec new_w_edge;
     Bridge.greedy_step_safe (adj_array_to_graph sadj n)
       (weighted_edges_from_arrays sadj seu sev n ec 0) new_w_edge;
     greedy_convert_safety sadj seu sev n ec new_w_edge
