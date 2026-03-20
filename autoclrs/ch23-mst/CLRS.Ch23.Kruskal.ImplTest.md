@@ -87,33 +87,39 @@ by Kruskal's algorithm. Previously, external consumers could only see
 array-level facts; now they can access the graph-theoretic `is_forest`
 predicate directly.
 
-## MST Infrastructure Status
+## MST Proof Infrastructure
 
-The Pulse postcondition proves the result is a **forest** (acyclic subgraph)
-with edges from the adjacency matrix. Extensive infrastructure is now proven
-(zero admits) for connecting to MST via the `kruskal_result_is_mst` bridge:
+All MST proof infrastructure is **fully verified with zero admits**:
 
-**Proven (7 of 10 bridge preconditions):**
+**Core Safety:**
+- `greedy_safety_step`: Adding min-weight cross-component edge preserves safety ✅
+- `edges_safe`: Clean safety predicate (edges ⊆ some MST) ✅
+- `adj_weight`: Safe adj matrix indexing (bundles NL arithmetic) ✅
 
-| Precondition | Lemma |
-|---|---|
-| `result_is_forest_adj` | Kruskal postcondition |
-| `subset_edges wes g.edges` | `weighted_edges_subset_graph` |
-| `acyclic g.n wes` | `acyclic_transfer` |
-| `noRepeats_edge wes` | `noRepeats_transfer` |
-| Valid graph edges | `adj_graph_valid_edges` |
-| UF completeness | `uf_complete_init/union/eq/unreachable` |
-| Scan minimality | `scan_min_inv` + `scan_min_inv_complete` |
+**Transfer Lemmas:**
+- `noRepeats_transfer`: w=1 noRepeats → weighted noRepeats ✅
+- `acyclic_transfer`: w=1 acyclic → weighted acyclic ✅
+- `reachable_weighted_to_unweighted` + `reachable_unweighted_to_weighted` ✅
 
-**Remaining for MST (3 preconditions need loop invariant changes):**
-- `length wes = n-1` (needs `ec == n-1` tracking for connected graphs)
-- `all_connected g.n wes` (follows from ec=n-1 + acyclic)
-- Safety `⊆ some MST` (needs `greedy_step_safe` at each loop step)
+**UF Completeness (zero admits):**
+- `uf_complete_init`, `uf_complete_union`, `uf_complete_eq`, `uf_complete_unreachable` ✅
+- Full equivalence: `find(u) = find(v) ⟺ reachable(forest, u, v)` ✅
+
+**Bridging:**
+- `pure_kruskal_is_mst`: Pure spec produces MST for connected graphs ✅
+- `scan_min_inv`: Minimum-weight cross-component edge tracking ✅
+- `adj_graph_edge_weight`, `adj_graph_edge_ge_scanmin` ✅
+
+**Remaining for Pulse postcondition upgrade to `is_mst`:**
+- Integrate `greedy_safety_step` + `uf_complete` into Pulse outer loop invariant
+- Track `ec == round` for connected graphs (needs cross-component edge existence)
+- Surface MST property to `kruskal` postcondition
 
 ## Conclusion
 
 **Satisfiability**: ✓ proven
 **Forest verification**: ✓ edge count bounded, endpoints valid, acyclicity, edge provenance
-**MST infrastructure**: ✓ all pure lemmas proven (UF completeness, transfer, scan min)
+**MST infrastructure**: ✓ all pure lemmas proven — **zero admits**
 **MST (pure spec)**: ✓ `pure_kruskal_is_mst` proves MST for connected graphs
+**Safety step**: ✓ `greedy_safety_step` proven via Bridge + UF completeness
 **MST (Pulse postcondition)**: pending loop invariant integration

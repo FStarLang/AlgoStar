@@ -1546,11 +1546,6 @@ let rec subset_edges_cons_to_append (hd: edge) (tl: list edge) (s: list edge)
 /// Named predicate: weighted edges are safe (⊆ some MST).
 /// Bundles all preconditions for weighted_edges_from_arrays to avoid
 /// Seq.index typing issues in ensures clauses.
-/// Safety predicate: the given edges are subset of some MST
-/// Takes the edge list directly to avoid Pure typing issues with weighted_edges_from_arrays
-let edges_safe (g: graph) (es: list edge) : prop =
-  exists (t: list edge). is_mst g t /\ subset_edges es t
-
 /// Helper 1: unreachable in weighted edges from UF find inequality
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
 let greedy_unreachable

@@ -236,8 +236,14 @@ val kruskal_result_is_mst
 
 
 (*** Pure Spec MST Theorem ***)
+(*** Safety Infrastructure ***)
 
-/// The pure Kruskal spec produces an MST for any connected graph.
+/// Safety predicate: edges ⊆ some MST
+let edges_safe (g: graph) (es: list edge) : prop =
+  exists (t: list edge). is_mst g t /\ subset_edges es t
+
+
+/// Pure Kruskal spec produces MST for connected graphs
 val pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
   : Lemma
     (requires
