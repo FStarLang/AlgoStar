@@ -32,6 +32,7 @@ open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Spec
+open CLRS.Ch23.Kruskal.Defs
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -43,118 +44,7 @@ module KSpec = CLRS.Ch23.Kruskal.Spec
 module UF = CLRS.Ch23.Kruskal.UF
 module Helpers = CLRS.Ch23.Kruskal.Helpers
 module Bridge = CLRS.Ch23.Kruskal.Bridge
-
-/// Safe indexing into adjacency matrix — bundles the nonlinear index bound
-let adj_weight (sadj: Seq.seq int) (n: nat{n > 0}) (u: nat{u < n}) (v: nat{v < n /\ Seq.length sadj == n * n}) : int
-  = Seq.index sadj (u * n + v)
-
-let valid_parents (sparent: Seq.seq SZ.t) (n: nat) : prop =
-  Seq.length sparent == n /\
-  (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) < n)
-
-let lemma_index_in_bounds (u v n: nat)
-  : Lemma (requires u < n /\ v < n /\ n > 0 /\ SZ.fits (n * n))
-          (ensures u * n + v < n * n /\ SZ.fits (u * n) /\ SZ.fits (u * n + v))
-  = ()
-
-// Valid endpoints: all selected edges have valid vertex indices
-let valid_endpoints (seu sev: Seq.seq int) (n ec: nat) : prop =
-  ec <= n /\
-  Seq.length seu == n /\ Seq.length sev == n /\
-  (forall (k: nat). k < ec ==>
-    Seq.index seu k >= 0 /\ Seq.index seu k < n /\
-    Seq.index sev k >= 0 /\ Seq.index sev k < n)
-
-// Convert imperative result to edge list for MST spec
-// Requires valid_endpoints to ensure int values are actually nat
-let rec edges_from_arrays (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec}) 
-  : Pure (list MSTSpec.edge)
-    (requires 
-      ec <= Seq.length seu /\ ec <= Seq.length sev /\
-      (forall (k:nat). k < ec ==> 
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0))
-    (ensures fun _ -> True)
-    (decreases (ec - i))
-  = if i >= ec then []
-    else 
-      let u_int = Seq.index seu i in
-      let v_int = Seq.index sev i in
-      // valid_endpoints ensures these are non-negative
-      {u = u_int; v = v_int; w = 1} :: edges_from_arrays seu sev ec (i + 1)
-
-// Postcondition: result forms a forest (acyclic edge set)
-let result_is_forest (seu sev: Seq.seq int) (n ec: nat) : prop =
-  valid_endpoints seu sev n ec /\
-  ec <= n - 1 /\
-  (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
-  KSpec.is_forest (edges_from_arrays seu sev ec 0) n
-
-// Forest property is established from the loop invariant which tracks is_forest.
-let lemma_kruskal_maintains_forest
-  (seu: Seq.seq int) (sev: Seq.seq int) (n ec: nat)
-  : Lemma (requires valid_endpoints seu sev n ec /\ ec <= n - 1 /\
-                    (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
-                    KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
-          (ensures result_is_forest seu sev n ec)
-  = ()
-
-// valid_endpoints implies all edges have valid vertices (< n)
-let rec valid_endpoints_implies_all_edges_valid
-  (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
-  : Lemma (requires valid_endpoints seu sev n ec)
-          (ensures UF.all_edges_valid (edges_from_arrays seu sev ec i) n)
-          (decreases (ec - i))
-  = if i >= ec then ()
-    else valid_endpoints_implies_all_edges_valid seu sev n ec (i + 1)
-
-// Extending valid_endpoints by one: if valid at ec and the new entry is valid, then valid at ec+1
-let valid_endpoints_extend
-  (seu sev seu' sev': Seq.seq int) (n ec: nat) (vbu vbv: nat)
-  : Lemma
-    (requires
-      valid_endpoints seu sev n ec /\
-      ec + 1 <= n /\
-      Seq.length seu' == n /\ Seq.length sev' == n /\
-      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
-                                   Seq.index sev' k = Seq.index sev k) /\
-      Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv /\
-      vbu < n /\ vbv < n)
-    (ensures valid_endpoints seu' sev' n (ec + 1))
-  = // For k < ec: old valid_endpoints + array agreement
-    assert (forall (k:nat). k < ec ==>
-      Seq.index seu' k >= 0 /\ Seq.index seu' k < n /\
-      Seq.index sev' k >= 0 /\ Seq.index sev' k < n);
-    // For k = ec: explicit
-    assert (Seq.index seu' ec >= 0 /\ Seq.index seu' ec < n);
-    assert (Seq.index sev' ec >= 0 /\ Seq.index sev' ec < n)
-
-// Extensionality: edges_from_arrays depends only on values in [i, ec)
-let rec edges_from_arrays_ext (seu1 sev1 seu2 sev2: Seq.seq int) (ec: nat) (i: nat{i <= ec})
-  : Lemma
-    (requires
-      ec <= Seq.length seu1 /\ ec <= Seq.length sev1 /\
-      ec <= Seq.length seu2 /\ ec <= Seq.length sev2 /\
-      (forall (k:nat). k < ec ==> Seq.index seu1 k >= 0 /\ Seq.index sev1 k >= 0) /\
-      (forall (k:nat). k < ec ==> Seq.index seu2 k >= 0 /\ Seq.index sev2 k >= 0) /\
-      (forall (k:nat). i <= k /\ k < ec ==>
-        Seq.index seu1 k == Seq.index seu2 k /\ Seq.index sev1 k == Seq.index sev2 k))
-    (ensures edges_from_arrays seu1 sev1 ec i == edges_from_arrays seu2 sev2 ec i)
-    (decreases (ec - i))
-  = if i >= ec then ()
-    else edges_from_arrays_ext seu1 sev1 seu2 sev2 ec (i + 1)
-
-// Extension: adding one element at index ec appends to the edge list
-let rec edges_from_arrays_extend (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec}) (eu ev: nat)
-  : Lemma
-    (requires
-      ec < Seq.length seu /\ ec < Seq.length sev /\
-      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
-      Seq.index seu ec == eu /\ Seq.index sev ec == ev)
-    (ensures edges_from_arrays seu sev (ec + 1) i ==
-             FStar.List.Tot.append (edges_from_arrays seu sev ec i) [{u = eu; v = ev; w = 1}])
-    (decreases (ec - i))
-  = if i >= ec then ()
-    else edges_from_arrays_extend seu sev ec (i + 1) eu ev
+module Defs = CLRS.Ch23.Kruskal.Defs
 
 (*** Scan Minimality Tracking ***)
 
@@ -268,83 +158,6 @@ let kruskal_inv_init (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n: nat)
   = UF.uf_inv_init sparent n;
     reveal_opaque (`%kruskal_inv) (kruskal_inv sparent seu sev n 0)
 
-// Track that each selected edge has a positive entry in the adjacency matrix.
-// This connects imperative edge arrays to the graph structure (needed for subset_edges).
-[@@"opaque_to_smt"]
-let edges_adj_pos (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop =
-  Seq.length sadj == n * n /\ n > 0 /\
-  ec <= Seq.length seu /\ ec <= Seq.length sev /\
-  (forall (k:nat). k < ec ==> 
-    Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
-    Seq.index seu k < n /\ Seq.index sev k < n /\
-    adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0)
-
-let edges_adj_pos_init (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat)
-  : Lemma (requires Seq.length sadj == n * n /\ n > 0 /\
-                    Seq.length seu == n /\ Seq.length sev == n)
-          (ensures edges_adj_pos sadj seu sev n 0)
-  = reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu sev n 0)
-
-let edges_adj_pos_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma (requires edges_adj_pos sadj seu sev n ec)
-          (ensures Seq.length sadj == n * n /\ n > 0 /\
-                   ec <= Seq.length seu /\ ec <= Seq.length sev /\
-                   (forall (k:nat). k < ec ==> 
-                     Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
-                     Seq.index seu k < n /\ Seq.index sev k < n /\
-                     adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0))
-  = reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu sev n ec)
-
-let edges_adj_pos_step
-  (sadj: Seq.seq int) (seu sev seu' sev': Seq.seq int) (n ec ec': nat)
-  (vbu vbv: nat) (should_add: bool)
-  : Lemma
-    (requires
-      edges_adj_pos sadj seu sev n ec /\
-      Seq.length sadj == n * n /\ n > 0 /\
-      vbu < n /\ vbv < n /\
-      ec' == (if should_add then ec + 1 else ec) /\
-      Seq.length seu' == Seq.length seu /\ Seq.length sev' == Seq.length sev /\
-      ec < Seq.length seu /\ ec < Seq.length sev /\
-      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
-                                   Seq.index sev' k = Seq.index sev k) /\
-      (should_add ==> Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv /\
-                       adj_weight sadj n vbu vbv > 0))
-    (ensures edges_adj_pos sadj seu' sev' n ec')
-  = reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu sev n ec);
-    reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu' sev' n ec')
-
-// Strengthened postcondition: forest + edges come from adjacency matrix
-let result_is_forest_adj (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop =
-  result_is_forest seu sev n ec /\
-  edges_adj_pos sadj seu sev n ec
-
-// Elim lemma for external consumers
-let result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma
-    (requires result_is_forest_adj sadj seu sev n ec)
-    (ensures
-      ec <= n - 1 /\
-      Seq.length seu == n /\ Seq.length sev == n /\
-      Seq.length sadj == n * n /\ n > 0 /\
-      (forall (k:nat). k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index seu k < n /\
-        Seq.index sev k >= 0 /\ Seq.index sev k < n /\
-        adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0))
-  = edges_adj_pos_elim sadj seu sev n ec
-
-// Structural elim: expose is_forest from result_is_forest_adj
-let result_is_forest_adj_forest_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma
-    (requires result_is_forest_adj sadj seu sev n ec)
-    (ensures
-      ec <= n - 1 /\ n > 0 /\
-      Seq.length seu == n /\ Seq.length sev == n /\
-      (forall (k:nat). k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
-      KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
-  = ()
-
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn find
   (#p: perm)
@@ -378,15 +191,6 @@ fn find
   !curr
 }
 #pop-options
-
-// Postcondition predicate for do_union: exposes what happened to parent array
-let do_union_post (sparent sparent': Seq.seq SZ.t) (root_u root_v n: nat) : prop =
-  valid_parents sparent' n /\
-  Seq.length sparent == n /\
-  Seq.length sparent' == n /\
-  (root_u < n ==> SZ.v (Seq.index sparent' root_u) == root_v) /\
-  (forall (i: nat). (i < n /\ i <> root_u) ==>
-    Seq.index sparent' i == Seq.index sparent i)
 
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
 fn do_union
@@ -540,27 +344,6 @@ let kruskal_step_maintains_inv
 *)
 
 // adj_row_edges, adj_all_edges, adj_array_to_graph are in Impl.fsti
-
-// Edges with actual weights from the adjacency matrix
-// (edges_from_arrays uses weight 1 for internal forest tracking;
-//  this version uses adj[u*n+v] for MST weight reasoning)
-let rec weighted_edges_from_arrays
-  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
-  : Pure (list edge)
-    (requires 
-      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
-      Seq.length sadj == n * n /\
-      (forall (k:nat). i <= k /\ k < ec ==> 
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
-        Seq.index seu k < n /\ Seq.index sev k < n))
-    (ensures fun r -> FStar.List.Tot.length r = ec - i)
-    (decreases (ec - i))
-  = if i >= ec then []
-    else
-      let u_int = Seq.index seu i in
-      let v_int = Seq.index sev i in
-      let w = Seq.index sadj (u_int * n + v_int) in
-      {u = u_int; v = v_int; w = w} :: weighted_edges_from_arrays sadj seu sev n ec (i + 1)
 
 (*** Graph Properties for MST Bridge ***)
 
@@ -1237,40 +1020,6 @@ let reachable_weighted_to_unweighted
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 #pop-options
 
-/// Weighted edges extend by one edge
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
-let rec weighted_edges_from_arrays_extend
-    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
-    (eu: nat{eu < n}) (ev: nat{ev < n})
-  : Lemma
-    (requires
-      n > 0 /\ ec < Seq.length seu /\ ec < Seq.length sev /\
-      Seq.length sadj == n * n /\
-      Seq.index seu ec == eu /\ Seq.index sev ec == ev /\
-      (forall (k:nat). i <= k /\ k < ec + 1 ==>
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
-        Seq.index seu k < n /\ Seq.index sev k < n))
-    (ensures
-      weighted_edges_from_arrays sadj seu sev n (ec + 1) i ==
-        FStar.List.Tot.append
-          (weighted_edges_from_arrays sadj seu sev n ec i)
-          [{u = eu; v = ev; w = adj_weight sadj n eu ev}])
-    (decreases (ec - i))
-  = if i >= ec then ()
-    else weighted_edges_from_arrays_extend sadj seu sev n ec (i + 1) eu ev
-#pop-options
-
-/// subset_edges (hd :: tl) s ⟹ subset_edges (tl @ [hd]) s
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
-let rec subset_edges_cons_to_append (hd: edge) (tl: list edge) (s: list edge)
-  : Lemma (requires subset_edges (hd :: tl) s)
-          (ensures subset_edges (FStar.List.Tot.append tl [hd]) s)
-          (decreases tl)
-  = match tl with
-    | [] -> ()
-    | _ :: rest -> subset_edges_cons_to_append hd rest s
-#pop-options
-
 /// Named predicate: weighted edges are safe (⊆ some MST).
 /// Bundles all preconditions for weighted_edges_from_arrays to avoid
 /// Seq.index typing issues in ensures clauses.
@@ -1357,11 +1106,6 @@ let adj_graph_edge_weight (sadj: Seq.seq int) (n: nat) (e: edge)
               e.w = adj_weight sadj n e.v e.u))
   = adj_all_edges_weight sadj n 0 e
 #pop-options
-
-/// Helper: u < n /\ v < n ==> u * n + v < n * n
-let index_bound (u v n: nat) 
-  : Lemma (requires u < n /\ v < n /\ n > 0) (ensures u * n + v < n * n)
-  = FStar.Math.Lemmas.lemma_mult_lt_right n u n
 
 /// Specialized: graph edge weight >= scan minimum when find ≠
 #restart-solver
@@ -1550,7 +1294,140 @@ let kruskal_mst_inv_elim
                     edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0)))
   = reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent seu sev n ec)
 
-// Step maintenance: adding or not adding an edge
+// Safety sub-proof for step_add: calls weighted_edges_from_arrays_extend + greedy_safety_step
+// Separated out because these calls need revealed per-element facts which interact poorly
+// with --split_queries in the larger step_add context
+#restart-solver
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+let kruskal_mst_inv_step_add_safety
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
+    (seu sev: Seq.seq int) (n ec: nat)
+    (vbu vbv: nat) (vbw: int)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      vbu < n /\ vbv < n /\ vbw > 0 /\
+      vbw == adj_weight sadj n vbu vbv /\
+      ec + 1 < n /\
+      Seq.index seu ec == vbu /\ Seq.index sev ec == vbv /\
+      valid_endpoints seu sev n ec /\
+      edges_adj_pos sadj seu sev n ec /\
+      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+      UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
+      scan_min_inv sparent sadj n (n * n) vbw /\
+      UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n /\
+      (symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+       all_connected n (adj_array_to_graph sadj n).edges ==>
+       edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0)))
+    (ensures
+      weighted_edges_from_arrays sadj seu sev n (ec + 1) 0 ==
+        FStar.List.Tot.append (weighted_edges_from_arrays sadj seu sev n ec 0)
+          [{MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = adj_weight sadj n vbu vbv}] /\
+      (symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+       all_connected n (adj_array_to_graph sadj n).edges ==>
+       edges_safe (adj_array_to_graph sadj n)
+         (FStar.List.Tot.append (weighted_edges_from_arrays sadj seu sev n ec 0)
+           [{MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = vbw}])))
+  = edges_adj_pos_elim sadj seu sev n ec;
+    weighted_edges_from_arrays_extend sadj seu sev n ec 0 vbu vbv;
+    let aux () : Lemma
+      (requires symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+               all_connected n (adj_array_to_graph sadj n).edges)
+      (ensures edges_safe (adj_array_to_graph sadj n)
+        (FStar.List.Tot.append (weighted_edges_from_arrays sadj seu sev n ec 0)
+          [{MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = vbw}]))
+      = greedy_safety_step sadj sparent seu sev n ec vbu vbv vbw
+    in
+    FStar.Classical.move_requires aux ()
+#pop-options
+
+// Step maintenance: adding an edge
+// Transfers all predicates from seu/sev to seu'/sev' via ext lemmas
+#restart-solver
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 2 --split_queries always"
+let kruskal_mst_inv_step_add
+    (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
+    (seu sev seu' sev': Seq.seq int) (n ec: nat)
+    (vbu vbv: nat) (vbw: int)
+    (root_u root_v: nat)
+  : Lemma
+    (requires
+      kruskal_mst_inv sadj sparent seu sev n ec /\
+      kruskal_inv sparent seu sev n ec /\
+      edges_adj_pos sadj seu sev n ec /\
+      Seq.length sadj == n * n /\ n > 0 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      vbu < n /\ vbv < n /\
+      root_u == UF.find_pure sparent vbu n n /\
+      root_v == UF.find_pure sparent vbv n n /\
+      root_u <> root_v /\
+      do_union_post sparent sparent' root_u root_v n /\
+      ec + 1 < n /\
+      Seq.length seu' == n /\ Seq.length sev' == n /\
+      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
+                                    Seq.index sev' k = Seq.index sev k) /\
+      Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv /\
+      vbw > 0 /\ vbw == adj_weight sadj n vbu vbv /\
+      scan_min_inv sparent sadj n (n * n) vbw)
+    (ensures kruskal_mst_inv sadj sparent' seu' sev' n (ec + 1))
+  = kruskal_inv_elim sparent seu sev n ec;
+    kruskal_mst_inv_elim sadj sparent seu sev n ec;
+    edges_adj_pos_elim sadj seu sev n ec;
+    let new_edge : MSTSpec.edge = {MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = 1} in
+    // Transfer opaque predicates from seu/sev to seu'/sev'
+    valid_endpoints_ext seu sev seu' sev' n ec;
+    edges_adj_pos_ext sadj seu sev seu' sev' n ec;
+    edges_from_arrays_ext seu sev seu' sev' ec 0;
+    weighted_edges_from_arrays_ext sadj seu sev seu' sev' n ec 0;
+    // UF completeness: use seu'/sev' (first ec elements = seu/sev via ext)
+    valid_endpoints_implies_all_edges_valid seu' sev' n ec 0;
+    UF.find_pure_bounded sparent vbu n n;
+    UF.find_pure_bounded sparent vbv n n;
+    UF.uf_complete_union sparent sparent' (edges_from_arrays seu' sev' ec 0) n ec
+      vbu vbv root_u root_v new_edge;
+    UF.uf_complete_cons_to_append sparent' new_edge (edges_from_arrays seu' sev' ec 0) n;
+    edges_from_arrays_extend seu' sev' ec 0 vbu vbv;
+    // Safety: call helper that takes flat preconditions
+    kruskal_mst_inv_step_add_safety sadj sparent seu' sev' n ec vbu vbv vbw;
+    reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent' seu' sev' n (ec + 1))
+#pop-options
+
+// Step maintenance: not adding an edge
+#restart-solver
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 2 --split_queries always"
+let kruskal_mst_inv_step_noop
+    (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
+    (seu sev seu' sev': Seq.seq int) (n ec: nat)
+    (vbu: nat) (root_u root_v: nat)
+  : Lemma
+    (requires
+      kruskal_mst_inv sadj sparent seu sev n ec /\
+      kruskal_inv sparent seu sev n ec /\
+      Seq.length sadj == n * n /\ n > 0 /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      ec <= n /\
+      vbu < n /\
+      root_u == UF.find_pure sparent vbu n n /\
+      root_u = root_v /\
+      do_union_post sparent sparent' root_u root_v n /\
+      Seq.length seu' == n /\ Seq.length sev' == n /\
+      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
+                                    Seq.index sev' k = Seq.index sev k))
+    (ensures kruskal_mst_inv sadj sparent' seu' sev' n ec)
+  = kruskal_inv_elim sparent seu sev n ec;
+    kruskal_mst_inv_elim sadj sparent seu sev n ec;
+    // Transfer valid_endpoints from seu/sev to seu'/sev' (same first ec values)
+    valid_endpoints_ext seu sev seu' sev' n ec;
+    edges_from_arrays_ext seu sev seu' sev' ec 0;
+    weighted_edges_from_arrays_ext sadj seu sev seu' sev' n ec 0;
+    kruskal_noop_proof sparent sparent' seu sev n ec vbu root_u root_v;
+    UF.uf_complete_eq sparent sparent' (edges_from_arrays seu sev ec 0) n;
+    reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent' seu' sev' n ec)
+#pop-options
+
+// Wrapper for both cases
 #restart-solver
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_mst_inv_step
@@ -1582,41 +1459,10 @@ let kruskal_mst_inv_step
       ec' <= Seq.length seu' /\ ec' <= Seq.length sev' /\
       (forall (k:nat). k < ec' ==> Seq.index seu' k >= 0 /\ Seq.index sev' k >= 0))
     (ensures kruskal_mst_inv sadj sparent' seu' sev' n ec')
-  = admit () // TODO: prove step (all helpers proven, just plumbing)
-    (*
-    kruskal_inv_elim sparent seu sev n ec;
-    kruskal_mst_inv_elim sadj sparent seu sev n ec;
-    edges_adj_pos_elim sadj seu sev n ec;
-    if should_add then begin
-      let new_edge : MSTSpec.edge = {MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = 1} in
-      edges_from_arrays_ext seu sev seu' sev' ec 0;
-      edges_from_arrays_extend seu' sev' ec 0 vbu vbv;
-      valid_endpoints_implies_all_edges_valid seu sev n ec 0;
-      UF.find_pure_bounded sparent vbu n n;
-      UF.find_pure_bounded sparent vbv n n;
-      UF.uf_complete_union sparent sparent' (edges_from_arrays seu sev ec 0) n ec
-        vbu vbv root_u root_v new_edge;
-      // uf_complete for (new_edge :: old_edges). Need for (old_edges @ [new_edge]).
-      // reachable is order-independent so uf_complete transfers.
-      // For now, assume this transfer (trivial but needs a small proof):
-      assume (UF.uf_complete sparent' (edges_from_arrays seu' sev' (ec + 1) 0) n);
-      // Safety
-      let aux () : Lemma
-        (requires symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
-                 all_connected n (adj_array_to_graph sadj n).edges)
-        (ensures edges_safe (adj_array_to_graph sadj n)
-          (FStar.List.Tot.append (weighted_edges_from_arrays sadj seu sev n ec 0)
-            [{MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = vbw}]))
-        = greedy_safety_step sadj sparent seu sev n ec vbu vbv vbw
-      in
-      FStar.Classical.move_requires aux ()
-    end else begin
-      edges_from_arrays_ext seu sev seu' sev' ec 0;
-      kruskal_noop_proof sparent sparent' seu sev n ec vbu root_u root_v;
-      UF.uf_complete_eq sparent sparent' (edges_from_arrays seu sev ec 0) n
-    end;
-    reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent' seu' sev' n ec')
-*)
+  = if should_add then
+      kruskal_mst_inv_step_add sadj sparent sparent' seu sev seu' sev' n ec vbu vbv vbw root_u root_v
+    else
+      kruskal_mst_inv_step_noop sadj sparent sparent' seu sev seu' sev' n ec vbu root_u root_v
 #pop-options
 
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2 "

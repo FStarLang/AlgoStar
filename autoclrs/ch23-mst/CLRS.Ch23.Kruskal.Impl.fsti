@@ -21,6 +21,7 @@ open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Spec
+open CLRS.Ch23.Kruskal.Defs
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -32,60 +33,6 @@ module KSpec = CLRS.Ch23.Kruskal.Spec
 module UF = CLRS.Ch23.Kruskal.UF
 module Helpers = CLRS.Ch23.Kruskal.Helpers
 module Bridge = CLRS.Ch23.Kruskal.Bridge
-
-(*** Core Definitions ***)
-
-/// Valid endpoints: all selected edges have valid vertex indices
-val valid_endpoints (seu sev: Seq.seq int) (n ec: nat) : prop
-
-/// Convert imperative result to edge list for MST spec (w=1 for all edges)
-val edges_from_arrays (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec})
-  : Pure (list MSTSpec.edge)
-    (requires
-      ec <= Seq.length seu /\ ec <= Seq.length sev /\
-      (forall (k:nat). k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0))
-    (ensures fun _ -> True)
-
-/// Postcondition: result forms a forest
-val result_is_forest (seu sev: Seq.seq int) (n ec: nat) : prop
-
-/// Each selected edge has a positive entry in the adjacency matrix
-val edges_adj_pos (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
-
-/// Strengthened postcondition: forest + edges come from adjacency matrix
-val result_is_forest_adj (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
-
-/// Elim lemma: extract concrete array-level facts from result_is_forest_adj.
-/// This exposes the key properties to external consumers:
-///   - Edge count is bounded by n-1
-///   - All selected edge endpoints are valid vertex indices (< n)
-///   - Each selected edge corresponds to a positive adjacency matrix entry
-val result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma
-    (requires result_is_forest_adj sadj seu sev n ec)
-    (ensures
-      ec <= n - 1 /\
-      Seq.length seu == n /\ Seq.length sev == n /\
-      Seq.length sadj == n * n /\ n > 0 /\
-      (forall (k:nat). k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index seu k < n /\
-        Seq.index sev k >= 0 /\ Seq.index sev k < n /\
-        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
-
-/// Structural elim lemma: extract the forest (acyclicity) property from
-/// result_is_forest_adj.
-/// This exposes that the selected edges form an acyclic graph (forest),
-/// which is the key structural invariant maintained by Kruskal's algorithm.
-val result_is_forest_adj_forest_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma
-    (requires result_is_forest_adj sadj seu sev n ec)
-    (ensures
-      ec <= n - 1 /\ n > 0 /\
-      Seq.length seu == n /\ Seq.length sev == n /\
-      (forall (k:nat). k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
-      KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
 
 (*** Impl ↔ Spec Bridging ***)
 
@@ -112,18 +59,6 @@ let rec adj_all_edges (sadj: Seq.seq int) (n: nat) (u: nat)
 
 let adj_array_to_graph (sadj: Seq.seq int) (n: nat{Seq.length sadj == n * n /\ n > 0}) : MSTSpec.graph =
   { MSTSpec.n = n; MSTSpec.edges = adj_all_edges sadj n 0 }
-
-/// Edges with actual weights from the adjacency matrix
-val weighted_edges_from_arrays
-  (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
-  : Pure (list edge)
-    (requires
-      n > 0 /\ ec <= Seq.length seu /\ ec <= Seq.length sev /\
-      Seq.length sadj == n * n /\
-      (forall (k:nat). i <= k /\ k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
-        Seq.index seu k < n /\ Seq.index sev k < n))
-    (ensures fun r -> FStar.List.Tot.length r = ec - i)
 
 (*** Graph Properties ***)
 
