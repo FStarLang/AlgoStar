@@ -230,6 +230,7 @@ fn rec rb_search (tree: rb_ptr) (k: int)
   preserves rbtree_subtree tree 'ft 'parent
   returns result: option int
   ensures pure (result == S.search 'ft k)
+  decreases 'ft
 {
   match tree {
     None -> {
@@ -273,6 +274,7 @@ fn rec rb_minimum (tree: rb_ptr) (bp: rb_node_ptr)
   requires pure (tree == Some bp)
   returns result: int
   ensures pure (S.Node? 'ft /\ result == S.minimum 'ft)
+  decreases 'ft
 {
   rewrite each tree as (Some bp);
   rbtree_case_some (Some bp) bp;
@@ -659,6 +661,7 @@ fn rec rb_clrs_ins (tree: rb_ptr) (k: int) (parent: rb_ptr)
   requires rbtree_subtree tree 'ft parent
   returns y: rb_ptr
   ensures rbtree_subtree y (CS.clrs_ins 'ft k) parent
+  decreases 'ft
 {
   match tree {
     None -> {

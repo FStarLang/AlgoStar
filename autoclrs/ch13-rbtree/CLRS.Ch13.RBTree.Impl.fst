@@ -586,6 +586,7 @@ fn rec rb_search (tree: rb_ptr) (k: int)
   preserves is_rbtree tree 'ft
   returns result: option int
   ensures pure (result == S.search 'ft k)
+  decreases 'ft
 {
   match tree {
     None -> {
@@ -623,6 +624,7 @@ fn rec rb_ins (tree: rb_ptr) (k: int)
   requires is_rbtree tree 'ft
   returns y: rb_ptr
   ensures is_rbtree y (S.ins 'ft k)
+  decreases 'ft
 {
   match tree {
     None -> {
