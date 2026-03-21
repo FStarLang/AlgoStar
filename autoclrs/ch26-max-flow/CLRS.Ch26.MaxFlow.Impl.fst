@@ -2474,6 +2474,7 @@ fn find_bottleneck_imp
          then vbn
          else bottleneck_via_pred spred cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v vc) (SZ.v n))
     )
+  decreases (seq_get sdist (SZ.v !current))
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
@@ -2593,6 +2594,7 @@ fn augment_imp
       augment_via_pred spred flow_seq cap_seq (SZ.v n) (SZ.v source) (SZ.v sink) bn (SZ.v n) ==
       augment_via_pred spred fs cap_seq (SZ.v n) (SZ.v source) (SZ.v vc) bn (SZ.v n)
     )
+  decreases (seq_get sdist (SZ.v !current))
   {
     let vc = !current;
     let u_int: int = A.op_Array_Access pred vc;
