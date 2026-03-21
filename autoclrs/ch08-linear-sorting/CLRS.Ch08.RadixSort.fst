@@ -115,7 +115,7 @@ ensures exists* s.
   let b = A.alloc (0 <: nat) len;
 
   // Mutable digit counter
-  let d = R.alloc 0sz;
+  let mut d: SZ.t = 0sz;
 
   // Main loop: for d = 0 to bigD - 1
   while (
@@ -143,6 +143,7 @@ ensures exists* s.
       SZ.fits (SZ.v base_val + 2) /\
       SZ.fits (SZ.v len + SZ.v base_val + 2)
     )
+  decreases (SZ.v bigD `Prims.op_Subtraction` SZ.v !d)
   {
     let vd = !d;
     with s_curr. assert (A.pts_to a s_curr);
@@ -194,7 +195,6 @@ ensures exists* s.
   // Free temporary resources
   with sb_final. assert (A.pts_to b sb_final);
   A.free b;
-  R.free d;
   ()
   } // else len > 0
 }

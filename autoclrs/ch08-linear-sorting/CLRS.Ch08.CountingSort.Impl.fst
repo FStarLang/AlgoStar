@@ -409,6 +409,7 @@ ensures exists* s.
         (forall (i:nat). SZ.v vpos + SZ.v vw <= i /\ i < Seq.length sa_inner ==>
           Seq.index sa_inner i == Seq.index sa i)
       )
+    decreases (SZ.v cnt_sz `Prims.op_Subtraction` SZ.v !w)
     {
       let vw = !w;
       with sa_w. assert (A.pts_to a sa_w);
