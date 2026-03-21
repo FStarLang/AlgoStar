@@ -65,6 +65,7 @@ fn check_no_negative_cycle
       (vok == false ==>
         ~(non_negative_diagonal contents (SZ.v n)))
     )
+  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !v)
   {
     let vv = !v;
     let idx = vv *^ n +^ vv;
