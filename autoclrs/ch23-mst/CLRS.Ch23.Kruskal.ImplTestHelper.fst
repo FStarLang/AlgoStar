@@ -46,10 +46,9 @@ let test_mst () : Lemma
     test_connected ();
     pure_kruskal_is_mst test_adj 3
 
-/// Prove edges_safe for any sadj that equals test_adj
-/// This can be called from Pulse after establishing sadj == test_adj
+/// Prove is_mst for any sadj that equals test_adj
 open CLRS.Ch23.Kruskal.Defs
-let test_edges_safe (sadj: Seq.seq int) (seu sev: Seq.seq int) (ec: nat)
+let test_is_mst_imperative (sadj: Seq.seq int) (seu sev: Seq.seq int) (ec: nat)
   : Lemma
     (requires Seq.equal sadj test_adj /\
               kruskal_mst_result sadj seu sev 3 ec /\
@@ -58,7 +57,7 @@ let test_edges_safe (sadj: Seq.seq int) (seu sev: Seq.seq int) (ec: nat)
               (forall (k:nat). k < ec ==>
                 Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
                 Seq.index seu k < 3 /\ Seq.index sev k < 3))
-    (ensures edges_safe (adj_array_to_graph sadj 3)
+    (ensures is_mst (adj_array_to_graph sadj 3)
       (weighted_edges_from_arrays sadj seu sev 3 ec 0))
   = test_symmetric ();
     test_no_self_loops ();

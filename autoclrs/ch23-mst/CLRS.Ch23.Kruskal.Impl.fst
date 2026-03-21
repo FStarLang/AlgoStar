@@ -1418,6 +1418,356 @@ let scan_zero_implies_all_connected
     uf_all_same_root_all_connected sparent (edges_from_arrays seu sev ec 0) n
 #pop-options
 
+(*** all_edges_distinct + ec==round tracking for is_mst ***)
+
+/// Edge in a list implies its endpoints are reachable via that list
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let edge_in_list_reachable (e: edge) (edges: list edge)
+  : Lemma
+    (requires mem_edge e edges)
+    (ensures reachable edges e.u e.v)
+  = assert (is_path_from_to [e] e.u e.v);
+    assert (subset_edges [e] edges)
+#pop-options
+
+/// New cross-component edge is not mem_edge of existing forest edges.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+let rec new_edge_not_in_forest
+    (sparent: Seq.seq SZ.t) (edges: list edge) (n ec: nat) (new_edge: edge)
+  : Lemma
+    (requires
+      UF.uf_inv sparent edges n ec /\
+      new_edge.u < n /\ new_edge.v < n /\
+      UF.find_pure sparent new_edge.u n n <> UF.find_pure sparent new_edge.v n n /\
+      UF.all_edges_valid edges n)
+    (ensures ~(mem_edge new_edge edges))
+    (decreases edges)
+  = match edges with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq new_edge hd then begin
+        // hd is in edges, so reachable(edges, hd.u, hd.v)
+        edge_in_list_reachable hd edges;
+        // uf_inv: reachable → find equal
+        // edge_eq: new_edge and hd have same endpoints
+        MSTSpec.edge_eq_endpoints new_edge hd
+        // find(new_edge.u)==find(new_edge.v), contradiction
+      end
+      else begin
+        // Recurse on tail: need uf_inv for tail's edges
+        // mem_edge new_edge (hd :: tl) with ~(edge_eq new_edge hd) implies mem_edge new_edge tl
+        // But we need uf_inv for the FULL edges list, not tl
+        // Use: if mem_edge new_edge tl, then mem_edge new_edge edges (since tl ⊆ edges)
+        // And any edge in tl is also in edges, so reachable in edges
+        // So the same contradiction applies
+        if mem_edge new_edge tl then begin
+          // new_edge is mem_edge of tl ⊆ edges, so mem_edge of edges
+          // Find the matching edge in tl
+          let rec find_in_tl (es: list edge) : Lemma
+            (requires mem_edge new_edge es /\
+                      (forall (e: edge). mem_edge e es ==> mem_edge e edges))
+            (ensures False)
+            (decreases es)
+            = match es with
+              | [] -> ()
+              | h :: t ->
+                if edge_eq new_edge h then begin
+                  assert (mem_edge h edges);
+                  edge_in_list_reachable h edges;
+                  MSTSpec.edge_eq_endpoints new_edge h
+                end
+                else find_in_tl t
+          in
+          find_in_tl tl
+        end
+      end
+#pop-options
+
+/// all_edges_distinct for append: if xs is distinct and y not in xs, then xs++[y] is distinct
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec all_edges_distinct_append_single (xs: list edge) (y: edge)
+  : Lemma
+    (requires all_edges_distinct xs /\ ~(mem_edge y xs))
+    (ensures all_edges_distinct (FStar.List.Tot.append xs [y]))
+    (decreases xs)
+  = match xs with
+    | [] -> ()
+    | hd :: tl ->
+      MSTSpec.mem_edge_append hd tl [y];
+      all_edges_distinct_append_single tl y
+#pop-options
+
+/// all_edges_distinct is preserved under extensional equality of edge lists
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let all_edges_distinct_ext (es1 es2: list edge)
+  : Lemma
+    (requires es1 == es2 /\ all_edges_distinct es1)
+    (ensures all_edges_distinct es2)
+  = ()
+#pop-options
+
+/// Helper: edges from arrays have no self-loops when adjacency matrix has no self-loops
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec edges_from_arrays_no_self_loops
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      edges_adj_pos sadj seu sev n ec /\
+      no_self_loops_adj sadj n /\ n > 0 /\
+      Seq.length sadj == n * n /\
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n))
+    (ensures
+      (forall (e: edge). mem_edge e (edges_from_arrays seu sev ec i) ==>
+        e.u < n /\ e.v < n /\ e.u <> e.v))
+    (decreases (ec - i))
+  = edges_adj_pos_elim sadj seu sev n ec;
+    if i >= ec then ()
+    else begin
+      edges_from_arrays_no_self_loops sadj seu sev n ec (i + 1);
+      // For edge at position i: {u=seu[i], v=sev[i], w=1}
+      // adj_weight(seu[i], sev[i]) > 0, no_self_loops says adj[u*n+u] = 0
+      // So seu[i] <> sev[i]
+      let u = Seq.index seu i in
+      let v = Seq.index sev i in
+      index_bound u v n;
+      let e_i : edge = {MSTSpec.u = u; MSTSpec.v = v; MSTSpec.w = 1} in
+      assert (u <> v);
+      // Any edge_eq to e_i also has e.u <> e.v
+      let aux (e: edge) : Lemma
+        (requires edge_eq e e_i)
+        (ensures e.u <> e.v)
+        = MSTSpec.edge_eq_endpoints e e_i
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+    end
+#pop-options
+
+/// For connected graphs with ec < n-1, the scan MUST find a cross-component edge.
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+let connected_implies_vbw_positive
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat) (vbw: int)
+    (vbu vbv: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      Defs.valid_parents sparent n /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      valid_endpoints seu sev n ec /\
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
+      UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
+      KSpec.is_forest (edges_from_arrays seu sev ec 0) n /\
+      all_edges_distinct (edges_from_arrays seu sev ec 0) /\
+      edges_adj_pos sadj seu sev n ec /\
+      ec < n - 1 /\
+      symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+      all_connected n (adj_array_to_graph sadj n).edges /\
+      scan_min_inv sparent sadj n (n * n) vbw /\
+      vbw >= 0 /\
+      vbu < n /\ vbv < n /\
+      (vbw > 0 ==> UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n))
+    (ensures vbw > 0)
+  = if vbw = 0 then begin
+      scan_min_inv_complete sparent sadj n vbw vbu vbv;
+      scan_zero_implies_all_connected sadj sparent seu sev n ec;
+      edges_from_arrays_no_self_loops sadj seu sev n ec 0;
+      edges_from_arrays_length seu sev ec 0;
+      acyclic_connected_length n (edges_from_arrays seu sev ec 0)
+      // acyclic_connected_length gives length >= n-1, but length == ec < n-1. Contradiction.
+    end
+#pop-options
+
+
+/// Remove first occurrence of an edge (by edge_eq) from a list
+let rec remove_edge_first (e: edge) (l: list edge) : list edge =
+  match l with
+  | [] -> []
+  | hd :: tl -> if edge_eq e hd then tl else hd :: remove_edge_first e tl
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec remove_edge_first_length (e: edge) (l: list edge)
+  : Lemma (requires mem_edge e l)
+          (ensures FStar.List.Tot.length (remove_edge_first e l) = FStar.List.Tot.length l - 1)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl -> if edge_eq e hd then () else remove_edge_first_length e tl
+
+let rec remove_edge_first_mem (x e: edge) (l: list edge)
+  : Lemma (requires mem_edge x l /\ ~(edge_eq x e))
+          (ensures mem_edge x (remove_edge_first e l))
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq e hd then begin
+        // hd is removed. x != hd (since ~(edge_eq x e) and edge_eq e hd → edge_eq x hd iff edge_eq x e)
+        // Need: mem_edge x tl
+        if edge_eq x hd then begin
+          MSTSpec.edge_eq_symmetric e hd;
+          MSTSpec.edge_eq_transitive x hd e
+        end
+      end
+      else if edge_eq x hd then ()
+      else remove_edge_first_mem x e tl
+
+let rec remove_edge_first_subset (e: edge) (l: list edge)
+  : Lemma (ensures forall x. mem_edge x (remove_edge_first e l) ==> mem_edge x l)
+          (decreases l)
+  = match l with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq e hd then ()
+      else remove_edge_first_subset e tl
+#pop-options
+
+/// Pigeonhole: subset + noRepeats + same length → reverse subset
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec pigeonhole_edges (a b: list edge)
+  : Lemma
+    (requires Bridge.noRepeats_edge a /\ subset_edges a b /\
+              FStar.List.Tot.length a = FStar.List.Tot.length b)
+    (ensures forall (e: edge). mem_edge e b ==> mem_edge e a)
+    (decreases a)
+  = match a with
+    | [] -> ()
+    | hd :: tl ->
+      assert (mem_edge hd b);
+      let b' = remove_edge_first hd b in
+      remove_edge_first_length hd b;
+      // tl ⊆ b': each element of tl is in b and ≠ hd, so in b'
+      let rec prove_tl_subset (p: list edge)
+        : Lemma (requires (forall (e: edge). mem_edge e p ==> mem_edge e tl) /\
+                          Bridge.noRepeats_edge (hd :: tl) /\
+                          subset_edges (hd :: tl) b)
+                (ensures subset_edges p b')
+                (decreases p)
+        = match p with
+          | [] -> ()
+          | e :: rest ->
+            assert (mem_edge e tl);
+            assert (not (mem_edge hd tl));
+            (if edge_eq e hd then begin
+              MSTSpec.edge_eq_symmetric e hd;
+              MSTSpec.mem_edge_eq hd e tl
+            end);
+            MSTSpec.mem_edge_subset e (hd :: tl) b;
+            remove_edge_first_mem e hd b;
+            prove_tl_subset rest
+      in
+      prove_tl_subset tl;
+      pigeonhole_edges tl b';
+      // Now: forall e ∈ b', e ∈ tl ⊆ a
+      // And: hd ∈ a
+      // Need: forall e ∈ b, e ∈ a
+      let aux (e: edge) : Lemma
+        (requires mem_edge e b)
+        (ensures mem_edge e a)
+        = if edge_eq e hd then ()
+          else begin
+            remove_edge_first_mem e hd b;
+            assert (mem_edge e b');
+            assert (mem_edge e tl)
+          end
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+/// all_connected transfers when one edge set contains all edges of another
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let all_connected_from_superset (n: nat) (sub sup: list edge)
+  : Lemma
+    (requires
+      n > 0 /\
+      all_connected n sub /\
+      (forall (e: edge). mem_edge e sub ==> mem_edge e sup))
+    (ensures all_connected n sup)
+  = let aux (v: nat) : Lemma
+      (requires v < n) (ensures reachable sup 0 v)
+      = assert (reachable sub 0 v);
+        let path_transfer (path: list edge) : Lemma
+          (requires subset_edges path sub /\ is_path_from_to path 0 v)
+          (ensures reachable sup 0 v)
+          = let rec transfer_subset (p: list edge)
+              : Lemma (requires subset_edges p sub)
+                      (ensures subset_edges p sup)
+                      (decreases p)
+              = match p with
+                | [] -> ()
+                | hd :: tl -> transfer_subset tl
+            in
+            transfer_subset path
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires path_transfer)
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+/// Post-loop MST derivation: from edges_safe + ec==n-1 + acyclic + noRepeats → is_mst
+#restart-solver
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+let derive_is_mst_post_loop
+    (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      ec == n - 1 /\
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      result_is_forest_adj sadj seu sev n ec /\
+      edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0) /\
+      Bridge.noRepeats_edge (edges_from_arrays seu sev ec 0) /\
+      symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+      all_connected n (adj_array_to_graph sadj n).edges)
+    (ensures
+      is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+  = let g = adj_array_to_graph sadj n in
+    let w_edges = weighted_edges_from_arrays sadj seu sev n ec 0 in
+    adj_graph_valid_edges sadj n;
+    result_is_forest_adj_elim sadj seu sev n ec;
+    result_is_forest_adj_forest_elim sadj seu sev n ec;
+    result_is_forest_adj_adj_elim sadj seu sev n ec;
+    // Transfer noRepeats + acyclic to weighted edges
+    noRepeats_transfer sadj seu sev n ec 0;
+    acyclic_transfer sadj seu sev n ec;
+    // subset_edges
+    weighted_edges_subset_graph sadj seu sev n ec;
+    // length
+    edges_from_arrays_length seu sev ec 0;
+    // edges_from_arrays_no_self_loops for valid endpoints
+    edges_from_arrays_no_self_loops sadj seu sev n ec 0;
+    // weighted_edges length
+    assert (FStar.List.Tot.length w_edges = ec);
+    // Derive all_connected for weighted edges
+    // From edges_safe: ∃T. is_mst g T ∧ subset_edges w_edges T
+    // T is a spanning tree with n-1 edges and all_connected
+    // |w_edges| == n-1 == |T|, w_edges ⊆ T, noRepeats(w_edges)
+    // By pigeonhole: T ⊆ w_edges (every MST edge is in our output)
+    // Since T is connected: all_connected n T → all_connected n w_edges
+    let derive_connected (t: list edge) : Lemma
+      (requires is_mst g t /\ subset_edges w_edges t)
+      (ensures all_connected n w_edges)
+      = assert (is_spanning_tree g t);
+        assert (FStar.List.Tot.length t = n - 1);
+        assert (FStar.List.Tot.length w_edges = n - 1);
+        pigeonhole_edges w_edges t;
+        // Now: forall e ∈ t, e ∈ w_edges
+        all_connected_from_superset n t w_edges
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires derive_connected);
+    // Now have: all_connected n w_edges
+    // Combine: is_spanning_tree + edges_safe → is_mst
+    Bridge.safe_spanning_tree_is_mst g w_edges
+#pop-options
+
 (*** kruskal_mst_result: opaque MST result predicate ***)
 
 [@@"opaque_to_smt"]
@@ -1427,7 +1777,7 @@ let kruskal_mst_result (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : 
   (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\ Seq.index seu k < n /\ Seq.index sev k < n) /\
   (symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
    all_connected n (adj_array_to_graph sadj n).edges ==>
-   edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+   is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
 
 let kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
   : Lemma
@@ -1439,7 +1789,7 @@ let kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: na
                                             Seq.index seu k < n /\ Seq.index sev k < n) /\
               symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
               all_connected n (adj_array_to_graph sadj n).edges)
-    (ensures edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+    (ensures is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
   = reveal_opaque (`%kruskal_mst_result) (kruskal_mst_result sadj seu sev n ec)
 
 (*** kruskal_mst_inv: MST loop invariant ***)
@@ -1658,6 +2008,95 @@ let kruskal_mst_inv_step
       kruskal_mst_inv_step_noop sadj sparent sparent' seu sev seu' sev' n ec vbu root_u root_v
 #pop-options
 
+/// Step lemma for all_edges_distinct + (connected ==> ec == round) tracking
+#restart-solver
+#push-options "--z3rlimit 800 --fuel 2 --ifuel 2"
+let kruskal_spanning_step_distinct
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
+    (seu sev seu' sev': Seq.seq int) (n ec ec': nat)
+    (vbu vbv: nat) (should_add: bool)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      ec + 1 < n /\
+      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      kruskal_inv sparent seu sev n ec /\
+      edges_adj_pos sadj seu sev n ec /\
+      all_edges_distinct (edges_from_arrays seu sev ec 0) /\
+      vbu < n /\ vbv < n /\
+      (should_add ==> UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n) /\
+      ec' == (if should_add then ec + 1 else ec) /\
+      Seq.length seu' == n /\ Seq.length sev' == n /\
+      (forall (k:nat). k < ec ==> Seq.index seu' k = Seq.index seu k /\
+                                    Seq.index sev' k = Seq.index sev k) /\
+      (should_add ==> Seq.index seu' ec == vbu /\ Seq.index sev' ec == vbv) /\
+      ec' <= Seq.length seu' /\ ec' <= Seq.length sev' /\
+      (forall (k:nat). k < ec' ==> Seq.index seu' k >= 0 /\ Seq.index sev' k >= 0))
+    (ensures all_edges_distinct (edges_from_arrays seu' sev' ec' 0))
+  = kruskal_inv_elim sparent seu sev n ec;
+    edges_adj_pos_elim sadj seu sev n ec;
+    edges_from_arrays_ext seu sev seu' sev' ec 0;
+    if should_add then begin
+      let new_edge : edge = {MSTSpec.u = vbu; MSTSpec.v = vbv; MSTSpec.w = 1} in
+      valid_endpoints_implies_all_edges_valid seu sev n ec 0;
+      new_edge_not_in_forest sparent (edges_from_arrays seu sev ec 0) n ec new_edge;
+      // edges_from_arrays seu' sev' ec 0 == edges_from_arrays seu sev ec 0
+      // So new_edge is not in seu'/sev' list either
+      assert (~(mem_edge new_edge (edges_from_arrays seu' sev' ec 0)));
+      edges_from_arrays_extend seu' sev' ec 0 vbu vbv;
+      all_edges_distinct_append_single (edges_from_arrays seu' sev' ec 0) new_edge
+    end
+    else ()
+
+let kruskal_spanning_step_count
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
+    (seu sev: Seq.seq int) (n ec ec' round: nat)
+    (vbu vbv: nat) (vbw: int)
+    (root_u root_v: nat) (should_add: bool)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      Seq.length seu == n /\ Seq.length sev == n /\
+      ec + 1 < n /\ round < n - 1 /\
+      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      kruskal_inv sparent seu sev n ec /\
+      edges_adj_pos sadj seu sev n ec /\
+      kruskal_mst_inv sadj sparent seu sev n ec /\
+      all_edges_distinct (edges_from_arrays seu sev ec 0) /\
+      (symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+       all_connected n (adj_array_to_graph sadj n).edges ==> ec == round) /\
+      vbu < n /\ vbv < n /\
+      root_u == UF.find_pure sparent vbu n n /\
+      root_v == UF.find_pure sparent vbv n n /\
+      (should_add ==> root_u <> root_v) /\
+      (~should_add ==> root_u = root_v) /\
+      ec' == (if should_add then ec + 1 else ec) /\
+      scan_min_inv sparent sadj n (n * n) vbw /\
+      vbw >= 0 /\
+      (vbw > 0 ==> root_u <> root_v /\ Seq.index sadj (vbu * n + vbv) = vbw) /\
+      (should_add ==> vbw > 0))
+    (ensures
+      symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+       all_connected n (adj_array_to_graph sadj n).edges ==> ec' == round + 1)
+  = if should_add then ()
+    else begin
+      // ~should_add ==> root_u = root_v
+      // vbw > 0 ==> root_u <> root_v; with root_u = root_v, vbw <= 0
+      // vbw >= 0, so vbw = 0
+      kruskal_inv_elim sparent seu sev n ec;
+      edges_adj_pos_elim sadj seu sev n ec;
+      kruskal_mst_inv_elim sadj sparent seu sev n ec;
+      let aux () : Lemma
+        (requires symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+                  all_connected n (adj_array_to_graph sadj n).edges)
+        (ensures False)
+        = connected_implies_vbw_positive sadj sparent seu sev n ec vbw vbu vbv
+      in
+      FStar.Classical.move_requires aux ()
+    end
+#pop-options
+
 #push-options "--z3rlimit 50 --ifuel 2 --fuel 2 "
 fn kruskal
   (adj: A.array int)
@@ -1742,7 +2181,13 @@ fn kruskal
       SZ.fits (SZ.v n * SZ.v n) /\
       kruskal_inv sparent seu sev (SZ.v n) (SZ.v vec) /\
       edges_adj_pos sadj seu sev (SZ.v n) (SZ.v vec) /\
-      kruskal_mst_inv sadj sparent seu sev (SZ.v n) (SZ.v vec)
+      kruskal_mst_inv sadj sparent seu sev (SZ.v n) (SZ.v vec) /\
+      Seq.length seu == SZ.v n /\ Seq.length sev == SZ.v n /\
+      (forall (k:nat). k < SZ.v vec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
+      all_edges_distinct (edges_from_arrays seu sev (SZ.v vec) 0) /\
+      (symmetric_adj sadj (SZ.v n) /\ no_self_loops_adj sadj (SZ.v n) /\
+       all_connected (SZ.v n) (adj_array_to_graph sadj (SZ.v n)).edges ==>
+       SZ.v vec == SZ.v vround)
     )
   decreases (SZ.v max_rounds - SZ.v !round)
   {
@@ -1887,6 +2332,11 @@ fn kruskal
     kruskal_mst_inv_step sadj sparent_cur sparent_new seu_cur sev_cur seu_new sev_new
       (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) vbw
       (SZ.v root_u) (SZ.v root_v) should_add;
+    kruskal_spanning_step_distinct sadj sparent_cur seu_cur sev_cur seu_new sev_new
+      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) should_add;
+    kruskal_spanning_step_count sadj sparent_cur seu_cur sev_cur
+      (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vround) (SZ.v vbu) (SZ.v vbv) vbw
+      (SZ.v root_u) (SZ.v root_v) should_add;
     
     round := vround +^ 1sz;
   };
@@ -1901,7 +2351,16 @@ fn kruskal
   result_is_forest_adj_intro sadj seu_f sev_f (SZ.v n) (SZ.v vec_f);
   // Extract MST safety from kruskal_mst_inv
   kruskal_mst_inv_elim sadj sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
-  // Establish kruskal_mst_result from kruskal_mst_inv
+  // Convert all_edges_distinct to Bridge.noRepeats_edge (identical definitions)
+  Defs.aed_eq_noRepeats (edges_from_arrays seu_f sev_f (SZ.v vec_f) 0);
+  // Derive is_mst for connected graphs using derive_is_mst_post_loop
+  FStar.Classical.arrow_to_impl
+    #(symmetric_adj sadj (SZ.v n) /\ no_self_loops_adj sadj (SZ.v n) /\
+      all_connected (SZ.v n) (adj_array_to_graph sadj (SZ.v n)).edges)
+    #(is_mst (adj_array_to_graph sadj (SZ.v n))
+        (weighted_edges_from_arrays sadj seu_f sev_f (SZ.v n) (SZ.v vec_f) 0))
+    (fun _ -> derive_is_mst_post_loop sadj seu_f sev_f (SZ.v n) (SZ.v vec_f));
+  // Establish kruskal_mst_result from the derivation
   reveal_opaque (`%kruskal_mst_result) (kruskal_mst_result sadj seu_f sev_f (SZ.v n) (SZ.v vec_f));
   
   // Clean up

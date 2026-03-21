@@ -190,7 +190,9 @@ val pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
 /// Result predicate: for connected graphs, the imperative output is safe (⊆ some MST)
 val kruskal_mst_result (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
 
-/// Elim lemma: extract edges_safe from kruskal_mst_result for connected symmetric graphs
+/// Elim lemma: extract is_mst from kruskal_mst_result for connected symmetric graphs.
+/// This is the main MST theorem for the imperative kruskal: calling kruskal on a
+/// connected symmetric graph produces an MST.
 val kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
   : Lemma
     (requires kruskal_mst_result sadj seu sev n ec /\
@@ -201,7 +203,7 @@ val kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: na
                                             Seq.index seu k < n /\ Seq.index sev k < n) /\
               symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
               all_connected n (adj_array_to_graph sadj n).edges)
-    (ensures edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
+    (ensures is_mst (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
 
 (*** Kruskal Function ***)
 

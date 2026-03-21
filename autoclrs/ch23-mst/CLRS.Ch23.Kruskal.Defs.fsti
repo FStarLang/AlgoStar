@@ -102,6 +102,14 @@ val edges_from_arrays_extend (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec}) 
     (ensures edges_from_arrays seu sev (ec + 1) i ==
              FStar.List.Tot.append (edges_from_arrays seu sev ec i) [{u = eu; v = ev; w = 1}])
 
+// Length of edges_from_arrays
+val edges_from_arrays_length (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0))
+    (ensures FStar.List.Tot.length (edges_from_arrays seu sev ec i) = ec - i)
+
 // Postcondition: result forms a forest (acyclic edge set)
 val result_is_forest (seu sev: Seq.seq int) (n ec: nat) : prop
 
@@ -188,6 +196,12 @@ val result_is_forest_adj_intro (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec:
     (requires result_is_forest seu sev n ec /\ edges_adj_pos sadj seu sev n ec)
     (ensures result_is_forest_adj sadj seu sev n ec)
 
+/// Extract edges_adj_pos from result_is_forest_adj
+val result_is_forest_adj_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires result_is_forest_adj sadj seu sev n ec)
+    (ensures edges_adj_pos sadj seu sev n ec)
+
 /// Postcondition predicate for do_union
 let do_union_post (sparent sparent': Seq.seq SZ.t) (root_u root_v n: nat) : prop =
   valid_parents sparent' n /\
@@ -254,3 +268,8 @@ val weighted_edges_from_arrays_extend
 val subset_edges_cons_to_append (hd: edge) (tl: list edge) (s: list edge)
   : Lemma (requires subset_edges (hd :: tl) s)
           (ensures subset_edges (FStar.List.Tot.append tl [hd]) s)
+
+module Bridge = CLRS.Ch23.Kruskal.Bridge
+/// all_edges_distinct and Bridge.noRepeats_edge are identical
+val aed_eq_noRepeats (es: list edge)
+  : Lemma (ensures all_edges_distinct es == Bridge.noRepeats_edge es)

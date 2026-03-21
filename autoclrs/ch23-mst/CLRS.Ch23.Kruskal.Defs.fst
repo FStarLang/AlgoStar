@@ -96,6 +96,17 @@ let rec edges_from_arrays_extend (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= e
   = if i >= ec then ()
     else edges_from_arrays_extend seu sev ec (i + 1) eu ev
 
+// Length of edges_from_arrays
+let rec edges_from_arrays_length (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec})
+  : Lemma
+    (requires
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0))
+    (ensures FStar.List.Tot.length (edges_from_arrays seu sev ec i) = ec - i)
+    (decreases (ec - i))
+  = if i >= ec then ()
+    else edges_from_arrays_length seu sev ec (i + 1)
+
 // Postcondition: result forms a forest (acyclic edge set)
 let result_is_forest (seu sev: Seq.seq int) (n ec: nat) : prop =
   valid_endpoints seu sev n ec /\
@@ -210,6 +221,12 @@ let result_is_forest_adj_intro (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec:
     (ensures result_is_forest_adj sadj seu sev n ec)
   = ()
 
+let result_is_forest_adj_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires result_is_forest_adj sadj seu sev n ec)
+    (ensures edges_adj_pos sadj seu sev n ec)
+  = ()
+
 // Edges with actual weights from the adjacency matrix
 // (edges_from_arrays uses weight 1 for internal forest tracking;
 //  this version uses adj[u*n+v] for MST weight reasoning)
@@ -271,3 +288,9 @@ let rec subset_edges_cons_to_append (hd: edge) (tl: list edge) (s: list edge)
     | [] -> ()
     | _ :: rest -> subset_edges_cons_to_append hd rest s
 #pop-options
+
+module Bridge = CLRS.Ch23.Kruskal.Bridge
+let rec aed_eq_noRepeats (es: list edge)
+  : Lemma (ensures all_edges_distinct es == Bridge.noRepeats_edge es)
+          (decreases es)
+  = match es with | [] -> () | _ :: tl -> aed_eq_noRepeats tl

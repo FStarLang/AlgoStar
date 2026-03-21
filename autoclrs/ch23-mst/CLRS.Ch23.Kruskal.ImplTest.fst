@@ -175,17 +175,17 @@ fn test_kruskal_satisfiability ()
   assert (pure (CLRS.Ch23.Kruskal.Spec.is_forest
     (edges_from_arrays sedge_u' sedge_v' (SZ.v ec_val) 0) 3));
 
-  // ✓ PROVEN (MST from imperative kruskal): 
-  //   kruskal_mst_result is in the postcondition of fn kruskal
-  //   For connected graphs: the imperative output is safe (⊆ some MST)
-  //   Use test_edges_safe to extract edges_safe for this specific graph
+  // ✓ PROVEN: is_mst — the imperative kruskal output IS the MST!
+  //   For connected symmetric graphs, kruskal produces an MST.
+  //   Proof chain: postcondition (forest + edges_safe) + graph properties
+  //   → derive_is_mst_post_loop (pigeonhole + connectivity transfer)
+  //   → is_mst
   test_mst ();
   assert (pure (kruskal_mst_result sadj sedge_u' sedge_v' 3 (SZ.v ec_val)));
-  // Establish sadj == test_adj and use helper to derive edges_safe
   assert (pure (Seq.equal sadj (Seq.seq_of_list [0;1;3;1;0;2;3;2;0])));
-  test_edges_safe sadj sedge_u' sedge_v' (SZ.v ec_val);
-  // ✓ PROVEN: edges_safe — the imperative output is a subset of some MST
-  assert (pure (edges_safe (adj_array_to_graph sadj 3)
+  test_is_mst_imperative sadj sedge_u' sedge_v' (SZ.v ec_val);
+  // ✓ THE MAIN RESULT: is_mst for the imperative kruskal output
+  assert (pure (CLRS.Ch23.MST.Spec.is_mst (adj_array_to_graph sadj 3)
     (weighted_edges_from_arrays sadj sedge_u' sedge_v' 3 (SZ.v ec_val) 0)));
 
   // --- Cleanup ---
