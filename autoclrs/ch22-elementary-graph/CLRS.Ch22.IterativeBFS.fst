@@ -221,7 +221,7 @@ fn bfs
           // dist[vu] is preserved during inner loop
           Seq.index sdist_v (SZ.v vu) == du
         )
-      // TODO: decreases — proof interference
+      decreases (SZ.v n - SZ.v !v)
       {
         let vv = !v;
 
