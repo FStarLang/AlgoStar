@@ -57,6 +57,7 @@ fn rec list_search (head: dlist) (k: int)
   preserves is_dlist head 'l
   returns found: bool
   ensures pure (found <==> L.mem k 'l)
+  decreases L.length 'l
 //SNIPPET_END: sll_list_search
 {
   match head {
@@ -88,6 +89,7 @@ fn rec list_delete (head: dlist) (k: int)
   requires is_dlist head 'l
   returns new_head: dlist
   ensures is_dlist new_head (remove_first k 'l)
+  decreases L.length 'l
 //SNIPPET_END: sll_list_delete
 {
   match head {
@@ -162,6 +164,7 @@ fn rec list_search_tick (head: dlist) (k: int) (ctr: GR.ref nat)
       found <==> L.mem k 'l /\
       reveal cf - reveal c0 <= search_cost (L.length 'l)
     )
+  decreases L.length 'l
 {
   match head {
     norewrite None -> {
@@ -195,6 +198,7 @@ fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
     pure (
       reveal cf - reveal c0 <= delete_cost (L.length 'l)
     )
+  decreases L.length 'l
 {
   match head {
     norewrite None -> {

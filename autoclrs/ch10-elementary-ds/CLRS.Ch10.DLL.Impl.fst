@@ -899,6 +899,7 @@ fn rec search_dls
   preserves dls p l prev_ptr tail None
   returns found: bool
   ensures pure (found <==> L.mem k l)
+  decreases L.length l
 {
   factor_dls p l prev_ptr tail None;
   unfold (dls_factored p l prev_ptr tail None);
@@ -979,6 +980,7 @@ fn rec search_dls_ptr
     | None -> ~(L.mem k l)
     | Some _ -> L.mem k l
   )
+  decreases L.length l
 {
   factor_dls p l prev_ptr tail None;
   unfold (dls_factored p l prev_ptr tail None);
@@ -1057,6 +1059,7 @@ fn rec search_dls_rev
   preserves dls_rev p rl next_ptr head None
   returns found: bool
   ensures pure (found <==> L.mem k rl)
+  decreases L.length rl
 {
   factor_dls_rev p rl next_ptr head None;
   unfold (dls_rev_factored p rl next_ptr head None);
@@ -1257,6 +1260,7 @@ fn rec delete_in_dls
   requires dls p l prev_ptr tail_ptr None
   returns r: (dptr & dptr)
   ensures delete_result (fst r) (snd r) prev_ptr (remove_first k l)
+  decreases L.length l
 {
   factor_dls p l prev_ptr tail_ptr None;
   unfold (dls_factored p l prev_ptr tail_ptr None);
@@ -1559,6 +1563,7 @@ fn rec delete_last_in_dls
   requires dls p l prev_ptr tail_ptr None
   returns r: (dptr & dptr)
   ensures delete_result (fst r) (snd r) prev_ptr (remove_last k l)
+  decreases L.length l
 {
   factor_dls p l prev_ptr tail_ptr None;
   unfold (dls_factored p l prev_ptr tail_ptr None);
