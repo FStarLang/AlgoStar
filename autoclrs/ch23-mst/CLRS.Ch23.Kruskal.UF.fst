@@ -477,3 +477,86 @@ let uf_complete_unreachable (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) 
                     ~(reachable edges u v))
           (ensures find_pure sparent u n n <> find_pure sparent v n n)
   = ()
+
+// Reachable is monotone: if forall e in es1 => mem_edge e es2, then reachable(es1) => reachable(es2)
+let reachable_monotone_list (es1 es2: list edge) (u v: nat)
+  : Lemma (requires reachable es1 u v /\
+                    (forall (x: edge). mem_edge x es1 ==> mem_edge x es2))
+          (ensures reachable es2 u v)
+  = // path p subset of es1 gives subset of es2 (element-wise)
+    let aux (p: list edge) : Lemma
+      (requires subset_edges p es1 /\ is_path_from_to p u v)
+      (ensures reachable es2 u v)
+      = // Step 1: from subset_edges p es1, derive forall e. mem_edge e p ==> mem_edge e es2
+        let step (e: edge) : Lemma (requires mem_edge e p) (ensures mem_edge e es2) =
+          mem_edge_subset e p es1  // mem_edge e p /\ subset_edges p es1 ==> mem_edge e es1
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires step);
+        // Step 2: now we have forall e. mem_edge e p ==> mem_edge e es2
+        subset_from_mem p es2
+        // Step 3: subset_edges p es2 /\ is_path_from_to p u v ==> reachable es2 u v (by def)
+    in
+    // Eliminate the existential in reachable es1 u v
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+
+// mem_edge is order-independent: e :: tl and tl @ [e] have same members
+let rec mem_edge_cons_append (x e: edge) (tl: list edge)
+  : Lemma (ensures mem_edge x (e :: tl) <==> mem_edge x (FStar.List.Tot.append tl [e]))
+          (decreases tl)
+  = match tl with
+    | [] -> ()
+    | _ :: rest -> mem_edge_cons_append x e rest
+
+// uf_complete preserved under list reordering
+// Key: reachable(e :: tl, u, v) <==> reachable(tl @ [e], u, v)
+// because any path subset of (e :: tl) is also subset of (tl @ [e])
+// and vice versa (mem_edge is order-independent)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec subset_edges_cons_append_transfer (path: list edge) (e: edge) (tl: list edge)
+  : Lemma (requires subset_edges path (e :: tl))
+          (ensures subset_edges path (FStar.List.Tot.append tl [e]))
+          (decreases path)
+  = match path with
+    | [] -> ()
+    | hd :: rest ->
+      subset_edges_cons_append_transfer rest e tl;
+      // hd is mem_edge in (e :: tl). Need: mem_edge hd (tl @ [e])
+      // mem_edge hd (e :: tl) = edge_eq hd e || mem_edge hd tl
+      // mem_edge hd (tl @ [e]): if mem_edge hd tl, done by subset_edges_snoc
+      // if edge_eq hd e, then mem_edge hd [e], so mem_edge hd (tl @ [e])
+      mem_edge_append hd tl [e]
+
+let uf_complete_cons_to_append (sparent: Seq.seq SZ.t) (e: edge) (tl: list edge) (n: nat)
+  : Lemma (requires uf_complete sparent (e :: tl) n)
+          (ensures uf_complete sparent (FStar.List.Tot.append tl [e]) n)
+  = // For each u,v with find(u)=find(v): get reachable(e::tl,u,v) from uf_complete,
+    // then transfer the path to (tl@[e]).
+    let aux (u v: nat) : Lemma
+      (requires u < n /\ v < n /\ find_pure sparent u n n = find_pure sparent v n n)
+      (ensures reachable (FStar.List.Tot.append tl [e]) u v)
+      = // uf_complete gives reachable(e::tl, u, v)
+        assert (reachable (e :: tl) u v);
+        // reachable is: exists path. subset_edges path (e::tl) /\ is_path_from_to path u v
+        // We need: exists path. subset_edges path (tl@[e]) /\ is_path_from_to path u v
+        // For ANY such path p, subset_edges_cons_append_transfer p e tl gives subset p (tl@[e])
+        // Use the SAME path as witness:
+        let es2 = FStar.List.Tot.append tl [e] in
+        let mem_transfer (x: edge) : Lemma
+          (requires mem_edge x (e :: tl)) (ensures mem_edge x es2)
+          = mem_edge_cons_append x e tl
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires mem_transfer);
+        reachable_monotone_list (e :: tl) es2 u v
+    in
+    let wrap (u: nat) : Lemma
+      (forall (v:nat). u < n /\ v < n /\ find_pure sparent u n n = find_pure sparent v n n ==>
+        reachable (FStar.List.Tot.append tl [e]) u v)
+      = let inner (v: nat) : Lemma
+          (requires u < n /\ v < n /\ find_pure sparent u n n = find_pure sparent v n n)
+          (ensures reachable (FStar.List.Tot.append tl [e]) u v)
+          = aux u v
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires inner)
+    in
+    FStar.Classical.forall_intro wrap
+#pop-options

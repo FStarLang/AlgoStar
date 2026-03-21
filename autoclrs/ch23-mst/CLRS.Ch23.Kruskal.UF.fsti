@@ -188,3 +188,9 @@ val uf_complete_unreachable (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) 
   : Lemma (requires uf_complete sparent edges n /\ u < n /\ v < n /\
                     ~(reachable edges u v))
           (ensures find_pure sparent u n n <> find_pure sparent v n n)
+
+/// uf_complete is preserved under list reordering (cons to append)
+/// reachable is order-independent since mem_edge/subset_edges don't depend on order
+val uf_complete_cons_to_append (sparent: Seq.seq SZ.t) (e: edge) (tl: list edge) (n: nat)
+  : Lemma (requires uf_complete sparent (e :: tl) n)
+          (ensures uf_complete sparent (tl `FStar.List.Tot.append` [e]) n)
