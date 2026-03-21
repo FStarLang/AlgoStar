@@ -373,7 +373,7 @@ let cuts_are_optimal_intro (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq 
 open Pulse.Lib.BoundedIntegers
 
 #pop-options
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 160 --fuel 2 --ifuel 2"
 
 //SNIPPET_START: extended_sig
 fn extended_rod_cutting
@@ -465,7 +465,7 @@ fn extended_rod_cutting
         // Preserve outer cuts_achieve_optimal through inner loop
         cuts_achieve_optimal s_prices sr_inner sc_inner (SZ.v vj - 1)
       )
-    // TODO: decreases — proof interference
+    decreases (Prims.op_Addition (SZ.v vj) 1 `Prims.op_Subtraction` SZ.v !i)
     {
       let vi = !i;
       let vq = !q;
@@ -503,43 +503,37 @@ fn extended_rod_cutting
     let final_best_i = !best_i;
     
     with sr_pre. assert (V.pts_to r sr_pre);
+
+    // Explicitly connect final_best_i to accum_argmax from loop invariant
+    assert (pure (SZ.v final_best_i == accum_argmax s_prices sr_pre (SZ.v vj) (SZ.v vj)));
+    assert (pure (final_q == accum_max s_prices sr_pre (SZ.v vj) (SZ.v vj)));
+
     accum_max_dp_correct s_prices sr_pre (SZ.v vj);
     
     // Use accum_argmax_valid to prove final_best_i achieves final_q
     accum_argmax_valid s_prices sr_pre (SZ.v vj) (SZ.v vj);
-    // Now we know: SZ.v final_best_i == accum_argmax ... (SZ.v vj) (SZ.v vj)
-    // and accum_argmax_valid gives us: 
-    //   final_best_i >= 1, final_best_i <= vj
-    //   prices[final_best_i - 1] + sr_pre[vj - final_best_i] == final_q  (when final_q > 0)
     
     with sc_pre. assert (V.pts_to s_cuts sc_pre);
     
     V.op_Array_Assignment r vj final_q;
     
     with sr_new. assert (V.pts_to r sr_new);
-    // sr_new == Seq.upd sr_pre (SZ.v vj) final_q
     assert (pure (sr_new == Seq.upd sr_pre (SZ.v vj) final_q));
     
     V.op_Array_Assignment s_cuts vj final_best_i;
     
     with sc_new. assert (V.pts_to s_cuts sc_new);
-    // sc_new == Seq.upd sc_pre (SZ.v vj) final_best_i
     assert (pure (sc_new == Seq.upd sc_pre (SZ.v vj) final_best_i));
     
     // dp_correct for sr_new up to vj:
     dp_correct_upd s_prices sr_pre (SZ.v vj) final_q;
     
     // s_cuts validity for sc_new up to vj:
-    // For k < vj: Seq.index sc_new k == Seq.index sc_pre k (SMT pattern)
-    // For k == vj: Seq.index sc_new vj == final_best_i
     assert (pure (SZ.v final_best_i >= 1 /\ SZ.v final_best_i <= SZ.v vj));
     assert (pure (Seq.index sc_new (SZ.v vj) == final_best_i));
-    // For k < vj, sc_new[k] = sc_pre[k], and outer invariant gives validity for sc_pre
-    // For k = vj, sc_new[vj] = final_best_i with 1 <= SZ.v final_best_i <= vj
     sc_upd_valid sc_pre final_best_i (SZ.v vj);
     
     // Prove cuts_achieve_optimal for the updated tables
-    // final_best_i achieves final_q: prices[best-1] + sr_pre[vj - best] == final_q
     assert (pure (SZ.v final_best_i - 1 < Seq.length s_prices));
     assert (pure (SZ.v vj - SZ.v final_best_i < Seq.length sr_pre));
     assert (pure (Seq.index s_prices (SZ.v final_best_i - 1) + Seq.index sr_pre (SZ.v vj - SZ.v final_best_i) == final_q));
