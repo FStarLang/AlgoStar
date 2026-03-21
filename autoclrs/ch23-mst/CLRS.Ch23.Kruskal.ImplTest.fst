@@ -36,6 +36,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
+open CLRS.Ch23.Kruskal.Defs
 open CLRS.Ch23.Kruskal.Impl
 open CLRS.Ch23.Kruskal.ImplTestHelper
 
@@ -177,11 +178,15 @@ fn test_kruskal_satisfiability ()
   // ✓ PROVEN (MST from imperative kruskal): 
   //   kruskal_mst_result is in the postcondition of fn kruskal
   //   For connected graphs: the imperative output is safe (⊆ some MST)
-  //   Combined with test_mst (pure spec): the spec suite determines MST
+  //   Use test_edges_safe to extract edges_safe for this specific graph
   test_mst ();
-  // The imperative output has kruskal_mst_result — for connected graphs,
-  // edges_safe holds, meaning the output edges are subset of some MST.
   assert (pure (kruskal_mst_result sadj sedge_u' sedge_v' 3 (SZ.v ec_val)));
+  // Establish sadj == test_adj and use helper to derive edges_safe
+  assert (pure (Seq.equal sadj (Seq.seq_of_list [0;1;3;1;0;2;3;2;0])));
+  test_edges_safe sadj sedge_u' sedge_v' (SZ.v ec_val);
+  // ✓ PROVEN: edges_safe — the imperative output is a subset of some MST
+  assert (pure (edges_safe (adj_array_to_graph sadj 3)
+    (weighted_edges_from_arrays sadj sedge_u' sedge_v' 3 (SZ.v ec_val) 0)));
 
   // --- Cleanup ---
   rewrite (A.pts_to adj sadj) as (A.pts_to (V.vec_to_array adj_v) sadj);

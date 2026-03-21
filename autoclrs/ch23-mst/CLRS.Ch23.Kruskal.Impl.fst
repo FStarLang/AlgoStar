@@ -1232,6 +1232,192 @@ let greedy_safety_step
     greedy_convert_safety sadj seu sev n ec new_w_edge
 #pop-options
 
+(*** Key graph-theory lemmas for MST postcondition ***)
+
+/// If every edge on a path has find(u)==find(v), then path endpoints have same root.
+/// This version takes subset_edges directly, avoiding memP issues with noeq types.
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec find_same_along_path
+    (sparent: Seq.seq SZ.t) (n: nat) (path: list MSTSpec.edge)
+    (u v: nat) (g_edges: list MSTSpec.edge)
+  : Lemma
+    (requires
+      Defs.valid_parents sparent n /\ n > 0 /\
+      u < n /\ v < n /\
+      is_path_from_to path u v /\
+      subset_edges path g_edges /\
+      (forall (e: MSTSpec.edge). mem_edge e g_edges ==>
+        e.u < n /\ e.v < n /\
+        UF.find_pure sparent e.u n n = UF.find_pure sparent e.v n n))
+    (ensures UF.find_pure sparent u n n = UF.find_pure sparent v n n)
+    (decreases path)
+  = match path with
+    | [] -> ()
+    | e :: rest ->
+      // subset_edges (e :: rest) g_edges gives mem_edge e g_edges
+      // So find(e.u) == find(e.v) from the hypothesis
+      if e.u = u then
+        find_same_along_path sparent n rest e.v v g_edges
+      else if e.v = u then
+        find_same_along_path sparent n rest e.u v g_edges
+      else ()
+#pop-options
+
+/// Graph edge entries from adj_row_edges have positive weight in at least one orientation
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec adj_row_edges_adj_pos (sadj: Seq.seq int) (n: nat) (u: nat) (v: nat) (e: edge)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
+              mem_edge e (adj_row_edges sadj n u v) /\ e.u < n /\ e.v < n)
+    (ensures adj_weight sadj n e.u e.v > 0 \/ adj_weight sadj n e.v e.u > 0)
+    (decreases (n - v))
+  = if v >= n then ()
+    else
+      let w = Seq.index sadj (u * n + v) in
+      if w > 0 && u < v then begin
+        if edge_eq e {u = u; v = v; w = w} then begin
+          MSTSpec.edge_eq_endpoints e {u = u; v = v; w = w};
+          index_bound u v n; index_bound v u n
+        end
+        else begin
+          adj_row_edges_props sadj n u (v + 1) e;
+          adj_row_edges_adj_pos sadj n u (v + 1) e
+        end
+      end
+      else begin
+        adj_row_edges_props sadj n u (v + 1) e;
+        adj_row_edges_adj_pos sadj n u (v + 1) e
+      end
+#pop-options
+
+/// Graph edge from adj_all_edges: positive weight in at least one orientation
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+let rec adj_all_edges_adj_pos (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge)
+  : Lemma
+    (requires Seq.length sadj == n * n /\ u <= n /\ n > 0 /\
+              mem_edge e (adj_all_edges sadj n u) /\ e.u < n /\ e.v < n)
+    (ensures adj_weight sadj n e.u e.v > 0 \/ adj_weight sadj n e.v e.u > 0)
+    (decreases (n - u))
+  = if u >= n then ()
+    else begin
+      MSTSpec.mem_edge_append e (adj_row_edges sadj n u 0) (adj_all_edges sadj n (u + 1));
+      if mem_edge e (adj_row_edges sadj n u 0) then
+        adj_row_edges_adj_pos sadj n u 0 e
+      else
+        adj_all_edges_adj_pos sadj n (u + 1) e
+    end
+#pop-options
+
+/// For a graph edge from adj_array_to_graph with symmetric adj: adj_weight(e.u, e.v) > 0
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+let graph_edge_adj_pos (sadj: Seq.seq int) (n: nat) (e: edge)
+  : Lemma
+    (requires n > 0 /\ Seq.length sadj == n * n /\ symmetric_adj sadj n /\
+              mem_edge e (adj_array_to_graph sadj n).edges /\
+              e.u < n /\ e.v < n)
+    (ensures adj_weight sadj n e.u e.v > 0)
+  = adj_all_edges_adj_pos sadj n 0 e;
+    index_bound e.u e.v n;
+    index_bound e.v e.u n
+#pop-options
+
+/// scan vbw=0 + symmetric → all graph edges have find(u)==find(v)
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+let scan_zero_graph_edges_same_root
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (n: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      Defs.valid_parents sparent n /\
+      symmetric_adj sadj n /\
+      (forall (u' v': nat). u' < n /\ v' < n ==>
+        adj_weight sadj n u' v' <= 0 \/
+        UF.find_pure sparent u' n n = UF.find_pure sparent v' n n))
+    (ensures
+      forall (e: edge). mem_edge e (adj_array_to_graph sadj n).edges ==>
+        e.u < n /\ e.v < n /\
+        UF.find_pure sparent e.u n n = UF.find_pure sparent e.v n n)
+  = adj_graph_valid_edges sadj n;
+    let aux (e: edge) : Lemma
+      (requires mem_edge e (adj_array_to_graph sadj n).edges)
+      (ensures e.u < n /\ e.v < n /\
+        UF.find_pure sparent e.u n n = UF.find_pure sparent e.v n n)
+      = adj_all_edges_props sadj n 0 e;
+        graph_edge_adj_pos sadj n e
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+/// Connected graph + all graph edges same root → all vertices same root
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+let connected_all_edges_same_root
+    (sparent: Seq.seq SZ.t) (n: nat) (g_edges: list MSTSpec.edge)
+  : Lemma
+    (requires
+      n > 0 /\
+      Defs.valid_parents sparent n /\
+      all_connected n g_edges /\
+      (forall (e: MSTSpec.edge). mem_edge e g_edges ==>
+        e.u < n /\ e.v < n /\
+        UF.find_pure sparent e.u n n = UF.find_pure sparent e.v n n))
+    (ensures
+      forall (u v: nat). u < n /\ v < n ==>
+        UF.find_pure sparent u n n = UF.find_pure sparent v n n)
+  = let aux (v: nat) : Lemma
+      (requires v < n)
+      (ensures UF.find_pure sparent 0 n n = UF.find_pure sparent v n n)
+      = assert (reachable g_edges 0 v);
+        let path_lemma (path: list MSTSpec.edge) : Lemma
+          (requires subset_edges path g_edges /\ is_path_from_to path 0 v)
+          (ensures UF.find_pure sparent 0 n n = UF.find_pure sparent v n n)
+          = find_same_along_path sparent n path 0 v g_edges
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires path_lemma)
+    in
+    // Prove: forall v. v < n ==> find(0) == find(v)
+    // The solver derives: forall u v. u < n /\ v < n ==> find(u) == find(0) == find(v)
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+/// If all vertices have same root and uf_complete, then all_connected for forest edges
+#push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
+let uf_all_same_root_all_connected
+    (sparent: Seq.seq SZ.t) (edges: list MSTSpec.edge) (n: nat)
+  : Lemma
+    (requires
+      n > 0 /\
+      UF.uf_complete sparent edges n /\
+      (forall (u v: nat). u < n /\ v < n ==>
+        UF.find_pure sparent u n n = UF.find_pure sparent v n n))
+    (ensures all_connected n edges)
+  = ()
+#pop-options
+
+/// Key lemma: for connected graphs, if the scan found no cross-component edge (vbw=0),
+/// then the forest already connects all vertices.
+#push-options "--z3rlimit 100 --fuel 1 --ifuel 0"
+let scan_zero_implies_all_connected
+    (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires
+      n > 0 /\ Seq.length sadj == n * n /\
+      Defs.valid_parents sparent n /\
+      ec <= Seq.length seu /\ ec <= Seq.length sev /\
+      (forall (k:nat). k < ec ==>
+        Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+        Seq.index seu k < n /\ Seq.index sev k < n) /\
+      UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
+      symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+      all_connected n (adj_array_to_graph sadj n).edges /\
+      (forall (u' v': nat). u' < n /\ v' < n ==>
+        adj_weight sadj n u' v' <= 0 \/
+        UF.find_pure sparent u' n n = UF.find_pure sparent v' n n))
+    (ensures all_connected n (edges_from_arrays seu sev ec 0))
+  = scan_zero_graph_edges_same_root sadj sparent n;
+    connected_all_edges_same_root sparent n (adj_array_to_graph sadj n).edges;
+    uf_all_same_root_all_connected sparent (edges_from_arrays seu sev ec 0) n
+#pop-options
+
 (*** kruskal_mst_result: opaque MST result predicate ***)
 
 [@@"opaque_to_smt"]
@@ -1247,6 +1433,10 @@ let kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: na
   : Lemma
     (requires kruskal_mst_result sadj seu sev n ec /\
               result_is_forest_adj sadj seu sev n ec /\
+              n > 0 /\ Seq.length sadj == n * n /\
+              ec <= Seq.length seu /\ ec <= Seq.length sev /\
+              (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+                                            Seq.index seu k < n /\ Seq.index sev k < n) /\
               symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
               all_connected n (adj_array_to_graph sadj n).edges)
     (ensures edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
@@ -1312,6 +1502,7 @@ let kruskal_mst_inv_step_add_safety
       ec + 1 < n /\
       Seq.index seu ec == vbu /\ Seq.index sev ec == vbv /\
       valid_endpoints seu sev n ec /\
+      valid_endpoints seu sev n (ec + 1) /\
       edges_adj_pos sadj seu sev n ec /\
       UF.uf_inv sparent (edges_from_arrays seu sev ec 0) n ec /\
       UF.uf_complete sparent (edges_from_arrays seu sev ec 0) n /\
@@ -1389,6 +1580,8 @@ let kruskal_mst_inv_step_add
       vbu vbv root_u root_v new_edge;
     UF.uf_complete_cons_to_append sparent' new_edge (edges_from_arrays seu' sev' ec 0) n;
     edges_from_arrays_extend seu' sev' ec 0 vbu vbv;
+    // Establish valid_endpoints for ec+1 (needed by kruskal_mst_inv_step_add_safety)
+    valid_endpoints_extend seu sev seu' sev' n ec vbu vbv;
     // Safety: call helper that takes flat preconditions
     kruskal_mst_inv_step_add_safety sadj sparent seu' sev' n ec vbu vbv vbw;
     reveal_opaque (`%kruskal_mst_inv) (kruskal_mst_inv sadj sparent' seu' sev' n (ec + 1))
@@ -1704,6 +1897,8 @@ fn kruskal
     A.pts_to edge_u seu_f ** A.pts_to edge_v sev_f ** R.pts_to edge_count vec_f);
   kruskal_inv_elim sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
   lemma_kruskal_maintains_forest seu_f sev_f (SZ.v n) (SZ.v vec_f);
+  // Combine result_is_forest + edges_adj_pos → result_is_forest_adj
+  result_is_forest_adj_intro sadj seu_f sev_f (SZ.v n) (SZ.v vec_f);
   // Extract MST safety from kruskal_mst_inv
   kruskal_mst_inv_elim sadj sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
   // Establish kruskal_mst_result from kruskal_mst_inv

@@ -190,14 +190,18 @@ val pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
 /// Result predicate: for connected graphs, the imperative output is safe (⊆ some MST)
 val kruskal_mst_result (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) : prop
 
-/// The MST result predicate implies: for connected symmetric graphs, the output is MST.
-/// Use kruskal_result_is_mst (from the bridging section) to derive is_mst
-/// from edges_safe + forest + spanning tree properties.
-///
-/// Usage in tests:
-///   1. Call kruskal → get result_is_forest_adj + kruskal_mst_result
-///   2. Call kruskal_mst_result_elim → get edges_safe (for connected graphs)
-///   3. With forest + safety → prove is_mst via bridge lemma
+/// Elim lemma: extract edges_safe from kruskal_mst_result for connected symmetric graphs
+val kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
+  : Lemma
+    (requires kruskal_mst_result sadj seu sev n ec /\
+              result_is_forest_adj sadj seu sev n ec /\
+              n > 0 /\ Seq.length sadj == n * n /\
+              ec <= Seq.length seu /\ ec <= Seq.length sev /\
+              (forall (k:nat). k < ec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0 /\
+                                            Seq.index seu k < n /\ Seq.index sev k < n) /\
+              symmetric_adj sadj n /\ no_self_loops_adj sadj n /\
+              all_connected n (adj_array_to_graph sadj n).edges)
+    (ensures edges_safe (adj_array_to_graph sadj n) (weighted_edges_from_arrays sadj seu sev n ec 0))
 
 (*** Kruskal Function ***)
 
