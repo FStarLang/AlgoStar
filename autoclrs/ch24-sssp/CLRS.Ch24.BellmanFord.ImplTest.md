@@ -93,3 +93,26 @@ exact equality — it requires proving a non-trivial mathematical property about
 the graph. While this is inherent to the Bellman-Ford algorithm's correctness
 theorem, it makes testing more complex than Dijkstra's unconditional
 `dist[v] == sp_dist(v)`.
+
+## Concrete Execution (C Extraction)
+
+The verified Bellman-Ford implementation is extracted to C via F*'s `--codegen krml`
+and KaRaMeL, then compiled and executed on the same test instance.
+
+**Command**: `make test-c KRML_HOME=../../krml/karamel`
+
+**Output**:
+```
+Bellman-Ford (3 vertices, source=0):
+  dist = [0, 4, 2]
+  no_neg_cycle = true
+  result: PASS
+```
+
+The extracted C code matches the F*-proven expected distances exactly.
+
+| Property | Status |
+|----------|--------|
+| Extraction to C via krml | ✅ |
+| Compilation with gcc | ✅ |
+| Runtime output matches expected | ✅ dist=[0,4,2], no_neg_cycle=true |

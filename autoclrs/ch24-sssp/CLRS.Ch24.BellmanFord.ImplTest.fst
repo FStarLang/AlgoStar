@@ -192,7 +192,7 @@ fn test_bellman_ford_3 ()
        as (A.pts_to dist (Seq.create 3 0));
 
   // --- Allocate result ref ---
-  let result = R.alloc false;
+  let mut result = false;
 
   // --- Ghost counter ---
   let ctr = GR.alloc #nat 0;
@@ -248,7 +248,6 @@ fn test_bellman_ford_3 ()
   V.to_vec_pts_to dv;
   V.free dv;
 
-  R.free result;
   GR.free ctr;
   ()
 }

@@ -69,3 +69,30 @@ Expected shortest paths from source 0:
 The Dijkstra `Impl.fsti` specification is **fully precise**: the postcondition
 `dist[v] == sp_dist(source, v)` uniquely determines the output for any input.
 No spec issues found.
+
+## Concrete Execution (C Extraction)
+
+The verified Dijkstra implementation is extracted to C via F*'s `--codegen krml`
+and KaRaMeL, then compiled and executed on the same test instance.
+
+**Command**: `make test-c KRML_HOME=../../krml/karamel`
+
+**Output**:
+```
+Dijkstra (3 vertices, source=0):
+  dist = [0, 3, 5]
+  pred = [0, 0, 1]
+  result: PASS
+```
+
+The extracted C code matches the F*-proven expected distances exactly.
+The predecessor array `pred = [0, 0, 1]` encodes the shortest-path tree:
+- vertex 0: self (source)
+- vertex 1: predecessor 0 (edge 0→1, weight 3)
+- vertex 2: predecessor 1 (path 0→1→2, weight 3+2=5)
+
+| Property | Status |
+|----------|--------|
+| Extraction to C via krml | ✅ |
+| Compilation with gcc | ✅ |
+| Runtime output matches expected | ✅ dist=[0,3,5], pred=[0,0,1] |
