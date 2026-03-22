@@ -2,6 +2,7 @@
 
 **Date:** 2026-03-18
 **Status:** ✅ Verified (zero admits, zero assumes)
+**Concrete Execution:** ✅ Extracted to C, compiled, and executed successfully (2026-03-22)
 
 ## Test Instance
 
@@ -68,3 +69,20 @@ for this concrete graph.
 | Timestamp distinctness (formal) | ❌ | Derived implicitly via ordering chain |
 | Edge classification | ❌ | Spec↔Impl disconnect (2D vs 1D adjacency) |
 | White-path theorem | ❌ | Not exposed in Impl.fsti |
+
+## Concrete Execution Results (2026-03-22)
+
+The DFS test was extracted to C via KaRaMeL and executed:
+
+```
+$ make test
+Ch22 ImplTest: running BFS, DFS, TopologicalSort tests...
+Ch22 ImplTest: all tests passed.
+```
+
+The extracted C code:
+- Allocates adjacency matrix, color, discovery time, finish time, predecessor, stack, and scan index arrays
+- Sets edges 0→1 and 1→2 in the adjacency matrix
+- Calls `stack_dfs` (the verified iterative DFS implementation)
+- Frees all allocated memory
+- Completes without errors, confirming the verified algorithm runs correctly on concrete data

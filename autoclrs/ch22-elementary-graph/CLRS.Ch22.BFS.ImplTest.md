@@ -2,6 +2,7 @@
 
 **Date:** 2026-03-17
 **Status:** ✅ Verified (zero admits, zero assumes)
+**Concrete Execution:** ✅ Extracted to C, compiled, and executed successfully (2026-03-22)
 
 ## Test Instance
 
@@ -87,3 +88,20 @@ length, so the postcondition IS precise enough to determine exact distances.
 For graphs with **multiple paths**, the predecessor distance consistency
 postcondition provides additional constraints that help determine distances
 (through the BFS tree structure), even without full shortest-path optimality.
+
+## Concrete Execution Results (2026-03-22)
+
+The BFS test was extracted to C via KaRaMeL and executed:
+
+```
+$ make test
+Ch22 ImplTest: running BFS, DFS, TopologicalSort tests...
+Ch22 ImplTest: all tests passed.
+```
+
+The extracted C code:
+- Allocates adjacency matrix, color, distance, predecessor, and queue arrays
+- Sets edges 0→1 and 1→2 in the adjacency matrix
+- Calls `queue_bfs` (the verified BFS implementation)
+- Frees all allocated memory
+- Completes without errors, confirming the verified algorithm runs correctly on concrete data
