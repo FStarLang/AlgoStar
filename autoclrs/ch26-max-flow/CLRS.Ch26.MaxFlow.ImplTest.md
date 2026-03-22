@@ -128,3 +128,35 @@ The postcondition of `max_flow` is **fully precise** for both test cases:
 | MFMC theorem usability | ✅ Applicable via bridge lemma + `no_augmenting_path` |
 | Success case (positive flow) | ✅ Return value = 7 for single-edge network |
 | Zero-flow case (disconnected) | ✅ Return value = 0 for disconnected network |
+
+## Concrete Execution Results (C Extraction)
+
+The verified Pulse implementation was extracted to C and executed concretely:
+
+**Extraction pipeline**: `F* --codegen krml` → KaRaMeL → C → gcc → native binary
+
+**Build command**: `make test` (in `autoclrs/ch26-max-flow/`)
+
+**Test output**:
+```
+=== CLRS Ch26 Max Flow: C Extraction Test ===
+Test 1: Single-edge network (expected flow = 7) ... PASS
+Test 2: Disconnected network (expected flow = 0) ... PASS
+=== All tests passed ===
+```
+
+| Test | Network | Expected flow | Result |
+|------|---------|---------------|--------|
+| Single-edge (2 vertices, cap[0→1]=7) | n=2, s=0, t=1 | 7 | ✅ PASS |
+| Disconnected (2 vertices, all caps=0) | n=2, s=0, t=1 | 0 | ✅ PASS |
+
+### Changes for C extraction
+
+1. **`Impl.fst`**: Replaced deprecated `A.alloc`/`A.free` with `V.alloc`/`V.free`
+   (Vec pattern) for BFS workspace arrays (color, pred, dist, queue)
+2. **`Makefile`**: Added `extract-krml`, `extract-c`, `compile-test`, `test` targets
+3. **`test_main.c`**: C harness that calls the two extracted test functions
+4. **`clrs_ch26_compat.h`**: Provides `FStar_SizeT_v` and `FStar_SizeT_uint_to_t`
+   shims for SizeT↔int conversions in extracted code
+5. **KaRaMeL bundle**: `-bundle CLRS.Ch26.MaxFlow.ImplTest=CLRS.Ch26.MaxFlow.*`
+   ensures only code reachable from ImplTest is extracted

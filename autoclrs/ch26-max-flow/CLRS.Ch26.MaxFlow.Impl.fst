@@ -7,6 +7,7 @@ open FStar.SizeT
 open FStar.Mul
 
 module A = Pulse.Lib.Array
+module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
@@ -2911,11 +2912,30 @@ fn max_flow
   // cap_sum == sum_flow_out cap_seq n source n >= 0
   lemma_cap_sum_nonneg cap_seq (SZ.v n) (SZ.v source);
 
-  // Phase 2: Allocate BFS workspace
-  let color = A.alloc 0 n;
-  let pred = A.alloc (-1) n;
-  let dist = A.alloc (-1) n;
-  let queue = A.alloc 0sz n;
+  // Phase 2: Allocate BFS workspace (using Vec to avoid deprecated A.alloc)
+  let color_v = V.alloc 0 n;
+  V.to_array_pts_to color_v;
+  let color = V.vec_to_array color_v;
+  with _sc0. assert (A.pts_to (V.vec_to_array color_v) _sc0);
+  rewrite (A.pts_to (V.vec_to_array color_v) _sc0) as (A.pts_to color _sc0);
+
+  let pred_v = V.alloc (-1) n;
+  V.to_array_pts_to pred_v;
+  let pred = V.vec_to_array pred_v;
+  with _sp0. assert (A.pts_to (V.vec_to_array pred_v) _sp0);
+  rewrite (A.pts_to (V.vec_to_array pred_v) _sp0) as (A.pts_to pred _sp0);
+
+  let dist_v = V.alloc (-1) n;
+  V.to_array_pts_to dist_v;
+  let dist = V.vec_to_array dist_v;
+  with _sd0. assert (A.pts_to (V.vec_to_array dist_v) _sd0);
+  rewrite (A.pts_to (V.vec_to_array dist_v) _sd0) as (A.pts_to dist _sd0);
+
+  let queue_v = V.alloc 0sz n;
+  V.to_array_pts_to queue_v;
+  let queue = V.vec_to_array queue_v;
+  with _sq0. assert (A.pts_to (V.vec_to_array queue_v) _sq0);
+  rewrite (A.pts_to (V.vec_to_array queue_v) _sq0) as (A.pts_to queue _sq0);
 
   // Phase 3: Main Ford-Fulkerson loop
   let mut continue_loop: bool = true;
@@ -2995,11 +3015,26 @@ fn max_flow
   // Read the final flow value to return
   let result = !flow_val;
 
-  // Cleanup BFS workspace
-  A.free color;
-  A.free pred;
-  A.free dist;
-  A.free queue;
+  // Cleanup BFS workspace (Vec pattern)
+  with _sc_fin. assert (A.pts_to color _sc_fin);
+  rewrite (A.pts_to color _sc_fin) as (A.pts_to (V.vec_to_array color_v) _sc_fin);
+  V.to_vec_pts_to color_v;
+  V.free color_v;
+
+  with _sp_fin. assert (A.pts_to pred _sp_fin);
+  rewrite (A.pts_to pred _sp_fin) as (A.pts_to (V.vec_to_array pred_v) _sp_fin);
+  V.to_vec_pts_to pred_v;
+  V.free pred_v;
+
+  with _sd_fin. assert (A.pts_to dist _sd_fin);
+  rewrite (A.pts_to dist _sd_fin) as (A.pts_to (V.vec_to_array dist_v) _sd_fin);
+  V.to_vec_pts_to dist_v;
+  V.free dist_v;
+
+  with _sq_fin. assert (A.pts_to queue _sq_fin);
+  rewrite (A.pts_to queue _sq_fin) as (A.pts_to (V.vec_to_array queue_v) _sq_fin);
+  V.to_vec_pts_to queue_v;
+  V.free queue_v;
 
   result
 }
