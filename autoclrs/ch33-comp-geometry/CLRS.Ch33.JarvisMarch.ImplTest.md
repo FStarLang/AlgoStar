@@ -102,6 +102,25 @@ postcondition tested here — the postcondition `result == find_next_spec` is
 unconditional. The geometric correctness assumptions are a separate concern
 from spec precision.
 
+## Concrete Execution (C Extraction)
+
+All three test functions were extracted to C via KaRaMeL (`krml`) and executed
+successfully:
+
+```
+--- Jarvis March (§33.3) ---
+  test_find_leftmost             PASS
+  test_find_next                 PASS
+  test_jarvis_march              PASS
+```
+
+**Pipeline**: F* → krml → C (gcc) → native executable.
+Array allocation uses `KRML_HOST_CALLOC`/`KRML_HOST_FREE` (from `V.alloc`/`V.free`).
+Coordinates use `krml_checked_int_t`; indices use `size_t` (from `SZ.t`).
+`find_next` tested from all three vertices (0→1→2→0 full cycle) in a single
+function call — all three invocations execute correctly in the same C function.
+Run with `make test_c` from the ch33-comp-geometry directory.
+
 ## Verification
 
 - **Admits**: 0

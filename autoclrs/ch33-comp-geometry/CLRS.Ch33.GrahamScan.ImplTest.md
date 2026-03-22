@@ -86,6 +86,23 @@ Three weaknesses were identified and fixed:
    **Fixed:** Added `ensures_left_turn` predicate (defined in Spec.fst with
    bounds-safe guards for Pulse compatibility).
 
+## Concrete Execution (C Extraction)
+
+All three test functions were extracted to C via KaRaMeL (`krml`) and executed
+successfully:
+
+```
+--- Graham Scan (§33.3) ---
+  test_find_bottom               PASS
+  test_polar_cmp                 PASS
+  test_pop_while                 PASS
+```
+
+**Pipeline**: F* → krml → C (gcc) → native executable.
+Array allocation uses `KRML_HOST_CALLOC`/`KRML_HOST_FREE` (from `V.alloc`/`V.free`).
+Coordinates use `krml_checked_int_t`; indices use `size_t` (from `SZ.t`).
+Run with `make test_c` from the ch33-comp-geometry directory.
+
 ## Verification
 
 - **Admits**: 0

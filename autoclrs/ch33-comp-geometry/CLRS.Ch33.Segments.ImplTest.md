@@ -47,6 +47,24 @@ postcondition uniquely determines the output. The test explicitly asserts:
 The postconditions are as strong as possible: total functional equivalence
 (`result == spec(args)`) leaves no room for imprecision.
 
+## Concrete Execution (C Extraction)
+
+All four test functions were extracted to C via KaRaMeL (`krml`) and executed
+successfully:
+
+```
+--- Segments (§33.1) ---
+  test_cross_product             PASS
+  test_direction                 PASS
+  test_on_segment                PASS
+  test_segments_intersect        PASS
+```
+
+**Pipeline**: F* → krml → C (gcc) → native executable.
+All functions use `krml_checked_int_t` (checked machine integers) for F* `int`.
+No memory allocation required (all functions are pure arithmetic).
+Run with `make test_c` from the ch33-comp-geometry directory.
+
 ## Verification
 
 - **Admits**: 0
