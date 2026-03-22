@@ -109,3 +109,44 @@ This is a standard pattern used in the ch13 RBTree ImplTest.
 - **Admits**: 0
 - **Assumes**: 0
 - **Solver options**: `--z3rlimit 80 --fuel 8 --ifuel 4`
+
+### Concrete Execution (C Extraction)
+
+The Pulse implementation was extracted to C via KaRaMeL and compiled/executed
+successfully.
+
+**Extraction pipeline:**
+1. F* `--codegen krml` produces `.krml` files for `ImplTest`, `Impl`, and
+   dependencies (`FStar.Pervasives`, `FStar.Pervasives.Native`)
+2. A thin wrapper module `CLRS.Ch12.BST.TestMain` provides a public entry point
+   that calls `test_bst_ptr`; an `.fsti` for `ImplTest` hides spec-only
+   top-level definitions (`t0`–`t4`) so they are not extracted
+3. KaRaMeL bundles the modules into a single C translation unit using
+   `-bundle 'CLRS.Ch12.BST.TestMain=CLRS.Ch12.BST.ImplTest,CLRS.Ch12.BST.Impl'`
+4. The generated C is compiled with `cc` and linked with `krmllib` helpers
+   (`prims.c`, `fstar_int32.c`) plus a `main.c` driver
+
+**Build command:** `make test-bst`
+
+**Output:**
+```
+=== CLRS Ch12 BST Pointer-Based Test ===
+Running test_bst_ptr...
+test_bst_ptr completed successfully.
+All BST operations (insert, search, min, max, delete, free) passed.
+```
+
+**Result:** ✅ All BST operations (insert, search, minimum, maximum, delete,
+free) execute correctly in compiled C code. The test completes without errors,
+confirming that the verified Pulse implementation produces correct runtime
+behavior.
+
+**Notes:**
+- The BST uses mathematical integers (`krml_checked_int_t`), not machine
+  integers. KaRaMeL warns about this (Warning 15) but the `compat.h` header
+  provides runtime-checked integer operations.
+- Ghost references (`GR.alloc`, `GR.free`) and ghost tick counters are fully
+  erased during extraction — no ghost code remains in the generated C.
+- `Box.alloc` / `Box.free` are correctly extracted to `malloc` / `free` for
+  heap-allocated BST nodes.
+
