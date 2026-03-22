@@ -152,3 +152,45 @@ different valid covers. For K₃:
 - The specific output depends on edge scanning order (the algorithm
   with lexicographic order produces `[1,1,0]`)
 - No admits or assumes were needed
+
+## Concrete Execution (C Extraction)
+
+**Status:** ✅ Extracted to C, compiled, and executed successfully
+
+The verified Pulse implementation was extracted to C via KaRaMeL and executed
+as a native binary.
+
+### Extraction Pipeline
+
+```
+F* (--codegen krml) → .krml → KaRaMeL (bundle) → .c → gcc → executable
+```
+
+**Build command:** `make test-c` (in `ch35-approximation/`)
+
+### Execution Output
+
+```
+=== Vertex Cover 2-Approximation: Extraction Test ===
+
+Test 1: test_vertex_cover_triangle (K3)
+  PASS (function completed without error)
+
+Test 2: approx_vertex_cover on K3 with output
+  Cover: [1, 1, 0]
+  Count: 2 (expected: 2)
+  Valid 2-approx cover: YES
+
+All tests passed.
+```
+
+### Key Observations
+
+- The extracted algorithm produces `[1, 1, 0]` for K₃, matching the
+  lexicographic edge scanning order (edge (0,1) is processed first,
+  both endpoints added to cover)
+- Cover count = 2 = OPT for K₃, so the 2-approximation is tight here
+- All ghost references, lemma calls, and proof obligations are fully
+  erased during extraction — only the imperative algorithm remains
+- F* `int` (mathematical integer) maps to `krml_checked_int_t` (`int32_t`)
+  via KaRaMeL's compatibility layer
