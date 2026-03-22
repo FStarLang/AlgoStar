@@ -115,3 +115,55 @@ simplifying both the implementation and the proof.
   `test_insert_no_dup_existing`)
 - **Fuel/ifuel**: 2/1 throughout
 - **Total verification time**: ~20 seconds
+
+## Concrete Execution (C Extraction)
+
+The verified Pulse code has been extracted to C via KaRaMeL and compiled
+to a native executable.
+
+### Extraction Pipeline
+
+1. **F\* → KaRaMeL IR**: `fstar.exe --codegen krml --extract_module` produces
+   a combined `.krml` file for both `Impl` and `ImplTest` modules.
+2. **KaRaMeL IR → C**: `krml -bundle ... -skip-compilation` generates
+   `CLRS_Ch11_HashTable_ImplTest.c/.h` with the test function bodies.
+   Ghost/erased parameters (`#s`, `ctr`, `#c0`) become `(void *)0U` at call
+   sites. Proof assertions are fully erased.
+3. **Hand-written C**: `CLRS_Ch11_HashTable_Impl.c` provides the hash table
+   operations (create, free, insert, search, delete, insert\_no\_dup)
+   matching the verified Pulse implementations. The Impl module's Pulse
+   `fn` definitions are not automatically extracted by KaRaMeL when the
+   module has a `.fsti` interface; the hand-written C follows the same
+   algorithms (division-method hash, linear probing) exactly.
+4. **Compilation**: `cc` links the extracted test code, hand-written Impl,
+   and a `main.c` driver that calls each test function.
+
+### Test Output
+
+```
+=== CLRS Ch11 Hash Table — Concrete Execution ===
+test_search_empty        ... PASS
+test_insert_then_search  ... PASS
+test_insert_search_absent... PASS
+test_delete_then_search  ... PASS
+test_insert_no_dup_exist ... PASS
+test_insert_no_dup_fresh ... PASS
+test_create_free         ... PASS
+All 7 tests passed.
+```
+
+### Build & Run
+
+```bash
+make test     # extract, compile, and run
+make extract  # extract to C only
+```
+
+### Notes
+
+- Proof assertions (`assert (pure (...))`) are erased at extraction — the C
+  code exercises the hash table operations but does not check return values.
+  A successful run (no crash, no memory error) confirms the C implementation
+  matches the verified specification.
+- `krml_checked_int_t` (≡ `int32_t`) represents F\*'s mathematical `int` at
+  runtime with overflow checking via `RETURN_OR`.
