@@ -344,7 +344,7 @@ ensures exists* s.
     let val_j = a.(vj);
     let idx : SZ.t = SZ.uint_to_t val_j;
     let old_count = V.op_Array_Access c_arr idx;
-    V.op_Array_Assignment c_arr idx (old_count + 1);
+    V.op_Array_Assignment c_arr idx (Prims.op_Addition old_count 1);
     with sc'. assert (V.pts_to c_arr sc');
     L.count_phase_step s0 sc sc' (SZ.v vj) k val_j;
     j := vj + 1sz;
@@ -428,7 +428,7 @@ ensures exists* s.
     
     pos := vpos + cnt_sz;
     cur_v := vcv + 1sz;
-    cur_v_nat := vcvn + 1;
+    cur_v_nat := Prims.op_Addition vcvn 1;
   };
   
   with vcv_f vpos_f vcvn_f sc_f sa_f.

@@ -114,3 +114,46 @@ The following spec improvements were made to `Impl.fsti`:
 3. **No issues with precondition strength**: Preconditions are satisfiable
    for reasonable inputs. The `SZ.fits` constraints are non-restrictive
    for practical input sizes.
+
+## Concrete Execution Results (C Extraction)
+
+The verified Pulse implementation has been extracted to C via KaRaMeL and
+executed concretely. Both test functions were extracted, compiled, and run
+successfully.
+
+### Extraction Pipeline
+
+1. **F\* → .krml**: `ImplTest.fst` and `Impl.fst` extracted to `.krml`
+   intermediate representation using `--codegen krml`.
+2. **KaRaMeL → C**: `.krml` files bundled into `ImplTest.c` using
+   `-bundle` options to include only reachable code.
+3. **C Compilation**: Compiled with `cc -std=c11` against krmllib runtime.
+4. **Execution**: Both tests run and pass.
+
+### Changes for Extraction
+
+- **`Impl.fst`**: Two uses of the `BoundedIntegers` typeclass `+` operator
+  on `int`/`nat` types in `counting_sort_inplace` were replaced with
+  explicit `Prims.op_Addition` calls. The BoundedIntegers typeclass dispatch
+  extracts to a record pattern match that KaRaMeL cannot translate to C.
+  SizeT arithmetic (using `+` on `SZ.t`) was unaffected.
+
+### Test Output
+
+```
+=== Counting Sort C Extraction Tests ===
+
+Test 1: counting_sort_inplace [3,1,2] -> [1,2,3] ...
+  PASSED
+
+Test 2: counting_sort_impl [3,1,2] -> [1,2,3] ...
+  PASSED
+
+All tests passed.
+```
+
+### Build Instructions
+
+```bash
+make test-c   # Extract to C, compile, and run tests
+```
