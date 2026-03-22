@@ -217,21 +217,25 @@ fn test_prim_3 ()
   rewrite (A.pts_to parent_arr ps2) as (A.pts_to (V.vec_to_array (snd res)) ps2);
   V.to_vec_pts_to (snd res);
 
-  // --- What CANNOT be proven from prim_correct ---
+  // --- What CAN be proven from prim_correct (with key_parent_consistent) ---
   //
-  // The following assertions would be CORRECT for this input
-  // (expected: key = [0, 1, 2], parent = [0, 0, 1])
-  // but CANNOT be proven because prim_correct is too weak:
+  // key_parent_consistent: for non-source v with finite key,
+  //   key[v] == weights[parent[v]*3+v]
   //
-  //   assert (pure (SZ.v k1 == 1));      -- UNPROVABLE
-  //   assert (pure (SZ.v k2 == 2));      -- UNPROVABLE
-  //   assert (pure (SZ.v p1 == 0));      -- UNPROVABLE (for parent[1])
-  //   assert (pure (SZ.v p2 == 1));      -- UNPROVABLE (for parent[2])
+  // This means: if key[1] < infinity, then key[1] == ws[parent[1]*3+1]
+  //             if key[2] < infinity, then key[2] == ws[parent[2]*3+2]
   //
-  // FINDING: prim_correct only captures array shapes and boundary
-  // values (key[source]=0, keys bounded, parent[source]=source).
-  // It does NOT capture any MST structural property (spanning,
-  // acyclic, minimum weight, correct parent relationships).
+  // For the test graph (symmetric: ws[u*3+v] == ws[v*3+u]):
+  //   key[1] is the weight of edge (parent[1], 1) in the MST
+  //   key[2] is the weight of edge (parent[2], 2) in the MST
+  //
+  // Combined with all_keys_bounded + parent_valid: 
+  //   the parent tree encodes actual graph edges with their weights.
+  //
+  // NOTE: To prove is_mst from the imperative output, we would need to
+  // also track which vertices have been added (in_mst array) and show
+  // the parent tree forms a spanning tree. This requires additional
+  // loop invariant strengthening (greedy safety via cut property).
 
   // --- Cleanup ---
   // API GAP: prim returns freshly allocated vecs but its postcondition
