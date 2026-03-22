@@ -1091,6 +1091,124 @@ let prim_spec
 module Bridge = CLRS.Ch23.Kruskal.Bridge
 module Existence = CLRS.Ch23.MST.Existence
 
+/// All endpoints of tree_edges are in in_tree (invariant of pure_prim_aux)
+let rec lemma_prim_aux_endpoints_in_tree
+    (adj: adj_matrix) (n: nat) (its: vertex_set) (tree_edges: list edge) (fuel: nat) (e: edge)
+  : Lemma
+    (requires well_formed_adj adj n /\ length its = n /\
+              (forall (e': edge). mem_edge e' tree_edges ==>
+                e'.u < n /\ e'.v < n /\ index its e'.u = true /\ index its e'.v = true) /\
+              mem_edge e (pure_prim_aux adj n its tree_edges fuel))
+    (ensures e.u < n /\ e.v < n)
+    (decreases fuel)
+  = if fuel = 0 then ()
+    else if all_in_tree its n then ()
+    else match pure_prim_step adj n its tree_edges with
+    | None -> ()
+    | Some step_e ->
+      lemma_prim_step_bounds adj n its tree_edges step_e;
+      lemma_find_min_aux_valid adj n its 0 None;
+      // Now we know: valid_crossing_with_weight adj n step_e its
+      // Which gives: step_e.u < length its, index its step_e.u = true,
+      //              step_e.v < length its, index its step_e.v = false
+      assert (valid_crossing_edge step_e its);
+      let its' = add_to_tree its step_e.v in
+      lemma_add_to_tree_preserves_length its step_e.v;
+      if mem_edge e tree_edges then ()
+      else if edge_eq e step_e then
+        edge_eq_endpoints e step_e
+      else begin
+        // e is in pure_prim_aux ... (step_e :: tree_edges) (fuel-1)
+        // Need: all endpoints of (step_e :: tree_edges) are in its'
+        let aux (e': edge) : Lemma
+          (requires mem_edge e' (step_e :: tree_edges))
+          (ensures e'.u < n /\ e'.v < n /\ index its' e'.u = true /\ index its' e'.v = true)
+          = if edge_eq e' step_e then begin
+              edge_eq_endpoints e' step_e;
+              // Either (e'.u=step_e.u, e'.v=step_e.v) or (e'.u=step_e.v, e'.v=step_e.u)
+              // step_e.u ∈ its, step_e.v added to its'
+              // Case 1: e'.u=step_e.u (in its→in its'), e'.v=step_e.v (added to its')
+              // Case 2: e'.u=step_e.v (added to its'), e'.v=step_e.u (in its→in its')
+              lemma_add_to_tree_adds its step_e.v;
+              assert (in_tree its step_e.u);
+              lemma_add_to_tree_preserves its step_e.v step_e.u
+            end
+            else begin
+              assert (mem_edge e' tree_edges);
+              lemma_add_to_tree_preserves its step_e.v e'.u;
+              lemma_add_to_tree_preserves its step_e.v e'.v
+            end
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+        lemma_prim_aux_endpoints_in_tree adj n its' (step_e :: tree_edges) (fuel - 1) e
+      end
+
+/// noRepeats for pure_prim_aux: each new edge's v is fresh (not in tree yet)
+#push-options "--z3rlimit 50"
+let rec lemma_prim_aux_noRepeats
+    (adj: adj_matrix) (n: nat) (its: vertex_set) (tree_edges: list edge) (fuel: nat)
+  : Lemma
+    (requires well_formed_adj adj n /\ length its = n /\
+              Bridge.noRepeats_edge tree_edges /\
+              (forall (e': edge). mem_edge e' tree_edges ==>
+                e'.u < n /\ e'.v < n /\ index its e'.u = true /\ index its e'.v = true))
+    (ensures Bridge.noRepeats_edge (pure_prim_aux adj n its tree_edges fuel))
+    (decreases fuel)
+  = if fuel = 0 then ()
+    else if all_in_tree its n then ()
+    else match pure_prim_step adj n its tree_edges with
+    | None -> ()
+    | Some step_e ->
+      lemma_prim_step_bounds adj n its tree_edges step_e;
+      lemma_find_min_aux_valid adj n its 0 None;
+      assert (valid_crossing_edge step_e its);
+      // step_e.v ∉ its (not in tree). All tree_edges endpoints ∈ its.
+      // So for any e' ∈ tree_edges: e'.v ∈ its, so e'.v ≠ step_e.v.
+      // Also e'.u ∈ its, so e'.u ≠ step_e.v (since step_e.v ∉ its).
+      // For edge_eq step_e e': need {step_e.u, step_e.v} = {e'.u, e'.v} and same w.
+      // step_e.v ∉ its, but e'.u ∈ its and e'.v ∈ its.
+      // If step_e.v = e'.u: step_e.v ∈ its — contradiction.
+      // If step_e.v = e'.v: step_e.v ∈ its — contradiction.
+      // So step_e.v ≠ e'.u and step_e.v ≠ e'.v.
+      // But edge_eq needs step_e.v ∈ {e'.u, e'.v}. Contradiction.
+      // So ¬(edge_eq step_e e'). Hence ¬(mem_edge step_e tree_edges).
+      let aux_not_mem (e': edge) : Lemma
+        (requires mem_edge e' tree_edges /\ edge_eq step_e e')
+        (ensures False)
+        = edge_eq_endpoints step_e e'
+          // step_e.v = e'.v or step_e.v = e'.u
+          // Both e'.u and e'.v are in its. step_e.v not in its. Contradiction.
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux_not_mem);
+      assert (~(mem_edge step_e tree_edges));
+      assert (Bridge.noRepeats_edge (step_e :: tree_edges));
+      // Establish endpoints invariant for step_e :: tree_edges in its'
+      let its' = add_to_tree its step_e.v in
+      lemma_add_to_tree_preserves_length its step_e.v;
+      lemma_add_to_tree_adds its step_e.v;
+      let aux2 (e': edge) : Lemma
+        (requires mem_edge e' (step_e :: tree_edges))
+        (ensures e'.u < n /\ e'.v < n /\ index its' e'.u = true /\ index its' e'.v = true)
+        = if edge_eq e' step_e then begin
+            edge_eq_endpoints e' step_e;
+            lemma_add_to_tree_adds its step_e.v;
+            lemma_add_to_tree_preserves its step_e.v step_e.u
+          end else begin
+            lemma_add_to_tree_preserves its step_e.v e'.u;
+            lemma_add_to_tree_preserves its step_e.v e'.v
+          end
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux2);
+      lemma_prim_aux_noRepeats adj n its' (step_e :: tree_edges) (fuel - 1)
+#pop-options
+
+/// noRepeats for pure_prim
+let lemma_pure_prim_noRepeats (adj: adj_matrix) (n: nat) (start: nat)
+  : Lemma (requires n > 0 /\ start < n /\ well_formed_adj adj n)
+          (ensures Bridge.noRepeats_edge (pure_prim adj n start))
+  = let its = upd (create n false) start true in
+    lemma_prim_aux_noRepeats adj n its [] n
+
 let pure_prim_is_mst (adj: adj_matrix) (n: nat) (start: nat)
   : Lemma (requires n > 0 /\ start < n /\
                     well_formed_adj adj n /\
@@ -1118,17 +1236,8 @@ let pure_prim_is_mst (adj: adj_matrix) (n: nat) (start: nat)
           subset_edges_transitive cycle result t
         );
         // Now: is_spanning_tree g result
-        // noRepeats: subset of acyclic tree with same length → noRepeats
-        // For now use an auxiliary lemma (provable from acyclicity + distinct endpoints)
-        let noRepeats_of_acyclic_connected () : Lemma
-          (ensures Bridge.noRepeats_edge result)
-          = // An acyclic connected graph with n-1 edges and valid distinct endpoints
-            // has all_edges_distinct (which equals noRepeats_edge).
-            // From acyclic: no cycle ⟹ no repeated edges (a repeated edge creates a 2-cycle).
-            // This is a basic graph theory fact.
-            admit ()
-        in
-        noRepeats_of_acyclic_connected ();
+        // noRepeats: proven by lemma_pure_prim_noRepeats
+        lemma_pure_prim_noRepeats adj n start;
         assert (exists (t2: list edge). is_mst g t2 /\ subset_edges result t2);
         Bridge.safe_spanning_tree_is_mst g result
       )

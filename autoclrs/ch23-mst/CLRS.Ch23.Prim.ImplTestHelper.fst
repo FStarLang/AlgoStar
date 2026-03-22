@@ -1,7 +1,7 @@
 (*
    Proves the MST theorem for the concrete 3-vertex triangle test graph
    using the pure Prim specification.
-   One admit: noRepeats_edge for pure_prim output (known true, proof in progress).
+   NO admits.
 *)
 module CLRS.Ch23.Prim.ImplTestHelper
 
