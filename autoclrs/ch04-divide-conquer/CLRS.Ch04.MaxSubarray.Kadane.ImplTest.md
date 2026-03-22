@@ -108,3 +108,30 @@ fully precise, and the complexity bound is now transparent and verifiable.
 
 - **Zero admits, zero assumes**
 - Verified with `--z3rlimit 80 --fuel 8 --ifuel 2`
+
+## Concrete Execution Status
+
+Successfully extracted to C and executed. The `Pulse.Lib.BoundedIntegers`
+dependency was removed from `Kadane.fst` (operators on `SZ.t` use `+^` from
+`FStar.SizeT`; operators on `int` come from `Prims`).
+
+### Extraction pipeline
+
+1. **F* → KaRaMeL IR**: `fstar --codegen krml --extract_module`
+2. **KaRaMeL IR → C**: `krml -bundle ... -add-include '"krml/internal/compat.h"'`
+3. **C → executable**: linked with `libkrmllib.a` (provides `Prims_op_*` for
+   checked integer arithmetic)
+
+### Test output
+
+```
+Kadane Max Subarray - mixed array... PASS
+Kadane Max Subarray - all negative... PASS
+```
+
+### Build
+
+```
+make extract   # Extract to C
+make test      # Extract, compile, link, and run
+```

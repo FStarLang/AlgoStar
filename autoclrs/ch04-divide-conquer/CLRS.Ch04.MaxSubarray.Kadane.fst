@@ -16,7 +16,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 open CLRS.Ch04.MaxSubarray.Spec
 
 module A = Pulse.Lib.Array
@@ -105,7 +104,7 @@ fn max_subarray
 
     current_sum := vnew_current;
     best_sum := vnew_best;
-    i := vi + 1sz;
+    i := vi +^ 1sz;
   };
 
   // At loop exit: i == len, so ctr == c0 + len = Theta(n) operations

@@ -70,3 +70,38 @@ precise enough to uniquely determine the output for any concrete input.
 
 - **Zero admits, zero assumes**
 - Verified with `--z3rlimit 60 --fuel 2 --ifuel 2`
+
+## Concrete Execution Status
+
+Successfully extracted to C and executed. The `Pulse.Lib.BoundedIntegers`
+dependency was removed from `Impl.fst` (operators on `SZ.t` already come from
+`FStar.SizeT`; operators on `int` come from `Prims`).
+
+### Extraction pipeline
+
+1. **F* → KaRaMeL IR**: `fstar --codegen krml --extract_module`
+2. **KaRaMeL IR → C**: `krml -bundle ... -add-include '"krml/internal/compat.h"'`
+3. **C → executable**: linked with `libkrmllib.a` (provides `Prims_op_*` for
+   checked integer arithmetic)
+
+### Test output
+
+```
+=== CLRS Ch04 Verified Algorithm Tests ===
+
+Binary Search - found case... PASS
+Binary Search - not found case... PASS
+Binary Search - empty array... PASS
+Matrix Multiply - 2x2... PASS
+Kadane Max Subarray - mixed array... PASS
+Kadane Max Subarray - all negative... PASS
+
+All 6 tests passed.
+```
+
+### Build
+
+```
+make extract   # Extract to C
+make test      # Extract, compile, link, and run
+```
