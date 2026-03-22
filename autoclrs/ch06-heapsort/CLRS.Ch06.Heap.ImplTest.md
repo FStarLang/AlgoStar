@@ -132,3 +132,49 @@ functional correctness:
 - **No specification gaps or weaknesses were found.** All five
   postcondition clauses are exercised by the test suite and found to
   be sufficiently constraining.
+
+## Concrete Execution Results
+
+The implementation was extracted to C via KaRaMeL and executed natively.
+
+### Extraction pipeline
+
+1. **F\* → KrML**: `fstar.exe --codegen krml` extracts `Impl.fst`,
+   `ImplTest.fst`, and `Pulse.Lib.BoundedIntegers` to `.krml` files.
+2. **KrML → C**: `krml` bundles all modules into a single C translation
+   unit (`CLRS_Ch06_Heap_ImplTest.c`), with a hand-written `main.c`
+   driver providing Prims integer operations and the entry point.
+3. **C → executable**: compiled with `cc -O2`.
+
+### Build command
+
+```
+make test    # in autoclrs/ch06-heapsort/
+```
+
+### Test output
+
+```
+CLRS Ch06 Heapsort — Concrete Execution Tests
+==============================================
+Test 1: heapsort [3,1,2] -> [1,2,3] ... PASS
+Test 2: build_max_heap [3,1,2] root=3 ... PASS
+Test 3: heapsort n=0 [5,3,7] unchanged ... PASS
+Test 4: heapsort prefix n=2 [7,5,3] -> [5,7,3] ... PASS
+Test 5: heapsort duplicates [2,1,2] -> [1,2,2] ... PASS
+==============================================
+All 5 tests passed.
+```
+
+### Summary
+
+| Property | Status |
+|----------|--------|
+| Extracted to C | ✅ via KaRaMeL |
+| Compiled | ✅ `cc -O2` |
+| Tests executed | ✅ All 5 pass |
+| Runtime errors | **0** |
+
+All five verified test functions execute correctly on native hardware,
+confirming that the verified F\*/Pulse heapsort implementation produces
+correct results when compiled to C.
