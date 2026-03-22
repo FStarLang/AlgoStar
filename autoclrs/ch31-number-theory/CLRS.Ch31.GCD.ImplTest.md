@@ -42,3 +42,15 @@ The GCD specification is **precise and complete**:
 - Divisibility (`divides result a /\ divides result b`) is directly stated.
 - The complexity bound includes both exact step count and O(log b) upper bound.
 - No issues found with the specification.
+
+### Concrete Execution Results
+
+The verified Pulse implementation was extracted to C via KaRaMeL and executed natively.
+
+- **Extraction**: `CLRS.Ch31.GCD.Impl.gcd_impl` extracts to a clean C function
+  using `size_t` (machine integers). Ghost parameters (complexity counter) and
+  pure assertions are fully erased. The GCD loop compiles to an idiomatic
+  C while-loop with `%` for the Euclidean step.
+- **Execution**: `test_gcd()` calls `gcd_impl(12, 8)` and completes successfully.
+  The extracted C code runs without overflow or runtime errors.
+- **Status**: ✅ PASSED — C extraction, compilation, and execution all succeed.

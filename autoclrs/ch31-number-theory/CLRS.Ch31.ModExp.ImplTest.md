@@ -31,3 +31,17 @@ The ModExp specification is **precise and complete**:
 - The complexity bound (`cf - c0 ≤ log2f(e) + 1`) is an upper bound, not exact,
   due to leading zero bits. This is acceptable for an O(log e) algorithm.
 - No issues found with the specification.
+
+### Concrete Execution Results
+
+The verified Pulse implementation was extracted to C via KaRaMeL and executed natively.
+
+- **Extraction**: `CLRS.Ch31.ModExp.Impl.mod_exp_impl` extracts to C using
+  `krml_checked_int_t` (int32 with overflow checking) for the mathematical
+  `int`/`nat`/`pos` parameters. Ghost parameters and pure assertions are
+  fully erased. The right-to-left binary exponentiation loop compiles to
+  an idiomatic C while-loop.
+- **Execution**: `test_mod_exp()` calls `mod_exp_impl(2, 10, 1000)` and
+  completes successfully. The extracted C code runs without overflow or
+  runtime errors.
+- **Status**: ✅ PASSED — C extraction, compilation, and execution all succeed.

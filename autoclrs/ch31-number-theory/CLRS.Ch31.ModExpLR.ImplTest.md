@@ -30,3 +30,18 @@ The ModExpLR specification is **precise and complete**:
 - The bounds postcondition (`0 ≤ result < m`) is correct and useful.
 - The complexity bound (`cf - c0 ≤ num_bits(e)`) is a tight upper bound.
 - No issues found with the specification.
+
+### Concrete Execution Results
+
+The verified Pulse implementation was extracted to C via KaRaMeL and executed natively.
+
+- **Extraction**: `CLRS.Ch31.ModExpLR.Impl.mod_exp_lr_impl` extracts to C using
+  `krml_checked_int_t` (int32 with overflow checking) for the mathematical
+  `int`/`nat`/`pos` parameters. Ghost parameters and pure assertions are
+  fully erased. The left-to-right binary exponentiation loop (scanning bits
+  from MSB to LSB via `num_bits` and `pow2`) compiles to an idiomatic C
+  while-loop.
+- **Execution**: `test_mod_exp_lr()` calls `mod_exp_lr_impl(3, 5, 7)` and
+  completes successfully. The extracted C code runs without overflow or
+  runtime errors.
+- **Status**: ✅ PASSED — C extraction, compilation, and execution all succeed.
