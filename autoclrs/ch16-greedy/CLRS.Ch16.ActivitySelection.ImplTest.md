@@ -55,6 +55,21 @@ The postcondition of `activity_selection` is precise enough to:
 - Determine the exact selected activities (via greedy choice + earliest compatible)
 - Determine the exact comparison count (via complexity bound)
 
+## Concrete Execution (C Extraction)
+
+**PASS** — Extracted to C via KaRaMeL (`make test-c`), compiled with GCC, and executed successfully.
+
+The extracted C code:
+- Allocates arrays for start times `[1, 3, 5]` and finish times `[4, 5, 7]`
+- Calls the verified `activity_selection` function
+- Returns count=2 with selected indices `{0, 2}`
+- Frees all allocated memory and exits cleanly
+
+One implementation change was needed for extraction: the `>=` comparison in
+`Impl.fst` was changed from the `Pulse.Lib.BoundedIntegers` typeclass
+overload to `Prims.op_GreaterThanOrEqual` to avoid a typeclass dictionary
+that KaRaMeL cannot inline for `int` types.
+
 ## Specification Quality Assessment
 
 The `Impl.fsti` specification for Activity Selection is **excellent**:

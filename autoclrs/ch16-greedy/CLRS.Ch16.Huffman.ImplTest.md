@@ -54,6 +54,20 @@ The postcondition of `huffman_tree` is precise enough to:
 - Guarantee WPL optimality (strongest possible statement)
 - Constrain each leaf's symbol to its original array index (via `tree_leaf_labels_valid`)
 
+## Concrete Execution (C Extraction)
+
+**PASS** — Extracted to C via KaRaMeL (`make test-c`), compiled with GCC, and executed successfully.
+
+The extracted C code:
+- Allocates a frequency array `[3, 5]`
+- Calls the verified `huffman_tree` function, which builds a min-heap priority
+  queue, performs `n-1 = 1` merge iteration, and returns a heap-allocated
+  Huffman tree
+- The separation logic ghost assertions (cost, optimality, leaf labels) are
+  erased during extraction — the concrete execution validates that the
+  algorithm runs without crashes or memory errors
+- All memory management (Vec, Box, ResizableVec for PQ) extracts cleanly
+
 ## Specification Quality Assessment
 
 The `Impl.fsti` specification for Huffman tree construction is **excellent**:

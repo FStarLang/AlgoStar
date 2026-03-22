@@ -126,7 +126,7 @@ fn activity_selection
       assert pure (vlast_finish <= curr_finish);
       
       // Compute both possible next selections
-      let selected = (curr_start >= vlast_finish);
+      let selected = Prims.op_GreaterThanOrEqual curr_start vlast_finish;
       
       // Count the comparison — one ghost tick
       tick ctr;

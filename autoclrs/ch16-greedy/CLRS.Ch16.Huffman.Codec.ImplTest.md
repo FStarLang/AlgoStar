@@ -62,6 +62,22 @@ The postconditions of `encode_impl` and `decode_impl` are precise enough to:
 - Determine the exact decoded message for a given bitstring
 - Determine exact output lengths
 
+## Concrete Execution (C Extraction)
+
+**NOT EXTRACTED** — The Codec ImplTest cannot currently be extracted to C.
+
+The `decode_impl` and `encode_impl` functions in `Codec.Impl.fsti` take
+`ft: HSpec.htree` as a concrete (non-ghost) parameter. `HSpec.htree` is a
+recursive algebraic datatype (`Leaf | Internal`) that KaRaMeL cannot
+represent in C. Additionally, `test_tree` (a pure `HSpec.htree` value) would
+need to be materialized at runtime.
+
+To enable C extraction, the codec interface would need to be refactored so
+that the spec tree `ft` is passed as a ghost/erased parameter rather than a
+concrete one. The heap-allocated tree pointer `root: hnode_ptr` already
+carries the runtime representation; the spec tree is only needed for
+separation logic proofs.
+
 ## Specification Quality Assessment
 
 The `Codec.Impl.fsti` specifications are **excellent**:
