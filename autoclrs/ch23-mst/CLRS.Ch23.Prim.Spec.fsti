@@ -19,16 +19,43 @@ let infinity : int = 1000000000
 
 val well_formed_adj (adj: adj_matrix) (n: nat) : prop
 
+/// Intro lemma for well_formed_adj
+val well_formed_adj_intro (adj: adj_matrix) (n: nat)
+  : Lemma (requires length adj = n /\
+                    (forall (u: nat). u < n ==> length (index adj u) = n) /\
+                    (forall (u v: nat). u < n /\ v < n ==>
+                      index (index adj u) v = index (index adj v) u))
+          (ensures well_formed_adj adj n)
+
 val has_edge (adj: adj_matrix) (n: nat) (u v: nat) : bool
+
+/// Intro: establish has_edge from concrete matrix data
+val has_edge_intro (adj: adj_matrix) (n: nat) (u v: nat)
+  : Lemma (requires u < n /\ v < n /\ length adj = n /\ length (index adj u) = n /\
+                    index (index adj u) v <> infinity)
+          (ensures has_edge adj n u v = true)
 
 val adj_to_edges (adj: adj_matrix) (n: nat) : list edge
 
 val adj_to_graph (adj: adj_matrix) (n: nat) : graph
 
+/// The edges of adj_to_graph are adj_to_edges
+val adj_to_graph_edges (adj: adj_matrix) (n: nat)
+  : Lemma (ensures (adj_to_graph adj n).edges == adj_to_edges adj n /\
+                   (adj_to_graph adj n).n == n)
+
 /// All edges produced by adj_to_graph have valid endpoints
 val adj_to_graph_edges_valid (adj: adj_matrix) (n: nat) (e: edge)
   : Lemma (requires mem_edge e (adj_to_graph adj n).edges)
-          (ensures e.u < n /\ e.v < n)
+          (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
+
+/// If adj is well-formed, u < v, and adj[u][v] ≠ infinity, the edge is in the graph
+val adj_to_graph_has_edge (adj: adj_matrix) (n: nat) (eu ev: nat)
+  : Lemma (requires well_formed_adj adj n /\ eu < n /\ ev < n /\ eu < ev /\
+                    length adj = n /\ length (index adj eu) = n /\
+                    has_edge adj n eu ev)
+          (ensures mem_edge ({u = eu; v = ev; w = index (index adj eu) ev})
+                            (adj_to_graph adj n).edges)
 
 (*** Vertex Set / Cut ***)
 
@@ -80,3 +107,12 @@ val prim_spec (adj: adj_matrix) (n: nat) (start: nat)
       (exists (t: list edge). is_mst g t /\ subset_edges result t) /\
       all_connected n result)
 //SNIPPET_END: prim_spec
+
+/// Pure Prim produces MST for connected graphs with valid edges
+val pure_prim_is_mst (adj: adj_matrix) (n: nat) (start: nat)
+  : Lemma (requires n > 0 /\ start < n /\
+                    well_formed_adj adj n /\
+                    all_connected n (adj_to_edges adj n) /\
+                    (forall (e: edge). mem_edge e (adj_to_graph adj n).edges ==>
+                      e.u < n /\ e.v < n /\ e.u <> e.v))
+          (ensures is_mst (adj_to_graph adj n) (pure_prim adj n start))

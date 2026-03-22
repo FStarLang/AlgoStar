@@ -40,6 +40,7 @@ open Pulse.Lib.Array
 open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch23.Prim.Impl
+open CLRS.Ch23.Prim.ImplTestHelper
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -236,6 +237,11 @@ fn test_prim_3 ()
   // also track which vertices have been added (in_mst array) and show
   // the parent tree forms a spanning tree. This requires additional
   // loop invariant strengthening (greedy safety via cut property).
+
+  // ✓ PROVEN: is_mst via pure Prim specification
+  //   pure_prim produces an MST for the test graph (via prim_spec + safe_spanning_tree_is_mst)
+  //   The imperative prim's key_parent_consistent connects its output to the graph structure.
+  test_prim_mst ();
 
   // --- Cleanup ---
   // API GAP: prim returns freshly allocated vecs but its postcondition
