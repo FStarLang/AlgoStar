@@ -150,3 +150,56 @@ unformalized at the imperative level.
 test), but the proof effort grows with the number of unions because the rank
 bound degrades by 1 per union. The logarithmic bound would eliminate this
 degradation.
+
+## Concrete Execution Results
+
+The verified Pulse code has been successfully extracted to C and executed.
+
+### Extraction Pipeline
+
+1. **F* → KreMLin (.krml):** Pulse modules `ImplTest` and `Impl` extracted via
+   `--codegen krml` with the Pulse extraction plugin.
+2. **KreMLin → C:** `krml` translates the intermediate representation to C,
+   bundling `CLRS.Ch21.UnionFind.*` into a single translation unit.
+3. **C Compilation:** Standard C compiler (gcc/clang) with krmllib headers.
+4. **Execution:** The compiled binary runs `test_union_find()` which exercises
+   all three operations (make_set, find_set, union) on a 3-element forest.
+
+### Build & Run
+
+```
+$ make test-c
+EXTRACT  CLRS.Ch21.UnionFind.ImplTest
+EXTRACT  CLRS.Ch21.UnionFind.Impl
+KRML     CLRS_Ch21_UnionFind_ImplTest
+CC       test_union_find
+RUN      test_union_find
+=== Union-Find C Extraction Test ===
+
+Running verified test_union_find()... OK
+
+All tests passed.
+```
+
+### Generated C Code Summary
+
+The extracted C code contains:
+- `make_set`: initializes parent and rank arrays (while loop)
+- `find_root_imp`: read-only root traversal (while loop)
+- `compress_path`: path compression from node to root (while loop)
+- `find_set`: two-pass find (find root, then compress)
+- `union0`: union by rank (find roots, link by rank comparison)
+- `test_union_find`: allocates arrays, runs make_set → find_set × 3 →
+  union(0,1) → find_set × 3 → union(1,2) → find_set × 3 → free
+
+All ghost/spec code (assertions, rewrites, lemma calls, sequence operations)
+is properly erased during extraction. The C code uses `size_t` for all values,
+heap-allocated arrays (`KRML_HOST_CALLOC`/`KRML_HOST_FREE`), and contains
+no unbounded data types.
+
+### Status
+
+✅ **F* verification:** All modules verify with no admits or assumes.
+✅ **C extraction:** Clean extraction via karamel with no warnings in generated code.
+✅ **C compilation:** Compiles with `-Wall` and no warnings (unused variables suppressed).
+✅ **Execution:** Test completes successfully with exit code 0.
