@@ -124,3 +124,54 @@ The strengthened `Impl.fsti` specification is **complete and precise**:
 - All postconditions uniquely determine the output for any concrete input
 - The search↔membership connection is directly exposed in postconditions
 - Same-key insert/search and delete/search patterns require zero helper lemmas
+
+---
+
+## C Extraction and Concrete Execution (2026-03-22)
+
+### Pipeline
+
+The verified Pulse implementation is extracted to C and executed:
+
+1. **F* → KReMLin (.krml):** `--codegen krml` extracts `Impl.fst`, `ImplTest.fst`, and
+   `Main.fst` (plus `Spec.fst` for runtime types like `color` and `balance_case`).
+2. **KReMLin → C:** `krml` with `-bundle 'CLRS.Ch13.RBTree.Main=CLRS.Ch13.RBTree.*'`
+   bundles all chapter modules into a single C translation unit. A second bundle
+   `-bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'` drops library/spec-only modules.
+3. **C → executable:** `gcc` compiles the extracted C with karamel's `compat.h`
+   (maps F\* mathematical integers to `int32_t`) and `prims.c` runtime.
+4. **Run:** `test_main.c` calls `CLRS_Ch13_RBTree_Main_main()` which exercises the
+   full test: create → insert 3,1,2 → search → delete 1 → search → free.
+
+### Key Design Decisions
+
+| Challenge | Solution |
+|-----------|----------|
+| Pulse `fn` exports marked `private` in .krml | Created `Main.fst` wrapper (no .fsti → function is public) |
+| Spec `rbtree` inductive is recursive by value (invalid C struct) | Created `ImplTest.fsti` to hide pure spec test values `t0`–`t5` |
+| Mathematical integers (`int`) in `rb_node.key` | `-add-include '"krml/internal/compat.h"'` maps to `int32_t` |
+| `Prims_op_LessThan` etc. needed at link time | Link with `krmllib/dist/generic/prims.c` |
+| Spec `color`/`balance_case` types needed at runtime | Include `Spec.krml` in bundle for `classify_runtime()` |
+
+### Build Targets
+
+```
+make extract-c   # Extract to _output/CLRS_Ch13_RBTree_Main.c
+make test-c      # Extract, compile, and run the test
+```
+
+### Result
+
+```
+$ make test-c
+KRML            CLRS_Ch13_RBTree_Main
+CC              test_rbtree
+RUN             test_rbtree
+RBTree test: starting
+RBTree test: passed
+```
+
+**Status:** ✅ All operations (new, insert, search, delete, free) execute correctly
+in C. The extracted code matches the verified Pulse implementation with zero
+runtime errors. Memory is properly allocated (via `KRML_HOST_MALLOC`) and freed
+(`KRML_HOST_FREE`).
