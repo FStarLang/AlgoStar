@@ -86,3 +86,53 @@ a separate permutation-preserves-bounds lemma.
 - **Admits:** 0
 - **Assumes:** 0
 - **Spec issues found:** `quicksort_bounded` was missing `between_bounds` — now fixed
+
+## C Extraction and Concrete Execution (2026-03-22)
+
+### Extraction Pipeline
+
+The verified Pulse code was extracted to C via karamel (krml) and executed:
+
+1. **F\* → .krml:** `ImplTest`, `Quicksort.Impl`, and `Partition.Impl` modules
+   extracted using `--codegen krml`
+2. **krml → C:** Translated via karamel with `-library CLRS.Ch07.Partition.Impl`
+   (workaround for a karamel `remove_unused_parameters` crash when all three
+   modules are processed together)
+3. **Partition in C:** Hand-written `CLRS_Ch07_Partition_Impl.c` provides the
+   Lomuto partition, matching krml's erased signature exactly
+4. **Compiled:** With `krmllib` runtime (prims.c for checked integer arithmetic)
+5. **Executed:** All tests pass
+
+### Test Results
+
+```
+=== Extracted test functions (crash = fail) ===
+  PASS: test_quicksort_3 completed
+  PASS: test_quicksort_with_complexity completed
+  PASS: test_quicksort_bounded completed
+
+=== Concrete verification ===
+  PASS: quicksort [3,1,2] -> arr[0]==1
+  PASS: quicksort [3,1,2] -> arr[1]==2
+  PASS: quicksort [3,1,2] -> arr[2]==3
+  PASS: quicksort_bounded [3,1,2] -> arr[0]==1
+  PASS: quicksort_bounded [3,1,2] -> arr[1]==2
+  PASS: quicksort_bounded [3,1,2] -> arr[2]==3
+  PASS: quicksort [1..5] -> sorted
+  PASS: quicksort [5..1] -> sorted
+  PASS: quicksort [42] -> [42]
+  PASS: quicksort [3,1,2,1,3] -> [1,1,2,3,3]
+
+13/13 tests passed
+```
+
+### Extraction Notes
+
+- **Ghost erasure:** All ghost operations (GR.alloc/free, assertions,
+  reveal_opaque, complexity counters) correctly erased by krml
+- **Type mapping:** F\*'s `int` maps to `krml_checked_int_t` (= `int32_t`)
+  with runtime overflow checking via krmllib
+- **Vec operations:** `V.alloc`/`V.free` extract to `KRML_HOST_CALLOC`/`KRML_HOST_FREE`
+- **Erased parameters:** Ghost bounds (`lb`, `rb`), ghost sequences (`#s0`),
+  and ghost counters (`ctr`, `#c0`) all erased to `(void *)0U`
+- **Build command:** `make test-c` in ch07-quicksort directory

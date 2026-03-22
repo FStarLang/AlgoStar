@@ -86,7 +86,7 @@ fn insertion_sort
     // Initial comparison: tick for the first comparison
     if (vj >^ 0sz) {
       let prev = a.(vj - 1sz);
-      cont := (prev > key);
+      cont := (Prims.op_GreaterThan prev key);
       tick ctr;
     } else {
       cont := false;
@@ -143,7 +143,7 @@ fn insertion_sort
       
       if (new_i >^ 0sz) {
         let new_prev = a.(new_i - 1sz);
-        cont := (new_prev > key);
+        cont := (Prims.op_GreaterThan new_prev key);
         // Tick for inner comparison
         tick ctr;
       } else {

@@ -198,7 +198,7 @@ fn merge
       let v1 = tmp1.(vi);
       let v2 = tmp2.(vj);
       tick ctr;  // one comparison
-      if (v1 <= v2) {
+      if (Prims.op_LessThanOrEqual v1 v2) {
         suffix_step_left s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
         pts_to_range_upd a (lo +^ vk) v1;
         i := vi +^ 1sz;
