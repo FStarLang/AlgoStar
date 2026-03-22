@@ -79,3 +79,16 @@ The SLL specification is clean and complete.
 - **Admits**: 0
 - **Assumes**: 0
 - **Solver options**: None needed (default settings)
+
+### Concrete Execution (C extraction)
+
+Extracted to C via `make test-c` (F* → krml → karamel → C → gcc).
+
+- **Extraction**: `CLRS.Ch10.SinglyLinkedList.{Base,Impl,ImplTest}` extracted
+  to `CLRS_Ch10_SinglyLinkedList_ImplTest.c` via karamel. Required including
+  `FStar_Pervasives_Native.krml` for `option (box node)` support.
+- **Compilation**: Compiled with `cc -std=c11` against krmllib.
+- **Execution**: `test_sll_spec_validation()` runs to completion with exit code 0.
+  All SLL operations (insert, search, delete) execute correctly with proper
+  heap allocation/deallocation of linked list nodes.
+- **Status**: ✅ PASS

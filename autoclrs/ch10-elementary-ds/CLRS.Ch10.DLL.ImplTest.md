@@ -116,3 +116,17 @@ are precise enough to determine concrete outputs.
 - **Admits**: 0
 - **Assumes**: 0
 - **Solver options**: None needed (default settings)
+
+### Concrete Execution (C extraction)
+
+Extracted to C via `make test-c` (F* → krml → karamel → C → gcc).
+
+- **Extraction**: `CLRS.Ch10.DLL.{Impl,ImplTest}` extracted to
+  `CLRS_Ch10_DLL_ImplTest.c` via karamel. Required
+  `FStar_Pervasives_Native.krml` for `option (box node)` support.
+- **Compilation**: Compiled with `cc -std=c11` against krmllib.
+- **Execution**: `test_dll_spec_validation()` runs to completion with exit code 0.
+  All DLL operations (insert head/tail, search forward/backward/ptr, delete
+  first/last/node) execute correctly with proper heap management. All four
+  scenarios (head-insert, tail-insert, delete-last, delete-node) pass.
+- **Status**: ✅ PASS

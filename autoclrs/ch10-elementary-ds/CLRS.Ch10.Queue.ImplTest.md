@@ -72,3 +72,15 @@ and supports wraparound.
 - **Admits**: 0
 - **Assumes**: 0
 - **Solver options**: None needed (default settings)
+
+### Concrete Execution (C extraction)
+
+Extracted to C via `make test-c` (F* → krml → karamel → C → gcc).
+
+- **Extraction**: `CLRS.Ch10.Queue.Impl` and `CLRS.Ch10.Queue.ImplTest` extracted
+  to `CLRS_Ch10_Queue_ImplTest.c` via karamel with bundle options.
+- **Compilation**: Compiled with `cc -std=c11` against krmllib.
+- **Execution**: `test_queue_spec_validation()` runs to completion with exit code 0.
+  All queue operations (create, enqueue, dequeue, queue_empty) execute correctly,
+  including the circular buffer wraparound scenario.
+- **Status**: ✅ PASS

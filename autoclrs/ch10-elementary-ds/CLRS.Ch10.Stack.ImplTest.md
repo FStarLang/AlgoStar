@@ -78,3 +78,16 @@ formulation, Z3 handles everything automatically.
 - **Admits**: 0
 - **Assumes**: 0
 - **Solver options**: None needed (default settings)
+
+### Concrete Execution (C extraction)
+
+Extracted to C via `make test-c` (F* → krml → karamel → C → gcc).
+
+- **Extraction**: `CLRS.Ch10.Stack.Impl` and `CLRS.Ch10.Stack.ImplTest` extracted
+  to `CLRS_Ch10_Stack_ImplTest.c` via karamel with bundle options.
+- **Compilation**: Compiled with `cc -std=c11` against krmllib.
+- **Execution**: `test_stack_spec_validation()` runs to completion with exit code 0.
+  All stack operations (create, push, pop, peek, stack_empty) execute correctly.
+  The proof-level assertions are erased during extraction; correctness is
+  guaranteed by the verified F* proofs.
+- **Status**: ✅ PASS
