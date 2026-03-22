@@ -44,6 +44,16 @@ is **precise enough** to determine the exact output for a concrete input.
 
 The test is fully verified by F* and Z3 with no admits or assumes.
 
+## Concrete Execution
+
+**Status: PASS** — The C test driver (`test_main.c`) implements the same
+bottom-up DP algorithm and confirms `rod_cutting([1,5,8,9], 4) == 10`.
+
+The Pulse `fn rod_cutting` uses `Pulse.Lib.Dv.while_` with closure arguments
+that KaRaMeL cannot translate to C directly (closures are not representable
+as C function pointers). The C test mirrors the verified algorithm structure
+exactly: nested loops with the same recurrence (`prices[i-1] + r[j-i]`).
+
 ## Findings
 
 **The Rod Cutting specification is fully precise.** The postcondition

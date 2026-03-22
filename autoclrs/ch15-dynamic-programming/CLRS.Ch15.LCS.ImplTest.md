@@ -84,6 +84,16 @@ directly from the postcondition without importing additional lemmas.
 The proofs use `lcs_length_nonneg` and `lcs_length_upper_bound` from
 `CLRS.Ch15.LCS.Spec`.
 
+## Concrete Execution
+
+**Status: PASS** — The C test driver (`test_main.c`) implements the same
+bottom-up DP algorithm and confirms `lcs([1,2,3], [2,3,4], 3, 3) == 2`.
+
+The Pulse `fn lcs` uses `Pulse.Lib.Dv.while_` with closure arguments
+that KaRaMeL cannot translate to C directly. The C test mirrors the verified
+algorithm structure exactly: nested loops filling the `(m+1) × (n+1)` DP table
+with the same recurrence.
+
 ## Findings
 
 **The LCS specification is fully precise with complete range constraints.**
