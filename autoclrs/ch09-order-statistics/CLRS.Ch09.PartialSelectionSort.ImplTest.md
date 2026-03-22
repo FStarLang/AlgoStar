@@ -69,3 +69,20 @@ states that the result is the (k-1)-th element of the sorted input (k is
 1-indexed in `select`). The sorted_prefix, prefix_leq_suffix, and permutation
 properties are also maintained. This matches the precision of the Quickselect
 specification.
+
+## C Extraction & Concrete Execution
+
+The implementation was extracted to C via `fstar --codegen krml` → `krml` and
+compiled with `gcc`. The extracted C functions were run on the same test inputs:
+
+```
+[PartialSelectionSort] select on [5, 2, 8]
+  select(k=1) = 2
+  PASS: select([5,2,8], k=1) == 2
+  select(k=2) = 5
+  PASS: select([5,2,8], k=2) == 5
+  select(k=3) = 8
+  PASS: select([5,2,8], k=3) == 8
+```
+
+**Status: ✅ All concrete execution results match the verified specification.**

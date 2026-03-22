@@ -41,3 +41,21 @@ Tests `find_minmax` and `find_minmax_pairs` from
 **Postcondition quality: PRECISE** — The postcondition for both functions is
 identical in structure (existence + universality for both min and max) and
 uniquely determines the output. No weaknesses found.
+
+## C Extraction & Concrete Execution
+
+The implementation was extracted to C via `fstar --codegen krml` → `krml` and
+compiled with `gcc`. The extracted C functions were run on the same test inputs:
+
+```
+[SimultaneousMinMax] find_minmax on [5, 2, 8]
+  min = 2, max = 8
+  PASS: find_minmax min == 2
+  PASS: find_minmax max == 8
+[SimultaneousMinMax] find_minmax_pairs on [5, 2, 8]
+  min = 2, max = 8
+  PASS: find_minmax_pairs min == 2
+  PASS: find_minmax_pairs max == 8
+```
+
+**Status: ✅ All concrete execution results match the verified specification.**

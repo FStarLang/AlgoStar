@@ -1,0 +1,36 @@
+/*
+ * krmlinit_override.c — Proper initialization for BoundedIntegers typeclass
+ *
+ * The generated krmlinit.c sets all function pointers to NULL because krml
+ * cannot translate F* lambda expressions to C. This file provides correct
+ * initialization using the Prims_op_* functions from krmllib.
+ */
+#include "krmlinit.h"
+#include "Pulse_Lib_BoundedIntegers.h"
+
+/* Prims integer operations (provided by krmllib/c/prims.c) */
+extern krml_checked_int_t Prims_op_Addition(krml_checked_int_t x, krml_checked_int_t y);
+extern krml_checked_int_t Prims_op_Subtraction(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_LessThan(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_LessThanOrEqual(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_GreaterThan(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_GreaterThanOrEqual(krml_checked_int_t x, krml_checked_int_t y);
+extern krml_checked_int_t Prims_op_Modulus(krml_checked_int_t x, krml_checked_int_t y);
+extern krml_checked_int_t Prims_op_Division(krml_checked_int_t x, krml_checked_int_t y);
+
+void krmlinit_globals(void) {
+  Pulse_Lib_BoundedIntegers_bounded_int_int =
+    (Pulse_Lib_BoundedIntegers_bounded_int__krml_checked_int_t){
+      .op_Plus            = Prims_op_Addition,
+      .op_Subtraction     = Prims_op_Subtraction,
+      .op_Less            = Prims_op_LessThan,
+      .op_Less_Equals     = Prims_op_LessThanOrEqual,
+      .op_Greater         = Prims_op_GreaterThan,
+      .op_Greater_Equals  = Prims_op_GreaterThanOrEqual,
+      .op_Percent         = Prims_op_Modulus,
+      .op_Slash           = Prims_op_Division
+    };
+  /* nat and pos use the same operations as int */
+  Pulse_Lib_BoundedIntegers_bounded_int_nat = Pulse_Lib_BoundedIntegers_bounded_int_int;
+  Pulse_Lib_BoundedIntegers_bounded_int_pos = Pulse_Lib_BoundedIntegers_bounded_int_int;
+}
