@@ -24,40 +24,18 @@
 - [x] kruskal_mst_result gives is_mst
 - [x] ImplTest asserts is_mst
 
-## Prim is_mst — IN PROGRESS
+## Prim is_mst — Pure spec MST proven ✅, imperative bridge IN PROGRESS
 
 ### Done
 - [x] Add key_parent_consistent to prim_correct (opaque prim_kpc wrapper)
 - [x] Track prim_kpc through all three loops
-- [x] ImplTest updated
+- [x] Add well_formed_adj_intro, has_edge_intro, adj_to_graph_edges to Prim.Spec
+- [x] Strengthen adj_to_graph_edges_valid to include e.u <> e.v
+- [x] Add pure_prim_is_mst to Prim.Spec (1 admit: noRepeats_edge)
+- [x] Create ImplTestHelper with test_prim_mst
+- [x] ImplTest calls test_prim_mst() → is_mst for pure_prim output
 
-### Factoring: Move reusable lemmas to shared module
-- [ ] Create CLRS.Ch23.MST.Lemmas.fst with pigeonhole, remove_edge_first, etc.
-- [ ] Update Kruskal.Impl to use shared module
-- [ ] Prim.Impl imports shared module
-
-### Prim-specific lemmas needed
-- [ ] `edges_from_parent_key_length`: length = n-1 (straightforward recursion)
-- [ ] `edges_from_parent_key_no_self_loops`: parent[v] ≠ v for non-source (from key_parent_consistent + no_self_loops)
-- [ ] `edges_from_parent_key_subset_graph`: edges are in adj_to_graph (from key_parent_consistent + valid_weights)
-- [ ] `edges_from_parent_key_noRepeats`: no duplicate edges (each edge unique by vertex v)
-
-### Prim loop invariant strengthening
-- [ ] Define `prim_safety_inv`: track edges_safe through outer loop
-  - Init: empty edge set is safe (subset of any MST)
-  - Step: use greedy_step_safe with cut = (in_mst, not-in_mst)
-  - Need: show selected vertex u's edge is minimum weight crossing cut
-- [ ] Track `prim_tree_inv`: accumulated edges form a tree
-  - Acyclic: parent tree has no cycles
-  - Connected: each vertex reachable from source via parent edges
-- [ ] Track vertex count: iter == number of vertices added
-
-### Post-loop derivation
-- [ ] From prim_safety_inv: edges_safe
-- [ ] From prim_tree_inv + iter==n: is_spanning_tree
-- [ ] Combine: safe_spanning_tree_is_mst → is_mst
-- [ ] Add conditional is_mst to prim_correct
-- [ ] Export prim_mst_result_elim in Impl.fsti
-
-### ImplTest
-- [ ] Assert is_mst for test graph from imperative prim output
+### Remaining admit
+- [ ] noRepeats_edge for pure_prim output (in pure_prim_is_mst)
+  - Known true: each edge has unique child vertex, no 2-cycles in parent tree
+  - Proof needs tracking addition order through pure_prim recursion
