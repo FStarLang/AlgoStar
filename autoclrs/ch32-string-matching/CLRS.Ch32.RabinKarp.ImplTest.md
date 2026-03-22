@@ -78,6 +78,25 @@ specification correctly captures the CLRS Rabin-Karp algorithm's behavior.
 **No specification weaknesses found.** The precondition is satisfiable and the
 postcondition is precise.
 
+## Concrete Execution
+
+**Status**: ✅ Extracted to C, compiled, and executed successfully
+
+The verified Pulse code was extracted to C via KaRaMeL and executed:
+
+```
+$ make test
+[3/3] Rabin-Karp          (CLRS §32.2) ... PASS
+```
+
+The test allocates arrays `text=[1,2,1,2,1]` and `pattern=[1,2,1]`, calls
+`rabin_karp` with hash parameters `d=10, q=13`, and returns cleanly
+(exit code 0). Ghost assertions, lemma calls, and the complexity counter
+are fully erased — only the rolling-hash algorithm logic and character
+verification loops remain.
+
+**Extraction pipeline**: F* → .krml → KaRaMeL → C → gcc → native binary
+
 ## Proof Technique
 
 - **Pure helper lemma** (`rk_count_matches_is_2`): Takes abstract `nat`

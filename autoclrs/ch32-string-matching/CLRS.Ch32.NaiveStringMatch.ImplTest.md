@@ -62,6 +62,24 @@ captures the CLRS notion of a valid shift.
 **No specification weaknesses found.** The precondition is satisfiable and the
 postcondition is precise.
 
+## Concrete Execution
+
+**Status**: ✅ Extracted to C, compiled, and executed successfully
+
+The verified Pulse code was extracted to C via KaRaMeL and executed:
+
+```
+$ make test
+[1/3] Naive String Match (CLRS §32.1) ... PASS
+```
+
+The test allocates arrays `text=[1,2,1,2,1]` and `pattern=[1,2,1]`, calls
+`naive_string_match`, and returns cleanly (exit code 0). Ghost assertions,
+lemma calls, and the complexity counter are fully erased in the extracted C —
+only the algorithm logic and array operations remain.
+
+**Extraction pipeline**: F* → .krml → KaRaMeL → C → gcc → native binary
+
 ## Proof Technique
 
 - **Pure helper lemma** (`count_matches_is_2`): Takes abstract sequences with

@@ -106,6 +106,25 @@ paralleling the equivalent lemmas in the Naive and Rabin-Karp modules.
 **No specification weaknesses remain.** The precondition is satisfiable, the
 postcondition is precise, and the upper bound is tight.
 
+## Concrete Execution
+
+**Status**: ✅ Extracted to C, compiled, and executed successfully
+
+The verified Pulse code was extracted to C via KaRaMeL and executed:
+
+```
+$ make test
+[2/3] KMP String Match   (CLRS §32.4) ... PASS
+```
+
+The test allocates arrays `text=[0,1,0,1,0]` and `pattern=[0,1,0]`, calls
+`kmp_string_match` (which internally allocates the prefix function array,
+runs `compute_prefix_function`, then `kmp_matcher`), and returns cleanly
+(exit code 0). Ghost assertions, lemma calls, Bridge helpers, and the
+complexity counter are fully erased — only the KMP algorithm logic remains.
+
+**Extraction pipeline**: F* → .krml → KaRaMeL → C → gcc → native binary
+
 ## Proof Technique
 
 - **Pure helper lemma** (`kmp_count_matches_is_2`): Takes abstract `int`
