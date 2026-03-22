@@ -78,7 +78,8 @@ let prim_correct
     SZ.v (Seq.index key_seq source) == 0 /\
     all_keys_bounded key_seq /\
     SZ.v (Seq.index parent_seq source) == source /\
-    parent_valid parent_seq n
+    parent_valid parent_seq n /\
+    key_parent_consistent key_seq parent_seq weights_seq n source
 
 /// Convert weight matrix from SizeT array to adjacency matrix spec
 val weights_to_adj_matrix (weights_seq: Seq.seq SZ.t) (n: nat) 

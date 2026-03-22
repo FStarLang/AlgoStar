@@ -134,6 +134,72 @@ let lemma_parent_source_preserves_key_parent_consistent
       key_parent_consistent key_seq (Seq.upd parent_seq source new_parent) weights_seq n source)
   = ()
 
+// Opaque wrapper for key_parent_consistent to control SMT exposure
+[@@"opaque_to_smt"]
+let prim_kpc (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat) : prop =
+  key_parent_consistent key_seq parent_seq weights_seq n source
+
+let prim_kpc_init (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires
+      Seq.length key_seq == n /\
+      Seq.length parent_seq == n /\
+      Seq.length weights_seq == n * n /\
+      source < n /\
+      (forall (v:nat). v < n /\ v <> source ==> SZ.v (Seq.index key_seq v) >= SZ.v infinity))
+    (ensures prim_kpc key_seq parent_seq weights_seq n source)
+  = reveal_opaque (`%prim_kpc) (prim_kpc key_seq parent_seq weights_seq n source);
+    lemma_key_parent_consistent_init key_seq parent_seq weights_seq n source
+
+let prim_kpc_step
+    (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source i: nat)
+    (new_key new_parent: SZ.t) (should_update: bool)
+  : Lemma
+    (requires
+      Seq.length key_seq == n /\
+      Seq.length parent_seq == n /\
+      Seq.length weights_seq == n * n /\
+      source < n /\ i < n /\ n > 0 /\
+      parent_valid parent_seq n /\
+      prim_kpc key_seq parent_seq weights_seq n source /\
+      SZ.v new_parent < n /\
+      (should_update ==>
+        SZ.v new_parent * n + i < n * n /\
+        SZ.v new_key == SZ.v (Seq.index weights_seq (SZ.v new_parent * n + i))) /\
+      (~should_update ==>
+        new_key == Seq.index key_seq i /\
+        new_parent == Seq.index parent_seq i))
+    (ensures prim_kpc (Seq.upd key_seq i new_key) (Seq.upd parent_seq i new_parent)
+                      weights_seq n source)
+  = reveal_opaque (`%prim_kpc) (prim_kpc key_seq parent_seq weights_seq n source);
+    reveal_opaque (`%prim_kpc) (prim_kpc (Seq.upd key_seq i new_key)
+                                         (Seq.upd parent_seq i new_parent) weights_seq n source);
+    lemma_upd_preserves_key_parent_consistent key_seq parent_seq weights_seq n source i
+                                               new_key new_parent should_update
+
+let prim_kpc_parent_source
+    (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat) (new_parent: SZ.t)
+  : Lemma
+    (requires
+      Seq.length key_seq == n /\
+      Seq.length parent_seq == n /\
+      Seq.length weights_seq == n * n /\
+      source < n /\
+      prim_kpc key_seq parent_seq weights_seq n source /\
+      SZ.v new_parent < n)
+    (ensures prim_kpc key_seq (Seq.upd parent_seq source new_parent) weights_seq n source)
+  = reveal_opaque (`%prim_kpc) (prim_kpc key_seq parent_seq weights_seq n source);
+    reveal_opaque (`%prim_kpc) (prim_kpc key_seq (Seq.upd parent_seq source new_parent)
+                                         weights_seq n source);
+    lemma_parent_source_preserves_key_parent_consistent key_seq parent_seq weights_seq
+                                                         n source new_parent
+
+let prim_kpc_elim (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires prim_kpc key_seq parent_seq weights_seq n source)
+    (ensures key_parent_consistent key_seq parent_seq weights_seq n source)
+  = reveal_opaque (`%prim_kpc) (prim_kpc key_seq parent_seq weights_seq n source)
+
 // Lemma: if u < n and n*n < bound, then u*n+v fits in 64 bits
 // Proved manually via recursive descent
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
@@ -154,6 +220,13 @@ let lemma_mul_bound (u n v: nat) (bound: nat)
           (ensures (u * n < bound /\ u * n + v < bound))
   = lemma_prod_fits u n;
     ()
+
+// Helper: u*n+v < n*n when u < n and v < n
+let lemma_index_bound (u v n: nat)
+  : Lemma (requires u < n /\ v < n /\ n > 0)
+          (ensures u * n + v < n * n)
+  = if u + 1 < n then lemma_prod_fits (u + 1) n
+    else ()
 
 // Direct U64-based index computation that bypasses SizeT overflow checks  
 // Requires: SizeT is 64-bit (fits_u64 holds)
@@ -224,7 +297,7 @@ let rec edges_from_parent_key
 //   - key: array of minimum edge weights to add each vertex to MST
 //   - in_mst: array indicating which vertices are in MST
 
-#push-options "--z3rlimit 80"
+#push-options "--z3rlimit 200"
 //SNIPPET_START: prim_sig
 fn prim
   (#p: perm)
@@ -283,8 +356,7 @@ fn prim
   with parent_init. assert (A.pts_to parent_a parent_init);
   lemma_create_parent_valid (SZ.v n) source;
   assert (pure (parent_valid parent_init (SZ.v n)));
-  lemma_key_parent_consistent_init key_seq_init parent_init weights_seq (SZ.v n) (SZ.v source);
-  assert (pure (key_parent_consistent key_seq_init parent_init weights_seq (SZ.v n) (SZ.v source)));
+  prim_kpc_init key_seq_init parent_init weights_seq (SZ.v n) (SZ.v source);
   
   // Main loop: n iterations
   let mut iter: SZ.t = 0sz;
@@ -307,7 +379,8 @@ fn prim
       // Maintain functional correctness:
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       all_keys_bounded key_seq /\
-      (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n)
+      (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n) /\
+      prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source)
     )
   // TODO: decreases — proof interference
   {
@@ -339,7 +412,8 @@ fn prim
         // Maintain functional correctness:
         SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
         all_keys_bounded key_seq /\
-        (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n)
+        (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n) /\
+        prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source)
       )
     decreases (SZ.v n - SZ.v !find_i)
     {
@@ -365,6 +439,9 @@ fn prim
     // Add min_idx to MST
     let u = !min_idx;
     A.op_Array_Assignment in_mst u 1sz;
+    
+    // Carry prim_kpc through in_mst write (prim_kpc doesn't depend on in_mst)
+    lemma_mul_bound (SZ.v u) (SZ.v n) 0 (pow2 64);
     
     // Update keys of neighbors
     let mut update_i: SZ.t = 0sz;
@@ -393,7 +470,11 @@ fn prim
         // Maintain functional correctness:
         SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
         all_keys_bounded key_seq /\
-        (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n)
+        (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n) /\
+        Seq.length weights_seq == SZ.v n * SZ.v n /\
+        SZ.v n > 0 /\ SZ.v source < SZ.v n /\
+        SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
+        prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source)
       )
     decreases (SZ.v n - SZ.v !update_i)
     {
@@ -405,17 +486,27 @@ fn prim
       
       // Compute weight index: u * n + v
       let weight_idx = compute_weight_idx u n v;
+      // Explicit bounds hint for Z3 stability
+      lemma_index_bound (SZ.v u) (SZ.v v) (SZ.v n);
       let weight_uv = A.op_Array_Access weights weight_idx;
       
-      // Compute new key value unconditionally
+      // Read old parent BEFORE key write (needed for prim_kpc_step)
+      let old_parent_v = A.op_Array_Access parent_a v;
+      
+      // Compute new key and parent values unconditionally
       let cond_not_in_mst = (in_mst_v = 0sz);
       let cond_weight_better = (weight_uv <^ key_v);
       let cond_weight_valid = (weight_uv <^ infinity);
       let should_update_key = (cond_not_in_mst && cond_weight_better && cond_weight_valid);
       let new_key_v : SZ.t = (if should_update_key then weight_uv else key_v);
+      let new_parent_v : SZ.t = (if should_update_key then u else old_parent_v);
       
       // Prove that new_key_v is bounded
       assert (pure (SZ.v new_key_v <= SZ.v infinity));
+      
+      // Maintain key_parent_consistent via opaque wrapper
+      with ks ps. assert (A.pts_to key_a ks ** A.pts_to parent_a ps);
+      prim_kpc_step ks ps weights_seq (SZ.v n) (SZ.v source) (SZ.v v) new_key_v new_parent_v should_update_key;
       
       // Write key
       A.op_Array_Assignment key_a v new_key_v;
@@ -425,10 +516,6 @@ fn prim
       assert (pure (SZ.v (Seq.index key_seq' (SZ.v source)) == 0));
       assert (pure (all_keys_bounded key_seq'));
       assert (pure (Seq.length key_seq' == SZ.v n));
-      
-      // Read old parent and compute new parent
-      let old_parent_v = A.op_Array_Access parent_a v;
-      let new_parent_v : SZ.t = (if should_update_key then u else old_parent_v);
       
       // Write parent
       A.op_Array_Assignment parent_a v new_parent_v;
@@ -453,6 +540,10 @@ fn prim
   // Prove parent_valid is maintained after parent[source] = source
   with final_parent_seq. assert (A.pts_to parent_a final_parent_seq);
   lemma_upd_preserves_parent_valid old_parent_seq (SZ.v source) source (SZ.v n);
+  // Maintain and reveal key_parent_consistent after parent[source] = source
+  with old_key_seq. assert (A.pts_to key_a old_key_seq);
+  prim_kpc_parent_source old_key_seq old_parent_seq weights_seq (SZ.v n) (SZ.v source) source;
+  prim_kpc_elim old_key_seq final_parent_seq weights_seq (SZ.v n) (SZ.v source);
   
   // Free the in_mst array
   with s_in_mst. assert (A.pts_to in_mst s_in_mst);
