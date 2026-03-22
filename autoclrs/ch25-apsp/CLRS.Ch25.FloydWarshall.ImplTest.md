@@ -196,3 +196,74 @@ These are used for the `fw_entry` evaluation and `fw_outer` connection
 lemmas. The Pulse test functions use default settings. The
 `lemma_neg_diag_not_nonneg` and `lemma_test_adj_non_negative_diagonal`
 lemmas use `--z3rlimit 40`.
+
+---
+
+## Concrete Execution (C Extraction)
+
+The implementation modules (`Impl.fst`, `NegCycleDetect.fst`) are
+extracted to C via KaRaMeL and compiled into an executable test.
+
+**Extraction pipeline:**
+1. F* `--codegen krml` extracts `Impl` and `NegCycleDetect` to `.krml`
+2. KaRaMeL bundles them into `CLRS_Ch25_FloydWarshall.c` with
+   `-bundle` to eliminate unreachable code (specs, lemmas, ghost state)
+3. gcc compiles the bundled C + `test_main.c` driver
+4. The test exercises the same 3×3 instance used in the Pulse proofs
+
+**Note:** The verified Pulse test functions (`test_floyd_warshall_impl`,
+etc.) are ghost-erased during extraction (their bodies become `()` after
+erasing all separation-logic assertions, lemma calls, and ghost reference
+operations). The C test driver calls the extracted `floyd_warshall`,
+`check_no_negative_cycle`, and `floyd_warshall_safe` functions directly,
+verifying the same expected outputs.
+
+**Implementation change for extraction:** In `Impl.fst`, the inner-loop
+arithmetic (`d_ik + d_kj`, `via_k < d_ij`) was changed from
+`Pulse.Lib.BoundedIntegers` operators to explicit `Prims.op_Addition` /
+`Prims.op_LessThan` calls. The `BoundedIntegers` typeclass record is
+not recognized by KaRaMeL; the explicit Prims operators extract to
+standard C integer operations. The proof obligations are unchanged.
+
+**Build:** `make test-c` (from `autoclrs/ch25-apsp/`)
+
+**Concrete execution results (2026-03-22):**
+
+```
+=== Ch25 Floyd-Warshall: Concrete Execution Tests ===
+
+Test 1: floyd_warshall on 3x3 graph
+  Input:
+    [   0,   5, inf ]
+    [  50,   0,  15 ]
+    [  30, inf,   0 ]
+  Output:
+    [   0,   5,  20 ]
+    [  45,   0,  15 ]
+    [  30,  35,   0 ]
+  => PASS
+
+Test 2: check_no_negative_cycle (non-negative diagonal)
+  Result: true (expected: true)
+  => PASS
+
+Test 3: check_no_negative_cycle (negative diagonal)
+  Result: false (expected: false)
+  => PASS
+
+Test 4: floyd_warshall_safe on 3x3 graph
+  Input:
+    [   0,   5, inf ]
+    [  50,   0,  15 ]
+    [  30, inf,   0 ]
+  Output:
+    [   0,   5,  20 ]
+    [  45,   0,  15 ]
+    [  30,  35,   0 ]
+  => PASS
+
+=== Results: 4 passed, 0 failed ===
+```
+
+**Status:** ✅ All 4 concrete execution tests pass — the extracted C code
+produces results identical to the proven specification values.

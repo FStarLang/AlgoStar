@@ -133,9 +133,9 @@ fn floyd_warshall
         let d_ij = A.op_Array_Access dist idx_ij;
         let d_kj = A.op_Array_Access dist idx_kj;
 
-        // Compute new value unconditionally
-        let via_k = d_ik + d_kj;
-        let new_val = (if via_k < d_ij then via_k else d_ij);
+        // Compute new value unconditionally (use Prims ops for krml extraction)
+        let via_k = Prims.op_Addition d_ik d_kj;
+        let new_val = (if Prims.op_LessThan via_k d_ij then via_k else d_ij);
 
         // Write unconditionally (no conditional writes)
         A.op_Array_Assignment dist idx_ij new_val;
