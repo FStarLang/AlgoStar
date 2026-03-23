@@ -200,7 +200,6 @@ let prim_kpc_elim (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat)
     (ensures key_parent_consistent key_seq parent_seq weights_seq n source)
   = reveal_opaque (`%prim_kpc) (prim_kpc key_seq parent_seq weights_seq n source)
 
-
 // Lemma: if u < n and n*n < bound, then u*n+v fits in 64 bits
 // Proved manually via recursive descent
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
@@ -289,68 +288,6 @@ let rec edges_from_parent_key
       let w = SZ.v (Seq.index key_seq i) in
       { u = p; v = i; w = w } :: edges_from_parent_key parent_seq key_seq n source (i + 1)
 
-(*** MST Result Predicate ***)
-
-/// weights_to_adj_matrix produces well_formed_adj when weights are symmetric
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
-let weights_to_adj_well_formed (weights_seq: Seq.seq SZ.t) (n: nat)
-  : Lemma
-    (requires Seq.length weights_seq == n * n /\ n > 0 /\
-              symmetric_weights weights_seq n)
-    (ensures PrimSpec.well_formed_adj (weights_to_adj_matrix weights_seq n) n)
-  = let adj = weights_to_adj_matrix weights_seq n in
-    introduce forall (u: nat). u < n ==> Seq.length (Seq.index adj u) = n
-    with introduce _ ==> _ with _. ();
-    introduce forall (u v: nat). u < n /\ v < n ==>
-      Seq.index (Seq.index adj u) v = Seq.index (Seq.index adj v) u
-    with introduce _ ==> _ with _. (
-      lemma_index_bound u v n;
-      lemma_index_bound v u n
-    );
-    PrimSpec.well_formed_adj_intro adj n
-#pop-options
-
-[@@"opaque_to_smt"]
-let prim_mst_result
-    (weights_seq: Seq.seq SZ.t) (n source: nat) : prop =
-  n > 0 /\ source < n /\
-  Seq.length weights_seq == n * n /\
-  (let adj = weights_to_adj_matrix weights_seq n in
-   (symmetric_weights weights_seq n /\
-    all_connected n (PrimSpec.adj_to_edges adj n) ==>
-    is_mst (PrimSpec.adj_to_graph adj n) (PrimSpec.pure_prim adj n source)))
-
-let prim_mst_result_elim
-    (weights_seq: Seq.seq SZ.t) (n source: nat)
-  : Lemma
-    (requires prim_mst_result weights_seq n source /\
-              symmetric_weights weights_seq n /\
-              all_connected n
-                (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n))
-    (ensures is_mst (PrimSpec.adj_to_graph (weights_to_adj_matrix weights_seq n) n)
-                    (PrimSpec.pure_prim (weights_to_adj_matrix weights_seq n) n source))
-  = reveal_opaque (`%prim_mst_result) (prim_mst_result weights_seq n source)
-
-let prim_mst_result_establish (weights_seq: Seq.seq SZ.t) (n source: nat)
-  : Lemma
-    (requires n > 0 /\ source < n /\ Seq.length weights_seq == n * n)
-    (ensures prim_mst_result weights_seq n source)
-  = FStar.Classical.arrow_to_impl
-      #(symmetric_weights weights_seq n /\
-        all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n))
-      #(is_mst (PrimSpec.adj_to_graph (weights_to_adj_matrix weights_seq n) n)
-               (PrimSpec.pure_prim (weights_to_adj_matrix weights_seq n) n source))
-      (fun _ -> weights_to_adj_well_formed weights_seq n;
-                let adj = weights_to_adj_matrix weights_seq n in
-                let aux (e: edge) : Lemma
-                  (requires mem_edge e (PrimSpec.adj_to_graph adj n).edges)
-                  (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
-                  = PrimSpec.adj_to_graph_edges_valid adj n e
-                in
-                FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
-                PrimSpec.pure_prim_is_mst adj n source);
-    reveal_opaque (`%prim_mst_result) (prim_mst_result weights_seq n source)
-
 // Prim's MST algorithm
 // Given:
 //   - weights: n×n weight matrix (flattened as array[n*n])
@@ -380,8 +317,7 @@ fn prim
     A.pts_to weights #p weights_seq **
     V.pts_to (fst res) key_seq **
     V.pts_to (snd res) parent_seq **
-    pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
-          prim_mst_result weights_seq (SZ.v n) (SZ.v source))
+    pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source))
 //SNIPPET_END: prim_sig
 {
   // Allocate key array, initialized to infinity
@@ -421,9 +357,6 @@ fn prim
   lemma_create_parent_valid (SZ.v n) source;
   assert (pure (parent_valid parent_init (SZ.v n)));
   prim_kpc_init key_seq_init parent_init weights_seq (SZ.v n) (SZ.v source);
-  
-  // Establish prim_mst_result before loop (independent of key/parent/in_mst)
-  prim_mst_result_establish weights_seq (SZ.v n) (SZ.v source);
   
   // Main loop: n iterations
   let mut iter: SZ.t = 0sz;

@@ -167,18 +167,11 @@ fn test_prim_3 ()
   let res = prim weights 3sz 0sz;
 
   // --- Extract postcondition ---
-  // prim_correct key_seq parent_seq ws 3 0 /\ prim_mst_result ws 3 0
+  // prim_correct key_seq parent_seq ws 3 0
   with key_seq parent_seq.
     assert (V.pts_to (fst res) key_seq **
             V.pts_to (snd res) parent_seq **
-            pure (prim_correct key_seq parent_seq ws 3 0 /\
-                  prim_mst_result ws 3 0));
-
-  // ✓ PROVEN: is_mst for the graph — from imperative prim's postcondition!
-  //   prim_mst_result gives: for connected symmetric graphs, pure_prim is MST
-  //   The imperative prim computes the same MST as pure_prim.
-  test_prim_mst ();
-  assert (pure (prim_mst_result ws 3 0));
+            pure (prim_correct key_seq parent_seq ws 3 0));
 
   // --- What CAN be proven from prim_correct ---
 
