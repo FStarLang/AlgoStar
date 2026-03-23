@@ -8,13 +8,11 @@ Inside `arrow_to_impl` closure. Need: `new_edge.w ≤ e'.w` for all crossing edg
 
 - [x] Step 1a: `weights_edge_in_graph` — weight entry → graph edge (PROVEN)
 - [x] Step 1b: `¬reachable old_es pu u` — path induction through MST-only edges (PROVEN)
-- [ ] Step 1c: `new_edge.w ≤ e'.w` — minimality via key invariant
-  - `graph_edge_weight_eq` PROVEN: graph edge weight = weights_seq entry
-  - `adj_to_graph_edge_weight` PROVEN in Spec: graph edge weight = adj matrix entry
-  - **BLOCKER**: zero-weight graph edges — `has_edge` checks `≠ infinity` but not `> 0`.
-    For zero-weight crossing edges, `key[u] > 0 > e'.w = 0` violates minimality.
-    Fix: add `no_zero_edges` precondition or fix `has_edge` to check `> 0`.
-    This is a representation issue, not an algorithmic one.
+- [x] Step 1c: `new_edge.w ≤ e'.w` — minimality via key invariant (PROVEN)
+  - `graph_edge_weight_eq` PROVEN
+  - `adj_to_graph_edge_weight` PROVEN in Spec
+  - `no_zero_edges` precondition added (weight 0 = diagonal only)
+  - Key invariant + extract-min + graph_edge_weight_eq chain: PROVEN
 - [x] Step 1d: `greedy_step_safe` call + `subset_edges_transitive` chain (PROVEN)
 - [x] u=source case (PROVEN)
 
