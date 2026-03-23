@@ -2,98 +2,65 @@
 
 ## Status: 3 admits in CLRS.Ch23.Prim.Impl.fst
 
-### Admit 1 (line 664): prim_safe_add_vertex, u ≠ source case
+### Admit 1 (line ~800): prim_safe_add_vertex, minimality
 
-Inside `arrow_to_impl` closure with `symmetric_weights` and `all_connected` available.
-Need to apply `Bridge.greedy_step_safe` on `new_edge` and `old_es` to get
-`∃T'. is_mst T' ∧ subset_edges (new_edge :: old_es) T'`, then chain with
-`subset_edges new_es (new_edge :: old_es)` via `subset_edges_transitive`.
+Inside `arrow_to_impl` closure. Need: `new_edge.w ≤ e'.w` for all crossing edges.
 
-#### Step 1a: Prove new_edge ∈ g.edges
-- `key_parent_consistent` gives `key[u] = weights[parent[u]*n+u]`
-- `key[u] < infinity` (from precondition)
-- `key[u] > 0` (need to prove: weight of a real edge is positive)
-- `weights_to_adj_preserves` (exists in Impl.fst) bridges weights_seq → adj matrix
-- `adj_to_graph_has_edge` (in Spec.fsti) gives mem_edge for adj matrix
-- With `symmetric_weights`: ensure `pu < u` or `u < pu` for adj_to_graph_has_edge
-  (adj_to_graph only emits u < v edges; use edge_eq symmetry)
-- Need helper: `weights_edge_in_graph weights_seq n pu u`
-  → `mem_edge {pu, u, key[u]} g.edges`
+- [x] Step 1a: `weights_edge_in_graph` — weight entry → graph edge (PROVEN)
+- [x] Step 1b: `¬reachable old_es pu u` — path induction through MST-only edges (PROVEN)
+- [ ] Step 1c: `new_edge.w ≤ e'.w` — minimality via key invariant
+  - Need: bridge `e'.w` (graph edge) to `weights_seq[e'.u*n+e'.v]` via `weights_to_adj_preserves`
+  - Need: determine which endpoint of `e'` is non-MST (at least one, since ¬reachable)
+  - Chain: `key[u] ≤ key[non-MST] ≤ weights[MST*n+non-MST] = e'.w`
+- [x] Step 1d: `greedy_step_safe` call + `subset_edges_transitive` chain (PROVEN)
+- [x] u=source case (PROVEN)
 
-#### Step 1b: Prove ¬reachable old_es pu u
-- Every edge in old_es has both endpoints in MST (from mst_edges_mem_implies_in_mst)
-- u is not in MST (from precondition: `in_mst_old[u] ≠ 1`)
-- Any path in old_es from pu to u would visit u — contradiction
-- Need lemma: `mst_edges_endpoints_in_mst` (for all e in old_es, e.u and e.v are in MST)
-- Then: if reachable old_es pu u, the path has subset_edges path old_es,
-  and path ends at u. Last edge has one endpoint = u. But u not in MST, contradiction.
-- Actually: need to prove this for all edges on the path, not just in old_es.
-  Use `edge_eq_endpoints` + `mst_edges_mem_implies_in_mst` for each path edge.
-
-#### Step 1c: Prove new_edge.w ≤ e'.w for all crossing graph edges e'
-- Crossing edge e' has e'.u in MST, e'.v not in MST (or vice versa via edge_eq)
-- `key[e'.v] ≤ weight(e'.u, e'.v)` from key invariant precondition
-- `key[u] ≤ key[e'.v]` from extract-min precondition
-- Need to connect graph edge weight to weights_seq: for mem_edge e' g.edges,
-  `e'.w = adj_matrix[e'.u][e'.v]` which maps back to weights_seq entry
-- With symmetric_weights: `e'.w = weights_seq[e'.u*n+e'.v]`
-- Chain: `new_edge.w = key[u] ≤ key[e'.v] ≤ weights[e'.u*n+e'.v] = e'.w`
-
-#### Step 1d: Apply greedy_step_safe and chain subsets
-- Call `Bridge.greedy_step_safe g old_es new_edge` with steps 1a-1c
-- Get `∃T'. is_mst T' ∧ subset_edges (new_edge :: old_es) T'`
-- Have `subset_edges new_es (new_edge :: old_es)` (already proven)
-- Apply `subset_edges_transitive new_es (new_edge :: old_es) T'`
-- Get `∃T'. is_mst T' ∧ subset_edges new_es T'` → `prim_safe ... in_mst_new ...`
-
-### Admit 2 (line 869): Pulse fn body calling prim_safe_add_vertex
+### Admit 2 (line ~1023): Pulse fn body calling prim_safe_add_vertex
 
 After `A.op_Array_Assignment in_mst u 1sz`, need to call `prim_safe_add_vertex`
-with proper arguments. Need to establish all preconditions:
+with proper arguments. Need to establish all preconditions from loop state:
 
-#### Step 2a: Track extract-min minimality
-- The extract-min loop finds u = argmin key[v] among non-MST vertices
-- Need to track this in the extract-min loop invariant:
-  `(min_key > 0 ==> forall v. v < scan_pos ∧ in_mst[v]=0 ==> key[u] ≤ key[v])`
-- After loop: `forall v. v < n ∧ in_mst[v]=0 ==> key[u] ≤ key[v]`
+- [ ] Step 2a: Track extract-min minimality in extract-min loop invariant
+  - `forall v < n. in_mst[v]=0 ==> key[u] ≤ key[v]`
+- [ ] Step 2b: Track key invariant through outer loop  
+  - `forall v w. v non-MST, w in-MST, weight(w,v) valid ==> key[v] ≤ weight(w,v)`
+  - Maintained by update loop: `key[v] = min(key[v], weight(u,v))` for new MST vertex u
+- [ ] Step 2c: Track parent[v] in MST for all in-MST non-source v
+  - `forall v. v in-MST, v ≠ source ==> parent[v] in-MST`
+- [ ] Step 2d: Track valid_weights from fn precondition
+- [ ] Step 2e: Track key[u] > 0 (follows from key invariant: key = weight > 0)
 
-#### Step 2b: Track key invariant through update loop
-- Before iteration i: key[v] ≤ weight(w,v) for all MST vertices w processed so far
-- After adding MST vertex w and updating: key[v] = min(key[v], weight(w,v))
-- Need opaque predicate `prim_key_inv` tracked through outer loop
-- Init: key = infinity for non-source → vacuously true (no MST vertices have edges yet)
-- Step: after update loop, key[v] ≤ weight(w,v) for the newly added w is ensured by
-  the update condition (key[v] = min(old_key[v], weight(w,v)))
+### Admit 3 (line ~1125): Post-loop prim_mst_result establishment
 
-#### Step 2c: Track parent[u] in MST
-- parent[u] is set during update loop when key[u] is updated
-- parent[u] = w where w is the MST vertex that gave minimum weight
-- w is in MST at the time parent[u] is set
-- parent[u] stays the same (not updated again unless a better weight found,
-  but only from MST vertices)
-- Need to track `in_mst[parent[v]] = 1` for non-MST vertices with finite key
+After outer loop exits, derive prim_mst_result from prim_safe.
 
-### Admit 3 (line 981): Post-loop prim_mst_result establishment
+- [ ] Step 3a: Prove all non-source vertices in MST at loop end
+  - For connected graph: each iteration adds one vertex (extract-min finds one)
+  - Track `|in_mst vertices| = iter + 1` or just `iter = n → all in MST`
+- [ ] Step 3b: `mst_edges_all_in` converts mst_edges_so_far to edges_from_parent_key (PROVEN helper)
+- [ ] Step 3c: Derive is_mst from prim_safe + spanning tree properties
+  - `prim_safe_elim` → `∃T. is_mst T ∧ subset_edges edges T`
+  - Need `is_spanning_tree g edges` (subset g.edges, n-1 edges, connected, acyclic)
+  - Need `noRepeats_edge edges` (from `lemma_pure_prim_noRepeats` pattern)
+  - Apply `Bridge.safe_spanning_tree_is_mst g edges`
+- [ ] Step 3d: `reveal_opaque prim_mst_result` inside `arrow_to_impl`
 
-After outer loop exits (iter = n), derive prim_mst_result from prim_safe.
+## Proven helpers (zero admits)
 
-#### Step 3a: Prove all non-source vertices are in MST at loop end
-- For connected graph: each iteration adds one new vertex (extract-min finds one)
-- After n iterations: all n vertices in MST
-- Need to track `|{v : in_mst[v]=1}| = iter + 1` (including source)
-- Or simpler: track `iter = n` at loop exit + connected → all in MST
+- `mst_edges_so_far`: edges for in-MST vertices only
+- `mst_edges_all_in`: when all in MST, equals edges_from_parent_key
+- `mst_edges_none_in`: when no non-source in MST, equals []
+- `mst_edges_ext`: extensionality for non-MST vertex key/parent changes  
+- `mst_edges_mem_implies_in_mst`: edge membership → in-MST vertex
+- `mst_edges_in_mst_implies_mem`: in-MST vertex → edge membership
+- `mst_edges_add_subset`: old MST edges ⊆ new MST edges when vertex added
+- `subset_from_mem`: pointwise mem_edge → subset_edges
+- `weights_edge_in_graph`: weight entry → graph edge
+- `weights_to_adj_well_formed`: symmetric weights → well_formed_adj
+- `prim_safe_init`, `prim_safe_elim`, `prim_safe_update_non_mst`
+- `prim_mst_result`, `prim_mst_result_elim`
 
-#### Step 3b: Convert mst_edges_so_far to edges_from_parent_key
-- `mst_edges_all_in` (already proven): when all non-source have in_mst=1,
-  mst_edges_so_far = edges_from_parent_key
-- Need `forall v. v <> source ==> in_mst[v] = 1` (from step 3a)
+## Build performance
 
-#### Step 3c: Derive is_mst from prim_safe + spanning tree properties
-- `prim_safe_elim` gives `∃T. is_mst T ∧ subset_edges edges T`
-- Need `is_spanning_tree g edges` (subset g.edges, n-1 edges, connected, acyclic)
-- `noRepeats_edge edges` (from parent tree structure, similar to pure_prim proof)
-- Apply `Bridge.safe_spanning_tree_is_mst g edges`
-
-#### Step 3d: Establish prim_mst_result predicate
-- `reveal_opaque` + the is_mst derivation from 3c
-- Inside `arrow_to_impl` conditioned on symmetric + connected
+- Prim.Impl.fst: **30 seconds** via make
+- fstar-mcp server at `http://127.0.0.1:3000/`: **18-30 seconds** incremental
