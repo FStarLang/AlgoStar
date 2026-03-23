@@ -509,6 +509,48 @@ let mst_edges_add_subset
                     (mst_edges_so_far ps ks ims_new n source 0)
 #pop-options
 
+/// Step 1a: positive weight in weights_seq → edge in adj_to_graph
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let weights_edge_in_graph
+    (weights_seq: Seq.seq SZ.t) (n u v: nat)
+  : Lemma
+    (requires n > 0 /\ u < n /\ v < n /\ u <> v /\
+              Seq.length weights_seq == n * n /\
+              symmetric_weights weights_seq n /\
+              valid_weights weights_seq n /\
+              SZ.v (Seq.index weights_seq (u * n + v)) > 0 /\
+              SZ.v (Seq.index weights_seq (u * n + v)) < SZ.v infinity)
+    (ensures (let adj = weights_to_adj_matrix weights_seq n in
+              let g = PrimSpec.adj_to_graph adj n in
+              let w = SZ.v (Seq.index weights_seq (u * n + v)) in
+              mem_edge ({u = u; v = v; w = w}) g.edges))
+  = let adj = weights_to_adj_matrix weights_seq n in
+    let w = SZ.v (Seq.index weights_seq (u * n + v)) in
+    lemma_index_bound u v n;
+    weights_to_adj_preserves weights_seq n u v;
+    let eu = if u < v then u else v in
+    let ev = if u < v then v else u in
+    lemma_index_bound eu ev n;
+    weights_to_adj_preserves weights_seq n eu ev;
+    // adj[eu][ev] = w (positive, < impl infinity 65535)
+    // PrimSpec.infinity = 10^9, so adj[eu][ev] ≠ PrimSpec.infinity
+    assert (Seq.index (Seq.index adj eu) ev <> PrimSpec.infinity);
+    PrimSpec.has_edge_intro adj n eu ev;
+    assert (Seq.length adj == n);
+    assert (Seq.length (Seq.index adj eu) == n);
+    PrimSpec.well_formed_adj_intro adj n;
+    PrimSpec.adj_to_graph_has_edge adj n eu ev;
+    if u < v then ()
+    else begin
+      edge_eq_reflexive ({u = ev; v = eu; w = w});
+      edge_eq_symmetric ({u = ev; v = eu; w = w})
+                         ({u = eu; v = ev; w = w});
+      mem_edge_eq ({u = eu; v = ev; w = w})
+                  ({u = ev; v = eu; w = w})
+                  (PrimSpec.adj_to_graph adj n).edges
+    end
+#pop-options
+
 /// Greedy step: adding vertex u to MST preserves safety.
 let prim_safe_add_vertex
     (parent_seq key_seq in_mst_old in_mst_new weights_seq: Seq.seq SZ.t) (n source u: nat)
