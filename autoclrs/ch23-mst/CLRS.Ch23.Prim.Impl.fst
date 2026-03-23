@@ -601,6 +601,10 @@ let prim_cut_step
         SZ.v (Seq.index weights_seq (w * n + v)) > 0 /\
         SZ.v (Seq.index weights_seq (w * n + v)) < SZ.v infinity ==>
         SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (w * n + v))) /\
+      // No zero-weight edges (standard MST convention: weights > 0)
+      (forall (u v: nat). u < n /\ v < n /\ u * n + v < n * n /\
+        SZ.v (Seq.index weights_seq (u * n + v)) = 0 ==>
+        u = v) /\
       // old edges are safe
       (let adj = weights_to_adj_matrix weights_seq n in
        let g = PrimSpec.adj_to_graph adj n in
@@ -679,36 +683,29 @@ let prim_cut_step
         graph_edge_weight_eq weights_seq n e';
         // e'.w = SZ.v (Seq.index weights_seq (e'.u * n + e'.v))
         if s e'.u then begin
+          // e'.u in MST, e'.v not. e'.w = weights[e'.u*n+e'.v]
           lemma_index_bound (e'.u) (e'.v) n;
-          // The key invariant quantifier needs weight > 0 ∧ < infinity
-          // valid_weights ensures all entries are 0 or (> 0 ∧ < infinity)
-          // Since e' is a graph edge, adj[e'.u][e'.v] ≠ spec_infinity and ≠ 0
-          // (has_edge checks ≠ infinity; edge_weight > 0 for real edges)
-          // So weights[e'.u*n+e'.v] > 0 ∧ < infinity
           let w_val = SZ.v (Seq.index weights_seq (e'.u * n + e'.v)) in
           assert (e'.w = w_val);
-          // From valid_weights: w_val = 0 ∨ (w_val > 0 ∧ w_val < SZ.v infinity)
-          // e'.w is an actual graph edge weight, so w_val > 0
-          // (adj_to_graph only includes edges where has_edge = true,
-          //  which means adj[u][v] ≠ PrimSpec.infinity. For valid_weights,
-          //  adj[u][v] = w_val when 0 < w_val < impl_infinity)
-          // If w_val = 0, adj[u][v] = 0, but has_edge requires adj[u][v] ≠ PrimSpec.infinity.
-          // 0 ≠ PrimSpec.infinity, so has_edge is true even for w_val=0!
-          // But edge_weight adj u v = 0, so e'.w = 0.
-          // key invariant only fires when weight > 0 ∧ < infinity.
-          // For w_val = 0: key invariant doesn't apply. But key[u] = ku > 0,
-          // and e'.w = 0 < ku. So key[u] > e'.w — WRONG direction!
-          // This means: for zero-weight edges, new_edge.w ≤ e'.w fails!
-          // But valid_weights says all entries are 0 or (> 0 ∧ < infinity).
-          // For a graph edge to have weight 0: that means the graph has a zero-weight edge.
-          // In standard MST, edge weights are positive. valid_weights allows w=0 for "no edge".
-          // But has_edge only checks adj ≠ infinity, not adj > 0.
-          // This is a representation issue. For now, assume w_val > 0 for graph edges.
-          // This is reasonable: in the test graph all weights are positive.
-          admit ()
+          // no_zero_edges: w_val = 0 ==> e'.u = e'.v. But e'.u <> e'.v (from edges_valid).
+          // So w_val > 0. With valid_weights: w_val < infinity.
+          assert (w_val > 0);
+          // key invariant: key[e'.v] ≤ w_val = e'.w
+          // extract-min: key[u] ≤ key[e'.v]
+          // So: new_edge.w = ku = key[u] ≤ e'.w
+          ()
         end else begin
+          // e'.v in MST, e'.u not
+          lemma_index_bound (e'.u) (e'.v) n;
           lemma_index_bound (e'.v) (e'.u) n;
-          admit ()
+          let w_val = SZ.v (Seq.index weights_seq (e'.u * n + e'.v)) in
+          assert (e'.w = w_val);
+          assert (e'.u <> e'.v);
+          assert (w_val > 0);
+          // symmetric: weights[e'.v*n+e'.u] = w_val
+          // key invariant: key[e'.u] <= weights[e'.v*n+e'.u] = w_val = e'.w
+          // extract-min: key[u] <= key[e'.u]
+          ()
         end
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires light_proof);
@@ -755,6 +752,9 @@ let prim_safe_add_vertex
               // Additional for proof: valid weights + key > 0
               valid_weights weights_seq n /\
               SZ.v (Seq.index key_seq u) > 0 /\
+              // No zero-weight edges (weight 0 = no edge)
+              (forall (u v: nat). u < n /\ v < n /\ u * n + v < n * n /\
+                SZ.v (Seq.index weights_seq (u * n + v)) = 0 ==> u = v) /\
               // All in-MST non-source vertices have parent in MST
               (forall (v:nat). v < n /\ v <> source /\ SZ.v (Seq.index in_mst_old v) = 1 ==>
                 SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq v))) = 1))
