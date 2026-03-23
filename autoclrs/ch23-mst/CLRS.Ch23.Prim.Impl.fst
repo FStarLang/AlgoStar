@@ -731,19 +731,38 @@ let prim_safe_add_vertex
           in
           FStar.Classical.forall_intro (FStar.Classical.move_requires valid_edges);
           // Step 1b: ¬reachable old_es pu u
-          // Every old_es edge has vertex v in MST and parent[v] in MST.
-          // u is not in MST. So u can't be reached.
-          // Admit for now - needs path induction lemma
-          assume (~(reachable old_es pu u));
+          // By contradiction: if reachable, there's a path ending at u.
+          // Every edge in old_es has both endpoints in MST (v in MST + parent[v] in MST).
+          // So every vertex on the path is in MST. But u is NOT in MST. Contradiction.
+          let unreachable_aux (path: list edge) : Lemma
+            (requires subset_edges path old_es /\ is_path_from_to path pu u)
+            (ensures False)
+            = // path ends at u. Last edge has an endpoint = u.
+              // Every edge in path is in old_es. Every edge in old_es has both endpoints in MST.
+              // By induction: every vertex visited by the path is in MST.
+              // But u is not in MST. Contradiction.
+              // Use mst_edges_path_stays_in_mst (if it exists) or inline the argument.
+              // Actually: pu is in MST. path goes from pu to u through MST-only edges.
+              // Induction: start vertex pu is in MST. Each edge connects MST vertices.
+              // So final vertex u must be in MST. Contradiction.
+              admit () // Path induction — small but needs helper
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires unreachable_aux);
+          assert (~(reachable old_es pu u));
           // Step 1c: new_edge.w ≤ e'.w for all crossing edges e'
-          // For crossing edge e': one endpoint w in MST, other v not in MST.
-          // key[v] ≤ weight(w,v) (key invariant). key[u] ≤ key[v] (extract-min).
-          // new_edge.w = key[u] ≤ e'.w
-          // Admit for now - needs graph edge ↔ weights_seq bridge  
-          assume (forall (e': edge). mem_edge e' g.edges ==>
-            e'.u < n /\ e'.v < n ==>
-            ~(reachable old_es e'.u e'.v) ==>
-            new_edge.w <= e'.w);
+          // Use key invariant + extract-min
+          let minimality_aux (e': edge) : Lemma
+            (requires mem_edge e' g.edges /\ e'.u < n /\ e'.v < n /\
+                      ~(reachable old_es e'.u e'.v))
+            (ensures new_edge.w <= e'.w)
+            = // e' crosses cut: one endpoint in MST, other not.
+              // Graph edge has e'.w = adj[e'.u][e'.v] = weights[e'.u*n+e'.v] (for valid weights)
+              // By key invariant: key[non-MST endpoint] ≤ weights[MST endpoint * n + non-MST]
+              // By extract-min: key[u] ≤ key[any non-MST]
+              // So new_edge.w = key[u] ≤ e'.w
+              admit () // Graph edge weight bridge — small
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires minimality_aux);
           // Step 1d: Apply greedy_step_safe
           let valid_edges (e': edge) : Lemma
             (requires mem_edge e' g.edges) (ensures e'.u < n /\ e'.v < n)
