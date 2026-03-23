@@ -561,7 +561,7 @@ let prim_safe_add_vertex
               Seq.length in_mst_old == n /\ Seq.length in_mst_new == n /\
               Seq.length weights_seq == n * n /\
               parent_valid parent_seq n /\
-              prim_kpc parent_seq key_seq weights_seq n source /\
+              prim_kpc key_seq parent_seq weights_seq n source /\
               // in_mst_new = upd in_mst_old u 1
               SZ.v (Seq.index in_mst_new u) = 1 /\
               (forall (v:nat). v < n /\ v <> u ==> Seq.index in_mst_new v == Seq.index in_mst_old v) /\
@@ -579,7 +579,13 @@ let prim_safe_add_vertex
                 SZ.v (Seq.index in_mst_old w) = 1 /\
                 SZ.v (Seq.index weights_seq (w * n + v)) > 0 /\
                 SZ.v (Seq.index weights_seq (w * n + v)) < SZ.v infinity ==>
-                SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (w * n + v))))
+                SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (w * n + v))) /\
+              // Additional for proof: valid weights + key > 0
+              valid_weights weights_seq n /\
+              SZ.v (Seq.index key_seq u) > 0 /\
+              // All in-MST non-source vertices have parent in MST
+              (forall (v:nat). v < n /\ v <> source /\ SZ.v (Seq.index in_mst_old v) = 1 ==>
+                SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq v))) = 1))
     (ensures prim_safe parent_seq key_seq in_mst_new weights_seq n source)
   = // Proof structure:
     // 1. Old edges are safe: ∃T. is_mst T ∧ old_edges ⊆ T
@@ -703,7 +709,55 @@ let prim_safe_add_vertex
           // Then chain: new_es ⊆ new_edge :: old_es ⊆ T'
           
           // For now, admit this complex step
-          admit ()
+          // Step 1a: new_edge ∈ g.edges
+          prim_kpc_elim key_seq parent_seq weights_seq n source;
+          assert (pu <> u); // in_mst[pu]=1 ≠ in_mst[u]
+          lemma_index_bound pu u n;
+          lemma_prod_fits pu n;
+          prim_kpc_elim key_seq parent_seq weights_seq n source;
+          // kpc: key[u] = weights[pu*n+u]
+          weights_edge_in_graph weights_seq n pu u;
+          // Now: mem_edge {pu, u, weights[pu*n+u]} g.edges
+          // And key[u] = weights[pu*n+u], so new_edge.w = ku = weights[pu*n+u]
+          // Need mem_edge new_edge g.edges. Since new_edge = {pu, u, ku}
+          // and ku = weights[pu*n+u], these are the same edge.
+          assert (mem_edge new_edge g.edges);
+          assert (new_edge.u < n /\ new_edge.v < n);
+          PrimSpec.adj_to_graph_edges adj n;
+          assert (g.n == n);
+          let valid_edges (e': edge) : Lemma
+            (requires mem_edge e' g.edges) (ensures e'.u < g.n /\ e'.v < g.n)
+            = PrimSpec.adj_to_graph_edges_valid adj n e'
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires valid_edges);
+          // Step 1b: ¬reachable old_es pu u
+          // Every old_es edge has vertex v in MST and parent[v] in MST.
+          // u is not in MST. So u can't be reached.
+          // Admit for now - needs path induction lemma
+          assume (~(reachable old_es pu u));
+          // Step 1c: new_edge.w ≤ e'.w for all crossing edges e'
+          // For crossing edge e': one endpoint w in MST, other v not in MST.
+          // key[v] ≤ weight(w,v) (key invariant). key[u] ≤ key[v] (extract-min).
+          // new_edge.w = key[u] ≤ e'.w
+          // Admit for now - needs graph edge ↔ weights_seq bridge  
+          assume (forall (e': edge). mem_edge e' g.edges ==>
+            e'.u < n /\ e'.v < n ==>
+            ~(reachable old_es e'.u e'.v) ==>
+            new_edge.w <= e'.w);
+          // Step 1d: Apply greedy_step_safe
+          let valid_edges (e': edge) : Lemma
+            (requires mem_edge e' g.edges) (ensures e'.u < n /\ e'.v < n)
+            = PrimSpec.adj_to_graph_edges_valid adj n e'
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires valid_edges);
+          Bridge.greedy_step_safe g old_es new_edge;
+          // ∃T'. is_mst T' ∧ subset_edges (new_edge :: old_es) T'
+          // Chain: new_es ⊆ (new_edge :: old_es) ⊆ T'
+          FStar.Classical.exists_elim
+            (exists (t: list edge). is_mst g t /\ subset_edges new_es t)
+            #(list edge) #(fun t -> is_mst g t /\ subset_edges (new_edge :: old_es) t) ()
+            (fun (t: list edge{is_mst g t /\ subset_edges (new_edge :: old_es) t}) ->
+              subset_edges_transitive new_es (new_edge :: old_es) t)
         end)
 let prim_safe_update_non_mst
     (ps1 ks1 ps2 ks2 in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
