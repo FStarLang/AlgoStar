@@ -419,9 +419,97 @@ let prim_safe_elim
               exists (t: list edge). is_mst g t /\ subset_edges es t))
   = reveal_opaque (`%prim_safe) (prim_safe parent_seq key_seq in_mst_seq weights_seq n source)
 
+/// mem_edge in mst_edges_so_far: each edge corresponds to an in-MST non-source vertex
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let rec mst_edges_mem_implies_in_mst
+    (ps ks ims: Seq.seq SZ.t) (n source: nat) (i: nat) (e: edge)
+  : Lemma
+    (requires Seq.length ps == n /\ Seq.length ks == n /\ Seq.length ims == n /\
+              i <= n /\ source < n /\ mem_edge e (mst_edges_so_far ps ks ims n source i))
+    (ensures exists (v:nat). v >= i /\ v < n /\ v <> source /\
+              SZ.v (Seq.index ims v) = 1 /\ edge_eq e ({u = SZ.v (Seq.index ps v); v = v; w = SZ.v (Seq.index ks v)}))
+    (decreases (n - i))
+  = if i >= n then ()
+    else if i = source then mst_edges_mem_implies_in_mst ps ks ims n source (i + 1) e
+    else if SZ.v (Seq.index ims i) = 1 then
+      (if edge_eq e ({u = SZ.v (Seq.index ps i); v = i; w = SZ.v (Seq.index ks i)}) then ()
+       else mst_edges_mem_implies_in_mst ps ks ims n source (i + 1) e)
+    else mst_edges_mem_implies_in_mst ps ks ims n source (i + 1) e
+
+/// Converse: if vertex v is in MST, its edge is in mst_edges_so_far
+let rec mst_edges_in_mst_implies_mem
+    (ps ks ims: Seq.seq SZ.t) (n source: nat) (i: nat) (v: nat)
+  : Lemma
+    (requires Seq.length ps == n /\ Seq.length ks == n /\ Seq.length ims == n /\
+              i <= n /\ source < n /\ v >= i /\ v < n /\ v <> source /\
+              SZ.v (Seq.index ims v) = 1)
+    (ensures mem_edge ({u = SZ.v (Seq.index ps v); v = v; w = SZ.v (Seq.index ks v)})
+                      (mst_edges_so_far ps ks ims n source i))
+    (decreases (n - i))
+  = if i >= n then ()
+    else if i = source then mst_edges_in_mst_implies_mem ps ks ims n source (i + 1) v
+    else if i = v then
+      edge_eq_reflexive ({u = SZ.v (Seq.index ps v); v = v; w = SZ.v (Seq.index ks v)})
+    else if SZ.v (Seq.index ims i) = 1 then
+      mst_edges_in_mst_implies_mem ps ks ims n source (i + 1) v
+    else
+      mst_edges_in_mst_implies_mem ps ks ims n source (i + 1) v
+#pop-options
+
+/// subset_edges when every edge in the left list is mem_edge of the right list
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec subset_from_mem (a b: list edge)
+  : Lemma (requires forall (e: edge). mem_edge e a ==> mem_edge e b)
+          (ensures subset_edges a b)
+          (decreases a)
+  = match a with | [] -> () | hd :: tl -> subset_from_mem tl b
+
+/// Old mst_edges ⊆ new mst_edges when vertex u is added to in_mst
+let mst_edges_add_subset
+    (ps ks ims_old ims_new: Seq.seq SZ.t) (n source u: nat)
+  : Lemma
+    (requires Seq.length ps == n /\ Seq.length ks == n /\
+              Seq.length ims_old == n /\ Seq.length ims_new == n /\
+              source < n /\ u < n /\ u <> source /\
+              SZ.v (Seq.index ims_old u) <> 1 /\
+              SZ.v (Seq.index ims_new u) = 1 /\
+              (forall (v:nat). v < n /\ v <> u ==> Seq.index ims_new v == Seq.index ims_old v))
+    (ensures subset_edges (mst_edges_so_far ps ks ims_old n source 0)
+                          (mst_edges_so_far ps ks ims_new n source 0))
+  = // For any edge e in old_edges: e corresponds to some in-MST vertex v ≠ u
+    // (since u was not in old MST). v is still in new MST (ims_new v = ims_old v = 1).
+    // So e is also in new_edges.
+    let aux (e: edge) : Lemma
+      (requires mem_edge e (mst_edges_so_far ps ks ims_old n source 0))
+      (ensures mem_edge e (mst_edges_so_far ps ks ims_new n source 0))
+      = mst_edges_mem_implies_in_mst ps ks ims_old n source 0 e;
+        // exists v: v < n, v <> source, ims_old[v] = 1, edge_eq e {ps[v], v, ks[v]}
+        // Since v <> u (because ims_old[u] <> 1 but ims_old[v] = 1):
+        // ims_new[v] = ims_old[v] = 1
+        // So the edge for v is in new_edges too
+        FStar.Classical.exists_elim
+          (mem_edge e (mst_edges_so_far ps ks ims_new n source 0))
+          #nat #(fun v -> v >= 0 /\ v < n /\ v <> source /\
+                   SZ.v (Seq.index ims_old v) = 1 /\
+                   edge_eq e ({u = SZ.v (Seq.index ps v); v = v; w = SZ.v (Seq.index ks v)}))
+          ()
+          (fun (v: nat{v >= 0 /\ v < n /\ v <> source /\
+                       SZ.v (Seq.index ims_old v) = 1 /\
+                       edge_eq e ({u = SZ.v (Seq.index ps v); v = v; w = SZ.v (Seq.index ks v)})}) ->
+            // v <> u since ims_old[u] <> 1 but ims_old[v] = 1
+            assert (v <> u);
+            assert (SZ.v (Seq.index ims_new v) = 1);
+            mst_edges_in_mst_implies_mem ps ks ims_new n source 0 v;
+            let ev = {u = SZ.v (Seq.index ps v); v = v; w = SZ.v (Seq.index ks v)} in
+            edge_eq_symmetric e ev;
+            mem_edge_eq ev e (mst_edges_so_far ps ks ims_new n source 0))
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+    subset_from_mem (mst_edges_so_far ps ks ims_old n source 0)
+                    (mst_edges_so_far ps ks ims_new n source 0)
+#pop-options
+
 /// Greedy step: adding vertex u to MST preserves safety.
-/// This is the core Prim correctness argument using the cut property.
-/// TODO: prove from extract-min minimality + key invariant
 let prim_safe_add_vertex
     (parent_seq key_seq in_mst_old in_mst_new weights_seq: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -441,7 +529,52 @@ let prim_safe_add_vertex
               (forall (v:nat). v < n /\ SZ.v (Seq.index in_mst_old v) <> 1 ==>
                 SZ.v (Seq.index key_seq u) <= SZ.v (Seq.index key_seq v)))
     (ensures prim_safe parent_seq key_seq in_mst_new weights_seq n source)
-  = admit () // Core greedy step — to be proven via Bridge.greedy_step_safe
+  = // Proof structure:
+    // 1. Old edges are safe: ∃T. is_mst T ∧ old_edges ⊆ T
+    // 2. New edge (parent[u], u, key[u]) + old_edges is safe by greedy_step_safe
+    //    → ∃T'. is_mst T' ∧ (new_edge :: old_edges) ⊆ T'
+    // 3. New mst_edges ⊆ (new_edge :: old_edges) by construction
+    // 4. Therefore new mst_edges ⊆ T'
+    reveal_opaque (`%prim_safe) (prim_safe parent_seq key_seq in_mst_old weights_seq n source);
+    reveal_opaque (`%prim_safe) (prim_safe parent_seq key_seq in_mst_new weights_seq n source);
+    // New edges ⊆ new_edge :: old_edges
+    let old_es = mst_edges_so_far parent_seq key_seq in_mst_old n source 0 in
+    let new_es = mst_edges_so_far parent_seq key_seq in_mst_new n source 0 in
+    let pu = SZ.v (Seq.index parent_seq u) in
+    let ku = SZ.v (Seq.index key_seq u) in
+    let new_edge : edge = {u = pu; v = u; w = ku} in
+    // Every edge in new_es is either new_edge or in old_es
+    let aux (e: edge) : Lemma
+      (requires mem_edge e new_es)
+      (ensures mem_edge e (new_edge :: old_es))
+      = mst_edges_mem_implies_in_mst parent_seq key_seq in_mst_new n source 0 e;
+        FStar.Classical.exists_elim
+          (mem_edge e (new_edge :: old_es))
+          #nat #(fun v -> v >= 0 /\ v < n /\ v <> source /\
+                   SZ.v (Seq.index in_mst_new v) = 1 /\
+                   edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)}))
+          ()
+          (fun (v: nat{v >= 0 /\ v < n /\ v <> source /\
+                       SZ.v (Seq.index in_mst_new v) = 1 /\
+                       edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)})}) ->
+            if v = u then ()  // e is the new edge
+            else begin
+              // v was already in old MST
+              assert (SZ.v (Seq.index in_mst_old v) = 1);
+              mst_edges_in_mst_implies_mem parent_seq key_seq in_mst_old n source 0 v;
+              let ev = {u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)} in
+              edge_eq_symmetric e ev;
+              mem_edge_eq ev e old_es
+              // e ∈ old_es, so e ∈ new_edge :: old_es
+            end)
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+    subset_from_mem new_es (new_edge :: old_es);
+    // subset_edges new_es (new_edge :: old_es) established
+    // Now derive prim_safe from this + old safety
+    // Case: u = source → new_es = old_es (source is skipped), trivially safe
+    // Case: u ≠ source → need greedy_step_safe (TODO: add key invariant precondition)
+    admit () // Remaining: greedy_step_safe application + key invariant
 let prim_safe_update_non_mst
     (ps1 ks1 ps2 ks2 in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
