@@ -526,8 +526,18 @@ let prim_safe_add_vertex
               // u was the minimum-key non-MST vertex
               SZ.v (Seq.index in_mst_old u) <> 1 /\
               SZ.v (Seq.index key_seq u) < SZ.v infinity /\
+              // parent[u] is in MST (was added before u)
+              SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq u))) = 1 /\
+              // key[u] <= key[v] for all non-MST v (extract-min result)
               (forall (v:nat). v < n /\ SZ.v (Seq.index in_mst_old v) <> 1 ==>
-                SZ.v (Seq.index key_seq u) <= SZ.v (Seq.index key_seq v)))
+                SZ.v (Seq.index key_seq u) <= SZ.v (Seq.index key_seq v)) /\
+              // key invariant: key[v] <= weight(w,v) for MST w, non-MST v
+              (forall (v w: nat). v < n /\ w < n /\
+                SZ.v (Seq.index in_mst_old v) <> 1 /\
+                SZ.v (Seq.index in_mst_old w) = 1 /\
+                SZ.v (Seq.index weights_seq (w * n + v)) > 0 /\
+                SZ.v (Seq.index weights_seq (w * n + v)) < SZ.v infinity ==>
+                SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (w * n + v))))
     (ensures prim_safe parent_seq key_seq in_mst_new weights_seq n source)
   = // Proof structure:
     // 1. Old edges are safe: ∃T. is_mst T ∧ old_edges ⊆ T
@@ -570,11 +580,73 @@ let prim_safe_add_vertex
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
     subset_from_mem new_es (new_edge :: old_es);
-    // subset_edges new_es (new_edge :: old_es) established
-    // Now derive prim_safe from this + old safety
-    // Case: u = source → new_es = old_es (source is skipped), trivially safe
-    // Case: u ≠ source → need greedy_step_safe (TODO: add key invariant precondition)
-    admit () // Remaining: greedy_step_safe application + key invariant
+    // Now derive prim_safe using arrow_to_impl
+    FStar.Classical.arrow_to_impl
+      #(symmetric_weights weights_seq n /\
+        all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n))
+      #(let adj = weights_to_adj_matrix weights_seq n in
+        let g = PrimSpec.adj_to_graph adj n in
+        exists (t: list edge). is_mst g t /\ subset_edges new_es t)
+      (fun _ ->
+        // From old prim_safe: ∃T. is_mst T ∧ old_es ⊆ T
+        let adj = weights_to_adj_matrix weights_seq n in
+        let g = PrimSpec.adj_to_graph adj n in
+        // old safety is available
+        assert (exists (t: list edge). is_mst g t /\ subset_edges old_es t);
+        if u = source then begin
+          // source is skipped by mst_edges_so_far. For all v ≠ source (= u):
+          // ims_new[v] = ims_old[v]. So new_es = old_es by ext.
+          mst_edges_ext parent_seq key_seq parent_seq key_seq in_mst_old n source 0;
+          // Wait — mst_edges_ext compares different ps/ks with same ims.
+          // I need: same ps/ks, different ims but equal for in-MST vertices.
+          // Since u = source is skipped, and all v ≠ source have ims_new = ims_old,
+          // the two mst_edges_so_far calls produce identical results.
+          // But mst_edges_ext requires same ims. I need a new ext lemma for different ims.
+          // Actually, mst_edges_add_subset already gives old ⊆ new.
+          // And the reverse: for any e in new_es, the vertex v has ims_new[v] = 1.
+          // Since v ≠ source (skipped) and v ≠ u = source (same), ims_old[v] = ims_new[v] = 1.
+          // So e is also in old_es. Hence new_es ⊆ old_es.
+          // With both directions: new_es and old_es have same edges.
+          // old_es ⊆ T, so new_es ⊆ T. QED.
+          // Use subset_from_mem new_es old_es (then transitivity with T)
+          let aux2 (e: edge) : Lemma
+            (requires mem_edge e new_es)
+            (ensures mem_edge e old_es)
+            = mst_edges_mem_implies_in_mst parent_seq key_seq in_mst_new n source 0 e;
+              FStar.Classical.exists_elim
+                (mem_edge e old_es) #nat
+                #(fun v -> v >= 0 /\ v < n /\ v <> source /\
+                   SZ.v (Seq.index in_mst_new v) = 1 /\
+                   edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)}))
+                ()
+                (fun (v:nat{v >= 0 /\ v < n /\ v <> source /\
+                   SZ.v (Seq.index in_mst_new v) = 1 /\
+                   edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)})}) ->
+                  assert (v <> u); // v <> source = u
+                  assert (SZ.v (Seq.index in_mst_old v) = 1);
+                  mst_edges_in_mst_implies_mem parent_seq key_seq in_mst_old n source 0 v;
+                  let ev = {u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)} in
+                  edge_eq_symmetric e ev;
+                  mem_edge_eq ev e old_es)
+          in
+          FStar.Classical.forall_intro (FStar.Classical.move_requires aux2);
+          subset_from_mem new_es old_es;
+          // new_es ⊆ old_es ⊆ T
+          FStar.Classical.exists_elim
+            (exists (t: list edge). is_mst g t /\ subset_edges new_es t)
+            #(list edge) #(fun t -> is_mst g t /\ subset_edges old_es t) ()
+            (fun (t: list edge{is_mst g t /\ subset_edges old_es t}) ->
+              subset_edges_transitive new_es old_es t)
+        end
+        else begin
+          // u ≠ source: need greedy_step_safe
+          // For greedy_step_safe we need:
+          // - new_edge ∈ g.edges (from key_parent_consistent + symmetric weights)
+          // - ¬reachable old_es pu u
+          // - new_edge.w ≤ e'.w for all crossing edges e'
+          // These require the key invariant
+          admit () // TODO: apply greedy_step_safe + subset_edges_transitive
+        end)
 let prim_safe_update_non_mst
     (ps1 ks1 ps2 ks2 in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
