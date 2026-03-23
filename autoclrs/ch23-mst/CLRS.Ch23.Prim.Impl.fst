@@ -593,6 +593,9 @@ let prim_cut_step
       SZ.v (Seq.index key_seq u) > 0 /\
       SZ.v (Seq.index key_seq u) < SZ.v infinity /\
       SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq u))) = 1 /\
+      // All in-MST non-source vertices have parent in MST
+      (forall (v:nat). v < n /\ v <> source /\ SZ.v (Seq.index in_mst_old v) = 1 ==>
+        SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq v))) = 1) /\
       // extract-min: key[u] <= key[v] for all non-MST v
       (forall (v:nat). v < n /\ SZ.v (Seq.index in_mst_old v) <> 1 ==>
         SZ.v (Seq.index key_seq u) <= SZ.v (Seq.index key_seq v)) /\
@@ -635,9 +638,45 @@ let prim_cut_step
     // new_edge crosses cut: pu in MST, u not
     assert (crosses_cut new_edge s);
     // respects: no old edge crosses cut
-    // Each old edge has both endpoints in MST (vertex v in MST + parent[v] in MST)
-    // Both s(e.u)=true and s(e.v)=true → crosses_cut = false
-    admit (); // TODO: prove respects — extract as separate lemma
+    let rec respects_proof (es: list edge)
+      : Lemma (requires 
+                (forall (e: edge). mem_edge e es ==>
+                  (exists (v:nat). v >= 0 /\ v < n /\ v <> source /\
+                    SZ.v (Seq.index in_mst_old v) = 1 /\
+                    edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)}))))
+              (ensures respects es s)
+              (decreases es)
+      = match es with
+        | [] -> ()
+        | e :: tl ->
+          // e has both endpoints in MST → same side of cut → doesn't cross
+          FStar.Classical.exists_elim
+            (not (crosses_cut e s))
+            #nat #(fun v -> v >= 0 /\ v < n /\ v <> source /\
+                     SZ.v (Seq.index in_mst_old v) = 1 /\
+                     edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)}))
+            ()
+            (fun (v:nat{v >= 0 /\ v < n /\ v <> source /\
+                        SZ.v (Seq.index in_mst_old v) = 1 /\
+                        edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)})}) ->
+              edge_eq_endpoints e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)});
+              let pv = SZ.v (Seq.index parent_seq v) in
+              // v in MST, parent[v] in MST (from precondition)
+              // s(v) = true, s(pv) = true → crosses_cut e s = false
+              assert (s v = true);
+              assert (s pv = true));
+          respects_proof tl
+    in
+    // Prove the mem_edge precondition for old_es
+    let mem_proof (e: edge) : Lemma
+      (requires mem_edge e old_es)
+      (ensures exists (v:nat). v >= 0 /\ v < n /\ v <> source /\
+                SZ.v (Seq.index in_mst_old v) = 1 /\
+                edge_eq e ({u = SZ.v (Seq.index parent_seq v); v = v; w = SZ.v (Seq.index key_seq v)}))
+      = mst_edges_mem_implies_in_mst parent_seq key_seq in_mst_old n source 0 e
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires mem_proof);
+    respects_proof old_es;
     // is_light_edge: new_edge.w ≤ e'.w for all crossing edges
     let light_proof (e': edge) : Lemma
       (requires mem_edge e' g.edges /\ crosses_cut e' s)
