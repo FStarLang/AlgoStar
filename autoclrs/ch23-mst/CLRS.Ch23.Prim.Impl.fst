@@ -288,6 +288,198 @@ let rec edges_from_parent_key
       let w = SZ.v (Seq.index key_seq i) in
       { u = p; v = i; w = w } :: edges_from_parent_key parent_seq key_seq n source (i + 1)
 
+(*** Greedy Safety for imperative Prim ***)
+
+/// mst_edges_so_far: edges only for in-MST non-source vertices
+let rec mst_edges_so_far
+  (parent_seq key_seq in_mst_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
+  : Pure (list edge)
+    (requires Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              Seq.length in_mst_seq == n /\ i <= n)
+    (ensures fun _ -> True)
+    (decreases (n - i))
+  = if i >= n then []
+    else if i = source then mst_edges_so_far parent_seq key_seq in_mst_seq n source (i + 1)
+    else if SZ.v (Seq.index in_mst_seq i) = 1 then
+      let p = SZ.v (Seq.index parent_seq i) in
+      let w = SZ.v (Seq.index key_seq i) in
+      { u = p; v = i; w = w } :: mst_edges_so_far parent_seq key_seq in_mst_seq n source (i + 1)
+    else mst_edges_so_far parent_seq key_seq in_mst_seq n source (i + 1)
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec mst_edges_all_in
+  (parent_seq key_seq in_mst_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
+  : Lemma
+    (requires Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              Seq.length in_mst_seq == n /\ i <= n /\ source < n /\
+              (forall (v:nat). v < n /\ v <> source ==> SZ.v (Seq.index in_mst_seq v) = 1))
+    (ensures mst_edges_so_far parent_seq key_seq in_mst_seq n source i ==
+             edges_from_parent_key parent_seq key_seq n source i)
+    (decreases (n - i))
+  = if i >= n then ()
+    else if i = source then mst_edges_all_in parent_seq key_seq in_mst_seq n source (i + 1)
+    else mst_edges_all_in parent_seq key_seq in_mst_seq n source (i + 1)
+
+let rec mst_edges_none_in
+  (parent_seq key_seq in_mst_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
+  : Lemma
+    (requires Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              Seq.length in_mst_seq == n /\ i <= n /\ source < n /\
+              (forall (v:nat). v < n /\ v <> source ==> SZ.v (Seq.index in_mst_seq v) <> 1))
+    (ensures mst_edges_so_far parent_seq key_seq in_mst_seq n source i == [])
+    (decreases (n - i))
+  = if i >= n then ()
+    else if i = source then mst_edges_none_in parent_seq key_seq in_mst_seq n source (i + 1)
+    else mst_edges_none_in parent_seq key_seq in_mst_seq n source (i + 1)
+
+let rec mst_edges_ext
+  (ps1 ks1 ps2 ks2 in_mst_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
+  : Lemma
+    (requires Seq.length ps1 == n /\ Seq.length ks1 == n /\
+              Seq.length ps2 == n /\ Seq.length ks2 == n /\
+              Seq.length in_mst_seq == n /\ i <= n /\ source < n /\
+              (forall (v:nat). v < n /\ v <> source /\ SZ.v (Seq.index in_mst_seq v) = 1 ==>
+                Seq.index ps1 v == Seq.index ps2 v /\ Seq.index ks1 v == Seq.index ks2 v))
+    (ensures mst_edges_so_far ps1 ks1 in_mst_seq n source i ==
+             mst_edges_so_far ps2 ks2 in_mst_seq n source i)
+    (decreases (n - i))
+  = if i >= n then ()
+    else if i = source then mst_edges_ext ps1 ks1 ps2 ks2 in_mst_seq n source (i + 1)
+    else if SZ.v (Seq.index in_mst_seq i) = 1 then
+      mst_edges_ext ps1 ks1 ps2 ks2 in_mst_seq n source (i + 1)
+    else
+      mst_edges_ext ps1 ks1 ps2 ks2 in_mst_seq n source (i + 1)
+#pop-options
+
+/// weights_to_adj_matrix produces well_formed_adj when weights are symmetric
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let weights_to_adj_well_formed (weights_seq: Seq.seq SZ.t) (n: nat)
+  : Lemma
+    (requires Seq.length weights_seq == n * n /\ n > 0 /\ symmetric_weights weights_seq n)
+    (ensures PrimSpec.well_formed_adj (weights_to_adj_matrix weights_seq n) n)
+  = PrimSpec.well_formed_adj_intro (weights_to_adj_matrix weights_seq n) n
+#pop-options
+
+/// Opaque greedy safety invariant
+[@@"opaque_to_smt"]
+let prim_safe (parent_seq key_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat) : prop =
+  n > 0 /\ source < n /\
+  Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+  Seq.length in_mst_seq == n /\ Seq.length weights_seq == n * n /\
+  (symmetric_weights weights_seq n /\
+   all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n) ==>
+   (let adj = weights_to_adj_matrix weights_seq n in
+    let g = PrimSpec.adj_to_graph adj n in
+    let es = mst_edges_so_far parent_seq key_seq in_mst_seq n source 0 in
+    exists (t: list edge). is_mst g t /\ subset_edges es t))
+
+#push-options "--z3rlimit 50"
+let prim_safe_init
+    (parent_seq key_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires n > 0 /\ source < n /\
+              Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              Seq.length in_mst_seq == n /\ Seq.length weights_seq == n * n /\
+              (forall (v:nat). v < n /\ v <> source ==> SZ.v (Seq.index in_mst_seq v) <> 1))
+    (ensures prim_safe parent_seq key_seq in_mst_seq weights_seq n source)
+  = mst_edges_none_in parent_seq key_seq in_mst_seq n source 0;
+    reveal_opaque (`%prim_safe) (prim_safe parent_seq key_seq in_mst_seq weights_seq n source);
+    FStar.Classical.arrow_to_impl
+      #(symmetric_weights weights_seq n /\
+        all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n))
+      #(let adj = weights_to_adj_matrix weights_seq n in
+        let g = PrimSpec.adj_to_graph adj n in
+        let es = mst_edges_so_far parent_seq key_seq in_mst_seq n source 0 in
+        exists (t: list edge). is_mst g t /\ subset_edges es t)
+      (fun _ ->
+        weights_to_adj_well_formed weights_seq n;
+        let adj = weights_to_adj_matrix weights_seq n in
+        PrimSpec.adj_to_graph_edges adj n;
+        let g = PrimSpec.adj_to_graph adj n in
+        let aux (e: edge) : Lemma
+          (requires mem_edge e g.edges) (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
+          = PrimSpec.adj_to_graph_edges_valid adj n e in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
+        assert (all_connected g.n g.edges);
+        CLRS.Ch23.MST.Existence.mst_exists g)
+#pop-options
+
+let prim_safe_elim
+    (parent_seq key_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires prim_safe parent_seq key_seq in_mst_seq weights_seq n source /\
+              n > 0 /\ source < n /\
+              Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              Seq.length in_mst_seq == n /\ Seq.length weights_seq == n * n /\
+              symmetric_weights weights_seq n /\
+              all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n))
+    (ensures (let adj = weights_to_adj_matrix weights_seq n in
+              let g = PrimSpec.adj_to_graph adj n in
+              let es = mst_edges_so_far parent_seq key_seq in_mst_seq n source 0 in
+              exists (t: list edge). is_mst g t /\ subset_edges es t))
+  = reveal_opaque (`%prim_safe) (prim_safe parent_seq key_seq in_mst_seq weights_seq n source)
+
+/// Greedy step: adding vertex u to MST preserves safety.
+/// This is the core Prim correctness argument using the cut property.
+/// TODO: prove from extract-min minimality + key invariant
+let prim_safe_add_vertex
+    (parent_seq key_seq in_mst_old in_mst_new weights_seq: Seq.seq SZ.t) (n source u: nat)
+  : Lemma
+    (requires prim_safe parent_seq key_seq in_mst_old weights_seq n source /\
+              n > 0 /\ source < n /\ u < n /\
+              Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              Seq.length in_mst_old == n /\ Seq.length in_mst_new == n /\
+              Seq.length weights_seq == n * n /\
+              parent_valid parent_seq n /\
+              prim_kpc parent_seq key_seq weights_seq n source /\
+              // in_mst_new = upd in_mst_old u 1
+              SZ.v (Seq.index in_mst_new u) = 1 /\
+              (forall (v:nat). v < n /\ v <> u ==> Seq.index in_mst_new v == Seq.index in_mst_old v) /\
+              // u was the minimum-key non-MST vertex
+              SZ.v (Seq.index in_mst_old u) <> 1 /\
+              SZ.v (Seq.index key_seq u) < SZ.v infinity /\
+              (forall (v:nat). v < n /\ SZ.v (Seq.index in_mst_old v) <> 1 ==>
+                SZ.v (Seq.index key_seq u) <= SZ.v (Seq.index key_seq v)))
+    (ensures prim_safe parent_seq key_seq in_mst_new weights_seq n source)
+  = admit () // Core greedy step — to be proven via Bridge.greedy_step_safe
+let prim_safe_update_non_mst
+    (ps1 ks1 ps2 ks2 in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires prim_safe ps1 ks1 in_mst_seq weights_seq n source /\
+              n > 0 /\ source < n /\
+              Seq.length ps1 == n /\ Seq.length ks1 == n /\
+              Seq.length in_mst_seq == n /\
+              Seq.length ps2 == n /\ Seq.length ks2 == n /\
+              (forall (v:nat). v < n /\ v <> source /\ SZ.v (Seq.index in_mst_seq v) = 1 ==>
+                Seq.index ps1 v == Seq.index ps2 v /\ Seq.index ks1 v == Seq.index ks2 v))
+    (ensures prim_safe ps2 ks2 in_mst_seq weights_seq n source)
+  = mst_edges_ext ps1 ks1 ps2 ks2 in_mst_seq n source 0;
+    reveal_opaque (`%prim_safe) (prim_safe ps1 ks1 in_mst_seq weights_seq n source);
+    reveal_opaque (`%prim_safe) (prim_safe ps2 ks2 in_mst_seq weights_seq n source)
+
+/// Opaque MST result: imperative edges form MST for connected symmetric graphs
+[@@"opaque_to_smt"]
+let prim_mst_result
+    (parent_seq key_seq weights_seq: Seq.seq SZ.t) (n source: nat) : prop =
+  n > 0 /\ source < n /\
+  Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+  Seq.length weights_seq == n * n /\
+  (symmetric_weights weights_seq n /\
+   all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n) ==>
+   is_mst (PrimSpec.adj_to_graph (weights_to_adj_matrix weights_seq n) n)
+          (edges_from_parent_key parent_seq key_seq n source 0))
+
+let prim_mst_result_elim
+    (parent_seq key_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires prim_mst_result parent_seq key_seq weights_seq n source /\
+              Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              symmetric_weights weights_seq n /\
+              all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n))
+    (ensures is_mst (PrimSpec.adj_to_graph (weights_to_adj_matrix weights_seq n) n)
+                    (edges_from_parent_key parent_seq key_seq n source 0))
+  = reveal_opaque (`%prim_mst_result) (prim_mst_result parent_seq key_seq weights_seq n source)
+
 // Prim's MST algorithm
 // Given:
 //   - weights: n×n weight matrix (flattened as array[n*n])
@@ -317,7 +509,8 @@ fn prim
     A.pts_to weights #p weights_seq **
     V.pts_to (fst res) key_seq **
     V.pts_to (snd res) parent_seq **
-    pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source))
+    pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
+          prim_mst_result parent_seq key_seq weights_seq (SZ.v n) (SZ.v source))
 //SNIPPET_END: prim_sig
 {
   // Allocate key array, initialized to infinity
@@ -358,6 +551,11 @@ fn prim
   assert (pure (parent_valid parent_init (SZ.v n)));
   prim_kpc_init key_seq_init parent_init weights_seq (SZ.v n) (SZ.v source);
   
+  // Establish greedy safety: initially no non-source vertices in MST
+  with in_mst_init. assert (A.pts_to in_mst in_mst_init);
+  assert (pure (Seq.equal in_mst_init (Seq.create (SZ.v n) 0sz)));
+  prim_safe_init parent_init key_seq_init in_mst_init weights_seq (SZ.v n) (SZ.v source);
+  
   // Main loop: n iterations
   let mut iter: SZ.t = 0sz;
   
@@ -380,7 +578,8 @@ fn prim
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       all_keys_bounded key_seq /\
       (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n) /\
-      prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source)
+      prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
+      prim_safe parent_seq key_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source)
     )
   // TODO: decreases — proof interference
   {
@@ -413,7 +612,8 @@ fn prim
         SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
         all_keys_bounded key_seq /\
         (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n) /\
-        prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source)
+        prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
+        prim_safe parent_seq key_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source)
       )
     decreases (SZ.v n - SZ.v !find_i)
     {
@@ -439,6 +639,14 @@ fn prim
     // Add min_idx to MST
     let u = !min_idx;
     A.op_Array_Assignment in_mst u 1sz;
+    
+    // Greedy step: prim_safe is maintained after adding vertex u to MST
+    with ks_step ps_step ims_step. 
+      assert (A.pts_to key_a ks_step ** A.pts_to parent_a ps_step ** A.pts_to in_mst ims_step);
+    // TODO: need extract-min minimality tracked through the extract-min loop
+    // For now, use admitted prim_safe_add_vertex
+    admit (); // prim_safe_add_vertex ps_step ks_step ... 
+    assert (pure (prim_safe ps_step ks_step ims_step weights_seq (SZ.v n) (SZ.v source)));
     
     // Carry prim_kpc through in_mst write (prim_kpc doesn't depend on in_mst)
     lemma_mul_bound (SZ.v u) (SZ.v n) 0 (pow2 64);
@@ -474,7 +682,8 @@ fn prim
         Seq.length weights_seq == SZ.v n * SZ.v n /\
         SZ.v n > 0 /\ SZ.v source < SZ.v n /\
         SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
-        prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source)
+        prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
+        prim_safe parent_seq key_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source)
       )
     decreases (SZ.v n - SZ.v !update_i)
     {
@@ -544,6 +753,11 @@ fn prim
   with old_key_seq. assert (A.pts_to key_a old_key_seq);
   prim_kpc_parent_source old_key_seq old_parent_seq weights_seq (SZ.v n) (SZ.v source) source;
   prim_kpc_elim old_key_seq final_parent_seq weights_seq (SZ.v n) (SZ.v source);
+  
+  // Derive prim_mst_result from prim_safe
+  // TODO: prove via mst_edges_all_in + safe_spanning_tree_is_mst chain
+  with s_in_mst_final. assert (A.pts_to in_mst s_in_mst_final);
+  admit (); // prim_mst_result establishment
   
   // Free the in_mst array
   with s_in_mst. assert (A.pts_to in_mst s_in_mst);

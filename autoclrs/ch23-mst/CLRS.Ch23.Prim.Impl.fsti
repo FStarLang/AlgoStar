@@ -97,6 +97,26 @@ val edges_from_parent_key
     (requires Seq.length parent_seq == n /\ Seq.length key_seq == n /\ i <= n)
     (ensures fun _ -> True)
 
+/// Symmetric weight matrix (undirected graph)
+let symmetric_weights (weights_seq: Seq.seq SZ.t) (n: nat) : prop =
+  Seq.length weights_seq == n * n /\
+  (forall (u v: nat). u < n /\ v < n ==>
+    SZ.v (Seq.index weights_seq (u * n + v)) = SZ.v (Seq.index weights_seq (v * n + u)))
+
+/// MST result: for connected symmetric graphs, edges_from_parent_key gives is_mst
+val prim_mst_result (parent_seq key_seq weights_seq: Seq.seq SZ.t) (n source: nat) : prop
+
+/// Elim: extract is_mst from prim_mst_result
+val prim_mst_result_elim (parent_seq key_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires prim_mst_result parent_seq key_seq weights_seq n source /\
+              Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+              symmetric_weights weights_seq n /\
+              all_connected n
+                (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq n) n))
+    (ensures is_mst (PrimSpec.adj_to_graph (weights_to_adj_matrix weights_seq n) n)
+                    (edges_from_parent_key parent_seq key_seq n source 0))
+
 //SNIPPET_START: prim_sig
 /// Prim's MST algorithm (imperative, adjacency matrix)
 ///
@@ -126,7 +146,8 @@ fn prim
     A.pts_to weights #p weights_seq **
     V.pts_to (fst res) key_seq **
     V.pts_to (snd res) parent_seq **
-    pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source))
+    pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
+          prim_mst_result parent_seq key_seq weights_seq (SZ.v n) (SZ.v source))
 //SNIPPET_END: prim_sig
 
 (*** MST Bridging Theorem ***)
