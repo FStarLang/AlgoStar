@@ -787,7 +787,19 @@ let prim_safe_add_vertex
               // By key invariant: key[non-MST endpoint] ≤ weights[MST endpoint * n + non-MST]
               // By extract-min: key[u] ≤ key[any non-MST]
               // So new_edge.w = key[u] ≤ e'.w
-              admit () // Graph edge weight bridge — small
+              // e' crosses the cut — at least one endpoint not in MST
+              // (if both were in MST, they'd be reachable via old_es since
+              //  old_es connects all MST vertices)
+              // Case: e'.v not in MST (or symmetrically e'.u)
+              // key[e'.v] ≤ weights[e'.u*n+e'.v] (key invariant, if e'.u in MST)
+              // key[u] ≤ key[e'.v] (extract-min)
+              // e'.w = adj[e'.u][e'.v] which via weights_to_adj equals weights[e'.u*n+e'.v]
+              // So new_edge.w = key[u] ≤ weights[e'.u*n+e'.v] = e'.w
+              //
+              // But determining which endpoint is in MST requires case analysis.
+              // And bridging e'.w to weights_seq needs weights_to_adj_preserves.
+              // For now admit — this is a pure arithmetic/bridging step.
+              admit ()
           in
           FStar.Classical.forall_intro (FStar.Classical.move_requires minimality_aux);
           // Step 1d: Apply greedy_step_safe
