@@ -9,9 +9,12 @@ Inside `arrow_to_impl` closure. Need: `new_edge.w ≤ e'.w` for all crossing edg
 - [x] Step 1a: `weights_edge_in_graph` — weight entry → graph edge (PROVEN)
 - [x] Step 1b: `¬reachable old_es pu u` — path induction through MST-only edges (PROVEN)
 - [ ] Step 1c: `new_edge.w ≤ e'.w` — minimality via key invariant
-  - Need: bridge `e'.w` (graph edge) to `weights_seq[e'.u*n+e'.v]` via `weights_to_adj_preserves`
-  - Need: determine which endpoint of `e'` is non-MST (at least one, since ¬reachable)
-  - Chain: `key[u] ≤ key[non-MST] ≤ weights[MST*n+non-MST] = e'.w`
+  - `graph_edge_weight_eq` PROVEN: graph edge weight = weights_seq entry
+  - `adj_to_graph_edge_weight` PROVEN in Spec: graph edge weight = adj matrix entry
+  - **BLOCKER**: zero-weight graph edges — `has_edge` checks `≠ infinity` but not `> 0`.
+    For zero-weight crossing edges, `key[u] > 0 > e'.w = 0` violates minimality.
+    Fix: add `no_zero_edges` precondition or fix `has_edge` to check `> 0`.
+    This is a representation issue, not an algorithmic one.
 - [x] Step 1d: `greedy_step_safe` call + `subset_edges_transitive` chain (PROVEN)
 - [x] u=source case (PROVEN)
 
