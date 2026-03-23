@@ -551,6 +551,121 @@ let weights_edge_in_graph
     end
 #pop-options
 
+/// Graph edge weight equals weights_seq entry (for valid weights + symmetric)
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+let graph_edge_weight_eq
+    (weights_seq: Seq.seq SZ.t) (n: nat) (e: edge)
+  : Lemma
+    (requires n > 0 /\ Seq.length weights_seq == n * n /\
+              valid_weights weights_seq n /\ symmetric_weights weights_seq n /\
+              mem_edge e (PrimSpec.adj_to_graph (weights_to_adj_matrix weights_seq n) n).edges /\
+              e.u < n /\ e.v < n)
+    (ensures e.w = SZ.v (Seq.index weights_seq (e.u * n + e.v)) /\
+             e.w > 0 /\ e.w < SZ.v infinity)
+  = let adj = weights_to_adj_matrix weights_seq n in
+    PrimSpec.adj_to_graph_edges_valid adj n e;
+    lemma_index_bound e.u e.v n;
+    lemma_index_bound e.v e.u n;
+    weights_to_adj_preserves weights_seq n e.u e.v;
+    weights_to_adj_preserves weights_seq n e.v e.u;
+    // e is edge_eq to some {eu, ev, edge_weight adj eu ev} with eu < ev
+    // By adj_to_edges_row construction and edge_eq_endpoints
+    // e.w = adj[eu][ev] which = weights[eu*n+ev] for valid weights
+    // By symmetric_weights: weights[e.u*n+e.v] = weights[eu*n+ev] (same unordered pair)
+    admit () // TODO: prove adj edge weight = weights_seq entry
+#pop-options
+
+/// Standalone cut_property application for Prim greedy step.
+/// Separated from prim_safe_add_vertex for solver efficiency.
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+let prim_cut_step
+    (parent_seq key_seq in_mst_old weights_seq: Seq.seq SZ.t) (n source u: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ u < n /\ u <> source /\
+      Seq.length parent_seq == n /\ Seq.length key_seq == n /\
+      Seq.length in_mst_old == n /\ Seq.length weights_seq == n * n /\
+      valid_weights weights_seq n /\
+      symmetric_weights weights_seq n /\
+      parent_valid parent_seq n /\
+      key_parent_consistent key_seq parent_seq weights_seq n source /\
+      SZ.v (Seq.index in_mst_old u) <> 1 /\
+      SZ.v (Seq.index key_seq u) > 0 /\
+      SZ.v (Seq.index key_seq u) < SZ.v infinity /\
+      SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq u))) = 1 /\
+      // extract-min: key[u] <= key[v] for all non-MST v
+      (forall (v:nat). v < n /\ SZ.v (Seq.index in_mst_old v) <> 1 ==>
+        SZ.v (Seq.index key_seq u) <= SZ.v (Seq.index key_seq v)) /\
+      // key invariant: key[v] <= weight(w,v) for MST w, non-MST v
+      (forall (v w: nat). v < n /\ w < n /\
+        SZ.v (Seq.index in_mst_old v) <> 1 /\
+        SZ.v (Seq.index in_mst_old w) = 1 /\
+        w * n + v < n * n /\
+        SZ.v (Seq.index weights_seq (w * n + v)) > 0 /\
+        SZ.v (Seq.index weights_seq (w * n + v)) < SZ.v infinity ==>
+        SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (w * n + v))) /\
+      // old edges are safe
+      (let adj = weights_to_adj_matrix weights_seq n in
+       let g = PrimSpec.adj_to_graph adj n in
+       let old_es = mst_edges_so_far parent_seq key_seq in_mst_old n source 0 in
+       exists (t: list edge). is_mst g t /\ subset_edges old_es t))
+    (ensures
+      (let adj = weights_to_adj_matrix weights_seq n in
+       let g = PrimSpec.adj_to_graph adj n in
+       let pu = SZ.v (Seq.index parent_seq u) in
+       let ku = SZ.v (Seq.index key_seq u) in
+       let new_edge : edge = {u = pu; v = u; w = ku} in
+       let old_es = mst_edges_so_far parent_seq key_seq in_mst_old n source 0 in
+       exists (t: list edge). is_mst g t /\ subset_edges (new_edge :: old_es) t))
+  = let adj = weights_to_adj_matrix weights_seq n in
+    let g = PrimSpec.adj_to_graph adj n in
+    let pu = SZ.v (Seq.index parent_seq u) in
+    let ku = SZ.v (Seq.index key_seq u) in
+    let new_edge : edge = {u = pu; v = u; w = ku} in
+    let old_es = mst_edges_so_far parent_seq key_seq in_mst_old n source 0 in
+    PrimSpec.adj_to_graph_edges adj n;
+    PrimSpec.well_formed_adj_intro adj n;
+    // new_edge ∈ g.edges
+    assert (pu <> u);
+    lemma_index_bound pu u n;
+    lemma_prod_fits pu n;
+    weights_edge_in_graph weights_seq n pu u;
+    // Define cut
+    let s : cut = fun v -> v < n && SZ.v (Seq.index in_mst_old v) = 1 in
+    // new_edge crosses cut: pu in MST, u not
+    assert (crosses_cut new_edge s);
+    // respects: no old edge crosses cut
+    // Each old edge has both endpoints in MST (vertex v in MST + parent[v] in MST)
+    // Both s(e.u)=true and s(e.v)=true → crosses_cut = false
+    admit (); // TODO: prove respects — extract as separate lemma
+    // is_light_edge: new_edge.w ≤ e'.w for all crossing edges
+    let light_proof (e': edge) : Lemma
+      (requires mem_edge e' g.edges /\ crosses_cut e' s)
+      (ensures new_edge.w <= e'.w)
+      = PrimSpec.adj_to_graph_edges_valid adj n e';
+        graph_edge_weight_eq weights_seq n e';
+        // e' crosses cut: one endpoint in MST, other not
+        if s e'.u then begin
+          // e'.u in MST, e'.v not
+          lemma_index_bound (e'.u) (e'.v) n;
+          () // key[u] ≤ key[e'.v] ≤ weights[e'.u*n+e'.v] = e'.w
+        end else begin
+          // e'.v in MST, e'.u not
+          lemma_index_bound (e'.v) (e'.u) n;
+          () // key[u] ≤ key[e'.u] ≤ weights[e'.v*n+e'.u] = e'.w (by symmetry)
+        end
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires light_proof);
+    // valid edges
+    let ve (e': edge) : Lemma
+      (requires mem_edge e' g.edges) (ensures e'.u < g.n /\ e'.v < g.n)
+      = PrimSpec.adj_to_graph_edges_valid adj n e'
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires ve);
+    // Apply cut_property
+    cut_property g old_es new_edge s
+#pop-options
+
 /// Greedy step: adding vertex u to MST preserves safety.
 #push-options "--z3rlimit 200"
 let prim_safe_add_vertex
@@ -688,128 +803,9 @@ let prim_safe_add_vertex
               subset_edges_transitive new_es old_es t)
         end
         else begin
-          // u ≠ source: apply greedy_step_safe
-          // 1. new_edge ∈ g.edges
-          // key_parent_consistent: key[u] = weights[parent[u]*n+u]
-          // Since key[u] < infinity and key[u] > 0 (finite, positive weight implies edge exists)
-          // weights_to_adj_matrix preserves weight, adj_to_graph includes edge
-          // TODO: prove new_edge ∈ g.edges from key_parent_consistent + symmetric_weights
-          
-          // 2. ¬reachable old_es pu u
-          // All old_es edges connect MST vertices to MST vertices.
-          // u is not in MST. So u is not reachable from any MST vertex via old_es.
-          // TODO: prove from old_es structure (each edge has both endpoints in MST)
-          
-          // 3. new_edge.w ≤ e'.w for all crossing edges e'
-          // For crossing edge e' = (w, v, weight(w,v)) with w in MST, v not in MST:
-          //   key[v] <= weight(w,v) (key invariant)
-          //   key[u] <= key[v] (extract-min)
-          //   So key[u] = new_edge.w <= weight(w,v) = e'.w
-          
-          // Apply greedy_step_safe with new_edge and old_es
-          // Then chain: new_es ⊆ new_edge :: old_es ⊆ T'
-          
-          // For now, admit this complex step
-          // Step 1a: new_edge ∈ g.edges
+          // u ≠ source: use prim_cut_step (cut_property based)
           prim_kpc_elim key_seq parent_seq weights_seq n source;
-          assert (pu <> u); // in_mst[pu]=1 ≠ in_mst[u]
-          lemma_index_bound pu u n;
-          lemma_prod_fits pu n;
-          prim_kpc_elim key_seq parent_seq weights_seq n source;
-          // kpc: key[u] = weights[pu*n+u]
-          weights_edge_in_graph weights_seq n pu u;
-          // Now: mem_edge {pu, u, weights[pu*n+u]} g.edges
-          // And key[u] = weights[pu*n+u], so new_edge.w = ku = weights[pu*n+u]
-          // Need mem_edge new_edge g.edges. Since new_edge = {pu, u, ku}
-          // and ku = weights[pu*n+u], these are the same edge.
-          assert (mem_edge new_edge g.edges);
-          assert (new_edge.u < n /\ new_edge.v < n);
-          PrimSpec.adj_to_graph_edges adj n;
-          assert (g.n == n);
-          let valid_edges (e': edge) : Lemma
-            (requires mem_edge e' g.edges) (ensures e'.u < g.n /\ e'.v < g.n)
-            = PrimSpec.adj_to_graph_edges_valid adj n e'
-          in
-          FStar.Classical.forall_intro (FStar.Classical.move_requires valid_edges);
-          // Step 1b: ¬reachable old_es pu u
-          // By contradiction: if reachable, there's a path ending at u.
-          // Every edge in old_es has both endpoints in MST (v in MST + parent[v] in MST).
-          // So every vertex on the path is in MST. But u is NOT in MST. Contradiction.
-          let unreachable_aux (path: list edge) : Lemma
-            (requires subset_edges path old_es /\ is_path_from_to path pu u)
-            (ensures False)
-            = // Every vertex on path is in MST. But u is not. Contradiction.
-              // Prove: every prefix endpoint is in MST, by induction.
-              let rec path_stays_in_mst (p: list edge) (start: nat)
-                : Lemma
-                  (requires subset_edges p old_es /\ is_path_from_to p start u /\
-                            start < n /\ SZ.v (Seq.index in_mst_old start) = 1)
-                  (ensures False)
-                  (decreases p)
-                = match p with
-                  | [] -> () // start = u, but in_mst[start]=1 and in_mst[u]≠1
-                  | e :: rest ->
-                    // e is in old_es, so e is edge_eq to {parent[w], w, key[w]} for some w in MST
-                    mst_edges_mem_implies_in_mst parent_seq key_seq in_mst_old n source 0 e;
-                    FStar.Classical.exists_elim False
-                      #nat #(fun w -> w >= 0 /\ w < n /\ w <> source /\
-                               SZ.v (Seq.index in_mst_old w) = 1 /\
-                               edge_eq e ({u = SZ.v (Seq.index parent_seq w); v = w; w = SZ.v (Seq.index key_seq w)}))
-                      ()
-                      (fun (w:nat{w >= 0 /\ w < n /\ w <> source /\
-                                  SZ.v (Seq.index in_mst_old w) = 1 /\
-                                  edge_eq e ({u = SZ.v (Seq.index parent_seq w); v = w; w = SZ.v (Seq.index key_seq w)})}) ->
-                        edge_eq_endpoints e ({u = SZ.v (Seq.index parent_seq w); v = w; w = SZ.v (Seq.index key_seq w)});
-                        let pw = SZ.v (Seq.index parent_seq w) in
-                        assert (SZ.v (Seq.index in_mst_old pw) = 1);
-                        let next = if e.u = start then e.v else e.u in
-                        // next ∈ {pw, w}, both in MST
-                        if e.u = start then
-                          assert (next == e.v /\ (e.v = pw \/ e.v = w))
-                        else
-                          assert (next == e.u /\ (e.u = pw \/ e.u = w));
-                        assert (SZ.v (Seq.index in_mst_old next) = 1);
-                        assert (next < n);
-                        path_stays_in_mst rest next)
-              in
-              path_stays_in_mst path pu
-          in
-          FStar.Classical.forall_intro (FStar.Classical.move_requires unreachable_aux);
-          assert (~(reachable old_es pu u));
-          // Step 1c: new_edge.w ≤ e'.w for all crossing edges e'
-          // Use key invariant + extract-min
-          let minimality_aux (e': edge) : Lemma
-            (requires mem_edge e' g.edges /\ e'.u < n /\ e'.v < n /\
-                      ~(reachable old_es e'.u e'.v))
-            (ensures new_edge.w <= e'.w)
-            = // e' crosses cut: one endpoint in MST, other not.
-              // Graph edge has e'.w = adj[e'.u][e'.v] = weights[e'.u*n+e'.v] (for valid weights)
-              // By key invariant: key[non-MST endpoint] ≤ weights[MST endpoint * n + non-MST]
-              // By extract-min: key[u] ≤ key[any non-MST]
-              // So new_edge.w = key[u] ≤ e'.w
-              // e' crosses the cut — at least one endpoint not in MST
-              // (if both were in MST, they'd be reachable via old_es since
-              //  old_es connects all MST vertices)
-              // Case: e'.v not in MST (or symmetrically e'.u)
-              // key[e'.v] ≤ weights[e'.u*n+e'.v] (key invariant, if e'.u in MST)
-              // key[u] ≤ key[e'.v] (extract-min)
-              // e'.w = adj[e'.u][e'.v] which via weights_to_adj equals weights[e'.u*n+e'.v]
-              // So new_edge.w = key[u] ≤ weights[e'.u*n+e'.v] = e'.w
-              //
-              // But determining which endpoint is in MST requires case analysis.
-              // And bridging e'.w to weights_seq needs weights_to_adj_preserves.
-              // For now admit — this is a pure arithmetic/bridging step.
-              admit ()
-          in
-          FStar.Classical.forall_intro (FStar.Classical.move_requires minimality_aux);
-          // Step 1d: Apply greedy_step_safe
-          let valid_edges (e': edge) : Lemma
-            (requires mem_edge e' g.edges) (ensures e'.u < n /\ e'.v < n)
-            = PrimSpec.adj_to_graph_edges_valid adj n e'
-          in
-          FStar.Classical.forall_intro (FStar.Classical.move_requires valid_edges);
-          Bridge.greedy_step_safe g old_es new_edge;
-          // ∃T'. is_mst T' ∧ subset_edges (new_edge :: old_es) T'
+          prim_cut_step parent_seq key_seq in_mst_old weights_seq n source u;
           // Chain: new_es ⊆ (new_edge :: old_es) ⊆ T'
           FStar.Classical.exists_elim
             (exists (t: list edge). is_mst g t /\ subset_edges new_es t)
