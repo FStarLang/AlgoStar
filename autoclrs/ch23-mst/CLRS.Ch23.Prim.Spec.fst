@@ -107,6 +107,46 @@ let adj_to_graph_edges_valid (adj: adj_matrix) (n: nat) (e: edge)
           (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
   = adj_to_edges_aux_valid adj n 0 e
 
+/// Row-level: edge weight equals adj matrix entry
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec adj_to_edges_row_weight (adj: adj_matrix) (n: nat) (u: nat) (v: nat) (e: edge)
+  : Lemma (requires well_formed_adj adj n /\ u < n /\ v <= n /\ n > 0 /\
+                    mem_edge e (adj_to_edges_row adj n u v) /\ e.u < n /\ e.v < n)
+          (ensures e.w = index (index adj e.u) e.v)
+          (decreases (n - v))
+  = if v >= n then ()
+    else if u < n && v < n && has_edge adj n u v && u < v then
+      if edge_eq e {u = u; v = v; w = edge_weight adj u v} then begin
+        edge_eq_endpoints e {u = u; v = v; w = edge_weight adj u v};
+        // e.w = edge_weight adj u v = adj[u][v]
+        // {e.u,e.v} = {u,v}. By well_formed (symmetric): adj[e.u][e.v] = adj[u][v]
+        ()
+      end
+      else adj_to_edges_row_weight adj n u (v + 1) e
+    else adj_to_edges_row_weight adj n u (v + 1) e
+
+let rec adj_to_edges_aux_weight (adj: adj_matrix) (n: nat) (u: nat) (e: edge)
+  : Lemma (requires well_formed_adj adj n /\ u <= n /\ n > 0 /\
+                    mem_edge e (adj_to_edges_aux adj n u) /\ e.u < n /\ e.v < n)
+          (ensures e.w = index (index adj e.u) e.v)
+          (decreases (n - u))
+  = if u >= n then ()
+    else begin
+      mem_edge_append e (adj_to_edges_row adj n u 0) (adj_to_edges_aux adj n (u + 1));
+      if mem_edge e (adj_to_edges_row adj n u 0) then
+        adj_to_edges_row_weight adj n u 0 e
+      else
+        adj_to_edges_aux_weight adj n (u + 1) e
+    end
+#pop-options
+
+let adj_to_graph_edge_weight (adj: adj_matrix) (n: nat) (e: edge)
+  : Lemma (requires well_formed_adj adj n /\ n > 0 /\
+                    mem_edge e (adj_to_graph adj n).edges /\
+                    e.u < n /\ e.v < n /\ length adj = n /\ length (index adj e.u) = n)
+          (ensures e.w = index (index adj e.u) e.v)
+  = adj_to_edges_aux_weight adj n 0 e
+
 // If has_edge, the edge is in adj_to_edges_row
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let rec adj_to_graph_row_has_edge (adj: adj_matrix) (n: nat) (u v v0: nat)

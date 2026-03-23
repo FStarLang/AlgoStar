@@ -49,6 +49,13 @@ val adj_to_graph_edges_valid (adj: adj_matrix) (n: nat) (e: edge)
   : Lemma (requires mem_edge e (adj_to_graph adj n).edges)
           (ensures e.u < n /\ e.v < n /\ e.u <> e.v)
 
+/// Graph edge weight equals adj matrix entry
+val adj_to_graph_edge_weight (adj: adj_matrix) (n: nat) (e: edge)
+  : Lemma (requires well_formed_adj adj n /\ n > 0 /\
+                    mem_edge e (adj_to_graph adj n).edges /\
+                    e.u < n /\ e.v < n /\ length adj = n /\ length (index adj e.u) = n)
+          (ensures e.w = index (index adj e.u) e.v)
+
 /// If adj is well-formed, u < v, and adj[u][v] ≠ infinity, the edge is in the graph
 val adj_to_graph_has_edge (adj: adj_matrix) (n: nat) (eu ev: nat)
   : Lemma (requires well_formed_adj adj n /\ eu < n /\ ev < n /\ eu < ev /\
