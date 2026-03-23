@@ -639,13 +639,29 @@ let prim_safe_add_vertex
               subset_edges_transitive new_es old_es t)
         end
         else begin
-          // u ≠ source: need greedy_step_safe
-          // For greedy_step_safe we need:
-          // - new_edge ∈ g.edges (from key_parent_consistent + symmetric weights)
-          // - ¬reachable old_es pu u
-          // - new_edge.w ≤ e'.w for all crossing edges e'
-          // These require the key invariant
-          admit () // TODO: apply greedy_step_safe + subset_edges_transitive
+          // u ≠ source: apply greedy_step_safe
+          // 1. new_edge ∈ g.edges
+          // key_parent_consistent: key[u] = weights[parent[u]*n+u]
+          // Since key[u] < infinity and key[u] > 0 (finite, positive weight implies edge exists)
+          // weights_to_adj_matrix preserves weight, adj_to_graph includes edge
+          // TODO: prove new_edge ∈ g.edges from key_parent_consistent + symmetric_weights
+          
+          // 2. ¬reachable old_es pu u
+          // All old_es edges connect MST vertices to MST vertices.
+          // u is not in MST. So u is not reachable from any MST vertex via old_es.
+          // TODO: prove from old_es structure (each edge has both endpoints in MST)
+          
+          // 3. new_edge.w ≤ e'.w for all crossing edges e'
+          // For crossing edge e' = (w, v, weight(w,v)) with w in MST, v not in MST:
+          //   key[v] <= weight(w,v) (key invariant)
+          //   key[u] <= key[v] (extract-min)
+          //   So key[u] = new_edge.w <= weight(w,v) = e'.w
+          
+          // Apply greedy_step_safe with new_edge and old_es
+          // Then chain: new_es ⊆ new_edge :: old_es ⊆ T'
+          
+          // For now, admit this complex step
+          admit ()
         end)
 let prim_safe_update_non_mst
     (ps1 ks1 ps2 ks2 in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
