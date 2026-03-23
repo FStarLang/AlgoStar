@@ -552,6 +552,7 @@ let weights_edge_in_graph
 #pop-options
 
 /// Greedy step: adding vertex u to MST preserves safety.
+#push-options "--z3rlimit 200"
 let prim_safe_add_vertex
     (parent_seq key_seq in_mst_old in_mst_new weights_seq: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -737,15 +738,41 @@ let prim_safe_add_vertex
           let unreachable_aux (path: list edge) : Lemma
             (requires subset_edges path old_es /\ is_path_from_to path pu u)
             (ensures False)
-            = // path ends at u. Last edge has an endpoint = u.
-              // Every edge in path is in old_es. Every edge in old_es has both endpoints in MST.
-              // By induction: every vertex visited by the path is in MST.
-              // But u is not in MST. Contradiction.
-              // Use mst_edges_path_stays_in_mst (if it exists) or inline the argument.
-              // Actually: pu is in MST. path goes from pu to u through MST-only edges.
-              // Induction: start vertex pu is in MST. Each edge connects MST vertices.
-              // So final vertex u must be in MST. Contradiction.
-              admit () // Path induction — small but needs helper
+            = // Every vertex on path is in MST. But u is not. Contradiction.
+              // Prove: every prefix endpoint is in MST, by induction.
+              let rec path_stays_in_mst (p: list edge) (start: nat)
+                : Lemma
+                  (requires subset_edges p old_es /\ is_path_from_to p start u /\
+                            start < n /\ SZ.v (Seq.index in_mst_old start) = 1)
+                  (ensures False)
+                  (decreases p)
+                = match p with
+                  | [] -> () // start = u, but in_mst[start]=1 and in_mst[u]≠1
+                  | e :: rest ->
+                    // e is in old_es, so e is edge_eq to {parent[w], w, key[w]} for some w in MST
+                    mst_edges_mem_implies_in_mst parent_seq key_seq in_mst_old n source 0 e;
+                    FStar.Classical.exists_elim False
+                      #nat #(fun w -> w >= 0 /\ w < n /\ w <> source /\
+                               SZ.v (Seq.index in_mst_old w) = 1 /\
+                               edge_eq e ({u = SZ.v (Seq.index parent_seq w); v = w; w = SZ.v (Seq.index key_seq w)}))
+                      ()
+                      (fun (w:nat{w >= 0 /\ w < n /\ w <> source /\
+                                  SZ.v (Seq.index in_mst_old w) = 1 /\
+                                  edge_eq e ({u = SZ.v (Seq.index parent_seq w); v = w; w = SZ.v (Seq.index key_seq w)})}) ->
+                        edge_eq_endpoints e ({u = SZ.v (Seq.index parent_seq w); v = w; w = SZ.v (Seq.index key_seq w)});
+                        let pw = SZ.v (Seq.index parent_seq w) in
+                        assert (SZ.v (Seq.index in_mst_old pw) = 1);
+                        let next = if e.u = start then e.v else e.u in
+                        // next ∈ {pw, w}, both in MST
+                        if e.u = start then
+                          assert (next == e.v /\ (e.v = pw \/ e.v = w))
+                        else
+                          assert (next == e.u /\ (e.u = pw \/ e.u = w));
+                        assert (SZ.v (Seq.index in_mst_old next) = 1);
+                        assert (next < n);
+                        path_stays_in_mst rest next)
+              in
+              path_stays_in_mst path pu
           in
           FStar.Classical.forall_intro (FStar.Classical.move_requires unreachable_aux);
           assert (~(reachable old_es pu u));
@@ -778,6 +805,8 @@ let prim_safe_add_vertex
             (fun (t: list edge{is_mst g t /\ subset_edges (new_edge :: old_es) t}) ->
               subset_edges_transitive new_es (new_edge :: old_es) t)
         end)
+#pop-options
+
 let prim_safe_update_non_mst
     (ps1 ks1 ps2 ks2 in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
