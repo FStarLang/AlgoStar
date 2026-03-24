@@ -1,50 +1,33 @@
 # Prim Imperative MST — Remaining Work
 
-## Status: 3 admits in CLRS.Ch23.Prim.Impl.fst
+## Status: 2 admits in CLRS.Ch23.Prim.Impl.fst (core greedy proof DONE)
 
-### Admit 1 (line ~800): prim_safe_add_vertex, minimality
+### Admit 1 (line ~1077): Pulse fn body calling prim_safe_add_vertex
 
-Inside `arrow_to_impl` closure. Need: `new_edge.w ≤ e'.w` for all crossing edges.
+Need to establish prim_safe_add_vertex preconditions from Pulse loop state.
+Currently tracked in outer loop: prim_safe, prim_kpc, parent_valid, all_keys_bounded.
 
-- [x] Step 1a: `weights_edge_in_graph` — weight entry → graph edge (PROVEN)
-- [x] Step 1b: `¬reachable old_es pu u` — path induction through MST-only edges (PROVEN)
-- [x] Step 1c: `new_edge.w ≤ e'.w` — minimality via key invariant (PROVEN)
-  - `graph_edge_weight_eq` PROVEN
-  - `adj_to_graph_edge_weight` PROVEN in Spec
-  - `no_zero_edges` precondition added (weight 0 = diagonal only)
-  - Key invariant + extract-min + graph_edge_weight_eq chain: PROVEN
-- [x] Step 1d: `greedy_step_safe` call + `subset_edges_transitive` chain (PROVEN)
-- [x] u=source case (PROVEN)
+Missing — need new opaque loop invariants:
+- [ ] Extract-min minimality: `key[u] ≤ key[v]` for all non-MST v
+  (track in extract-min inner loop, carry to outer loop body)
+- [ ] Key invariant: `key[v] ≤ weights[w*n+v]` for MST w, non-MST v
+  (init: key=infinity, trivially true; maintained by update loop: key[v]=min(old,weight(u,v)))
+- [ ] Parent-in-MST: `in_mst[parent[v]]=1` for all in-MST non-source v
+  (init: only source in MST; step: parent[v] set to u which is in MST)
+- [ ] valid_weights, no_zero_edges from fn prim precondition (carry through)
+- [ ] key[u] > 0 (follows from key invariant: key = min weight from MST, weights > 0)
+- [ ] in_mst[u] ≠ 1 (extract-min picks non-MST vertex)
+- [ ] key[u] < infinity (extract-min found finite key)
 
-### Admit 2 (line ~1023): Pulse fn body calling prim_safe_add_vertex
-
-After `A.op_Array_Assignment in_mst u 1sz`, need to call `prim_safe_add_vertex`
-with proper arguments. Need to establish all preconditions from loop state:
-
-- [ ] Step 2a: Track extract-min minimality in extract-min loop invariant
-  - `forall v < n. in_mst[v]=0 ==> key[u] ≤ key[v]`
-- [ ] Step 2b: Track key invariant through outer loop  
-  - `forall v w. v non-MST, w in-MST, weight(w,v) valid ==> key[v] ≤ weight(w,v)`
-  - Maintained by update loop: `key[v] = min(key[v], weight(u,v))` for new MST vertex u
-- [ ] Step 2c: Track parent[v] in MST for all in-MST non-source v
-  - `forall v. v in-MST, v ≠ source ==> parent[v] in-MST`
-- [ ] Step 2d: Track valid_weights from fn precondition
-- [ ] Step 2e: Track key[u] > 0 (follows from key invariant: key = weight > 0)
-
-### Admit 3 (line ~1125): Post-loop prim_mst_result establishment
+### Admit 2 (line ~1189): Post-loop prim_mst_result derivation
 
 After outer loop exits, derive prim_mst_result from prim_safe.
 
-- [ ] Step 3a: Prove all non-source vertices in MST at loop end
-  - For connected graph: each iteration adds one vertex (extract-min finds one)
-  - Track `|in_mst vertices| = iter + 1` or just `iter = n → all in MST`
-- [ ] Step 3b: `mst_edges_all_in` converts mst_edges_so_far to edges_from_parent_key (PROVEN helper)
-- [ ] Step 3c: Derive is_mst from prim_safe + spanning tree properties
-  - `prim_safe_elim` → `∃T. is_mst T ∧ subset_edges edges T`
-  - Need `is_spanning_tree g edges` (subset g.edges, n-1 edges, connected, acyclic)
-  - Need `noRepeats_edge edges` (from `lemma_pure_prim_noRepeats` pattern)
-  - Apply `Bridge.safe_spanning_tree_is_mst g edges`
-- [ ] Step 3d: `reveal_opaque prim_mst_result` inside `arrow_to_impl`
+- [ ] All non-source vertices in MST at loop end (connected graph → each iter adds one)
+- [ ] mst_edges_all_in conversion (PROVEN helper)
+- [ ] Spanning tree properties: n-1 edges, connected, acyclic, subset g.edges
+- [ ] noRepeats_edge (from parent tree structure or pigeonhole)
+- [ ] safe_spanning_tree_is_mst → is_mst
 
 ## Proven helpers (zero admits)
 
