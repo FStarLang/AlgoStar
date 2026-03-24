@@ -990,10 +990,13 @@ let prim_inv_add_vertex
       Seq.length key_seq == n /\ Seq.length parent_seq == n /\
       Seq.length in_mst_old == n /\ Seq.length in_mst_new == n /\
       Seq.length weights_seq == n * n /\
-      SZ.v (Seq.index in_mst_old u) <> 1 /\
+      // Binary ims values (from algorithm: only writes 0 or 1)
+      (forall (j:nat). j < n ==> SZ.v (Seq.index in_mst_old j) = 0 \/ SZ.v (Seq.index in_mst_old j) = 1) /\
+      SZ.v (Seq.index in_mst_old u) = 0 /\
       SZ.v (Seq.index in_mst_new u) = 1 /\
       (forall (v:nat). v < n /\ v <> u ==> Seq.index in_mst_new v == Seq.index in_mst_old v) /\
-      (forall (v:nat). v < n /\ SZ.v (Seq.index in_mst_old v) <> 1 ==>
+      // Extract-min result using = 0 (matches code comparison)
+      (forall (v:nat). v < n /\ SZ.v (Seq.index in_mst_old v) = 0 ==>
         SZ.v (Seq.index key_seq u) <= SZ.v (Seq.index key_seq v)) /\
       SZ.v (Seq.index key_seq u) < SZ.v infinity)
     (ensures
@@ -1018,6 +1021,91 @@ let prim_inv_add_vertex
       SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq v))) = 1);
     // Call prim_safe_add_vertex
     prim_safe_add_vertex parent_seq key_seq in_mst_old in_mst_new weights_seq n source u
+#pop-options
+
+/// Opaque context bundle for extract-min loop pass-through.
+/// Keeps the extract-min loop VC small by hiding all outer invariants behind one atom.
+[@@"opaque_to_smt"]
+let extract_min_ctx
+    (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat) : prop =
+  n > 0 /\ source < n /\
+  Seq.length key_seq == n /\ Seq.length parent_seq == n /\
+  Seq.length in_mst_seq == n /\ Seq.length weights_seq == n * n /\
+  prim_inv key_seq parent_seq in_mst_seq weights_seq n source /\
+  Bridge.noRepeats_edge (mst_edges_so_far parent_seq key_seq in_mst_seq n source 0) /\
+  SZ.v (Seq.index key_seq source) == 0 /\
+  all_keys_bounded key_seq /\
+  (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < n) /\
+  (forall (j:nat). j < n ==> SZ.v (Seq.index in_mst_seq j) = 0 \/ SZ.v (Seq.index in_mst_seq j) = 1)
+
+let extract_min_ctx_intro
+    (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\
+      Seq.length key_seq == n /\ Seq.length parent_seq == n /\
+      Seq.length in_mst_seq == n /\ Seq.length weights_seq == n * n /\
+      prim_inv key_seq parent_seq in_mst_seq weights_seq n source /\
+      Bridge.noRepeats_edge (mst_edges_so_far parent_seq key_seq in_mst_seq n source 0) /\
+      SZ.v (Seq.index key_seq source) == 0 /\
+      all_keys_bounded key_seq /\
+      (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < n) /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index in_mst_seq j) = 0 \/ SZ.v (Seq.index in_mst_seq j) = 1))
+    (ensures extract_min_ctx key_seq parent_seq in_mst_seq weights_seq n source)
+  = reveal_opaque (`%extract_min_ctx) (extract_min_ctx key_seq parent_seq in_mst_seq weights_seq n source)
+
+let extract_min_ctx_elim
+    (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires extract_min_ctx key_seq parent_seq in_mst_seq weights_seq n source /\
+              Seq.length key_seq == n /\ Seq.length parent_seq == n /\
+              Seq.length in_mst_seq == n /\ source < n)
+    (ensures
+      prim_inv key_seq parent_seq in_mst_seq weights_seq n source /\
+      Bridge.noRepeats_edge (mst_edges_so_far parent_seq key_seq in_mst_seq n source 0) /\
+      SZ.v (Seq.index key_seq source) == 0 /\
+      all_keys_bounded key_seq /\
+      (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < n) /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index in_mst_seq j) = 0 \/ SZ.v (Seq.index in_mst_seq j) = 1))
+  = reveal_opaque (`%extract_min_ctx) (extract_min_ctx key_seq parent_seq in_mst_seq weights_seq n source)
+
+/// Adding source to MST: prim_safe unchanged (source skipped in mst_edges_so_far).
+/// Also: prim_inv is maintained (all dynamic invariants are vacuous or unchanged).
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
+let prim_inv_add_source
+    (key_seq parent_seq in_mst_old in_mst_new weights_seq: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires
+      prim_inv key_seq parent_seq in_mst_old weights_seq n source /\
+      n > 0 /\ source < n /\
+      Seq.length key_seq == n /\ Seq.length parent_seq == n /\
+      Seq.length in_mst_old == n /\ Seq.length in_mst_new == n /\
+      Seq.length weights_seq == n * n /\
+      SZ.v (Seq.index in_mst_new source) = 1 /\
+      (forall (v:nat). v < n /\ v <> source ==> Seq.index in_mst_new v == Seq.index in_mst_old v))
+    (ensures
+      prim_safe parent_seq key_seq in_mst_new weights_seq n source /\
+      prim_kpc key_seq parent_seq weights_seq n source)
+  = prim_inv_elim key_seq parent_seq in_mst_old weights_seq n source;
+    // Prove mst_edges_so_far is identical for old and new ims (source is skipped)
+    let rec ext_ims (ps ks: Seq.seq SZ.t) (ims1 ims2: Seq.seq SZ.t) (nn src: nat) (i: nat)
+      : Lemma
+        (requires Seq.length ps == nn /\ Seq.length ks == nn /\ Seq.length ims1 == nn /\ Seq.length ims2 == nn /\
+                  i <= nn /\ src < nn /\
+                  (forall (v:nat). v < nn /\ v <> src ==> Seq.index ims1 v == Seq.index ims2 v))
+        (ensures mst_edges_so_far ps ks ims1 nn src i == mst_edges_so_far ps ks ims2 nn src i)
+        (decreases (nn - i))
+      = if i >= nn then ()
+        else if i = src then ext_ims ps ks ims1 ims2 nn src (i + 1)
+        else begin
+          ext_ims ps ks ims1 ims2 nn src (i + 1);
+          assert (Seq.index ims1 i == Seq.index ims2 i)
+        end
+    in
+    ext_ims parent_seq key_seq in_mst_old in_mst_new n source 0;
+    // prim_safe: mst_edges_so_far equal → prim_safe transfers
+    reveal_opaque (`%prim_safe) (prim_safe parent_seq key_seq in_mst_old weights_seq n source);
+    reveal_opaque (`%prim_safe) (prim_safe parent_seq key_seq in_mst_new weights_seq n source)
 #pop-options
 
 /// After update-keys loop: update prim_inv with new key/parent sequences.
@@ -1519,7 +1607,7 @@ let derive_prim_mst_post_loop
 //   - key: array of minimum edge weights to add each vertex to MST
 //   - in_mst: array indicating which vertices are in MST
 
-#push-options "--z3rlimit 400"
+#push-options "--z3rlimit 600"
 //SNIPPET_START: prim_sig
 fn prim
   (#p: perm)
@@ -1619,10 +1707,15 @@ fn prim
       // Maintain functional correctness (needed for Pulse array operations):
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       all_keys_bounded key_seq /\
-      (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n)
+      (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n) /\
+      (forall (j:nat). j < SZ.v n ==> SZ.v (Seq.index in_mst_seq j) = 0 \/ SZ.v (Seq.index in_mst_seq j) = 1)
     )
   // TODO: decreases — proof interference
   {
+    // Bundle pass-through state into opaque atom for extract-min loop
+    with ks_ctx ps_ctx ims_ctx. assert (A.pts_to key_a ks_ctx ** A.pts_to parent_a ps_ctx ** A.pts_to in_mst ims_ctx);
+    extract_min_ctx_intro ks_ctx ps_ctx ims_ctx weights_seq (SZ.v n) (SZ.v source);
+    
     // Find minimum key vertex not in MST
     let mut min_idx: SZ.t = 0sz;
     let mut min_key: SZ.t = infinity;
@@ -1648,14 +1741,12 @@ fn prim
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
         Seq.length parent_seq == SZ.v n /\
-        SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
         Seq.length weights_seq == SZ.v n * SZ.v n /\
         SZ.v n > 0 /\ SZ.v source < SZ.v n /\
-        prim_inv key_seq parent_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
-        Bridge.noRepeats_edge (mst_edges_so_far parent_seq key_seq in_mst_seq (SZ.v n) (SZ.v source) 0) /\
-        SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
+        SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
+        // All outer invariants bundled into one opaque atom
+        extract_min_ctx key_seq parent_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
         all_keys_bounded key_seq /\
-        (forall (j:nat). j < Seq.length parent_seq ==> SZ.v (Seq.index parent_seq j) < SZ.v n) /\
         // Extract-min tracking:
         SZ.v v_min_key <= SZ.v infinity /\
         (SZ.v v_min_key < SZ.v infinity ==>
@@ -1688,25 +1779,43 @@ fn prim
       find_i := v_find_i +^ 1sz;
     };
     
+    // Restore pass-through state from opaque context
     // Add min_idx to MST
     let u = !min_idx;
     // Save old in_mst state for the greedy step proof
     with ks_pre_add ps_pre_add ims_pre_add. 
       assert (A.pts_to key_a ks_pre_add ** A.pts_to parent_a ps_pre_add ** A.pts_to in_mst ims_pre_add);
+    extract_min_ctx_elim ks_pre_add ps_pre_add ims_pre_add weights_seq (SZ.v n) (SZ.v source);
     
     A.op_Array_Assignment in_mst u 1sz;
     
-    // Greedy step: use prim_inv_add_vertex if u <> source.
-    // Source case: key[source] = 0, adding source preserves prim_safe vacuously.
+    // Greedy step: branch on u = source vs u <> source
     with ims_post_add. assert (A.pts_to in_mst ims_post_add);
     
-    // Handle source vs non-source. Source has key 0, is first to be added.
-    // For simplicity, admit the source case (trivial: no MST edges change when source is added).
-    // Non-source: full greedy step via prim_inv_add_vertex.
-    // TODO: handle u = source properly (prim_safe unchanged since source skipped in mst_edges)
-    admit (); // greedy step — need to handle source/non-source cases
+    // Both branches establish prim_safe and prim_kpc on new in_mst.
+    // Also carry through noRepeats (source case: unchanged; non-source: add step).
+    if (u = source) {
+      // Source case: source is skipped in mst_edges_so_far, so prim_safe transfers
+      prim_inv_add_source ks_pre_add ps_pre_add ims_pre_add ims_post_add weights_seq (SZ.v n) (SZ.v source);
+      // noRepeats: mst_edges_so_far unchanged (source skipped, non-source ims identical)
+      ()
+    } else {
+      // Non-source case: full greedy step
+      // Extract-min gives: min_key = key[u] <= key[v] for all non-MST v, and key[u] < infinity
+      // After extract-min loop: min_key < infinity means u is non-MST with min key
+      // From extract-min invariant: ims_pre_add[u] = 0 (not in MST) since min_key < infinity
+      // and min_key == key[min_idx] and ims[min_idx] = 0
+      // Also: forall j < n. ims[j] = 0 ==> min_key <= key[j]
+      // So: forall j. j < n /\ ims[j] <> 1 ==> key[u] <= key[j]
+      // (using ims values are 0 or 1, so = 0 iff <> 1)
+      prim_inv_add_vertex ks_pre_add ps_pre_add ims_pre_add ims_post_add weights_seq (SZ.v n) (SZ.v source) (SZ.v u);
+      // noRepeats maintained
+      prim_inv_elim ks_pre_add ps_pre_add ims_pre_add weights_seq (SZ.v n) (SZ.v source);
+      mst_edges_noRepeats_add ps_pre_add ks_pre_add ims_pre_add ims_post_add (SZ.v n) (SZ.v source) (SZ.v u) 0;
+      ()
+    };
     
-    // After add-vertex: we have prim_safe and prim_kpc on new in_mst
+    // After add-vertex: prim_safe and prim_kpc on new in_mst
     
     // Update keys of neighbors
     let mut update_i: SZ.t = 0sz;
