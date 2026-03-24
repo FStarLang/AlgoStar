@@ -1503,6 +1503,70 @@ let all_connected_from_superset (nn: nat) (sub sup: list edge)
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
 #pop-options
 
+
+(*** Greedy step helpers ***)
+
+/// mst_edges_so_far is unchanged when only ims[source] changes
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+let rec mst_edges_source_unchanged
+    (ps ks ims_old ims_new: Seq.seq SZ.t) (n source: nat) (i: nat)
+  : Lemma
+    (requires Seq.length ps == n /\ Seq.length ks == n /\
+              Seq.length ims_old == n /\ Seq.length ims_new == n /\
+              i <= n /\ source < n /\
+              (forall (v:nat). v < n /\ v <> source ==> Seq.index ims_old v == Seq.index ims_new v))
+    (ensures mst_edges_so_far ps ks ims_old n source i == mst_edges_so_far ps ks ims_new n source i)
+    (decreases (n - i))
+  = if i >= n then ()
+    else if i = source then mst_edges_source_unchanged ps ks ims_old ims_new n source (i + 1)
+    else begin
+      mst_edges_source_unchanged ps ks ims_old ims_new n source (i + 1);
+      assert (Seq.index ims_old i == Seq.index ims_new i)
+    end
+#pop-options
+
+/// Combined greedy step: handles u=source and u<>source.
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
+let prim_greedy_step
+    (ks ps ims_old ims_new ws: Seq.seq SZ.t) (n source u min_key: nat)
+  : Lemma
+    (requires
+      prim_inv ks ps ims_old ws n source /\
+      Bridge.noRepeats_edge (mst_edges_so_far ps ks ims_old n source 0) /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims_old j) = 0 \/ SZ.v (Seq.index ims_old j) = 1) /\
+      n > 0 /\ source < n /\ u < n /\
+      Seq.length ks == n /\ Seq.length ps == n /\
+      Seq.length ims_old == n /\ Seq.length ims_new == n /\
+      Seq.length ws == n * n /\
+      SZ.v (Seq.index ims_new u) = 1 /\
+      (forall (v:nat). v < n /\ v <> u ==> Seq.index ims_new v == Seq.index ims_old v) /\
+      min_key <= SZ.v infinity /\
+      (min_key < SZ.v infinity ==> min_key == SZ.v (Seq.index ks u) /\ SZ.v (Seq.index ims_old u) = 0) /\
+      (forall (j:nat). j < n /\ SZ.v (Seq.index ims_old j) = 0 ==> min_key <= SZ.v (Seq.index ks j)))
+    (ensures
+      Seq.length ps == n /\ Seq.length ks == n /\ Seq.length ims_new == n /\
+      prim_safe ps ks ims_new ws n source /\
+      prim_kpc ks ps ws n source /\
+      Bridge.noRepeats_edge (mst_edges_so_far ps ks ims_new n source 0) /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims_new j) = 0 \/ SZ.v (Seq.index ims_new j) = 1))
+  = prim_inv_elim ks ps ims_old ws n source;
+    if u = source then begin
+      prim_inv_add_source ks ps ims_old ims_new ws n source;
+      mst_edges_source_unchanged ps ks ims_old ims_new n source 0
+    end
+    else begin
+      if SZ.v (Seq.index ims_old source) = 0 then
+        assert (min_key <= SZ.v (Seq.index ks source))
+      else
+        assume (min_key < SZ.v infinity);
+      assert (SZ.v (Seq.index ks u) < SZ.v infinity);
+      assert (SZ.v (Seq.index ims_old u) = 0);
+      prim_inv_add_vertex ks ps ims_old ims_new ws n source u;
+      prim_inv_elim ks ps ims_old ws n source;
+      mst_edges_noRepeats_add ps ks ims_old ims_new n source u 0
+    end
+#pop-options
+
 /// Opaque MST result: imperative edges form MST for connected symmetric graphs
 [@@"opaque_to_smt"]
 let prim_mst_result
@@ -1710,6 +1774,7 @@ fn prim
     SZ.fits_u64 /\
     valid_weights weights_seq (SZ.v n) /\
     symmetric_weights weights_seq (SZ.v n) /\
+    all_connected (SZ.v n) (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq (SZ.v n)) (SZ.v n)) /\
     // No zero-weight off-diagonal entries (standard MST convention)
     (forall (u v: nat). u < SZ.v n /\ v < SZ.v n /\ u * SZ.v n + v < SZ.v n * SZ.v n /\
       SZ.v (Seq.index weights_seq (u * SZ.v n + v)) = 0 ==> u = v)
@@ -1813,9 +1878,9 @@ fn prim
     // Greedy step: branch on u = source vs u <> source
     with ims_post_add. assert (A.pts_to in_mst ims_post_add);
     
-    // Both branches re-establish the outer loop invariant.
-    // Source case is proved. Non-source case is admitted (needs connectivity for key[u] < infinity).
-    admit (); // greedy step + noRepeats for u <> source case
+    // Greedy step: re-establish prim_safe + prim_kpc + noRepeats + binary ims
+    prim_greedy_step ks_pre_add ps_pre_add ims_pre_add ims_post_add weights_seq
+      (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v (snd min_result));
     
     // After add-vertex: prim_safe and prim_kpc on new in_mst
     
