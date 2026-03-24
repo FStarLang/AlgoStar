@@ -451,6 +451,11 @@ val acyclic_edge_disconnects (n: nat) (e: edge) (tl: list edge)
                     ~(mem_edge e tl))
           (ensures ~(reachable tl e.u e.v))
 
+// Acyclicity is preserved for subsets
+val acyclic_subset (n: nat) (es es': list edge)
+  : Lemma (requires acyclic n es /\ (forall (e:edge). mem_edge e es' ==> mem_edge e es))
+          (ensures acyclic n es')
+
 // Acyclic + connected ⟹ exactly n-1 edges
 val acyclic_connected_length (n: nat) (es: list edge)
   : Lemma (requires n > 0 /\ all_connected n es /\ acyclic n es /\ all_edges_distinct es /\

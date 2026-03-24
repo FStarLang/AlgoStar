@@ -139,7 +139,11 @@ fn prim
     SZ.v n * SZ.v n < pow2 64 /\
     SZ.v source < SZ.v n /\
     Seq.length weights_seq == SZ.v n * SZ.v n /\
-    SZ.fits_u64
+    SZ.fits_u64 /\
+    valid_weights weights_seq (SZ.v n) /\
+    symmetric_weights weights_seq (SZ.v n) /\
+    (forall (u v: nat). u < SZ.v n /\ v < SZ.v n /\ u * SZ.v n + v < SZ.v n * SZ.v n /\
+      SZ.v (Seq.index weights_seq (u * SZ.v n + v)) = 0 ==> u = v)
   )
   returns res: (V.vec SZ.t & V.vec SZ.t)
   ensures exists* (key_seq parent_seq: Ghost.erased (Seq.seq SZ.t)).

@@ -5,12 +5,10 @@ include $(PULSE_ROOT)/mk/test.mk
 # reasoning in Queue.fst dequeue proof
 OTHERFLAGS := $(subst --ext optimize_let_vc,,$(subst --ext fly_deps,,$(OTHERFLAGS))) --ext optimize_let_vc=false --ext fly_deps=false --include ../common
 
-# ---------- C extraction and testing ----------
+# ── C extraction and test targets ──────────────────────────────────
+CHAPTER_ID        = ch10
+EXTRACT_DIR       = $(OUTPUT_DIR)/csrc
 
-KRML_EXE  ?= $(KRML_HOME)/krml
-CSRC_DIR   = $(OUTPUT_DIR)/csrc
-
-# Modules to extract (ImplTest + Impl deps)
 EXTRACT_MODULES = \
   CLRS.Ch10.Stack.Impl \
   CLRS.Ch10.Stack.ImplTest \
@@ -22,7 +20,7 @@ EXTRACT_MODULES = \
   CLRS.Ch10.DLL.Impl \
   CLRS.Ch10.DLL.ImplTest
 
-# Step 1: extract each module to .krml
+# Step 1: extract each module to .krml (shell loop)
 extract-krml: __verify
 	@echo "  [EXTRACT-KRML] Ch10 modules"
 	@for mod in $(EXTRACT_MODULES); do \
@@ -36,42 +34,24 @@ extract-krml: __verify
 	  fi; \
 	done
 
-# Step 2: convert .krml → .c/.h via krml
-extract-c: extract-krml
-	@echo "  [KRML] Ch10 → C"
-	@mkdir -p $(CSRC_DIR)
-	$(KRML_EXE) \
-	  -skip-makefiles -skip-linking \
-	  -warn-error -2-3-4-9-11-15-17 \
-	  -header $(PULSE_ROOT)/mk/krmlheader \
-	  -bundle "CLRS.Ch10.Stack.ImplTest=CLRS.Ch10.Stack.Impl,CLRS.Ch10.Stack.ImplTest" \
-	  -bundle "CLRS.Ch10.Queue.ImplTest=CLRS.Ch10.Queue.Impl,CLRS.Ch10.Queue.ImplTest" \
-	  -bundle "CLRS.Ch10.SinglyLinkedList.ImplTest=CLRS.Ch10.SinglyLinkedList.Base,CLRS.Ch10.SinglyLinkedList.Impl,CLRS.Ch10.SinglyLinkedList.ImplTest,FStar.Pervasives.Native" \
-	  -bundle "CLRS.Ch10.DLL.ImplTest=CLRS.Ch10.DLL.Impl,CLRS.Ch10.DLL.ImplTest" \
-	  $(OUTPUT_DIR)/CLRS_Ch10_*.krml \
-	  $(KRML_HOME)/krmllib/.extract/FStar_Pervasives_Native.krml \
-	  -tmpdir $(CSRC_DIR)
+KRML_INPUT_FILES  = $(OUTPUT_DIR)/CLRS_Ch10_*.krml \
+                    $(KRML_HOME)/krmllib/.extract/FStar_Pervasives_Native.krml
+KRML_BUNDLE_FLAGS = \
+  -bundle "CLRS.Ch10.Stack.ImplTest=CLRS.Ch10.Stack.Impl,CLRS.Ch10.Stack.ImplTest" \
+  -bundle "CLRS.Ch10.Queue.ImplTest=CLRS.Ch10.Queue.Impl,CLRS.Ch10.Queue.ImplTest" \
+  -bundle "CLRS.Ch10.SinglyLinkedList.ImplTest=CLRS.Ch10.SinglyLinkedList.Base,CLRS.Ch10.SinglyLinkedList.Impl,CLRS.Ch10.SinglyLinkedList.ImplTest,FStar.Pervasives.Native" \
+  -bundle "CLRS.Ch10.DLL.ImplTest=CLRS.Ch10.DLL.Impl,CLRS.Ch10.DLL.ImplTest"
+KRML_WARN_FLAGS   = -warn-error -2-3-4-9-11-15-17
+KRML_EXTRA_FLAGS  = -header $(PULSE_ROOT)/mk/krmlheader
+EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch10_Stack_ImplTest.c \
+                    $(EXTRACT_DIR)/CLRS_Ch10_Queue_ImplTest.c \
+                    $(EXTRACT_DIR)/CLRS_Ch10_SinglyLinkedList_ImplTest.c \
+                    $(EXTRACT_DIR)/CLRS_Ch10_DLL_ImplTest.c
+EXTRA_LINK_LIBS   = $(KRML_HOME)/krmllib/dist/generic/libkrmllib.a
 
-# Step 3: compile C to executable
-build-test: extract-c
-	@echo "  [CC] ch10_test"
-	cc -std=c11 -g -fwrapv -D_BSD_SOURCE -D_DEFAULT_SOURCE \
-	  -I $(CSRC_DIR) \
-	  -I $(KRML_HOME)/krmllib/dist/minimal \
-	  -I $(KRML_HOME)/krmllib \
-	  -I $(KRML_HOME)/include \
-	  -Wall -Wno-parentheses -Wno-unused-variable \
-	  -o $(CSRC_DIR)/ch10_test \
-	  main.c \
-	  $(CSRC_DIR)/CLRS_Ch10_Stack_ImplTest.c \
-	  $(CSRC_DIR)/CLRS_Ch10_Queue_ImplTest.c \
-	  $(CSRC_DIR)/CLRS_Ch10_SinglyLinkedList_ImplTest.c \
-	  $(CSRC_DIR)/CLRS_Ch10_DLL_ImplTest.c \
-	  $(KRML_HOME)/krmllib/dist/generic/libkrmllib.a
+include ../autoclrs.test.mk
 
-# Step 4: run the test
-test-c: build-test
-	@echo "  [RUN] ch10_test"
-	@$(CSRC_DIR)/ch10_test
+# Override: extraction depends on the shell-loop step
+$(firstword $(EXTRACT_C_FILES)): extract-krml
 
-.PHONY: extract-krml extract-c build-test test-c
+.PHONY: extract-krml

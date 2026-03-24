@@ -4,23 +4,15 @@ include $(PULSE_ROOT)/mk/test.mk
 # reasoning in MatrixChain.fst
 OTHERFLAGS := $(subst --ext optimize_let_vc,,$(subst --ext fly_deps,,$(OTHERFLAGS))) --ext optimize_let_vc=false --ext fly_deps=false --include ../common
 
-# ============================================================================
-# C extraction and test targets
-# ============================================================================
-
-KRML_HOME ?= ../../krml/karamel
-KRML_EXE  ?= $(KRML_HOME)/krml
-KRMLLIB   ?= $(KRML_HOME)/krmllib/.extract
+# ── C extraction targets ──────────────────────────────────────────
+CHAPTER_ID  = ch15
 EXTRACT_DIR = _extract
 
 IMPLTEST_MODULES = CLRS.Ch15.RodCutting.ImplTest \
                    CLRS.Ch15.LCS.ImplTest \
                    CLRS.Ch15.MatrixChain.ImplTest
 
-$(EXTRACT_DIR):
-	mkdir -p $@
-
-# Step 1: Extract each ImplTest module to .krml (includes Pulse deps via out.krml)
+# Step 1: Extract each ImplTest module to .krml (shell loop)
 extract-krml: $(ALL_CHECKED_FILES)
 	@echo "=== Extracting ImplTest modules to .krml ==="
 	@for mod in $(IMPLTEST_MODULES); do \
@@ -37,30 +29,40 @@ extract-krml: $(ALL_CHECKED_FILES)
 		fi; \
 	done
 
-# Step 2: KaRaMeL translates .krml to C headers
-extract-c: extract-krml | $(EXTRACT_DIR)
-	@echo "=== Running KaRaMeL ==="
+KRML_INPUT_FILES  = $(OUTPUT_DIR)/CLRS_Ch15_RodCutting_ImplTest.krml \
+                    $(OUTPUT_DIR)/CLRS_Ch15_LCS_ImplTest.krml \
+                    $(OUTPUT_DIR)/CLRS_Ch15_MatrixChain_ImplTest.krml
+KRML_BUNDLE_FLAGS = -bundle 'FStar.*,Prims'
+KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+# KaRaMeL produces headers; the actual C test is hand-written
+EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch15_RodCutting_ImplTest.c
+
+# Override: extraction depends on the shell-loop step
+$(firstword $(EXTRACT_C_FILES)): extract-krml
+	@mkdir -p $(EXTRACT_DIR)
 	$(KRML_EXE) \
 		-tmpdir $(EXTRACT_DIR) \
 		-skip-compilation \
-		-warn-error -2-9-11-15-17 \
+		$(KRML_WARN_FLAGS) \
 		-add-include '"krml/internal/compat.h"' \
-		-bundle 'FStar.*,Prims' \
-		$(OUTPUT_DIR)/CLRS_Ch15_RodCutting_ImplTest.krml \
-		$(OUTPUT_DIR)/CLRS_Ch15_LCS_ImplTest.krml \
-		$(OUTPUT_DIR)/CLRS_Ch15_MatrixChain_ImplTest.krml \
-		$(KRMLLIB)/*.krml
-	@echo "C headers written to $(EXTRACT_DIR)/"
+		$(KRML_BUNDLE_FLAGS) \
+		$(KRML_INPUT_FILES) \
+		$(KRML_EXTRA_INPUTS)
 
-# Step 3: Compile and run the C test driver
-#   The test_main.c contains hand-written C implementations that mirror
-#   the verified Pulse algorithms exactly. Since the Pulse while-loop
-#   pattern uses closures that KaRaMeL cannot translate to C directly,
-#   the C implementations are written manually to match the verified code.
-test-c: | $(EXTRACT_DIR)
-	@echo "=== Compiling C test driver ==="
-	$(CC) -O2 -Wall -Wextra -o $(EXTRACT_DIR)/test_main test_main.c
-	@echo "=== Running C tests ==="
-	@$(EXTRACT_DIR)/test_main
+# The C test driver is self-contained (mirrors the verified algorithms)
+TEST_MAIN         = test_main.c
+EXTRA_C_SOURCES   =
+CC_EXTRA_FLAGS    = -O2 -Wextra
 
-.PHONY: extract-krml extract-c test-c
+$(EXTRACT_DIR)/$(CHAPTER_ID)_test: $(TEST_MAIN)
+	@mkdir -p $(EXTRACT_DIR)
+	$(call msg, "CC", "$(CHAPTER_ID)_test")
+	$(CC) -O2 -Wall -Wextra -o $@ $(TEST_MAIN)
+
+$(EXTRACT_DIR)/$(CHAPTER_ID)_test.out: $(EXTRACT_DIR)/$(CHAPTER_ID)_test
+	$(call msg, "RUN", "$(CHAPTER_ID)_test")
+	./$< | tee $@
+
+.PHONY: extract-krml extract test-c
+extract: $(EXTRACT_C_FILES)
+test-c: $(EXTRACT_DIR)/$(CHAPTER_ID)_test.out
