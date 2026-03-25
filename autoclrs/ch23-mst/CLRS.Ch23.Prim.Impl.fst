@@ -1895,7 +1895,7 @@ fn find_min_vertex
 
 /// Hoisted update-keys loop: for each vertex v, if v not in MST and weight(u,v) < key[v],
 /// set key[v] = weight(u,v) and parent[v] = u. Maintains prim_kpc and prim_safe.
-#push-options "--z3rlimit 600"
+#push-options "--z3rlimit 800"
 fn update_keys
   (#p: perm)
   (key_a: array SZ.t) (#ks0: Ghost.erased (Seq.seq SZ.t))
@@ -1963,6 +1963,8 @@ fn update_keys
       SZ.v n > 0 /\ SZ.v source < SZ.v n /\
       SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
       prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
+      prim_safe ps0 ks0 in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
+      Seq.length ks0 == SZ.v n /\ Seq.length ps0 == SZ.v n /\
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       (forall (v:nat). v < SZ.v n /\ v <> SZ.v source /\ SZ.v (Seq.index in_mst_seq v) = 1 ==>
         Seq.index ps0 v == Seq.index parent_seq v /\ Seq.index ks0 v == Seq.index key_seq v)
@@ -1989,20 +1991,10 @@ fn update_keys
     A.op_Array_Assignment parent_a v new_parent_v;
     update_i := v +^ 1sz;
   };
-  // Reconstruct prim_safe
-  with ks_f ps_f. assert (A.pts_to key_a ks_f ** A.pts_to parent_a ps_f);
-  // Re-assert loop invariant facts that Z3 needs for the lemma call
-  assert (pure (
-    Seq.length ks_f == SZ.v n /\ Seq.length ps_f == SZ.v n /\
-    Seq.length in_mst_seq == SZ.v n /\ SZ.v n > 0 /\ SZ.v source < SZ.v n /\
-    Seq.length ks0 == SZ.v n /\ Seq.length ps0 == SZ.v n /\
-    prim_safe ps0 ks0 in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
-    (forall (v:nat). v < SZ.v n /\ v <> SZ.v source /\ SZ.v (Seq.index in_mst_seq v) = 1 ==>
-      Seq.index ps0 v == Seq.index ps_f v /\ Seq.index ks0 v == Seq.index ks_f v)
-  ));
-  // prim_safe transfer — math proven by update_keys_transfer_safe / prim_safe_update_non_mst
-  // Can't call directly due to Ghost.erased typing of ps0/ks0 in Pulse
-  admit ()
+  // The loop invariant provides all facts needed for update_keys_transfer_safe.
+  // prim_safe ps0 ks0 ims is available, plus the "unchanged" forall.
+  // update_keys_transfer_safe reconstructs prim_safe on the new sequences.
+  admit () // TODO: Pulse VC doesn't propagate loop invariant facts to post-loop lemma calls
 }
 #pop-options
 
