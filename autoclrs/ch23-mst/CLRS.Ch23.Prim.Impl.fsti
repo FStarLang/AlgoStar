@@ -142,6 +142,7 @@ fn prim
     SZ.fits_u64 /\
     valid_weights weights_seq (SZ.v n) /\
     symmetric_weights weights_seq (SZ.v n) /\
+    all_connected (SZ.v n) (PrimSpec.adj_to_edges (weights_to_adj_matrix weights_seq (SZ.v n)) (SZ.v n)) /\
     (forall (u v: nat). u < SZ.v n /\ v < SZ.v n /\ u * SZ.v n + v < SZ.v n * SZ.v n /\
       SZ.v (Seq.index weights_seq (u * SZ.v n + v)) = 0 ==> u = v)
   )
