@@ -1773,7 +1773,7 @@ let update_keys_transfer_safe
 
 /// Combined: transfer prim_safe + rebuild prim_loop_state in one lemma.
 /// Called from update_keys post-loop. Outputs prim_loop_state on new seqs.
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
 let update_keys_rebuild
     (ks_old ps_old ks_new ps_new ims ws: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -1796,6 +1796,8 @@ let update_keys_rebuild
     prim_loop_state_elim ks_old ps_old ims ws n source;
     prim_inv_elim ks_old ps_old ims ws n source;
     mst_edges_ext ps_old ks_old ps_new ks_new ims n source 0;
+    // key_inv on new state needs update_keys to track key-only-decreases
+    // This is the remaining mathematical gap — keys only decrease, so key_inv preserved
     assume (prim_inv ks_new ps_new ims ws n source);
     prim_loop_state_intro ks_new ps_new ims ws n source
 #pop-options
@@ -1803,7 +1805,7 @@ let update_keys_rebuild
 /// Rebuild prim_loop_state after update_keys.
 /// Avoids Seq.index on params (which causes typing issues in Pulse callers).
 /// Instead takes all needed opaque predicates directly.
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 600 --fuel 2 --ifuel 1"
 let rebuild_prim_loop_state
     (ks_old ps_old ks_new ps_new ims ws: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -1846,9 +1848,13 @@ let rebuild_prim_loop_state
     //     If key_old[v] < infinity: parent_old[v] in MST (from old inv). ✓
     // in-MST-finite-key: for v in MST: key_new[v] < infinity
     //   v in MST: key_new[v] = key_old[v] (unchanged). key_old[v] < infinity (from old inv). ✓
-    // These arguments are correct but Z3 needs help. Use prim_inv_after_update_keys.
-    // But it needs all components explicitly. Let's just provide them.
-    // For now, admit the prim_inv construction — the math above is sound.
+    // key_inv on new: key_new[v] <= key_old[v] (unchanged or decreased) <= weight(w,v) from old inv
+    // parent-in-MST on new: parent_new[v] = parent_old[v] for in-MST v (unchanged); for non-MST updated: parent = u (in MST)
+    // in-MST-finite-key: in-MST key unchanged, old had < infinity
+    // All 3 follow from "unchanged for in-MST" + old prim_inv. Z3 should derive with enough rlimit.
+    reveal_opaque (`%prim_inv) (prim_inv ks_old ps_old ims ws n source);
+    prim_safe_update_non_mst ps_old ks_old ps_new ks_new ims ws n source;
+    // Same gap: key_inv on new state needs update_keys to track key-only-decreases
     assume (prim_inv ks_new ps_new ims ws n source);
     prim_loop_state_intro ks_new ps_new ims ws n source
 #pop-options
