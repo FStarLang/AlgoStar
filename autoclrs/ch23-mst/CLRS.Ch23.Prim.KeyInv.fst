@@ -74,27 +74,6 @@ let parent_in_mst_init (ks ps ims: Seq.seq SZ.t) (n source: nat)
           (ensures parent_in_mst ks ps ims n source)
   = reveal_opaque (`%parent_in_mst) (parent_in_mst ks ps ims n source)
 
-/// After update_keys: key_inv preserved because keys only decrease
-let key_inv_after_update (ks_old ks_new ims ws: Seq.seq SZ.t) (n: nat)
-  : Lemma (requires key_inv ks_old ims ws n /\
-                    Seq.length ks_old == n /\
-                    Seq.length ks_new == n /\
-                    (forall (v:nat). v < n ==> SZ.v (Seq.index ks_new v) <= SZ.v (Seq.index ks_old v)))
-          (ensures key_inv ks_new ims ws n)
-  = reveal_opaque (`%key_inv) (key_inv ks_old ims ws n);
-    reveal_opaque (`%key_inv) (key_inv ks_new ims ws n)
-
-/// After update_keys: ims_finite_key preserved (in-MST keys unchanged)
-let ims_finite_key_after_update (ks_old ks_new ims: Seq.seq SZ.t) (n: nat)
-  : Lemma (requires ims_finite_key ks_old ims n /\
-                    Seq.length ks_old == n /\ Seq.length ims == n /\
-                    Seq.length ks_new == n /\
-                    (forall (v:nat). v < n /\ SZ.v (Seq.index ims v) = 1 ==>
-                      Seq.index ks_old v == Seq.index ks_new v))
-          (ensures ims_finite_key ks_new ims n)
-  = reveal_opaque (`%ims_finite_key) (ims_finite_key ks_old ims n);
-    reveal_opaque (`%ims_finite_key) (ims_finite_key ks_new ims n)
-
 /// Opaque predicates for update_keys output facts
 [@@"opaque_to_smt"]
 let ims_unchanged (ks_old ps_old ks_new ps_new ims: Seq.seq SZ.t) (n source: nat) : prop =
@@ -205,6 +184,27 @@ let update_progress_elim (ks_old ps_old ks_new ps_new ims: Seq.seq SZ.t) (n sour
                    key_decreased_parent_is_u ks_old ks_new ps_new ims n u /\
                    keys_only_decrease ks_old ks_new n)
   = reveal_opaque (`%update_progress) (update_progress ks_old ps_old ks_new ps_new ims n source u)
+
+/// After update_keys: key_inv preserved because keys only decrease
+let key_inv_after_update (ks_old ks_new ims ws: Seq.seq SZ.t) (n: nat)
+  : Lemma (requires key_inv ks_old ims ws n /\
+                    Seq.length ks_old == n /\
+                    Seq.length ks_new == n /\
+                    (forall (v:nat). v < n ==> SZ.v (Seq.index ks_new v) <= SZ.v (Seq.index ks_old v)))
+          (ensures key_inv ks_new ims ws n)
+  = reveal_opaque (`%key_inv) (key_inv ks_old ims ws n);
+    reveal_opaque (`%key_inv) (key_inv ks_new ims ws n)
+
+/// After update_keys: ims_finite_key preserved (in-MST keys unchanged)
+let ims_finite_key_after_update (ks_old ks_new ims: Seq.seq SZ.t) (n: nat)
+  : Lemma (requires ims_finite_key ks_old ims n /\
+                    Seq.length ks_old == n /\ Seq.length ims == n /\
+                    Seq.length ks_new == n /\
+                    (forall (v:nat). v < n /\ SZ.v (Seq.index ims v) = 1 ==>
+                      Seq.index ks_old v == Seq.index ks_new v))
+          (ensures ims_finite_key ks_new ims n)
+  = reveal_opaque (`%ims_finite_key) (ims_finite_key ks_old ims n);
+    reveal_opaque (`%ims_finite_key) (ims_finite_key ks_new ims n)
 
 /// parent_in_mst elim: instantiate the quantifier at specific v, w
 let parent_in_mst_at (ks ps ims: Seq.seq SZ.t) (n source v w: nat)
@@ -322,4 +322,27 @@ let key_inv_bare_raw (ks ims ws: Seq.seq SZ.t) (n: nat)
       SZ.v (Seq.index ws (w * n + v)) > 0 /\ SZ.v (Seq.index ws (w * n + v)) < SZ.v (65535sz) ==>
       SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (w * n + v)))
   = reveal_opaque (`%key_inv) (key_inv ks ims ws n)
+#pop-options
+
+/// Extract bare ims_unchanged forall (for prim_safe_update_non_mst)
+let ims_unchanged_bare (ks_old ps_old ks_new ps_new ims: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires ims_unchanged ks_old ps_old ks_new ps_new ims n source /\
+              Seq.length ks_old == n /\ Seq.length ps_old == n /\
+              Seq.length ks_new == n /\ Seq.length ps_new == n /\ Seq.length ims == n)
+    (ensures forall (v:nat). v < n /\ SZ.v (Seq.index ims v) = 1 /\ v <> source ==>
+      Seq.index ps_old v == Seq.index ps_new v /\ Seq.index ks_old v == Seq.index ks_new v)
+  = reveal_opaque (`%ims_unchanged) (ims_unchanged ks_old ps_old ks_new ps_new ims n source)
+
+/// Extract parent-in-MST for finite-key vertices (used by mst_edges_noRepeats_add)
+#push-options "--z3rlimit 50"
+let parent_in_mst_finite_key (ks ps ims: Seq.seq SZ.t) (n source: nat)
+  : Lemma
+    (requires parent_in_mst ks ps ims n source /\
+             Seq.length ks == n /\ Seq.length ps == n /\ Seq.length ims == n /\
+             n > 0 /\ source < n)
+    (ensures forall (v:nat). v < n /\ SZ.v (Seq.index ks v) < SZ.v (65535sz) /\ v <> source ==>
+               SZ.v (Seq.index ps v) < n /\
+               SZ.v (Seq.index ims (SZ.v (Seq.index ps v))) = 1)
+  = reveal_opaque (`%parent_in_mst) (parent_in_mst ks ps ims n source)
 #pop-options
