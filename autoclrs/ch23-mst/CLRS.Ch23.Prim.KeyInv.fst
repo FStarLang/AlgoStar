@@ -346,3 +346,72 @@ let parent_in_mst_finite_key (ks ps ims: Seq.seq SZ.t) (n source: nat)
                SZ.v (Seq.index ims (SZ.v (Seq.index ps v))) = 1)
   = reveal_opaque (`%parent_in_mst) (parent_in_mst ks ps ims n source)
 #pop-options
+
+(*** Combined prim_inv_bundle — used by Prim.Impl to define prim_inv ***)
+
+[@@"opaque_to_smt"]
+let prim_inv_bundle (safe kpc: prop) (ks ps ims ws: Seq.seq SZ.t) (n source: nat) : prop =
+  safe /\ kpc /\
+  n > 0 /\ source < n /\
+  Seq.length ks == n /\ Seq.length ps == n /\
+  Seq.length ims == n /\ Seq.length ws == n * n /\
+  Defs.valid_weights ws n /\ Defs.symmetric_weights ws n /\
+  Defs.parent_valid ps n /\ Defs.all_keys_bounded ks /\
+  SZ.v (Seq.index ks source) == 0 /\
+  Defs.no_zero_edges ws n /\
+  key_inv ks ims ws n /\
+  ims_finite_key ks ims n /\
+  parent_in_mst ks ps ims n source
+
+#push-options "--z3rlimit 50"
+let prim_inv_bundle_intro (safe kpc: prop) (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
+  : Lemma (requires safe /\ kpc /\ n > 0 /\ source < n /\
+      Seq.length ks == n /\ Seq.length ps == n /\
+      Seq.length ims == n /\ Seq.length ws == n * n /\
+      Defs.valid_weights ws n /\ Defs.symmetric_weights ws n /\
+      Defs.parent_valid ps n /\ Defs.all_keys_bounded ks /\
+      SZ.v (Seq.index ks source) == 0 /\ Defs.no_zero_edges ws n /\
+      key_inv ks ims ws n /\ ims_finite_key ks ims n /\
+      parent_in_mst ks ps ims n source)
+    (ensures prim_inv_bundle safe kpc ks ps ims ws n source)
+  = reveal_opaque (`%prim_inv_bundle) (prim_inv_bundle safe kpc ks ps ims ws n source)
+
+let prim_inv_bundle_elim (safe kpc: prop) (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
+  : Lemma (requires prim_inv_bundle safe kpc ks ps ims ws n source)
+    (ensures safe /\ kpc /\ n > 0 /\ source < n /\
+      Seq.length ks == n /\ Seq.length ps == n /\
+      Seq.length ims == n /\ Seq.length ws == n * n /\
+      Defs.valid_weights ws n /\ Defs.symmetric_weights ws n /\
+      Defs.parent_valid ps n /\ Defs.all_keys_bounded ks /\
+      SZ.v (Seq.index ks source) == 0 /\ Defs.no_zero_edges ws n /\
+      key_inv ks ims ws n /\ ims_finite_key ks ims n /\
+      parent_in_mst ks ps ims n source)
+  = reveal_opaque (`%prim_inv_bundle) (prim_inv_bundle safe kpc ks ps ims ws n source)
+#pop-options
+
+/// Rebuild prim_inv_bundle after update_keys.
+#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
+let prim_inv_bundle_after_update
+    (safe_old kpc_old safe_new kpc_new: prop)
+    (ks_old ps_old ks_new ps_new ims ws: Seq.seq SZ.t) (n source u: nat)
+  : Lemma
+    (requires
+      prim_inv_bundle safe_old kpc_old ks_old ps_old ims ws n source /\
+      safe_new /\ kpc_new /\
+      n > 0 /\ source < n /\ u < n /\ Seq.length ims == n /\
+      SZ.v (Seq.index ims u) = 1 /\
+      Seq.length ks_new == n /\ Seq.length ps_new == n /\
+      Defs.all_keys_bounded ks_new /\ Defs.parent_valid ps_new n /\
+      SZ.v (Seq.index ks_new source) == 0 /\
+      update_progress ks_old ps_old ks_new ps_new ims n source u)
+    (ensures prim_inv_bundle safe_new kpc_new ks_new ps_new ims ws n source)
+  = prim_inv_bundle_elim safe_old kpc_old ks_old ps_old ims ws n source;
+    update_progress_elim ks_old ps_old ks_new ps_new ims n source u;
+    // Extract bare foralls for the _after_update lemmas that need them
+    ims_unchanged_bare ks_old ps_old ks_new ps_new ims n source;
+    reveal_opaque (`%keys_only_decrease) (keys_only_decrease ks_old ks_new n);
+    key_inv_after_update ks_old ks_new ims ws n;
+    ims_finite_key_after_update ks_old ks_new ims n;
+    parent_in_mst_after_update ks_old ps_old ks_new ps_new ims n source u;
+    prim_inv_bundle_intro safe_new kpc_new ks_new ps_new ims ws n source
+#pop-options

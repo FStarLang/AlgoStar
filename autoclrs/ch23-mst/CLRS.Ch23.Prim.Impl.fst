@@ -897,8 +897,7 @@ let prim_inv
   KeyInv.prim_inv_bundle
     (prim_safe parent_seq key_seq in_mst_seq weights_seq n source)
     (prim_kpc key_seq parent_seq weights_seq n source)
-    key_seq parent_seq in_mst_seq weights_seq n source /\
-  Bridge.noRepeats_edge (mst_edges_so_far parent_seq key_seq in_mst_seq n source 0)
+    key_seq parent_seq in_mst_seq weights_seq n source
 
 /// Init: all vacuously true at start
 #push-options "--z3rlimit 200 --split_queries always"
@@ -927,6 +926,10 @@ let prim_inv_init
   = KeyInv.key_inv_init key_seq in_mst_seq weights_seq n;
     KeyInv.ims_finite_key_init key_seq in_mst_seq n source;
     KeyInv.parent_in_mst_init key_seq parent_seq in_mst_seq n source;
+    KeyInv.prim_inv_bundle_intro
+      (prim_safe parent_seq key_seq in_mst_seq weights_seq n source)
+      (prim_kpc key_seq parent_seq weights_seq n source)
+      key_seq parent_seq in_mst_seq weights_seq n source;
     reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
 #pop-options
 
@@ -951,7 +954,11 @@ let prim_inv_elim
       KeyInv.key_inv key_seq in_mst_seq weights_seq n /\
       KeyInv.ims_finite_key key_seq in_mst_seq n /\
       KeyInv.parent_in_mst key_seq parent_seq in_mst_seq n source)
-  = reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
+  = reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source);
+    KeyInv.prim_inv_bundle_elim
+      (prim_safe parent_seq key_seq in_mst_seq weights_seq n source)
+      (prim_kpc key_seq parent_seq weights_seq n source)
+      key_seq parent_seq in_mst_seq weights_seq n source
 
 /// Intro: build prim_inv from all components (avoids reveal_opaque at call sites)
 #push-options "--z3rlimit 50"
@@ -975,7 +982,11 @@ let prim_inv_intro
       KeyInv.ims_finite_key key_seq in_mst_seq n /\
       KeyInv.parent_in_mst key_seq parent_seq in_mst_seq n source)
     (ensures prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
-  = reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
+  = KeyInv.prim_inv_bundle_intro
+      (prim_safe parent_seq key_seq in_mst_seq weights_seq n source)
+      (prim_kpc key_seq parent_seq weights_seq n source)
+      key_seq parent_seq in_mst_seq weights_seq n source;
+    reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
 #pop-options
 
 /// After extract-min + in_mst[u]:=1: advance greedy safety.
@@ -1707,6 +1718,7 @@ let prim_loop_state
   Seq.length ims == n /\ Seq.length ws == n * n /\
   n * n < pow2 64 /\ SZ.fits_u64 /\
   prim_inv ks ps ims ws n source /\
+  Bridge.noRepeats_edge (mst_edges_so_far ps ks ims n source 0) /\
   SZ.v (Seq.index ks source) == 0 /\
   all_keys_bounded ks /\
   parent_valid ps n /\
@@ -1746,24 +1758,6 @@ let prim_loop_state_elim
       (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
   = reveal_opaque (`%prim_loop_state) (prim_loop_state ks ps ims ws n source)
 
-/// Focused extractor: get KeyInv predicates + weights properties from prim_loop_state
-#push-options "--z3rlimit 50"
-let prim_loop_state_key_facts
-    (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
-  : Lemma
-    (requires prim_loop_state ks ps ims ws n source)
-    (ensures
-      KeyInv.key_inv ks ims ws n /\
-      KeyInv.ims_finite_key ks ims n /\
-      KeyInv.parent_in_mst ks ps ims n source /\
-      valid_weights ws n /\ symmetric_weights ws n /\
-      (forall (uv vv: nat). uv < n /\ vv < n /\ uv * n + vv < n * n /\
-        SZ.v (Seq.index ws (uv * n + vv)) = 0 ==> uv = vv) /\
-      prim_safe ps ks ims ws n source /\
-      prim_kpc ks ps ws n source)
-  = reveal_opaque (`%prim_loop_state) (prim_loop_state ks ps ims ws n source);
-    reveal_opaque (`%prim_inv) (prim_inv ks ps ims ws n source)
-#pop-options
 
 (*** Pulse-callable lemma wrappers ***)
 
@@ -1802,6 +1796,7 @@ let update_keys_rebuild
       Seq.length ims == n /\ Seq.length ws == n * n /\
       n > 0 /\ source < n /\ u < n /\ n * n < pow2 64 /\ SZ.fits_u64 /\
       prim_loop_state ks_old ps_old ims ws n source /\
+      prim_safe ps_old ks_old ims ws n source /\
       all_keys_bounded ks_new /\
       parent_valid ps_new n /\
       prim_kpc ks_new ps_new ws n source /\
@@ -1810,62 +1805,27 @@ let update_keys_rebuild
       (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
       KeyInv.update_progress ks_old ps_old ks_new ps_new ims n source u)
     (ensures prim_loop_state ks_new ps_new ims ws n source)
-  = // Extract old prim_inv components
-    prim_loop_state_elim ks_old ps_old ims ws n source;
-    reveal_opaque (`%prim_inv) (prim_inv ks_old ps_old ims ws n source);
-    // Transfer prim_safe (needs ims_unchanged)
+  = // 1. Extract ims_unchanged
     KeyInv.update_progress_elim ks_old ps_old ks_new ps_new ims n source u;
     KeyInv.ims_unchanged_bare ks_old ps_old ks_new ps_new ims n source;
+    // 2. Transfer prim_safe (prim_safe ps_old ks_old is in requires)
     prim_safe_update_non_mst ps_old ks_old ps_new ks_new ims ws n source;
-    // Transfer noRepeats (in-MST key/parent unchanged → mst_edges unchanged)
+    // 3. Transfer noRepeats
+    prim_loop_state_elim ks_old ps_old ims ws n source;
     mst_edges_ext ps_old ks_old ps_new ks_new ims n source 0;
-    // Use prim_inv_bundle_after_update for the KeyInv predicates
+    // 4. Build new prim_inv_bundle (old bundle from prim_inv inside prim_loop_state)
+    reveal_opaque (`%prim_inv) (prim_inv ks_old ps_old ims ws n source);
     KeyInv.prim_inv_bundle_after_update
       (prim_safe ps_old ks_old ims ws n source)
       (prim_kpc ks_old ps_old ws n source)
       (prim_safe ps_new ks_new ims ws n source)
       (prim_kpc ks_new ps_new ws n source)
       ks_old ps_old ks_new ps_new ims ws n source u;
-    // Build prim_inv
     reveal_opaque (`%prim_inv) (prim_inv ks_new ps_new ims ws n source);
+    // 5. Build prim_loop_state
     prim_loop_state_intro ks_new ps_new ims ws n source
 #pop-options
 
-/// Rebuild prim_loop_state after update_keys.
-/// Avoids Seq.index on params (which causes typing issues in Pulse callers).
-/// Instead takes all needed opaque predicates directly.
-#restart-solver
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 0"
-let rebuild_prim_loop_state
-    (ks_old ps_old ks_new ps_new ims ws: Seq.seq SZ.t) (n source u: nat)
-  : Lemma
-    (requires
-      Seq.length ks_old == n /\ Seq.length ps_old == n /\
-      Seq.length ks_new == n /\ Seq.length ps_new == n /\
-      Seq.length ims == n /\ Seq.length ws == n * n /\
-      n > 0 /\ source < n /\ u < n /\ n * n < pow2 64 /\ SZ.fits_u64 /\
-      prim_loop_state ks_old ps_old ims ws n source /\
-      all_keys_bounded ks_new /\ parent_valid ps_new n /\
-      prim_kpc ks_new ps_new ws n source /\
-      SZ.v (Seq.index ks_new source) == 0 /\
-      SZ.v (Seq.index ims u) = 1 /\
-      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
-      KeyInv.update_progress ks_old ps_old ks_new ps_new ims n source u)
-    (ensures prim_loop_state ks_new ps_new ims ws n source)
-  = prim_loop_state_elim ks_old ps_old ims ws n source;
-    prim_inv_elim ks_old ps_old ims ws n source;
-    // Transfer prim_safe and build noRepeats
-    KeyInv.update_progress_elim ks_old ps_old ks_new ps_new ims n source u;
-    prim_safe_update_non_mst ps_old ks_old ps_new ks_new ims ws n source;
-    mst_edges_ext ps_old ks_old ps_new ks_new ims n source 0;
-    // Build KeyInv predicates on new state
-    KeyInv.key_inv_after_update ks_old ks_new ims ws n;
-    KeyInv.ims_finite_key_after_update ks_old ks_new ims n;
-    KeyInv.parent_in_mst_after_update ks_old ps_old ks_new ps_new ims n source u;
-    // Build prim_inv
-    prim_inv_intro ks_new ps_new ims ws n source;
-    prim_loop_state_intro ks_new ps_new ims ws n source
-#pop-options
 
 /// Hoisted extract-min loop: find the minimum-key non-MST vertex.
 /// Returns (min_idx, min_key) pair.
@@ -2048,6 +2008,7 @@ fn update_keys
   };
   with ks_f ps_f. assert (A.pts_to key_a ks_f ** A.pts_to parent_a ps_f);
   prim_loop_state_elim ks0 ps0 in_mst_seq weights_seq (SZ.v n) (SZ.v source);
+  prim_inv_elim ks0 ps0 in_mst_seq weights_seq (SZ.v n) (SZ.v source);
   update_keys_rebuild ks0 ps0 ks_f ps_f in_mst_seq weights_seq (SZ.v n) (SZ.v source) (SZ.v u);
   ()
 }
