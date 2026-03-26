@@ -994,18 +994,16 @@ let prim_inv_add_vertex
     // So parent[u] <> u (ims_old[parent[u]] = 1 but ims_old[u] <> 1).
     // kpc: key[u] = weights[parent[u]*n+u]. no_zero_edges + parent[u] <> u: weights > 0.
     let pu = SZ.v (Seq.index parent_seq u) in
-    assert (SZ.v (Seq.index in_mst_old pu) = 1); // from parent-in-MST
+    // parent-in-MST: key[u] < infinity, u <> source → ims[parent[u]] = 1
+    KeyInv.parent_in_mst_at key_seq parent_seq in_mst_old n source u pu;
+    assert (SZ.v (Seq.index in_mst_old pu) = 1);
     assert (pu <> u); // ims_old[pu] = 1, ims_old[u] <> 1
     lemma_index_bound pu u n;
-    // kpc gives key[u] = weights[pu*n+u]
     assert (SZ.v (Seq.index key_seq u) == SZ.v (Seq.index weights_seq (pu * n + u)));
-    // no_zero_edges: weights[pu*n+u] = 0 → pu = u, contradiction
     assert (SZ.v (Seq.index key_seq u) > 0);
-    // Parent-in-MST for old in-MST non-source vertices:
-    // From in-MST → finite-key, plus parent-in-MST for finite-key
-    assert (forall (v:nat). v < n /\ v <> source /\ SZ.v (Seq.index in_mst_old v) = 1 ==>
-      SZ.v (Seq.index in_mst_old (SZ.v (Seq.index parent_seq v))) = 1);
-    // Call prim_safe_add_vertex
+    // Extract bare quantifiers for prim_safe_add_vertex
+    KeyInv.parent_in_mst_for_ims key_seq parent_seq in_mst_old n source;
+    KeyInv.key_inv_bare key_seq in_mst_old weights_seq n;
     prim_safe_add_vertex parent_seq key_seq in_mst_old in_mst_new weights_seq n source u
 #pop-options
 

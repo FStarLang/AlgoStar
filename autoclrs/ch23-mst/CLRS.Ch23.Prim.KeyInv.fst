@@ -11,9 +11,11 @@ open FStar.SizeT
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-/// Safe weight accessor: total function, no FStar.Mul overflow in Seq.index
-let swt (ws: Seq.seq SZ.t) (n: nat{n > 0}) (u: nat{u < n}) (v: nat{v < n /\ Seq.length ws == n * n}) : nat
-  = SZ.v (Seq.index ws (u * n + v))
+/// Safe weight accessor: total function, returns 0 for out-of-bounds
+let swt (ws: Seq.seq SZ.t) (n: nat) (u v: nat) : nat
+  = if n > 0 && u < n && v < n && Seq.length ws = n * n && u * n + v < Seq.length ws
+    then SZ.v (Seq.index ws (u * n + v))
+    else 0
 
 /// Key invariant: for each non-MST vertex v, key[v] <= weight(w,v) for all MST vertices w
 [@@"opaque_to_smt"]
@@ -22,9 +24,10 @@ let key_inv (ks ims ws: Seq.seq SZ.t) (n: nat) : prop =
   (forall (v w: nat). v < n /\ w < n /\
     SZ.v (Seq.index ims v) <> 1 /\
     SZ.v (Seq.index ims w) = 1 /\
-    swt ws n w v > 0 /\
-    swt ws n w v < SZ.v (65535sz) ==>
-    SZ.v (Seq.index ks v) <= swt ws n w v)
+    w * n + v < n * n /\
+    SZ.v (Seq.index ws (w * n + v)) > 0 /\
+    SZ.v (Seq.index ws (w * n + v)) < SZ.v (65535sz) ==>
+    SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (w * n + v)))
 
 /// In-MST vertices have finite keys
 [@@"opaque_to_smt"]
@@ -271,8 +274,52 @@ let key_inv_after_add_vertex (ks ims_old ims_new ws: Seq.seq SZ.t) (n u: nat)
                     (forall (v:nat). v < n /\ v <> u ==> Seq.index ims_old v == Seq.index ims_new v) /\
                     // key[v] <= weight(u,v) for all non-MST v with valid edges
                     (forall (v:nat). v < n /\ SZ.v (Seq.index ims_new v) <> 1 /\
-                      swt ws n u v > 0 /\ swt ws n u v < SZ.v (65535sz) ==>
-                      SZ.v (Seq.index ks v) <= swt ws n u v))
+                      u * n + v < n * n /\
+                      SZ.v (Seq.index ws (u * n + v)) > 0 /\ SZ.v (Seq.index ws (u * n + v)) < SZ.v (65535sz) ==>
+                      SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (u * n + v))))
           (ensures key_inv ks ims_new ws n)
   = reveal_opaque (`%key_inv) (key_inv ks ims_old ws n);
     reveal_opaque (`%key_inv) (key_inv ks ims_new ws n)
+
+/// Derive bare "in-MST → parent in MST" forall from parent_in_mst + ims_finite_key.
+/// Needed by prim_safe_add_vertex which expects this as a precondition.
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+let parent_in_mst_for_ims
+    (ks ps ims: Seq.seq SZ.t) (n source: nat)
+  : Lemma 
+    (requires parent_in_mst ks ps ims n source /\ ims_finite_key ks ims n /\
+             Seq.length ks == n /\ Seq.length ps == n /\ Seq.length ims == n /\
+             n > 0 /\ source < n)
+    (ensures forall (v:nat). v < n /\ v <> source /\ SZ.v (Seq.index ims v) = 1 ==>
+               SZ.v (Seq.index ps v) < n /\
+               SZ.v (Seq.index ims (SZ.v (Seq.index ps v))) = 1)
+  = reveal_opaque (`%parent_in_mst) (parent_in_mst ks ps ims n source);
+    reveal_opaque (`%ims_finite_key) (ims_finite_key ks ims n)
+#pop-options
+
+/// Extract bare key_inv forall from opaque key_inv.
+/// Needed by prim_safe_add_vertex.
+let key_inv_bare (ks ims ws: Seq.seq SZ.t) (n: nat)
+  : Lemma
+    (requires key_inv ks ims ws n /\
+              Seq.length ks == n /\ Seq.length ims == n /\ Seq.length ws == n * n /\ n > 0)
+    (ensures forall (v w: nat). v < n /\ w < n /\
+      SZ.v (Seq.index ims v) <> 1 /\ SZ.v (Seq.index ims w) = 1 /\
+      w * n + v < n * n /\
+      SZ.v (Seq.index ws (w * n + v)) > 0 /\ SZ.v (Seq.index ws (w * n + v)) < SZ.v (65535sz) ==>
+      SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (w * n + v)))
+  = reveal_opaque (`%key_inv) (key_inv ks ims ws n)
+
+/// Same as key_inv_bare but with raw Seq.index (for prim_safe_add_vertex compatibility)
+#push-options "--z3rlimit 50"
+let key_inv_bare_raw (ks ims ws: Seq.seq SZ.t) (n: nat)
+  : Lemma
+    (requires key_inv ks ims ws n /\
+              Seq.length ks == n /\ Seq.length ims == n /\ Seq.length ws == n * n /\ n > 0)
+    (ensures forall (v w: nat). v < n /\ w < n /\
+      SZ.v (Seq.index ims v) <> 1 /\ SZ.v (Seq.index ims w) = 1 /\
+      w * n + v < n * n /\
+      SZ.v (Seq.index ws (w * n + v)) > 0 /\ SZ.v (Seq.index ws (w * n + v)) < SZ.v (65535sz) ==>
+      SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (w * n + v)))
+  = reveal_opaque (`%key_inv) (key_inv ks ims ws n)
+#pop-options
