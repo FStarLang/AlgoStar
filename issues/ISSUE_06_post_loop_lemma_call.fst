@@ -111,6 +111,7 @@ fn update_loop
   };
   // Post-loop: transfer my_safe from old to new sequences
   with ks_f ps_f. assert (A.pts_to key_a ks_f ** A.pts_to parent_a ps_f);
-  my_safe_transfer ps0 ks0 ps_f ks_f ims (SZ.v n)
+  my_safe_transfer ps0 ks0 ps_f ks_f ims (SZ.v n);
+  ()
 }
 #pop-options
