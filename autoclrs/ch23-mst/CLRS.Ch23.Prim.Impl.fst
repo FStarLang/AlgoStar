@@ -18,6 +18,7 @@ module U64 = FStar.UInt64
 
 module PrimSpec = CLRS.Ch23.Prim.Spec
 module Bridge = CLRS.Ch23.Kruskal.Bridge
+module KeyInv = CLRS.Ch23.Prim.KeyInv
 
 // Convert SizeT weights to int for specification
 let sizet_to_int (x: SZ.t) : int = SZ.v x
@@ -906,20 +907,10 @@ let prim_inv
   // No zero-weight edges
   (forall (u v: nat). u < n /\ v < n /\ u * n + v < n * n /\
     SZ.v (Seq.index weights_seq (u * n + v)) = 0 ==> u = v) /\
-  // Key invariant: key[v] <= weight(w,v) for in-MST w, non-MST v
-  (forall (v w: nat). v < n /\ w < n /\
-    SZ.v (Seq.index in_mst_seq v) <> 1 /\
-    SZ.v (Seq.index in_mst_seq w) = 1 /\
-    w * n + v < n * n /\
-    SZ.v (Seq.index weights_seq (w * n + v)) > 0 /\
-    SZ.v (Seq.index weights_seq (w * n + v)) < SZ.v infinity ==>
-    SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (w * n + v))) /\
-  // In-MST vertices have finite keys (maintained: extract-min selects finite-key, keys don't increase for MST vertices)
-  (forall (v: nat). v < n /\ SZ.v (Seq.index in_mst_seq v) = 1 ==>
-    SZ.v (Seq.index key_seq v) < SZ.v infinity) /\
-  // Parent-in-MST for finite-key non-source vertices
-  (forall (v: nat). v < n /\ SZ.v (Seq.index key_seq v) < SZ.v infinity /\ v <> source ==>
-    SZ.v (Seq.index in_mst_seq (SZ.v (Seq.index parent_seq v))) = 1)
+  // Key invariant, in-MST-finite-key, parent-in-MST via KeyInv opaque preds
+  KeyInv.key_inv key_seq in_mst_seq weights_seq n /\
+  KeyInv.ims_finite_key key_seq in_mst_seq n /\
+  KeyInv.parent_in_mst key_seq parent_seq in_mst_seq n source
 
 /// Init: all vacuously true at start
 #push-options "--z3rlimit 200 --split_queries always"
@@ -945,7 +936,10 @@ let prim_inv_init
       // All non-source keys >= infinity
       (forall (v:nat). v < n /\ v <> source ==> SZ.v (Seq.index key_seq v) >= SZ.v infinity))
     (ensures prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
-  = reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
+  = KeyInv.key_inv_init key_seq in_mst_seq weights_seq n;
+    KeyInv.ims_finite_key_init key_seq in_mst_seq n source;
+    KeyInv.parent_in_mst_init key_seq parent_seq in_mst_seq n source;
+    reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
 #pop-options
 
 /// Elim: extract all components from prim_inv
@@ -966,17 +960,9 @@ let prim_inv_elim
       SZ.v (Seq.index key_seq source) == 0 /\
       (forall (u v: nat). u < n /\ v < n /\ u * n + v < n * n /\
         SZ.v (Seq.index weights_seq (u * n + v)) = 0 ==> u = v) /\
-      (forall (v w: nat). v < n /\ w < n /\
-        SZ.v (Seq.index in_mst_seq v) <> 1 /\
-        SZ.v (Seq.index in_mst_seq w) = 1 /\
-        w * n + v < n * n /\
-        SZ.v (Seq.index weights_seq (w * n + v)) > 0 /\
-        SZ.v (Seq.index weights_seq (w * n + v)) < SZ.v infinity ==>
-        SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (w * n + v))) /\
-      (forall (v: nat). v < n /\ SZ.v (Seq.index in_mst_seq v) = 1 ==>
-        SZ.v (Seq.index key_seq v) < SZ.v infinity) /\
-      (forall (v: nat). v < n /\ SZ.v (Seq.index key_seq v) < SZ.v infinity /\ v <> source ==>
-        SZ.v (Seq.index in_mst_seq (SZ.v (Seq.index parent_seq v))) = 1))
+      KeyInv.key_inv key_seq in_mst_seq weights_seq n /\
+      KeyInv.ims_finite_key key_seq in_mst_seq n /\
+      KeyInv.parent_in_mst key_seq parent_seq in_mst_seq n source)
   = reveal_opaque (`%prim_inv) (prim_inv key_seq parent_seq in_mst_seq weights_seq n source)
 
 /// After extract-min + in_mst[u]:=1: advance greedy safety.

@@ -150,6 +150,59 @@ let keys_only_decrease_at (ks_old ks_new: Seq.seq SZ.t) (n v: nat)
           (ensures SZ.v (Seq.index ks_new v) <= SZ.v (Seq.index ks_old v))
   = reveal_opaque (`%keys_only_decrease) (keys_only_decrease ks_old ks_new n)
 
+/// Bundle all 4 update_keys progress predicates into one opaque atom.
+/// Used in the Pulse update_keys loop invariant to keep VC small.
+[@@"opaque_to_smt"]
+let update_progress (ks_old ps_old ks_cur ps_cur ims: Seq.seq SZ.t) (n source u: nat) : prop =
+  ims_unchanged ks_old ps_old ks_cur ps_cur ims n source /\
+  key_unchanged_parent_unchanged ks_old ps_old ks_cur ps_cur n /\
+  key_decreased_parent_is_u ks_old ks_cur ps_cur ims n u /\
+  keys_only_decrease ks_old ks_cur n
+
+let update_progress_init (ks ps ims: Seq.seq SZ.t) (n source u: nat)
+  : Lemma (requires Seq.length ks == n /\ Seq.length ps == n /\ Seq.length ims == n /\
+                    n > 0 /\ source < n /\ u < n)
+          (ensures update_progress ks ps ks ps ims n source u)
+  = reveal_opaque (`%update_progress) (update_progress ks ps ks ps ims n source u);
+    reveal_opaque (`%ims_unchanged) (ims_unchanged ks ps ks ps ims n source);
+    reveal_opaque (`%key_unchanged_parent_unchanged) (key_unchanged_parent_unchanged ks ps ks ps n);
+    reveal_opaque (`%key_decreased_parent_is_u) (key_decreased_parent_is_u ks ks ps ims n u);
+    reveal_opaque (`%keys_only_decrease) (keys_only_decrease ks ks n)
+
+#push-options "--z3rlimit 50"
+let update_progress_step
+    (ks_old ps_old ks_cur ps_cur ims: Seq.seq SZ.t) (n source u i: nat)
+    (new_k new_p: SZ.t) (should_update: bool)
+  : Lemma
+    (requires
+      update_progress ks_old ps_old ks_cur ps_cur ims n source u /\
+      Seq.length ks_cur == n /\ Seq.length ps_cur == n /\
+      Seq.length ks_old == n /\ Seq.length ps_old == n /\
+      Seq.length ims == n /\ n > 0 /\ source < n /\ u < n /\ i < n /\
+      (should_update ==> SZ.v (Seq.index ims i) <> 1 /\
+        SZ.v new_k < SZ.v (Seq.index ks_cur i) /\ SZ.v new_p == u) /\
+      (~should_update ==> new_k == Seq.index ks_cur i /\ new_p == Seq.index ps_cur i))
+    (ensures update_progress ks_old ps_old (Seq.upd ks_cur i new_k) (Seq.upd ps_cur i new_p) ims n source u)
+  = reveal_opaque (`%update_progress) (update_progress ks_old ps_old ks_cur ps_cur ims n source u);
+    reveal_opaque (`%update_progress) (update_progress ks_old ps_old (Seq.upd ks_cur i new_k) (Seq.upd ps_cur i new_p) ims n source u);
+    reveal_opaque (`%ims_unchanged) (ims_unchanged ks_old ps_old ks_cur ps_cur ims n source);
+    reveal_opaque (`%ims_unchanged) (ims_unchanged ks_old ps_old (Seq.upd ks_cur i new_k) (Seq.upd ps_cur i new_p) ims n source);
+    reveal_opaque (`%key_unchanged_parent_unchanged) (key_unchanged_parent_unchanged ks_old ps_old ks_cur ps_cur n);
+    reveal_opaque (`%key_unchanged_parent_unchanged) (key_unchanged_parent_unchanged ks_old ps_old (Seq.upd ks_cur i new_k) (Seq.upd ps_cur i new_p) n);
+    reveal_opaque (`%key_decreased_parent_is_u) (key_decreased_parent_is_u ks_old ks_cur ps_cur ims n u);
+    reveal_opaque (`%key_decreased_parent_is_u) (key_decreased_parent_is_u ks_old (Seq.upd ks_cur i new_k) (Seq.upd ps_cur i new_p) ims n u);
+    reveal_opaque (`%keys_only_decrease) (keys_only_decrease ks_old ks_cur n);
+    reveal_opaque (`%keys_only_decrease) (keys_only_decrease ks_old (Seq.upd ks_cur i new_k) n)
+#pop-options
+
+let update_progress_elim (ks_old ps_old ks_new ps_new ims: Seq.seq SZ.t) (n source u: nat)
+  : Lemma (requires update_progress ks_old ps_old ks_new ps_new ims n source u)
+          (ensures ims_unchanged ks_old ps_old ks_new ps_new ims n source /\
+                   key_unchanged_parent_unchanged ks_old ps_old ks_new ps_new n /\
+                   key_decreased_parent_is_u ks_old ks_new ps_new ims n u /\
+                   keys_only_decrease ks_old ks_new n)
+  = reveal_opaque (`%update_progress) (update_progress ks_old ps_old ks_new ps_new ims n source u)
+
 /// parent_in_mst elim: instantiate the quantifier at specific v, w
 let parent_in_mst_at (ks ps ims: Seq.seq SZ.t) (n source v w: nat)
   : Lemma (requires parent_in_mst ks ps ims n source /\
