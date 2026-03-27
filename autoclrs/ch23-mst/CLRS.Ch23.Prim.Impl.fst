@@ -458,51 +458,50 @@ let prim_loop_state_elim
 
 (*** Pulse-callable lemma wrappers ***)
 
-/// Wrapper for prim_safe_update_non_mst that takes all needed facts explicitly.
-/// This avoids Ghost.erased typing issues in Pulse — all args are concrete when called.
+/// Combined: transfer from pre-add state + update_progress → post-update prim_loop_state.
+/// Takes prim_loop_state on PRE-ADD ims, produces prim_loop_state on POST-ADD ims.
 #restart-solver
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 0"
 let update_keys_rebuild
-    (ks_old ps_old ks_new ps_new ims ws: Seq.seq SZ.t) (n source u: nat)
+    (ks_old ps_old ks_new ps_new ims_old ims_new ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
     (requires
       Seq.length ks_old == n /\ Seq.length ps_old == n /\
       Seq.length ks_new == n /\ Seq.length ps_new == n /\
-      Seq.length ims == n /\ Seq.length ws == n * n /\
+      Seq.length ims_old == n /\ Seq.length ims_new == n /\ Seq.length ws == n * n /\
       n > 0 /\ source < n /\ u < n /\ n * n < pow2 64 /\ SZ.fits_u64 /\
-      prim_loop_state ks_old ps_old ims ws n source /\
-      prim_safe ps_old ks_old ims ws n source /\
+      prim_loop_state ks_old ps_old ims_old ws n source /\
+      prim_safe ps_old ks_old ims_new ws n source /\
+      Bridge.noRepeats_edge (mst_edges_so_far ps_old ks_old ims_new n source 0) /\
+      SZ.v (Seq.index ims_new u) = 1 /\
+      (forall (v:nat). v < n /\ v <> u ==> Seq.index ims_new v == Seq.index ims_old v) /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims_new j) = 0 \/ SZ.v (Seq.index ims_new j) = 1) /\
       all_keys_bounded ks_new /\
       parent_valid ps_new n /\
       prim_kpc ks_new ps_new ws n source /\
       SZ.v (Seq.index ks_new source) == 0 /\
-      SZ.v (Seq.index ims u) = 1 /\
-      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
-      KeyInv.update_progress ks_old ps_old ks_new ps_new ims n source u)
-    (ensures prim_loop_state ks_new ps_new ims ws n source)
-  = // 1. Transfer prim_safe (using ims_unchanged from update_progress)
-    KeyInv.update_progress_elim ks_old ps_old ks_new ps_new ims n source u;
-    KeyInv.ims_unchanged_bare ks_old ps_old ks_new ps_new ims n source;
-    prim_safe_update_non_mst ps_old ks_old ps_new ks_new ims ws n source;
-    // 2. Transfer noRepeats
-    prim_loop_state_elim ks_old ps_old ims ws n source;
-    mst_edges_ext ps_old ks_old ps_new ks_new ims n source 0;
-    // 3. Use KeyInv.loop_state_after_update for everything else
-    reveal_opaque (`%prim_loop_state) (prim_loop_state ks_old ps_old ims ws n source);
-    reveal_opaque (`%prim_inv) (prim_inv ks_old ps_old ims ws n source);
-    KeyInv.loop_state_after_update
-      (prim_inv ks_old ps_old ims ws n source)
-      (Bridge.noRepeats_edge (mst_edges_so_far ps_old ks_old ims n source 0))
-      (prim_safe ps_old ks_old ims ws n source)
-      (prim_kpc ks_old ps_old ws n source)
-      (prim_safe ps_new ks_new ims ws n source)
-      (prim_kpc ks_new ps_new ws n source)
-      (Bridge.noRepeats_edge (mst_edges_so_far ps_new ks_new ims n source 0))
-      ks_old ps_old ks_new ps_new ims ws n source u;
-    // 4. Wrap into prim_loop_state
-    reveal_opaque (`%prim_inv) (prim_inv ks_new ps_new ims ws n source);
-    reveal_opaque (`%prim_loop_state) (prim_loop_state ks_new ps_new ims ws n source)
+      KeyInv.update_progress ks_old ps_old ks_new ps_new ims_new n source u)
+    (ensures prim_loop_state ks_new ps_new ims_new ws n source)
+  = // 1. Transfer prim_safe to new ks/ps
+    KeyInv.update_progress_elim ks_old ps_old ks_new ps_new ims_new n source u;
+    KeyInv.ims_unchanged_bare ks_old ps_old ks_new ps_new ims_new n source;
+    prim_safe_update_non_mst ps_old ks_old ps_new ks_new ims_new ws n source;
+    // 2. Transfer noRepeats to new ks/ps  
+    mst_edges_ext ps_old ks_old ps_new ks_new ims_new n source 0;
+    // 3. Get key_inv from pre-add state, chain through add + update
+    prim_loop_state_elim ks_old ps_old ims_old ws n source;
+    prim_inv_elim ks_old ps_old ims_old ws n source;
+    // key_inv ks_old ims_old ws n → key_inv ks_new ims_old ws n (keys decreased)
+    reveal_opaque (`%KeyInv.keys_only_decrease) (KeyInv.keys_only_decrease ks_old ks_new n);
+    KeyInv.key_inv_after_update ks_old ks_new ims_old ws n;
+    // key_inv ks_new ims_old ws n → key_inv ks_new ims_new ws n
+    // Need: key[v] <= weight(u,v) for non-MST v with valid weight
+    // From update_keys loop: either key decreased (to weight(u,v)) or weight(u,v) >= key[v]
+    // This requires the "keys_bounded_by_u" fact from the update_keys loop
+    // For now, admit this key_inv transfer
+    admit ()
 #pop-options
+
 
 
 /// Hoisted extract-min loop: find the minimum-key non-MST vertex.
@@ -594,6 +593,10 @@ fn find_min_vertex
 
 /// Hoisted update-keys loop: for each vertex v, if v not in MST and weight(u,v) < key[v],
 /// set key[v] = weight(u,v) and parent[v] = u. Maintains prim_kpc and prim_safe.
+///
+/// Takes prim_loop_state on PRE-ADD ims (ims_old) as ghost context.
+/// The actual in_mst array has POST-ADD ims (u already added).
+/// Outputs prim_loop_state on POST-ADD ims with updated keys/parents.
 #push-options "--z3rlimit 800"
 fn update_keys
   (#p: perm)
@@ -602,6 +605,7 @@ fn update_keys
   (parent_a: array SZ.t) (#ps0: Ghost.erased (Seq.seq SZ.t))
   (weights: array SZ.t) (#weights_seq: Ghost.erased (Seq.seq SZ.t))
   (n: SZ.t) (source: SZ.t) (u: SZ.t)
+  (#ims_old: Ghost.erased (Seq.seq SZ.t))
   requires
     A.pts_to key_a ks0 **
     A.pts_to in_mst in_mst_seq **
@@ -619,7 +623,15 @@ fn update_keys
       prim_kpc ks0 ps0 weights_seq (SZ.v n) (SZ.v source) /\
       prim_safe ps0 ks0 in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
       SZ.v (Seq.index ks0 (SZ.v source)) == 0 /\
-      prim_loop_state ks0 ps0 in_mst_seq weights_seq (SZ.v n) (SZ.v source)
+      // Ghost: prim_loop_state on pre-add ims
+      Seq.length ims_old == SZ.v n /\
+      prim_loop_state ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source) /\
+      // How ims_old relates to in_mst_seq (post-add):
+      SZ.v (Seq.index in_mst_seq (SZ.v u)) = 1 /\
+      (forall (v:nat). v < SZ.v n /\ v <> SZ.v u ==> Seq.index in_mst_seq v == Seq.index ims_old v) /\
+      (forall (j:nat). j < SZ.v n ==> SZ.v (Seq.index in_mst_seq j) = 0 \/ SZ.v (Seq.index in_mst_seq j) = 1) /\
+      // noRepeats on new ims
+      Bridge.noRepeats_edge (mst_edges_so_far ps0 ks0 in_mst_seq (SZ.v n) (SZ.v source) 0)
     )
   returns _r: unit
   ensures exists* (ks1 ps1: Ghost.erased (Seq.seq SZ.t)).
@@ -657,7 +669,7 @@ fn update_keys
       SZ.v n > 0 /\ SZ.v source < SZ.v n /\
       SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
       prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
-      prim_loop_state ks0 ps0 in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
+      prim_loop_state ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source) /\
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       KeyInv.update_progress ks0 ps0 key_seq parent_seq in_mst_seq (SZ.v n) (SZ.v source) (SZ.v u)
     )
@@ -685,9 +697,9 @@ fn update_keys
     update_i := v +^ 1sz;
   };
   with ks_f ps_f. assert (A.pts_to key_a ks_f ** A.pts_to parent_a ps_f);
-  prim_loop_state_elim ks0 ps0 in_mst_seq weights_seq (SZ.v n) (SZ.v source);
-  prim_inv_elim ks0 ps0 in_mst_seq weights_seq (SZ.v n) (SZ.v source);
-  update_keys_rebuild ks0 ps0 ks_f ps_f in_mst_seq weights_seq (SZ.v n) (SZ.v source) (SZ.v u);
+  prim_loop_state_elim ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source);
+  prim_inv_elim ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source);
+  update_keys_rebuild ks0 ps0 ks_f ps_f ims_old in_mst_seq weights_seq (SZ.v n) (SZ.v source) (SZ.v u);
   ()
 }
 #pop-options
@@ -739,17 +751,9 @@ fn prim_step
   Greedy.prim_noRepeats_step ks_pre ps_pre ims_pre ims_post weights_seq
     (SZ.v n) (SZ.v source) (SZ.v u);
   
-  // Build prim_loop_state on post-add state for update_keys
-  // prim_greedy_step gave: prim_safe + prim_kpc + binary ims
-  // prim_noRepeats_step gave: noRepeats
-  // prim_inv_elim gave: all other facts from pre-add prim_inv
-  // Need to construct prim_inv on post-add state first
-  // For now, admit prim_loop_state construction — all components available
-  admit ();
-
-  // 4. Update keys of neighbors — outputs prim_loop_state directly
+  // 4. Update keys of neighbors — takes pre-add ims as ghost context
   lemma_mul_bound (SZ.v u) (SZ.v n) 0 (pow2 64);
-  update_keys key_a in_mst parent_a weights n source u;
+  update_keys #p key_a #ks_pre in_mst #ims_post parent_a #ps_pre weights #weights_seq n source u #ims_pre;
   ()
 }
 #pop-options
