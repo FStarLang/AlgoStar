@@ -736,19 +736,25 @@ fn prim_step
   (parent_a: array SZ.t)
   (weights: array SZ.t) (#weights_seq: Ghost.erased (Seq.seq SZ.t))
   (n: SZ.t) (source: SZ.t)
+  (count: Ghost.erased nat)
   requires exists* (ks ps ims: Ghost.erased (Seq.seq SZ.t)).
     A.pts_to key_a ks **
     A.pts_to in_mst ims **
     A.pts_to parent_a ps **
     A.pts_to weights #p weights_seq **
-    pure (prim_loop_state ks ps ims weights_seq (SZ.v n) (SZ.v source))
+    pure (prim_loop_state ks ps ims weights_seq (SZ.v n) (SZ.v source) /\
+          Seq.length ims == SZ.v n /\
+          KeyInv.mst_count ims (SZ.v n) 0 == Ghost.reveal count /\
+          Ghost.reveal count < SZ.v n)
   returns _r: unit
   ensures exists* (ks' ps' ims': Ghost.erased (Seq.seq SZ.t)).
     A.pts_to key_a ks' **
     A.pts_to in_mst ims' **
     A.pts_to parent_a ps' **
     A.pts_to weights #p weights_seq **
-    pure (prim_loop_state ks' ps' ims' weights_seq (SZ.v n) (SZ.v source))
+    pure (prim_loop_state ks' ps' ims' weights_seq (SZ.v n) (SZ.v source) /\
+          Seq.length ims' == SZ.v n /\
+          KeyInv.mst_count ims' (SZ.v n) 0 == Ghost.reveal count + 1)
 {
   // Extract facts from prim_loop_state
   with ks0 ps0 ims0. assert (A.pts_to key_a ks0 ** A.pts_to in_mst ims0 ** A.pts_to parent_a ps0);
@@ -792,6 +798,13 @@ fn prim_step
   Greedy.prim_noRepeats_step ks_pre ps_pre ims_pre ims_post weights_seq
     (SZ.v n) (SZ.v source) (SZ.v u);
   
+  // mst_count: u was not in MST before add
+  // Source case: key[source]=0 < infinity, so ims[source]=0
+  // Non-source case: assume connectivity gives min_key < infinity, so ims[u]=0
+  // Both covered by the assume_ above + find_min_vertex postcondition
+  assume_ (pure (SZ.v (Seq.index ims_pre (SZ.v u)) = 0));
+  KeyInv.mst_count_add ims_pre (SZ.v n) (SZ.v u) 0;
+
   // 4. Update keys of neighbors — takes pre-add ims as ghost context
   lemma_mul_bound (SZ.v u) (SZ.v n) 0 (pow2 64);
   update_keys #p key_a #ks_pre in_mst #ims_post parent_a #ps_pre weights #weights_seq n source u #ims_pre;
@@ -876,6 +889,7 @@ fn prim
   
   // Establish prim_loop_state
   prim_loop_state_intro key_seq_init parent_init in_mst_init weights_seq (SZ.v n) (SZ.v source);
+  KeyInv.mst_count_zero (SZ.v n) 0;
   
   // Main loop: n iterations
   let mut iter: SZ.t = 0sz;
@@ -893,12 +907,15 @@ fn prim
     pure (
       SZ.v v_iter <= SZ.v n /\
       SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
-      prim_loop_state key_seq parent_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source)
+      Seq.length in_mst_seq == SZ.v n /\
+      prim_loop_state key_seq parent_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
+      KeyInv.mst_count in_mst_seq (SZ.v n) 0 == SZ.v v_iter
     )
   // TODO: decreases
   {
+    let cur_iter = !iter;
     // One complete iteration of Prim's algorithm (hoisted)
-    prim_step key_a in_mst parent_a weights n source;
+    prim_step key_a in_mst parent_a weights n source (Ghost.hide (SZ.v cur_iter));
     
     // Increment iteration counter — just need n*n < pow2 64 for SZ arithmetic
     let v_iter = !iter;
@@ -913,10 +930,8 @@ fn prim
   prim_loop_state_elim ks_end ps_end ims_end weights_seq (SZ.v n) (SZ.v source);
   prim_inv_elim ks_end ps_end ims_end weights_seq (SZ.v n) (SZ.v source);
   
-  // derive_prim_mst_post_loop needs all-in-MST. 
-  // After n iterations, all vertices are in MST. 
-  // For now: assume the all-in-MST fact and derive prim_mst_result.
-  assume_ (pure (forall (v:nat). v < SZ.v n /\ v <> SZ.v source ==> SZ.v (Seq.index ims_end v) = 1));
+  // All vertices in MST: mst_count = n after n iterations
+  KeyInv.mst_count_full ims_end (SZ.v n) 0;
   derive_prim_mst_post_loop ks_end ps_end ims_end weights_seq (SZ.v n) (SZ.v source);
   
   // Set parent[source] = source

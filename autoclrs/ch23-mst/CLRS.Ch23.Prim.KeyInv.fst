@@ -749,3 +749,13 @@ let rec mst_count_not_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
     else if SZ.v (Seq.index ims i) = 0 then ()
     else mst_count_not_full ims n (i + 1)
 #pop-options
+
+/// Initially all ims=0, so mst_count = 0
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec mst_count_zero (n: nat) (i: nat)
+  : Lemma (requires i <= n)
+          (ensures mst_count (Seq.create n 0sz) n i == 0)
+          (decreases (n - i))
+  = if i >= n then ()
+    else mst_count_zero n (i + 1)
+#pop-options
