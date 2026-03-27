@@ -896,8 +896,11 @@ fn prim
   prim_kpc_elim ks_end ps_final weights_seq (SZ.v n) (SZ.v source);
   
   // derive_prim_mst_post_loop needs prim_inv + noRepeats + all-in-MST
-  // For now: admit the final derivation (needs all-in-MST argument from n iterations)
-  admit ();
+  // prim_correct is provable from loop invariants directly
+  // prim_mst_result needs all-in-MST (after n iterations), which requires tracking MST size
+  // For now: admit prim_mst_result (prim_correct is proven)
+  assert (pure (prim_correct ks_end ps_final weights_seq (SZ.v n) (SZ.v source)));
+  admit (); // prim_mst_result: needs all-in-MST argument
   
   // Free the in_mst array
   with s_in_mst. assert (A.pts_to in_mst s_in_mst);
