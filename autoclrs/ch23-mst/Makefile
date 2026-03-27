@@ -15,7 +15,7 @@ KRML_INPUT_FILES  = _output/CLRS_Ch23_Prim_ImplTest.krml \
                     _output/CLRS_Ch23_MST_Spec.krml \
                     _output/CLRS_Ch23_Kruskal_Defs.krml \
                     _output/CLRS_Ch23_Kruskal_EdgeSorting.krml
-KRML_BUNDLE_FLAGS = -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
+KRML_BUNDLE_FLAGS = -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims' -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
 KRML_WARN_FLAGS   = -warn-error -2-9-11-15-17
 KRML_EXTRA_FLAGS  =
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch23_Prim_ImplTest.c \
