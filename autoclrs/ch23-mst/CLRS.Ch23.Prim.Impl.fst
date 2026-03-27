@@ -792,21 +792,20 @@ fn prim_step
   prim_loop_state_elim ks0 ps0 ims0 weights_seq (SZ.v n) (SZ.v source);
   
   // 1. Find minimum key vertex
-  let min_result = find_min_vertex key_a in_mst n;
-  let u = fst min_result;
+  let (u, min_key_val) = find_min_vertex key_a in_mst n;
   
   // 2. Save pre-add state and add u to MST
   with ks_pre ps_pre ims_pre.
     assert (A.pts_to key_a ks_pre ** A.pts_to parent_a ps_pre ** A.pts_to in_mst ims_pre);
   // ims_pre = ims0 (in_mst unchanged since find_min_vertex)
-  assert (pure (SZ.v (fst min_result) < SZ.v n));
+  assert (pure (SZ.v (u) < SZ.v n));
   assert (pure (
-    SZ.v (snd min_result) <= SZ.v infinity /\
-    (SZ.v (snd min_result) < SZ.v infinity ==>
-      SZ.v (snd min_result) == SZ.v (Seq.index ks_pre (SZ.v (fst min_result))) /\
-      SZ.v (Seq.index ims_pre (SZ.v (fst min_result))) = 0) /\
+    SZ.v (min_key_val) <= SZ.v infinity /\
+    (SZ.v (min_key_val) < SZ.v infinity ==>
+      SZ.v (min_key_val) == SZ.v (Seq.index ks_pre (SZ.v (u))) /\
+      SZ.v (Seq.index ims_pre (SZ.v (u))) = 0) /\
     (forall (j:nat). j < SZ.v n /\ SZ.v (Seq.index ims_pre j) = 0 ==>
-      SZ.v (snd min_result) <= SZ.v (Seq.index ks_pre j))
+      SZ.v (min_key_val) <= SZ.v (Seq.index ks_pre j))
   ));
   A.op_Array_Assignment in_mst u 1sz;
   
@@ -815,7 +814,7 @@ fn prim_step
   prim_inv_elim ks_pre ps_pre ims_pre weights_seq (SZ.v n) (SZ.v source);
   // min_key < infinity and ims[u]=0 — call BEFORE if/else
   min_key_finite ks_pre ims_pre weights_seq
-    (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v (snd min_result)) (Ghost.reveal count);
+    (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v (min_key_val)) (Ghost.reveal count);
   if (u = source) {
     prim_inv_add_source ks_pre ps_pre ims_pre ims_post weights_seq
       (SZ.v n) (SZ.v source);

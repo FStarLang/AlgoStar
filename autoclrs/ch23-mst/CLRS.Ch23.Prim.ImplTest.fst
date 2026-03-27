@@ -200,23 +200,23 @@ fn test_prim_3 ()
   test_graph_preconditions ws;
 
   // --- Call prim ---
-  let res = prim weights 3sz 0sz;
+  let (key_vec, parent_vec) = prim weights 3sz 0sz;
 
   // --- Extract postcondition ---
   // prim_correct key_seq parent_seq ws 3 0
   // prim_mst_result parent_seq key_seq ws 3 0
   with key_seq parent_seq.
-    assert (V.pts_to (fst res) key_seq **
-            V.pts_to (snd res) parent_seq **
+    assert (V.pts_to (key_vec) key_seq **
+            V.pts_to (parent_vec) parent_seq **
             pure (prim_correct key_seq parent_seq ws 3 0 /\
                   prim_mst_result parent_seq key_seq ws 3 0));
 
   // --- What CAN be proven from prim_correct ---
 
   // Convert key vec to array for reading
-  V.to_array_pts_to (fst res);
-  let key_arr = V.vec_to_array (fst res);
-  rewrite (A.pts_to (V.vec_to_array (fst res)) key_seq)
+  V.to_array_pts_to (key_vec);
+  let key_arr = V.vec_to_array (key_vec);
+  rewrite (A.pts_to (V.vec_to_array (key_vec)) key_seq)
        as (A.pts_to key_arr key_seq);
 
   // ✓ PROVEN: key[source] == 0
@@ -231,13 +231,13 @@ fn test_prim_3 ()
 
   // Convert key array back to vec for cleanup
   with ks. assert (A.pts_to key_arr ks);
-  rewrite (A.pts_to key_arr ks) as (A.pts_to (V.vec_to_array (fst res)) ks);
-  V.to_vec_pts_to (fst res);
+  rewrite (A.pts_to key_arr ks) as (A.pts_to (V.vec_to_array (key_vec)) ks);
+  V.to_vec_pts_to (key_vec);
 
   // Convert parent vec to array for reading
-  V.to_array_pts_to (snd res);
-  let parent_arr = V.vec_to_array (snd res);
-  rewrite (A.pts_to (V.vec_to_array (snd res)) parent_seq)
+  V.to_array_pts_to (parent_vec);
+  let parent_arr = V.vec_to_array (parent_vec);
+  rewrite (A.pts_to (V.vec_to_array (parent_vec)) parent_seq)
        as (A.pts_to parent_arr parent_seq);
 
   // ✓ PROVEN: parent[source] == source
@@ -253,8 +253,8 @@ fn test_prim_3 ()
 
   // Convert parent array back to vec for cleanup
   with ps2. assert (A.pts_to parent_arr ps2);
-  rewrite (A.pts_to parent_arr ps2) as (A.pts_to (V.vec_to_array (snd res)) ps2);
-  V.to_vec_pts_to (snd res);
+  rewrite (A.pts_to parent_arr ps2) as (A.pts_to (V.vec_to_array (parent_vec)) ps2);
+  V.to_vec_pts_to (parent_vec);
 
   // --- What CAN be proven from prim_correct (with key_parent_consistent) ---
   //
@@ -282,10 +282,10 @@ fn test_prim_3 ()
   // API GAP: prim returns freshly allocated vecs but its postcondition
   // does not include is_full_vec, preventing the caller from freeing them.
   // We use drop_ to discard the permissions (test-only resource leak).
-  with ks2. assert (V.pts_to (fst res) ks2);
-  drop_ (V.pts_to (fst res) ks2);
-  with ps3. assert (V.pts_to (snd res) ps3);
-  drop_ (V.pts_to (snd res) ps3);
+  with ks2. assert (V.pts_to (key_vec) ks2);
+  drop_ (V.pts_to (key_vec) ks2);
+  with ps3. assert (V.pts_to (parent_vec) ps3);
+  drop_ (V.pts_to (parent_vec) ps3);
 
   with ws2. assert (A.pts_to weights ws2);
   rewrite (A.pts_to weights ws2) as (A.pts_to (V.vec_to_array wv) ws2);
