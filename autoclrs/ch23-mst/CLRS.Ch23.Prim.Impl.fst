@@ -25,11 +25,6 @@ module Defs = CLRS.Ch23.Prim.Defs
 // Re-export from Greedy for backward compatibility
 let sizet_to_int = Greedy.sizet_to_int
 
-let sizet_seq_to_int_seq (s: Seq.seq SZ.t) : Seq.seq int =
-  Seq.init (Seq.length s) (fun (i:nat{i < Seq.length s}) -> sizet_to_int (Seq.index s i))
-
-let weights_to_adj_matrix = Greedy.weights_to_adj_matrix
-
 // Lemma: Seq.create produces bounded keys
 let lemma_create_bounded (n: nat) (v: SZ.t)
   : Lemma (requires SZ.v v <= SZ.v infinity)

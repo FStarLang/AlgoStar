@@ -103,15 +103,54 @@ let prim_correct_keys_bounded
 
 // Test graph preconditions (concrete data, verified by inspection)
 // weights_to_adj_matrix normalization too complex for assert_norm
+// Test graph preconditions — each proved from concrete data
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let test_valid_weights_3 () : Lemma (valid_weights weights3 3) = ()
+let test_symmetric_weights_3 () : Lemma (symmetric_weights weights3 3) = ()
+let test_no_zero_edges_3 () : Lemma
+  (forall (u v: nat). u < 3 /\ v < 3 /\ u * 3 + v < 9 /\
+    SZ.v (Seq.index weights3 (u * 3 + v)) = 0 ==> u = v) = ()
+#pop-options
+
+// all_connected for the test graph: prove paths exist
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 800"
+let test_all_connected_impl () : Lemma
+  (CLRS.Ch23.MST.Spec.all_connected 3
+    (CLRS.Ch23.Prim.Spec.adj_to_edges (weights_to_adj_matrix weights3 3) 3))
+  = let adj = weights_to_adj_matrix weights3 3 in
+    CLRS.Ch23.Prim.Spec.well_formed_adj_intro adj 3;
+    CLRS.Ch23.Prim.Spec.has_edge_intro adj 3 0 1;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_has_edge adj 3 0 1;
+    CLRS.Ch23.Prim.Spec.has_edge_intro adj 3 1 2;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_has_edge adj 3 1 2;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_edges adj 3;
+    let es = CLRS.Ch23.Prim.Spec.adj_to_edges adj 3 in
+    let e01 : CLRS.Ch23.MST.Spec.edge = {u=0; v=1; w=1} in
+    let e12 : CLRS.Ch23.MST.Spec.edge = {u=1; v=2; w=2} in
+    CLRS.Ch23.MST.Spec.edge_eq_reflexive e01;
+    CLRS.Ch23.MST.Spec.edge_eq_reflexive e12;
+    assert (CLRS.Ch23.MST.Spec.is_path_from_to [] 0 0);
+    assert (CLRS.Ch23.MST.Spec.subset_edges ([] <: list CLRS.Ch23.MST.Spec.edge) es);
+    assert (CLRS.Ch23.MST.Spec.is_path_from_to [e01] 0 1);
+    assert (CLRS.Ch23.MST.Spec.subset_edges [e01] es);
+    assert (CLRS.Ch23.MST.Spec.is_path_from_to [e01; e12] 0 2);
+    assert (CLRS.Ch23.MST.Spec.subset_edges [e01; e12] es)
+#pop-options
+
+#push-options "--z3rlimit 50"
 let test_graph_preconditions (ws: Seq.seq SZ.t) : Lemma
-  (requires Seq.length ws == 9)
+  (requires ws == weights3)
   (ensures
     valid_weights ws 3 /\
     symmetric_weights ws 3 /\
     CLRS.Ch23.MST.Spec.all_connected 3 (CLRS.Ch23.Prim.Spec.adj_to_edges (weights_to_adj_matrix ws 3) 3) /\
     (forall (u v: nat). u < 3 /\ v < 3 /\ u * 3 + v < 9 /\
       SZ.v (Seq.index ws (u * 3 + v)) = 0 ==> u = v))
-  = admit () // test data: triangle graph [0,1,3; 1,0,2; 3,2,0]
+  = test_valid_weights_3 ();
+    test_symmetric_weights_3 ();
+    test_no_zero_edges_3 ();
+    test_all_connected_impl ()
+#pop-options
 
 #push-options "--z3rlimit 200 --fuel 10 --ifuel 10"
 
@@ -155,6 +194,8 @@ fn test_prim_3 ()
   // Bind ghost sequence for weights before calling prim
   with ws. assert (A.pts_to weights ws);
 
+  // Establish ws == weights3 from the array writes
+  seq_after_writes_weights ();
   // Establish new prim preconditions for the test graph
   test_graph_preconditions ws;
 

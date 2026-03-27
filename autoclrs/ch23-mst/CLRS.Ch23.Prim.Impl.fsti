@@ -82,12 +82,7 @@ let prim_correct
     key_parent_consistent key_seq parent_seq weights_seq n source
 
 /// Convert weight matrix from SizeT array to adjacency matrix spec
-val weights_to_adj_matrix (weights_seq: Seq.seq SZ.t) (n: nat) 
-  : Pure adj_matrix
-    (requires Seq.length weights_seq == n * n)
-    (ensures fun adj -> 
-      Seq.length adj == n /\
-      (forall (u:nat). u < n ==> Seq.length (Seq.index adj u) == n))
+let weights_to_adj_matrix = CLRS.Ch23.Prim.Greedy.weights_to_adj_matrix
 
 /// Extract MST edges from the parent array:
 /// For each vertex v ≠ source, emit edge {parent[v], v, key[v]}
