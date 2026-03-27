@@ -415,3 +415,82 @@ let prim_inv_bundle_after_update
     parent_in_mst_after_update ks_old ps_old ks_new ps_new ims n source u;
     prim_inv_bundle_intro safe_new kpc_new ks_new ps_new ims ws n source
 #pop-options
+
+(*** Full prim_loop_state rebuild — all reasoning in KeyInv ***)
+
+/// Opaque loop state: prim_inv_bundle + noRepeats + basics.
+/// Matches prim_loop_state from Prim.Impl.
+[@@"opaque_to_smt"]
+let loop_state
+    (inv noRepeats: prop)
+    (ks ps ims ws: Seq.seq SZ.t) (n source: nat) : prop =
+  n > 0 /\ source < n /\
+  Seq.length ks == n /\ Seq.length ps == n /\
+  Seq.length ims == n /\ Seq.length ws == n * n /\
+  n * n < pow2 64 /\ SZ.fits_u64 /\
+  inv /\ noRepeats /\
+  SZ.v (Seq.index ks source) == 0 /\
+  Defs.all_keys_bounded ks /\
+  Defs.parent_valid ps n /\
+  (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1)
+
+#push-options "--z3rlimit 50"
+let loop_state_intro (inv noRepeats: prop)
+    (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
+  : Lemma (requires n > 0 /\ source < n /\
+      Seq.length ks == n /\ Seq.length ps == n /\
+      Seq.length ims == n /\ Seq.length ws == n * n /\
+      n * n < pow2 64 /\ SZ.fits_u64 /\
+      inv /\ noRepeats /\
+      SZ.v (Seq.index ks source) == 0 /\
+      Defs.all_keys_bounded ks /\ Defs.parent_valid ps n /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
+    (ensures loop_state inv noRepeats ks ps ims ws n source)
+  = reveal_opaque (`%loop_state) (loop_state inv noRepeats ks ps ims ws n source)
+
+let loop_state_elim (inv noRepeats: prop)
+    (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
+  : Lemma (requires loop_state inv noRepeats ks ps ims ws n source)
+    (ensures n > 0 /\ source < n /\
+      Seq.length ks == n /\ Seq.length ps == n /\
+      Seq.length ims == n /\ Seq.length ws == n * n /\
+      n * n < pow2 64 /\ SZ.fits_u64 /\
+      inv /\ noRepeats /\
+      SZ.v (Seq.index ks source) == 0 /\
+      Defs.all_keys_bounded ks /\ Defs.parent_valid ps n /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
+  = reveal_opaque (`%loop_state) (loop_state inv noRepeats ks ps ims ws n source)
+#pop-options
+
+/// Full loop_state rebuild after update_keys.
+/// Takes: old loop_state + update_progress + new safe + new kpc + new noRepeats.
+/// All reasoning (key_inv, ims_finite_key, parent_in_mst) done here in KeyInv context.
+#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
+let loop_state_after_update
+    (inv_old noRepeats_old safe_old kpc_old: prop)
+    (safe_new kpc_new noRepeats_new: prop)
+    (ks_old ps_old ks_new ps_new ims ws: Seq.seq SZ.t) (n source u: nat)
+  : Lemma
+    (requires
+      loop_state inv_old noRepeats_old ks_old ps_old ims ws n source /\
+      // inv_old = prim_inv_bundle safe_old kpc_old ... (caller instantiates)
+      inv_old == prim_inv_bundle safe_old kpc_old ks_old ps_old ims ws n source /\
+      // New state
+      safe_new /\ kpc_new /\ noRepeats_new /\
+      n > 0 /\ source < n /\
+      Seq.length ks_new == n /\ Seq.length ps_new == n /\
+      Seq.length ims == n /\
+      Defs.all_keys_bounded ks_new /\ Defs.parent_valid ps_new n /\
+      SZ.v (Seq.index ks_new source) == 0 /\
+      u < n /\ SZ.v (Seq.index ims u) = 1 /\
+      update_progress ks_old ps_old ks_new ps_new ims n source u)
+    (ensures loop_state
+      (prim_inv_bundle safe_new kpc_new ks_new ps_new ims ws n source)
+      noRepeats_new ks_new ps_new ims ws n source)
+  = loop_state_elim inv_old noRepeats_old ks_old ps_old ims ws n source;
+    prim_inv_bundle_after_update safe_old kpc_old safe_new kpc_new
+      ks_old ps_old ks_new ps_new ims ws n source u;
+    loop_state_intro
+      (prim_inv_bundle safe_new kpc_new ks_new ps_new ims ws n source)
+      noRepeats_new ks_new ps_new ims ws n source
+#pop-options

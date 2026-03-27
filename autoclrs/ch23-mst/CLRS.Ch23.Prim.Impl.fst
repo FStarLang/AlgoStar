@@ -1713,16 +1713,11 @@ let derive_prim_mst_post_loop
 [@@"opaque_to_smt"]
 let prim_loop_state
     (ks ps ims ws: Seq.seq SZ.t) (n source: nat) : prop =
-  n > 0 /\ source < n /\
-  Seq.length ks == n /\ Seq.length ps == n /\
-  Seq.length ims == n /\ Seq.length ws == n * n /\
-  n * n < pow2 64 /\ SZ.fits_u64 /\
-  prim_inv ks ps ims ws n source /\
-  Bridge.noRepeats_edge (mst_edges_so_far ps ks ims n source 0) /\
-  SZ.v (Seq.index ks source) == 0 /\
-  all_keys_bounded ks /\
-  parent_valid ps n /\
-  (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1)
+  Seq.length ps == n /\ Seq.length ks == n /\ Seq.length ims == n /\ source < n /\ n > 0 /\
+  KeyInv.loop_state
+    (prim_inv ks ps ims ws n source)
+    (Bridge.noRepeats_edge (mst_edges_so_far ps ks ims n source 0))
+    ks ps ims ws n source
 
 let prim_loop_state_intro
     (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
@@ -1739,7 +1734,11 @@ let prim_loop_state_intro
       parent_valid ps n /\
       (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
     (ensures prim_loop_state ks ps ims ws n source)
-  = reveal_opaque (`%prim_loop_state) (prim_loop_state ks ps ims ws n source)
+  = KeyInv.loop_state_intro
+      (prim_inv ks ps ims ws n source)
+      (Bridge.noRepeats_edge (mst_edges_so_far ps ks ims n source 0))
+      ks ps ims ws n source;
+    reveal_opaque (`%prim_loop_state) (prim_loop_state ks ps ims ws n source)
 
 let prim_loop_state_elim
     (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
@@ -1756,7 +1755,11 @@ let prim_loop_state_elim
       all_keys_bounded ks /\
       parent_valid ps n /\
       (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
-  = reveal_opaque (`%prim_loop_state) (prim_loop_state ks ps ims ws n source)
+  = reveal_opaque (`%prim_loop_state) (prim_loop_state ks ps ims ws n source);
+    KeyInv.loop_state_elim
+      (prim_inv ks ps ims ws n source)
+      (Bridge.noRepeats_edge (mst_edges_so_far ps ks ims n source 0))
+      ks ps ims ws n source
 
 
 (*** Pulse-callable lemma wrappers ***)
@@ -1805,25 +1808,28 @@ let update_keys_rebuild
       (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
       KeyInv.update_progress ks_old ps_old ks_new ps_new ims n source u)
     (ensures prim_loop_state ks_new ps_new ims ws n source)
-  = // 1. Extract ims_unchanged
+  = // 1. Transfer prim_safe (using ims_unchanged from update_progress)
     KeyInv.update_progress_elim ks_old ps_old ks_new ps_new ims n source u;
     KeyInv.ims_unchanged_bare ks_old ps_old ks_new ps_new ims n source;
-    // 2. Transfer prim_safe (prim_safe ps_old ks_old is in requires)
     prim_safe_update_non_mst ps_old ks_old ps_new ks_new ims ws n source;
-    // 3. Transfer noRepeats
+    // 2. Transfer noRepeats
     prim_loop_state_elim ks_old ps_old ims ws n source;
     mst_edges_ext ps_old ks_old ps_new ks_new ims n source 0;
-    // 4. Build new prim_inv_bundle (old bundle from prim_inv inside prim_loop_state)
+    // 3. Use KeyInv.loop_state_after_update for everything else
+    reveal_opaque (`%prim_loop_state) (prim_loop_state ks_old ps_old ims ws n source);
     reveal_opaque (`%prim_inv) (prim_inv ks_old ps_old ims ws n source);
-    KeyInv.prim_inv_bundle_after_update
+    KeyInv.loop_state_after_update
+      (prim_inv ks_old ps_old ims ws n source)
+      (Bridge.noRepeats_edge (mst_edges_so_far ps_old ks_old ims n source 0))
       (prim_safe ps_old ks_old ims ws n source)
       (prim_kpc ks_old ps_old ws n source)
       (prim_safe ps_new ks_new ims ws n source)
       (prim_kpc ks_new ps_new ws n source)
+      (Bridge.noRepeats_edge (mst_edges_so_far ps_new ks_new ims n source 0))
       ks_old ps_old ks_new ps_new ims ws n source u;
+    // 4. Wrap into prim_loop_state
     reveal_opaque (`%prim_inv) (prim_inv ks_new ps_new ims ws n source);
-    // 5. Build prim_loop_state
-    prim_loop_state_intro ks_new ps_new ims ws n source
+    reveal_opaque (`%prim_loop_state) (prim_loop_state ks_new ps_new ims ws n source)
 #pop-options
 
 
