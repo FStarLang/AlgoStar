@@ -736,3 +736,16 @@ let rec mst_count_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
       mst_count_full ims n (i + 1)
     end
 #pop-options
+
+/// If mst_count < n, there exists a non-MST vertex
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec mst_count_not_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
+  : Lemma
+    (requires Seq.length ims == n /\ i <= n /\ mst_count ims n i < n - i /\
+              (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
+    (ensures exists (v:nat). v >= i /\ v < n /\ SZ.v (Seq.index ims v) = 0)
+    (decreases (n - i))
+  = if i >= n then ()
+    else if SZ.v (Seq.index ims i) = 0 then ()
+    else mst_count_not_full ims n (i + 1)
+#pop-options
