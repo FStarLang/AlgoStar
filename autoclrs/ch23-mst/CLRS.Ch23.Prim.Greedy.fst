@@ -721,30 +721,78 @@ let mst_edges_noRepeats_init
 ///
 /// This is a deep graph theory argument. For now we state it and leave the proof
 /// to future work (requires path manipulation lemmas not yet in the codebase).
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
 let connectivity_gives_finite_key
-    (ks ims ws: Seq.seq SZ.t) (n source u: nat) (min_key: nat)
+    (ks ims ws: Seq.seq SZ.t) (n source: nat) (min_key count: nat)
   : Lemma
     (requires
-      n > 0 /\ source < n /\ u < n /\ u <> source /\
+      n > 0 /\ source < n /\
       Seq.length ks == n /\ Seq.length ims == n /\ Seq.length ws == n * n /\
       KeyInv.key_inv ks ims ws n /\
       valid_weights ws n /\ symmetric_weights ws n /\ no_zero_edges ws n /\
       all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix ws n) n) /\
       SZ.v (Seq.index ims source) = 1 /\
-      SZ.v (Seq.index ims u) <> 1 /\
       (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
       SZ.v (Seq.index ks source) == 0 /\
-      // min_key is the extract-min result
       min_key <= SZ.v infinity /\
-      (forall (j:nat). j < n /\ SZ.v (Seq.index ims j) = 0 ==> min_key <= SZ.v (Seq.index ks j)))
+      (forall (j:nat). j < n /\ SZ.v (Seq.index ims j) = 0 ==> min_key <= SZ.v (Seq.index ks j)) /\
+      KeyInv.mst_count ims n 0 == count /\ count < n)
     (ensures min_key < SZ.v infinity)
-  = // Connected graph: path from source to u exists
-    // This path must cross the MST/non-MST boundary
-    // At the crossing edge (w,v): w in MST, v not in MST
-    // valid_weights + no_zero_edges: weight(w,v) > 0 and < infinity
-    // key_inv: key[v] <= weight(w,v) < infinity
-    // extract-min: min_key <= key[v] < infinity
-    admit () // TODO: path crossing argument
+  = // count < n → exists non-MST vertex
+    KeyInv.mst_count_not_full ims n 0;
+    // Convert ims to vertex_set (Seq.seq bool)
+    let its : PrimSpec.vertex_set = Seq.init n (fun (i:nat{i < n}) -> SZ.v (Seq.index ims i) = 1) in
+    let adj = weights_to_adj_matrix ws n in
+    // Well-formedness
+    weights_to_adj_well_formed ws n;
+    // its has an in-MST vertex (source)
+    assert (Seq.length its = n);
+    assert (Seq.index its source = true);
+    // Apply the crossing lemma from Prim.Spec  
+    PrimSpec.lemma_connected_implies_crossing_edge adj n its;
+    // Eliminate the double existential to get concrete u', v'
+    KeyInv.key_inv_bare ks ims ws n;
+    FStar.Classical.exists_elim (min_key < SZ.v infinity)
+      #nat #(fun u' -> exists (v':nat). u' < n /\ v' < n /\
+        u' < Seq.length its /\ v' < Seq.length its /\
+        Seq.index its u' = true /\ Seq.index its v' = false /\
+        PrimSpec.has_edge adj n u' v') ()
+      (fun (u':nat{exists (v':nat). u' < n /\ v' < n /\
+        u' < Seq.length its /\ v' < Seq.length its /\
+        Seq.index its u' = true /\ Seq.index its v' = false /\
+        PrimSpec.has_edge adj n u' v'}) ->
+        FStar.Classical.exists_elim (min_key < SZ.v infinity)
+          #nat #(fun v' -> u' < n /\ v' < n /\
+            u' < Seq.length its /\ v' < Seq.length its /\
+            Seq.index its u' = true /\ Seq.index its v' = false /\
+            PrimSpec.has_edge adj n u' v') ()
+          (fun (v':nat{u' < n /\ v' < n /\
+            u' < Seq.length its /\ v' < Seq.length its /\
+            Seq.index its u' = true /\ Seq.index its v' = false /\
+            PrimSpec.has_edge adj n u' v'}) ->
+            // its[u'] = true ↔ ims[u'] = 1 (in MST)
+            // its[v'] = false ↔ ims[v'] ≠ 1, so ims[v'] = 0 (not in MST)
+            // has_edge: adj[u'][v'] ≠ PrimSpec.infinity
+            // weights_to_adj_preserves: weight in ws is > 0 and < impl infinity
+            lemma_index_bound u' v' n;
+            weights_to_adj_preserves ws n u' v';
+            // has_edge: adj[u'][v'] <> PrimSpec.infinity
+            // weights_to_adj_preserves: w_imp >= SZ.v infinity ==> w_spec = PrimSpec.infinity
+            // Contrapositive: w_spec <> PrimSpec.infinity ==> w_imp < SZ.v infinity
+            // Also: its[u'] = true /\ its[v'] = false → ims[u']=1, ims[v']=0 → u' <> v'
+            // no_zero_edges + u' <> v' → w_imp > 0
+            // key_inv_bare: ims[v']=0 → key[v'] <= w_imp < infinity
+            // extract-min: min_key <= key[v']
+            assert (u' <> v');
+            lemma_index_bound u' v' n;
+            // no_zero_edges + u' <> v': weight > 0
+            // valid_weights + has_edge: weight < impl infinity
+            // key_inv: key[v'] <= weight since ims[u']=1 (MST), ims[v']=0 (non-MST)
+            // extract-min: min_key <= key[v']
+            assert (SZ.v (Seq.index ims u') = 1);
+            assert (SZ.v (Seq.index ims v') = 0);
+            ()))
+#pop-options
 
 (*** Combined greedy step + noRepeats step ***)
 

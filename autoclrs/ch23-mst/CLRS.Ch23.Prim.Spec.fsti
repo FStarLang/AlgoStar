@@ -123,3 +123,15 @@ val pure_prim_is_mst (adj: adj_matrix) (n: nat) (start: nat)
                     (forall (e: edge). mem_edge e (adj_to_graph adj n).edges ==>
                       e.u < n /\ e.v < n /\ e.u <> e.v))
           (ensures is_mst (adj_to_graph adj n) (pure_prim adj n start))
+
+/// Connectivity implies crossing edge exists between in-tree and non-tree vertices
+val lemma_connected_implies_crossing_edge
+    (adj: adj_matrix) (n: nat) (its: vertex_set)
+  : Lemma (requires well_formed_adj adj n /\ length its = n /\
+                    all_connected n (adj_to_edges adj n) /\ n > 0 /\
+                    (exists (u: nat). u < n /\ index its u = true) /\
+                    (exists (v: nat). v < n /\ index its v = false))
+          (ensures (exists (u' v': nat). u' < n /\ v' < n /\
+                    u' < length its /\ v' < length its /\
+                    index its u' = true /\ index its v' = false /\
+                    has_edge adj n u' v'))

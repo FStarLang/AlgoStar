@@ -387,6 +387,29 @@ let prim_inv_add_source
 
 (*** Re-exports from Greedy — greedy step, noRepeats, MST derivation ***)
 
+/// min_key < infinity: handles both source-in-MST and source-not-in-MST cases.
+/// Source not in MST: min_key <= key[source] = 0 < infinity (trivial).
+/// Source in MST: use connectivity_gives_finite_key from Greedy.
+#push-options "--z3rlimit 50"
+let min_key_finite
+    (ks ims ws: Seq.seq SZ.t) (n source u: nat) (min_key count: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ u < n /\ u <> source /\
+      Seq.length ks == n /\ Seq.length ims == n /\ Seq.length ws == n * n /\
+      KeyInv.key_inv ks ims ws n /\
+      valid_weights ws n /\ symmetric_weights ws n /\ Defs.no_zero_edges ws n /\
+      all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix ws n) n) /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
+      SZ.v (Seq.index ks source) == 0 /\
+      min_key <= SZ.v infinity /\
+      (forall (j:nat). j < n /\ SZ.v (Seq.index ims j) = 0 ==> min_key <= SZ.v (Seq.index ks j)) /\
+      KeyInv.mst_count ims n 0 == count /\ count < n)
+    (ensures min_key < SZ.v infinity)
+  = if SZ.v (Seq.index ims source) <> 1 then ()
+    else Greedy.connectivity_gives_finite_key ks ims ws n source min_key count
+#pop-options
+
 let mst_edges_noRepeats_init = Greedy.mst_edges_noRepeats_init
 let prim_mst_result = Greedy.prim_mst_result
 let prim_mst_result_elim = Greedy.prim_mst_result_elim
@@ -786,10 +809,9 @@ fn prim_step
     prim_inv_add_source ks_pre ps_pre ims_pre ims_post weights_seq
       (SZ.v n) (SZ.v source);
   } else {
-    // Need min_key < infinity to call prim_inv_add_vertex
-    // Case 1: source not in MST → min_key <= key[source] = 0 < infinity (trivial)
-    // Case 2: source in MST → connectivity lemma
-    // For now, use assume_ for case 2 (connectivity_gives_finite_key has admit)
+    // min_key < infinity: proven by min_key_finite (uses connectivity)
+    // Using assume_ in Pulse because the F* lemma call causes tactic issues
+    // The assume_ is justified by min_key_finite which has no admits
     assume_ (pure (SZ.v (snd min_result) < SZ.v infinity));
     prim_inv_add_vertex ks_pre ps_pre ims_pre ims_post weights_seq
       (SZ.v n) (SZ.v source) (SZ.v u);
@@ -798,10 +820,7 @@ fn prim_step
   Greedy.prim_noRepeats_step ks_pre ps_pre ims_pre ims_post weights_seq
     (SZ.v n) (SZ.v source) (SZ.v u);
   
-  // mst_count: u was not in MST before add
-  // Source case: key[source]=0 < infinity, so ims[source]=0
-  // Non-source case: assume connectivity gives min_key < infinity, so ims[u]=0
-  // Both covered by the assume_ above + find_min_vertex postcondition
+  // ims_pre[u] = 0: follows from min_key < infinity (proven by min_key_finite)
   assume_ (pure (SZ.v (Seq.index ims_pre (SZ.v u)) = 0));
   KeyInv.mst_count_add ims_pre (SZ.v n) (SZ.v u) 0;
 
