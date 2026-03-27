@@ -397,6 +397,11 @@ val subset_edges_exchange (a: list edge) (e_add e_rem: edge) (t: list edge) (s: 
   : Lemma (requires subset_edges a t /\ respects a s /\ crosses_cut e_rem s)
           (ensures subset_edges a (e_add :: filter (fun e -> not (edge_eq e e_rem)) t))
 
+
+val acyclic_subset (n: nat) (es es': list edge)
+  : Lemma (requires acyclic n es /\ (forall (e:edge). mem_edge e es' ==> mem_edge e es))
+          (ensures acyclic n es')
+
 // Exchange preserves spanning tree
 val exchange_is_spanning_tree
     (g: graph) (t: list edge) (e_add e_rem: edge) (path: list edge)
@@ -450,11 +455,6 @@ val acyclic_edge_disconnects (n: nat) (e: edge) (tl: list edge)
   : Lemma (requires acyclic n (e :: tl) /\ e.u < n /\ e.v < n /\ e.u <> e.v /\
                     ~(mem_edge e tl))
           (ensures ~(reachable tl e.u e.v))
-
-// Acyclicity is preserved for subsets
-val acyclic_subset (n: nat) (es es': list edge)
-  : Lemma (requires acyclic n es /\ (forall (e:edge). mem_edge e es' ==> mem_edge e es))
-          (ensures acyclic n es')
 
 // Acyclic + connected ⟹ exactly n-1 edges
 val acyclic_connected_length (n: nat) (es: list edge)

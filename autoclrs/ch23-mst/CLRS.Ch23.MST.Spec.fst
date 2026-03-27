@@ -1078,6 +1078,40 @@ let rec subset_edges_filter (t g_edges: list edge) (f: edge -> bool)
       subset_edges_filter tl g_edges f
 
 // Acyclicity is anti-monotone: fewer edges → still acyclic
+(*** Helpers for Cut Property Proof ***)
+
+// Filtering preserves membership for non-matching edges
+let rec mem_edge_filter_neg (x e_rem: edge) (t: list edge)
+  : Lemma (requires mem_edge x t /\ not (edge_eq x e_rem))
+          (ensures mem_edge x (filter (fun e -> not (edge_eq e e_rem)) t))
+          (decreases t)
+  = match t with
+    | [] -> ()
+    | hd :: tl ->
+      if edge_eq x hd then begin
+        if edge_eq hd e_rem then
+          edge_eq_transitive x hd e_rem  // contradiction: derives edge_eq x e_rem
+        else ()
+      end else
+        mem_edge_filter_neg x e_rem tl
+
+// If cut respects a and e_rem crosses cut, then a ⊆ (e_add :: filter (...) t)
+let rec subset_edges_exchange (a: list edge) (e_add e_rem: edge) (t: list edge) (s: cut)
+  : Lemma (requires subset_edges a t /\ respects a s /\ crosses_cut e_rem s)
+          (ensures subset_edges a (e_add :: filter (fun e -> not (edge_eq e e_rem)) t))
+          (decreases a)
+  = match a with
+    | [] -> ()
+    | hd :: tl ->
+      // hd doesn't cross the cut (from respects)
+      if edge_eq hd e_rem then edge_eq_crosses hd e_rem s  // contradiction
+      else begin
+        mem_edge_filter_neg hd e_rem t;
+        ()
+      end;
+      subset_edges_exchange tl e_add e_rem t s
+
+
 let acyclic_subset (n: nat) (es es': list edge)
   : Lemma (requires acyclic n es /\ (forall (e:edge). mem_edge e es' ==> mem_edge e es))
           (ensures acyclic n es')
@@ -1339,39 +1373,6 @@ let acyclic_implies_unreachable (n: nat) (t: list edge) (e: edge)
           // The cycle (e :: rp) at vertex e.u < n contradicts acyclic n (e :: t)
         )
     end
-
-(*** Helpers for Cut Property Proof ***)
-
-// Filtering preserves membership for non-matching edges
-let rec mem_edge_filter_neg (x e_rem: edge) (t: list edge)
-  : Lemma (requires mem_edge x t /\ not (edge_eq x e_rem))
-          (ensures mem_edge x (filter (fun e -> not (edge_eq e e_rem)) t))
-          (decreases t)
-  = match t with
-    | [] -> ()
-    | hd :: tl ->
-      if edge_eq x hd then begin
-        if edge_eq hd e_rem then
-          edge_eq_transitive x hd e_rem  // contradiction: derives edge_eq x e_rem
-        else ()
-      end else
-        mem_edge_filter_neg x e_rem tl
-
-// If cut respects a and e_rem crosses cut, then a ⊆ (e_add :: filter (...) t)
-let rec subset_edges_exchange (a: list edge) (e_add e_rem: edge) (t: list edge) (s: cut)
-  : Lemma (requires subset_edges a t /\ respects a s /\ crosses_cut e_rem s)
-          (ensures subset_edges a (e_add :: filter (fun e -> not (edge_eq e e_rem)) t))
-          (decreases a)
-  = match a with
-    | [] -> ()
-    | hd :: tl ->
-      // hd doesn't cross the cut (from respects)
-      if edge_eq hd e_rem then edge_eq_crosses hd e_rem s  // contradiction
-      else begin
-        mem_edge_filter_neg hd e_rem t;
-        ()
-      end;
-      subset_edges_exchange tl e_add e_rem t s
 
 // Reachable superset: if reachable in sub and sub ⊆ sup (via mem_edge), then reachable in sup
 let reachable_superset (sub sup: list edge) (u v: nat)
