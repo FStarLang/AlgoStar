@@ -461,7 +461,7 @@ let prim_loop_state_elim
 /// Combined: transfer from pre-add state + update_progress → post-update prim_loop_state.
 /// Takes prim_loop_state on PRE-ADD ims, produces prim_loop_state on POST-ADD ims.
 #restart-solver
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 0"
+#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
 let update_keys_rebuild
     (ks_old ps_old ks_new ps_new ims_old ims_new ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -480,7 +480,8 @@ let update_keys_rebuild
       parent_valid ps_new n /\
       prim_kpc ks_new ps_new ws n source /\
       SZ.v (Seq.index ks_new source) == 0 /\
-      KeyInv.update_progress ks_old ps_old ks_new ps_new ims_new n source u)
+      KeyInv.update_progress ks_old ps_old ks_new ps_new ims_new n source u /\
+      KeyInv.keys_bounded_by_u ks_new ws ims_new n u)
     (ensures prim_loop_state ks_new ps_new ims_new ws n source)
   = // 1. Transfer prim_safe to new ks/ps
     KeyInv.update_progress_elim ks_old ps_old ks_new ps_new ims_new n source u;
@@ -494,12 +495,19 @@ let update_keys_rebuild
     // key_inv ks_old ims_old ws n → key_inv ks_new ims_old ws n (keys decreased)
     reveal_opaque (`%KeyInv.keys_only_decrease) (KeyInv.keys_only_decrease ks_old ks_new n);
     KeyInv.key_inv_after_update ks_old ks_new ims_old ws n;
-    // key_inv ks_new ims_old ws n → key_inv ks_new ims_new ws n
-    // Need: key[v] <= weight(u,v) for non-MST v with valid weight
-    // From update_keys loop: either key decreased (to weight(u,v)) or weight(u,v) >= key[v]
-    // This requires the "keys_bounded_by_u" fact from the update_keys loop
-    // For now, admit this key_inv transfer
-    admit ()
+    // key_inv ks_new ims_old ws n → key_inv ks_new ims_new ws n 
+    // Using keys_bounded_by_u to provide key[v] <= weight(u,v) for non-MST v
+    KeyInv.keys_bounded_by_u_elim ks_new ws ims_new n u;
+    KeyInv.key_inv_after_add_vertex ks_new ims_old ims_new ws n u;
+    // ims_finite_key: in-MST keys are finite. For old MST vertices: unchanged (ims_unchanged).
+    // For new MST vertex u: key[u] < infinity from extract-min.
+    KeyInv.ims_finite_key_after_update ks_old ks_new ims_new n;
+    // parent_in_mst: use parent_in_mst_after_update from KeyInv
+    KeyInv.parent_in_mst_after_update ks_old ps_old ks_new ps_new ims_new n source u;
+    // Build prim_inv
+    prim_inv_intro ks_new ps_new ims_new ws n source;
+    // Build prim_loop_state
+    prim_loop_state_intro ks_new ps_new ims_new ws n source
 #pop-options
 
 
@@ -671,7 +679,13 @@ fn update_keys
       prim_kpc key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
       prim_loop_state ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source) /\
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
-      KeyInv.update_progress ks0 ps0 key_seq parent_seq in_mst_seq (SZ.v n) (SZ.v source) (SZ.v u)
+      KeyInv.update_progress ks0 ps0 key_seq parent_seq in_mst_seq (SZ.v n) (SZ.v source) (SZ.v u) /\
+      // Partial keys_bounded_by_u: for processed vertices v < vi
+      (forall (v:nat). v < SZ.v vi /\ SZ.v (Seq.index in_mst_seq v) <> 1 /\
+        SZ.v u * SZ.v n + v < SZ.v n * SZ.v n /\
+        SZ.v (Seq.index weights_seq (SZ.v u * SZ.v n + v)) > 0 /\
+        SZ.v (Seq.index weights_seq (SZ.v u * SZ.v n + v)) < SZ.v infinity ==>
+        SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (SZ.v u * SZ.v n + v)))
     )
   decreases (SZ.v n - SZ.v !update_i)
   {
@@ -697,6 +711,8 @@ fn update_keys
     update_i := v +^ 1sz;
   };
   with ks_f ps_f. assert (A.pts_to key_a ks_f ** A.pts_to parent_a ps_f);
+  // Derive keys_bounded_by_u from the partial quantifier (vi = n covers all vertices)
+  KeyInv.keys_bounded_by_u_intro ks_f weights_seq in_mst_seq (SZ.v n) (SZ.v u);
   prim_loop_state_elim ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source);
   prim_inv_elim ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source);
   update_keys_rebuild ks0 ps0 ks_f ps_f ims_old in_mst_seq weights_seq (SZ.v n) (SZ.v source) (SZ.v u);
