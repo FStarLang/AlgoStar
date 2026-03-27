@@ -2101,8 +2101,8 @@ let kruskal_spanning_step_count
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
-  (edge_u edge_v: A.array int)
-  (#sedge_u #sedge_v: Ghost.erased (Seq.seq int))
+  (edge_u edge_v: A.array SZ.t)
+  (#sedge_u #sedge_v: Ghost.erased (Seq.seq SZ.t))
   (edge_count: R.ref SZ.t)
   (n: SZ.t)
   requires 
@@ -2123,8 +2123,8 @@ fn kruskal
     A.pts_to edge_u sedge_u' **
     A.pts_to edge_v sedge_v' **
     R.pts_to edge_count vec **
-    pure (result_is_forest_adj sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec) /\
-          kruskal_mst_result sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec))
+    pure (result_is_forest_adj sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v n) (SZ.v vec) /\
+          kruskal_mst_result sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v n) (SZ.v vec))
 //SNIPPET_END: kruskal_sig
 {
   // Initialize parent[i] = i
@@ -2159,9 +2159,9 @@ fn kruskal
   with sp_init. assert (A.pts_to parent sp_init);
   with seu_init. assert (A.pts_to edge_u seu_init);
   with sev_init. assert (A.pts_to edge_v sev_init);
-  kruskal_inv_init sp_init seu_init sev_init (SZ.v n);
-  edges_adj_pos_init sadj seu_init sev_init (SZ.v n);
-  kruskal_mst_inv_init sadj sp_init seu_init sev_init (SZ.v n);
+  kruskal_inv_init sp_init (sizet_seq_to_int seu_init) (sizet_seq_to_int sev_init) (SZ.v n);
+  edges_adj_pos_init sadj (sizet_seq_to_int seu_init) (sizet_seq_to_int sev_init) (SZ.v n);
+  kruskal_mst_inv_init sadj sp_init (sizet_seq_to_int seu_init) (sizet_seq_to_int sev_init) (SZ.v n);
   
   // Process n-1 rounds
   let mut round: SZ.t = 0sz;
@@ -2179,15 +2179,17 @@ fn kruskal
       SZ.v vround <= SZ.v n - 1 /\
       SZ.v vec <= SZ.v vround /\
       SZ.fits (SZ.v n * SZ.v n) /\
-      kruskal_inv sparent seu sev (SZ.v n) (SZ.v vec) /\
-      edges_adj_pos sadj seu sev (SZ.v n) (SZ.v vec) /\
-      kruskal_mst_inv sadj sparent seu sev (SZ.v n) (SZ.v vec) /\
       Seq.length seu == SZ.v n /\ Seq.length sev == SZ.v n /\
-      (forall (k:nat). k < SZ.v vec ==> Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
-      all_edges_distinct (edges_from_arrays seu sev (SZ.v vec) 0) /\
-      (symmetric_adj sadj (SZ.v n) /\ no_self_loops_adj sadj (SZ.v n) /\
-       all_connected (SZ.v n) (adj_array_to_graph sadj (SZ.v n)).edges ==>
-       SZ.v vec == SZ.v vround)
+      (let ieu = sizet_seq_to_int seu in
+       let iev = sizet_seq_to_int sev in
+       kruskal_inv sparent ieu iev (SZ.v n) (SZ.v vec) /\
+       edges_adj_pos sadj ieu iev (SZ.v n) (SZ.v vec) /\
+       kruskal_mst_inv sadj sparent ieu iev (SZ.v n) (SZ.v vec) /\
+       (forall (k:nat). k < SZ.v vec ==> Seq.index ieu k >= 0 /\ Seq.index iev k >= 0) /\
+       all_edges_distinct (edges_from_arrays ieu iev (SZ.v vec) 0) /\
+       (symmetric_adj sadj (SZ.v n) /\ no_self_loops_adj sadj (SZ.v n) /\
+        all_connected (SZ.v n) (adj_array_to_graph sadj (SZ.v n)).edges ==>
+        SZ.v vec == SZ.v vround))
     )
   decreases (SZ.v max_rounds - SZ.v !round)
   {
@@ -2200,8 +2202,8 @@ fn kruskal
     with vec_cur. assert (R.pts_to edge_count vec_cur);
     
     // Extract valid_parents before scan (find needs it inside inner loop)
-    kruskal_inv_valid_parents sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
-    kruskal_inv_endpoints sparent_cur seu_cur sev_cur (SZ.v n) (SZ.v vec_cur);
+    kruskal_inv_valid_parents sparent_cur (sizet_seq_to_int seu_cur) (sizet_seq_to_int sev_cur) (SZ.v n) (SZ.v vec_cur);
+    kruskal_inv_endpoints sparent_cur (sizet_seq_to_int seu_cur) (sizet_seq_to_int sev_cur) (SZ.v n) (SZ.v vec_cur);
     
     // Find minimum weight cross-component edge
     let mut best_u: SZ.t = 0sz;
@@ -2312,8 +2314,8 @@ fn kruskal
     let old_eu0 = A.op_Array_Access edge_u 0sz;
     let old_ev0 = A.op_Array_Access edge_v 0sz;
     let write_pos: SZ.t = (if should_add then vec else 0sz);
-    A.op_Array_Assignment edge_u write_pos (if should_add then SZ.v vbu else old_eu0);
-    A.op_Array_Assignment edge_v write_pos (if should_add then SZ.v vbv else old_ev0);
+    A.op_Array_Assignment edge_u write_pos (if should_add then vbu else old_eu0);
+    A.op_Array_Assignment edge_v write_pos (if should_add then vbv else old_ev0);
     edge_count := (if should_add then vec +^ 1sz else vec);
     do_union parent root_u root_v n;
     
@@ -2323,18 +2325,18 @@ fn kruskal
     with sev_new. assert (A.pts_to edge_v sev_new);
     with vec_new. assert (R.pts_to edge_count vec_new);
     kruskal_step_maintains_inv
-      sparent_cur sparent_new seu_cur sev_cur seu_new sev_new
+      sparent_cur sparent_new (sizet_seq_to_int seu_cur) (sizet_seq_to_int sev_cur) (sizet_seq_to_int seu_new) (sizet_seq_to_int sev_new)
       (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv)
       (SZ.v root_u) (SZ.v root_v) should_add;
-    edges_adj_pos_step sadj seu_cur sev_cur seu_new sev_new
+    edges_adj_pos_step sadj (sizet_seq_to_int seu_cur) (sizet_seq_to_int sev_cur) (sizet_seq_to_int seu_new) (sizet_seq_to_int sev_new)
       (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) should_add;
     scan_min_inv_complete sparent_cur sadj (SZ.v n) vbw (SZ.v vbu) (SZ.v vbv);
-    kruskal_mst_inv_step sadj sparent_cur sparent_new seu_cur sev_cur seu_new sev_new
+    kruskal_mst_inv_step sadj sparent_cur sparent_new (sizet_seq_to_int seu_cur) (sizet_seq_to_int sev_cur) (sizet_seq_to_int seu_new) (sizet_seq_to_int sev_new)
       (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) vbw
       (SZ.v root_u) (SZ.v root_v) should_add;
-    kruskal_spanning_step_distinct sadj sparent_cur seu_cur sev_cur seu_new sev_new
+    kruskal_spanning_step_distinct sadj sparent_cur (sizet_seq_to_int seu_cur) (sizet_seq_to_int sev_cur) (sizet_seq_to_int seu_new) (sizet_seq_to_int sev_new)
       (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vbu) (SZ.v vbv) should_add;
-    kruskal_spanning_step_count sadj sparent_cur seu_cur sev_cur
+    kruskal_spanning_step_count sadj sparent_cur (sizet_seq_to_int seu_cur) (sizet_seq_to_int sev_cur)
       (SZ.v n) (SZ.v vec) (SZ.v vec_new) (SZ.v vround) (SZ.v vbu) (SZ.v vbv) vbw
       (SZ.v root_u) (SZ.v root_v) should_add;
     
@@ -2345,23 +2347,23 @@ fn kruskal
   with sp_f. assert (A.pts_to parent sp_f);
   with seu_f sev_f vec_f. assert (
     A.pts_to edge_u seu_f ** A.pts_to edge_v sev_f ** R.pts_to edge_count vec_f);
-  kruskal_inv_elim sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
-  lemma_kruskal_maintains_forest seu_f sev_f (SZ.v n) (SZ.v vec_f);
+  kruskal_inv_elim sp_f (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v n) (SZ.v vec_f);
+  lemma_kruskal_maintains_forest (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v n) (SZ.v vec_f);
   // Combine result_is_forest + edges_adj_pos → result_is_forest_adj
-  result_is_forest_adj_intro sadj seu_f sev_f (SZ.v n) (SZ.v vec_f);
+  result_is_forest_adj_intro sadj (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v n) (SZ.v vec_f);
   // Extract MST safety from kruskal_mst_inv
-  kruskal_mst_inv_elim sadj sp_f seu_f sev_f (SZ.v n) (SZ.v vec_f);
+  kruskal_mst_inv_elim sadj sp_f (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v n) (SZ.v vec_f);
   // Convert all_edges_distinct to Bridge.noRepeats_edge (identical definitions)
-  Defs.aed_eq_noRepeats (edges_from_arrays seu_f sev_f (SZ.v vec_f) 0);
+  Defs.aed_eq_noRepeats (edges_from_arrays (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v vec_f) 0);
   // Derive is_mst for connected graphs using derive_is_mst_post_loop
   FStar.Classical.arrow_to_impl
     #(symmetric_adj sadj (SZ.v n) /\ no_self_loops_adj sadj (SZ.v n) /\
       all_connected (SZ.v n) (adj_array_to_graph sadj (SZ.v n)).edges)
     #(is_mst (adj_array_to_graph sadj (SZ.v n))
-        (weighted_edges_from_arrays sadj seu_f sev_f (SZ.v n) (SZ.v vec_f) 0))
-    (fun _ -> derive_is_mst_post_loop sadj seu_f sev_f (SZ.v n) (SZ.v vec_f));
+        (weighted_edges_from_arrays sadj (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v n) (SZ.v vec_f) 0))
+    (fun _ -> derive_is_mst_post_loop sadj (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v n) (SZ.v vec_f));
   // Establish kruskal_mst_result from the derivation
-  reveal_opaque (`%kruskal_mst_result) (kruskal_mst_result sadj seu_f sev_f (SZ.v n) (SZ.v vec_f));
+  reveal_opaque (`%kruskal_mst_result) (kruskal_mst_result sadj (sizet_seq_to_int seu_f) (sizet_seq_to_int sev_f) (SZ.v n) (SZ.v vec_f));
   
   // Clean up
   rewrite (A.pts_to parent sp_f) as (A.pts_to (V.vec_to_array parent_v) sp_f);

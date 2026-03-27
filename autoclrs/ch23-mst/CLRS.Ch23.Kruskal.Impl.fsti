@@ -28,6 +28,10 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module V = Pulse.Lib.Vec
+
+/// Convert SZ.t sequence to int sequence (for bridging implementation → spec)
+let sizet_seq_to_int (s: Seq.seq SZ.t) : Seq.seq int =
+  Seq.init (Seq.length s) (fun (i:nat{i < Seq.length s}) -> (SZ.v (Seq.index s i) <: int))
 module MSTSpec = CLRS.Ch23.MST.Spec
 module KSpec = CLRS.Ch23.Kruskal.Spec
 module UF = CLRS.Ch23.Kruskal.UF
@@ -211,8 +215,8 @@ val kruskal_mst_result_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: na
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
-  (edge_u edge_v: A.array int)
-  (#sedge_u #sedge_v: Ghost.erased (Seq.seq int))
+  (edge_u edge_v: A.array SZ.t)
+  (#sedge_u #sedge_v: Ghost.erased (Seq.seq SZ.t))
   (edge_count: R.ref SZ.t)
   (n: SZ.t)
   requires
@@ -233,6 +237,6 @@ fn kruskal
     A.pts_to edge_u sedge_u' **
     A.pts_to edge_v sedge_v' **
     R.pts_to edge_count vec **
-    pure (result_is_forest_adj sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec) /\
-          kruskal_mst_result sadj sedge_u' sedge_v' (SZ.v n) (SZ.v vec))
+    pure (result_is_forest_adj sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v n) (SZ.v vec) /\
+          kruskal_mst_result sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v n) (SZ.v vec))
 //SNIPPET_END: kruskal_sig

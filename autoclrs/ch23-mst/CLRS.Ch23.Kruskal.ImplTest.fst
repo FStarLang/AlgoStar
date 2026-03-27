@@ -103,17 +103,17 @@ fn test_kruskal_satisfiability ()
   adj.(8sz) <- 0;
 
   // --- Output edge arrays (capacity = n = 3) ---
-  let eu_v = V.alloc 0 3sz;
+  let eu_v = V.alloc 0sz 3sz;
   V.to_array_pts_to eu_v;
   let edge_u = V.vec_to_array eu_v;
-  rewrite (A.pts_to (V.vec_to_array eu_v) (Seq.create 3 0))
-       as (A.pts_to edge_u (Seq.create 3 0));
+  rewrite (A.pts_to (V.vec_to_array eu_v) (Seq.create 3 0sz))
+       as (A.pts_to edge_u (Seq.create 3 0sz));
 
-  let ev_v = V.alloc 0 3sz;
+  let ev_v = V.alloc 0sz 3sz;
   V.to_array_pts_to ev_v;
   let edge_v = V.vec_to_array ev_v;
-  rewrite (A.pts_to (V.vec_to_array ev_v) (Seq.create 3 0))
-       as (A.pts_to edge_v (Seq.create 3 0));
+  rewrite (A.pts_to (V.vec_to_array ev_v) (Seq.create 3 0sz))
+       as (A.pts_to edge_v (Seq.create 3 0sz));
 
   // --- Edge count reference, initialized to 0 ---
   let ec_ref = R.alloc 0sz;
@@ -150,9 +150,9 @@ fn test_kruskal_satisfiability ()
     assert (A.pts_to adj sadj **
             A.pts_to edge_u sedge_u' **
             A.pts_to edge_v sedge_v' **
-            pure (result_is_forest_adj sadj sedge_u' sedge_v' 3 (SZ.v ec_val) /\
-                  kruskal_mst_result sadj sedge_u' sedge_v' 3 (SZ.v ec_val)));
-  result_is_forest_adj_elim sadj sedge_u' sedge_v' 3 (SZ.v ec_val);
+            pure (result_is_forest_adj sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) /\
+                  kruskal_mst_result sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val)));
+  result_is_forest_adj_elim sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val);
 
   // ✓ PROVEN: edge count bounded by n-1 = 2
   assert (pure (SZ.v ec_val <= 2));
@@ -163,17 +163,17 @@ fn test_kruskal_satisfiability ()
 
   // ✓ PROVEN: all selected endpoints are valid vertices
   assert (pure (forall (k:nat). k < SZ.v ec_val ==>
-    Seq.index sedge_u' k >= 0 /\ Seq.index sedge_u' k < 3 /\
-    Seq.index sedge_v' k >= 0 /\ Seq.index sedge_v' k < 3));
+    SZ.v (Seq.index sedge_u' k) >= 0 /\ SZ.v (Seq.index sedge_u' k) < 3 /\
+    SZ.v (Seq.index sedge_v' k) >= 0 /\ SZ.v (Seq.index sedge_v' k) < 3));
 
   // ✓ PROVEN: each selected edge has a positive adjacency matrix entry
   assert (pure (forall (k:nat). k < SZ.v ec_val ==>
-    Seq.index sadj (Seq.index sedge_u' k * 3 + Seq.index sedge_v' k) > 0));
+    Seq.index sadj (SZ.v (Seq.index sedge_u' k) * 3 + SZ.v (Seq.index sedge_v' k)) > 0));
 
   // ✓ PROVEN (NEW): the selected edges form a forest (acyclic subgraph)
-  result_is_forest_adj_forest_elim sadj sedge_u' sedge_v' 3 (SZ.v ec_val);
+  result_is_forest_adj_forest_elim sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val);
   assert (pure (CLRS.Ch23.Kruskal.Spec.is_forest
-    (edges_from_arrays sedge_u' sedge_v' (SZ.v ec_val) 0) 3));
+    (edges_from_arrays (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v ec_val) 0) 3));
 
   // ✓ PROVEN: is_mst — the imperative kruskal output IS the MST!
   //   For connected symmetric graphs, kruskal produces an MST.
@@ -181,12 +181,12 @@ fn test_kruskal_satisfiability ()
   //   → derive_is_mst_post_loop (pigeonhole + connectivity transfer)
   //   → is_mst
   test_mst ();
-  assert (pure (kruskal_mst_result sadj sedge_u' sedge_v' 3 (SZ.v ec_val)));
+  assert (pure (kruskal_mst_result sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val)));
   assert (pure (Seq.equal sadj (Seq.seq_of_list [0;1;3;1;0;2;3;2;0])));
-  test_is_mst_imperative sadj sedge_u' sedge_v' (SZ.v ec_val);
+  test_is_mst_imperative sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v ec_val);
   // ✓ THE MAIN RESULT: is_mst for the imperative kruskal output
   assert (pure (CLRS.Ch23.MST.Spec.is_mst (adj_array_to_graph sadj 3)
-    (weighted_edges_from_arrays sadj sedge_u' sedge_v' 3 (SZ.v ec_val) 0)));
+    (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0)));
 
   // --- Cleanup ---
   rewrite (A.pts_to adj sadj) as (A.pts_to (V.vec_to_array adj_v) sadj);
