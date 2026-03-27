@@ -796,68 +796,7 @@ let connectivity_gives_finite_key
 
 (*** Combined greedy step + noRepeats step ***)
 
-/// Combined greedy step — takes prim_inv_bundle components, outputs safety facts.
-/// Uses KeyInv predicates as structured inputs.
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
-let prim_greedy_step
-    (ks ps ims_old ims_new ws: Seq.seq SZ.t) (n source u min_key: nat)
-  : Lemma
-    (requires
-      prim_safe ps ks ims_old ws n source /\
-      KeyInv.key_inv ks ims_old ws n /\
-      KeyInv.ims_finite_key ks ims_old n /\
-      KeyInv.parent_in_mst ks ps ims_old n source /\
-      key_parent_consistent ks ps ws n source /\
-      valid_weights ws n /\ symmetric_weights ws n /\
-      parent_valid ps n /\ all_keys_bounded ks /\
-      no_zero_edges ws n /\
-      n > 0 /\ source < n /\ u < n /\
-      Seq.length ks == n /\ Seq.length ps == n /\
-      Seq.length ims_old == n /\ Seq.length ims_new == n /\
-      Seq.length ws == n * n /\
-      SZ.v (Seq.index ks source) == 0 /\
-      (forall (j:nat). j < n ==> SZ.v (Seq.index ims_old j) = 0 \/ SZ.v (Seq.index ims_old j) = 1) /\
-      SZ.v (Seq.index ims_new u) = 1 /\
-      (forall (v:nat). v < n /\ v <> u ==> Seq.index ims_new v == Seq.index ims_old v) /\
-      min_key <= SZ.v infinity /\
-      (min_key < SZ.v infinity ==> min_key == SZ.v (Seq.index ks u) /\ SZ.v (Seq.index ims_old u) = 0) /\
-      (forall (j:nat). j < n /\ SZ.v (Seq.index ims_old j) = 0 ==> min_key <= SZ.v (Seq.index ks j)))
-    (ensures
-      prim_safe ps ks ims_new ws n source /\
-      (forall (j:nat). j < n ==> SZ.v (Seq.index ims_new j) = 0 \/ SZ.v (Seq.index ims_new j) = 1) /\
-      (u <> source ==> SZ.v (Seq.index ims_old u) = 0 /\ SZ.v (Seq.index ks u) < SZ.v infinity))
-  = if u = source then begin
-      // Source case: mst_edges_so_far skips source, so edges unchanged
-      mst_edges_source_unchanged ps ks ims_old ims_new n source 0;
-      reveal_opaque (`%prim_safe) (prim_safe ps ks ims_old ws n source);
-      reveal_opaque (`%prim_safe) (prim_safe ps ks ims_new ws n source)
-    end
-    else begin
-      // key[u] < infinity: source has key 0
-      // If source is non-MST: min_key <= key[source] = 0 < infinity
-      // If source is in MST: connectivity gives a finite-key non-MST vertex (assume for now)
-      (if SZ.v (Seq.index ims_old source) = 0 then
-        assert (min_key <= SZ.v (Seq.index ks source))
-      else
-        assume (min_key < SZ.v infinity));
-      assert (min_key < SZ.v infinity);
-      assert (SZ.v (Seq.index ks u) < SZ.v infinity);
-      assert (SZ.v (Seq.index ims_old u) = 0);
-      // Get bare quantifiers from KeyInv predicates
-      KeyInv.parent_in_mst_for_ims ks ps ims_old n source;
-      KeyInv.key_inv_bare ks ims_old ws n;
-      let pu = SZ.v (Seq.index ps u) in
-      KeyInv.parent_in_mst_at ks ps ims_old n source u pu;
-      assert (SZ.v (Seq.index ims_old pu) = 1);
-      assert (pu <> u);
-      lemma_index_bound pu u n;
-      assert (SZ.v (Seq.index ks u) > 0);
-      prim_safe_add_vertex ps ks ims_old ims_new ws n source u
-    end
-#pop-options
-
-/// noRepeats step: uses KeyInv.parent_in_mst for the parent-in-MST fact.
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
 let prim_noRepeats_step
     (ks ps ims_old ims_new ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
