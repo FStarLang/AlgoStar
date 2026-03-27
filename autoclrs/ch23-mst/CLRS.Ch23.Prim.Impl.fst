@@ -837,7 +837,7 @@ fn prim_step
 }
 #pop-options
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 100"
 //SNIPPET_START: prim_sig
 fn prim
   (#p: perm)
@@ -936,7 +936,7 @@ fn prim
       prim_loop_state key_seq parent_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source) /\
       KeyInv.mst_count in_mst_seq (SZ.v n) 0 == SZ.v v_iter
     )
-  // TODO: decreases
+  decreases (SZ.v n - SZ.v !iter)
   {
     let cur_iter = !iter;
     // One complete iteration of Prim's algorithm (hoisted)
