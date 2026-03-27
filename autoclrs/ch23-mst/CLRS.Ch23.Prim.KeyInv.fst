@@ -494,3 +494,63 @@ let loop_state_after_update
       (prim_inv_bundle safe_new kpc_new ks_new ps_new ims ws n source)
       noRepeats_new ks_new ps_new ims ws n source
 #pop-options
+
+(*** keys_bounded_by_u — tracks key[v] <= weight(u,v) for non-MST v ***)
+
+/// After update_keys: key[v] <= weight(u,v) for all non-MST v with valid weight(u,v).
+/// This is needed by key_inv_after_add_vertex to extend key_inv to new ims.
+[@@"opaque_to_smt"]
+let keys_bounded_by_u (ks ws ims: Seq.seq SZ.t) (n u: nat) : prop =
+  Seq.length ks == n /\ Seq.length ws == n * n /\ Seq.length ims == n /\ u < n /\
+  (forall (v:nat). v < n /\ SZ.v (Seq.index ims v) <> 1 /\
+    u * n + v < n * n /\
+    SZ.v (Seq.index ws (u * n + v)) > 0 /\
+    SZ.v (Seq.index ws (u * n + v)) < SZ.v (65535sz) ==>
+    SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (u * n + v)))
+
+let keys_bounded_by_u_elim (ks ws ims: Seq.seq SZ.t) (n u: nat)
+  : Lemma (requires keys_bounded_by_u ks ws ims n u /\
+                    Seq.length ks == n /\ Seq.length ws == n * n /\ Seq.length ims == n /\ u < n)
+          (ensures forall (v:nat). v < n /\ SZ.v (Seq.index ims v) <> 1 /\
+            u * n + v < n * n /\
+            SZ.v (Seq.index ws (u * n + v)) > 0 /\
+            SZ.v (Seq.index ws (u * n + v)) < SZ.v (65535sz) ==>
+            SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (u * n + v)))
+  = reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims n u)
+
+/// Step: after processing vertex i in update_keys loop.
+#push-options "--z3rlimit 50"
+let keys_bounded_by_u_step
+    (ks ws ims: Seq.seq SZ.t) (n u i: nat)
+    (new_k: SZ.t) (should_update: bool)
+  : Lemma
+    (requires
+      keys_bounded_by_u ks ws ims n u /\
+      Seq.length ks == n /\ Seq.length ws == n * n /\ Seq.length ims == n /\
+      u < n /\ i < n /\
+      (should_update ==>
+        u * n + i < n * n /\
+        SZ.v new_k == SZ.v (Seq.index ws (u * n + i))) /\
+      (~should_update ==> new_k == Seq.index ks i /\
+        (SZ.v (Seq.index ims i) <> 1 /\ u * n + i < n * n /\
+         SZ.v (Seq.index ws (u * n + i)) > 0 /\
+         SZ.v (Seq.index ws (u * n + i)) < SZ.v (65535sz) ==>
+         SZ.v (Seq.index ks i) <= SZ.v (Seq.index ws (u * n + i)))))
+    (ensures keys_bounded_by_u (Seq.upd ks i new_k) ws ims n u)
+  = reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims n u);
+    reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u (Seq.upd ks i new_k) ws ims n u)
+#pop-options
+
+/// Init: vacuously true (no v satisfies the antecedent if all non-MST keys are infinity)
+/// But more practically, we initialize from the fact that the initial keys satisfy this
+/// if they're all >= weight(u,v) (which is NOT guaranteed at init).
+/// So we use a dummy init that requires the condition explicitly.
+let keys_bounded_by_u_intro (ks ws ims: Seq.seq SZ.t) (n u: nat)
+  : Lemma (requires Seq.length ks == n /\ Seq.length ws == n * n /\ Seq.length ims == n /\ u < n /\
+                    (forall (v:nat). v < n /\ SZ.v (Seq.index ims v) <> 1 /\
+                      u * n + v < n * n /\
+                      SZ.v (Seq.index ws (u * n + v)) > 0 /\
+                      SZ.v (Seq.index ws (u * n + v)) < SZ.v (65535sz) ==>
+                      SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (u * n + v))))
+          (ensures keys_bounded_by_u ks ws ims n u)
+  = reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims n u)
