@@ -695,3 +695,44 @@ let keys_bounded_partial_full (ks ws ims: Seq.seq SZ.t) (n u: nat)
           (ensures keys_bounded_by_u ks ws ims n u)
   = reveal_opaque (`%keys_bounded_partial) (keys_bounded_partial ks ws ims n u n);
     reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims n u)
+
+(*** MST vertex counting ***)
+
+/// Count vertices with ims[v] = 1
+let rec mst_count (ims: Seq.seq SZ.t) (n: nat) (i: nat)
+  : Pure nat (requires Seq.length ims == n /\ i <= n) (ensures fun c -> c <= n - i)
+    (decreases (n - i))
+  = if i >= n then 0
+    else (if SZ.v (Seq.index ims i) = 1 then 1 else 0) + mst_count ims n (i + 1)
+
+/// Adding vertex u (ims[u]:=1) increases count by 1
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+let rec mst_count_add (ims: Seq.seq SZ.t) (n u: nat) (i: nat)
+  : Lemma
+    (requires Seq.length ims == n /\ u < n /\ i <= n /\
+              SZ.v (Seq.index ims u) <> 1)
+    (ensures mst_count (Seq.upd ims u 1sz) n i ==
+             mst_count ims n i + (if i <= u then 1 else 0))
+    (decreases (n - i))
+  = if i >= n then ()
+    else mst_count_add ims n u (i + 1)
+#pop-options
+
+/// If mst_count = n, then all vertices are in MST
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+let rec mst_count_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
+  : Lemma
+    (requires Seq.length ims == n /\ i <= n /\
+              mst_count ims n i == n - i /\
+              (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
+    (ensures forall (v:nat). v >= i /\ v < n ==> SZ.v (Seq.index ims v) = 1)
+    (decreases (n - i))
+  = if i >= n then ()
+    else begin
+      // ims[i] must be 1 (otherwise count would be < n - i)
+      // count = (ims[i]=1 ? 1 : 0) + count_from_(i+1)
+      // count_from_(i+1) <= n - (i+1). So if ims[i]=0: count = count_from_(i+1) <= n-i-1 < n-i. Contradiction.
+      assert (SZ.v (Seq.index ims i) = 1);
+      mst_count_full ims n (i + 1)
+    end
+#pop-options

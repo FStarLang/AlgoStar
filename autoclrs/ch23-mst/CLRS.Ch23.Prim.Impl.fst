@@ -891,7 +891,7 @@ fn prim
     A.pts_to parent_a parent_seq **
     A.pts_to weights #p weights_seq **
     pure (
-      SZ.v v_iter <= SZ.v n + 1 /\
+      SZ.v v_iter <= SZ.v n /\
       SZ.v n * SZ.v n < pow2 64 /\ SZ.fits_u64 /\
       prim_loop_state key_seq parent_seq in_mst_seq weights_seq (SZ.v n) (SZ.v source)
     )
@@ -913,19 +913,20 @@ fn prim
   prim_loop_state_elim ks_end ps_end ims_end weights_seq (SZ.v n) (SZ.v source);
   prim_inv_elim ks_end ps_end ims_end weights_seq (SZ.v n) (SZ.v source);
   
+  // derive_prim_mst_post_loop needs all-in-MST. 
+  // After n iterations, all vertices are in MST. 
+  // For now: assume the all-in-MST fact and derive prim_mst_result.
+  assume_ (pure (forall (v:nat). v < SZ.v n /\ v <> SZ.v source ==> SZ.v (Seq.index ims_end v) = 1));
+  derive_prim_mst_post_loop ks_end ps_end ims_end weights_seq (SZ.v n) (SZ.v source);
+  
   // Set parent[source] = source
   prim_kpc_parent_source ks_end ps_end weights_seq (SZ.v n) (SZ.v source) source;
+  // Transfer prim_mst_result through parent[source] update
+  Greedy.prim_mst_result_upd_source ps_end ks_end weights_seq (SZ.v n) (SZ.v source) source;
   A.op_Array_Assignment parent_a source source;
   with ps_final. assert (A.pts_to parent_a ps_final);
   lemma_upd_preserves_parent_valid ps_end (SZ.v source) source (SZ.v n);
   prim_kpc_elim ks_end ps_final weights_seq (SZ.v n) (SZ.v source);
-  
-  // derive_prim_mst_post_loop needs prim_inv + noRepeats + all-in-MST
-  // prim_correct is provable from loop invariants directly
-  // prim_mst_result needs all-in-MST (after n iterations), which requires tracking MST size
-  // prim_mst_result needs all-in-MST argument (after n iterations, all vertices in MST)
-  assume_ (pure (prim_mst_result ps_final ks_end weights_seq (SZ.v n) (SZ.v source)));
-  
   // Free the in_mst array
   with s_in_mst. assert (A.pts_to in_mst s_in_mst);
   rewrite (A.pts_to in_mst s_in_mst) as (A.pts_to (V.vec_to_array in_mst_v) s_in_mst);

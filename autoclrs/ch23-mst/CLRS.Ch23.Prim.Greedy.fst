@@ -979,6 +979,31 @@ let prim_mst_result_elim
                     (edges_from_parent_key ps ks n source 0))
   = reveal_opaque (`%prim_mst_result) (prim_mst_result ps ks ws n source)
 
+/// prim_mst_result is invariant under parent[source] change
+/// because edges_from_parent_key skips source
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+let prim_mst_result_upd_source
+    (ps ks ws: Seq.seq SZ.t) (n source: nat) (new_p: SZ.t)
+  : Lemma
+    (requires prim_mst_result ps ks ws n source /\
+              Seq.length ps == n /\ Seq.length ks == n /\ source < n /\ SZ.v new_p < n)
+    (ensures prim_mst_result (Seq.upd ps source new_p) ks ws n source)
+  = // edges_from_parent_key skips source, so same edges
+    let rec efpk_skip_source (p1 p2 k: Seq.seq SZ.t) (nn src: nat) (i: nat)
+      : Lemma (requires Seq.length p1 == nn /\ Seq.length p2 == nn /\ Seq.length k == nn /\
+                        i <= nn /\ src < nn /\
+                        (forall (v:nat). v < nn /\ v <> src ==> Seq.index p1 v == Seq.index p2 v))
+              (ensures edges_from_parent_key p1 k nn src i == edges_from_parent_key p2 k nn src i)
+              (decreases (nn - i))
+      = if i >= nn then ()
+        else if i = src then efpk_skip_source p1 p2 k nn src (i + 1)
+        else efpk_skip_source p1 p2 k nn src (i + 1)
+    in
+    efpk_skip_source ps (Seq.upd ps source new_p) ks n source 0;
+    reveal_opaque (`%prim_mst_result) (prim_mst_result ps ks ws n source);
+    reveal_opaque (`%prim_mst_result) (prim_mst_result (Seq.upd ps source new_p) ks ws n source)
+#pop-options
+
 /// Post-loop MST derivation
 #restart-solver
 #push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always"
