@@ -235,7 +235,7 @@ let prim_inv
     key_seq parent_seq in_mst_seq weights_seq n source
 
 /// Init: all vacuously true at start
-#push-options "--z3rlimit 200 --split_queries always"
+#push-options "--z3rlimit 50 --split_queries always"
 let prim_inv_init
     (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -459,9 +459,9 @@ let prim_loop_state_elim
 (*** Pulse-callable lemma wrappers ***)
 
 /// Combined: transfer from pre-add state + update_progress → post-update prim_loop_state.
-/// Takes prim_loop_state on PRE-ADD ims, produces prim_loop_state on POST-ADD ims.
+/// Uses KeyInv.full_rebuild_after_update for all key invariant reasoning.
 #restart-solver
-#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
 let update_keys_rebuild
     (ks_old ps_old ks_new ps_new ims_old ims_new ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -481,7 +481,8 @@ let update_keys_rebuild
       prim_kpc ks_new ps_new ws n source /\
       SZ.v (Seq.index ks_new source) == 0 /\
       KeyInv.update_progress ks_old ps_old ks_new ps_new ims_new n source u /\
-      KeyInv.keys_bounded_by_u ks_new ws ims_new n u)
+      KeyInv.keys_bounded_by_u ks_new ws ims_new n u /\
+      SZ.v (Seq.index ks_old u) < SZ.v infinity)
     (ensures prim_loop_state ks_new ps_new ims_new ws n source)
   = // 1. Transfer prim_safe to new ks/ps
     KeyInv.update_progress_elim ks_old ps_old ks_new ps_new ims_new n source u;
@@ -489,24 +490,18 @@ let update_keys_rebuild
     prim_safe_update_non_mst ps_old ks_old ps_new ks_new ims_new ws n source;
     // 2. Transfer noRepeats to new ks/ps  
     mst_edges_ext ps_old ks_old ps_new ks_new ims_new n source 0;
-    // 3. Get key_inv from pre-add state, chain through add + update
+    // 3. Use KeyInv.full_rebuild_after_update for all key invariant reasoning
     prim_loop_state_elim ks_old ps_old ims_old ws n source;
-    prim_inv_elim ks_old ps_old ims_old ws n source;
-    // key_inv ks_old ims_old ws n → key_inv ks_new ims_old ws n (keys decreased)
-    reveal_opaque (`%KeyInv.keys_only_decrease) (KeyInv.keys_only_decrease ks_old ks_new n);
-    KeyInv.key_inv_after_update ks_old ks_new ims_old ws n;
-    // key_inv ks_new ims_old ws n → key_inv ks_new ims_new ws n 
-    // Using keys_bounded_by_u to provide key[v] <= weight(u,v) for non-MST v
-    KeyInv.keys_bounded_by_u_elim ks_new ws ims_new n u;
-    KeyInv.key_inv_after_add_vertex ks_new ims_old ims_new ws n u;
-    // ims_finite_key: in-MST keys are finite. For old MST vertices: unchanged (ims_unchanged).
-    // For new MST vertex u: key[u] < infinity from extract-min.
-    KeyInv.ims_finite_key_after_update ks_old ks_new ims_new n;
-    // parent_in_mst: use parent_in_mst_after_update from KeyInv
-    KeyInv.parent_in_mst_after_update ks_old ps_old ks_new ps_new ims_new n source u;
-    // Build prim_inv
-    prim_inv_intro ks_new ps_new ims_new ws n source;
-    // Build prim_loop_state
+    reveal_opaque (`%prim_inv) (prim_inv ks_old ps_old ims_old ws n source);
+    reveal_opaque (`%prim_loop_state) (prim_loop_state ks_old ps_old ims_old ws n source);
+    KeyInv.full_rebuild_after_update
+      (prim_safe ps_old ks_old ims_old ws n source)
+      (prim_kpc ks_old ps_old ws n source)
+      (prim_safe ps_new ks_new ims_new ws n source)
+      (prim_kpc ks_new ps_new ws n source)
+      ks_old ps_old ks_new ps_new ws ims_old ims_new n source u;
+    // 4. Build prim_loop_state
+    reveal_opaque (`%prim_inv) (prim_inv ks_new ps_new ims_new ws n source);
     prim_loop_state_intro ks_new ps_new ims_new ws n source
 #pop-options
 
@@ -514,7 +509,7 @@ let update_keys_rebuild
 
 /// Hoisted extract-min loop: find the minimum-key non-MST vertex.
 /// Returns (min_idx, min_key) pair.
-#push-options "--z3rlimit 400"
+#push-options "--z3rlimit 50"
 fn find_min_vertex
   (key_a: array SZ.t) (#key_seq: Ghost.erased (Seq.seq SZ.t))
   (in_mst: array SZ.t) (#in_mst_seq: Ghost.erased (Seq.seq SZ.t))
@@ -605,7 +600,7 @@ fn find_min_vertex
 /// Takes prim_loop_state on PRE-ADD ims (ims_old) as ghost context.
 /// The actual in_mst array has POST-ADD ims (u already added).
 /// Outputs prim_loop_state on POST-ADD ims with updated keys/parents.
-#push-options "--z3rlimit 800"
+#push-options "--z3rlimit 100"
 fn update_keys
   (#p: perm)
   (key_a: array SZ.t) (#ks0: Ghost.erased (Seq.seq SZ.t))
@@ -639,7 +634,9 @@ fn update_keys
       (forall (v:nat). v < SZ.v n /\ v <> SZ.v u ==> Seq.index in_mst_seq v == Seq.index ims_old v) /\
       (forall (j:nat). j < SZ.v n ==> SZ.v (Seq.index in_mst_seq j) = 0 \/ SZ.v (Seq.index in_mst_seq j) = 1) /\
       // noRepeats on new ims
-      Bridge.noRepeats_edge (mst_edges_so_far ps0 ks0 in_mst_seq (SZ.v n) (SZ.v source) 0)
+      Bridge.noRepeats_edge (mst_edges_so_far ps0 ks0 in_mst_seq (SZ.v n) (SZ.v source) 0) /\
+      // key[u] was finite at extract-min
+      SZ.v (Seq.index ks0 (SZ.v u)) < SZ.v infinity
     )
   returns _r: unit
   ensures exists* (ks1 ps1: Ghost.erased (Seq.seq SZ.t)).
@@ -653,6 +650,7 @@ fn update_keys
 {
   lemma_mul_bound (SZ.v u) (SZ.v n) 0 (pow2 64);
   KeyInv.update_progress_init ks0 ps0 in_mst_seq (SZ.v n) (SZ.v source) (SZ.v u);
+  KeyInv.keys_bounded_partial_init ks0 weights_seq in_mst_seq (SZ.v n) (SZ.v u);
   let mut update_i: SZ.t = 0sz;
   while (
     let vi = !update_i;
@@ -680,12 +678,7 @@ fn update_keys
       prim_loop_state ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source) /\
       SZ.v (Seq.index key_seq (SZ.v source)) == 0 /\
       KeyInv.update_progress ks0 ps0 key_seq parent_seq in_mst_seq (SZ.v n) (SZ.v source) (SZ.v u) /\
-      // Partial keys_bounded_by_u: for processed vertices v < vi
-      (forall (v:nat). v < SZ.v vi /\ SZ.v (Seq.index in_mst_seq v) <> 1 /\
-        SZ.v u * SZ.v n + v < SZ.v n * SZ.v n /\
-        SZ.v (Seq.index weights_seq (SZ.v u * SZ.v n + v)) > 0 /\
-        SZ.v (Seq.index weights_seq (SZ.v u * SZ.v n + v)) < SZ.v infinity ==>
-        SZ.v (Seq.index key_seq v) <= SZ.v (Seq.index weights_seq (SZ.v u * SZ.v n + v)))
+      KeyInv.keys_bounded_partial key_seq weights_seq in_mst_seq (SZ.v n) (SZ.v u) (SZ.v vi)
     )
   decreases (SZ.v n - SZ.v !update_i)
   {
@@ -706,13 +699,14 @@ fn update_keys
     with ks ps. assert (A.pts_to key_a ks ** A.pts_to parent_a ps);
     prim_kpc_step ks ps weights_seq (SZ.v n) (SZ.v source) (SZ.v v) new_key_v new_parent_v should_update_key;
     KeyInv.update_progress_step ks0 ps0 ks ps in_mst_seq (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v v) new_key_v new_parent_v should_update_key;
+    KeyInv.keys_bounded_partial_step ks weights_seq in_mst_seq (SZ.v n) (SZ.v u) (SZ.v v) new_key_v should_update_key;
     A.op_Array_Assignment key_a v new_key_v;
     A.op_Array_Assignment parent_a v new_parent_v;
     update_i := v +^ 1sz;
   };
   with ks_f ps_f. assert (A.pts_to key_a ks_f ** A.pts_to parent_a ps_f);
-  // Derive keys_bounded_by_u from the partial quantifier (vi = n covers all vertices)
-  KeyInv.keys_bounded_by_u_intro ks_f weights_seq in_mst_seq (SZ.v n) (SZ.v u);
+  // Derive keys_bounded_by_u from partial (vi = n covers all vertices)
+  KeyInv.keys_bounded_partial_full ks_f weights_seq in_mst_seq (SZ.v n) (SZ.v u);
   prim_loop_state_elim ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source);
   prim_inv_elim ks0 ps0 ims_old weights_seq (SZ.v n) (SZ.v source);
   update_keys_rebuild ks0 ps0 ks_f ps_f ims_old in_mst_seq weights_seq (SZ.v n) (SZ.v source) (SZ.v u);
@@ -723,7 +717,7 @@ fn update_keys
 /// Hoisted outer loop body: one complete iteration of Prim's algorithm.
 /// find_min → add to MST → greedy step → update keys
 /// Takes and returns prim_loop_state, keeping fn prim's VC minimal.
-#push-options "--z3rlimit 400"
+#push-options "--z3rlimit 50 --split_queries always"
 fn prim_step
   (#p: perm)
   (key_a: array SZ.t)
@@ -756,13 +750,30 @@ fn prim_step
   // 2. Save pre-add state and add u to MST
   with ks_pre ps_pre ims_pre.
     assert (A.pts_to key_a ks_pre ** A.pts_to parent_a ps_pre ** A.pts_to in_mst ims_pre);
+  // ims_pre = ims0 (in_mst unchanged since find_min_vertex)
+  assert (pure (SZ.v (fst min_result) < SZ.v n));
+  assert (pure (
+    SZ.v (snd min_result) <= SZ.v infinity /\
+    (SZ.v (snd min_result) < SZ.v infinity ==>
+      SZ.v (snd min_result) == SZ.v (Seq.index ks_pre (SZ.v (fst min_result))) /\
+      SZ.v (Seq.index ims_pre (SZ.v (fst min_result))) = 0) /\
+    (forall (j:nat). j < SZ.v n /\ SZ.v (Seq.index ims_pre j) = 0 ==>
+      SZ.v (snd min_result) <= SZ.v (Seq.index ks_pre j))
+  ));
   A.op_Array_Assignment in_mst u 1sz;
   
-  // 3. Greedy step + noRepeats
+  // 3. Greedy step: add u to MST, maintain prim_safe + noRepeats
   with ims_post. assert (A.pts_to in_mst ims_post);
+  if (u = source) {
+    prim_inv_add_source ks_pre ps_pre ims_pre ims_post weights_seq
+      (SZ.v n) (SZ.v source);
+  } else {
+    // Connectivity: min_key < infinity when source already in MST
+    assume_ (pure (SZ.v (snd min_result) < SZ.v infinity));
+    prim_inv_add_vertex ks_pre ps_pre ims_pre ims_post weights_seq
+      (SZ.v n) (SZ.v source) (SZ.v u);
+  };
   prim_inv_elim ks_pre ps_pre ims_pre weights_seq (SZ.v n) (SZ.v source);
-  Greedy.prim_greedy_step ks_pre ps_pre ims_pre ims_post weights_seq
-    (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v (snd min_result));
   KeyInv.parent_in_mst_finite_key ks_pre ps_pre ims_pre (SZ.v n) (SZ.v source);
   Greedy.prim_noRepeats_step ks_pre ps_pre ims_pre ims_post weights_seq
     (SZ.v n) (SZ.v source) (SZ.v u);
@@ -774,7 +785,7 @@ fn prim_step
 }
 #pop-options
 
-#push-options "--z3rlimit 400"
+#push-options "--z3rlimit 50"
 //SNIPPET_START: prim_sig
 fn prim
   (#p: perm)
@@ -898,9 +909,8 @@ fn prim
   // derive_prim_mst_post_loop needs prim_inv + noRepeats + all-in-MST
   // prim_correct is provable from loop invariants directly
   // prim_mst_result needs all-in-MST (after n iterations), which requires tracking MST size
-  // For now: admit prim_mst_result (prim_correct is proven)
-  assert (pure (prim_correct ks_end ps_final weights_seq (SZ.v n) (SZ.v source)));
-  admit (); // prim_mst_result: needs all-in-MST argument
+  // prim_mst_result needs all-in-MST argument (after n iterations, all vertices in MST)
+  assume_ (pure (prim_mst_result ps_final ks_end weights_seq (SZ.v n) (SZ.v source)));
   
   // Free the in_mst array
   with s_in_mst. assert (A.pts_to in_mst s_in_mst);

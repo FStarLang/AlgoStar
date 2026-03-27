@@ -554,3 +554,144 @@ let keys_bounded_by_u_intro (ks ws ims: Seq.seq SZ.t) (n u: nat)
                       SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (u * n + v))))
           (ensures keys_bounded_by_u ks ws ims n u)
   = reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims n u)
+
+
+(*** Lift KeyInv predicates through add-vertex (ims_old → ims_new) ***)
+
+/// Lift key_inv, ims_finite_key, parent_in_mst from ims_old to ims_new
+/// when vertex u is added to MST. All reveal_opaque done here in KeyInv's 4s context.
+#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+let lift_predicates_add_vertex
+    (ks ps ws ims_old ims_new: Seq.seq SZ.t) (n source u: nat)
+  : Lemma
+    (requires
+      key_inv ks ims_old ws n /\
+      ims_finite_key ks ims_old n /\
+      parent_in_mst ks ps ims_old n source /\
+      keys_bounded_by_u ks ws ims_new n u /\
+      n > 0 /\ source < n /\ u < n /\
+      Seq.length ks == n /\ Seq.length ps == n /\
+      Seq.length ws == n * n /\
+      Seq.length ims_old == n /\ Seq.length ims_new == n /\
+      SZ.v (Seq.index ks u) < SZ.v (65535sz) /\
+      SZ.v (Seq.index ims_new u) = 1 /\
+      (forall (v:nat). v < n /\ v <> u ==> Seq.index ims_new v == Seq.index ims_old v) /\
+      (forall (v:nat). v < n ==> SZ.v (Seq.index ps v) < n))
+    (ensures
+      key_inv ks ims_new ws n /\
+      ims_finite_key ks ims_new n /\
+      parent_in_mst ks ps ims_new n source)
+  = // key_inv: old MST vertices w still satisfy key[v] <= weight(w,v).
+    // New MST vertex u: keys_bounded_by_u gives key[v] <= weight(u,v).
+    reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims_new n u);
+    key_inv_after_add_vertex ks ims_old ims_new ws n u;
+    // ims_finite_key: old MST vertices have finite keys. u has finite key (precondition).
+    reveal_opaque (`%ims_finite_key) (ims_finite_key ks ims_old n);
+    reveal_opaque (`%ims_finite_key) (ims_finite_key ks ims_new n);
+    // parent_in_mst: for all v with finite key and v <> source, ims[parent[v]] = 1.
+    // In ims_new, if parent[v] = u then ims_new[u] = 1. If parent[v] <> u then ims_new[parent[v]] = ims_old[parent[v]] = 1.
+    reveal_opaque (`%parent_in_mst) (parent_in_mst ks ps ims_old n source);
+    reveal_opaque (`%parent_in_mst) (parent_in_mst ks ps ims_new n source)
+#pop-options
+
+/// Full rebuild: from pre-add state + update_progress + keys_bounded_by_u,
+/// produce prim_inv_bundle on NEW keys and NEW ims.
+/// All reasoning done here with reveal_opaque in KeyInv's tight context.
+#push-options "--z3rlimit 100 --fuel 0 --ifuel 0"
+let full_rebuild_after_update
+    (safe_old kpc_old safe_new kpc_new: prop)
+    (ks_old ps_old ks_new ps_new ws ims_old ims_new: Seq.seq SZ.t) (n source u: nat)
+  : Lemma
+    (requires
+      prim_inv_bundle safe_old kpc_old ks_old ps_old ims_old ws n source /\
+      update_progress ks_old ps_old ks_new ps_new ims_new n source u /\
+      keys_bounded_by_u ks_new ws ims_new n u /\
+      safe_new /\ kpc_new /\
+      n > 0 /\ source < n /\ u < n /\
+      Seq.length ks_old == n /\ Seq.length ps_old == n /\
+      Seq.length ks_new == n /\ Seq.length ps_new == n /\
+      Seq.length ws == n * n /\
+      Seq.length ims_old == n /\ Seq.length ims_new == n /\
+      SZ.v (Seq.index ks_old u) < SZ.v (65535sz) /\
+      SZ.v (Seq.index ims_new u) = 1 /\
+      (forall (v:nat). v < n /\ v <> u ==> Seq.index ims_new v == Seq.index ims_old v) /\
+      Defs.all_keys_bounded ks_new /\ Defs.parent_valid ps_new n /\
+      SZ.v (Seq.index ks_new source) == 0)
+    (ensures prim_inv_bundle safe_new kpc_new ks_new ps_new ims_new ws n source)
+  = prim_inv_bundle_elim safe_old kpc_old ks_old ps_old ims_old ws n source;
+    update_progress_elim ks_old ps_old ks_new ps_new ims_new n source u;
+    // Reveal all predicates for direct reasoning
+    reveal_opaque (`%key_inv) (key_inv ks_old ims_old ws n);
+    reveal_opaque (`%keys_only_decrease) (keys_only_decrease ks_old ks_new n);
+    reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks_new ws ims_new n u);
+    reveal_opaque (`%ims_unchanged) (ims_unchanged ks_old ps_old ks_new ps_new ims_new n source);
+    // key_inv ks_new ims_new ws n:
+    // For MST vertex w in ims_new and non-MST v in ims_new:
+    // If w<>u: w was in ims_old. keys_only_decrease: ks_new[v] <= ks_old[v].
+    //   key_inv on old: ks_old[v] <= ws[w*n+v]. So ks_new[v] <= ws[w*n+v].
+    // If w=u: keys_bounded_by_u gives ks_new[v] <= ws[u*n+v].
+    reveal_opaque (`%key_inv) (key_inv ks_new ims_new ws n);
+    // ims_finite_key ks_new ims_new n:
+    // For v with ims_new[v]=1: if v=u, ks_new[u] <= ks_old[u] < infinity.
+    //   If v<>u: ims_old[v]=1, ims_unchanged gives ks_new[v]=ks_old[v], old ims_finite_key gives < infinity.
+    reveal_opaque (`%ims_finite_key) (ims_finite_key ks_old ims_old n);
+    reveal_opaque (`%ims_finite_key) (ims_finite_key ks_new ims_new n);
+    // parent_in_mst ks_new ps_new ims_new n source:
+    // Explicit case analysis: for v with key_new[v]<inf, v<>source, w=parent_new[v]:
+    // Case 1: v in ims_new (ims_new[v]=1, v<>source): ims_unchanged gives ps_new[v]=ps_old[v], ks_new[v]=ks_old[v]
+    //   parent_in_mst on old: ims_old[ps_old[v]]=1. Since ps_old[v]<>u or =u, ims_new[w]=1.
+    // Case 2: v not in ims_new, key unchanged: ps_new[v]=ps_old[v], same as case 1.
+    // Case 3: v not in ims_new, key decreased: ps_new[v]=u, ims_new[u]=1.
+    reveal_opaque (`%parent_in_mst) (parent_in_mst ks_old ps_old ims_old n source);
+    reveal_opaque (`%parent_in_mst) (parent_in_mst ks_new ps_new ims_new n source);
+    reveal_opaque (`%key_unchanged_parent_unchanged) (key_unchanged_parent_unchanged ks_old ps_old ks_new ps_new n);
+    reveal_opaque (`%key_decreased_parent_is_u) (key_decreased_parent_is_u ks_old ks_new ps_new ims_new n u);
+    prim_inv_bundle_intro safe_new kpc_new ks_new ps_new ims_new ws n source
+#pop-options
+
+/// Derive keys_bounded_by_u from prim_kpc + update_progress after the loop.
+/// For each non-MST v: if key decreased, parent=u so key=weight(u,v) from kpc.
+/// If key unchanged, we need weight(u,v) >= key[v]. This is tracked separately.
+/// So we need an additional "not_updated_weight_geq" fact.
+
+/// Partial keys_bounded_by_u: for vertices v < up_to
+[@@"opaque_to_smt"]
+let keys_bounded_partial (ks ws ims: Seq.seq SZ.t) (n u up_to: nat) : prop =
+  Seq.length ks == n /\ Seq.length ws == n * n /\ Seq.length ims == n /\ u < n /\ up_to <= n /\
+  (forall (v:nat). v < up_to /\ SZ.v (Seq.index ims v) <> 1 /\
+    u * n + v < n * n /\
+    SZ.v (Seq.index ws (u * n + v)) > 0 /\
+    SZ.v (Seq.index ws (u * n + v)) < SZ.v (65535sz) ==>
+    SZ.v (Seq.index ks v) <= SZ.v (Seq.index ws (u * n + v)))
+
+let keys_bounded_partial_init (ks ws ims: Seq.seq SZ.t) (n u: nat)
+  : Lemma (requires Seq.length ks == n /\ Seq.length ws == n * n /\ Seq.length ims == n /\ u < n)
+          (ensures keys_bounded_partial ks ws ims n u 0)
+  = reveal_opaque (`%keys_bounded_partial) (keys_bounded_partial ks ws ims n u 0)
+
+#push-options "--z3rlimit 50"
+let keys_bounded_partial_step
+    (ks ws ims: Seq.seq SZ.t) (n u i: nat) (new_k: SZ.t) (should_update: bool)
+  : Lemma
+    (requires
+      keys_bounded_partial ks ws ims n u i /\
+      Seq.length ks == n /\ Seq.length ws == n * n /\ Seq.length ims == n /\
+      u < n /\ i < n /\
+      (should_update ==> u * n + i < n * n /\
+        SZ.v new_k == SZ.v (Seq.index ws (u * n + i))) /\
+      (~should_update ==> new_k == Seq.index ks i /\
+        (SZ.v (Seq.index ims i) <> 1 /\ u * n + i < n * n /\
+         SZ.v (Seq.index ws (u * n + i)) > 0 /\
+         SZ.v (Seq.index ws (u * n + i)) < SZ.v (65535sz) ==>
+         SZ.v (Seq.index ks i) <= SZ.v (Seq.index ws (u * n + i)))))
+    (ensures keys_bounded_partial (Seq.upd ks i new_k) ws ims n u (i + 1))
+  = reveal_opaque (`%keys_bounded_partial) (keys_bounded_partial ks ws ims n u i);
+    reveal_opaque (`%keys_bounded_partial) (keys_bounded_partial (Seq.upd ks i new_k) ws ims n u (i + 1))
+#pop-options
+
+/// At loop end (up_to = n), derive full keys_bounded_by_u
+let keys_bounded_partial_full (ks ws ims: Seq.seq SZ.t) (n u: nat)
+  : Lemma (requires keys_bounded_partial ks ws ims n u n)
+          (ensures keys_bounded_by_u ks ws ims n u)
+  = reveal_opaque (`%keys_bounded_partial) (keys_bounded_partial ks ws ims n u n);
+    reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims n u)
