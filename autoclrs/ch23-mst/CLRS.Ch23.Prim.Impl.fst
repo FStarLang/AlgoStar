@@ -20,6 +20,7 @@ module PrimSpec = CLRS.Ch23.Prim.Spec
 module Bridge = CLRS.Ch23.Kruskal.Bridge
 module KeyInv = CLRS.Ch23.Prim.KeyInv
 module Greedy = CLRS.Ch23.Prim.Greedy
+module Defs = CLRS.Ch23.Prim.Defs
 
 // Re-export from Greedy for backward compatibility
 let sizet_to_int = Greedy.sizet_to_int
@@ -411,7 +412,11 @@ let prim_loop_state
   KeyInv.loop_state
     (prim_inv ks ps ims ws n source)
     (Bridge.noRepeats_edge (mst_edges_so_far ps ks ims n source 0))
-    ks ps ims ws n source
+    ks ps ims ws n source /\
+  // Constants from fn prim precondition (needed for connectivity argument)
+  valid_weights ws n /\ symmetric_weights ws n /\
+  Defs.no_zero_edges ws n /\
+  all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix ws n) n)
 
 let prim_loop_state_intro
     (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
@@ -426,7 +431,10 @@ let prim_loop_state_intro
       SZ.v (Seq.index ks source) == 0 /\
       all_keys_bounded ks /\
       parent_valid ps n /\
-      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
+      valid_weights ws n /\ symmetric_weights ws n /\
+      Defs.no_zero_edges ws n /\
+      all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix ws n) n))
     (ensures prim_loop_state ks ps ims ws n source)
   = KeyInv.loop_state_intro
       (prim_inv ks ps ims ws n source)
@@ -448,7 +456,10 @@ let prim_loop_state_elim
       SZ.v (Seq.index ks source) == 0 /\
       all_keys_bounded ks /\
       parent_valid ps n /\
-      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1))
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
+      valid_weights ws n /\ symmetric_weights ws n /\
+      Defs.no_zero_edges ws n /\
+      all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix ws n) n))
   = reveal_opaque (`%prim_loop_state) (prim_loop_state ks ps ims ws n source);
     KeyInv.loop_state_elim
       (prim_inv ks ps ims ws n source)
@@ -764,16 +775,19 @@ fn prim_step
   
   // 3. Greedy step: add u to MST, maintain prim_safe + noRepeats
   with ims_post. assert (A.pts_to in_mst ims_post);
+  prim_inv_elim ks_pre ps_pre ims_pre weights_seq (SZ.v n) (SZ.v source);
   if (u = source) {
     prim_inv_add_source ks_pre ps_pre ims_pre ims_post weights_seq
       (SZ.v n) (SZ.v source);
   } else {
-    // Connectivity: min_key < infinity when source already in MST
+    // Need min_key < infinity to call prim_inv_add_vertex
+    // Case 1: source not in MST → min_key <= key[source] = 0 < infinity (trivial)
+    // Case 2: source in MST → connectivity lemma
+    // For now, use assume_ for case 2 (connectivity_gives_finite_key has admit)
     assume_ (pure (SZ.v (snd min_result) < SZ.v infinity));
     prim_inv_add_vertex ks_pre ps_pre ims_pre ims_post weights_seq
       (SZ.v n) (SZ.v source) (SZ.v u);
   };
-  prim_inv_elim ks_pre ps_pre ims_pre weights_seq (SZ.v n) (SZ.v source);
   KeyInv.parent_in_mst_finite_key ks_pre ps_pre ims_pre (SZ.v n) (SZ.v source);
   Greedy.prim_noRepeats_step ks_pre ps_pre ims_pre ims_post weights_seq
     (SZ.v n) (SZ.v source) (SZ.v u);

@@ -707,6 +707,45 @@ let mst_edges_noRepeats_init
   = mst_edges_none_in ps ks ims n source 0
 #pop-options
 
+(*** Connectivity lemma: min_key < infinity ***)
+
+/// When source is in MST and there's a non-MST vertex u,
+/// connectivity + key_inv + valid_weights guarantees some non-MST vertex has finite key.
+/// This is needed for prim_inv_add_vertex's precondition.
+///
+/// Argument: graph connected → path from source (MST) to u (non-MST).
+/// Path must cross the MST/non-MST boundary at some edge (w,v) with w in MST, v not.
+/// valid_weights → weight(w,v) > 0 ∧ weight(w,v) < infinity (since w≠v and no_zero_edges).
+/// key_inv → key[v] ≤ weight(w,v) < infinity.
+/// So min_key ≤ key[v] < infinity.
+///
+/// This is a deep graph theory argument. For now we state it and leave the proof
+/// to future work (requires path manipulation lemmas not yet in the codebase).
+let connectivity_gives_finite_key
+    (ks ims ws: Seq.seq SZ.t) (n source u: nat) (min_key: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ u < n /\ u <> source /\
+      Seq.length ks == n /\ Seq.length ims == n /\ Seq.length ws == n * n /\
+      KeyInv.key_inv ks ims ws n /\
+      valid_weights ws n /\ symmetric_weights ws n /\ no_zero_edges ws n /\
+      all_connected n (PrimSpec.adj_to_edges (weights_to_adj_matrix ws n) n) /\
+      SZ.v (Seq.index ims source) = 1 /\
+      SZ.v (Seq.index ims u) <> 1 /\
+      (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1) /\
+      SZ.v (Seq.index ks source) == 0 /\
+      // min_key is the extract-min result
+      min_key <= SZ.v infinity /\
+      (forall (j:nat). j < n /\ SZ.v (Seq.index ims j) = 0 ==> min_key <= SZ.v (Seq.index ks j)))
+    (ensures min_key < SZ.v infinity)
+  = // Connected graph: path from source to u exists
+    // This path must cross the MST/non-MST boundary
+    // At the crossing edge (w,v): w in MST, v not in MST
+    // valid_weights + no_zero_edges: weight(w,v) > 0 and < infinity
+    // key_inv: key[v] <= weight(w,v) < infinity
+    // extract-min: min_key <= key[v] < infinity
+    admit () // TODO: path crossing argument
+
 (*** Combined greedy step + noRepeats step ***)
 
 /// Combined greedy step — takes prim_inv_bundle components, outputs safety facts.
