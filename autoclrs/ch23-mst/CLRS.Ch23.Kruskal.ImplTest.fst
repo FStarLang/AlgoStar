@@ -157,6 +157,18 @@ fn test_kruskal_satisfiability ()
   // ✓ PROVEN: edge count bounded by n-1 = 2
   assert (pure (SZ.v ec_val <= 2));
 
+  // ✓ PROVEN: concrete edge count is exactly 2
+  // (from is_mst: spanning tree of 3 vertices has exactly 2 edges)
+  assert (pure (SZ.v ec_val == 2));
+
+  // ✓ PROVEN: concrete MST edges: {(0,1,1), (1,2,2)}
+  // Kruskal processes edges in weight order: first (0,1) weight 1, then (1,2) weight 2
+  // edge_u = [0, 1, ...], edge_v = [1, 2, ...]
+  assert (pure (SZ.v (Seq.index sedge_u' 0) == 0));
+  assert (pure (SZ.v (Seq.index sedge_v' 0) == 1));
+  assert (pure (SZ.v (Seq.index sedge_u' 1) == 1));
+  assert (pure (SZ.v (Seq.index sedge_v' 1) == 2));
+
   // ✓ PROVEN: output arrays have correct length
   assert (pure (Seq.length sedge_u' == 3));
   assert (pure (Seq.length sedge_v' == 3));
