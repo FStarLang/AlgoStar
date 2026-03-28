@@ -183,3 +183,118 @@ let prim_unique_output (ks ps ws: Seq.seq SZ.t)
       SZ.v (Seq.index ks 2) == 2 /\ SZ.v (Seq.index ps 2) == 1)
   = prim_consistent_output ks ps ws
 #pop-options
+
+
+let kpc_inst (ks ps ws: Seq.seq SZ.t) (v: nat)
+  : Lemma
+    (requires key_parent_consistent ks ps ws 3 0 /\
+              Seq.length ks == 3 /\ Seq.length ps == 3 /\ Seq.length ws == 9 /\
+              parent_valid ps 3 /\ v < 3 /\ v <> 0 /\
+              SZ.v (Seq.index ks v) < SZ.v CLRS.Ch23.Prim.Defs.infinity)
+    (ensures SZ.v (Seq.index ks v) == SZ.v (Seq.index ws (SZ.v (Seq.index ps v) * 3 + v)))
+  = ()
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 50"
+let efpk_3 (ps ks: Seq.seq SZ.t)
+  : Lemma (requires Seq.length ps == 3 /\ Seq.length ks == 3)
+          (ensures edges_from_parent_key ps ks 3 0 0 ==
+                   [{u=SZ.v (Seq.index ps 1); v=1; w=SZ.v (Seq.index ks 1)};
+                    {u=SZ.v (Seq.index ps 2); v=2; w=SZ.v (Seq.index ks 2)}])
+  = ()
+#pop-options
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 200 --split_queries always"
+let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
+  : Lemma
+    (requires Seq.length ps == 3 /\ Seq.length ks == 3 /\ Seq.length ws == 9 /\ ws == tw /\
+              is_mst (CLRS.Ch23.Prim.Spec.adj_to_graph (weights_to_adj_matrix ws 3) 3)
+                     (edges_from_parent_key ps ks 3 0 0))
+    (ensures SZ.v (Seq.index ps 1) <> 1 /\ SZ.v (Seq.index ps 2) <> 2 /\
+             SZ.v (Seq.index ks 1) < SZ.v CLRS.Ch23.Prim.Defs.infinity /\
+             SZ.v (Seq.index ks 2) < SZ.v CLRS.Ch23.Prim.Defs.infinity)
+  = efpk_3 ps ks;
+    let adj = weights_to_adj_matrix ws 3 in
+    let g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
+    let e1 : edge = {u=SZ.v (Seq.index ps 1); v=1; w=SZ.v (Seq.index ks 1)} in
+    let e2 : edge = {u=SZ.v (Seq.index ps 2); v=2; w=SZ.v (Seq.index ks 2)} in
+    edge_eq_reflexive e1; edge_eq_reflexive e2;
+    mem_edge_subset e1 (edges_from_parent_key ps ks 3 0 0) g.edges;
+    mem_edge_subset e2 (edges_from_parent_key ps ks 3 0 0) g.edges;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_edges_valid adj 3 e1;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_edges_valid adj 3 e2;
+    CLRS.Ch23.Prim.Spec.well_formed_adj_intro adj 3;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_edge_weight adj 3 e1;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_edge_weight adj 3 e2;
+    assert_norm (SZ.v (Seq.index tw 0) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 1) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 2) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 3) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 4) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 5) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 6) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 7) < SZ.v CLRS.Ch23.Prim.Defs.infinity);
+    assert_norm (SZ.v (Seq.index tw 8) < SZ.v CLRS.Ch23.Prim.Defs.infinity)
+#pop-options
+
+/// Witness: [{u=0;v=1;w=1}; {u=1;v=2;w=2}] is a spanning tree with weight 3
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 800"
+let witness_spanning_tree ()
+  : Lemma
+    (let adj = weights_to_adj_matrix tw 3 in
+     let g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
+     let t : list edge = [{u=0;v=1;w=1}; {u=1;v=2;w=2}] in
+     is_spanning_tree g t /\ total_weight t == 3)
+  = let adj = weights_to_adj_matrix tw 3 in
+    let g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
+    let e01 : edge = {u=0; v=1; w=1} in
+    let e12 : edge = {u=1; v=2; w=2} in
+    let t : list edge = [e01; e12] in
+    CLRS.Ch23.Prim.Spec.adj_to_graph_edges adj 3;
+    CLRS.Ch23.Prim.Spec.well_formed_adj_intro adj 3;
+    // Both edges are in the graph
+    CLRS.Ch23.Prim.Spec.has_edge_intro adj 3 0 1;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_has_edge adj 3 0 1;
+    CLRS.Ch23.Prim.Spec.has_edge_intro adj 3 1 2;
+    CLRS.Ch23.Prim.Spec.adj_to_graph_has_edge adj 3 1 2;
+    edge_eq_reflexive e01; edge_eq_reflexive e12;
+    // Connectivity: paths from 0 to all vertices
+    assert (is_path_from_to ([] <: list edge) 0 0);
+    assert (subset_edges ([] <: list edge) t);
+    assert (is_path_from_to [e01] 0 1);
+    assert (subset_edges [e01] t);
+    assert (is_path_from_to [e01; e12] 0 2);
+    assert (subset_edges [e01; e12] t);
+    // Acyclicity: build up from empty list
+    acyclic_when_unreachable 3 [] e12;
+    acyclic_when_unreachable 3 [e12] e01
+#pop-options
+
+/// Total weight: from is_mst + witness spanning tree, k1+k2 ≤ 3
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 100"
+let mst_total_weight (ks ps ws: Seq.seq SZ.t)
+  : Lemma
+    (requires Seq.length ps == 3 /\ Seq.length ks == 3 /\ Seq.length ws == 9 /\ ws == tw /\
+              is_mst (CLRS.Ch23.Prim.Spec.adj_to_graph (weights_to_adj_matrix ws 3) 3)
+                     (edges_from_parent_key ps ks 3 0 0))
+    (ensures SZ.v (Seq.index ks 1) + SZ.v (Seq.index ks 2) <= 3)
+  = efpk_3 ps ks;
+    witness_spanning_tree ()
+#pop-options
+
+#push-options "--z3rlimit 50"
+let mst_test_facts (ps ks ws: Seq.seq SZ.t)
+  : Lemma
+    (requires prim_correct ks ps ws 3 0 /\ ws == tw /\
+              prim_mst_result ps ks ws 3 0 /\
+              symmetric_weights ws 3 /\
+              all_connected 3 (CLRS.Ch23.Prim.Spec.adj_to_edges (weights_to_adj_matrix ws 3) 3))
+    (ensures
+      SZ.v (Seq.index ks 1) < SZ.v CLRS.Ch23.Prim.Defs.infinity /\
+      SZ.v (Seq.index ks 2) < SZ.v CLRS.Ch23.Prim.Defs.infinity /\
+      SZ.v (Seq.index ps 1) <> 1 /\
+      SZ.v (Seq.index ps 2) <> 2 /\
+      SZ.v (Seq.index ks 1) + SZ.v (Seq.index ks 2) <= 3)
+  = prim_mst_result_elim ps ks ws 3 0;
+    mst_edge_facts ps ks ws;
+    mst_total_weight ks ps ws
+#pop-options

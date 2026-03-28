@@ -27,7 +27,7 @@
    This is a platform-specific assumption (64-bit SizeT) that cannot be
    proven from first principles. We assume it for this test.
 
-   Admits: SZ.fits_u64 (platform), test_graph_preconditions (Seq.init normalization).
+   Admits: SZ.fits_u64 (platform assumption only).
 *)
 module CLRS.Ch23.Prim.ImplTest
 #lang-pulse
@@ -245,15 +245,9 @@ fn test_prim_3 ()
   let p2 = parent_arr.(2sz);
   assert (pure (SZ.v p0 == 0));  // parent[source] = source
 
-  // ✓ PROVEN: output consistent with valid parent trees  
-  // prim_consistent_output needs key < infinity. Runtime check guards it.
-  assert (pure (SZ.v k1 <= SZ.v infinity /\ SZ.v k2 <= SZ.v infinity));
-  // The key < infinity fact: guaranteed by the MST (all edges have finite weights).
-  // We use assume_ since prim_correct doesn't include all_keys_finite.
-  assume_ (pure (SZ.v k1 < SZ.v infinity /\ SZ.v k2 < SZ.v infinity));
-  // ✓ PROVEN: unique MST = 0→1→2 (key[1]=1, key[2]=2, parent[1]=0, parent[2]=1)
-  // From is_mst: no self-loops + minimum total weight
-  assume_ (pure (SZ.v p1 <> 1 /\ SZ.v p2 <> 2 /\ SZ.v k1 + SZ.v k2 <= 3));
+  // ✓ PROVEN: derive key < infinity, no self-loops, and total weight ≤ 3
+  // from is_mst (via prim_mst_result) + concrete graph weights
+  mst_test_facts parent_seq key_seq ws;
   prim_unique_output key_seq parent_seq ws;
   assert (pure (SZ.v k1 == 1 /\ SZ.v p1 == 0 /\
                 SZ.v k2 == 2 /\ SZ.v p2 == 1));
