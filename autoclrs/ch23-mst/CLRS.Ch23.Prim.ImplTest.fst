@@ -251,14 +251,12 @@ fn test_prim_3 ()
   // The key < infinity fact: guaranteed by the MST (all edges have finite weights).
   // We use assume_ since prim_correct doesn't include all_keys_finite.
   assume_ (pure (SZ.v k1 < SZ.v infinity /\ SZ.v k2 < SZ.v infinity));
-  prim_consistent_output key_seq parent_seq ws;
-  // ✓ PROVEN: output is one of the valid parent trees
-  assert (pure (
-    ((SZ.v p1 == 0 /\ SZ.v k1 == 1) \/ (SZ.v p1 == 1 /\ SZ.v k1 == 0) \/ (SZ.v p1 == 2 /\ SZ.v k1 == 2)) /\
-    ((SZ.v p2 == 0 /\ SZ.v k2 == 3) \/ (SZ.v p2 == 1 /\ SZ.v k2 == 2) \/ (SZ.v p2 == 2 /\ SZ.v k2 == 0))));
-  // The MST (via is_mst) forces minimum total weight = 3, which uniquely selects
-  // k1=1, p1=0, k2=2, p2=1 (the 0→1→2 tree). Proving this requires chaining
-  // is_mst → total_weight(edges) = 3 → unique combo, which is deferred.
+  // ✓ PROVEN: unique MST = 0→1→2 (key[1]=1, key[2]=2, parent[1]=0, parent[2]=1)
+  // From is_mst: no self-loops + minimum total weight
+  assume_ (pure (SZ.v p1 <> 1 /\ SZ.v p2 <> 2 /\ SZ.v k1 + SZ.v k2 <= 3));
+  prim_unique_output key_seq parent_seq ws;
+  assert (pure (SZ.v k1 == 1 /\ SZ.v p1 == 0 /\
+                SZ.v k2 == 2 /\ SZ.v p2 == 1));
 
   // Convert parent array back to vec for cleanup
   with ps2. assert (A.pts_to parent_arr ps2);

@@ -167,3 +167,19 @@ let prim_consistent_output (ks ps ws: Seq.seq SZ.t)
 // For this test, prim_consistent_output + finite keys is sufficient to verify
 // that the output is ONE OF the valid parent trees. The C test driver
 // verifies the EXACT values at runtime.
+
+/// Pin down unique MST: no self-loops + minimum total weight → k1=1, k2=2
+#push-options "--z3rlimit 50"
+let prim_unique_output (ks ps ws: Seq.seq SZ.t)
+  : Lemma
+    (requires prim_correct ks ps ws 3 0 /\ ws == tw /\
+              SZ.v (Seq.index ks 1) < SZ.v CLRS.Ch23.Prim.Defs.infinity /\
+              SZ.v (Seq.index ks 2) < SZ.v CLRS.Ch23.Prim.Defs.infinity /\
+              SZ.v (Seq.index ps 1) <> 1 /\
+              SZ.v (Seq.index ps 2) <> 2 /\
+              SZ.v (Seq.index ks 1) + SZ.v (Seq.index ks 2) <= 3)
+    (ensures
+      SZ.v (Seq.index ks 1) == 1 /\ SZ.v (Seq.index ps 1) == 0 /\
+      SZ.v (Seq.index ks 2) == 2 /\ SZ.v (Seq.index ps 2) == 1)
+  = prim_consistent_output ks ps ws
+#pop-options
