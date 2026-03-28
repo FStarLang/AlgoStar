@@ -193,6 +193,12 @@ fn test_kruskal_satisfiability ()
   assert (pure (CLRS.Ch23.MST.Spec.is_mst (adj_array_to_graph sadj 3)
     (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0)));
 
+  // ✓ PROVEN: unique MST = 0--1--2 with total weight 3
+  // From is_mst + concrete graph: the only MST edges are {(0,1,1), (1,2,2)}
+  kruskal_mst_edges (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0);
+  assert (pure (CLRS.Ch23.MST.Spec.total_weight
+    (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0) == 3));
+
   // --- Cleanup ---
   rewrite (A.pts_to adj sadj) as (A.pts_to (V.vec_to_array adj_v) sadj);
   V.to_vec_pts_to adj_v;
