@@ -84,7 +84,7 @@ let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
 fn test_kruskal_satisfiability ()
   requires emp
   returns r: bool
-  ensures emp
+  ensures pure (r == true)
 {
   // --- Set up adjacency matrix for 3-vertex triangle ---
   // Graph:  0 --1-- 1 --2-- 2

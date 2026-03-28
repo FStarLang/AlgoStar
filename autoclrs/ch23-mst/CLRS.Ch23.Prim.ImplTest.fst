@@ -165,7 +165,7 @@ let test_graph_preconditions (ws: Seq.seq SZ.t) : Lemma
 fn test_prim_3 ()
   requires emp
   returns r: bool
-  ensures emp
+  ensures pure (r == true)
 {
   // --- Set up weight matrix for 3-vertex triangle ---
   // Graph:  0 --1-- 1 --2-- 2
