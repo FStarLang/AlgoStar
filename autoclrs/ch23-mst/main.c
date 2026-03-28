@@ -29,13 +29,16 @@
 int main(void) {
   printf("=== CLRS Ch23 MST — Extracted tests ===\n\n");
 
-  /* ── Prim: proof test (ghost assertions, erased) ── */
-  printf("--- Prim proof test (3-vertex triangle) ---\n");
-  CLRS_Ch23_Prim_ImplTest_test_prim_3();
-  printf("  PASS (is_mst verified, output uniqueness proved)\n\n");
+  /* ── Prim: proof + runtime test ── */
+  printf("--- Prim test (3-vertex triangle) ---\n");
+  if (!CLRS_Ch23_Prim_ImplTest_test_prim_3()) {
+    fprintf(stderr, "FAIL: Prim output mismatch\n");
+    return 1;
+  }
+  printf("  PASS (proof: is_mst verified; runtime: key=[0,1,2] parent=[0,0,1])\n\n");
 
-  /* ── Prim: runtime output check ── */
-  printf("--- Prim runtime check ---\n");
+  /* ── Prim: independent runtime check via direct API ── */
+  printf("--- Prim runtime recheck (direct API) ---\n");
   {
     /*  Graph:  0 --1-- 1 --2-- 2
                 |               |
@@ -63,13 +66,16 @@ int main(void) {
     KRML_HOST_FREE(parents);
   }
 
-  /* ── Kruskal: proof test (ghost assertions, erased) ── */
-  printf("--- Kruskal proof test (3-vertex triangle) ---\n");
-  CLRS_Ch23_Kruskal_ImplTest_test_kruskal_satisfiability();
-  printf("  PASS (is_mst verified, MST edges proved unique)\n\n");
+  /* ── Kruskal: proof + runtime test ── */
+  printf("--- Kruskal test (3-vertex triangle) ---\n");
+  if (!CLRS_Ch23_Kruskal_ImplTest_test_kruskal_satisfiability()) {
+    fprintf(stderr, "FAIL: Kruskal output mismatch\n");
+    return 1;
+  }
+  printf("  PASS (proof: is_mst verified; runtime: edges checked)\n\n");
 
-  /* ── Kruskal: runtime output check ── */
-  printf("--- Kruskal runtime check ---\n");
+  /* ── Kruskal: independent runtime check via direct API ── */
+  printf("--- Kruskal runtime recheck (direct API) ---\n");
   {
     int32_t adj[] = {0,1,3, 1,0,2, 3,2,0};
     size_t edge_u[3] = {0}, edge_v[3] = {0};

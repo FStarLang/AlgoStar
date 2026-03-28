@@ -52,6 +52,11 @@ let assume_fits_u64 () : Lemma (ensures SZ.fits_u64) = admit ()
 
 (* ---------- Pure helpers ---------- *)
 
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  let open FStar.SizeT in not (a <^ b || b <^ a)
+
 (* The concrete weight matrix as a sequence *)
 let weights3 : Seq.seq SZ.t = Seq.seq_of_list [0sz; 1sz; 3sz; 1sz; 0sz; 2sz; 3sz; 2sz; 0sz]
 
@@ -159,7 +164,7 @@ let test_graph_preconditions (ws: Seq.seq SZ.t) : Lemma
 ```pulse
 fn test_prim_3 ()
   requires emp
-  returns _: unit
+  returns r: bool
   ensures emp
 {
   // --- Set up weight matrix for 3-vertex triangle ---
@@ -246,11 +251,15 @@ fn test_prim_3 ()
   assert (pure (SZ.v p0 == 0));  // parent[source] = source
 
   // ✓ PROVEN: derive key < infinity, no self-loops, and total weight ≤ 3
-  // from is_mst (via prim_mst_result) + concrete graph weights
+  // from is_mst (via prim_mst_result) + concrete graph weights (ghost, erased)
   mst_test_facts parent_seq key_seq ws;
   prim_unique_output key_seq parent_seq ws;
   assert (pure (SZ.v k1 == 1 /\ SZ.v p1 == 0 /\
                 SZ.v k2 == 2 /\ SZ.v p2 == 1));
+
+  // Runtime check (computational — survives extraction to C)
+  let pass = sz_eq k0 0sz && sz_eq k1 1sz && sz_eq k2 2sz &&
+             sz_eq p0 0sz && sz_eq p1 0sz && sz_eq p2 1sz;
 
   // Convert parent array back to vec for cleanup
   with ps2. assert (A.pts_to parent_arr ps2);
@@ -293,7 +302,10 @@ fn test_prim_3 ()
   V.to_vec_pts_to wv;
   V.free wv;
 
-  ()
+  // ✓ PROVEN: ghost assertions (erased at extraction)
+  // mst_test_facts + prim_unique_output prove k1=1,p1=0,k2=2,p2=1
+  // The runtime check above independently verifies the same.
+  pass
 }
 ```
 

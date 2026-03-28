@@ -46,6 +46,11 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  let open FStar.SizeT in not (a <^ b || b <^ a)
+
 (* ---------- Test ---------- *)
 
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 2"
@@ -78,7 +83,7 @@ module Seq = FStar.Seq
 ```pulse
 fn test_kruskal_satisfiability ()
   requires emp
-  returns _: unit
+  returns r: bool
   ensures emp
 {
   // --- Set up adjacency matrix for 3-vertex triangle ---
@@ -199,6 +204,20 @@ fn test_kruskal_satisfiability ()
   assert (pure (CLRS.Ch23.MST.Spec.total_weight
     (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0) == 3));
 
+  // Runtime check (computational — survives extraction to C)
+  // Read edge endpoints for runtime verification
+  let eu0 = edge_u.(0sz);
+  let ev0 = edge_v.(0sz);
+  let eu1 = edge_u.(1sz);
+  let ev1 = edge_v.(1sz);
+  // MST edges are {(0,1),(1,2)} — any order, any endpoint direction
+  let e0_is_01 = (sz_eq eu0 0sz && sz_eq ev0 1sz) || (sz_eq eu0 1sz && sz_eq ev0 0sz);
+  let e0_is_12 = (sz_eq eu0 1sz && sz_eq ev0 2sz) || (sz_eq eu0 2sz && sz_eq ev0 1sz);
+  let e1_is_01 = (sz_eq eu1 0sz && sz_eq ev1 1sz) || (sz_eq eu1 1sz && sz_eq ev1 0sz);
+  let e1_is_12 = (sz_eq eu1 1sz && sz_eq ev1 2sz) || (sz_eq eu1 2sz && sz_eq ev1 1sz);
+  let pass = sz_eq ec_val 2sz &&
+             ((e0_is_01 && e1_is_12) || (e0_is_12 && e1_is_01));
+
   // --- Cleanup ---
   rewrite (A.pts_to adj sadj) as (A.pts_to (V.vec_to_array adj_v) sadj);
   V.to_vec_pts_to adj_v;
@@ -213,7 +232,7 @@ fn test_kruskal_satisfiability ()
   V.free ev_v;
 
   R.free ec_ref;
-  ()
+  pass
 }
 ```
 
