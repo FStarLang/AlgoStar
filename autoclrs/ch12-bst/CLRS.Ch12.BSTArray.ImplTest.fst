@@ -55,7 +55,7 @@ let _ : squash (~(key_in_subtree empty_keys empty_valid 7 0 5)) = ()
    § 2. Pulse API test — exercises tree_search and tree_insert
    ==================================================================== *)
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
+#push-options "--fuel 8 --ifuel 4"
 
 ```pulse
 (** test_bstarray_search_insert

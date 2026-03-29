@@ -474,7 +474,7 @@ ghost fn consume_bst_leaf (x: bst_ptr) (#ft: bst) (#parent: bst_ptr)
 // ============================================================
 
 //SNIPPET_START: tree_delete
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
+#push-options "--fuel 2 --ifuel 2"
 
 fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat)
   requires bst_subtree tree 'ft parent ** GR.pts_to ticks 'n

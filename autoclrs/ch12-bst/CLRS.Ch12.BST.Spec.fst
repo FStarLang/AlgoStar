@@ -900,7 +900,6 @@ let lemma_sorted_prepend_greater (bound: int) (ys: list int)
 
 // Helper: if xs is sorted, all_less bound xs, ys is sorted, all_greater bound ys,
 // then xs @ [bound] @ ys is sorted
-#push-options "--z3rlimit 20"
 
 let lemma_sorted_concat (xs: list int) (bound: int) (ys: list int)
   : Lemma
@@ -927,8 +926,6 @@ let lemma_sorted_concat (xs: list int) (bound: int) (ys: list int)
         // Now we have sorted ((xs @ [bound]) @ ys)
         // Need to show this equals xs @ [bound] @ ys
         FStar.List.Tot.Properties.append_assoc xs [bound] ys
-
-#pop-options
 
 (* ------------------------------------------------------------------------
    Lemma: inorder traversal of a valid BST is sorted

@@ -64,7 +64,7 @@ let rec bst_minimum_exists (t: bst)
     | Node Leaf _ _ -> ()
     | Node left _ _ -> bst_minimum_exists left
 
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--fuel 1 --ifuel 1"
 
 //SNIPPET_START: delete_key_set_lemma
 val delete_key_set_lemma: t:bst -> k:int ->

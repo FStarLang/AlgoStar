@@ -18,7 +18,7 @@ open FStar.Classical
 open CLRS.Ch12.BST.Spec
 open CLRS.Ch12.BSTArray.Predicates
 
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--fuel 2 --ifuel 1"
 
 (* =========================================================================
    § 1. Abstraction Function: array representation → inductive BST

@@ -142,7 +142,7 @@ let maximum_after_delete_2 ()
    precision for all operations in Impl.fsti
    ==================================================================== *)
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
+#push-options "--fuel 8 --ifuel 4"
 
 ```pulse
 (** test_bst_ptr
