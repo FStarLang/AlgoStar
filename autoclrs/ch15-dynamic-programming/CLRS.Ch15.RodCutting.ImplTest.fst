@@ -42,6 +42,7 @@ let rod_cutting_pre_satisfiable ()
     (ensures SZ.fits (SZ.v 4sz + 1))
   = assert_norm (SZ.fits (SZ.v 4sz + 1))
 
+#push-options "--z3rlimit 10"
 fn test_rod_cutting ()
   requires emp
   returns _: unit
@@ -83,3 +84,4 @@ fn test_rod_cutting ()
   V.to_vec_pts_to pv;
   V.free pv;
 }
+#pop-options
