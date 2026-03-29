@@ -135,7 +135,7 @@ let rank_strict_mono (f: uf_forest{uf_inv f}) (x: nat{x < f.n})
     rank_mono f (Seq.index f.parent x); pure_find_in_bounds f (Seq.index f.parent x)
 
 // Compression of v to its root preserves uf_inv
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let compress_preserves_uf_inv (f: uf_forest{uf_inv f}) (v: nat{v < f.n})
   : Lemma (ensures (pure_find_in_bounds f v;
                     uf_inv { f with parent = Seq.upd f.parent v (pure_find f v) }))
@@ -159,7 +159,7 @@ let pure_find_nonroot (f: uf_forest{uf_inv f}) (v: nat{v < f.n})
   = pure_find_is_root f v
 
 // Compression of v to its root preserves pure_find for ALL nodes
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 80"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let rec compress_preserves_find
   (f: uf_forest{uf_inv f}) (v: nat{v < f.n}) (z: nat{z < f.n})
   : Lemma (requires (pure_find_in_bounds f v;
@@ -234,7 +234,7 @@ let pure_union (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n}) : uf_fore
       { f with parent = Seq.upd f.parent root_y root_x;
                rank = Seq.upd f.rank root_x (rx + 1) }
 
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let pure_union_preserves_inv (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n})
   : Lemma (ensures uf_inv (pure_union f x y))
   = pure_find_in_bounds f x; pure_find_in_bounds f y;
@@ -258,7 +258,7 @@ let pure_union_preserves_inv (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f
 // - Nodes in root_b's tree still find root_b
 // - Nodes in other trees are unchanged
 #restart-solver
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let rec pure_find_after_link
   (f f': uf_forest{uf_inv f /\ uf_inv f'})
   (root_a root_b: nat)
@@ -298,7 +298,7 @@ let rec pure_find_after_link
 
 // Correctness: union merges the two sets
 #restart-solver
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let pure_union_same_set (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n})
   : Lemma (ensures (pure_union_preserves_inv f x y;
                     let f' = pure_union f x y in
@@ -330,7 +330,7 @@ let pure_union_same_set (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n})
 
 // Stability: union does not merge unrelated sets
 #restart-solver
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let pure_union_other_set (f: uf_forest{uf_inv f}) (x y z: nat{x < f.n /\ y < f.n /\ z < f.n})
   : Lemma (requires pure_find f z <> pure_find f x /\ pure_find f z <> pure_find f y)
           (ensures (pure_union_preserves_inv f x y;
@@ -356,7 +356,7 @@ let pure_union_other_set (f: uf_forest{uf_inv f}) (x y z: nat{x < f.n /\ y < f.n
 
 // Membership: elements already in x's or y's class join the merged class
 #restart-solver
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let pure_union_membership (f: uf_forest{uf_inv f}) (x y z: nat{x < f.n /\ y < f.n /\ z < f.n})
   : Lemma (requires pure_find f z == pure_find f x \/ pure_find f z == pure_find f y)
           (ensures (pure_union_preserves_inv f x y;
@@ -388,7 +388,7 @@ let pure_union_membership (f: uf_forest{uf_inv f}) (x y z: nat{x < f.n /\ y < f.
 
 // Membership (universal): all elements in x's or y's class join the merged class
 #restart-solver
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let pure_union_membership_all (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n})
   : Lemma (ensures (pure_union_preserves_inv f x y;
                     let f' = pure_union f x y in
@@ -406,7 +406,7 @@ let pure_union_membership_all (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < 
 
 // Stability (universal): union does not merge any unrelated set
 #restart-solver
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let pure_union_stability (f: uf_forest{uf_inv f}) (x y: nat{x < f.n /\ y < f.n})
   : Lemma (ensures (pure_union_preserves_inv f x y;
                     let f' = pure_union f x y in

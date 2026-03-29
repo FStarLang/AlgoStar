@@ -1,6 +1,9 @@
 PULSE_ROOT ?= ../../FStar/pulse
-include $(PULSE_ROOT)/mk/test.mk
+KRML_HOME  ?= ../../FStar/karamel
+STAGE3     ?= 1
+export STAGE3
 OTHERFLAGS += --include ../common
+include $(PULSE_ROOT)/mk/test.mk
 
 # ========== C extraction and test targets ==========
 CHAPTER_ID       = ch21
@@ -21,7 +24,7 @@ KRML_BUNDLE_FLAGS = \
   -bundle 'FStar.*' -bundle 'Prims' -bundle 'C'
 KRML_WARN_FLAGS   = -warn-error '-2-4-11-15'
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch21_UnionFind_ImplTest.c
-KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+KRML_EXTRA_INPUTS = $(wildcard $(KRML_HOME)/krmllib/.extract/*.krml)
 EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/c.c
 TEST_EXE_NAME     = test_union_find
 

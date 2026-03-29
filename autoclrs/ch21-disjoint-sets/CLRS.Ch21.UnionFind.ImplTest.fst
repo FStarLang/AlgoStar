@@ -34,7 +34,7 @@ module Spec = CLRS.Ch21.UnionFind.Spec
    Proof: rank_invariant says non-root x has rank[x] < rank[parent[x]],
    but with all ranks 0 this gives 0 < 0, contradiction. So parent[x] == x,
    and pure_find_root gives pure_find(forest, x) == x. *)
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 40"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let fresh_forest_find (sp sr: Seq.seq SZ.t) (n: nat) (x: nat)
   : Lemma
     (requires
@@ -57,7 +57,7 @@ let fresh_forest_find (sp sr: Seq.seq SZ.t) (n: nat) (x: nat)
 
 (* ---------- Test function ---------- *)
 
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 80"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 ```pulse
 fn test_union_find ()
   requires emp

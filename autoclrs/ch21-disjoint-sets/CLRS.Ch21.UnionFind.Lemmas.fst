@@ -288,7 +288,7 @@ let make_forest_sized_size_correct (n: nat{n > 0})
 // actual tree cardinalities. This is NOT automatically proven by F*'s type system,
 // but holds by construction through the operations (make_forest_sized, pure_union_sized).
 //
-#push-options "--z3rlimit 20 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2"
 let union_size_bound
   (f: uf_forest_sized{is_valid_uf_sized f /\
                        rank_invariant (project_to_unsized f)})
@@ -312,7 +312,7 @@ let union_size_bound
 #pop-options
 
 // Key lemma: pure_union_sized preserves size_rank_invariant
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10"
 let pure_union_sized_preserves_invariant 
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f) /\ 
