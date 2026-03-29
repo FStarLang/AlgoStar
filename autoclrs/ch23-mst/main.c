@@ -16,8 +16,8 @@
 #include "CLRS_Ch23_Kruskal_ImplTest.h"
 
 /* Direct algorithm API for runtime checks */
-#include "internal/CLRS_Ch23_Prim_Impl.h"
-#include "internal/CLRS_Ch23_Kruskal_Impl.h"
+#include "CLRS_Ch23_Prim_Impl.h"
+#include "CLRS_Ch23_Kruskal_Impl.h"
 
 #define CHECK(cond, msg) do { \
     if (!(cond)) { \

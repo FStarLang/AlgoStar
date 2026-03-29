@@ -1,4 +1,5 @@
 PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
 include $(PULSE_ROOT)/mk/test.mk
 # Undo optimize_let_vc and fly_deps — they break SizeT overflow
 # reasoning in Prim.fst
