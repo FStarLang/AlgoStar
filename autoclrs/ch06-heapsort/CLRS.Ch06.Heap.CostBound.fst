@@ -60,7 +60,7 @@ let max_heapify_bound_left (heap_size: pos) (idx: nat{idx < heap_size})
     ()
 
 // When a node has a right child, its bound is >= 2 + the bound of the right child
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10"
 let max_heapify_bound_right (heap_size: pos) (idx: nat{idx < heap_size})
   : Lemma (requires right_idx idx < heap_size)
           (ensures max_heapify_bound heap_size idx >= 
@@ -98,7 +98,7 @@ let max_heapify_bound_le_root (heap_size: pos) (idx: nat{idx < heap_size})
 // Heapsort cost is O(n log n)
 // Proof: (n/2)*m + (n-1)*m <= n*m + n*m = 2*n*m where m = max_heapify_bound(n,0) = 2*log2_floor(n)
 //        so total <= 2*n*2*log2_floor(n) = 4*n*log2_floor(n)
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10"
 let heapsort_cost_nlogn (n: pos)
   : Lemma (ensures heapsort_cost_bound n <= 4 * n * log2_floor n)
   = max_heapify_bound_root n;

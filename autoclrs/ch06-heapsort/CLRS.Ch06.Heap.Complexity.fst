@@ -161,7 +161,7 @@ private let cancel_mul_div (a: nat) (b: pos) : Lemma ((a * b) / b = a) = lemma_d
 private let floor_mul_le (a: nat) (b: pos) (c: nat) : Lemma ((a / b) * c <= a * c / b) =
   lemma_div_mod a b; lemma_div_plus ((a % b) * c) ((a / b) * c) b
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10 --split_queries always"
 
 /// Scaling: pow2(H) * sum floor(n*h/2^h) <= n * weighted_pow2_sum(0,H)
 private let rec scaled_floor_sum_bound (n: pos) (h max_h: nat)
@@ -469,7 +469,7 @@ let heapsort_better_than_quadratic (n: pos{n >= 11})
 // ========== Root-bound lemmas for bridging to CostBound module ==========
 
 // For small n, verify computationally
-#push-options "--fuel 20 --ifuel 5 --z3rlimit 300"
+#push-options "--fuel 20 --ifuel 5 --z3rlimit 80"
 private
 let build_heap_ops_le_root_bound_small (n: pos)
   : Lemma (requires n < 32)
@@ -477,7 +477,7 @@ let build_heap_ops_le_root_bound_small (n: pos)
   = ()
 #pop-options
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let build_heap_ops_le_root_bound (n: pos)
   : Lemma (ensures build_heap_ops n <= (n / 2) * 2 * log2_floor n)
   = if n < 32 then

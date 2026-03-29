@@ -75,7 +75,7 @@ fn tick2 (ctr: GR.ref nat) (#n: erased nat)
 // ticks 2 (for the two child comparisons). The total is bounded by
 // max_heapify_bound(heap_size, idx) = 2 * log2_floor(heap_size / (idx+1)).
 
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn rec max_heapify
   (a: A.array int) (idx: SZ.t) (heap_size: SZ.t) (start: Ghost.erased nat)
   (ctr: GR.ref nat)
@@ -193,7 +193,7 @@ ensures exists* s' (cf: nat).
 
 #restart-solver
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn build_max_heap
   (a: A.array int)
   (n: SZ.t)

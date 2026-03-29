@@ -35,7 +35,7 @@ module CB = CLRS.Ch06.Heap.CostBound
 
 // ========== Test 1: heapsort completeness on [3;1;2] ==========
 
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
 
 (* Pure helper: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
    Uses SP.count to prove that each element appears exactly once, then
@@ -135,7 +135,7 @@ fn test_heapsort_3 ()
 
 // ========== Test 2: build_max_heap completeness — root = max ==========
 
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
 
 (* Pure helper: max-heap + permutation of [3;1;2] determines root == 3.
    root_ge_element gives s[0] >= s[i] for all i < 3, and count reasoning
@@ -208,7 +208,7 @@ fn test_build_max_heap_3 ()
 
 // ========== Test 3: heapsort n=0 — identity (array unchanged) ==========
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 
 ```pulse
 (* Identity: heapsort with n=0 leaves the array unchanged.
@@ -255,7 +255,7 @@ fn test_heapsort_0 ()
 
 // ========== Test 4: heapsort prefix sorting (n < array length) ==========
 
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
 
 (* Pure helper: sorted_upto 2 + permutation of [7;5;3] with s[2]==3
    determines s[0]==5 /\ s[1]==7.  The preservation clause gives s[2]==3,
@@ -331,7 +331,7 @@ fn test_heapsort_prefix ()
 
 // ========== Test 5: heapsort with duplicates [2;1;2] ==========
 
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
 
 (* Pure helper: sorted + permutation of [2;1;2] determines [1;2;2].
    count(1)=1, count(2)=2 pins the unique sorted output. *)

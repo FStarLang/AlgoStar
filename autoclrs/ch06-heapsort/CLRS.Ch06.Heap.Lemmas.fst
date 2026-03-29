@@ -104,7 +104,7 @@ let swap_is_permutation (s: Seq.seq int) (i j: nat)
 
 // ========== Sift-down swap lemmas (max-heap, subtree version) ==========
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let swap_preserves_heap_down_other (s:Seq.seq int) (len:nat{len <= Seq.length s})
   (p:nat{p < len}) (ch:nat{ch < len /\ p <> ch})
   (j:nat{j < len /\ j <> p /\ j <> ch})
@@ -168,7 +168,7 @@ let swap_heap_down_at_grandparent (s:Seq.seq int) (len:nat{len <= Seq.length s})
 #pop-options
 
 // Main sift-down swap lemma for almost_heaps_from
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let sift_down_swap_lemma_from (s:Seq.seq int) (len:nat{len <= Seq.length s})
   (k:nat) (p:nat{p < len /\ p >= k}) (ch:nat{ch < len /\ p <> ch})
   : Lemma (requires 
@@ -295,7 +295,7 @@ let extract_extends_sorted_upto (s:Seq.seq int) (len n:nat)
 #pop-options
 
 // Helper: element at index i in s2 exists at some index in s1's prefix
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 150 --fuel 2 --ifuel 2"
 private
 let perm_prefix_bounded_aux_upto (s1 s2:Seq.seq int) (k n:nat) (i:nat) (j:nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
@@ -348,7 +348,7 @@ let perm_prefix_bounded_aux_upto (s1 s2:Seq.seq int) (k n:nat) (i:nat) (j:nat)
     ()
 #pop-options
 
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
 let perm_preserves_sorted_suffix_upto (s1 s2:Seq.seq int) (k n:nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
                     k <= n /\ n <= Seq.length s1 /\
