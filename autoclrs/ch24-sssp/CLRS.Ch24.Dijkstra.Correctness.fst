@@ -78,7 +78,7 @@ module SP = CLRS.Ch24.ShortestPath.Spec
 /// Since u is minimum unvisited and y is unvisited: dist[u] <= dist[y].
 /// Therefore: dist[u] <= dist[y] = δ(s,y) <= δ(s,u).
 //SNIPPET_START: greedy_choice
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 let greedy_choice_invariant
   (dist: Seq.seq int)
   (weights: Seq.seq int)

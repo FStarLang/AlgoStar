@@ -94,7 +94,7 @@ let sp_dist_k_v2_1 () : Lemma (SP.sp_dist_k tw_seq 3 0 2 1 == 5) =
 (* sp_dist(2) = 2 via path 0→1→2: 4+(-2) = 2 < 5.
    The normalizer struggles with this computation, so we help Z3
    by providing concrete element values and intermediate sp_dist_k results. *)
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 20 --fuel 8 --ifuel 4"
 let sp_dist_v2 () : Lemma (SP.sp_dist tw_seq 3 0 2 == 2) =
   sp_dist_k_v1_1 ();
   sp_dist_k_v2_1 ();
@@ -116,7 +116,7 @@ let sp_dist_v2 () : Lemma (SP.sp_dist tw_seq 3 0 2 == 2) =
    An extra relaxation pass doesn't improve any distance.
    Strategy: use sp_dist (which normalizes) as a bridge to sp_dist_k(v, 2),
    then use fuel for Z3 to unfold sp_dist_k(v, 3) = min(sp_dist_k(v, 2), ...). *)
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 20 --fuel 8 --ifuel 4"
 let tw_no_neg_cycles () : Lemma (SP.no_neg_cycles_flat tw_seq 3 0) =
   sp_dist_v0 (); sp_dist_v1 (); sp_dist_v2 ();
   assert_norm (Seq.length tw_seq == 9);
@@ -163,7 +163,7 @@ let seq_after_weight_writes ()
 
 (* ========== Main Test ========== *)
 
-#push-options "--z3rlimit 200 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 4 --ifuel 2"
 ```pulse
 fn test_bellman_ford_3 ()
   requires emp

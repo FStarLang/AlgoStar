@@ -99,7 +99,7 @@ theorem, it makes testing more complex than Dijkstra's unconditional
 The verified Bellman-Ford implementation is extracted to C via F*'s `--codegen krml`
 and KaRaMeL, then compiled and executed on the same test instance.
 
-**Command**: `make test-c KRML_HOME=../../krml/karamel`
+**Command**: `make test-c`
 
 **Output**:
 ```

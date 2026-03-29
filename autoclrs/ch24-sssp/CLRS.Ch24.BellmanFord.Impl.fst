@@ -739,7 +739,7 @@ let bellman_ford_complexity_is_cubic (cf c0 n: nat) : Lemma
   =
   bellman_ford_cubic_bound n
 
-#push-options "--z3rlimit 200 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 60 --fuel 0 --ifuel 0 --split_queries always"
 //SNIPPET_START: bellman_ford_sig
 fn bellman_ford
   (weights: A.array int)

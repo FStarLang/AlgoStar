@@ -119,7 +119,7 @@ let seq_after_weight_writes ()
 
 (* ========== Main Test ========== *)
 
-#push-options "--z3rlimit 80 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 4 --ifuel 2"
 ```pulse
 fn test_dijkstra_3 ()
   requires emp

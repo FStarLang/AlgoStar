@@ -1,4 +1,5 @@
 PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
 OTHERFLAGS += --split_queries always
 include $(PULSE_ROOT)/mk/test.mk
 

@@ -75,7 +75,7 @@ No spec issues found.
 The verified Dijkstra implementation is extracted to C via F*'s `--codegen krml`
 and KaRaMeL, then compiled and executed on the same test instance.
 
-**Command**: `make test-c KRML_HOME=../../krml/karamel`
+**Command**: `make test-c`
 
 **Output**:
 ```

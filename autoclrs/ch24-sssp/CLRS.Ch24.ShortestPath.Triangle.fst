@@ -216,7 +216,7 @@ let rec chain_vertex
 #pop-options
 
 // B-inequality: we re-derive chain_vertex(m+1) to get the B-property
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 0"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 0"
 let chain_B_property
   (weights: Seq.seq int) (n: pos) (s v: Fin.under n) (m: nat)
   : Lemma
