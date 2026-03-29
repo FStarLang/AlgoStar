@@ -339,7 +339,7 @@ let rec count_all_true (n: nat)
 
 // Well-ordering argument: if a valid cover exists with count ≤ bound,
 // then a minimum vertex cover exists.
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let rec min_cover_exists_aux (adj: seq int) (n: nat) (bound: nat)
   : Lemma 
     (requires Seq.length adj = n * n /\

@@ -41,7 +41,7 @@ let is_cover_next_row (s_adj s_cover: Seq.seq int) (n: nat) (u: nat)
   = ()
 
 // Lemma: updating cover preserves is_cover when the update only sets values to non-zero
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let is_cover_step (s_adj s_cover: Seq.seq int) (n vu vv: nat) 
   (cu cv has_edge: int) (new_cu new_cv: int)
   : Lemma
@@ -104,7 +104,7 @@ let rec existsb_false_means_all_false (#a: Type) (f: a -> bool) (l: list a)
     | _ :: tl -> existsb_false_means_all_false f tl
 
 // Step lemma: matching_inv is maintained after processing edge (vu, vv)
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let matching_inv_step (s_adj s_cover: Seq.seq int) (n vu vv: nat) (m: list Spec.edge)
   (cu cv has_edge: int) (new_cu new_cv: int)
   : Lemma

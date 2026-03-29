@@ -100,7 +100,7 @@ let triangle_cover_enumeration
 
 (*** Pulse test: triangle graph K₃ ***)
 
-#push-options "--z3rlimit 200 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2"
 
 ```pulse
 fn test_vertex_cover_triangle ()

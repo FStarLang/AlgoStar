@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "VertexCoverTest.h"
-#include "internal/VertexCoverTest.h"
 
 int main(void) {
     /* --- Run the verified test (alloc, compute, free) --- */

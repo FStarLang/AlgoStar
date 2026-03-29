@@ -12,7 +12,7 @@ KRML_BUNDLE_FLAGS = \
   -bundle 'CLRS.Ch35.VertexCover.ImplTest+CLRS.Ch35.VertexCover.Impl=*[rename=VertexCoverTest]' \
   -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
 KRML_EXTRA_FLAGS  = -header=$(PULSE_ROOT)/mk/krmlheader
-KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+KRML_EXTRA_INPUTS = $(wildcard $(KRML_HOME)/krmllib/.extract/*.krml)
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/VertexCoverTest.c
 TEST_EXE_NAME     = test_vertex_cover
 
