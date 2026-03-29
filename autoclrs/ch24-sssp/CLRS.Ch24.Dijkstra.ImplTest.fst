@@ -77,6 +77,7 @@ let tw_all_nonneg () : Lemma (SP.all_weights_non_negative tw_seq) =
 
 (* With friend CLRS.Ch24.ShortestPath.Inf, the normalizer can fully evaluate
    sp_dist on our concrete graph since inf = 1000000 is visible. *)
+#push-options "--z3rlimit 40 --split_queries always"
 let sp_dist_v0 () : Lemma (SP.sp_dist tw_seq 3 0 0 == 0) =
   assert_norm (SP.sp_dist tw_seq 3 0 0 == 0)
 
@@ -85,6 +86,7 @@ let sp_dist_v1 () : Lemma (SP.sp_dist tw_seq 3 0 1 == 3) =
 
 let sp_dist_v2 () : Lemma (SP.sp_dist tw_seq 3 0 2 == 5) =
   assert_norm (SP.sp_dist tw_seq 3 0 2 == 5)
+#pop-options
 
 (* Completeness: Dijkstra's postcondition (dist[v] == sp_dist(0,v) for all v)
    uniquely determines dist = [0; 3; 5] for this input. *)

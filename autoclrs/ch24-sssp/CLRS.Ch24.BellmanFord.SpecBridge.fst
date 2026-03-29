@@ -94,7 +94,7 @@ let well_bounded_weaken (#n: nat) (adj: BFS.adj_matrix n) (src: nat{src < n}) (k
    4.  Main equivalence theorem — mutually recursive proof
    ================================================================ *)
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries no"
 
 let rec sp_dist_k_equiv
   (#n: nat) (adj: BFS.adj_matrix n) (src dst: nat{src < n /\ dst < n}) (k: nat)
