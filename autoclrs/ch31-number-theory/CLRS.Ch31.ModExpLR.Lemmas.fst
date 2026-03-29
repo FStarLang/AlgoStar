@@ -45,7 +45,7 @@ let lemma_mod_mul_both (a b: int) (m: pos)
     lemma_mod_mul_distr_r a b m
 
 // Left-to-right step lemma
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10 --split_queries always"
 let mod_exp_lr_step (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
   : Lemma (
       let d = pow b prefix % m in
