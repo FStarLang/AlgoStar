@@ -213,7 +213,7 @@ fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
 
 // Local wrapper: calls merge_bundle_step with all preconditions pre-computed.
 // This isolates the heavy SMT work from the Pulse VC.
-#push-options "--z3rlimit 500 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
 let merge_step_local
   (freq_seq: Seq.seq int) (nd_contents0: Seq.seq hnode_ptr) (merged: hnode_ptr)
   (pq0 pq1 pq2 pq3: Seq.seq pq_entry)
@@ -260,7 +260,7 @@ let merge_step_local
 #pop-options
 
 //SNIPPET_START: huffman_tree_sig
-#push-options "--z3rlimit 200"
+#push-options "--z3rlimit 20 --split_queries always"
 fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))

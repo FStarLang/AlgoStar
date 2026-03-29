@@ -1,7 +1,5 @@
 /* Stubs for Prims and FStar runtime functions needed by extracted C code. */
-#include <stddef.h>
-#include <stdbool.h>
-#include "krmllib.h"
+#include "prims_stubs.h"
 
 bool Prims_op_GreaterThanOrEqual(krml_checked_int_t x, krml_checked_int_t y) { return x >= y; }
 bool Prims_op_LessThanOrEqual(krml_checked_int_t x, krml_checked_int_t y) { return x <= y; }

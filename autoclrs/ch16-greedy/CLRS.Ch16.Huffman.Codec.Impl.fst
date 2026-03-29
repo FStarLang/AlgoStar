@@ -109,7 +109,7 @@ fn rec decode_step_impl
 
 // ========== decode_impl: full decoder ==========
 
-#push-options "--z3rlimit 80"
+#push-options "--z3rlimit 60"
 // Helper: after decoding one symbol, the suffix invariant is maintained
 let decode_suffix_step
   (ft: HSpec.htree)
@@ -173,7 +173,7 @@ let decode_suffix_step
 
 // Full decoder: decode entire bitstring into an output array.
 // Postcondition: output matches pure decode.
-#push-options "--z3rlimit 160 --split_queries always"
+#push-options "--z3rlimit 50 --split_queries always"
 fn decode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (bits: A.array bool) (bit_len: SZ.t)
@@ -262,10 +262,30 @@ let tree_height_internal (f: pos) (l r: HSpec.htree)
            tree_height (HSpec.Internal f l r) >= 1 + tree_height r)
   = ()
 
+// Helper: combine a bit at 'depth' with a codeword at 'depth+1'
+// to get a (b :: cw) codeword at 'depth'. Handles the i=0 / i>0 case split.
+#push-options "--z3rlimit 10"
+let codeword_cons_combine
+  (out: Seq.seq bool) (b: bool) (cw: list bool) (depth: nat)
+  : Lemma
+    (requires
+      depth + 1 + L.length cw <= Seq.length out /\
+      Seq.index out depth == b /\
+      (forall (i:nat). i < L.length cw ==> Seq.index out (depth + 1 + i) == L.index cw i))
+    (ensures
+      (forall (i:nat). i < 1 + L.length cw ==> Seq.index out (depth + i) == L.index (b :: cw) i))
+  = let aux (i: nat{i < 1 + L.length cw})
+      : Lemma (Seq.index out (depth + i) == L.index (b :: cw) i)
+      = if i = 0 then ()
+        else ()
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+#pop-options
+
 // Walk the tree to find the codeword for a given symbol.
 // Writes codeword bits into cw_buf starting at position depth.
 // Returns (found, codeword_length).
-#push-options "--z3rlimit 400 --split_queries always --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 40 --split_queries always --fuel 1 --ifuel 1"
 fn rec codeword_impl
   (cur: hnode_ptr) (ft: HSpec.htree) (sym: nat)
   (cw_buf: A.array bool) (depth: SZ.t) (max_depth: SZ.t)
@@ -318,6 +338,8 @@ fn rec codeword_impl
 
       if (fst left_result) {
         // Found in left subtree — codeword = true :: left_cw
+        with cw_left. assert (A.pts_to cw_buf cw_left);
+        codeword_cons_combine cw_left true (Some?.v (HCodec.codeword l sym)) (SZ.v depth);
         HCodec.codeword_internal f l r sym;
         intro_is_htree_internal cur lp rp f l r;
         rewrite (is_htree cur (HSpec.Internal f l r)) as (is_htree cur ft);
@@ -332,6 +354,8 @@ fn rec codeword_impl
 
         if (fst right_result) {
           // Found in right subtree — codeword = false :: right_cw
+          with cw_right. assert (A.pts_to cw_buf cw_right);
+          codeword_cons_combine cw_right false (Some?.v (HCodec.codeword r sym)) (SZ.v depth);
           HCodec.codeword_internal f l r sym;
           intro_is_htree_internal cur lp rp f l r;
           rewrite (is_htree cur (HSpec.Internal f l r)) as (is_htree cur ft);
@@ -365,8 +389,8 @@ let syms_as_list_cons (s: Seq.seq nat) (lo hi: nat)
 #push-options "--z3rlimit 20"
 let rec append_index_left (l1 l2: list bool) (i: nat)
   : Lemma (requires i < L.length l1)
-          (ensures L.length (l1 @ l2) == L.length l1 + L.length l2 /\
-                   L.index (l1 @ l2) i == L.index l1 i)
+          (ensures L.length (L.append l1 l2) == L.length l1 + L.length l2 /\
+                   L.index (L.append l1 l2) i == L.index l1 i)
           (decreases l1)
   = L.append_length l1 l2;
     match l1 with
@@ -374,8 +398,8 @@ let rec append_index_left (l1 l2: list bool) (i: nat)
 
 let rec append_index_right (l1 l2: list bool) (i: nat)
   : Lemma (requires i < L.length l2)
-          (ensures L.length (l1 @ l2) == L.length l1 + L.length l2 /\
-                   L.index (l1 @ l2) (L.length l1 + i) == L.index l2 i)
+          (ensures L.length (L.append l1 l2) == L.length l1 + L.length l2 /\
+                   L.index (L.append l1 l2) (L.length l1 + i) == L.index l2 i)
           (decreases l1)
   = L.append_length l1 l2;
     match l1 with
@@ -384,7 +408,7 @@ let rec append_index_right (l1 l2: list bool) (i: nat)
 #pop-options
 
 // After one encode step: remaining-suffix index invariant is maintained (list-only, no Seq)
-#push-options "--z3rlimit 80"
+#push-options "--z3rlimit 60"
 let encode_suffix_step
   (ft: HSpec.htree)
   (msg_seq: Seq.seq nat)
@@ -417,7 +441,7 @@ let encode_suffix_step
     let full_enc = Some?.v (HCodec.encode ft (syms_as_list msg_seq 0 msg_len)) in
     let cw = Some?.v (HCodec.codeword ft s) in
     let new_remaining = Some?.v (HCodec.encode ft (syms_as_list msg_seq (si + 1) msg_len)) in
-    assert (remaining_enc == cw @ new_remaining);
+    assert (remaining_enc == L.append cw new_remaining);
     L.append_length cw new_remaining;
     let aux_cw (k: nat{k < L.length cw})
       : Lemma (L.index cw k == L.index full_enc (bp + k))
@@ -431,10 +455,43 @@ let encode_suffix_step
     Classical.forall_intro (Classical.move_requires aux_suffix)
 #pop-options
 
+// Chain four quantifier facts into one combined prefix invariant:
+// (1) new output already matches full_enc below bp  (chained by Z3 from invariant + codeword_impl preserved prefix)
+// (2) new output has codeword bits at [bp, bp+cw_len)  (from codeword_impl)
+// (3) codeword bits match full_enc at [bp, bp+cw_len)  (from encode_suffix_step)
+// ==> new output matches full_enc below bp+cw_len
+// The case split i < bp vs i >= bp is what Z3 can't do alone.
+#push-options "--z3rlimit 10"
+let encode_prefix_combine
+  (out_new: Seq.seq bool)
+  (full_enc cw: list bool)
+  (bp cw_len: nat)
+  : Lemma
+    (requires
+      bp + cw_len <= Seq.length out_new /\
+      bp + cw_len <= L.length full_enc /\
+      cw_len == L.length cw /\
+      (forall (i:nat). i < bp ==> Seq.index out_new i == L.index full_enc i) /\
+      (forall (i:nat). i < cw_len ==> Seq.index out_new (bp + i) == L.index cw i) /\
+      (forall (k:nat). k < cw_len ==> L.index cw k == L.index full_enc (bp + k)))
+    (ensures
+      (forall (i:nat). i < bp + cw_len ==> Seq.index out_new i == L.index full_enc i))
+  = let aux (i: nat{i < bp + cw_len})
+      : Lemma (Seq.index out_new i == L.index full_enc i)
+      = if i < bp then ()
+        else begin
+          let k = i - bp in
+          assert (Seq.index out_new (bp + k) == L.index cw k);
+          assert (L.index cw k == L.index full_enc (bp + k))
+        end
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+#pop-options
+
 // Encode: for each symbol in msg, look up codeword and write to output.
 // Uses suffix-based invariant: tracks encode of remaining symbols.
 #restart-solver
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
 fn encode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (msg: A.array nat) (msg_len: SZ.t)
@@ -504,6 +561,13 @@ fn encode_impl
 
     // Prove the suffix invariant is maintained (list-level facts)
     encode_suffix_step ft msg_seq (SZ.v si) (SZ.v msg_len) (SZ.v bp) s;
+
+    // Chain quantifiers: new output matches full encoding for prefix [0, bp+cw_len)
+    encode_prefix_combine
+      cw_out
+      (Some?.v (HCodec.encode ft (syms_as_list msg_seq 0 (SZ.v msg_len))))
+      (Some?.v (HCodec.codeword ft s))
+      (SZ.v bp) (SZ.v cw_len);
 
     // Update indices
     bit_pos := bp +^ cw_len;

@@ -208,7 +208,7 @@ let list_remove_two_trace (#a: Type) (active: list a) (j1 j2: nat) (k: nat)
     end
 #pop-options
 
-#push-options "--z3rlimit 800 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
 let freq2_le_at_rem_pos
   (pq0 pq1: Seq.seq pq_entry) (active0: list forest_entry)
   (freq1 freq2: pos) (idx1 idx2: SZ.t) (j1 j2: nat) (k: nat)
@@ -253,7 +253,7 @@ let freq2_le_at_rem_pos
     pq_min_le_mem_fst (freq2, idx2) pq1 (Seq.index pq0 pj)
 #pop-options
 
-#push-options "--z3rlimit 200"
+#push-options "--z3rlimit 40"
 let freq2_le_remaining_root_freqs
   (pq0 pq1: Seq.seq pq_entry) (active0: list forest_entry)
   (freq1 freq2: pos) (idx1 idx2: SZ.t) (j1 j2: nat)
@@ -361,7 +361,7 @@ let pq_tree_freq_match_init_step
     in
     pq_tree_freq_match_intro s1 new_active aux
 
-#push-options "--z3rlimit 200"
+#push-options "--z3rlimit 20"
 let forest_has_pq_entry_init_step
   (s0 s1: Seq.seq pq_entry) (f: pos) (idx: SZ.t)
   (active_old: list forest_entry) (p: hnode_ptr)
@@ -406,7 +406,7 @@ let forest_has_pq_entry_remove_at (pq: Seq.seq pq_entry) (active: list forest_en
     in
     Classical.forall_intro aux
 
-#push-options "--z3rlimit 200"
+#push-options "--z3rlimit 20"
 let forest_has_pq_entry_prepend
   (s0 s1: Seq.seq pq_entry) (f: pos) (idx: SZ.t)
   (active_old: list forest_entry) (e: forest_entry)
@@ -441,7 +441,7 @@ let forest_has_pq_entry_prepend
 
 // ========== Section 5: Merge step helpers ==========
 
-#push-options "--z3rlimit 200 --split_queries always --z3refresh"
+#push-options "--z3rlimit 40 --split_queries always --z3refresh"
 let list_remove_two_preserves_entry (entries: list forest_entry) (j1 j2 k: nat)
   : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2 /\
                     k < L.length entries /\ k <> j1 /\ k <> j2 /\
@@ -590,7 +590,7 @@ let init_bundle_intro_empty (freq_seq: Seq.seq int) (nd_contents: Seq.seq hnode_
     reveal_opaque (`%forest_distinct_indices) forest_distinct_indices;
     pq_tree_freq_match_intro Seq.empty [] (fun _ -> ())
 
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
 let init_bundle_step
   (freq_seq: Seq.seq int)
   (nd_old nd_new: Seq.seq hnode_ptr)
@@ -639,7 +639,7 @@ let init_bundle_step
     all_leaf_freqs_init_step active_old vi leaf freq_val freq_seq (SZ.v vi)
 #pop-options
 
-#push-options "--z3rlimit 300 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 0"
 let init_to_merge_bundle
   (freq_seq: Seq.seq int) (nd_contents: Seq.seq hnode_ptr)
   (pq: Seq.seq pq_entry) (active: list forest_entry) (n: nat)
@@ -702,7 +702,7 @@ let merge_bundle_intro (freq_seq: Seq.seq int) (nd_contents: Seq.seq hnode_ptr)
           (ensures merge_bundle freq_seq nd_contents pq active n)
   = reveal_opaque (`%merge_bundle) merge_bundle
 
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 1 --split_queries always"
 let cost_invariant_from_merge_bundle
   (freq_seq: Seq.seq int) (nd_old: Seq.seq hnode_ptr)
   (pq0 pq1: Seq.seq pq_entry)
@@ -748,7 +748,7 @@ let cost_invariant_from_merge_bundle
     freq2_le_remaining_root_freqs pq0 pq1 active0 freq1 freq2 idx1 idx2 j1 j2
 #pop-options
 
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
+#push-options "--z3rlimit 100 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
 private
 let merge_bundle_step_aux
   (freq_seq: Seq.seq int)

@@ -26,7 +26,35 @@ KRML_BUNDLE_FLAGS = \
   -bundle 'CLRS.Ch16.Huffman.ImplTest=CLRS.Ch16.Huffman.*,Pulse.Lib.PriorityQueue,Pulse.Lib.ResizableVec,Pulse.Lib.TotalOrder,Pulse.Lib.Vec,Pulse.Lib.Box' \
   -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
 KRML_WARN_FLAGS   = -warn-error -2-9-11-15-17-18
-KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+KRML_EXTRA_FLAGS  = -add-include '"prims_stubs.h"'
+
+# krmllib .krml files for FStar standard library types (option, order, seq).
+# These are not shipped pre-built in fstar2; extract them on demand.
+KRMLLIB_EXTRACT   = $(KRML_HOME)/krmllib/.extract
+KRMLLIB_KRML      = $(KRMLLIB_EXTRACT)/FStar_Pervasives_Native.krml \
+                    $(KRMLLIB_EXTRACT)/FStar_Order.krml \
+                    $(KRMLLIB_EXTRACT)/FStar_Seq_Base.krml
+FSTAR_ULIB        = $(shell dirname $$(readlink -f $(FSTAR_EXE)))/../lib/fstar/ulib
+
+$(KRMLLIB_EXTRACT)/FStar_Pervasives_Native.krml: | $(KRMLLIB_EXTRACT)
+	$(FSTAR_EXE) --no_cmi --odir $(KRMLLIB_EXTRACT) --codegen krml \
+	  --extract_module FStar.Pervasives.Native \
+	  $(FSTAR_ULIB)/FStar.Pervasives.Native.fst
+
+$(KRMLLIB_EXTRACT)/FStar_Order.krml: | $(KRMLLIB_EXTRACT)
+	$(FSTAR_EXE) --no_cmi --odir $(KRMLLIB_EXTRACT) --codegen krml \
+	  --extract_module FStar.Order \
+	  $(FSTAR_ULIB)/FStar.Order.fst
+
+$(KRMLLIB_EXTRACT)/FStar_Seq_Base.krml: | $(KRMLLIB_EXTRACT)
+	$(FSTAR_EXE) --no_cmi --odir $(KRMLLIB_EXTRACT) --codegen krml \
+	  --extract_module FStar.Seq.Base \
+	  $(FSTAR_ULIB)/FStar.Seq.Base.fst
+
+$(KRMLLIB_EXTRACT):
+	mkdir -p $@
+
+KRML_EXTRA_INPUTS = $(KRMLLIB_KRML) $(OUTPUT_DIR)/out.krml
 
 # KaRaMeL produces multiple .c files; the Activity one is the primary target
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch16_ActivitySelection_ImplTest.c \
@@ -38,3 +66,6 @@ CC_EXTRA_FLAGS    = -Wno-unused-but-set-variable
 CC_EXTRA_INCLUDES = -I $(EXTRACT_DIR)/internal
 
 include ../autoclrs.test.mk
+
+# Ensure krmllib .krml files are built before KaRaMeL extraction
+$(firstword $(EXTRACT_C_FILES)): $(KRMLLIB_KRML)
