@@ -25,7 +25,6 @@ open CLRS.Common.Complexity
 module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 
-#push-options "--z3rlimit 30"
 //SNIPPET_START: mod_exp_impl_sig
 fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
   (ctr: GR.ref nat) (#c0: erased nat)
@@ -90,4 +89,3 @@ fn mod_exp_impl (b_init: int) (e_init: nat) (m_init: pos)
 
   !result
 }
-#pop-options

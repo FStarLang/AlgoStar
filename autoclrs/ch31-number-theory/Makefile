@@ -1,4 +1,7 @@
 PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
+STAGE3     ?= 1
+export STAGE3
 OTHERFLAGS += --include ../common
 include $(PULSE_ROOT)/mk/test.mk
 
@@ -29,7 +32,7 @@ KRML_BUNDLE_FLAGS = \
   -bundle 'CLRS.Ch31.GCD.ImplTest+CLRS.Ch31.ModExp.ImplTest+CLRS.Ch31.ModExpLR.ImplTest=CLRS.*' \
   -bundle 'FStar.*' -bundle 'Pulse.*' -bundle 'PulseCore.*' -bundle 'Prims'
 KRML_WARN_FLAGS   = -warn-error -2-1-15
-KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+KRML_EXTRA_INPUTS =
 EXTRACT_C_FILES   = $(OUTPUT_DIR)/$(BUNDLE_C_STEM).c
 EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
                     $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c

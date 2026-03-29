@@ -29,7 +29,7 @@ open CLRS.Common.Complexity
 module R = Pulse.Lib.Reference
 module GR = Pulse.Lib.GhostReference
 
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 10"
 fn mod_exp_lr_impl (b_init: int) (e_init: nat) (m_init: pos)
   (ctr: GR.ref nat) (#c0: erased nat)
   requires GR.pts_to ctr c0
@@ -69,7 +69,9 @@ fn mod_exp_lr_impl (b_init: int) (e_init: nat) (m_init: pos)
     lemma_bit_decompose e_init vi;
     mod_exp_lr_step b_init (e_init / pow2 (vi + 1)) m_init ((e_init / pow2 vi) % 2);
 
-    if ((e_init / pow2 vi) % 2 = 1) {
+    let bit = (e_init / pow2 vi) % 2;
+    assert pure (e_init / pow2 vi == 2 * (e_init / pow2 (vi + 1)) + bit);
+    if (bit = 1) {
       d := ((vd * vd) % m_init * b_init) % m_init;
     } else {
       d := (vd * vd) % m_init;

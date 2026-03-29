@@ -61,7 +61,6 @@ let rec pow_mod_base (b: int) (e: nat) (m: pos)
     end
 
 // Step lemmas
-#push-options "--z3rlimit 20"
 let mod_exp_step_even (vr vb: int) (ve: nat{ve > 0 /\ ve % 2 == 0}) (m: pos)
   : Lemma (let new_b = (vb * vb) % m in
            let new_e = ve / 2 in
@@ -92,7 +91,6 @@ let mod_exp_step (vr vb: int) (ve: nat) (m: pos)
   = if ve % 2 = 0 then mod_exp_step_even vr vb ve m
     else mod_exp_step_odd vr vb ve m
 //SNIPPET_END: mod_exp_step
-#pop-options
 
 /// mod_exp_spec always returns a value in [0, m)
 let mod_exp_spec_bounds (b: int) (e: nat) (m: pos)

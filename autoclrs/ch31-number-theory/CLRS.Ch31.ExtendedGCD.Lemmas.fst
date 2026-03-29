@@ -136,7 +136,6 @@ let divides_div_exact (x: int) (d: pos)
 
 /// Division distributes over sums of multiples:
 /// (q*b + r) / d == q*(b/d) + r/d when d divides both b and r
-#push-options "--z3rlimit 20"
 let div_sum_exact (r: nat) (b: nat) (q: nat) (d: pos)
   : Lemma (requires divides d r /\ divides d b)
           (ensures (q * b + r) / d == q * (b / d) + r / d)
@@ -148,13 +147,11 @@ let div_sum_exact (r: nat) (b: nat) (q: nat) (d: pos)
     assert (b == kb * d);
     assert (q * b + r == (q * kb + kr) * d);
     cancel_mul_div (q * kb + kr) d
-#pop-options
 
 //SNIPPET_START: extended_gcd_coeff_bounds
 /// Coefficient bounds (CLRS Theorem 31.8):
 /// When a > 0 and b > 0, the Bézout coefficients satisfy
 /// |x| ≤ b/gcd(a,b) and |y| ≤ a/gcd(a,b).
-#push-options "--z3rlimit 20"
 let rec extended_gcd_coeff_bounds (a b: nat)
   : Lemma (requires a > 0 /\ b > 0)
           (ensures (let (| d, x, y |) = extended_gcd a b in
@@ -185,4 +182,3 @@ let rec extended_gcd_coeff_bounds (a b: nat)
       let (| d, _x', _y' |) = extended_gcd b r in
       div_sum_exact r b q d
     )
-#pop-options

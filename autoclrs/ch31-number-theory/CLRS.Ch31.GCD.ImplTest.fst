@@ -31,8 +31,6 @@ open CLRS.Ch31.GCD.Complexity
 module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 
-#push-options "--z3rlimit 30 --fuel 8 --ifuel 4"
-
 /// Prove the expected output by normalizing the pure spec
 let gcd_expected ()
   : Lemma (gcd_spec 12 8 == 4)
@@ -73,5 +71,3 @@ fn test_gcd ()
   GR.free ctr;
 }
 ```
-
-#pop-options

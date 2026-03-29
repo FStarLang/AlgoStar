@@ -26,8 +26,6 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Classical = FStar.Classical
 
-#set-options "--z3rlimit 10"
-
 //SNIPPET_START: gcd_impl_sig
 fn gcd_impl (a_init b_init: SZ.t)
   (ctr: GR.ref nat) (#c0: erased nat)

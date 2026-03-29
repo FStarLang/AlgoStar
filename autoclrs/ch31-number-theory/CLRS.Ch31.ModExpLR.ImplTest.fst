@@ -27,8 +27,6 @@ open CLRS.Ch31.ModExpLR.Complexity
 
 module GR = Pulse.Lib.GhostReference
 
-#push-options "--z3rlimit 30 --fuel 16 --ifuel 4"
-
 /// Prove the expected output by normalizing the pure spec
 let modexplr_expected ()
   : Lemma (mod_exp_spec 3 5 7 == 5)
@@ -61,5 +59,3 @@ fn test_mod_exp_lr ()
   GR.free ctr;
 }
 ```
-
-#pop-options

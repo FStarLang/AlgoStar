@@ -30,12 +30,10 @@ let lemma_num_bits_half (n: nat)
   = ()
 
 // Key lemma: a % b ≤ a / 2 when a ≥ b > 0
-#push-options "--z3rlimit 20"
 let lemma_mod_le_half (a b: nat)
   : Lemma (requires a >= b /\ b > 0)
           (ensures a % b <= a / 2)
   = ()
-#pop-options
 
 // Arithmetic helper: if x <= y - 1 then 2x + 3 <= 2y + 1
 let lemma_arithmetic_helper (x y: nat)
@@ -54,7 +52,6 @@ let lemma_gcd_steps_bound_step (a b r r2: nat)
 
 //SNIPPET_START: lemma_gcd_steps_log
 // Main theorem: Euclid's algorithm takes at most 2*log2(b) + 1 steps (Lamé's theorem)
-#push-options "--z3rlimit 20 --fuel 3 --ifuel 2"
 let rec lemma_gcd_steps_log (a b: nat)
   : Lemma (requires b > 0)
           (ensures gcd_steps a b <= op_Multiply 2 (num_bits b) + 1)
@@ -73,7 +70,6 @@ let rec lemma_gcd_steps_log (a b: nat)
         lemma_gcd_steps_bound_step a b r r2
       )
     )
-#pop-options
 
 // O(log min(a,b)) bound: combines the O(log b) bound with commutativity
 let gcd_steps_log_min (a b: nat)
