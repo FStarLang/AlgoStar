@@ -23,7 +23,7 @@ open CLRS.Ch32.RabinKarp.Spec
 
 //SNIPPET_START: correctness
 /// No false positives: every returned position is a valid match.
-#push-options "--fuel 2 --ifuel 2 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 2 --z3rlimit 10"
 let rec rabin_karp_matches_no_false_positives
     (text pattern:Seq.seq nat) (d:nat) (q:nat{q <> 0})
     (s:nat) (current_hash:nat)
@@ -81,7 +81,7 @@ let rec rabin_karp_matches_no_false_negatives
 #pop-options
 
 /// Main theorem: rabin_karp_find_all is correct (no false positives, no false negatives).
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 let rabin_karp_find_all_no_false_positives (text pattern:Seq.seq nat) (d:nat) (q:nat{q <> 0})
   : Lemma (forall (pos:nat). List.Tot.mem pos (rabin_karp_find_all text pattern d q) ==>
               matches_at text pattern pos)

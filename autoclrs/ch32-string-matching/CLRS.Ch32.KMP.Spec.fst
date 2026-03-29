@@ -182,7 +182,7 @@ let matched_prefix_implies_ps (text pattern: seq int) (i q k: nat)
 /// follow_fail returns a valid result.
 /// Result r satisfies: r <= k, and if r > 0 then pattern[r] = c.
 /// If r < k and r > 0, then r is in the failure chain (is_prefix_suffix of k-1).
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 let rec follow_fail_valid (pattern pi: seq int) (k: nat) (c: int)
   : Lemma
     (requires pi_max pattern pi /\ k > 0 /\ k - 1 < length pattern)
@@ -235,7 +235,7 @@ let ps_nesting (pattern: seq int) (q: nat{q < length pattern}) (k j: nat)
 
 /// Key lemma: follow_fail finds any target in the failure chain.
 /// If target is a PS of k-1 with pattern[target] = c, then follow_fail >= target.
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 let rec follow_fail_maximal (pattern pi: seq int) (k: nat) (c: int) (target: nat)
   : Lemma
     (requires pi_max pattern pi /\
@@ -301,7 +301,7 @@ let kmp_step_valid_lt (text pattern: seq int) (i q q': nat)
 
 /// The KMP step result is a valid matched prefix
 #restart-solver
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let kmp_step_valid (text pattern pi: seq int) (i q: nat)
   : Lemma
     (requires pi_max pattern pi /\
@@ -470,7 +470,7 @@ let matches_at_dec_iff (text pattern: seq int) (s: nat)
 // ========== Match Detection Equivalence ==========
 
 /// q_new = m iff there's a match at position i+1-m
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 150 --fuel 2 --ifuel 1 --split_queries always"
 let kmp_match_iff (text pattern pi: seq int) (i q: nat)
   : Lemma
     (requires pi_max pattern pi /\
@@ -588,7 +588,7 @@ let count_tracking (text pattern: seq int) (i count: nat) (found: bool)
 #pop-options
 
 /// Count tracking part of KMP step
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
 let kmp_count_step (text pattern pi: seq int) (i q count: nat)
   : Lemma
     (requires pi_max pattern pi /\

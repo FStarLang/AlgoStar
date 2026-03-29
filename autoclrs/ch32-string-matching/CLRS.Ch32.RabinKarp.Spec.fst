@@ -74,7 +74,7 @@ let lemma_mod_add_3 (a b c:int) (p:pos)
 
 /// Key lemma: extract the most-significant digit from the hash.
 ///   hash(i,j) == (hash(i+1,j) + d^(j-i-1) · x[i]) % q
-#push-options "--z3rlimit_factor 40 --ifuel 0 --fuel 2 --split_queries no"
+#push-options "--z3rlimit 20 --ifuel 0 --fuel 2 --split_queries no"
 #restart-solver
 let rec hash_inversion (x:Seq.seq nat) (d:nat) (q:nat{q <> 0})
                        (i:nat) (j:nat{i < j /\ j <= Seq.length x})
@@ -177,7 +177,7 @@ let lemma_mod_sub_via_add (a b:int) (q:pos)
 
 //SNIPPET_START: rolling_hash_step_correct
 /// rolling_hash_step computes the same result as the proven rolling_hash_proven.
-#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let rolling_hash_step_correct
     (text:Seq.seq nat) (d:nat) (q:pos)
     (s:nat) (m:nat{m > 0 /\ s + m < Seq.length text})
@@ -250,7 +250,7 @@ let verify_match (text pattern:Seq.seq nat) (s:nat)
   else matches_at_dec text pattern s
 
 /// Rabin-Karp: scan text from position s, maintaining rolling hash.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit_factor 4"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let rec rabin_karp_matches (text pattern:Seq.seq nat)
                            (d:nat) (q:nat{q <> 0})
                            (s:nat) (current_hash:nat)
@@ -341,7 +341,7 @@ let rec rabin_karp_matches_no_false_negatives
 #pop-options
 
 /// Main theorem: rabin_karp_find_all is correct (no false positives, no false negatives).
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 let rabin_karp_find_all_no_false_positives (text pattern:Seq.seq nat) (d:nat) (q:nat{q <> 0})
   : Lemma (forall (pos:nat). List.Tot.mem pos (rabin_karp_find_all text pattern d q) ==>
               matches_at text pattern pos)

@@ -32,7 +32,7 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 open FStar.Mul
 
-#push-options "--z3rlimit 120 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 40 --ifuel 2 --fuel 2"
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -218,7 +218,7 @@ fn compute_prefix_function
 // ========== KMP Matcher ==========
 
 #restart-solver
-#push-options "--z3rlimit 100 --ifuel 1 --fuel 1"
+#push-options "--z3rlimit 40 --ifuel 1 --fuel 1"
 
 //SNIPPET_START: kmp_matcher_sig
 fn kmp_matcher
@@ -416,7 +416,7 @@ fn kmp_matcher
 // ========== Combined KMP with Complexity ==========
 
 #restart-solver
-#push-options "--z3rlimit 50 --ifuel 1 --fuel 1"
+#push-options "--z3rlimit 20 --ifuel 1 --fuel 1"
 
 fn kmp_string_match
   (#p_text #p_pat: perm)
