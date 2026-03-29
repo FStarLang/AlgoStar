@@ -80,7 +80,7 @@ let lemma_seq_eq_test_adj (s: Seq.seq int)
 (*** 2. Prove graph is DAG: construct topological order, use theorem ***)
 
 // Position lookups for the witness topological order [0,1,2]
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 80"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10 --split_queries always"
 
 let positions_correct ()
   : Lemma (
@@ -143,7 +143,7 @@ let no_cycle_test ()
 
 (*** Main test ***)
 
-#push-options "--z3rlimit 200 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
 
 ```pulse
 fn test_topo_sort_3 ()

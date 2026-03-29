@@ -87,7 +87,7 @@ let reachable_0_in_0 ()
 #pop-options
 
 // Vertex 1 is reachable from 0 in 1 step via edge 0→1
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10 --split_queries always"
 let reachable_1_in_1 ()
   : Lemma (reachable_in test_adj 3 0 1 1)
   = assert_norm (Seq.index test_adj (0 * 3 + 1) <> 0);
@@ -95,7 +95,7 @@ let reachable_1_in_1 ()
 #pop-options
 
 // Vertex 2 is reachable from 0 in 2 steps via 0→1→2
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 20 --split_queries always"
 let reachable_2_in_2 ()
   : Lemma (reachable_in test_adj 3 0 2 2)
   = assert_norm (Seq.index test_adj (0 * 3 + 1) <> 0);
@@ -108,7 +108,7 @@ let reachable_2_in_2 ()
 
 // No vertex has an edge to vertex 0 in test_adj
 // (adj[0*3+0]=0, adj[1*3+0]=0, adj[2*3+0]=0)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10 --split_queries always"
 
 let lemma_no_edge_to_0 ()
   : Lemma (forall (u:nat). ~(has_edge test_adj 3 u 0))
@@ -173,7 +173,7 @@ let lemma_only_2_steps_to_2 (k: nat)
 
 (*** Main test ***)
 
-#push-options "--z3rlimit 200 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 4 --ifuel 2 --split_queries always"
 
 ```pulse
 fn test_bfs_3 ()

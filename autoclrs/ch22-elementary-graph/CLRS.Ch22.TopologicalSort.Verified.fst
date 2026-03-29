@@ -520,7 +520,7 @@ let rec lemma_chain_has_path
    Walk positions 0, 1, ..., marking visited. Stop when a repeat is found.
    Terminates: count_visited increases each step until n, then pigeonhole forces repeat. *)
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 80"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 80 --split_queries always"
 
 private let rec count_visited (visited: Seq.seq bool) (m: nat)
   : Pure nat (requires m <= Seq.length visited) (ensures fun c -> c <= m) (decreases m)
@@ -536,7 +536,6 @@ private let rec lemma_count_visited_set (visited: Seq.seq bool) (m pos: nat)
   = if m = 0 then ()
     else lemma_count_visited_set visited (m - 1) pos
 
-#push-options "--split_queries always"
 let rec find_chain_duplicate
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
   (k: nat) (visited: Seq.seq bool)

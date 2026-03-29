@@ -8,7 +8,7 @@ open CLRS.Ch22.TopologicalSort.Verified
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-#set-options "--z3rlimit 100"
+#set-options "--z3rlimit 10 --split_queries always"
 
 // Helper lemma: if u < n, v < n, and n*n fits, then u*n+v < n*n and fits
 val lemma_index_in_bounds (u v n: nat)
@@ -133,7 +133,7 @@ val queue_fresh_dequeue
     (requires queue_fresh output count queue qh qt /\ qh < qt)
     (ensures queue_fresh output count queue (qh + 1) qt)
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 val queue_fresh_extend_output
   (output_old output_new: Seq.seq int) (count: nat)
   (queue: Seq.seq SZ.t) (qh qt: nat) (u: int)
@@ -892,7 +892,7 @@ val lemma_queue_distinct_transfer_and_extend
           SZ.v (Seq.index queue_new i) <> SZ.v (Seq.index queue_new j)))
     (ensures queue_distinct_sz queue_new qh qt_new)
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 10"
 val lemma_old_new_cross_distinct
   (sin_deg: Seq.seq int)
   (queue_old queue_new: Seq.seq SZ.t)
@@ -923,7 +923,7 @@ val lemma_old_new_cross_distinct
 
 #pop-options
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 10"
 val lemma_new_entries_fresh_after_upd
   (sin_deg: Seq.seq int) (queue: Seq.seq SZ.t)
   (output_old output_new: Seq.seq int)
@@ -955,7 +955,7 @@ val lemma_new_entries_fresh_after_upd
 
 #pop-options
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 10"
 val lemma_bridge_preds
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int)
@@ -978,7 +978,7 @@ val lemma_bridge_preds
 
 #pop-options
 
-#push-options "--z3rlimit 100"
+#push-options "--z3rlimit 10"
 val lemma_bridge_fresh
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int)
@@ -1007,7 +1007,7 @@ val lemma_bridge_fresh
 
 #pop-options
 
-#push-options "--z3rlimit 100"
+#push-options "--z3rlimit 10"
 val lemma_bridge_distinct
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int)

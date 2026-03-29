@@ -80,7 +80,7 @@ let lemma_seq_eq_test_adj (s: Seq.seq int)
 // For our graph: only adj[0*3+1]=1 and adj[1*3+2]=1 are nonzero.
 // So pred[1] must be 0 (only vertex with edge to 1) and pred[2] must be 1.
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10 --split_queries always"
 let derive_pred_values
   (scolor sd spred: Seq.seq int)
   : Lemma
@@ -102,7 +102,7 @@ let derive_pred_values
 
 (*** Main test ***)
 
-#push-options "--z3rlimit 200 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
 
 ```pulse
 fn test_dfs_3 ()
