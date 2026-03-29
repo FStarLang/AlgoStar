@@ -59,8 +59,8 @@ let mm_dot_products (sa sb: Seq.seq int)
              dot_product_spec sa sb 2 0 1 2 == 22 /\
              dot_product_spec sa sb 2 1 0 2 == 43 /\
              dot_product_spec sa sb 2 1 1 2 == 50)
-  = let sa' = Seq.seq_of_list [1; 2; 3; 4] in
-    let sb' = Seq.seq_of_list [5; 6; 7; 8] in
+  = let unfold sa' = Seq.seq_of_list [1; 2; 3; 4] in
+    let unfold sb' = Seq.seq_of_list [5; 6; 7; 8] in
     Seq.lemma_eq_intro sa sa';
     Seq.lemma_eq_intro sb sb';
     assert_norm (dot_product_spec sa' sb' 2 0 0 2 == 19);
@@ -79,7 +79,7 @@ let mm_2sz_pre ()
 
 // ---------- Test function ----------
 
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 
 fn test_matrix_multiply_2x2 ()
   requires emp

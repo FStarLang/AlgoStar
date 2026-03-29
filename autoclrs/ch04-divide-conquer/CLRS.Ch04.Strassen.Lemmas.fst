@@ -97,7 +97,7 @@ let lemma_assemble_quadrants_elem (c11 c12 c21 c22:matrix{
                       else get_elem c22 (i - n) (j - n))))
   = ()
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 
 // Helper lemmas for matrix algebra
 
@@ -201,6 +201,7 @@ let lemma_dot_product_quadrant_split
 
 /// When a matrix is square, pow2-sized, and has rows > 1,
 /// half = rows/2 is a valid quadrant size: positive, pow2, and n - half == half.
+#pop-options  // end --z3rlimit 10 --fuel 1 --ifuel 1
 #push-options "--z3rlimit 10 --fuel 2 --ifuel 0"
 let lemma_submatrix_square_pow2
   (m:matrix{is_square m /\ pow2_size m /\ rows m > 1})
@@ -255,7 +256,7 @@ let rec lemma_dot_product_aux_submatrix_second
 #pop-options
 
 /// Wrapper: standard_multiply decomposes via quadrants.
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let lemma_standard_multiply_quadrant_decomp
   (a b:matrix{cols a == rows b /\ is_square a /\ is_square b})
   (half:pos{2 * half == rows a})
@@ -286,7 +287,7 @@ let lemma_standard_multiply_quadrant_decomp
 #pop-options
 
 // Helper: prove element-wise equality for a specific element
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1 --split_queries always"
 let rec lemma_strassen_elem_correct 
   (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   (i:nat{i < rows a}) (j:nat{j < cols b})
@@ -551,3 +552,5 @@ let lemma_strassen_correct (a b:matrix{cols a == rows b /\ is_square a /\ is_squ
     in
     FStar.Classical.forall_intro_2 aux
 //SNIPPET_END: strassen_correct
+
+#pop-options  // end --fuel 2 --ifuel 1 --z3rlimit 20

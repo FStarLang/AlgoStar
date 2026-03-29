@@ -1,7 +1,13 @@
 PULSE_ROOT ?= ../../FStar/pulse
+STAGE3     ?= 1
+export STAGE3
+ifndef FSTAR_EXE
+FSTAR_EXE  := $(realpath ../../FStar/out/bin/fstar.exe)
+endif
+export FSTAR_EXE
 
 KRML_HOME  ?= ../../FStar/karamel
-KRML_EXE  ?= $(KRML_HOME)/krml
+KRML_EXE   ?= $(KRML_HOME)/krml
 
 include $(PULSE_ROOT)/mk/test.mk
 
@@ -35,10 +41,11 @@ $(OUTPUT_DIR)/$(subst .,_,$(1)).krml: $(OUTPUT_DIR)/$(1)_krml_extracted
 endef
 $(foreach m,$(ALL_EXTRACT_MODULES),$(eval $(call krml_rule,$(m))))
 
-KRML_INPUT_FILES  = $(patsubst %,$(OUTPUT_DIR)/$(subst .,_,%).krml,$(ALL_EXTRACT_MODULES))
+KRML_INPUT_FILES  = $(foreach m,$(ALL_EXTRACT_MODULES),$(OUTPUT_DIR)/$(subst .,_,$(m)).krml)
 KRML_BUNDLE_FLAGS = -bundle '$(BUNDLE_API)=CLRS.Ch04.*'
 KRML_EXTRA_FLAGS  = -header=$(PULSE_ROOT)/mk/krmlheader
 EXTRACT_C_FILES   = $(OUTPUT_DIR)/$(BUNDLE_C_STEM).c
-EXTRA_LINK_LIBS   = $(KRML_HOME)/krmllib/dist/generic/libkrmllib.a
+EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
+                    $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
 
 include ../autoclrs.test.mk

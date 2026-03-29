@@ -40,7 +40,7 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 
 // ========== Binary Search with Complexity Bound ==========
 
-#set-options "--z3rlimit 60"
+#set-options "--z3rlimit 10"
 
 //SNIPPET_START: binary_search_sig
 fn binary_search

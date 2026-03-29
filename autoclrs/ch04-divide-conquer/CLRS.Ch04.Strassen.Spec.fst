@@ -13,7 +13,7 @@ open FStar.Classical
 
 module Seq = FStar.Seq
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 
 // ========== Matrix Representation ==========
 
@@ -159,7 +159,7 @@ let assemble_quadrants (c11 c12 c21 c22:matrix)
 
 // ========== Strassen's Algorithm ==========
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 
 //SNIPPET_START: strassen_multiply
 let rec strassen_multiply (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})

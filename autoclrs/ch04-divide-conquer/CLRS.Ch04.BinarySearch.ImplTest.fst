@@ -29,7 +29,7 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 
 // Test 1: Found case — search for 3 in sorted array [1; 3; 5]
 // Expected: result == 1 (the index where 3 resides)

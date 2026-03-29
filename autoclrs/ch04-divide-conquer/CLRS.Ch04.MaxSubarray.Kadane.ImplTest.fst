@@ -61,7 +61,7 @@ let kadane_test_lemma (s: Seq.seq int)
               Seq.index s 1 == 3 /\
               Seq.index s 2 == (0 - 2))
     (ensures max_subarray_spec s == 3)
-  = let s' = Seq.seq_of_list [(0-1); 3; (0-2)] in
+  = let unfold s' = Seq.seq_of_list [(0-1); 3; (0-2)] in
     assert_norm (Seq.length s' == 3);
     assert_norm (Seq.index s' 0 == (0 - 1));
     assert_norm (Seq.index s' 1 == 3);
@@ -92,7 +92,7 @@ let kadane_all_negative_lemma (s: Seq.seq int)
               Seq.index s 1 == (0 - 3) /\
               Seq.index s 2 == (0 - 1))
     (ensures max_subarray_spec s == (0 - 1))
-  = let s' = Seq.seq_of_list [(0-5); (0-3); (0-1)] in
+  = let unfold s' = Seq.seq_of_list [(0-5); (0-3); (0-1)] in
     assert_norm (Seq.length s' == 3);
     assert_norm (Seq.index s' 0 == (0 - 5));
     assert_norm (Seq.index s' 1 == (0 - 3));
@@ -103,7 +103,7 @@ let kadane_all_negative_lemma (s: Seq.seq int)
 
 // ---------- Test functions ----------
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 8 --ifuel 2"
 
 // Test 1: Mixed array — max subarray is a single positive element
 fn test_kadane_max_subarray ()
