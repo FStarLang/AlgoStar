@@ -1,5 +1,5 @@
-PULSE_ROOT ?= ../../pulse
-KRML_HOME  ?= ../../krml/karamel
+PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
 include $(PULSE_ROOT)/mk/test.mk
 # Undo optimize_let_vc and fly_deps — they break modular arithmetic
 # reasoning in Queue.fst dequeue proof

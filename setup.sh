@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — Build FStar and Pulse from submodules
+# setup.sh — Build F* (fstar2 branch: unified F*, Pulse, KaRaMeL)
 #
 # Prerequisites:
 #   - OCaml (>= 4.14) with opam
@@ -7,16 +7,16 @@
 #   - GNU make, git
 #
 # Usage:
-#   ./setup.sh          # build both FStar and Pulse
-#   ./setup.sh fstar    # build only FStar
-#   ./setup.sh pulse    # build only Pulse (requires FStar already built)
+#   ./setup.sh          # build F* stage3 + KaRaMeL
+#   ./setup.sh fstar    # build only F* stage3
+#   ./setup.sh karamel  # build only KaRaMeL (requires F* already built)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FSTAR_DIR="$SCRIPT_DIR/FStar"
-PULSE_DIR="$SCRIPT_DIR/pulse"
-FSTAR_EXE="$FSTAR_DIR/bin/fstar.exe"
+FSTAR_EXE="$FSTAR_DIR/out/bin/fstar.exe"
+KRML_EXE="$FSTAR_DIR/karamel/krml"
 NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
 red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
@@ -39,17 +39,23 @@ check_prereqs() {
 }
 
 check_submodules() {
-  if [ ! -f "$FSTAR_DIR/Makefile" ] || [ ! -f "$PULSE_DIR/Makefile" ]; then
+  if [ ! -f "$FSTAR_DIR/Makefile" ]; then
     info "Initializing git submodules..."
     cd "$SCRIPT_DIR"
     git submodule update --init --recursive
   fi
+  # Ensure karamel submodule is initialized within FStar
+  if [ ! -f "$FSTAR_DIR/karamel/Makefile" ]; then
+    info "Initializing karamel submodule..."
+    cd "$FSTAR_DIR"
+    git submodule update --init karamel
+  fi
 }
 
 build_fstar() {
-  info "Building F* (this may take 10-20 minutes)..."
+  info "Building F* stage3 (this may take 20-40 minutes)..."
   cd "$FSTAR_DIR"
-  ADMIT=1 make -j"$NPROC"
+  make -j"$NPROC" 3
   if [ -x "$FSTAR_EXE" ]; then
     green "F* built successfully: $FSTAR_EXE"
     "$FSTAR_EXE" --version
@@ -59,15 +65,20 @@ build_fstar() {
   fi
 }
 
-build_pulse() {
+build_karamel() {
   if [ ! -x "$FSTAR_EXE" ]; then
     red "F* not built yet. Run './setup.sh fstar' first."
     exit 1
   fi
-  info "Building Pulse..."
-  cd "$PULSE_DIR"
-  FSTAR_EXE="$FSTAR_EXE" ADMIT=1 make -j"$NPROC"
-  green "Pulse built successfully."
+  info "Building KaRaMeL..."
+  cd "$FSTAR_DIR"
+  make karamel
+  if [ -x "$KRML_EXE" ]; then
+    green "KaRaMeL built successfully: $KRML_EXE"
+  else
+    red "KaRaMeL build failed — $KRML_EXE not found."
+    exit 1
+  fi
 }
 
 # ---- Main ----
@@ -77,15 +88,15 @@ check_submodules
 
 case "${1:-all}" in
   fstar) build_fstar ;;
-  pulse) build_pulse ;;
+  karamel) build_karamel ;;
   all)
     build_fstar
-    build_pulse
+    build_karamel
     echo
     green "Setup complete. Run 'make' to verify all chapters."
     ;;
   *)
-    echo "Usage: $0 [fstar|pulse|all]"
+    echo "Usage: $0 [fstar|karamel|all]"
     exit 1
     ;;
 esac

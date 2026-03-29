@@ -4,9 +4,11 @@
 #   make            # verify all chapters
 #   make -j8        # parallel build
 
-PULSE_ROOT ?= ../pulse
+PULSE_ROOT ?= ../FStar/pulse
+STAGE3     ?= 1
+export STAGE3
 ifndef FSTAR_EXE
-FSTAR_EXE  := $(CURDIR)/../FStar/bin/fstar.exe
+FSTAR_EXE  := $(CURDIR)/../FStar/out/bin/fstar.exe
 endif
 export FSTAR_EXE
 

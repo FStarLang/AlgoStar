@@ -11,17 +11,16 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 AUTOCLRS="$(cd "$SCRIPT_DIR/.." && pwd)"
-PULSE_ROOT="${PULSE_ROOT:-$AUTOCLRS/../pulse}"
-KRML_HOME="${KRML_HOME:-$AUTOCLRS/../karamel}"
+FSTAR_HOME="${FSTAR_HOME:-$AUTOCLRS/FStar}"
+KRML_HOME="${KRML_HOME:-$FSTAR_HOME/karamel}"
 KRML_EXE="$KRML_HOME/krml"
-FSTAR_EXE="${FSTAR_EXE:-fstar.exe}"
+FSTAR_EXE="${FSTAR_EXE:-$FSTAR_HOME/out/bin/fstar.exe}"
 OUTPUT_DIR="${1:-$AUTOCLRS/test/extracted}"
 
 FSTAR_OPTS="--cache_checked_modules \
   --already_cached Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore \
   --warn_error -321 --warn_error @247 \
   --ext optimize_let_vc --ext fly_deps \
-  --include $PULSE_ROOT/out/lib/pulse \
   --codegen krml"
 
 KRML_FLAGS="-skip-makefiles -skip-linking -warn-error -2-3-4-9-11-15-17"

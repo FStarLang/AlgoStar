@@ -1,11 +1,10 @@
 {
-    "fstar_exe": "./FStar/bin/fstar.exe",
+    "fstar_exe": "./FStar/out/bin/fstar.exe",
     "options": [
         "--warn_error", "-321",
         "--warn_error", "@247"
     ],
     "include_dirs": [
-        "./pulse/out/lib/pulse",
         "autoclrs/common",
         "autoclrs/ch02-getting-started",
         "autoclrs/ch04-divide-conquer",

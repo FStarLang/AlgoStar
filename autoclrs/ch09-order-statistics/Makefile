@@ -1,4 +1,4 @@
-PULSE_ROOT ?= ../../pulse
+PULSE_ROOT ?= ../../FStar/pulse
 include $(PULSE_ROOT)/mk/test.mk
 # Explicitly disable optimize_let_vc and fly_deps for this chapter — they break
 # quantifier instantiation in insert_sorted (CLRS.Ch09.PartialSelectionSort.Spec.fst)

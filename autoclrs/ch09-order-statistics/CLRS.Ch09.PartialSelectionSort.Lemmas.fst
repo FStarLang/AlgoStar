@@ -66,7 +66,7 @@ let perm_tail_count (min: int) (t1 t2: seq int) (s1 s2: seq int) (x: int)
 #pop-options
 
 #restart-solver
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 120 --fuel 2 --ifuel 1 --split_queries always"
 //SNIPPET_START: sorted_permutation_equal
 let rec sorted_permutation_equal (s1 s2: seq int)
   : Lemma (requires is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)

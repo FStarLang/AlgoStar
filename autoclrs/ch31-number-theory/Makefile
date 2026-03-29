@@ -1,4 +1,4 @@
-PULSE_ROOT ?= ../../pulse
+PULSE_ROOT ?= ../../FStar/pulse
 OTHERFLAGS += --include ../common
 include $(PULSE_ROOT)/mk/test.mk
 

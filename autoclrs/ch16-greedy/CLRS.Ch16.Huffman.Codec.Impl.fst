@@ -265,7 +265,7 @@ let tree_height_internal (f: pos) (l r: HSpec.htree)
 // Walk the tree to find the codeword for a given symbol.
 // Writes codeword bits into cw_buf starting at position depth.
 // Returns (found, codeword_length).
-#push-options "--z3rlimit 200 --split_queries always --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 400 --split_queries always --fuel 1 --ifuel 1"
 fn rec codeword_impl
   (cur: hnode_ptr) (ft: HSpec.htree) (sym: nat)
   (cw_buf: A.array bool) (depth: SZ.t) (max_depth: SZ.t)

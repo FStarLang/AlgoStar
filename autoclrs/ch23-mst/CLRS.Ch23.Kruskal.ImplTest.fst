@@ -49,7 +49,7 @@ let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
 
 (* ---------- Test ---------- *)
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --split_queries always"
 
 ```pulse
 fn test_kruskal_satisfiability ()

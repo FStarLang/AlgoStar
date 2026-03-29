@@ -1,5 +1,5 @@
-PULSE_ROOT ?= ../../pulse
-KRML_HOME  ?= ../../krml/karamel
+PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
 KRML_EXE   ?= $(KRML_HOME)/krml
 include $(PULSE_ROOT)/mk/test.mk
 

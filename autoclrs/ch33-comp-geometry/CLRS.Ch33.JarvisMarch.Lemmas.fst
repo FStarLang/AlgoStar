@@ -238,7 +238,7 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_aux_beats_all xs ys current current 0;
   find_next_spec_bounded xs ys current
 
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 40 --split_queries always"
 let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
   : Lemma
     (requires

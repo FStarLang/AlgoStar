@@ -70,11 +70,13 @@ let tw_weights_in_range () : Lemma (SP.weights_in_range tw_seq 3) =
    - sp_dist(0,0) = 0
    - sp_dist(0,1) = 4  (direct edge 0→1)
    - sp_dist(0,2) = 2  (path 0→1→2: 4+(-2) < 5) *)
+#push-options "--z3rlimit 40 --split_queries always"
 let sp_dist_v0 () : Lemma (SP.sp_dist tw_seq 3 0 0 == 0) =
   assert_norm (SP.sp_dist tw_seq 3 0 0 == 0)
 
 let sp_dist_v1 () : Lemma (SP.sp_dist tw_seq 3 0 1 == 4) =
   assert_norm (SP.sp_dist tw_seq 3 0 1 == 4)
+#pop-options
 
 (* Normalizer needs concrete element values to evaluate sp_dist_k comparisons *)
 let tw_idx5 () : Lemma (Seq.index tw_seq 5 == (-2)) =

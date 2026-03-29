@@ -1,5 +1,5 @@
-PULSE_ROOT ?= ../../pulse
-KRML_HOME ?= ../../krml/karamel
+PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
 include $(PULSE_ROOT)/mk/test.mk
 
 # ── C extraction and test targets ──────────────────────────────────
@@ -9,8 +9,7 @@ CHAPTER_ID = ch11
 FSTAR_EXTRACT = $(FSTAR_EXE) --cache_checked_modules --odir $(OUTPUT_DIR) \
 	--cache_dir $(CACHE_DIR) \
 	--already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' \
-	--warn_error '-321' --warn_error '@247' --ext optimize_let_vc --ext fly_deps \
-	--include $(PULSE_ROOT)/out/lib/pulse
+	--warn_error '-321' --warn_error '@247' --ext optimize_let_vc --ext fly_deps
 
 # Step 1: Combined extraction to single .krml
 $(OUTPUT_DIR)/CLRS_Ch11_HashTable_combined.krml: \

@@ -1,6 +1,4 @@
 [submodule "FStar"]
 	path = FStar
 	url = git@github.com:FStarLang/FStar.git
-[submodule "pulse"]
-	path = pulse
-	url = git@github.com:FStarLang/pulse.git
+	branch = fstar2

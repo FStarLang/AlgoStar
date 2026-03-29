@@ -35,7 +35,7 @@
 
 # ─── Standard defaults ─────────────────────────────────────────────
 
-KRML_HOME         ?= ../../krml/karamel
+KRML_HOME         ?= ../../FStar/karamel
 KRML_EXE          ?= $(KRML_HOME)/krml
 EXTRACT_DIR       ?= $(OUTPUT_DIR)
 KRML_WARN_FLAGS   ?= -warn-error -2-9-11-15-17
