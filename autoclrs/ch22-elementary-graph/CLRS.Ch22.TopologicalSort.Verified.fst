@@ -536,6 +536,7 @@ private let rec lemma_count_visited_set (visited: Seq.seq bool) (m pos: nat)
   = if m = 0 then ()
     else lemma_count_visited_set visited (m - 1) pos
 
+#push-options "--split_queries always"
 let rec find_chain_duplicate
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
   (k: nat) (visited: Seq.seq bool)

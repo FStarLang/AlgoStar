@@ -1,9 +1,7 @@
 PULSE_ROOT ?= ../../FStar/pulse
 KRML_HOME  ?= ../../FStar/karamel
 include $(PULSE_ROOT)/mk/test.mk
-# Undo optimize_let_vc and fly_deps — they break proofs in
-# TopologicalSort.Impl and TopologicalSort.Verified.fst
-OTHERFLAGS := $(subst --ext optimize_let_vc,,$(subst --ext fly_deps,,$(OTHERFLAGS))) --ext optimize_let_vc=false --ext fly_deps=false --include ../common
+OTHERFLAGS += --include ../common
 
 # ── C extraction and test targets ──────────────────────────────────
 CHAPTER_ID        = ch22
