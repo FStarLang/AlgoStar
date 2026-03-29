@@ -49,7 +49,7 @@ let array_to_model (s: Seq.seq int) : Spec.ht_model =
     This is because (key % size + p) % size is a permutation of
     {0..size-1} as p ranges over {0..size-1}.
 *)
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let lemma_linear_probe_surjective
   (key: int{key >= 0}) (size: nat{size > 0}) (j: nat{j < size})
   : Lemma (exists (p: nat). p < size /\ Impl.hash_probe_nat key p size == j)
@@ -80,7 +80,7 @@ let lemma_index_implies_key_in_table
     (ensures Impl.key_in_table s size key)
   = lemma_linear_probe_surjective key size i
 
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let lemma_key_in_table_iff_array_has_key
   (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: int{key >= 0})
   : Lemma (Impl.key_in_table s size key <==> array_has_key s key)
@@ -96,7 +96,7 @@ let lemma_key_in_table_iff_array_has_key
     All probes missing the key is equivalent to the key not being
     in the array.
 *)
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let lemma_probes_not_key_full_iff
   (s: Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s}) (key: int{key >= 0})
   : Lemma (Impl.probes_not_key s size key size <==> ~(array_has_key s key))
@@ -114,7 +114,7 @@ let lemma_probes_not_key_full_iff
     ================================================================ *)
 
 (** Membership in the model corresponds to positive-key array presence *)
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec lemma_array_to_model_mem
   (s: Seq.seq int) (i: nat{i <= Seq.length s}) (k: nat)
   : Lemma
@@ -141,7 +141,7 @@ let lemma_array_to_model_mem_full
     If the key appeared at most once (unique_key) and delete changed that
     slot from key to -2, then the key is completely absent.
 *)
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let lemma_delete_unique_guarantees_absence
   (s s': Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s})
   (key: int{key >= 0})
@@ -175,7 +175,7 @@ let lemma_delete_unique_guarantees_absence
     If the key was absent from the table and was freshly inserted at
     exactly one position, then the key is unique in the new table.
 *)
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let lemma_insert_fresh_unique_key
   (s s': Seq.seq int) (size: nat{size > 0 /\ size == Seq.length s})
   (key: int{key >= 0})

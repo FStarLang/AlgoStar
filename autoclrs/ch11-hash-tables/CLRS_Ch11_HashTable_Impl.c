@@ -6,8 +6,7 @@
   Linear probing: h(k, i) = (h(k) + i) % size
   Sentinel values: -1 = empty, -2 = deleted, >= 0 = valid key
 
-  Ghost/erased parameters (void *) are accepted but ignored — they correspond
-  to F* erased types (#s, ctr, #c0) that are passed as NULL at runtime.
+  Signatures match the KaRaMeL-extracted externs (erased params removed).
 */
 
 #include "CLRS_Ch11_HashTable_Impl.h"
@@ -24,17 +23,12 @@ krml_checked_int_t *CLRS_Ch11_HashTable_Impl_hash_table_create(size_t size) {
   return table;
 }
 
-void CLRS_Ch11_HashTable_Impl_hash_table_free(
-    krml_checked_int_t *tv, void *s_erased) {
-  (void)s_erased;
+void CLRS_Ch11_HashTable_Impl_hash_table_free(krml_checked_int_t *tv) {
   KRML_HOST_FREE(tv);
 }
 
 bool CLRS_Ch11_HashTable_Impl_hash_insert(
-    krml_checked_int_t *table, void *s_erased,
-    size_t size, krml_checked_int_t key,
-    void *ctr_erased, void *c0_erased) {
-  (void)s_erased; (void)ctr_erased; (void)c0_erased;
+    krml_checked_int_t *table, size_t size, krml_checked_int_t key) {
   for (size_t i = 0; i < size; i++) {
     size_t idx = hash_probe(key, i, size);
     krml_checked_int_t slot = table[idx];
@@ -47,10 +41,7 @@ bool CLRS_Ch11_HashTable_Impl_hash_insert(
 }
 
 size_t CLRS_Ch11_HashTable_Impl_hash_search(
-    krml_checked_int_t *table, void *s_erased,
-    size_t size, krml_checked_int_t key,
-    void *ctr_erased, void *c0_erased) {
-  (void)s_erased; (void)ctr_erased; (void)c0_erased;
+    krml_checked_int_t *table, size_t size, krml_checked_int_t key) {
   for (size_t i = 0; i < size; i++) {
     size_t idx = hash_probe(key, i, size);
     krml_checked_int_t slot = table[idx];
@@ -63,12 +54,8 @@ size_t CLRS_Ch11_HashTable_Impl_hash_search(
 }
 
 bool CLRS_Ch11_HashTable_Impl_hash_delete(
-    krml_checked_int_t *table, void *s_erased,
-    size_t size, krml_checked_int_t key,
-    void *ctr_erased, void *c0_erased) {
-  (void)s_erased; (void)ctr_erased; (void)c0_erased;
-  size_t r = CLRS_Ch11_HashTable_Impl_hash_search(
-      table, NULL, size, key, NULL, NULL);
+    krml_checked_int_t *table, size_t size, krml_checked_int_t key) {
+  size_t r = CLRS_Ch11_HashTable_Impl_hash_search(table, size, key);
   if (r < size) {
     table[r] = -2;
     return true;
@@ -77,14 +64,9 @@ bool CLRS_Ch11_HashTable_Impl_hash_delete(
 }
 
 bool CLRS_Ch11_HashTable_Impl_hash_insert_no_dup(
-    krml_checked_int_t *table, void *s_erased,
-    size_t size, krml_checked_int_t key,
-    void *ctr_erased, void *c0_erased) {
-  (void)s_erased; (void)ctr_erased; (void)c0_erased;
-  size_t r = CLRS_Ch11_HashTable_Impl_hash_search(
-      table, NULL, size, key, NULL, NULL);
+    krml_checked_int_t *table, size_t size, krml_checked_int_t key) {
+  size_t r = CLRS_Ch11_HashTable_Impl_hash_search(table, size, key);
   if (r < size)
     return true;
-  return CLRS_Ch11_HashTable_Impl_hash_insert(
-      table, NULL, size, key, NULL, NULL);
+  return CLRS_Ch11_HashTable_Impl_hash_insert(table, size, key);
 }

@@ -63,7 +63,7 @@ let lemma_create_no_key (n: nat{n > 0}) (key: int{key >= 0})
 // - Postcondition is precise: search for absent key returns exactly `size`
 //
 
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_search_empty ()
   requires emp
   ensures emp
@@ -110,7 +110,7 @@ fn test_search_empty ()
 // - The slot at the returned index contains the key
 //
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_then_search ()
   requires emp
   ensures emp
@@ -162,7 +162,7 @@ fn test_insert_then_search ()
 //   that other keys remain absent
 //
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_search_absent ()
   requires emp
   ensures emp
@@ -212,7 +212,7 @@ fn test_insert_search_absent ()
 // - Z3 reasons through the composition of insert and delete postconditions
 //
 
-#push-options "--z3rlimit 120 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_delete_then_search ()
   requires emp
   ensures emp
@@ -267,7 +267,7 @@ fn test_delete_then_search ()
 // - b2 == true is forced by postcondition contradiction
 //
 
-#push-options "--z3rlimit 120 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_no_dup_existing ()
   requires emp
   ensures emp
@@ -319,7 +319,7 @@ fn test_insert_no_dup_existing ()
 // - On success, the key was freshly inserted (not already present)
 //
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_no_dup_fresh ()
   requires emp
   ensures emp

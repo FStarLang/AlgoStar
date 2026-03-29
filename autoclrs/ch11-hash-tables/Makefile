@@ -5,19 +5,13 @@ include $(PULSE_ROOT)/mk/test.mk
 # ── C extraction and test targets ──────────────────────────────────
 CHAPTER_ID = ch11
 
-# Custom FSTAR for extraction (no --cmi)
-FSTAR_EXTRACT = $(FSTAR_EXE) --cache_checked_modules --odir $(OUTPUT_DIR) \
-	--cache_dir $(CACHE_DIR) \
-	--already_cached 'Prims,FStar,Pulse.Nolib,Pulse.Lib,Pulse.Class,PulseCore' \
-	--warn_error '-321' --warn_error '@247' --ext optimize_let_vc --ext fly_deps
-
 # Step 1: Combined extraction to single .krml
 $(OUTPUT_DIR)/CLRS_Ch11_HashTable_combined.krml: \
     _cache/CLRS.Ch11.HashTable.ImplTest.fst.checked \
     _cache/CLRS.Ch11.HashTable.Impl.fst.checked
 	@mkdir -p $(OUTPUT_DIR)
 	$(call msg, "EXTRACT", "combined.krml")
-	$(FSTAR_EXTRACT) \
+	$(FSTAR) \
 	  CLRS.Ch11.HashTable.ImplTest.fst \
 	  --codegen krml \
 	  --extract_module CLRS.Ch11.HashTable.Impl \
