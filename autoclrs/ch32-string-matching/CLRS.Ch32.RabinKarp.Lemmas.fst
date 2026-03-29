@@ -74,6 +74,7 @@ let rec rabin_karp_matches_no_false_negatives
         let next = rolling_hash_step current_hash
                      (Seq.index text s) (Seq.index text (s + m)) d q h in
         rolling_hash_step_correct text d q s m current_hash h;
+        assert (next == hash text d q (s + 1) (s + m + 1));
         rabin_karp_matches_no_false_negatives text pattern d q (s + 1) next
       )
     )

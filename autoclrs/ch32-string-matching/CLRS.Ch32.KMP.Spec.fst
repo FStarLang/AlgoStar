@@ -346,9 +346,9 @@ let kmp_step_maximal (text pattern pi: seq int) (i q: nat)
               (ensures k <= q_new) =
       if k = 0 then ()
       else begin
-        assert (index text i == index pattern (k - 1));
         assert (matched_prefix_at text pattern i (k - 1));
         assert (k - 1 < m);
+        assert (index text i == index pattern (k - 1));
         assert (k - 1 <= q);
         if k - 1 = q then begin
           if q > 0 then begin
