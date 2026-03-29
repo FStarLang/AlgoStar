@@ -43,7 +43,9 @@ let empty_keys : Seq.seq int = Seq.create 7 0
 let empty_valid : Seq.seq bool = Seq.create 7 false
 
 // well_formed_bst holds for the empty tree (all valid entries false)
+#push-options "--fuel 4 --ifuel 2"
 let _ : squash (AP.well_formed_bst empty_keys empty_valid 7 0 0 100) = ()
+#pop-options
 
 // subtree_in_range holds trivially for the empty tree
 let _ : squash (subtree_in_range empty_keys empty_valid 7 0 0 100) = ()
