@@ -108,7 +108,7 @@ let adj_to_graph_edges_valid (adj: adj_matrix) (n: nat) (e: edge)
   = adj_to_edges_aux_valid adj n 0 e
 
 /// Row-level: edge weight equals adj matrix entry
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec adj_to_edges_row_weight (adj: adj_matrix) (n: nat) (u: nat) (v: nat) (e: edge)
   : Lemma (requires well_formed_adj adj n /\ u < n /\ v <= n /\ n > 0 /\
                     mem_edge e (adj_to_edges_row adj n u v) /\ e.u < n /\ e.v < n)
@@ -148,7 +148,7 @@ let adj_to_graph_edge_weight (adj: adj_matrix) (n: nat) (e: edge)
   = adj_to_edges_aux_weight adj n 0 e
 
 // If has_edge, the edge is in adj_to_edges_row
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec adj_to_graph_row_has_edge (adj: adj_matrix) (n: nat) (u v v0: nat)
   : Lemma (requires u < n /\ v < n /\ u < v /\ v0 <= v /\
                     has_edge adj n u v /\ well_formed_adj adj n)
@@ -400,7 +400,7 @@ let rec lemma_find_min_aux_min
 (*** Adjacency Matrix Edge Membership Lemmas ***)
 
 // Extract: every edge in adj_to_edges has valid properties
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec lemma_adj_row_extract (adj: adj_matrix) (n: nat) (u: nat) (vs: nat) (e: edge)
   : Lemma (requires mem_edge e (adj_to_edges_row adj n u vs) /\ well_formed_adj adj n)
           (ensures e.u < n /\ e.v < n /\ has_edge adj n e.u e.v /\
@@ -413,7 +413,7 @@ let rec lemma_adj_row_extract (adj: adj_matrix) (n: nat) (u: nat) (vs: nat) (e: 
     else lemma_adj_row_extract adj n u (vs+1) e
 #pop-options
 
-#push-options "--z3rlimit 20 --fuel 1"
+#push-options "--z3rlimit 5 --fuel 1"
 let rec lemma_adj_aux_extract (adj: adj_matrix) (n: nat) (us: nat) (e: edge)
   : Lemma (requires mem_edge e (adj_to_edges_aux adj n us) /\ well_formed_adj adj n)
           (ensures e.u < n /\ e.v < n /\ has_edge adj n e.u e.v /\
@@ -458,7 +458,7 @@ let rec lemma_in_adj_aux (adj: adj_matrix) (n: nat) (u: nat) (us: nat) (e: edge)
     end
 
 // has_edge implies mem_edge in adj_to_edges
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let lemma_has_edge_in_adj (adj: adj_matrix) (n: nat) (u v: nat)
   : Lemma (requires well_formed_adj adj n /\ u < n /\ v < n /\ u <> v /\ has_edge adj n u v)
           (ensures mem_edge ({u=u;v=v;w=edge_weight adj u v}) (adj_to_edges adj n))
@@ -488,7 +488,7 @@ let lemma_count_le (s: vertex_set)
   : Lemma (ensures count_tree_vertices s <= length s)
   = lemma_count_le_length s 0
 
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec lemma_count_lt_has_false (s: vertex_set) (i: nat)
   : Lemma (requires count_tree_vertices_aux s i < length s - i /\ i <= length s)
           (ensures (exists (v: nat). i <= v /\ v < length s /\ index s v = false))
@@ -509,7 +509,7 @@ let rec lemma_count_add_new (s: vertex_set) (v: nat) (i: nat)
       else (Seq.lemma_index_upd2 s v true i; lemma_count_add_new s v (i + 1))
     end
 
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec lemma_count_single_true (n: nat) (start: nat) (i: nat)
   : Lemma (requires start < n /\ i <= n)
           (ensures count_tree_vertices_aux (upd (create n false) start true) i =
@@ -528,7 +528,7 @@ let rec lemma_count_single_true (n: nat) (start: nat) (i: nat)
 #pop-options
 
 // If count = length, every index is true
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec lemma_all_in_tree_means_all_true (s: vertex_set) (i: nat)
   : Lemma (requires count_tree_vertices_aux s i = length s - i /\ i <= length s)
           (ensures (forall (v: nat). i <= v /\ v < length s ==> index s v = true))
@@ -550,7 +550,7 @@ let rec lemma_all_in_tree_means_all_true (s: vertex_set) (i: nat)
 (*** Connectivity Lemmas ***)
 
 // Connected graph implies crossing edge exists
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let lemma_connected_implies_crossing_edge
     (adj: adj_matrix) (n: nat) (its: vertex_set)
   : Lemma (requires well_formed_adj adj n /\ length its = n /\
@@ -637,7 +637,7 @@ let lemma_single_edge_reachable (e: edge) (es: list edge)
     assert (is_path_from_to [e] e.v e.u)
 
 // Tree connectivity extends when adding a crossing edge
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let lemma_tree_connected_extend
     (start: nat) (its: vertex_set) (tree_edges: list edge) (e: edge)
   : Lemma (requires tree_connected start its tree_edges /\
@@ -686,7 +686,7 @@ let pure_prim (adj: adj_matrix) (n: nat) (start: nat) : list edge =
     pure_prim_aux adj n in_tree [] n
 
 // tree_edges is subset of result
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let rec lemma_prim_aux_extends (adj: adj_matrix) (n: nat) (its: vertex_set)
     (tree_edges: list edge) (fuel: nat)
   : Lemma (ensures subset_edges tree_edges (pure_prim_aux adj n its tree_edges fuel))
@@ -787,7 +787,7 @@ let rec lemma_cut_respects_tree_edges
       lemma_cut_respects_tree_edges rest in_tree_set n
 
 // Count edges in result
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec lemma_prim_aux_edge_count
     (adj: adj_matrix)
     (n: nat)
@@ -816,7 +816,7 @@ let rec lemma_prim_aux_edge_count
 #pop-options
 
 // Main correctness: result has n-1 edges AND connects all vertices
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 9 --fuel 2 --ifuel 1"
 let rec lemma_prim_aux_count_and_conn
     (adj: adj_matrix) (n: nat) (its: vertex_set) (tree_edges: list edge) (fuel: nat) (start: nat)
   : Lemma (requires well_formed_adj adj n /\ length its = n /\ n > 0 /\
@@ -1184,7 +1184,7 @@ let rec lemma_prim_aux_endpoints_in_tree
       end
 
 /// noRepeats for pure_prim_aux: each new edge's v is fresh (not in tree yet)
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let rec lemma_prim_aux_noRepeats
     (adj: adj_matrix) (n: nat) (its: vertex_set) (tree_edges: list edge) (fuel: nat)
   : Lemma

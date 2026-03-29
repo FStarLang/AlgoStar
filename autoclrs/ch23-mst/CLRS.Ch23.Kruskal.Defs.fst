@@ -25,7 +25,7 @@ let lemma_index_in_bounds (u v n: nat)
 // edges_from_arrays is defined transparently in the .fsti
 
 // Transfer lemma for extensional array equality
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0 --split_queries always"
 let valid_endpoints_ext (seu sev seu' sev': Seq.seq int) (n ec: nat)
   : Lemma (requires valid_endpoints seu sev n ec /\
                     ec <= n /\
@@ -150,7 +150,7 @@ let edges_adj_pos_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
                      adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0))
   = reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu sev n ec)
 
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0 --split_queries always"
 let edges_adj_pos_ext (sadj: Seq.seq int) (seu sev seu' sev': Seq.seq int) (n ec: nat)
   : Lemma (requires edges_adj_pos sadj seu sev n ec /\
                     ec <= n /\
@@ -233,7 +233,7 @@ let result_is_forest_adj_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n 
 // weighted_edges_from_arrays is defined transparently in the .fsti
 
 /// Weighted edges extensional equality: same arrays for first ec elements gives same list
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec weighted_edges_from_arrays_ext
     (sadj: Seq.seq int) (seu1 sev1 seu2 sev2: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -256,7 +256,7 @@ let rec weighted_edges_from_arrays_ext
 #pop-options
 
 /// Weighted edges extend by one edge
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5 "
 let rec weighted_edges_from_arrays_extend
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
     (eu: nat{eu < n}) (ev: nat{ev < n})
@@ -279,7 +279,7 @@ let rec weighted_edges_from_arrays_extend
 #pop-options
 
 /// subset_edges (hd :: tl) s ==> subset_edges (tl @ [hd]) s
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec subset_edges_cons_to_append (hd: edge) (tl: list edge) (s: list edge)
   : Lemma (requires subset_edges (hd :: tl) s)
           (ensures subset_edges (FStar.List.Tot.append tl [hd]) s)

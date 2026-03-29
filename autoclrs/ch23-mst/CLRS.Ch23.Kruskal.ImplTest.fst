@@ -92,7 +92,7 @@ fn test_kruskal_satisfiability ()
        as (A.pts_to edge_v (Seq.create 3 0sz));
 
   // --- Edge count reference, initialized to 0 ---
-  let ec_ref = R.alloc 0sz;
+  let mut ec_ref = 0sz;
 
   // --- Precondition verification ---
   // SZ.v 3sz > 0                     ✓ (3 > 0)
@@ -174,7 +174,6 @@ fn test_kruskal_satisfiability ()
   V.to_vec_pts_to ev_v;
   V.free ev_v;
 
-  R.free ec_ref;
   pass
 }
 ```

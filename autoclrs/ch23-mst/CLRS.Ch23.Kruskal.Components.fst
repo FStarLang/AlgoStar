@@ -48,7 +48,7 @@ let rec is_path_append_edge (path: list edge) (u v w: nat) (e: edge)
         is_path_append_edge rest hd.u v w e
 
 // Helper: reversing a path reverses direction
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let rec is_path_reverse (path: list edge) (u v: nat)
   : Lemma 
     (requires is_path_from_to path u v)
@@ -86,7 +86,7 @@ let rec subset_edges_append_single (prefix: list edge) (e: edge) (es: list edge)
     | hd :: rest -> subset_edges_append_single rest e es
 
 // Helper: subset preserved under reversal
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let rec subset_edges_rev (path: list edge) (es: list edge)
   : Lemma 
     (requires subset_edges path es)
@@ -303,7 +303,7 @@ let neighbor_reaches (edges: list edge) (v u w: nat)
     )
 
 // Key lemma: BFS soundness - every vertex in result is either in visited or reachable from frontier  
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 150"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let rec bfs_reach_list_sound (edges: list edge) (frontier: list nat) (visited: list nat) (fuel: nat) (w: nat)
   : Lemma (requires mem w (bfs_reach_list edges frontier visited fuel))
           (ensures mem w visited \/ (exists u. mem u frontier /\ reachable edges u w))
@@ -591,7 +591,7 @@ let bfs_well_formed (edges: list edge) (frontier visited: list nat) : prop =
 // Main BFS completeness invariant:
 // If well-formed, noRepeats, bounded, and sufficient fuel,
 // then the result is neighbor-closed and contains all frontier + visited.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let rec bfs_complete_invariant
     (edges: list edge) (frontier: list nat) (visited: list nat) (fuel: nat)
   : Lemma

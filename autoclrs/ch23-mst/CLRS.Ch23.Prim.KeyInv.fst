@@ -151,7 +151,7 @@ let update_progress_init (ks ps ims: Seq.seq SZ.t) (n source u: nat)
     reveal_opaque (`%key_decreased_parent_is_u) (key_decreased_parent_is_u ks ks ps ims n u);
     reveal_opaque (`%keys_only_decrease) (keys_only_decrease ks ks n)
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let update_progress_step
     (ks_old ps_old ks_cur ps_cur ims: Seq.seq SZ.t) (n source u i: nat)
     (new_k new_p: SZ.t) (should_update: bool)
@@ -218,7 +218,7 @@ let parent_in_mst_at (ks ps ims: Seq.seq SZ.t) (n source v w: nat)
 
 /// After update_keys: parent_in_mst preserved
 /// Uses explicit quantifier instantiation — no Z3 quantifier matching needed
-#push-options "--z3rlimit 100 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let parent_in_mst_after_update 
     (ks_old ps_old ks_new ps_new ims: Seq.seq SZ.t) (n source u: nat)
   : Lemma 
@@ -283,7 +283,7 @@ let key_inv_after_add_vertex (ks ims_old ims_new ws: Seq.seq SZ.t) (n u: nat)
 
 /// Derive bare "in-MST → parent in MST" forall from parent_in_mst + ims_finite_key.
 /// Needed by prim_safe_add_vertex which expects this as a precondition.
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let parent_in_mst_for_ims
     (ks ps ims: Seq.seq SZ.t) (n source: nat)
   : Lemma 
@@ -311,7 +311,7 @@ let key_inv_bare (ks ims ws: Seq.seq SZ.t) (n: nat)
   = reveal_opaque (`%key_inv) (key_inv ks ims ws n)
 
 /// Same as key_inv_bare but with raw Seq.index (for prim_safe_add_vertex compatibility)
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let key_inv_bare_raw (ks ims ws: Seq.seq SZ.t) (n: nat)
   : Lemma
     (requires key_inv ks ims ws n /\
@@ -335,7 +335,7 @@ let ims_unchanged_bare (ks_old ps_old ks_new ps_new ims: Seq.seq SZ.t) (n source
   = reveal_opaque (`%ims_unchanged) (ims_unchanged ks_old ps_old ks_new ps_new ims n source)
 
 /// Extract parent-in-MST for finite-key vertices (used by mst_edges_noRepeats_add)
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let parent_in_mst_finite_key (ks ps ims: Seq.seq SZ.t) (n source: nat)
   : Lemma
     (requires parent_in_mst ks ps ims n source /\
@@ -363,7 +363,7 @@ let prim_inv_bundle (safe kpc: prop) (ks ps ims ws: Seq.seq SZ.t) (n source: nat
   ims_finite_key ks ims n /\
   parent_in_mst ks ps ims n source
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let prim_inv_bundle_intro (safe kpc: prop) (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
   : Lemma (requires safe /\ kpc /\ n > 0 /\ source < n /\
       Seq.length ks == n /\ Seq.length ps == n /\
@@ -390,7 +390,7 @@ let prim_inv_bundle_elim (safe kpc: prop) (ks ps ims ws: Seq.seq SZ.t) (n source
 #pop-options
 
 /// Rebuild prim_inv_bundle after update_keys.
-#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let prim_inv_bundle_after_update
     (safe_old kpc_old safe_new kpc_new: prop)
     (ks_old ps_old ks_new ps_new ims ws: Seq.seq SZ.t) (n source u: nat)
@@ -434,7 +434,7 @@ let loop_state
   Defs.parent_valid ps n /\
   (forall (j:nat). j < n ==> SZ.v (Seq.index ims j) = 0 \/ SZ.v (Seq.index ims j) = 1)
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let loop_state_intro (inv noRepeats: prop)
     (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
   : Lemma (requires n > 0 /\ source < n /\
@@ -465,7 +465,7 @@ let loop_state_elim (inv noRepeats: prop)
 /// Full loop_state rebuild after update_keys.
 /// Takes: old loop_state + update_progress + new safe + new kpc + new noRepeats.
 /// All reasoning (key_inv, ims_finite_key, parent_in_mst) done here in KeyInv context.
-#push-options "--z3rlimit 200 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let loop_state_after_update
     (inv_old noRepeats_old safe_old kpc_old: prop)
     (safe_new kpc_new noRepeats_new: prop)
@@ -519,7 +519,7 @@ let keys_bounded_by_u_elim (ks ws ims: Seq.seq SZ.t) (n u: nat)
   = reveal_opaque (`%keys_bounded_by_u) (keys_bounded_by_u ks ws ims n u)
 
 /// Step: after processing vertex i in update_keys loop.
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let keys_bounded_by_u_step
     (ks ws ims: Seq.seq SZ.t) (n u i: nat)
     (new_k: SZ.t) (should_update: bool)
@@ -560,7 +560,7 @@ let keys_bounded_by_u_intro (ks ws ims: Seq.seq SZ.t) (n u: nat)
 
 /// Lift key_inv, ims_finite_key, parent_in_mst from ims_old to ims_new
 /// when vertex u is added to MST. All reveal_opaque done here in KeyInv's 4s context.
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let lift_predicates_add_vertex
     (ks ps ws ims_old ims_new: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -597,7 +597,7 @@ let lift_predicates_add_vertex
 /// Full rebuild: from pre-add state + update_progress + keys_bounded_by_u,
 /// produce prim_inv_bundle on NEW keys and NEW ims.
 /// All reasoning done here with reveal_opaque in KeyInv's tight context.
-#push-options "--z3rlimit 100 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let full_rebuild_after_update
     (safe_old kpc_old safe_new kpc_new: prop)
     (ks_old ps_old ks_new ps_new ws ims_old ims_new: Seq.seq SZ.t) (n source u: nat)
@@ -669,7 +669,7 @@ let keys_bounded_partial_init (ks ws ims: Seq.seq SZ.t) (n u: nat)
           (ensures keys_bounded_partial ks ws ims n u 0)
   = reveal_opaque (`%keys_bounded_partial) (keys_bounded_partial ks ws ims n u 0)
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let keys_bounded_partial_step
     (ks ws ims: Seq.seq SZ.t) (n u i: nat) (new_k: SZ.t) (should_update: bool)
   : Lemma
@@ -706,7 +706,7 @@ let rec mst_count (ims: Seq.seq SZ.t) (n: nat) (i: nat)
     else (if SZ.v (Seq.index ims i) = 1 then 1 else 0) + mst_count ims n (i + 1)
 
 /// Adding vertex u (ims[u]:=1) increases count by 1
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec mst_count_add (ims: Seq.seq SZ.t) (n u: nat) (i: nat)
   : Lemma
     (requires Seq.length ims == n /\ u < n /\ i <= n /\
@@ -719,7 +719,7 @@ let rec mst_count_add (ims: Seq.seq SZ.t) (n u: nat) (i: nat)
 #pop-options
 
 /// If mst_count = n, then all vertices are in MST
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec mst_count_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
   : Lemma
     (requires Seq.length ims == n /\ i <= n /\
@@ -738,7 +738,7 @@ let rec mst_count_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
 #pop-options
 
 /// If mst_count < n, there exists a non-MST vertex
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec mst_count_not_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
   : Lemma
     (requires Seq.length ims == n /\ i <= n /\ mst_count ims n i < n - i /\
@@ -751,7 +751,7 @@ let rec mst_count_not_full (ims: Seq.seq SZ.t) (n: nat) (i: nat)
 #pop-options
 
 /// Initially all ims=0, so mst_count = 0
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec mst_count_zero (n: nat) (i: nat)
   : Lemma (requires i <= n)
           (ensures mst_count (Seq.create n 0sz) n i == 0)

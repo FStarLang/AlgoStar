@@ -75,7 +75,7 @@ let lemma_upd_preserves_bounded (s: Seq.seq SZ.t) (i: nat) (v: SZ.t)
           (ensures all_keys_bounded (Seq.upd s i v))
   = ()
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 8 --fuel 2 --ifuel 1"
 let rec lemma_prod_fits (u n: nat) : Lemma
   (requires u < n /\ n > 0)
   (ensures u * n < n * n)
@@ -95,7 +95,7 @@ let lemma_mul_bound (u n v: nat) (bound: nat)
     ()
 
 // Helper lemma: if n^2 < 2^64, then n + 2 fits in SZ.t (on 64-bit platforms)
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let lemma_n_squared_implies_n_plus_2_fits (n: nat)
   : Lemma (requires n * n < pow2 64 /\ SZ.fits_u64)
           (ensures n + 2 < pow2 64 /\ SZ.fits (n + 2))

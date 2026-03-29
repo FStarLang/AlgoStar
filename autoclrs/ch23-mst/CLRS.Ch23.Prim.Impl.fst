@@ -230,7 +230,7 @@ let prim_inv
     key_seq parent_seq in_mst_seq weights_seq n source
 
 /// Init: all vacuously true at start
-#push-options "--z3rlimit 50 --split_queries always"
+#push-options "--z3rlimit 5 --split_queries always"
 let prim_inv_init
     (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -291,7 +291,7 @@ let prim_inv_elim
       key_seq parent_seq in_mst_seq weights_seq n source
 
 /// Intro: build prim_inv from all components (avoids reveal_opaque at call sites)
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let prim_inv_intro
     (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -320,7 +320,7 @@ let prim_inv_intro
 #pop-options
 
 /// After extract-min + in_mst[u]:=1: advance greedy safety.
-#push-options "--z3rlimit 100 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let prim_inv_add_vertex
     (key_seq parent_seq in_mst_old in_mst_new weights_seq: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -385,7 +385,7 @@ let prim_inv_add_source
 /// Source not in MST: min_key <= key[source] = 0 < infinity.
 /// Source in MST: connectivity_gives_finite_key.
 /// Also derives ims[u] = 0 from find_min postcondition.
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 8"
 let min_key_finite
     (ks ims ws: Seq.seq SZ.t) (n source u: nat) (min_key count: nat)
   : Lemma
@@ -502,7 +502,7 @@ let prim_loop_state_elim
 /// Combined: transfer from pre-add state + update_progress → post-update prim_loop_state.
 /// Uses KeyInv.full_rebuild_after_update for all key invariant reasoning.
 #restart-solver
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let update_keys_rebuild
     (ks_old ps_old ks_new ps_new ims_old ims_new ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -550,7 +550,7 @@ let update_keys_rebuild
 
 /// Hoisted extract-min loop: find the minimum-key non-MST vertex.
 /// Returns (min_idx, min_key) pair.
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 fn find_min_vertex
   (key_a: array SZ.t) (#key_seq: Ghost.erased (Seq.seq SZ.t))
   (in_mst: array SZ.t) (#in_mst_seq: Ghost.erased (Seq.seq SZ.t))
@@ -641,7 +641,7 @@ fn find_min_vertex
 /// Takes prim_loop_state on PRE-ADD ims (ims_old) as ghost context.
 /// The actual in_mst array has POST-ADD ims (u already added).
 /// Outputs prim_loop_state on POST-ADD ims with updated keys/parents.
-#push-options "--z3rlimit 100"
+#push-options "--z3rlimit 110"
 fn update_keys
   (#p: perm)
   (key_a: array SZ.t) (#ks0: Ghost.erased (Seq.seq SZ.t))
@@ -758,7 +758,7 @@ fn update_keys
 /// Hoisted outer loop body: one complete iteration of Prim's algorithm.
 /// find_min → add to MST → greedy step → update keys
 /// Takes and returns prim_loop_state, keeping fn prim's VC minimal.
-#push-options "--z3rlimit 50 --split_queries always"
+#push-options "--z3rlimit 5 --split_queries always"
 fn prim_step
   (#p: perm)
   (key_a: array SZ.t)
@@ -835,7 +835,7 @@ fn prim_step
 }
 #pop-options
 
-#push-options "--z3rlimit 100"
+#push-options "--z3rlimit 160"
 //SNIPPET_START: prim_sig
 fn prim
   (#p: perm)
@@ -997,7 +997,7 @@ fn prim
 ///   - No duplicate edges
 ///
 /// See Kruskal.Bridge for safe_spanning_tree_is_mst.
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let prim_result_is_mst
     (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma

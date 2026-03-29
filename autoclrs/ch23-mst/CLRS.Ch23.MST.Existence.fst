@@ -48,7 +48,7 @@ let rec min_weight_bound (e: edge) (es: list edge)
     end
 
 /// Total weight of edges >= length * min_weight, when all edges come from a source list
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let rec total_weight_lower_bound (t: list edge) (source: list edge)
   : Lemma (requires Cons? source /\ subset_edges t source)
           (ensures total_weight t >= (length t) * (min_weight_in_list source))
@@ -64,7 +64,7 @@ let rec total_weight_lower_bound (t: list edge) (source: list edge)
 
 (*** MST Existence: Trivial Case (single vertex) ***)
 
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let mst_trivial (g: graph)
   : Lemma (requires g.n = 1 /\ Nil? g.edges)
           (ensures exists (t: list edge). is_mst g t)
@@ -96,7 +96,7 @@ let mst_trivial (g: graph)
 (*** MST Existence: General Case via Weight Induction ***)
 
 /// Connected graph with no edges must have exactly 1 vertex
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let connected_no_edges_means_one_vertex (g: graph)
   : Lemma (requires g.n > 0 /\ all_connected g.n g.edges /\ Nil? g.edges)
           (ensures g.n = 1)
@@ -117,7 +117,7 @@ let connected_no_edges_means_one_vertex (g: graph)
 #pop-options
 
 /// Strong induction on weight: if a spanning tree with bounded weight exists, MST exists
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let rec mst_exists_aux (g: graph) (fuel: nat)
   : Lemma
     (requires

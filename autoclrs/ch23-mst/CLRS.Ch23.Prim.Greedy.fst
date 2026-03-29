@@ -35,7 +35,7 @@ let weights_to_adj_matrix (weights_seq: Seq.seq SZ.t) (n: nat)
       )
     )
 
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let weights_to_adj_preserves (weights_seq: Seq.seq SZ.t) (n: nat) (u v: nat)
   : Lemma (requires valid_weights weights_seq n /\ n > 0 /\ u < n /\ v < n /\
                     u * n + v < n * n)
@@ -48,7 +48,7 @@ let weights_to_adj_preserves (weights_seq: Seq.seq SZ.t) (n: nat) (u v: nat)
   = ()
 #pop-options
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let weights_to_adj_well_formed (weights_seq: Seq.seq SZ.t) (n: nat)
   : Lemma
     (requires Seq.length weights_seq == n * n /\ n > 0 /\ symmetric_weights weights_seq n)
@@ -58,7 +58,7 @@ let weights_to_adj_well_formed (weights_seq: Seq.seq SZ.t) (n: nat)
 
 (*** Index arithmetic helpers ***)
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec lemma_prod_fits (u n: nat) : Lemma
   (requires u < n /\ n > 0) (ensures u * n < n * n) (decreases n - u)
   = if u >= n - 1 then ()
@@ -99,7 +99,7 @@ let rec mst_edges_so_far
       { u = p; v = i; w = w } :: mst_edges_so_far parent_seq key_seq in_mst_seq n source (i + 1)
     else mst_edges_so_far parent_seq key_seq in_mst_seq n source (i + 1)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec mst_edges_all_in
   (parent_seq key_seq in_mst_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
   : Lemma
@@ -193,7 +193,7 @@ let rec mst_edges_source_unchanged
 
 (*** Subset helpers ***)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec subset_from_mem (a b: list edge)
   : Lemma (requires forall (e: edge). mem_edge e a ==> mem_edge e b)
           (ensures subset_edges a b) (decreases a)
@@ -238,7 +238,7 @@ let mst_edges_add_subset
 (*** Weight ↔ Graph edge bridging ***)
 
 /// Positive weight → edge in graph. Uses swt for clean reasoning.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let weights_edge_in_graph
     (ws: Seq.seq SZ.t) (n u v: nat)
   : Lemma
@@ -272,7 +272,7 @@ let weights_edge_in_graph
 #pop-options
 
 /// Graph edge weight = swt
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let graph_edge_weight_eq
     (ws: Seq.seq SZ.t) (n: nat) (e: edge)
   : Lemma
@@ -303,7 +303,7 @@ let prim_safe (ps ks ims ws: Seq.seq SZ.t) (n source: nat) : prop =
     let es = mst_edges_so_far ps ks ims n source 0 in
     exists (t: list edge). is_mst g t /\ subset_edges es t))
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let prim_safe_init
     (ps ks ims ws: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -365,7 +365,7 @@ let prim_safe_update_non_mst
 (*** Core Greedy Step via Cut Property ***)
 
 /// The main cut_property application. Uses KeyInv predicates as preconditions.
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
 let prim_cut_step
     (ps ks ims ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -492,7 +492,7 @@ let prim_cut_step
 
 /// Full add-vertex step: prim_safe preserved when adding vertex u.
 /// Takes prim_safe + KeyInv predicates as opaque preconditions.
-#push-options "--z3rlimit 200"
+#push-options "--z3rlimit 5"
 let prim_safe_add_vertex
     (ps ks ims_old ims_new ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -600,7 +600,7 @@ let prim_safe_add_vertex
 
 (*** noRepeats tracking ***)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec mst_edges_noRepeats_add
     (ps ks ims_old ims_new: Seq.seq SZ.t) (n source u: nat) (i: nat)
   : Lemma
@@ -696,7 +696,7 @@ let rec mst_edges_noRepeats_add
     end
 #pop-options
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let mst_edges_noRepeats_init
     (ps ks ims: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -721,7 +721,7 @@ let mst_edges_noRepeats_init
 ///
 /// This is a deep graph theory argument. For now we state it and leave the proof
 /// to future work (requires path manipulation lemmas not yet in the codebase).
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 25 --fuel 2 --ifuel 1"
 let connectivity_gives_finite_key
     (ks ims ws: Seq.seq SZ.t) (n source: nat) (min_key count: nat)
   : Lemma
@@ -796,7 +796,7 @@ let connectivity_gives_finite_key
 
 (*** Combined greedy step + noRepeats step ***)
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let prim_noRepeats_step
     (ks ps ims_old ims_new ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -820,7 +820,7 @@ let prim_noRepeats_step
 
 (*** Post-loop MST derivation ***)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec efpk_length
     (ps ks: Seq.seq SZ.t) (n source: nat) (i: nat)
   : Lemma
@@ -833,7 +833,7 @@ let rec efpk_length
     else efpk_length ps ks n source (i + 1)
 #pop-options
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec efpk_valid_endpoints
     (ps ks: Seq.seq SZ.t) (n source: nat) (i: nat) (e: edge)
   : Lemma
@@ -968,7 +968,7 @@ let prim_mst_result_elim
 
 /// prim_mst_result is invariant under parent[source] change
 /// because edges_from_parent_key skips source
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let prim_mst_result_upd_source
     (ps ks ws: Seq.seq SZ.t) (n source: nat) (new_p: SZ.t)
   : Lemma
@@ -993,7 +993,7 @@ let prim_mst_result_upd_source
 
 /// Post-loop MST derivation
 #restart-solver
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --split_queries always"
 let derive_prim_is_mst
     (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
   : Lemma

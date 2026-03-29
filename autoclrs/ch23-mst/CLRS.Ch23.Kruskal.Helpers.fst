@@ -30,7 +30,7 @@ let empty_is_forest (n: nat) : Lemma (KSpec.is_forest ([] #MSTSpec.edge) n)
   = ()
 
 // edges_from_arrays with same underlying arrays at positions < ec gives same result
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 5"
 let rec edges_from_arrays_stable
     (seu sev seu' sev': Seq.seq int) (ec: nat) (i: nat{i <= ec})
   : Lemma 
@@ -48,7 +48,7 @@ let rec edges_from_arrays_stable
 #pop-options
 
 // edges_from_arrays with ec+1 = old list ++ [new_edge]
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 5"
 let rec edges_from_arrays_snoc
     (seu sev: Seq.seq int) (ec: nat) (i: nat{i <= ec})
     (u_val v_val: nat)

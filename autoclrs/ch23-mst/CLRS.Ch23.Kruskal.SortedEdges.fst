@@ -37,7 +37,7 @@ let sorted_edges_indices (es: list edge) : prop =
     (index es i).w <= (index es j).w
 
 #restart-solver
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec sorted_edges_indices_helper (es: list edge)
   : Lemma (requires sorted_edges es)
           (ensures sorted_edges_indices es)
@@ -95,7 +95,7 @@ let process_edge_subset (e: edge) (result: list edge) (n: nat) (full_edges: list
     subset_edges_cons result e full_edges
 
 // Property 1: Result is subset of input edges
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let rec kruskal_subset_lemma
   (edges: list edge)
   (result: list edge)

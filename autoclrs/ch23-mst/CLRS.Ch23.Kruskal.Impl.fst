@@ -69,7 +69,7 @@ let scan_min_inv_init (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat)
           (ensures scan_min_inv sparent sadj n 0 0)
   = reveal_opaque (`%scan_min_inv) (scan_min_inv sparent sadj n 0 0)
 
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let scan_min_inv_step
     (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n u0 v0: nat)
     (old_vbw new_vbw w: int) (diff_comp take_it: bool)
@@ -158,7 +158,7 @@ let kruskal_inv_init (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n: nat)
   = UF.uf_inv_init sparent n;
     reveal_opaque (`%kruskal_inv) (kruskal_inv sparent seu sev n 0)
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 fn find
   (#p: perm)
   (parent: A.array SZ.t)
@@ -192,7 +192,7 @@ fn find
 }
 #pop-options
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 fn do_union
   (parent: A.array SZ.t)
   (#sparent: Ghost.erased (Seq.seq SZ.t))
@@ -208,7 +208,7 @@ fn do_union
 #pop-options
 
 // Lemma for when we add an edge: proves uf_inv, is_forest, valid_endpoints for new state.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 "
+#push-options "--z3rlimit 70 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_add_edge_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int)
@@ -252,7 +252,7 @@ let kruskal_add_edge_proof
 #pop-options
 
 // Lemma for when we don't add an edge: parent is effectively unchanged.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let kruskal_noop_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev: Seq.seq int)
@@ -283,7 +283,7 @@ let kruskal_noop_proof
 #pop-options
 
 // Unified step lemma — dispatches to add_edge or noop proof.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 "
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
 let kruskal_step_maintains_inv
   (sparent sparent': Seq.seq SZ.t)
   (seu sev seu' sev': Seq.seq int)
@@ -352,7 +352,7 @@ let kruskal_step_maintains_inv
 (*** Bridging Lemmas: adj_array_to_graph has valid edges ***)
 
 /// Each entry in adj_row_edges has endpoints u < v < n
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let rec adj_row_edges_props (sadj: Seq.seq int) (n: nat) (u: nat) (v: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
@@ -373,7 +373,7 @@ let rec adj_row_edges_props (sadj: Seq.seq int) (n: nat) (u: nat) (v: nat) (e: e
 #pop-options
 
 /// Each entry in adj_all_edges has valid endpoints
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let rec adj_all_edges_props (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u <= n /\ n > 0 /\
@@ -407,7 +407,7 @@ let adj_graph_valid_edges (sadj: Seq.seq int) (n: nat)
 (*** Bridging Lemmas: weighted edges ⊆ graph edges ***)
 
 /// If u < v < n and adj[u*n+v] > 0, then {u,v,adj[u*n+v]} ∈ adj_row_edges
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let rec adj_row_edges_mem (sadj: Seq.seq int) (n: nat) (u: nat) (target_v: nat) (v: nat)
   : Lemma
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
@@ -424,7 +424,7 @@ let rec adj_row_edges_mem (sadj: Seq.seq int) (n: nat) (u: nat) (target_v: nat) 
 #pop-options
 
 /// Membership in a row's edges implies membership in all edges
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let rec adj_all_edges_row_mem (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge) (start_u: nat)
   : Lemma
     (requires Seq.length sadj == n * n /\ n > 0 /\ u < n /\ start_u <= u /\ start_u <= n /\
@@ -440,7 +440,7 @@ let rec adj_all_edges_row_mem (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge) (s
 #pop-options
 
 /// Each weighted edge is a graph edge (inductive helper)
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 50 "
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let rec weighted_edges_subset_graph_aux
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n: nat) (ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -484,7 +484,7 @@ let rec weighted_edges_subset_graph_aux
 #pop-options
 
 /// Weighted edges are subset of graph edges
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let weighted_edges_subset_graph
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
   : Lemma
@@ -506,7 +506,7 @@ let weighted_edges_subset_graph
 
 /// Both lists share endpoints: edges_from_arrays uses w=1, weighted uses adj weight.
 /// mem_edge in weighted list implies corresponding w=1 edge is in the w=1 list.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec mem_edge_weighted_to_unweighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
     (e: edge)
@@ -535,7 +535,7 @@ let rec mem_edge_weighted_to_unweighted
 #pop-options
 
 /// Transfer noRepeats from w=1 edges to weighted edges.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1"
 let rec noRepeats_transfer
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -569,7 +569,7 @@ let rec map_to_w1 (cycle: list edge) : list edge =
   | e :: tl -> {u = e.u; v = e.v; w = 1} :: map_to_w1 tl
 
 /// map_to_w1 preserves is_path_from_to (only uses .u/.v)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec map_to_w1_path (cycle: list edge) (s f: nat)
   : Lemma (ensures is_path_from_to (map_to_w1 cycle) s f <==> is_path_from_to cycle s f)
           (decreases cycle)
@@ -582,7 +582,7 @@ let rec map_to_w1_path (cycle: list edge) (s f: nat)
 #pop-options
 
 /// map_to_w1 subset: if cycle ⊆ weighted edges, map_to_w1 cycle ⊆ w=1 edges
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec map_to_w1_subset
     (cycle: list edge) (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -605,7 +605,7 @@ let rec map_to_w1_subset
 #pop-options
 
 /// Extract weight from mem_edge: edge weight = adj[u*n+v] or adj[v*n+u]
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec weighted_edge_weight_from_mem
     (e: edge) (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -662,7 +662,7 @@ let rec weighted_edge_valid_endpoints
 #pop-options
 
 /// Same endpoints + symmetric adj implies same weight → edge_eq
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let weighted_edge_eq_from_endpoints
     (e1 e2: edge)
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
@@ -686,7 +686,7 @@ let weighted_edge_eq_from_endpoints
 #pop-options
 
 /// ~(mem_edge e tl) on weighted ==> ~(mem_edge {e.u,e.v,1} (map_to_w1 tl))
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec map_to_w1_not_mem_weighted
     (e: edge) (tl: list edge)
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
@@ -718,7 +718,7 @@ let rec map_to_w1_not_mem_weighted
 #pop-options
 
 /// all_edges_distinct transfer
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec map_to_w1_distinct_from_weighted
     (cycle: list edge)
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
@@ -745,7 +745,7 @@ let rec map_to_w1_distinct_from_weighted
 #pop-options
 
 /// Main acyclicity transfer: acyclic(w=1) + symmetric ==> acyclic(weighted)
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 80"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let acyclic_transfer
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
   : Lemma
@@ -796,7 +796,7 @@ let acyclic_transfer
 ///   - No duplicate weighted edges
 ///
 /// See Kruskal.Bridge for greedy_step_safe and safe_spanning_tree_is_mst.
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let kruskal_result_is_mst
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
   : Lemma
@@ -825,7 +825,7 @@ let kruskal_result_is_mst
 
 module Existence = CLRS.Ch23.MST.Existence
 
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
   : Lemma
     (requires
@@ -844,7 +844,7 @@ let pure_kruskal_is_mst (sadj: Seq.seq int) (n: nat)
 (*** Safety Step ***)
 
 /// Helper: if adj[u*n+v] > 0 and u <> v, edge {u,v,adj[u*n+v]} is in the graph
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let adj_graph_mem_edge (sadj: Seq.seq int) (n u v: nat)
   : Lemma
     (requires Seq.length sadj == n * n /\ n > 0 /\ u < n /\ v < n /\ u <> v /\
@@ -865,7 +865,7 @@ let adj_graph_mem_edge (sadj: Seq.seq int) (n u v: nat)
 
 /// Reverse transfer: reachable via w=1 ⟹ reachable via weighted
 /// (map w=1 edge to weighted edge with same endpoints — different from map_to_w1)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec mem_edge_unweighted_to_weighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
     (e: edge)
@@ -921,7 +921,7 @@ let mem_edge_reachable (e: edge) (es: list edge)
 /// the same positions with the same .u/.v. So if a w=1 edge matches entry k
 /// (by edge_eq), the weighted entry k has the same .u/.v and is mem_edge in the
 /// weighted list. We can construct the weighted path by replacing weights.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec path_to_weighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
     (path: list edge) (s f: nat)
@@ -997,7 +997,7 @@ let reachable_unweighted_to_weighted
 #pop-options
 
 /// Reachability transfer: reachable via weighted ⟹ reachable via w=1
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let reachable_weighted_to_unweighted
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
     (u v: nat)
@@ -1024,7 +1024,7 @@ let reachable_weighted_to_unweighted
 /// Bundles all preconditions for weighted_edges_from_arrays to avoid
 /// Seq.index typing issues in ensures clauses.
 /// Helper 1: unreachable in weighted edges from UF find inequality
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let greedy_unreachable
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int)
     (n ec vbu vbv: nat)
@@ -1042,7 +1042,7 @@ let greedy_unreachable
 
 /// scan_min_inv_complete but using adj_weight (avoids Seq.index typing issues at call sites)
 #restart-solver
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 50"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let scan_min_complete_adj_weight
     (sparent: Seq.seq SZ.t) (sadj: Seq.seq int) (n: nat) (vbw: int)
     (vbu vbv eu ev: nat)
@@ -1062,7 +1062,7 @@ let scan_min_complete_adj_weight
 
 
 /// Graph edge weight matches adj matrix
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 800 "
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec adj_row_edges_weight (sadj: Seq.seq int) (n u v: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
@@ -1109,7 +1109,7 @@ let adj_graph_edge_weight (sadj: Seq.seq int) (n: nat) (e: edge)
 
 /// Specialized: graph edge weight >= scan minimum when find ≠
 #restart-solver
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 800 "
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let adj_graph_edge_ge_scanmin
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (n: nat) (e: edge)
     (vbw: int) (vbu vbv: nat)
@@ -1134,7 +1134,7 @@ let adj_graph_edge_ge_scanmin
     else ()
 #pop-options
 #restart-solver
-#push-options "--z3rlimit 300 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let greedy_min_weight
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int)
     (n ec: nat) (new_w_edge: edge)
@@ -1170,7 +1170,7 @@ let greedy_min_weight
 
 /// Helper 3: convert greedy_step_safe result from cons to append form
 #restart-solver
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let greedy_convert_safety
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (new_w_edge: edge)
   : Lemma
@@ -1198,7 +1198,7 @@ let greedy_convert_safety
 
 /// Greedy safety step: composed from helpers
 #restart-solver
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let greedy_safety_step
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
     (seu sev: Seq.seq int) (n ec: nat)
@@ -1236,7 +1236,7 @@ let greedy_safety_step
 
 /// If every edge on a path has find(u)==find(v), then path endpoints have same root.
 /// This version takes subset_edges directly, avoiding memP issues with noeq types.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec find_same_along_path
     (sparent: Seq.seq SZ.t) (n: nat) (path: list MSTSpec.edge)
     (u v: nat) (g_edges: list MSTSpec.edge)
@@ -1264,7 +1264,7 @@ let rec find_same_along_path
 #pop-options
 
 /// Graph edge entries from adj_row_edges have positive weight in at least one orientation
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec adj_row_edges_adj_pos (sadj: Seq.seq int) (n: nat) (u: nat) (v: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u < n /\ v <= n /\ n > 0 /\
@@ -1291,7 +1291,7 @@ let rec adj_row_edges_adj_pos (sadj: Seq.seq int) (n: nat) (u: nat) (v: nat) (e:
 #pop-options
 
 /// Graph edge from adj_all_edges: positive weight in at least one orientation
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let rec adj_all_edges_adj_pos (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge)
   : Lemma
     (requires Seq.length sadj == n * n /\ u <= n /\ n > 0 /\
@@ -1309,7 +1309,7 @@ let rec adj_all_edges_adj_pos (sadj: Seq.seq int) (n: nat) (u: nat) (e: edge)
 #pop-options
 
 /// For a graph edge from adj_array_to_graph with symmetric adj: adj_weight(e.u, e.v) > 0
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let graph_edge_adj_pos (sadj: Seq.seq int) (n: nat) (e: edge)
   : Lemma
     (requires n > 0 /\ Seq.length sadj == n * n /\ symmetric_adj sadj n /\
@@ -1322,7 +1322,7 @@ let graph_edge_adj_pos (sadj: Seq.seq int) (n: nat) (e: edge)
 #pop-options
 
 /// scan vbw=0 + symmetric → all graph edges have find(u)==find(v)
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let scan_zero_graph_edges_same_root
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (n: nat)
   : Lemma
@@ -1349,7 +1349,7 @@ let scan_zero_graph_edges_same_root
 #pop-options
 
 /// Connected graph + all graph edges same root → all vertices same root
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let connected_all_edges_same_root
     (sparent: Seq.seq SZ.t) (n: nat) (g_edges: list MSTSpec.edge)
   : Lemma
@@ -1380,7 +1380,7 @@ let connected_all_edges_same_root
 #pop-options
 
 /// If all vertices have same root and uf_complete, then all_connected for forest edges
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let uf_all_same_root_all_connected
     (sparent: Seq.seq SZ.t) (edges: list MSTSpec.edge) (n: nat)
   : Lemma
@@ -1395,7 +1395,7 @@ let uf_all_same_root_all_connected
 
 /// Key lemma: for connected graphs, if the scan found no cross-component edge (vbw=0),
 /// then the forest already connects all vertices.
-#push-options "--z3rlimit 100 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let scan_zero_implies_all_connected
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat)
   : Lemma
@@ -1421,7 +1421,7 @@ let scan_zero_implies_all_connected
 (*** all_edges_distinct + ec==round tracking for is_mst ***)
 
 /// Edge in a list implies its endpoints are reachable via that list
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let edge_in_list_reachable (e: edge) (edges: list edge)
   : Lemma
     (requires mem_edge e edges)
@@ -1431,7 +1431,7 @@ let edge_in_list_reachable (e: edge) (edges: list edge)
 #pop-options
 
 /// New cross-component edge is not mem_edge of existing forest edges.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec new_edge_not_in_forest
     (sparent: Seq.seq SZ.t) (edges: list edge) (n ec: nat) (new_edge: edge)
   : Lemma
@@ -1484,7 +1484,7 @@ let rec new_edge_not_in_forest
 #pop-options
 
 /// all_edges_distinct for append: if xs is distinct and y not in xs, then xs++[y] is distinct
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec all_edges_distinct_append_single (xs: list edge) (y: edge)
   : Lemma
     (requires all_edges_distinct xs /\ ~(mem_edge y xs))
@@ -1498,7 +1498,7 @@ let rec all_edges_distinct_append_single (xs: list edge) (y: edge)
 #pop-options
 
 /// all_edges_distinct is preserved under extensional equality of edge lists
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let all_edges_distinct_ext (es1 es2: list edge)
   : Lemma
     (requires es1 == es2 /\ all_edges_distinct es1)
@@ -1507,7 +1507,7 @@ let all_edges_distinct_ext (es1 es2: list edge)
 #pop-options
 
 /// Helper: edges from arrays have no self-loops when adjacency matrix has no self-loops
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec edges_from_arrays_no_self_loops
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat) (i: nat{i <= ec})
   : Lemma
@@ -1546,7 +1546,7 @@ let rec edges_from_arrays_no_self_loops
 #pop-options
 
 /// For connected graphs with ec < n-1, the scan MUST find a cross-component edge.
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let connected_implies_vbw_positive
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat) (vbw: int)
     (vbu vbv: nat)
@@ -1590,7 +1590,7 @@ let rec remove_edge_first (e: edge) (l: list edge) : list edge =
   | [] -> []
   | hd :: tl -> if edge_eq e hd then tl else hd :: remove_edge_first e tl
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec remove_edge_first_length (e: edge) (l: list edge)
   : Lemma (requires mem_edge e l)
           (ensures FStar.List.Tot.length (remove_edge_first e l) = FStar.List.Tot.length l - 1)
@@ -1628,7 +1628,7 @@ let rec remove_edge_first_subset (e: edge) (l: list edge)
 #pop-options
 
 /// Pigeonhole: subset + noRepeats + same length → reverse subset
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec pigeonhole_edges (a b: list edge)
   : Lemma
     (requires Bridge.noRepeats_edge a /\ subset_edges a b /\
@@ -1680,7 +1680,7 @@ let rec pigeonhole_edges (a b: list edge)
 #pop-options
 
 /// all_connected transfers when one edge set contains all edges of another
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let all_connected_from_superset (n: nat) (sub sup: list edge)
   : Lemma
     (requires
@@ -1711,7 +1711,7 @@ let all_connected_from_superset (n: nat) (sub sup: list edge)
 
 /// Post-loop MST derivation: from edges_safe + ec==n-1 + acyclic + noRepeats → is_mst
 #restart-solver
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let derive_is_mst_post_loop
     (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
   : Lemma
@@ -1838,7 +1838,7 @@ let kruskal_mst_inv_elim
 // Separated out because these calls need revealed per-element facts which interact poorly
 // with --split_queries in the larger step_add context
 #restart-solver
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let kruskal_mst_inv_step_add_safety
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
     (seu sev: Seq.seq int) (n ec: nat)
@@ -1887,7 +1887,7 @@ let kruskal_mst_inv_step_add_safety
 // Step maintenance: adding an edge
 // Transfers all predicates from seu/sev to seu'/sev' via ext lemmas
 #restart-solver
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_mst_inv_step_add
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -1939,7 +1939,7 @@ let kruskal_mst_inv_step_add
 
 // Step maintenance: not adding an edge
 #restart-solver
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_mst_inv_step_noop
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -1972,7 +1972,7 @@ let kruskal_mst_inv_step_noop
 
 // Wrapper for both cases
 #restart-solver
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_mst_inv_step
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec ec': nat)
@@ -2010,7 +2010,7 @@ let kruskal_mst_inv_step
 
 /// Step lemma for all_edges_distinct + (connected ==> ec == round) tracking
 #restart-solver
-#push-options "--z3rlimit 800 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let kruskal_spanning_step_distinct
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec ec': nat)
@@ -2097,7 +2097,7 @@ let kruskal_spanning_step_count
     end
 #pop-options
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2 "
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))

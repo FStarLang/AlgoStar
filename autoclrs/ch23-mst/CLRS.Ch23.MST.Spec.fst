@@ -273,7 +273,7 @@ let mem_edge_eq_neg (a b: edge) (tl: list edge)
 
 // Split a simple path at the first occurrence of an edge matching e.
 // Since all_edges_distinct, the suffix doesn't reuse e, so it's entirely in t.
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec split_at_first_e (path: list edge) (e: edge) (t: list edge) (start finish: nat)
   : Lemma (requires is_path_from_to path start finish /\
                     subset_edges path (e :: t) /\
@@ -344,7 +344,7 @@ let cycle_must_use_e (n: nat) (t: list edge) (e: edge) (v: nat) (cycle: list edg
     end
 
 // Helper: if t is acyclic and e's endpoints are NOT connected in t, then e :: t is also acyclic
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let acyclic_when_unreachable (n: nat) (t: list edge) (e: edge)
   : Lemma (requires acyclic n t /\ e.u < n /\ e.v < n /\ ~(mem_edge e t) /\ ~(reachable t e.u e.v))
           (ensures acyclic n (e :: t))
@@ -414,7 +414,7 @@ let rec path_crosses_when_sides_differ
       end
 
 // General version: a simple path using edge e with s(a)=s(b) must have a t-crossing
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec find_t_crossing (path: list edge) (e: edge) (t: list edge) (s: cut) (a b: nat)
   : Lemma (requires is_path_from_to path a b /\
                     subset_edges path (e :: t) /\
@@ -549,7 +549,7 @@ let rec filter_complement_length (f: edge -> bool) (t: list edge)
 
 // If we can show that exchanging edges preserves spanning tree property
 // and doesn't increase weight, we prove the cut property
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 50"
 let lemma_exchange_preserves_mst 
     (g: graph)
     (t: list edge)      // Original MST
@@ -907,7 +907,7 @@ let rec path_endpoints_reachable (es path: list edge) (root a b: nat)
       path_endpoints_reachable es tl root next b
 
 // Reachable in full list => reachable via component-filtered list
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let reachable_in_component (es: list edge) (root v: nat)
   : Lemma (requires reachable es root v)
           (ensures (let f = fun (e: edge) -> reachable_dec es root e.u && reachable_dec es root e.v in
@@ -949,7 +949,7 @@ let reachable_empty (root v: nat)
         match p with | [] -> () | _ :: _ -> ())
 
 // Main counting bound: number of reachable vertices <= 1 + number of edges
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
   : Lemma (ensures count_reachable es root n n <= 1 + length es)
           (decreases length es)
@@ -1158,7 +1158,7 @@ let acyclic_filter (n: nat) (t: list edge) (e_rem: edge)
     acyclic_subset n t ft
 
 // Forward: mem_edge in t implies mem_edge in e_rem :: filtered_t
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec mem_edge_t_to_erem_ft (x e_rem: edge) (t: list edge)
   : Lemma (requires mem_edge x t)
           (ensures mem_edge x (e_rem :: filter (fun e -> not (edge_eq e e_rem)) t))
@@ -1180,7 +1180,7 @@ let rec mem_edge_t_to_erem_ft (x e_rem: edge) (t: list edge)
 #pop-options
 
 // Reachable in t implies reachable in e_rem :: filtered_t
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let reachable_t_iff_erem_ft (t: list edge) (e_rem: edge) (u v: nat)
   : Lemma (requires reachable t u v)
           (ensures reachable (e_rem :: filter (fun e -> not (edge_eq e e_rem)) t) u v)
@@ -1262,7 +1262,7 @@ let rec mem_edge_eq_transfer (a b: edge) (l: list edge)
       else
         mem_edge_eq_transfer a b tl
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec all_edges_distinct_rev_acc (l acc: list edge)
   : Lemma (requires all_edges_distinct l /\ all_edges_distinct acc /\
                     (forall e. mem_edge e l ==> ~(mem_edge e acc)) /\
@@ -1453,7 +1453,7 @@ let rec subset_edges_t_to_erem_ft (p: list edge) (e_rem: edge) (t: list edge)
 // then T - {e_rem} + {e_add} is still a spanning tree.
 // Proof requires: (1) e_rem removal splits T into two components,
 // (2) e_add reconnects them (since it's on the path), (3) acyclicity is restored.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 140 --fuel 2 --ifuel 1 --split_queries always"
 let exchange_is_spanning_tree
     (g: graph) (t: list edge) (e_add e_rem: edge) (path: list edge)
   : Lemma (requires is_spanning_tree g t /\
@@ -1656,7 +1656,7 @@ let exchange_is_spanning_tree
     assert (length t' = g.n - 1)
 #pop-options
 
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let cut_property g a e s =
   let goal : prop = exists (t': list edge). is_mst g t' /\ subset_edges (e :: a) t' in
   // Extract MST T containing A
@@ -1781,7 +1781,7 @@ let rec all_edges_distinct_snoc (p: list edge) (e0: edge)
 
 // If endpoints of e are reachable from each other in t, then e :: t has a cycle.
 // (Converse of acyclic_when_unreachable)
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let reachable_implies_not_acyclic (n: nat) (t: list edge) (e: edge)
   : Lemma (requires acyclic n t /\ reachable t e.u e.v /\
                     e.u < n /\ e.v < n /\ e.u <> e.v /\ ~(mem_edge e t))
@@ -1854,7 +1854,7 @@ let rec ghost_filter_superset
 
 // Bridge case: if hd connects root's tl-component to nr's tl-component,
 // then root reaches nr in tl, contradicting acyclicity of e :: tl.
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let acyclic_bridge_no_cross
     (n: nat) (e: edge) (tl: list edge) (root: nat) (hd: edge)
   : Lemma (requires acyclic n (e :: tl) /\
@@ -1903,7 +1903,7 @@ let rec count_reachable_disjoint_lower
 
 // In bridge case: component edges of es (w.r.t. root) from tl decompose into
 // root's tl-component edges and nr's tl-component edges.
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1"
 let rec ghost_filter_bridge_split
     (n: nat) (e: edge) (tl rem: list edge) (root: nat)
   : Lemma (requires acyclic n (e :: tl) /\
@@ -2051,7 +2051,7 @@ let rec ghost_filter_or_bound (f f1 f2: edge -> GTot bool) (es: list edge)
     | hd :: tl -> ghost_filter_or_bound f f1 f2 tl
 
 // For acyclic graph: count_reachable >= 1 + |component edges|
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 35 --fuel 2 --ifuel 1"
 let rec acyclic_count_lower_bound
     (es: list edge) (root: nat) (n: nat)
   : Lemma (requires acyclic n es /\ all_edges_distinct es /\
@@ -2183,7 +2183,7 @@ let rec acyclic_count_lower_bound
 #pop-options
 
 // Acyclic + connected ⟹ exactly n-1 edges
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let acyclic_connected_length (n: nat) (es: list edge)
   : Lemma (requires n > 0 /\ all_connected n es /\ acyclic n es /\ all_edges_distinct es /\
                     (forall (e: edge). mem_edge e es ==> e.u < n /\ e.v < n /\ e.u <> e.v))

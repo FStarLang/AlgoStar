@@ -19,7 +19,7 @@ let test_adj : adj_matrix = Seq.seq_of_list [
   Seq.seq_of_list [3; 2; 0]
 ]
 
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 10"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 5"
 
 let test_well_formed () : Lemma (well_formed_adj test_adj 3) =
   assert_norm (Seq.length test_adj == 3);
@@ -194,7 +194,7 @@ let efpk_3 (ps ks: Seq.seq SZ.t)
   = ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 150 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 140 --split_queries always"
 let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
   : Lemma
     (requires Seq.length ps == 3 /\ Seq.length ks == 3 /\ Seq.length ws == 9 /\ ws == tw /\
@@ -228,7 +228,7 @@ let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
 #pop-options
 
 /// Witness: [{u=0;v=1;w=1}; {u=1;v=2;w=2}] is a spanning tree with weight 3
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 20"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 8"
 let witness_spanning_tree ()
   : Lemma
     (let adj = weights_to_adj_matrix tw 3 in

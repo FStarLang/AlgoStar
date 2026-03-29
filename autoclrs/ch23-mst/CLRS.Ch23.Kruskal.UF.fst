@@ -157,7 +157,7 @@ let rec find_pure_rerouted
 
 // Key theorem: union maintains the UF invariant
 // After adding edge (u_val, v_val) and setting parent[root_u] := root_v
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 350 --fuel 2 --ifuel 2"
 let uf_inv_union
     (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
@@ -271,7 +271,7 @@ let acyclic_cons_to_append (n: nat) (e: edge) (t: list edge)
 
 // uf_inv is permutation-invariant (cons vs append)
 // Uses comp_reachable to avoid existential reasoning about reachable
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let uf_inv_cons_to_append (sparent: Seq.seq SZ.t) (e: edge) (t: list edge) (n ec: nat)
   : Lemma (requires uf_inv sparent (e :: t) n ec /\ all_edges_valid (e :: t) n)
           (ensures uf_inv sparent (t @ [e]) n ec)
@@ -350,7 +350,7 @@ let reachable_monotone (e: edge) (edges: list edge) (u v: nat)
 
 // Initial completeness: identity parent means find(u) = u,
 // so find(u) = find(v) implies u = v, hence reachable via empty path
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let uf_complete_init (sparent: Seq.seq SZ.t) (n: nat)
   : Lemma (requires identity_parent n sparent /\ n > 0)
           (ensures uf_complete sparent [] n)
@@ -376,7 +376,7 @@ let uf_complete_init (sparent: Seq.seq SZ.t) (n: nat)
 #pop-options
 
 // Union step: after adding edge (u_val, v_val) and setting parent'[root_u] = root_v
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 400 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15 --split_queries always"
 let uf_complete_union
     (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
@@ -457,7 +457,7 @@ let uf_complete_union
 #pop-options
 
 // Extensional equality preserves completeness
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 200"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let uf_complete_eq (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat)
   : Lemma (requires uf_complete sparent edges n /\ Seq.length sparent = n /\ Seq.length sparent' = n /\
                     (forall (i: nat). i < n ==> SZ.v (Seq.index sparent i) = SZ.v (Seq.index sparent' i)))
@@ -511,7 +511,7 @@ let rec mem_edge_cons_append (x e: edge) (tl: list edge)
 // Key: reachable(e :: tl, u, v) <==> reachable(tl @ [e], u, v)
 // because any path subset of (e :: tl) is also subset of (tl @ [e])
 // and vice versa (mem_edge is order-independent)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec subset_edges_cons_append_transfer (path: list edge) (e: edge) (tl: list edge)
   : Lemma (requires subset_edges path (e :: tl))
           (ensures subset_edges path (FStar.List.Tot.append tl [e]))

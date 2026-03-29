@@ -98,7 +98,7 @@ let crossing_means_unreachable
 
 (*** Main theorem: greedy_step_safe ***)
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let greedy_step_safe (g: graph) (forest: list edge) (e: edge)
   : Lemma
     (requires
@@ -372,7 +372,7 @@ let connected_subset_of_tree (g: graph) (result mst: list edge)
       end else ()
     end
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let safe_spanning_tree_is_mst (g: graph) (forest: list edge)
   : Lemma
     (requires

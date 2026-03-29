@@ -696,7 +696,7 @@ let rec path_skip_to_shorter (path: list edge) (current target: nat)
       else path_skip_to_shorter rest next target
 
 // Remove revisits to start vertex u
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec remove_start_revisit (path: list edge) (es: list edge) (u v: nat)
   : Pure (list edge)
          (requires is_path_from_to path u v /\ subset_edges path es /\ u <> v)
@@ -719,7 +719,7 @@ let rec remove_start_revisit (path: list edge) (es: list edge) (u v: nat)
 #pop-options
 
 // After remove_start_revisit, all edges in tl have endpoints ≠ u
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec no_visit_means_no_u_endpoints (path: list edge) (current u finish: nat)
   : Lemma (requires is_path_from_to path current finish /\
                     current <> u /\ ~(vertex_visited path current u))
@@ -768,7 +768,7 @@ let rec mem_edge_of_subset (e: edge) (a b: list edge)
       end else mem_edge_of_subset e tl b
 
 // Simple path extraction: guaranteed to produce edges from the original path
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec extract_simple_path (path: list edge) (u v: nat)
   : Lemma (requires is_path_from_to path u v /\ u <> v)
           (ensures exists (path': list edge). is_path_from_to path' u v /\ 
@@ -845,7 +845,7 @@ let rec extract_simple_path (path: list edge) (u v: nat)
 #pop-options
 
 // Now we can prove: adding edge between reachable vertices creates cycle
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let reachable_means_not_acyclic (n: nat) (t: list edge) (e: edge)
   : Lemma (requires acyclic n t /\ reachable t e.u e.v /\ 
                     e.u < n /\ e.v < n /\ e.u <> e.v /\ ~(mem_edge e t))
@@ -930,7 +930,7 @@ let reachable_means_not_acyclic (n: nat) (t: list edge) (e: edge)
 
 // Connected subset of spanning tree equals the spanning tree
 // If result ⊆ mst and result connects all vertices, then all mst edges are in result
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let connected_subset_of_tree_is_tree (g: graph) (result mst: list edge)
   : Lemma (requires is_spanning_tree g mst /\
                     subset_edges result mst /\
@@ -1067,7 +1067,7 @@ let rec subset_noRepeats_length_le (a b: list edge)
 let mem_edge_in_list (e: edge) (es: list edge) : bool = mem_edge e es
 
 // If both endpoints of e are reachable from root in tl, adding e doesn't create new reachability
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let redundant_edge_reachability (tl: list edge) (e: edge) (root v: nat)
   : Lemma (requires same_component tl root e.u /\ same_component tl root e.v /\
                     same_component (e :: tl) root v)
@@ -1401,7 +1401,7 @@ let same_component_dec_empty_0 (u v: nat)
 
 // Key counting lemma: number of reachable vertices ≤ 1 + number of edges
 // Uses count_reachable to ensure a single lambda symbol in SMT encoding
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 59"
 let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
   : Lemma (ensures count_reachable es root n n <= 1 + length es)
           (decreases length es)
@@ -1602,7 +1602,7 @@ let rec noRepeats_is_all_edges_distinct (l: list edge)
     | [] -> ()
     | _ :: tl -> noRepeats_is_all_edges_distinct tl
 
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let theorem_kruskal_produces_spanning_tree (g: graph)
   : Lemma (requires g.n > 0 /\ 
                     all_connected g.n g.edges /\
@@ -1895,7 +1895,7 @@ let same_component_dec_empty (u v: nat)
     end
 
 /// Helper: vertices_in_component with empty edges returns [v] when v < n
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 10"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let rec vertices_in_component_empty (v: nat) (n: nat) (i: nat{i <= n})
   : Lemma (requires v < n)
           (ensures vertices_in_component [] v n i == (if i <= v && v < n then [v] else []))
@@ -1925,7 +1925,7 @@ let not_in_different_component_empty (i j: nat) (n: nat)
   = component_of_empty i n
 
 /// Helper: build_components with empty edges produces n singletons
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec build_components_empty_length (n: nat) (i: nat{i <= n})
                                       (acc: list (list nat))
   : Lemma (requires
