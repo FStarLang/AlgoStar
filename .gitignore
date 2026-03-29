@@ -13,3 +13,4 @@ test/run_tests
 # Doc build artifacts
 doc/_build/
 doc/__pycache__/
+krml/
