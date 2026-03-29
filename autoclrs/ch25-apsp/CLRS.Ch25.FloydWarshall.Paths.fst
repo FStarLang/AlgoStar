@@ -244,7 +244,7 @@ let rec lemma_split_prefix_hd (w: list nat) (v: nat)
         | _ :: _ :: _ -> lemma_split_prefix_hd (b :: rest) v
 
 // Weight additivity: weight(w) == weight(prefix) + weight(suffix)
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_split_weight (adj: Seq.seq int) (n: nat) (w: list nat) (v: nat)
   : Lemma (requires is_walk w /\ mem v (intermediates w) /\ Seq.length adj == n * n /\
                     walk_valid w n /\ n > 0)
@@ -402,7 +402,7 @@ let lemma_concat_src (w1 w2: list nat)
     ()
 
 // Weight of concatenation
-#push-options "--z3rlimit 40 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2"
 let rec lemma_concat_weight (adj: Seq.seq int) (n: nat) (w1 w2: list nat)
   : Lemma (requires is_walk w1 /\ is_walk w2 /\ walk_dst w1 == walk_src w2 /\
                     walk_valid w1 n /\ walk_valid w2 n /\

@@ -30,7 +30,7 @@ KRML_BUNDLE_FLAGS = \
 KRML_EXTRA_FLAGS  = \
   -no-prefix CLRS.Ch25.FloydWarshall.Impl \
   -no-prefix CLRS.Ch25.FloydWarshall.NegCycleDetect
-KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+KRML_EXTRA_INPUTS =
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch25_FloydWarshall.c
 TEST_MAIN         = test_main.c
 TEST_EXE_NAME     = test_ch25

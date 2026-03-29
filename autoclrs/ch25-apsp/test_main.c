@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "CLRS_Ch25_FloydWarshall.h"
-#include "internal/CLRS_Ch25_FloydWarshall.h"
 
 /* Prims int operations needed by extracted code */
 krml_checked_int_t Prims_op_Addition(krml_checked_int_t x, krml_checked_int_t y) {

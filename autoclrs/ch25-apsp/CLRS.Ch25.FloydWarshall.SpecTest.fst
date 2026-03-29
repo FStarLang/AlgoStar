@@ -27,7 +27,7 @@ let test_adj : seq int = seq_of_list [0; 5; 1000000; 50; 0; 15; 30; 1000000; 0]
 // 2 [ 30  35  0  ]
 
 // Verify each entry of the FW recurrence at level n=3
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 40 --split_queries always"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 10 --split_queries always"
 let test_00 () : Lemma (fw_entry test_adj 3 0 0 3 == 0) = ()
 let test_01 () : Lemma (fw_entry test_adj 3 0 1 3 == 5) = ()
 let test_02 () : Lemma (fw_entry test_adj 3 0 2 3 == 20) = ()

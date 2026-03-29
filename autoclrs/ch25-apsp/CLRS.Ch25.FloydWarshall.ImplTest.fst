@@ -107,7 +107,7 @@ let lemma_seq_eq_test_adj (s: Seq.seq int)
 //   Seq.index (fw_outer test_adj 3 0) (qi*3+qj) == fw_entry test_adj 3 qi qj 3
 // The SMT solver evaluates fw_entry to the expected concrete value.
 
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 80 --split_queries always"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 20 --split_queries always"
 
 // Step 1: Prove fw_entry values for all 9 entries (same as SpecTest.fst)
 let fw_val_00 () : Lemma (fw_entry test_adj 3 0 0 3 == 0) = ()
@@ -251,7 +251,7 @@ fn test_floyd_warshall_impl ()
 // knowledge of the diagonal entries, we can prove which value b must take.
 
 // Prove test_adj has non-negative diagonal (d[0][0]=0, d[1][1]=0, d[2][2]=0)
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 40"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 10"
 let lemma_test_adj_non_negative_diagonal ()
   : Lemma (non_negative_diagonal test_adj 3)
   = assert_norm (Seq.length test_adj == 3 * 3);
@@ -390,7 +390,7 @@ fn test_neg_cycle_check_false ()
 
 (*** 6. floyd_warshall_safe API — weights_bounded + non_negative_diagonal ***)
 
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 40"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 10"
 let lemma_test_adj_weights_bounded ()
   : Lemma (weights_bounded test_adj 3)
   = assert_norm (Seq.length test_adj == 3 * 3);

@@ -286,7 +286,7 @@ let rec lemma_fw_inner_i_correct
 
 (* Inductive step: if d matches fw_entry at level k, then after fw_inner_i,
    d matches fw_entry at level k+1 *)
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let lemma_fw_step
   (adj d: seq int) (n k: nat) (qi qj: nat)
   : Lemma
