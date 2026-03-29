@@ -1,8 +1,7 @@
 PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
 include $(PULSE_ROOT)/mk/test.mk
-# Explicitly disable optimize_let_vc and fly_deps for this chapter — they break
-# quantifier instantiation in insert_sorted (CLRS.Ch09.PartialSelectionSort.Spec.fst)
-OTHERFLAGS := $(subst --ext optimize_let_vc,,$(subst --ext fly_deps,,$(OTHERFLAGS))) --ext optimize_let_vc=false --ext fly_deps=false --include ../common
+OTHERFLAGS += --include ../common
 
 # ── C extraction and test targets ──────────────────────────────────
 CHAPTER_ID        = ch09
@@ -21,7 +20,7 @@ KRML_MODULES = \
 
 KRML_INPUT_FILES  = $(patsubst %,$(OUTPUT_DIR)/%.krml,$(KRML_MODULES))
 KRML_BUNDLE_FLAGS =
-KRML_WARN_FLAGS   = -warn-error -9-10-11-15-17
+KRML_WARN_FLAGS   = -warn-error -2-9-10-11-15-17
 KRML_EXTRA_FLAGS  = \
   -faggressive-inlining \
   -drop 'CLRS.Ch09.PartialSelectionSort.Spec,CLRS.Ch09.Quickselect.Spec,CLRS.Ch09.MinMax.Spec,CLRS.Common.Complexity'

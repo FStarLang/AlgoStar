@@ -100,7 +100,7 @@ fn find_minmax
 
 // ========== CLRS pair-processing — ⌊3n/2⌋ comparisons ==========
 
-#push-options "--z3rlimit 500 --ifuel 3 --fuel 3"
+#push-options "--z3rlimit 5 --ifuel 3 --fuel 3"
 //SNIPPET_START: find_minmax_pairs
 fn find_minmax_pairs
   (#p: perm)

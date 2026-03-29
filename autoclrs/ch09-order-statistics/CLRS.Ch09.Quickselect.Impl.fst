@@ -48,7 +48,7 @@ let swap_is_permutation = QSpec.swap_is_permutation
 
 // ========== In-place partition — ticks once per comparison ==========
 
-#push-options "--z3rlimit 120 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 10 --ifuel 2 --fuel 2"
 //SNIPPET_START: partition_in_range
 fn partition_in_range
   (a: A.array int)
@@ -154,7 +154,7 @@ fn partition_in_range
 
 // ========== Helper lemma wrappers ==========
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 20 --split_queries always"
 let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma
     (requires lo <= hi /\ hi <= Seq.length s_pre /\
@@ -199,7 +199,7 @@ let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
 
 // ========== Quickselect — single function, correctness + complexity ==========
 
-#push-options "--z3rlimit 200 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 20 --ifuel 2 --fuel 2"
 //SNIPPET_START: quickselect
 fn quickselect
   (a: A.array int)

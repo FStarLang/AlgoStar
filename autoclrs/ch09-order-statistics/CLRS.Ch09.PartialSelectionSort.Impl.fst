@@ -99,7 +99,7 @@ let swap_is_permutation (s: Seq.seq int) (i j: nat)
 
 // ========== find_min_index_from — ticks once per comparison ==========
 
-#push-options "--z3rlimit 50 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 10 --ifuel 2 --fuel 2"
 fn find_min_index_from
   (#p: perm)
   (a: array int)
@@ -168,7 +168,7 @@ fn find_min_index_from
 
 /// Bridge from opaque permutation + sorted_prefix + prefix_leq_suffix
 /// to select_spec, using pulse_correctness_hint.
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let select_correctness (s0 s_final: Seq.seq int) (k: nat)
   : Lemma
     (requires k > 0 /\ k <= Seq.length s0 /\

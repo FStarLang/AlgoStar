@@ -8,10 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "internal/CLRS_Ch09_MinMax_Impl.h"
-#include "internal/CLRS_Ch09_PartialSelectionSort_Impl.h"
-#include "internal/CLRS_Ch09_Quickselect_Impl.h"
-#include "internal/CLRS_Ch09_SimultaneousMinMax_Impl.h"
+#include "CLRS_Ch09_MinMax_Impl.h"
+#include "CLRS_Ch09_PartialSelectionSort_Impl.h"
+#include "CLRS_Ch09_Quickselect_Impl.h"
+#include "CLRS_Ch09_SimultaneousMinMax_Impl.h"
 #include "krmlinit.h"
 
 static int tests_run = 0;

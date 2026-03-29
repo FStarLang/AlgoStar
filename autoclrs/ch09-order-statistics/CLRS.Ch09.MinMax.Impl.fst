@@ -28,7 +28,7 @@ module Seq = FStar.Seq
 
 // ========== Minimum Finding ==========
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 //SNIPPET_START: find_minimum
 fn find_minimum
   (#p: perm)
@@ -91,7 +91,7 @@ fn find_minimum
 
 // ========== Maximum Finding ==========
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 
 //SNIPPET_START: find_maximum
 fn find_maximum

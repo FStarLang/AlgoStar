@@ -52,21 +52,62 @@ let rec sorted_head_le (s: seq int) (x: int)
     )
 
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 0"
-/// Helper: if head is same and whole-sequence counts match, tail counts match.
-/// Isolated to avoid is_sorted quantifier explosion.
-let perm_tail_count (min: int) (t1 t2: seq int) (s1 s2: seq int) (x: int)
-  : Lemma (requires Seq.length s1 > 0 /\ Seq.length s2 > 0 /\
-                    Seq.index s1 0 == min /\ Seq.index s2 0 == min /\
-                    Seq.tail s1 == t1 /\ Seq.tail s2 == t2 /\
-                    count_occ s1 x = count_occ s2 x)
-          (ensures count_occ t1 x = count_occ t2 x)
-  = count_occ_cons min t1 x;
-    count_occ_cons min t2 x
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 0"
+/// Helper: the head element has positive count (no is_sorted in scope).
+let head_has_positive_count (s: seq int)
+  : Lemma (requires Seq.length s > 0)
+          (ensures count_occ s (Seq.index s 0) > 0)
+  = count_occ_cons (Seq.index s 0) (Seq.tail s) (Seq.index s 0)
 #pop-options
 
 #restart-solver
-#push-options "--z3rlimit 120 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 0"
+/// Helper: if s1, s2 have the same head and are permutations, tails are permutations.
+/// Proved WITHOUT is_sorted in scope, which avoids quantifier blow-up.
+let perm_tails (s1 s2: seq int)
+  : Lemma (requires Seq.length s1 > 0 /\ Seq.length s2 > 0 /\
+                    Seq.index s1 0 = Seq.index s2 0 /\
+                    is_permutation s1 s2)
+          (ensures is_permutation (Seq.tail s1) (Seq.tail s2))
+  = let min = Seq.index s1 0 in
+    let t1 = Seq.tail s1 in
+    let t2 = Seq.tail s2 in
+    let aux (x: int) : Lemma (count_occ t1 x = count_occ t2 x)
+      = count_occ_cons min t1 x;
+        count_occ_cons min t2 x
+    in
+    Classical.forall_intro aux
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 1"
+/// Helper: heads of sorted permutations are equal.
+/// Uses head_has_positive_count to establish sorted_head_le preconditions
+/// while keeping fuel at 0 to prevent is_sorted quantifier explosion.
+let sorted_perm_heads_equal (s1 s2: seq int)
+  : Lemma (requires Seq.length s1 > 0 /\ is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
+          (ensures Seq.index s1 0 = Seq.index s2 0)
+  = head_has_positive_count s1;
+    sorted_head_le s2 (Seq.index s1 0);
+    head_has_positive_count s2;
+    sorted_head_le s1 (Seq.index s2 0)
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
+/// Helper: if heads are equal and tails are Seq.equal, the full seqs are Seq.equal.
+let equal_head_tail (s1 s2: seq int)
+  : Lemma (requires Seq.length s1 > 1 /\ Seq.length s2 > 1 /\
+                    Seq.index s1 0 = Seq.index s2 0 /\
+                    Seq.equal (Seq.tail s1) (Seq.tail s2))
+          (ensures Seq.equal s1 s2)
+  = Seq.lemma_eq_elim (Seq.tail s1) (Seq.tail s2);
+    Seq.cons_head_tail s1;
+    Seq.cons_head_tail s2
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 //SNIPPET_START: sorted_permutation_equal
 let rec sorted_permutation_equal (s1 s2: seq int)
   : Lemma (requires is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
@@ -75,23 +116,14 @@ let rec sorted_permutation_equal (s1 s2: seq int)
 //SNIPPET_END: sorted_permutation_equal
   = if Seq.length s1 = 0 then ()
     else begin
-      let min1 = Seq.index s1 0 in
-      let min2 = Seq.index s2 0 in
-      let t1 = Seq.tail s1 in
-      let t2 = Seq.tail s2 in
-      count_occ_cons min1 t1 min1;
-      count_occ_cons min2 t2 min2;
-      sorted_head_le s2 min1;
-      sorted_head_le s1 min2;
+      sorted_perm_heads_equal s1 s2;
       if Seq.length s1 = 1 then ()
       else begin
         sorted_tail s1;
         sorted_tail s2;
-        let aux (x: int) : Lemma (count_occ t1 x = count_occ t2 x)
-          = perm_tail_count min1 t1 t2 s1 s2 x
-        in
-        Classical.forall_intro aux;
-        sorted_permutation_equal t1 t2
+        perm_tails s1 s2;
+        sorted_permutation_equal (Seq.tail s1) (Seq.tail s2);
+        equal_head_tail s1 s2
       end
     end
 #pop-options
@@ -100,7 +132,7 @@ let rec sorted_permutation_equal (s1 s2: seq int)
 
 #restart-solver
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let partition_left_part_correct (s s': seq int) (k lo p hi: nat)
   : Lemma (requires lo <= k /\ k < p /\ p < hi /\ hi <= Seq.length s /\
                     is_permutation s s' /\
@@ -117,7 +149,7 @@ let partition_left_part_correct (s s': seq int) (k lo p hi: nat)
     ()
 #pop-options
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let partition_right_part_correct (s s': seq int) (k lo p hi: nat)
   : Lemma (requires lo <= p /\ p < k /\ k < hi /\ hi <= Seq.length s /\
                     is_permutation s s' /\
@@ -134,7 +166,7 @@ let partition_right_part_correct (s s': seq int) (k lo p hi: nat)
     ()
 #pop-options
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let partitioned_count_lt (s: seq int) (p: nat)
   : Lemma (requires p < Seq.length s /\
                     (forall (i: nat). i < p ==> Seq.index s i <= Seq.index s p) /\
@@ -166,7 +198,7 @@ let rec count_le_lt_monotone (s: seq int) (v w: int)
   = if Seq.length s = 0 then ()
     else count_le_lt_monotone (Seq.tail s) v w
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let partition_property_implies_kth (s: seq int) (k: nat) (v: int)
   : Lemma (requires k < Seq.length s /\
                     count_lt s v <= k /\
@@ -181,7 +213,7 @@ let partition_property_implies_kth (s: seq int) (k: nat) (v: int)
     else ()
 #pop-options
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let partition_pivot_is_kth (s s': seq int) (k lo p hi: nat)
   : Lemma (requires lo <= k /\ k == p /\ p < hi /\ hi <= Seq.length s /\
                     is_permutation s s' /\
@@ -196,7 +228,7 @@ let partition_pivot_is_kth (s s': seq int) (k lo p hi: nat)
     partition_property_implies_kth s k v
 #pop-options
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let pulse_correctness_hint (s0 s_final: seq int) (k: nat)
   : Lemma (requires k < Seq.length s0 /\
                     Seq.length s_final == Seq.length s0 /\
