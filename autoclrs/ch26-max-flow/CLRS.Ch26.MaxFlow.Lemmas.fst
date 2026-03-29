@@ -370,7 +370,7 @@ let rec lemma_augment_preserves_capacity (flow: Seq.seq int) (cap: Seq.seq int)
 (** ========== Helper: augment_aux preserves sums for vertices not on path ========== *)
 
 (** For vertices not on the path, augment_aux doesn't change their flow sums *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_augment_aux_preserves_vertex_sums
   (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
   (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -429,7 +429,7 @@ let lemma_zero_flow_value (n: nat{n > 0}) (source: nat{source < n})
     lemma_zero_sum_out n source n
 
 (** Lemma: Augmenting along path strictly increases flow value (P0.1.9) *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let lemma_augment_increases_value_aux (flow: Seq.seq int) (cap: Seq.seq int)
                                            (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
                                            (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -529,7 +529,7 @@ let lemma_zero_flow_valid (n: nat) (cap: Seq.seq int) (source: nat{source < n}) 
     For vertex w on the path (w ≠ head, w ≠ last), augmentation preserves
     inflow = outflow because the incoming and outgoing path edges contribute
     equal and opposite changes. *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec lemma_augment_aux_conservation
   (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
   (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -624,7 +624,7 @@ let rec lemma_augment_aux_conservation
 #pop-options
 
 (** P0.1.7 + P0.1.8: Augmentation preserves valid flow *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let augment_preserves_valid (#n: nat) (cap: capacity_matrix n) (flow: flow_matrix n)
                              (source: nat{source < n}) (sink: nat{sink < n})
                              (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -774,7 +774,7 @@ let lemma_augment_edge_commute
     when u does not appear in the remaining path (simple path property).
     v may appear in rest (as its head), but that's fine because
     edges in rest don't involve u, so {u,v} ≠ {a,b} for any edge (a,b) in rest. *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_augment_edge_commutes_with_aux
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
@@ -805,7 +805,7 @@ let rec lemma_augment_edge_commutes_with_aux
     augment_aux [u, v, ...rest] = ae(augment_aux [v, ...rest], u, v, delta)
     This follows from augment_edge at (u,v) commuting with augment_aux on rest,
     since u does not appear in rest (simple path). *)
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let lemma_augment_aux_first_last
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
@@ -841,7 +841,7 @@ let rec lemma_init_preserves_distinct_vertices (l: list nat{Cons? l})
 (** Process the last edge first: for a simple path,
     augment_aux flow path = augment_aux (ae flow last_edge) init_path.
     This is the key for connecting augment_imp (backward walk) to augment_aux. *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_augment_aux_last_first
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})

@@ -226,6 +226,7 @@ let elim_bfs_pred_ok (scolor spred sdist cap_seq flow_seq: Seq.seq int) (n sourc
   = reveal_opaque (`%bfs_pred_ok) (bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail)
 
 (** Discovery preserves bfs_pred_ok: when discovering vv from u *)
+#push-options "--split_queries always"
 let lemma_discover_preserves_bfs_pred_ok
   (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n source u vv vtail: nat)
@@ -315,6 +316,7 @@ let lemma_discover_preserves_bfs_pred_ok
     in
     Classical.forall_intro (Classical.move_requires aux2);
     mk_bfs_pred_ok sc' sp' sd' cap_seq flow_seq n source (vtail + 1)
+#pop-options
 
 (** No-discovery preserves bfs_pred_ok *)
 let lemma_nodiscover_preserves_bfs_pred_ok
@@ -1084,7 +1086,7 @@ let rec bottleneck_via_pred (spred cap_seq flow_seq: Seq.seq int)
       else int_max
 
 (** Bottleneck of (prefix ++ [x]) = min(bottleneck(prefix), edge_residual(last prefix, x)) *)
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_bottleneck_append
   (cap_seq flow_seq: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ n > 0})
@@ -1131,7 +1133,7 @@ let rec lemma_bottleneck_append
 
 (** Bottleneck via pred equals bottleneck on the path from preds.
     Requires pred_ok with sufficient fuel. *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_bottleneck_via_pred_eq (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
   (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
@@ -1170,7 +1172,7 @@ let rec lemma_bottleneck_via_pred_eq (scolor spred sdist cap_seq flow_seq: Seq.s
 #pop-options
 
 (** Each edge on path from preds has positive residual capacity *)
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let lemma_path_edges_positive (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
   (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
@@ -1189,7 +1191,7 @@ let lemma_path_edges_positive (scolor spred sdist cap_seq flow_seq: Seq.seq int)
 #pop-options
 
 (** Bottleneck via pred is positive when pred_ok holds and current ≠ source *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_bottleneck_via_pred_positive (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
   (source: nat{source < n}) (current: nat{current < n}) (fuel: nat)
@@ -1218,7 +1220,7 @@ let rec lemma_bottleneck_via_pred_positive (scolor spred sdist cap_seq flow_seq:
 #pop-options
 
 (** Fuel monotonicity: bottleneck_via_pred gives the same result with any sufficient fuel *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_bottleneck_fuel_mono (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0})
   (source: nat{source < n}) (current: nat{current < n}) (fuel1 fuel2: nat)
@@ -1262,7 +1264,7 @@ let rec lemma_bottleneck_via_pred_le_int_max (spred cap_seq flow_seq: Seq.seq in
 (** One step of the bottleneck loop: given the invariant holds for (vc, vbn),
     after computing new_vbn via the code's branching, the invariant holds for (u, new_vbn).
     This encapsulates all the case analysis + fuel mono + min associativity. *)
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let lemma_bottleneck_step
   (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0
@@ -1341,7 +1343,7 @@ let rec augment_via_pred (spred: Seq.seq int) (flow_seq cap_seq: Seq.seq int)
       else flow_seq
 
 (** Fuel monotonicity for augment_via_pred *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_augment_fuel_mono (scolor spred sdist cap_seq flow_seq flow_comp: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ 
           Seq.length flow_comp == n * n /\ Seq.length spred == n /\ n > 0})
@@ -1369,7 +1371,7 @@ let rec lemma_augment_fuel_mono (scolor spred sdist cap_seq flow_seq flow_comp: 
 
 (** One step of augment loop: AVP(fs, vc, n) == AVP(augment_edge(fs, ..., u, vc, bn), u, n)
     when u = pred[vc] and pred_ok holds. *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let lemma_augment_step
   (scolor spred sdist cap_seq flow_pred fs: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_pred == n * n /\
@@ -1427,7 +1429,7 @@ let rec lemma_init_append_singleton (l: list nat{Cons? l}) (x: nat)
 
 (** Augment via pred equals augment_aux on the path from preds.
     flow_pred is the original BFS flow (for pred_ok), flow_comp is the computation flow. *)
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_augment_via_pred_eq (scolor spred sdist cap_seq flow_pred: Seq.seq int)
   (flow_comp: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_pred == n * n /\
@@ -1505,7 +1507,7 @@ let rec lemma_augment_via_pred_eq (scolor spred sdist cap_seq flow_pred: Seq.seq
 (** Master augmentation lemma: chains all the pieces together.
     Given imp_valid_flow + BFS pred_ok + bottleneck + augment results,
     proves that the augmented flow is still imp_valid and flow value increased. *)
-#push-options "--z3rlimit 120 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let lemma_augment_chain
   (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n: nat{Seq.length cap_seq == n * n /\ Seq.length flow_seq == n * n /\ Seq.length spred == n /\ n > 0
@@ -1555,7 +1557,7 @@ let lemma_augment_chain
 
 (** Zero flow satisfies imp_valid_flow when capacities are valid.
     Used to establish the loop invariant after zero_init_flow. *)
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let lemma_zero_flow_imp_valid (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
   : Lemma
     (requires
@@ -1678,7 +1680,7 @@ let lemma_cap_sum_nonneg
     Key lemma: any path from a colored source to an uncolored sink must
     cross from colored to uncolored; at that edge, both forward and backward
     residual capacity are ≤ 0 (by bfs_complete), giving bottleneck ≤ 0. *)
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec lemma_bottleneck_crossing
   (scolor cap flow: Seq.seq int)
   (n: nat)
@@ -1725,7 +1727,7 @@ let rec lemma_bottleneck_crossing
 (** BFS completeness lemma — replaces axiom_bfs_complete.
     When BFS terminates with all residual neighbors of discovered vertices
     also discovered, and sink is undiscovered, no augmenting path exists. *)
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let lemma_bfs_complete
   (cap_seq flow_seq scolor: Seq.seq int)
   (n source sink: nat)
@@ -1751,7 +1753,7 @@ let lemma_bfs_complete
    BFS ON RESIDUAL GRAPH
    ================================================================ *)
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn bfs_init
   (color pred dist: A.array int)
   (n source: SZ.t)
@@ -1908,7 +1910,7 @@ let elim_discover_delta
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 300 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -1986,7 +1988,7 @@ let maybe_discover_else_proof
       cap_seq flow_seq n u vv source vtail vtail
 
 (** Try to discover vertex vv from u in the residual graph *)
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn maybe_discover
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2088,7 +2090,7 @@ fn maybe_discover
 #pop-options
 
 (** Explore all neighbors of vertex u in the residual graph *)
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
 fn bfs_explore_neighbors
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2240,7 +2242,7 @@ fn bfs_explore_neighbors
 #pop-options
 
 (** Main BFS: returns whether sink was reached *)
-#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1 --split_queries always"
 fn bfs_residual
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2403,7 +2405,7 @@ fn bfs_residual
 
 (** Find bottleneck: walk pred array from sink to source *)
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 fn find_bottleneck_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
@@ -2530,7 +2532,7 @@ fn find_bottleneck_imp
 
 (** Augment flow: walk pred array from sink to source, update flow *)
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 fn augment_imp
   (capacity flow pred: A.array int)
   (n source sink: SZ.t)
@@ -2656,7 +2658,7 @@ let valid_caps_intro (cap_seq: Seq.seq int) (n: nat)
   = ()
 
 (** Check valid_caps: all capacity entries are non-negative *)
-#push-options "--z3rlimit 50 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 fn check_valid_caps_fn
   (capacity: A.array int)
   (nn: SZ.t)
@@ -2703,7 +2705,7 @@ fn check_valid_caps_fn
    ================================================================ *)
 
 (** Compute sum_flow_out from an array: Σ_{j<n} arr[v*n + j] *)
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn compute_sum_out_fn
   (arr: A.array int)
   (n: SZ.t)
@@ -2746,7 +2748,7 @@ fn compute_sum_out_fn
 #pop-options
 
 (** Compute sum_flow_into from an array: Σ_{u<n} arr[u*n + v] *)
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn compute_sum_in_fn
   (arr: A.array int)
   (n: SZ.t)
@@ -2813,7 +2815,7 @@ fn compute_flow_value_fn
 #pop-options
 
 (** Initialize flow to zero *)
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn zero_init_flow
   (flow: A.array int)
   (nn: SZ.t)
@@ -2856,7 +2858,7 @@ fn zero_init_flow
     - Each augmentation where we continue increases flow_value by >= 1
     - Iteration counter iters is bounded by flow_value + 1
     - Measure: cap_sum + 1 - iters (non-negative, decreases by 1 each iteration) *)
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn max_flow
   (capacity: A.array int)
   (#cap_seq: Ghost.erased (Seq.seq int))

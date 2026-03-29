@@ -31,7 +31,7 @@ module L = FStar.List.Tot
    Pure helper lemmas for postcondition completeness
    ================================================================ *)
 
-#push-options "--z3rlimit 100 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2"
 
 (* Helper to instantiate the universally quantified no_augmenting_path
    with a specific concrete path. *)
@@ -113,7 +113,7 @@ let single_edge_mfmc (flow_seq cap_seq: Seq.seq int)
    Disconnected graph lemmas
    ================================================================ *)
 
-#push-options "--z3rlimit 100 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2"
 
 (* Completeness lemma for disconnected 2-vertex network.
    Network: n=2, s=0, t=1, all capacities=0.
@@ -153,7 +153,7 @@ let disconnected_flow_value (flow_seq cap_seq: Seq.seq int)
    Pulse test functions
    ================================================================ *)
 
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 10 --fuel 8 --ifuel 4"
 
 ```pulse
 (* Completeness test: 2-vertex single-edge network.
@@ -260,7 +260,7 @@ fn test_max_flow_completeness ()
    Pulse test: Disconnected graph (flow_value = 0)
    ================================================================ *)
 
-#push-options "--z3rlimit 200 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 10 --fuel 8 --ifuel 4"
 
 ```pulse
 (* Completeness test: 2-vertex disconnected network.

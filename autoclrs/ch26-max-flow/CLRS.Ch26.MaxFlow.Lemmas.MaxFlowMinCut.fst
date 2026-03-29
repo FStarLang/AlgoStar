@@ -78,7 +78,7 @@ let rec lemma_aggregation
       lemma_aggregation flow n s_set (k - 1)
 
 (** Conservation collapse: sum_excess_S(n) = flow_value *)
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 10"
 let rec lemma_conservation_collapse
   (flow cap: Seq.seq int) (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
   (source: nat{source < n}) (sink: nat{sink < n}) (s_set: nat -> bool) (k: nat)
@@ -158,7 +158,7 @@ let rec lemma_ss_inner_neg_col_diff
     else lemma_ss_inner_neg_col_diff flow n s_set a (w - 1)
 
 (** Decomposition: ss_outer(n,S) = ss_outer(n,S') + ss_inner(a,n,S') + col_diff(S',a,n) *)
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let rec lemma_ss_outer_decompose
   (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
   (s_set: nat -> bool) (a: nat{a < n /\ s_set a}) (k: nat)
@@ -186,7 +186,7 @@ let rec lemma_ss_outer_decompose
 #pop-options
 
 (** Main cancellation: ss_outer(n) = 0 by induction on |S| *)
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let rec lemma_ss_outer_zero
   (flow: Seq.seq int) (n: nat{Seq.length flow == n * n})
   (s_set: nat -> bool)
@@ -307,7 +307,7 @@ let reachable_in_Gf (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix
   exists (p: list nat). path_in_residual cap flow source v p
 
 (** Appending a traversable edge preserves traversability *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_append_edge_traversable
   (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (p: list nat) (v: nat{v < n})
@@ -439,7 +439,7 @@ let rec lemma_check_any_found (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: f
     else lemma_check_any_found cap flow source fuel v u0 (start + 1)
 
 (** check_any_predecessor is monotone in the predecessor reachability *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_check_any_mono (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (source: nat{source < n}) (fuel: nat{fuel > 0}) (v: nat{v < n /\ v <> source}) (u: nat)
   : Lemma
@@ -481,7 +481,7 @@ let lemma_step_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_m
 #pop-options
 
 (** Reachable ⟹ path in residual graph (for bottleneck contradiction) *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_check_any_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (source: nat{source < n}) (fuel: nat{fuel > 0})
   (v: nat{v < n /\ v <> source}) (u: nat)
@@ -520,7 +520,7 @@ let rec lemma_reachable_implies_path (#n: nat{n > 0}) (cap: capacity_matrix n) (
 #pop-options
 
 (** init preserves traversability *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_init_traversable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (p: list nat)
   : Lemma
@@ -553,7 +553,7 @@ let rec lemma_init_length (#a: Type) (p: list a{Cons? p})
   = match p with | [_] -> () | _ :: rest -> lemma_init_length rest
 
 (** Path with ≤ fuel+1 vertices implies is_reachable *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 200"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_path_implies_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (source: nat{source < n}) (v: nat{v < n}) (fuel: nat)
   (p: list nat)
@@ -651,7 +651,7 @@ let rec lemma_concat_traversable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow
 
 (** Cycle removal: given a path with repeated vertex at positions i < j,
     remove the cycle p[i+1..j] to get a shorter valid path *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let lemma_cycle_remove (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (source: nat{source < n}) (v: nat{v < n})
   (p: list nat) (i j: nat)
@@ -691,7 +691,7 @@ let lemma_cycle_remove (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_mat
     assert (L.length p' < L.length p)
 #pop-options
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_shorten_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (source: nat{source < n}) (v: nat{v < n})
   (p: list nat)
@@ -725,7 +725,7 @@ let rec lemma_shorten_path (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow
 #pop-options
 
 (** Fixed point: reachable_in_Gf ⟹ is_reachable source n *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let lemma_reachable_iff_bounded (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
   (source: nat{source < n}) (v: nat{v < n})
   : Lemma

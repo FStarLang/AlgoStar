@@ -118,7 +118,7 @@ let lemma_bfs_visited_source
   = assert (Seq.index (Seq.init n (fun (i: nat{i < n}) -> i = source)) source == true)
 
 (** BFS visited is monotone: once visited, always visited *)
-let rec lemma_bfs_visited_monotone
+let lemma_bfs_visited_monotone
   (cap flow: Seq.seq int) 
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
   (source: nat{source < n})
@@ -342,7 +342,7 @@ let lemma_path_vertices_valid
   = ()
 
 (** augment_edge on (p,q) doesn't change residual of (u,v) when u,v ∉ {p,q} and p ≠ q *)
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 10"
 let lemma_augment_edge_residual_unchanged
   (cap flow: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
@@ -363,7 +363,7 @@ let lemma_augment_edge_residual_unchanged
 #pop-options
 
 (** augment_edge on (p,q) doesn't change residual of (u,v) when v ∉ {p,q} and u ∈ {p,q} and p ≠ q *)
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 10"
 let lemma_augment_edge_residual_unchanged_partial
   (cap flow: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
@@ -388,7 +388,7 @@ let lemma_augment_edge_residual_unchanged_partial
 #pop-options
 
 (** augment_edge on (p,q) doesn't change residual of (u,v) when u ∉ {p,q} and v ∈ {p,q} and p ≠ q *)
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 10"
 let lemma_augment_edge_residual_unchanged_partial2
   (cap flow: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
@@ -414,7 +414,7 @@ let lemma_augment_edge_residual_unchanged_partial2
     Proof: augment_edge changes exactly one flow entry. In the forward case (flow(p,q) += delta)
     the only new edge possible is (q,p) via increased back-residual. In the backward case
     (flow(q,p) -= delta) the only new edge possible is (q,p) via increased forward-residual. *)
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 20"
 let lemma_augment_edge_creates_reversed
   (cap flow: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
@@ -466,7 +466,7 @@ let lemma_augment_edge_creates_reversed
     If u is not on the path, then flow(u,_) and flow(_,u) are unchanged (by
     lemma_augment_aux_get_not_on_path), so residual of (u,v) is unchanged.
     Similarly for v. *)
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let rec lemma_new_edge_from_path
   (cap flow: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
@@ -520,7 +520,7 @@ let rec consecutive_on_path (v u: nat) (path: list nat) : Tot prop (decreases pa
 
 (** Key: if augment_aux creates a new edge (u,v), then (v,u) are consecutive on the path.
     Proof by induction on path, using lemma_augment_edge_creates_reversed for the single edge. *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec lemma_new_edge_consecutive
   (cap flow: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
@@ -637,7 +637,7 @@ let lemma_shortest_path_member_distance
     then v is reachable within k steps in G_f.
     
     Requires the augmenting path to be a shortest augmenting path starting at source. *)
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let rec lemma_bfs_layer_nondecreasing
   (cap flow: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
@@ -808,7 +808,7 @@ let lemma_augment_edge_get_other_row_sym (flow cap: Seq.seq int)
       lemma_get_set_other flow n v u (get flow n v u - delta) b a
 
 (** Helper: augment_aux preserves flow at (a, b) when a ∉ path *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_augment_aux_get_not_on_path
   (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
   (path: list nat{Cons? path /\ (forall (w: nat). FStar.List.Tot.mem w path ==> w < n)})
@@ -868,7 +868,7 @@ let lemma_augment_unfold
   = ()
 
 (** Helper: transfer becomes_critical from augmented flow to original. *)
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
 let lemma_transfer_critical
   (#n: nat{n > 0})
   (cap: capacity_matrix n) (flow flow_1 flow': flow_matrix n)
@@ -899,7 +899,7 @@ let lemma_transfer_critical
       end
     end
 #pop-options
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec lemma_augmentation_creates_critical_edge
   (#n: nat{n > 0})
   (cap: capacity_matrix n)
@@ -1064,7 +1064,7 @@ let rec forward_criticality_count
 
 (** Forward criticality count is bounded: 2 * count + d_floor ≤ n + 1.
     Proof by induction with a two-state machine (alive/dead for forward residual). *)
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 let rec lemma_forward_critical_bound
   (#n: nat{n > 0})
   (cap: capacity_matrix n)
@@ -1168,7 +1168,7 @@ let rec backward_criticality_count
 
 (** Backward criticality count is bounded: 2 * count + d_floor ≤ n + 1.
     Symmetric to the forward proof. *)
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 let rec lemma_backward_critical_bound
   (#n: nat{n > 0})
   (cap: capacity_matrix n)
