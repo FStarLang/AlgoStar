@@ -27,6 +27,7 @@ open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
+module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module R = Pulse.Lib.Reference
@@ -111,8 +112,12 @@ ensures exists* s.
     Bridge.base_perm_implies_s_perm s0 s0;
     ()
   } else {
-  // Allocate temporary buffer b
-  let b = A.alloc (0 <: nat) len;
+  // Allocate temporary buffer via Vec, then obtain an array view
+  let v_buf = V.alloc (0 <: nat) len;
+  V.to_array_pts_to v_buf;
+  let b = V.vec_to_array v_buf;
+  rewrite (A.pts_to (V.vec_to_array v_buf) (Seq.create (SZ.v len) 0))
+       as (A.pts_to b (Seq.create (SZ.v len) (0 <: nat)));
 
   // Mutable digit counter
   let mut d: SZ.t = 0sz;
@@ -194,7 +199,9 @@ ensures exists* s.
   
   // Free temporary resources
   with sb_final. assert (A.pts_to b sb_final);
-  A.free b;
+  rewrite (A.pts_to b sb_final) as (A.pts_to (V.vec_to_array v_buf) sb_final);
+  V.to_vec_pts_to v_buf;
+  V.free v_buf;
   ()
   } // else len > 0
 }
