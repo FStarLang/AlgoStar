@@ -1,9 +1,9 @@
 PULSE_ROOT ?= ../../FStar/pulse
 KRML_HOME  ?= ../../FStar/karamel
+STAGE3     ?= 1
+export STAGE3
 include $(PULSE_ROOT)/mk/test.mk
-# Undo optimize_let_vc and fly_deps — they break modular arithmetic
-# reasoning in Queue.fst dequeue proof
-OTHERFLAGS := $(subst --ext optimize_let_vc,,$(subst --ext fly_deps,,$(OTHERFLAGS))) --ext optimize_let_vc=false --ext fly_deps=false --include ../common
+OTHERFLAGS += --include ../common
 
 # ── C extraction and test targets ──────────────────────────────────
 CHAPTER_ID        = ch10
@@ -21,6 +21,7 @@ EXTRACT_MODULES = \
   CLRS.Ch10.DLL.ImplTest
 
 # Step 1: extract each module to .krml (shell loop)
+# Also extract FStar.Pervasives.Native (provides the option type for KaRaMeL)
 extract-krml: __verify
 	@echo "  [EXTRACT-KRML] Ch10 modules"
 	@for mod in $(EXTRACT_MODULES); do \
@@ -33,9 +34,14 @@ extract-krml: __verify
 	    fi; \
 	  fi; \
 	done
+	@if [ ! -f $(OUTPUT_DIR)/FStar_Pervasives_Native.krml ]; then \
+	  printf "    %-50s" "FStar.Pervasives.Native"; \
+	  $(FSTAR) --codegen krml --extract_module FStar.Pervasives.Native --odir $(OUTPUT_DIR) FStar.Pervasives.Native.fst > /dev/null 2>&1 && echo "OK" || echo "FAIL"; \
+	fi
 
-KRML_INPUT_FILES  = $(OUTPUT_DIR)/CLRS_Ch10_*.krml \
-                    $(KRML_HOME)/krmllib/.extract/FStar_Pervasives_Native.krml
+# KaRaMeL input files (must be listed explicitly — wildcards don't work as prerequisites)
+KRML_INPUT_FILES  = $(patsubst %,$(OUTPUT_DIR)/%.krml, \
+                      $(subst .,_,$(EXTRACT_MODULES)) FStar_Pervasives_Native)
 KRML_BUNDLE_FLAGS = \
   -bundle "CLRS.Ch10.Stack.ImplTest=CLRS.Ch10.Stack.Impl,CLRS.Ch10.Stack.ImplTest" \
   -bundle "CLRS.Ch10.Queue.ImplTest=CLRS.Ch10.Queue.Impl,CLRS.Ch10.Queue.ImplTest" \
@@ -47,11 +53,15 @@ EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch10_Stack_ImplTest.c \
                     $(EXTRACT_DIR)/CLRS_Ch10_Queue_ImplTest.c \
                     $(EXTRACT_DIR)/CLRS_Ch10_SinglyLinkedList_ImplTest.c \
                     $(EXTRACT_DIR)/CLRS_Ch10_DLL_ImplTest.c
-EXTRA_LINK_LIBS   = $(KRML_HOME)/krmllib/dist/generic/libkrmllib.a
+EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
+                    $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
 
 include ../autoclrs.test.mk
 
-# Override: extraction depends on the shell-loop step
+# Override: all .krml and .c extraction comes from our shell-loop + KaRaMeL bundle,
+# not the test.mk individual extraction pattern rules
+$(KRML_INPUT_FILES): extract-krml ;
 $(firstword $(EXTRACT_C_FILES)): extract-krml
+$(EXTRACT_DIR)/%.c: extract-krml ;
 
 .PHONY: extract-krml

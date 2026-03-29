@@ -338,7 +338,6 @@ fn enqueue (#t:Type0) (q: queue t) (#contents: erased (list t)) (x: t)
 }
 
 // Dequeue an element from the head
-#push-options "--z3rlimit 40"
 fn dequeue (#t:Type0) (q: queue t) (#contents: erased (list t))
   requires queue_inv q contents
   requires pure (L.length (reveal contents) > 0)
@@ -359,9 +358,8 @@ fn dequeue (#t:Type0) (q: queue t) (#contents: erased (list t))
   
   // Prove elem is the first element of contents
   assert (pure (SZ.v head_v < reveal q.capacity));
-  // elem == Seq.index arr_seq (SZ.v head_val) from Vec read
-  // head_val == head_v from Box read
   // head_v < capacity, so head_v % capacity == head_v
+  Math.small_mod (SZ.v head_v) (reveal q.capacity);
   assert (pure (SZ.v head_v % reveal q.capacity == SZ.v head_v));
   // From invariant with i=0: arr_seq[(head_v + 0) % capacity] == contents[0]
   assert (pure (Seq.index arr_seq ((SZ.v head_v + 0) % reveal q.capacity) == L.index (reveal contents) 0));
@@ -415,4 +413,3 @@ fn dequeue (#t:Type0) (q: queue t) (#contents: erased (list t))
   
   elem
 }
-#pop-options

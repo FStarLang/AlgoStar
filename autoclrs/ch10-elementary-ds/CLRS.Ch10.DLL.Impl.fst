@@ -703,7 +703,7 @@ let rev_preserves_cons (#a:Type) (l:list a {Cons? l})
   = FStar.List.Tot.Properties.rev_length l
 
 // One-step unfolding of L.rev for SMT
-#push-options "--fuel 2 --ifuel 2"
+#push-options "--ifuel 2"
 let rev_cons (#a:Type) (x:a) (rest:list a)
   : Lemma (L.rev (x :: rest) == L.rev rest @ [x])
   [SMTPat (L.rev (x :: rest))]
@@ -711,7 +711,6 @@ let rev_cons (#a:Type) (x:a) (rest:list a)
 #pop-options
 
 // mem is preserved by rev
-#push-options "--fuel 2"
 let rec mem_rev (#a:eqtype) (x: a) (l: list a)
   : Lemma (L.mem x (L.rev l) == L.mem x l)
   = match l with
@@ -719,9 +718,7 @@ let rec mem_rev (#a:eqtype) (x: a) (l: list a)
     | hd :: tl ->
       mem_rev x tl;
       FStar.List.Tot.Properties.append_mem (L.rev tl) [hd] x
-#pop-options
 
-#push-options "--fuel 2"
 ghost
 fn rec dls_to_dls_rev
   (p: box node)
@@ -756,10 +753,8 @@ fn rec dls_to_dls_rev
     }
   }
 }
-#pop-options
 
 // --- dls_rev_to_dls: Convert dls_rev back to dls ---
-#push-options "--fuel 2"
 ghost
 fn rec dls_rev_to_dls
   (p: box node)
@@ -794,7 +789,6 @@ fn rec dls_rev_to_dls
     }
   }
 }
-#pop-options
 
 // --- LIST-INSERT-TAIL ---
 
@@ -1092,7 +1086,6 @@ fn rec search_dls_rev
   }
 }
 
-#push-options "--fuel 2"
 fn list_search_back (hd tl: dptr) (k: int)
   preserves dll hd tl 'l
   returns found: bool
@@ -1131,7 +1124,6 @@ fn list_search_back (hd tl: dptr) (k: int)
     }
   }
 }
-#pop-options
 
 // --- O(1) delete: see list_delete_node after list_delete ---
 
