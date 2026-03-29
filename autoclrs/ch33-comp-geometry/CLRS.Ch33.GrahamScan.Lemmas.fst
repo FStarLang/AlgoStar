@@ -131,7 +131,7 @@ let rec pop_while_spec_ge_1 (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat)
         else ()
       end else ()
 
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 0 --split_queries always"
 let scan_step_preserves_left_turns
   (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: SZ.t)
   : Lemma
@@ -148,10 +148,39 @@ let scan_step_preserves_left_turns
   pop_while_ensures_left_turn xs ys hull top (SZ.v p_idx);
   let top' = pop_while_spec xs ys hull top (SZ.v p_idx) in
   let hull' = Seq.upd hull top' p_idx in
-  // For i + 2 < top': hull'[i] == hull[i] for all positions < top',
-  // so all_left_turns_sz for the prefix follows from the original.
-  // For i + 2 == top' (when top' >= 2): pop_while_ensures_left_turn gives cp > 0.
-  assert (forall (i: nat). i < top' ==> Seq.index hull' i == Seq.index hull i);
-  assert (top' <= top);
-  ()
+  all_left_turns_sz_prefix xs ys hull top top';
+  // Establish hull' bounds so Z3 can verify Seq.index well-formedness
+  // under the ==> antecedent in aux's ensures clause.
+  assert (Seq.length hull' == Seq.length hull);
+  assert (top' + 1 <= Seq.length hull');
+  // Prove the quantifier in all_left_turns_sz pointwise.
+  // Key: the implication is INSIDE ensures (no requires clause), so ==>
+  // (a dependent arrow) protects the Seq.index bounds — avoiding the
+  // well-formedness issue that Classical.move_requires would cause.
+  let aux (i: nat) : Lemma
+    (ensures (i + 2 < top' + 1 ==>
+      (SZ.v (Seq.index hull' i) < Seq.length xs /\
+       SZ.v (Seq.index hull' (i + 1)) < Seq.length xs /\
+       SZ.v (Seq.index hull' (i + 2)) < Seq.length xs /\
+       cross_prod (Seq.index xs (SZ.v (Seq.index hull' i)))
+                  (Seq.index ys (SZ.v (Seq.index hull' i)))
+                  (Seq.index xs (SZ.v (Seq.index hull' (i + 1))))
+                  (Seq.index ys (SZ.v (Seq.index hull' (i + 1))))
+                  (Seq.index xs (SZ.v (Seq.index hull' (i + 2))))
+                  (Seq.index ys (SZ.v (Seq.index hull' (i + 2)))) > 0)))
+    = if i + 2 < top' + 1 then begin
+        if i + 2 < top' then begin
+          // Interior case: all three indices < top', so hull' agrees with hull
+          assert (Seq.index hull' i == Seq.index hull i);
+          assert (Seq.index hull' (i + 1) == Seq.index hull (i + 1));
+          assert (Seq.index hull' (i + 2) == Seq.index hull (i + 2))
+        end else begin
+          // Boundary case: i + 2 == top', i.e., i == top' - 2
+          assert (Seq.index hull' i == Seq.index hull (top' - 2));
+          assert (Seq.index hull' (i + 1) == Seq.index hull (top' - 1));
+          assert (Seq.index hull' (i + 2) == p_idx)
+        end
+      end else ()
+  in
+  FStar.Classical.forall_intro aux
 #pop-options

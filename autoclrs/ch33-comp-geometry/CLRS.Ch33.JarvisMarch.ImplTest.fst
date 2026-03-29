@@ -70,7 +70,7 @@ let find_next_from_2_lemma (sxs sys: Seq.seq int)
 
 (* jarvis_march_spec returns 3: all three triangle vertices are on the hull.
    p0=0 (leftmost), then 0→1→2→0 (back to start), so hull has 3 vertices. *)
-#push-options "--fuel 8 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 8 --ifuel 1 --z3rlimit 10"
 let jarvis_march_triangle_lemma (sxs sys: Seq.seq int)
   : Lemma (requires triangle_pre sxs sys)
           (ensures jarvis_march_spec sxs sys == 3)

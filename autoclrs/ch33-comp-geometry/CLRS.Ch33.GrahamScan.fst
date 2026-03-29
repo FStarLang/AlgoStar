@@ -334,7 +334,7 @@ let rec pop_while_spec_ge_1 (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat)
       end else ()
 
 // scan_step preserves the all_left_turns_sz invariant (CLRS Theorem 33.1).
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let scan_step_preserves_left_turns
   (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: SZ.t)
   : Lemma
