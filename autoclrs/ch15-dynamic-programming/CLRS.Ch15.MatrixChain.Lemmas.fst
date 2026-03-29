@@ -419,7 +419,7 @@ let rec lemma_mc_inner_i_fills_correctly
 ///   - entries for chain lengths < l-1 are preserved (by preserves_shorter)
 ///   - entries for chain length l-1 are filled correctly
 /// dp_correct_upto advances from (l-1) to l.
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 25 --ifuel 2"
 let lemma_mc_inner_i_correct
   (table: seq int) (dims: seq int) (n l: nat)
   : Lemma
@@ -620,7 +620,7 @@ let mc_cost_eq_optimal_split (p: seq int) (i j: nat)
     assert (mc_cost p i j == min_splits p i j (i + 1) first)
 
 /// Construct a parenthesization achieving mc_cost.
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let rec optimal_paren (p: seq int) (i: nat) (j: nat{i <= j /\ length p > j + 1})
   : Tot (t:paren i j{paren_cost p t == mc_cost p i j}) (decreases (j - i))
   = if i = j then PLeaf i
@@ -685,7 +685,7 @@ private let cube_mono (x y: int) (d: nat)
 
 /// The cost of the left-leaning parenthesization is bounded by (j - i) * D^3
 /// when all dimension entries in p are non-negative and bounded by D.
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let rec left_paren_cost_bound (p: seq int) (i: nat) (j: nat{j >= i}) (d: nat)
   : Lemma
     (requires

@@ -48,7 +48,7 @@ let mc_pre_satisfiable ()
   = assert_norm (SZ.v 3sz > 0 /\
                  SZ.fits (op_Multiply (SZ.v 3sz) (SZ.v 3sz)))
 
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10"
 
 fn test_matrix_chain ()
   requires emp

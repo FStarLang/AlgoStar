@@ -252,7 +252,7 @@ let cuts_upd_valid (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t)
     Classical.forall_intro_2 aux
 
 // Lemma: when dp_correct holds, cuts_achieve_optimal implies the postcondition property
-#push-options "--z3rlimit 200"
+#push-options "--z3rlimit 30"
 let cuts_optimal_from_dp (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t) (n: nat)
   : Lemma (requires dp_correct prices sr n /\ 
                      cuts_achieve_optimal prices sr sc n /\
@@ -373,7 +373,7 @@ let cuts_are_optimal_intro (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq 
 open Pulse.Lib.BoundedIntegers
 
 #pop-options
-#push-options "--z3rlimit 160 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 2 --split_queries always"
 
 //SNIPPET_START: extended_sig
 fn extended_rod_cutting

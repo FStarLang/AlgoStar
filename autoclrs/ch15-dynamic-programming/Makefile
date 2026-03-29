@@ -17,7 +17,7 @@ extract-krml: $(ALL_CHECKED_FILES)
 		echo "  Extracting $$mod"; \
 		rm -f $(OUTPUT_DIR)/out.krml; \
 		$(FSTAR) --codegen krml \
-			$$(echo $$mod | tr '.' '/').fst; \
+			$$mod.fst; \
 		krml=$$(echo $$mod | tr '.' '_').krml; \
 		if [ -f $(OUTPUT_DIR)/out.krml ]; then \
 			mv $(OUTPUT_DIR)/out.krml $(OUTPUT_DIR)/$$krml; \

@@ -179,7 +179,7 @@ let lemma_snoc_last (s: seq int) (v: int)
   = lemma_index_app2 s (create 1 v) (length s)
 
 /// build_lcs is a subsequence of x
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let rec build_lcs_subseq_x (x y: seq int) (i j: nat)
   : Lemma
     (requires i <= length x /\ j <= length y)
@@ -225,7 +225,7 @@ let rec build_lcs_subseq_x (x y: seq int) (i j: nat)
 #pop-options
 
 /// build_lcs is a subsequence of y
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 5"
 let rec build_lcs_subseq_y (x y: seq int) (i j: nat)
   : Lemma
     (requires i <= length x /\ j <= length y)

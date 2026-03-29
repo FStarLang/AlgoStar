@@ -86,7 +86,7 @@ let lcs_table_correct (x y: seq int) (tbl: seq int) (m n: nat) (i j: nat) : prop
 
 // Lemma: updating table[i*(n+1)+j] with lcs_length value preserves correctness
 // and advances to (i, j+1)
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let lcs_table_update_preserves (x y: seq int) (tbl: seq int) (m n i j: nat) (v: int)
   : Lemma 
     (requires 
