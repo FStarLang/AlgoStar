@@ -86,11 +86,9 @@ let weights_to_adj_matrix = CLRS.Ch23.Prim.Greedy.weights_to_adj_matrix
 
 /// Extract MST edges from the parent array:
 /// For each vertex v ≠ source, emit edge {parent[v], v, key[v]}
-val edges_from_parent_key
-  (parent_seq key_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
-  : Pure (list edge)
-    (requires Seq.length parent_seq == n /\ Seq.length key_seq == n /\ i <= n)
-    (ensures fun _ -> True)
+/// Extract MST edges from the parent array:
+/// For each vertex v ≠ source, emit edge {parent[v], v, key[v]}
+let edges_from_parent_key = CLRS.Ch23.Prim.Greedy.edges_from_parent_key
 
 /// Symmetric weight matrix (undirected graph)
 let symmetric_weights (weights_seq: Seq.seq SZ.t) (n: nat) : prop =

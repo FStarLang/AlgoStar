@@ -208,7 +208,6 @@ let compute_weight_idx = compute_weight_idx_u64
 
 (*** Re-exports from Greedy ***)
 
-let edges_from_parent_key = Greedy.edges_from_parent_key
 let mst_edges_so_far = Greedy.mst_edges_so_far
 let mst_edges_ext = Greedy.mst_edges_ext
 let mst_edges_none_in = Greedy.mst_edges_none_in
