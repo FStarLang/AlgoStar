@@ -1,4 +1,7 @@
 PULSE_ROOT ?= ../../FStar/pulse
+KRML_HOME  ?= ../../FStar/karamel
+STAGE3 ?= 1
+export STAGE3
 OTHERFLAGS += --include ../common
 include $(PULSE_ROOT)/mk/test.mk
 
@@ -16,6 +19,7 @@ EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch07_Quicksort_Impl.c \
                     $(EXTRACT_DIR)/CLRS_Ch07_Quicksort_ImplTest.c
 EXTRA_C_SOURCES   = CLRS_Ch07_Partition_Impl.c fstar_support.c \
                     $(KRML_HOME)/krmllib/dist/generic/prims.c
+CC_EXTRA_FLAGS    = -include fstar_support.h
 TEST_EXE_NAME     = quicksort_test.exe
 
 include ../autoclrs.test.mk

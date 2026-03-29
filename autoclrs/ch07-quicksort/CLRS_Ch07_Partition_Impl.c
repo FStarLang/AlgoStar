@@ -10,7 +10,7 @@
   krml generates for the caller (CLRS_Ch07_Quicksort_Impl.c).
 */
 
-#include "internal/CLRS_Ch07_Partition_Impl.h"
+#include "CLRS_Ch07_Partition_Impl.h"
 
 /* Lomuto partition: pivot = a[hi-1], rearrange a[lo..hi) so that
    elements <= pivot come before the pivot position, elements > pivot after.

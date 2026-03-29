@@ -87,8 +87,11 @@ $(__EXTRACT_PRIMARY): $(KRML_INPUT_FILES)
 	  $(KRML_EXTRA_INPUTS)
 
 # If KaRaMeL produces more than one .c, the extras depend on the primary.
+# The @: no-op recipe prevents make from falling through to test.mk's
+# implicit pattern rule for .c-from-.krml extraction.
 ifneq ($(word 2,$(EXTRACT_C_FILES)),)
 $(wordlist 2,$(words $(EXTRACT_C_FILES)),$(EXTRACT_C_FILES)): $(__EXTRACT_PRIMARY)
+	@:
 endif
 
 # ─── Step 2: Compile + Link ───────────────────────────────────────

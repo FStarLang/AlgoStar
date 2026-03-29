@@ -30,35 +30,36 @@ module Seq = FStar.Seq
 module SP = FStar.Seq.Properties
 module SS = CLRS.Common.SortSpec
 
-#push-options "--z3rlimit 400 --fuel 8 --ifuel 4"
-
-(* Pure helper: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
-   Uses explicit Prims operators so Z3 can reason about element ordering. *)
-let std_sort3 (s: Seq.seq int)
-  : Lemma
-    (requires (forall (i j:nat). Prims.op_LessThanOrEqual i j /\
-                                 Prims.op_LessThan j (Seq.length s) ==>
-                                 Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j)) /\
-              SP.permutation int (Seq.seq_of_list [3; 1; 2]) s)
-    (ensures Seq.index s 0 == 1 /\ Seq.index s 1 == 2 /\ Seq.index s 2 == 3)
-= SP.perm_len (Seq.seq_of_list [3; 1; 2]) s;
-  assert_norm (SP.count 1 (Seq.seq_of_list [3; 1; 2]) == 1);
-  assert_norm (SP.count 2 (Seq.seq_of_list [3; 1; 2]) == 1);
-  assert_norm (SP.count 3 (Seq.seq_of_list [3; 1; 2]) == 1);
-  assert_norm (SP.count 0 (Seq.seq_of_list [3; 1; 2]) == 0);
-  assert_norm (SP.count 4 (Seq.seq_of_list [3; 1; 2]) == 0)
-
-(* Completeness lemma: bridges BoundedIntegers typeclass operators in SS.sorted
-   to standard Prims operators for Z3 reasoning *)
+(* Completeness lemma: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
+   Bridges BoundedIntegers typeclass operators (used in SS.sorted) to Prims operators,
+   and uses Prims.op_Equality in assert_norm so the normalizer can reduce SP.count.
+   Uses pointwise sorted assertions instead of quantifier bridging for efficiency. *)
+#push-options "--fuel 8 --z3rlimit 20"
 let completeness_sort3 (s: Seq.seq int)
   : Lemma
     (requires SS.sorted s /\ SP.permutation int (Seq.seq_of_list [3; 1; 2]) s)
     (ensures Seq.index s 0 == 1 /\ Seq.index s 1 == 2 /\ Seq.index s 2 == 3)
-= assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
-  assert (forall (i j:nat). (i < j) == Prims.op_LessThan i j);
+= // Permutation preserves length
+  SP.perm_len (Seq.seq_of_list [3; 1; 2]) s;
+  // Bridge BoundedIntegers <= to Prims <= so Z3 can use sorted pointwise
   assert (forall (x y:int). (x <= y) == Prims.op_LessThanOrEqual x y);
-  assert (forall (x y:int). (x < y) == Prims.op_LessThan x y);
-  std_sort3 s
+  assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
+  assert (forall (i j:nat). (i < j) == Prims.op_LessThan i j);
+  // Instantiate sorted at specific index pairs (avoids expensive quantifier chaining)
+  assert (Prims.op_LessThanOrEqual (Seq.index s 0) (Seq.index s 1));
+  assert (Prims.op_LessThanOrEqual (Seq.index s 0) (Seq.index s 2));
+  assert (Prims.op_LessThanOrEqual (Seq.index s 1) (Seq.index s 2));
+  // Use Prims.op_Equality so the normalizer can reduce SP.count on concrete input
+  assert_norm (Prims.op_Equality #int (SP.count 1 (Seq.seq_of_list [3; 1; 2])) 1);
+  assert_norm (Prims.op_Equality #int (SP.count 2 (Seq.seq_of_list [3; 1; 2])) 1);
+  assert_norm (Prims.op_Equality #int (SP.count 3 (Seq.seq_of_list [3; 1; 2])) 1);
+  assert_norm (Prims.op_Equality #int (SP.count 0 (Seq.seq_of_list [3; 1; 2])) 0);
+  assert_norm (Prims.op_Equality #int (SP.count 4 (Seq.seq_of_list [3; 1; 2])) 0)
+#pop-options
+
+// Pulse test functions need modest fuel/rlimit for connecting array writes
+// to Seq.seq_of_list [3;1;2] when proving completeness_sort3 precondition.
+#push-options "--fuel 4 --z3rlimit 15"
 
 ```pulse
 (* Completeness: y = quicksort(x); assert(y == expected) *)

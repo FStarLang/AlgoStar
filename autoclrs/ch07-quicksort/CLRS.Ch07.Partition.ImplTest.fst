@@ -30,7 +30,9 @@ module Seq = FStar.Seq
 module SP = FStar.Seq.Properties
 module SS = CLRS.Common.SortSpec
 
-#push-options "--z3rlimit 400 --fuel 8 --ifuel 4"
+// Test file: concrete 3-element reasoning needs fuel for count/permutation unfolding.
+// split_queries helps Z3 handle count facts independently.
+#push-options "--fuel 4 --z3rlimit 20 --split_queries always"
 
 (* Lemma: for input [3; 1; 2], the partition postcondition determines
    that the three sub-sequences form a valid split of exactly these elements.
