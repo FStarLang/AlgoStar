@@ -81,7 +81,7 @@ let _ = assert_norm (CS.clrs_insert (CS.clrs_insert S.Leaf 3) 1 ==
 
 (*** Pulse test: exercise the CLRSImpl.fsti API on concrete inputs ***)
 
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 100"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 10"
 
 // Helper lemmas for normalizing CLRS spec on concrete inputs
 let clrs_search_3_1_2_for_2 ()

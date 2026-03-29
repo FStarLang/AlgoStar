@@ -82,7 +82,7 @@ let _ = assert_norm (S.search t5 3 == Some 3)
 
 (*** Pulse test: exercise the Impl.fsti API on concrete inputs ***)
 
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 100"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 10"
 
 // Helper: membership lemma chain establishes mem 4 (insert(insert(insert Leaf 3) 1) 2) = false
 // (Still needed for non-existing key tests where the postcondition gives

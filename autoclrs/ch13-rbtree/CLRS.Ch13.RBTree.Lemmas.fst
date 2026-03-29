@@ -21,7 +21,7 @@ open CLRS.Ch13.RBTree.Spec
 (*** Theorem 13.1: Height Bound ***)
 
 // Key lemma: node_count t >= pow2 (bh t) - 1
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 5"
 let rec min_nodes_for_bh (t: rbtree)
   : Lemma
     (requires same_bh t /\ no_red_red t)
@@ -35,7 +35,7 @@ let rec min_nodes_for_bh (t: rbtree)
       Math.Lemmas.pow2_plus 1 (bh l)
 #pop-options
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec bh_height_bound (t: rbtree)
   : Lemma
     (requires no_red_red t /\ same_bh t)
@@ -56,7 +56,7 @@ let rbtree_height_le_2bh (t: rbtree)
   = bh_height_bound t
 
 // pow2(log2_floor n) <= n
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 5"
 let rec pow2_log2_le (n: pos)
   : Lemma (ensures pow2 (log2_floor n) <= n)
     (decreases n)
@@ -68,7 +68,7 @@ let rec pow2_log2_le (n: pos)
 #pop-options
 
 // if n >= pow2 k then log2_floor n >= k
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 let rec log2_floor_ge (n: pos) (k: nat)
   : Lemma
     (requires n >= pow2 k)
@@ -118,14 +118,14 @@ let classify_balance_lemma (c: color) (l: rbtree) (v: int) (r: rbtree)
 (*** Insert Correctness ***)
 
 // balance preserves membership
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let balance_mem (c: color) (l: rbtree) (v: int) (r: rbtree) (k: int)
   : Lemma (ensures mem k (balance c l v r) <==> (k = v || mem k l || mem k r))
   = ()
 #pop-options
 
 // ins preserves membership and adds new key
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let rec ins_mem (t: rbtree) (k: int) (x: int)
   : Lemma
     (ensures mem x (ins t k) <==> (x = k || mem x t))
@@ -147,7 +147,7 @@ let insert_mem (t: rbtree) (k: int) (x: int)
   = ins_mem t k x
 
 // balance preserves all_lt / all_gt bounds
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let balance_all_lt (c: color) (l: rbtree) (v: int) (r: rbtree) (bound: int)
   : Lemma 
     (requires all_lt l bound /\ all_lt r bound /\ v < bound)
@@ -162,7 +162,7 @@ let balance_all_gt (c: color) (l: rbtree) (v: int) (r: rbtree) (bound: int)
 #pop-options
 
 // ins preserves all_lt / all_gt when new key satisfies bound
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let rec ins_all_lt (t: rbtree) (k: int) (bound: int)
   : Lemma
     (requires all_lt t bound /\ k < bound)
@@ -217,7 +217,7 @@ let rec all_gt_weaken (t: rbtree) (b1 b2: int)
 
 
 // ins preserves BST ordering
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let balance_is_bst (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires is_bst l /\ is_bst r /\ all_lt l v /\ all_gt r v)
@@ -264,7 +264,7 @@ let insert_preserves_bst (t: rbtree) (k: int)
 (*** Insert Preserves RB Properties ***)
 
 // balance preserves same_bh
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let balance_same_bh (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l = bh r)
@@ -273,7 +273,7 @@ let balance_same_bh (c: color) (l: rbtree) (v: int) (r: rbtree)
 #pop-options
 
 // balance preserves bh value  
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let balance_bh (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l = bh r)
@@ -281,7 +281,7 @@ let balance_bh (c: color) (l: rbtree) (v: int) (r: rbtree)
   = ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let balance_restores_no_red_red_left (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires c = Black /\ almost_no_red_red l /\ no_red_red r)
@@ -310,7 +310,7 @@ let balance_red_almost (l: rbtree) (v: int) (r: rbtree)
 #pop-options
 
 // ins maintains same_bh, preserves bh, and has almost_no_red_red
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let rec ins_properties (t: rbtree) (k: int)
   : Lemma
     (requires same_bh t /\ no_red_red t)
@@ -459,7 +459,7 @@ let rec bst_gt_not_mem (t: rbtree) (bound: int) (k: int)
 (*** Search Correctness ***)
 
 // BST search finds a member: search t k == Some k when mem k t
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec search_mem (t: rbtree) (k: int)
   : Lemma
     (requires is_bst t /\ mem k t)
@@ -479,7 +479,7 @@ let rec search_mem (t: rbtree) (k: int)
 #pop-options
 
 // BST search returns None for non-members (does not require is_bst)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec search_not_mem (t: rbtree) (k: int)
   : Lemma
     (requires ~(mem k t))
@@ -534,7 +534,7 @@ let rec predecessor_mem (t: rbtree) (k: int)
         predecessor_mem l k
 
 // Successor is the smallest key > k (in a BST)
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let rec successor_is_next (t: rbtree) (k: int) (x: int)
   : Lemma
     (requires is_bst t /\ mem x t = true /\ x > k)
@@ -572,7 +572,7 @@ let rec successor_is_next (t: rbtree) (k: int) (x: int)
 #pop-options
 
 // Predecessor is the largest key < k (in a BST)
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let rec predecessor_is_prev (t: rbtree) (k: int) (x: int)
   : Lemma
     (requires is_bst t /\ mem x t = true /\ x < k)
@@ -609,7 +609,7 @@ let rec predecessor_is_prev (t: rbtree) (k: int) (x: int)
 (*** Delete Correctness — Membership ***)
 
 // balL preserves membership
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let balL_mem (l: rbtree) (v: int) (r: rbtree) (x: int)
   : Lemma (ensures mem x (balL l v r) <==> (x = v || mem x l || mem x r))
   = match l, r with
@@ -620,7 +620,7 @@ let balL_mem (l: rbtree) (v: int) (r: rbtree) (x: int)
 #pop-options
 
 // balR preserves membership
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let balR_mem (l: rbtree) (v: int) (r: rbtree) (x: int)
   : Lemma (ensures mem x (balR l v r) <==> (x = v || mem x l || mem x r))
   = match l, r with
@@ -631,7 +631,7 @@ let balR_mem (l: rbtree) (v: int) (r: rbtree) (x: int)
 #pop-options
 
 // fuse preserves membership
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let rec fuse_mem (l r: rbtree) (x: int)
   : Lemma
     (ensures mem x (fuse l r) <==> (mem x l || mem x r))
@@ -653,7 +653,7 @@ let rec fuse_mem (l r: rbtree) (x: int)
 #pop-options
 
 // del preserves membership (removes exactly k)
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
 let rec del_mem (t: rbtree) (k: int) (x: int)
   : Lemma
     (requires is_bst t)
@@ -694,7 +694,7 @@ let delete_mem (t: rbtree) (k: int) (x: int)
 (*** Delete Correctness — BST Preservation ***)
 
 // balL preserves all_lt / all_gt
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let balL_all_lt (l: rbtree) (v: int) (r: rbtree) (bound: int)
   : Lemma
     (requires all_lt l bound /\ all_lt r bound /\ v < bound)
@@ -737,7 +737,7 @@ let balR_all_gt (l: rbtree) (v: int) (r: rbtree) (bound: int)
 #pop-options
 
 // balL preserves BST
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
 let balL_is_bst (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires is_bst l /\ is_bst r /\ all_lt l v /\ all_gt r v)
@@ -770,7 +770,7 @@ let balR_is_bst (l: rbtree) (v: int) (r: rbtree)
 #pop-options
 
 // fuse preserves all_lt
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let rec fuse_all_lt (l r: rbtree) (bound: int)
   : Lemma
     (requires all_lt l bound /\ all_lt r bound)
@@ -813,7 +813,7 @@ let rec fuse_all_gt (l r: rbtree) (bound: int)
 #pop-options
 
 // fuse preserves BST — uses explicit bounds (all_lt l sep, all_gt r sep)
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
 let rec fuse_is_bst (l r: rbtree) (sep: int)
   : Lemma
     (requires is_bst l /\ is_bst r /\ all_lt l sep /\ all_gt r sep)
@@ -859,7 +859,7 @@ let rec fuse_is_bst (l r: rbtree) (sep: int)
 #pop-options
 
 // del preserves all_lt / all_gt
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let rec del_all_lt (t: rbtree) (k: int) (bound: int)
   : Lemma
     (requires is_bst t /\ all_lt t bound)
@@ -904,7 +904,7 @@ let rec del_all_gt (t: rbtree) (k: int) (bound: int)
 #pop-options
 
 // del preserves BST
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let rec del_preserves_bst (t: rbtree) (k: int)
   : Lemma
     (requires is_bst t)
@@ -948,7 +948,7 @@ let delete_preserves_bst (t: rbtree) (k: int)
 // ====== Properties of balL (with weak left precondition) ======
 // balL is called with del's output (which may only have almost_no_red_red)
 
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
 let balL_props (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l + 1 = bh r /\
@@ -972,7 +972,7 @@ let balL_props (l: rbtree) (v: int) (r: rbtree)
 
 // Stronger: when r is Black or Leaf (sibling of a Red parent's child),
 // balL always produces no_red_red (not just almost_no_red_red)
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
 let balL_strong (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l + 1 = bh r /\
@@ -992,7 +992,7 @@ let balL_strong (l: rbtree) (v: int) (r: rbtree)
 
 // ====== Properties of balR (symmetric) ======
 
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
 let balR_props (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l = bh r + 1 /\
@@ -1013,7 +1013,7 @@ let balR_props (l: rbtree) (v: int) (r: rbtree)
     | _ -> ()
 #pop-options
 
-#push-options "--fuel 5 --ifuel 3 --z3rlimit 30"
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
 let balR_strong (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l = bh r + 1 /\
@@ -1033,7 +1033,7 @@ let balR_strong (l: rbtree) (v: int) (r: rbtree)
 
 // ====== Properties of fuse ======
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let rec fuse_props (l r: rbtree)
   : Lemma
     (requires same_bh l /\ same_bh r /\ bh l = bh r /\ no_red_red l /\ no_red_red r)
@@ -1069,7 +1069,7 @@ let rec fuse_props (l r: rbtree)
 // del on a Red Node: bh unchanged, no_red_red (stronger, since children Black)
 // del on Leaf: identity
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let rec del_props (t: rbtree) (k: int)
   : Lemma
     (requires same_bh t /\ no_red_red t)
@@ -1117,7 +1117,7 @@ let rec del_props (t: rbtree) (k: int)
 #pop-options
 
 // delete maintains all RB properties
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let delete_is_rbtree (t: rbtree) (k: int)
   : Lemma
     (requires is_rbtree t /\ is_bst t)
@@ -1129,14 +1129,14 @@ let delete_is_rbtree (t: rbtree) (k: int)
 (*** Insert Preserves Node Count ***)
 
 // balance preserves node count
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 5"
 let balance_node_count (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma (ensures node_count (balance c l v r) = 1 + node_count l + node_count r)
   = ()
 #pop-options
 
 // ins increases node count by 0 (if key exists) or 1 (if key is new)
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let rec ins_node_count (t: rbtree) (k: int)
   : Lemma
     (requires is_bst t)
@@ -1167,7 +1167,7 @@ let insert_node_count (t: rbtree) (k: int)
 
 // balance on a tree with no red-red violations is a no-op:
 // none of the four rotation cases can match.
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 10"
 let balance_no_red_red_id (c: color) (l: rbtree) (v: int) (r: rbtree)
   : Lemma
     (requires no_red_red l /\ no_red_red r /\
@@ -1180,7 +1180,7 @@ let balance_no_red_red_id (c: color) (l: rbtree) (v: int) (r: rbtree)
 // When mem k t and is_bst t, ins recurses to the node where k = v and
 // returns it unchanged. balance gets the original subtrees and falls
 // through to the identity case.
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 10"
 let rec ins_duplicate (t: rbtree) (k: int)
   : Lemma
     (requires is_bst t /\ no_red_red t /\ mem k t)

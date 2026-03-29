@@ -237,7 +237,7 @@ let delete_big_o (t: rbtree) (k: int)
 // Example: A tree with 15 nodes (complete binary tree) has height ≤ 7
 // log2_floor(16) = 4, so 2*4 = 8, and our bound holds.
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let log2_floor_16 ()
   : Lemma (log2_floor 16 = 4)
   = assert_norm (log2_floor 16 = 4)
@@ -259,7 +259,7 @@ let example_bound_15_nodes (t: rbtree) (k: int)
 // Example: A tree with 1023 nodes has height ≤ 20
 // log2_floor(1024) = 10, so 2*10 = 20.
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 let log2_floor_1024 ()
   : Lemma (log2_floor 1024 = 10)
   = assert_norm (log2_floor 1024 = 10)

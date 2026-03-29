@@ -90,7 +90,7 @@ let rec minimum_ticks_bounded (t: rbtree{Node? t})
 // Since minimum(t) is the leftmost key (BST property), clrs_del always
 // goes left, and at the minimum node l=Leaf so no further recursion.
 // Cost: at most height(t) + 1
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec clrs_del_minimum_bounded (t: rbtree)
   : Lemma (requires is_bst t /\ Node? t)
           (ensures clrs_del_ticks t (minimum t) <= height t + 1)
@@ -114,7 +114,7 @@ let rec clrs_del_minimum_bounded (t: rbtree)
 // clrs_del_ticks bounded by 2 * height + 1
 // Proof: path traversal costs at most height(t), and the two-child
 // case adds minimum_ticks + clrs_del of successor, both bounded by height.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec clrs_del_ticks_bounded (t: rbtree) (k: int)
   : Lemma (requires is_bst t)
           (ensures clrs_del_ticks t k <= 2 * height t + 1)

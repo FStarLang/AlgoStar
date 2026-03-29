@@ -268,7 +268,7 @@ fn rec rb_search (tree: rb_ptr) (k: int)
 // TREE-MINIMUM (§12.2)
 // ============================================================
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 fn rec rb_minimum (tree: rb_ptr) (bp: rb_node_ptr)
   preserves rbtree_subtree tree 'ft 'parent
   requires pure (tree == Some bp)
