@@ -42,8 +42,8 @@ let test_well_formed () : Lemma (well_formed_adj test_adj 3) =
 let test_connected () : Lemma (all_connected 3 (adj_to_edges test_adj 3)) =
   test_well_formed ();
   adj_to_graph_edges test_adj 3;
-  let g = adj_to_graph test_adj 3 in
-  let es = g.edges in
+  let unfold g = adj_to_graph test_adj 3 in
+  let unfold es = g.edges in
   // Establish has_edge for concrete edges
   assert_norm (Seq.index (Seq.index test_adj 0) 1 = 1);
   assert_norm (1 <> infinity);
@@ -204,8 +204,8 @@ let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
              SZ.v (Seq.index ks 1) < SZ.v CLRS.Ch23.Prim.Defs.infinity /\
              SZ.v (Seq.index ks 2) < SZ.v CLRS.Ch23.Prim.Defs.infinity)
   = efpk_3 ps ks;
-    let adj = weights_to_adj_matrix ws 3 in
-    let g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
+    let unfold adj = weights_to_adj_matrix ws 3 in
+    let unfold g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
     let e1 : edge = {u=SZ.v (Seq.index ps 1); v=1; w=SZ.v (Seq.index ks 1)} in
     let e2 : edge = {u=SZ.v (Seq.index ps 2); v=2; w=SZ.v (Seq.index ks 2)} in
     edge_eq_reflexive e1; edge_eq_reflexive e2;
@@ -235,8 +235,8 @@ let witness_spanning_tree ()
      let g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
      let t : list edge = [{u=0;v=1;w=1}; {u=1;v=2;w=2}] in
      is_spanning_tree g t /\ total_weight t == 3)
-  = let adj = weights_to_adj_matrix tw 3 in
-    let g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
+  = let unfold adj = weights_to_adj_matrix tw 3 in
+    let unfold g = CLRS.Ch23.Prim.Spec.adj_to_graph adj 3 in
     let e01 : edge = {u=0; v=1; w=1} in
     let e12 : edge = {u=1; v=2; w=2} in
     let t : list edge = [e01; e12] in
