@@ -39,7 +39,7 @@ module Seq = FStar.Seq
 // Helper: copy range between arrays
 // ================================================================
 
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 
 fn copy_range
   (src dst: array int)
@@ -236,7 +236,7 @@ fn merge
 // Recursive Merge Sort
 // ================================================================
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 
 fn rec merge_sort_aux
   (a: array int)

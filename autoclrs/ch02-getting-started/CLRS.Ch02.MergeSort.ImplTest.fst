@@ -35,7 +35,7 @@ module Seq = FStar.Seq
 module SP = FStar.Seq.Properties
 module SS = CLRS.Common.SortSpec
 
-#push-options "--z3rlimit 400 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 200 --fuel 6 --ifuel 2"
 
 (* Pure helper: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
    Uses explicit Prims operators so Z3 can reason about element ordering. *)

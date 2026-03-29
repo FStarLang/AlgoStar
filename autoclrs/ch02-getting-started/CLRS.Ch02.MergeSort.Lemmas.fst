@@ -36,7 +36,7 @@ let rec seq_merge_length (s1 s2: Seq.seq int)
 // Merge preserves count (=> permutation of append)
 // ================================================================
 
-#push-options "--z3rlimit 50 --fuel 3 --ifuel 2"
+#push-options "--z3rlimit 2 --fuel 1 --ifuel 1"
 
 let count_empty (x: int) (s: Seq.seq int)
   : Lemma (requires Seq.length s = 0)
@@ -82,7 +82,7 @@ let seq_merge_permutation (s1 s2: Seq.seq int)
 // Merge preserves sortedness
 // ================================================================
 
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 2 --fuel 2 --ifuel 1"
 
 let rec seq_merge_all_ge (v: int) (s1 s2: Seq.seq int)
   : Lemma (requires all_ge v s1 /\ all_ge v s2)
@@ -134,7 +134,7 @@ let rec seq_merge_sorted (s1 s2: Seq.seq int)
 // Key lemma: relating seq_merge to head and suffix
 // ================================================================
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 2 --fuel 2 --ifuel 1"
 
 let seq_merge_head_right (s1 s2: Seq.seq int)
   : Lemma (requires Seq.length s1 = 0 /\ Seq.length s2 > 0)

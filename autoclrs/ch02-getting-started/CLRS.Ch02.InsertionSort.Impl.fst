@@ -29,7 +29,7 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 
 //SNIPPET_START: insertion_sort_sig
 fn insertion_sort

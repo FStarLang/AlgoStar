@@ -153,7 +153,7 @@ let arithmetic_step (n: pos{n > 1}) (m: pos) (log_m: nat)
     
     ()
 
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 
 let rec merge_sort_n_log_n_bound (n: pos)
   : Lemma (ensures merge_sort_ops n <= 4 * n * log2_ceil n + 4 * n)
@@ -221,7 +221,7 @@ let merge_sort_is_n_log_n (n: pos)
 
 /// ========== Monotonicity and Split ==========
 
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
 
 /// merge_sort_ops is monotone: larger inputs have larger costs
 let rec merge_sort_ops_monotone (m n: pos)
