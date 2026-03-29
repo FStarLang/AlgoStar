@@ -1,7 +1,7 @@
-# Kruskal's Algorithm — Spec Validation Test
+# Kruskal's Algorithm — Verified Test
 
 **File**: `CLRS.Ch23.Kruskal.ImplTest.fst`
-**Status**: ✅ Verified (no admits, no assumes)
+**Status**: ✅ Verified — zero admits, zero assumes, output uniqueness proved
 
 ## Test Instance
 
@@ -14,127 +14,58 @@
 Adjacency matrix (flat 3×3): `[0, 1, 3, 1, 0, 2, 3, 2, 0]`
 Expected MST: edges `{(0,1) w=1, (1,2) w=2}`, total weight = 3
 
-## What Was Proven
+## What Is Proven
 
-### ✅ Precondition Satisfiability
+### ✅ Postcondition: `result_is_forest_adj` + `kruskal_mst_result`
 
-The test constructs a valid input and calls `kruskal`, proving all
-preconditions are satisfiable:
-
-| Precondition | Concrete Value | Status |
-|--------------|---------------|--------|
-| `SZ.v n > 0` | 3 > 0 | ✅ Automatic |
-| `Seq.length sadj == n * n` | 9 == 9 | ✅ From array writes |
-| `Seq.length sedge_u == n` | 3 == 3 | ✅ From V.alloc |
-| `Seq.length sedge_v == n` | 3 == 3 | ✅ From V.alloc |
-| `SZ.fits (n * n)` | `SZ.fits 9` | ✅ Via `fits_at_least_16` (9 < 2¹⁶) |
-
-### ✅ Partial Postcondition Verification (via elim lemmas)
-
-We use `result_is_forest_adj_elim` and `result_is_forest_adj_forest_elim`
-to expose concrete facts from the opaque postcondition:
-
-| Property | Status | How |
-|----------|:------:|-----|
+| Property | Status | Source |
+|----------|:------:|--------|
 | Edge count ≤ n-1 = 2 | ✅ | `result_is_forest_adj_elim` |
 | Output array lengths correct | ✅ | `result_is_forest_adj_elim` |
 | All endpoints valid (< n) | ✅ | `result_is_forest_adj_elim` |
 | Edges from positive adj entries | ✅ | `result_is_forest_adj_elim` |
 | Result is a forest (acyclic) | ✅ | `result_is_forest_adj_forest_elim` |
-| Edge count = 2 exactly | ❌ | Forest, not spanning tree |
-| Specific edge endpoints | ❌ | Multiple valid forests exist |
-| Result is spanning tree | ❌ | Not in postcondition |
-| Result is MST | ❌ | Not in postcondition |
+| **Result is MST** | ✅ | `kruskal_mst_result` → `is_mst` |
 
-## Spec Improvements Made
+### ✅ Concrete MST Uniqueness
 
-### Added: `result_is_forest_adj_elim` (Impl.fsti)
+From `is_mst` + concrete graph structure, the MST edges are uniquely determined:
 
-```fstar
-val result_is_forest_adj_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma
-    (requires result_is_forest_adj sadj seu sev n ec)
-    (ensures
-      ec <= n - 1 /\
-      Seq.length seu == n /\ Seq.length sev == n /\
-      Seq.length sadj == n * n /\ n > 0 /\
-      (forall (k:nat). k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index seu k < n /\
-        Seq.index sev k >= 0 /\ Seq.index sev k < n /\
-        Seq.index sadj (Seq.index seu k * n + Seq.index sev k) > 0))
-```
+| Property | Status | How |
+|----------|:------:|-----|
+| MST contains edge (0,1) w=1 | ✅ | `kruskal_mst_edges` |
+| MST contains edge (1,2) w=2 | ✅ | `kruskal_mst_edges` |
+| Total weight == 3 | ✅ | `kruskal_mst_edges` |
 
-This lemma exposes array-level facts from the previously completely opaque
-`result_is_forest_adj` postcondition.
+**Proof chain**: `is_mst` → `kruskal_witness_spanning_tree` (witness with weight 3
+bounds total) → case analysis on graph edges (weight-3 edge eliminated by bound,
+duplicate-(0,1) case eliminated by `both_01_not_connected` + `no_path_to_2`) →
+only option is `{(0,1,1), (1,2,2)}`.
 
-### Added: `result_is_forest_adj_forest_elim` (Impl.fsti)
+Unlike Prim (per-vertex key/parent arrays), Kruskal stores edges in discovery
+order with arbitrary endpoint direction. So we prove **edge set membership**
+(`mem_edge`, direction-insensitive) rather than specific array indices.
 
-```fstar
-val result_is_forest_adj_forest_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
-  : Lemma
-    (requires result_is_forest_adj sadj seu sev n ec)
-    (ensures
-      ec <= n - 1 /\ n > 0 /\
-      Seq.length seu == n /\ Seq.length sev == n /\
-      (forall (k:nat). k < ec ==>
-        Seq.index seu k >= 0 /\ Seq.index sev k >= 0) /\
-      KSpec.is_forest (edges_from_arrays seu sev ec 0) n)
-```
+### ✅ Runtime Check (survives C extraction)
 
-This lemma exposes the **structural forest property**: the selected edges
-form an acyclic subgraph. This is the key structural invariant maintained
-by Kruskal's algorithm. Previously, external consumers could only see
-array-level facts; now they can access the graph-theoretic `is_forest`
-predicate directly.
+The function returns `bool` with `ensures pure (r == true)`:
+- `sz_eq` comparisons check `ec=2` and edges `{(0,1),(1,2)}` in any order/direction
+- The proof guarantees the runtime check always passes
+- Extracted C code contains the actual comparisons (not erased)
 
-## MST Proof Infrastructure
+## Proof Architecture
 
-All MST proof infrastructure is **fully verified with zero admits**:
+| Module | Role | Admits |
+|--------|------|--------|
+| `ImplTestHelper.fst` | MST proof + uniqueness lemmas | **0** |
+| `ImplTest.fst` | Pulse test function | **0** |
+| `Impl.fst` | Imperative Kruskal + MST elim | **0** |
+| `Spec.fst` | Pure Kruskal + correctness | **0** |
 
-**Core Safety:**
-- `greedy_safety_step`: Adding min-weight cross-component edge preserves safety ✅
-- `edges_safe`: Clean safety predicate (edges ⊆ some MST) ✅
-- `adj_weight`: Safe adj matrix indexing (bundles NL arithmetic) ✅
+## Key Helper Lemmas (ImplTestHelper)
 
-**Transfer Lemmas:**
-- `noRepeats_transfer`: w=1 noRepeats → weighted noRepeats ✅
-- `acyclic_transfer`: w=1 acyclic → weighted acyclic ✅
-- `reachable_weighted_to_unweighted` + `reachable_unweighted_to_weighted` ✅
-
-**UF Completeness (zero admits):**
-- `uf_complete_init`, `uf_complete_union`, `uf_complete_eq`, `uf_complete_unreachable` ✅
-- Full equivalence: `find(u) = find(v) ⟺ reachable(forest, u, v)` ✅
-
-**Bridging:**
-- `pure_kruskal_is_mst`: Pure spec produces MST for connected graphs ✅
-- `scan_min_inv`: Minimum-weight cross-component edge tracking ✅
-- `adj_graph_edge_weight`, `adj_graph_edge_ge_scanmin` ✅
-
-**Remaining for Pulse postcondition upgrade to `is_mst`:**
-- Integrate `greedy_safety_step` + `uf_complete` into Pulse outer loop invariant
-- Track `ec == round` for connected graphs (needs cross-component edge existence)
-- Surface MST property to `kruskal` postcondition
-
-## Conclusion
-
-**Verdict**: ✅ **Precise** (with 1 admitted step lemma in loop invariant maintenance)
-
-| Property | Status |
-|----------|:------:|
-| Precondition satisfiable | ✅ |
-| Edge count ≤ n-1 | ✅ |
-| All endpoints valid (< n) | ✅ |
-| Edges from positive adj entries | ✅ |
-| Result is a forest (acyclic) | ✅ |
-| **MST (pure spec)** | ✅ `test_mst()` → `pure_kruskal_is_mst` |
-| **MST (imperative kruskal)** | ✅ `kruskal_mst_result` in postcondition |
-| Zero admits | ✅ |
-
-The `fn kruskal` postcondition now includes `kruskal_mst_result`, proving
-that for connected symmetric graphs, the imperative output is safe (⊆ some MST).
-The test calls `kruskal` and proves forest properties
-from the postcondition. Additionally, `ImplTestHelper.test_mst()` proves
-that `pure_kruskal` produces an MST for the concrete test graph (via
-`pure_kruskal_is_mst` + `symmetric_adj` + `no_self_loops_adj` + `all_connected`).
-This demonstrates that the spec suite can determine the MST for any
-connected graph — the **Precise** level.
+- **`kruskal_witness_spanning_tree`**: `[{0,1,1}; {1,2,2}]` is a spanning tree
+  with weight 3 (acyclicity via `acyclic_when_unreachable`)
+- **`no_path_to_2`**: recursive — edges connecting only {0,1} can't reach vertex 2
+- **`both_01_not_connected`**: two copies of edge (0,1) violate `all_connected`
+- **`kruskal_mst_edges`**: from `is_mst` + witness, derives unique MST edges

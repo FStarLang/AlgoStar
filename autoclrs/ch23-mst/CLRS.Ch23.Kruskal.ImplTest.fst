@@ -1,9 +1,8 @@
 (*
-   CLRS Chapter 23: Kruskal's Algorithm — Spec Validation Test
+   CLRS Chapter 23: Kruskal's Algorithm — Verified Test
 
-   Validates the Impl.fsti API for CLRS §23.2 Kruskal's MST algorithm
-   by calling it on a small concrete instance and checking what the
-   postcondition can prove about the output.
+   Calls the imperative `fn kruskal` on a concrete 3-vertex triangle graph
+   and proves the output is the unique MST: 0 --1-- 1 --2-- 2.
 
    Test instance:
      3-vertex triangle graph:
@@ -13,19 +12,16 @@
      Adjacency matrix (flat 3×3): [0,1,3, 1,0,2, 3,2,0]
      Expected MST: edges {(0,1) w=1, (1,2) w=2}, total weight = 3
 
-   Result: The postcondition `result_is_forest_adj` is declared as an
-   opaque `val` in the .fsti. However, we added an elim lemma
-   `result_is_forest_adj_elim` that exposes concrete facts:
-     ✓ Precondition is satisfiable
-     ✓ Edge count bounded by n-1 (ec <= 2 for n=3)
-     ✓ All selected endpoints are valid vertices (< n)
-     ✓ Each selected edge has a positive adjacency matrix entry
-     ✗ Cannot verify exact edge count (could be 0, 1, or 2)
-     ✗ Cannot verify specific edge endpoints
-     ✗ Cannot verify spanning tree or MST property
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        ✓ result_is_forest_adj: forest + valid endpoints + positive weights
+        ✓ kruskal_mst_result → is_mst: output IS a minimum spanning tree
+        ✓ kruskal_mst_edges: MST edges are exactly {(0,1,1), (1,2,2)}
+        ✓ ensures (r == true): proof guarantees the runtime check passes
 
-   Attribution: Pattern inspired by
-   https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst
+     2. RUNTIME (computational, survives extraction to C):
+        ✓ sz_eq comparisons check ec=2, edges={(0,1),(1,2)} in any order/direction
+        ✓ Returns bool — caller can verify at runtime
 
    NO admits. NO assumes.
 *)
@@ -54,31 +50,6 @@ let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
 (* ---------- Test ---------- *)
 
 #push-options "--z3rlimit 100 --fuel 2 --ifuel 2"
-
-(*
-   Satisfiability & completeness test for Kruskal's algorithm.
-
-   This test constructs a concrete 3-vertex triangle graph and calls
-   the verified kruskal function. It demonstrates that:
-
-   1. The PRECONDITION IS SATISFIABLE: we can construct a valid input
-      that meets all requirements (n > 0, adj sized n×n, output arrays
-      sized n, SZ.fits(n*n)).
-
-   2. The POSTCONDITION IS OPAQUE: result_is_forest_adj is declared as
-      `val result_is_forest_adj (sadj: Seq.seq int) (seu sev: Seq.seq int)
-       (n ec: nat) : prop`
-      in CLRS.Ch23.Kruskal.Impl.fsti, making it completely opaque to
-      external consumers. We cannot unfold it to learn:
-      - How many edges were selected (ec value)
-      - Which specific edges were selected
-      - That the result is a spanning tree
-      - That the result is an MST
-
-   FINDING: The Kruskal API's postcondition is too opaque for spec
-   validation. A consumer calling kruskal gets a proof of an opaque
-   prop but cannot extract any useful information from it.
-*)
 
 ```pulse
 fn test_kruskal_satisfiability ()
@@ -133,19 +104,7 @@ fn test_kruskal_satisfiability ()
   // --- Call kruskal ---
   kruskal adj edge_u edge_v ec_ref 3sz;
 
-  // --- Postcondition analysis ---
-  // We now have (existentially quantified):
-  //   result_is_forest_adj sadj sedge_u' sedge_v' 3 (SZ.v vec)
-  //
-  // Using the elim lemma result_is_forest_adj_elim, we CAN extract:
-  //   - ec <= n - 1 = 2 (edge count bound)
-  //   - All selected edge endpoints are valid (< n = 3)
-  //   - Each selected edge has a positive adjacency matrix entry
-  //
-  // We still CANNOT determine:
-  //   - The exact value of ec (could be 0, 1, or 2)
-  //   - Which specific edges were selected
-  //   - Whether the result is a spanning tree or MST
+  // --- Postcondition: forest + MST ---
 
   // Read edge count
   let ec_val = !ec_ref;
@@ -159,53 +118,37 @@ fn test_kruskal_satisfiability ()
                   kruskal_mst_result sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val)));
   result_is_forest_adj_elim sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val);
 
-  // ✓ PROVEN: edge count bounded by n-1 = 2
+  // Forest properties (from elim lemmas)
   assert (pure (SZ.v ec_val <= 2));
-
-  // ✓ PROVEN: edge count bounded by n-1 = 2
-  // (from result_is_forest_adj_elim: forest on 3 vertices has ≤ 2 edges)
-  // Exact edge count (ec==2) and specific edge values would require
-  // is_mst (proven below) — the MST has exactly n-1=2 edges.
-
-  // ✓ PROVEN: output arrays have correct length
   assert (pure (Seq.length sedge_u' == 3));
   assert (pure (Seq.length sedge_v' == 3));
 
-  // ✓ PROVEN: all selected endpoints are valid vertices
+  // Valid endpoints and positive weights
   assert (pure (forall (k:nat). k < SZ.v ec_val ==>
     SZ.v (Seq.index sedge_u' k) >= 0 /\ SZ.v (Seq.index sedge_u' k) < 3 /\
     SZ.v (Seq.index sedge_v' k) >= 0 /\ SZ.v (Seq.index sedge_v' k) < 3));
-
-  // ✓ PROVEN: each selected edge has a positive adjacency matrix entry
   assert (pure (forall (k:nat). k < SZ.v ec_val ==>
     Seq.index sadj (SZ.v (Seq.index sedge_u' k) * 3 + SZ.v (Seq.index sedge_v' k)) > 0));
 
-  // ✓ PROVEN (NEW): the selected edges form a forest (acyclic subgraph)
+  // Forest (acyclic subgraph)
   result_is_forest_adj_forest_elim sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val);
   assert (pure (CLRS.Ch23.Kruskal.Spec.is_forest
     (edges_from_arrays (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v ec_val) 0) 3));
 
-  // ✓ PROVEN: is_mst — the imperative kruskal output IS the MST!
-  //   For connected symmetric graphs, kruskal produces an MST.
-  //   Proof chain: postcondition (forest + edges_safe) + graph properties
-  //   → derive_is_mst_post_loop (pigeonhole + connectivity transfer)
-  //   → is_mst
+  // --- Proof: is_mst for the imperative output ---
   test_mst ();
-  assert (pure (kruskal_mst_result sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val)));
   assert (pure (Seq.equal sadj (Seq.seq_of_list [0;1;3;1;0;2;3;2;0])));
   test_is_mst_imperative sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') (SZ.v ec_val);
-  // ✓ THE MAIN RESULT: is_mst for the imperative kruskal output
+  // is_mst for the imperative kruskal output
   assert (pure (CLRS.Ch23.MST.Spec.is_mst (adj_array_to_graph sadj 3)
     (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0)));
 
-  // ✓ PROVEN: unique MST = 0--1--2 with total weight 3
-  // From is_mst + concrete graph: the only MST edges are {(0,1,1), (1,2,2)}
+  // --- Proof: unique MST edges {(0,1,1), (1,2,2)}, total weight 3 ---
   kruskal_mst_edges (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0);
   assert (pure (CLRS.Ch23.MST.Spec.total_weight
     (weighted_edges_from_arrays sadj (sizet_seq_to_int sedge_u') (sizet_seq_to_int sedge_v') 3 (SZ.v ec_val) 0) == 3));
 
-  // Runtime check (computational — survives extraction to C)
-  // Read edge endpoints for runtime verification
+  // --- Runtime check (survives extraction to C) ---
   let eu0 = edge_u.(0sz);
   let ev0 = edge_v.(0sz);
   let eu1 = edge_u.(1sz);

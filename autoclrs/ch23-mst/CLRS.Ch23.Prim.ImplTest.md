@@ -1,7 +1,7 @@
-# Prim's Algorithm — Spec Validation Test
+# Prim's Algorithm — Verified Test
 
 **File**: `CLRS.Ch23.Prim.ImplTest.fst`
-**Status**: ✅ Verified — imperative Prim produces MST (zero admits in proof code)
+**Status**: ✅ Verified — zero admits in proof code, output uniqueness proved
 
 ## Test Instance
 
@@ -12,7 +12,7 @@
   +------3--------+
 ```
 Weight matrix (flat 3×3, SZ.t): `[0, 1, 3, 1, 0, 2, 3, 2, 0]`
-Expected MST: edges `{(0,1) w=1, (1,2) w=2}`
+Expected MST: edges `{(0,1) w=1, (1,2) w=2}`, total weight = 3
 
 ## What Is Proven
 
@@ -25,23 +25,28 @@ Expected MST: edges `{(0,1) w=1, (1,2) w=2}`
 | `key[i] <= infinity` for all i | ✅ | `all_keys_bounded` |
 | `parent[v] < n` for all v | ✅ | `parent_valid` |
 | `key[v] == weights[parent[v]*n+v]` | ✅ | `key_parent_consistent` |
-| **Result is MST** | ✅ | `prim_mst_result` → `prim_mst_result_elim` → `is_mst` |
+| **Result is MST** | ✅ | `prim_mst_result` → `is_mst` |
 
-### ✅ MST Proof (imperative output)
+### ✅ Concrete Output Uniqueness
 
-The postcondition `prim_mst_result` proves that the edges extracted from
-the parent/key arrays form a **minimum spanning tree** of the input graph.
-This is proven via:
+From `is_mst` + concrete graph structure, the output is uniquely determined:
 
-1. **Greedy safety** (cut property, CLRS Thm 23.1): each greedy step preserves
-   the invariant that current edges are a subset of some MST
-2. **Key invariant**: `key[v] ≤ weight(w,v)` for MST vertex w, non-MST vertex v
-3. **Connectivity**: connected graph guarantees finite-key non-MST vertex exists
-4. **Vertex counting**: after n iterations, all vertices are in MST
-5. **Post-loop derivation**: `n-1` edges + spanning + acyclic + safe → MST
+| Property | Status | How |
+|----------|:------:|-----|
+| `key[1] == 1, parent[1] == 0` | ✅ | `mst_test_facts` + `prim_unique_output` |
+| `key[2] == 2, parent[2] == 1` | ✅ | `mst_test_facts` + `prim_unique_output` |
+| Total weight == 3 | ✅ | `witness_spanning_tree` bounds `is_mst` |
 
-Calling `prim_mst_result_elim` (given `symmetric_weights` + `all_connected`)
-extracts `is_mst g (edges_from_parent_key parent_seq key_seq n source 0)`.
+**Proof chain**: `is_mst` → `mst_edge_facts` (no self-loops, finite keys)
+→ `mst_total_weight` (witness spanning tree with weight 3 bounds total)
+→ `prim_unique_output` (eliminates all but one (key,parent) assignment).
+
+### ✅ Runtime Check (survives C extraction)
+
+The function returns `bool` with `ensures pure (r == true)`:
+- `sz_eq` comparisons check `key=[0,1,2], parent=[0,0,1]`
+- The proof guarantees the runtime check always passes
+- Extracted C code contains the actual comparisons (not erased)
 
 ## Proof Architecture
 
@@ -50,18 +55,15 @@ extracts `is_mst g (edges_from_parent_key parent_seq key_seq n source 0)`.
 | `Defs.fst` | 68 | 1.5s | 0 |
 | `KeyInv.fst` | 730 | 6s | 0 |
 | `Greedy.fst` | 1060 | 45s | 0 |
-| `Impl.fst` | 1010 | 69s | **0** |
-| `ImplTest.fst` | 260 | 5s | 2 (test-only) |
+| `Impl.fst` | 985 | 69s | **0** |
+| `ImplTestHelper.fst` | ~290 | 41s | 0 |
+| `ImplTest.fst` | ~300 | 11s | 1 (platform) |
 
-## Test Admits (not proof gaps)
+## Admits
 
-### 1. `SZ.fits_u64` (Platform Assumption)
-64-bit SizeT — cannot be proven from first principles.
-
-### 2. `test_graph_preconditions` (Normalization)
-`valid_weights`, `symmetric_weights`, `all_connected`, `no_zero_edges` for
-the concrete test data. These are verifiable by inspection but F*'s normalizer
-can't reduce `weights_to_adj_matrix` (involves `Seq.init` with lambdas).
+### `SZ.fits_u64` (Platform Assumption)
+64-bit SizeT — deployment property of the target platform.
+Not a spec or proof gap.
 
 ## API Gap
 

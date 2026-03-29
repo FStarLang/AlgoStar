@@ -1,9 +1,8 @@
 (*
-   CLRS Chapter 23: Prim's Algorithm — Spec Validation Test
+   CLRS Chapter 23: Prim's Algorithm — Verified Test
 
-   Validates the Impl.fsti API for CLRS §23.2 Prim's MST algorithm
-   by calling it on a small concrete instance and checking what the
-   postcondition can prove about the output.
+   Calls the imperative `fn prim` on a concrete 3-vertex triangle graph
+   and proves the output is the unique MST: 0 --1-- 1 --2-- 2.
 
    Test instance:
      3-vertex triangle graph (source = vertex 0):
@@ -11,23 +10,22 @@
        |               |
        +------3--------+
      Weight matrix (flat 3×3, SZ.t): [0,1,3, 1,0,2, 3,2,0]
-     Expected MST: edges {(0,1) w=1, (1,2) w=2}
+     Expected MST: edges {(0,1) w=1, (1,2) w=2}, total weight = 3
      Expected key array:    [0, 1, 2]   (key[v] = weight of MST edge to v)
      Expected parent array: [0, 0, 1]   (parent[v] = MST parent of v)
 
-   Result: The postcondition proves:
-     ✓ key[source] == 0
-     ✓ parent[source] == source
-     ✓ All keys bounded by infinity (65535)
-     ✓ All parent values are valid vertex indices (< n)
-     ✓ key_parent_consistent: key[v] == weights[parent[v]*n+v]
-     ✓ prim_mst_result: the output IS a minimum spanning tree (is_mst)
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        ✓ prim_correct: key/parent consistency, parent validity
+        ✓ prim_mst_result → is_mst: output IS a minimum spanning tree
+        ✓ mst_test_facts + prim_unique_output: key=[0,1,2], parent=[0,0,1]
+        ✓ ensures (r == true): proof guarantees the runtime check passes
 
-   PLATFORM ASSUMPTION: SZ.fits_u64 is required by Prim's precondition.
-   This is a platform-specific assumption (64-bit SizeT) that cannot be
-   proven from first principles. We assume it for this test.
+     2. RUNTIME (computational, survives extraction to C):
+        ✓ sz_eq comparisons check key=[0,1,2], parent=[0,0,1]
+        ✓ Returns bool — caller can verify at runtime
 
-   Admits: SZ.fits_u64 (platform assumption only).
+   Admits: SZ.fits_u64 (platform assumption — 64-bit SizeT).
 *)
 module CLRS.Ch23.Prim.ImplTest
 #lang-pulse
@@ -218,7 +216,7 @@ fn test_prim_3 ()
             pure (prim_correct key_seq parent_seq ws 3 0 /\
                   prim_mst_result parent_seq key_seq ws 3 0));
 
-  // --- What CAN be proven from prim_correct ---
+  // --- Read output arrays ---
 
   // Convert key vec to array for reading
   V.to_array_pts_to (key_vec);
@@ -250,14 +248,13 @@ fn test_prim_3 ()
   let p2 = parent_arr.(2sz);
   assert (pure (SZ.v p0 == 0));  // parent[source] = source
 
-  // ✓ PROVEN: derive key < infinity, no self-loops, and total weight ≤ 3
-  // from is_mst (via prim_mst_result) + concrete graph weights (ghost, erased)
+  // --- Proof: derive unique MST output ---
   mst_test_facts parent_seq key_seq ws;
   prim_unique_output key_seq parent_seq ws;
   assert (pure (SZ.v k1 == 1 /\ SZ.v p1 == 0 /\
                 SZ.v k2 == 2 /\ SZ.v p2 == 1));
 
-  // Runtime check (computational — survives extraction to C)
+  // --- Runtime check (survives extraction to C) ---
   let pass = sz_eq k0 0sz && sz_eq k1 1sz && sz_eq k2 2sz &&
              sz_eq p0 0sz && sz_eq p1 0sz && sz_eq p2 1sz;
 
@@ -266,32 +263,11 @@ fn test_prim_3 ()
   rewrite (A.pts_to parent_arr ps2) as (A.pts_to (V.vec_to_array (parent_vec)) ps2);
   V.to_vec_pts_to (parent_vec);
 
-  // --- What CAN be proven from prim_correct (with key_parent_consistent) ---
-  //
-  // key_parent_consistent: for non-source v with finite key,
-  //   key[v] == weights[parent[v]*3+v]
-  //
-  // This means: if key[1] < infinity, then key[1] == ws[parent[1]*3+1]
-  //             if key[2] < infinity, then key[2] == ws[parent[2]*3+2]
-  //
-  // For the test graph (symmetric: ws[u*3+v] == ws[v*3+u]):
-  //   key[1] is the weight of edge (parent[1], 1) in the MST
-  //   key[2] is the weight of edge (parent[2], 2) in the MST
-  //
-  // Combined with all_keys_bounded + parent_valid: 
-  //   the parent tree encodes actual graph edges with their weights.
-  //
-  // ✓ PROVEN: is_mst for the IMPERATIVE Prim output (not just pure spec)
-  //   prim_mst_result_elim extracts is_mst given symmetric_weights + all_connected
+  // --- Also proven: is_mst via two independent paths ---
   prim_mst_result_elim parent_seq key_seq ws 3 0;
-
-  // Also proven via pure Prim specification (independent proof)
   test_prim_mst ();
 
-  // --- Cleanup ---
-  // API GAP: prim returns freshly allocated vecs but its postcondition
-  // does not include is_full_vec, preventing the caller from freeing them.
-  // We use drop_ to discard the permissions (test-only resource leak).
+  // --- Cleanup (test-only: drop_ due to missing is_full_vec in prim postcondition) ---
   with ks2. assert (V.pts_to (key_vec) ks2);
   drop_ (V.pts_to (key_vec) ks2);
   with ps3. assert (V.pts_to (parent_vec) ps3);
@@ -302,9 +278,6 @@ fn test_prim_3 ()
   V.to_vec_pts_to wv;
   V.free wv;
 
-  // ✓ PROVEN: ghost assertions (erased at extraction)
-  // mst_test_facts + prim_unique_output prove k1=1,p1=0,k2=2,p2=1
-  // The runtime check above independently verifies the same.
   pass
 }
 ```
