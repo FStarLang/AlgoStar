@@ -59,7 +59,7 @@ let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
 let weights3 : Seq.seq SZ.t = Seq.seq_of_list [0sz; 1sz; 3sz; 1sz; 0sz; 2sz; 3sz; 2sz; 0sz]
 
 (* After 9 array writes, the ghost sequence equals weights3 *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let seq_after_writes_weights ()
   : Lemma (let s = Seq.create 9 0sz in
            let s = Seq.upd s 0 0sz in
@@ -75,39 +75,12 @@ let seq_after_writes_weights ()
   = assert_norm (weights3 `Seq.equal` Seq.seq_of_list [0sz; 1sz; 3sz; 1sz; 0sz; 2sz; 3sz; 2sz; 0sz])
 #pop-options
 
-(* Postcondition provides:
-   prim_correct: basic structural properties (key/parent arrays)
-   prim_mst_result: the output edges form a minimum spanning tree
-   
-   Combined with prim_mst_result_elim (given symmetric + connected):
-     is_mst g (edges_from_parent_key parent_seq key_seq n source 0)
-*)
-
-(* Helper: extract key[source]==0 and parent[source]==source from prim_correct *)
-let prim_correct_key_source
-  (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat)
-  : Lemma
-    (requires prim_correct key_seq parent_seq weights_seq n source)
-    (ensures SZ.v (Seq.index key_seq source) == 0 /\
-             SZ.v (Seq.index parent_seq source) == source /\
-             Seq.length key_seq == n /\
-             Seq.length parent_seq == n)
-  = ()
-
-(* Helper: extract key boundedness from prim_correct *)
-let prim_correct_keys_bounded
-  (key_seq parent_seq weights_seq: Seq.seq SZ.t) (n source: nat) (i: nat)
-  : Lemma
-    (requires prim_correct key_seq parent_seq weights_seq n source /\ i < n)
-    (ensures SZ.v (Seq.index key_seq i) <= SZ.v infinity)
-  = ()
-
 (* ---------- Main Test ---------- *)
 
 // Test graph preconditions (concrete data, verified by inspection)
 // weights_to_adj_matrix normalization too complex for assert_norm
 // Test graph preconditions — each proved from concrete data
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let test_valid_weights_3 () : Lemma (valid_weights weights3 3) = ()
 let test_symmetric_weights_3 () : Lemma (symmetric_weights weights3 3) = ()
 let test_no_zero_edges_3 () : Lemma
@@ -116,7 +89,7 @@ let test_no_zero_edges_3 () : Lemma
 #pop-options
 
 // all_connected for the test graph: prove paths exist
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 800"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 30"
 let test_all_connected_impl () : Lemma
   (CLRS.Ch23.MST.Spec.all_connected 3
     (CLRS.Ch23.Prim.Spec.adj_to_edges (weights_to_adj_matrix weights3 3) 3))
@@ -140,7 +113,7 @@ let test_all_connected_impl () : Lemma
     assert (CLRS.Ch23.MST.Spec.subset_edges [e01; e12] es)
 #pop-options
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let test_graph_preconditions (ws: Seq.seq SZ.t) : Lemma
   (requires ws == weights3)
   (ensures
@@ -157,7 +130,7 @@ let test_graph_preconditions (ws: Seq.seq SZ.t) : Lemma
 
 
 // Derive concrete key/parent values from prim_correct + concrete weights
-#push-options "--z3rlimit 200 --fuel 10 --ifuel 10"
+#push-options "--z3rlimit 10 --fuel 10 --ifuel 10"
 
 ```pulse
 fn test_prim_3 ()

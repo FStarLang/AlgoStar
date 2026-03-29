@@ -13,7 +13,7 @@ module Seq = FStar.Seq
 
 let test_adj : Seq.seq int = Seq.seq_of_list [0; 1; 3; 1; 0; 2; 3; 2; 0]
 
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 800"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 20"
 
 let test_symmetric () : Lemma (symmetric_adj test_adj 3) =
   assert_norm (Seq.length test_adj == 9);
@@ -117,6 +117,9 @@ let kruskal_witness_spanning_tree ()
     acyclic_when_unreachable 3 [] e12;
     acyclic_when_unreachable 3 [e12] e01
 
+#pop-options
+
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 400"
 /// From is_mst of the concrete graph, derive the unique MST edges.
 /// The MST is 0--1--2 with weight 3.
 let kruskal_mst_edges (es: list edge)

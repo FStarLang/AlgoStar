@@ -19,7 +19,7 @@ let test_adj : adj_matrix = Seq.seq_of_list [
   Seq.seq_of_list [3; 2; 0]
 ]
 
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 800"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 10"
 
 let test_well_formed () : Lemma (well_formed_adj test_adj 3) =
   assert_norm (Seq.length test_adj == 3);
@@ -96,7 +96,7 @@ let tw : Seq.seq SZ.t = Seq.seq_of_list [0sz; 1sz; 3sz; 1sz; 0sz; 2sz; 3sz; 2sz;
 
 // Direct case analysis: given key = tw[parent*3+v] with parent<3,
 // enumerate all possibilities
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let key_from_parent_1 (k p: nat)
   : Lemma (requires p < 3 /\ k < 65535 /\
                     k == SZ.v (Seq.index tw (p * 3 + 1)))
@@ -135,7 +135,7 @@ let kpc_at (ks ps ws: Seq.seq SZ.t) (v: nat)
 // We CANNOT derive unique values from prim_correct alone!
 // We need prim_mst_result to force the minimum.
 // For now, settle for proving key/parent CONSISTENCY (k matches the weight).
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let prim_consistent_output (ks ps ws: Seq.seq SZ.t)
   : Lemma
     (requires prim_correct ks ps ws 3 0 /\ ws == tw /\
@@ -169,7 +169,7 @@ let prim_consistent_output (ks ps ws: Seq.seq SZ.t)
 // verifies the EXACT values at runtime.
 
 /// Pin down unique MST: no self-loops + minimum total weight → k1=1, k2=2
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let prim_unique_output (ks ps ws: Seq.seq SZ.t)
   : Lemma
     (requires prim_correct ks ps ws 3 0 /\ ws == tw /\
@@ -185,16 +185,7 @@ let prim_unique_output (ks ps ws: Seq.seq SZ.t)
 #pop-options
 
 
-let kpc_inst (ks ps ws: Seq.seq SZ.t) (v: nat)
-  : Lemma
-    (requires key_parent_consistent ks ps ws 3 0 /\
-              Seq.length ks == 3 /\ Seq.length ps == 3 /\ Seq.length ws == 9 /\
-              parent_valid ps 3 /\ v < 3 /\ v <> 0 /\
-              SZ.v (Seq.index ks v) < SZ.v CLRS.Ch23.Prim.Defs.infinity)
-    (ensures SZ.v (Seq.index ks v) == SZ.v (Seq.index ws (SZ.v (Seq.index ps v) * 3 + v)))
-  = ()
-
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 50"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 5"
 let efpk_3 (ps ks: Seq.seq SZ.t)
   : Lemma (requires Seq.length ps == 3 /\ Seq.length ks == 3)
           (ensures edges_from_parent_key ps ks 3 0 0 ==
@@ -203,7 +194,7 @@ let efpk_3 (ps ks: Seq.seq SZ.t)
   = ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 200 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 150 --split_queries always"
 let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
   : Lemma
     (requires Seq.length ps == 3 /\ Seq.length ks == 3 /\ Seq.length ws == 9 /\ ws == tw /\
@@ -237,7 +228,7 @@ let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
 #pop-options
 
 /// Witness: [{u=0;v=1;w=1}; {u=1;v=2;w=2}] is a spanning tree with weight 3
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 800"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 20"
 let witness_spanning_tree ()
   : Lemma
     (let adj = weights_to_adj_matrix tw 3 in
@@ -270,7 +261,7 @@ let witness_spanning_tree ()
 #pop-options
 
 /// Total weight: from is_mst + witness spanning tree, k1+k2 ≤ 3
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 100"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 5"
 let mst_total_weight (ks ps ws: Seq.seq SZ.t)
   : Lemma
     (requires Seq.length ps == 3 /\ Seq.length ks == 3 /\ Seq.length ws == 9 /\ ws == tw /\
@@ -281,7 +272,7 @@ let mst_total_weight (ks ps ws: Seq.seq SZ.t)
     witness_spanning_tree ()
 #pop-options
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let mst_test_facts (ps ks ws: Seq.seq SZ.t)
   : Lemma
     (requires prim_correct ks ps ws 3 0 /\ ws == tw /\
