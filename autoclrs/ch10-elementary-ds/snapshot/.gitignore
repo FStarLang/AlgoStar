@@ -1,0 +1,2 @@
+# Override root .gitignore to track krmllib headers in snapshot
+!krml/
