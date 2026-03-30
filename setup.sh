@@ -65,11 +65,27 @@ build_fstar() {
   fi
 }
 
+patch_karamel() {
+  local patch="$SCRIPT_DIR/patches/karamel-simplify-bounds-check.patch"
+  if [ -f "$patch" ]; then
+    cd "$FSTAR_DIR/karamel"
+    if ! git diff --quiet lib/Simplify.ml 2>/dev/null; then
+      info "KaRaMeL Simplify.ml already modified, skipping patch."
+    elif patch -p1 --dry-run < "$patch" >/dev/null 2>&1; then
+      info "Applying KaRaMeL Simplify.ml bounds-check patch..."
+      patch -p1 < "$patch"
+    else
+      info "KaRaMeL patch already applied or does not apply cleanly, skipping."
+    fi
+  fi
+}
+
 build_karamel() {
   if [ ! -x "$FSTAR_EXE" ]; then
     red "F* not built yet. Run './setup.sh fstar' first."
     exit 1
   fi
+  patch_karamel
   info "Building KaRaMeL..."
   cd "$FSTAR_DIR"
   make karamel
