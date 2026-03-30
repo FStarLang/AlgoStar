@@ -50,3 +50,45 @@ EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
                     $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
 
 include ../autoclrs.test.mk
+
+# ── Snapshot target ──────────────────────────────────────────────────
+# Produces a self-contained C directory in snapshot/ that can be built
+# without F*, Pulse, or KaRaMeL.
+
+SNAPSHOT_DIR = snapshot
+
+.PHONY: snapshot
+snapshot: $(EXTRACT_C_FILES)
+	$(call msg, "SNAPSHOT", "$(CHAPTER_ID)")
+	@# ── Generated .c / .h from extraction ──
+	cp $(OUTPUT_DIR)/$(BUNDLE_C_STEM).c $(SNAPSHOT_DIR)/
+	cp $(OUTPUT_DIR)/$(BUNDLE_C_STEM).h $(SNAPSHOT_DIR)/
+	@mkdir -p $(SNAPSHOT_DIR)/internal
+	cp $(OUTPUT_DIR)/internal/FStar_Pulse_PulseCore_Prims.h $(SNAPSHOT_DIR)/internal/
+	cp $(OUTPUT_DIR)/internal/Prims.h                       $(SNAPSHOT_DIR)/internal/
+	@# ── Handwritten test driver ──
+	cp main.c $(SNAPSHOT_DIR)/main.c
+	@# ── KaRaMeL runtime headers ──
+	@mkdir -p $(SNAPSHOT_DIR)/krmllib/krml/internal
+	cp $(KRML_HOME)/include/krmllib.h              $(SNAPSHOT_DIR)/krmllib/
+	cp $(KRML_HOME)/include/krml/fstar_int.h       $(SNAPSHOT_DIR)/krmllib/krml/
+	cp $(KRML_HOME)/include/krml/lowstar_endianness.h $(SNAPSHOT_DIR)/krmllib/krml/
+	cp $(KRML_HOME)/include/krml/internal/builtin.h   $(SNAPSHOT_DIR)/krmllib/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/callconv.h  $(SNAPSHOT_DIR)/krmllib/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/compat.h    $(SNAPSHOT_DIR)/krmllib/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/debug.h     $(SNAPSHOT_DIR)/krmllib/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/target.h    $(SNAPSHOT_DIR)/krmllib/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/types.h     $(SNAPSHOT_DIR)/krmllib/krml/internal/
+	@# ── KaRaMeL runtime C sources (generic) ──
+	@mkdir -p $(SNAPSHOT_DIR)/krmllib/dist/generic
+	cp $(KRML_HOME)/krmllib/dist/generic/prims.c        $(SNAPSHOT_DIR)/krmllib/dist/generic/
+	cp $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c  $(SNAPSHOT_DIR)/krmllib/dist/generic/
+	cp $(KRML_HOME)/krmllib/dist/generic/Prims.h        $(SNAPSHOT_DIR)/krmllib/dist/generic/
+	cp $(KRML_HOME)/krmllib/dist/generic/FStar_Int32.h  $(SNAPSHOT_DIR)/krmllib/dist/generic/
+	@# ── KaRaMeL runtime headers (minimal) ──
+	@mkdir -p $(SNAPSHOT_DIR)/krmllib/dist/minimal
+	cp $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt128.h        $(SNAPSHOT_DIR)/krmllib/dist/minimal/
+	cp $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt_8_16_32_64.h $(SNAPSHOT_DIR)/krmllib/dist/minimal/
+	cp $(KRML_HOME)/krmllib/dist/minimal/LowStar_Endianness.h   $(SNAPSHOT_DIR)/krmllib/dist/minimal/
+	cp $(KRML_HOME)/krmllib/dist/minimal/fstar_uint128_gcc64.h  $(SNAPSHOT_DIR)/krmllib/dist/minimal/
+	@echo "Snapshot ready in $(SNAPSHOT_DIR)/"

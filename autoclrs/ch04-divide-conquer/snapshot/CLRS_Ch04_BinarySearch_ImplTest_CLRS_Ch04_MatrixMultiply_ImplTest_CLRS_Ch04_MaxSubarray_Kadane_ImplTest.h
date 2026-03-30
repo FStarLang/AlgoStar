@@ -1,0 +1,27 @@
+/* krml header omitted for test repeatability */
+
+
+#ifndef CLRS_Ch04_BinarySearch_ImplTest_CLRS_Ch04_MatrixMultiply_ImplTest_CLRS_Ch04_MaxSubarray_Kadane_ImplTest_H
+#define CLRS_Ch04_BinarySearch_ImplTest_CLRS_Ch04_MatrixMultiply_ImplTest_CLRS_Ch04_MaxSubarray_Kadane_ImplTest_H
+
+#include "krmllib.h"
+
+#include "krml/internal/compat.h"
+
+bool CLRS_Ch04_BinarySearch_ImplTest_sz_eq(size_t a, size_t b);
+
+bool CLRS_Ch04_BinarySearch_ImplTest_test_binary_search_found(void);
+
+bool CLRS_Ch04_BinarySearch_ImplTest_test_binary_search_not_found(void);
+
+bool CLRS_Ch04_BinarySearch_ImplTest_test_binary_search_empty(void);
+
+bool CLRS_Ch04_MatrixMultiply_ImplTest_test_matrix_multiply_2x2(void);
+
+bool CLRS_Ch04_MaxSubarray_Kadane_ImplTest_test_kadane_max_subarray(void);
+
+bool CLRS_Ch04_MaxSubarray_Kadane_ImplTest_test_kadane_all_negative(void);
+
+
+#define CLRS_Ch04_BinarySearch_ImplTest_CLRS_Ch04_MatrixMultiply_ImplTest_CLRS_Ch04_MaxSubarray_Kadane_ImplTest_H_DEFINED
+#endif /* CLRS_Ch04_BinarySearch_ImplTest_CLRS_Ch04_MatrixMultiply_ImplTest_CLRS_Ch04_MaxSubarray_Kadane_ImplTest_H */
