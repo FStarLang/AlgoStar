@@ -11,6 +11,9 @@
    4. Prefix sorting [7; 5; 3] with n=2 — element preservation
    5. Sorting with duplicates [2; 1; 2] — duplicate handling
 
+   Each test returns bool with ensures pure (r == true).
+   Runtime comparisons survive extraction to C, enabling actual result checking.
+
    NO admits. NO assumes.
 *)
 
@@ -32,6 +35,10 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module SP = FStar.Seq.Properties
 module CB = CLRS.Ch06.Heap.CostBound
+
+// Concrete equality on int — survives extraction to C (== on krml_checked_int_t)
+inline_for_extraction
+let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 // ========== Test 1: heapsort completeness on [3;1;2] ==========
 
@@ -84,8 +91,8 @@ let completeness_sort3 (s0 s: Seq.seq int)
 (* Completeness: y = heapsort([3,1,2]); assert(y == [1,2,3]) *)
 fn test_heapsort_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Input: [3; 1; 2]
   let v = V.alloc 0 3sz;
@@ -112,7 +119,7 @@ fn test_heapsort_3 ()
   // Now Z3 sees: SP.permutation int s0 s, and knows s0 == [3;1;2] from array writes
   completeness_sort3 s0 s;
 
-  // Read and verify each element
+  // Read and verify each element (concrete reads survive extraction)
   let v0 = arr.(0sz);
   let v1 = arr.(1sz);
   let v2 = arr.(2sz);
@@ -127,7 +134,10 @@ fn test_heapsort_3 ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+
+  // Runtime check (survives extraction to C)
+  let pass = int_eq v0 1 && int_eq v1 2 && int_eq v2 3;
+  pass
 }
 ```
 
@@ -169,8 +179,8 @@ let heap_root3 (s0 s: Seq.seq int)
 (* build_max_heap completeness: build_max_heap([3,1,2]); assert(root == 3) *)
 fn test_build_max_heap_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -189,7 +199,7 @@ fn test_build_max_heap_3 ()
   reveal_opaque (`%permutation) (permutation s0 s);
   heap_root3 s0 s;
 
-  // Root is the maximum
+  // Root is the maximum (concrete read survives extraction)
   let v0 = arr.(0sz);
   assert (pure (v0 == 3));
 
@@ -200,7 +210,10 @@ fn test_build_max_heap_3 ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+
+  // Runtime check (survives extraction to C)
+  let pass = int_eq v0 3;
+  pass
 }
 ```
 
@@ -215,8 +228,8 @@ fn test_build_max_heap_3 ()
    Exercises the forall k. 0 <= k < length s ==> s[k] == s0[k] clause. *)
 fn test_heapsort_0 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -247,7 +260,10 @@ fn test_heapsort_0 ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+
+  // Runtime check (survives extraction to C)
+  let pass = int_eq v0 5 && int_eq v1 3 && int_eq v2 7;
+  pass
 }
 ```
 
@@ -288,8 +304,8 @@ let completeness_prefix2 (s0 s: Seq.seq int)
 (* Prefix sort: heapsort([7,5,3], n=2); assert first 2 sorted, third unchanged *)
 fn test_heapsort_prefix ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -323,7 +339,10 @@ fn test_heapsort_prefix ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+
+  // Runtime check (survives extraction to C)
+  let pass = int_eq v0 5 && int_eq v1 7 && int_eq v2 3;
+  pass
 }
 ```
 
@@ -360,8 +379,8 @@ let completeness_sort_dupes (s0 s: Seq.seq int)
 (* Duplicates: heapsort([2,1,2]); assert output == [1,2,2] *)
 fn test_heapsort_duplicates ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -394,7 +413,10 @@ fn test_heapsort_duplicates ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+
+  // Runtime check (survives extraction to C)
+  let pass = int_eq v0 1 && int_eq v1 2 && int_eq v2 2;
+  pass
 }
 ```
 

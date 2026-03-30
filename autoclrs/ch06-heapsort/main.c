@@ -2,9 +2,12 @@
  * main.c — Test driver for CLRS Ch06 Heapsort extracted from Pulse/F*
  *
  * Provides:
- *   - Prims integer operations (extern'd by krml extraction)
- *   - krmlinit_globals override to wire up the BoundedIntegers typeclass dict
- *   - main() entry point calling all 5 test functions
+ *   - krmlinit_globals to wire up the BoundedIntegers typeclass dict
+ *     (using Prims_op_* from krmllib's prims.c)
+ *   - main() entry point calling all 5 test functions and checking results
+ *
+ * Prims integer operations are provided by $(KRML_HOME)/krmllib/dist/generic/prims.c
+ * via EXTRA_C_SOURCES in the Makefile (no hand-written implementations needed).
  */
 
 #include <stdio.h>
@@ -15,41 +18,17 @@
 #include "CLRS_Ch06_Heap_ImplTest.h"
 #include "internal/CLRS_Ch06_Heap_ImplTest.h"
 
-/* Prims integer operations for krml_checked_int_t (int32_t) */
+/* Prims_op_* declarations — implementations from krmllib/dist/generic/prims.c */
+extern krml_checked_int_t Prims_op_Addition(krml_checked_int_t x, krml_checked_int_t y);
+extern krml_checked_int_t Prims_op_Subtraction(krml_checked_int_t x, krml_checked_int_t y);
+extern krml_checked_int_t Prims_op_Modulus(krml_checked_int_t x, krml_checked_int_t y);
+extern krml_checked_int_t Prims_op_Division(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_LessThan(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_LessThanOrEqual(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_GreaterThan(krml_checked_int_t x, krml_checked_int_t y);
+extern bool Prims_op_GreaterThanOrEqual(krml_checked_int_t x, krml_checked_int_t y);
 
-krml_checked_int_t Prims_op_Addition(krml_checked_int_t x, krml_checked_int_t y) {
-  return x + y;
-}
-
-krml_checked_int_t Prims_op_Subtraction(krml_checked_int_t x, krml_checked_int_t y) {
-  return x - y;
-}
-
-krml_checked_int_t Prims_op_Modulus(krml_checked_int_t x, krml_checked_int_t y) {
-  return x % y;
-}
-
-krml_checked_int_t Prims_op_Division(krml_checked_int_t x, krml_checked_int_t y) {
-  return x / y;
-}
-
-bool Prims_op_LessThan(krml_checked_int_t x, krml_checked_int_t y) {
-  return x < y;
-}
-
-bool Prims_op_LessThanOrEqual(krml_checked_int_t x, krml_checked_int_t y) {
-  return x <= y;
-}
-
-bool Prims_op_GreaterThan(krml_checked_int_t x, krml_checked_int_t y) {
-  return x > y;
-}
-
-bool Prims_op_GreaterThanOrEqual(krml_checked_int_t x, krml_checked_int_t y) {
-  return x >= y;
-}
-
-/* Initialize the BoundedIntegers typeclass dict with actual function pointers */
+/* Initialize the BoundedIntegers typeclass dict with Prims_op_* from krmllib */
 void krmlinit_globals(void) {
   Pulse_Lib_BoundedIntegers_bounded_int_int =
     (Pulse_Lib_BoundedIntegers_bounded_int__krml_checked_int_t){
@@ -67,30 +46,57 @@ void krmlinit_globals(void) {
 int main(void) {
   krmlinit_globals();
 
+  int failures = 0;
+
   printf("CLRS Ch06 Heapsort — Concrete Execution Tests\n");
   printf("==============================================\n");
 
   printf("Test 1: heapsort [3,1,2] -> [1,2,3] ... ");
-  CLRS_Ch06_Heap_ImplTest_test_heapsort_3();
-  printf("PASS\n");
+  if (CLRS_Ch06_Heap_ImplTest_test_heapsort_3()) {
+    printf("PASS\n");
+  } else {
+    printf("FAIL\n");
+    failures++;
+  }
 
   printf("Test 2: build_max_heap [3,1,2] root=3 ... ");
-  CLRS_Ch06_Heap_ImplTest_test_build_max_heap_3();
-  printf("PASS\n");
+  if (CLRS_Ch06_Heap_ImplTest_test_build_max_heap_3()) {
+    printf("PASS\n");
+  } else {
+    printf("FAIL\n");
+    failures++;
+  }
 
   printf("Test 3: heapsort n=0 [5,3,7] unchanged ... ");
-  CLRS_Ch06_Heap_ImplTest_test_heapsort_0();
-  printf("PASS\n");
+  if (CLRS_Ch06_Heap_ImplTest_test_heapsort_0()) {
+    printf("PASS\n");
+  } else {
+    printf("FAIL\n");
+    failures++;
+  }
 
   printf("Test 4: heapsort prefix n=2 [7,5,3] -> [5,7,3] ... ");
-  CLRS_Ch06_Heap_ImplTest_test_heapsort_prefix();
-  printf("PASS\n");
+  if (CLRS_Ch06_Heap_ImplTest_test_heapsort_prefix()) {
+    printf("PASS\n");
+  } else {
+    printf("FAIL\n");
+    failures++;
+  }
 
   printf("Test 5: heapsort duplicates [2,1,2] -> [1,2,2] ... ");
-  CLRS_Ch06_Heap_ImplTest_test_heapsort_duplicates();
-  printf("PASS\n");
+  if (CLRS_Ch06_Heap_ImplTest_test_heapsort_duplicates()) {
+    printf("PASS\n");
+  } else {
+    printf("FAIL\n");
+    failures++;
+  }
 
   printf("==============================================\n");
-  printf("All 5 tests passed.\n");
-  return 0;
+  if (failures == 0) {
+    printf("All 5 tests passed.\n");
+    return 0;
+  } else {
+    printf("%d test(s) FAILED.\n", failures);
+    return 1;
+  }
 }
