@@ -30,6 +30,11 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Spec = CLRS.Ch32.KMP.Spec
 
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  let open FStar.SizeT in not (a <^ b || b <^ a)
+
 (* SZ.fits for our concrete sizes:
    n=5, m=3: need fits(n+1)=6, fits(m+1)=4, fits(2*n)=10,
    fits(2*(m-1))=4, fits(2*n+2*m)=16 *)
@@ -95,8 +100,8 @@ let kmp_match_at_2 (text pat: Seq.seq int)
 (* Test: Precondition satisfiability + Postcondition precision *)
 fn test_kmp_string_match ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Text: [0, 1, 0, 1, 0] (length 5)
   let tv = V.alloc 0 5sz;
@@ -138,6 +143,9 @@ fn test_kmp_string_match ()
   kmp_count_matches_is_2 s_text s_pat;
   assert (pure (SZ.v count == 2));
 
+  // Runtime check that survives extraction
+  let pass = sz_eq count 2sz;
+
   // Verify individual match positions
   kmp_match_at_0 s_text s_pat;
   kmp_match_at_2 s_text s_pat;
@@ -152,7 +160,7 @@ fn test_kmp_string_match ()
   V.to_vec_pts_to pv;
   V.free pv;
 
-  ()
+  pass
 }
 ```
 

@@ -29,6 +29,11 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  let open FStar.SizeT in not (a <^ b || b <^ a)
+
 (* SZ.fits for our concrete sizes:
    n=5, m=3: need fits(n-m+2)=fits(4) and fits((n-m+1)*m)=fits(9) *)
 let naive_fits () : Lemma (SZ.fits 4 /\ SZ.fits 9) =
@@ -89,8 +94,8 @@ let match_at_2 (text pat: Seq.seq int)
 (* Test: Precondition satisfiability + Postcondition precision *)
 fn test_naive_string_match ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Text: [1, 2, 1, 2, 1] (length 5)
   let tv = V.alloc #int 0 5sz;
@@ -132,6 +137,9 @@ fn test_naive_string_match ()
   count_matches_is_2 s_text s_pat;
   assert (pure (SZ.v count == 2));
 
+  // Runtime check that survives extraction
+  let pass = sz_eq count 2sz;
+
   // Verify individual match positions
   match_at_0 s_text s_pat;
   match_at_2 s_text s_pat;
@@ -146,7 +154,7 @@ fn test_naive_string_match ()
   V.to_vec_pts_to pv;
   V.free pv;
 
-  ()
+  pass
 }
 ```
 

@@ -33,7 +33,8 @@ open CLRS.Ch32.RabinKarp.Complexity
 
 // ========== Pure Specification ==========
 
-// Count of matches from position 0 to limit-1
+// Pure spec function: only used in postconditions (ghost), not extracted to C
+noextract
 let rec count_matches_up_to (text pattern: Seq.seq nat) (limit: nat)
   : Tot nat (decreases limit)
   = if limit = 0 then 0
@@ -335,7 +336,7 @@ fn rabin_karp
       // Rolling hash update: t_{s+1} = (d * ((t_s + q - (old*h)%q) % q) + new) % q
       let old_char = A.op_Array_Access text vs;
       let new_char = A.op_Array_Access text (vs +^ m);
-      let new_hash = RKSpec.rolling_hash_step vt_hash_outer old_char new_char d q h;
+      let new_hash = (d * ((vt_hash_outer + q - (old_char * h) % q) % q) + new_char) % q;
       RKSpec.rolling_hash_step_correct s_text d q (SZ.v vs) (SZ.v m) vt_hash_outer h;
       t_hash := new_hash;
       s := vs +^ 1sz

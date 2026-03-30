@@ -152,13 +152,14 @@ fn compute_prefix_function
       with _vd_il _vki_il s_pi_il _vci_il. _;
       let vk = !k;
       
-      let safe_pi_idx: SZ.t = (if SZ.v vk > 0 then vk -^ 1sz else 0sz);
+      let vk_pos = (vk >^ 0sz);
+      let safe_pi_idx: SZ.t = (if vk_pos then vk -^ 1sz else 0sz);
       let pi_prev = V.op_Array_Access pi safe_pi_idx;
       
       let pk = A.op_Array_Access pattern vk;
       let pq = A.op_Array_Access pattern vq;
       
-      let should_update: bool = (SZ.v vk > 0 && pk <> pq);
+      let should_update: bool = (vk_pos && pk <> pq);
       
       if should_update {
         // Follow failure chain — count this comparison, k decreases
@@ -340,7 +341,7 @@ fn kmp_matcher
       let text_char = A.op_Array_Access text vi;
       let pat_char = A.op_Array_Access pattern vq;
       
-      let should_follow: bool = (SZ.v vq > 0 && pat_char <> text_char);
+      let should_follow: bool = (vq >^ 0sz && pat_char <> text_char);
       
       if should_follow {
         // Follow failure chain — count this comparison, q decreases

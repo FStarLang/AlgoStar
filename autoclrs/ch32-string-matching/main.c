@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include "Ch32_StringMatch.h"
 
 int main(void) {
@@ -6,17 +7,17 @@ int main(void) {
 
   printf("[1/3] Naive String Match (CLRS §32.1) ... ");
   fflush(stdout);
-  test_naive_string_match();
+  if (!test_naive_string_match()) { printf("FAIL\n"); return 1; }
   printf("PASS\n");
 
   printf("[2/3] KMP String Match   (CLRS §32.4) ... ");
   fflush(stdout);
-  test_kmp_string_match();
+  if (!test_kmp_string_match()) { printf("FAIL\n"); return 1; }
   printf("PASS\n");
 
   printf("[3/3] Rabin-Karp          (CLRS §32.2) ... ");
   fflush(stdout);
-  test_rabin_karp();
+  if (!test_rabin_karp()) { printf("FAIL\n"); return 1; }
   printf("PASS\n");
 
   printf("\nAll 3 tests passed.\n");

@@ -29,6 +29,11 @@ module RKSpec = CLRS.Ch32.RabinKarp.Spec
 
 open CLRS.Ch32.RabinKarp.Complexity
 
+(* int equality check — computational, survives extraction to C *)
+inline_for_extraction
+let int_eq (a b: int) : (r:bool{r <==> a = b}) =
+  not (a < b || b < a)
+
 (* SZ.fits for our concrete sizes:
    n=5, m=3: need fits(n-m+2)=fits(4) and fits(n+1)=fits(6) *)
 let rk_fits () : Lemma (SZ.fits 4 /\ SZ.fits 6) =
@@ -89,8 +94,8 @@ let rk_match_at_2 (text pat: Seq.seq nat)
 (* Test: Precondition satisfiability + Postcondition precision *)
 fn test_rabin_karp ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Text: [1, 2, 1, 2, 1] (length 5, nat)
   let tv = V.alloc #nat 0 5sz;
@@ -132,6 +137,9 @@ fn test_rabin_karp ()
   rk_count_matches_is_2 s_text s_pat;
   assert (pure (count == 2));
 
+  // Runtime check that survives extraction
+  let pass = int_eq count 2;
+
   // Verify individual match positions
   rk_match_at_0 s_text s_pat;
   rk_match_at_2 s_text s_pat;
@@ -146,7 +154,7 @@ fn test_rabin_karp ()
   V.to_vec_pts_to pv;
   V.free pv;
 
-  ()
+  pass
 }
 ```
 
