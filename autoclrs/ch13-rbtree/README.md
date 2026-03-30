@@ -303,6 +303,35 @@ All lemmas are fully verified with zero admits:
 - **Integer keys only.** No generic key type or comparator function.
 - **No persistent/functional interface.** The Pulse implementation is
   destructive — insert/delete consume the input tree.
+- **Unbounded `int` in extractable code.** The Impl uses F*'s mathematical
+  `int` for keys. KaRaMeL maps this to `krml_checked_int_t` (`int32_t` with
+  runtime overflow checking via `compat.h`). Proofs guarantee correctness for
+  all integers; the C code operates on 32-bit values. A future improvement
+  would use `FStar.Int32.t` explicitly, keeping the Spec on unbounded `int`
+  and bridging via `Int32.v` in ghost assertions.
+
+## C Extraction
+
+The Okasaki implementation (`Impl`) and its test (`ImplTest`) are extracted
+to C via KaRaMeL and compiled into a test executable.
+
+```bash
+make test-c    # Extract, compile, and run C tests
+```
+
+The extracted test performs **runtime result checks**: `opt_int_eq` comparisons
+verify search results against expected values, and the test returns `bool`.
+The C driver (`test_main.c`) exits non-zero on failure. Ghost assertions
+(erased at extraction) guarantee the runtime checks always pass.
+
+### CLRSImpl (verification-only)
+
+The `CLRSImpl` module is a complete CLRS-faithful alternative implementation
+using parent pointers and explicit rotation-based INSERT-FIXUP / DELETE-FIXUP.
+It is **fully verified** (zero admits) but is **not extracted to C**. It serves
+as a verification artifact demonstrating that the CLRS pseudocode can be
+implemented faithfully in Pulse with full proofs. The Okasaki implementation
+is preferred for extraction due to its simpler structure (no parent pointers).
 
 ## File Inventory
 
@@ -315,9 +344,12 @@ All lemmas are fully verified with zero admits:
 | `CLRS.Ch13.RBTree.Complexity.fst` | Complexity proofs | 0 |
 | `CLRS.Ch13.RBTree.Impl.fsti` | Okasaki Pulse: types, slprop, full API signatures | 0 |
 | `CLRS.Ch13.RBTree.Impl.fst` | Okasaki Pulse: implementation (search, balance, insert, delete, free) | 0 |
+| `CLRS.Ch13.RBTree.ImplTest.fsti` | Test interface (returns bool) | 0 |
+| `CLRS.Ch13.RBTree.ImplTest.fst` | Spec validation test with runtime result checks | 0 |
+| `CLRS.Ch13.RBTree.Main.fst` | Entry point for C extraction (returns bool) | 0 |
 | `CLRS.Ch13.RBTree.CLRSSpec.fst` | CLRS-style pure spec: rotations, fixup, delete-fixup | 0 |
 | `CLRS.Ch13.RBTree.CLRSImpl.fsti` | CLRS Pulse: types, slprop, full API signatures | 0 |
-| `CLRS.Ch13.RBTree.CLRSImpl.fst` | CLRS Pulse: implementation with rotations and parent pointers | 0 |
+| `CLRS.Ch13.RBTree.CLRSImpl.fst` | CLRS Pulse: implementation with rotations and parent pointers (verification-only) | 0 |
 
 ## Building and Verification
 

@@ -17,7 +17,11 @@ KRML_BUNDLE_FLAGS = \
   -bundle 'CLRS.Ch13.RBTree.Main=CLRS.Ch13.RBTree.*' \
   -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
 KRML_EXTRA_FLAGS  =
-KRML_WARN_FLAGS   = -warn-error -2-15-20
+# Warning -15: expected — Impl uses F*'s unbounded `int` for keys, which
+# KaRaMeL maps to krml_checked_int_t (int32_t with overflow checks).
+# The compat.h header is included to provide this fallback.
+# Warning -2: standard (unused variables from ghost erasure).
+KRML_WARN_FLAGS   = -warn-error -2-15
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch13_RBTree_Main.c
 EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
                     $(KRML_HOME)/krmllib/c/fstar_int32.c
