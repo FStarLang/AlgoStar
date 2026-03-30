@@ -35,7 +35,7 @@ module Stab = CLRS.Ch08.RadixSort.Stability
 
 // ========== Main Algorithm ==========
 
-#push-options "--z3rlimit 120 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
 //SNIPPET_START: counting_sort_impl_sig
 ```pulse
 fn counting_sort_impl
@@ -287,7 +287,7 @@ ensures exists* sb'.
 
 open Pulse.Lib.BoundedIntegers
 
-#push-options "--z3rlimit 400 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 200 --fuel 1 --ifuel 1 --split_queries always"
 ```pulse
 fn counting_sort_inplace
   (a: A.array nat)
@@ -446,7 +446,7 @@ ensures exists* s.
 
 // ========== Digit-keyed Counting Sort (for multi-digit RadixSort) ==========
 
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
 ```pulse
 fn counting_sort_by_digit
   (a: A.array nat)     // Input array (read-only)

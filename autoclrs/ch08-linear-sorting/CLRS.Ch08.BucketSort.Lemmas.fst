@@ -400,7 +400,7 @@ let rec create_all_buckets_perm
 (* ========== Main Algorithm ========== *)
 
 //SNIPPET_START: bucket_sort_sig
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
 let bucket_sort (xs: list int) (k: pos)
   : Pure (list int)
     (requires True)

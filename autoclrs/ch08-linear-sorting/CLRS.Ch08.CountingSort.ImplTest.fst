@@ -32,7 +32,7 @@ module S = CLRS.Ch08.CountingSort.Spec
 
 // ========== Pure Helper Lemmas ==========
 
-#push-options "--z3rlimit 400 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 30 --fuel 8 --ifuel 4 --split_queries always"
 
 (* A sorted nat-permutation of [3;1;2] must be [1;2;3].
    Proved via element counts: each of {1,2,3} appears exactly once,

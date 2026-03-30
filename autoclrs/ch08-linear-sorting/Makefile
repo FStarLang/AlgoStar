@@ -1,6 +1,7 @@
 PULSE_ROOT ?= ../../FStar/pulse
 KRML_HOME  ?= ../../FStar/karamel
 KRML_EXE   ?= $(KRML_HOME)/krml
+STAGE3     ?= 1
 include $(PULSE_ROOT)/mk/test.mk
 
 # ── C extraction and test targets ──────────────────────────────────
