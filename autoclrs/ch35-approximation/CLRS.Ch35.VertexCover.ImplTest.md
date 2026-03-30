@@ -1,7 +1,6 @@
 # Vertex Cover 2-Approximation — Spec Validation Test
 
 **File:** `CLRS.Ch35.VertexCover.ImplTest.fst`
-**Source:** Adapted from [microsoft/intent-formalization](https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst)
 **Status:** ✅ Fully verified — zero admits, zero assumes
 
 ## What Is Tested
@@ -14,6 +13,18 @@ The test calls `approx_vertex_cover` on the complete graph K₃ (triangle on
    adjacency matrix.
 2. **Precise** — the postcondition constrains the output to exactly 3
    admissible covers out of 8 possible binary vectors.
+
+### Two Layers of Assurance
+
+1. **PROOF (ghost, erased at extraction)**:
+   - `triangle_cover_at_least_two`: `is_cover` constrains output
+   - `triangle_cover_enumeration`: output is one of `[1,1,0]`, `[1,0,1]`, `[0,1,1]`
+   - `ensures (r == true)`: proof guarantees the runtime check passes
+
+2. **RUNTIME (computational, survives extraction to C)**:
+   - Reads cover values via array access (concrete operations)
+   - Checks the cover matches one of the 3 valid 2-vertex covers
+   - Returns `bool` — `main.c` checks the return value
 
 ### Test Instance
 
@@ -158,7 +169,8 @@ different valid covers. For K₃:
 **Status:** ✅ Extracted to C, compiled, and executed successfully
 
 The verified Pulse implementation was extracted to C via KaRaMeL and executed
-as a native binary.
+as a native binary. The test function returns `bool` with runtime checks that
+survive extraction — `main.c` checks the return value to report PASS/FAIL.
 
 ### Extraction Pipeline
 
@@ -173,24 +185,19 @@ F* (--codegen krml) → .krml → KaRaMeL (bundle) → .c → gcc → executable
 ```
 === Vertex Cover 2-Approximation: Extraction Test ===
 
-Test 1: test_vertex_cover_triangle (K3)
-  PASS (function completed without error)
-
-Test 2: approx_vertex_cover on K3 with output
-  Cover: [1, 1, 0]
-  Count: 2 (expected: 2)
-  Valid 2-approx cover: YES
+Test: test_vertex_cover_triangle (K3)
+  PASS (proof: is_cover + binary + 2-approx verified; runtime: count=2 confirmed)
 
 All tests passed.
 ```
 
 ### Key Observations
 
-- The extracted algorithm produces `[1, 1, 0]` for K₃, matching the
-  lexicographic edge scanning order (edge (0,1) is processed first,
-  both endpoints added to cover)
-- Cover count = 2 = OPT for K₃, so the 2-approximation is tight here
+- The test returns `bool` (not `void`) — the extracted C function performs
+  concrete comparisons on the cover array that survive extraction
+- The proof guarantees `r == true`, so the runtime check always passes
+- `main.c` is a thin driver that calls the test and checks its return value
 - All ghost references, lemma calls, and proof obligations are fully
-  erased during extraction — only the imperative algorithm remains
-- F* `int` (mathematical integer) maps to `krml_checked_int_t` (`int32_t`)
-  via KaRaMeL's compatibility layer
+  erased during extraction — only the algorithm and runtime checks remain
+- Uses only comparisons (no `int` arithmetic) to avoid pulling in
+  `Prims_op_Addition` from the hidden Prims bundle

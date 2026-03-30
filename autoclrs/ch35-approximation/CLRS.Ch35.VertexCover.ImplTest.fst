@@ -1,9 +1,6 @@
 (*
    CLRS Chapter 35: Vertex Cover 2-Approximation — Spec Validation Test
 
-   Adapted from:
-   https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst
-
    Tests that the approx_vertex_cover API's postcondition
    (is_cover + binary + 2-approximation + even count) is satisfiable
    and sufficiently precise to constrain the output for a concrete
@@ -14,10 +11,17 @@
      Edges: {(0,1), (0,2), (1,2)}
      Adjacency matrix (row-major, 3×3): [0,1,1, 1,0,1, 1,1,0]
 
-   The postcondition proves the output is one of exactly 3 admissible
-   binary covers: [1,1,0], [1,0,1], [0,1,1] — ruling out all 0-vertex,
-   1-vertex covers AND the all-vertices cover [1,1,1] (which has odd
-   count 3, contradicting the even-count property).
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        ✓ triangle_cover_at_least_two: is_cover constrains output
+        ✓ triangle_cover_enumeration: output is one of [1,1,0], [1,0,1], [0,1,1]
+        ✓ ensures (r == true): proof guarantees the runtime check passes
+
+     2. RUNTIME (computational, survives extraction to C):
+        ✓ Reads cover values and checks binary property + count == 2
+        ✓ Returns bool — caller can verify at runtime
+
+   NO admits. NO assumes.
 *)
 module CLRS.Ch35.VertexCover.ImplTest
 #lang-pulse
@@ -100,13 +104,13 @@ let triangle_cover_enumeration
 
 (*** Pulse test: triangle graph K₃ ***)
 
-#push-options "--z3rlimit 10 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 4 --ifuel 2"
 
 ```pulse
 fn test_vertex_cover_triangle ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // --- Setup: adjacency matrix for K₃ (3 vertices, all pairs connected) ---
   // Layout (row-major 3×3): [0,1,1, 1,0,1, 1,1,0]
@@ -127,14 +131,10 @@ fn test_vertex_cover_triangle ()
   // Bind ghost sequence of adjacency matrix
   with s_adj. assert (A.pts_to adj s_adj);
 
-  // --- Precondition satisfiability ---
-  // Z3 verifies all preconditions from the concrete array values:
-  //   SZ.v 3sz > 0, SZ.fits 9, Seq.length == 9, is_symmetric_adj
-
   // --- Call the 2-approximation vertex cover algorithm ---
   let cover = approx_vertex_cover adj 3sz;
 
-  // --- Postcondition validation ---
+  // --- Ghost proof: establish that output is one of [1,1,0], [1,0,1], [0,1,1] ---
   with s_cover. assert (V.pts_to cover s_cover);
 
   // Assert concrete adjacency values (trigger for lemma preconditions)
@@ -148,7 +148,29 @@ fn test_vertex_cover_triangle ()
   // Prove: output is one of exactly 3 valid covers (even count rules out [1,1,1])
   triangle_cover_enumeration s_adj s_cover;
 
+  // --- Runtime: read cover values (survives extraction to C) ---
+  V.to_array_pts_to cover;
+  let cover_a = V.vec_to_array cover;
+  rewrite (A.pts_to (V.vec_to_array cover) s_cover)
+       as (A.pts_to cover_a s_cover);
+
+  let c0 = A.op_Array_Access cover_a 0sz;
+  let c1 = A.op_Array_Access cover_a 1sz;
+  let c2 = A.op_Array_Access cover_a 2sz;
+
+  // Runtime check: cover is one of the 3 valid 2-vertex covers for K₃
+  // Uses only comparisons (no int arithmetic) to avoid Prims_op_Addition in extraction
+  // From triangle_cover_enumeration, Z3 knows exactly one disjunct holds
+  let ok =
+    (c0 = 1 && c1 = 1 && c2 = 0) ||
+    (c0 = 1 && c1 = 0 && c2 = 1) ||
+    (c0 = 0 && c1 = 1 && c2 = 1);
+
   // --- Cleanup ---
+  with s_cover'. assert (A.pts_to cover_a s_cover');
+  rewrite (A.pts_to cover_a s_cover')
+       as (A.pts_to (V.vec_to_array cover) s_cover');
+  V.to_vec_pts_to cover;
   V.free cover;
 
   with s_a. assert (A.pts_to adj s_a);
@@ -156,6 +178,8 @@ fn test_vertex_cover_triangle ()
        as (A.pts_to (V.vec_to_array adj_v) s_a);
   V.to_vec_pts_to adj_v;
   V.free adj_v;
+
+  ok
 }
 ```
 
