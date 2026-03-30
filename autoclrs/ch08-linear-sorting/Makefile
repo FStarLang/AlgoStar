@@ -23,3 +23,28 @@ CC_EXTRA_INCLUDES = -I $(OUTPUT_DIR)/internal
 TEST_EXE_NAME     = test_counting_sort
 
 include ../autoclrs.test.mk
+
+# ── Snapshot target ─────────────────────────────────────────────────
+# Extracts verified C code into a self-contained snapshot/ directory
+# that can be built and tested without F*, Pulse, or KaRaMeL.
+SNAPSHOT_DIR = snapshot
+
+.PHONY: snapshot
+snapshot: $(EXTRACT_C_FILES)
+	@echo "  SNAPSHOT       $(CHAPTER_ID)"
+	@mkdir -p $(SNAPSHOT_DIR)/include $(SNAPSHOT_DIR)/dist/minimal \
+	          $(SNAPSHOT_DIR)/dist/generic $(SNAPSHOT_DIR)/internal
+	@# Generated files (F* + KaRaMeL)
+	@cp $(EXTRACT_DIR)/ImplTest.c $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/ImplTest.h $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/internal/*.h $(SNAPSHOT_DIR)/internal/
+	@# KaRaMeL runtime headers
+	@cp -r $(KRML_HOME)/include/* $(SNAPSHOT_DIR)/include/
+	@# KaRaMeL minimal distribution headers
+	@cp $(KRML_HOME)/krmllib/dist/minimal/*.h $(SNAPSHOT_DIR)/dist/minimal/
+	@# KaRaMeL generic runtime C sources
+	@cp $(KRML_HOME)/krmllib/dist/generic/Prims.h      $(SNAPSHOT_DIR)/dist/generic/
+	@cp $(KRML_HOME)/krmllib/dist/generic/prims.c       $(SNAPSHOT_DIR)/dist/generic/
+	@cp $(KRML_HOME)/krmllib/dist/generic/FStar_Int32.h $(SNAPSHOT_DIR)/dist/generic/
+	@cp $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c $(SNAPSHOT_DIR)/dist/generic/
+	@echo "  Snapshot ready in $(SNAPSHOT_DIR)/"
