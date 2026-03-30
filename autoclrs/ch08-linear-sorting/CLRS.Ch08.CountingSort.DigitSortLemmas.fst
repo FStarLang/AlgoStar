@@ -275,7 +275,8 @@ let rec count_positive_find (s: Seq.seq nat) (x: nat)
 /// Bridge: B.count s x == SeqP.count x s
 let rec b_count_eq_seqp_count (s: Seq.seq nat) (x: nat)
   : Lemma (ensures B.count s x == SeqP.count x s) (decreases Seq.length s)
-  = if Seq.length s = 0 then ()
+  = B.count_unfold s x;
+    if Seq.length s = 0 then ()
     else b_count_eq_seqp_count (Seq.tail s) x
 
 /// Slice split: count over [a, c) = count over [a, b) + count over [b, c)
@@ -1410,4 +1411,10 @@ let phase4_final_is_stable (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n: nat
 let empty_is_stable_on_digit (s1 s2: Seq.seq nat) (d base: nat)
   : Lemma (requires Seq.length s1 == 0 /\ Seq.length s2 == 0 /\ base >= 2)
           (ensures Stab.is_stable_sort_on_digit s1 s2 d base)
-  = reveal_opaque (`%Stab.is_stable_sort_on_digit) (Stab.is_stable_sort_on_digit s1 s2 d base)
+  = // Prove permutation s1 s2 by revealing count for empty sequences
+    let aux (x: nat) : Lemma (B.count s1 x == B.count s2 x) =
+      B.count_unfold s1 x;
+      B.count_unfold s2 x
+    in
+    Classical.forall_intro aux;
+    reveal_opaque (`%Stab.is_stable_sort_on_digit) (Stab.is_stable_sort_on_digit s1 s2 d base)

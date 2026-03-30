@@ -88,15 +88,51 @@ let rec sorted_on_digit (s: seq nat) (d: nat) (base: nat) : Tot prop (decreases 
 
 (* ========== Permutation ========== *)
 
-/// Count occurrences of x in sequence
+/// Count occurrences of x in sequence.
+/// Opaque to SMT to prevent quantifier cascades: Z3's fuel-based
+/// unfolding of count interacts badly with the universal quantifier
+/// in `permutation`, causing 60K+ instantiations and 10-minute proofs.
+/// Use count_unfold to reveal the definition where needed.
+[@@"opaque_to_smt"]
 let rec count (s: seq nat) (x: nat) : Tot nat (decreases (length s)) =
   if length s = 0 then 0
   else (if index s 0 = x then 1 else 0) + count (tail s) x
 
-/// s_out is a permutation of s_in (same length and same counts for all values)
+/// Explicit unfolding lemma for count — use this instead of relying on fuel.
+let count_unfold (s: seq nat) (x: nat)
+  : Lemma (count s x == (if length s = 0 then 0
+                          else (if index s 0 = x then 1 else 0) + count (tail s) x))
+  = reveal_opaque (`%count) (count s x)
+
+/// s_out is a permutation of s_in (same length and same counts for all values).
+/// Pattern on count s_in x: since count is opaque_to_smt, this only fires
+/// when count terms are explicitly introduced via count_unfold or count_cons.
 let permutation (s_in s_out: seq nat) : prop =
   length s_in == length s_out /\
-  (forall (x: nat). count s_in x == count s_out x)
+  (forall (x: nat). {:pattern (count s_in x)} count s_in x == count s_out x)
+
+/// Extract a specific count equality from a permutation proof.
+let permutation_count (s_in s_out: seq nat) (x: nat)
+  : Lemma (requires permutation s_in s_out)
+          (ensures count s_in x == count s_out x)
+  = ()
+
+/// Extract length equality from a permutation proof.
+let permutation_length (s_in s_out: seq nat)
+  : Lemma (requires permutation s_in s_out)
+          (ensures length s_in == length s_out)
+  = ()
+
+/// Permutation is reflexive
+let permutation_reflexive (s: seq nat)
+  : Lemma (permutation s s)
+  = ()
+
+/// Build a permutation from length + forall count
+let mk_permutation (s_in s_out: seq nat)
+  : Lemma (requires length s_in == length s_out /\ (forall (x: nat). count s_in x == count s_out x))
+          (ensures permutation s_in s_out)
+  = ()
 
 (* ========== Permutation helpers ========== *)
 
@@ -105,7 +141,8 @@ let rec count_positive_means_appears (s: seq nat) (v: nat)
   : Lemma (requires count s v > 0)
           (ensures (exists (i: nat). i < length s /\ index s i == v))
           (decreases (length s))
-  = if length s = 0 then ()
+  = count_unfold s v;
+    if length s = 0 then ()
     else if index s 0 = v then ()
     else count_positive_means_appears (tail s) v
 
@@ -113,7 +150,8 @@ let rec count_positive_means_appears (s: seq nat) (v: nat)
 let rec element_appears_means_count_positive (s: seq nat) (i: nat{i < length s})
   : Lemma (ensures count s (index s i) > 0)
           (decreases (length s))
-  = if i = 0 then ()
+  = count_unfold s (index s i);
+    if i = 0 then ()
     else element_appears_means_count_positive (tail s) (i - 1)
 
 /// Permutation is transitive
@@ -131,7 +169,6 @@ let permutation_preserves_bounds (s_in s_out: seq nat) (bound: nat)
       let v = index s_out i in
       element_appears_means_count_positive s_out i;
       assert (count s_out v > 0);
-      assert (count s_in v == count s_out v);
       assert (count s_in v > 0);
       count_positive_means_appears s_in v;
       ()

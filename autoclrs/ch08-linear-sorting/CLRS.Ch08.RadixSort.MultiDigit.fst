@@ -51,13 +51,9 @@ let sorted_on_digit_tail (s: seq nat) (d: nat) (base: nat)
 /// Helper: count in cons
 let count_cons (x h: nat) (s: seq nat)
   : Lemma (count (cons h s) x == (if h = x then 1 else 0) + count s x)
-  = if length s = 0 then ()
-    else (
-      cons_tail h s;
-      assert (tail (cons h s) == s);
-      cons_index_0 h s;
-      assert (index (cons h s) 0 == h)
-    )
+  = count_unfold (cons h s) x;
+    SeqP.head_cons h s;
+    SeqP.lemma_tl h s
 
 (* ========== Helper: insertion into sorted sequence by digit ========== *)
 
@@ -75,7 +71,7 @@ let rec insert_by_digit (x: nat) (s: seq nat) (d: nat) (base: nat)
 let rec insertion_sort_by_digit (s: seq nat) (d: nat) (base: nat)
   : Tot (seq nat) (decreases (length s))
   = if length s = 0 then 
-      empty
+      s
     else 
       insert_by_digit (index s 0) (insertion_sort_by_digit (tail s) d base) d base
 
@@ -229,7 +225,20 @@ let rec insert_by_digit_permutation
                    (forall (y: nat). y <> x ==> count result y == count s y)))
           (decreases (length s))
   = insert_by_digit_length x s d base;
-    if length s = 0 then ()
+    let result = insert_by_digit x s d base in
+    if length s = 0 then (
+      // result = create 1 x
+      count_unfold s x;     // count empty x == 0
+      count_unfold result x; // count (create 1 x) x == 1 + count (tail (create 1 x)) x
+      count_unfold (tail result) x; // count empty x == 0
+      // For y <> x: count result y == count s y == 0
+      let aux (y: nat) : Lemma (requires y <> x) (ensures count result y == count s y) =
+        count_unfold s y;
+        count_unfold result y;
+        count_unfold (tail result) y
+      in
+      Classical.forall_intro (Classical.move_requires aux)
+    )
     else if digit x d base <= digit (index s 0) d base then (
       // result = cons x s
       let result = cons x s in
@@ -258,6 +267,7 @@ let rec insert_by_digit_permutation
       
       // Prove count result x == count s x + 1
       count_cons x h result_tail;
+      count_unfold s x;
       assert (count result x == (if h = x then 1 else 0) + count result_tail x);
       assert (count result_tail x == count t x + 1);
       assert (count s x == (if h = x then 1 else 0) + count t x);
@@ -265,6 +275,7 @@ let rec insert_by_digit_permutation
       // Prove count result y == count s y for y <> x
       let aux (y: nat) : Lemma (requires y <> x) (ensures count result y == count s y) =
         count_cons y h result_tail;
+        count_unfold s y;
         assert (count result y == (if h = y then 1 else 0) + count result_tail y);
         assert (count result_tail y == count t y); // from IH for y <> x
         assert (count s y == (if h = y then 1 else 0) + count t y)
@@ -274,25 +285,37 @@ let rec insert_by_digit_permutation
 #pop-options
 
 /// Lemma: insertion_sort_by_digit is a permutation
+#restart-solver
+#push-options "--z3rlimit 30 --split_queries always"
+let insertion_sort_permutation_base
+  (s: seq nat{length s = 0}) (d: nat) (base: pos)
+  : Lemma (permutation s (insertion_sort_by_digit s d base))
+  = () // insertion_sort_by_digit s d base = s by fuel reduction
+
 let rec insertion_sort_permutation
   (s: seq nat) (d: nat) (base: nat)
   : Lemma (requires base > 0)
           (ensures permutation s (insertion_sort_by_digit s d base))
           (decreases (length s))
-  = if length s = 0 then ()
+  = if length s = 0 then
+      insertion_sort_permutation_base s d base
     else (
       insertion_sort_permutation (tail s) d base;
-      insert_by_digit_permutation (index s 0) (insertion_sort_by_digit (tail s) d base) d base;
-      // Now prove that the full permutation holds
       let x = index s 0 in
       let sorted_tail = insertion_sort_by_digit (tail s) d base in
+      insert_by_digit_permutation x sorted_tail d base;
       let result = insert_by_digit x sorted_tail d base in
-      // We know: sorted_tail is permutation of tail s
-      // We know: result has count(result, x) = count(sorted_tail, x) + 1
-      //          and count(result, y) = count(sorted_tail, y) for y <> x
-      // Need: count(result, z) = count(s, z) for all z
-      ()
+      let aux (z: nat) : Lemma (count s z == count result z) =
+        count_unfold s z;
+        permutation_count (tail s) sorted_tail z
+        // count s z == (if x=z then 1 else 0) + count sorted_tail z
+        // From insert_by_digit_permutation:
+        //   count result x == count sorted_tail x + 1
+        //   z<>x ==> count result z == count sorted_tail z
+      in
+      Classical.forall_intro aux
     )
+#pop-options
 
 /// Lemma: stable_sort_on_digit is a permutation
 let stable_sort_on_digit_permutation
@@ -306,11 +329,9 @@ let rec element_in_seq_has_positive_count (s: seq nat) (x: nat) (i: nat)
   : Lemma (requires i < length s /\ index s i == x)
           (ensures count s x > 0)
           (decreases (length s))
-  = if i = 0 then ()
-    else (
-      assert (count s x >= count (tail s) x);
-      element_in_seq_has_positive_count (tail s) x (i - 1)
-    )
+  = count_unfold s x;
+    if i = 0 then ()
+    else element_in_seq_has_positive_count (tail s) x (i - 1)
 
 /// Element at position k in s appears somewhere in insert_by_digit h s
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
@@ -446,7 +467,8 @@ let rec insertion_sort_stable (s: seq nat) (d base: nat) (i j: nat)
 let rec two_elem_count (s: seq nat) (x: nat) (i j: nat)
   : Lemma (requires i < j /\ j < length s /\ index s i == x /\ index s j == x)
           (ensures count s x >= 2) (decreases (length s))
-  = if i = 0 then element_in_seq_has_positive_count (tail s) x (j - 1)
+  = count_unfold s x;
+    if i = 0 then element_in_seq_has_positive_count (tail s) x (j - 1)
     else two_elem_count (tail s) x (i - 1) (j - 1)
 
 /// If count >= 2, find two positions
@@ -454,7 +476,8 @@ let rec two_positions (s: seq nat) (v: nat)
   : Lemma (requires count s v >= 2)
           (ensures exists (i j: nat). i < j /\ j < length s /\ index s i == v /\ index s j == v)
           (decreases (length s))
-  = if length s = 0 then ()
+  = count_unfold s v;
+    if length s = 0 then ()
     else if index s 0 = v then (
       count_positive_means_appears (tail s) v
     ) else two_positions (tail s) v
@@ -990,7 +1013,8 @@ let rec count_positive_implies_bounded (s: seq nat) (x: nat) (bound: nat)
   : Lemma (requires count s x > 0 /\ (forall (i: nat). i < length s ==> index s i < bound))
           (ensures x < bound)
           (decreases (length s))
-  = if length s = 0 then ()
+  = count_unfold s x;
+    if length s = 0 then ()
     else if index s 0 = x then ()
     else count_positive_implies_bounded (tail s) x bound
 

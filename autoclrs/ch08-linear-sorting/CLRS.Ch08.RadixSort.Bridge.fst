@@ -33,7 +33,8 @@ module B = CLRS.Ch08.RadixSort.Base
 let rec count_equiv (s: seq nat) (x: nat)
   : Lemma (ensures SeqP.count x s == B.count s x)
           (decreases (length s))
-  = if length s = 0 then ()
+  = B.count_unfold s x;
+    if length s = 0 then ()
     else count_equiv (tail s) x
 
 (* ========== Permutation bridge ========== *)
