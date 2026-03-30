@@ -30,6 +30,10 @@ module Seq = FStar.Seq
 module SP = FStar.Seq.Properties
 module SS = CLRS.Common.SortSpec
 
+(* Runtime integer equality check that survives KaRaMeL extraction to C *)
+inline_for_extraction
+let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
+
 (* Completeness lemma: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
    Bridges BoundedIntegers typeclass operators (used in SS.sorted) to Prims operators,
    and uses Prims.op_Equality in assert_norm so the normalizer can reduce SP.count.
@@ -65,8 +69,8 @@ let completeness_sort3 (s: Seq.seq int)
 (* Completeness: y = quicksort(x); assert(y == expected) *)
 fn test_quicksort_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Input: [3; 1; 2]
   let v = V.alloc 0 3sz;
@@ -90,20 +94,21 @@ fn test_quicksort_3 ()
   // Now Z3 sees: SP.permutation int s0 s, and knows s0 == [3;1;2] from array writes
   completeness_sort3 s;
 
-  // Read and verify each element
+  // Read and verify each element (runtime checks that survive extraction)
   let v0 = arr.(0sz);
   let v1 = arr.(1sz);
   let v2 = arr.(2sz);
   assert (pure (v0 == 1));
   assert (pure (v1 == 2));
   assert (pure (v2 == 3));
+  let ok = int_eq v0 1 && int_eq v1 2 && int_eq v2 3;
 
   // cleanup
   with s2. assert (A.pts_to arr s2);
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 ```
 
@@ -111,8 +116,8 @@ fn test_quicksort_3 ()
 ```pulse
 fn test_quicksort_with_complexity ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Input: [3; 1; 2]
   let v = V.alloc 0 3sz;
@@ -155,6 +160,7 @@ fn test_quicksort_with_complexity ()
   assert (pure (v0 == 1));
   assert (pure (v1 == 2));
   assert (pure (v2 == 3));
+  let ok = int_eq v0 1 && int_eq v1 2 && int_eq v2 3;
 
   // Cleanup
   GR.free ctr;
@@ -162,7 +168,7 @@ fn test_quicksort_with_complexity ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 ```
 
@@ -170,8 +176,8 @@ fn test_quicksort_with_complexity ()
 ```pulse
 fn test_quicksort_bounded ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Input: [3; 1; 2]
   let v = V.alloc 0 3sz;
@@ -207,13 +213,24 @@ fn test_quicksort_bounded ()
   reveal_opaque (`%SS.permutation) (SS.permutation s0 s);
   completeness_sort3 s;
 
-  // Convert back and cleanup
+  // Convert back so we can read elements
   A.pts_to_range_elim arr 1.0R s;
+
+  // Read and verify each element (runtime checks that survive extraction)
+  let v0 = arr.(0sz);
+  let v1 = arr.(1sz);
+  let v2 = arr.(2sz);
+  assert (pure (v0 == 1));
+  assert (pure (v1 == 2));
+  assert (pure (v2 == 3));
+  let ok = int_eq v0 1 && int_eq v1 2 && int_eq v2 3;
+
+  // cleanup
   with s2. assert (A.pts_to arr s2);
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 ```
 
