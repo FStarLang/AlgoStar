@@ -43,3 +43,42 @@ TEST_MAIN         = main.c
 TEST_EXE_NAME     = ch09_test
 
 include ../autoclrs.test.mk
+
+# ── Snapshot target ─────────────────────────────────────────────────
+# Populate snapshot/ with extracted C, handwritten driver, and krmllib
+# runtime so it builds standalone (no F*/KaRaMeL/Pulse needed).
+
+SNAPSHOT_DIR = snapshot
+
+.PHONY: snapshot
+snapshot: $(EXTRACT_C_FILES)
+	@echo "=== Populating $(SNAPSHOT_DIR) ==="
+	@# Generated .c and .h from extraction
+	cp $(OUTPUT_DIR)/*.c $(OUTPUT_DIR)/*.h $(SNAPSHOT_DIR)/
+	@mkdir -p $(SNAPSHOT_DIR)/internal
+	cp $(OUTPUT_DIR)/internal/*.h $(SNAPSHOT_DIR)/internal/
+	@# Handwritten sources (main driver and krmlinit override)
+	cp main.c krmlinit_override.c $(SNAPSHOT_DIR)/
+	@# KaRaMeL C runtime headers and sources
+	@mkdir -p $(SNAPSHOT_DIR)/krmllib/include/krml/internal
+	cp $(KRML_HOME)/include/krmllib.h        $(SNAPSHOT_DIR)/krmllib/include/
+	cp $(KRML_HOME)/include/krml/fstar_int.h $(SNAPSHOT_DIR)/krmllib/include/krml/
+	cp $(KRML_HOME)/include/krml/lowstar_endianness.h $(SNAPSHOT_DIR)/krmllib/include/krml/
+	cp $(KRML_HOME)/include/krml/internal/builtin.h   $(SNAPSHOT_DIR)/krmllib/include/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/callconv.h  $(SNAPSHOT_DIR)/krmllib/include/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/compat.h    $(SNAPSHOT_DIR)/krmllib/include/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/debug.h     $(SNAPSHOT_DIR)/krmllib/include/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/target.h    $(SNAPSHOT_DIR)/krmllib/include/krml/internal/
+	cp $(KRML_HOME)/include/krml/internal/types.h     $(SNAPSHOT_DIR)/krmllib/include/krml/internal/
+	@mkdir -p $(SNAPSHOT_DIR)/krmllib/dist
+	cp $(KRML_HOME)/krmllib/dist/generic/Prims.h       $(SNAPSHOT_DIR)/krmllib/dist/
+	cp $(KRML_HOME)/krmllib/dist/generic/FStar_Int32.h $(SNAPSHOT_DIR)/krmllib/dist/
+	cp $(KRML_HOME)/krmllib/dist/minimal/fstar_uint128_gcc64.h           $(SNAPSHOT_DIR)/krmllib/dist/
+	cp $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt128.h                 $(SNAPSHOT_DIR)/krmllib/dist/
+	cp $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt_8_16_32_64.h        $(SNAPSHOT_DIR)/krmllib/dist/
+	cp $(KRML_HOME)/krmllib/dist/minimal/LowStar_Endianness.h           $(SNAPSHOT_DIR)/krmllib/dist/
+	@mkdir -p $(SNAPSHOT_DIR)/krmllib/c
+	cp $(KRML_HOME)/krmllib/c/prims.c       $(SNAPSHOT_DIR)/krmllib/c/
+	cp $(KRML_HOME)/krmllib/c/fstar_int32.c $(SNAPSHOT_DIR)/krmllib/c/
+	@echo "=== Building snapshot ==="
+	$(MAKE) -C $(SNAPSHOT_DIR) run
