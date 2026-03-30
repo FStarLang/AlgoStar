@@ -1,5 +1,8 @@
 module CLRS.Ch31.GCD.ImplTest
 
 open Pulse.Lib.Pervasives
+open FStar.SizeT
 
-val test_gcd (_:unit) : stt unit emp (fun _ -> emp)
+module SZ = FStar.SizeT
+
+val test_gcd (_:unit) : stt bool emp (fun r -> pure (r == true))

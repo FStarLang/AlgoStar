@@ -1,7 +1,5 @@
 PULSE_ROOT ?= ../../FStar/pulse
 KRML_HOME  ?= ../../FStar/karamel
-STAGE3     ?= 1
-export STAGE3
 OTHERFLAGS += --include ../common
 include $(PULSE_ROOT)/mk/test.mk
 
@@ -14,6 +12,11 @@ EXTRACT_MODULES = \
   CLRS.Ch31.GCD.Spec \
   CLRS.Ch31.GCD.Complexity \
   CLRS.Ch31.GCD.Lemmas \
+  CLRS.Ch31.ExtendedGCD.ImplTest \
+  CLRS.Ch31.ExtendedGCD.Impl \
+  CLRS.Ch31.ExtendedGCD.Spec \
+  CLRS.Ch31.ExtendedGCD.Complexity \
+  CLRS.Ch31.ExtendedGCD.Lemmas \
   CLRS.Ch31.ModExp.ImplTest \
   CLRS.Ch31.ModExp.Impl \
   CLRS.Ch31.ModExp.Spec \
@@ -25,17 +28,16 @@ EXTRACT_MODULES = \
   CLRS.Ch31.ModExpLR.Lemmas \
   CLRS.Common.Complexity
 
-BUNDLE_C_STEM = CLRS_Ch31_GCD_ImplTest_CLRS_Ch31_ModExp_ImplTest_CLRS_Ch31_ModExpLR_ImplTest
+BUNDLE_C_STEM = Ch31_NumberTheory
 
 KRML_INPUT_FILES  = $(foreach m,$(EXTRACT_MODULES),$(OUTPUT_DIR)/$(subst .,_,$m).krml)
 KRML_BUNDLE_FLAGS = \
-  -bundle 'CLRS.Ch31.GCD.ImplTest+CLRS.Ch31.ModExp.ImplTest+CLRS.Ch31.ModExpLR.ImplTest=CLRS.*' \
-  -bundle 'FStar.*' -bundle 'Pulse.*' -bundle 'PulseCore.*' -bundle 'Prims'
-KRML_WARN_FLAGS   = -warn-error -2-1-15
+  -bundle 'CLRS.Ch31.GCD.ImplTest+CLRS.Ch31.ExtendedGCD.ImplTest+CLRS.Ch31.ModExp.ImplTest+CLRS.Ch31.ModExpLR.ImplTest=CLRS.*[rename=Ch31_NumberTheory]' \
+  -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
+KRML_WARN_FLAGS   = -warn-error -2-9-15-17
 KRML_EXTRA_INPUTS =
 EXTRACT_C_FILES   = $(OUTPUT_DIR)/$(BUNDLE_C_STEM).c
-EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
-                    $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
-CC_EXTRA_FLAGS    = -Wno-implicit-function-declaration
+EXTRA_C_SOURCES   =
+CC_EXTRA_FLAGS    =
 
 include ../autoclrs.test.mk
