@@ -86,4 +86,68 @@ $(EXTRACT_DIR)/%.krml:
 $(EXTRACT_DIR)/%.c: $(EXTRACT_DIR)/%.krml
 	@true
 
+# ── Snapshot target ─────────────────────────────────────────────────
+# Copies extracted C/H files and krmllib headers into a self-contained
+# snapshot/ directory that can be built without F*/KaRaMeL installed.
+
+SNAPSHOT_DIR = snapshot
+
+SNAPSHOT_KRML_HEADERS = \
+  $(KRML_HOME)/include/krmllib.h \
+  $(KRML_HOME)/include/krml/fstar_int.h \
+  $(KRML_HOME)/include/krml/lowstar_endianness.h \
+  $(KRML_HOME)/include/krml/internal/builtin.h \
+  $(KRML_HOME)/include/krml/internal/callconv.h \
+  $(KRML_HOME)/include/krml/internal/compat.h \
+  $(KRML_HOME)/include/krml/internal/debug.h \
+  $(KRML_HOME)/include/krml/internal/target.h \
+  $(KRML_HOME)/include/krml/internal/types.h \
+  $(KRML_HOME)/krmllib/dist/generic/Prims.h \
+  $(KRML_HOME)/krmllib/dist/generic/FStar_Int32.h \
+  $(KRML_HOME)/krmllib/dist/generic/prims.c \
+  $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c \
+  $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt128.h \
+  $(KRML_HOME)/krmllib/dist/minimal/fstar_uint128_gcc64.h \
+  $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt_8_16_32_64.h \
+  $(KRML_HOME)/krmllib/dist/minimal/LowStar_Endianness.h
+
+.PHONY: snapshot
+snapshot: $(EXTRACT_C_FILES)
+	@echo "  SNAPSHOT  $(SNAPSHOT_DIR)"
+	@mkdir -p $(SNAPSHOT_DIR)/krml/internal \
+	          $(SNAPSHOT_DIR)/krmllib/dist/minimal \
+	          $(SNAPSHOT_DIR)/krmllib/dist/generic \
+	          $(SNAPSHOT_DIR)/internal
+	@# Copy extracted .c/.h files
+	@cp $(EXTRACT_DIR)/RodCutting_ImplTest.c $(EXTRACT_DIR)/RodCutting_ImplTest.h \
+	    $(EXTRACT_DIR)/LCS_ImplTest.c $(EXTRACT_DIR)/LCS_ImplTest.h \
+	    $(EXTRACT_DIR)/MatrixChain_ImplTest.c $(EXTRACT_DIR)/MatrixChain_ImplTest.h \
+	    $(EXTRACT_DIR)/Support.c \
+	    $(EXTRACT_DIR)/krmlinit.c $(EXTRACT_DIR)/krmlinit.h \
+	    $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/internal/Support.h $(SNAPSHOT_DIR)/internal/
+	@# Copy krmllib headers
+	@cp $(KRML_HOME)/include/krmllib.h $(SNAPSHOT_DIR)/
+	@cp $(KRML_HOME)/include/krml/fstar_int.h \
+	    $(KRML_HOME)/include/krml/lowstar_endianness.h \
+	    $(SNAPSHOT_DIR)/krml/
+	@cp $(KRML_HOME)/include/krml/internal/builtin.h \
+	    $(KRML_HOME)/include/krml/internal/callconv.h \
+	    $(KRML_HOME)/include/krml/internal/compat.h \
+	    $(KRML_HOME)/include/krml/internal/debug.h \
+	    $(KRML_HOME)/include/krml/internal/target.h \
+	    $(KRML_HOME)/include/krml/internal/types.h \
+	    $(SNAPSHOT_DIR)/krml/internal/
+	@cp $(KRML_HOME)/krmllib/dist/generic/Prims.h \
+	    $(KRML_HOME)/krmllib/dist/generic/FStar_Int32.h \
+	    $(KRML_HOME)/krmllib/dist/generic/prims.c \
+	    $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c \
+	    $(SNAPSHOT_DIR)/krmllib/dist/generic/
+	@cp $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt128.h \
+	    $(KRML_HOME)/krmllib/dist/minimal/fstar_uint128_gcc64.h \
+	    $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt_8_16_32_64.h \
+	    $(KRML_HOME)/krmllib/dist/minimal/LowStar_Endianness.h \
+	    $(SNAPSHOT_DIR)/krmllib/dist/minimal/
+	@echo "  Snapshot ready — run: make -C $(SNAPSHOT_DIR)"
+
 include ../autoclrs.test.mk
