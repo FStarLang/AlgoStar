@@ -1,0 +1,10 @@
+/* fstar_support.h — Declarations for fstar_support.c */
+#ifndef FSTAR_SUPPORT_H
+#define FSTAR_SUPPORT_H
+
+#include <stddef.h>
+#include "krml/internal/compat.h"
+
+extern krml_checked_int_t FStar_SizeT_v(size_t x);
+
+#endif

@@ -141,6 +141,23 @@ let no_cycle_test ()
 
 #pop-options
 
+(*** Helper: connect all_distinct to pairwise inequality of int elements ***)
+
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+let lemma_distinct_pairwise (sout: Seq.seq int) (i j: nat)
+  : Lemma
+    (requires
+      Seq.length sout >= 3 /\
+      (forall (k:nat). k < Seq.length sout ==> Seq.index sout k >= 0) /\
+      all_distinct (seq_int_to_nat sout) /\
+      i < Seq.length sout /\ j < Seq.length sout /\ i <> j)
+    (ensures Seq.index sout i <> Seq.index sout j)
+  = let r = seq_int_to_nat sout in
+    assert (Seq.index r i == Seq.index sout i);
+    assert (Seq.index r j == Seq.index sout j);
+    assert (Seq.index r i <> Seq.index r j)
+#pop-options
+
 (*** Main test ***)
 
 #push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
@@ -148,8 +165,8 @@ let no_cycle_test ()
 ```pulse
 fn test_topo_sort_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures emp ** pure (r == true)
 {
   (* ---- Phase 1: Allocate and initialize ---- *)
 
@@ -207,9 +224,38 @@ fn test_topo_sort_3 ()
   // -- (F) Complexity bound --
   assert (pure (cf - 0 <= 3 * 3));
 
+  // -- (G) Read concrete output values for runtime check --
+  V.to_array_pts_to output;
+  let out_arr = V.vec_to_array output;
+  rewrite (A.pts_to (V.vec_to_array output) sout)
+       as (A.pts_to out_arr sout);
+  A.pts_to_len out_arr;
+  let v0 = out_arr.(0sz);
+  let v1 = out_arr.(1sz);
+  let v2 = out_arr.(2sz);
+
+  // Ghost: connect reads to postcondition
+  assert (pure (v0 >= 0 /\ v0 < 3));
+  assert (pure (v1 >= 0 /\ v1 < 3));
+  assert (pure (v2 >= 0 /\ v2 < 3));
+
+  // Pairwise distinct: use helper lemma
+  lemma_distinct_pairwise sout 0 1;
+  lemma_distinct_pairwise sout 0 2;
+  lemma_distinct_pairwise sout 1 2;
+  assert (pure (v0 <> v1 /\ v0 <> v2 /\ v1 <> v2));
+
+  // -- Runtime check (survives extraction to C) --
+  // Checks: all elements in range and pairwise distinct
+  let result = (v0 >= 0 && v0 < 3 && v1 >= 0 && v1 < 3 && v2 >= 0 && v2 < 3 &&
+                v0 <> v1 && v0 <> v2 && v1 <> v2);
+
   (* ---- Phase 4: Cleanup ---- *)
-  // Free the output vec
-  drop_ (V.pts_to output sout);
+  // Convert array back to Vec and free properly (fixes memory leak)
+  with s'. assert (A.pts_to out_arr s');
+  rewrite (A.pts_to out_arr s') as (A.pts_to (V.vec_to_array output) s');
+  V.to_vec_pts_to output;
+  V.free output;
 
   with s1. assert (A.pts_to adj s1);
   rewrite (A.pts_to adj s1) as (A.pts_to (V.vec_to_array adj_v) s1);
@@ -217,7 +263,7 @@ fn test_topo_sort_3 ()
   V.free adj_v;
 
   GR.free ctr;
-  ()
+  result
 }
 ```
 

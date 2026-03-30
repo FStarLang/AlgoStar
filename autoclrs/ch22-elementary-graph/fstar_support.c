@@ -1,0 +1,24 @@
+/*
+  fstar_support.c — Minimal support for krml-extracted code.
+
+  Provides stubs required by krmllib's prims.c and symbols that
+  KaRaMeL emits for F*'s unbounded-int / SizeT conversions.
+*/
+
+#include <stddef.h>
+#include <stdint.h>
+#include "krml/internal/compat.h"
+
+/* Stub for FStar.Int32.to_string (required by krmllib prims.c) */
+const char* FStar_Int32_to_string(int32_t i) {
+  (void)i;
+  return "<int>";
+}
+
+/* FStar.SizeT.v — convert size_t to krml_checked_int_t.
+   Used when the Impl code stores SZ.t values into int-typed arrays
+   (e.g., predecessor arrays).  This is a narrowing cast that is safe
+   for the small graph sizes used in the test suite. */
+krml_checked_int_t FStar_SizeT_v(size_t x) {
+  return (krml_checked_int_t)x;
+}

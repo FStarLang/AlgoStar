@@ -107,8 +107,8 @@ let derive_pred_values
 ```pulse
 fn test_dfs_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures emp ** pure (r == true)
 {
   (* ---- Phase 1: Allocate and initialize ---- *)
 
@@ -258,6 +258,25 @@ fn test_dfs_3 ()
   // for non-root vertices, but the discovery ordering d[0]<d[1]<d[2] + d[u]<f[u]
   // + timestamp bounds [1,6] already constrains the timestamps significantly.
 
+  // -- (J) Read concrete values for runtime check --
+  let c0 = color.(0sz);
+  let c1 = color.(1sz);
+  let c2 = color.(2sz);
+  let rd0 = d_arr.(0sz);
+  let rd1 = d_arr.(1sz);
+  let rd2 = d_arr.(2sz);
+  let rf0 = f_arr.(0sz);
+  let rf1 = f_arr.(1sz);
+  let rf2 = f_arr.(2sz);
+
+  // Ghost: connect concrete reads to postcondition
+  assert (pure (c0 == 2 /\ c1 == 2 /\ c2 == 2));
+  assert (pure (rd0 < rf0 /\ rd1 < rf1 /\ rd2 < rf2));
+
+  // -- Runtime check (survives extraction to C) --
+  // Checks: all vertices BLACK, parenthesis theorem holds
+  let result = (c0 = 2 && c1 = 2 && c2 = 2 && rd0 < rf0 && rd1 < rf1 && rd2 < rf2);
+
   (* ---- Phase 4: Cleanup ---- *)
   with s1. assert (A.pts_to adj s1);
   rewrite (A.pts_to adj s1) as (A.pts_to (V.vec_to_array adj_v) s1);
@@ -295,7 +314,7 @@ fn test_dfs_3 ()
   V.free scan_v;
 
   GR.free ctr;
-  ()
+  result
 }
 ```
 

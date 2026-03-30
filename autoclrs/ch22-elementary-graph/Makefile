@@ -20,14 +20,14 @@ IMPLTEST_KRML = \
 	$(OUTPUT_DIR)/CLRS_Ch22_TopologicalSort_Spec.krml
 
 KRML_INPUT_FILES  = $(IMPLTEST_KRML)
-KRML_BUNDLE_FLAGS = -bundle 'CLRS.Ch22.ImplTestMain=*'
-KRML_WARN_FLAGS   = -warn-error -2 -warn-error -4 -warn-error -1 -warn-error -15 -warn-error -17 -warn-error -9
-KRML_EXTRA_FLAGS  = -add-include '"ch22_support.h"'
+KRML_BUNDLE_FLAGS = \
+	-bundle 'CLRS.Ch22.ImplTestMain=CLRS.Ch22.*' \
+	-bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
+KRML_WARN_FLAGS   = -warn-error -2-9-11-15-17
+KRML_EXTRA_FLAGS  = -add-include '"fstar_support.h"'
+EXTRA_C_SOURCES   = fstar_support.c \
+                    $(KRML_HOME)/krmllib/dist/generic/prims.c
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch22_ImplTestMain.c
-CC_EXTRA_INCLUDES = -I .
 TEST_EXE_NAME     = ch22_test
 
 include ../autoclrs.test.mk
-
-# Override: also depend on the support header
-$(TEST_EXE): ch22_support.h

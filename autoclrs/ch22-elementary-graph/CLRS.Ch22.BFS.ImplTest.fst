@@ -178,8 +178,8 @@ let lemma_only_2_steps_to_2 (k: nat)
 ```pulse
 fn test_bfs_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures emp ** pure (r == true)
 {
   (* ---- Phase 1: Allocate and initialize ---- *)
 
@@ -283,6 +283,9 @@ fn test_bfs_3 ()
   assert (pure (d1 == 1));   // distance to vertex 1
   assert (pure (d2 == 2));   // distance to vertex 2
 
+  // -- Runtime check (survives extraction to C) --
+  let result = (d0 = 0 && d1 = 1 && d2 = 2);
+
   // -- (F) Predecessor distance consistency (NEW) --
   // From the new pred_dist postcondition: for discovered vertices with
   // valid pred, dist[v] = dist[pred[v]] + 1 and pred[v] is discovered
@@ -319,7 +322,7 @@ fn test_bfs_3 ()
   V.free queue_v;
 
   GR.free ctr;
-  ()
+  result
 }
 ```
 

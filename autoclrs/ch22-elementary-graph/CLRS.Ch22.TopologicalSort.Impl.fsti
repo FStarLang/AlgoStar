@@ -41,6 +41,7 @@ fn topological_sort
     V.pts_to output sout **
     GR.pts_to ctr cf **
     pure (
+      V.is_full_vec output /\
       Seq.length sout == SZ.v n /\
       // All vertices in output are valid indices
       (forall (i: nat). i < SZ.v n ==> Seq.index sout i < SZ.v n) /\
