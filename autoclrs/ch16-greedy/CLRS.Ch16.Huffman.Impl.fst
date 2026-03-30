@@ -209,6 +209,31 @@ fn rec free_htree (p: hnode_ptr) (ft: HSpec.htree)
   }
 }
 
+/// Read root frequency without destroying the tree.
+fn root_freq (p: hnode_ptr) (ft: HSpec.htree)
+  requires is_htree p ft
+  returns r: int
+  ensures is_htree p ft ** pure (r == htree_freq ft)
+{
+  match ft {
+    HSpec.Leaf s f -> {
+      unfold (is_htree p (HSpec.Leaf s f));
+      let node = Box.op_Bang p;
+      fold (is_htree p (HSpec.Leaf s f));
+      rewrite (is_htree p (HSpec.Leaf s f)) as (is_htree p ft);
+      node.freq
+    }
+    HSpec.Internal f l r -> {
+      unfold (is_htree p (HSpec.Internal f l r));
+      with lp rp. _;
+      let node = Box.op_Bang p;
+      fold (is_htree p (HSpec.Internal f l r));
+      rewrite (is_htree p (HSpec.Internal f l r)) as (is_htree p ft);
+      node.freq
+    }
+  }
+}
+
 // ========== Main Huffman Tree Algorithm ==========
 
 // Local wrapper: calls merge_bundle_step with all preconditions pre-computed.

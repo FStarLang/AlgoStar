@@ -28,6 +28,18 @@ open CLRS.Ch16.Huffman.Defs
 
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
 
+/// Extract the root frequency from a spec-level Huffman tree.
+let htree_freq (t: HSpec.htree) : int =
+  match t with
+  | HSpec.Leaf _ f -> f
+  | HSpec.Internal f _ _ -> f
+
+/// The stored root frequency is always positive (freq is pos).
+let htree_freq_positive (t: HSpec.htree) : Lemma (htree_freq t > 0) =
+  match t with
+  | HSpec.Leaf _ _ -> ()
+  | HSpec.Internal _ _ _ -> ()
+
 /// Recursive separation logic predicate: relates a heap-allocated tree to a spec tree.
 val is_htree (p: hnode_ptr) (ft: HSpec.htree) : Tot slprop
 
@@ -35,6 +47,12 @@ val is_htree (p: hnode_ptr) (ft: HSpec.htree) : Tot slprop
 fn free_htree (p: hnode_ptr) (ft: HSpec.htree)
   requires is_htree p ft
   ensures emp
+
+/// Read the root frequency of a heap-allocated Huffman tree (non-destructive).
+fn root_freq (p: hnode_ptr) (ft: HSpec.htree)
+  requires is_htree p ft
+  returns r: int
+  ensures is_htree p ft ** pure (r == htree_freq ft)
 
 //SNIPPET_START: huffman_tree_iface
 /// Build an optimal Huffman tree from an array of positive frequencies.

@@ -154,8 +154,8 @@ fn build_test_tree ()
 ```pulse
 fn test_decode ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Build test tree
   let root = build_test_tree ();
@@ -200,8 +200,11 @@ fn test_decode ()
   assert (pure (v0 == 0));
   assert (pure (v1 == 1));
 
-  // Cleanup
-  drop_ (is_htree root test_tree);
+  // Runtime check (survives extraction to C)
+  let pass = (v0 = 0) && (v1 = 1);
+
+  // Cleanup — free tree properly
+  free_htree root test_tree;
   
   with s1. assert (A.pts_to bits s1);
   rewrite (A.pts_to bits s1) as (A.pts_to (V.vec_to_array bv) s1);
@@ -212,7 +215,7 @@ fn test_decode ()
   rewrite (A.pts_to output s2) as (A.pts_to (V.vec_to_array ov) s2);
   V.to_vec_pts_to ov;
   V.free ov;
-  ()
+  pass
 }
 ```
 #pop-options
@@ -223,8 +226,8 @@ fn test_decode ()
 ```pulse
 fn test_encode ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Build test tree
   let root = build_test_tree ();
@@ -270,8 +273,11 @@ fn test_encode ()
   assert (pure (v0 == true));
   assert (pure (v1 == false));
 
-  // Cleanup
-  drop_ (is_htree root test_tree);
+  // Runtime check (survives extraction to C)
+  let pass = (v0 = true) && (v1 = false);
+
+  // Cleanup — free tree properly
+  free_htree root test_tree;
   
   with s1. assert (A.pts_to msg s1);
   rewrite (A.pts_to msg s1) as (A.pts_to (V.vec_to_array mv) s1);
@@ -282,7 +288,7 @@ fn test_encode ()
   rewrite (A.pts_to output s2) as (A.pts_to (V.vec_to_array ov) s2);
   V.to_vec_pts_to ov;
   V.free ov;
-  ()
+  pass
 }
 ```
 #pop-options

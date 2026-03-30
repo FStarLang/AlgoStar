@@ -36,7 +36,9 @@ open CLRS.Ch16.ActivitySelection.Complexity
 (* ---------- Pure helpers for the concrete instance ---------- *)
 
 (* The concrete start times [1; 3; 5] and finish times [4; 5; 7] *)
+noextract
 let start3 : Seq.seq int = Seq.seq_of_list [1; 3; 5]
+noextract
 let finish3 : Seq.seq int = Seq.seq_of_list [4; 5; 7]
 
 (* finish_sorted for [4; 5; 7] *)
@@ -184,14 +186,19 @@ let seq_after_writes_finish ()
   = assert_norm (finish3 `Seq.equal` Seq.seq_of_list [4; 5; 7])
 
 
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  let open FStar.SizeT in not (a <^ b || b <^ a)
+
 (* ==================== Main Test ==================== *)
 
 #push-options "--z3rlimit 80 --fuel 4 --ifuel 2"
 ```pulse
 fn test_activity_selection_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // --- Allocate start_times = [1; 3; 5] ---
   let sv = V.alloc 0 3sz;
@@ -260,6 +267,9 @@ fn test_activity_selection_3 ()
   assert (pure (cf >= 0 /\ cf - 0 == 3 - 1));
   assert (pure (cf == 2));
 
+  // --- Runtime check (survives extraction to C) ---
+  let pass = sz_eq v0 0sz && sz_eq v1 2sz && sz_eq count 2sz;
+
   // --- Cleanup ---
   with sout'. assert (A.pts_to out_arr sout');
   rewrite (A.pts_to out_arr sout') as (A.pts_to (V.vec_to_array ov) sout');
@@ -277,7 +287,7 @@ fn test_activity_selection_3 ()
   V.free sv;
 
   GR.free ctr;
-  ()
+  pass
 }
 ```
 #pop-options

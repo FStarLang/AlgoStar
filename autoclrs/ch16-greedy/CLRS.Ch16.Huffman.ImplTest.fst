@@ -35,6 +35,7 @@ module HCmplx = CLRS.Ch16.Huffman.Complexity
 
 (* ---------- Pure helpers ---------- *)
 
+noextract
 let freq_seq2 : Seq.seq int = Seq.seq_of_list [3; 5]
 
 (* greedy_cost [3; 5] == 8 *)
@@ -100,8 +101,8 @@ let leaf_labels_constrain_syms (ft: HSpec.htree) (s: nat) (f: pos)
 ```pulse
 fn test_huffman_2 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // --- Allocate frequencies = [3; 5] ---
   let fv = V.alloc 0 2sz;
@@ -138,22 +139,25 @@ fn test_huffman_2 ()
   assert (pure (cf == 1));
 
   // --- Prove leaf symbol mapping is correct ---
-  // The new tree_leaf_labels_valid postcondition guarantees:
-  // for any leaf (s, f) in the tree, s < 2 and s0[s] == f
-  // Since s0 == freq_seq2 == [3; 5], this constrains:
-  //   sym 0 -> freq 3, sym 1 -> freq 5
   assert (pure (tree_leaf_labels_valid ft s0));
-  
-  // --- Drop tree (free_htree takes non-ghost arg; drop is simpler for test) ---
+
+  // --- Drop tree (ghost ft prevents calling free_htree) ---
   drop_ (is_htree tree_ptr ft);
   
+  // --- Runtime check: verify input array is preserved (survives extraction) ---
+  let f0 = freqs.(0sz);
+  let f1 = freqs.(1sz);
+  assert (pure (f0 == 3));
+  assert (pure (f1 == 5));
+  let pass = (f0 = 3) && (f1 = 5);
+
   with s_final. assert (A.pts_to freqs s_final);
   rewrite (A.pts_to freqs s_final) as (A.pts_to (V.vec_to_array fv) s_final);
   V.to_vec_pts_to fv;
   V.free fv;
 
   GR.free ctr;
-  ()
+  pass
 }
 ```
 #pop-options
