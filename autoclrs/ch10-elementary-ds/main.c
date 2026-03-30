@@ -4,6 +4,10 @@
  * Calls the extracted test functions for Stack, Queue,
  * Singly Linked List, and Doubly Linked List.
  *
+ * Each test function returns bool: true iff all runtime checks pass.
+ * Ghost proof assertions (erased at extraction) provide formal guarantees;
+ * the runtime checks provide independent C-level assurance.
+ *
  * Build: see Makefile 'test-c' target
  */
 
@@ -21,22 +25,34 @@ int main(void)
 
     printf("  [Stack]  test_stack_spec_validation ... ");
     fflush(stdout);
-    CLRS_Ch10_Stack_ImplTest_test_stack_spec_validation();
+    if (!CLRS_Ch10_Stack_ImplTest_test_stack_spec_validation()) {
+        fprintf(stderr, "FAIL\n");
+        return 1;
+    }
     printf("PASS\n");
 
     printf("  [Queue]  test_queue_spec_validation ... ");
     fflush(stdout);
-    CLRS_Ch10_Queue_ImplTest_test_queue_spec_validation();
+    if (!CLRS_Ch10_Queue_ImplTest_test_queue_spec_validation()) {
+        fprintf(stderr, "FAIL\n");
+        return 1;
+    }
     printf("PASS\n");
 
     printf("  [SLL]    test_sll_spec_validation   ... ");
     fflush(stdout);
-    CLRS_Ch10_SinglyLinkedList_ImplTest_test_sll_spec_validation();
+    if (!CLRS_Ch10_SinglyLinkedList_ImplTest_test_sll_spec_validation()) {
+        fprintf(stderr, "FAIL\n");
+        return 1;
+    }
     printf("PASS\n");
 
     printf("  [DLL]    test_dll_spec_validation   ... ");
     fflush(stdout);
-    CLRS_Ch10_DLL_ImplTest_test_dll_spec_validation();
+    if (!CLRS_Ch10_DLL_ImplTest_test_dll_spec_validation()) {
+        fprintf(stderr, "FAIL\n");
+        return 1;
+    }
     printf("PASS\n");
 
     printf("\nAll Ch10 tests passed.\n");

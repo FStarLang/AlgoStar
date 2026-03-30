@@ -1,15 +1,12 @@
 (**
    Spec validation test for CLRS.Ch10.Queue.Impl — CLRS §10.1.
 
-   Adapted from Test.Queue.fst in
-   https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch10-elementary-ds/Test.Queue.fst
-
-   Tests:
-   1. Precondition satisfiability — create_queue, enqueue, dequeue all callable
-   2. Postcondition precision — after enqueue [10;20;30] and dequeue, we can
-      prove the dequeued values are exactly 10, 20, 30 in FIFO order.
-   3. queue_empty returns true iff the queue is empty.
-   4. Wraparound correctness — enqueue after dequeue exercises circular buffer.
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        Ghost assert(pure(...)) statements verify correctness at proof time.
+     2. RUNTIME (computational, survives extraction to C):
+        int_eq / bool_eq comparisons check concrete values.
+        Returns bool — caller can verify at runtime.
 
    No admits. No assumes.
 *)
@@ -21,6 +18,12 @@ open CLRS.Ch10.Queue.Impl
 module Q  = CLRS.Ch10.Queue.Impl
 module SZ = FStar.SizeT
 module L  = FStar.List.Tot
+
+inline_for_extraction
+let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
+
+inline_for_extraction
+let bool_eq (a b: bool) : (r:bool{r <==> a = b}) = (a = b)
 
 ```pulse
 (** Main spec-validation test for Queue.
@@ -34,8 +37,8 @@ module L  = FStar.List.Tot
 *)
 fn test_queue_spec_validation ()
   requires emp
-  returns _:unit
-  ensures exists* (q:Q.queue int) (contents:Ghost.erased (list int)). Q.queue_inv q contents
+  returns r: bool
+  ensures pure (r == true)
 {
   // 1. Create an empty queue with capacity 5
   let q = Q.create_queue int 0 5sz;
@@ -43,62 +46,71 @@ fn test_queue_spec_validation ()
   // 2. Verify empty
   let b0 = Q.queue_empty q;
   assert (pure (b0 == true));
+  let pass = bool_eq b0 true;
 
-  // 3. Enqueue 10 → contents = [10]
+  // 3. Enqueue 10, 20, 30
   Q.enqueue q 10;
-
-  // 4. Enqueue 20 → contents = [10; 20]
   Q.enqueue q 20;
-
-  // 5. Enqueue 30 → contents = [10; 20; 30]
   Q.enqueue q 30;
 
-  // 6. Verify not empty
+  // 4. Verify not empty
   let b1 = Q.queue_empty q;
   assert (pure (b1 == false));
+  let pass = pass && bool_eq b1 false;
 
-  // 7. Dequeue — postcondition says contents == x :: xs
-  //    Since contents was [10; 20; 30], x must be 10
+  // 5. Dequeue — FIFO: must be 10
   let x1 = Q.dequeue q;
   assert (pure (x1 == 10));
+  let pass = pass && int_eq x1 10;
 
-  // 8. Dequeue — contents was [20; 30], x must be 20
+  // 6. Dequeue — must be 20
   let x2 = Q.dequeue q;
   assert (pure (x2 == 20));
+  let pass = pass && int_eq x2 20;
 
-  // 9. Dequeue — contents was [30], x must be 30
+  // 7. Dequeue — must be 30
   let x3 = Q.dequeue q;
   assert (pure (x3 == 30));
+  let pass = pass && int_eq x3 30;
 
-  // 10. Queue should now be empty
+  // 8. Queue should now be empty
   let b2 = Q.queue_empty q;
   assert (pure (b2 == true));
+  let pass = pass && bool_eq b2 true;
 
   // --- Scenario 2: Wraparound test ---
 
-  // 11. Enqueue 40, 50
+  // 9. Enqueue 40, 50
   Q.enqueue q 40;
   Q.enqueue q 50;
 
-  // 12. Dequeue 40
+  // 10. Dequeue 40
   let y1 = Q.dequeue q;
   assert (pure (y1 == 40));
+  let pass = pass && int_eq y1 40;
 
-  // 13. Enqueue 60 (this wraps around in the circular buffer)
+  // 11. Enqueue 60 (this wraps around in the circular buffer)
   Q.enqueue q 60;
 
-  // 14. Dequeue 50
+  // 12. Dequeue 50
   let y2 = Q.dequeue q;
   assert (pure (y2 == 50));
+  let pass = pass && int_eq y2 50;
 
-  // 15. Dequeue 60
+  // 13. Dequeue 60
   let y3 = Q.dequeue q;
   assert (pure (y3 == 60));
+  let pass = pass && int_eq y3 60;
 
-  // 16. Empty again
+  // 14. Empty again
   let b3 = Q.queue_empty q;
   assert (pure (b3 == true));
+  let pass = pass && bool_eq b3 true;
 
-  ()
+  // Cleanup (test-only: drop invariant, OS reclaims at exit)
+  with contents. assert (Q.queue_inv q contents);
+  drop_ (Q.queue_inv q contents);
+
+  pass
 }
 ```

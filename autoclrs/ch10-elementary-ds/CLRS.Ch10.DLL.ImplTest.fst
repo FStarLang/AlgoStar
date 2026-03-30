@@ -1,19 +1,12 @@
 (**
    Spec validation test for CLRS.Ch10.DLL.Impl — CLRS §10.2.
 
-   Adapted from Test.DLL.fst and Test.DLL2.fst in
-   https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch10-elementary-ds/Test.DLL.fst
-
-   Tests:
-   1. Precondition satisfiability — all DLL operations callable
-   2. Postcondition precision for list_insert — after insert 3, 2, 1 the list
-      is precisely [1; 2; 3]
-   3. Postcondition precision for list_insert_tail — appending at tail
-   4. Postcondition precision for list_search — returns true iff member
-   5. Postcondition precision for list_search_back — equivalent to forward search
-   6. Postcondition precision for list_delete — removes first occurrence
-   7. Full round-trip: insert all, delete all, list is empty
-   8. Ghost helpers: dll_nil, dll_nil_elim, dll_none_nil, dll_some_cons
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        Ghost assert(pure(...)) statements verify correctness at proof time.
+     2. RUNTIME (computational, survives extraction to C):
+        bool_eq comparisons and Some?/None? checks survive extraction.
+        Returns bool — caller can verify at runtime.
 
    No admits. No assumes.
 *)
@@ -22,6 +15,9 @@ module CLRS.Ch10.DLL.ImplTest
 open Pulse.Lib.Pervasives
 open CLRS.Ch10.DLL.Impl
 module L = FStar.List.Tot
+
+inline_for_extraction
+let bool_eq (a b: bool) : (r:bool{r <==> a = b}) = (a = b)
 
 ```pulse
 (** Main spec-validation test for Doubly Linked List.
@@ -38,11 +34,17 @@ module L = FStar.List.Tot
       Insert 10 at head, insert 20 at tail, insert 30 at tail → [10; 20; 30].
       Verify via search.
       Delete all.
+
+    Scenario 3 — list_delete_last:
+      Build [1; 2; 1; 3], delete_last 1 → [1; 2; 3].
+
+    Scenario 4 — list_delete_node (delete by index):
+      Build [10; 20; 30], delete at index 1 → [10; 30], etc.
 *)
 fn test_dll_spec_validation ()
   requires emp
-  returns _:unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Create head and tail refs, start with empty dll
   let mut hd_ref : dptr = None;
@@ -67,32 +69,37 @@ fn test_dll_spec_validation ()
   // Search forward for 2 — should be true
   let found2 = list_search hd1 tl1 2;
   assert (pure (found2 == true));
+  let pass = bool_eq found2 true;
 
   // Search forward for 99 — should be false
   let not99 = list_search hd1 tl1 99;
   assert (pure (not99 == false));
+  let pass = pass && bool_eq not99 false;
 
   // Search backward for 3 — should be true
   let found3_back = list_search_back hd1 tl1 3;
   assert (pure (found3_back == true));
+  let pass = pass && bool_eq found3_back true;
 
   // Search backward for 0 — should be false
   let not0_back = list_search_back hd1 tl1 0;
   assert (pure (not0_back == false));
+  let pass = pass && bool_eq not0_back false;
 
   // Search via pointer for 1 — should be Some
   let ptr1 = list_search_ptr hd1 tl1 1;
   assert (pure (Some? ptr1));
+  let pass = pass && (Some? ptr1);
 
   // Search via pointer for 42 — should be None
   let ptr42 = list_search_ptr hd1 tl1 42;
   assert (pure (None? ptr42));
+  let pass = pass && (None? ptr42);
 
-  // Delete 2 → list is [1; 3] (remove_first 2 [1;2;3] == [1;3])
+  // Delete 2 → list is [1; 3]
   list_delete hd_ref tl_ref 2;
 
   // Delete-not-found: delete 99 from [1;3] → list unchanged
-  //   remove_first 99 [1;3] == [1;3]
   list_delete hd_ref tl_ref 99;
 
   // Search for 2 after delete — should be false
@@ -100,12 +107,15 @@ fn test_dll_spec_validation ()
   let tl2 = !tl_ref;
   let gone2 = list_search hd2 tl2 2;
   assert (pure (gone2 == false));
+  let pass = pass && bool_eq gone2 false;
 
   // 1 and 3 still present
   let still1 = list_search hd2 tl2 1;
   assert (pure (still1 == true));
+  let pass = pass && bool_eq still1 true;
   let still3 = list_search hd2 tl2 3;
   assert (pure (still3 == true));
+  let pass = pass && bool_eq still3 true;
 
   // Delete 1 → list is [3]
   list_delete hd_ref tl_ref 1;
@@ -139,12 +149,16 @@ fn test_dll_spec_validation ()
 
   let f10 = list_search hd3 tl3 10;
   assert (pure (f10 == true));
+  let pass = pass && bool_eq f10 true;
   let f20 = list_search hd3 tl3 20;
   assert (pure (f20 == true));
+  let pass = pass && bool_eq f20 true;
   let f30 = list_search hd3 tl3 30;
   assert (pure (f30 == true));
+  let pass = pass && bool_eq f30 true;
   let f99 = list_search hd3 tl3 99;
   assert (pure (f99 == false));
+  let pass = pass && bool_eq f99 false;
 
   // Delete all
   list_delete hd_ref tl_ref 10;
@@ -168,11 +182,6 @@ fn test_dll_spec_validation ()
   list_insert hd_ref tl_ref 1;
 
   // delete_last 1 from [1;2;1;3] → removes the LAST 1 → [1;2;3]
-  //   remove_last 1 [1;2;1;3]: mem 1 [2;1;3] = true, so 1 :: remove_last 1 [2;1;3]
-  //     remove_last 1 [2;1;3]: mem 1 [1;3] = true, so 2 :: remove_last 1 [1;3]
-  //       remove_last 1 [1;3]: mem 1 [3] = false, hd=1=k, so [3]
-  //     → 2 :: [3] = [2;3]
-  //   → 1 :: [2;3] = [1;2;3]
   list_delete_last hd_ref tl_ref 1;
 
   // Verify: 1 still present (first occurrence preserved), 2 and 3 present
@@ -180,13 +189,15 @@ fn test_dll_spec_validation ()
   let tl4 = !tl_ref;
   let f1_s3 = list_search hd4 tl4 1;
   assert (pure (f1_s3 == true));
+  let pass = pass && bool_eq f1_s3 true;
   let f2_s3 = list_search hd4 tl4 2;
   assert (pure (f2_s3 == true));
+  let pass = pass && bool_eq f2_s3 true;
   let f3_s3 = list_search hd4 tl4 3;
   assert (pure (f3_s3 == true));
+  let pass = pass && bool_eq f3_s3 true;
 
   // delete_last of non-existent key — list unchanged
-  //   remove_last 99 [1;2;3] == [1;2;3]
   list_delete_last hd_ref tl_ref 99;
 
   // Still [1;2;3]
@@ -194,6 +205,7 @@ fn test_dll_spec_validation ()
   let tl4b = !tl_ref;
   let f1_s3b = list_search hd4b tl4b 1;
   assert (pure (f1_s3b == true));
+  let pass = pass && bool_eq f1_s3b true;
 
   // Clean up scenario 3
   list_delete hd_ref tl_ref 1;
@@ -207,7 +219,6 @@ fn test_dll_spec_validation ()
   list_insert hd_ref tl_ref 10;
 
   // Delete at index 1 → removes 20 → [10; 30]
-  //   remove_at 1 [10;20;30] = 10 :: remove_at 0 [20;30] = 10 :: [30] = [10;30]
   list_delete_node hd_ref tl_ref 1;
 
   // Verify: 10 and 30 present, 20 absent
@@ -215,13 +226,15 @@ fn test_dll_spec_validation ()
   let tl5 = !tl_ref;
   let f10_s4 = list_search hd5 tl5 10;
   assert (pure (f10_s4 == true));
+  let pass = pass && bool_eq f10_s4 true;
   let f30_s4 = list_search hd5 tl5 30;
   assert (pure (f30_s4 == true));
+  let pass = pass && bool_eq f30_s4 true;
   let f20_s4 = list_search hd5 tl5 20;
   assert (pure (f20_s4 == false));
+  let pass = pass && bool_eq f20_s4 false;
 
   // Delete at index 0 → removes 10 → [30]
-  //   remove_at 0 [10;30] = [30]
   list_delete_node hd_ref tl_ref 0;
 
   // Verify: only 30 remains
@@ -229,8 +242,10 @@ fn test_dll_spec_validation ()
   let tl6 = !tl_ref;
   let f30_s4b = list_search hd6 tl6 30;
   assert (pure (f30_s4b == true));
+  let pass = pass && bool_eq f30_s4b true;
   let f10_s4b = list_search hd6 tl6 10;
   assert (pure (f10_s4b == false));
+  let pass = pass && bool_eq f10_s4b false;
 
   // Delete last element at index 0 → empty
   list_delete_node hd_ref tl_ref 0;
@@ -241,6 +256,6 @@ fn test_dll_spec_validation ()
   dll_nil_elim hd_e tl_e;
   assert (pure (hd_e == None /\ tl_e == None));
 
-  ()
+  pass
 }
 ```
