@@ -69,7 +69,17 @@ precise enough to uniquely determine the output for any concrete input.
 ## Verification Status
 
 - **Zero admits, zero assumes**
-- Verified with `--z3rlimit 60 --fuel 2 --ifuel 2`
+- Verified with `--z3rlimit 10 --fuel 2 --ifuel 2`
+
+## Runtime Assurance
+
+Each test function returns `bool` with two layers of assurance:
+
+1. **PROOF** (ghost, erased at extraction): Ghost assertions prove the
+   postcondition uniquely determines the result. `ensures pure (r == true)`
+   proves the runtime check always succeeds.
+2. **RUNTIME** (computational, survives extraction to C): `sz_eq` comparisons
+   produce a `bool` that is checked by the C test driver (`main.c`).
 
 ## Concrete Execution Status
 

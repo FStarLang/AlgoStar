@@ -107,7 +107,17 @@ fully precise, and the complexity bound is now transparent and verifiable.
 ## Verification Status
 
 - **Zero admits, zero assumes**
-- Verified with `--z3rlimit 80 --fuel 8 --ifuel 2`
+- Verified with `--z3rlimit 10 --fuel 8 --ifuel 2`
+
+## Runtime Assurance
+
+Each test function returns `bool` with two layers of assurance:
+
+1. **PROOF** (ghost, erased at extraction): Ghost assertions prove the
+   postcondition uniquely determines the result. `ensures pure (r == true)`
+   proves the runtime check always succeeds.
+2. **RUNTIME** (computational, survives extraction to C): `result = expected`
+   comparisons produce a `bool` checked by the C test driver (`main.c`).
 
 ## Concrete Execution Status
 

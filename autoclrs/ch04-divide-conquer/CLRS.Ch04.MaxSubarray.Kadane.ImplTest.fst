@@ -108,8 +108,8 @@ let kadane_all_negative_lemma (s: Seq.seq int)
 // Test 1: Mixed array — max subarray is a single positive element
 fn test_kadane_max_subarray ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Create array [-1, 3, -2]
   let v = V.alloc 0 3sz;
@@ -129,15 +129,16 @@ fn test_kadane_max_subarray ()
   let ctr = GR.alloc #nat 0;
   let result = max_subarray arr 3sz ctr;
 
-  // Postcondition: result == max_subarray_spec s0
-  // Helper lemma proves max_subarray_spec s0 == 3
+  // PROOF: ghost assertions prove result is uniquely determined
   kadane_test_lemma s0;
   assert (pure (result == 3));
 
   // Complexity: exactly 3 operations for 3 elements
-  // (Now provable because complexity_bounded_linear is transparent via Spec.fst)
   with cf. assert (GR.pts_to ctr cf);
   assert (pure (cf == 3));
+
+  // RUNTIME: computational check (survives extraction to C)
+  let ok = (result = 3);
 
   // Cleanup
   GR.free ctr;
@@ -145,7 +146,7 @@ fn test_kadane_max_subarray ()
   rewrite (A.pts_to arr s1) as (A.pts_to (V.vec_to_array v) s1);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 
 // Test 2: All-negative array — result is the least-negative element
@@ -153,8 +154,8 @@ fn test_kadane_max_subarray ()
 // Expected: result == -1 (the maximum element in [-5, -3, -1])
 fn test_kadane_all_negative ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Create array [-5, -3, -1]
   let v = V.alloc 0 3sz;
@@ -174,8 +175,7 @@ fn test_kadane_all_negative ()
   let ctr = GR.alloc #nat 0;
   let result = max_subarray arr 3sz ctr;
 
-  // Postcondition: result == max_subarray_spec s0
-  // Helper lemma proves max_subarray_spec s0 == -1
+  // PROOF: ghost assertions prove result is uniquely determined
   kadane_all_negative_lemma s0;
   assert (pure (result == (0 - 1)));
 
@@ -183,13 +183,16 @@ fn test_kadane_all_negative ()
   with cf. assert (GR.pts_to ctr cf);
   assert (pure (cf == 3));
 
+  // RUNTIME: computational check (survives extraction to C)
+  let ok = (result = (0 - 1));
+
   // Cleanup
   GR.free ctr;
   with s1. assert (A.pts_to arr s1);
   rewrite (A.pts_to arr s1) as (A.pts_to (V.vec_to_array v) s1);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 
 #pop-options

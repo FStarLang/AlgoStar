@@ -8,6 +8,12 @@
 
    Also verifies the complexity bound: at most ⌊log₂ n⌋ + 1 comparisons.
 
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        Ghost assertions prove the postcondition uniquely determines the result.
+     2. RUNTIME (computational, survives extraction to C):
+        sz_eq comparisons produce a bool that is checked by the C test driver.
+
    Validates:
    - Precondition (is_sorted) is satisfiable on concrete sorted input
    - Postcondition uniquely determines the output for concrete inputs
@@ -29,22 +35,19 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  let open FStar.SizeT in not (a <^ b || b <^ a)
+
 #push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 
 // Test 1: Found case — search for 3 in sorted array [1; 3; 5]
 // Expected: result == 1 (the index where 3 resides)
-//
-// Postcondition reasoning (Z3 derives this automatically):
-//   From result <= 3:
-//   - If result == 3, postcondition gives forall i < 3. s0[i] != 3.
-//     But s0[1] = 3, contradiction. So result < 3.
-//   - Then s0[result] == 3. Since s0 = [1,3,5]:
-//     result=0 → s0[0]=1 ≠ 3, result=2 → s0[2]=5 ≠ 3.
-//     Only result=1 works: s0[1]=3 == 3. ✓
 fn test_binary_search_found ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -59,12 +62,15 @@ fn test_binary_search_found ()
   let ctr = GR.alloc #nat 0;
   let result = binary_search arr 3sz 3 ctr;
 
-  // Postcondition precision: result is uniquely determined
+  // PROOF: ghost assertion proves result is uniquely determined
   assert (pure (SZ.v result == 1));
 
   // Complexity: at most log2f(3) + 1 = 2 comparisons
   with cf. assert (GR.pts_to ctr cf);
   assert (pure (cf <= 2));
+
+  // RUNTIME: computational check (survives extraction to C)
+  let ok = sz_eq result 1sz;
 
   // Cleanup
   GR.free ctr;
@@ -72,20 +78,15 @@ fn test_binary_search_found ()
   rewrite (A.pts_to arr s1) as (A.pts_to (V.vec_to_array v) s1);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 
 // Test 2: Not found case — search for 2 in sorted array [1; 3; 5]
 // Expected: result == 3 (sentinel value = len, meaning not found)
-//
-// Postcondition reasoning (Z3 derives this automatically):
-//   If result < 3, then s0[result] == 2.
-//   But s0 = [1,3,5], and none of 1,3,5 equals 2.
-//   So result < 3 leads to contradiction, hence result == 3.
 fn test_binary_search_not_found ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -100,12 +101,15 @@ fn test_binary_search_not_found ()
   let ctr = GR.alloc #nat 0;
   let result = binary_search arr 3sz 2 ctr;
 
-  // Postcondition precision: result is uniquely determined (not found sentinel)
+  // PROOF: ghost assertion proves result is uniquely determined (not found sentinel)
   assert (pure (SZ.v result == SZ.v 3sz));
 
   // Complexity: at most log2f(3) + 1 = 2 comparisons
   with cf. assert (GR.pts_to ctr cf);
   assert (pure (cf <= 2));
+
+  // RUNTIME: computational check (survives extraction to C)
+  let ok = sz_eq result 3sz;
 
   // Cleanup
   GR.free ctr;
@@ -113,20 +117,15 @@ fn test_binary_search_not_found ()
   rewrite (A.pts_to arr s1) as (A.pts_to (V.vec_to_array v) s1);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 
 // Test 3: Empty array — search for 1 in [] (len=0)
 // Expected: result == 0 (sentinel = len, not found)
-//
-// Postcondition reasoning:
-//   result <= 0 and result == 0, so result == 0.
-//   Complexity: log2f(0) + 1 = 0 + 1 = 1, so cf <= 1.
-//   Actually 0 comparisons are made (empty array), so cf == 0.
 fn test_binary_search_empty ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 0sz;
   V.to_array_pts_to v;
@@ -138,12 +137,15 @@ fn test_binary_search_empty ()
   let ctr = GR.alloc #nat 0;
   let result = binary_search arr 0sz 1 ctr;
 
-  // Postcondition precision: result == 0 (sentinel for empty array)
+  // PROOF: ghost assertion proves result == 0 (sentinel for empty array)
   assert (pure (SZ.v result == 0));
 
   // Complexity: at most log2f(0) + 1 = 1 comparison
   with cf. assert (GR.pts_to ctr cf);
   assert (pure (cf <= 1));
+
+  // RUNTIME: computational check (survives extraction to C)
+  let ok = sz_eq result 0sz;
 
   // Cleanup
   GR.free ctr;
@@ -151,7 +153,7 @@ fn test_binary_search_empty ()
   rewrite (A.pts_to arr s1) as (A.pts_to (V.vec_to_array v) s1);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  ok
 }
 
 #pop-options

@@ -83,8 +83,8 @@ let mm_2sz_pre ()
 
 fn test_matrix_multiply_2x2 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Allocate A = [[1,2],[3,4]] as flat array [1,2,3,4]
   let av = V.alloc 0 4sz;
@@ -139,17 +139,15 @@ fn test_matrix_multiply_2x2 ()
   // Bind result ghost sequence
   with sc1. assert (A.pts_to c_arr sc1);
 
-  // Prove postcondition precision: mat_mul_correct determines exact output
+  // PROOF: ghost assertions prove exact output values
   mm_indices ();
   mm_dot_products sa0 sb0;
-
-  // Assert exact output values: C = [[19,22],[43,50]]
   assert (pure (Seq.index sc1 0 == 19));
   assert (pure (Seq.index sc1 1 == 22));
   assert (pure (Seq.index sc1 2 == 43));
   assert (pure (Seq.index sc1 3 == 50));
 
-  // Read and verify concrete values (exercises extraction)
+  // RUNTIME: read concrete values and check (survives extraction to C)
   let c00 = c_arr.(0sz);
   let c01 = c_arr.(1sz);
   let c10 = c_arr.(2sz);
@@ -158,10 +156,10 @@ fn test_matrix_multiply_2x2 ()
   assert (pure (c01 == 22));
   assert (pure (c10 == 43));
   assert (pure (c11 == 50));
+  let ok = (c00 = 19 && c01 = 22 && c10 = 43 && c11 = 50);
 
-  // Cleanup
-  with cf. assert (GR.pts_to ctr cf);
   // Complexity: exactly n³ = 2³ = 8 multiply-add operations
+  with cf. assert (GR.pts_to ctr cf);
   assert (pure (cf == 8));
   GR.free ctr;
 
@@ -179,6 +177,8 @@ fn test_matrix_multiply_2x2 ()
   rewrite (A.pts_to a_arr sa1) as (A.pts_to (V.vec_to_array av) sa1);
   V.to_vec_pts_to av;
   V.free av;
+
+  ok
 }
 
 #pop-options

@@ -68,7 +68,18 @@ complete.
 ## Verification Status
 
 - **Zero admits, zero assumes**
-- Verified with `--z3rlimit 80 --fuel 2 --ifuel 2`
+- Verified with `--z3rlimit 10 --fuel 2 --ifuel 2`
+
+## Runtime Assurance
+
+The test function returns `bool` with two layers of assurance:
+
+1. **PROOF** (ghost, erased at extraction): Ghost assertions prove the exact
+   output entries. `ensures pure (r == true)` proves the runtime check
+   always succeeds.
+2. **RUNTIME** (computational, survives extraction to C): Reads concrete
+   array values and checks `c00 = 19 && c01 = 22 && c10 = 43 && c11 = 50`.
+   The C test driver (`main.c`) checks the returned `bool`.
 
 ## Concrete Execution Status
 
