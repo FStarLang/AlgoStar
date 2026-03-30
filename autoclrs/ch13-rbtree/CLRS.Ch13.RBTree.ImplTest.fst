@@ -9,6 +9,16 @@
  * Adapted from the intent-formalization test patterns at:
  *   https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/
  *
+ * Two layers of assurance:
+ *   1. PROOF (ghost, erased at extraction):
+ *      ✓ Postconditions from rb_insert_v / rb_search_v / rb_delete_v
+ *      ✓ Ghost assertions establish each search result matches expected value
+ *      ✓ ensures (r == true): proof guarantees the runtime check passes
+ *
+ *   2. RUNTIME (computational, survives extraction to C):
+ *      ✓ opt_int_eq comparisons check search results against expected values
+ *      ✓ Returns bool — caller (test_main.c) verifies at runtime
+ *
  * Goals:
  *   - Prove preconditions of Impl.fsti functions are satisfiable
  *   - Prove postconditions are precise enough to determine concrete outputs
@@ -82,6 +92,14 @@ let _ = assert_norm (S.search t5 3 == Some 3)
 
 (*** Pulse test: exercise the Impl.fsti API on concrete inputs ***)
 
+(* option int equality — computational, survives extraction to C *)
+inline_for_extraction
+let opt_int_eq (a b: option int) : (r:bool{r <==> a == b}) =
+  match a, b with
+  | None, None -> true
+  | Some x, Some y -> x = y
+  | _ -> false
+
 #push-options "--fuel 8 --ifuel 2 --z3rlimit 10"
 
 // Helper: membership lemma chain establishes mem 4 (insert(insert(insert Leaf 3) 1) 2) = false
@@ -119,11 +137,12 @@ let mem_3_after_delete_1 ()
  *  5. After delete, remaining keys are still searchable
  *     — derived from postcondition + delete_mem + insert_mem chain
  *  6. Memory is properly freed via free_valid_rbtree
+ *  7. Returns bool from runtime comparisons — survives extraction to C
  *)
 fn test_rbtree_insert_search_delete ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns passed: bool
+  ensures emp ** pure (passed == true)
 {
   // 1. Create empty RB tree
   let tree0 = I.rb_new ();
@@ -132,28 +151,30 @@ fn test_rbtree_insert_search_delete ()
   let tree1 = I.rb_insert_v tree0 3;
   // Postcondition gives: valid_rbtree tree1 (S.insert S.Leaf 3)
   //   + S.mem 3 (S.insert S.Leaf 3) = true
-  //   + S.search (S.insert S.Leaf 3) 3 == Some 3       ← NEW
+  //   + S.search (S.insert S.Leaf 3) 3 == Some 3
 
   let tree2 = I.rb_insert_v tree1 1;
 
   let tree3 = I.rb_insert_v tree2 2;
   // Postcondition gives: valid_rbtree tree3 (S.insert (S.insert (S.insert S.Leaf 3) 1) 2)
   //   + S.mem 2 ... = true
-  //   + S.search ... 2 == Some 2                        ← NEW
+  //   + S.search ... 2 == Some 2
 
   // 3. Search for existing key 2 — postcondition of rb_insert_v already
   //    established S.search 'ft 2 == Some 2, so rb_search_v directly gives r2 == Some 2.
   //    NO helper lemma or assert_norm needed!
   let r2 = I.rb_search_v tree3 2;
   assert (pure (r2 == Some 2));
+  let check1 = opt_int_eq r2 (Some 2);
 
   // 4. Search for non-existing key 4 — postcondition gives
   //    ~(S.mem 4 'ft) ==> r4 == None; we establish ~(S.mem 4 'ft) via insert_mem chain
   let r4 = I.rb_search_v tree3 4;
   mem_4_not_in_t3 ();
   assert (pure (r4 == None));
+  let check2 = opt_int_eq r4 None;
 
-  // 5. Delete key 1 — postcondition gives S.search (S.delete 'ft 1) 1 == None   ← NEW
+  // 5. Delete key 1 — postcondition gives S.search (S.delete 'ft 1) 1 == None
   let tree4 = I.rb_delete_v tree3 1;
 
   // 6. Search for deleted key 1 — postcondition of rb_delete_v already
@@ -161,15 +182,21 @@ fn test_rbtree_insert_search_delete ()
   //    NO helper lemma or assert_norm needed!
   let r1_after = I.rb_search_v tree4 1;
   assert (pure (r1_after == None));
+  let check3 = opt_int_eq r1_after None;
 
   // 7. Search for remaining key 3 — we establish S.mem 3 'ft via
   //    insert_mem + delete_mem chain, then postcondition gives r3_after == Some 3
   let r3_after = I.rb_search_v tree4 3;
   mem_3_after_delete_1 ();
   assert (pure (r3_after == Some 3));
+  let check4 = opt_int_eq r3_after (Some 3);
 
   // 8. Clean up: free all memory
   I.free_valid_rbtree tree4;
+
+  // 9. Return runtime check result (ghost proof guarantees this is true)
+  let result = check1 && check2 && check3 && check4;
+  result
 }
 ```
 

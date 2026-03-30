@@ -6,7 +6,8 @@ module T = CLRS.Ch13.RBTree.ImplTest
 
 fn main ()
   requires emp
-  ensures emp
+  returns r: bool
+  ensures emp ** pure (r == true)
 {
   T.test_rbtree_insert_search_delete ()
 }

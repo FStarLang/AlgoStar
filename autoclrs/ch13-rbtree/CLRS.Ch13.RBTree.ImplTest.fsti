@@ -4,5 +4,5 @@ open Pulse.Lib.Pervasives
 
 fn test_rbtree_insert_search_delete ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures emp ** pure (r == true)

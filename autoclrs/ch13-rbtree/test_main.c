@@ -4,7 +4,10 @@
 
 int main(void) {
   printf("RBTree test: starting\n");
-  CLRS_Ch13_RBTree_Main_main();
+  if (!CLRS_Ch13_RBTree_Main_main()) {
+    fprintf(stderr, "RBTree test: FAILED\n");
+    return 1;
+  }
   printf("RBTree test: passed\n");
   return 0;
 }
