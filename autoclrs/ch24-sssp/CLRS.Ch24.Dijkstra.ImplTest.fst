@@ -123,8 +123,8 @@ let seq_after_weight_writes ()
 ```pulse
 fn test_dijkstra_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // --- Allocate weights array (3×3 = 9 entries) ---
   let wv = V.alloc 0 9sz;
@@ -189,6 +189,9 @@ fn test_dijkstra_3 ()
   assert (pure (d1 == 3));
   assert (pure (d2 == 5));
 
+  // --- Computational check (survives extraction to C) ---
+  let pass = (d0 = 0 && d1 = 3 && d2 = 5);
+
   // --- Cleanup ---
   with sw'. assert (A.pts_to weights sw');
   rewrite (A.pts_to weights sw') as (A.pts_to (V.vec_to_array wv) sw');
@@ -206,7 +209,7 @@ fn test_dijkstra_3 ()
   V.free pv;
 
   GR.free ctr;
-  ()
+  pass
 }
 ```
 #pop-options

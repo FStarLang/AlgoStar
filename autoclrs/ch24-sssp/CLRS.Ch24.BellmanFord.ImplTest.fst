@@ -167,8 +167,8 @@ let seq_after_weight_writes ()
 ```pulse
 fn test_bellman_ford_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // --- Allocate weights array (3×3 = 9 entries) ---
   let wv = V.alloc 0 9sz;
@@ -217,27 +217,23 @@ fn test_bellman_ford_3 ()
   with no_neg_cycle. assert (R.pts_to result no_neg_cycle);
   with (cf: nat). assert (GR.pts_to ctr cf);
 
-  // --- Unconditional: dist[source] == 0 ---
+  // --- Read concrete values ---
   let d0 = dist.(0sz);
-  assert (pure (d0 == 0));
+  let d1 = dist.(1sz);
+  let d2 = dist.(2sz);
+  let nc = !result;
 
   // --- Prove no_neg_cycles_flat for our graph ---
   tw_no_neg_cycles ();
   sp_dist_v0 (); sp_dist_v1 (); sp_dist_v2 ();
 
-  // --- Unconditional completeness ---
-  // The new postcondition guarantees:
-  //   no_neg_cycles_flat ==> no_neg_cycle == true
-  // We proved no_neg_cycles_flat, so no_neg_cycle == true.
-  // Combined with the equality clause:
-  //   no_neg_cycles_flat /\ no_neg_cycle == true ==>
-  //     forall v < 3. dist[v] == sp_dist(0, v)
-  // We get unconditional dist equality:
+  // --- Ghost proof: output is uniquely determined ---
   assert (pure (no_neg_cycle == true));
-  assert (pure (
-    Seq.index sdist' 0 == 0 /\
-    Seq.index sdist' 1 == 4 /\
-    Seq.index sdist' 2 == 2));
+  assert (pure (d0 == 0 /\ d1 == 4 /\ d2 == 2));
+  assert (pure (nc == true));
+
+  // --- Computational check (survives extraction to C) ---
+  let pass = (d0 = 0 && d1 = 4 && d2 = 2 && nc);
 
   // --- Cleanup ---
   with sw'. assert (A.pts_to weights sw');
@@ -251,7 +247,7 @@ fn test_bellman_ford_3 ()
   V.free dv;
 
   GR.free ctr;
-  ()
+  pass
 }
 ```
 #pop-options
