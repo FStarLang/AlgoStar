@@ -88,6 +88,15 @@ let digit_counts_match_prefix (sc: Seq.seq int) (sa: Seq.seq nat)
 let digit_counts_match (sc: Seq.seq int) (sa: Seq.seq nat) (d base: nat) : prop =
   digit_counts_match_prefix sc sa d base (Seq.length sa)
 
+/// When all counts are zero, digit_counts_match_prefix holds at progress 0
+let digit_counts_match_prefix_zero (sc: Seq.seq int) (sa: Seq.seq nat) (d base: nat)
+  : Lemma (requires
+      Seq.length sc == base /\ base > 0 /\
+      Seq.length sa > 0 /\
+      (forall (v: nat). v < base ==> Seq.index sc v == 0))
+    (ensures digit_counts_match_prefix sc sa d base 0)
+  = assert (Seq.equal (Seq.slice sa 0 0) Seq.empty)
+
 /// Phase 2 step: increment count for digit of sa[j]
 #push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
 let digit_count_phase_step
