@@ -22,8 +22,8 @@ KRML_EXTRA_INPUTS = $(wildcard $(KRML_HOME)/krmllib/.extract/*.krml)
 
 BUNDLE_NAME       = CLRS_Ch33_Segments_ImplTest_CLRS_Ch33_GrahamScan_ImplTest_CLRS_Ch33_JarvisMarch_ImplTest
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/$(BUNDLE_NAME).c
-EXTRA_C_SOURCES   = prims_shim.c
-EXTRA_LINK_LIBS   =
-CC_EXTRA_FLAGS    = -Wextra -Wno-unused-but-set-variable
+EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c
+EXTRA_LINK_LIBS   = -Wl,--gc-sections
+CC_EXTRA_FLAGS    = -Wextra -Wno-unused-but-set-variable -ffunction-sections -fdata-sections
 
 include ../autoclrs.test.mk

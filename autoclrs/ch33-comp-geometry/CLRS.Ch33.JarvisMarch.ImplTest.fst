@@ -7,12 +7,16 @@
    3. Semantically strong — postconditions expose key properties:
       - find_leftmost: is_leftmost (the result truly is the leftmost point)
       - find_next: result <> current (always advances to a different point)
+      - jarvis_march_with_hull: valid_jarvis_hull (hull indices match spec)
 
    Test instance: triangle (0,0), (2,0), (1,2) — all 3 points on the convex hull.
    - find_leftmost returns 0 (minimum x-coordinate)
    - find_next from 0 returns 1 (most clockwise from (0,0) is (2,0))
    - find_next from 1 returns 2, from 2 returns 0 (full cycle)
    - jarvis_march returns 3 (all 3 points are hull vertices)
+   - jarvis_march_with_hull returns 3 and populates hull with [0, 1, 2]
+
+   Each test returns a bool (true = pass) that is checked at the C level.
 
    Zero admits. Zero assumes. All assertions proven by SMT.
 *)
@@ -33,6 +37,8 @@ module Seq = FStar.Seq
 (* ========== Helper lemmas for concrete spec evaluation ========== *)
 
 (* Shared precondition for the triangle test case *)
+[@@"noextract"]
+unfold
 let triangle_pre (sxs sys: Seq.seq int) : prop =
   Seq.length sxs == 3 /\ Seq.length sys == 3 /\
   Seq.index sxs 0 == 0 /\ Seq.index sxs 1 == 2 /\ Seq.index sxs 2 == 1 /\
@@ -85,8 +91,8 @@ let jarvis_march_triangle_lemma (sxs sys: Seq.seq int)
 ```pulse
 fn test_find_leftmost ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Points: (0,0), (2,0), (1,2)
   let vx = V.alloc 0 3sz;
@@ -110,14 +116,16 @@ fn test_find_leftmost ()
   with sxs. assert (A.pts_to xs sxs);
   with sys. assert (A.pts_to ys sys);
 
-  let result = find_leftmost xs ys 3sz;
+  let r = find_leftmost xs ys 3sz;
 
   // Postcondition: SZ.v result == find_leftmost_spec sxs sys
   find_leftmost_triangle_lemma sxs sys;
-  assert (pure (SZ.v result == 0));
+  assert (pure (SZ.v r == 0));
 
   // Strengthened postcondition: result is truly the leftmost point
-  assert (pure (is_leftmost sxs sys (SZ.v result)));
+  assert (pure (is_leftmost sxs sys (SZ.v r)));
+
+  let ok = (r = 0sz);
 
   // Cleanup
   with sx. assert (A.pts_to xs sx);
@@ -129,7 +137,7 @@ fn test_find_leftmost ()
   rewrite (A.pts_to ys sy) as (A.pts_to (V.vec_to_array vy) sy);
   V.to_vec_pts_to vy;
   V.free vy;
-  ()
+  ok
 }
 ```
 
@@ -138,8 +146,8 @@ fn test_find_leftmost ()
 ```pulse
 fn test_find_next ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Points: (0,0), (2,0), (1,2)
   let vx = V.alloc 0 3sz;
@@ -184,6 +192,8 @@ fn test_find_next ()
 
   // Full cycle: 0 → 1 → 2 → 0 (all three hull edges tested)
 
+  let ok = (r0 = 1sz && r1 = 2sz && r2 = 0sz);
+
   // Cleanup
   with sx. assert (A.pts_to xs sx);
   rewrite (A.pts_to xs sx) as (A.pts_to (V.vec_to_array vx) sx);
@@ -194,7 +204,7 @@ fn test_find_next ()
   rewrite (A.pts_to ys sy) as (A.pts_to (V.vec_to_array vy) sy);
   V.to_vec_pts_to vy;
   V.free vy;
-  ()
+  ok
 }
 ```
 
@@ -203,8 +213,8 @@ fn test_find_next ()
 ```pulse
 fn test_jarvis_march ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Points: (0,0), (2,0), (1,2) — all on the convex hull
   let vx = V.alloc 0 3sz;
@@ -238,6 +248,8 @@ fn test_jarvis_march ()
   assert (pure (SZ.v h >= 1));
   assert (pure (SZ.v h <= 3));
 
+  let ok = (h = 3sz);
+
   // Cleanup
   with sx. assert (A.pts_to xs sx);
   rewrite (A.pts_to xs sx) as (A.pts_to (V.vec_to_array vx) sx);
@@ -248,6 +260,86 @@ fn test_jarvis_march ()
   rewrite (A.pts_to ys sy) as (A.pts_to (V.vec_to_array vy) sy);
   V.to_vec_pts_to vy;
   V.free vy;
-  ()
+  ok
+}
+```
+
+(* ========== Test: jarvis_march_with_hull ========== *)
+
+```pulse
+fn test_jarvis_march_with_hull ()
+  requires emp
+  returns result: bool
+  ensures emp ** pure (result == true)
+{
+  // Points: (0,0), (2,0), (1,2) — all on the convex hull
+  let vx = V.alloc 0 3sz;
+  V.to_array_pts_to vx;
+  let xs = V.vec_to_array vx;
+  rewrite (A.pts_to (V.vec_to_array vx) (Seq.create 3 0))
+       as (A.pts_to xs (Seq.create 3 0));
+  xs.(0sz) <- 0;
+  xs.(1sz) <- 2;
+  xs.(2sz) <- 1;
+
+  let vy = V.alloc 0 3sz;
+  V.to_array_pts_to vy;
+  let ys = V.vec_to_array vy;
+  rewrite (A.pts_to (V.vec_to_array vy) (Seq.create 3 0))
+       as (A.pts_to ys (Seq.create 3 0));
+  ys.(0sz) <- 0;
+  ys.(1sz) <- 0;
+  ys.(2sz) <- 2;
+
+  // Allocate hull output array
+  let vhull = V.alloc 0sz 3sz;
+  V.to_array_pts_to vhull;
+  let hull = V.vec_to_array vhull;
+  rewrite (A.pts_to (V.vec_to_array vhull) (Seq.create 3 0sz))
+       as (A.pts_to hull (Seq.create 3 0sz));
+
+  with sxs. assert (A.pts_to xs sxs);
+  with sys. assert (A.pts_to ys sys);
+
+  let h = jarvis_march_with_hull xs ys 3sz hull;
+
+  // Postcondition: h == 3, valid hull
+  jarvis_march_triangle_lemma sxs sys;
+  assert (pure (SZ.v h == 3));
+
+  // Verify hull validity
+  with shull'. assert (A.pts_to hull shull');
+  assert (pure (valid_jarvis_hull sxs sys shull' (SZ.v h)));
+
+  // Read hull to check at C level: hull should be [0, 1, 2]
+  let h0 = hull.(0sz);
+  let h1 = hull.(1sz);
+  let h2 = hull.(2sz);
+
+  find_leftmost_triangle_lemma sxs sys;
+  find_next_from_0_lemma sxs sys;
+  find_next_from_1_lemma sxs sys;
+  assert (pure (SZ.v h0 == 0));
+  assert (pure (SZ.v h1 == 1));
+  assert (pure (SZ.v h2 == 2));
+
+  let ok = (h = 3sz && h0 = 0sz && h1 = 1sz && h2 = 2sz);
+
+  // Cleanup
+  with sx. assert (A.pts_to xs sx);
+  rewrite (A.pts_to xs sx) as (A.pts_to (V.vec_to_array vx) sx);
+  V.to_vec_pts_to vx;
+  V.free vx;
+
+  with sy. assert (A.pts_to ys sy);
+  rewrite (A.pts_to ys sy) as (A.pts_to (V.vec_to_array vy) sy);
+  V.to_vec_pts_to vy;
+  V.free vy;
+
+  with sh. assert (A.pts_to hull sh);
+  rewrite (A.pts_to hull sh) as (A.pts_to (V.vec_to_array vhull) sh);
+  V.to_vec_pts_to vhull;
+  V.free vhull;
+  ok
 }
 ```

@@ -8,6 +8,8 @@
    Each postcondition has the form `result == spec(args)`, so precision follows
    from the fact that spec(concrete_args) evaluates to a unique value.
 
+   Each test returns a bool (true = pass) that is checked at the C level.
+
    Zero admits. Zero assumes. All assertions proven by SMT.
 *)
 
@@ -30,8 +32,8 @@ open FStar.Mul
 
 fn test_cross_product ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // CCW: p1=(0,0), p2=(1,0), p3=(0,1)
   //   (1-0)*(1-0) - (0-0)*(0-0) = 1
@@ -51,7 +53,8 @@ fn test_cross_product ()
   // Precision: postcondition uniquely determines each result
   assert (pure (r_ccw <> 0 /\ r_ccw <> (-1)));
   assert (pure (r_cw <> 0 /\ r_cw <> 1));
-  ()
+
+  (r_ccw = 1 && r_cw = (-1) && r_col = 0)
 }
 
 (* ========== Test: direction ==========
@@ -62,12 +65,12 @@ fn test_cross_product ()
 
 fn test_direction ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   let r = direction 0 0 1 0 0 1;
   assert (pure (r == 1));
-  ()
+  (r = 1)
 }
 
 (* ========== Test: on_segment ==========
@@ -79,8 +82,8 @@ fn test_direction ()
 
 fn test_on_segment ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Interior of bounding box
   let r1 = on_segment 0 0 2 2 1 1;
@@ -101,7 +104,8 @@ fn test_on_segment ()
   // Precision: true/false uniquely determined
   assert (pure (r1 <> false));
   assert (pure (r2 <> true));
-  ()
+
+  (r1 && not r2 && r3 && r4)
 }
 
 (* ========== Test: segments_intersect ==========
@@ -113,8 +117,8 @@ fn test_on_segment ()
 
 fn test_segments_intersect ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Crossing: (0,0)-(2,2) and (0,2)-(2,0) form an X
   let r1 = segments_intersect 0 0 2 2 0 2 2 0;
@@ -127,5 +131,6 @@ fn test_segments_intersect ()
   // Precision: postcondition rules out the other boolean
   assert (pure (r1 <> false));
   assert (pure (r2 <> true));
-  ()
+
+  (r1 && not r2)
 }

@@ -11,7 +11,10 @@
 
    Test instances:
    - find_bottom, polar_cmp: triangle (0,0), (2,0), (1,2)
-   - pop_while: 4-point set (0,0), (2,0), (1,1), (0,2) with hull [0,1,2]
+   - pop_while, graham_scan_step: 4-point set (0,0), (2,0), (1,1), (0,2)
+     with hull [0,1,2]
+
+   Each test returns a bool (true = pass) that is checked at the C level.
 
    Zero admits. Zero assumes. All assertions proven by SMT.
 *)
@@ -72,13 +75,33 @@ let pop_while_concrete_lemma (sxs sys: Seq.seq int) (shull: Seq.seq SZ.t)
 = ()
 #pop-options
 
+(* scan_step_sz_spec on the same 4-point set: after popping, pushes point 3.
+   pop_while returns top=2, then hull[2] := 3sz, new top=3.
+   The result hull should have 3sz at index 2. *)
+#push-options "--fuel 4 --ifuel 1"
+let scan_step_concrete_lemma (sxs sys: Seq.seq int) (shull: Seq.seq SZ.t)
+  : Lemma
+    (requires Seq.length sxs == 4 /\ Seq.length sys == 4 /\ Seq.length shull == 4 /\
+              Seq.index sxs 0 == 0 /\ Seq.index sxs 1 == 2 /\
+              Seq.index sxs 2 == 1 /\ Seq.index sxs 3 == 0 /\
+              Seq.index sys 0 == 0 /\ Seq.index sys 1 == 0 /\
+              Seq.index sys 2 == 1 /\ Seq.index sys 3 == 2 /\
+              Seq.index shull 0 == 0sz /\ Seq.index shull 1 == 1sz /\
+              Seq.index shull 2 == 2sz /\ Seq.index shull 3 == 0sz)
+    (ensures snd (scan_step_sz_spec sxs sys shull 3 3sz) == 3 /\
+             Seq.index (fst (scan_step_sz_spec sxs sys shull 3 3sz)) 0 == 0sz /\
+             Seq.index (fst (scan_step_sz_spec sxs sys shull 3 3sz)) 1 == 1sz /\
+             Seq.index (fst (scan_step_sz_spec sxs sys shull 3 3sz)) 2 == 3sz)
+= ()
+#pop-options
+
 (* ========== Test: find_bottom ========== *)
 
 ```pulse
 fn test_find_bottom ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Points: (0,0), (2,0), (1,2)
   let vx = V.alloc 0 3sz;
@@ -102,15 +125,17 @@ fn test_find_bottom ()
   with sxs. assert (A.pts_to xs sxs);
   with sys. assert (A.pts_to ys sys);
 
-  let result = find_bottom xs ys 3sz;
+  let r = find_bottom xs ys 3sz;
 
   // Postcondition: SZ.v result == find_bottom_spec sxs sys
   // Helper lemma evaluates the spec to 0
   find_bottom_triangle_lemma sxs sys;
-  assert (pure (SZ.v result == 0));
+  assert (pure (SZ.v r == 0));
 
   // Strengthened postcondition: result is truly the bottom-most point
-  assert (pure (is_bottommost sxs sys (SZ.v result)));
+  assert (pure (is_bottommost sxs sys (SZ.v r)));
+
+  let ok = (r = 0sz);
 
   // Cleanup
   with sx. assert (A.pts_to xs sx);
@@ -122,7 +147,7 @@ fn test_find_bottom ()
   rewrite (A.pts_to ys sy) as (A.pts_to (V.vec_to_array vy) sy);
   V.to_vec_pts_to vy;
   V.free vy;
-  ()
+  ok
 }
 ```
 
@@ -131,8 +156,8 @@ fn test_find_bottom ()
 ```pulse
 fn test_polar_cmp ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Points: (0,0), (2,0), (1,2)
   let vx = V.alloc 0 3sz;
@@ -157,14 +182,16 @@ fn test_polar_cmp ()
   with sys. assert (A.pts_to ys sys);
 
   // Compare polar angles: pivot=0, a=1, b=2
-  let result = polar_cmp xs ys 3sz 0sz 1sz 2sz;
+  let r = polar_cmp xs ys 3sz 0sz 1sz 2sz;
 
   // Postcondition: result == polar_cmp_spec sxs sys 0 1 2
   polar_cmp_triangle_lemma sxs sys;
-  assert (pure (result == 4));
+  assert (pure (r == 4));
 
   // Precision: positive result means point 1 comes before point 2 in CCW order
-  assert (pure (result > 0));
+  assert (pure (r > 0));
+
+  let ok = (r = 4);
 
   // Cleanup
   with sx. assert (A.pts_to xs sx);
@@ -176,7 +203,7 @@ fn test_polar_cmp ()
   rewrite (A.pts_to ys sy) as (A.pts_to (V.vec_to_array vy) sy);
   V.to_vec_pts_to vy;
   V.free vy;
-  ()
+  ok
 }
 ```
 
@@ -185,8 +212,8 @@ fn test_polar_cmp ()
 ```pulse
 fn test_pop_while ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns result: bool
+  ensures emp ** pure (result == true)
 {
   // Points: (0,0), (2,0), (1,1), (0,2)
   let vx = V.alloc 0 4sz;
@@ -224,17 +251,19 @@ fn test_pop_while ()
   with shull. assert (A.pts_to hull shull);
 
   // Call pop_while: top=3, new point=3
-  let result = pop_while xs ys hull 3sz 3sz 4sz;
+  let r = pop_while xs ys hull 3sz 3sz 4sz;
 
   // Postcondition: SZ.v result == pop_while_spec sxs sys shull 3 3
   pop_while_concrete_lemma sxs sys shull;
-  assert (pure (SZ.v result == 2));
+  assert (pure (SZ.v r == 2));
 
   // Strengthened postcondition: stack is never emptied
-  assert (pure (SZ.v result >= 1));
+  assert (pure (SZ.v r >= 1));
 
   // Strengthened postcondition: left-turn guarantee at the new top
-  assert (pure (ensures_left_turn sxs sys shull (SZ.v result) 3));
+  assert (pure (ensures_left_turn sxs sys shull (SZ.v r) 3));
+
+  let ok = (r = 2sz);
 
   // Cleanup
   with sx. assert (A.pts_to xs sx);
@@ -251,6 +280,89 @@ fn test_pop_while ()
   rewrite (A.pts_to hull sh) as (A.pts_to (V.vec_to_array vh) sh);
   V.to_vec_pts_to vh;
   V.free vh;
-  ()
+  ok
+}
+```
+
+(* ========== Test: graham_scan_step ========== *)
+
+```pulse
+fn test_graham_scan_step ()
+  requires emp
+  returns result: bool
+  ensures emp ** pure (result == true)
+{
+  // Points: (0,0), (2,0), (1,1), (0,2)
+  let vx = V.alloc 0 4sz;
+  V.to_array_pts_to vx;
+  let xs = V.vec_to_array vx;
+  rewrite (A.pts_to (V.vec_to_array vx) (Seq.create 4 0))
+       as (A.pts_to xs (Seq.create 4 0));
+  xs.(0sz) <- 0;
+  xs.(1sz) <- 2;
+  xs.(2sz) <- 1;
+  xs.(3sz) <- 0;
+
+  let vy = V.alloc 0 4sz;
+  V.to_array_pts_to vy;
+  let ys = V.vec_to_array vy;
+  rewrite (A.pts_to (V.vec_to_array vy) (Seq.create 4 0))
+       as (A.pts_to ys (Seq.create 4 0));
+  ys.(0sz) <- 0;
+  ys.(1sz) <- 0;
+  ys.(2sz) <- 1;
+  ys.(3sz) <- 2;
+
+  // Hull stack: [0, 1, 2, _] with top=3
+  let vh = V.alloc 0sz 4sz;
+  V.to_array_pts_to vh;
+  let hull = V.vec_to_array vh;
+  rewrite (A.pts_to (V.vec_to_array vh) (Seq.create 4 0sz))
+       as (A.pts_to hull (Seq.create 4 0sz));
+  hull.(0sz) <- 0sz;
+  hull.(1sz) <- 1sz;
+  hull.(2sz) <- 2sz;
+
+  with sxs. assert (A.pts_to xs sxs);
+  with sys. assert (A.pts_to ys sys);
+  with shull. assert (A.pts_to hull shull);
+
+  // Call graham_scan_step: top=3, new point=3 (index 3)
+  // This should pop point 2 (non-left-turn), then push point 3
+  let r = graham_scan_step xs ys hull 3sz 3sz 4sz;
+
+  // Postcondition: result == snd (scan_step_sz_spec sxs sys shull 3 3sz)
+  scan_step_concrete_lemma sxs sys shull;
+  assert (pure (SZ.v r == 3));
+
+  // Verify hull contents after the step
+  with shull'. assert (A.pts_to hull shull');
+  assert (pure (Seq.index shull' 0 == 0sz));
+  assert (pure (Seq.index shull' 1 == 1sz));
+  assert (pure (Seq.index shull' 2 == 3sz));
+
+  // Read hull values to check at C level
+  let h0 = hull.(0sz);
+  let h1 = hull.(1sz);
+  let h2 = hull.(2sz);
+
+  let ok = (r = 3sz && h0 = 0sz && h1 = 1sz && h2 = 3sz);
+
+  // Cleanup
+  with sx. assert (A.pts_to xs sx);
+  rewrite (A.pts_to xs sx) as (A.pts_to (V.vec_to_array vx) sx);
+  V.to_vec_pts_to vx;
+  V.free vx;
+
+  with sy. assert (A.pts_to ys sy);
+  rewrite (A.pts_to ys sy) as (A.pts_to (V.vec_to_array vy) sy);
+  V.to_vec_pts_to vy;
+  V.free vy;
+
+  with sh. assert (A.pts_to hull sh);
+  rewrite (A.pts_to hull sh) as (A.pts_to (V.vec_to_array vh) sh);
+  V.to_vec_pts_to vh;
+  V.free vh;
+  ok
 }
 ```
