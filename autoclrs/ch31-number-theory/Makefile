@@ -41,3 +41,25 @@ EXTRA_C_SOURCES   =
 CC_EXTRA_FLAGS    =
 
 include ../autoclrs.test.mk
+
+# ── Snapshot target ─────────────────────────────────────────────────
+# Produces a self-contained C distribution in snapshot/ that can be
+# built with just a C compiler (no F*, Pulse, or KaRaMeL required).
+
+SNAPSHOT_DIR = snapshot
+KRML_INCLUDE_DIR = $(KRML_HOME)/include
+
+.PHONY: snapshot
+snapshot: $(EXTRACT_C_FILES)
+	@echo "  [SNAPSHOT] Creating $(SNAPSHOT_DIR)/"
+	@rm -rf $(SNAPSHOT_DIR)
+	@mkdir -p $(SNAPSHOT_DIR)
+	cp $(OUTPUT_DIR)/$(BUNDLE_C_STEM).c $(SNAPSHOT_DIR)/
+	cp $(OUTPUT_DIR)/$(BUNDLE_C_STEM).h $(SNAPSHOT_DIR)/
+	cp $(TEST_MAIN) $(SNAPSHOT_DIR)/
+	cp -r $(KRML_INCLUDE_DIR)/krmllib.h $(SNAPSHOT_DIR)/
+	cp -r $(KRML_INCLUDE_DIR)/krml $(SNAPSHOT_DIR)/
+	@# Copy krmllib uint128 / endianness support headers (transitively included)
+	cp $(KRML_HOME)/krmllib/dist/minimal/*.h $(SNAPSHOT_DIR)/
+	cp snapshot.Makefile $(SNAPSHOT_DIR)/Makefile
+	@echo "  [SNAPSHOT] Done — build with: cd $(SNAPSHOT_DIR) && make test"
