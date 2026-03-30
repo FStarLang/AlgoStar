@@ -1,15 +1,28 @@
+/*
+  Test driver for CLRS Chapter 21 Disjoint Sets — C extraction test.
+
+  Two layers of assurance:
+  1. PROOF: Ghost Pulse assertions (erased at extraction) verify
+     pure_find equivalences and disjoint-set invariants from the spec.
+  2. RUNTIME: C-level checks below independently verify the concrete
+     output values (find_set results, union merge/stability).
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include "CLRS_Ch21_UnionFind_ImplTest.h"
 
 int main(void) {
-  printf("=== Union-Find C Extraction Test ===\n\n");
+  printf("=== CLRS Ch21 Union-Find — Extracted tests ===\n\n");
 
-  printf("Running verified test_union_find()... ");
-  CLRS_Ch21_UnionFind_ImplTest_test_union_find();
-  printf("OK\n\n");
+  printf("--- Union-Find test (3-element forest) ---\n");
+  if (!CLRS_Ch21_UnionFind_ImplTest_test_union_find()) {
+    fprintf(stderr, "FAIL: Union-Find output mismatch\n");
+    return 1;
+  }
+  printf("  PASS (proof: uf_inv verified; runtime: find/union checks passed)\n\n");
 
-  printf("All tests passed.\n");
+  printf("=== All ch21 tests passed ===\n");
   return 0;
 }

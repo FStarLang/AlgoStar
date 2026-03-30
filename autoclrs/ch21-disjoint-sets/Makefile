@@ -21,8 +21,8 @@ KRML_INPUT_FILES  = $(OUTPUT_DIR)/CLRS_Ch21_UnionFind_ImplTest.krml \
                     $(OUTPUT_DIR)/CLRS_Ch21_UnionFind_Impl.krml
 KRML_BUNDLE_FLAGS = \
   -bundle 'CLRS.Ch21.UnionFind.ImplTest=CLRS.Ch21.UnionFind.*' \
-  -bundle 'FStar.*' -bundle 'Prims' -bundle 'C'
-KRML_WARN_FLAGS   = -warn-error '-2-4-11-15'
+  -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims,C'
+KRML_WARN_FLAGS   = -warn-error '-2-9-11-15-17'
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/CLRS_Ch21_UnionFind_ImplTest.c
 KRML_EXTRA_INPUTS = $(wildcard $(KRML_HOME)/krmllib/.extract/*.krml)
 EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/c.c

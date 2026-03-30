@@ -11,6 +11,16 @@
    5. Chained union: union(0,1) then union(1,2), proves find(0)==find(1)==find(2)
       (requires rank bound postcondition to chain unions)
 
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        ✓ uf_inv maintained throughout
+        ✓ pure_find equivalences verified via ghost assertions
+        ✓ ensures pure (r == true): proof guarantees the runtime check passes
+
+     2. RUNTIME (computational, survives extraction to C):
+        ✓ sz_eq comparisons check find_set return values
+        ✓ Returns bool — caller can verify at runtime
+
    No admits. No assumes. Fully verified by F* and Z3.
 *)
 
@@ -27,6 +37,11 @@ module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module Spec = CLRS.Ch21.UnionFind.Spec
+
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  not (a <^ b || b <^ a)
 
 (* ---------- Pure helper: fresh forest has pure_find(x) == x ---------- *)
 
@@ -61,8 +76,8 @@ let fresh_forest_find (sp sr: Seq.seq SZ.t) (n: nat) (x: nat)
 ```pulse
 fn test_union_find ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let n = 3sz;
 
@@ -110,6 +125,9 @@ fn test_union_find ()
   with sp3. assert (A.pts_to parent sp3);
   assert (pure (SZ.v r2 == 2));
 
+  // Runtime check: fresh forest — each element is its own representative
+  let pass1 = sz_eq r0 0sz && sz_eq r1 1sz && sz_eq r2 2sz;
+
   // ===== Test 2: union(0, 1) =====
 
   // Establish rank bound precondition: all ranks are 0 < 3
@@ -130,6 +148,9 @@ fn test_union_find ()
   let r2' = find_set parent 2sz n #_ #sr4;
   with sp7. assert (A.pts_to parent sp7);
   assert (pure (SZ.v r2' == 2));
+
+  // Runtime check: after union(0,1), find(0)==find(1) and find(2)==2
+  let pass2 = sz_eq r0' r1' && sz_eq r2' 2sz;
 
   // ===== Test 3: chained union — union(1, 2) after union(0, 1) =====
 
@@ -159,6 +180,9 @@ fn test_union_find ()
   // Transitivity: all three elements in the same equivalence class
   assert (pure (SZ.v r0'' == SZ.v r2''));
 
+  // Runtime check: after chained union, all three in same class
+  let pass3 = sz_eq r0'' r1'' && sz_eq r1'' r2'';
+
   // ===== Cleanup =====
   rewrite (A.pts_to parent sp11) as (A.pts_to (V.vec_to_array vp) sp11);
   V.to_vec_pts_to vp;
@@ -167,7 +191,9 @@ fn test_union_find ()
   rewrite (A.pts_to rank sr8) as (A.pts_to (V.vec_to_array vr) sr8);
   V.to_vec_pts_to vr;
   V.free vr;
-  ()
+
+  let pass = pass1 && pass2 && pass3;
+  pass
 }
 ```
 #pop-options
