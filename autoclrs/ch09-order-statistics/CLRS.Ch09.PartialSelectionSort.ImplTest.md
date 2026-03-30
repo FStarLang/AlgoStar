@@ -72,16 +72,16 @@ specification.
 
 ## C Extraction & Concrete Execution
 
-The implementation was extracted to C via `fstar --codegen krml` → `krml` and
-compiled with `gcc`. The extracted C functions were run on the same test inputs:
+Each test function returns `bool` with `ensures pure (r == true)`:
+1. **PROOF** (ghost, erased): Postcondition uniquely determines the result
+2. **RUNTIME** (concrete, survives extraction): `int_eq` comparison returns bool
+
+The extracted C code captures return values and performs concrete equality checks:
 
 ```
-[PartialSelectionSort] select on [5, 2, 8]
-  select(k=1) = 2
+[PartialSelectionSort]
   PASS: select([5,2,8], k=1) == 2
-  select(k=2) = 5
   PASS: select([5,2,8], k=2) == 5
-  select(k=3) = 8
   PASS: select([5,2,8], k=3) == 8
 ```
 

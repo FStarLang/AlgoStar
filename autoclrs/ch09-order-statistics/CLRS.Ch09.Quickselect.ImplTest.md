@@ -59,14 +59,15 @@ property and permutation are also verified. No weaknesses found.
 
 ## C Extraction & Concrete Execution
 
-The implementation was extracted to C via `fstar --codegen krml` → `krml` and
-compiled with `gcc`. The extracted C functions were run on the same test inputs:
+Each test function returns `bool` with `ensures pure (r == true)`:
+1. **PROOF** (ghost, erased): Postcondition uniquely determines the result
+2. **RUNTIME** (concrete, survives extraction): `int_eq` comparison returns bool
+
+The extracted C code captures return values and performs concrete equality checks:
 
 ```
-[Quickselect] quickselect on [5, 2, 8]
-  quickselect(k=0) = 2
+[Quickselect]
   PASS: quickselect([5,2,8], k=0) == 2
-  quickselect(k=2) = 8
   PASS: quickselect([5,2,8], k=2) == 8
 ```
 

@@ -44,16 +44,16 @@ is the strongest possible specification for min/max. No weaknesses found.
 
 ## C Extraction & Concrete Execution
 
-The implementation was extracted to C via `fstar --codegen krml` → `krml` and
-compiled with `gcc`. The extracted C functions were run on the same test inputs:
+Each test function returns `bool` with `ensures pure (r == true)`:
+1. **PROOF** (ghost, erased): Postcondition uniquely determines the result
+2. **RUNTIME** (concrete, survives extraction): `int_eq` comparison returns bool
+
+The extracted C code captures return values and performs concrete equality checks:
 
 ```
-[MinMax] find_minimum on [5, 2, 8]
-  result = 2
-  PASS: min([5,2,8]) == 2
-[MinMax] find_maximum on [5, 2, 8]
-  result = 8
-  PASS: max([5,2,8]) == 8
+[MinMax]
+  PASS: find_minimum([5,2,8]) == 2
+  PASS: find_maximum([5,2,8]) == 8
 ```
 
 **Status: ✅ All concrete execution results match the verified specification.**
