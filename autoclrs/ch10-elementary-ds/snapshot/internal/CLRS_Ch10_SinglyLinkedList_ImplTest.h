@@ -1,0 +1,47 @@
+/* krml header omitted for test repeatability */
+
+
+#ifndef internal_CLRS_Ch10_SinglyLinkedList_ImplTest_H
+#define internal_CLRS_Ch10_SinglyLinkedList_ImplTest_H
+
+#include "krmllib.h"
+
+#include "../CLRS_Ch10_SinglyLinkedList_ImplTest.h"
+#include "krml/internal/compat.h"
+
+typedef struct CLRS_Ch10_SinglyLinkedList_Base_node_s CLRS_Ch10_SinglyLinkedList_Base_node;
+
+#define FStar_Pervasives_Native_None 0
+#define FStar_Pervasives_Native_Some 1
+
+typedef uint8_t FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node__tags;
+
+typedef struct FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node__s
+{
+  FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node__tags tag;
+  CLRS_Ch10_SinglyLinkedList_Base_node *v;
+}
+FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node_;
+
+typedef struct CLRS_Ch10_SinglyLinkedList_Base_node_s
+{
+  krml_checked_int_t key;
+  FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node_ next;
+}
+CLRS_Ch10_SinglyLinkedList_Base_node;
+
+bool
+CLRS_Ch10_SinglyLinkedList_Impl_list_search(
+  FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node_ head,
+  krml_checked_int_t k
+);
+
+FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node_
+CLRS_Ch10_SinglyLinkedList_Impl_list_delete(
+  FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node_ head,
+  krml_checked_int_t k
+);
+
+
+#define internal_CLRS_Ch10_SinglyLinkedList_ImplTest_H_DEFINED
+#endif /* internal_CLRS_Ch10_SinglyLinkedList_ImplTest_H */

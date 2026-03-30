@@ -40,3 +40,51 @@ $(EXTRACT_DIR)/%.c: $(EXTRACT_DIR)/%.krml
 	@true
 
 include ../autoclrs.test.mk
+
+# ── Snapshot target ─────────────────────────────────────────────────
+# Produces a self-contained snapshot/ directory with all extracted C/H
+# files plus the minimal krmllib runtime needed to compile and run tests
+# without the F*/KaRaMeL toolchain.
+
+SNAPSHOT_DIR      = snapshot
+SNAPSHOT_KRML     = $(SNAPSHOT_DIR)/krml/internal
+SNAPSHOT_KRMLLIB  = $(SNAPSHOT_DIR)/krmllib
+SNAPSHOT_INTERNAL = $(SNAPSHOT_DIR)/internal
+
+.PHONY: snapshot
+snapshot: $(EXTRACT_C_FILES)
+	@echo "  [SNAPSHOT] Populating $(SNAPSHOT_DIR)/"
+	@mkdir -p $(SNAPSHOT_KRML) $(SNAPSHOT_KRMLLIB) $(SNAPSHOT_INTERNAL)
+	@# Extracted C/H files
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_Stack_ImplTest.c      $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_Stack_ImplTest.h      $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_Queue_ImplTest.c      $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_Queue_ImplTest.h      $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_SinglyLinkedList_ImplTest.c $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_SinglyLinkedList_ImplTest.h $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_DLL_ImplTest.c        $(SNAPSHOT_DIR)/
+	@cp $(EXTRACT_DIR)/CLRS_Ch10_DLL_ImplTest.h        $(SNAPSHOT_DIR)/
+	@# Internal headers
+	@cp $(EXTRACT_DIR)/internal/CLRS_Ch10_DLL_ImplTest.h          $(SNAPSHOT_INTERNAL)/
+	@cp $(EXTRACT_DIR)/internal/CLRS_Ch10_SinglyLinkedList_ImplTest.h $(SNAPSHOT_INTERNAL)/
+	@cp $(EXTRACT_DIR)/internal/FStar_Pulse_PulseCore_Prims.h     $(SNAPSHOT_INTERNAL)/
+	@# krmllib include headers
+	@cp $(KRML_HOME)/include/krmllib.h                  $(SNAPSHOT_DIR)/
+	@cp $(KRML_HOME)/include/krml/fstar_int.h           $(SNAPSHOT_DIR)/krml/
+	@cp $(KRML_HOME)/include/krml/lowstar_endianness.h  $(SNAPSHOT_DIR)/krml/
+	@cp $(KRML_HOME)/include/krml/internal/builtin.h    $(SNAPSHOT_KRML)/
+	@cp $(KRML_HOME)/include/krml/internal/callconv.h   $(SNAPSHOT_KRML)/
+	@cp $(KRML_HOME)/include/krml/internal/compat.h     $(SNAPSHOT_KRML)/
+	@cp $(KRML_HOME)/include/krml/internal/debug.h      $(SNAPSHOT_KRML)/
+	@cp $(KRML_HOME)/include/krml/internal/target.h     $(SNAPSHOT_KRML)/
+	@cp $(KRML_HOME)/include/krml/internal/types.h      $(SNAPSHOT_KRML)/
+	@# krmllib runtime C sources and headers
+	@cp $(KRML_HOME)/krmllib/dist/generic/prims.c       $(SNAPSHOT_KRMLLIB)/
+	@cp $(KRML_HOME)/krmllib/dist/generic/Prims.h       $(SNAPSHOT_KRMLLIB)/
+	@cp $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c $(SNAPSHOT_KRMLLIB)/
+	@cp $(KRML_HOME)/krmllib/dist/generic/FStar_Int32.h $(SNAPSHOT_KRMLLIB)/
+	@cp $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt128.h          $(SNAPSHOT_KRMLLIB)/
+	@cp $(KRML_HOME)/krmllib/dist/minimal/fstar_uint128_gcc64.h    $(SNAPSHOT_KRMLLIB)/
+	@cp $(KRML_HOME)/krmllib/dist/minimal/FStar_UInt_8_16_32_64.h  $(SNAPSHOT_KRMLLIB)/
+	@cp $(KRML_HOME)/krmllib/dist/minimal/LowStar_Endianness.h    $(SNAPSHOT_KRMLLIB)/
+	@echo "  [SNAPSHOT] Done — run 'make -C $(SNAPSHOT_DIR)' to build and test"

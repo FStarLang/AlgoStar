@@ -1,0 +1,71 @@
+/* krml header omitted for test repeatability */
+
+
+#ifndef internal_CLRS_Ch10_DLL_ImplTest_H
+#define internal_CLRS_Ch10_DLL_ImplTest_H
+
+#include "krmllib.h"
+
+#include "internal/CLRS_Ch10_SinglyLinkedList_ImplTest.h"
+#include "../CLRS_Ch10_DLL_ImplTest.h"
+#include "krml/internal/compat.h"
+
+typedef struct CLRS_Ch10_DLL_Impl_node_s CLRS_Ch10_DLL_Impl_node;
+
+typedef struct FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node__s
+{
+  FStar_Pervasives_Native_option___CLRS_Ch10_SinglyLinkedList_Base_node__tags tag;
+  CLRS_Ch10_DLL_Impl_node *v;
+}
+FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_;
+
+typedef struct CLRS_Ch10_DLL_Impl_node_s
+{
+  krml_checked_int_t key;
+  FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_ prev;
+  FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_ next;
+}
+CLRS_Ch10_DLL_Impl_node;
+
+bool CLRS_Ch10_DLL_Impl_search_dls(CLRS_Ch10_DLL_Impl_node *p, krml_checked_int_t k);
+
+FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_
+CLRS_Ch10_DLL_Impl_search_dls_ptr(CLRS_Ch10_DLL_Impl_node *p, krml_checked_int_t k);
+
+bool CLRS_Ch10_DLL_Impl_search_dls_rev(CLRS_Ch10_DLL_Impl_node *p, krml_checked_int_t k);
+
+typedef struct
+K___FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node__FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node__s
+{
+  FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_ fst;
+  FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_ snd;
+}
+K___FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node__FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_;
+
+K___FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node__FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_
+CLRS_Ch10_DLL_Impl_delete_in_dls(
+  CLRS_Ch10_DLL_Impl_node *p,
+  krml_checked_int_t k,
+  FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_ prev_ptr,
+  CLRS_Ch10_DLL_Impl_node *tail_ptr
+);
+
+K___FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node__FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_
+CLRS_Ch10_DLL_Impl_delete_at_in_dls(
+  CLRS_Ch10_DLL_Impl_node *p,
+  krml_checked_int_t i,
+  FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_ prev_ptr,
+  CLRS_Ch10_DLL_Impl_node *tail_ptr
+);
+
+K___FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node__FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_
+CLRS_Ch10_DLL_Impl_delete_last_in_dls(
+  CLRS_Ch10_DLL_Impl_node *p,
+  krml_checked_int_t k,
+  FStar_Pervasives_Native_option___CLRS_Ch10_DLL_Impl_node_ prev_ptr,
+  CLRS_Ch10_DLL_Impl_node *tail_ptr
+);
+
+
+#define internal_CLRS_Ch10_DLL_ImplTest_H_DEFINED
+#endif /* internal_CLRS_Ch10_DLL_ImplTest_H */
