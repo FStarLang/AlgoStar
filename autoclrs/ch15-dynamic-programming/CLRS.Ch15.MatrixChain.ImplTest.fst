@@ -1,22 +1,15 @@
 (*
-   Spec validation test for Matrix Chain Multiplication (CLRS §15.2)
-
-   Adapted from: https://github.com/microsoft/intent-formalization/blob/main/
-     eval-autoclrs-specs/intree-tests/ch15-dynamic-programming/Test.MatrixChain.fst
+   Spec validation test for Matrix Chain Multiplication (CLRS Â§15.2)
 
    Input: dims = [10, 30, 5, 60], n = 3 (three matrices)
-     Matrix A₁: 10×30, A₂: 30×5, A₃: 5×60
    Expected: mc_result [10,30,5,60] 3 = 4500
-     Optimal parenthesization: (A₁A₂)A₃
-       cost = 10*30*5 + 10*5*60 = 1500 + 3000 = 4500
+     Optimal parenthesization: (A1*A2)*A3 = 10*30*5 + 10*5*60 = 4500
 
    What is proven:
    1. The precondition of matrix_chain_order is satisfiable for a concrete input.
-   2. The postcondition is precise: after calling matrix_chain_order, we can
-      prove result == 4500 using only the postcondition
-      (result == mc_result s_dims n) and a normalization lemma.
-   3. Non-negativity: result >= 0 is proven directly from the postcondition.
-   4. No admits, no assumes.
+   2. The postcondition is precise: result == 4500.
+   3. No admits, no assumes.
+   4. Runtime check: returns bool (true iff result == 4500), proven true.
 *)
 
 module CLRS.Ch15.MatrixChain.ImplTest
@@ -35,12 +28,10 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-/// Prove the expected output by normalizing the spec on the concrete input
 let mc_expected ()
   : Lemma (mc_result (Seq.seq_of_list [10; 30; 5; 60]) 3 == 4500)
   = assert_norm (mc_result (Seq.seq_of_list [10; 30; 5; 60]) 3 == 4500)
 
-/// Prove the precondition is satisfiable
 let mc_pre_satisfiable ()
   : Lemma
     (ensures SZ.v 3sz > 0 /\
@@ -52,10 +43,9 @@ let mc_pre_satisfiable ()
 
 fn test_matrix_chain ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
-  // Allocate dimension array [10, 30, 5, 60]
   let dv = V.alloc 10 4sz;
   V.to_array_pts_to dv;
   let dims = V.vec_to_array dv;
@@ -69,21 +59,17 @@ fn test_matrix_chain ()
   dims.(2sz) <- 5;
   dims.(3sz) <- 60;
 
-  // Prove precondition is satisfiable
   mc_pre_satisfiable ();
 
-  // Call matrix_chain_order
   let ctr = GR.alloc #nat 0;
   let result = matrix_chain_order dims 3sz ctr;
 
-  // Prove the result is exactly 4500 using the postcondition
   mc_expected ();
   assert (pure (result == 4500));
 
-  // Verify non-negativity directly from postcondition (no extra lemmas needed)
-  assert (pure (result >= 0));
+  // Runtime check that survives extraction to C
+  let pass = (result = 4500);
 
-  // Cleanup
   with cf. assert (GR.pts_to ctr cf);
   GR.free ctr;
 
@@ -91,6 +77,8 @@ fn test_matrix_chain ()
   rewrite (A.pts_to dims s1) as (A.pts_to (V.vec_to_array dv) s1);
   V.to_vec_pts_to dv;
   V.free dv;
+
+  pass
 }
 
 #pop-options

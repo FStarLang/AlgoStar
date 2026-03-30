@@ -4,50 +4,47 @@ PULSE_ROOT ?= ../../FStar/pulse
 include $(PULSE_ROOT)/mk/test.mk
 OTHERFLAGS += --include ../common
 
-# ── C extraction targets ──────────────────────────────────────────
+# ── C extraction and test targets ──────────────────────────────────
 CHAPTER_ID  = ch15
 EXTRACT_DIR = _extract
 
-# Modules to extract: each ImplTest + its Impl
-IMPLTEST_MODULES = CLRS.Ch15.RodCutting.ImplTest \
-                   CLRS.Ch15.LCS.ImplTest \
-                   CLRS.Ch15.MatrixChain.ImplTest
+# Impl modules need full-dependency .krml because Pulse.Lib.BoundedIntegers
+# .krml files are not available separately in krmllib.  The full-dep .krml
+# bundles all transitive Pulse dependencies so KaRaMeL can generate C.
+IMPL_MODULES = CLRS.Ch15.RodCutting.Impl \
+               CLRS.Ch15.LCS.Impl \
+               CLRS.Ch15.MatrixChain.Impl
 
-IMPL_MODULES     = CLRS.Ch15.RodCutting.Impl \
-                   CLRS.Ch15.LCS.Impl \
-                   CLRS.Ch15.MatrixChain.Impl
+# ImplTest per-module .krml (produced by test.mk pattern rule)
+# Impl full-dependency .krml (produced by extract-impl-krml below)
+KRML_INPUT_FILES = \
+  $(OUTPUT_DIR)/CLRS_Ch15_RodCutting_ImplTest.krml \
+  $(OUTPUT_DIR)/CLRS_Ch15_RodCutting_Impl_full.krml \
+  $(OUTPUT_DIR)/CLRS_Ch15_LCS_ImplTest.krml \
+  $(OUTPUT_DIR)/CLRS_Ch15_LCS_Impl_full.krml \
+  $(OUTPUT_DIR)/CLRS_Ch15_MatrixChain_ImplTest.krml \
+  $(OUTPUT_DIR)/CLRS_Ch15_MatrixChain_Impl_full.krml
 
-# Step 1a: Extract each ImplTest to a per-module .krml (from .checked)
-# These small .krml files contain only the test module's AST.
-IMPLTEST_KRMLS = $(patsubst %,$(OUTPUT_DIR)/$(subst .,_,%).krml,$(IMPLTEST_MODULES))
-
-# Step 1b: Extract each Impl to a full-dependency .krml (from .fst)
-# These larger .krml files include all transitive dependencies (Pulse
-# primitives, etc.) so KaRaMeL can compile Pulse fn bodies to C.
-IMPL_KRMLS = $(patsubst %,$(OUTPUT_DIR)/%_full.krml,$(subst .,_,$(IMPL_MODULES)))
-
-# The per-module extraction uses test.mk's pattern rule automatically.
-# The full-dependency extraction needs a custom rule:
+# Full-dependency extraction for Impl modules
+.PHONY: extract-impl-krml
 extract-impl-krml: $(ALL_CHECKED_FILES)
 	@for mod in $(IMPL_MODULES); do \
-		echo "  Extracting $$mod (full deps)"; \
-		rm -f $(OUTPUT_DIR)/out.krml; \
-		$(FSTAR) --codegen krml $$mod.fst; \
 		krml=$$(echo $$mod | tr '.' '_')_full.krml; \
-		if [ -f $(OUTPUT_DIR)/out.krml ]; then \
-			mv $(OUTPUT_DIR)/out.krml $(OUTPUT_DIR)/$$krml; \
+		if [ ! -f $(OUTPUT_DIR)/$$krml ]; then \
+			echo "  Extracting $$mod (full deps)"; \
+			rm -f $(OUTPUT_DIR)/out.krml; \
+			$(FSTAR) --codegen krml $$mod.fst; \
+			if [ -f $(OUTPUT_DIR)/out.krml ]; then \
+				mv $(OUTPUT_DIR)/out.krml $(OUTPUT_DIR)/$$krml; \
+			fi; \
 		fi; \
 	done
 
-extract-impltest-krml: $(ALL_CHECKED_FILES)
-	@for mod in $(IMPLTEST_MODULES); do \
-		checked=$$(echo $$mod | tr '/' '.').fst.checked; \
-		echo "  Extracting $$mod (per-module)"; \
-		$(FSTAR) --codegen krml --extract_module $$mod $(CACHE_DIR)/$$checked; \
-	done
-
-# Step 2: KaRaMeL .krml → .c
-KRML_WARN_FLAGS   ?= -warn-error -2-9-11-15-17
+# Wire full-dep extraction as prerequisite of KaRaMeL step
+$(OUTPUT_DIR)/CLRS_Ch15_RodCutting_Impl_full.krml \
+$(OUTPUT_DIR)/CLRS_Ch15_LCS_Impl_full.krml \
+$(OUTPUT_DIR)/CLRS_Ch15_MatrixChain_Impl_full.krml: extract-impl-krml
+	@true
 
 KRML_BUNDLE_FLAGS = \
   -bundle 'CLRS.Ch15.RodCutting.ImplTest+CLRS.Ch15.RodCutting.Impl=CLRS.Ch15.RodCutting.ImplTest,CLRS.Ch15.RodCutting.Impl[rename=RodCutting_ImplTest]' \
@@ -55,61 +52,38 @@ KRML_BUNDLE_FLAGS = \
   -bundle 'CLRS.Ch15.MatrixChain.ImplTest+CLRS.Ch15.MatrixChain.Impl=CLRS.Ch15.MatrixChain.ImplTest,CLRS.Ch15.MatrixChain.Impl[rename=MatrixChain_ImplTest]' \
   -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims,CLRS.Ch15.RodCutting.Spec,CLRS.Ch15.RodCutting.Lemmas,CLRS.Ch15.LCS.Spec,CLRS.Ch15.LCS.Lemmas,CLRS.Ch15.MatrixChain.Spec,CLRS.Ch15.MatrixChain.Lemmas,CLRS.Ch15.MatrixChain.Complexity[rename=Support]'
 
+# Warnings 11 (non-Low* expression) and 15 (non-Low* function) are expected:
+# the Impl modules use nat/int via Pulse.Lib.BoundedIntegers for checked
+# arithmetic, which KaRaMeL handles via krml_checked_int_t.
+KRML_WARN_FLAGS = -warn-error -2-9-11-15-17
+
 KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
 
-EXTRACT_C_FILES   = $(EXTRACT_DIR)/RodCutting_ImplTest.c \
-                    $(EXTRACT_DIR)/LCS_ImplTest.c \
-                    $(EXTRACT_DIR)/MatrixChain_ImplTest.c
+# C files produced by KaRaMeL (all from one invocation)
+EXTRACT_C_FILES = \
+  $(EXTRACT_DIR)/RodCutting_ImplTest.c \
+  $(EXTRACT_DIR)/LCS_ImplTest.c \
+  $(EXTRACT_DIR)/MatrixChain_ImplTest.c \
+  $(EXTRACT_DIR)/Support.c \
+  $(EXTRACT_DIR)/krmlinit.c
 
-$(firstword $(EXTRACT_C_FILES)): extract-impl-krml extract-impltest-krml
-	@mkdir -p $(EXTRACT_DIR)
-	$(KRML_EXE) \
-		-skip-makefiles -skip-compilation -skip-linking \
-		$(KRML_WARN_FLAGS) \
-		-add-include '"krml/internal/compat.h"' \
-		$(KRML_BUNDLE_FLAGS) \
-		-tmpdir $(EXTRACT_DIR) \
-		$(OUTPUT_DIR)/CLRS_Ch15_RodCutting_ImplTest.krml \
-		$(OUTPUT_DIR)/CLRS_Ch15_RodCutting_Impl_full.krml \
-		$(OUTPUT_DIR)/CLRS_Ch15_LCS_ImplTest.krml \
-		$(OUTPUT_DIR)/CLRS_Ch15_LCS_Impl_full.krml \
-		$(OUTPUT_DIR)/CLRS_Ch15_MatrixChain_ImplTest.krml \
-		$(OUTPUT_DIR)/CLRS_Ch15_MatrixChain_Impl_full.krml \
-		$(KRML_EXTRA_INPUTS)
+EXTRA_C_SOURCES = \
+  $(KRML_HOME)/krmllib/dist/generic/prims.c \
+  $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
 
-# All .c files are produced by the single krml invocation above
-$(wordlist 2,$(words $(EXTRACT_C_FILES)),$(EXTRACT_C_FILES)): $(firstword $(EXTRACT_C_FILES))
-	@:
+CC_EXTRA_INCLUDES = -I $(EXTRACT_DIR)/internal
 
-# Step 3: Compile and link
-KRML_CC_INCLUDES = \
-  -I $(KRML_HOME)/include \
-  -I $(KRML_HOME)/krmllib/dist/minimal \
-  -I $(KRML_HOME)/krmllib/dist/generic \
-  -I $(KRML_HOME)/krmllib \
-  -I $(EXTRACT_DIR) \
-  -I $(EXTRACT_DIR)/internal \
-  -I .
+TEST_EXE_NAME = ch15_test
 
-KRML_CC_FLAGS = -std=c11 -Wall -g -fwrapv \
-  -D_BSD_SOURCE -D_DEFAULT_SOURCE \
-  -Wno-unused-variable -Wno-unused-parameter -Wno-parentheses
+# Note: CLRS.Ch15.{RodCutting,MatrixChain}.Extended.fst are proof-only
+# modules (verified Pulse code) not intended for C extraction. They extend
+# the core algorithms but have no ImplTest or extraction targets.
 
-EXTRA_C_SOURCES = $(KRML_HOME)/krmllib/dist/generic/prims.c \
-                  $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
+# Cancel Pulse's generic .krml -> .c pattern rules for our extract dir
+# (we use KaRaMeL batch extraction via autoclrs.test.mk instead)
+$(EXTRACT_DIR)/%.krml:
+	@true
+$(EXTRACT_DIR)/%.c: $(EXTRACT_DIR)/%.krml
+	@true
 
-$(EXTRACT_DIR)/$(CHAPTER_ID)_test: $(EXTRACT_C_FILES) main.c
-	@mkdir -p $(EXTRACT_DIR)
-	$(call msg, "CC+LINK", "$(CHAPTER_ID)_test")
-	$(CC) $(KRML_CC_FLAGS) $(KRML_CC_INCLUDES) \
-		-o $@ main.c \
-		$(EXTRACT_C_FILES) $(EXTRACT_DIR)/Support.c \
-		$(EXTRA_C_SOURCES)
-
-$(EXTRACT_DIR)/$(CHAPTER_ID)_test.out: $(EXTRACT_DIR)/$(CHAPTER_ID)_test
-	$(call msg, "RUN", "$(CHAPTER_ID)_test")
-	./$< | tee $@
-
-.PHONY: extract-impl-krml extract-impltest-krml extract test-c
-extract: $(EXTRACT_C_FILES)
-test-c: $(EXTRACT_DIR)/$(CHAPTER_ID)_test.out
+include ../autoclrs.test.mk

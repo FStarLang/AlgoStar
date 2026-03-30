@@ -3,10 +3,11 @@
  *
  * Provides:
  *   - Pulse.Lib.BoundedIntegers typeclass instance initialization
- *   - main() that calls each extracted ImplTest function
+ *   - main() that calls each extracted ImplTest function and checks results
  *
  * The algorithm implementations are extracted from verified Pulse code
- * via F* --codegen krml and KaRaMeL.
+ * via F* --codegen krml and KaRaMeL.  Each test_* function returns bool
+ * (proven to be true by the Pulse postcondition).
  */
 
 #include <stdio.h>
@@ -51,16 +52,25 @@ int main(void) {
   printf("=== Ch15 Dynamic Programming — Extracted C Tests ===\n\n");
 
   printf("Rod Cutting (extracted from verified Pulse):\n");
-  CLRS_Ch15_RodCutting_ImplTest_test_rod_cutting();
-  printf("  PASS: rod_cutting completed\n\n");
+  if (!CLRS_Ch15_RodCutting_ImplTest_test_rod_cutting()) {
+    fprintf(stderr, "  FAIL: rod_cutting result mismatch\n");
+    return 1;
+  }
+  printf("  PASS: rod_cutting (result == 10)\n\n");
 
   printf("LCS (extracted from verified Pulse):\n");
-  CLRS_Ch15_LCS_ImplTest_test_lcs();
-  printf("  PASS: lcs completed\n\n");
+  if (!CLRS_Ch15_LCS_ImplTest_test_lcs()) {
+    fprintf(stderr, "  FAIL: lcs result mismatch\n");
+    return 1;
+  }
+  printf("  PASS: lcs (result == 2)\n\n");
 
   printf("Matrix Chain (extracted from verified Pulse):\n");
-  CLRS_Ch15_MatrixChain_ImplTest_test_matrix_chain();
-  printf("  PASS: matrix_chain completed\n\n");
+  if (!CLRS_Ch15_MatrixChain_ImplTest_test_matrix_chain()) {
+    fprintf(stderr, "  FAIL: matrix_chain result mismatch\n");
+    return 1;
+  }
+  printf("  PASS: matrix_chain (result == 4500)\n\n");
 
   printf("=== All 3 extracted tests passed ===\n");
   return 0;

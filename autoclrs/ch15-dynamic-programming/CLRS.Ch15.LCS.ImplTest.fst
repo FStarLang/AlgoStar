@@ -1,21 +1,14 @@
 (*
-   Spec validation test for Longest Common Subsequence (CLRS §15.4)
-
-   Adapted from: https://github.com/microsoft/intent-formalization/blob/main/
-     eval-autoclrs-specs/intree-tests/ch15-dynamic-programming/Test.LCS.fst
+   Spec validation test for Longest Common Subsequence (CLRS Â§15.4)
 
    Input: x = [1, 2, 3], y = [2, 3, 4], m = 3, n = 3
-   Expected: lcs_length [1,2,3] [2,3,4] 3 3 = 2
-     LCS is [2, 3], length 2
+   Expected: lcs_length [1,2,3] [2,3,4] 3 3 = 2 (LCS is [2, 3])
 
    What is proven:
    1. The precondition of lcs is satisfiable for a concrete input.
-   2. The postcondition is precise: after calling lcs, we can prove
-      result == 2 using only the postcondition
-      (result == lcs_length sx sy m n) and a normalization lemma.
-   3. Non-negativity: result >= 0 is proven directly from the postcondition.
-   4. Upper bounds: result <= m and result <= n are proven from the postcondition.
-   5. No admits, no assumes.
+   2. The postcondition is precise: result == 2.
+   3. No admits, no assumes.
+   4. Runtime check: returns bool (true iff result == 2), proven true.
 *)
 
 module CLRS.Ch15.LCS.ImplTest
@@ -34,12 +27,10 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-/// Prove the expected output by normalizing the spec on the concrete input
 let lcs_expected ()
   : Lemma (lcs_length (Seq.seq_of_list [1; 2; 3]) (Seq.seq_of_list [2; 3; 4]) 3 3 == 2)
   = assert_norm (lcs_length (Seq.seq_of_list [1; 2; 3]) (Seq.seq_of_list [2; 3; 4]) 3 3 == 2)
 
-/// Prove the precondition is satisfiable
 let lcs_pre_satisfiable ()
   : Lemma
     (ensures SZ.fits (op_Multiply (SZ.v 3sz + 1) (SZ.v 3sz + 1)))
@@ -47,10 +38,9 @@ let lcs_pre_satisfiable ()
 
 fn test_lcs ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
-  // Allocate x = [1, 2, 3]
   let xv = V.alloc 0 3sz;
   V.to_array_pts_to xv;
   let x_arr = V.vec_to_array xv;
@@ -63,7 +53,6 @@ fn test_lcs ()
   x_arr.(1sz) <- 2;
   x_arr.(2sz) <- 3;
 
-  // Allocate y = [2, 3, 4]
   let yv = V.alloc 0 3sz;
   V.to_array_pts_to yv;
   let y_arr = V.vec_to_array yv;
@@ -76,23 +65,17 @@ fn test_lcs ()
   y_arr.(1sz) <- 3;
   y_arr.(2sz) <- 4;
 
-  // Prove precondition is satisfiable
   lcs_pre_satisfiable ();
 
-  // Call lcs
   let ctr = GR.alloc #nat 0;
   let result = lcs x_arr y_arr 3sz 3sz ctr;
 
-  // Prove the result is exactly 2 using the postcondition
   lcs_expected ();
   assert (pure (result == 2));
 
-  // Verify range properties directly from postcondition (no extra lemmas needed)
-  assert (pure (result >= 0));
-  assert (pure (result <= 3));  // result <= m
-  assert (pure (result <= 3));  // result <= n
+  // Runtime check that survives extraction to C
+  let pass = (result = 2);
 
-  // Cleanup
   with cf. assert (GR.pts_to ctr cf);
   GR.free ctr;
 
@@ -105,4 +88,6 @@ fn test_lcs ()
   rewrite (A.pts_to x_arr sx1) as (A.pts_to (V.vec_to_array xv) sx1);
   V.to_vec_pts_to xv;
   V.free xv;
+
+  pass
 }

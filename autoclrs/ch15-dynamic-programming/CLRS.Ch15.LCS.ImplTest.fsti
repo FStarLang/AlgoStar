@@ -5,5 +5,5 @@ open Pulse.Lib.Pervasives
 
 fn test_lcs ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
