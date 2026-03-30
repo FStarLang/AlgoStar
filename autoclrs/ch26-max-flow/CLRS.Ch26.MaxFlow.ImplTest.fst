@@ -27,6 +27,10 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module L = FStar.List.Tot
 
+(* Decidable int equality — inline_for_extraction ensures it survives to C *)
+inline_for_extraction
+let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
+
 (* ================================================================
    Pure helper lemmas for postcondition completeness
    ================================================================ *)
@@ -166,7 +170,7 @@ let disconnected_flow_value (flow_seq cap_seq: Seq.seq int)
    4. MFMC applicable: flow_value = min-cut capacity *)
 fn test_max_flow_completeness ()
   requires emp
-  returns _: unit
+  returns r: bool
   ensures emp
 {
   let n : SZ.t = 2sz;
@@ -231,6 +235,10 @@ fn test_max_flow_completeness ()
     // Verify MFMC theorem is applicable: flow_value = min-cut capacity
     single_edge_mfmc flow_seq cap_seq;
 
+    // Runtime check — survives extraction to C
+    let pass = int_eq f01 7 && int_eq f00 0 && int_eq f10 0
+               && int_eq f11 0 && int_eq flow_val 7;
+
     // Cleanup
     with sc2. assert (A.pts_to capacity sc2);
     rewrite (A.pts_to capacity sc2) as (A.pts_to (V.vec_to_array cv) sc2);
@@ -240,6 +248,7 @@ fn test_max_flow_completeness ()
     rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
     V.to_vec_pts_to fv;
     V.free fv;
+    pass
   } else {
     // Unreachable: capacities [0;7;0;0] are non-negative
     with sc2. assert (A.pts_to capacity sc2);
@@ -250,6 +259,7 @@ fn test_max_flow_completeness ()
     rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
     V.to_vec_pts_to fv;
     V.free fv;
+    false
   }
 }
 ```
@@ -273,7 +283,7 @@ fn test_max_flow_completeness ()
    4. Flow value correct: |f| = 0 *)
 fn test_max_flow_disconnected_completeness ()
   requires emp
-  returns _: unit
+  returns r: bool
   ensures emp
 {
   let n : SZ.t = 2sz;
@@ -329,6 +339,10 @@ fn test_max_flow_disconnected_completeness ()
     lemma_imp_flow_value_eq flow_seq 2 0;
     assert (pure (flow_val == 0));
 
+    // Runtime check — survives extraction to C
+    let pass = int_eq f00 0 && int_eq f01 0 && int_eq f10 0
+               && int_eq f11 0 && int_eq flow_val 0;
+
     // Cleanup
     with sc2. assert (A.pts_to capacity sc2);
     rewrite (A.pts_to capacity sc2) as (A.pts_to (V.vec_to_array cv) sc2);
@@ -338,6 +352,7 @@ fn test_max_flow_disconnected_completeness ()
     rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
     V.to_vec_pts_to fv;
     V.free fv;
+    pass
   } else {
     // Unreachable: all-zero capacities are non-negative
     with sc2. assert (A.pts_to capacity sc2);
@@ -348,6 +363,198 @@ fn test_max_flow_disconnected_completeness ()
     rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
     V.to_vec_pts_to fv;
     V.free fv;
+    false
+  }
+}
+```
+
+#pop-options
+
+(* ================================================================
+   Additional runtime tests from various graph topologies.
+   These check the flow_val return value against expected values.
+   ================================================================ *)
+
+#push-options "--z3rlimit 10 --fuel 8 --ifuel 4"
+
+```pulse
+(** Test 3: 3-vertex graph with two paths.
+    s=0, t=2. Edges: 0→1 cap 10, 1→2 cap 5, 0→2 cap 15.
+    Expected max flow = 20 (15 via 0→2 + 5 via 0→1→2). *)
+fn test_max_flow_3v ()
+  requires emp
+  returns r: bool
+  ensures emp
+{
+  let n : SZ.t = 3sz;
+  let nn : SZ.t = n *^ n;
+
+  let cv = V.alloc 0 nn;
+  V.to_array_pts_to cv;
+  let capacity = V.vec_to_array cv;
+  with sc. assert (A.pts_to (V.vec_to_array cv) sc);
+  rewrite (A.pts_to (V.vec_to_array cv) sc) as (A.pts_to capacity sc);
+
+  let fv = V.alloc 0 nn;
+  V.to_array_pts_to fv;
+  let flow = V.vec_to_array fv;
+  with sf. assert (A.pts_to (V.vec_to_array fv) sf);
+  rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
+
+  // Edge 0→1 cap 10, edge 1→2 cap 5, edge 0→2 cap 15
+  A.op_Array_Assignment capacity (0sz *^ n +^ 1sz) 10;
+  A.op_Array_Assignment capacity (1sz *^ n +^ 2sz) 5;
+  A.op_Array_Assignment capacity (0sz *^ n +^ 2sz) 15;
+
+  with sc2. assert (A.pts_to capacity sc2);
+  let caps_ok = check_valid_caps_fn capacity nn;
+  if caps_ok {
+    valid_caps_intro sc2 (SZ.v n);
+    let flow_val = max_flow capacity flow n 0sz 2sz;
+
+    // Runtime check: expected max flow = 20
+    let pass = int_eq flow_val 20;
+
+    with sc3. assert (A.pts_to capacity sc3);
+    rewrite (A.pts_to capacity sc3) as (A.pts_to (V.vec_to_array cv) sc3);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+    pass
+  } else {
+    with sc3. assert (A.pts_to capacity sc3);
+    rewrite (A.pts_to capacity sc3) as (A.pts_to (V.vec_to_array cv) sc3);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+    false
+  }
+}
+```
+
+```pulse
+(** Test 4: Diamond graph with 4 vertices, multiple paths.
+    s=0, t=3. Edges: 0→1 cap 10, 0→2 cap 10, 1→3 cap 10, 2→3 cap 10.
+    Expected max flow = 20 (10 via 0→1→3 + 10 via 0→2→3). *)
+fn test_max_flow_diamond ()
+  requires emp
+  returns r: bool
+  ensures emp
+{
+  let n : SZ.t = 4sz;
+  let nn : SZ.t = n *^ n;
+
+  let cv = V.alloc 0 nn;
+  V.to_array_pts_to cv;
+  let capacity = V.vec_to_array cv;
+  with sc. assert (A.pts_to (V.vec_to_array cv) sc);
+  rewrite (A.pts_to (V.vec_to_array cv) sc) as (A.pts_to capacity sc);
+
+  let fv = V.alloc 0 nn;
+  V.to_array_pts_to fv;
+  let flow = V.vec_to_array fv;
+  with sf. assert (A.pts_to (V.vec_to_array fv) sf);
+  rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
+
+  // 0→1 cap 10, 0→2 cap 10, 1→3 cap 10, 2→3 cap 10
+  A.op_Array_Assignment capacity (0sz *^ n +^ 1sz) 10;
+  A.op_Array_Assignment capacity (0sz *^ n +^ 2sz) 10;
+  A.op_Array_Assignment capacity (1sz *^ n +^ 3sz) 10;
+  A.op_Array_Assignment capacity (2sz *^ n +^ 3sz) 10;
+
+  with sc2. assert (A.pts_to capacity sc2);
+  let caps_ok = check_valid_caps_fn capacity nn;
+  if caps_ok {
+    valid_caps_intro sc2 (SZ.v n);
+    let flow_val = max_flow capacity flow n 0sz 3sz;
+
+    // Runtime check: expected max flow = 20
+    let pass = int_eq flow_val 20;
+
+    with sc3. assert (A.pts_to capacity sc3);
+    rewrite (A.pts_to capacity sc3) as (A.pts_to (V.vec_to_array cv) sc3);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+    pass
+  } else {
+    with sc3. assert (A.pts_to capacity sc3);
+    rewrite (A.pts_to capacity sc3) as (A.pts_to (V.vec_to_array cv) sc3);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+    false
+  }
+}
+```
+
+```pulse
+(** Test 5: Bottleneck graph — capacity limited by middle edge.
+    s=0, t=2. Edges: 0→1 cap 100, 1→2 cap 1. Expected max flow = 1. *)
+fn test_max_flow_bottleneck ()
+  requires emp
+  returns r: bool
+  ensures emp
+{
+  let n : SZ.t = 3sz;
+  let nn : SZ.t = n *^ n;
+
+  let cv = V.alloc 0 nn;
+  V.to_array_pts_to cv;
+  let capacity = V.vec_to_array cv;
+  with sc. assert (A.pts_to (V.vec_to_array cv) sc);
+  rewrite (A.pts_to (V.vec_to_array cv) sc) as (A.pts_to capacity sc);
+
+  let fv = V.alloc 0 nn;
+  V.to_array_pts_to fv;
+  let flow = V.vec_to_array fv;
+  with sf. assert (A.pts_to (V.vec_to_array fv) sf);
+  rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
+
+  // 0→1 cap 100, 1→2 cap 1
+  A.op_Array_Assignment capacity (0sz *^ n +^ 1sz) 100;
+  A.op_Array_Assignment capacity (1sz *^ n +^ 2sz) 1;
+
+  with sc2. assert (A.pts_to capacity sc2);
+  let caps_ok = check_valid_caps_fn capacity nn;
+  if caps_ok {
+    valid_caps_intro sc2 (SZ.v n);
+    let flow_val = max_flow capacity flow n 0sz 2sz;
+
+    // Runtime check: expected max flow = 1
+    let pass = int_eq flow_val 1;
+
+    with sc3. assert (A.pts_to capacity sc3);
+    rewrite (A.pts_to capacity sc3) as (A.pts_to (V.vec_to_array cv) sc3);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+    pass
+  } else {
+    with sc3. assert (A.pts_to capacity sc3);
+    rewrite (A.pts_to capacity sc3) as (A.pts_to (V.vec_to_array cv) sc3);
+    V.to_vec_pts_to cv;
+    V.free cv;
+    with sf2. assert (A.pts_to flow sf2);
+    rewrite (A.pts_to flow sf2) as (A.pts_to (V.vec_to_array fv) sf2);
+    V.to_vec_pts_to fv;
+    V.free fv;
+    false
   }
 }
 ```
