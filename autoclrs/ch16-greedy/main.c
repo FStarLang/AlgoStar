@@ -1,21 +1,26 @@
-/* Ch16 ImplTest runner — calls extracted test functions and prints results. */
+/* Ch16 ImplTest runner — calls extracted test functions and checks results. */
 #include <stdio.h>
-#include "krmlinit.h"
+#include <stdlib.h>
 #include "CLRS_Ch16_ActivitySelection_ImplTest.h"
 #include "CLRS_Ch16_Huffman_ImplTest.h"
 
 int main(void) {
-  krmlinit_globals();
   printf("=== Ch16 ImplTest C Extraction Tests ===\n\n");
 
-  printf("Running Activity Selection test... ");
-  CLRS_Ch16_ActivitySelection_ImplTest_test_activity_selection_3();
-  printf("PASSED\n");
+  printf("--- Activity Selection test ---\n");
+  if (!CLRS_Ch16_ActivitySelection_ImplTest_test_activity_selection_3()) {
+    fprintf(stderr, "FAIL: Activity Selection output mismatch\n");
+    return 1;
+  }
+  printf("  PASS (proof: optimality verified; runtime: count=2, sel=[0,2])\n\n");
 
-  printf("Running Huffman Tree test... ");
-  CLRS_Ch16_Huffman_ImplTest_test_huffman_2();
-  printf("PASSED\n");
+  printf("--- Huffman Tree test ---\n");
+  if (!CLRS_Ch16_Huffman_ImplTest_test_huffman_2()) {
+    fprintf(stderr, "FAIL: Huffman Tree test failed\n");
+    return 1;
+  }
+  printf("  PASS (proof: cost=8, WPL-optimal; runtime: input preserved)\n\n");
 
-  printf("\nAll tests PASSED.\n");
+  printf("=== All ch16 tests passed ===\n");
   return 0;
 }
