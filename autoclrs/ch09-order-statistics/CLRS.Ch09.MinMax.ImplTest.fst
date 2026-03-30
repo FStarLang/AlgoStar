@@ -2,13 +2,12 @@
    CLRS Chapter 9.1: MINIMUM / MAXIMUM — Spec Validation Test
 
    Tests find_minimum and find_maximum on a small concrete array [5, 2, 8].
-   Proves:
-   - Preconditions are satisfiable
-   - Postconditions are precise enough to determine the exact output
-     (min_val == 2, max_val == 8) for the given input
 
-   Adapted from: https://github.com/microsoft/intent-formalization/blob/main/
-     eval-autoclrs-specs/intree-tests/ch09-order-statistics/Test.MinMax.fst
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        ✓ Postcondition proves min_val == 2, max_val == 8
+     2. RUNTIME (computational, survives extraction to C):
+        ✓ Concrete bool comparisons returned from each test function
 
    NO admits. NO assumes.
 *)
@@ -27,13 +26,21 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module GR = Pulse.Lib.GhostReference
 
+(* Concrete int equality — survives extraction to C *)
+inline_for_extraction
+let int_eq (a b: int) : bool =
+  not (Prims.op_LessThan a b || Prims.op_LessThan b a)
+
+let int_eq_correct (a b: int)
+  : Lemma (int_eq a b <==> a = b) = ()
+
 #push-options "--z3rlimit 400 --fuel 8 --ifuel 4"
 
 ```pulse
 fn test_find_minimum ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -43,14 +50,16 @@ fn test_find_minimum ()
   arr.(1sz) <- 2;
   arr.(2sz) <- 8;
 
-  // Bind input ghost state (pattern from working ch07 test)
   with s0. assert (A.pts_to arr s0);
 
   let ctr = GR.alloc #nat 0;
   let min_val = find_minimum arr 3sz ctr #(hide 0);
-  // Postcondition: min_val exists in array AND min_val <= all elements
-  // For [5, 2, 8], min = 2
+  // Ghost proof: min_val == 2 (erased at extraction)
   assert (pure (min_val == 2));
+
+  // Concrete check: survives extraction to C
+  int_eq_correct min_val 2;
+  let ok = int_eq min_val 2;
 
   with cf. assert (GR.pts_to ctr cf);
   GR.free ctr;
@@ -58,14 +67,15 @@ fn test_find_minimum ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
+  ok
 }
 ```
 
 ```pulse
 fn test_find_maximum ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 3sz;
   V.to_array_pts_to v;
@@ -75,14 +85,16 @@ fn test_find_maximum ()
   arr.(1sz) <- 2;
   arr.(2sz) <- 8;
 
-  // Bind input ghost state
   with s0. assert (A.pts_to arr s0);
 
   let ctr = GR.alloc #nat 0;
   let max_val = find_maximum arr 3sz ctr #(hide 0);
-  // Postcondition: max_val exists in array AND max_val >= all elements
-  // For [5, 2, 8], max = 8
+  // Ghost proof: max_val == 8 (erased at extraction)
   assert (pure (max_val == 8));
+
+  // Concrete check: survives extraction to C
+  int_eq_correct max_val 8;
+  let ok = int_eq max_val 8;
 
   with cf. assert (GR.pts_to ctr cf);
   GR.free ctr;
@@ -90,6 +102,7 @@ fn test_find_maximum ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
+  ok
 }
 ```
 
