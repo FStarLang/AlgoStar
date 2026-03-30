@@ -7,14 +7,15 @@
    Input:  [3; 1; 2]
    Expected output: [1; 2; 3]
 
-   Proves:
-   1. The precondition is satisfiable (by constructing a valid call)
-   2. sorted + permutation of [3;1;2] uniquely determines [1;2;3]
-   3. complexity_bounded cf 0 3 holds (cf <= 3)
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        ✓ sorted + permutation uniquely determines [1;2;3]
+        ✓ complexity_bounded cf 0 3 holds (cf <= 3)
+        ✓ ensures (r == true): proof guarantees the runtime check passes
 
-   Adapted from:
-     https://github.com/microsoft/intent-formalization/blob/main/
-       eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst
+     2. RUNTIME (computational, survives extraction to C):
+        ✓ Reads array elements after sorting and compares to expected values
+        ✓ Returns bool — caller can verify at runtime
 
    NO admits. NO assumes.
 *)
@@ -66,11 +67,12 @@ let completeness_sort3 (s: Seq.seq int)
   std_sort3 s
 
 ```pulse
-(* Spec validation: insertion_sort on [3;1;2] produces [1;2;3] *)
+(* Spec validation: insertion_sort on [3;1;2] produces [1;2;3].
+   Returns bool with runtime checks that survive extraction to C. *)
 fn test_insertion_sort_3 ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Input: [3; 1; 2]
   let v = V.alloc 0 3sz;
@@ -111,22 +113,26 @@ fn test_insertion_sort_3 ()
   // Verify complexity bound: at most n*(n-1)/2 = 3 comparisons
   assert (pure (cf <= 3));
 
+  // Runtime check (survives extraction to C)
+  let pass = (v0 = 1) && (v1 = 2) && (v2 = 3);
+
   // Cleanup
   GR.free ctr;
   with s2. assert (A.pts_to arr s2);
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  pass
 }
 ```
 
 ```pulse
-(* Edge case: insertion_sort on empty array (len=0) does zero comparisons *)
+(* Edge case: insertion_sort on empty array (len=0) does zero comparisons.
+   Returns true — nothing to check at runtime for an empty array. *)
 fn test_insertion_sort_empty ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 0 0sz;
   V.to_array_pts_to v;
@@ -148,16 +154,17 @@ fn test_insertion_sort_empty ()
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  true
 }
 ```
 
 ```pulse
-(* Edge case: insertion_sort on single element (len=1) does zero comparisons *)
+(* Edge case: insertion_sort on single element (len=1) does zero comparisons.
+   Reads the element and checks it is unchanged. *)
 fn test_insertion_sort_single ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let v = V.alloc 42 1sz;
   V.to_array_pts_to v;
@@ -174,12 +181,21 @@ fn test_insertion_sort_single ()
   // Zero comparisons for single-element input
   assert (pure (cf == 0));
 
+  // Reveal opaque permutation so Z3 can reason about the single element
+  reveal_opaque (`%SS.permutation) (SS.permutation s0 s);
+  SP.perm_len (reveal s0) (reveal s);
+
+  // Read and verify element is unchanged
+  let v0 = arr.(0sz);
+  assert (pure (v0 == 42));
+  let pass = (v0 = 42);
+
   GR.free ctr;
   with s2. assert (A.pts_to arr s2);
   rewrite (A.pts_to arr s2) as (A.pts_to (V.vec_to_array v) s2);
   V.to_vec_pts_to v;
   V.free v;
-  ()
+  pass
 }
 ```
 
