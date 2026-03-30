@@ -66,7 +66,8 @@ let lemma_create_no_key (n: nat{n > 0}) (key: int{key >= 0})
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_search_empty ()
   requires emp
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   let tv = hash_table_create 3sz;
   let table = V.vec_to_array tv;
@@ -77,21 +78,19 @@ fn test_search_empty ()
   // Search for key 5 in empty table
   let r = hash_search table 3sz 5 ctr;
 
-  // Postcondition precision: We prove the result is exactly 3 (not found).
-  //
-  // Reasoning from the postcondition:
-  //   - SZ.v r <= 3
-  //   - SZ.v r < 3 ==> Seq.index (Seq.create 3 (-1)) (SZ.v r) == 5
-  //   - But Seq.index (Seq.create 3 (-1)) i == -1 for any valid i
-  //   - So SZ.v r < 3 leads to -1 == 5, a contradiction
-  //   - Therefore SZ.v r == 3
   assert (pure (SZ.v r == 3));
+
+  // Compute runtime-observable result
+  let ok = (r =^ 3sz);
+  assert (pure (ok == true));
 
   // Cleanup
   GR.free ctr;
   with s. assert (A.pts_to table s);
   rewrite (A.pts_to table s) as (A.pts_to (V.vec_to_array tv) s);
   hash_table_free tv;
+
+  ok
 }
 #pop-options
 
@@ -113,7 +112,8 @@ fn test_search_empty ()
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_then_search ()
   requires emp
-  ensures emp
+  returns res: bool
+  ensures pure (res == true)
 {
   let tv = hash_table_create 3sz;
   let table = V.vec_to_array tv;
@@ -123,30 +123,24 @@ fn test_insert_then_search ()
 
   // Insert key 0
   let b = hash_insert table 3sz 0 ctr;
-
-  // ** NEW: Insert on empty table MUST succeed **
-  // The false branch of the postcondition asserts:
-  //   forall q < 3. Seq.index (Seq.create 3 (-1)) (hash_probe_nat 0 q 3) =!= -1
-  // For q = 0: hash_probe_nat 0 0 3 = 0, and Seq.index (Seq.create 3 (-1)) 0 = -1
-  // So -1 =!= -1 is false — contradiction. Hence b must be true.
   trigger_insert_empty 3 0;
   assert (pure (b == true));
 
   // Search for key 0 — must find it
   let r = hash_search table 3sz 0 ctr;
-
-  // Postcondition precision: search must find key 0.
-  // From insert: key_in_table s' 3 0
-  // From search: SZ.v r == 3 ==> ~(key_in_table s' 3 0)
-  // Contrapositive: key_in_table s' 3 0 ==> SZ.v r != 3
-  // Combined with SZ.v r <= 3: SZ.v r < 3
   assert (pure (SZ.v r < 3));
+
+  // Compute runtime-observable result
+  let ok = (b && (r <^ 3sz));
+  assert (pure (ok == true));
 
   // Cleanup
   GR.free ctr;
   with s. assert (A.pts_to table s);
   rewrite (A.pts_to table s) as (A.pts_to (V.vec_to_array tv) s);
   hash_table_free tv;
+
+  ok
 }
 #pop-options
 
@@ -165,7 +159,8 @@ fn test_insert_then_search ()
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_search_absent ()
   requires emp
-  ensures emp
+  returns res: bool
+  ensures pure (res == true)
 {
   let tv = hash_table_create 3sz;
   let table = V.vec_to_array tv;
@@ -180,20 +175,19 @@ fn test_insert_search_absent ()
 
   // Search for key 1 — should NOT find it
   let r = hash_search table 3sz 1 ctr;
-
-  // Postcondition precision: search must return 3 (not found).
-  //
-  // From search: SZ.v r < 3 ==> Seq.index s' (SZ.v r) == 1
-  // From insert: s' has slots that are either 0 (at idx) or -1 (elsewhere)
-  // Neither 0 nor -1 equals 1, so SZ.v r < 3 leads to contradiction
-  // Therefore SZ.v r == 3
   assert (pure (SZ.v r == 3));
+
+  // Compute runtime-observable result
+  let ok = (b && (r =^ 3sz));
+  assert (pure (ok == true));
 
   // Cleanup
   GR.free ctr;
   with s. assert (A.pts_to table s);
   rewrite (A.pts_to table s) as (A.pts_to (V.vec_to_array tv) s);
   hash_table_free tv;
+
+  ok
 }
 #pop-options
 
@@ -215,7 +209,8 @@ fn test_insert_search_absent ()
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_delete_then_search ()
   requires emp
-  ensures emp
+  returns res: bool
+  ensures pure (res == true)
 {
   let tv = hash_table_create 3sz;
   let table = V.vec_to_array tv;
@@ -229,29 +224,24 @@ fn test_delete_then_search ()
   assert (pure (b1 == true));
 
   // Delete key 0 — must succeed
-  // ** NEW: delete on present key MUST succeed **
-  // From insert: key_in_table s' 3 0 (key is in the table)
-  // Delete's false branch: ~(key_in_table s' 3 0) — contradicts the above
-  // So b2 == true is forced.
   let b2 = hash_delete table 3sz 0 ctr;
   assert (pure (b2 == true));
 
   // Search for key 0 — should NOT find it
   let r = hash_search table 3sz 0 ctr;
-
-  // The slot that had key 0 is now -2.
-  // From insert: the key was at exactly one position (seq_modified_at from [-1,-1,-1])
-  // From delete: that position is now -2, all others unchanged
-  // So no slot contains 0.
-  // From search: SZ.v r < 3 ==> Seq.index s'' (SZ.v r) == 0
-  // But no slot contains 0, so SZ.v r == 3
   assert (pure (SZ.v r == 3));
+
+  // Compute runtime-observable result
+  let ok = (b1 && b2 && (r =^ 3sz));
+  assert (pure (ok == true));
 
   // Cleanup
   GR.free ctr;
   with s. assert (A.pts_to table s);
   rewrite (A.pts_to table s) as (A.pts_to (V.vec_to_array tv) s);
   hash_table_free tv;
+
+  ok
 }
 #pop-options
 
@@ -270,7 +260,8 @@ fn test_delete_then_search ()
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_no_dup_existing ()
   requires emp
-  ensures emp
+  returns res: bool
+  ensures pure (res == true)
 {
   let tv = hash_table_create 3sz;
   let table = V.vec_to_array tv;
@@ -286,24 +277,23 @@ fn test_insert_no_dup_existing ()
   // Now try insert_no_dup with the same key 0
   with s1. assert (A.pts_to table s1);
   let b2 = hash_insert_no_dup table 3sz 0 ctr;
-
-  // insert_no_dup postcondition on success:
-  //   key_in_table s' 3 0 /\ key_findable s' 3 0 /\
-  //   (s' == s1 \/ (freshly inserted))
-  //
-  // In the else branch: ~(key_in_table s1 3 0). But we know key_in_table s1 3 0
-  // from the insert postcondition. Contradiction! So b2 must be true.
   assert (pure (b2 == true));
 
   // Verify key 0 is still findable
   let r = hash_search table 3sz 0 ctr;
   assert (pure (SZ.v r < 3));
 
+  // Compute runtime-observable result
+  let ok = (b1 && b2 && (r <^ 3sz));
+  assert (pure (ok == true));
+
   // Cleanup
   GR.free ctr;
   with s. assert (A.pts_to table s);
   rewrite (A.pts_to table s) as (A.pts_to (V.vec_to_array tv) s);
   hash_table_free tv;
+
+  ok
 }
 #pop-options
 
@@ -322,7 +312,8 @@ fn test_insert_no_dup_existing ()
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn test_insert_no_dup_fresh ()
   requires emp
-  ensures emp
+  returns res: bool
+  ensures pure (res == true)
 {
   let tv = hash_table_create 3sz;
   let table = V.vec_to_array tv;
@@ -335,27 +326,24 @@ fn test_insert_no_dup_fresh ()
 
   // insert_no_dup key 0 into empty table — must succeed
   let b = hash_insert_no_dup table 3sz 0 ctr;
-
-  // ** NEW: insert_no_dup on empty table MUST succeed **
-  // The false branch asserts forall q < 3. probe positions are non-empty/non-deleted.
-  // For q = 0: hash_probe_nat(0,0,3) = 0, Seq.index (Seq.create 3 (-1)) 0 = -1
-  // And -1 =!= -1 is false — contradiction. So b must be true.
   trigger_insert_empty 3 0;
   assert (pure (b == true));
-
-  // The postcondition distinguishes fresh insert from "was already present"
-  // using the ~(key_in_table s size key) clause from the fresh-insert disjunct.
-  // We proved ~(key_in_table (Seq.create 3 (-1)) 3 0) above.
 
   // Verify key 0 is findable
   let r = hash_search table 3sz 0 ctr;
   assert (pure (SZ.v r < 3));
+
+  // Compute runtime-observable result
+  let ok = (b && (r <^ 3sz));
+  assert (pure (ok == true));
 
   // Cleanup
   GR.free ctr;
   with s. assert (A.pts_to table s);
   rewrite (A.pts_to table s) as (A.pts_to (V.vec_to_array tv) s);
   hash_table_free tv;
+
+  ok
 }
 #pop-options
 
@@ -372,8 +360,10 @@ fn test_insert_no_dup_fresh ()
 
 fn test_create_free ()
   requires emp
-  ensures emp
+  returns res: bool
+  ensures pure (res == true)
 {
   let tv = hash_table_create 5sz;
   hash_table_free tv;
+  true
 }

@@ -10,6 +10,13 @@
    2. Postconditions are precise enough to determine exact outputs
    3. Validity (bst_valid) is preserved through insert and delete
 
+   Two layers of assurance:
+     1. PROOF (ghost, erased at extraction):
+        Ghost assertions verify postcondition precision
+     2. RUNTIME (computational, survives extraction to C):
+        Concrete comparisons check search results, min, max, delete effects
+        Returns bool — caller can verify at runtime
+
    Methodology:
      Bhat et al., "Towards Validated Specifications for LLM-Generated Code"
      https://arxiv.org/abs/2406.09757
@@ -140,7 +147,17 @@ let maximum_after_delete_2 ()
 (* ====================================================================
    § 3. Pulse API test — precondition satisfiability + postcondition
    precision for all operations in Impl.fsti
+
+   Two layers of assurance:
+     1. PROOF: ghost assertions (erased at extraction) verify postconditions
+     2. RUNTIME: concrete comparisons (survive extraction to C) check results
+
+   Returns bool — caller can detect failure at runtime.
    ==================================================================== *)
+
+(* int equality check — computational, survives extraction to C *)
+inline_for_extraction
+let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 #push-options "--fuel 8 --ifuel 4"
 
@@ -153,11 +170,14 @@ let maximum_after_delete_2 ()
  * Instance: insert {2, 1, 3}, search for present/absent keys,
  *           find min/max, delete root key 2, verify deletion,
  *           free entire tree
+ *
+ * Returns true iff all runtime checks pass.
+ * Ghost postcondition: r == true (proven at verification time).
  *)
 fn test_bst_ptr ()
   requires emp
-  returns _: unit
-  ensures emp
+  returns r: bool
+  ensures pure (r == true)
 {
   // Ghost tick counter (erased at runtime)
   let ticks = GR.alloc #nat 0;
@@ -195,6 +215,9 @@ fn test_bst_ptr ()
   let m4 = tree_search r3 4 ticks;
   assert (pure (m4 == false));
 
+  // --- Runtime checks for search (survive extraction to C) ---
+  let pass_search = f1 && f2 && f3 && not m0 && not m4;
+
   // === Minimum, Maximum (need Some bp), Delete, post-delete search ===
   match r3 {
     Some bp -> {
@@ -207,6 +230,9 @@ fn test_bst_ptr ()
       maximum_t3 ();
       let max_v = tree_maximum (Some bp) bp ticks;
       assert (pure (max_v == 3));
+
+      // --- Runtime checks for min/max ---
+      let pass_minmax = int_eq min_v 1 && int_eq max_v 3;
 
       // tree_delete: delete root key 2
       // Postcondition: ghost tree = bst_delete 'ft 2
@@ -226,6 +252,9 @@ fn test_bst_ptr ()
       let s3 = tree_search r4 3 ticks;
       assert (pure (s3 == true));
 
+      // --- Runtime checks for delete ---
+      let pass_delete = not g2 && s1 && s3;
+
       // Min/max after delete (need Some bp again)
       match r4 {
         Some bp4 -> {
@@ -237,14 +266,24 @@ fn test_bst_ptr ()
           let max4 = tree_maximum (Some bp4) bp4 ticks;
           assert (pure (max4 == 3));
 
+          // --- Runtime checks for post-delete min/max ---
+          let pass_postdel = int_eq min4 1 && int_eq max4 3;
+
           // free_bst: deallocate entire tree
           free_bst (Some bp4);
           GR.free ticks;
+
+          // --- Final result: all checks must pass ---
+          let result = pass_search && pass_minmax && pass_delete && pass_postdel;
+          result
         }
         None -> {
           // Dead branch: tree has keys {1, 3} after delete
           free_bst (None #bst_node_ptr);
           GR.free ticks;
+          // Still return combined result (dead branch, proven unreachable)
+          let result = pass_search && pass_minmax && pass_delete;
+          result
         }
       }
     }
@@ -252,6 +291,7 @@ fn test_bst_ptr ()
       // Dead branch: tree has 3 elements after inserts
       free_bst (None #bst_node_ptr);
       GR.free ticks;
+      pass_search
     }
   }
 }

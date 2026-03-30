@@ -118,37 +118,32 @@ simplifying both the implementation and the proof.
 
 ## Concrete Execution (C Extraction)
 
-The verified Pulse code has been extracted to C via KaRaMeL and compiled
+The verified Pulse code is extracted to C via KaRaMeL and compiled
 to a native executable.
 
 ### Extraction Pipeline
 
-1. **F\* → KaRaMeL IR**: `fstar.exe --codegen krml --extract_module` produces
-   a combined `.krml` file for both `Impl` and `ImplTest` modules.
-2. **KaRaMeL IR → C**: `krml -bundle ... -skip-compilation` generates
-   `CLRS_Ch11_HashTable_ImplTest.c/.h` with the test function bodies.
-   Ghost/erased parameters (`#s`, `ctr`, `#c0`) become `(void *)0U` at call
-   sites. Proof assertions are fully erased.
-3. **Hand-written C**: `CLRS_Ch11_HashTable_Impl.c` provides the hash table
-   operations (create, free, insert, search, delete, insert\_no\_dup)
-   matching the verified Pulse implementations. The Impl module's Pulse
-   `fn` definitions are not automatically extracted by KaRaMeL when the
-   module has a `.fsti` interface; the hand-written C follows the same
-   algorithms (division-method hash, linear probing) exactly.
-4. **Compilation**: `cc` links the extracted test code, hand-written Impl,
-   and a `main.c` driver that calls each test function.
+1. **F\* → KaRaMeL IR**: Per-module `fstar.exe --codegen krml --extract_module`
+   produces separate `.krml` files for `Impl` and `ImplTest` modules.
+2. **KaRaMeL IR → C**: `krml -bundle ...` generates
+   `CLRS_Ch11_HashTable_ImplTest.c/.h` with both the Impl functions (as
+   `static`) and the ImplTest functions (as public `bool`-returning).
+   Ghost/erased parameters (`#s`, `ctr`, `#c0`) are fully erased.
+3. **Compilation**: `cc` links the extracted test code, runtime stubs
+   (`fstar_support.c`, `prims.c`), and a `main.c` driver that checks
+   each test function's `bool` return value.
 
 ### Test Output
 
 ```
 === CLRS Ch11 Hash Table — Concrete Execution ===
-test_search_empty        ... PASS
-test_insert_then_search  ... PASS
-test_insert_search_absent... PASS
-test_delete_then_search  ... PASS
-test_insert_no_dup_exist ... PASS
-test_insert_no_dup_fresh ... PASS
-test_create_free         ... PASS
+test_search_empty                ... PASS
+test_insert_then_search          ... PASS
+test_insert_search_absent        ... PASS
+test_delete_then_search          ... PASS
+test_insert_no_dup_existing      ... PASS
+test_insert_no_dup_fresh         ... PASS
+test_create_free                 ... PASS
 All 7 tests passed.
 ```
 
@@ -161,9 +156,10 @@ make extract  # extract to C only
 
 ### Notes
 
-- Proof assertions (`assert (pure (...))`) are erased at extraction — the C
-  code exercises the hash table operations but does not check return values.
-  A successful run (no crash, no memory error) confirms the C implementation
-  matches the verified specification.
+- All 7 test functions return `bool` with postcondition `pure (r == true)`.
+  Each test computes a concrete boolean result by comparing runtime values
+  and returns it. The `main.c` driver checks return values and fails fast
+  on any mismatch.
 - `krml_checked_int_t` (≡ `int32_t`) represents F\*'s mathematical `int` at
-  runtime with overflow checking via `RETURN_OR`.
+  runtime. The `fstar_support.c` file provides runtime stubs for
+  `FStar_SizeT_v` and `FStar_SizeT_uint_to_t` conversions.

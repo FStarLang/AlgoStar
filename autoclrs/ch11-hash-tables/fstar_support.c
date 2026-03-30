@@ -1,0 +1,23 @@
+/*
+  Minimal support for krml-extracted code.
+  Provides runtime stubs for mathematical integer ↔ size_t conversions
+  and the FStar_Int32_to_string required by krmllib prims.c.
+*/
+
+#include <stdint.h>
+#include <stddef.h>
+
+/* FStar_SizeT_v: size_t → krml_checked_int_t (int32_t) */
+int32_t FStar_SizeT_v(size_t x) {
+  return (int32_t)x;
+}
+
+/* FStar_SizeT_uint_to_t: krml_checked_int_t (int32_t) → size_t */
+size_t FStar_SizeT_uint_to_t(int32_t x) {
+  return (size_t)x;
+}
+
+/* Required by krmllib prims.c */
+const char* FStar_Int32_to_string(int32_t i) {
+  return "<int>";
+}
