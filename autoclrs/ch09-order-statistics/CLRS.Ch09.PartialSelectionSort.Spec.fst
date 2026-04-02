@@ -115,7 +115,7 @@ let count_occ_cons (hd: int) (tl: seq int) (x: int)
     assert (Seq.index s 0 == hd);
     assert (Seq.equal (Seq.tail s) tl)
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let rec count_occ_append (s1 s2: seq int) (x: int)
   : Lemma (ensures count_occ (Seq.append s1 s2) x = count_occ s1 x + count_occ s2 x)
           (decreases Seq.length s1)
@@ -234,7 +234,7 @@ let rec insert_permutation (x: int) (s: seq int)
     Classical.forall_intro aux
 
 #restart-solver
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 /// Helper: cons preserves sorting when head is <= all elements
 let sorted_cons (h: int) (t: seq int)
   : Lemma (requires is_sorted t /\
@@ -255,7 +255,7 @@ let sorted_cons (h: int) (t: seq int)
 #pop-options
 
 #restart-solver
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 /// Head of insert: the first element of (insert x s) is min(x, head s)
 let insert_head (x: int) (s: seq int)
   : Lemma (requires Seq.length s > 0)
@@ -265,7 +265,7 @@ let insert_head (x: int) (s: seq int)
 #pop-options
 
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 0"
 /// Extract: head of sorted sequence is <= any element
 let sorted_head_le_index (s: seq int) (j: nat)
   : Lemma (requires is_sorted s /\ Seq.length s > 0 /\ j < Seq.length s)
@@ -273,7 +273,7 @@ let sorted_head_le_index (s: seq int) (j: nat)
   = ()
 
 /// Tail of a sorted sequence is sorted
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let sorted_tail_spec (s: seq int)
   : Lemma (requires Seq.length s > 1 /\ is_sorted s)
           (ensures is_sorted (Seq.tail s))
@@ -290,7 +290,7 @@ let sorted_tail_spec (s: seq int)
 #pop-options
 
 #restart-solver
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec insert_sorted (x: int) (s: seq int)
   : Lemma (requires is_sorted s)
           (ensures is_sorted (insert x s))
@@ -351,7 +351,7 @@ let rec pure_sort_permutation (s: seq int)
 // - Exactly k elements (at positions 0..k-1) are < s[k]
 // - At least k+1 elements (positions 0..k) are <= s[k]
 
-#push-options "--z3rlimit 40 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2"
 let rec count_lt_sorted_prefix (s: seq int) (k: nat) (v: int)
   : Lemma (requires k <= Seq.length s /\
                      (forall (i: nat). i < k ==> Seq.index s i < v))
@@ -374,7 +374,7 @@ let rec count_lt_sorted_prefix (s: seq int) (k: nat) (v: int)
     )
 #pop-options
 
-#push-options "--z3rlimit 40 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2"
 let rec count_lt_sorted_suffix (s: seq int) (n: nat) (v: int)
   : Lemma (requires n <= Seq.length s /\
                      (forall (i: nat). i < n ==> v <= Seq.index s i))
@@ -442,7 +442,7 @@ let rec remove_element_length (s: seq int) (x: int) (i: nat{i < Seq.length s /\ 
   = if i = 0 then ()
     else remove_element_length (Seq.tail s) x (i - 1)
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let rec remove_element_count_occ (s: seq int) (x: int) (y: int) 
                                    (i: nat{i < Seq.length s /\ Seq.index s i = x})
   : Lemma (ensures count_occ (remove_element s x i) y = 
@@ -458,7 +458,7 @@ let rec remove_element_count_occ (s: seq int) (x: int) (y: int)
 #pop-options
 
 // If s1 and s2 are permutations, removing the same element gives permutations
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let remove_preserves_permutation (s1 s2: seq int) (x: int)
                                    (i1: nat{i1 < Seq.length s1 /\ Seq.index s1 i1 = x})
                                    (i2: nat{i2 < Seq.length s2 /\ Seq.index s2 i2 = x})
@@ -476,7 +476,7 @@ let remove_preserves_permutation (s1 s2: seq int) (x: int)
 #pop-options
 
 // Helper: count_lt after removing an element
-#push-options "--z3rlimit 40 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 4 --ifuel 2"
 let rec remove_element_count_lt (s: seq int) (x: int) (v: int)
                                   (i: nat{i < Seq.length s /\ Seq.index s i = x})
   : Lemma (ensures count_lt (remove_element s x i) v = 
@@ -492,7 +492,7 @@ let rec remove_element_count_lt (s: seq int) (x: int) (v: int)
 #pop-options
 
 // Main theorem: count_lt is permutation-invariant
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let rec count_lt_permutation_invariant (s1 s2: seq int) (v: int)
   : Lemma (requires is_permutation s1 s2)
           (ensures count_lt s1 v = count_lt s2 v)
@@ -528,7 +528,7 @@ let rec count_lt_permutation_invariant (s1 s2: seq int) (v: int)
 #pop-options
 
 // Helper: count_le after removing an element
-#push-options "--z3rlimit 40 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 5 --fuel 4 --ifuel 2"
 let rec remove_element_count_le (s: seq int) (x: int) (v: int)
                                   (i: nat{i < Seq.length s /\ Seq.index s i = x})
   : Lemma (ensures count_le (remove_element s x i) v = 
@@ -544,7 +544,7 @@ let rec remove_element_count_le (s: seq int) (x: int) (v: int)
 #pop-options
 
 // Main theorem: count_le is permutation-invariant
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let rec count_le_permutation_invariant (s1 s2: seq int) (v: int)
   : Lemma (requires is_permutation s1 s2)
           (ensures count_le s1 v = count_le s2 v)
@@ -573,7 +573,7 @@ let rec count_le_permutation_invariant (s1 s2: seq int) (v: int)
 #pop-options
 
 // Helper: In a sorted sequence, count_le on prefix [0..k] is at least k+1
-#push-options "--z3rlimit 40 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2"
 let rec count_le_prefix_lower (s: seq int) (n: nat) (v: int)
   : Lemma (requires n <= Seq.length s /\
                      (forall (i:nat). i < n ==> Seq.index s i <= v))
@@ -595,7 +595,7 @@ let rec count_le_prefix_lower (s: seq int) (n: nat) (v: int)
 #pop-options
 
 // Helper: In a sequence, count_lt on suffix where all elements >= v is 0
-#push-options "--z3rlimit 40 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2"
 let rec count_lt_suffix_upper (s: seq int) (k: nat) (n: nat) (v: int)
   : Lemma (requires k <= n /\ n <= Seq.length s /\
                      (forall (i:nat). k <= i /\ i < n ==> v <= Seq.index s i))
@@ -614,7 +614,7 @@ let rec count_lt_suffix_upper (s: seq int) (k: nat) (n: nat) (v: int)
 #pop-options
 
 // Helper: count_lt is always bounded by sequence length
-#push-options "--z3rlimit 20 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2"
 let rec count_lt_bounded (s: seq int) (v: int)
   : Lemma (ensures count_lt s v <= Seq.length s)
           (decreases Seq.length s)
@@ -626,7 +626,7 @@ let rec count_lt_bounded (s: seq int) (v: int)
 #pop-options
 
 // Helper: if a sequence contains v at some position, count_lt s v < length s
-#push-options "--z3rlimit 40 --fuel 2"
+#push-options "--z3rlimit 5 --fuel 2"
 let rec count_lt_upper_bound (s: seq int) (v: int) (pos: nat)
   : Lemma (requires pos < Seq.length s /\ Seq.index s pos = v)
           (ensures count_lt s v < Seq.length s)
@@ -645,7 +645,7 @@ let rec count_lt_upper_bound (s: seq int) (v: int) (pos: nat)
 #pop-options
 
 // For a sorted sequence, the element at position k has the partition property
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let sorted_partition_characterization (s: seq int) (k: nat{k < Seq.length s})
   : Lemma (requires is_sorted s)
           (ensures (let v = Seq.index s k in
@@ -685,7 +685,7 @@ let sorted_partition_characterization (s: seq int) (k: nat{k < Seq.length s})
     ()
 #pop-options
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let select_spec_partition_property (s: seq int) (k: nat{k < Seq.length s})
   : Lemma (ensures (let v = select_spec s k in
                     count_lt s v <= k /\

@@ -25,7 +25,7 @@ let slice_eq_from_pointwise (s1 s2: Seq.seq int) (a b: nat)
 
 // ========== Count in range is permutation-invariant when outside is unchanged ==========
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
   : Lemma (requires lo <= hi /\ hi <= Seq.length s_pre /\
                     Seq.length s_pre == Seq.length s1 /\
@@ -55,7 +55,7 @@ let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
 
 // ========== If s[j] exists, count(s[j], s) >= 1 ==========
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec index_has_positive_count (s: Seq.seq int) (j: nat)
   : Lemma (requires j < Seq.length s)
           (ensures Seq.Properties.count (Seq.index s j) s >= 1)
@@ -66,7 +66,7 @@ let rec index_has_positive_count (s: Seq.seq int) (j: nat)
 
 // ========== If count(x, s) >= 1, x appears somewhere in s ==========
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec count_pos_has_index (s: Seq.seq int) (x: int)
   : Lemma (requires Seq.Properties.count x s > 0)
           (ensures exists (i: nat). i < Seq.length s /\ Seq.index s i == x)
@@ -78,7 +78,7 @@ let rec count_pos_has_index (s: Seq.seq int) (x: int)
 
 // ========== Main lemma: lower bound preservation ==========
 
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 15 --fuel 1 --ifuel 1 --split_queries always"
 let perm_unchanged_lower_bound
   (s_pre s1: Seq.seq int) (lo hi: nat) (v: int) (j: nat)
   : Lemma
@@ -102,7 +102,7 @@ let perm_unchanged_lower_bound
 
 // ========== Symmetric: upper bound preservation ==========
 
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 15 --fuel 1 --ifuel 1 --split_queries always"
 let perm_unchanged_upper_bound
   (s_pre s1: Seq.seq int) (lo hi: nat) (v: int) (j: nat)
   : Lemma
@@ -126,7 +126,7 @@ let perm_unchanged_upper_bound
 
 // ========== Universally-quantified versions ==========
 
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let perm_unchanged_lower_bound_forall
   (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma
@@ -154,7 +154,7 @@ let perm_unchanged_lower_bound_forall
     Classical.forall_intro (Classical.move_requires aux)
 #pop-options
 
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let perm_unchanged_upper_bound_forall
   (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma

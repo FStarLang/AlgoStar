@@ -134,7 +134,7 @@ let k_times_n_bound (n k: nat)
           (ensures k * n <= n * n)
   = ()
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 
 (**
  * Main Theorem: select_complexity_bound

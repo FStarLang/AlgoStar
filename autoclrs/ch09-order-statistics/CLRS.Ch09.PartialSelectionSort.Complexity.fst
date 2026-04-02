@@ -153,7 +153,7 @@ let rec select_comparisons_tight (n k: nat) : Tot nat (decreases k) =
 
 // Closed form (multiplication by 2 to avoid integer division):
 // 2 * select_comparisons_tight n k == k * (2*n - k - 1)
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 5"
 let rec select_tight_closed_form (n k: nat)
   : Lemma (requires k <= n /\ n > 0)
           (ensures 2 * select_comparisons_tight n k == k * (2 * n - k - 1))

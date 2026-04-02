@@ -35,7 +35,7 @@ let int_eq (a b: int) : bool =
 let int_eq_correct (a b: int)
   : Lemma (int_eq a b <==> a = b) = ()
 
-#push-options "--z3rlimit 400 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 5 --fuel 8 --ifuel 4"
 
 let select_spec_0 () : Lemma (select_spec (Seq.seq_of_list [5; 2; 8]) 0 == 2) =
   assert_norm (select_spec (Seq.seq_of_list [5; 2; 8]) 0 == 2)

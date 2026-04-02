@@ -19,7 +19,7 @@ open CLRS.Ch09.PartialSelectionSort.Spec
 // ========== Sorted permutations are equal (from SortedPerm.fst) ==========
 
 #restart-solver
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --z3refresh"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --z3refresh"
 let sorted_tail (s: seq int)
   : Lemma (requires Seq.length s > 1 /\ is_sorted s)
           (ensures is_sorted (Seq.tail s))
@@ -80,7 +80,7 @@ let perm_tails (s1 s2: seq int)
 #pop-options
 
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 0 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 1"
 /// Helper: heads of sorted permutations are equal.
 /// Uses head_has_positive_count to establish sorted_head_le preconditions
 /// while keeping fuel at 0 to prevent is_sorted quantifier explosion.
@@ -132,7 +132,7 @@ let rec sorted_permutation_equal (s1 s2: seq int)
 
 #restart-solver
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 5"
 let partition_left_part_correct (s s': seq int) (k lo p hi: nat)
   : Lemma (requires lo <= k /\ k < p /\ p < hi /\ hi <= Seq.length s /\
                     is_permutation s s' /\
@@ -149,7 +149,7 @@ let partition_left_part_correct (s s': seq int) (k lo p hi: nat)
     ()
 #pop-options
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 5"
 let partition_right_part_correct (s s': seq int) (k lo p hi: nat)
   : Lemma (requires lo <= p /\ p < k /\ k < hi /\ hi <= Seq.length s /\
                     is_permutation s s' /\
@@ -166,7 +166,7 @@ let partition_right_part_correct (s s': seq int) (k lo p hi: nat)
     ()
 #pop-options
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 5"
 let partitioned_count_lt (s: seq int) (p: nat)
   : Lemma (requires p < Seq.length s /\
                     (forall (i: nat). i < p ==> Seq.index s i <= Seq.index s p) /\
@@ -198,7 +198,7 @@ let rec count_le_lt_monotone (s: seq int) (v w: int)
   = if Seq.length s = 0 then ()
     else count_le_lt_monotone (Seq.tail s) v w
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 5"
 let partition_property_implies_kth (s: seq int) (k: nat) (v: int)
   : Lemma (requires k < Seq.length s /\
                     count_lt s v <= k /\
@@ -213,7 +213,7 @@ let partition_property_implies_kth (s: seq int) (k: nat) (v: int)
     else ()
 #pop-options
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 5"
 let partition_pivot_is_kth (s s': seq int) (k lo p hi: nat)
   : Lemma (requires lo <= k /\ k == p /\ p < hi /\ hi <= Seq.length s /\
                     is_permutation s s' /\
@@ -228,7 +228,7 @@ let partition_pivot_is_kth (s s': seq int) (k lo p hi: nat)
     partition_property_implies_kth s k v
 #pop-options
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 5"
 let pulse_correctness_hint (s0 s_final: seq int) (k: nat)
   : Lemma (requires k < Seq.length s0 /\
                     Seq.length s_final == Seq.length s0 /\
