@@ -97,7 +97,7 @@ let lemma_probes_not_key_full
 // Lemma: under valid_ht, if a key is at some array index, then key_findable holds.
 // This uses the surjectivity of linear probing (every index is reachable by some probe)
 // and the valid_ht invariant (no empty slot blocks an earlier probe position).
-#push-options "--z3rlimit 15 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let lemma_valid_ht_key_at_index_findable
   (s: Seq.seq int) (size: nat) (key: int{key >= 0}) (idx: nat)
   : Lemma
@@ -155,7 +155,7 @@ let lemma_valid_ht_delete
 
 // valid_ht is preserved by insert (replacing -1 or -2 with a key >= 0)
 // when the insertion point is the first empty/deleted slot in the probe sequence
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let lemma_valid_ht_insert
   (s: Seq.seq int) (size: nat)
   (key: int{key >= 0}) (probe_i: nat{probe_i < size})
@@ -232,7 +232,7 @@ fn hash_table_free (tv: V.vec int) (#s: erased (Seq.seq int))
 
 // Returns true if successful, false if table is full
 // Proves both correctness and O(n) complexity
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 //SNIPPET_START: ht_hash_insert_impl
 fn hash_insert
   (table: A.array int)
