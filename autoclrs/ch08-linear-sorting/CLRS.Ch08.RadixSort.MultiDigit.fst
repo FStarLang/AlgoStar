@@ -946,7 +946,7 @@ let digits_lexicographic_implies_value_le
 /// Either all digits are equal, or the most significant differing digit has x<y
 /// and all higher digits are equal.
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
 let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
   : Lemma (requires base >= 2 /\
                     (forall (d:nat). d < nd ==> digit x d base <= digit y d base))

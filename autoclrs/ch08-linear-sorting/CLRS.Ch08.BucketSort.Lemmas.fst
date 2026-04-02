@@ -438,9 +438,16 @@ let bucket_sort (xs: list int) (k: pos)
       let perm_aux (y: int) : Lemma (List.count y (concat_all sorted_buckets) == List.count y xs) =
         create_all_buckets_perm xs 0 k min_val (max_val + 1) y;
         sort_all_buckets_count buckets y;
-        if not (min_val <= y && y < max_val + 1) then
+        if not (min_val <= y && y < max_val + 1) then begin
+          // Recall: all members of xs are in [min_val, max_val]
+          list_min_from_le_all (Cons?.tl xs) (Cons?.hd xs);
+          list_max_from_ge_all (Cons?.tl xs) (Cons?.hd xs);
+          assert (forall z. List.mem z (Cons?.tl xs) ==> min_val <= z /\ z <= max_val);
+          assert (min_val <= Cons?.hd xs /\ Cons?.hd xs <= max_val);
+          assert (forall z. List.mem z xs ==> min_val <= z /\ z < max_val + 1);
+          assert (not (List.mem y xs));
           List.mem_count xs y
-        else ()
+        end else ()
       in
       FStar.Classical.forall_intro perm_aux;
       

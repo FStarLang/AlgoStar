@@ -287,7 +287,7 @@ ensures exists* sb'.
 
 open Pulse.Lib.BoundedIntegers
 
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1 --split_queries always --z3smtopt '(set-option :smt.qi.eager_threshold 100)'"
+#push-options "--z3rlimit 60 --fuel 1 --ifuel 1 --z3smtopt '(set-option :smt.qi.eager_threshold 100)'"
 ```pulse
 fn counting_sort_inplace
   (a: A.array nat)

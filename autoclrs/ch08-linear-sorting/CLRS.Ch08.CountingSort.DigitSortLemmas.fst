@@ -473,7 +473,22 @@ let phase4_b_step_core
           write_pos_outside_smaller sa d base remaining key v pos
         else if v > key then
           write_pos_outside_larger sa d base remaining key v pos (Seq.index sc v)
-        else ()
+        else begin
+          // v == key: the newly written position has the right digit,
+          // and all old positions are preserved by the sb' update.
+          assert (Seq.index sc' key == pos - 1);
+          assert (B.digit (Seq.index sb' (pos - 1)) d base == key);
+          let aux (p: nat) : Lemma
+            (requires pos - 1 <= p /\ p < digit_count_le sa key d base)
+            (ensures p < n /\ B.digit (Seq.index sb' p) d base == key)
+            = if p = pos - 1 then ()
+              else begin
+                assert (p >= pos);
+                assert (Seq.index sb' p == Seq.index sb p)
+              end
+          in
+          Classical.forall_intro (Classical.move_requires aux)
+        end
     in
     Classical.forall_intro (Classical.move_requires target)
 #pop-options
