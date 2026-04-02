@@ -76,7 +76,7 @@ let pq_freqs_positive_shrink (s0 s1: Seq.seq pq_entry) (x: pq_entry)
     Classical.forall_intro aux
 
 // After insert: pq_idx_unique extends (new entry's index is fresh)
-#push-options "--z3rlimit 120"
+#push-options "--z3rlimit 30"
 let pq_idx_unique_extends (s0 s1: Seq.seq pq_entry) (x: pq_entry)
   : Lemma (requires PQ.extends s0 s1 x /\ pq_idx_unique s0 /\
                     (forall (j: nat). j < Seq.length s0 ==> snd (Seq.index s0 j) <> snd x))

@@ -109,7 +109,7 @@ fn rec decode_step_impl
 
 // ========== decode_impl: full decoder ==========
 
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 20"
 // Helper: after decoding one symbol, the suffix invariant is maintained
 let decode_suffix_step
   (ft: HSpec.htree)
@@ -173,7 +173,7 @@ let decode_suffix_step
 
 // Full decoder: decode entire bitstring into an output array.
 // Postcondition: output matches pure decode.
-#push-options "--z3rlimit 50 --split_queries always"
+#push-options "--z3rlimit 20 --split_queries always"
 fn decode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (bits: A.array bool) (bit_len: SZ.t)
@@ -408,7 +408,7 @@ let rec append_index_right (l1 l2: list bool) (i: nat)
 #pop-options
 
 // After one encode step: remaining-suffix index invariant is maintained (list-only, no Seq)
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 20"
 let encode_suffix_step
   (ft: HSpec.htree)
   (msg_seq: Seq.seq nat)

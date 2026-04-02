@@ -59,10 +59,9 @@ let rec partition_pos_le (pivot: pos) (l: list pos)
     | [] -> ()
     | _ :: tl -> partition_pos_le pivot tl
 
-let rec sortWith_preserves_le_pivot (pivot: pos) (l: list pos)
+let sortWith_preserves_le_pivot (pivot: pos) (l: list pos)
   : Lemma (requires forall x. mem x l ==> x <= pivot)
           (ensures forall x. mem x (sortWith pos_compare l) ==> x <= pivot)
-          (decreases length l)
   = sortWith_permutation pos_compare l;
     let sorted = sortWith pos_compare l in
     let aux (x: pos)
@@ -71,10 +70,9 @@ let rec sortWith_preserves_le_pivot (pivot: pos) (l: list pos)
     in
     Classical.forall_intro (Classical.move_requires aux)
 
-let rec sortWith_preserves_ge_pivot (pivot: pos) (l: list pos)
+let sortWith_preserves_ge_pivot (pivot: pos) (l: list pos)
   : Lemma (requires forall x. mem x l ==> x >= pivot)
           (ensures forall x. mem x (sortWith pos_compare l) ==> x >= pivot)
-          (decreases length l)
   = sortWith_permutation pos_compare l;
     let sorted = sortWith pos_compare l in
     let aux (x: pos)
@@ -177,7 +175,7 @@ let greedy_cost_sorted_unfold (freqs: list pos)
 
 // ========== Bridge: huffman_complete cost == greedy_cost ==========
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec huffman_from_pq_cost_eq_greedy (pq: HComp.priority_queue)
   : Lemma (requires HComp.is_valid_pq pq /\ HComp.all_leaves pq)
           (ensures HSpec.cost (HComp.huffman_from_pq pq) == greedy_cost (HComp.all_leaf_freqs pq))
@@ -284,7 +282,7 @@ let count_cons (x: pos) (h: pos) (tl: list pos)
 // If f1 is the global minimum and f2 is the minimum of (freqs - {f1}),
 // and remaining is freqs - {f1} - {f2}, then
 // greedy_cost(freqs) == (f1+f2) + greedy_cost((f1+f2)::remaining)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let greedy_cost_unfold_with_mins (freqs: list pos) (f1 f2: pos) (remaining: list pos)
   : Lemma (requires
       length freqs >= 2 /\

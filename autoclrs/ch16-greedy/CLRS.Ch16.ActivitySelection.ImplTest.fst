@@ -74,7 +74,7 @@ let compatible_0_2 ()
 
 (* No compatible set of size 3 exists: all 3 activities can't be mutually compatible
    since activities 0 and 1 overlap (finish[0]=4 > start[1]=3) *)
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 40"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 15"
 let no_compatible_3 (sel: list nat)
   : Lemma
     (requires S.mutually_compatible start3 finish3 sel /\
@@ -99,7 +99,7 @@ let no_compatible_3 (sel: list nat)
 #pop-options
 
 (* max_compatible_count for this instance is 2 *)
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 80"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 20"
 let max_compatible_is_2 ()
   : Lemma (S.max_compatible_count start3 finish3 3 == 2)
   = reveal_opaque (`%S.max_compatible_count) (S.max_compatible_count start3 finish3 3);
@@ -139,7 +139,7 @@ let post_implies_count_2 (count: SZ.t) (sout: Seq.seq SZ.t) (cf c0: nat)
    We prove sel[1] must be 2: it can't be 1 (incompatible with 0) and
    earliest_compatible ensures no gaps are skipped without good reason. *)
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 80"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 20"
 let post_implies_selection_is_0_2
   (count: SZ.t) (sout: Seq.seq SZ.t) (cf c0: nat)
   : Lemma
@@ -193,7 +193,7 @@ let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
 
 (* ==================== Main Test ==================== *)
 
-#push-options "--z3rlimit 80 --fuel 4 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 4 --ifuel 2"
 ```pulse
 fn test_activity_selection_3 ()
   requires emp

@@ -152,7 +152,7 @@ let encode_cons (t: htree) (s: nat) (rest: list nat)
 (*** Helper lemmas ***)
 
 // codeword is non-empty for symbols in an Internal tree
-let rec codeword_nonempty (t: htree) (s: nat)
+let codeword_nonempty (t: htree) (s: nat)
   : Lemma (requires Internal? t /\ Some? (codeword t s))
           (ensures (let Some cw = codeword t s in Cons? cw))
   = ()

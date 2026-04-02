@@ -236,7 +236,7 @@ let forest_distinct_indices_after_merge
     forest_distinct_indices_prepend (list_remove_two active0 j1 j2) (idx, merged, tree)
 
 // Node-pointer correspondence after Seq.upd at idx1
-#push-options "--split_queries always --z3rlimit 100"
+#push-options "--split_queries always --z3rlimit 30"
 let node_ptr_correspondence_upd_tail
   (active0: list forest_entry) (j1 j2: nat)
   (idx1: SZ.t) (merged: hnode_ptr) (tree: HSpec.htree)
@@ -616,7 +616,7 @@ let rec forest_root_freqs_remove_at (entries: list forest_entry) (j: nat) (x: po
         if j = 0 then ()
         else forest_root_freqs_remove_at rest (j - 1) x
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 20"
 let forest_root_freqs_remove_two (entries: list forest_entry) (j1 j2: nat) (x: pos)
   : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2)
           (ensures L.count x (forest_root_freqs entries) ==
@@ -674,7 +674,7 @@ let rec forest_root_freqs_length (entries: list forest_entry)
 // Cost invariant maintenance through one merge step.
 // This is a PURE arithmetic lemma — no PQ quantifiers, no forest traversal quantifiers.
 // Separated to keep Z3 quantifier context clean.
-#push-options "--z3rlimit 200 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 0"
 let cost_invariant_merge_step
   (active0: list forest_entry) (j1 j2: nat)
   (freq1 freq2 sum_freq: pos) (idx1: SZ.t) (merged: hnode_ptr)
@@ -778,7 +778,7 @@ let cost_zero_root_eq_leaf_freqs (entries: list forest_entry) (x: pos)
 // ========== Section 7: remaining_no_idx ==========
 
 // no remaining forest entry has idx1 (from forest_distinct_indices + removal of j1)
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 20"
 let remaining_no_idx (active: list forest_entry) (j1 j2: nat) (idx1: SZ.t)
   : Lemma (requires j1 < L.length active /\ j2 < L.length active /\ j1 <> j2 /\
                     forest_distinct_indices active /\

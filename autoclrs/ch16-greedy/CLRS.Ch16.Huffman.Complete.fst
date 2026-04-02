@@ -824,7 +824,7 @@ let single_leaf_freqs_implies_leaf (t: htree) (f: pos)
 // both assumed axiomatically in the Spec module.
 // The optimal_substructure_lemma above proves the WPL relationship for any
 // sibling merge, which is the key structural ingredient of such a proof.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
 let huffman_correctness_theorem (freqs: list pos{Cons? freqs})
   : Lemma (ensures (
       let t = huffman_complete freqs in
@@ -991,10 +991,9 @@ let rec insert_sorted_map_freq_of (t1 t2: htree) (l1 l2: list htree)
     | _, _ -> () // impossible by map length
 
 // insert_sorted with same freq_of produces same length
-let rec insert_sorted_same_length (t1 t2: htree) (l1 l2: list htree)
+let insert_sorted_same_length (t1 t2: htree) (l1 l2: list htree)
   : Lemma (requires freq_of t1 = freq_of t2 /\ length l1 = length l2 /\ map freq_of l1 = map freq_of l2)
           (ensures length (insert_sorted t1 l1) = length (insert_sorted t2 l2))
-          (decreases l1)
   = insert_sorted_length t1 l1; insert_sorted_length t2 l2
 
 // insert_sorted preserves validity
@@ -1007,7 +1006,7 @@ let insert_sorted_valid (t: htree) (l: list htree)
 // ---- Part 2: WPL decomposition (key structural lemma) ----
 // For two PQs with the same map freq_of, the WPL difference equals the sum_costs difference
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec huffman_from_pq_wpl_decomp
   (pq1 pq2: priority_queue)
   : Lemma (requires
@@ -1101,7 +1100,7 @@ let single_swap_wpl_le
 // The generalized exchange: make minimum-frequency leaves siblings
 // This adapts the CLRS greedy exchange argument to work for ANY tree (not just optimal ones)
 // Uses single_swap_wpl_le instead of single_swap_optimal to avoid requiring optimality.
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 400"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 300"
 let make_min_siblings (t: htree) (freqs: list pos{length freqs >= 2})
   : Lemma (requires same_frequency_multiset t freqs)
           (ensures (let (f1, f2) = find_two_mins freqs in
@@ -1475,10 +1474,9 @@ let rec replace_siblings_changes_count (t: htree) (f1 f2: pos) (x: pos)
 #pop-options
 
 // How insert_sorted of a Leaf changes all_leaf_freqs counts  
-let rec insert_sorted_leaf_all_leaf_freqs (t: htree) (l: list htree) (x: pos)
+let insert_sorted_leaf_all_leaf_freqs (t: htree) (l: list htree) (x: pos)
   : Lemma (ensures count x (all_leaf_freqs (insert_sorted t l)) =
                    count x (leaf_freqs t) + count x (all_leaf_freqs l))
-          (decreases l)
   = insert_sorted_preserves_leaf_multiset t l x
 
 // ---- Part 5: Properties of sorted all-Leaf PQs ----
@@ -1542,7 +1540,7 @@ let rec find_two_mins_sorted (l: list pos{length l >= 2})
 
 // Key lemma: huffman_from_pq on an all-Leaf PQ is WPL-optimal
 // Proof by induction on PQ length
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let rec huffman_from_pq_wpl_le
   (pq: priority_queue{is_valid_pq pq /\ all_leaves pq})
   (t': htree)

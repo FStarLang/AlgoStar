@@ -535,7 +535,7 @@ let merge_step_new_entry_freq_ok
     pq_entry_freq_ok_intro_at sum_freq idx1 na 0
 #pop-options
 
-#push-options "--z3rlimit 120"
+#push-options "--z3rlimit 30"
 let pq_tree_freq_match_merge_step
   (pq2 pq3: Seq.seq pq_entry) (active0: list forest_entry)
   (j1 j2: nat) (idx1: SZ.t) (freq1 freq2: int) (merged: hnode_ptr)
@@ -590,7 +590,7 @@ let init_bundle_intro_empty (freq_seq: Seq.seq int) (nd_contents: Seq.seq hnode_
     reveal_opaque (`%forest_distinct_indices) forest_distinct_indices;
     pq_tree_freq_match_intro Seq.empty [] (fun _ -> ())
 
-#push-options "--z3rlimit 100 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
 let init_bundle_step
   (freq_seq: Seq.seq int)
   (nd_old nd_new: Seq.seq hnode_ptr)

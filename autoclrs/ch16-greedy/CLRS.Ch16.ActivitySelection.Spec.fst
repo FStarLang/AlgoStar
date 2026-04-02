@@ -797,7 +797,7 @@ let rec lemma_greedy_dominates
 
 // Maximality: no compatible set can be strictly larger than the greedy selection
 // Uses: lemma_greedy_dominates + last-element exhaustiveness
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
 let lemma_greedy_is_maximal
   (start finish: Seq.seq int) (n: nat)
   (greedy other: list nat)
@@ -942,7 +942,7 @@ let rec lemma_pairwise_is_sequential_aux
       ()
     end
 
-let rec lemma_pairwise_is_sequential
+let lemma_pairwise_is_sequential
   (start: Seq.seq int) (finish: Seq.seq int) (sel: Seq.seq nat)
   : Lemma
     (requires
@@ -951,7 +951,6 @@ let rec lemma_pairwise_is_sequential
       Seq.length sel > 0)
     (ensures
       sequentially_compatible start finish (seq_to_list sel))
-    (decreases Seq.length sel)
   = lemma_pairwise_is_sequential_aux start finish sel 0
 
 let rec lemma_implementation_is_greedy_aux
@@ -987,7 +986,7 @@ let rec lemma_implementation_is_greedy_aux
       ()
     end
 
-let rec lemma_implementation_is_greedy
+let lemma_implementation_is_greedy
   (start: Seq.seq int) (finish: Seq.seq int) (n: nat) (sel: Seq.seq nat)
   : Lemma
     (requires
@@ -1002,7 +1001,6 @@ let rec lemma_implementation_is_greedy
       AL.earliest_compatible sel start finish n n)
     (ensures
       is_greedy_selection start finish n (seq_to_list sel))
-    (decreases Seq.length sel)
   = lemma_implementation_is_greedy_aux start finish n sel 0
 
 (*
@@ -1030,7 +1028,7 @@ let rec lemma_seq_to_list_aux_preserves_sorted
       ()
     end
 
-let rec lemma_seq_to_list_preserves_sorted
+let lemma_seq_to_list_preserves_sorted
   (sel: Seq.seq nat) (n: nat)
   : Lemma
     (requires
@@ -1038,7 +1036,6 @@ let rec lemma_seq_to_list_preserves_sorted
       (forall (i:nat). i < Seq.length sel ==> Seq.index sel i < n))
     (ensures
       list_sorted_indices (seq_to_list sel) n)
-    (decreases Seq.length sel)
   = lemma_seq_to_list_aux_preserves_sorted sel n 0
 
 //SNIPPET_START: theorem_implementation_optimal

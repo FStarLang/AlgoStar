@@ -562,7 +562,7 @@ let rec replace_then_get (t: htree) (pos: tree_position) (new_t: htree)
         | Leaf _ _ -> ())
 #pop-options
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let swap_reduces_wpl_disjoint (t: htree) (pos_high pos_low: tree_position) (f_high f_low: pos)
   : Lemma (requires
             is_leaf_at t pos_high f_high /\
@@ -628,7 +628,7 @@ let rec leaf_position_no_extension (t: htree) (pos1 pos2: tree_position)
 
 // The swap reduces WPL when the conditions are met
 // High-freq at deep position, low-freq at shallow position → swap reduces WPL
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let swap_reduces_wpl (t: htree) (pos_high pos_low: tree_position)
   : Lemma (requires (match get_subtree_at t pos_high, get_subtree_at t pos_low with
                      | Some (Leaf _ f_high), Some (Leaf _ f_low) ->
@@ -944,7 +944,7 @@ let rec max_leaf_depth_ge (t: htree) (d: nat)
         max_leaf_depth_ge r (d + 1)
 
 // Sibling leaves at max depth: an Internal tree has sibling leaves at max depth
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 50"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 20"
 let rec max_depth_has_sibling_leaves (t: htree)
   : Lemma (requires Internal? t)
           (ensures (exists (parent: tree_position) (fl fr: pos).
@@ -1148,7 +1148,7 @@ let rec find_leaf_pos (t: htree) (f: pos) : Tot (option tree_position) (decrease
             | None -> None
 
 // find_leaf_pos correctness
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec find_leaf_pos_correct (t: htree) (f: pos)
   : Lemma (ensures (match find_leaf_pos t f with
                      | Some p -> is_leaf_at t p f
@@ -1178,7 +1178,7 @@ let rec find_leaf_pos_none (t: htree) (f: pos)
 // Key single-swap lemma: swap two leaves, preserve multiset, WPL doesn't increase
 // Given: high-freq leaf at deep position, low-freq leaf at shallow position (or equal depth)
 // Result: swapped tree with WPL <= original and same frequency multiset
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 120"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
 let single_swap_optimal
   (t: htree) (pos_deep pos_shallow: tree_position) (f_deep f_shallow: pos)
   (freqs: list pos)
@@ -1338,7 +1338,7 @@ let replace_pair_wpl
 #pop-options
 
 // find_two_mins_le2: f2 is <= all elements except possibly one copy of f1
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 120"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
 let rec find_two_mins_le2 (l: list pos{length l >= 2})
   : Lemma (ensures (let (m1, m2) = find_two_mins l in
                     forall x. mem x l ==> (x >= m2 \/ x = m1)))
@@ -1454,7 +1454,7 @@ let rec subtree_count_le (t: htree) (p: tree_position) (f: pos)
 #pop-options
 
 // If find_two_mins returns equal values, count >= 2
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec find_two_mins_equal_count (l: list pos{length l >= 2})
   : Lemma (ensures (let (m1, m2) = find_two_mins l in m1 = m2 ==> count m1 l >= 2))
           (decreases l)
@@ -1482,7 +1482,7 @@ let rec find_two_mins_equal_count (l: list pos{length l >= 2})
 #pop-options
 
 // If count m1 l >= 2 and m1 is the minimum, find_two_mins returns (m1, m1)
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 100"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 20"
 let rec find_two_mins_count_ge2 (l: list pos{length l >= 2}) (m1: pos)
   : Lemma (requires fst (find_two_mins l) = m1 /\ count m1 l >= 2)
           (ensures snd (find_two_mins l) = m1)
@@ -1633,7 +1633,7 @@ let rec find_leaf_pos_avoiding_some (t: htree) (f: pos) (avoid: tree_position)
 
 // Exchange sub-lemma: given an optimal tree with sibling leaves a,b at max depth,
 // produce an optimal tree with f1,f2 as siblings
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 600"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 100"
 let greedy_exchange
   (t: htree) (freqs: list pos{length freqs >= 2})
   (parent: tree_position) (a b: pos)
@@ -1958,7 +1958,7 @@ let greedy_exchange
 #pop-options
 
 // Main greedy choice theorem
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 200"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 30"
 let greedy_choice_theorem (freqs: list pos{length freqs >= 2})
   : Lemma (ensures greedy_choice_property freqs)
   = let (f1, f2) = find_two_mins freqs in
