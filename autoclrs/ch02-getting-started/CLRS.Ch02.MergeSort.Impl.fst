@@ -86,7 +86,7 @@ fn copy_range
 // Merge Implementation
 // ================================================================
 
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 
 //SNIPPET_START: merge_sig
 fn merge
