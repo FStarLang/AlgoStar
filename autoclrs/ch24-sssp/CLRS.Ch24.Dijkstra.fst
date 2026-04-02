@@ -174,7 +174,7 @@ let relax_round_lb_post
 #pop-options
 
 /// Bridge lemma: pred_ok is preserved by the relaxation round
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let relax_round_pred_ok
   (sweights sdist_pre sdist_after: Seq.seq int)
   (spred_pre spred_after: Seq.seq SZ.t)
@@ -273,7 +273,7 @@ let all_visited_tri_is_full
 
 // After relaxation from u: triangle inequality extends and ordering is preserved
 // Preconditions: old invariants hold, u is min unvisited, relaxation properties hold
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let extend_tri_after_relax
   (sweights sdist_old sdist_new svisited_old: Seq.seq int) (n u: nat)
   : Lemma
@@ -502,6 +502,36 @@ let lemma_2d_index_fits (u v n: nat)
   = assert (u * n <= (n - 1) * n);
     assert ((n - 1) * n + v < n * n)
 
+// Helper: extend the "relaxed edges from u" quantifier by one step
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let extend_relaxed_from_u
+  (sdist sweights: Seq.seq int) (n u vv: nat)
+  (new_dist_val dist_u: int) : Lemma
+  (requires
+    u < n /\ vv < n /\
+    Seq.length sdist == n /\ Seq.length sweights == n * n /\
+    dist_u == Seq.index sdist u /\
+    Seq.index (Seq.upd sdist vv new_dist_val) u == dist_u /\
+    (forall (v': nat). v' < vv /\ v' < n /\
+      u * n + v' < Seq.length sweights ==>
+      (let w = Seq.index sweights (u * n + v') in
+       let d_u = Seq.index sdist u in
+       (w < SP.inf /\ d_u < SP.inf) ==> Seq.index sdist v' <= d_u + w)) /\
+    (let w = Seq.index sweights (u * n + vv) in
+     (w < SP.inf /\ dist_u < SP.inf) ==> new_dist_val <= dist_u + w))
+  (ensures
+    (let sdist' = Seq.upd sdist vv new_dist_val in
+    forall (v': nat). v' < vv + 1 /\ v' < n /\
+      u * n + v' < Seq.length sweights ==>
+      (let w = Seq.index sweights (u * n + v') in
+       let d_u = Seq.index sdist' u in
+       (w < SP.inf /\ d_u < SP.inf) ==> Seq.index sdist' v' <= d_u + w)))
+  =
+  let sdist' = Seq.upd sdist vv new_dist_val in
+  assert (Seq.index sdist' vv == new_dist_val);
+  assert (Seq.index sdist' u == dist_u)
+#pop-options
+
 // Relax loop + bridge lemmas, extracted to its own scope for SMT tractability
 #push-options "--z3rlimit 30 --fuel 0 --ifuel 0 --split_queries always"
 fn dijkstra_relax_round
@@ -643,6 +673,7 @@ fn dijkstra_relax_round
   decreases (SZ.v n - SZ.v !v)
   {
     let vv = !v;
+    with sdist_v. assert (A.pts_to dist sdist_v);
 
     // Explicit fact about abstract inf for SMT
     assert pure (SP.inf > 0);
@@ -660,6 +691,12 @@ fn dijkstra_relax_round
     let should_update = (can_relax && sum < old_dist);
     let new_dist: int = (if should_update then sum else old_dist);
     let new_pred: SZ.t = (if should_update then u else old_pred);
+
+    // Help SMT: u's dist is preserved and relaxation holds for edge (u,vv)
+    assert pure (Seq.index sdist_v (SZ.v u) == dist_u);
+    assert pure ((w < SP.inf /\ dist_u < SP.inf) ==> new_dist <= dist_u + w);
+    assert pure (Seq.index (Seq.upd sdist_v (SZ.v vv) new_dist) (SZ.v u) == dist_u);
+    extend_relaxed_from_u sdist_v sweights (SZ.v n) (SZ.v u) (SZ.v vv) new_dist dist_u;
 
     A.op_Array_Assignment dist vv new_dist;
     A.op_Array_Assignment pred vv new_pred;

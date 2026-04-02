@@ -320,7 +320,7 @@ let path_weight_wir_abs_bound (p: SP.path) (weights: Seq.seq int) (n: nat)
 
 // --- Chain lemma: sp_dist_triangle_flat along a path from source ---
 
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 10"
 let rec sp_dist_chain (weights: Seq.seq int) (n source: nat) (p: SP.path)
   : Lemma
     (requires SP.no_neg_cycles_flat weights n source /\
@@ -485,7 +485,7 @@ let upd_preserves_current_u_cond
 
 // --- Relaxation step establishes current_u_relaxed for the current edge ---
 
-#push-options "--z3rlimit 60 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let relax_step_current_u_edge
   (sdist weights: Seq.seq int) (n source u_idx v_idx: nat)
   (dist_u w_uv old_dist_v new_dist_v: int) (should_update: bool) (k: nat) : Lemma
@@ -523,6 +523,41 @@ let relax_step_current_u_edge
         source_edge_bound weights n source u_idx k
       else ()
     end
+  in
+  FStar.Classical.move_requires helper ()
+#pop-options
+
+// --- Extend current_u_relaxed by one step (from v_bound to v_bound+1) ---
+
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let extend_current_u_relaxed_cond
+  (sdist weights: Seq.seq int) (n source k u vv: nat)
+  (new_val: int) : Lemma
+  (requires
+    n > 0 /\ source < n /\ u < n /\ vv < n /\
+    Seq.length sdist == n /\ Seq.length weights == n * n /\
+    (SP.no_neg_cycles_flat weights n source ==>
+      current_u_relaxed (Seq.upd sdist vv new_val) weights n source k u vv) /\
+    (SP.no_neg_cycles_flat weights n source ==>
+      (let w = Seq.index weights (u * n + vv) in
+       let sp_u = SP.sp_dist_k weights n source u k in
+       (w < SP.inf /\ sp_u < SP.inf) ==> new_val <= sp_u + w)))
+  (ensures
+    SP.no_neg_cycles_flat weights n source ==>
+      current_u_relaxed (Seq.upd sdist vv new_val) weights n source k u (vv + 1))
+  =
+  let helper (_:unit) : Lemma
+    (requires
+      SP.no_neg_cycles_flat weights n source /\
+      current_u_relaxed (Seq.upd sdist vv new_val) weights n source k u vv /\
+      (let w = Seq.index weights (u * n + vv) in
+       let sp_u = SP.sp_dist_k weights n source u k in
+       (w < SP.inf /\ sp_u < SP.inf) ==> new_val <= sp_u + w))
+    (ensures
+      current_u_relaxed (Seq.upd sdist vv new_val) weights n source k u (vv + 1))
+    =
+    let dist' = Seq.upd sdist vv new_val in
+    assert (Seq.index dist' vv == new_val)
   in
   FStar.Classical.move_requires helper ()
 #pop-options
@@ -739,7 +774,7 @@ let bellman_ford_complexity_is_cubic (cf c0 n: nat) : Lemma
   =
   bellman_ford_cubic_bound n
 
-#push-options "--z3rlimit 60 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
 //SNIPPET_START: bellman_ford_sig
 fn bellman_ford
   (weights: A.array int)
@@ -972,6 +1007,9 @@ fn bellman_ford
         assert pure (~should_update ==> (w_uv >= SP.inf \/ dist_u >= SP.inf \/ dist_u + w_uv >= old_dist_v \/ (SZ.v vv) == (SZ.v source)));
         relax_step_current_u_edge sdist_v sweights (SZ.v n) (SZ.v source) (SZ.v vu) (SZ.v vv)
           dist_u w_uv old_dist_v new_dist_v should_update (SZ.v vround - 1);
+        // Combine: extend current_u_relaxed from vv to vv+1
+        extend_current_u_relaxed_cond sdist_v sweights (SZ.v n) (SZ.v source) (SZ.v vround - 1) (SZ.v vu) (SZ.v vv)
+          new_dist_v;
         
         A.op_Array_Assignment dist vv new_dist_v;
         tick ctr;
