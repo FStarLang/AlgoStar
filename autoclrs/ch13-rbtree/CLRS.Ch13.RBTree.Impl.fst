@@ -217,7 +217,6 @@ fn check_right_balance (r: rb_ptr)
                 S.BC_None
               }
               Some rrp -> {
-                rewrite each (Some rrp) as rn.right;
                 is_rbtree_case_some rn.right rrp;
                 let rrn = !rrp;
                 let res = (if (S.Red? rrn.color) then S.BC_RR else S.BC_None);
@@ -229,7 +228,6 @@ fn check_right_balance (r: rb_ptr)
             }
           }
           Some rlp -> {
-            rewrite each (Some rlp) as rn.left;
             is_rbtree_case_some rn.left rlp;
             let rln = !rlp;
             if (S.Red? rln.color) {
@@ -248,7 +246,6 @@ fn check_right_balance (r: rb_ptr)
                   S.BC_None
                 }
                 Some rrp -> {
-                  rewrite each (Some rrp) as rn.right;
                   is_rbtree_case_some rn.right rrp;
                   let rrn = !rrp;
                   let res = (if (S.Red? rrn.color) then S.BC_RR else S.BC_None);
@@ -304,7 +301,6 @@ fn classify_runtime (c: S.color) (l: rb_ptr) (r: rb_ptr)
                   check_right_balance r
                 }
                 Some lrp -> {
-                  rewrite each (Some lrp) as ln.right;
                   is_rbtree_case_some ln.right lrp;
                   let lrn = !lrp;
                   if (S.Red? lrn.color) {
@@ -322,7 +318,6 @@ fn classify_runtime (c: S.color) (l: rb_ptr) (r: rb_ptr)
               }
             }
             Some llp -> {
-              rewrite each (Some llp) as ln.left;
               is_rbtree_case_some ln.left llp;
               let lln = !llp;
               if (S.Red? lln.color) {
@@ -341,7 +336,6 @@ fn classify_runtime (c: S.color) (l: rb_ptr) (r: rb_ptr)
                     check_right_balance r
                   }
                   Some lrp -> {
-                    rewrite each (Some lrp) as ln.right;
                     is_rbtree_case_some ln.right lrp;
                     let lrn = !lrp;
                     if (S.Red? lrn.color) {
@@ -385,7 +379,6 @@ fn balance_ll (l: rb_ptr) (v: int) (r: rb_ptr)
   // BC_LL implies lt is a Node
   is_rbtree_not_leaf l;
   let lp = Some?.v l;
-  rewrite each (Some lp) as l;
   is_rbtree_case_some l lp;
   let ln = !lp;
   // ln.left must be Some (the red grandchild)
@@ -393,7 +386,6 @@ fn balance_ll (l: rb_ptr) (v: int) (r: rb_ptr)
   // so ln.left's ghost tree is Node Red a x b, i.e., a Node
   is_rbtree_not_leaf ln.left;
   let llp = Some?.v ln.left;
-  rewrite each (Some llp) as ln.left;
   is_rbtree_case_some ln.left llp;
   let lln = !llp;
   // Now we have:
@@ -431,13 +423,11 @@ fn balance_lr (l: rb_ptr) (v: int) (r: rb_ptr)
   L.classify_balance_lemma S.Black lt v rt;
   is_rbtree_not_leaf l;
   let lp = Some?.v l;
-  rewrite each (Some lp) as l;
   is_rbtree_case_some l lp;
   let ln = !lp;
   // ln.right must be Some (the red grandchild)
   is_rbtree_not_leaf ln.right;
   let lrp = Some?.v ln.right;
-  rewrite each (Some lrp) as ln.right;
   is_rbtree_case_some ln.right lrp;
   let lrn = !lrp;
   // Build: Node Red (Node Black a x b) y (Node Black c_ v r)
@@ -470,13 +460,11 @@ fn balance_rl (l: rb_ptr) (v: int) (r: rb_ptr)
   L.classify_balance_lemma S.Black lt v rt;
   is_rbtree_not_leaf r;
   let rp = Some?.v r;
-  rewrite each (Some rp) as r;
   is_rbtree_case_some r rp;
   let rn = !rp;
   // rn.left must be Some (the red grandchild)
   is_rbtree_not_leaf rn.left;
   let rlp = Some?.v rn.left;
-  rewrite each (Some rlp) as rn.left;
   is_rbtree_case_some rn.left rlp;
   let rln = !rlp;
   // Build: Node Red (Node Black l v b) y (Node Black c_ z d)
@@ -509,13 +497,11 @@ fn balance_rr (l: rb_ptr) (v: int) (r: rb_ptr)
   L.classify_balance_lemma S.Black lt v rt;
   is_rbtree_not_leaf r;
   let rp = Some?.v r;
-  rewrite each (Some rp) as r;
   is_rbtree_case_some r rp;
   let rn = !rp;
   // rn.right must be Some (the red grandchild)
   is_rbtree_not_leaf rn.right;
   let rrp = Some?.v rn.right;
-  rewrite each (Some rrp) as rn.right;
   is_rbtree_case_some rn.right rrp;
   let rrn = !rrp;
   // Build: Node Red (Node Black l v b) y (Node Black c_ z d)
@@ -789,7 +775,6 @@ fn rb_balL (l: rb_ptr) (v: int) (r: rb_ptr)
     // Case 1: l = Node Red a x b → Node Red (Node Black a x b) v r
     is_rbtree_not_leaf l;
     let lp = Some?.v l;
-    rewrite each (Some lp) as l;
     is_rbtree_case_some l lp;
     let ln = !lp;
     lp := { key = ln.key; color = S.Black; left = ln.left; right = ln.right };
@@ -803,7 +788,6 @@ fn rb_balL (l: rb_ptr) (v: int) (r: rb_ptr)
       // Case 2: r = Node Black b y c → balance Black l v (Node Red b y c)
       is_rbtree_not_leaf r;
       let rp = Some?.v r;
-      rewrite each (Some rp) as r;
       is_rbtree_case_some r rp;
       let rn = !rp;
       rp := { key = rn.key; color = S.Red; left = rn.left; right = rn.right };
@@ -817,7 +801,6 @@ fn rb_balL (l: rb_ptr) (v: int) (r: rb_ptr)
         // r is Red: check if r.left is Black for Case 3
         is_rbtree_not_leaf r;
         let rp = Some?.v r;
-        rewrite each (Some rp) as r;
         is_rbtree_case_some r rp;
         let rn = !rp;
         let rl_black = is_color rn.left S.Black;
@@ -826,7 +809,6 @@ fn rb_balL (l: rb_ptr) (v: int) (r: rb_ptr)
           // Result: Node Red (Node Black l v b) y (balance Black c z (redden d))
           is_rbtree_not_leaf rn.left;
           let rlp = Some?.v rn.left;
-          rewrite each (Some rlp) as rn.left;
           is_rbtree_case_some rn.left rlp;
           let rln = !rlp;
           let rd = rb_redden rn.right;
@@ -873,7 +855,6 @@ fn rb_balR (l: rb_ptr) (v: int) (r: rb_ptr)
     // Case 1: r = Node Red b y c → Node Red l v (Node Black b y c)
     is_rbtree_not_leaf r;
     let rp = Some?.v r;
-    rewrite each (Some rp) as r;
     is_rbtree_case_some r rp;
     let rn = !rp;
     rp := { key = rn.key; color = S.Black; left = rn.left; right = rn.right };
@@ -887,7 +868,6 @@ fn rb_balR (l: rb_ptr) (v: int) (r: rb_ptr)
       // Case 2: l = Node Black a x b → balance Black (Node Red a x b) v r
       is_rbtree_not_leaf l;
       let lp = Some?.v l;
-      rewrite each (Some lp) as l;
       is_rbtree_case_some l lp;
       let ln = !lp;
       lp := { key = ln.key; color = S.Red; left = ln.left; right = ln.right };
@@ -901,7 +881,6 @@ fn rb_balR (l: rb_ptr) (v: int) (r: rb_ptr)
         // l is Red: check if l.right is Black for Case 3
         is_rbtree_not_leaf l;
         let lp = Some?.v l;
-        rewrite each (Some lp) as l;
         is_rbtree_case_some l lp;
         let ln = !lp;
         let lr_black = is_color ln.right S.Black;
@@ -910,7 +889,6 @@ fn rb_balR (l: rb_ptr) (v: int) (r: rb_ptr)
           // Result: Node Red (balance Black (redden a) x b) y (Node Black c v r)
           is_rbtree_not_leaf ln.right;
           let lrp = Some?.v ln.right;
-          rewrite each (Some lrp) as ln.right;
           is_rbtree_case_some ln.right lrp;
           let lrn = !lrp;
           let la = rb_redden ln.left;
@@ -986,7 +964,6 @@ fn rec rb_fuse (l: rb_ptr) (r: rb_ptr)
               // s = Node Red b' z c' → Node Red (Node Red a x b') z (Node Red c' y d)
               is_rbtree_not_leaf s;
               let sp = Some?.v s;
-              rewrite each (Some sp) as s;
               is_rbtree_case_some s sp;
               let sn = !sp;
               // Build Node Red a x b' (reuse lp)
@@ -1019,7 +996,6 @@ fn rec rb_fuse (l: rb_ptr) (r: rb_ptr)
               // s = Node Red b' z c' → Node Red (Node Black a x b') z (Node Black c' y d)
               is_rbtree_not_leaf s;
               let sp = Some?.v s;
-              rewrite each (Some sp) as s;
               is_rbtree_case_some s sp;
               let sn = !sp;
               // Build Node Black a x b' (reuse lp)

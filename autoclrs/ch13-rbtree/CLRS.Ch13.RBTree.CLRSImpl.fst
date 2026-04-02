@@ -524,7 +524,6 @@ fn rb_clrs_fixup_left (c: S.color) (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb_
         let ln = !lvl;
         rbtree_not_leaf ln.right;
         let lrvl = Some?.v ln.right;
-        rewrite each (Some lrvl) as ln.right;
         rbtree_case_some ln.right lrvl;
         let lrn = !lrvl;
         // Reuse lvl for Node Red a y b
@@ -595,7 +594,6 @@ fn rb_clrs_fixup_right (c: S.color) (l: rb_ptr) (v: int) (r: rb_ptr) (parent: rb
         let rn = !rvl;
         rbtree_not_leaf rn.left;
         let rlvl = Some?.v rn.left;
-        rewrite each (Some rlvl) as rn.left;
         rbtree_case_some rn.left rlvl;
         let rln = !rlvl;
         // Reuse rvl for Node Red c' z d
@@ -825,7 +823,6 @@ fn rb_clrs_del_cases234_left
           // Result: Node c (Node Black x v wll) wlv (Node Black wlr wy wr)
           rbtree_not_leaf wn.left;
           let wlvl = Some?.v wn.left;
-          rewrite each (Some wlvl) as wn.left;
           rbtree_case_some wn.left wlvl;
           let wln = !wlvl;
           let left_child = new_node v S.Black x wln.left parent;
@@ -960,7 +957,6 @@ fn rb_clrs_del_cases234_right
           // Result: Node c (Node Black wl wy wrl) wrv (Node Black wrr v x)
           rbtree_not_leaf wn.right;
           let wrvl = Some?.v wn.right;
-          rewrite each (Some wrvl) as wn.right;
           rbtree_case_some wn.right wrvl;
           let wrn = !wrvl;
           let right_child = new_node v S.Black wrn.right x parent;
@@ -1124,7 +1120,6 @@ fn rec rb_clrs_del (tree: rb_ptr) (k: int) (parent: rb_ptr)
               }
               Some rbp -> {
                 // Left is Leaf, Right is Node: replace with Black(right's children)
-                rewrite each (Some rbp) as node.right;
                 rbtree_some_is_node node.right rbp;
                 rbtree_case_some node.right rbp;
                 let rn = !rbp;
@@ -1142,7 +1137,6 @@ fn rec rb_clrs_del (tree: rb_ptr) (k: int) (parent: rb_ptr)
               None -> {
                 // Left is Node, Right is Leaf: replace with Black(left's children)
                 consume_rbtree_leaf node.right;
-                rewrite each (Some lbp) as node.left;
                 rbtree_some_is_node node.left lbp;
                 rbtree_case_some node.left lbp;
                 let ln = !lbp;
@@ -1156,9 +1150,7 @@ fn rec rb_clrs_del (tree: rb_ptr) (k: int) (parent: rb_ptr)
               Some rbp -> {
                 // Both children are Nodes: successor-based delete
                 // Establish Node? lt and Node? rt for the spec's pattern match
-                rewrite each (Some lbp) as node.left;
                 rbtree_some_is_node node.left lbp;
-                rewrite each (Some rbp) as node.right;
                 rbtree_some_is_node node.right rbp;
                 let sk = rb_minimum node.right rbp;
                 let res = rb_clrs_del node.right sk (Some vl);
