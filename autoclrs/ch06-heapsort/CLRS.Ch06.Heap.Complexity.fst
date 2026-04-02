@@ -469,12 +469,12 @@ let heapsort_better_than_quadratic (n: pos{n >= 11})
 // ========== Root-bound lemmas for bridging to CostBound module ==========
 
 // For small n, verify computationally
-#push-options "--fuel 20 --ifuel 5 --z3rlimit 80"
+#push-options "--fuel 20 --ifuel 5 --z3rlimit 50 --split_queries always"
 private
 let build_heap_ops_le_root_bound_small (n: pos)
   : Lemma (requires n < 32)
           (ensures build_heap_ops n <= (n / 2) * 2 * log2_floor n)
-  = ()
+  = if n < 16 then () else ()
 #pop-options
 
 #push-options "--z3rlimit 10"

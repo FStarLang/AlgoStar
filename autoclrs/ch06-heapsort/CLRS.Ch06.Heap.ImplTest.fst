@@ -42,7 +42,7 @@ let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 // ========== Test 1: heapsort completeness on [3;1;2] ==========
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 80 --fuel 8 --ifuel 4 --warn_error -349"
 
 (* Pure helper: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
    Uses SP.count to prove that each element appears exactly once, then
