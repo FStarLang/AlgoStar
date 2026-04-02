@@ -194,7 +194,7 @@ let efpk_3 (ps ks: Seq.seq SZ.t)
   = ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 140 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 80 --split_queries always"
 let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
   : Lemma
     (requires Seq.length ps == 3 /\ Seq.length ks == 3 /\ Seq.length ws == 9 /\ ws == tw /\

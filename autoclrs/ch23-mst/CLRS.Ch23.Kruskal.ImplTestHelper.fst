@@ -13,7 +13,7 @@ module Seq = FStar.Seq
 
 let test_adj : Seq.seq int = Seq.seq_of_list [0; 1; 3; 1; 0; 2; 3; 2; 0]
 
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 10"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 10 --split_queries always"
 
 let test_symmetric () : Lemma (symmetric_adj test_adj 3) =
   assert_norm (Seq.length test_adj == 9);

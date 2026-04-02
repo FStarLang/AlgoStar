@@ -157,7 +157,7 @@ let rec find_pure_rerouted
 
 // Key theorem: union maintains the UF invariant
 // After adding edge (u_val, v_val) and setting parent[root_u] := root_v
-#push-options "--z3rlimit 350 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 300 --fuel 2 --ifuel 2"
 let uf_inv_union
     (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)

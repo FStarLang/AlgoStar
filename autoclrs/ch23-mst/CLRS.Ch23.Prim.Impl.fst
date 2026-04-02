@@ -641,7 +641,7 @@ fn find_min_vertex
 /// Takes prim_loop_state on PRE-ADD ims (ims_old) as ghost context.
 /// The actual in_mst array has POST-ADD ims (u already added).
 /// Outputs prim_loop_state on POST-ADD ims with updated keys/parents.
-#push-options "--z3rlimit 110"
+#push-options "--z3rlimit 80"
 fn update_keys
   (#p: perm)
   (key_a: array SZ.t) (#ks0: Ghost.erased (Seq.seq SZ.t))
@@ -835,7 +835,7 @@ fn prim_step
 }
 #pop-options
 
-#push-options "--z3rlimit 160"
+#push-options "--z3rlimit 80"
 //SNIPPET_START: prim_sig
 fn prim
   (#p: perm)

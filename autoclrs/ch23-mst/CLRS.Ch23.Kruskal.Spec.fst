@@ -1401,7 +1401,7 @@ let same_component_dec_empty_0 (u v: nat)
 
 // Key counting lemma: number of reachable vertices ≤ 1 + number of edges
 // Uses count_reachable to ensure a single lambda symbol in SMT encoding
-#push-options "--z3rlimit 59"
+#push-options "--z3rlimit 35"
 let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
   : Lemma (ensures count_reachable es root n n <= 1 + length es)
           (decreases length es)

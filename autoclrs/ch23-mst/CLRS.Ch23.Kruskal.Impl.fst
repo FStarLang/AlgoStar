@@ -208,7 +208,7 @@ fn do_union
 #pop-options
 
 // Lemma for when we add an edge: proves uf_inv, is_forest, valid_endpoints for new state.
-#push-options "--z3rlimit 70 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_add_edge_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int)
