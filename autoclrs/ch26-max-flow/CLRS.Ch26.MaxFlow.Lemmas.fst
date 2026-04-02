@@ -183,6 +183,7 @@ let lemma_augment_edge_conservation_other (flow: Seq.seq int) (cap: Seq.seq int)
        lemma_sum_flow_out_update_other flow n v u (get flow n v u - delta) w n)
 
 (** Lemma: For intermediate vertices on path, inflow and outflow both increase by delta *)
+#push-options "--z3rlimit 10"
 let lemma_augment_edge_conservation_intermediate (flow: Seq.seq int) (cap: Seq.seq int)
                                                   (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
                                                   (u1: nat{u1 < n}) (v1: nat{v1 < n})
@@ -211,6 +212,12 @@ let lemma_augment_edge_conservation_intermediate (flow: Seq.seq int) (cap: Seq.s
     // Second edge (u2, v2) = (v1, v2): increases outflow from v1 by delta
     let flow'' = augment_edge flow' cap n u2 v2 delta in
     assert (u2 = v1);
+    // Help SMT: the first augment at (u1,v1) doesn't change cell (v1,v2) since u1≠v1
+    // flow' = set flow n u1 v1 (...), and (v1,v2) ≠ (u1,v1) since v1≠u1
+    assert (u1 * n + v1 <> v1 * n + v2);
+    assert (get flow' n v1 v2 == get flow n v1 v2);
+    assert (residual_capacity cap flow' n v1 v2 == residual_capacity cap flow n v1 v2);
+    assert (residual_capacity cap flow' n v1 v2 > 0);
     assert (get flow'' n v1 v2 == get flow' n v1 v2 + delta);
     lemma_sum_flow_out_increase flow' n v1 v2 delta n;
     assert (sum_flow_out flow'' n v1 n == sum_flow_out flow' n v1 n + delta);
@@ -222,6 +229,7 @@ let lemma_augment_edge_conservation_intermediate (flow: Seq.seq int) (cap: Seq.s
     assert (sum_flow_out flow'' n v1 n == sum_flow_out flow n v1 n + delta);
     // Since they were equal initially, they remain equal
     assert (sum_flow_into flow'' n v1 n == sum_flow_out flow'' n v1 n)
+#pop-options
 
 (** ========== Helper: Matrix cell independence under augment_edge ========== *)
 
@@ -303,7 +311,7 @@ let rec lemma_bottleneck_unchanged
     | [] -> () // impossible due to Cons? precondition
 
 (** Main lemma: Path augmentation preserves valid flow (P0.1.7 + P0.1.8) *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_augment_preserves_capacity (flow: Seq.seq int) (cap: Seq.seq int)
                                           (n: nat{Seq.length flow == n * n /\ Seq.length cap == n * n})
                                           (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -341,14 +349,18 @@ let rec lemma_augment_preserves_capacity (flow: Seq.seq int) (cap: Seq.seq int)
                assert (bn <= residual_capacity cap flow n u v);
                assert (get flow n u v + bn <= get cap n u v))
             else
-              (assert (get flow' n u' v' == get flow n u' v'))
+              (// (u',v') ≠ (u,v), so index u'*n+v' ≠ u*n+v
+               lemma_get_set_other flow n u v (get flow n u v + bn) u' v';
+               assert (get flow' n u' v' == get flow n u' v'))
           else
             if u' = v && v' = u then
               (assert (get flow' n v u == get flow n v u - bn);
                assert (bn <= get flow n v u);
                assert (0 <= get flow n v u - bn))
             else
-              (assert (get flow' n u' v' == get flow n u' v'))
+              (// (u',v') ≠ (v,u), so index u'*n+v' ≠ v*n+u
+               lemma_get_set_other flow n v u (get flow n v u - bn) u' v';
+               assert (get flow' n u' v' == get flow n u' v'))
       in
       FStar.Classical.forall_intro_2 (FStar.Classical.move_requires_2 aux);
       
@@ -714,7 +726,7 @@ let lemma_augment_edge_residual_unchanged
     when they modify disjoint matrix cells. This holds when the edges are 
     different as undirected edges: {u1,v1} ≠ {u2,v2}. 
     Adjacent path edges (u,v) and (v,w) satisfy this because u ≠ w. *)
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 let lemma_augment_edge_commute
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})

@@ -130,6 +130,7 @@ let imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source 
     let aux_cap (u: nat{u < n}) (v: nat{v < n})
       : Lemma (0 <= get flow_seq n u v /\ get flow_seq n u v <= get cap_seq n u v)
       = let idx = u * n + v in
+        FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1);
         assert (idx < n * n);
         assert (seq_get flow_seq idx == Seq.index flow_seq idx);
         assert (get flow_seq n u v == Seq.index flow_seq idx);
@@ -1910,7 +1911,7 @@ let elim_discover_delta
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1 --split_queries always"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -1951,11 +1952,6 @@ let maybe_discover_then_proof
     assert (SZ.v vv < Seq.length scolor);
     assert (Seq.index scolor (SZ.v vv) == 0);
     assert (count_color1 sc' n == count_color1 scolor n + 1);
-    let c1 = count_color1 sc' n in
-    let c0 = count_color1 scolor n in
-    assert (c1 == c0 + 1);
-    assert (c1 + vtail == c0 + 1 + vtail);
-    assert (c0 + 1 + vtail == c0 + (vtail + 1));
     // Queue prefix: writing at position vtail doesn't affect positions < vtail
     assert (Seq.length sq' == n);
     assert (forall (j: nat). j < vtail ==> j < Seq.length sq' /\ Seq.index sq' j == Seq.index squeue j);
@@ -1963,6 +1959,11 @@ let maybe_discover_then_proof
     // New entry at position vtail has color 1: sq'[vtail]=vv and sc'[vv]=1
     assert (Seq.index sq' vtail == vv);
     assert (Seq.index sc' (SZ.v vv) == 1);
+    // Help SMT: connect seq_get/seq_get_sz to Seq.index for queue_color1
+    assert (vtail < Seq.length sq');
+    assert (seq_get_sz sq' vtail == vv);
+    assert (SZ.v vv < Seq.length sc');
+    assert (seq_get sc' (SZ.v vv) == 1);
     assert (queue_color1 sc' sq' vtail (vtail + 1) n);
     mk_discover_delta scolor sc' sp' squeue sq'
       cap_seq flow_seq n u (SZ.v vv) source vtail (vtail + 1)
