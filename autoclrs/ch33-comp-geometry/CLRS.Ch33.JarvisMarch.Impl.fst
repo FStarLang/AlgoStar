@@ -264,7 +264,7 @@ fn hull_write_step
   hull_out.(vh) <- next
 }
 
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 10"
 fn jarvis_march_with_hull (#p: perm) (xs ys: array int)
   (#sxs: Ghost.erased (Seq.seq int))
   (#sys: Ghost.erased (Seq.seq int))

@@ -238,7 +238,7 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_aux_beats_all xs ys current current 0;
   find_next_spec_bounded xs ys current
 
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 10 --split_queries always"
 let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
   : Lemma
     (requires
@@ -250,32 +250,31 @@ let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) 
     (ensures
       valid_jarvis_hull xs ys (Seq.upd hull h next) (h + 1)) =
   let hull' = Seq.upd hull h next in
-  // Basic Seq.upd facts
+  // Seq.upd facts
   assert (Seq.length hull' == Seq.length hull);
   assert (Seq.index hull' h == next);
   assert (forall (i: nat). i < h ==> Seq.index hull' i == Seq.index hull i);
-  // Conjunct 1: h + 1 >= 1
-  assert (h + 1 >= 1);
-  // Conjunct 2: h + 1 <= Seq.length hull'
-  assert (h + 1 <= Seq.length hull');
-  // Conjunct 3: Seq.length ys == Seq.length xs (from valid_jarvis_hull precondition)
-  assert (Seq.length ys == Seq.length xs);
-  // Conjunct 4: hull'[0] == find_leftmost_spec (h >= 1 so index 0 unchanged)
+  // hull'[0] == find_leftmost_spec (h >= 1 so index 0 unchanged)
   assert (Seq.index hull' 0 == Seq.index hull 0);
   assert (SZ.v (Seq.index hull' 0) == find_leftmost_spec xs ys);
-  // Conjunct 5: all indices < h+1 are in bounds
-  assert (forall (i: nat). i < h ==> SZ.v (Seq.index hull' i) < Seq.length xs);
+  // all indices < h+1 are in bounds (use assert_spinoff to avoid polluting context)
   assert (SZ.v (Seq.index hull' h) < Seq.length xs);
-  assert (forall (i: nat). i < h + 1 ==> SZ.v (Seq.index hull' i) < Seq.length xs);
-  // Conjunct 6: find_next chain for indices 1..h
-  // For i < h: hull'[i] == hull[i] and hull'[i-1] == hull[i-1], so chain is preserved
-  assert (forall (i: nat). i >= 1 /\ i < h ==>
+  assert_spinoff (forall (i: nat). i < h + 1 ==> SZ.v (Seq.index hull' i) < Seq.length xs);
+  // find_next chain for indices < h preserved (use assert_spinoff)
+  assert_spinoff (forall (i: nat). i >= 1 /\ i < h ==>
     SZ.v (Seq.index hull' i) == find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1))));
-  // For i == h: hull'[h] == next and hull'[h-1] == hull[h-1]
+  // chain for index h
   assert (Seq.index hull' (h - 1) == Seq.index hull (h - 1));
-  assert (SZ.v (Seq.index hull' h) == find_next_spec xs ys (SZ.v (Seq.index hull' (h - 1))));
-  // Combine: case split i < h vs i == h
-  assert (forall (i: nat). (i >= 1 /\ i < h + 1) ==> (i < h \/ i = h));
-  assert (forall (i: nat). i >= 1 /\ i < h + 1 ==>
+  calc (==) {
+    SZ.v (Seq.index hull' h);
+    == {}
+    SZ.v next;
+    == {}
+    find_next_spec xs ys (SZ.v (Seq.index hull (h - 1)));
+    == {}
+    find_next_spec xs ys (SZ.v (Seq.index hull' (h - 1)));
+  };
+  // Combined chain for postcondition
+  assert_spinoff (forall (i: nat). i >= 1 /\ i < h + 1 ==>
     SZ.v (Seq.index hull' i) == find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1))))
 #pop-options
