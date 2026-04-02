@@ -29,6 +29,10 @@ let permutation_swap (s: Seq.seq int) (i j: nat_smaller (Seq.length s))
       then (Seq.Properties.lemma_swap_permutes s i j; seq_swap_commute s i j)
       else Seq.Properties.lemma_swap_permutes s j i
 
+// These lemmas relate forall-quantified preconditions to slice-based postconditions.
+// Split queries isolate the postcondition sub-query from ground terms, preventing
+// Z3 from instantiating the quantifiers. Disable split_queries here.
+#push-options "--split_queries no"
 let transfer_larger_slice
   (s : Seq.seq int)
   (shift : nat)
@@ -67,3 +71,4 @@ let transfer_strictly_larger_slice
   = assert (forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)));
     assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (lb < Seq.index s ((k+shift) - shift)));
     assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (lb < Seq.index s k))
+#pop-options

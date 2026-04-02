@@ -99,7 +99,9 @@ fn swap (a: A.array int) (i j: nat) (#l:nat{l <= i /\ l <= j}) (#r:nat{i < r /\ 
   let vj = a.(SZ.uint_to_t j);
   (a.(SZ.uint_to_t i) <- vj);
   (a.(SZ.uint_to_t j) <- vi);
-  ()
+  with s1. assert (A.pts_to_range a l r s1);
+  permutation_swap s0 (i - l) (j - l);
+  assert (pure (permutation s0 (seq_swap s0 (i - l) (j - l))))
 }
 
 // ========== CLRS Partition with Tick Counter ==========
