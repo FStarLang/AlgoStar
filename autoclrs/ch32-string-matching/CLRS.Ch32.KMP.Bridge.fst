@@ -173,7 +173,7 @@ let ps_nesting_gen (#a: eqtype) (pattern: seq a)
 /// the mismatch invariant extends from k to k'.
 /// Uses ps_nesting_gen: any PS j of pattern[0..q-1] with k' < j < k
 /// is also a PS of pattern[0..k-1], hence j <= pi[k-1] = k', contradiction.
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let inner_maximality_step (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern}) (k: nat) (k_new: nat)
   : Lemma
@@ -211,7 +211,7 @@ let apply_mismatch (#a: eqtype) (pattern: seq a)
   = ()
 
 /// maximality_at_q: proves any PS j of pattern[0..q] satisfies j <= pi_q.
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let maximality_at_q (#a: eqtype) (pattern: seq a) (pi_new: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern /\ q < length pi_new})
     (k_final: nat) (chars_match: bool) (j: nat)
@@ -267,7 +267,7 @@ let fold_pi_max_up_to (#a: eqtype) (pattern: seq a) (pi: seq SZ.t) (bound: nat)
 
 /// Top-level helper: validity at any q' < q+1 from separate facts.
 /// Must be top-level to avoid inner function subtyping issues.
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
 let valid_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern}) (q': nat{q' < length pattern})
   : Lemma
@@ -283,7 +283,7 @@ let valid_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
 
 /// Top-level helper: maximality at any q' < q+1 from separate flat foralls.
 /// Explicit case split avoids Z3 trigger matching issues.
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
 let max_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern}) (q': nat{q' < length pattern}) (k: nat)
   : Lemma
