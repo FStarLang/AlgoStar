@@ -51,7 +51,7 @@ let lemma_triangle_step (n: nat)
 
 // ========== Main Implementation ==========
 
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2 --split_queries always"
 
 open Pulse.Lib.BoundedIntegers
 

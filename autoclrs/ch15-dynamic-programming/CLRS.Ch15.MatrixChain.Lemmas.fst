@@ -419,7 +419,7 @@ let rec lemma_mc_inner_i_fills_correctly
 ///   - entries for chain lengths < l-1 are preserved (by preserves_shorter)
 ///   - entries for chain length l-1 are filled correctly
 /// dp_correct_upto advances from (l-1) to l.
-#push-options "--z3rlimit 25 --ifuel 2"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let lemma_mc_inner_i_correct
   (table: seq int) (dims: seq int) (n l: nat)
   : Lemma
