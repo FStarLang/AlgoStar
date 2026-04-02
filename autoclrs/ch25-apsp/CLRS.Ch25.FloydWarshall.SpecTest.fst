@@ -41,7 +41,13 @@ let test_22 () : Lemma (fw_entry test_adj 3 2 2 3 == 0) = ()
 // Non-negative diagonal at all levels (no negative cycles in test graph)
 let test_no_neg_cycle () : Lemma (
     forall (k: nat) (v: nat). k <= 3 /\ v < 3 ==> fw_entry test_adj 3 v v k >= 0)
-  = ()
+  = assert_norm (weights_bounded test_adj 3);
+    let aux (k v: nat) : Lemma
+      (requires k <= 3 /\ v < 3)
+      (ensures fw_entry test_adj 3 v v k >= 0)
+      = lemma_weights_bounded_nonneg_entry test_adj 3 v v k
+    in
+    FStar.Classical.forall_intro_2 (FStar.Classical.move_requires_2 aux)
 
 // The main Spec theorem connects fw_entry to fw_outer:
 //   index (fw_outer adj n 0) (qi*n+qj) == fw_entry adj n qi qj n

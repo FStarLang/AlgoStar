@@ -7,7 +7,7 @@ open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch25.FloydWarshall.Spec
 
-#set-options "--z3rlimit 40"
+#set-options "--z3rlimit 20"
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
