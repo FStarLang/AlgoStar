@@ -56,7 +56,7 @@ let lemma_queue_preds_extend_output
 (* When a vertex w is newly enqueued (added at position qt in queue),
    and all predecessors of w are in output[0..count+1),
    the queue preds property extends *)
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
 let lemma_queue_preds_enqueue
   (adj: seq int) (n: nat) (queue_old queue_new: seq FStar.SizeT.t) (qh qt: nat)
    (output: seq int) (count: nat) (w: FStar.SizeT.t)
@@ -207,6 +207,7 @@ let rec lemma_zero_crp_from_all_preds (adj: seq int) (n: nat) (output: seq int) 
     else lemma_zero_crp_from_all_preds adj n output count w (scan - 1)
 
 (* Corollary: queue_preds + indeg_correct implies in_deg == 0 for each queue entry *)
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let lemma_queue_entry_zero_indeg
   (adj: seq int) (n: nat) (in_deg: seq int) (queue: seq FStar.SizeT.t)
   (output: seq int) (count: nat) (qh qt: nat) (qi: nat)
@@ -228,6 +229,7 @@ let lemma_queue_entry_zero_indeg
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
     // Step 3: all preds in output → count_remaining_preds == 0
     lemma_zero_crp_from_all_preds adj n output count w n
+#pop-options
 
 (* Forall-lifted: all old queue entries have zero in-degree.
    NOTE: ensures includes bounds conjuncts for Seq.index well-formedness *)
@@ -350,7 +352,7 @@ let lemma_not_in_output_upd_neq
     lemma_is_in_output_extend_neg output count x count u_val
 
 (* Key transition lemma: how count_remaining_preds changes when extending output by one vertex *)
-#push-options "--z3rlimit 40 --fuel 2"
+#push-options "--z3rlimit 10 --fuel 2"
 let rec lemma_crp_extend
   (adj: seq int) (n: nat) (output: seq int) (count: nat) (u_val: int) (v: nat) (scan: nat)
   : Lemma
@@ -452,7 +454,7 @@ let rec lemma_crp_zero_when_all_preds_in_output
     else lemma_crp_zero_when_all_preds_in_output adj n output count v (scan - 1)
 
 (* Main lemma: under strong_order_inv + indeg_correct, output verts have in_deg == 0 *)
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10"
 let lemma_output_vert_zero_indeg
   (adj: seq int) (n: nat) (in_deg: seq int) (output: seq int) (count: nat) (j: nat)
   : Lemma

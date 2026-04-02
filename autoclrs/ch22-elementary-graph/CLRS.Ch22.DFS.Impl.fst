@@ -1207,7 +1207,7 @@ fn dfs_visit
 (* Helper: conditionally perform DFS-VISIT if vertex is WHITE.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --split_queries always"
 fn maybe_dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -1306,7 +1306,7 @@ fn maybe_dfs_visit
    Main stack-based DFS — proves both correctness and complexity
    ================================================================ *)
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1 --split_queries always"
 //SNIPPET_START: stack_dfs_sig
 fn stack_dfs
   (adj: A.array int)

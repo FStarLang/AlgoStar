@@ -84,7 +84,7 @@ let queue_fresh_dequeue
    The dequeued element u is at queue[qh]. After adding u to output at position count,
    remaining queue entries in [qh+1, qt) must not be u (from queue_distinct)
    AND must not be in output[0..count) (from queue_fresh before dequeue). *)
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let queue_fresh_extend_output
   (output_old output_new: Seq.seq int) (count: nat)
   (queue: Seq.seq SZ.t) (qh qt: nat) (u: int)
@@ -1168,7 +1168,7 @@ let lemma_queue_distinct_transfer_and_extend
 (* Prove old-new cross distinct from indeg facts:
    old entries have indeg 0, new entries have indeg > 0 → different vertices.
    NOTE: bounds must precede foralls for Seq.index well-formedness *)
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let lemma_old_new_cross_distinct
   (sin_deg: Seq.seq int)
   (queue_old queue_new: Seq.seq SZ.t)
@@ -1203,7 +1203,7 @@ let lemma_old_new_cross_distinct
    Key: combines pn_extract_new (sin_deg > 0) + positive_indeg_implies_fresh (fresh against output_pre)
    + Seq.upd (output_post differs only at vout) + sin_deg[u]=0 vs sin_deg[v]>0 (u <> v)
    NOTE: bounds must precede foralls for Seq.index well-formedness *)
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let lemma_new_entries_fresh_after_upd
   (sin_deg: Seq.seq int) (queue: Seq.seq SZ.t)
   (output_old output_new: Seq.seq int)
@@ -1236,7 +1236,7 @@ let lemma_new_entries_fresh_after_upd
 #pop-options
 
 (* Sub-lemma 1: queue_preds — reveal_opaque + zero_indeg_preds_exist_forall *)
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let lemma_bridge_preds
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int)
@@ -1266,7 +1266,7 @@ let lemma_bridge_preds
 #pop-options
 
 (* Sub-lemma 2: queue_fresh — chain extraction + combined fresh + Seq.upd bridge + transfer *)
-#push-options "--z3rlimit 100"
+#push-options "--z3rlimit 5"
 let lemma_bridge_fresh
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int)
@@ -1307,7 +1307,7 @@ let lemma_bridge_fresh
 #pop-options
 
 (* Sub-lemma 3: queue_distinct — extraction foralls + zero_indeg_forall + cross_distinct + transfer *)
-#push-options "--z3rlimit 100"
+#push-options "--z3rlimit 5"
 let lemma_bridge_distinct
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int)
@@ -1547,7 +1547,7 @@ let rec lemma_is_in_output_preserved
     else lemma_is_in_output_preserved output_old output_new (count - 1) v
 
 (* zero_indeg_accounted after dequeue + output extend *)
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let lemma_zero_indeg_accounted_dequeue_extend
   (in_deg: Seq.seq int) (n: nat)
   (output_pre output_post: Seq.seq int) (count: nat)
@@ -1764,7 +1764,7 @@ let lemma_post_process_neighbors
 #pop-options
 
 (* queue_entries_zero_indeg maintenance after process_neighbors *)
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let lemma_queue_entries_zero_indeg_after_pn
   (adj: Seq.seq int) (n: nat)
   (sin_deg_pre sin_deg_post: Seq.seq int) (output: Seq.seq int) (count: nat)

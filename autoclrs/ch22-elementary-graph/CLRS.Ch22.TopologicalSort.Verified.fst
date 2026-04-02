@@ -25,7 +25,7 @@ open FStar.Mul
  * Pure proof: strong_order_inv implies topological ordering on int sequences
  *)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 
 // Distinctness for int sequences
 let all_distinct_int (order: Seq.seq int) : prop =
@@ -110,7 +110,7 @@ let lemma_distinct_has_position_int (order: Seq.seq int) (v: nat) (pos: nat)
  * then every vertex v < n appears exactly once in output (permutation property)
  *)
  
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 
 // Count how many times v appears in seq[0..len)
 let rec count_occurrences (s: Seq.seq int) (len: nat) (v: int) 
@@ -289,7 +289,7 @@ let lemma_pigeonhole_count_occurrences (s: Seq.seq int) (count n: nat)
  * Main theorem: strong_order_inv implies topological ordering
  *)
  
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 
 let lemma_strong_order_implies_topo_order_int
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int)
@@ -359,7 +359,7 @@ let lemma_strong_order_implies_topo_order_int
  * Bridge to the spec: int-based order implies nat-based order
  *)
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 
 // Convert int sequence to nat sequence when all elements are valid
 let seq_int_to_nat (s: Seq.seq int) (n: nat)
@@ -462,7 +462,7 @@ let theorem_kahns_algorithm_correct
  * This contradicts the DAG property.
  *)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 
 (* Backward chain: chain(0) = v0, chain(k+1) = predecessor of chain(k) *)
 let rec build_chain_value
@@ -520,7 +520,7 @@ let rec lemma_chain_has_path
    Walk positions 0, 1, ..., marking visited. Stop when a repeat is found.
    Terminates: count_visited increases each step until n, then pigeonhole forces repeat. *)
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 80 --split_queries always"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 
 private let rec count_visited (visited: Seq.seq bool) (m: nat)
   : Pure nat (requires m <= Seq.length visited) (ensures fun c -> c <= m) (decreases m)
@@ -535,6 +535,27 @@ private let rec lemma_count_visited_set (visited: Seq.seq bool) (m pos: nat)
     (decreases m)
   = if m = 0 then ()
     else lemma_count_visited_set visited (m - 1) pos
+
+#pop-options
+
+// Helper: if a witness j >= p has f(j) == target but f(p) <> target, then j >= p+1
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+private let lemma_exists_shift_bound
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
+  (vk: nat) (p k: nat)
+  : Lemma
+    (requires
+      v0 < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
+      not (is_in_output output count v0) /\
+      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+        count_remaining_preds adj n output count w n > 0) /\
+      build_chain_value adj n output count v0 p <> vk /\
+      (exists (j: nat). j >= p /\ j < k /\ build_chain_value adj n output count v0 j == vk))
+    (ensures exists (j: nat). j >= p + 1 /\ j < k /\ build_chain_value adj n output count v0 j == vk)
+  = ()
+#pop-options
+
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 40 --split_queries always"
 
 let rec find_chain_duplicate
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
@@ -569,7 +590,7 @@ let rec find_chain_duplicate
           else begin
             // The witness j from the precondition satisfies j >= p /\ j < k /\ bcv j == vk.
             // Since bcv p <> vk, j <> p, hence j >= p + 1.
-            assert (exists (j: nat). j >= p + 1 /\ j < k /\ build_chain_value adj n output count v0 j == vk);
+            lemma_exists_shift_bound adj n output count v0 vk p k;
             find_earlier (p + 1)
           end
       in
@@ -585,7 +606,7 @@ let rec find_chain_duplicate
 #pop-options
 
 (* Main cycle lemma *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 
 let lemma_non_output_implies_cycle
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
