@@ -89,7 +89,7 @@ let rec mask_loop_invariant_lemma (n: pos) (k: nat)
     )
 
 // b_mod preserves modular exponentiation step
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0 --z3smtopt '(set-option :smt.arith.nl false)'"
 let mod_exp_lr_step_bmod (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
   : Lemma (
       let d = pow b prefix % m in
@@ -101,8 +101,9 @@ let mod_exp_lr_step_bmod (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
   = let d = pow b prefix % m in
     let d_sq = (d * d) % m in
     mod_exp_lr_step b prefix m bit;
-    if bit = 1 then
+    if bit = 1 then (
       lemma_mod_mul_distr_r d_sq b m
+    )
 #pop-options
 
 // After the step, d_new = pow b (e / mask) % m
