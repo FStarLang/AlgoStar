@@ -116,6 +116,7 @@ let lemma_zero_array_eq_create (s: Seq.seq int) (len: nat)
     This connects the imperative postcondition to the spec-level predicate
     used by the MFMC theorem. The two predicates are equivalent when indices
     are in range: seq_get s (u*n+v) = get s n u v = Seq.index s (u*n+v). *)
+#push-options "--z3rlimit 10"
 let imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
   : Lemma
     (requires imp_valid_flow flow_seq cap_seq n source sink)
@@ -138,6 +139,7 @@ let imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source 
         assert (get cap_seq n u v == Seq.index cap_seq idx)
     in
     FStar.Classical.forall_intro_2 aux_cap
+#pop-options
 
 (** Reverse bridge: valid_flow implies imp_valid_flow.
     Together with imp_valid_flow_implies_valid_flow, the two predicates are equivalent. *)
@@ -441,7 +443,9 @@ let lemma_partial_nbrs_step
           seq_get scolor' w <> 0) /\
         (seq_get flow_seq (w * n + u) > 0 ==>
           seq_get scolor' w <> 0))
-    = if w < bound then begin
+    = FStar.Math.Lemmas.nat_times_nat_is_nat u n;
+      FStar.Math.Lemmas.nat_times_nat_is_nat w n;
+      if w < bound then begin
         assert (seq_get cap_seq (u * n + w) - seq_get flow_seq (u * n + w) > 0 ==>
           seq_get scolor w <> 0);
         assert (seq_get flow_seq (w * n + u) > 0 ==>
@@ -459,6 +463,13 @@ let lemma_partial_nbrs_step
 (** Active queue elements have color 1 *)
 let queue_color1 (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n: nat) : prop =
   forall (j: nat). vhead <= j /\ j < vtail ==> seq_get scolor (SZ.v (seq_get_sz squeue j)) == 1
+
+(** Single-element queue_color1: if the entry at position k has color 1, then [k, k+1) is color1 *)
+let lemma_queue_color1_singleton (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (k n: nat)
+  : Lemma
+    (requires seq_get scolor (SZ.v (seq_get_sz squeue k)) == 1)
+    (ensures queue_color1 scolor squeue k (k + 1) n)
+  = ()
 
 (** Active queue elements are colored (non-zero) — weaker, but maintained after color[u]=2 *)
 let queue_nonzero (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vhead vtail n: nat) : prop =
@@ -1911,7 +1922,7 @@ let elim_discover_delta
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -1945,26 +1956,22 @@ let maybe_discover_then_proof
     let sp' = Seq.upd spred (SZ.v vv) u in
     let sq' = Seq.upd squeue vtail vv in
     mk_bfs_inv_props sc' sp' sq' cap_seq flow_seq n source (vtail + 1);
-    // Help SMT with each conjunct of mk_discover_delta's precondition
     assert (bfs_inv_props sc' sp' sq' cap_seq flow_seq n source (vtail + 1));
     assert (vtail + 1 >= vtail);
     assert (nbr_colored_if_residual sc' cap_seq flow_seq n u (SZ.v vv));
-    assert (SZ.v vv < Seq.length scolor);
-    assert (Seq.index scolor (SZ.v vv) == 0);
     assert (count_color1 sc' n == count_color1 scolor n + 1);
-    // Queue prefix: writing at position vtail doesn't affect positions < vtail
-    assert (Seq.length sq' == n);
-    assert (forall (j: nat). j < vtail ==> j < Seq.length sq' /\ Seq.index sq' j == Seq.index squeue j);
+    assert (count_color1 sc' n + vtail == count_color1 scolor n + (vtail + 1));
     assert (queue_prefix_preserved squeue sq' vtail);
-    // New entry at position vtail has color 1: sq'[vtail]=vv and sc'[vv]=1
-    assert (Seq.index sq' vtail == vv);
-    assert (Seq.index sc' (SZ.v vv) == 1);
-    // Help SMT: connect seq_get/seq_get_sz to Seq.index for queue_color1
-    assert (vtail < Seq.length sq');
+    // Single-element queue_color1 via helper lemma
     assert (seq_get_sz sq' vtail == vv);
-    assert (SZ.v vv < Seq.length sc');
     assert (seq_get sc' (SZ.v vv) == 1);
+    assert (SZ.v (seq_get_sz sq' vtail) == SZ.v vv);
+    assert (seq_get sc' (SZ.v (seq_get_sz sq' vtail)) == 1);
+    lemma_queue_color1_singleton sc' sq' vtail n;
     assert (queue_color1 sc' sq' vtail (vtail + 1) n);
+    // Color preservation
+    assert (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get sc' j <> 0);
+    assert (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get sc' j == 1);
     mk_discover_delta scolor sc' sp' squeue sq'
       cap_seq flow_seq n u (SZ.v vv) source vtail (vtail + 1)
 #pop-options
@@ -2380,22 +2387,21 @@ fn bfs_residual
     A.op_Array_Assignment color u 2;
     ()
   };
-  let sink_color: int = A.op_Array_Access color sink;
 
   // Extract pred_ok from bfs_pred_ok
   with sd_final. assert (A.pts_to dist sd_final);
   with sp_final. assert (A.pts_to pred sp_final);
-  with sc_pre. assert (A.pts_to color sc_pre);
+  with sc_final. assert (A.pts_to color sc_final);
   with vtail_final. assert (R.pts_to q_tail vtail_final);
-  elim_bfs_pred_ok sc_pre sp_final sd_final cap_seq flow_seq
+  elim_bfs_pred_ok sc_final sp_final sd_final cap_seq flow_seq
     (SZ.v n) (SZ.v source) (SZ.v vtail_final);
 
   // BFS completeness: at termination, queue is empty → count_color1 == 0 → no color-1 vertices
   // → processed_complete = bfs_complete
-  with sc_final. assert (A.pts_to color sc_final);
   lemma_count_zero_no_color1 sc_final (SZ.v n);
   lemma_processed_to_bfs_complete sc_final cap_seq flow_seq (SZ.v n);
 
+  let sink_color: int = A.op_Array_Access color sink;
   (sink_color <> 0)
 }
 #pop-options

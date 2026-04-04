@@ -15,12 +15,18 @@
      that are proven to be valid vertex indices (>= 0 and < n)
    
    Eliminating this header would require refactoring the pred array
-   to use size_t with a sentinel value instead of int with -1. */
+   to use size_t with a sentinel value instead of int with -1.
+
+   We also provide Prims_op_* implementations for mathematical integer
+   operations extracted by KaRaMeL (addition, subtraction, comparisons).
+   These operate on krml_checked_int_t (int32_t) with overflow checking. */
 
 #ifndef CLRS_CH26_COMPAT_H
 #define CLRS_CH26_COMPAT_H
 
 #include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <assert.h>
 #include "krml/internal/compat.h"
 
@@ -34,6 +40,31 @@ static inline krml_checked_int_t FStar_SizeT_v(size_t x) {
 static inline size_t FStar_SizeT_uint_to_t(krml_checked_int_t x) {
   assert(x >= 0);
   return (size_t)x;
+}
+
+/* Prims integer operations on krml_checked_int_t with overflow checking */
+static inline krml_checked_int_t Prims_op_Addition(krml_checked_int_t x, krml_checked_int_t y) {
+  int64_t r = (int64_t)x + (int64_t)y;
+  assert(r >= INT32_MIN && r <= INT32_MAX);
+  return (int32_t)r;
+}
+
+static inline krml_checked_int_t Prims_op_Subtraction(krml_checked_int_t x, krml_checked_int_t y) {
+  int64_t r = (int64_t)x - (int64_t)y;
+  assert(r >= INT32_MIN && r <= INT32_MAX);
+  return (int32_t)r;
+}
+
+static inline bool Prims_op_GreaterThan(krml_checked_int_t x, krml_checked_int_t y) {
+  return x > y;
+}
+
+static inline bool Prims_op_GreaterThanOrEqual(krml_checked_int_t x, krml_checked_int_t y) {
+  return x >= y;
+}
+
+static inline bool Prims_op_LessThan(krml_checked_int_t x, krml_checked_int_t y) {
+  return x < y;
 }
 
 #endif /* CLRS_CH26_COMPAT_H */

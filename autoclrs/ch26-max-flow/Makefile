@@ -11,7 +11,7 @@ KRML_INPUT_FILES  = $(OUTPUT_DIR)/CLRS_Ch26_MaxFlow_ImplTest.krml \
 KRML_BUNDLE_FLAGS = -bundle CLRS.Ch26.MaxFlow.ImplTest=CLRS.Ch26.MaxFlow.*
 KRML_WARN_FLAGS   = -warn-error -2-9-11-15-17
 EXTRACT_C_FILES   = $(OUTPUT_DIR)/CLRS_Ch26_MaxFlow_ImplTest.c
-EXTRA_LINK_LIBS   = $(KRML_HOME)/krmllib/dist/generic/libkrmllib.a
+EXTRA_LINK_LIBS   =
 CC_EXTRA_INCLUDES = -include clrs_ch26_compat.h
 TEST_MAIN         = test_main.c
 TEST_EXE_NAME     = test_max_flow
