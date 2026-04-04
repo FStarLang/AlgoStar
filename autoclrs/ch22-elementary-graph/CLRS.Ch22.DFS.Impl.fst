@@ -928,7 +928,7 @@ fn scan_for_white_neighbor
 
 (* Helper: perform DFS-VISIT for a single white vertex *)
 
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 80 --fuel 2 --ifuel 1 --split_queries always"
 fn dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -1306,7 +1306,7 @@ fn maybe_dfs_visit
    Main stack-based DFS — proves both correctness and complexity
    ================================================================ *)
 
-#push-options "--z3rlimit 15 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
 //SNIPPET_START: stack_dfs_sig
 fn stack_dfs
   (adj: A.array int)

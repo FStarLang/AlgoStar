@@ -135,7 +135,7 @@ let source_dist_zero (n: nat) (adj: Seq.seq int) (source: nat)
 
 // Key helper: if u is in the frontier at level k and edge(u,v), 
 // then v is visited at level k+1
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 
 // If has_frontier_neighbor finds u at position scan, it returns true
 let rec scan_finds_neighbor (n: nat) (adj: Seq.seq int) (frontier: Seq.seq bool) (v: nat) (u: nat) (scan: nat)

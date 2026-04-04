@@ -41,7 +41,7 @@ let has_edge_equiv
 
 /// TS.has_path decomposes from the left (edge, then sub-path).
 /// We need right-extension: has_path(u,w,k) ∧ edge(w,v) ⟹ has_path(u,v,k+1).
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec ts_path_extend_right
   (adj: Seq.seq int) (n: nat) (u w v: nat) (k: nat)
   : Lemma
@@ -69,7 +69,7 @@ let rec ts_path_extend_right
 /// Convert a 2D (right-decomposed) path to a 1D (left-decomposed) path.
 /// DFS.Spec: has_path(u,v,k) = ∃w. has_path(u,w,k-1) ∧ edge(w,v)  [right]
 /// TS.Spec:  has_path(u,v,k) = ∃w. edge(u,w) ∧ has_path(w,v,k-1)  [left]
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec has_path_2d_to_1d
   (adj2d: Seq.seq (Seq.seq int)) (adj1d: Seq.seq int) (n: nat)
   (u v: nat) (k: nat)
@@ -99,7 +99,7 @@ let rec has_path_2d_to_1d
 
 /// Helper: skipping one position in an injective function preserves injectivity
 /// and maps to a smaller codomain.
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 private let skip_pos_lt (f: (nat -> GTot nat)) (p m n: nat) (i: nat)
   : Lemma
     (requires
@@ -117,7 +117,7 @@ private let skip_pos_lt (f: (nat -> GTot nat)) (p m n: nat) (i: nat)
     assert (f i' < n)
 #pop-options
 
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 private let skip_pos_inj (f: (nat -> GTot nat)) (p m n: nat) (i j: nat)
   : Lemma
     (requires
@@ -149,7 +149,7 @@ private let skip_pos_inj (f: (nat -> GTot nat)) (p m n: nat) (i j: nat)
     assert (f i' <> f j')
 #pop-options
 
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 30"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 let rec injective_bound (f: (nat -> GTot nat)) (m n: nat)
   : Lemma
     (requires
@@ -209,7 +209,7 @@ let rec injective_bound (f: (nat -> GTot nat)) (m n: nat)
 /// Build a prefix of path vertices using IndefiniteDescription.
 /// Given has_path(u, v, k) and m ≤ k, extract m+1 vertices with edges between them.
 /// Returns a Seq of length m+1.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec build_path_prefix
   (adj: Seq.seq int) (n: nat) (u v: nat) (k: nat) (m: nat)
   : Ghost (Seq.seq nat)
@@ -277,7 +277,7 @@ let rec build_path_prefix
 #pop-options
 
 /// Consecutive edges in a vertex sequence compose into TS.has_path.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec edges_form_ts_path
   (adj: Seq.seq int) (n: nat) (vs: Seq.seq nat) (i j: nat)
   : Lemma
@@ -306,15 +306,14 @@ let rec edges_form_ts_path
 ///   recurse (decreases k). Otherwise, decompose the first n+1 vertices.
 ///   By no-shorter-cycle, these n+1 vertices are all distinct and < n,
 ///   which contradicts injective_bound.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 40 --split_queries always"
-let rec any_cycle_implies_ts_has_cycle
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 25 --split_queries always"
+let any_cycle_implies_ts_has_cycle
   (adj: Seq.seq int) (n: nat{n > 0}) (u: nat) (k: nat)
   : Lemma
     (requires
       TS.has_path adj n u u k /\ k > 0 /\ u < n /\
       Seq.length adj == n * n)
     (ensures TS.has_cycle adj n)
-    (decreases k)
   = if k <= n then ()
     else (
       // k > n. Use SEM: does a shorter cycle exist anywhere?
@@ -397,7 +396,7 @@ let has_cycle_2d (adj2d: Seq.seq (Seq.seq int)) (n: nat) : prop =
   exists (u:nat) (k:nat). u < n /\ k > 0 /\ has_path adj2d n u u k
 
 /// A back edge implies a 1D cycle (under adj_equiv), hence contradicts TS.is_dag.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let back_edge_implies_ts_cycle
   (adj2d: Seq.seq (Seq.seq int)) (adj1d: Seq.seq int) (n: nat)
   : Lemma
@@ -458,7 +457,7 @@ let is_permutation (order: Seq.seq nat) (n: nat) : prop =
 /// Proof: u is at position pu, v at position pv.
 /// If pv ≤ pu, then by sorted order, f[order[pv]] ≥ f[order[pu]], i.e., f[v] ≥ f[u].
 /// But f[u] > f[v]. Contradiction. So pu < pv.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20 --split_queries always"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10 --split_queries always"
 let higher_f_implies_earlier_position
   (st: dfs_state) (order: Seq.seq nat) (n: nat) (u v: nat)
   : Lemma
@@ -608,7 +607,7 @@ let higher_f_implies_earlier_position
 /// 4. has_edge_equiv: edge in adj1d ⟺ edge in adj2d
 /// 5. higher_f_implies_earlier_position: f[u]>f[v] + sorted order ⟹ appears_before
 /// 6. Combine for is_topological_order
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let dfs_topological_sort_correct
   (adj2d: Seq.seq (Seq.seq int)) (adj1d: Seq.seq int) (n: nat)
   (order: Seq.seq nat)
@@ -670,7 +669,7 @@ let dfs_topological_sort_correct
 (*** §10. Additional Bridge Lemmas ***)
 
 /// has_cycle_2d is equivalent to has_back_edge (both directions)
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let has_cycle_2d_iff_back_edge (adj2d: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma
     (ensures

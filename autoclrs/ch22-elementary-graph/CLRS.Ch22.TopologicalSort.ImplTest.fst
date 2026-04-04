@@ -56,7 +56,7 @@ let fits_9 () : Lemma (SZ.fits (SZ.v 3sz * SZ.v 3sz))
 
 (*** Helper: connect array writes to named test_adj ***)
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let lemma_seq_eq_test_adj (s: Seq.seq int)
   : Lemma
     (requires Seq.length s == 9 /\

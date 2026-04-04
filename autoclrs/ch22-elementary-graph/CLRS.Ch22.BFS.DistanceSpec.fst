@@ -260,7 +260,7 @@ let singleton_path (n: nat) (adj: Seq.seq bool) (v: nat{v < n})
 // Helper: if v is in the list of new vertices from expand_frontier, 
 // then v is an unvisited neighbor of some frontier vertex
 // Helper: if v is in unvisited_neighbors of u, then there's an edge from u to v
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec unvisited_neighbors_mem (n: nat) (adj: Seq.seq bool) (visited: Seq.seq bool)
                                  (u: nat) (scan: nat{scan <= n}) (v: nat)
   : Lemma
@@ -354,7 +354,7 @@ let rec dedup_mem (vs: list nat) (v: nat)
         if L.mem w (dedup rest) then ()
         else ()
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 
 // Helper: mark_visited preserves existing markings
 let rec mark_visited_preserves (n: nat) (visited: Seq.seq bool) (vs: list nat) (v: nat{v < n})
@@ -371,7 +371,7 @@ let rec mark_visited_preserves (n: nat) (visited: Seq.seq bool) (vs: list nat) (
           mark_visited_preserves n visited rest v
 
 // Helper: if v is in the list vs, mark_visited marks it
-#push-options "--z3rlimit 40 --fuel 2"
+#push-options "--z3rlimit 10 --fuel 2"
 let rec mark_visited_marks (n: nat) (visited: Seq.seq bool) (vs: list nat) (v: nat{v < n})
   : Lemma
     (requires Seq.length visited = n /\ L.mem v vs)
@@ -394,7 +394,7 @@ let rec mark_visited_marks (n: nat) (visited: Seq.seq bool) (vs: list nat) (v: n
 #pop-options
 
 // Lemma: vertices in the frontier are visited
-#push-options "--z3rlimit 30"
+#push-options "--z3rlimit 10"
 let frontier_visited (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (k: nat) (u: nat)
   : Lemma
     (requires
@@ -581,7 +581,7 @@ let newly_visited_in_frontier (n: nat) (adj: Seq.seq bool) (source: nat{source <
 
 // --- Frontier + edge implies next visited ---
 
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let frontier_edge_implies_next_visited (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
                                         (k: nat) (u v: nat)
   : Lemma
@@ -631,7 +631,7 @@ let rec visited_edge_implies_next_visited (n: nat) (adj: Seq.seq bool) (source: 
 
 // If u is visited at step j, and there's a path from u to v, then v is visited
 // at step j + path_length p
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec path_visited_general (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
                               (j: nat) (p: list nat)
   : Lemma
@@ -721,7 +721,7 @@ let rec check_via_scan_elim (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
     else check_via_scan_elim n adj s v len_tail (scan + 1)
 
 // has_path_of_length is complete: if a path exists, it returns true
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec has_path_complete (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
                            (s: nat{s < n}) (v: nat{v < n})
                            (p: list nat)
@@ -739,7 +739,7 @@ let rec has_path_complete (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
 #pop-options
 
 // has_path_of_length is sound: if it returns true, a path exists
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec has_path_sound (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
                         (s: nat{s < n}) (v: nat{v < n})
                         (len: nat)
@@ -798,7 +798,7 @@ let rec find_min_ge (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
     else find_min_ge n adj s v (start + 1) k
 
 // If find_min_path_length returns Some k, then has_path_of_length k is true
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let rec find_min_some (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
                        (s: nat{s < n}) (v: nat{v < n})
                        (start: nat) (k: nat)
@@ -865,7 +865,7 @@ let rec find_visit_ge (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
     end
 
 // If find_visit_time returns Some k, then v is first visited at step k
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec find_visit_some (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
                          (v: nat{v < n}) (start: nat{start <= n + 1}) (k: nat)
   : Lemma
@@ -895,7 +895,7 @@ let rec find_visit_some (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
 #pop-options
 
 // If find_visit_time returns None, v is never visited
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec find_visit_none (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
                          (v: nat{v < n}) (start: nat{start <= n + 1}) (step: nat)
   : Lemma
@@ -933,7 +933,7 @@ let rec find_visit_none_not_visited (n: nat) (adj: Seq.seq bool) (source: nat{so
     end
 
 // If v is visited at step k and not before, find_visit_time returns Some k
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 25 --fuel 2 --ifuel 1"
 let rec find_visit_finds (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
                           (v: nat{v < n}) (start: nat{start <= n + 1}) (k: nat)
   : Lemma
@@ -993,7 +993,7 @@ let rec find_min_none_all (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
 // --- Main correctness theorem ---
 
 // Main theorem: BFS computes shortest path distances
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let bfs_correctness (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (v: nat{v < n})
   : Lemma
     (requires Seq.length adj = n * n)

@@ -54,7 +54,7 @@ let reachable_in_succ_witness (adj: Seq.seq int) (n: nat) (source v: nat) (k: na
 // Distance array: dist[v] = shortest distance from source to v (-1 if unreachable)
 // BFS computes shortest (unweighted) distances via iterative relaxation
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
 fn bfs
   (adj: A.array int)
   (n: SZ.t)

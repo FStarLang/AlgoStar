@@ -785,7 +785,7 @@ let pn_enqueue_complete_initial
   = ()
 
 (* pn_enqueue_complete: step — extend from vv to vv+1 *)
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10"
 let pn_enqueue_complete_step
   (sin_deg_start sin_deg_cur sin_deg_new: Seq.seq int)
   (squeue_cur squeue_new: Seq.seq SZ.t)
@@ -931,7 +931,7 @@ let rec lemma_sum_counts_skip_bounded (squeue: Seq.seq SZ.t) (lo hi m vv: nat)
     end
     else lemma_sum_counts_skip_bounded squeue lo hi (m - 1) vv
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let lemma_vtail_lt_n (squeue: Seq.seq SZ.t) (vtail n vv: nat)
   : Lemma
     (requires vtail <= n /\ n <= Seq.length squeue /\ vv < n /\
@@ -1500,12 +1500,11 @@ let zero_indeg_accounted_at_exit
   = reveal_opaque (`%zero_indeg_accounted) (zero_indeg_accounted in_deg n output count queue qh qh)
 
 (* is_in_queue after dequeue: if v was in [qh, qt) and v != queue[qh], then v in [qh+1, qt) *)
-let rec lemma_is_in_queue_dequeue
+let lemma_is_in_queue_dequeue
   (queue: Seq.seq SZ.t) (qh qt: nat) (v: nat)
   : Lemma
     (requires qh < qt /\ qt <= Seq.length queue /\ is_in_queue_sz queue qh qt v /\ SZ.v (Seq.index queue qh) <> v)
     (ensures is_in_queue_sz queue (qh + 1) qt v)
-    (decreases (qt - qh))
   = if qh >= qt then ()
     else if SZ.v (Seq.index queue qh) = v then ()
     else ()

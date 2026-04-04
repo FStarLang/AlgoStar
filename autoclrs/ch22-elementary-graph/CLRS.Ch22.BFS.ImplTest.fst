@@ -56,7 +56,7 @@ let precondition_satisfiable ()
 
 (*** Helper: connect array writes to named test_adj ***)
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let lemma_seq_eq_test_adj (s: Seq.seq int)
   : Lemma
     (requires Seq.length s == 9 /\
@@ -95,7 +95,7 @@ let reachable_1_in_1 ()
 #pop-options
 
 // Vertex 2 is reachable from 0 in 2 steps via 0→1→2
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 20 --split_queries always"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10 --split_queries always"
 let reachable_2_in_2 ()
   : Lemma (reachable_in test_adj 3 0 2 2)
   = assert_norm (Seq.index test_adj (0 * 3 + 1) <> 0);
@@ -173,7 +173,7 @@ let lemma_only_2_steps_to_2 (k: nat)
 
 (*** Main test ***)
 
-#push-options "--z3rlimit 20 --fuel 4 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
 
 ```pulse
 fn test_bfs_3 ()

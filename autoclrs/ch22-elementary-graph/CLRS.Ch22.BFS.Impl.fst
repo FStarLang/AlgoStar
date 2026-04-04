@@ -622,7 +622,7 @@ let lemma_bfs_complexity_bound (n k: nat)
    Factored out to avoid Pulse unification issues with conditional branches
    that perform multiple array mutations. *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
 fn discover_vertex
   (color: A.array int) (dist: A.array int) (pred: A.array int)
   (queue_data: A.array SZ.t) (q_tail: ref SZ.t)
@@ -687,7 +687,7 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
 fn maybe_discover
   (adj: A.array int)
   (color: A.array int) (dist: A.array int) (pred: A.array int)
@@ -801,7 +801,7 @@ fn maybe_discover
 }
 #pop-options
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)

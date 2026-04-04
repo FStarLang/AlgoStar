@@ -263,7 +263,7 @@ let descendant_discovered_later
 
 (*** Forward Direction: white path implies ancestor ***)
 
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let contained_strict
   (adj: Seq.seq (Seq.seq int)) (n: nat)
   (u v: nat)
@@ -300,7 +300,7 @@ let contained_strict
 #pop-options
 
 // Inductive proof: path_all_white from x to v at d[u] implies v is within u's interval
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let rec white_path_within_interval
   (adj: Seq.seq (Seq.seq int)) (n: nat)
   (u x v: nat) (k: nat)
@@ -390,7 +390,7 @@ let rec white_path_within_interval
     )
 #pop-options
 
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let white_path_implies_descendant
   (adj: Seq.seq (Seq.seq int))
   (n: nat)
@@ -428,7 +428,7 @@ let white_path_implies_descendant
 (*** Backward Direction: ancestor implies white path ***)
 
 // Helper: if path is white at time t2, it's also white at earlier time t1 ≤ t2
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let rec path_all_white_earlier_time
   (adj: Seq.seq (Seq.seq int)) (n: nat) (d: Seq.seq nat)
   (u v: nat) (t1 t2: nat) (k: nat)
@@ -451,7 +451,7 @@ let rec path_all_white_earlier_time
 // Helper: vertices discovered during dfs_visit(root), other than root, have d > root's d.
 // root's d = st.time + 1. Other vertices' d comes from visit_neighbors after discover,
 // where time = st.time + 1, so d > st.time + 1 by visit_neighbors_timestamps_in_range.
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let dfs_visit_strict_d
   (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (st: dfs_state) (w: nat)
   : Lemma
@@ -474,7 +474,7 @@ let dfs_visit_strict_d
 // BUILD pair: given dfs_visit(root, st) discovers v, construct white path root→v at time du.
 // Invariant: every undiscovered vertex (st.d[w] = 0) has d_top[w] > du,
 // hence is white at time du.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
 let rec visit_neighbors_build_wp
   (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (neighbors: list nat) (st: dfs_state)
   (v: nat) (d_top: Seq.seq nat) (du: nat)
@@ -557,7 +557,7 @@ and dfs_visit_build_wp
 // Both propagate automatically through the recursion since
 // visit_neighbors(w::rest, st) = visit_neighbors(rest, dfs_visit(w, st)).
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
 let rec visit_neighbors_find_wp
   (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (neighbors: list nat) (st: dfs_state)
   (u v: nat) (d_top: Seq.seq nat) (du fu: nat)
@@ -724,7 +724,7 @@ and dfs_visit_find_wp
 
 // dfs_loop wrapper: trace through dfs_loop to find where u is discovered,
 // establish the white-path invariant, and call the BUILD pair.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
 let rec dfs_loop_white_path
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state)
   (u v: nat)
@@ -862,7 +862,7 @@ let rec dfs_loop_white_path
     )
 #pop-options
 
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let descendant_implies_white_path
   (adj: Seq.seq (Seq.seq int))
   (n: nat)

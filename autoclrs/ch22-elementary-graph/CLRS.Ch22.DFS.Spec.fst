@@ -963,7 +963,7 @@ let parenthesis_theorem (st: dfs_state) : prop =
 // The formal proof proceeds by mutual induction on dfs_visit/visit_neighbors,
 // maintaining the combined invariant: strong_valid_state st /\ parenthesis_theorem st.
 
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 1 --ifuel 1"
 
 // Discovering a vertex preserves parenthesis: u becomes Gray (not Black),
 // so all Black vertex pairs have unchanged intervals.
@@ -1262,7 +1262,7 @@ let rec has_path (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat) (steps: nat)
 // Helper: dfs_visit makes the target vertex non-White when it was White.
 // Proof: by unfolding dfs_visit — discover_vertex sets u to Gray,
 // visit_neighbors preserves Gray (or turns it Black), finish_vertex sets u to Black.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let dfs_visit_makes_nonwhite (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
   : Lemma
     (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
@@ -1288,7 +1288,7 @@ let dfs_visit_makes_nonwhite (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st:
 // Proof: by induction on (n - u), following the recursive structure of dfs_loop.
 // At each step, dfs_visit (or no-op) makes u non-White, then the IH on u+1
 // handles the rest and preserves u's non-White status.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
 let rec dfs_loop_visits_all (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
   : Lemma
     (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n)
@@ -1355,7 +1355,7 @@ let dfs_visits_reachable (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
 (*** DFS Structural Lemmas ***)
 
 // Path composition
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 10"
 let rec has_path_compose (adj: Seq.seq (Seq.seq int)) (n: nat) (u w v: nat) (k1 k2: nat)
   : Lemma
     (requires has_path adj n u w k1 /\ has_path adj n w v k2)
@@ -1400,7 +1400,7 @@ let rec get_white_neighbors_complete
     else get_white_neighbors_complete adj n u (start + 1) st v
 
 // After visit_neighbors, every listed White vertex becomes non-White
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec visit_neighbors_makes_listed_nonwhite
   (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (v: nat)
   : Lemma
@@ -1430,7 +1430,7 @@ let rec visit_neighbors_makes_listed_nonwhite
 #pop-options
 
 // After dfs_visit(u) where u is White, ALL neighbors of u are non-White
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1"
 let dfs_visit_visits_all_neighbors
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state) (v: nat)
   : Lemma
@@ -1458,7 +1458,7 @@ let dfs_visit_visits_all_neighbors
 #pop-options
 
 // Black is preserved through dfs_visit/visit_neighbors
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec visit_neighbors_black_preserved
   (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (w: nat)
   : Lemma
@@ -1506,7 +1506,7 @@ and dfs_visit_black_preserved
 #pop-options
 
 // dfs_visit makes the target vertex Black (not just non-White)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
 let dfs_visit_makes_black (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
   : Lemma
     (requires st.n = n /\ Seq.length st.d = st.n /\ Seq.length st.color = st.n /\ Seq.length st.f = st.n /\
@@ -1576,7 +1576,7 @@ let rec dfs_loop_black_preserved
     )
 
 // dfs_visit: any vertex that was White and becomes non-White is actually Black
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
 let rec visit_neighbors_white_to_black
   (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (j: nat)
   : Lemma
@@ -1639,7 +1639,7 @@ and dfs_visit_white_to_black
 
 // dfs_visit preserves the "no Gray" invariant:
 // if all non-White are Black before, all non-White are Black after
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let dfs_visit_no_gray (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
   : Lemma
     (requires
@@ -1665,7 +1665,7 @@ let dfs_visit_no_gray (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_st
 #pop-options
 
 // All vertices are Black after dfs
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 30"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
 let rec dfs_loop_all_black
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (w: nat)
   : Lemma
@@ -1714,7 +1714,7 @@ let dfs_all_black (adj: Seq.seq (Seq.seq int)) (n: nat) (w: nat)
     dfs_loop_all_black adj n 0 (init_state n) w
 
 // Vertices discovered during dfs_visit(u) are reachable from u
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1"
 let rec visit_neighbors_reachable
   (adj: Seq.seq (Seq.seq int)) (n: nat) (root: nat) (neighbors: list nat) (st: dfs_state) (v: nat)
   : Lemma
@@ -1868,7 +1868,7 @@ let has_back_edge (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : prop =
 //     This needs dfs_visit_edge_dv_le_fu to show d[v] <= f[u] for edge u→v.
 
 // Helper: after dfs_visit(u) where u is White, d[v] <= f[u] for any neighbor v
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1"
 let dfs_visit_edge_dv_le_fu
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state) (v: nat)
   : Lemma
@@ -1902,7 +1902,7 @@ let all_edges_inv (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : prop =
     color_of st v <> White /\ d_of st v <= f_of st u)
 
 // Mutual recursion: all_edges_inv is maintained through dfs_visit/visit_neighbors
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec visit_neighbors_all_edges_inv
   (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state)
   : Lemma
@@ -2001,7 +2001,7 @@ and dfs_visit_all_edges_inv
 #pop-options
 
 // dfs_loop preserves all_edges_inv
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1"
 let rec dfs_loop_all_edges_inv
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state)
   : Lemma
@@ -2092,7 +2092,7 @@ let discover_preserves_f_distinct (u: nat) (st: dfs_state)
 
 // Finishing a vertex preserves all_f_distinct when strong_valid_state holds.
 // Key: f[u] = time+1 > time >= f[v] for all existing non-zero f[v].
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let finish_preserves_f_distinct (u: nat) (st: dfs_state)
   : Lemma
     (requires
@@ -2146,7 +2146,7 @@ let finish_preserves_f_distinct (u: nat) (st: dfs_state)
 
 // Mutual induction: visit_neighbors and dfs_visit preserve all_f_distinct.
 // Uses dfs_visit_inv/visit_neighbors_inv for strong_valid_state + parenthesis_theorem.
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 1 --ifuel 1"
 let rec visit_neighbors_f_distinct
   (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state)
   : Lemma
@@ -2206,7 +2206,7 @@ and dfs_visit_f_distinct
 #pop-options
 
 // dfs_loop preserves all_f_distinct
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 1 --ifuel 1"
 let rec dfs_loop_f_distinct
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (st: dfs_state)
   : Lemma
@@ -2228,7 +2228,7 @@ let rec dfs_loop_f_distinct
 #pop-options
 
 // DFS finish times are distinct for distinct vertices.
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 1 --ifuel 1"
 let dfs_distinct_finish_times
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u v: nat)
   : Lemma
@@ -2270,7 +2270,7 @@ let topological_order (st: dfs_state) (adj: Seq.seq (Seq.seq int)) (n: nat) : pr
 // - ~(d[v] <= d[u] /\ f[u] <= f[v]) (from ~has_back_edge)
 // - parenthesis theorem: intervals nested or disjoint
 // - only f[u] > f[v] is consistent with all constraints
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let topo_order_iff_no_back_edge
   (adj: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma
@@ -2360,7 +2360,7 @@ let topological_sort_property (adj: Seq.seq (Seq.seq int)) (n: nat)
 (*** Cycle Detection Proof ***)
 
 // Finish times strictly decrease along paths when there are no back edges
-#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1"
 let rec path_finish_decreasing
   (adj: Seq.seq (Seq.seq int)) (n: nat) (st: dfs_state) (u v: nat) (k: nat)
   : Lemma
@@ -2387,7 +2387,7 @@ let rec path_finish_decreasing
 #pop-options
 
 // Forward: cycle → back_edge (by contrapositive)
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let cycle_implies_back_edge
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u: nat) (k: nat)
   : Lemma
@@ -2485,7 +2485,7 @@ let rec dfs_loop_d_gt_time
 // and both are discovered during dfs_visit(root), then has_path v u.
 // Key insight: if v=root, dfs_visit_reachable gives has_path root u = has_path v u.
 // If v≠root, recurse into the visit_neighbors call that discovered v.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec visit_neighbors_containment_reachable
   (adj: Seq.seq (Seq.seq int)) (n: nat) (neighbors: list nat) (st: dfs_state) (u v: nat)
   : Lemma
@@ -2671,7 +2671,7 @@ let no_gray (st: dfs_state) (n: nat) : prop =
   forall (j: nat). j < n /\ j < Seq.length st.color /\ Seq.index st.color j <> White ==>
     Seq.index st.color j = Black
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec dfs_loop_containment_gives_path
   (adj: Seq.seq (Seq.seq int)) (n: nat) (u_start: nat) (st: dfs_state) (u v: nat)
   : Lemma
@@ -2789,7 +2789,7 @@ let rec dfs_loop_containment_gives_path
 // A back edge (u,v) has edge u→v with d[v]≤d[u], f[u]≤f[v].
 // Use dfs_loop_containment_gives_path to get has_path v u,
 // then compose with edge u→v to get cycle v→...→u→v.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let back_edge_implies_cycle
   (adj: Seq.seq (Seq.seq int)) (n: nat)
   : Lemma
@@ -2865,7 +2865,7 @@ let cycle_detection_theorem (adj: Seq.seq (Seq.seq int)) (n: nat)
 
 (*** Helper Lemmas for Properties ***)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 
 // Discovery time is set when vertex turns gray
 let discovered_means_gray_or_black (st: dfs_state) (u: nat)

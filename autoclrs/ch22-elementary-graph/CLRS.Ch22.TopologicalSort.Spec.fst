@@ -143,9 +143,9 @@ let lemma_distinct_has_position (order: Seq.seq nat) (v: nat) (pos: nat)
 
 (*** Main Theorems ***)
 
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 
 // Transitivity of appears_before
 let lemma_appears_before_trans (order: Seq.seq nat) (u v w: nat)
@@ -182,7 +182,7 @@ let rec lemma_topo_order_path (adj: Seq.seq int) (n: nat) (order: Seq.seq nat) (
 
 #pop-options
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 10"
 //SNIPPET_START: topo_order_implies_dag
 // Main theorem: A topological order implies the graph is a DAG
 let lemma_topo_order_implies_dag (adj: Seq.seq int) (n: nat) (order: Seq.seq nat)
