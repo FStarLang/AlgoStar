@@ -60,10 +60,7 @@ let completeness_sort3 (s: Seq.seq int)
   : Lemma
     (requires SS.sorted s /\ SP.permutation int (Seq.seq_of_list [3; 1; 2]) s)
     (ensures Seq.index s 0 == 1 /\ Seq.index s 1 == 2 /\ Seq.index s 2 == 3)
-= assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
-  assert (forall (i j:nat). (i < j) == Prims.op_LessThan i j);
-  assert (forall (x y:int). (x <= y) == Prims.op_LessThanOrEqual x y);
-  assert (forall (x y:int). (x < y) == Prims.op_LessThan x y);
+= SS.sorted_as_prims s;
   std_sort3 s
 
 ```pulse

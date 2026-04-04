@@ -104,3 +104,17 @@ let append_permutations (s1 s2 s1' s2': Seq.seq int)
 let singl_sorted (s: Seq.seq int)
   : Lemma (requires Seq.length s <= 1) (ensures sorted s)
   = ()
+
+(* Bridge BoundedIntegers operators in sorted to Prims operators for SMT.
+   The new F* encodes typeclass-resolved operators as distinct Z3 symbols
+   from Prims built-in operators, preventing quantifier trigger matching.
+   Call this lemma before using sorted with explicit Prims operator reasoning. *)
+let sorted_as_prims (s: Seq.seq int)
+  : Lemma (requires sorted s)
+          (ensures forall (i j:nat). Prims.op_LessThanOrEqual i j /\
+                                     Prims.op_LessThan j (Seq.length s) ==>
+                                     Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j))
+  = assert_norm (sorted s ==
+      (forall (i j: nat). Prims.op_LessThanOrEqual i j /\
+                          Prims.op_LessThan j (Seq.length s) ==>
+                          Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j)))
