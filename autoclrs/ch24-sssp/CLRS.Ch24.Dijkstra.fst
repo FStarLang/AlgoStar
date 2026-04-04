@@ -209,6 +209,8 @@ let relax_round_pred_ok
     )
     (ensures pred_ok spred_after sdist_after sweights (Seq.upd svisited_pre u 1) n source)
   = let svisited_now = Seq.upd svisited_pre u 1 in
+    Seq.lemma_index_upd1 svisited_pre u 1;
+    assert (Seq.index svisited_now u = 1);
     // Source is never "updated" since dist[source] = 0 and the update requires strict decrease
     // (dist_u + w >= 0 = dist_pre[source], so no strict decrease is possible)
     assert (Seq.index sdist_after source == Seq.index sdist_pre source);
@@ -230,8 +232,7 @@ let relax_round_pred_ok
           assert (Seq.index svisited_now p = 1)
         end else begin
           assert (SZ.v (Seq.index spred_after v) == u);
-          assert (Seq.index sdist_after u == Seq.index sdist_pre u);
-          assert (Seq.index svisited_now u = 1)
+          assert (Seq.index sdist_after u == Seq.index sdist_pre u)
         end
     in
     FStar.Classical.forall_intro aux
