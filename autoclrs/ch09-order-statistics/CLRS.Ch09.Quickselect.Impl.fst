@@ -199,7 +199,7 @@ let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
 
 // ========== Quickselect — single function, correctness + complexity ==========
 
-#push-options "--z3rlimit 5 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 5 --ifuel 2 --fuel 2 --split_queries always"
 //SNIPPET_START: quickselect
 fn quickselect
   (a: A.array int)
