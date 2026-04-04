@@ -38,7 +38,7 @@ let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
    Bridges BoundedIntegers typeclass operators (used in SS.sorted) to Prims operators,
    and uses Prims.op_Equality in assert_norm so the normalizer can reduce SP.count.
    Uses pointwise sorted assertions instead of quantifier bridging for efficiency. *)
-#push-options "--fuel 8 --z3rlimit 20"
+#push-options "--fuel 8 --z3rlimit 10"
 let completeness_sort3 (s: Seq.seq int)
   : Lemma
     (requires SS.sorted s /\ SP.permutation int (Seq.seq_of_list [3; 1; 2]) s)
@@ -63,7 +63,7 @@ let completeness_sort3 (s: Seq.seq int)
 
 // Pulse test functions need modest fuel/rlimit for connecting array writes
 // to Seq.seq_of_list [3;1;2] when proving completeness_sort3 precondition.
-#push-options "--fuel 4 --z3rlimit 15"
+#push-options "--fuel 4 --z3rlimit 10"
 
 ```pulse
 (* Completeness: y = quicksort(x); assert(y == expected) *)
