@@ -220,7 +220,7 @@ let rec path_node_bounded (parent: Seq.seq SZ.t) (n: nat) (i: nat) (fuel: nat) (
   = if k = 0 then ()
     else path_node_bounded parent n (SZ.v (Seq.index parent i)) (fuel - 1) (k - 1)
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 8"
 let path_len_strict_bound (parent: Seq.seq SZ.t) (n: nat) (i: nat)
   : Lemma (requires is_forest parent n /\ i < n)
           (ensures path_len parent i n < n)

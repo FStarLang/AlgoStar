@@ -312,7 +312,7 @@ let union_size_bound
 #pop-options
 
 // Key lemma: pure_union_sized preserves size_rank_invariant
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 5 --split_queries always"
 let pure_union_sized_preserves_invariant 
   (f: uf_forest_sized{is_valid_uf_sized f /\ 
                        rank_invariant (project_to_unsized f) /\ 
