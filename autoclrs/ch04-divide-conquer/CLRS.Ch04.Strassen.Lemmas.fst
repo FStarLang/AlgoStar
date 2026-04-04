@@ -287,7 +287,7 @@ let lemma_standard_multiply_quadrant_decomp
 #pop-options
 
 // Helper: prove element-wise equality for a specific element
-#push-options "--z3rlimit 25 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 22 --fuel 2 --ifuel 1 --split_queries always"
 let rec lemma_strassen_elem_correct 
   (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   (i:nat{i < rows a}) (j:nat{j < cols b})
