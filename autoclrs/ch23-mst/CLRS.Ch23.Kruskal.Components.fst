@@ -268,7 +268,7 @@ let reachability_transitive (edges: list edge) (u v w: nat)
   = same_component_transitive edges u v w
 
 // Helper lemma: if a vertex is in the frontier, we can reach it
-let rec mem_frontier_reachable (frontier: list nat) (u v: nat)
+let mem_frontier_reachable (frontier: list nat) (u v: nat)
   : Lemma (requires mem u frontier)
           (ensures exists u'. mem u' frontier /\ reachable [] u' v ==> reachable [] u v)
   = ()

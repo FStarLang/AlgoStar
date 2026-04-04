@@ -1432,7 +1432,7 @@ let edge_in_list_reachable (e: edge) (edges: list edge)
 
 /// New cross-component edge is not mem_edge of existing forest edges.
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
-let rec new_edge_not_in_forest
+let new_edge_not_in_forest
     (sparent: Seq.seq SZ.t) (edges: list edge) (n ec: nat) (new_edge: edge)
   : Lemma
     (requires
@@ -1546,7 +1546,7 @@ let rec edges_from_arrays_no_self_loops
 #pop-options
 
 /// For connected graphs with ec < n-1, the scan MUST find a cross-component edge.
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let connected_implies_vbw_positive
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat) (vbw: int)
     (vbu vbv: nat)
@@ -2097,7 +2097,7 @@ let kruskal_spanning_step_count
     end
 #pop-options
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 --split_queries always"
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))

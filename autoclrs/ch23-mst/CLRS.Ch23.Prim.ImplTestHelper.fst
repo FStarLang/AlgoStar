@@ -228,7 +228,7 @@ let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
 #pop-options
 
 /// Witness: [{u=0;v=1;w=1}; {u=1;v=2;w=2}] is a spanning tree with weight 3
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 8"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 8 --split_queries always"
 let witness_spanning_tree ()
   : Lemma
     (let adj = weights_to_adj_matrix tw 3 in

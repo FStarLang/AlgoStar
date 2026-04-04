@@ -89,7 +89,7 @@ let test_no_zero_edges_3 () : Lemma
 #pop-options
 
 // all_connected for the test graph: prove paths exist
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 30"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 30 --split_queries always"
 let test_all_connected_impl () : Lemma
   (CLRS.Ch23.MST.Spec.all_connected 3
     (CLRS.Ch23.Prim.Spec.adj_to_edges (weights_to_adj_matrix weights3 3) 3))
