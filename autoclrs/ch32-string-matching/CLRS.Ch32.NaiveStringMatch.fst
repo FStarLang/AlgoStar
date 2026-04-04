@@ -26,7 +26,7 @@ open CLRS.Ch32.NaiveStringMatch.Lemmas
 open CLRS.Ch32.NaiveStringMatch.Complexity
 open CLRS.Common.Complexity
 
-#push-options "--z3rlimit 20 --ifuel 2 --fuel 2"
+#push-options "--z3rlimit 5 --ifuel 2 --fuel 2"
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

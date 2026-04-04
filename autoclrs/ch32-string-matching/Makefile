@@ -29,7 +29,7 @@ KRML_EXTRA_FLAGS  = \
   -no-prefix 'CLRS.Ch32.NaiveStringMatch' \
   -no-prefix 'CLRS.Ch32.KMP' \
   -no-prefix 'CLRS.Ch32.RabinKarp'
-KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+KRML_EXTRA_INPUTS =
 EXTRACT_C_FILES   = $(EXTRACT_DIR)/Ch32_StringMatch.c
 # prims.c provides Prims_op_* (checked int arithmetic used by RabinKarp's int/nat computations)
 # fstar_int32.c provides FStar_Int32_to_string (dependency of prims.c)
