@@ -278,3 +278,31 @@ let phase2_step (sa_before sa_after s0:Seq.seq nat) (pos:nat) (cnt:nat) (cur_v:n
     in
     Classical.forall_intro (Classical.move_requires aux_zero)
 #pop-options
+
+let inner_write_step
+  (sa_w sa_new sa_outer:Seq.seq nat)
+  (pos:nat) (vw:nat) (vcvn:nat) (write_pos:nat)
+  (cnt_sz:nat) (s0_len:nat)
+  : Lemma
+    (requires
+      write_pos == pos + vw /\
+      vw < cnt_sz /\
+      pos + cnt_sz <= Seq.length sa_w /\
+      Seq.length sa_w == s0_len /\
+      Seq.length sa_new == s0_len /\
+      Seq.length sa_outer == s0_len /\
+      Seq.index sa_new write_pos == vcvn /\
+      (forall (j:nat). j < Seq.length sa_new /\ j <> write_pos ==>
+        Seq.index sa_new j == Seq.index sa_w j) /\
+      (forall (i:nat). pos <= i /\ i < pos + vw ==> Seq.index sa_w i == vcvn) /\
+      (forall (i:nat). i < pos ==> Seq.index sa_w i == Seq.index sa_outer i) /\
+      (forall (i:nat). pos + vw <= i /\ i < Seq.length sa_w ==>
+        Seq.index sa_w i == Seq.index sa_outer i))
+    (ensures
+      vw + 1 <= cnt_sz /\
+      Seq.length sa_new == s0_len /\
+      (forall (i:nat). pos <= i /\ i < pos + vw + 1 ==> Seq.index sa_new i == vcvn) /\
+      (forall (i:nat). i < pos ==> Seq.index sa_new i == Seq.index sa_outer i) /\
+      (forall (i:nat). pos + vw + 1 <= i /\ i < Seq.length sa_new ==>
+        Seq.index sa_new i == Seq.index sa_outer i))
+  = ()

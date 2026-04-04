@@ -35,7 +35,7 @@ module Stab = CLRS.Ch08.RadixSort.Stability
 
 // ========== Main Algorithm ==========
 
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 15 --fuel 1 --ifuel 1"
 //SNIPPET_START: counting_sort_impl_sig
 ```pulse
 fn counting_sort_impl
@@ -260,6 +260,8 @@ ensures exists* sb'.
       done := true;
     } else {
       // j_back--
+      assert (pure (SZ.v vj_back <> 0));
+      assert (pure (SZ.v vj_back >= 1));
       j_back := vj_back -^ 1sz;
     };
   };
@@ -287,7 +289,7 @@ ensures exists* sb'.
 
 open Pulse.Lib.BoundedIntegers
 
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1 --z3smtopt '(set-option :smt.qi.eager_threshold 100)'"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --z3smtopt '(set-option :smt.qi.eager_threshold 100)'"
 ```pulse
 fn counting_sort_inplace
   (a: A.array nat)
@@ -420,6 +422,8 @@ ensures exists* s.
       assert (pure (Seq.index sa_new (SZ.v write_pos) == vcvn));
       assert (pure (forall (j:nat). j < Seq.length sa_new /\ j <> SZ.v write_pos ==>
         Seq.index sa_new j == Seq.index sa_w j));
+      L.inner_write_step sa_w sa_new sa (SZ.v vpos) (SZ.v vw) vcvn (SZ.v write_pos)
+                          (SZ.v cnt_sz) (Seq.length s0);
       w := vw + 1sz;
     };
     
@@ -446,7 +450,7 @@ ensures exists* s.
 
 // ========== Digit-keyed Counting Sort (for multi-digit RadixSort) ==========
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
 ```pulse
 fn counting_sort_by_digit
   (a: A.array nat)     // Input array (read-only)
@@ -667,6 +671,8 @@ ensures exists* sb'.
       done := true;
     } else {
       // j_back--
+      assert (pure (SZ.v vj_back <> 0));
+      assert (pure (SZ.v vj_back >= 1));
       j_back := vj_back -^ 1sz;
     };
   };
