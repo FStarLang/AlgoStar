@@ -57,7 +57,7 @@ KRML_BUNDLE_FLAGS = \
 # arithmetic, which KaRaMeL handles via krml_checked_int_t.
 KRML_WARN_FLAGS = -warn-error -2-9-11-15-17
 
-KRML_EXTRA_INPUTS = $(KRML_HOME)/krmllib/.extract/*.krml
+KRML_EXTRA_INPUTS = $(wildcard $(KRML_HOME)/krmllib/.extract/*.krml)
 
 # C files produced by KaRaMeL (all from one invocation)
 EXTRACT_C_FILES = \
