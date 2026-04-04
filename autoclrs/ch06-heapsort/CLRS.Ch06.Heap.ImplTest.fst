@@ -42,7 +42,7 @@ let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 // ========== Test 1: heapsort completeness on [3;1;2] ==========
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 4 --warn_error -349"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --warn_error -349 --split_queries always"
 
 (* Pure helper: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
    Uses SP.count to prove that each element appears exactly once, then
@@ -85,6 +85,8 @@ let completeness_sort3 (s0 s: Seq.seq int)
   assert_norm (Seq.index l 1 == 1);
   assert_norm (Seq.index l 2 == 2);
   assert (Seq.equal s0 l);
+  Seq.lemma_eq_elim s0 l;
+  SP.perm_len s0 s;
   std_sort3 s
 
 ```pulse
@@ -145,7 +147,7 @@ fn test_heapsort_3 ()
 
 // ========== Test 2: build_max_heap completeness — root = max ==========
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --split_queries always"
 
 (* Pure helper: max-heap + permutation of [3;1;2] determines root == 3.
    root_ge_element gives s[0] >= s[i] for all i < 3, and count reasoning
@@ -271,7 +273,7 @@ fn test_heapsort_0 ()
 
 // ========== Test 4: heapsort prefix sorting (n < array length) ==========
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --split_queries always"
 
 (* Pure helper: sorted_upto 2 + permutation of [7;5;3] with s[2]==3
    determines s[0]==5 /\ s[1]==7.  The preservation clause gives s[2]==3,
@@ -350,7 +352,7 @@ fn test_heapsort_prefix ()
 
 // ========== Test 5: heapsort with duplicates [2;1;2] ==========
 
-#push-options "--z3rlimit 80 --fuel 8 --ifuel 4"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --split_queries always"
 
 (* Pure helper: sorted + permutation of [2;1;2] determines [1;2;2].
    count(1)=1, count(2)=2 pins the unique sorted output. *)
