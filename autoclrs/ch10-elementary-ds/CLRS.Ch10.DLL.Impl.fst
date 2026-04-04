@@ -703,12 +703,10 @@ let rev_preserves_cons (#a:Type) (l:list a {Cons? l})
   = FStar.List.Tot.Properties.rev_length l
 
 // One-step unfolding of L.rev for SMT
-#push-options "--ifuel 2"
 let rev_cons (#a:Type) (x:a) (rest:list a)
   : Lemma (L.rev (x :: rest) == L.rev rest @ [x])
   [SMTPat (L.rev (x :: rest))]
   = FStar.List.Tot.Properties.rev_append [x] rest
-#pop-options
 
 // mem is preserved by rev
 let rec mem_rev (#a:eqtype) (x: a) (l: list a)
