@@ -131,7 +131,7 @@ let rec pop_while_spec_ge_1 (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat)
         else ()
       end else ()
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 0 --split_queries always"
 let scan_step_preserves_left_turns
   (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (top: nat) (p_idx: SZ.t)
   : Lemma

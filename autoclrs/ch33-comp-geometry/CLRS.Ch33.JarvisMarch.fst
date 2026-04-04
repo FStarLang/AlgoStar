@@ -287,7 +287,7 @@ let cross_prod_swap23 (x1 y1 x2 y2 x3 y3: int) : Lemma
 //   Multiply H2 by ay: bx*cy*ay >= cx*by*ay
 //   Since bx*ay*cy = bx*cy*ay: ax*by*cy >= cx*by*ay
 //   Since by > 0: ax*cy >= cx*ay. QED
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 10 --split_queries always"
 let half_plane_transitivity (ax ay bx b_y cx cy: int) : Lemma
   (requires ay >= 0 /\ b_y > 0 /\ cy >= 0 /\
             ax * b_y - bx * ay >= 0 /\
