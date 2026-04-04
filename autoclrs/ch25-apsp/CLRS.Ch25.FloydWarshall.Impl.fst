@@ -7,7 +7,7 @@ open FStar.SizeT
 open FStar.Mul
 open CLRS.Ch25.FloydWarshall.Spec
 
-#set-options "--z3rlimit 20"
+#set-options "--z3rlimit 20 --split_queries always"
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -28,6 +28,24 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 }
 
 open Pulse.Lib.BoundedIntegers
+
+// Helper: row-major index is within n*n (NL arithmetic)
+let index_bound_lemma (a b n: nat)
+  : Lemma (requires a < n /\ b < n)
+          (ensures a * n + b < n * n)
+  = FStar.Math.Lemmas.lemma_mult_le_right n a (n - 1);
+    FStar.Math.Lemmas.distributivity_sub_left n 1 n
+
+// Helper: (a+1)*n == a*n + n (NL arithmetic)
+let succ_mul_lemma (a n: nat)
+  : Lemma (ensures (a + 1) * n == a * n + n)
+  = FStar.Math.Lemmas.distributivity_add_left a 1 n
+
+// Helper: (a+1)*n*n == a*n*n + n*n (NL arithmetic)
+let succ_mul2_lemma (a n: nat)
+  : Lemma (ensures (a + 1) * n * n == a * n * n + n * n)
+  = FStar.Math.Lemmas.distributivity_add_left a 1 n;
+    FStar.Math.Lemmas.distributivity_add_left (a * n) n n
 
 // ========== Floyd-Warshall with correctness + complexity ==========
 
@@ -125,6 +143,10 @@ fn floyd_warshall
       {
         let vj = !j;
 
+        // NL arithmetic: row-major index bounds
+        index_bound_lemma (SZ.v vi) (SZ.v vj) (SZ.v n);
+        index_bound_lemma (SZ.v vk) (SZ.v vj) (SZ.v n);
+
         // Compute indices
         let idx_ij = vi *^ n +^ vj;
         let idx_kj = vk *^ n +^ vj;
@@ -146,8 +168,16 @@ fn floyd_warshall
         j := vj +^ 1sz;
       };
 
+      // NL arithmetic: (vi+1)*n == vi*n + n
+      succ_mul_lemma (SZ.v vi) (SZ.v n);
+      assert (pure ((SZ.v vi + 1) * SZ.v n == SZ.v vi * SZ.v n + SZ.v n));
+
       i := vi +^ 1sz;
     };
+
+    // NL arithmetic: (vk+1)*n*n == vk*n*n + n*n
+    succ_mul2_lemma (SZ.v vk) (SZ.v n);
+    assert (pure ((SZ.v vk + 1) * SZ.v n * SZ.v n == SZ.v vk * SZ.v n * SZ.v n + SZ.v n * SZ.v n));
 
     k := vk +^ 1sz;
   }
