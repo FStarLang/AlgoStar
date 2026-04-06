@@ -177,7 +177,7 @@ Each `ImplTest.fst` file serves as a **spec-precision validation test**: it cons
 | 10 | Singly Linked List | Deterministic | ✅ Precise | **Comprehensive** | Full lifecycle | 0 | None |
 | 11 | Hash Table | Deterministic | ✅ Precise | **Comprehensive** | 7 tests | 0 | None — insert forced true on non-full tables |
 | 12 | BST (Pointer) | Deterministic | ✅ Precise | **Comprehensive** | 14+ pure + Pulse | 0 | None |
-| 12 | BST (Array) | Deterministic | ⚠️ Moderate | Moderate | Search + insert + bridge | 0 | Insert doesn't guarantee success; no frame property |
+| 12 | BST (Array) | Deterministic | ⚠️ Moderate | Moderate | Search + insert + bridge | 0 | Insert can fail on skewed trees (inherent to implicit-array layout); no frame property |
 | 13 | RB-Tree (Okasaki) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None — strengthened postconditions |
 | 13 | RB-Tree (CLRS) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None |
 | 15 | Rod Cutting | Deterministic | ✅ Precise | Minimal | 1 (n=4) | 0 | None |
@@ -193,7 +193,7 @@ Each `ImplTest.fst` file serves as a **spec-precision validation test**: it cons
 | 23 | Kruskal | Relational | ✅ Precise | Moderate | 1 Pulse + 6 helper lemmas (3-vertex triangle) | 0 | None — `is_mst` proven, unique MST edges derived |
 | 23 | Prim | Relational | ✅ Precise | Moderate | 6 + 5 helper lemmas (3-vertex triangle) | 1 | None — `is_mst` proven, unique output derived; 1 platform admit (`SZ.fits_u64`) |
 | 24 | Bellman-Ford | Deterministic (conditional) | ✅ Precise | Moderate | 1 (3-vertex, neg wts) | 0 | Unconditional completeness via `no_neg_cycles_flat` |
-| 24 | Dijkstra | Deterministic | ✅ Precise | Minimal | 1 (3-vertex) | 0 | Predecessor array not verified |
+| 24 | Dijkstra | Deterministic | ✅ Precise | Minimal | 1 (3-vertex, dist + pred) | 0 | None — both dist and pred arrays verified |
 | 25 | Floyd-Warshall | Deterministic | ✅ Precise | **Comprehensive** | All 9 entries + neg-cycle + safe API | 0 | None — neg-cycle detection fully characterized |
 | 26 | Max Flow (Edmonds-Karp) | Deterministic + Optimality | ✅ Precise | **Comprehensive** | 5 (single-edge, disconnected, 3-vertex, diamond, bottleneck) | 0 | None — return value + MFMC theorem |
 | 31 | GCD | Deterministic | ✅ Precise | Minimal | 1 (gcd(12,8)) | 0 | None — positivity + divisibility in postcondition |
@@ -238,6 +238,7 @@ Many specs were improved in this revision cycle. Key improvements include:
 | Prim | Full MST property proven via `prim_mst_result` → `is_mst`; concrete output uniqueness (`key[1]=1, parent[1]=0, key[2]=2, parent[2]=1`); `key_parent_consistent` tracked; ImplTestHelper with witness spanning tree and uniqueness lemmas |
 | Kruskal | Full MST property proven via `kruskal_mst_result` → `is_mst`; unique MST edges derived (`{(0,1) w=1, (1,2) w=2}`); ImplTestHelper with `kruskal_witness_spanning_tree`, `kruskal_mst_edges`, connectivity lemmas |
 | Bellman-Ford | Unconditional completeness via `no_neg_cycles_flat ⟹ no_neg_cycle == true` |
+| Dijkstra | Predecessor array fully verified via `shortest_path_tree` + `completeness_pred_3`; both dist and pred uniquely determined |
 | Floyd-Warshall | Neg-cycle detection return value fully characterized (both true and false cases); safe API tested |
 | Max Flow | Return value exposed (`fv == imp_flow_value`); 3 new tests added (3-vertex, diamond, bottleneck) for 5 total |
 | GCD | Positivity + divisibility added to postcondition |
@@ -266,7 +267,7 @@ These specs fully determine the output for any concrete input. The postcondition
 | BST (Pointer), RB-Trees | Ghost tree determines exact structure |
 | All DP (Rod, MatrixChain, LCS) | `result == dp_spec(input)` |
 | Huffman Codec | `decode(bits, tree) == message` |
-| Dijkstra, Floyd-Warshall | `dist[v] == sp_dist(source, v)` |
+| Dijkstra, Floyd-Warshall | `dist[v] == sp_dist(source, v)` + `shortest_path_tree` (pred) |
 | GCD, Extended GCD, ModExp, ModExpLR | `result == math_spec(args)` |
 | All String Matching | `result == count_matches_spec(text, pattern)` |
 | Segments primitives | `result == cross_product_spec(...)` |
@@ -291,7 +292,7 @@ These specs allow multiple correct outputs by design — the algorithm has legit
 
 | Algorithm | Gap | Impact |
 |-----------|-----|--------|
-| **BST Array (Ch12)** | Insert doesn't guarantee success; no frame property for other keys | Cannot prove insert succeeds on non-full tree or absent keys remain absent |
+| **BST Array (Ch12)** | Insert doesn't characterize when it succeeds/fails; no frame property for other keys | Insert can fail on skewed trees even with spare capacity (inherent to implicit-array layout where node `i` has children at `2i+1`, `2i+2`). Spec could be strengthened to state `success <==> insertion path stays within cap`. Frame property (`keys' == Seq.upd keys idx key`) would enable proving absent keys remain absent after insert. |
 
 #### Minor Gaps
 
@@ -299,7 +300,6 @@ These specs allow multiple correct outputs by design — the algorithm has legit
 |-----------|-----|
 | Counting Sort (Ch08) | `counting_sort_by_digit` untested; stability unverified |
 | DFS (Ch22) | Edge classification and white-path theorem not exposed in `Impl.fsti` |
-| Dijkstra (Ch24) | Predecessor array not verified |
 | Prim (Ch23) | Postcondition lacks `is_full_vec` for returned vecs (prevents freeing without `drop_`) |
 | Graham Scan (Ch33) | No test with interior points |
 | Jarvis March (Ch33) | No test with non-convex input |
@@ -396,14 +396,13 @@ Activity Selection, Max Flow, Kruskal, and Prim use postcondition optimality cla
 
 ### 1. Fix Remaining Spec Gaps (High Priority)
 
-1. **BST Array (Ch12)**: Add insert success guarantee when tree has empty slots; add frame property for absent keys.
+1. **BST Array (Ch12)**: Characterize when insert succeeds (`success <==> BST search path for key stays within cap`); add frame property for absent keys (`keys' == Seq.upd keys idx key`). Note: insert failure on skewed trees is inherent to the implicit-array layout, not a bug.
 
 ### 2. Remaining Minor Improvements (Medium Priority)
 
 2. **DFS (Ch22)**: Expose edge classification and white-path theorem through `Impl.fsti`.
 3. **Counting Sort (Ch08)**: Test `counting_sort_by_digit`; verify stability.
-4. **Dijkstra (Ch24)**: Verify predecessor array.
-5. **Prim (Ch23)**: Add `is_full_vec` to returned vecs' postcondition so callers can free without `drop_`.
+4. **Prim (Ch23)**: Add `is_full_vec` to returned vecs' postcondition so callers can free without `drop_`.
 
 ### 3. Expand Test Coverage (Lower Priority)
 
