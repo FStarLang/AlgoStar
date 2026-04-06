@@ -177,7 +177,7 @@ Each `ImplTest.fst` file serves as a **spec-precision validation test**: it cons
 | 10 | Singly Linked List | Deterministic | ✅ Precise | **Comprehensive** | Full lifecycle | 0 | None |
 | 11 | Hash Table | Deterministic | ✅ Precise | **Comprehensive** | 7 tests | 0 | None — insert forced true on non-full tables |
 | 12 | BST (Pointer) | Deterministic | ✅ Precise | **Comprehensive** | 14+ pure + Pulse | 0 | None |
-| 12 | BST (Array) | Deterministic | ⚠️ Moderate | Moderate | Search + insert + bridge | 0 | Insert can fail on skewed trees (inherent to implicit-array layout); no frame property |
+| 12 | BST (Array) | Deterministic | ✅ Precise | Moderate | Search + insert + bridge + frame | 0 | Frame property now proven (`Seq.upd`); insert success still uncharacterized for skewed trees |
 | 13 | RB-Tree (Okasaki) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None — strengthened postconditions |
 | 13 | RB-Tree (CLRS) | Deterministic | ✅ Precise | **Comprehensive** | 14 pure + Pulse | 0 | None |
 | 15 | Rod Cutting | Deterministic | ✅ Precise | Minimal | 1 (n=4) | 0 | None |
@@ -227,7 +227,7 @@ Many specs were improved in this revision cycle. Key improvements include:
 | Partial Selection Sort | Strengthened to `result==select_spec`; added k=2, k=3 tests |
 | DLL | Added `list_delete_last` and `list_delete_node` scenarios (4 total) |
 | Hash Table | Insert forced true on non-full tables via probe-sequence contradiction; delete strengthened |
-| BST Array | Insert postcondition now includes `key_in_subtree`; `wfb_to_sir` bridge exported |
+| BST Array | Insert postcondition now includes `key_in_subtree`; `wfb_to_sir` bridge exported; frame property added (`keys' == Seq.upd keys idx key`, `valid' == Seq.upd valid idx true`) — other positions provably unchanged; runtime frame check added |
 | RB-Tree (Okasaki) | Strengthened postconditions directly give search results for inserted/deleted keys |
 | Matrix Chain | Non-negativity (`result >= 0`) added to postcondition |
 | LCS | Range constraints (`0 ≤ result ≤ min(m,n)`) added to postcondition |
@@ -288,11 +288,11 @@ These specs allow multiple correct outputs by design — the algorithm has legit
 
 ### Remaining Spec Gaps
 
-#### ⚠️ Significant (important properties missing from postcondition)
+#### ⚠️ Minor–Moderate (remaining weaknesses)
 
 | Algorithm | Gap | Impact |
 |-----------|-----|--------|
-| **BST Array (Ch12)** | Insert doesn't characterize when it succeeds/fails; no frame property for other keys | Insert can fail on skewed trees even with spare capacity (inherent to implicit-array layout where node `i` has children at `2i+1`, `2i+2`). Spec could be strengthened to state `success <==> insertion path stays within cap`. Frame property (`keys' == Seq.upd keys idx key`) would enable proving absent keys remain absent after insert. |
+| **BST Array (Ch12)** | Insert doesn't characterize when it succeeds/fails | Insert can fail on skewed trees even with spare capacity (inherent to implicit-array layout where node `i` has children at `2i+1`, `2i+2`). Spec could be strengthened to state `success <==> insertion path stays within cap`. ~~Frame property~~: **RESOLVED** — postcondition now uses `Seq.upd`, proving all other positions unchanged. |
 
 #### Minor Gaps
 
@@ -379,8 +379,8 @@ Activity Selection, Max Flow, Kruskal, and Prim use postcondition optimality cla
 
 | Quality Level | Count | Algorithms |
 |---------------|-------|-----------|
-| ✅ Precise & Complete | 48 | InsSort, MergeSort, Heapsort, Quicksort, Partition, BinSearch, Kadane, MatMul, MinMax, SimMinMax, Quickselect, PartSelSort, Stack, Queue, DLL, SLL, HashTable, BST(Ptr), RBTree×2, RodCut, MatChain, LCS, ActSel, Huffman×2, TopSort, FW, Dijkstra, BellmanFord, MaxFlow, Kruskal, Prim, DFS, GCD, ExtGCD, ModExp×2, NaiveMatch, KMP, RabinKarp, Segments, GrahamScan, JarvisMarch, VertexCover, UnionFind, BFS, CountingSort |
-| ⚠️ Moderate gaps | 1 | BSTArray |
+| ✅ Precise & Complete | 49 | InsSort, MergeSort, Heapsort, Quicksort, Partition, BinSearch, Kadane, MatMul, MinMax, SimMinMax, Quickselect, PartSelSort, Stack, Queue, DLL, SLL, HashTable, BST(Ptr), BSTArray, RBTree×2, RodCut, MatChain, LCS, ActSel, Huffman×2, TopSort, FW, Dijkstra, BellmanFord, MaxFlow, Kruskal, Prim, DFS, GCD, ExtGCD, ModExp×2, NaiveMatch, KMP, RabinKarp, Segments, GrahamScan, JarvisMarch, VertexCover, UnionFind, BFS, CountingSort |
+| ⚠️ Moderate gaps | 0 | — |
 
 ### By Test Coverage
 
@@ -394,12 +394,9 @@ Activity Selection, Max Flow, Kruskal, and Prim use postcondition optimality cla
 
 ## Priority Recommendations
 
-### 1. Fix Remaining Spec Gaps (High Priority)
+### 1. Remaining Minor Improvements (Medium Priority)
 
-1. **BST Array (Ch12)**: Characterize when insert succeeds (`success <==> BST search path for key stays within cap`); add frame property for absent keys (`keys' == Seq.upd keys idx key`). Note: insert failure on skewed trees is inherent to the implicit-array layout, not a bug.
-
-### 2. Remaining Minor Improvements (Medium Priority)
-
+1. **BST Array (Ch12)**: Characterize when insert succeeds (`success <==> BST search path for key stays within cap`). Frame property now resolved.
 2. **DFS (Ch22)**: Expose edge classification and white-path theorem through `Impl.fsti`.
 3. **Counting Sort (Ch08)**: Test `counting_sort_by_digit`; verify stability.
 4. **Prim (Ch23)**: Add `is_full_vec` to returned vecs' postcondition so callers can free without `drop_`.
