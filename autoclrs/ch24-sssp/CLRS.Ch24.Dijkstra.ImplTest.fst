@@ -10,6 +10,8 @@
      Edges: 0→1 (weight 3), 0→2 (weight 7), 1→2 (weight 2)
      Expected shortest paths from 0:
        dist[0] = 0, dist[1] = 3, dist[2] = 5 (via 0→1→2: 3+2)
+     Expected predecessor tree:
+       pred[0] = 0 (source), pred[1] = 0 (via 0→1), pred[2] = 1 (via 1→2)
 
    Attribution: Pattern inspired by
    https://github.com/microsoft/intent-formalization/blob/main/eval-autoclrs-specs/intree-tests/ch07-quicksort/Test.Quicksort.fst
@@ -88,6 +90,11 @@ let sp_dist_v2 () : Lemma (SP.sp_dist tw_seq 3 0 2 == 5) =
   assert_norm (SP.sp_dist tw_seq 3 0 2 == 5)
 #pop-options
 
+(* SZ.t equality check — computational, survives extraction to C *)
+inline_for_extraction
+let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
+  let open FStar.SizeT in not (a <^ b || b <^ a)
+
 (* Completeness: Dijkstra's postcondition (dist[v] == sp_dist(0,v) for all v)
    uniquely determines dist = [0; 3; 5] for this input. *)
 let completeness_dijkstra_3 (sdist: Seq.seq int) (sw: Seq.seq int)
@@ -101,6 +108,34 @@ let completeness_dijkstra_3 (sdist: Seq.seq int) (sw: Seq.seq int)
       Seq.index sdist 1 == 3 /\
       Seq.index sdist 2 == 5)
   = sp_dist_v0 (); sp_dist_v1 (); sp_dist_v2 ()
+
+(* Completeness: Dijkstra's postcondition (shortest_path_tree)
+   uniquely determines pred = [0sz; 0sz; 1sz] for this input.
+
+   Proof: For each non-source vertex v, shortest_path_tree gives
+     sp_dist(0,v) == sp_dist(0, pred[v]) + w(pred[v], v)
+   with pred[v] < 3. Case analysis on pred[v] ∈ {0,1,2} using
+   concrete sp_dist and weight values eliminates all but one option:
+     pred[1] = 0 (only 0+3=3 works), pred[2] = 1 (only 3+2=5 works). *)
+#push-options "--z3rlimit 40 --split_queries always"
+let completeness_pred_3 (spred: Seq.seq SZ.t) (sw: Seq.seq int)
+  : Lemma
+    (requires
+      sw `Seq.equal` tw_seq /\
+      DI.shortest_path_tree spred sw 3 0)
+    (ensures
+      SZ.v (Seq.index spred 0) == 0 /\
+      SZ.v (Seq.index spred 1) == 0 /\
+      SZ.v (Seq.index spred 2) == 1)
+  = sp_dist_v0 (); sp_dist_v1 (); sp_dist_v2 ();
+    // Weight values for Z3 case analysis on predecessors
+    assert_norm (Seq.index tw_seq 1 == 3);      // w(0,1) = 3
+    assert_norm (Seq.index tw_seq 4 == SP.inf);  // w(1,1) = inf
+    assert_norm (Seq.index tw_seq 7 == SP.inf);  // w(2,1) = inf
+    assert_norm (Seq.index tw_seq 2 == 7);       // w(0,2) = 7
+    assert_norm (Seq.index tw_seq 5 == 2);       // w(1,2) = 2
+    assert_norm (Seq.index tw_seq 8 == SP.inf)   // w(2,2) = inf
+#pop-options
 
 (* Build the concrete weight sequence from array writes *)
 let seq_after_weight_writes ()
@@ -180,6 +215,7 @@ fn test_dijkstra_3 ()
 
   // --- Prove completeness: output is uniquely determined ---
   completeness_dijkstra_3 sdist' sw;
+  completeness_pred_3 spred' sw;
 
   // --- Read back and verify each distance ---
   let d0 = dist.(0sz);
@@ -189,8 +225,17 @@ fn test_dijkstra_3 ()
   assert (pure (d1 == 3));
   assert (pure (d2 == 5));
 
+  // --- Read back and verify each predecessor ---
+  let p0 = pred.(0sz);
+  let p1 = pred.(1sz);
+  let p2 = pred.(2sz);
+  assert (pure (SZ.v p0 == 0));
+  assert (pure (SZ.v p1 == 0));
+  assert (pure (SZ.v p2 == 1));
+
   // --- Computational check (survives extraction to C) ---
-  let pass = (d0 = 0 && d1 = 3 && d2 = 5);
+  let pass = (d0 = 0 && d1 = 3 && d2 = 5
+           && sz_eq p0 0sz && sz_eq p1 0sz && sz_eq p2 1sz);
 
   // --- Cleanup ---
   with sw'. assert (A.pts_to weights sw');

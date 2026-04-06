@@ -36,10 +36,15 @@ Expected shortest paths from source 0:
   - `sp_dist(tw, 3, 0, 0) == 0` ✓
   - `sp_dist(tw, 3, 0, 1) == 3` ✓
   - `sp_dist(tw, 3, 0, 2) == 5` ✓
-- **Completeness lemma**: The postcondition `forall v < 3. dist[v] == sp_dist(0, v)`
+- **Completeness lemma (dist)**: The postcondition `forall v < 3. dist[v] == sp_dist(0, v)`
   combined with the computed `sp_dist` values uniquely determines `dist = [0, 3, 5]`.
-- **Runtime verification**: After calling `dijkstra`, the test reads back `dist[0]`,
-  `dist[1]`, `dist[2]` and asserts they equal 0, 3, 5 respectively.
+- **Completeness lemma (pred)**: The `shortest_path_tree` postcondition gives
+  `sp_dist(0,v) == sp_dist(0, pred[v]) + w(pred[v], v)` for each reachable non-source
+  vertex. Case analysis on `pred[v] ∈ {0,1,2}` using the concrete sp_dist and weight
+  values eliminates all but one option per vertex, uniquely determining `pred = [0, 0, 1]`.
+- **Runtime verification**: After calling `dijkstra`, the test reads back `dist[0..2]`
+  and `pred[0..2]`, asserts they match the proven values, and performs a computational
+  check that survives extraction to C.
 
 ### Summary
 
@@ -47,7 +52,8 @@ Expected shortest paths from source 0:
 |----------|--------|
 | Precondition satisfiable | ✅ Proven |
 | sp_dist computed for all vertices | ✅ `assert_norm` |
-| Postcondition determines output uniquely | ✅ Proven |
+| Postcondition determines dist uniquely | ✅ Proven |
+| Postcondition determines pred uniquely | ✅ Proven |
 | Output values verified by reading | ✅ `assert (pure (...))` |
 | No admits | ✅ |
 | No assumes | ✅ |
