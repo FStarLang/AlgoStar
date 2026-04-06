@@ -166,10 +166,11 @@ fn tree_insert
       (not success ==> Seq.equal keys_seq' keys_seq /\
                        Seq.equal valid_seq' valid_seq) /\
       (success ==> (exists (idx: nat). idx < SZ.v t.cap /\
-                    idx < Seq.length keys_seq' /\
-                    idx < Seq.length valid_seq' /\
-                    Seq.index keys_seq' idx == key /\
-                    Seq.index valid_seq' idx == true)) /\
+                    idx < Seq.length keys_seq /\
+                    idx < Seq.length valid_seq /\
+                    Seq.index valid_seq idx == false /\
+                    Seq.equal keys_seq' (Seq.upd keys_seq idx key) /\
+                    Seq.equal valid_seq' (Seq.upd valid_seq idx true))) /\
       (success ==> key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 key) /\
       AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
     )

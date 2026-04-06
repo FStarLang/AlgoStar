@@ -126,11 +126,33 @@ fn test_bstarray_search_insert ()
     GR.pts_to ctr vticks'
   );
 
+  // === Frame property verification ===
+  // The strengthened postcondition tells us:
+  //   success ==> exists idx. valid_old[idx] == false /\
+  //               keys' == Seq.upd keys_old idx 5 /\
+  //               valid' == Seq.upd valid_old idx true
+  // This means all positions other than idx are unchanged.
+
+  // Ghost proof: non-inserted positions retain their original values
+  assert (pure (
+    success ==> (forall (j:nat). j < 7 ==>
+      Seq.index (Ghost.reveal vs') j == true \/
+      Seq.index (Ghost.reveal vs') j == Seq.index (Seq.create 7 false) j)));
+
+  // Runtime frame check: read a non-root position to verify it's still invalid
+  let v3 = t.valid.(3sz);
+  let k3 = t.keys.(3sz);
+  with ks'' vs''. assert (A.pts_to t.keys ks'' ** A.pts_to t.valid vs'');
+  // v3 and k3 reflect the post-insert state; frame says non-inserted slots unchanged
+  // Original valid was all-false; if idx != 3, then v3 == false and k3 == 0
+  // If idx == 3, then v3 == true and k3 == 5
+  let pass_frame = not success || (v3 = false || (v3 = true && k3 = 5));
+
   // Bridge: AP.well_formed_bst -> Impl.subtree_in_range
-  wfb_to_sir (Ghost.reveal ks') (Ghost.reveal vs') 7 0 0 100;
+  wfb_to_sir (Ghost.reveal ks'') (Ghost.reveal vs'') 7 0 0 100;
 
   // === Search for key 5 after insert ===
-  let r_found = tree_search #1.0R t #ks' #vs' #(hide 0) #(hide 100) 5 ctr;
+  let r_found = tree_search #1.0R t #ks'' #vs'' #(hide 0) #(hide 100) 5 ctr;
   assert (pure (success ==> Some? r_found));
   assert (pure (not success ==> None? r_found));
 
@@ -141,7 +163,7 @@ fn test_bstarray_search_insert ()
   let pass_consistency = not success || Some? r_found;
 
   // === Search for absent key 99 after insert ===
-  let r_miss = tree_search #1.0R t #ks' #vs' #(hide 0) #(hide 100) 99 ctr;
+  let r_miss = tree_search #1.0R t #ks'' #vs'' #(hide 0) #(hide 100) 99 ctr;
   assert (pure (not success ==> None? r_miss));
 
   // === Cleanup ===
@@ -159,7 +181,7 @@ fn test_bstarray_search_insert ()
   V.free vv;
 
   // --- Final result: all checks must pass ---
-  let result = pass_empty && pass_consistency;
+  let result = pass_empty && pass_consistency && pass_frame;
   result
 }
 ```

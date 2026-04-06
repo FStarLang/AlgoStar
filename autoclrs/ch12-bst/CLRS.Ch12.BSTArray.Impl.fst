@@ -456,10 +456,11 @@ fn tree_insert
       (not success ==> Seq.equal keys_seq' keys_seq /\
                        Seq.equal valid_seq' valid_seq) /\
       (success ==> (exists (idx: nat). idx < SZ.v t.cap /\
-                    idx < Seq.length keys_seq' /\
-                    idx < Seq.length valid_seq' /\
-                    Seq.index keys_seq' idx == key /\
-                    Seq.index valid_seq' idx == true)) /\
+                    idx < Seq.length keys_seq /\
+                    idx < Seq.length valid_seq /\
+                    Seq.index valid_seq idx == false /\
+                    Seq.equal keys_seq' (Seq.upd keys_seq idx key) /\
+                    Seq.equal valid_seq' (Seq.upd valid_seq idx true))) /\
       (success ==> key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 key) /\
       AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
     )
@@ -483,11 +484,13 @@ fn tree_insert
       pure (Seq.length ks == A.length t.keys /\ Seq.length vs' == A.length t.valid /\
         // If not yet successful, arrays unchanged
         (not vs ==> Seq.equal ks keys_seq /\ Seq.equal vs' valid_seq) /\
-        // If successful, key is in the tree at some index
+        // If successful, arrays are exactly Seq.upd at the inserted index (frame)
         (vs ==> (exists (idx: nat). idx < SZ.v t.cap /\
-                 idx < Seq.length ks /\ idx < Seq.length vs' /\
-                 Seq.index ks idx == key /\
-                 Seq.index vs' idx == true)) /\
+                 idx < Seq.length keys_seq /\
+                 idx < Seq.length valid_seq /\
+                 Seq.index valid_seq idx == false /\
+                 Seq.equal ks (Seq.upd keys_seq idx key) /\
+                 Seq.equal vs' (Seq.upd valid_seq idx true))) /\
         // If successful, key is reachable from root
         (vs ==> key_in_subtree ks vs' (SZ.v t.cap) 0 key) /\
         // BST invariant preserved
