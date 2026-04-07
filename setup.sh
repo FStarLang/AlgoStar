@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — Build F* (fstar2 branch: unified F*, Pulse, KaRaMeL)
+# setup.sh — Build F* (master branch: unified F*, Pulse, KaRaMeL)
 #
 # Prerequisites:
 #   - OCaml (>= 4.14) with opam

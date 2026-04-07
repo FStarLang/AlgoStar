@@ -1,4 +1,4 @@
 [submodule "FStar"]
 	path = FStar
 	url = git@github.com:FStarLang/FStar.git
-	branch = fstar2
+	branch = master
