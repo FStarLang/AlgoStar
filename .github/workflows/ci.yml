@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install F* (nightly binary)
+        run: ./setup.sh binary
+
+      - name: Show F* version
+        run: ./fstar/bin/fstar.exe --version
+
+      - name: Verify all chapters
+        run: make -C autoclrs -j$(nproc)
