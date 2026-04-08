@@ -2,3 +2,6 @@
 	path = FStar
 	url = git@github.com:FStarLang/FStar.git
 	branch = master
+[submodule "c2pulse"]
+	path = c2pulse
+	url = https://github.com/FStarLang/c2pulse.git

@@ -122,6 +122,22 @@ build_karamel() {
 
 # ---- Binary install ----
 
+build_c2pulse() {
+  if [ -d "$SCRIPT_DIR/c2pulse" ] && command -v cargo &>/dev/null; then
+    info "Building c2pulse..."
+    cd "$SCRIPT_DIR/c2pulse"
+    cargo build --quiet
+    green "c2pulse built: $SCRIPT_DIR/c2pulse/target/debug/c2pulse"
+
+    # Build the c2pulse Pulse library using our F* binary
+    info "Building c2pulse Pulse library..."
+    rm -f opt/env.mk opt/env.sh opt/opam-available.done
+    PATH="$FSTAR_BIN_DIR/bin:$PATH" C2PULSE_OPT=0 ./opt/configure
+    C2PULSE_OPT=0 make lib
+    green "c2pulse Pulse library verified."
+  fi
+}
+
 install_binary() {
   info "Installing F* nightly binary to $FSTAR_BIN_DIR ..."
   curl -fsSL https://aka.ms/install-fstar | bash -s -- \
@@ -142,6 +158,10 @@ install_binary() {
 
   green "F* binary installed successfully."
   "$FSTAR_BIN_DIR/bin/fstar.exe" --version
+
+  # Build c2pulse (C-to-Pulse translator) if present
+  build_c2pulse
+
   echo
   green "Setup complete. Run 'make' to verify all chapters."
 }
