@@ -7,8 +7,9 @@
 #   make -j8        # parallel build across chapters
 #
 # Prerequisites:
-#   1. git submodule update --init --recursive
-#   2. ./setup.sh   (builds FStar and Pulse from submodules)
+#   ./setup.sh binary   (install pre-built F* binary — fast)
+#   OR
+#   ./setup.sh          (build F* from source — requires OCaml)
 
 .PHONY: all verify clean
 

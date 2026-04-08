@@ -4,13 +4,26 @@
 #   make            # verify all chapters
 #   make -j8        # parallel build
 
-PULSE_ROOT ?= ../FStar/pulse
+# Detect binary install (fstar/) vs source build (FStar/)
+ifneq ($(wildcard $(CURDIR)/../fstar/bin/fstar.exe),)
+  PULSE_ROOT ?= $(CURDIR)/../fstar/pulse
+  ifndef FSTAR_EXE
+    FSTAR_EXE := $(CURDIR)/../fstar/bin/fstar.exe
+  endif
+  KRML_HOME  ?= $(CURDIR)/../fstar/karamel
+else
+  PULSE_ROOT ?= ../FStar/pulse
+  ifndef FSTAR_EXE
+    FSTAR_EXE := $(CURDIR)/../FStar/out/bin/fstar.exe
+  endif
+endif
 STAGE3     ?= 1
 export STAGE3
-ifndef FSTAR_EXE
-FSTAR_EXE  := $(CURDIR)/../FStar/out/bin/fstar.exe
-endif
 export FSTAR_EXE
+export PULSE_ROOT
+ifdef KRML_HOME
+export KRML_HOME
+endif
 
 SUBDIRS += ch02-getting-started
 SUBDIRS += ch04-divide-conquer

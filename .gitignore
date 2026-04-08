@@ -14,3 +14,6 @@ test/run_tests
 doc/_build/
 doc/__pycache__/
 krml/
+
+# Binary F* install (created by ./setup.sh binary)
+/fstar/

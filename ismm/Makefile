@@ -3,16 +3,23 @@
 # Uses F* and Pulse from sibling submodules (../FStar, ../pulse).
 # Follows the same conventions as autoclrs/ch*/Makefile.
 
-PULSE_ROOT ?= ../pulse
-
-ifndef FSTAR_EXE
-FSTAR_EXE := $(CURDIR)/../FStar/bin/fstar.exe
+# Detect binary install (../fstar/) vs source build (../FStar/)
+ifneq ($(wildcard $(CURDIR)/../fstar/bin/fstar.exe),)
+  PULSE_ROOT ?= $(CURDIR)/../fstar/pulse
+  ifndef FSTAR_EXE
+    FSTAR_EXE := $(CURDIR)/../fstar/bin/fstar.exe
+  endif
+  KRML_HOME ?= $(CURDIR)/../fstar/karamel
+  KRML_EXE  ?= $(KRML_HOME)/krml
+else
+  PULSE_ROOT ?= ../pulse
+  ifndef FSTAR_EXE
+    FSTAR_EXE := $(CURDIR)/../FStar/bin/fstar.exe
+  endif
+  KRML_HOME ?= $(HOME)/ws2/FunFM/tools/krml/karamel
+  KRML_EXE  ?= $(KRML_HOME)/krml
 endif
 export FSTAR_EXE
-
-# KaRaMeL for C extraction
-KRML_HOME ?= $(HOME)/ws2/FunFM/tools/krml/karamel
-KRML_EXE  ?= $(KRML_HOME)/krml
 
 include $(PULSE_ROOT)/mk/test.mk
 
