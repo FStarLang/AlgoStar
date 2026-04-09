@@ -2,21 +2,25 @@
  * Kadane's Maximum Subarray — C implementation with c2pulse verification.
  *
  * Proves:
- *   1. The result is >= every element in the array (so it's at least as
- *      large as the best single-element subarray).
- *   2. The result is >= the sum of every contiguous subarray ending at
- *      each position (via current_sum tracking).
+ *   1. The result equals max_subarray_spec (the mathematically optimal
+ *      maximum contiguous subarray sum), via bridge lemmas connecting
+ *      c2pulse's array model to CLRS.Ch04.MaxSubarray.Spec.
+ *   2. The result is >= every element in the array.
  *   3. current_sum tracks max(a[i], current_sum + a[i]) — the maximum
  *      suffix sum ending at position i.
  *   4. best_sum tracks the global maximum over all suffix sums.
  *
- * Equivalent to the functional correctness in
- * CLRS.Ch04.MaxSubarray.Kadane.fsti (minus complexity bound).
+ * Equivalent to CLRS.Ch04.MaxSubarray.Kadane.fsti (minus complexity bound).
  */
 
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
+
+_include_pulse(
+  open CLRS.Ch04.Kadane.C.BridgeLemmas
+  open CLRS.Ch04.MaxSubarray.Spec
+)
 
 /*
  * Maximum subarray sum using Kadane's algorithm.
@@ -38,6 +42,8 @@ int kadane(_array int *a, size_t len)
   _preserves_value(a._length)
   /* result >= every single element */
   _ensures(_forall(size_t i, i < len ==> return >= a[i]))
+  /* result == max_subarray_spec (functional correctness) */
+  _ensures((bool) _inline_pulse(Int32.v $(return) >= max_subarray_spec_c (array_value_of $(a)) /\ Int32.v $(return) <= max_subarray_spec_c (array_value_of $(a))))
 {
   int best_sum = a[0];
   int current_sum = a[0];
@@ -61,6 +67,11 @@ int kadane(_array int *a, size_t len)
     _invariant((_specint) current_sum <= (_specint) i * 1000000)
     _invariant(best_sum >= -1000000)
     _invariant((_specint) best_sum <= (_specint) i * 1000000)
+    /* Functional correctness: kadane_spec_c partial computation */
+    _invariant((bool) _inline_pulse(
+      kadane_spec_c (array_value_of $(a)) (SizeT.v $(i))
+        (Int32.v $(current_sum)) (Int32.v $(best_sum))
+        = max_subarray_spec_c (array_value_of $(a))))
   {
     int sum_with_current = current_sum + a[i];
     if (a[i] > sum_with_current) {
