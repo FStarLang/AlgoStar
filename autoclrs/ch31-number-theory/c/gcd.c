@@ -7,6 +7,7 @@
  *   3. The result divides both a_init and b_init.
  *
  * Based on CLRS p. 935, Alg 31.2 (Euclid's algorithm).
+ * Uses recursive form matching the mathematical specification.
  */
 
 #include "c2pulse.h"
@@ -17,30 +18,22 @@ _include_pulse(
   open FStar.Math.Euclid
 )
 
-size_t gcd(size_t a_init, size_t b_init)
-  _requires((bool) _inline_pulse(SizeT.v $(a_init) > 0 \/ SizeT.v $(b_init) > 0))
+_rec size_t gcd(size_t a, size_t b)
+  _requires((bool) _inline_pulse(SizeT.v $(a) > 0 \/ SizeT.v $(b) > 0))
   _ensures((bool) _inline_pulse(
-    SizeT.v $(return) = gcd_spec (SizeT.v $(a_init)) (SizeT.v $(b_init))
+    SizeT.v $(return) = gcd_spec (SizeT.v $(a)) (SizeT.v $(b))
     /\ SizeT.v $(return) > 0
-    /\ divides (SizeT.v $(return)) (SizeT.v $(a_init))
-    /\ divides (SizeT.v $(return)) (SizeT.v $(b_init))
+    /\ divides (SizeT.v $(return)) (SizeT.v $(a))
+    /\ divides (SizeT.v $(return)) (SizeT.v $(b))
   ))
+  _decreases((_specint) b)
 {
-  size_t a = a_init;
-  size_t b = b_init;
-
-  while (b > 0)
-    _invariant(_live(a) && _live(b))
-    _invariant((bool) _inline_pulse(
-      gcd_spec (SizeT.v $(a)) (SizeT.v $(b)) = gcd_spec (SizeT.v $(a_init)) (SizeT.v $(b_init))
-      /\ (SizeT.v $(a) > 0 \/ SizeT.v $(b) > 0)
-    ))
-  {
-    size_t temp = a % b;
-    a = b;
-    b = temp;
+  if (b == 0) {
+    _ghost_stmt(gcd_spec_divides (SizeT.v $(a)) (SizeT.v $(b)));
+    return a;
   }
-
-  _ghost_stmt(gcd_spec_divides (SizeT.v $(a_init)) (SizeT.v $(b_init)));
-  return a;
+  size_t r = a % b;
+  size_t d = gcd(b, r);
+  _ghost_stmt(gcd_spec_divides (SizeT.v $(a)) (SizeT.v $(b)));
+  return d;
 }

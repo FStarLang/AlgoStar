@@ -2,12 +2,13 @@
  * Extended GCD — C implementation with c2pulse verification.
  *
  * Proves:
- *   1. The result d equals gcd(a_init, b_init) via extended_gcd.
+ *   1. The result d equals gcd(a, b) via extended_gcd.
  *   2. d is positive (> 0).
- *   3. Bézout's identity: a_init*x + b_init*y = d for the extended_gcd coefficients.
- *   4. d divides both a_init and b_init.
+ *   3. Bézout's identity: a*x + b*y = d for the extended_gcd coefficients.
+ *   4. d divides both a and b.
  *
  * Based on CLRS p. 937, Alg 31.3 (Extended Euclidean Algorithm).
+ * Uses recursive form matching the mathematical specification.
  * The Bézout coefficients x, y are ghost values — only d is returned.
  */
 
@@ -29,36 +30,30 @@ _include_pulse(
     match extended_gcd a b with (| _, _, y |) -> y
 )
 
-size_t extended_gcd_impl(size_t a_init, size_t b_init)
-  _requires((bool) _inline_pulse(SizeT.v $(a_init) > 0 \/ SizeT.v $(b_init) > 0))
+_rec size_t extended_gcd_impl(size_t a, size_t b)
+  _requires((bool) _inline_pulse(SizeT.v $(a) > 0 \/ SizeT.v $(b) > 0))
   _ensures((bool) _inline_pulse(
-    SizeT.v $(return) = egcd_d (SizeT.v $(a_init)) (SizeT.v $(b_init))
+    SizeT.v $(return) = egcd_d (SizeT.v $(a)) (SizeT.v $(b))
     /\ SizeT.v $(return) > 0
-    /\ op_Multiply (SizeT.v $(a_init)) (egcd_x (SizeT.v $(a_init)) (SizeT.v $(b_init)))
-       + op_Multiply (SizeT.v $(b_init)) (egcd_y (SizeT.v $(a_init)) (SizeT.v $(b_init)))
+    /\ op_Multiply (SizeT.v $(a)) (egcd_x (SizeT.v $(a)) (SizeT.v $(b)))
+       + op_Multiply (SizeT.v $(b)) (egcd_y (SizeT.v $(a)) (SizeT.v $(b)))
        = SizeT.v $(return)
-    /\ divides (SizeT.v $(return)) (SizeT.v $(a_init))
-    /\ divides (SizeT.v $(return)) (SizeT.v $(b_init))
+    /\ divides (SizeT.v $(return)) (SizeT.v $(a))
+    /\ divides (SizeT.v $(return)) (SizeT.v $(b))
   ))
+  _decreases((_specint) b)
 {
-  size_t a = a_init;
-  size_t b = b_init;
-
-  while (b > 0)
-    _invariant(_live(a) && _live(b))
-    _invariant((bool) _inline_pulse(
-      gcd_spec (SizeT.v $(a)) (SizeT.v $(b)) = gcd_spec (SizeT.v $(a_init)) (SizeT.v $(b_init))
-      /\ (SizeT.v $(a) > 0 \/ SizeT.v $(b) > 0)
-    ))
-  {
-    size_t temp = a % b;
-    a = b;
-    b = temp;
+  if (b == 0) {
+    _ghost_stmt(extended_gcd_computes_gcd (SizeT.v $(a)) (SizeT.v $(b)));
+    _ghost_stmt(bezout_identity (SizeT.v $(a)) (SizeT.v $(b)));
+    _ghost_stmt(extended_gcd_divides_both (SizeT.v $(a)) (SizeT.v $(b)));
+    return a;
   }
-
-  _ghost_stmt(extended_gcd_computes_gcd (SizeT.v $(a_init)) (SizeT.v $(b_init)));
-  _ghost_stmt(bezout_identity (SizeT.v $(a_init)) (SizeT.v $(b_init)));
-  _ghost_stmt(extended_gcd_divides_both (SizeT.v $(a_init)) (SizeT.v $(b_init)));
-  _ghost_stmt(gcd_spec_divides (SizeT.v $(a_init)) (SizeT.v $(b_init)));
-  return a;
+  size_t r = a % b;
+  size_t d = extended_gcd_impl(b, r);
+  _ghost_stmt(extended_gcd_computes_gcd (SizeT.v $(a)) (SizeT.v $(b)));
+  _ghost_stmt(bezout_identity (SizeT.v $(a)) (SizeT.v $(b)));
+  _ghost_stmt(extended_gcd_divides_both (SizeT.v $(a)) (SizeT.v $(b)));
+  _ghost_stmt(gcd_spec_divides (SizeT.v $(a)) (SizeT.v $(b)));
+  return d;
 }
