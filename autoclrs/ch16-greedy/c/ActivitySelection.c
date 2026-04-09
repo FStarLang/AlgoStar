@@ -10,6 +10,12 @@
  *   2. First selected activity is index 0
  *   3. Selected indices are valid (< n) and strictly increasing
  *   4. Pairwise compatibility: finish[out[j]] <= start[out[j+1]]
+ *   5. Earliest compatible: every skipped activity is incompatible
+ *      with the last selected before it
+ *
+ * The earliest_compatible property (5) is the key greedy invariant
+ * that enables the optimality proof (CLRS Theorem 16.1) via
+ * bridge lemmas in CLRS.Ch16.ActivitySelection.C.BridgeLemmas.
  *
  * Preconditions:
  *   - finish times are sorted in non-decreasing order
@@ -58,6 +64,10 @@ size_t activity_selection(
   _ensures(_forall(size_t j, j < return ==> out[j] < n))
   _ensures(_forall(size_t j, j + 1 < return ==> out[j] < out[j + 1]))
   _ensures(_forall(size_t j, j + 1 < return ==> finish_times[out[j]] <= start_times[out[j + 1]]))
+  /* earliest_compatible: between consecutive selected */
+  _ensures(n > 0 ==> _forall(size_t j, j + 1 < return ==>
+    _forall(size_t z, out[j] < z && z < out[j + 1] && z < n ==>
+      start_times[z] < finish_times[out[j]])))
 {
   if (n == 0) return 0;
 
@@ -77,11 +87,21 @@ size_t activity_selection(
     _invariant(_forall(size_t j, j + 1 < count ==> out[j] < out[j + 1]))
     _invariant(_forall(size_t j, j + 1 < count ==> finish_times[out[j]] <= start_times[out[j + 1]]))
     _invariant(last_finish == finish_times[out[count - 1]])
+    /* earliest_compatible: skipped activities after last selection are incompatible */
+    _invariant(_forall(size_t z, out[count - 1] < z && z < i && z < n ==>
+      start_times[z] < finish_times[out[count - 1]]))
+    /* earliest_compatible: between consecutive selected activities */
+    _invariant(_forall(size_t j, j + 1 < count ==>
+      _forall(size_t z, out[j] < z && z < out[j + 1] && z < n ==>
+        start_times[z] < finish_times[out[j]])))
     _ensures(count >= 1 && count <= n)
     _ensures(out[0] == 0)
     _ensures(_forall(size_t j, j < count ==> out[j] < n))
     _ensures(_forall(size_t j, j + 1 < count ==> out[j] < out[j + 1]))
     _ensures(_forall(size_t j, j + 1 < count ==> finish_times[out[j]] <= start_times[out[j + 1]]))
+    _ensures(_forall(size_t j, j + 1 < count ==>
+      _forall(size_t z, out[j] < z && z < out[j + 1] && z < n ==>
+        start_times[z] < finish_times[out[j]])))
   {
     if (start_times[i] >= last_finish) {
       out[count] = i;

@@ -32,6 +32,7 @@ FSTAR = $(FSTAR_EXE) \
 	$(OTHERFLAGS) \
 	--cache_checked_modules \
 	--cache_dir $(CACHE_DIR) \
+	--cache_dir $(CH16_DIR)/_cache \
 	--include $(PULSE_LIB) \
 	--include $(CH16_DIR) \
 	--include $(COMMON_DIR) \
