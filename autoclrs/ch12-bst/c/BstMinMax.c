@@ -1,5 +1,5 @@
 /*
- * BST Minimum & Maximum — C implementation with c2pulse verification.
+ * BST Minimum & Maximum — Recursive C implementation with c2pulse verification.
  *
  * Array-based BST: node i has left child at 2*i+1, right child at 2*i+2.
  * Keys stored in keys[], occupancy in valid[] (0 = empty, nonzero = occupied).
@@ -9,7 +9,7 @@
  *   2. bst_maximum returns a key that exists in the tree (at a valid position).
  *   3. The arrays are unmodified (read-only operations).
  *
- * CLRS Reference: §12.2 TREE-MINIMUM and TREE-MAXIMUM (iterative variants)
+ * CLRS Reference: §12.2 TREE-MINIMUM and TREE-MAXIMUM (recursive)
  */
 
 #include "c2pulse.h"
@@ -17,91 +17,73 @@
 #include <stddef.h>
 
 /*
- * Iterative BST minimum.
+ * Recursive BST minimum.
  *
- * Walks left from the root (index 0) until no left child exists.
- * Returns the key at the leftmost valid node.
+ * Starting at node i, follows left children (2*i+1) until
+ * no valid left child exists.
+ * Returns the key at the leftmost valid node in the subtree.
  *
- * Precondition: the root must be valid (valid[0] != 0).
+ * Precondition: node i must be valid (valid[i] != 0).
  */
-int bst_minimum(_array int *keys, _array int *valid, size_t cap)
+_rec int bst_minimum(_array int *keys, _array int *valid, size_t cap, size_t i)
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
-  _requires(valid[0] != 0)
+  _requires(i < cap && valid[i] != 0)
   _preserves_value(keys._length)
   _preserves_value(valid._length)
   /* Local BST ordering: left child key < parent key */
-  _requires(_forall(size_t i,
-    i < cap && valid[i] != 0 && 2 * i + 1 < cap && valid[2 * i + 1] != 0
-      ==> keys[2 * i + 1] < keys[i]))
+  _requires(_forall(size_t j,
+    j < cap && valid[j] != 0 && 2 * j + 1 < cap && valid[2 * j + 1] != 0
+      ==> keys[2 * j + 1] < keys[j]))
+  /* Frame: arrays are unmodified (read-only operation) */
+  _ensures(_forall(size_t j, j < cap ==> keys[j] == _old(keys[j])))
+  _ensures(_forall(size_t j, j < cap ==> valid[j] == _old(valid[j])))
+  /* Result is bounded by the root key of the subtree */
+  _ensures(return <= keys[i])
+  _decreases(cap - i)
 {
-  size_t i = 0;
-
-  while (i < cap)
-    _invariant(_live(i))
-    _invariant(_live(*keys) && _live(*valid))
-    _invariant(keys._length == cap && valid._length == cap)
-    _invariant(cap > 0 && cap < 32768)
-    _invariant(i <= cap)
-    _invariant(i < cap ==> valid[i] != 0)
-    _invariant(_forall(size_t j,
-      j < cap && valid[j] != 0 && 2 * j + 1 < cap && valid[2 * j + 1] != 0
-        ==> keys[2 * j + 1] < keys[j]))
-  {
-    size_t left = 2 * i + 1;
-    if (left >= cap) {
-      return keys[i];
-    }
-    if (valid[left] == 0) {
-      return keys[i];
-    }
-    i = left;
+  size_t left = 2 * i + 1;
+  if (left >= cap) {
+    return keys[i];
   }
-
-  return keys[0];
+  if (valid[left] == 0) {
+    return keys[i];
+  }
+  return bst_minimum(keys, valid, cap, left);
 }
 
 /*
- * Iterative BST maximum.
+ * Recursive BST maximum.
  *
- * Walks right from the root (index 0) until no right child exists.
- * Returns the key at the rightmost valid node.
+ * Starting at node i, follows right children (2*i+2) until
+ * no valid right child exists.
+ * Returns the key at the rightmost valid node in the subtree.
  *
- * Precondition: the root must be valid (valid[0] != 0).
+ * Precondition: node i must be valid (valid[i] != 0).
  */
-int bst_maximum(_array int *keys, _array int *valid, size_t cap)
+_rec int bst_maximum(_array int *keys, _array int *valid, size_t cap, size_t i)
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
-  _requires(valid[0] != 0)
+  _requires(i < cap && valid[i] != 0)
   _preserves_value(keys._length)
   _preserves_value(valid._length)
   /* Local BST ordering: right child key > parent key */
-  _requires(_forall(size_t i,
-    i < cap && valid[i] != 0 && 2 * i + 2 < cap && valid[2 * i + 2] != 0
-      ==> keys[i] < keys[2 * i + 2]))
+  _requires(_forall(size_t j,
+    j < cap && valid[j] != 0 && 2 * j + 2 < cap && valid[2 * j + 2] != 0
+      ==> keys[j] < keys[2 * j + 2]))
+  /* Frame: arrays are unmodified (read-only operation) */
+  _ensures(_forall(size_t j, j < cap ==> keys[j] == _old(keys[j])))
+  _ensures(_forall(size_t j, j < cap ==> valid[j] == _old(valid[j])))
+  /* Result is bounded by the root key of the subtree */
+  _ensures(return >= keys[i])
+  _decreases(cap - i)
 {
-  size_t i = 0;
-
-  while (i < cap)
-    _invariant(_live(i))
-    _invariant(_live(*keys) && _live(*valid))
-    _invariant(keys._length == cap && valid._length == cap)
-    _invariant(cap > 0 && cap < 32768)
-    _invariant(i <= cap)
-    _invariant(i < cap ==> valid[i] != 0)
-    _invariant(_forall(size_t j,
-      j < cap && valid[j] != 0 && 2 * j + 2 < cap && valid[2 * j + 2] != 0
-        ==> keys[j] < keys[2 * j + 2]))
-  {
-    size_t right = 2 * i + 2;
-    if (right >= cap) {
-      return keys[i];
-    }
-    if (valid[right] == 0) {
-      return keys[i];
-    }
-    i = right;
+  size_t right = 2 * i + 2;
+  if (right >= cap) {
+    return keys[i];
   }
-
-  return keys[0];
+  if (valid[right] == 0) {
+    return keys[i];
+  }
+  return bst_maximum(keys, valid, cap, right);
 }
