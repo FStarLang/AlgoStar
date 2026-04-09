@@ -1,4 +1,5 @@
 _cache/
 *.fst
+!CLRS.*.fst
 *_diagnostics.json
 *_source_range_info.json
