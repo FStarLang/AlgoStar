@@ -34,6 +34,13 @@ fn func_counting_sort (var_a: (array Int32.t)) (var_len: SizeT.t) (var_k_val: In
         ((((SizeT.v var_i) + 1) < (SizeT.v var_len)) ==>
           (((array_read var_a var_i)) `Int32.lte`
             ((array_read var_a (SizeT.uint_to_t ((SizeT.v var_i) + 1))))))))
+  ensures
+    (with_pure
+      (forall
+        (var_i: SizeT.t).
+        ((var_i `SizeT.lt` var_len) ==>
+          ((0 <= (id #int (Int32.v ((array_read var_a var_i))))) &&
+            (((array_read var_a var_i)) `Int32.lte` var_k_val)))))
 { assume pure False; unreachable () }
 
 #restart-solver
@@ -66,6 +73,13 @@ fn func_bucket_sort (var_a: (array Int32.t)) (var_len: SizeT.t) (var_k_val: Int3
         ((((SizeT.v var_i) + 1) < (SizeT.v var_len)) ==>
           (((array_read var_a var_i)) `Int32.lte`
             ((array_read var_a (SizeT.uint_to_t ((SizeT.v var_i) + 1))))))))
+  ensures
+    (with_pure
+      (forall
+        (var_i: SizeT.t).
+        ((var_i `SizeT.lt` var_len) ==>
+          ((0 <= (id #int (Int32.v ((array_read var_a var_i))))) &&
+            (((array_read var_a var_i)) `Int32.lte` var_k_val)))))
 {
   let mut var_a = var_a;
   let mut var_len = var_len;

@@ -28,7 +28,8 @@ void counting_sort(_array int *a, size_t len, int k_val)
   _requires((bool) _inline_pulse(SizeT.fits (Int32.v $(k_val) + 2)))
   _preserves(a._length == len)
   _requires(_forall(size_t i, i < len ==> a[i] >= 0 && a[i] <= k_val))
-  _ensures(_forall(size_t i, i + 1 < len ==> a[i] <= a[i + 1]));
+  _ensures(_forall(size_t i, i + 1 < len ==> a[i] <= a[i + 1]))
+  _ensures(_forall(size_t i, i < len ==> a[i] >= 0 && a[i] <= k_val));
 
 /*
  * Array-based bucket sort for non-negative int values in [0, k_val].
@@ -45,6 +46,7 @@ void bucket_sort(_array int *a, size_t len, int k_val)
   _preserves(a._length == len)
   _requires(_forall(size_t i, i < len ==> a[i] >= 0 && a[i] <= k_val))
   _ensures(_forall(size_t i, i + 1 < len ==> a[i] <= a[i + 1]))
+  _ensures(_forall(size_t i, i < len ==> a[i] >= 0 && a[i] <= k_val))
 {
   counting_sort(a, len, k_val);
 }
