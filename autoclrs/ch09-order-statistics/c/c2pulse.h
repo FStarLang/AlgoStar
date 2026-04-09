@@ -30,6 +30,8 @@ __attribute__((annotate("c2pulse-pure"))) _Bool c2pulse_c_assert_enabled(void);
 #define _array __attribute((annotate("c2pulse-array")))
 #define _arrayptr __attribute((annotate("c2pulse-arrayptr")))
 #define _pure __attribute((annotate("c2pulse-pure")))
+#define _rec __attribute((annotate("c2pulse-rec")))
+#define _decreases(p) __attribute__((annotate("c2pulse-decreases", __capture_args(p))))
 
 #define _inline_pulse(args) _inline_pulse(__capture_args(args))
 
@@ -52,6 +54,8 @@ __attribute__((annotate("c2pulse-pure"))) _Bool c2pulse_c_assert_enabled(void);
 #define _array
 #define _arrayptr
 #define _pure
+#define _rec
+#define _decreases(p)
 
 #endif
 

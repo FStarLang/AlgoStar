@@ -7,8 +7,10 @@
  *
  * Proves (matching CLRS.Ch09.PartialSelectionSort.Impl.fsti):
  *   - find_min_index_from: returned index is in range and holds the minimum
- *   - select: output has sorted prefix, prefix <= suffix, result == a[k-1]
+ *   - select: prefix <= suffix boundary, result == a[k-1]
  *
+ * Note: sorted_prefix and permutation require ghost state or more powerful
+ * SMT reasoning not available in c2pulse. See the F* proof for those.
  * Complexity tracking omitted (no ghost counters in c2pulse).
  */
 
