@@ -5,6 +5,7 @@
  *   1. The returned pivot index is within [lo, hi).
  *   2. All elements in [lo, return) are <= a[return] (the pivot).
  *   3. All elements in (return, hi) are > a[return].
+ *   4. Elements outside [lo, hi) are unchanged (frame preservation).
  *
  * Matches the specification in CLRS.Ch07.Partition.Impl.fsti.
  */
@@ -23,12 +24,14 @@
  *   - a[lo..i)   : elements <= pivot
  *   - a[i..j)    : elements >  pivot
  *   - a[hi-1]    : pivot (unchanged during loop)
+ *   - Outside [lo,hi): unchanged from function entry
  */
 size_t partition(_array int *a, size_t len, size_t lo, size_t hi)
   _requires(a._length == len && lo < hi && hi <= len)
   _ensures(a._length == len && lo <= return && return < hi)
   _ensures(_forall(size_t k, lo <= k && k < return ==> a[k] <= a[return]))
   _ensures(_forall(size_t k, return < k && k < hi ==> a[return] < a[k]))
+  _ensures(_forall(size_t k, k < len && (k < lo || hi <= k) ==> a[k] == _old(a[k])))
 {
   int pivot = a[hi - 1];
   size_t i = lo;
@@ -42,6 +45,7 @@ size_t partition(_array int *a, size_t len, size_t lo, size_t hi)
     _invariant(a[hi - 1] == pivot)
     _invariant(_forall(size_t k, lo <= k && k < i ==> a[k] <= pivot))
     _invariant(_forall(size_t k, i <= k && k < j ==> a[k] > pivot))
+    _invariant(_forall(size_t k, k < len && (k < lo || hi <= k) ==> a[k] == _old(a[k])))
   {
     if (a[j] <= pivot) {
       tmp = a[i];
