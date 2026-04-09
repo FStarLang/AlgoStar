@@ -17,6 +17,7 @@
  * Proves:
  *   Structural safety — no buffer overflows, no arithmetic overflow.
  *   out_count <= n (bounded output)
+ *   All output entries are valid vertex indices (output[i] < n)
  */
 
 #include "c2pulse.h"
@@ -32,6 +33,7 @@ void topological_sort(_array int *adj, size_t n,
   _preserves(indeg._length == n)
   _preserves(queue._length == n)
   _preserves(output._length == n)
+  _ensures(_forall(size_t i, i < n ==> output[i] < n))
 {
   /* Phase 1: zero indeg */
   for (size_t i = 0; i < n; i = i + 1)
@@ -72,6 +74,7 @@ void topological_sort(_array int *adj, size_t n,
     _invariant(_live(*output))
     _invariant(output._length == n)
     _invariant(i <= n)
+    _invariant(_forall(size_t j, j < i ==> output[j] == 0))
   {
     output[i] = 0;
   }
@@ -102,6 +105,7 @@ void topological_sort(_array int *adj, size_t n,
     _invariant(queue._length == n && output._length == n)
     _invariant(head <= tail && tail <= n)
     _invariant(out_count <= n)
+    _invariant(_forall(size_t j, j < n ==> output[j] < n))
   {
     size_t u = queue[head];
     if (u >= n) { u = 0; }

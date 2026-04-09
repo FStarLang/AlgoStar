@@ -27,12 +27,14 @@ void bfs(_array int *adj, size_t n, size_t source,
   _preserves(queue._length == n)
   _ensures(color[source] != 0)
   _ensures(dist[source] == 0)
+  _ensures(_forall(size_t w, w < n && color[w] != 0 ==> dist[w] >= 0))
 {
   for (size_t i = 0; i < n; i = i + 1)
     _invariant(_live(i))
     _invariant(_live(*color) && _live(*dist) && _live(*pred))
     _invariant(color._length == n && dist._length == n && pred._length == n)
     _invariant(i <= n)
+    _invariant(_forall(size_t w, w < i ==> color[w] == 0))
   {
     color[i] = 0;
     dist[i] = -1;
@@ -52,31 +54,36 @@ void bfs(_array int *adj, size_t n, size_t source,
     _invariant(color._length == n && dist._length == n && pred._length == n && queue._length == n)
     _invariant(head <= tail && tail <= n)
     _invariant(color[source] != 0 && dist[source] == 0)
+    _invariant(_forall(size_t w, w < n && color[w] != 0 ==> dist[w] >= 0))
   {
     size_t u = queue[head];
     head = head + 1;
     if (u >= n) { u = 0; }
 
-    for (size_t v = 0; v < n; v = v + 1)
-      _invariant(_live(v) && _live(head) && _live(tail) && _live(u))
-      _invariant(_live(*adj) && _live(*color) && _live(*dist) && _live(*pred) && _live(*queue))
-      _invariant(adj._length == n * n)
-      _invariant(color._length == n && dist._length == n && pred._length == n && queue._length == n)
-      _invariant(v <= n)
-      _invariant(head <= tail && tail <= n)
-      _invariant(u < n)
-      _invariant(color[source] != 0 && dist[source] == 0)
-    {
-      int du = dist[u];
-      if (adj[u * n + v] != 0 && color[v] == 0 && du < 2147483646 && tail < n) {
-        color[v] = 1;
-        dist[v] = du + 1;
-        pred[v] = u;
-        queue[tail] = v;
-        tail = tail + 1;
+    if (color[u] != 0) {
+      for (size_t v = 0; v < n; v = v + 1)
+        _invariant(_live(v) && _live(head) && _live(tail) && _live(u))
+        _invariant(_live(*adj) && _live(*color) && _live(*dist) && _live(*pred) && _live(*queue))
+        _invariant(adj._length == n * n)
+        _invariant(color._length == n && dist._length == n && pred._length == n && queue._length == n)
+        _invariant(v <= n)
+        _invariant(head <= tail && tail <= n)
+        _invariant(u < n)
+        _invariant(color[source] != 0 && dist[source] == 0)
+        _invariant(color[u] != 0 && dist[u] >= 0)
+        _invariant(_forall(size_t w, w < n && color[w] != 0 ==> dist[w] >= 0))
+      {
+        int du = dist[u];
+        if (adj[u * n + v] != 0 && color[v] == 0 && du >= 0 && du < 2147483646 && tail < n) {
+          color[v] = 1;
+          dist[v] = du + 1;
+          pred[v] = u;
+          queue[tail] = v;
+          tail = tail + 1;
+        }
       }
-    }
 
-    color[u] = 2;
+      color[u] = 2;
+    }
   }
 }
