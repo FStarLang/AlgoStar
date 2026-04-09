@@ -14,6 +14,14 @@ open Pulse.Lib.C.Array
 
 #restart-solver
 
+open AVCBridgeLemmas
+
+#restart-solver
+
+open CLRS.Ch35.VertexCover.Spec
+
+#restart-solver
+
 fn func_approx_vertex_cover (var_adj: (array Int32.t)) (var_n: SizeT.t) (var_cover: (array Int32.t))
   requires
     exists* (val_adj_0: (Seq.seq (option Int32.t))) (val_adj_1: (nat->prop)).
@@ -35,6 +43,19 @@ fn func_approx_vertex_cover (var_adj: (array Int32.t)) (var_n: SizeT.t) (var_cov
   ensures
     exists* (val_cover_0: (Seq.seq (option Int32.t))) (val_cover_1: (nat->prop)).
     ((array_pts_to var_cover 1.0R val_cover_0 val_cover_1))
+  ensures
+    (with_pure
+      (AVCHelper.outer_inv_pure
+(array_value_of var_adj)
+(array_value_of var_cover)
+(SizeT.v var_n)
+(SizeT.v var_n)))
+  ensures
+    (with_pure
+      (CLRS.Ch35.VertexCover.Spec.is_cover
+(AVCBridgeLemmas.to_int_seq (array_value_of var_adj))
+(AVCBridgeLemmas.to_int_seq (array_value_of var_cover))
+(SizeT.v var_n) (SizeT.v var_n) 0))
 {
   let mut var_adj = var_adj;
   let mut var_n = var_n;
@@ -106,4 +127,5 @@ pure (AVCHelper.inner_inv_pure sa sc (SizeT.v (!var_n)) (SizeT.v (!var_u)) (Size
     };
     var_u := ((!var_u) `SizeT.add` 1sz);
   };
+  AVCBridgeLemmas.bridge_full (array_value_of (!var_adj)) (array_value_of (!var_cover)) (SizeT.v (!var_n));
 }
