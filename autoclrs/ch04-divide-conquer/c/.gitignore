@@ -1,0 +1,5 @@
+_cache/
+*.fst
+!c2pulse.h
+*_diagnostics.json
+*_source_range_info.json
