@@ -45,6 +45,9 @@ void rb_insert(_array rb_node *nodes, size_t max_cap, size_t *p_cap, size_t *p_r
   _ensures(_forall(size_t i, i < *p_cap ==>
     nodes[i].left  <= *p_cap &&
     nodes[i].right <= *p_cap))
+  /* Capacity grows by at most 1 */
+  _ensures((_specint) *p_cap >= (_specint) _old(*p_cap))
+  _ensures((_specint) *p_cap <= (_specint) _old(*p_cap) + 1)
 {
   size_t cap = *p_cap;
   size_t root = *p_root;

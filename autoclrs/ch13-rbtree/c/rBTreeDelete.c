@@ -74,9 +74,10 @@ void rb_transplant(_array rb_node_p *nodes, size_t cap, size_t *p_root,
 }
 
 /*
- * Find minimum in subtree: writes result to *p_min.
+ * Find minimum in subtree: recursive version returning index.
+ * fuel bounds recursion depth (pass cap for initial call).
  */
-void tree_minimum(_array rb_node_p *nodes, size_t cap, size_t idx, size_t *p_min)
+_rec size_t tree_minimum(_array rb_node_p *nodes, size_t cap, size_t idx, size_t fuel)
   _preserves(nodes._length == cap)
   _preserves(cap > 0)
   _requires(idx < cap)
@@ -84,24 +85,21 @@ void tree_minimum(_array rb_node_p *nodes, size_t cap, size_t idx, size_t *p_min
     nodes[i].left   <= cap &&
     nodes[i].right  <= cap &&
     nodes[i].parent <= cap))
-  _ensures(*p_min < cap)
+  _ensures(return < cap)
+  /* Frame: arrays are unmodified */
+  _ensures(_forall(size_t i, i < cap ==>
+    nodes[i].key    == _old(nodes[i].key) &&
+    nodes[i].color  == _old(nodes[i].color) &&
+    nodes[i].left   == _old(nodes[i].left) &&
+    nodes[i].right  == _old(nodes[i].right) &&
+    nodes[i].parent == _old(nodes[i].parent)))
+  _decreases((_specint) fuel)
 {
-  size_t curr = idx;
-  while (nodes[curr].left < cap)
-    _invariant(_live(curr))
-    _invariant(_live(*nodes))
-    _invariant(_live(*p_min))
-    _invariant(nodes._length == cap)
-    _invariant(cap > 0)
-    _invariant(curr < cap)
-    _invariant(_forall(size_t i, i < cap ==>
-      nodes[i].left   <= cap &&
-      nodes[i].right  <= cap &&
-      nodes[i].parent <= cap))
-  {
-    curr = nodes[curr].left;
+  size_t left = nodes[idx].left;
+  if (fuel == 0 || left >= cap) {
+    return idx;
   }
-  *p_min = curr;
+  return tree_minimum(nodes, cap, left, fuel - 1);
 }
 
 /*
@@ -157,8 +155,7 @@ void delete_two_children(_array rb_node_p *nodes, size_t cap, size_t *p_root,
     nodes[i].parent <= cap))
   _ensures(*p_root <= cap)
 {
-  size_t y = cap;
-  tree_minimum(nodes, cap, zr, &y);
+  size_t y = tree_minimum(nodes, cap, zr, cap);
 
   int32_t yk = nodes[y].key;
   int32_t zc = nodes[z].color;

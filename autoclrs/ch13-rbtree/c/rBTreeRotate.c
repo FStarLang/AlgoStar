@@ -39,6 +39,10 @@ void left_rotate(_array rb_node_p *nodes, size_t cap, size_t *p_root, size_t x)
     nodes[i].right <= cap &&
     nodes[i].parent <= cap))
   _ensures(*p_root < cap)
+  /* Keys and colors are preserved by rotation */
+  _ensures(_forall(size_t i, i < cap ==>
+    nodes[i].key   == _old(nodes[i].key) &&
+    nodes[i].color == _old(nodes[i].color)))
 {
   /* Read all values before any mutation — only scalars, no struct vars */
   size_t y  = nodes[x].right;
@@ -127,6 +131,10 @@ void right_rotate(_array rb_node_p *nodes, size_t cap, size_t *p_root, size_t y_
     nodes[i].right <= cap &&
     nodes[i].parent <= cap))
   _ensures(*p_root < cap)
+  /* Keys and colors are preserved by rotation */
+  _ensures(_forall(size_t i, i < cap ==>
+    nodes[i].key   == _old(nodes[i].key) &&
+    nodes[i].color == _old(nodes[i].color)))
 {
   /* Read all values before any mutation */
   size_t x  = nodes[y_idx].left;

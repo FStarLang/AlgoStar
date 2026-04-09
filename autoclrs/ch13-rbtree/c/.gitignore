@@ -3,3 +3,4 @@ _cache/
 *_diagnostics.json
 *_source_range_info.json
 !c2pulse.h
+!CLRS.Ch13.RBTree.C.BridgeLemmas.fst
