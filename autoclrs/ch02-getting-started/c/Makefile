@@ -29,12 +29,13 @@ endif
 CACHE_DIR  := _cache
 
 FSTAR = $(FSTAR_EXE) \
+	$(OTHERFLAGS) \
 	--cache_checked_modules \
 	--cache_dir $(CACHE_DIR) \
 	--include $(PULSE_LIB) \
 	--include $(CH02_DIR) \
 	--include $(COMMON_DIR) \
-	--z3rlimit 40 \
+	--z3rlimit 80 \
 	--already_cached Prims,FStar,Pulse.Nolib,Pulse.Class,Pulse.Lib,PulseCore
 
 # ── Source files ───────────────────────────────────────────────────
@@ -62,13 +63,19 @@ $(foreach f,$(C_FILES),$(eval $(call make_fst_rule,$(f))))
 %.fst:
 	$(C2PULSE) $<
 
-# fstar: .fst → .checked
-$(CACHE_DIR)/%.fst.checked: %.fst
+# fstar: .fst → .checked  (helpers first so caches are ready)
+$(CACHE_DIR)/%.fst.checked: %.fst | $(HELPER_CHECKED)
 	@mkdir -p $(CACHE_DIR)
 	$(FSTAR) --force $<
 	@touch $@
 
-verify: $(CHECKED) $(HELPER_CHECKED)
+# Helper modules have no ordering constraint among themselves
+$(HELPER_CHECKED): $(CACHE_DIR)/%.fst.checked: %.fst
+	@mkdir -p $(CACHE_DIR)
+	$(FSTAR) --force $<
+	@touch $@
+
+verify: $(HELPER_CHECKED) $(CHECKED)
 
 clean:
 	rm -rf $(CACHE_DIR) $(FST_FILES)
