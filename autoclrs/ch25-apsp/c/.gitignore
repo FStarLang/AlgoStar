@@ -1,4 +1,5 @@
 _cache/
-*.fst
+# c2pulse-generated .fst (FloydWarshall.fst from floydWarshall.c)
+FloydWarshall.fst
 *_diagnostics.json
 *_source_range_info.json
