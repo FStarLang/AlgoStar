@@ -55,6 +55,10 @@ HELPER_CHECKED := $(addprefix $(CACHE_DIR)/,$(addsuffix .checked,$(HELPER_FST)))
 
 # ── Rules ──────────────────────────────────────────────────────────
 
+# Generated .fst files depend on helper modules being checked first
+# (e.g., Max_flow.fst opens BridgeLemmas via _include_pulse)
+$(CHECKED): $(HELPER_CHECKED)
+
 # Generate per-file rules: MaxFlow.fst: max_flow.c $(C2PULSE) c2pulse.h
 define make_fst_rule
 $(call c_to_fst,$(1)): $(1) $$(C2PULSE) c2pulse.h

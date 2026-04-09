@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include "c2pulse.h"
 
+_include_pulse(open CLRS.Ch26.MaxFlow.C.BridgeLemmas)
+
 /* ================================================================
    ZERO INITIALIZATION
    ================================================================ */
@@ -28,6 +30,7 @@
 void zero_init(_array int *arr, size_t len)
   _requires(arr._length == len)
   _ensures(arr._length == len)
+  _ensures(_forall(size_t k, k < len ==> arr[k] == 0))
 {
   _ghost_stmt(admit());
   for (size_t i = 0; i < len; i = i + 1)
@@ -35,6 +38,7 @@ void zero_init(_array int *arr, size_t len)
     _invariant(_live(*arr))
     _invariant(arr._length == len)
     _invariant(i <= len)
+    _invariant(_forall(size_t k, k < i ==> arr[k] == 0))
   {
     arr[i] = 0;
   }
@@ -53,6 +57,10 @@ void bfs_init(
   _requires(color._length == n && pred._length == n && dist._length == n)
   _requires(n > 0 && source < n)
   _ensures(color._length == n && pred._length == n && dist._length == n)
+  _ensures(color[source] == 1 && dist[source] == 0)
+  _ensures(_forall(size_t i, i < n && i != source ==> color[i] == 0))
+  _ensures(_forall(size_t i, i < n && i != source ==> pred[i] == n))
+  _ensures(_forall(size_t i, i < n && i != source ==> dist[i] == -1))
 {
   _ghost_stmt(admit());
   for (size_t i = 0; i < n; i = i + 1)
@@ -153,8 +161,51 @@ int bfs_residual(
 }
 
 /* ================================================================
-   BOTTLENECK COMPUTATION
+   BOTTLENECK COMPUTATION (recursive)
    ================================================================ */
+
+/*
+ * Recursive helper: walk pred chain from cur to source, tracking min
+ * residual capacity in bn.  fuel limits recursion depth (≤ n).
+ */
+_rec int find_bottleneck_rec(
+    _array int *cap,
+    _array int *flow,
+    _array size_t *pred,
+    size_t n,
+    size_t source,
+    size_t cur,
+    int bn,
+    size_t fuel)
+  _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
+            pred._length == n)
+  _requires(n > 0 && source < n && cur < n && bn > 0 && fuel <= n)
+  _preserves_value(cap._length)
+  _preserves_value(flow._length)
+  _preserves_value(pred._length)
+  _ensures(return > 0)
+  _decreases((_specint) fuel)
+{
+  _ghost_stmt(admit());
+  if (cur == source || fuel == 0) {
+    return bn;
+  }
+  size_t u = pred[cur];
+  if (u >= n) {
+    return bn;
+  }
+
+  int res_fwd = cap[u * n + cur] - flow[u * n + cur];
+  int new_bn = bn;
+  if (res_fwd > 0) {
+    if (res_fwd < bn) new_bn = res_fwd;
+  } else {
+    int res_bwd = flow[cur * n + u];
+    if (res_bwd > 0 && res_bwd < bn) new_bn = res_bwd;
+  }
+
+  return find_bottleneck_rec(cap, flow, pred, n, source, u, new_bn, fuel - 1);
+}
 
 /*
  * Find min residual capacity along pred chain from sink to source.
@@ -174,37 +225,52 @@ int find_bottleneck(
   _ensures(return > 0)
 {
   _ghost_stmt(admit());
-  int bn = 2147483647;
-  size_t cur = sink;
-
-  while (cur != source)
-    _invariant(_live(cur) && _live(bn))
-    _invariant(_live(*cap) && _live(*flow) && _live(*pred))
-    _invariant(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
-               pred._length == n)
-    _invariant(cur < n)
-    _invariant(bn > 0)
-  {
-    size_t u = pred[cur];
-    if (u >= n) break;
-
-    int res_fwd = cap[u * n + cur] - flow[u * n + cur];
-    if (res_fwd > 0) {
-      if (res_fwd < bn) bn = res_fwd;
-    } else {
-      int res_bwd = flow[cur * n + u];
-      if (res_bwd > 0 && res_bwd < bn) bn = res_bwd;
-    }
-
-    cur = u;
-  }
-
-  return bn;
+  return find_bottleneck_rec(cap, flow, pred, n, source, sink, 2147483647, n);
 }
 
 /* ================================================================
-   FLOW AUGMENTATION
+   FLOW AUGMENTATION (recursive)
    ================================================================ */
+
+/*
+ * Recursive helper: walk pred chain from cur to source, augmenting
+ * flow by bn units along each edge.  fuel limits recursion depth.
+ */
+_rec void augment_flow_rec(
+    _array int *cap,
+    _array int *flow,
+    _array size_t *pred,
+    size_t n,
+    size_t source,
+    size_t cur,
+    int bn,
+    size_t fuel)
+  _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
+            pred._length == n)
+  _requires(n > 0 && source < n && cur < n && bn > 0 && fuel <= n)
+  _preserves_value(cap._length)
+  _preserves_value(pred._length)
+  _ensures(flow._length == (_specint)n * (_specint)n)
+  _decreases((_specint) fuel)
+{
+  _ghost_stmt(admit());
+  if (cur == source || fuel == 0) {
+    return;
+  }
+  size_t u = pred[cur];
+  if (u >= n) {
+    return;
+  }
+
+  int res_fwd = cap[u * n + cur] - flow[u * n + cur];
+  if (res_fwd > 0) {
+    flow[u * n + cur] = flow[u * n + cur] + bn;
+  } else {
+    flow[cur * n + u] = flow[cur * n + u] - bn;
+  }
+
+  augment_flow_rec(cap, flow, pred, n, source, u, bn, fuel - 1);
+}
 
 /*
  * Augment flow along the pred chain by bn units.
@@ -224,27 +290,7 @@ void augment_flow(
            pred._length == n)
 {
   _ghost_stmt(admit());
-  size_t cur = sink;
-
-  while (cur != source)
-    _invariant(_live(cur) && _live(bn))
-    _invariant(_live(*cap) && _live(*flow) && _live(*pred))
-    _invariant(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
-               pred._length == n)
-    _invariant(cur < n)
-  {
-    size_t u = pred[cur];
-    if (u >= n) break;
-
-    int res_fwd = cap[u * n + cur] - flow[u * n + cur];
-    if (res_fwd > 0) {
-      flow[u * n + cur] = flow[u * n + cur] + bn;
-    } else {
-      flow[cur * n + u] = flow[cur * n + u] - bn;
-    }
-
-    cur = u;
-  }
+  augment_flow_rec(cap, flow, pred, n, source, sink, bn, n);
 }
 
 /* ================================================================
@@ -300,6 +346,7 @@ int max_flow(
   _requires(n > 0 && source < n && sink < n && source != sink)
   _ensures(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n)
   _ensures(return >= 0)
+  _ensures(_forall(size_t k, k < (_specint)n * (_specint)n ==> flow[k] >= 0))
 {
   _ghost_stmt(admit());
 

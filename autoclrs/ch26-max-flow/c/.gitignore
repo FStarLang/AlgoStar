@@ -1,4 +1,5 @@
 _cache/
 *.fst
+!CLRS.Ch26.MaxFlow.C.BridgeLemmas.fst
 *_diagnostics.json
 *_source_range_info.json
