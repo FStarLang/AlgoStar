@@ -39,6 +39,8 @@ void insertion_sort(_array int *a, size_t len)
     _invariant(a._length == len)
     _invariant(i <= len)
     _invariant(_forall(size_t k, k + 1 < i ==> a[k] <= a[k + 1]))
+    /* frame: elements past current position are unchanged */
+    _invariant(_forall(size_t k, k >= i && k < len ==> a[k] == _old(a[k])))
   {
     size_t j = i;
     while (j > 0)
@@ -54,6 +56,8 @@ void insertion_sort(_array int *a, size_t len)
       _invariant(j < i ==> _forall(size_t k, j < k && k <= i ==> a[j] <= a[k]))
       /* boundary: prefix end <= displaced start */
       _invariant(j > 0 && j + 1 <= i ==> a[j - 1] <= a[j + 1])
+      /* frame: elements past i are unchanged */
+      _invariant(_forall(size_t k, k > i && k < len ==> a[k] == _old(a[k])))
       /* post-loop: a[0..i] sorted */
       _ensures(_forall(size_t k, k + 1 <= i ==> a[k] <= a[k + 1]))
     {

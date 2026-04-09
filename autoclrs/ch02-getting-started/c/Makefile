@@ -69,11 +69,15 @@ $(CACHE_DIR)/%.fst.checked: %.fst | $(HELPER_CHECKED)
 	$(FSTAR) --force $<
 	@touch $@
 
-# Helper modules have no ordering constraint among themselves
+# Helper modules (hand-written .fst files)
 $(HELPER_CHECKED): $(CACHE_DIR)/%.fst.checked: %.fst
 	@mkdir -p $(CACHE_DIR)
 	$(FSTAR) --force $<
 	@touch $@
+
+# Bridge-lemma dependency: MergeSort bridge depends on InsertionSort bridge
+$(CACHE_DIR)/CLRS.Ch02.MergeSort.C.BridgeLemmas.fst.checked: \
+	$(CACHE_DIR)/CLRS.Ch02.InsertionSort.C.BridgeLemmas.fst.checked
 
 verify: $(HELPER_CHECKED) $(CHECKED)
 
