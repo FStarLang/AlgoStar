@@ -1,5 +1,5 @@
 /*
- * Graham Scan helpers — CLRS Chapter 33, Section 33.3
+ * Graham Scan — CLRS Chapter 33, Section 33.3
  *
  * C implementation with c2pulse verification.
  *
@@ -8,8 +8,10 @@
  *      (minimum y, tiebreak minimum x) — the is_bottommost property.
  *   2. polar_cmp correctly computes the cross product for polar
  *      angle comparison relative to a pivot point.
+ *   3. pop_while (recursive) pops non-left-turn elements from hull stack.
+ *   4. graham_scan_step performs one scan iteration: pop then push.
  *
- * Coordinates are bounded to [-16383, 16383] for polar_cmp to ensure
+ * Coordinates are bounded to [-16383, 16383] to ensure
  * all Int32 intermediate computations stay within range.
  *
  * Equivalent to CLRS.Ch33.GrahamScan.Impl.fsti specifications.
@@ -77,6 +79,7 @@ int polar_cmp(_array int *xs, _array int *ys, size_t len,
   _requires(ys[b] > -16384 && ys[b] < 16384)
   _preserves_value(xs._length)
   _preserves_value(ys._length)
+  _ensures((_specint) return == ((_specint) xs[a] - (_specint) xs[p0]) * ((_specint) ys[b] - (_specint) ys[p0]) - ((_specint) xs[b] - (_specint) xs[p0]) * ((_specint) ys[a] - (_specint) ys[p0]))
 {
   int ax = xs[a] - xs[p0];
   _assert(ax > -32767 && ax < 32767);
@@ -91,4 +94,95 @@ int polar_cmp(_array int *xs, _array int *ys, size_t len,
   int term2 = bx * ay;
   _assert(term2 > -1073741824 && term2 < 1073741824);
   return term1 - term2;
+}
+
+/*
+ * Cross product helper for Graham scan.
+ * Computes (p2-p1) × (p3-p1) using bounded Int32 arithmetic.
+ */
+int gs_cross(int x1, int y1, int x2, int y2, int x3, int y3)
+  _requires(x1 > -16384 && x1 < 16384 && y1 > -16384 && y1 < 16384)
+  _requires(x2 > -16384 && x2 < 16384 && y2 > -16384 && y2 < 16384)
+  _requires(x3 > -16384 && x3 < 16384 && y3 > -16384 && y3 < 16384)
+  _ensures((_specint) return == ((_specint) x2 - (_specint) x1) * ((_specint) y3 - (_specint) y1) - ((_specint) x3 - (_specint) x1) * ((_specint) y2 - (_specint) y1))
+{
+  int dx2 = x2 - x1;
+  _assert(dx2 > -32767 && dx2 < 32767);
+  int dy2 = y2 - y1;
+  _assert(dy2 > -32767 && dy2 < 32767);
+  int dx3 = x3 - x1;
+  _assert(dx3 > -32767 && dx3 < 32767);
+  int dy3 = y3 - y1;
+  _assert(dy3 > -32767 && dy3 < 32767);
+  int term1 = dx2 * dy3;
+  _assert(term1 > -1073741824 && term1 < 1073741824);
+  int term2 = dx3 * dy2;
+  _assert(term2 > -1073741824 && term2 < 1073741824);
+  return term1 - term2;
+}
+
+/*
+ * Pop non-left-turn elements from the hull stack (recursive).
+ *
+ * Given the hull stack indices in hull[0..top), check whether the top
+ * two hull points and the new point p_idx form a left turn (cross
+ * product > 0). If not, pop the top element and recurse.
+ *
+ * Requires top >= 2. Returns the new top index in [1, top].
+ */
+_rec size_t pop_while(_array int *xs, _array int *ys, size_t len,
+                      _array size_t *hull, size_t top, size_t p_idx)
+  _requires(xs._length == len && ys._length == len)
+  _requires(top >= 2 && top <= hull._length)
+  _requires(p_idx < len)
+  _requires(_forall(size_t i, i < top ==> hull[i] < len))
+  _requires(_forall(size_t k, k < len ==> xs[k] > -16384 && xs[k] < 16384))
+  _requires(_forall(size_t k, k < len ==> ys[k] > -16384 && ys[k] < 16384))
+  _preserves_value(xs._length)
+  _preserves_value(ys._length)
+  _preserves_value(hull._length)
+  _ensures(return >= 1 && return <= top)
+  _ensures(_forall(size_t k, k < hull._length ==> hull[k] == _old(hull[k])))
+  _ensures(_forall(size_t k, k < len ==> xs[k] == _old(xs[k])))
+  _ensures(_forall(size_t k, k < len ==> ys[k] == _old(ys[k])))
+  _decreases(top)
+{
+  size_t t1_idx = hull[top - 1];
+  size_t t2_idx = hull[top - 2];
+
+  /* Cross product: (t2→t1) × (t2→p) */
+  int cp = gs_cross(xs[t2_idx], ys[t2_idx],
+                    xs[t1_idx], ys[t1_idx],
+                    xs[p_idx], ys[p_idx]);
+
+  if (cp <= 0) {
+    if (top == 2) return 1;
+    return pop_while(xs, ys, len, hull, top - 1, p_idx);
+  }
+  return top;
+}
+
+/*
+ * One step of the Graham scan: pop non-left-turns, then push p_idx.
+ *
+ * hull is modified: hull[new_top] = p_idx.
+ * Returns the new stack top (>= 2).
+ */
+size_t graham_scan_step(_array int *xs, _array int *ys, size_t len,
+                        _array size_t *hull, size_t top, size_t p_idx)
+  _requires(xs._length == len && ys._length == len)
+  _requires(top >= 2 && top < hull._length)
+  _requires(hull._length <= len)
+  _requires(p_idx < len)
+  _requires(_forall(size_t i, i < top ==> hull[i] < len))
+  _requires(_forall(size_t k, k < len ==> xs[k] > -16384 && xs[k] < 16384))
+  _requires(_forall(size_t k, k < len ==> ys[k] > -16384 && ys[k] < 16384))
+  _preserves_value(xs._length)
+  _preserves_value(ys._length)
+  _preserves_value(hull._length)
+  _ensures(return >= 2 && return <= hull._length)
+{
+  size_t new_top = pop_while(xs, ys, len, hull, top, p_idx);
+  hull[new_top] = p_idx;
+  return new_top + 1;
 }

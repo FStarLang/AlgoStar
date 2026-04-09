@@ -21,6 +21,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(
+  open CLRS.Ch33.Segments.Spec
+  open FStar.Mul
+)
+
 /* Cross product (p2-p1) × (p3-p1).
  *   > 0 if p3 is to the left of line p1→p2 (CCW)
  *   < 0 if p3 is to the right (CW)
@@ -31,6 +36,7 @@ int cross_product(int x1, int y1, int x2, int y2, int x3, int y3)
   _requires(x2 > -16384 && x2 < 16384 && y2 > -16384 && y2 < 16384)
   _requires(x3 > -16384 && x3 < 16384 && y3 > -16384 && y3 < 16384)
   _ensures(return == (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
+  _ensures((_specint) return == ((_specint) x2 - (_specint) x1) * ((_specint) y3 - (_specint) y1) - ((_specint) x3 - (_specint) x1) * ((_specint) y2 - (_specint) y1))
 {
   int dx21 = x2 - x1;
   int dy31 = y3 - y1;
@@ -75,6 +81,7 @@ bool segments_intersect(int x1, int y1, int x2, int y2,
   _requires(x2 > -16384 && x2 < 16384 && y2 > -16384 && y2 < 16384)
   _requires(x3 > -16384 && x3 < 16384 && y3 > -16384 && y3 < 16384)
   _requires(x4 > -16384 && x4 < 16384 && y4 > -16384 && y4 < 16384)
+  _ensures((bool) _inline_pulse($(return) == segments_intersect_spec (Int32.v $(x1)) (Int32.v $(y1)) (Int32.v $(x2)) (Int32.v $(y2)) (Int32.v $(x3)) (Int32.v $(y3)) (Int32.v $(x4)) (Int32.v $(y4))))
 {
   int d1 = cross_product(x3, y3, x4, y4, x1, y1);
   int d2 = cross_product(x3, y3, x4, y4, x2, y2);
