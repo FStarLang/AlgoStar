@@ -64,7 +64,9 @@ $(foreach f,$(C_FILES),$(eval $(call make_fst_rule,$(f))))
 	$(C2PULSE) $<
 
 # Per-file z3rlimit overrides (default 40 is too low for complex files)
-EXTRA_FSTAR_RabinKarp.fst = --z3rlimit 200
+EXTRA_FSTAR_NaiveStringMatch.fst = --z3rlimit 400 --fuel 4 --ifuel 2
+EXTRA_FSTAR_RabinKarp.fst = --z3rlimit 400
+EXTRA_FSTAR_KMP.fst = --z3rlimit 200 --fuel 2 --ifuel 1 --split_queries always
 
 # fstar: .fst → .checked
 $(CACHE_DIR)/%.fst.checked: %.fst

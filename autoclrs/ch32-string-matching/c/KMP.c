@@ -5,12 +5,18 @@
  * Two phases: compute_prefix fills the prefix (failure) function,
  * then kmp_count uses it for linear-time matching.
  *
- * Proves: memory safety, pi bounds (0 <= pi[j] <= j), count <= n-m+1.
+ * Proves: memory safety, pi bounds (0 <= pi[j] <= j),
+ *         functional correctness: count == count_matches_spec.
  */
 
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
+
+_include_pulse(open CLRS.Ch32.KMP.PureDefs)
+_include_pulse(open CLRS.Ch32.KMP.Spec)
+_include_pulse(open CLRS.Ch32.KMP.C.BridgeLemmas)
+_include_pulse(open CLRS.Ch32.KMP.Bridge)
 
 /* Compute the prefix (failure) function for pattern[0..m-1].
  * Stores pi[j] = length of longest proper prefix of pattern[0..j]
@@ -77,59 +83,197 @@ size_t kmp_count(_array int *text, size_t n,
   _requires((_specint) m < 2147483647)
   _requires(_forall(size_t j, j < m ==> pi[j] >= 0))
   _requires(_forall(size_t j, j < m ==> (_specint) pi[j] <= (_specint) j))
+  _requires((_slprop) _inline_pulse(
+    with_pure (
+      pi_max
+        (unwrap_int_seq (array_value_of var_pattern) (SizeT.v var_m))
+        (unwrap_int_seq (array_value_of var_pi) (SizeT.v var_m))
+    )
+  ))
   _ensures(return <= n - m + 1)
   _ensures(_forall(size_t j, j < m ==> pi[j] >= 0))
   _ensures(_forall(size_t j, j < m ==> (_specint) pi[j] <= (_specint) j))
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      SizeT.v return_1 =
+        count_matches_spec
+          (unwrap_int_seq (array_value_of var_text) (SizeT.v var_n))
+          (unwrap_int_seq (array_value_of var_pattern) (SizeT.v var_m))
+          (SizeT.v var_n) (SizeT.v var_m)
+    )
+  ))
 {
+  _ghost_stmt(let _vt = array_value_of (!var_text));
+  _ghost_stmt(let _vp = array_value_of (!var_pattern));
+  _ghost_stmt(let _vpi = array_value_of (!var_pi));
+
+  _ghost_stmt(
+    is_max_prefix_below_init
+      (unwrap_int_seq _vt (SizeT.v (!var_n)))
+      (unwrap_int_seq _vp (SizeT.v (!var_m)))
+      (SizeT.v (!var_n)) (SizeT.v (!var_m))
+  );
+
   int q = 0;
   size_t count = 0;
   for (size_t i = 0; i < n; i = i + 1)
     _invariant(_live(i) && _live(q) && _live(count))
-    _invariant(_live(*text) && _live(*pattern) && _live(*pi))
-    _invariant(text._length == n && pattern._length == m && pi._length == m)
-    _invariant(i <= n)
-    _invariant(q >= 0 && (_specint) q < (_specint) m)
-    _invariant((_specint) q <= (_specint) i)
-    _invariant(m > 0 && m <= n)
-    _invariant((_specint) m < 2147483647)
+    _invariant((_slprop) _inline_pulse(
+      exists* (mask_t: (nat -> prop)) (mask_p: (nat -> prop)) (mask_pi: (nat -> prop)).
+        (array_pts_to (!var_text) 1.0R _vt mask_t) **
+        (array_pts_to (!var_pattern) 1.0R _vp mask_p) **
+        (array_pts_to (!var_pi) 1.0R _vpi mask_pi)
+    ))
+    _invariant(text._length == n && pattern._length == m && pi._length == m && i <= n && q >= 0 && (_specint) q < (_specint) m && (_specint) q <= (_specint) i && (_specint) q + 1 <= 2147483647 && m > 0 && m <= n && (_specint) m < 2147483647)
     _invariant(_forall(size_t j, j < m ==> pi[j] >= 0))
     _invariant(_forall(size_t j, j < m ==> (_specint) pi[j] <= (_specint) j))
     _invariant((_specint) i < (_specint) m ==> count == 0)
     _invariant((_specint) i >= (_specint) m ==> (_specint) count <= (_specint) i - (_specint) m + 1)
+    _invariant((_slprop) _inline_pulse(
+      with_pure (
+        Prims.l_and
+          (pi_max
+            (unwrap_int_seq _vp (SizeT.v (!var_m)))
+            (unwrap_int_seq _vpi (SizeT.v (!var_m))))
+          (Prims.l_and
+            (is_max_prefix_below
+              (unwrap_int_seq _vt (SizeT.v (!var_n)))
+              (unwrap_int_seq _vp (SizeT.v (!var_m)))
+              (SizeT.v (!var_i))
+              (to_nat (Int32.v (!var_q))))
+            (Prims.l_and
+              (SizeT.v (!var_i) >= SizeT.v (!var_m) ==>
+                SizeT.v (!var_count) =
+                  count_before
+                    (unwrap_int_seq _vt (SizeT.v (!var_n)))
+                    (unwrap_int_seq _vp (SizeT.v (!var_m)))
+                    (SizeT.v (!var_i) - SizeT.v (!var_m) + 1))
+              (SizeT.v (!var_i) < SizeT.v (!var_m) ==>
+                SizeT.v (!var_count) = 0)))
+      )
+    ))
   {
-    /* Follow failure chain */
-    while (q > 0)
-      _invariant(_live(q))
-      _invariant(_live(*text) && _live(*pattern) && _live(*pi))
-      _invariant(text._length == n && pattern._length == m && pi._length == m)
-      _invariant(q >= 0 && (_specint) q < (_specint) m)
-      _invariant((_specint) q <= (_specint) i)
-      _invariant(i < n)
-      _invariant(m > 0 && m <= n)
-      _invariant((_specint) m < 2147483647)
+    int q_init = q;
+    /* Follow failure chain (break-free compound condition) */
+    int found = 0;
+    while (q > 0 && found == 0)
+      _invariant(_live(q) && _live(found) && _live(q_init))
+      _invariant((_slprop) _inline_pulse(
+        exists* (mask_t: (nat -> prop)) (mask_p: (nat -> prop)) (mask_pi: (nat -> prop)).
+          (array_pts_to (!var_text) 1.0R _vt mask_t) **
+          (array_pts_to (!var_pattern) 1.0R _vp mask_p) **
+          (array_pts_to (!var_pi) 1.0R _vpi mask_pi)
+      ))
+      _invariant(text._length == n && pattern._length == m && pi._length == m && q >= 0 && (_specint) q < (_specint) m && (_specint) q <= (_specint) i && i < n && (_specint) q + 1 <= 2147483647 && m > 0 && m <= n && (_specint) m < 2147483647 && (found == 0 || found == 1) && q_init >= 0 && (_specint) q_init < (_specint) m && (_specint) q <= (_specint) q_init)
       _invariant(_forall(size_t j, j < m ==> pi[j] >= 0))
       _invariant(_forall(size_t j, j < m ==> (_specint) pi[j] <= (_specint) j))
-      _ensures(q >= 0 && (_specint) q < (_specint) m)
-      _ensures((_specint) q <= (_specint) i)
-      _ensures(text._length == n && pattern._length == m && pi._length == m)
-      _ensures(_forall(size_t j, j < m ==> pi[j] >= 0))
-      _ensures(_forall(size_t j, j < m ==> (_specint) pi[j] <= (_specint) j))
-      _ensures((_specint) m < 2147483647)
-      _ensures(m > 0 && m <= n)
-      _ensures(i < n)
+      _invariant((_specint) i < (_specint) m ==> count == 0)
+      _invariant((_specint) i >= (_specint) m ==> (_specint) count <= (_specint) i - (_specint) m + 1)
+      _invariant((_slprop) _inline_pulse(
+        with_pure (
+          Prims.l_and
+            (pi_max
+              (unwrap_int_seq _vp (SizeT.v (!var_m)))
+              (unwrap_int_seq _vpi (SizeT.v (!var_m))))
+            (Prims.l_and
+              (is_max_prefix_below
+                (unwrap_int_seq _vt (SizeT.v (!var_n)))
+                (unwrap_int_seq _vp (SizeT.v (!var_m)))
+                (SizeT.v (!var_i))
+                (to_nat (Int32.v (!var_q_init))))
+              (Prims.l_and
+                (follow_fail
+                  (unwrap_int_seq _vp (SizeT.v (!var_m)))
+                  (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+                  (to_nat (Int32.v (!var_q_init)))
+                  (unwrap_int_val (Seq.index _vt (SizeT.v (!var_i))))
+                ==
+                follow_fail
+                  (unwrap_int_seq _vp (SizeT.v (!var_m)))
+                  (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+                  (to_nat (Int32.v (!var_q)))
+                  (unwrap_int_val (Seq.index _vt (SizeT.v (!var_i)))))
+                (Prims.l_and
+                  (SizeT.v (!var_i) >= SizeT.v (!var_m) ==>
+                    SizeT.v (!var_count) =
+                      count_before
+                        (unwrap_int_seq _vt (SizeT.v (!var_n)))
+                        (unwrap_int_seq _vp (SizeT.v (!var_m)))
+                        (SizeT.v (!var_i) - SizeT.v (!var_m) + 1))
+                  (Prims.l_and
+                    (SizeT.v (!var_i) < SizeT.v (!var_m) ==>
+                      SizeT.v (!var_count) = 0)
+                    (Prims.l_and
+                      (((to_nat (Int32.v (!var_found))) = 1) ==>
+                        ((to_nat (Int32.v (!var_q))) > 0))
+                      (((to_nat (Int32.v (!var_found))) = 1) ==>
+                        (unwrap_int_val (Seq.index _vp (to_nat (Int32.v (!var_q)))) =
+                         unwrap_int_val (Seq.index _vt (SizeT.v (!var_i)))))))))))
+      ))
     {
-      if (pattern[(size_t)q] == text[i]) break;
-      q = pi[(size_t)(q - 1)];
+      if (pattern[(size_t)q] == text[i]) {
+        found = 1;
+      } else {
+        _ghost_stmt(
+          follow_fail_step
+            (unwrap_int_seq _vp (SizeT.v (!var_m)))
+            (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+            (to_nat (Int32.v (!var_q)))
+            (unwrap_int_val (Seq.index _vt (SizeT.v (!var_i))))
+        );
+        q = pi[(size_t)(q - 1)];
+      }
     }
+
+    /* Bridge: connect inner loop result to kmp_step_result */
+    _ghost_stmt(
+      unwrap_seq_index_lemma _vp
+        (SizeT.v (!var_m))
+        (to_nat (Int32.v (!var_q)))
+    );
+
+    _ghost_stmt(
+      kmp_extend_connection
+        (unwrap_int_seq _vp (SizeT.v (!var_m)))
+        (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+        (to_nat (Int32.v (!var_q_init)))
+        (to_nat (Int32.v (!var_q)))
+        (unwrap_int_val (Seq.index _vt (SizeT.v (!var_i))))
+        (SizeT.v (!var_m))
+    );
 
     if (pattern[(size_t)q] == text[i]) {
       q = q + 1;
     }
 
-    if ((size_t)q == m) {
+    size_t count_before_match = count;
+
+    if (q >= 0 && (size_t)q == m) {
       count = count + 1;
       q = pi[(size_t)(q - 1)];
     }
+
+    _ghost_stmt(
+      kmp_count_step
+        (unwrap_int_seq _vt (SizeT.v (!var_n)))
+        (unwrap_int_seq _vp (SizeT.v (!var_m)))
+        (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+        (SizeT.v (!var_i))
+        (to_nat (Int32.v (!var_q_init)))
+        (SizeT.v (!var_count_before_match))
+    );
   }
+
+  _ghost_stmt(
+    count_finish _vt _vp
+      (SizeT.v (!var_n)) (SizeT.v (!var_m))
+  );
+  _ghost_stmt(
+    count_matches_spec_bounded
+      (unwrap_int_seq _vt (SizeT.v (!var_n)))
+      (unwrap_int_seq _vp (SizeT.v (!var_m)))
+      (SizeT.v (!var_n)) (SizeT.v (!var_m))
+  );
+
   return count;
 }
