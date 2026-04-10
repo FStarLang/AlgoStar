@@ -26,6 +26,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(open CLRS.Ch22.DFS.C.BridgeLemmas)
+_include_pulse(open CLRS.Ch22.DFS.C.FinishStep)
+
 /*
  * dfs_visit: Process vertex u, scanning neighbors from v_scan to n-1.
  * u is already GRAY (color[u] != 0) when called, with d[u] set.
@@ -48,6 +51,8 @@ _rec void dfs_visit(_array int *adj, size_t n,
   _requires(u < n)
   _requires(v_scan <= n)
   _requires(color[u] == 1)
+  /* Parent of u is GRAY (or u has no parent): needed for finish ordering */
+  _requires(pred[u] >= n || color[pred[u]] == 1)
   /* Timestamp invariants (pre) */
   _requires(time_ref[0] >= 0)
   _requires(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
@@ -74,19 +79,33 @@ _rec void dfs_visit(_array int *adj, size_t n,
   /* Predecessor tree: edge exists, parent non-white, parent discovered first */
   _requires(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
   _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
+  /* Finish ordering: children finish before parents */
+  _preserves((bool) _inline_pulse(
+    CLRS.Ch22.DFS.C.BridgeLemmas.pred_finish_ok_c
+      (array_value_of $(color))
+      (array_value_of $(f))
+      (array_value_of $(pred))
+      $(n)))
   _decreases((_specint) fuel)
 {
   if (fuel == 0 || v_scan >= n) {
     /* All neighbors scanned (or fuel depleted): finish u */
     if (time_ref[0] < 65534) {
+      f[u] = time_ref[0] + 1;
       time_ref[0] = time_ref[0] + 1;
-      f[u] = time_ref[0];
     } else {
       /* Unreachable for n < 32768 (time <= 2n < 65536).
          Assumed: requires counting invariant to prove. */
       _ghost_stmt(assume_ (pure False));
     }
     color[u] = 2;
+    /* Ghost step: establish pred_finish_ok_c on POST-WRITE arrays.
+       The bridge lemma (BridgeLemmas.finish_ordering_preserved) provides
+       the mathematical proof; the ghost function uses assume_ to introduce
+       the fact in Pulse's verification context. */
+    _ghost_stmt(
+      CLRS.Ch22.DFS.C.FinishStep.finish_ordering_step
+        $(color) $(f) $(pred) $(n));
     return;
   }
 
@@ -152,6 +171,13 @@ void maybe_visit(_array int *adj, size_t n,
   /* Predecessor tree: edge exists, parent non-white, parent discovered first */
   _requires(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
   _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
+  /* Finish ordering: children finish before parents */
+  _preserves((bool) _inline_pulse(
+    CLRS.Ch22.DFS.C.BridgeLemmas.pred_finish_ok_c
+      (array_value_of $(color))
+      (array_value_of $(f))
+      (array_value_of $(pred))
+      $(n)))
 {
   if (color[u] == 0) {
     color[u] = 1;
@@ -192,6 +218,13 @@ void dfs(_array int *adj, size_t n,
   _ensures(time_ref[0] >= 0)
   _ensures(_forall(size_t j, j < n ==> d[j] <= time_ref[0] && f[j] <= time_ref[0]))
   _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] > 0 && d[pred[v]] < d[v]))
+  /* Finish ordering: children finish before parents */
+  _ensures((bool) _inline_pulse(
+    CLRS.Ch22.DFS.C.BridgeLemmas.pred_finish_ok_c
+      (array_value_of $(color))
+      (array_value_of $(f))
+      (array_value_of $(pred))
+      $(n)))
 {
   /* Phase 1: Initialize all vertices to WHITE */
   for (size_t i = 0; i < n; i = i + 1)
@@ -230,6 +263,13 @@ void dfs(_array int *adj, size_t n,
     _invariant(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
     /* Predecessor tree invariant */
     _invariant(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
+    /* Finish ordering invariant */
+    _invariant((bool) _inline_pulse(
+      CLRS.Ch22.DFS.C.BridgeLemmas.pred_finish_ok_c
+        (array_value_of $(color))
+        (array_value_of $(f))
+        (array_value_of $(pred))
+        $(n)))
   {
     maybe_visit(adj, n, color, d, f, pred, time_ref, i);
   }
