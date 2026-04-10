@@ -5,6 +5,7 @@
  *   1. The result equals gcd_spec(a_init, b_init).
  *   2. The result is positive (> 0).
  *   3. The result divides both a_init and b_init.
+ *   4. O(log b) complexity bound: gcd_steps(a,b) <= 2*num_bits(b)+1.
  *
  * Based on CLRS p. 935, Alg 31.2 (Euclid's algorithm).
  * Uses recursive form matching the mathematical specification.
@@ -15,6 +16,7 @@
 
 _include_pulse(
   open CLRS.Ch31.GCD.Spec
+  open CLRS.Ch31.GCD.Complexity
   open FStar.Math.Euclid
 )
 
@@ -25,6 +27,7 @@ _rec size_t gcd(size_t a, size_t b)
     /\ SizeT.v $(return) > 0
     /\ divides (SizeT.v $(return)) (SizeT.v $(a))
     /\ divides (SizeT.v $(return)) (SizeT.v $(b))
+    /\ (SizeT.v $(b) > 0 ==> gcd_steps (SizeT.v $(a)) (SizeT.v $(b)) <= op_Multiply 2 (num_bits (SizeT.v $(b))) + 1)
   ))
   _decreases((_specint) b)
 {
@@ -32,6 +35,7 @@ _rec size_t gcd(size_t a, size_t b)
     _ghost_stmt(gcd_spec_divides (SizeT.v $(a)) (SizeT.v $(b)));
     return a;
   }
+  _ghost_stmt(lemma_gcd_steps_log (SizeT.v $(a)) (SizeT.v $(b)));
   size_t r = a % b;
   size_t d = gcd(b, r);
   _ghost_stmt(gcd_spec_divides (SizeT.v $(a)) (SizeT.v $(b)));
