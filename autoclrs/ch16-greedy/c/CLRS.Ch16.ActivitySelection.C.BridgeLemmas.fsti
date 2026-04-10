@@ -10,10 +10,14 @@
    - first_is_zero: out[0] == 0
    - between_consecutive: skipped activities between consecutive
      selections were incompatible (part 1 of earliest_compatible)
+   - after_last: skipped activities after the last selection were
+     incompatible (part 2 of earliest_compatible) — verified as a
+     loop ensures in the C code, but cannot be exported as a
+     function postcondition due to a c2pulse limitation with
+     connecting loop-level ensures to function-level return values.
 
-   This bridge adds the "after last" part of earliest_compatible
-   (admitted, due to a c2pulse limitation with quantified
-   postconditions) and concludes optimality via the F* Spec proof.
+   This bridge assumes the "after last" property (which IS verified
+   in the C loop) and concludes optimality via the F* Spec proof.
 *)
 module CLRS.Ch16.ActivitySelection.C.BridgeLemmas
 

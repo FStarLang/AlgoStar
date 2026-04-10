@@ -2,8 +2,10 @@
    Activity Selection — Bridge Lemmas (Implementation)
 
    Bridges C-level postconditions to the full F* optimality proof.
-   The "after last" part of earliest_compatible is admitted because
-   c2pulse cannot export it as a function postcondition (see .fsti).
+   The "after last" part of earliest_compatible is verified in the
+   C code's loop ensures (see ActivitySelection.c) but cannot be
+   exported as a function postcondition due to a c2pulse limitation.
+   It is assumed here to complete the bridge to the optimality proof.
 *)
 module CLRS.Ch16.ActivitySelection.C.BridgeLemmas
 
@@ -36,9 +38,8 @@ let bridge_c_to_optimal
        We need to establish the full earliest_compatible to invoke
        the optimality corollary. The "after last" part:
          forall z. sel[|sel|-1] < z < n ==> start[z] < finish[sel[|sel|-1]]
-       is admitted because the C postcondition cannot export it
-       (c2pulse with_pure limitation). The property holds by construction:
-       the greedy loop scans all activities z > sel[|sel|-1] and only skips
-       those with start[z] < last_finish = finish[sel[|sel|-1]]. *)
+       is assumed because the C function postcondition cannot export it
+       (c2pulse loop-ensures-to-return limitation). The property IS verified
+       in the C code's loop ensures — see ActivitySelection.c. *)
     assume (L.earliest_compatible sel start finish n n);
     S.corollary_greedy_count_is_maximum_l start finish n sel

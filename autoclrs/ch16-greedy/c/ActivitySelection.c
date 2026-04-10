@@ -10,12 +10,16 @@
  *   2. First selected activity is index 0
  *   3. Selected indices are valid (< n) and strictly increasing
  *   4. Pairwise compatibility: finish[out[j]] <= start[out[j+1]]
- *   5. Earliest compatible: every skipped activity is incompatible
- *      with the last selected before it
+ *   5. Earliest compatible (between consecutive): every skipped
+ *      activity between consecutive selections is incompatible
+ *   6. Earliest compatible (after last): every activity after the
+ *      last selection is incompatible (verified in loop ensures;
+ *      cannot be exported as a function postcondition due to a
+ *      c2pulse limitation with connecting loop ensures to return)
  *
- * The earliest_compatible property (5) is the key greedy invariant
- * that enables the optimality proof (CLRS Theorem 16.1) via
- * bridge lemmas in CLRS.Ch16.ActivitySelection.C.BridgeLemmas.
+ * Properties (5) and (6) together form the full earliest_compatible
+ * invariant that enables the optimality proof (CLRS Theorem 16.1)
+ * via bridge lemmas in CLRS.Ch16.ActivitySelection.C.BridgeLemmas.
  *
  * Preconditions:
  *   - finish times are sorted in non-decreasing order
@@ -102,6 +106,9 @@ size_t activity_selection(
     _ensures(_forall(size_t j, j + 1 < count ==>
       _forall(size_t z, out[j] < z && z < out[j + 1] && z < n ==>
         start_times[z] < finish_times[out[j]])))
+    /* after last: when loop ends, i==n, so the tail invariant gives us this */
+    _ensures(_forall(size_t z, out[count - 1] < z && z < n ==>
+      start_times[z] < finish_times[out[count - 1]]))
   {
     if (start_times[i] >= last_finish) {
       out[count] = i;
