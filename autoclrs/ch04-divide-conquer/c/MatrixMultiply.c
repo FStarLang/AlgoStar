@@ -1,8 +1,15 @@
 /*
  * Matrix Multiply — C implementation with c2pulse verification.
  *
- * Proves memory safety, array bounds, and absence of integer overflow
- * for the standard O(n^3) matrix multiplication algorithm.
+ * Proves:
+ *   1. Memory safety, array bounds, absence of integer overflow.
+ *
+ * NOTE: Functional correctness (mat_mul_correct) is NOT proven here.
+ * The Pulse Impl.fst proves it, but c2pulse's array_value_of observer
+ * cannot resolve ghost array sequences when 2+ arrays share the
+ * separation-logic context (Pulse elaboration limitation).
+ * The bridge lemmas module is provided for future use if this
+ * limitation is lifted.
  *
  * Matrices are stored in row-major flat arrays of size n*n.
  * Precondition: n <= 46 and max_val <= 46 ensures all intermediate
@@ -11,14 +18,16 @@
  * The algorithm is split into two functions to keep Pulse elaboration
  * tractable: dot_product handles the inner k-loop with its overflow
  * proof, while matrix_multiply handles the outer i,j loops.
- *
- * Equivalent structural properties to CLRS.Ch04.MatrixMultiply.Impl.fsti
- * (minus functional dot-product correctness).
  */
 
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
+
+_include_pulse(
+  open CLRS.Ch04.MatrixMultiply.C.BridgeLemmas
+  open CLRS.Ch04.MatrixMultiply.Spec
+)
 
 /*
  * Compute dot product of row i of A and column j of B.
@@ -56,6 +65,7 @@ int dot_product(
     _assert(av >= -max_val && av <= max_val);
     _assert(bv >= -max_val && bv <= max_val);
     int prod = av * bv;
+    _assert(prod >= -mv2 && prod <= mv2);
     sum = sum + prod;
     bound = bound + mv2;
   }
