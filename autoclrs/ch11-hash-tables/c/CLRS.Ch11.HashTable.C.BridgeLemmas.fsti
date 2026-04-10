@@ -70,6 +70,54 @@ let rec lemma_to_int_seq_index (s: Seq.seq (option Int32.t)) (i: nat) (j: nat)
 
 
 (** ================================================================
+    c2pulse-level valid_ht: mirrors Impl.valid_ht but uses the total
+    seq_val function on option-Int32 sequences, avoiding partial
+    Some?.v and Seq.index well-typedness issues in quantifiers.
+    ================================================================ *)
+let c_valid_ht (s: Seq.seq (option Int32.t)) (sz: nat) : prop =
+  sz > 0 /\ sz == Seq.length s /\
+  (forall (k: nat) (probe: nat). {:pattern (seq_val s (Impl.hash_probe_nat k probe sz))}
+    probe < sz /\ seq_val s (Impl.hash_probe_nat k probe sz) == k ==>
+    (forall (p: nat). {:pattern (Impl.hash_probe_nat k p sz)}
+      p < probe ==> seq_val s (Impl.hash_probe_nat k p sz) =!= -1))
+
+(** c_valid_ht is equivalent to Impl.valid_ht on the converted sequence *)
+val lemma_c_valid_ht_iff_valid_ht
+  (s: Seq.seq (option Int32.t))
+  (sz: nat)
+  : Lemma
+    (requires sz > 0 /\ sz == Seq.length s)
+    (ensures (lemma_to_int_seq_full_length s;
+              c_valid_ht s sz <==> Impl.valid_ht (to_int_seq_full s) sz))
+
+
+(** c_valid_ht is preserved by inserting a key at an empty/deleted probe position *)
+val lemma_c_valid_ht_insert
+  (s: Seq.seq (option Int32.t)) (sz: nat)
+  (key_v: Int32.t) (probe_i: nat{probe_i < sz})
+  : Lemma
+    (requires c_valid_ht s sz /\
+              Int32.v key_v >= 0 /\
+              (seq_val s (Impl.hash_probe_nat (Int32.v key_v) probe_i sz) == -1 \/
+               seq_val s (Impl.hash_probe_nat (Int32.v key_v) probe_i sz) == -2) /\
+              (forall (q: nat). q < probe_i ==>
+                seq_val s (Impl.hash_probe_nat (Int32.v key_v) q sz) =!= -1 /\
+                seq_val s (Impl.hash_probe_nat (Int32.v key_v) q sz) =!= -2))
+    (ensures c_valid_ht (Seq.upd s (Impl.hash_probe_nat (Int32.v key_v) probe_i sz) (Some key_v)) sz)
+    [SMTPat (c_valid_ht (Seq.upd s (Impl.hash_probe_nat (Int32.v key_v) probe_i sz) (Some key_v)) sz)]
+
+
+(** c_valid_ht is preserved by deleting a key (replacing with -2) *)
+val lemma_c_valid_ht_delete
+  (s: Seq.seq (option Int32.t)) (sz: nat)
+  (idx: nat{idx < sz})
+  : Lemma
+    (requires c_valid_ht s sz /\ seq_val s idx >= 0)
+    (ensures c_valid_ht (Seq.upd s idx (Some (Int32.int_to_t (-2)))) sz)
+    [SMTPat (c_valid_ht (Seq.upd s idx (Some (Int32.int_to_t (-2)))) sz)]
+
+
+(** ================================================================
     Bridge 1: Key absence at all c2pulse indices implies
               ~(key_in_table) at the Impl level
     ================================================================

@@ -51,6 +51,154 @@ let rec lemma_to_int_seq_index (s: Seq.seq (option Int32.t)) (i: nat) (j: nat)
 
 
 (** ================================================================
+    Bridge 0: c_valid_ht <==> valid_ht equivalence
+    ================================================================ *)
+
+let c_valid_ht (s: Seq.seq (option Int32.t)) (sz: nat) : prop =
+  sz > 0 /\ sz == Seq.length s /\
+  (forall (k: nat) (probe: nat). {:pattern (seq_val s (Impl.hash_probe_nat k probe sz))}
+    probe < sz /\ seq_val s (Impl.hash_probe_nat k probe sz) == k ==>
+    (forall (p: nat). {:pattern (Impl.hash_probe_nat k p sz)}
+      p < probe ==> seq_val s (Impl.hash_probe_nat k p sz) =!= -1))
+
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+let lemma_c_valid_ht_iff_valid_ht
+  (s: Seq.seq (option Int32.t))
+  (sz: nat)
+  : Lemma
+    (requires sz > 0 /\ sz == Seq.length s)
+    (ensures (lemma_to_int_seq_full_length s;
+              c_valid_ht s sz <==> Impl.valid_ht (to_int_seq_full s) sz))
+  = lemma_to_int_seq_full_length s;
+    let si = to_int_seq_full s in
+    // Show: seq_val s i == Seq.index si i for all i < sz
+    introduce forall (i: nat). i < sz ==> seq_val s i == Seq.index si i
+    with introduce _ ==> _
+    with _. lemma_to_int_seq_index s 0 i;
+    // Forward direction: c_valid_ht ==> valid_ht
+    // Since seq_val s (hp k p sz) == Seq.index si (hp k p sz),
+    // the quantified conditions transfer directly.
+    // Backward direction: valid_ht ==> c_valid_ht
+    // Same reasoning in reverse.
+    // Note: valid_ht quantifies over k: int with k >= 0,
+    // while c_valid_ht quantifies over k: nat. These are equivalent.
+    assert (c_valid_ht s sz <==> Impl.valid_ht si sz) by (FStar.Tactics.V2.smt ())
+#pop-options
+
+
+(** ================================================================
+    Bridge 0b: c_valid_ht preserved by insert
+    ================================================================ *)
+
+// Helper: seq_val commutes with Seq.upd
+private let lemma_seq_val_upd_same
+  (s: Seq.seq (option Int32.t)) (idx: nat{idx < Seq.length s}) (v: Int32.t)
+  : Lemma (seq_val (Seq.upd s idx (Some v)) idx == Int32.v v)
+  = ()
+
+private let lemma_seq_val_upd_other
+  (s: Seq.seq (option Int32.t)) (idx: nat{idx < Seq.length s}) (v: Int32.t) (j: nat)
+  : Lemma (requires j <> idx)
+          (ensures seq_val (Seq.upd s idx (Some v)) j == seq_val s j)
+  = if j < Seq.length s then () else ()
+
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
+let lemma_c_valid_ht_insert
+  (s: Seq.seq (option Int32.t)) (sz: nat)
+  (key_v: Int32.t) (probe_i: nat{probe_i < sz})
+  : Lemma
+    (requires c_valid_ht s sz /\
+              Int32.v key_v >= 0 /\
+              (seq_val s (Impl.hash_probe_nat (Int32.v key_v) probe_i sz) == -1 \/
+               seq_val s (Impl.hash_probe_nat (Int32.v key_v) probe_i sz) == -2) /\
+              (forall (q: nat). q < probe_i ==>
+                seq_val s (Impl.hash_probe_nat (Int32.v key_v) q sz) =!= -1 /\
+                seq_val s (Impl.hash_probe_nat (Int32.v key_v) q sz) =!= -2))
+    (ensures c_valid_ht (Seq.upd s (Impl.hash_probe_nat (Int32.v key_v) probe_i sz) (Some key_v)) sz)
+  = let key = Int32.v key_v in
+    let idx = Impl.hash_probe_nat key probe_i sz in
+    let s' = Seq.upd s idx (Some key_v) in
+    // Need: forall k probe. probe < sz /\ seq_val s' (hp k probe sz) == k ==>
+    //   forall p. p < probe ==> seq_val s' (hp k p sz) =!= -1
+    introduce forall (k: nat) (probe: nat).
+      probe < sz /\ seq_val s' (Impl.hash_probe_nat k probe sz) == k ==>
+      (forall (p: nat). p < probe ==> seq_val s' (Impl.hash_probe_nat k p sz) =!= -1)
+    with introduce _ ==> _
+    with _. (
+      introduce forall (p: nat). p < probe ==> seq_val s' (Impl.hash_probe_nat k p sz) =!= -1
+      with introduce _ ==> _
+      with _. (
+        let hp_kp = Impl.hash_probe_nat k p sz in
+        if hp_kp = idx then (
+          // This probe position is the newly-written slot: seq_val s' idx == key >= 0 =!= -1
+          lemma_seq_val_upd_same s idx key_v
+        ) else (
+          // This probe position was not modified: seq_val s' hp_kp == seq_val s hp_kp
+          lemma_seq_val_upd_other s idx key_v hp_kp;
+          // Now use original c_valid_ht or the fact that slot wasn't -1
+          let hp_kprobe = Impl.hash_probe_nat k probe sz in
+          if hp_kprobe = idx then (
+            // seq_val s' idx == key, so k == key
+            lemma_seq_val_upd_same s idx key_v;
+            // Since k == key and p < probe, hp_kp is an earlier probe for key
+            // We need: seq_val s hp_kp =!= -1
+            // Since the original slot at hp_kp was either:
+            //  a) an earlier probe of key before probe_i: occupied (not -1, not -2, so not -1)
+            //  b) something else: by original c_valid_ht
+            ()
+          ) else (
+            // seq_val s' hp_kprobe == seq_val s hp_kprobe == k (from hypothesis)
+            lemma_seq_val_upd_other s idx key_v hp_kprobe;
+            // By original c_valid_ht: seq_val s hp_kp =!= -1
+            ()
+          )
+        )
+      )
+    )
+#pop-options
+
+
+(** ================================================================
+    Bridge 0c: c_valid_ht preserved by delete
+    ================================================================ *)
+
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
+let lemma_c_valid_ht_delete
+  (s: Seq.seq (option Int32.t)) (sz: nat)
+  (idx: nat{idx < sz})
+  : Lemma
+    (requires c_valid_ht s sz /\ seq_val s idx >= 0)
+    (ensures c_valid_ht (Seq.upd s idx (Some (Int32.int_to_t (-2))) ) sz)
+  = let s' = Seq.upd s idx (Some (Int32.int_to_t (-2))) in
+    introduce forall (k: nat) (probe: nat).
+      probe < sz /\ seq_val s' (Impl.hash_probe_nat k probe sz) == k ==>
+      (forall (p: nat). p < probe ==> seq_val s' (Impl.hash_probe_nat k p sz) =!= -1)
+    with introduce _ ==> _
+    with _. (
+      introduce forall (p: nat). p < probe ==> seq_val s' (Impl.hash_probe_nat k p sz) =!= -1
+      with introduce _ ==> _
+      with _. (
+        let hp_kp = Impl.hash_probe_nat k p sz in
+        if hp_kp = idx then
+          // This position now has -2, which is =!= -1
+          lemma_seq_val_upd_same s idx (Int32.int_to_t (-2))
+        else (
+          lemma_seq_val_upd_other s idx (Int32.int_to_t (-2)) hp_kp;
+          let hp_kprobe = Impl.hash_probe_nat k probe sz in
+          if hp_kprobe = idx then (
+            // seq_val s' idx == -2, but k >= 0 (since k: nat), so k =!= -2
+            // Contradiction: seq_val s' idx == k requires k == -2, but k: nat
+            lemma_seq_val_upd_same s idx (Int32.int_to_t (-2))
+          ) else (
+            lemma_seq_val_upd_other s idx (Int32.int_to_t (-2)) hp_kprobe
+          )
+        )
+      )
+    )
+#pop-options
+
+
+(** ================================================================
     Bridge 1: Key absence
     ================================================================ *)
 
