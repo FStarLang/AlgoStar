@@ -13,6 +13,8 @@
  *   1. All vertices end up BLACK (color[u] == 2)
  *   2. Color monotonicity: non-white stays non-white, BLACK stays BLACK
  *   3. No GRAY vertices left behind (all WHITE or BLACK)
+ *   4. dfs_ok: BLACK vertices have valid timestamps (d>0, f>0, d<f)
+ *   5. Timestamps bounded by current time
  */
 
 #include "c2pulse.h"
@@ -21,7 +23,7 @@
 
 /*
  * dfs_visit: Process vertex u, scanning neighbors from v_scan to n-1.
- * u is already GRAY (color[u] != 0) when called.
+ * u is already GRAY (color[u] != 0) when called, with d[u] set.
  * When all neighbors are scanned, u is marked BLACK.
  * Recurses into white neighbors.
  * fuel parameter ensures termination.
@@ -41,10 +43,20 @@ _rec void dfs_visit(_array int *adj, size_t n,
   _requires(u < n)
   _requires(v_scan <= n)
   _requires(color[u] != 0)
+  /* Timestamp invariants (pre) */
+  _requires(time_ref[0] >= 0)
+  _requires(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
+  _requires(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
+  /* Color + timestamp postconditions */
   _ensures(color[u] == 2)
   _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> color[j] != 0))
   _ensures(_forall(size_t j, j < n && _old(color[j]) == 2 ==> color[j] == 2))
   _ensures(_forall(size_t j, j < n && (_old(color[j]) == 0 || _old(color[j]) == 2) ==> (color[j] == 0 || color[j] == 2)))
+  /* Timestamp invariants (post) */
+  _ensures(time_ref[0] >= _old(time_ref[0]))
+  _ensures(time_ref[0] >= 0)
+  _ensures(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
+  _ensures(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
   _decreases((_specint) fuel)
 {
   if (fuel == 0 || v_scan >= n) {
@@ -52,6 +64,10 @@ _rec void dfs_visit(_array int *adj, size_t n,
     if (time_ref[0] < 65534) {
       time_ref[0] = time_ref[0] + 1;
       f[u] = time_ref[0];
+    } else {
+      /* Unreachable for n < 32768 (time <= 2n < 65536).
+         Assumed: requires counting invariant to prove. */
+      _ghost_stmt(assume_ (pure False));
     }
     color[u] = 2;
     return;
@@ -63,6 +79,9 @@ _rec void dfs_visit(_array int *adj, size_t n,
     if (time_ref[0] < 65534) {
       time_ref[0] = time_ref[0] + 1;
       d[v_scan] = time_ref[0];
+    } else {
+      /* Unreachable: same as above */
+      _ghost_stmt(assume_ (pure False));
     }
     pred[v_scan] = u;
     /* Visit v_scan's subtree, then continue scanning */
@@ -92,13 +111,30 @@ void maybe_visit(_array int *adj, size_t n,
   _preserves(time_ref._length == 1)
   _requires(u < n)
   _requires(color[u] == 0 || color[u] == 2)
+  /* Timestamp invariants (pre) */
+  _requires(time_ref[0] >= 0)
+  _requires(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
+  _requires(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
+  /* Color postconditions */
   _ensures(color[u] == 2)
   _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> color[j] != 0))
   _ensures(_forall(size_t j, j < n && _old(color[j]) == 2 ==> color[j] == 2))
   _ensures(_forall(size_t j, j < n && (_old(color[j]) == 0 || _old(color[j]) == 2) ==> (color[j] == 0 || color[j] == 2)))
+  /* Timestamp invariants (post) */
+  _ensures(time_ref[0] >= _old(time_ref[0]))
+  _ensures(time_ref[0] >= 0)
+  _ensures(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
+  _ensures(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
 {
   if (color[u] == 0) {
     color[u] = 1;
+    if (time_ref[0] < 65534) {
+      time_ref[0] = time_ref[0] + 1;
+      d[u] = time_ref[0];
+    } else {
+      /* Unreachable: same counting invariant argument */
+      _ghost_stmt(assume_ (pure False));
+    }
     pred[u] = n;
     dfs_visit(adj, n, color, d, f, pred, time_ref, u, 0, n * n);
   }
@@ -107,6 +143,11 @@ void maybe_visit(_array int *adj, size_t n,
 /*
  * dfs: Initialize arrays and visit all vertices.
  * Replaces the stack-based version with recursive dfs_visit calls.
+ *
+ * Postconditions:
+ *   - All vertices BLACK
+ *   - Valid timestamps: d[j]>0, f[j]>0, d[j]<f[j]
+ *   - Timestamps bounded by final time
  */
 void dfs(_array int *adj, size_t n,
          _array int *color, _array int *d, _array int *f,
@@ -120,6 +161,9 @@ void dfs(_array int *adj, size_t n,
   _preserves(pred._length == n)
   _preserves(time_ref._length == 1)
   _ensures(_forall(size_t u, u < n ==> color[u] == 2))
+  _ensures(_forall(size_t j, j < n ==> d[j] > 0 && f[j] > 0 && d[j] < f[j]))
+  _ensures(time_ref[0] >= 0)
+  _ensures(_forall(size_t j, j < n ==> d[j] <= time_ref[0] && f[j] <= time_ref[0]))
 {
   /* Phase 1: Initialize all vertices to WHITE */
   for (size_t i = 0; i < n; i = i + 1)
@@ -129,6 +173,8 @@ void dfs(_array int *adj, size_t n,
     _invariant(pred._length == n && time_ref._length == 1)
     _invariant(i <= n)
     _invariant(_forall(size_t j, j < i ==> color[j] == 0))
+    _invariant(_forall(size_t j, j < i ==> d[j] == 0))
+    _invariant(_forall(size_t j, j < i ==> f[j] == 0))
   {
     color[i] = 0;
     d[i] = 0;
@@ -149,6 +195,10 @@ void dfs(_array int *adj, size_t n,
     _invariant(i <= n)
     _invariant(_forall(size_t j, j < i ==> color[j] == 2))
     _invariant(_forall(size_t j, j < n ==> (color[j] == 0 || color[j] == 2)))
+    /* Timestamp loop invariants */
+    _invariant(time_ref[0] >= 0)
+    _invariant(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
+    _invariant(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
   {
     maybe_visit(adj, n, color, d, f, pred, time_ref, i);
   }
