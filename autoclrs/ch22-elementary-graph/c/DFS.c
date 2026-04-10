@@ -15,6 +15,9 @@
  *   3. No GRAY vertices left behind (all WHITE or BLACK)
  *   4. dfs_ok: BLACK vertices have valid timestamps (d>0, f>0, d<f)
  *   5. Timestamps bounded by current time
+ *   6. Frame: d and pred unchanged for non-WHITE vertices
+ *   7. pred_edge_ok: edge exists from parent to child, parent non-white,
+ *      parent discovered before child (d[pred[v]] < d[v])
  */
 
 #include "c2pulse.h"
@@ -57,6 +60,12 @@ _rec void dfs_visit(_array int *adj, size_t n,
   _ensures(time_ref[0] >= 0)
   _ensures(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
   _ensures(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
+  /* Frame conditions: d and pred unchanged for non-WHITE vertices */
+  _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> d[j] == _old(d[j])))
+  _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> pred[j] == _old(pred[j])))
+  /* Predecessor tree: edge exists, parent non-white, parent discovered first */
+  _requires(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
+  _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
   _decreases((_specint) fuel)
 {
   if (fuel == 0 || v_scan >= n) {
@@ -125,6 +134,12 @@ void maybe_visit(_array int *adj, size_t n,
   _ensures(time_ref[0] >= 0)
   _ensures(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
   _ensures(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
+  /* Frame conditions: d and pred unchanged for non-WHITE vertices */
+  _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> d[j] == _old(d[j])))
+  _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> pred[j] == _old(pred[j])))
+  /* Predecessor tree: edge exists, parent non-white, parent discovered first */
+  _requires(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
+  _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
 {
   if (color[u] == 0) {
     color[u] = 1;
@@ -164,6 +179,7 @@ void dfs(_array int *adj, size_t n,
   _ensures(_forall(size_t j, j < n ==> d[j] > 0 && f[j] > 0 && d[j] < f[j]))
   _ensures(time_ref[0] >= 0)
   _ensures(_forall(size_t j, j < n ==> d[j] <= time_ref[0] && f[j] <= time_ref[0]))
+  _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && d[pred[v]] < d[v]))
 {
   /* Phase 1: Initialize all vertices to WHITE */
   for (size_t i = 0; i < n; i = i + 1)
@@ -175,6 +191,7 @@ void dfs(_array int *adj, size_t n,
     _invariant(_forall(size_t j, j < i ==> color[j] == 0))
     _invariant(_forall(size_t j, j < i ==> d[j] == 0))
     _invariant(_forall(size_t j, j < i ==> f[j] == 0))
+    _invariant(_forall(size_t j, j < i ==> pred[j] == n))
   {
     color[i] = 0;
     d[i] = 0;
@@ -199,6 +216,8 @@ void dfs(_array int *adj, size_t n,
     _invariant(time_ref[0] >= 0)
     _invariant(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
     _invariant(_forall(size_t j, j < n && color[j] == 2 ==> f[j] > 0 && f[j] <= time_ref[0] && d[j] < f[j]))
+    /* Predecessor tree invariant */
+    _invariant(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
   {
     maybe_visit(adj, n, color, d, f, pred, time_ref, i);
   }
