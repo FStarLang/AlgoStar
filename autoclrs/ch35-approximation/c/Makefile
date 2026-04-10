@@ -35,7 +35,7 @@ FSTAR = $(FSTAR_EXE) \
 	--include $(PULSE_LIB) \
 	--include $(CH35_DIR) \
 	--include $(COMMON_DIR) \
-	--z3rlimit 40 \
+	--z3rlimit 200 \
 	--already_cached Prims,FStar,Pulse.Nolib,Pulse.Class,Pulse.Lib,PulseCore
 
 # ── Source files ───────────────────────────────────────────────────
@@ -63,13 +63,32 @@ $(foreach f,$(C_FILES),$(eval $(call make_fst_rule,$(f))))
 %.fst:
 	$(C2PULSE) $<
 
+# Parent modules needed for caching (local helpers depend on these)
+$(CACHE_DIR)/CLRS.Ch35.VertexCover.Spec.fst.checked: $(CH35_DIR)/CLRS.Ch35.VertexCover.Spec.fst
+	@mkdir -p $(CACHE_DIR)
+	$(FSTAR) --force $<
+
+$(CACHE_DIR)/CLRS.Ch35.VertexCover.Lemmas.fsti.checked: $(CH35_DIR)/CLRS.Ch35.VertexCover.Lemmas.fsti $(CACHE_DIR)/CLRS.Ch35.VertexCover.Spec.fst.checked
+	@mkdir -p $(CACHE_DIR)
+	$(FSTAR) --force $<
+
+$(CACHE_DIR)/CLRS.Ch35.VertexCover.Lemmas.fst.checked: $(CH35_DIR)/CLRS.Ch35.VertexCover.Lemmas.fst $(CACHE_DIR)/CLRS.Ch35.VertexCover.Lemmas.fsti.checked
+	@mkdir -p $(CACHE_DIR)
+	$(FSTAR) --force $<
+
 # fstar: .fst → .checked
 $(CACHE_DIR)/%.fst.checked: %.fst
 	@mkdir -p $(CACHE_DIR)
 	$(FSTAR) --force $<
-	@touch $@
 
 verify: $(CHECKED) $(HELPER_CHECKED)
+
+# ── Inter-module dependencies ──────────────────────────────────────
+$(CACHE_DIR)/AVCHelper.fst.checked: $(CACHE_DIR)/CLRS.Ch35.VertexCover.Spec.fst.checked
+$(CACHE_DIR)/AVCGhostStep.fst.checked: $(CACHE_DIR)/AVCHelper.fst.checked
+$(CACHE_DIR)/AVCBridgeLemmas.fsti.checked: $(CACHE_DIR)/AVCHelper.fst.checked $(CACHE_DIR)/CLRS.Ch35.VertexCover.Lemmas.fsti.checked
+$(CACHE_DIR)/AVCBridgeLemmas.fst.checked: $(CACHE_DIR)/AVCBridgeLemmas.fsti.checked $(CACHE_DIR)/CLRS.Ch35.VertexCover.Lemmas.fst.checked
+$(CACHE_DIR)/ApproxVertexCover.fst.checked: $(CACHE_DIR)/AVCHelper.fst.checked $(CACHE_DIR)/AVCGhostStep.fst.checked $(CACHE_DIR)/AVCBridgeLemmas.fst.checked
 
 clean:
 	rm -rf $(CACHE_DIR) $(FST_FILES)

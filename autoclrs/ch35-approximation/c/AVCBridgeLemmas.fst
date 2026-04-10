@@ -1,6 +1,7 @@
 module AVCBridgeLemmas
 
 open FStar.Mul
+open FStar.List.Tot
 module Seq = FStar.Seq
 module Spec = CLRS.Ch35.VertexCover.Spec
 module Lemmas = CLRS.Ch35.VertexCover.Lemmas
@@ -67,3 +68,45 @@ let bridge_full
   = outer_inv_implies_is_cover sa sc n;
     binary_implies_binary_int sc n;
     Lemmas.min_cover_exists (to_int_seq sa) n
+
+#push-options "--z3rlimit 80"
+let bridge_apply_approximation
+  (sa sc: Seq.seq (option Int32.t)) (n: nat) (m: list Spec.edge)
+  : Lemma (requires AVCHelper.outer_inv_pure sa sc n n /\
+                    AVCHelper.matching_inv_opt sa sc n m)
+          (ensures (
+            let s_adj = to_int_seq sa in
+            let s_cover = to_int_seq sc in
+            forall (opt: nat). Spec.min_vertex_cover_size s_adj n opt ==>
+              Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n <= 2 * opt))
+  = let s_adj = to_int_seq sa in
+    let s_cover = to_int_seq sc in
+    to_int_seq_length sa;
+    to_int_seq_length sc;
+    binary_implies_binary_int sc n;
+    let bound (c_opt: Spec.cover_fn)
+      : Lemma (requires Spec.is_valid_graph_cover s_adj n c_opt)
+              (ensures Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n <= 2 * Spec.count_cover c_opt n) =
+      Lemmas.approximation_ratio_theorem s_adj s_cover n m c_opt
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires bound)
+#pop-options
+
+#push-options "--z3rlimit 80"
+let bridge_derive_even_count
+  (sa sc: Seq.seq (option Int32.t)) (n: nat) (m: list Spec.edge)
+  : Lemma (requires AVCHelper.outer_inv_pure sa sc n n /\
+                    AVCHelper.matching_inv_opt sa sc n m)
+          (ensures (
+            let s_cover = to_int_seq sc in
+            exists (k: nat). Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n = 2 * k))
+  = let s_adj = to_int_seq sa in
+    let s_cover = to_int_seq sc in
+    to_int_seq_length sa;
+    to_int_seq_length sc;
+    binary_implies_binary_int sc n;
+    let c_alg = Spec.seq_to_cover_fn s_cover n in
+    let c_m : Spec.cover_fn = fun (x:nat) -> existsb (fun (e: Spec.edge) -> Spec.edge_uses_vertex e x) m in
+    Lemmas.count_cover_ext c_alg c_m n;
+    Lemmas.matching_cover_size m n
+#pop-options

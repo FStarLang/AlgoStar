@@ -50,3 +50,23 @@ val bridge_full
             (forall (i: nat). i < n ==>
               (Seq.index s_cover i = 0 \/ Seq.index s_cover i = 1)) /\
             (exists (opt: nat). Spec.min_vertex_cover_size s_adj n opt)))
+
+(** Bridge: matching_inv_opt + outer_inv_pure ⟹ 2-approximation bound *)
+val bridge_apply_approximation
+  (sa sc: Seq.seq (option Int32.t)) (n: nat) (m: list Spec.edge)
+  : Lemma (requires AVCHelper.outer_inv_pure sa sc n n /\
+                    AVCHelper.matching_inv_opt sa sc n m)
+          (ensures (
+            let s_adj = to_int_seq sa in
+            let s_cover = to_int_seq sc in
+            forall (opt: nat). Spec.min_vertex_cover_size s_adj n opt ==>
+              Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n <= 2 * opt))
+
+(** Bridge: matching_inv_opt + outer_inv_pure ⟹ even cover count *)
+val bridge_derive_even_count
+  (sa sc: Seq.seq (option Int32.t)) (n: nat) (m: list Spec.edge)
+  : Lemma (requires AVCHelper.outer_inv_pure sa sc n n /\
+                    AVCHelper.matching_inv_opt sa sc n m)
+          (ensures (
+            let s_cover = to_int_seq sc in
+            exists (k: nat). Spec.count_cover (Spec.seq_to_cover_fn s_cover n) n = 2 * k))
