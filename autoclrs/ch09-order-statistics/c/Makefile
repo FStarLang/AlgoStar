@@ -35,7 +35,7 @@ FSTAR = $(FSTAR_EXE) \
 	--include $(PULSE_LIB) \
 	--include $(CH09_DIR) \
 	--include $(COMMON_DIR) \
-	--z3rlimit 40 \
+	--z3rlimit 320 \
 	--already_cached Prims,FStar,Pulse.Nolib,Pulse.Class,Pulse.Lib,PulseCore
 
 # ── Source files ───────────────────────────────────────────────────
