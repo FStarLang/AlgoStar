@@ -3,15 +3,13 @@
  *
  * Uses a proper recursive struct node { data, next } with heap allocation.
  * The recursive is_list predicate and ghost fold/unfold helpers are defined
- * inline via _include_pulse. list_insert is implemented in C; list_search
- * and list_delete are written as Pulse fn rec in _include_pulse (since they
- * require recursive pattern-matching on the ghost list, which _ghost_stmt
- * cannot express).
+ * inline via _include_pulse. All operations (insert, search, delete) are
+ * implemented in C with _plain parameters and _ghost_stmt proof steps.
  *
  * Operations (matching CLRS §10.2):
- *   - list_insert: prepend element at head, O(1) — C function
- *   - list_search: scan for key, O(n)  — Pulse fn rec in _include_pulse
- *   - list_delete: remove first occurrence of key, O(n) — Pulse fn rec
+ *   - list_insert: prepend element at head, O(1)
+ *   - list_search: scan for key, O(n)
+ *   - list_delete: remove first occurrence of key, O(n)
  */
 
 #include "c2pulse.h"
@@ -25,11 +23,11 @@ typedef struct node {
     struct node *next;
 } node;
 
-/* ── Pulse helpers and operations ──────────────────────────────────
+/* ── Pulse predicates and ghost helpers ──────────────────────────────
  *
- * is_list predicate, ghost fold/unfold helpers, and list_search/list_delete
- * are all defined in this _include_pulse block. They use the c2pulse-generated
- * struct_node type and field accessors.
+ * The _include_pulse block defines the is_list ownership predicate and
+ * ghost fold/unfold helpers. These are used in _ghost_stmt blocks within
+ * the C functions below.
  */
 _include_pulse(
   module L = FStar.List.Tot
@@ -109,68 +107,9 @@ _include_pulse(
   = match l with
     | [] -> []
     | hd :: tl -> if hd = k then tl else hd :: remove_first k tl
-
-  (* LIST-SEARCH: traverse from head looking for key k. O(n). *)
-  fn rec list_search (head: $type(node *)) (k: Int32.t)
-    preserves is_list head $`l
-    returns found: bool
-    ensures pure (found <==> L.mem k $`l)
-    decreases $`l
-  {
-    if (is_null head) {
-      is_list_nil_case head;
-      false
-    } else {
-      elim_is_list_nonnull head;
-      let nd = !head;
-      let d = nd.struct_node__data;
-      if (d = k) {
-        Pulse.Lib.Reference.pts_to_not_null head;
-        intro_is_list_cons head nd;
-        true
-      } else {
-        let r = list_search nd.struct_node__next k;
-        Pulse.Lib.Reference.pts_to_not_null head;
-        intro_is_list_cons head nd;
-        r
-      }
-    }
-  }
-
-  (* LIST-DELETE: remove first occurrence of key k. O(n). *)
-  fn rec list_delete (head: $type(node *)) (k: Int32.t)
-    requires is_list head $`l
-    returns new_head: $type(node *)
-    ensures is_list new_head (remove_first k $`l)
-    decreases $`l
-  {
-    if (is_null head) {
-      is_list_nil_case head;
-      head
-    } else {
-      elim_is_list_nonnull head;
-      let nd = !head;
-      let d = nd.struct_node__data;
-      let nx = nd.struct_node__next;
-      rewrite each nd.struct_node__next as nx;
-      if (d = k) {
-        Pulse.Lib.C.Ref.free_ref head;
-        nx
-      } else {
-        let new_tail = list_delete nx k;
-        head := { struct_node__data = d; struct_node__next = new_tail };
-        Pulse.Lib.Reference.pts_to_not_null head;
-        intro_is_list_cons head { struct_node__data = d; struct_node__next = new_tail };
-        head
-      }
-    }
-  }
 )
 
 /* ── LIST-INSERT ─────────────────────────────────────────────────── */
-/* Allocate a new node with key x and prepend it to the list.
- * Returns the new head. O(1).
- */
 _plain node *list_insert(_plain node *head, int x)
     _requires((_slprop) _inline_pulse(is_list $(head) $`l))
     _ensures((_slprop) _inline_pulse(is_list $(return) ($(x) :: $`l)))
@@ -182,4 +121,71 @@ _plain node *list_insert(_plain node *head, int x)
       intro_is_list_cons (!var_n) (!(!var_n))
     );
     return n;
+}
+
+/* ── LIST-SEARCH ─────────────────────────────────────────────────── */
+_rec bool list_search(_plain node *head, int k)
+    _decreases((_slprop) _inline_pulse($`l))
+    _requires((_slprop) _inline_pulse(is_list $(head) $`l))
+    _ensures((_slprop) _inline_pulse(
+        is_list $(head) $`l ** pure ($(return) <==> L.mem $(k) $`l)))
+{
+    if (head == NULL) {
+        _ghost_stmt(is_list_nil_case $(head));
+        return false;
+    }
+    _ghost_stmt(
+        elim_is_list_nonnull $(head);
+        struct_node__aux_raw_unfold $(head)
+    );
+    int d = head->data;
+    node *nx = head->next;
+    if (d == k) {
+        _ghost_stmt(
+            struct_node__aux_raw_fold $(head);
+            Pulse.Lib.Reference.pts_to_not_null $(head);
+            intro_is_list_cons $(head) (!($(head)))
+        );
+        return true;
+    }
+    bool r = list_search(nx, k);
+    _ghost_stmt(
+        struct_node__aux_raw_fold $(head);
+        Pulse.Lib.Reference.pts_to_not_null $(head);
+        intro_is_list_cons $(head) (!($(head)))
+    );
+    return r;
+}
+
+/* ── LIST-DELETE ─────────────────────────────────────────────────── */
+_rec _plain node *list_delete(_plain node *head, int k)
+    _decreases((_slprop) _inline_pulse($`l))
+    _requires((_slprop) _inline_pulse(is_list $(head) $`l))
+    _ensures((_slprop) _inline_pulse(is_list $(return) (remove_first $(k) $`l)))
+{
+    if (head == NULL) {
+        _ghost_stmt(is_list_nil_case $(head));
+        return head;
+    }
+    _ghost_stmt(
+        elim_is_list_nonnull $(head);
+        struct_node__aux_raw_unfold $(head)
+    );
+    int d = head->data;
+    node *nx = head->next;
+    if (d == k) {
+        _ghost_stmt(
+            struct_node__aux_raw_fold $(head);
+            Pulse.Lib.C.Ref.free_ref $(head)
+        );
+        return nx;
+    }
+    node *new_tail = list_delete(nx, k);
+    head->next = new_tail;
+    _ghost_stmt(
+        struct_node__aux_raw_fold $(head);
+        Pulse.Lib.Reference.pts_to_not_null $(head);
+        intro_is_list_cons $(head) (!($(head)))
+    );
+    return head;
 }
