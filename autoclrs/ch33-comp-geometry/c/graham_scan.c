@@ -22,6 +22,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(
+  open CLRS.Ch33.Segments.Spec
+  open FStar.Mul
+)
+
 /*
  * Find the bottom-most point (minimum y coordinate).
  * Break ties by choosing the point with minimum x coordinate.
@@ -80,6 +85,7 @@ int polar_cmp(_array int *xs, _array int *ys, size_t len,
   _preserves_value(xs._length)
   _preserves_value(ys._length)
   _ensures((_specint) return == ((_specint) xs[a] - (_specint) xs[p0]) * ((_specint) ys[b] - (_specint) ys[p0]) - ((_specint) xs[b] - (_specint) xs[p0]) * ((_specint) ys[a] - (_specint) ys[p0]))
+  _ensures((bool) _inline_pulse((id #int (Int32.v $(return))) == cross_product_spec (id #int (Int32.v (array_read $(xs) $(p0)))) (id #int (Int32.v (array_read $(ys) $(p0)))) (id #int (Int32.v (array_read $(xs) $(a)))) (id #int (Int32.v (array_read $(ys) $(a)))) (id #int (Int32.v (array_read $(xs) $(b)))) (id #int (Int32.v (array_read $(ys) $(b))))))
 {
   int ax = xs[a] - xs[p0];
   _assert(ax > -32767 && ax < 32767);
@@ -105,6 +111,7 @@ int gs_cross(int x1, int y1, int x2, int y2, int x3, int y3)
   _requires(x2 > -16384 && x2 < 16384 && y2 > -16384 && y2 < 16384)
   _requires(x3 > -16384 && x3 < 16384 && y3 > -16384 && y3 < 16384)
   _ensures((_specint) return == ((_specint) x2 - (_specint) x1) * ((_specint) y3 - (_specint) y1) - ((_specint) x3 - (_specint) x1) * ((_specint) y2 - (_specint) y1))
+  _ensures((bool) _inline_pulse((id #int (Int32.v $(return))) == cross_product_spec (Int32.v $(x1)) (Int32.v $(y1)) (Int32.v $(x2)) (Int32.v $(y2)) (Int32.v $(x3)) (Int32.v $(y3))))
 {
   int dx2 = x2 - x1;
   _assert(dx2 > -32767 && dx2 < 32767);
@@ -181,6 +188,8 @@ size_t graham_scan_step(_array int *xs, _array int *ys, size_t len,
   _preserves_value(ys._length)
   _preserves_value(hull._length)
   _ensures(return >= 2 && return <= hull._length)
+  _ensures(hull[return - 1] == p_idx)
+  _ensures(_forall(size_t k, k + 1 < return ==> hull[k] == _old(hull[k])))
 {
   size_t new_top = pop_while(xs, ys, len, hull, top, p_idx);
   hull[new_top] = p_idx;

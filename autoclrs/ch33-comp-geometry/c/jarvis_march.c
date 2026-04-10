@@ -23,6 +23,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(
+  open CLRS.Ch33.Segments.Spec
+  open FStar.Mul
+)
+
 /*
  * Find the leftmost point (minimum x coordinate).
  * Break ties by choosing the point with minimum y coordinate.
@@ -72,6 +77,7 @@ int jm_cross(int x1, int y1, int x2, int y2, int x3, int y3)
   _requires(x2 > -16384 && x2 < 16384 && y2 > -16384 && y2 < 16384)
   _requires(x3 > -16384 && x3 < 16384 && y3 > -16384 && y3 < 16384)
   _ensures((_specint) return == ((_specint) x2 - (_specint) x1) * ((_specint) y3 - (_specint) y1) - ((_specint) x3 - (_specint) x1) * ((_specint) y2 - (_specint) y1))
+  _ensures((bool) _inline_pulse((id #int (Int32.v $(return))) == cross_product_spec (Int32.v $(x1)) (Int32.v $(y1)) (Int32.v $(x2)) (Int32.v $(y2)) (Int32.v $(x3)) (Int32.v $(y3))))
 {
   int dx2 = x2 - x1;
   _assert(dx2 > -32767 && dx2 < 32767);

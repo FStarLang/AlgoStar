@@ -37,6 +37,7 @@ int cross_product(int x1, int y1, int x2, int y2, int x3, int y3)
   _requires(x3 > -16384 && x3 < 16384 && y3 > -16384 && y3 < 16384)
   _ensures(return == (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
   _ensures((_specint) return == ((_specint) x2 - (_specint) x1) * ((_specint) y3 - (_specint) y1) - ((_specint) x3 - (_specint) x1) * ((_specint) y2 - (_specint) y1))
+  _ensures((bool) _inline_pulse((id #int (Int32.v $(return))) == cross_product_spec (Int32.v $(x1)) (Int32.v $(y1)) (Int32.v $(x2)) (Int32.v $(y2)) (Int32.v $(x3)) (Int32.v $(y3))))
 {
   int dx21 = x2 - x1;
   int dy31 = y3 - y1;
@@ -53,6 +54,7 @@ int direction(int x1, int y1, int x2, int y2, int x3, int y3)
   _requires(x2 > -16384 && x2 < 16384 && y2 > -16384 && y2 < 16384)
   _requires(x3 > -16384 && x3 < 16384 && y3 > -16384 && y3 < 16384)
   _ensures(return == (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1))
+  _ensures((bool) _inline_pulse((id #int (Int32.v $(return))) == direction_spec (Int32.v $(x1)) (Int32.v $(y1)) (Int32.v $(x2)) (Int32.v $(y2)) (Int32.v $(x3)) (Int32.v $(y3))))
 {
   return cross_product(x1, y1, x2, y2, x3, y3);
 }
@@ -63,6 +65,7 @@ int direction(int x1, int y1, int x2, int y2, int x3, int y3)
 bool on_segment(int x1, int y1, int x2, int y2, int x, int y)
   _ensures(return == ((x <= x1 || x <= x2) && (x >= x1 || x >= x2) &&
                       (y <= y1 || y <= y2) && (y >= y1 || y >= y2)))
+  _ensures((bool) _inline_pulse($(return) == on_segment_spec (Int32.v $(x1)) (Int32.v $(y1)) (Int32.v $(x2)) (Int32.v $(y2)) (Int32.v $(x)) (Int32.v $(y))))
 {
   int max_x = (x1 >= x2) ? x1 : x2;
   int min_x = (x1 <= x2) ? x1 : x2;
