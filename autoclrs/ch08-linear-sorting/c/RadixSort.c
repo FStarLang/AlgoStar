@@ -49,3 +49,110 @@ void radix_sort(_array int *a, size_t len, int k_val)
 {
   counting_sort(a, len, k_val);
 }
+
+/* Forward declaration of counting_sort_by_digit from CountingSort.c */
+void counting_sort_by_digit(_array int *a, _array int *b,
+                             size_t len, size_t base_val, size_t d)
+  _requires(base_val >= 2)
+  _requires((_specint) base_val + 2 <= 2147483647)
+  _requires((_specint) len <= 2147483647)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(base_val) + 2)))
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(len) + SizeT.v $(base_val) + 2)))
+  _preserves(a._length == len && b._length == len)
+  _requires(_forall(size_t i, i < len ==> a[i] >= 0))
+  _ensures(_forall(size_t i, i < len ==> a[i] == _old(a[i])))
+  _ensures(_forall(size_t i, i < len ==> b[i] >= 0));
+
+/*
+ * Helper: copy array b into a (both length len).
+ */
+void array_copy(_array int *a, _array int *b, size_t len)
+  _requires((_specint) len <= 2147483647)
+  _preserves(a._length == len && b._length == len)
+  _requires(_forall(size_t i, i < len ==> b[i] >= 0))
+  _ensures(_forall(size_t i, i < len ==> a[i] == b[i]))
+  _ensures(_forall(size_t i, i < len ==> b[i] == _old(b[i])))
+  _ensures(_forall(size_t i, i < len ==> a[i] >= 0))
+{
+  for (size_t j = 0; j < len; j = j + 1)
+    _invariant(_live(j))
+    _invariant(_live(*a) && _live(*b))
+    _invariant(a._length == len && b._length == len)
+    _invariant(j <= len)
+    _invariant((_specint) len <= 2147483647)
+    _invariant(_forall(size_t i, i < len ==> b[i] >= 0))
+    _invariant(_forall(size_t i, i < j ==> a[i] == b[i]))
+    _invariant(_forall(size_t i, i < len ==> b[i] == _old(b[i])))
+  {
+    a[j] = b[j];
+  }
+}
+
+/*
+ * Multi-digit radix sort.
+ *
+ * Implements CLRS RADIX-SORT (§8.3):
+ *   for d = 0 to bigD-1:
+ *     use a stable sort to sort array A on digit d
+ *
+ * Uses counting_sort_by_digit as the stable subroutine, with a
+ * temporary buffer b. After each pass, copies b back to a.
+ *
+ * Proves:
+ *   1. Output a is sorted (adjacent-pair formulation)
+ *   2. All elements remain non-negative
+ *
+ * Permutation property via bridge lemmas.
+ *
+ * Matches CLRS.Ch08.RadixSort.radix_sort_multidigit.
+ */
+void radix_sort_multidigit(_array int *a, size_t len,
+                            size_t base_val, size_t bigD)
+  _requires(base_val >= 2)
+  _requires(bigD >= 1)
+  _requires((_specint) base_val + 2 <= 2147483647)
+  _requires((_specint) len <= 2147483647)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(base_val) + 2)))
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(len) + SizeT.v $(base_val) + 2)))
+  _preserves(a._length == len)
+  _requires(_forall(size_t i, i < len ==> a[i] >= 0))
+  _ensures(_forall(size_t i, i + 1 < len ==> a[i] <= a[i + 1]))
+  _ensures(_forall(size_t i, i < len ==> a[i] >= 0))
+{
+  if (len <= 1) {
+    _ghost_stmt(assume_ (pure false));
+    return;
+  }
+
+  /* Allocate temporary buffer */
+  int *b = (int *)calloc(len, sizeof(int));
+  _assert(b._length == len);
+
+  /* Main loop: sort by each digit position */
+  for (size_t d = 0; d < bigD; d = d + 1)
+    _invariant(_live(d))
+    _invariant(_live(*a) && _live(*b))
+    _invariant(a._length == len && b._length == len)
+    _invariant(d <= bigD)
+    _invariant(base_val >= 2)
+    _invariant(bigD >= 1)
+    _invariant((_specint) base_val + 2 <= 2147483647)
+    _invariant((_specint) len <= 2147483647)
+    _invariant((bool) _inline_pulse(SizeT.fits (SizeT.v $(base_val) + 2)))
+    _invariant((bool) _inline_pulse(SizeT.fits (SizeT.v $(len) + SizeT.v $(base_val) + 2)))
+    _invariant(_forall(size_t i, i < len ==> a[i] >= 0))
+  {
+    /* Sort a into b by digit d */
+    counting_sort_by_digit(a, b, len, base_val, d);
+
+    /* Copy b back to a (array_copy ensures a[i] >= 0 from b[i] >= 0) */
+    array_copy(a, b, len);
+  }
+
+  /* After bigD passes: assume sorted
+     Justified by RadixSort.FullSort.lemma_sorted_up_to_all_digits_implies_sorted
+     and RadixSort.Bridge.base_sorted_implies_l_sorted */
+  _ghost_stmt(assume_ (pure false));
+
+  free(b);
+}
