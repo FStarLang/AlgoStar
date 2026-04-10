@@ -15,6 +15,22 @@
  * loop counters). int for data values (capacity, flow, colors, distances).
  * Queue and pred arrays are size_t* (store vertex indices).
  * Sentinel for "no predecessor" is n (invalid vertex).
+ *
+ * Verified properties (no admit):
+ *   - zero_init: all elements set to 0
+ *   - bfs_init: color/pred/dist correctly initialized for BFS
+ *   - find_bottleneck_rec/find_bottleneck: returns positive bottleneck,
+ *     array bounds + SizeT arithmetic fully verified via index_fits lemma,
+ *     Int32 subtraction overflow proved via non-negativity preconditions
+ *
+ * Admitted (Int32 overflow — c2pulse uses Int32.t, Pulse Impl uses int):
+ *   - bfs_residual: dist[u]+1 can overflow for n > 2^31
+ *   - augment_flow_rec/augment_flow: flow[i]+bn can overflow
+ *   - compute_flow_value: accumulator fv can overflow
+ *   - max_flow: depends on above; also nested let-mut structural limitation
+ *
+ * Target spec: CLRS.Ch26.MaxFlow.Impl.fsti
+ * Bridge lemmas: CLRS.Ch26.MaxFlow.C.BridgeLemmas.fst
  */
 
 #include <stdlib.h>
