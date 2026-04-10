@@ -121,3 +121,20 @@ let c_flow_value (flow_s: Seq.seq (option Int32.t))
 let all_nonneg_caps (cap_s: Seq.seq (option Int32.t)) (n: nat) : prop =
   Seq.length cap_s == n * n /\
   (forall (i: nat). i < n * n ==> seq_val cap_s i >= 0)
+
+(** Nonlinear arithmetic: a*n + b < n*n when a < n /\ b < n *)
+let index_bound (a b n: nat)
+  : Lemma (requires a < n /\ b < n)
+          (ensures a * n + b < n * n)
+  = FStar.Math.Lemmas.lemma_mult_le_right n a (n - 1);
+    FStar.Math.Lemmas.distributivity_sub_left n 1 n
+
+(** Combined index bound + SizeT fits for flat matrix access *)
+let index_fits (a b n: nat)
+  : Lemma (requires a < n /\ b < n /\ SizeT.fits (n * n))
+          (ensures a * n + b < n * n /\
+                   SizeT.fits (a * n + b) /\
+                   SizeT.fits (a * n))
+  = index_bound a b n;
+    SizeT.fits_lte (a * n + b) (n * n);
+    SizeT.fits_lte (a * n) (n * n)

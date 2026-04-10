@@ -32,7 +32,6 @@ void zero_init(_array int *arr, size_t len)
   _ensures(arr._length == len)
   _ensures(_forall(size_t k, k < len ==> arr[k] == 0))
 {
-  _ghost_stmt(admit());
   for (size_t i = 0; i < len; i = i + 1)
     _invariant(_live(i))
     _invariant(_live(*arr))
@@ -62,12 +61,14 @@ void bfs_init(
   _ensures(_forall(size_t i, i < n && i != source ==> pred[i] == n))
   _ensures(_forall(size_t i, i < n && i != source ==> dist[i] == -1))
 {
-  _ghost_stmt(admit());
   for (size_t i = 0; i < n; i = i + 1)
     _invariant(_live(i))
     _invariant(_live(*color) && _live(*pred) && _live(*dist))
     _invariant(color._length == n && pred._length == n && dist._length == n)
     _invariant(i <= n)
+    _invariant(_forall(size_t k, k < i ==> color[k] == 0))
+    _invariant(_forall(size_t k, k < i ==> pred[k] == n))
+    _invariant(_forall(size_t k, k < i ==> dist[k] == -1))
   {
     color[i] = 0;
     pred[i] = n;
@@ -95,6 +96,7 @@ int bfs_residual(
     size_t n,
     size_t source,
     size_t sink)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
   _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n)
   _requires(color._length == n && pred._length == n &&
             dist._length == n && queue._length == n)
@@ -177,16 +179,18 @@ _rec int find_bottleneck_rec(
     size_t cur,
     int bn,
     size_t fuel)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
   _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
             pred._length == n)
   _requires(n > 0 && source < n && cur < n && bn > 0 && fuel <= n)
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> cap[p] >= 0))
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> flow[p] >= 0))
   _preserves_value(cap._length)
   _preserves_value(flow._length)
   _preserves_value(pred._length)
   _ensures(return > 0)
   _decreases((_specint) fuel)
 {
-  _ghost_stmt(admit());
   if (cur == source || fuel == 0) {
     return bn;
   }
@@ -195,12 +199,14 @@ _rec int find_bottleneck_rec(
     return bn;
   }
 
+  _ghost_stmt(index_fits (SizeT.v $(u)) (SizeT.v $(cur)) (SizeT.v $(n)));
+  _ghost_stmt(index_fits (SizeT.v $(cur)) (SizeT.v $(u)) (SizeT.v $(n)));
   int res_fwd = cap[u * n + cur] - flow[u * n + cur];
+  int res_bwd = flow[cur * n + u];
   int new_bn = bn;
   if (res_fwd > 0) {
     if (res_fwd < bn) new_bn = res_fwd;
   } else {
-    int res_bwd = flow[cur * n + u];
     if (res_bwd > 0 && res_bwd < bn) new_bn = res_bwd;
   }
 
@@ -217,14 +223,16 @@ int find_bottleneck(
     size_t n,
     size_t source,
     size_t sink)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
   _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
             pred._length == n)
   _requires(n > 0 && source < n && sink < n && source != sink)
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> cap[p] >= 0))
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> flow[p] >= 0))
   _ensures(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
            pred._length == n)
   _ensures(return > 0)
 {
-  _ghost_stmt(admit());
   return find_bottleneck_rec(cap, flow, pred, n, source, sink, 2147483647, n);
 }
 
@@ -245,9 +253,12 @@ _rec void augment_flow_rec(
     size_t cur,
     int bn,
     size_t fuel)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
   _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
             pred._length == n)
   _requires(n > 0 && source < n && cur < n && bn > 0 && fuel <= n)
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> cap[p] >= 0))
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> flow[p] >= 0))
   _preserves_value(cap._length)
   _preserves_value(pred._length)
   _ensures(flow._length == (_specint)n * (_specint)n)
@@ -283,13 +294,15 @@ void augment_flow(
     size_t source,
     size_t sink,
     int bn)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
   _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
             pred._length == n)
   _requires(n > 0 && source < n && sink < n && source != sink && bn > 0)
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> cap[p] >= 0))
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> flow[p] >= 0))
   _ensures(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n &&
            pred._length == n)
 {
-  _ghost_stmt(admit());
   augment_flow_rec(cap, flow, pred, n, source, sink, bn, n);
 }
 
@@ -301,6 +314,7 @@ int compute_flow_value(
     _array int *flow,
     size_t n,
     size_t source)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
   _requires(flow._length == (_specint)n * (_specint)n)
   _requires(n > 0 && source < n)
   _ensures(flow._length == (_specint)n * (_specint)n)
@@ -314,6 +328,8 @@ int compute_flow_value(
     _invariant(flow._length == (_specint)n * (_specint)n)
     _invariant(v <= n)
   {
+    _ghost_stmt(index_fits (SizeT.v $(source)) (SizeT.v $(v)) (SizeT.v $(n)));
+    _ghost_stmt(index_fits (SizeT.v $(v)) (SizeT.v $(source)) (SizeT.v $(n)));
     fv = fv + flow[source * n + v] - flow[v * n + source];
   }
 
@@ -342,14 +358,15 @@ int max_flow(
     size_t n,
     size_t source,
     size_t sink)
+  _requires((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
   _requires(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n)
   _requires(n > 0 && source < n && sink < n && source != sink)
+  _requires(_forall(size_t k, k < (_specint)n * (_specint)n ==> cap[k] >= 0))
   _ensures(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n)
   _ensures(return >= 0)
   _ensures(_forall(size_t k, k < (_specint)n * (_specint)n ==> flow[k] >= 0))
 {
   _ghost_stmt(admit());
-
   zero_init(flow, n * n);
 
   _array int *color = (int *)calloc(n, sizeof(int));
