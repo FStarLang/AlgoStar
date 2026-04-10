@@ -11,13 +11,17 @@
  *   - Frame preservation (elements outside working range unchanged)
  *   - Termination of max_heapify (via _decreases)
  *   - Max-heap property (max_heapify postcondition, build_max_heap)
+ *   - Element bounding (max_heapify bounded postcondition)
  *   - Sortedness (heapsort postcondition)
  *
- * Max_heapify claims heaps_from as postcondition with targeted assume
- * for the internal sift-down proof (proved in Lemmas.sift_down_swap_lemma_from).
- * Build_max_heap is assume-free: max_heapify's postcondition suffices.
- * Heapsort uses assume for sorted-suffix/prefix-le-suffix invariants
- * (proved in Lemmas via root_ge_element, extract_extends_sorted_upto).
+ * All three functions are ASSUME-FREE.
+ *
+ * max_heapify: heaps_from + bounded postconditions proved via
+ *   almost_heaps_from + grandparent_ok preconditions. The bounded
+ *   postcondition (a[k] <= bound) carries through the recursion.
+ * build_max_heap: assume-free; max_heapify's postcondition suffices.
+ * heapsort: assume-free; uses root_ge_element_bridge (inductive lemma)
+ *   to establish bounded precondition for max_heapify after swap.
  *
  * Uses _rec for max_heapify (natural recursion as in CLRS).
  * Full correctness proofs are in CLRS.Ch06.Heap.Impl.fst.
@@ -32,36 +36,41 @@
  *
  * Mirrors CLRS.Ch06.Heap.Impl.max_heapify.
  *
- * Pre:  bounds only (no heap property required — assumed internally)
- * Post: heaps_from(a, heap_size, start) + frame
+ * Pre:  almost_heaps_from + grandparent_ok + bounded
+ * Post: heaps_from + bounded + frame
  *
  * The `start` parameter tracks the lower bound of the "heaps_from"
- * region, as in Impl.fst. The internal proof (sift-down swap lemma,
- * almost_to_full) is covered by assume (proved in Lemmas).
+ * region, as in Impl.fst. The `bound` parameter carries an upper
+ * bound on element values through the recursion (used by heapsort
+ * to establish prefix_le_suffix after extract-max).
  */
 _rec void max_heapify(_array int *a, size_t len,
                       size_t idx, size_t heap_size,
-                      size_t start)
+                      size_t start, int bound)
   _requires(a._length == len)
   _requires(idx < heap_size && heap_size <= len && start <= idx)
   _requires((bool) _inline_pulse(SizeT.fits (2 `op_Multiply` SizeT.v $(len) + 2)))
-  /* almost_heaps_from(a, heap_size, start, idx): all nodes from start
-     to heap_size-1 satisfy heap_down_at, except possibly at idx. */
+  /* almost_heaps_from(a, heap_size, start, idx) */
   _requires(_forall(size_t k,
     !(k >= start && k < heap_size && k != idx) ||
     ((2 * k + 1 >= heap_size || a[k] >= a[2 * k + 1]) &&
      (2 * k + 2 >= heap_size || a[k] >= a[2 * k + 2]))))
-  /* grandparent_ok: parent of idx dominates children of idx.
-     Needed for the swap case: after swap, parent(idx) >= new a[idx]. */
+  /* grandparent_ok */
   _requires(idx == 0 || (idx - 1) / 2 < start ||
     ((2 * idx + 1 >= heap_size || a[(idx - 1) / 2] >= a[2 * idx + 1]) &&
      (2 * idx + 2 >= heap_size || a[(idx - 1) / 2] >= a[2 * idx + 2])))
+  /* bounded: all elements in [start, heap_size) are <= bound */
+  _requires(_forall(size_t k,
+    !(k >= start && k < heap_size) || a[k] <= bound))
   _preserves_value(a._length)
   /* heaps_from(a, heap_size, start) */
   _ensures(_forall(size_t k,
     k >= start && k < heap_size ==>
     (2 * k + 1 >= heap_size || a[k] >= a[2 * k + 1]) &&
     (2 * k + 2 >= heap_size || a[k] >= a[2 * k + 2])))
+  /* bounded preserved */
+  _ensures(_forall(size_t k,
+    !(k >= start && k < heap_size) || a[k] <= bound))
   /* Frame */
   _ensures(_forall(size_t k,
     k >= heap_size && k < len ==> a[k] == _old(a[k])))
@@ -71,7 +80,7 @@ _rec void max_heapify(_array int *a, size_t len,
 
   if (left >= heap_size) {
     /* Leaf: heap_down_at(idx) trivially true (no children in range),
-       combined with almost_heaps_from ==> heaps_from. SMT derives this. */
+       combined with almost_heaps_from ==> heaps_from. Bounded unchanged. */
     return;
   }
 
@@ -93,24 +102,15 @@ _rec void max_heapify(_array int *a, size_t len,
     a[idx] = a[largest];
     a[largest] = tmp;
 
-    /* After swap: a[idx] = old largest value, a[largest] = old a[idx].
-       - heap_down_at(idx) holds since a[idx] is now the max of {idx, left, right}
-       - almost_heaps_from(a', heap_size, start, largest) holds because:
-         * For k != idx, k != largest: a'[k] unchanged, children unchanged
-           (children of k can't be largest since parent(largest)=idx),
-           so heap_down_at(k) preserved from almost_heaps_from
-         * For k = parent(idx) if k >= start: grandparent_ok gives
-           a[parent(idx)] >= a[children(idx)], and a'[idx] = max child
-           which is one of children(idx), so a'[parent(idx)] >= a'[idx]
-       - grandparent_ok for recursive call: from almost_heaps_from,
-         heap_down_at(largest) holds in old array, giving bounds on
-         children of largest
-       SMT derives this from almost_heaps_from + grandparent_ok. */
+    /* After swap: bounded preserved since both idx and largest are
+       in [start, heap_size) and we just exchanged their values.
+       heap_down_at(idx) holds, almost_heaps_from for recursive call,
+       grandparent_ok from old heap_down_at(largest). */
 
-    max_heapify(a, len, largest, heap_size, start);
+    max_heapify(a, len, largest, heap_size, start, bound);
   } else {
-    /* No swap: a[idx] >= children, so heap_down_at(idx) holds.
-       Combined with almost_heaps_from ==> heaps_from. SMT derives this. */
+    /* No swap: a[idx] >= children, heap_down_at(idx) holds.
+       Combined with almost_heaps_from ==> heaps_from. Bounded unchanged. */
   }
 }
 
@@ -120,8 +120,8 @@ _rec void max_heapify(_array int *a, size_t len,
  * Mirrors CLRS.Ch06.Heap.Impl.build_max_heap.
  *
  * No assume needed: max_heapify's heaps_from postcondition directly
- * re-establishes the loop invariant. The frame invariant is also
- * preserved by max_heapify's frame postcondition.
+ * re-establishes the loop invariant. Passes INT32_MAX as bound
+ * (trivially satisfied for all Int32 values).
  */
 void build_max_heap(_array int *a, size_t len, size_t n)
   _requires(a._length == len)
@@ -158,7 +158,7 @@ void build_max_heap(_array int *a, size_t len, size_t n)
       k >= n && k < len ==> a[k] == _old(a[k])))
   {
     i = i - 1;
-    max_heapify(a, len, i, n, i);
+    max_heapify(a, len, i, n, i, 2147483647);
   }
 }
 
@@ -167,14 +167,10 @@ void build_max_heap(_array int *a, size_t len, size_t n)
  *
  * Mirrors CLRS.Ch06.Heap.Impl.heapsort.
  *
- * Contains targeted assumes for:
- *   1. extract_almost_heaps: after swap, non-root nodes still satisfy
- *      heap property (proved in Lemmas.extract_almost_heaps)
- *   2. prefix_le_suffix + sorted suffix: root_ge_element + frame
- *      (proved in Lemmas.root_ge_element, extract_extends_sorted_upto)
- *
- * The max-heap invariant on [0, heap_sz) is maintained by
- * max_heapify's heaps_from postcondition.
+ * ASSUME-FREE: Uses root_ge_element_bridge to establish that the
+ * root dominates all heap elements (an inductive fact that SMT
+ * cannot derive alone). This provides the bounded precondition
+ * for max_heapify, which in turn gives prefix_le_suffix.
  */
 void heapsort(_array int *a, size_t len, size_t n)
   _requires(a._length == len)
@@ -212,19 +208,33 @@ void heapsort(_array int *a, size_t len, size_t n)
     _invariant(_forall(size_t k,
       k >= n && k < len ==> a[k] == _old(a[k])))
   {
+    /* Root dominance: forall k < heap_sz: a[k] <= a[0].
+       This is an inductive fact (root_ge_element) that SMT cannot
+       derive from heap_down_at alone. The bridge lemma converts
+       the c2pulse heap invariant to the Spec predicate and calls
+       the inductive root_ge_element lemma. */
+#undef assert
+    _ghost_stmt(let _va = array_value_of (!var_a));
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.root_ge_element_bridge _va (!var_heap_sz)
+    );
+#define assert(x) __c2pulse_c_assert(x)
+
     heap_sz = heap_sz - 1;
 
     int tmp = a[0];
     a[0] = a[heap_sz];
     a[heap_sz] = tmp;
 
-    /* heap_sz > 0: loop entered with heap_sz > 1, decremented to >= 1.
-       Call max_heapify unconditionally (as in Impl.fst). */
-    max_heapify(a, len, 0, heap_sz, 0);
-
-    /* After swap + max_heapify, sorted suffix and prefix_le_suffix
-       need re-establishment (proved in Lemmas via root_ge_element,
-       extract_extends_sorted_upto, perm_preserves_sorted_suffix_upto). */
-    _ghost_stmt(assume (pure False));
+    /* After swap, all elements in [0, heap_sz) are <= tmp = old root.
+       - tmp = old a[0], the max-heap root
+       - root_ge_element: forall k < old_heap_sz: a_old[k] <= a_old[0] = tmp
+       - After swap: a'[0] = a_old[heap_sz] <= tmp, a'[k] = a_old[k] <= tmp
+       - max_heapify bounded postcondition preserves: a_new[k] <= tmp
+       - Frame: a_new[heap_sz] = tmp
+       - prefix_le_suffix: a_new[k] <= tmp = a_new[heap_sz]
+       - suffix_sorted at boundary: tmp = a_old[0] <= a_old[old_heap_sz]
+         = a_new[heap_sz+1] from old prefix_le_suffix */
+    max_heapify(a, len, 0, heap_sz, 0, tmp);
   }
 }
