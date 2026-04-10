@@ -47,7 +47,7 @@ _rec void dfs_visit(_array int *adj, size_t n,
   _preserves(time_ref._length == 1)
   _requires(u < n)
   _requires(v_scan <= n)
-  _requires(color[u] != 0)
+  _requires(color[u] == 1)
   /* Timestamp invariants (pre) */
   _requires(time_ref[0] >= 0)
   _requires(_forall(size_t j, j < n && color[j] != 0 ==> d[j] > 0 && d[j] <= time_ref[0]))
@@ -65,6 +65,10 @@ _rec void dfs_visit(_array int *adj, size_t n,
   /* Frame conditions: d, pred unchanged for non-WHITE vertices */
   _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> d[j] == _old(d[j])))
   _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> pred[j] == _old(pred[j])))
+  /* f-frame: f unchanged for BLACK vertices */
+  _ensures(_forall(size_t j, j < n && _old(color[j]) == 2 ==> f[j] == _old(f[j])))
+  /* GRAY frame: GRAY vertices other than u stay GRAY */
+  _ensures(_forall(size_t j, j < n && _old(color[j]) == 1 && j != u ==> color[j] == 1))
   /* u finishes at the current time */
   _ensures(f[u] == time_ref[0])
   /* Predecessor tree: edge exists, parent non-white, parent discovered first */
@@ -141,6 +145,10 @@ void maybe_visit(_array int *adj, size_t n,
   /* Frame conditions: d, pred unchanged for non-WHITE vertices */
   _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> d[j] == _old(d[j])))
   _ensures(_forall(size_t j, j < n && _old(color[j]) != 0 ==> pred[j] == _old(pred[j])))
+  /* f-frame: f unchanged for BLACK vertices */
+  _ensures(_forall(size_t j, j < n && _old(color[j]) == 2 ==> f[j] == _old(f[j])))
+  /* GRAY frame: all GRAY vertices stay GRAY (u is WHITE or BLACK at entry) */
+  _ensures(_forall(size_t j, j < n && _old(color[j]) == 1 ==> color[j] == 1))
   /* Predecessor tree: edge exists, parent non-white, parent discovered first */
   _requires(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
   _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] < d[v]))
