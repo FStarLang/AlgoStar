@@ -101,6 +101,8 @@ int bfs_residual(
   _requires(color._length == n && pred._length == n &&
             dist._length == n && queue._length == n)
   _requires(n > 0 && source < n && sink < n && source != sink)
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> cap[p] >= 0))
+  _requires(_forall(size_t p, p < (_specint)n * (_specint)n ==> flow[p] >= 0))
   _ensures(cap._length == (_specint)n * (_specint)n && flow._length == (_specint)n * (_specint)n)
   _ensures(color._length == n && pred._length == n &&
            dist._length == n && queue._length == n)
@@ -120,6 +122,9 @@ int bfs_residual(
     _invariant(color._length == n && pred._length == n &&
                dist._length == n && queue._length == n)
     _invariant(q_head <= q_tail && q_tail <= n)
+    _invariant((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
+    _invariant(_forall(size_t p, p < (_specint)n * (_specint)n ==> cap[p] >= 0))
+    _invariant(_forall(size_t p, p < (_specint)n * (_specint)n ==> flow[p] >= 0))
   {
     size_t u = queue[q_head];
     q_head = q_head + 1;
@@ -135,20 +140,25 @@ int bfs_residual(
         _invariant(v <= n)
         _invariant(q_head <= q_tail && q_tail <= n)
         _invariant(u < n)
+        _invariant((bool) _inline_pulse(SizeT.fits (SizeT.v $(n) * SizeT.v $(n))))
+        _invariant(_forall(size_t p, p < (_specint)n * (_specint)n ==> cap[p] >= 0))
+        _invariant(_forall(size_t p, p < (_specint)n * (_specint)n ==> flow[p] >= 0))
       {
-        if (color[v] == 0) {
-          int res_fwd = cap[u * n + v] - flow[u * n + v];
-          int res_bwd = flow[v * n + u];
+        _ghost_stmt(index_fits (SizeT.v $(u)) (SizeT.v $(v)) (SizeT.v $(n)));
+        _ghost_stmt(index_fits (SizeT.v $(v)) (SizeT.v $(u)) (SizeT.v $(n)));
+        int color_v = color[v];
+        int res_fwd = cap[u * n + v] - flow[u * n + v];
+        int res_bwd = flow[v * n + u];
+        int dist_u = dist[u];
 
-          if (res_fwd > 0 || res_bwd > 0) {
-            color[v] = 1;
-            pred[v] = u;
-            dist[v] = dist[u] + 1;
+        if (color_v == 0 && (res_fwd > 0 || res_bwd > 0)) {
+          color[v] = 1;
+          pred[v] = u;
+          dist[v] = dist_u + 1;
 
-            if (q_tail < n) {
-              queue[q_tail] = v;
-              q_tail = q_tail + 1;
-            }
+          if (q_tail < n) {
+            queue[q_tail] = v;
+            q_tail = q_tail + 1;
           }
         }
       }
