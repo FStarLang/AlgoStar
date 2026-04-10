@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-/* Merge a[lo..mid) and a[mid..hi) into buf[lo..hi), preserving sortedness */
+/* Merge a[lo..mid) and a[mid..hi) into buf[lo..hi), preserving sortedness.
+ * Proves merge_complexity_bounded: at most hi - lo comparisons. */
 void merge_rec(_array int *a, _array int *buf, size_t len,
                size_t lo, size_t mid, size_t hi)
   _requires(a._length == len && buf._length == len)
@@ -17,8 +18,9 @@ void merge_rec(_array int *a, _array int *buf, size_t len,
 {
   size_t i = lo;
   size_t j = mid;
+  size_t cost = 0;
   for (size_t k = lo; k < hi; k = k + 1)
-    _invariant(_live(k) && _live(i) && _live(j))
+    _invariant(_live(k) && _live(i) && _live(j) && _live(cost))
     _invariant(_live(*buf))
     _invariant(buf._length == len)
     _invariant(lo <= k && k <= hi && hi <= len)
@@ -28,6 +30,8 @@ void merge_rec(_array int *a, _array int *buf, size_t len,
     _invariant(_forall(size_t p, lo <= p && p + 1 < k ==> buf[p] <= buf[p + 1]))
     _invariant(k > lo && i < mid ==> buf[k - 1] <= a[i])
     _invariant(k > lo && j < hi ==> buf[k - 1] <= a[j])
+    /* complexity: at most one comparison per iteration */
+    _invariant(cost <= k - lo)
   {
     if (i >= mid) {
       buf[k] = a[j];
@@ -38,11 +42,15 @@ void merge_rec(_array int *a, _array int *buf, size_t len,
     } else if (a[i] <= a[j]) {
       buf[k] = a[i];
       i = i + 1;
+      cost = cost + 1;
     } else {
       buf[k] = a[j];
       j = j + 1;
+      cost = cost + 1;
     }
   }
+  /* merge_complexity_bounded: at most hi - lo comparisons */
+  _assert(cost <= hi - lo);
 }
 
 /* Recursive top-down merge sort: sort a[lo..hi) using buf as scratch */
