@@ -175,9 +175,9 @@ _rec _plain node *list_delete(_plain node *head, int k)
     node *nx = head->next;
     if (d == k) {
         _ghost_stmt(
-            struct_node__aux_raw_fold $(head);
-            Pulse.Lib.C.Ref.free_ref $(head)
+            struct_node__aux_raw_fold $(head)
         );
+        free(head);
         return nx;
     }
     node *new_tail = list_delete(nx, k);
