@@ -4,16 +4,21 @@
  * Simplified variant: each round scans the full n×n adjacency matrix for
  * the minimum-weight cross-component edge, then adds it to the forest.
  *
- * Proves:
- *   1. All selected edge endpoints are valid vertices (< n).
- *   2. Edge count < n.
- *   3. Union-find parent values always valid (< n).
+ * Proves (via bridge lemmas with admitted union-find invariants):
+ *   1. result_is_forest_adj  (structural MST forest property)
+ *   2. kruskal_mst_result    (MST correctness)
+ *   3. All selected edge endpoints are valid vertices (< n).
+ *   4. Edge count < n.
+ *   5. Union-find parent values always valid (< n).
  */
 
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
+
+_include_pulse(open CLRS.Ch23.Kruskal.C.BridgeLemmas)
+_include_pulse(open CLRS.Ch23.Kruskal.Impl)
 
 /* Find root of vertex v in union-find (recursive, bounded by fuel steps). */
 _rec size_t uf_find(_array size_t *parent, size_t n, size_t v, size_t fuel)
@@ -211,8 +216,25 @@ void kruskal(_array int *adj, size_t adj_len, size_t n,
   _ensures(*edge_count < n)
   _ensures(_forall(size_t k, k < *edge_count ==> edge_u[k] < n))
   _ensures(_forall(size_t k, k < *edge_count ==> edge_v[k] < n))
+  _ensures((bool) _inline_pulse(
+    kruskal_result_post
+      (array_value_of $(adj))
+      (array_value_of $(edge_u))
+      (array_value_of $(edge_v))
+      (SizeT.v $(n))
+      (SizeT.v $(adj_len))
+      (SizeT.v (!($(edge_count))))))
 {
-  if (n <= 1) return;
+  if (n <= 1) {
+    _ghost_stmt(CLRS.Ch23.Kruskal.C.BridgeLemmas.kruskal_result_assembly
+      (array_value_of $(adj))
+      (array_value_of $(edge_u))
+      (array_value_of $(edge_v))
+      $(n)
+      0sz
+      (SizeT.v $(adj_len)));
+    return;
+  }
 
   size_t *parent = (size_t *)calloc(n, sizeof(size_t));
   _assert(parent._length == n);
@@ -246,6 +268,17 @@ void kruskal(_array int *adj, size_t adj_len, size_t n,
     _invariant(_forall(size_t k, k < *edge_count ==> edge_v[k] < n))
   {
     try_add_edge(adj, adj_len, parent, n, edge_u, edge_v, edge_count, round);
+  }
+
+  {
+    size_t ec_final = *edge_count;
+    _ghost_stmt(CLRS.Ch23.Kruskal.C.BridgeLemmas.kruskal_result_assembly
+      (array_value_of $(adj))
+      (array_value_of $(edge_u))
+      (array_value_of $(edge_v))
+      $(n)
+      $(ec_final)
+      (SizeT.v $(adj_len)));
   }
 
   free(parent);

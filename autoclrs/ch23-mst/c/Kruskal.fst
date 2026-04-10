@@ -6,6 +6,14 @@ open Pulse.Lib.C
 
 #restart-solver
 
+open CLRS.Ch23.Kruskal.C.BridgeLemmas
+
+#restart-solver
+
+open CLRS.Ch23.Kruskal.Impl
+
+#restart-solver
+
 fn rec func_uf_find
     (var_parent: (array SizeT.t))
     (var_n: SizeT.t)
@@ -577,6 +585,15 @@ fn func_kruskal
         (var_k: SizeT.t).
         ((var_k `SizeT.lt` (!var_edge_count)) ==>
           (((array_read var_edge_v var_k)) `SizeT.lt` var_n))))
+  ensures
+    (with_pure
+      (kruskal_result_post
+(array_value_of var_adj)
+(array_value_of var_edge_u)
+(array_value_of var_edge_v)
+(SizeT.v var_n)
+(SizeT.v var_adj_len)
+(SizeT.v (!(var_edge_count)))))
 {
   let mut var_adj = var_adj;
   let mut var_adj_len = var_adj_len;
@@ -585,6 +602,13 @@ fn func_kruskal
   let mut var_edge_v = var_edge_v;
   let mut var_edge_count = var_edge_count;
   if (((!var_n) `SizeT.lte` 1sz)) {
+    CLRS.Ch23.Kruskal.C.BridgeLemmas.kruskal_result_assembly
+(array_value_of (!var_adj))
+(array_value_of (!var_edge_u))
+(array_value_of (!var_edge_v))
+(!var_n)
+0sz
+(SizeT.v (!var_adj_len));
     return;
   } else {};
   let mut var_parent : (array SizeT.t);
@@ -661,5 +685,14 @@ fn func_kruskal
         (!var_round));
     var_round := ((!var_round) `SizeT.add` 1sz);
   };
+  let mut var_ec_final : SizeT.t;
+  var_ec_final := (!(!var_edge_count));
+  CLRS.Ch23.Kruskal.C.BridgeLemmas.kruskal_result_assembly
+(array_value_of (!var_adj))
+(array_value_of (!var_edge_u))
+(array_value_of (!var_edge_v))
+(!var_n)
+(!var_ec_final)
+(SizeT.v (!var_adj_len));
   (Pulse.Lib.C.Array.free_array (!var_parent));
 }
