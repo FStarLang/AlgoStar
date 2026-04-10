@@ -191,7 +191,7 @@ void dfs(_array int *adj, size_t n,
   _ensures(_forall(size_t j, j < n ==> d[j] > 0 && f[j] > 0 && d[j] < f[j]))
   _ensures(time_ref[0] >= 0)
   _ensures(_forall(size_t j, j < n ==> d[j] <= time_ref[0] && f[j] <= time_ref[0]))
-  _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && d[pred[v]] < d[v]))
+  _ensures(_forall(size_t v, v < n && pred[v] < n ==> adj[pred[v] * n + v] != 0 && color[pred[v]] != 0 && d[pred[v]] > 0 && d[pred[v]] < d[v]))
 {
   /* Phase 1: Initialize all vertices to WHITE */
   for (size_t i = 0; i < n; i = i + 1)
