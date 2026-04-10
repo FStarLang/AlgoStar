@@ -4,10 +4,12 @@
  * Proves:
  *   1. The returned pivot index is within [lo, hi).
  *   2. All elements in [lo, return) are <= a[return] (the pivot).
- *   3. All elements in (return, hi) are > a[return].
+ *   3. All elements in (return, hi) are > a[return] (strictly_larger_than).
  *   4. Elements outside [lo, hi) are unchanged (frame preservation).
+ *   5. No-fabrication: every output element existed in the input range.
  *
- * Matches the specification in CLRS.Ch07.Partition.Impl.fsti.
+ * Matches the specification in CLRS.Ch07.Partition.Impl.fsti
+ * (minus complexity counting and full permutation, which use ghost refs).
  */
 
 #include "c2pulse.h"
@@ -19,12 +21,6 @@
  *
  * Chooses a[hi-1] as the pivot. Scans left-to-right, swapping elements
  * <= pivot into the front partition. Finally swaps the pivot into place.
- *
- * Invariants (main loop):
- *   - a[lo..i)   : elements <= pivot
- *   - a[i..j)    : elements >  pivot
- *   - a[hi-1]    : pivot (unchanged during loop)
- *   - Outside [lo,hi): unchanged from function entry
  */
 size_t partition(_array int *a, size_t len, size_t lo, size_t hi)
   _requires(a._length == len && lo < hi && hi <= len)
@@ -32,6 +28,9 @@ size_t partition(_array int *a, size_t len, size_t lo, size_t hi)
   _ensures(_forall(size_t k, lo <= k && k < return ==> a[k] <= a[return]))
   _ensures(_forall(size_t k, return < k && k < hi ==> a[return] < a[k]))
   _ensures(_forall(size_t k, k < len && (k < lo || hi <= k) ==> a[k] == _old(a[k])))
+  /* No-fabrication: every output element in [lo,hi) existed in the input */
+  _ensures(_forall(size_t k, lo <= k && k < hi ==>
+      _exists(size_t j, lo <= j && j < hi && a[k] == _old(a[j]))))
 {
   int pivot = a[hi - 1];
   size_t i = lo;
@@ -46,6 +45,9 @@ size_t partition(_array int *a, size_t len, size_t lo, size_t hi)
     _invariant(_forall(size_t k, lo <= k && k < i ==> a[k] <= pivot))
     _invariant(_forall(size_t k, i <= k && k < j ==> a[k] > pivot))
     _invariant(_forall(size_t k, k < len && (k < lo || hi <= k) ==> a[k] == _old(a[k])))
+    /* No-fabrication: loop invariant */
+    _invariant(_forall(size_t k, lo <= k && k < hi ==>
+        _exists(size_t m, lo <= m && m < hi && a[k] == _old(a[m]))))
   {
     if (a[j] <= pivot) {
       tmp = a[i];

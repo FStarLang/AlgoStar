@@ -3,11 +3,11 @@
  *
  * Uses recursive quicksort via c2pulse's _rec support.
  *
- * Proves:
- *   - Partition: left ≤ pivot, right > pivot, bounds + frame preserved
+ * Proved mechanically (via c2pulse annotations):
+ *   - Partition: left ≤ pivot, right > pivot, bounds + frame preserved,
+ *     no-fabrication (each output element existed in the input)
  *   - Quicksort: sorted postcondition, bounds preservation, frame
  *   - Termination via _decreases(hi - lo)
- *   - No assumes or admits
  *
  * The proof strategy uses concrete int bounds (lb, rb) threaded through
  * the recursion.  Partition preserves bounds; after recursive sorts,
@@ -15,6 +15,14 @@
  *
  * This matches the approach in CLRS.Ch07.Quicksort.Impl.fst which uses
  * ghost bounds (lb, rb : erased int) and between_bounds / lemma_sorted_append.
+ *
+ * No-fabrication property: every element in the output range was present
+ * somewhere in the input range.  Combined with the bridge lemmas in
+ * CLRS.Ch07.Quicksort.C.BridgeLemmas, this connects to the full
+ * SortSpec.permutation proved in the Pulse implementation.
+ *
+ * Complexity tracking (ghost tick counters) is Pulse-specific and omitted
+ * here; the full complexity proof is in CLRS.Ch07.Quicksort.Impl.fst.
  */
 
 #include "c2pulse.h"
@@ -22,15 +30,20 @@
 #include <stddef.h>
 
 /*
- * Lomuto partition with bounds and frame preservation.
+ * Lomuto partition with bounds, frame, and no-fabrication tracking.
  *
  * Chooses a[hi-1] as pivot.  Scans left-to-right, swapping elements
  * ≤ pivot into the front partition.  Finally swaps pivot into place.
  *
- * Postconditions:
- *   - Partition property: left ≤ pivot < right
- *   - Bounds preserved: all elements in [lo,hi) stay in [lb,rb]
+ * Postconditions match CLRS.Ch07.Partition.Impl.fsti:
+ *   - Partition property: left ≤ pivot, right > pivot (strictly_larger_than)
+ *   - Bounds preserved: all elements in [lo,hi) stay in [lb,rb] (between_bounds)
  *   - Frame: elements outside [lo,hi) unchanged
+ *   - No-fabrication: every output element existed in the input range
+ *
+ * The full SortSpec.permutation is proved in the Pulse Impl via ghost
+ * sequences; the no-fabrication _exists here is a weaker but still
+ * useful guarantee that connects to permutation via bridge lemmas.
  */
 size_t partition(_array int *a, size_t len, size_t lo, size_t hi, int lb, int rb)
   _requires(a._length == len && lo < hi && hi <= len)
@@ -42,6 +55,9 @@ size_t partition(_array int *a, size_t len, size_t lo, size_t hi, int lb, int rb
   _ensures(lb <= a[return] && a[return] <= rb)
   _ensures(_forall(size_t k, lo <= k && k < hi ==> lb <= a[k] && a[k] <= rb))
   _ensures(_forall(size_t k, k < len && (k < lo || hi <= k) ==> a[k] == _old(a[k])))
+  /* No-fabrication: every output element in [lo,hi) existed in the input */
+  _ensures(_forall(size_t k, lo <= k && k < hi ==>
+      _exists(size_t j, lo <= j && j < hi && a[k] == _old(a[j]))))
 {
   int pivot = a[hi - 1];
   size_t i = lo;
@@ -58,6 +74,9 @@ size_t partition(_array int *a, size_t len, size_t lo, size_t hi, int lb, int rb
     _invariant(_forall(size_t k, i <= k && k < j ==> a[k] > pivot))
     _invariant(_forall(size_t k, lo <= k && k < hi ==> lb <= a[k] && a[k] <= rb))
     _invariant(_forall(size_t k, k < len && (k < lo || hi <= k) ==> a[k] == _old(a[k])))
+    /* No-fabrication: loop invariant */
+    _invariant(_forall(size_t k, lo <= k && k < hi ==>
+        _exists(size_t m, lo <= m && m < hi && a[k] == _old(a[m]))))
   {
     if (a[j] <= pivot) {
       tmp = a[i];
