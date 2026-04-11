@@ -29,12 +29,33 @@ void compute_prefix(_array int *pattern, size_t m, _array int *pi)
   _ensures(_forall(size_t j, j < m ==> pi[j] >= 0))
   _ensures(_forall(size_t j, j < m ==> (_specint) pi[j] <= (_specint) j))
   _ensures(pattern._length == m)
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      pi_max_up_to_int
+        (unwrap_int_seq (array_value_of var_pattern) (SizeT.v var_m))
+        (unwrap_int_seq (array_value_of var_pi) (SizeT.v var_m))
+        (SizeT.v var_m)
+    )
+  ))
 {
+  _ghost_stmt(let _vp = array_value_of (!var_pattern));
+
   pi[0] = 0;
   int k = 0;
+
+  _ghost_stmt(
+    maximality_base_int
+      (unwrap_int_seq _vp (SizeT.v (!var_m)))
+      (unwrap_int_seq (array_value_of (!var_pi)) (SizeT.v (!var_m)))
+  );
+
   for (size_t q = 1; q < m; q = q + 1)
     _invariant(_live(q) && _live(k))
-    _invariant(_live(*pattern) && _live(*pi))
+    _invariant((_slprop) _inline_pulse(
+      exists* (val_pi: (Seq.seq (option Int32.t))) (mask_p: (nat -> prop)) (mask_pi: (nat -> prop)).
+        (array_pts_to (!var_pattern) 1.0R _vp mask_p) **
+        (array_pts_to (!var_pi) 1.0R val_pi mask_pi)
+    ))
     _invariant(pattern._length == m && pi._length == m)
     _invariant(q <= m && m > 0)
     _invariant(k >= 0)
@@ -42,33 +63,158 @@ void compute_prefix(_array int *pattern, size_t m, _array int *pi)
     _invariant((_specint) m < 2147483647)
     _invariant(_forall(size_t j, j < q ==> pi[j] >= 0))
     _invariant(_forall(size_t j, j < q ==> (_specint) pi[j] <= (_specint) j))
+    _invariant((_slprop) _inline_pulse(
+      with_pure (
+        pi_max_up_to_int
+          (unwrap_int_seq _vp (SizeT.v (!var_m)))
+          (unwrap_int_seq (array_value_of (!var_pi)) (SizeT.v (!var_m)))
+          (SizeT.v (!var_q))
+      )
+    ))
+    _invariant((_slprop) _inline_pulse(
+      with_pure (
+        is_prefix_suffix #int
+          (unwrap_int_seq _vp (SizeT.v (!var_m)))
+          (SizeT.v (!var_q) - 1)
+          (to_nat (Int32.v (!var_k)))
+      )
+    ))
+    _invariant((_slprop) _inline_pulse(
+      with_pure (
+        Int32.v (!var_k) ==
+        unwrap_int_val (Seq.index (array_value_of (!var_pi)) (SizeT.v (!var_q) - 1))
+      )
+    ))
   {
+    _ghost_stmt(let _vpi = array_value_of (!var_pi));
+
+    _ghost_stmt(
+      inner_init_int
+        (unwrap_int_seq _vp (SizeT.v (!var_m)))
+        (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+        (SizeT.v (!var_q))
+        (to_nat (Int32.v (!var_k)))
+    );
+
     /* Follow failure chain until match or k == 0 */
-    while (k > 0)
-      _invariant(_live(k))
-      _invariant(_live(*pattern) && _live(*pi))
+    int found = 0;
+    while (k > 0 && found == 0)
+      _invariant(_live(k) && _live(found))
+      _invariant((_slprop) _inline_pulse(
+        exists* (mask_p: (nat -> prop)) (mask_pi: (nat -> prop)).
+          (array_pts_to (!var_pattern) 1.0R _vp mask_p) **
+          (array_pts_to (!var_pi) 1.0R _vpi mask_pi)
+      ))
       _invariant(pattern._length == m && pi._length == m)
       _invariant(k >= 0)
       _invariant((_specint) k < (_specint) q && q < m)
       _invariant((_specint) m < 2147483647)
       _invariant(m > 0)
+      _invariant(found == 0 || found == 1)
+      _invariant(found == 1 ==> pattern[(size_t)k] == pattern[q])
       _invariant(_forall(size_t j, j < q ==> pi[j] >= 0))
       _invariant(_forall(size_t j, j < q ==> (_specint) pi[j] <= (_specint) j))
-      _ensures(k >= 0)
-      _ensures((_specint) k < (_specint) q)
-      _ensures(pattern._length == m && pi._length == m)
-      _ensures(_forall(size_t j, j < q ==> pi[j] >= 0))
-      _ensures(_forall(size_t j, j < q ==> (_specint) pi[j] <= (_specint) j))
-      _ensures((_specint) m < 2147483647)
-      _ensures(m > 0 && q < m)
+      _invariant((_slprop) _inline_pulse(
+        with_pure (
+          pi_max_up_to_int
+            (unwrap_int_seq _vp (SizeT.v (!var_m)))
+            (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+            (SizeT.v (!var_q))
+        )
+      ))
+      _invariant((_slprop) _inline_pulse(
+        with_pure (
+          is_prefix_suffix #int
+            (unwrap_int_seq _vp (SizeT.v (!var_m)))
+            (SizeT.v (!var_q) - 1)
+            (to_nat (Int32.v (!var_k)))
+        )
+      ))
+      _invariant((_slprop) _inline_pulse(
+        with_pure (
+          CLRS.Ch32.KMP.Bridge.all_ps_above_mismatch #int
+            (unwrap_int_seq _vp (SizeT.v (!var_m)))
+            (SizeT.v (!var_q))
+            (to_nat (Int32.v (!var_k)))
+        )
+      ))
     {
-      if (pattern[(size_t)k] == pattern[q]) break;
-      k = pi[(size_t)(k - 1)];
+      if (pattern[(size_t)k] == pattern[q]) {
+        found = 1;
+      } else {
+        _ghost_stmt(
+          unwrap_seq_index_lemma _vp
+            (SizeT.v (!var_m))
+            (to_nat (Int32.v (!var_k)))
+        );
+        _ghost_stmt(
+          unwrap_seq_index_lemma _vp
+            (SizeT.v (!var_m))
+            (SizeT.v (!var_q))
+        );
+        _ghost_stmt(
+          pi_max_instantiate_int
+            (unwrap_int_seq _vp (SizeT.v (!var_m)))
+            (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+            (SizeT.v (!var_q))
+            (to_nat (Int32.v (!var_k) - 1))
+        );
+        _ghost_stmt(
+          unwrap_seq_index_lemma _vpi
+            (SizeT.v (!var_m))
+            (to_nat (Int32.v (!var_k) - 1))
+        );
+        _ghost_stmt(
+          inner_step_int
+            (unwrap_int_seq _vp (SizeT.v (!var_m)))
+            (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+            (SizeT.v (!var_q))
+            (to_nat (Int32.v (!var_k)))
+            (to_nat (unwrap_int_val (Seq.index _vpi (to_nat (Int32.v (!var_k) - 1)))))
+        );
+        k = pi[(size_t)(k - 1)];
+      }
     }
+
+    int k_final = k;
+
     if (pattern[(size_t)k] == pattern[q]) {
       k = k + 1;
     }
+
+    _assert(k >= 0);
+    _assert((_specint)k <= (_specint)q);
+
     pi[q] = k;
+
+    _ghost_stmt(let _vpi_new = array_value_of (!var_pi));
+    _ghost_stmt(
+      unwrap_seq_update _vpi
+        (SizeT.v (!var_m))
+        (SizeT.v (!var_q))
+        (!var_k)
+    );
+    _ghost_stmt(
+      unwrap_seq_index_lemma _vp
+        (SizeT.v (!var_m))
+        (to_nat (Int32.v (!var_k_final)))
+    );
+    _ghost_stmt(
+      unwrap_seq_index_lemma _vp
+        (SizeT.v (!var_m))
+        (SizeT.v (!var_q))
+    );
+    _ghost_stmt(
+      extend_maximality_int
+        (unwrap_int_seq _vp (SizeT.v (!var_m)))
+        (unwrap_int_seq _vpi (SizeT.v (!var_m)))
+        (unwrap_int_seq _vpi_new (SizeT.v (!var_m)))
+        (SizeT.v (!var_q))
+        (to_nat (Int32.v (!var_k_final)))
+        (op_Equality
+          (Seq.index (unwrap_int_seq _vp (SizeT.v (!var_m))) (to_nat (Int32.v (!var_k_final))))
+          (Seq.index (unwrap_int_seq _vp (SizeT.v (!var_m))) (SizeT.v (!var_q))))
+    );
   }
 }
 
