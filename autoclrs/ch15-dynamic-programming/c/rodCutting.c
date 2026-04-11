@@ -7,10 +7,11 @@
  *   1. Base case: r[0] == 0
  *   2. Non-negativity: r[k] >= 0 for all k in 0..n
  *   3. Upper bound: r[k] <= 1000000 * k for all k in 0..n
- *   4. DP recurrence lower bound (admitted): for all j in 1..n, for all i in 1..j:
- *      r[j] >= prices[i-1] + r[j-i]
- *   5. Functional correctness (admitted):
+ *   4. Functional correctness:
  *      r[n] == optimal_revenue(prices, n)
+ *
+ * NO admits. All correctness via dp_correct + accum_max tracking invariants
+ * mirroring the Pulse Impl proof.
  */
 
 #include "c2pulse.h"
@@ -41,6 +42,12 @@ void rod_cutting(_array int *prices, size_t n, _array int *r)
 {
   r[0] = 0;
 
+  /* Ghost: establish dp_correct at j=0 (base case r[0]==0) */
+  _ghost_stmt(
+    dp_correct_init
+      (to_nat_seq (array_value_of $(prices)))
+      (to_nat_seq (array_value_of $(r))));
+
   for (size_t j = 1; j <= n; j = j + 1)
     _invariant(_live(j))
     _invariant(_live(*r) && _live(*prices))
@@ -52,6 +59,13 @@ void rod_cutting(_array int *prices, size_t n, _array int *r)
     _invariant(_forall(size_t k, k >= j || r[k] >= 0))
     _invariant(_forall(size_t k, k >= j ||
       (bool) _inline_pulse(Int32.v (array_read $(r) var_k) <= 1000000 * SizeT.v var_k)))
+    /* Functional correctness: dp_correct for all k < j */
+    _invariant((_slprop) _inline_pulse(
+      with_pure (
+        dp_correct
+          (to_nat_seq (array_value_of $(prices)))
+          (to_nat_seq (array_value_of $(r)))
+          (SizeT.v $(j) - 1))))
   {
     int q = 0;
 
@@ -69,8 +83,23 @@ void rod_cutting(_array int *prices, size_t n, _array int *r)
         (bool) _inline_pulse(Int32.v (array_read $(r) var_k) <= 1000000 * SizeT.v var_k)))
       _invariant(q >= 0)
       _invariant((bool) _inline_pulse(Int32.v $(q) <= 1000000 * SizeT.v $(j)))
+      /* Functional correctness: dp_correct for k < j (table unchanged in inner loop) */
+      _invariant((_slprop) _inline_pulse(
+        with_pure (
+          dp_correct
+            (to_nat_seq (array_value_of $(prices)))
+            (to_nat_seq (array_value_of $(r)))
+            (SizeT.v $(j) - 1))))
+      /* Accumulator tracks accum_max */
+      _invariant((_slprop) _inline_pulse(
+        with_pure (
+          id #int (Int32.v $(q)) ==
+            accum_max
+              (to_nat_seq (array_value_of $(prices)))
+              (to_nat_seq (array_value_of $(r)))
+              (SizeT.v $(j))
+              (SizeT.v $(i) - 1))))
     {
-      /* Read into locals so asserts use matching index terms */
       int p_val = prices[i - 1];
       int r_val = r[j - i];
       _assert(p_val >= 0);
@@ -83,9 +112,13 @@ void rod_cutting(_array int *prices, size_t n, _array int *r)
       }
     }
 
+    /* Ghost: after inner loop, q == accum_max(prices, r, j, j) == optimal_revenue(prices, j) */
+    _ghost_stmt(
+      accum_max_dp_correct
+        (to_nat_seq (array_value_of $(prices)))
+        (to_nat_seq (array_value_of $(r)))
+        (SizeT.v $(j)));
+
     r[j] = q;
   }
-
-  /* admit: DP recurrence postcondition (verified structurally via bridge lemmas) */
-  _ghost_stmt(admit());
 }

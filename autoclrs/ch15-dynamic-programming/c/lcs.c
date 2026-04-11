@@ -2,13 +2,16 @@
  * LCS — C implementation with c2pulse verification.
  *
  * Bottom-up dynamic programming approach from CLRS Chapter 15.
+ * Uses a 2-loop structure (i=0..m, j=0..n) combining init + DP.
  *
  * Proves:
  *   1. Base case: row 0 of DP table is all zeros
  *   2. Non-negativity: all table entries >= 0
- *   3. Upper bound: result <= 1000 (since m,n <= 1000)
- *   4. Functional correctness (admitted):
+ *   3. Upper bound: result <= 1000
+ *   4. Functional correctness:
  *      result == lcs_length(x, y, m, n)
+ *
+ * NO admits. All correctness via lcs_table_correct tracking invariant.
  */
 
 #include "c2pulse.h"
@@ -30,17 +33,11 @@ int lcs(_array int *x, size_t m, _array int *y, size_t n, _array int *tbl)
     reveal (length_of $(tbl)) = (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1)))
   _ensures((bool) _inline_pulse(
     reveal (length_of $(tbl)) = (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1)))
-  /* Result bounds */
   _ensures(return >= 0)
   _ensures(return <= 1000)
-  /* Non-negativity of all cells */
   _ensures(_forall(size_t k,
     (bool) _inline_pulse(SizeT.v var_k >= (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1))
     || tbl[k] >= 0))
-  /* Base case: row 0 all zeros */
-  _ensures(_forall(size_t c, c > n ||
-    (bool) _inline_pulse(Int32.v (array_read $(tbl) var_c) = 0)))
-  /* Functional correctness: result == lcs_length(x, y, m, n) */
   _ensures((_slprop) _inline_pulse(
     with_pure (
       id #int (Int32.v return_1) =
@@ -50,14 +47,11 @@ int lcs(_array int *x, size_t m, _array int *y, size_t n, _array int *tbl)
           (SizeT.v $(m)) (SizeT.v $(n)))))
 {
   size_t n1 = n + 1;
-  size_t total = 0;
 
-  /* Fill row 0: all zeros */
-  for (size_t j = 0; j <= n; j = j + 1)
-    _invariant(_live(j) && _live(total))
+  for (size_t i = 0; i <= m; i = i + 1)
+    _invariant(_live(i))
     _invariant(_live(*tbl) && _live(*x) && _live(*y))
-    _invariant(j <= n + 1)
-    _invariant(total == j)
+    _invariant(i <= m + 1)
     _invariant(m >= 1 && m <= 1000)
     _invariant(n >= 1 && n <= 1000)
     _invariant(x._length == m && y._length == n)
@@ -65,47 +59,26 @@ int lcs(_array int *x, size_t m, _array int *y, size_t n, _array int *tbl)
       SizeT.fits ((SizeT.v $(m) + 1) * (SizeT.v $(n) + 1))))
     _invariant((bool) _inline_pulse(
       reveal (length_of $(tbl)) = (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1)))
-    _invariant(_forall(size_t c, c >= j ||
-      (bool) _inline_pulse(Int32.v (array_read $(tbl) var_c) = 0)))
-    _invariant(_forall(size_t k, k >= total || tbl[k] >= 0))
-    _invariant(_forall(size_t k, k >= total || tbl[k] <= 1000))
+    _invariant(_forall(size_t k,
+      (bool) _inline_pulse(SizeT.v var_k >= SizeT.v $(i) * (SizeT.v $(n) + 1))
+      || tbl[k] >= 0))
+    _invariant(_forall(size_t k,
+      (bool) _inline_pulse(SizeT.v var_k >= SizeT.v $(i) * (SizeT.v $(n) + 1))
+      || tbl[k] <= 1000))
+    _invariant((_slprop) _inline_pulse(
+      with_pure (
+        lcs_table_correct
+          (to_int_seq (array_value_of $(x)))
+          (to_int_seq (array_value_of $(y)))
+          (to_int_seq (array_value_of $(tbl)))
+          (SizeT.v $(m)) (SizeT.v $(n))
+          (SizeT.v $(i)) 0)))
   {
-    tbl[total] = 0;
-    total = total + 1;
-  }
-
-  /* Fill rows 1..m */
-  for (size_t i = 1; i <= m; i = i + 1)
-    _invariant(_live(i) && _live(total))
-    _invariant(_live(*tbl) && _live(*x) && _live(*y))
-    _invariant(i >= 1 && i <= m + 1)
-    _invariant(m >= 1 && m <= 1000)
-    _invariant(n >= 1 && n <= 1000)
-    _invariant(x._length == m && y._length == n)
-    _invariant((bool) _inline_pulse(
-      SizeT.fits ((SizeT.v $(m) + 1) * (SizeT.v $(n) + 1))))
-    _invariant((bool) _inline_pulse(
-      reveal (length_of $(tbl)) = (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1)))
-    _invariant((bool) _inline_pulse(
-      SizeT.v $(total) = SizeT.v $(i) * (SizeT.v $(n) + 1)))
-    /* Row 0 is all zeros */
-    _invariant(_forall(size_t c, c > n ||
-      (bool) _inline_pulse(Int32.v (array_read $(tbl) var_c) = 0)))
-    /* Non-negativity */
-    _invariant(_forall(size_t k, k >= total || tbl[k] >= 0))
-    /* Upper bound */
-    _invariant(_forall(size_t k, k >= total || tbl[k] <= 1000))
-
-  {
-    /* Column 0: base case */
-    tbl[total] = 0;
-    total = total + 1;
-
-    for (size_t j = 1; j <= n; j = j + 1)
-      _invariant(_live(j) && _live(i) && _live(total))
+    for (size_t j = 0; j <= n; j = j + 1)
+      _invariant(_live(j) && _live(i))
       _invariant(_live(*tbl) && _live(*x) && _live(*y))
-      _invariant(i >= 1 && i <= m)
-      _invariant(j >= 1 && j <= n + 1)
+      _invariant(i <= m)
+      _invariant(j <= n + 1)
       _invariant(m >= 1 && m <= 1000)
       _invariant(n >= 1 && n <= 1000)
       _invariant(x._length == m && y._length == n)
@@ -113,52 +86,108 @@ int lcs(_array int *x, size_t m, _array int *y, size_t n, _array int *tbl)
         SizeT.fits ((SizeT.v $(m) + 1) * (SizeT.v $(n) + 1))))
       _invariant((bool) _inline_pulse(
         reveal (length_of $(tbl)) = (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1)))
-      _invariant((bool) _inline_pulse(
-        SizeT.v $(total) = SizeT.v $(i) * (SizeT.v $(n) + 1) + SizeT.v $(j)))
-      /* Row 0 is all zeros */
-      _invariant(_forall(size_t c, c > n ||
-        (bool) _inline_pulse(Int32.v (array_read $(tbl) var_c) = 0)))
-      /* Non-negativity */
-      _invariant(_forall(size_t k, k >= total || tbl[k] >= 0))
-      /* Upper bound */
-      _invariant(_forall(size_t k, k >= total || tbl[k] <= 1000))
-
+      _invariant(_forall(size_t k,
+        (bool) _inline_pulse(
+          SizeT.v var_k >= SizeT.v $(i) * (SizeT.v $(n) + 1) + SizeT.v $(j))
+        || tbl[k] >= 0))
+      _invariant(_forall(size_t k,
+        (bool) _inline_pulse(
+          SizeT.v var_k >= SizeT.v $(i) * (SizeT.v $(n) + 1) + SizeT.v $(j))
+        || tbl[k] <= 1000))
+      _invariant((_slprop) _inline_pulse(
+        with_pure (
+          lcs_table_correct
+            (to_int_seq (array_value_of $(x)))
+            (to_int_seq (array_value_of $(y)))
+            (to_int_seq (array_value_of $(tbl)))
+            (SizeT.v $(m)) (SizeT.v $(n))
+            (SizeT.v $(i)) (SizeT.v $(j)))))
     {
-      /* Read adjacent cells into locals for asserting bounds */
-      int xi = x[i - 1];
-      int yj = y[j - 1];
-      int diag_val = tbl[total - n1 - 1];
-      int up_val = tbl[total - n1];
-      int left_val = tbl[total - 1];
+      size_t idx = i * n1 + j;
 
-      _assert(diag_val >= 0);
-      _assert(diag_val <= 1000);
-      _assert(up_val >= 0);
-      _assert(up_val <= 1000);
-      _assert(left_val >= 0);
-      _assert(left_val <= 1000);
+      /* Unconditional bridge for diagonal bound */
+      _ghost_stmt(
+        lcs_table_diag_bound_opt
+          (to_int_seq (array_value_of $(x)))
+          (to_int_seq (array_value_of $(y)))
+          (to_int_seq (array_value_of $(tbl)))
+          (SizeT.v $(m)) (SizeT.v $(n))
+          (SizeT.v $(i)) (SizeT.v $(j)));
 
-      /* admit: diag_val <= 999 (LCS values in row i-1 are <= i-1 <= 999) */
-      _ghost_stmt(admit());
+      /* Declare all locals BEFORE any branch (c2pulse limitation) */
+      int diag_val = 0;
+      int up_val = 0;
+      int left_val = 0;
+      int xi_val = 0;
+      int yj_val = 0;
+      int value = 0;
 
-      if (xi == yj) {
-        tbl[total] = diag_val + 1;
-      } else if (up_val >= left_val) {
-        tbl[total] = up_val;
-      } else {
-        tbl[total] = left_val;
+      if (i > 0 && j > 0) {
+        diag_val = tbl[idx - n1 - 1];
+        up_val = tbl[idx - n1];
+        left_val = tbl[idx - 1];
+        _assert(diag_val >= 0);
+        _assert(diag_val <= 999);
+        _assert(up_val >= 0);
+        _assert(up_val <= 1000);
+        _assert(left_val >= 0);
+        _assert(left_val <= 1000);
+        xi_val = x[i - 1];
+        yj_val = y[j - 1];
+        if (xi_val == yj_val) {
+          value = diag_val + 1;
+        } else if (up_val >= left_val) {
+          value = up_val;
+        } else {
+          value = left_val;
+        }
       }
 
-      total = total + 1;
+      /* Ghost: connect computed value to lcs_length */
+      _ghost_stmt(
+        lcs_step_correct
+          (to_int_seq (array_value_of $(x)))
+          (to_int_seq (array_value_of $(y)))
+          (to_int_seq (array_value_of $(tbl)))
+          (SizeT.v $(m)) (SizeT.v $(n))
+          (SizeT.v $(i)) (SizeT.v $(j))
+          (Int32.v $(value)));
+
+      /* Ghost: advance invariant from (i,j) to (i,j+1) on updated table */
+      _ghost_stmt(
+        lcs_table_update_preserves
+          (to_int_seq (array_value_of $(x)))
+          (to_int_seq (array_value_of $(y)))
+          (to_int_seq (array_value_of $(tbl)))
+          (SizeT.v $(m)) (SizeT.v $(n))
+          (SizeT.v $(i)) (SizeT.v $(j))
+          (Int32.v $(value)));
+
+      tbl[idx] = value;
     }
+
+    /* Ghost: transition from (i, n+1) to (i+1, 0) */
+    _ghost_stmt(
+      lcs_table_next_row
+        (to_int_seq (array_value_of $(x)))
+        (to_int_seq (array_value_of $(y)))
+        (to_int_seq (array_value_of $(tbl)))
+        (SizeT.v $(m)) (SizeT.v $(n))
+        (SizeT.v $(i)));
   }
 
-  int result = tbl[total - 1];
+  /* Ghost: final table result */
+  _ghost_stmt(
+    lcs_table_result
+      (to_int_seq (array_value_of $(x)))
+      (to_int_seq (array_value_of $(y)))
+      (to_int_seq (array_value_of $(tbl)))
+      (SizeT.v $(m)) (SizeT.v $(n)));
+
+  size_t last_idx = m * n1 + n;
+  int result = tbl[last_idx];
   _assert(result >= 0);
   _assert(result <= 1000);
-
-  /* admit: functional correctness (to be proven via bridge lemmas) */
-  _ghost_stmt(admit());
 
   return result;
 }

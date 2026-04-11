@@ -22,3 +22,14 @@ let to_nat_seq_index (s: seq (option I32.t)) (i: nat)
           (ensures Seq.index (to_nat_seq s) i == (let v = I32.v (Some?.v (Seq.index s i)) in if v >= 0 then v else 0))
           [SMTPat (Seq.index (to_nat_seq s) i)]
   = ()
+
+let to_nat_seq_upd_some (s: seq (option I32.t)) (j: nat) (v: I32.t)
+  : Lemma (requires j < Seq.length s /\ I32.v v >= 0)
+          (ensures to_nat_seq (Seq.upd s j (Some v)) == Seq.upd (to_nat_seq s) j (I32.v v))
+          [SMTPat (to_nat_seq (Seq.upd s j (Some v)))]
+  = assert (Seq.equal (to_nat_seq (Seq.upd s j (Some v))) (Seq.upd (to_nat_seq s) j (I32.v v)))
+
+let dp_correct_init (prices: seq nat) (sr: seq nat)
+  : Lemma (requires Seq.length sr > 0 /\ Seq.index sr 0 == 0)
+          (ensures dp_correct prices sr 0)
+  = ()
