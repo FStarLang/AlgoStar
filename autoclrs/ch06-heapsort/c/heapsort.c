@@ -74,6 +74,11 @@ _rec void max_heapify(_array int *a, size_t len,
   /* Frame */
   _ensures(_forall(size_t k,
     k >= heap_size && k < len ==> a[k] == _old(a[k])))
+  /* Permutation: result is a rearrangement of input */
+  _ensures((bool) _inline_pulse(
+    FStar.Seq.Properties.permutation (option Int32.t)
+      (old (array_value_of $(a)))
+      (array_value_of $(a))))
   _decreases(heap_size - idx)
 {
   size_t left  = 2 * idx + 1;
@@ -98,19 +103,42 @@ _rec void max_heapify(_array int *a, size_t len,
   }
 
   if (largest != idx) {
+    /* Capture pre-swap state for permutation proof */
+#undef assert
+    _ghost_stmt(let _pre_swap = array_value_of (!var_a));
+#define assert(x) __c2pulse_c_assert(x)
+
     int tmp = a[idx];
     a[idx] = a[largest];
     a[largest] = tmp;
 
-    /* After swap: bounded preserved since both idx and largest are
-       in [start, heap_size) and we just exchanged their values.
-       heap_down_at(idx) holds, almost_heaps_from for recursive call,
-       grandparent_ok from old heap_down_at(largest). */
+    /* After swap: establish permutation pre_swap -> current */
+#undef assert
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.swap_option_perm _pre_swap (SizeT.v (!var_idx)) (SizeT.v (!var_largest))
+    );
+#define assert(x) __c2pulse_c_assert(x)
 
     max_heapify(a, len, largest, heap_size, start, bound);
+
+    /* Compose: permutation pre_swap post_swap (swap_option_perm)
+               + permutation post_swap current (recursive postcondition)
+               = permutation pre_swap current */
+#undef assert
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.option_perm_trans
+        _pre_swap
+        (Seq.upd (Seq.upd _pre_swap (SizeT.v (!var_idx)) (Seq.index _pre_swap (SizeT.v (!var_largest)))) (SizeT.v (!var_largest)) (Seq.index _pre_swap (SizeT.v (!var_idx))))
+        (array_value_of (!var_a))
+    );
+#define assert(x) __c2pulse_c_assert(x)
   } else {
-    /* No swap: a[idx] >= children, heap_down_at(idx) holds.
-       Combined with almost_heaps_from ==> heaps_from. Bounded unchanged. */
+    /* No swap: permutation is reflexive */
+#undef assert
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.option_perm_refl (array_value_of (!var_a))
+    );
+#define assert(x) __c2pulse_c_assert(x)
   }
 }
 
@@ -136,8 +164,18 @@ void build_max_heap(_array int *a, size_t len, size_t n)
   /* Frame */
   _ensures(_forall(size_t k,
     k >= n && k < len ==> a[k] == _old(a[k])))
+  /* Permutation */
+  _ensures((bool) _inline_pulse(
+    FStar.Seq.Properties.permutation (option Int32.t)
+      (old (array_value_of $(a)))
+      (array_value_of $(a))))
 {
   if (n <= 1) return;
+
+  /* Capture initial state for permutation composition in loop body */
+#undef assert
+  _ghost_stmt(let _init_seq = array_value_of (!var_a));
+#define assert(x) __c2pulse_c_assert(x)
 
   size_t i = n / 2;
 
@@ -156,9 +194,27 @@ void build_max_heap(_array int *a, size_t len, size_t n)
     /* Frame */
     _invariant(_forall(size_t k,
       k >= n && k < len ==> a[k] == _old(a[k])))
+    /* Permutation: current array is a permutation of initial */
+    _invariant((bool) _inline_pulse(
+      FStar.Seq.Properties.permutation (option Int32.t)
+        _init_seq
+        (array_value_of $(a))))
   {
+#undef assert
+    _ghost_stmt(let _pre_iter = array_value_of (!var_a));
+#define assert(x) __c2pulse_c_assert(x)
     i = i - 1;
     max_heapify(a, len, i, n, i, 2147483647);
+    /* Compose: permutation _init_seq pre_iter (invariant) +
+                permutation pre_iter post_iter (max_heapify postcondition) */
+#undef assert
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.option_perm_trans
+        _init_seq
+        _pre_iter
+        (array_value_of (!var_a))
+    );
+#define assert(x) __c2pulse_c_assert(x)
   }
 }
 
@@ -180,10 +236,25 @@ void heapsort(_array int *a, size_t len, size_t n)
   _ensures(_forall(size_t k, k + 1 < n ==> a[k] <= a[k + 1]))
   _ensures(_forall(size_t k,
     k >= n && k < len ==> a[k] == _old(a[k])))
+  /* Permutation */
+  _ensures((bool) _inline_pulse(
+    FStar.Seq.Properties.permutation (option Int32.t)
+      (old (array_value_of $(a)))
+      (array_value_of $(a))))
 {
   if (n <= 1) return;
 
+  /* Capture pre-build state for final permutation composition */
+#undef assert
+  _ghost_stmt(let _orig_seq = array_value_of (!var_a));
+#define assert(x) __c2pulse_c_assert(x)
+
   build_max_heap(a, len, n);
+
+  /* Capture state after build_max_heap for permutation composition */
+#undef assert
+  _ghost_stmt(let _init_seq = array_value_of (!var_a));
+#define assert(x) __c2pulse_c_assert(x)
 
   size_t heap_sz = n;
 
@@ -207,34 +278,75 @@ void heapsort(_array int *a, size_t len, size_t n)
     /* Frame */
     _invariant(_forall(size_t k,
       k >= n && k < len ==> a[k] == _old(a[k])))
+    /* Permutation: current is permutation of post-build_max_heap */
+    _invariant((bool) _inline_pulse(
+      FStar.Seq.Properties.permutation (option Int32.t)
+        _init_seq
+        (array_value_of $(a))))
   {
-    /* Root dominance: forall k < heap_sz: a[k] <= a[0].
-       This is an inductive fact (root_ge_element) that SMT cannot
-       derive from heap_down_at alone. The bridge lemma converts
-       the c2pulse heap invariant to the Spec predicate and calls
-       the inductive root_ge_element lemma. */
+    /* Root dominance: forall k < heap_sz: a[k] <= a[0]. */
 #undef assert
-    _ghost_stmt(let _va = array_value_of (!var_a));
+    _ghost_stmt(let _pre_iter = array_value_of (!var_a));
     _ghost_stmt(
-      CLRS.Ch06.Heap.C.BridgeLemmas.root_ge_element_bridge _va (!var_heap_sz)
+      CLRS.Ch06.Heap.C.BridgeLemmas.root_ge_element_bridge _pre_iter (!var_heap_sz)
     );
 #define assert(x) __c2pulse_c_assert(x)
 
     heap_sz = heap_sz - 1;
 
+    /* Capture pre-swap state */
+#undef assert
+    _ghost_stmt(let _pre_swap = array_value_of (!var_a));
+#define assert(x) __c2pulse_c_assert(x)
+
     int tmp = a[0];
     a[0] = a[heap_sz];
     a[heap_sz] = tmp;
 
-    /* After swap, all elements in [0, heap_sz) are <= tmp = old root.
-       - tmp = old a[0], the max-heap root
-       - root_ge_element: forall k < old_heap_sz: a_old[k] <= a_old[0] = tmp
-       - After swap: a'[0] = a_old[heap_sz] <= tmp, a'[k] = a_old[k] <= tmp
-       - max_heapify bounded postcondition preserves: a_new[k] <= tmp
-       - Frame: a_new[heap_sz] = tmp
-       - prefix_le_suffix: a_new[k] <= tmp = a_new[heap_sz]
-       - suffix_sorted at boundary: tmp = a_old[0] <= a_old[old_heap_sz]
-         = a_new[heap_sz+1] from old prefix_le_suffix */
+    /* swap permutation proof */
+#undef assert
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.swap_option_perm _pre_swap 0 (SizeT.v (!var_heap_sz))
+    );
+#define assert(x) __c2pulse_c_assert(x)
+
     max_heapify(a, len, 0, heap_sz, 0, tmp);
+
+    /* Compose permutation chain:
+       pre_swap -> post_swap (swap_option_perm)
+       post_swap -> current (max_heapify postcondition)
+       pre_iter -> pre_swap (equal, heap_sz decrement doesn't change array)
+       _init_seq -> pre_iter (loop invariant) */
+#undef assert
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.option_perm_trans
+        _pre_swap
+        (Seq.upd (Seq.upd _pre_swap 0 (Seq.index _pre_swap (SizeT.v (!var_heap_sz)))) (SizeT.v (!var_heap_sz)) (Seq.index _pre_swap 0))
+        (array_value_of (!var_a))
+    );
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.option_perm_trans
+        _pre_iter
+        _pre_swap
+        (array_value_of (!var_a))
+    );
+    _ghost_stmt(
+      CLRS.Ch06.Heap.C.BridgeLemmas.option_perm_trans
+        _init_seq
+        _pre_iter
+        (array_value_of (!var_a))
+    );
+#define assert(x) __c2pulse_c_assert(x)
   }
+
+  /* Final composition: old -> post_build (build_max_heap postcond)
+                         + post_build -> final (loop) */
+#undef assert
+  _ghost_stmt(
+    CLRS.Ch06.Heap.C.BridgeLemmas.option_perm_trans
+      _orig_seq
+      _init_seq
+      (array_value_of (!var_a))
+  );
+#define assert(x) __c2pulse_c_assert(x)
 }

@@ -19,6 +19,7 @@ module CLRS.Ch06.Heap.C.BridgeLemmas
 
 open CLRS.Ch06.Heap.Spec
 module Seq  = FStar.Seq
+module SeqP = FStar.Seq.Properties
 module I32  = FStar.Int32
 module SZ   = FStar.SizeT
 
@@ -31,6 +32,31 @@ let all_some (s: Seq.seq (option I32.t)) (n: nat) : prop =
 val extract_ints (s: Seq.seq (option I32.t)) (n: nat{all_some s n})
   : Tot (r: Seq.seq int{Seq.length r == n /\
     (forall (i: nat). i < n ==> Seq.index r i == I32.v (Some?.v (Seq.index s i)))})
+
+/// Permutation over option Int32.t sequences (c2pulse representation).
+
+val option_perm_refl (s: Seq.seq (option I32.t))
+  : Lemma (SeqP.permutation (option I32.t) s s)
+
+val option_perm_trans (s1 s2 s3: Seq.seq (option I32.t))
+  : Lemma
+    (requires SeqP.permutation (option I32.t) s1 s2 /\
+              SeqP.permutation (option I32.t) s2 s3)
+    (ensures SeqP.permutation (option I32.t) s1 s3)
+
+/// After a c2pulse swap (two array_writes), the result equals SeqP.swap.
+val swap_option_seq_eq (s: Seq.seq (option I32.t))
+  (i j: nat{i < Seq.length s /\ j < Seq.length s /\ i <> j})
+  : Lemma
+    (Seq.equal
+      (Seq.upd (Seq.upd s i (Seq.index s j)) j (Seq.index s i))
+      (SeqP.swap s i j))
+
+/// Swapping two elements preserves permutation.
+val swap_option_perm (s: Seq.seq (option I32.t))
+  (i j: nat{i < Seq.length s /\ j < Seq.length s})
+  : Lemma (SeqP.permutation (option I32.t) s
+    (Seq.upd (Seq.upd s i (Seq.index s j)) j (Seq.index s i)))
 
 /// Root of a max-heap dominates all elements.
 /// This is an inductive fact (root_ge_element) that SMT cannot derive
