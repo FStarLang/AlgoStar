@@ -85,10 +85,12 @@ let lemma_walk_valid_restricted (w: list nat) (n: nat)
    § 2. Basic Walk Properties + Base Case
    ======================================================================== *)
 
+#push-options "--fuel 4"
 let lemma_direct_walk_valid (adj: Seq.seq int) (n: nat) (i j: nat) (k: nat)
   : Lemma (requires i < n /\ j < n /\ Seq.length adj == n * n)
           (ensures valid_restricted_walk adj n i j k [i; j])
   = ()
+#pop-options
 
 let lemma_direct_walk_weight (adj: Seq.seq int) (n: nat) (i j: nat)
   : Lemma (requires i < n /\ j < n /\ Seq.length adj == n * n)
@@ -176,11 +178,13 @@ let rec lemma_split_suffix_is_walk (w: list nat) (v: nat)
       end
 
 // The prefix starts at walk_src
+#push-options "--ifuel 2"
 let rec lemma_split_prefix_src (w: list nat) (v: nat)
   : Lemma (requires is_walk w /\ mem v (intermediates w))
           (ensures walk_src (walk_split_prefix w v) == walk_src w)
           (decreases length w)
-  = match w with
+  = lemma_split_prefix_is_walk w v;
+    match w with
     | _ :: b :: rest ->
       if b = v then ()
       else match rest with
@@ -192,14 +196,15 @@ let rec lemma_split_prefix_dst (w: list nat) (v: nat)
   : Lemma (requires is_walk w /\ mem v (intermediates w))
           (ensures walk_dst (walk_split_prefix w v) == v)
           (decreases length w)
-  = match w with
+  = lemma_split_prefix_is_walk w v;
+    match w with
     | _ :: b :: rest ->
       if b = v then ()
       else match rest with
         | [] | [_] -> ()
         | _ :: _ :: _ ->
-          lemma_split_prefix_is_walk (b :: rest) v;
           lemma_split_prefix_dst (b :: rest) v
+#pop-options
 
 // The suffix starts at v
 let rec lemma_split_suffix_src (w: list nat) (v: nat)
@@ -290,6 +295,7 @@ let rec lemma_split_suffix_shorter (w: list nat) (v: nat)
         | _ :: _ :: _ -> lemma_split_suffix_shorter (b :: rest) v
 
 // walk_valid is preserved by splitting
+#push-options "--fuel 4"
 let rec lemma_split_prefix_valid (w: list nat) (v: nat) (n: nat)
   : Lemma (requires is_walk w /\ walk_valid w n /\ mem v (intermediates w))
           (ensures walk_valid (walk_split_prefix w v) n)
@@ -300,6 +306,7 @@ let rec lemma_split_prefix_valid (w: list nat) (v: nat) (n: nat)
       else match rest with
         | [] | [_] -> ()
         | _ :: _ :: _ -> lemma_split_prefix_valid (b :: rest) v n
+#pop-options
 
 let rec lemma_split_suffix_valid (w: list nat) (v: nat) (n: nat)
   : Lemma (requires is_walk w /\ walk_valid w n /\ mem v (intermediates w))
@@ -440,6 +447,7 @@ let lemma_concat_dst (w1 w2: list nat)
     lemma_last_append w1 (tl w2)
 
 // walk_valid preserved by concatenation
+#push-options "--fuel 4"
 let rec lemma_concat_valid (w1 w2: list nat) (n: nat)
   : Lemma (requires is_walk w1 /\ is_walk w2 /\ walk_valid w1 n /\ walk_valid w2 n)
           (ensures walk_valid (walk_concat w1 w2) n)
@@ -449,6 +457,7 @@ let rec lemma_concat_valid (w1 w2: list nat) (n: nat)
     | a :: b :: c :: rest' ->
       let rest = b :: c :: rest' in
       lemma_concat_valid rest w2 n
+#pop-options
 
 // Helper: all_less_than distributes over append
 let rec lemma_all_lt_append (l1 l2: list nat) (k: nat)

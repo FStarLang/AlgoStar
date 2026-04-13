@@ -20,7 +20,9 @@ CH25_DIR   := $(CURDIR)/..
 COMMON_DIR := $(CURDIR)/../../common
 
 # Detect binary install vs source build for fstar.exe
-ifneq ($(wildcard $(ROOT)/fstar/bin/fstar.exe),)
+ifneq ($(wildcard $(ROOT)/FStar/bin/fstar.exe),)
+  FSTAR_EXE ?= $(ROOT)/FStar/bin/fstar.exe
+else ifneq ($(wildcard $(ROOT)/fstar/bin/fstar.exe),)
   FSTAR_EXE ?= $(ROOT)/fstar/bin/fstar.exe
 else
   FSTAR_EXE ?= $(ROOT)/FStar/out/bin/fstar.exe
@@ -37,7 +39,7 @@ FSTAR = $(FSTAR_EXE) \
 	--include $(CH25_DIR)/_cache \
 	--include $(COMMON_DIR) \
 	--z3rlimit 80 \
-	--already_cached Prims,FStar,Pulse.Nolib,Pulse.Class,Pulse.Lib,PulseCore,CLRS.Ch25.FloydWarshall
+	--already_cached Prims,FStar,Pulse.Nolib,Pulse.Class,PulseCore,CLRS.Ch25.FloydWarshall
 
 # ── Source files ───────────────────────────────────────────────────
 C_FILES := $(wildcard *.c)
