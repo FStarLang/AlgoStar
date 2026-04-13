@@ -24,6 +24,8 @@
 
 _include_pulse(
   open CLRS.Ch33.Segments.Spec
+  open CLRS.Ch33.GrahamScan.Spec
+  open CLRS.Ch33.GrahamScan.C.BridgeLemmas
   open FStar.Mul
 )
 
@@ -43,6 +45,8 @@ size_t find_bottom(_array int *xs, _array int *ys, size_t len)
   _ensures(return < len)
   _ensures(_forall(size_t k, k < len ==>
     ys[return] < ys[k] || (ys[return] == ys[k] && xs[return] <= xs[k])))
+  _ensures((bool) _inline_pulse(
+    SizeT.v $(return) == find_bottom_spec_c (array_value_of $(xs)) (array_value_of $(ys))))
 {
   size_t best = 0;
   for (size_t i = 1; i < len; i = i + 1)
@@ -53,6 +57,10 @@ size_t find_bottom(_array int *xs, _array int *ys, size_t len)
     _invariant(best < len)
     _invariant(_forall(size_t k, k < i ==>
       ys[best] < ys[k] || (ys[best] == ys[k] && xs[best] <= xs[k])))
+    _invariant((bool) _inline_pulse(
+      find_bottom_aux_c (array_value_of $(xs)) (array_value_of $(ys))
+        (SizeT.v $(i)) (SizeT.v $(best))
+      == find_bottom_spec_c (array_value_of $(xs)) (array_value_of $(ys))))
   {
     if (ys[i] < ys[best] || (ys[i] == ys[best] && xs[i] < xs[best])) {
       best = i;
@@ -86,6 +94,9 @@ int polar_cmp(_array int *xs, _array int *ys, size_t len,
   _preserves_value(ys._length)
   _ensures((_specint) return == ((_specint) xs[a] - (_specint) xs[p0]) * ((_specint) ys[b] - (_specint) ys[p0]) - ((_specint) xs[b] - (_specint) xs[p0]) * ((_specint) ys[a] - (_specint) ys[p0]))
   _ensures((bool) _inline_pulse((id #int (Int32.v $(return))) == cross_product_spec (id #int (Int32.v (array_read $(xs) $(p0)))) (id #int (Int32.v (array_read $(ys) $(p0)))) (id #int (Int32.v (array_read $(xs) $(a)))) (id #int (Int32.v (array_read $(ys) $(a)))) (id #int (Int32.v (array_read $(xs) $(b)))) (id #int (Int32.v (array_read $(ys) $(b))))))
+  _ensures((bool) _inline_pulse(
+    (id #int (Int32.v $(return))) == polar_cmp_spec_c (array_value_of $(xs)) (array_value_of $(ys))
+      (SizeT.v $(p0)) (SizeT.v $(a)) (SizeT.v $(b))))
 {
   int ax = xs[a] - xs[p0];
   _assert(ax > -32767 && ax < 32767);
@@ -152,6 +163,12 @@ _rec size_t pop_while(_array int *xs, _array int *ys, size_t len,
   _ensures(_forall(size_t k, k < hull._length ==> hull[k] == _old(hull[k])))
   _ensures(_forall(size_t k, k < len ==> xs[k] == _old(xs[k])))
   _ensures(_forall(size_t k, k < len ==> ys[k] == _old(ys[k])))
+  _ensures((bool) _inline_pulse(
+    SizeT.v $(return) == pop_while_spec_c (array_value_of $(xs)) (array_value_of $(ys))
+      (array_value_of $(hull)) (SizeT.v $(top)) (SizeT.v $(p_idx))))
+  _ensures((bool) _inline_pulse(
+    ensures_left_turn_c (array_value_of $(xs)) (array_value_of $(ys))
+      (array_value_of $(hull)) (SizeT.v $(return)) (SizeT.v $(p_idx))))
   _decreases(top)
 {
   size_t t1_idx = hull[top - 1];

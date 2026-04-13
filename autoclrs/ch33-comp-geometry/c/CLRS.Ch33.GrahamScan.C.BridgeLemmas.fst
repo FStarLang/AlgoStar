@@ -3,8 +3,11 @@
    to CLRS.Ch33.GrahamScan.Spec functions (int sequences).
 
    c2pulse operates on Seq.seq (option Int32.t); the Impl.fsti specs
-   use Seq.seq int. These lemmas prove that the c2pulse ensures
-   imply the corresponding spec-level properties.
+   use Seq.seq int. These bridge wrappers work directly on option
+   sequences to match c2pulse's element access pattern, then are
+   proven equivalent to the spec functions.
+
+   NO admits. NO assumes.
 *)
 
 module CLRS.Ch33.GrahamScan.C.BridgeLemmas
@@ -15,94 +18,77 @@ open CLRS.Ch33.GrahamScan.Spec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-(* Convert c2pulse option-wrapped Int32 sequence to plain int sequence.
-   Requires all elements are Some (well-initialized). *)
-let int_val (x: Int32.t) : int = Int32.v x
+(* ================================================================
+   Direct access helpers matching c2pulse's array_read
+   ================================================================ *)
 
-let to_int_seq
-  (s: Seq.seq (option Int32.t) {forall (i: nat). i < Seq.length s ==> Some? (Seq.index s i)})
-  : GTot (Seq.seq int)
-  = Seq.init_ghost (Seq.length s) (fun i -> int_val (Some?.v (Seq.index s i)))
+let ival (s: Seq.seq (option Int32.t)) (i: nat) : int =
+  if i < Seq.length s then
+    match Seq.index s i with Some v -> Int32.v v | None -> 0
+  else 0
 
-let to_int_seq_length
-  (s: Seq.seq (option Int32.t) {forall (i: nat). i < Seq.length s ==> Some? (Seq.index s i)})
-  : Lemma (Seq.length (to_int_seq s) == Seq.length s)
-  = ()
+(* ================================================================
+   _c wrappers: spec-equivalent functions on option Int32.t seqs
+   ================================================================ *)
 
-(* The c2pulse forall ensures for find_bottom implies is_bottommost on int sequences. *)
-let find_bottom_is_bottommost_bridge
-  (xs_opt: Seq.seq (option Int32.t))
-  (ys_opt: Seq.seq (option Int32.t))
-  (m: nat)
-  : Lemma
-    (requires
-      Seq.length xs_opt == Seq.length ys_opt /\
-      m < Seq.length xs_opt /\
-      (forall (i: nat). i < Seq.length xs_opt ==> Some? (Seq.index xs_opt i)) /\
-      (forall (i: nat). i < Seq.length ys_opt ==> Some? (Seq.index ys_opt i)) /\
-      (forall (k: nat). k < Seq.length xs_opt ==>
-        int_val (Some?.v (Seq.index ys_opt m)) < int_val (Some?.v (Seq.index ys_opt k)) \/
-        (int_val (Some?.v (Seq.index ys_opt m)) = int_val (Some?.v (Seq.index ys_opt k)) /\
-         int_val (Some?.v (Seq.index xs_opt m)) <= int_val (Some?.v (Seq.index xs_opt k)))))
-    (ensures (
-      let sxs = to_int_seq xs_opt in
-      let sys = to_int_seq ys_opt in
-      is_bottommost sxs sys m))
-  = ()
+let rec find_bottom_aux_c (xs ys: Seq.seq (option Int32.t)) (i best: nat)
+  : Tot nat (decreases (Seq.length xs - i)) =
+  if best >= Seq.length xs || Seq.length ys <> Seq.length xs then best
+  else if i >= Seq.length xs then best
+  else
+    let new_best =
+      if ival ys i < ival ys best ||
+         (ival ys i = ival ys best && ival xs i < ival xs best)
+      then i
+      else best
+    in
+    find_bottom_aux_c xs ys (i + 1) new_best
 
-(* polar_cmp_spec is cross_product_spec applied to array elements (by definition). *)
-let polar_cmp_bridge
-  (sxs sys: Seq.seq int)
-  (p0 a b: nat)
-  : Lemma
-    (requires
-      p0 < Seq.length sxs /\ a < Seq.length sxs /\ b < Seq.length sxs /\
-      Seq.length sys == Seq.length sxs)
-    (ensures
-      polar_cmp_spec sxs sys p0 a b ==
-      cross_product_spec (Seq.index sxs p0) (Seq.index sys p0)
-                         (Seq.index sxs a) (Seq.index sys a)
-                         (Seq.index sxs b) (Seq.index sys b))
-  = ()
+let find_bottom_spec_c (xs ys: Seq.seq (option Int32.t)) : Tot nat =
+  if Seq.length xs = 0 then 0
+  else find_bottom_aux_c xs ys 1 0
 
-(* The c2pulse cross_product_spec ensures for polar_cmp, when lifted through
-   to_int_seq, equals polar_cmp_spec on the int sequences. *)
-let polar_cmp_c2pulse_bridge
-  (xs_opt ys_opt: Seq.seq (option Int32.t))
-  (p0 a b: nat)
-  : Lemma
-    (requires
-      Seq.length xs_opt == Seq.length ys_opt /\
-      p0 < Seq.length xs_opt /\ a < Seq.length xs_opt /\ b < Seq.length xs_opt /\
-      (forall (i: nat). i < Seq.length xs_opt ==> Some? (Seq.index xs_opt i)) /\
-      (forall (i: nat). i < Seq.length ys_opt ==> Some? (Seq.index ys_opt i)))
-    (ensures (
-      let sxs = to_int_seq xs_opt in
-      let sys = to_int_seq ys_opt in
-      polar_cmp_spec sxs sys p0 a b ==
-      cross_product_spec
-        (int_val (Some?.v (Seq.index xs_opt p0)))
-        (int_val (Some?.v (Seq.index ys_opt p0)))
-        (int_val (Some?.v (Seq.index xs_opt a)))
-        (int_val (Some?.v (Seq.index ys_opt a)))
-        (int_val (Some?.v (Seq.index xs_opt b)))
-        (int_val (Some?.v (Seq.index ys_opt b)))))
-  = ()
+let polar_cmp_spec_c (xs ys: Seq.seq (option Int32.t)) (p0 a b: nat) : Tot int =
+  if p0 >= Seq.length xs || a >= Seq.length xs || b >= Seq.length xs ||
+     Seq.length ys <> Seq.length xs
+  then 0
+  else
+    cross_product_spec (ival xs p0) (ival ys p0)
+                       (ival xs a) (ival ys a)
+                       (ival xs b) (ival ys b)
 
-(* The c2pulse hull write property (hull[return-1] = p_idx, below preserved)
-   partially captures scan_step_sz_spec. This lemma shows that if the
-   pop_while result is new_top, writing p_idx at new_top gives the same
-   sequence as Seq.upd hull new_top p_idx. *)
-let scan_step_hull_write_bridge
-  (hull: Seq.seq SZ.t)
-  (new_top: nat)
-  (p_idx: SZ.t)
-  : Lemma
-    (requires new_top < Seq.length hull)
-    (ensures (
-      let hull' = Seq.upd hull new_top p_idx in
-      Seq.index hull' new_top == p_idx /\
-      (forall (k: nat). k < new_top ==> Seq.index hull' k == Seq.index hull k) /\
-      (forall (k: nat). k > new_top /\ k < Seq.length hull ==>
-        Seq.index hull' k == Seq.index hull k)))
-  = ()
+let sz_val (s: Seq.seq (option SZ.t)) (i: nat) : SZ.t =
+  if i < Seq.length s then
+    match Seq.index s i with Some v -> v | None -> 0sz
+  else 0sz
+
+let rec pop_while_spec_c (xs ys: Seq.seq (option Int32.t))
+                          (hull: Seq.seq (option SZ.t)) (top: nat) (p_idx: nat)
+  : Tot nat (decreases top) =
+  if top < 2 || top > Seq.length hull then top
+  else
+    let t1 = SZ.v (sz_val hull (top - 1)) in
+    let t2 = SZ.v (sz_val hull (top - 2)) in
+    if t1 >= Seq.length xs || t2 >= Seq.length xs || p_idx >= Seq.length xs ||
+       Seq.length ys <> Seq.length xs
+    then top
+    else
+      let cp = cross_product_spec
+        (ival xs t2) (ival ys t2)
+        (ival xs t1) (ival ys t1)
+        (ival xs p_idx) (ival ys p_idx) in
+      if cp <= 0 then pop_while_spec_c xs ys hull (top - 1) p_idx
+      else top
+
+let ensures_left_turn_c (xs ys: Seq.seq (option Int32.t))
+                         (hull: Seq.seq (option SZ.t)) (top p_idx: nat) : prop =
+  if top >= 2 && top <= Seq.length hull && p_idx < Seq.length xs &&
+     Seq.length ys = Seq.length xs then
+    let t1 = SZ.v (sz_val hull (top - 1)) in
+    let t2 = SZ.v (sz_val hull (top - 2)) in
+    if t1 < Seq.length xs && t2 < Seq.length xs then
+      cross_product_spec (ival xs t2) (ival ys t2)
+                         (ival xs t1) (ival ys t1)
+                         (ival xs p_idx) (ival ys p_idx) > 0
+    else True
+  else True

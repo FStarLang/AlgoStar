@@ -25,6 +25,8 @@
 
 _include_pulse(
   open CLRS.Ch33.Segments.Spec
+  open CLRS.Ch33.JarvisMarch.Spec
+  open CLRS.Ch33.JarvisMarch.C.BridgeLemmas
   open FStar.Mul
 )
 
@@ -48,6 +50,8 @@ size_t find_leftmost(_array int *xs, _array int *ys, size_t len)
     xs[return] < xs[k] || (xs[return] == xs[k] && ys[return] <= ys[k])))
   _ensures(_forall(size_t k, k < len ==> xs[k] > -16384 && xs[k] < 16384))
   _ensures(_forall(size_t k, k < len ==> ys[k] > -16384 && ys[k] < 16384))
+  _ensures((bool) _inline_pulse(
+    SizeT.v $(return) == find_leftmost_spec_c (array_value_of $(xs)) (array_value_of $(ys))))
 {
   size_t best = 0;
   for (size_t i = 1; i < len; i = i + 1)
@@ -60,6 +64,10 @@ size_t find_leftmost(_array int *xs, _array int *ys, size_t len)
       xs[best] < xs[k] || (xs[best] == xs[k] && ys[best] <= ys[k])))
     _invariant(_forall(size_t k, k < len ==> xs[k] > -16384 && xs[k] < 16384))
     _invariant(_forall(size_t k, k < len ==> ys[k] > -16384 && ys[k] < 16384))
+    _invariant((bool) _inline_pulse(
+      find_leftmost_aux_c (array_value_of $(xs)) (array_value_of $(ys))
+        (SizeT.v $(i)) (SizeT.v $(best))
+      == find_leftmost_spec_c (array_value_of $(xs)) (array_value_of $(ys))))
   {
     if (xs[i] < xs[best] || (xs[i] == xs[best] && ys[i] < ys[best])) {
       best = i;
