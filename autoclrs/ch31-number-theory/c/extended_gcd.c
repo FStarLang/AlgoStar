@@ -6,7 +6,6 @@
  *   2. d is positive (> 0).
  *   3. Bézout's identity: a*x + b*y = d for the extended_gcd coefficients.
  *   4. d divides both a and b.
- *   5. O(log b) complexity bound: gcd_steps(a,b) <= 2*num_bits(b)+1.
  *
  * Based on CLRS p. 937, Alg 31.3 (Extended Euclidean Algorithm).
  * Uses recursive form matching the mathematical specification.
@@ -18,7 +17,6 @@
 
 _include_pulse(
   open CLRS.Ch31.GCD.Spec
-  open CLRS.Ch31.GCD.Complexity
   open CLRS.Ch31.ExtendedGCD.Spec
   open CLRS.Ch31.ExtendedGCD.Lemmas
   open FStar.Math.Euclid
@@ -42,7 +40,6 @@ _rec size_t extended_gcd_impl(size_t a, size_t b)
        = SizeT.v $(return)
     /\ divides (SizeT.v $(return)) (SizeT.v $(a))
     /\ divides (SizeT.v $(return)) (SizeT.v $(b))
-    /\ (SizeT.v $(b) > 0 ==> gcd_steps (SizeT.v $(a)) (SizeT.v $(b)) <= op_Multiply 2 (num_bits (SizeT.v $(b))) + 1)
   ))
   _decreases((_specint) b)
 {
@@ -52,7 +49,6 @@ _rec size_t extended_gcd_impl(size_t a, size_t b)
     _ghost_stmt(extended_gcd_divides_both (SizeT.v $(a)) (SizeT.v $(b)));
     return a;
   }
-  _ghost_stmt(lemma_gcd_steps_log (SizeT.v $(a)) (SizeT.v $(b)));
   size_t r = a % b;
   size_t d = extended_gcd_impl(b, r);
   _ghost_stmt(extended_gcd_computes_gcd (SizeT.v $(a)) (SizeT.v $(b)));

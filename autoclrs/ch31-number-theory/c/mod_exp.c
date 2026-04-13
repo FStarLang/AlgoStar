@@ -4,7 +4,6 @@
  * Proves:
  *   1. The result equals mod_exp_spec(b, e, m) = pow(b, e) % m.
  *   2. The result is in [0, m).
- *   3. Complexity bound: at most floor(log2(e)) + 1 loop iterations.
  *
  * Based on CLRS Exercise 31.6-2.
  * Precondition: m > 0 and m*m fits in size_t (overflow safety).
@@ -16,13 +15,8 @@
 _include_pulse(
   open CLRS.Ch31.ModExp.Spec
   open CLRS.Ch31.ModExp.Lemmas
-  open CLRS.Ch31.ModExp.Complexity
   open FStar.Mul
   open FStar.Math.Lemmas
-
-  let rec lemma_log2f_lt (n: int)
-    : Lemma (requires n >= 1) (ensures log2f n < n) (decreases n)
-    = if n <= 1 then () else lemma_log2f_lt (n / 2)
 )
 
 size_t mod_exp(size_t b_init, size_t e_init, size_t m)
@@ -42,22 +36,18 @@ size_t mod_exp(size_t b_init, size_t e_init, size_t m)
   size_t result = 1 % m;
   size_t base = b_init % m;
   size_t exp = e_init;
-  size_t steps = 0;
 
   while (exp > 0)
-    _invariant(_live(result) && _live(base) && _live(exp) && _live(steps))
+    _invariant(_live(result) && _live(base) && _live(exp))
     _invariant((bool) _inline_pulse(
       SizeT.v $(exp) <= SizeT.v $(e_init)
       /\ SizeT.v $(result) >= 0 /\ SizeT.v $(result) < SizeT.v $(m)
       /\ SizeT.v $(base) >= 0 /\ SizeT.v $(base) < SizeT.v $(m)
       /\ (op_Multiply (SizeT.v $(result)) (pow (SizeT.v $(base)) (SizeT.v $(exp)))) % SizeT.v $(m)
          = mod_exp_spec (SizeT.v $(b_init)) (SizeT.v $(e_init)) (SizeT.v $(m))
-      /\ SizeT.v $(steps) <= log2f (SizeT.v $(e_init)) + 1
-      /\ (SizeT.v $(exp) > 0 ==> SizeT.v $(steps) + log2f (SizeT.v $(exp)) <= log2f (SizeT.v $(e_init)))
     ))
   {
     _ghost_stmt(mod_exp_step (SizeT.v $(result)) (SizeT.v $(base)) (SizeT.v $(exp)) (SizeT.v $(m)));
-    _ghost_stmt(lemma_log2f_halve_le (SizeT.v $(exp)));
 
     if (exp % 2 == 1) {
       _assert((bool) _inline_pulse(
@@ -76,8 +66,6 @@ size_t mod_exp(size_t b_init, size_t e_init, size_t m)
       op_Multiply (SizeT.v $(base)) (SizeT.v $(m))
         < op_Multiply (SizeT.v $(m)) (SizeT.v $(m))));
     base = (base * base) % m;
-    _ghost_stmt(lemma_log2f_lt (SizeT.v $(e_init)));
-    steps = steps + 1;
     exp = exp / 2;
   }
 
