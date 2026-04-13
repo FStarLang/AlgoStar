@@ -18,6 +18,10 @@ open CLRS.Ch15.LCS.C.BridgeLemmas
 
 #restart-solver
 
+open CLRS.Ch15.LCS.C.BridgeLemmas2
+
+#restart-solver
+
 fn func_lcs
     (var_x: (array Int32.t))
     (var_m: SizeT.t)
@@ -54,6 +58,8 @@ fn func_lcs
   ensures (with_pure (reveal (length_of var_tbl) = (SizeT.v var_m + 1) * (SizeT.v var_n + 1)))
   ensures (with_pure (0 <= (id #int (Int32.v return_1))))
   ensures (with_pure ((id #int (Int32.v return_1)) <= 1000))
+  ensures (with_pure (Int32.v return_1 <= SizeT.v var_m))
+  ensures (with_pure (Int32.v return_1 <= SizeT.v var_n))
   ensures
     (with_pure
       (forall
@@ -68,84 +74,91 @@ lcs_length
 (to_int_seq (array_value_of var_y))
 (SizeT.v var_m) (SizeT.v var_n)))
 {
-  let var_n1 = (var_n `SizeT.add` 1sz);
+  let mut var_x = var_x;
+  let mut var_m = var_m;
+  let mut var_y = var_y;
+  let mut var_n = var_n;
+  let mut var_tbl = var_tbl;
+  let mut var_n1 : SizeT.t;
+  var_n1 := ((!var_n) `SizeT.add` 1sz);
   let mut var_i : SizeT.t;
   var_i := 0sz;
-  while (((!var_i) `SizeT.lte` var_m))
+  while (((!var_i) `SizeT.lte` (!var_m)))
     invariant (live var_i)
-    invariant (((Pulse.Lib.C.Array.live_array var_tbl) **
-          (Pulse.Lib.C.Array.live_array var_x))
+    invariant (((Pulse.Lib.C.Array.live_array (!var_tbl)) **
+          (Pulse.Lib.C.Array.live_array (!var_x)))
         **
-        (Pulse.Lib.C.Array.live_array var_y))
-    invariant (with_pure ((SizeT.v (!var_i)) <= ((SizeT.v var_m) + 1)))
-    invariant (with_pure ((1 <= (SizeT.v var_m)) && ((SizeT.v var_m) <= 1000)))
-    invariant (with_pure ((1 <= (SizeT.v var_n)) && ((SizeT.v var_n) <= 1000)))
+        (Pulse.Lib.C.Array.live_array (!var_y)))
+    invariant (with_pure ((SizeT.v (!var_i)) <= ((SizeT.v (!var_m)) + 1)))
+    invariant (with_pure ((1 <= (SizeT.v (!var_m))) && ((SizeT.v (!var_m)) <= 1000)))
+    invariant (with_pure ((1 <= (SizeT.v (!var_n))) && ((SizeT.v (!var_n)) <= 1000)))
     invariant (with_pure
-        (((reveal (length_of var_x)) = (SizeT.v var_m)) &&
-          ((reveal (length_of var_y)) = (SizeT.v var_n))))
-    invariant (with_pure (SizeT.fits ((SizeT.v var_m + 1) * (SizeT.v var_n + 1))))
+        (((reveal (length_of (!var_x))) = (SizeT.v (!var_m))) &&
+          ((reveal (length_of (!var_y))) = (SizeT.v (!var_n)))))
+    invariant (with_pure (SizeT.fits ((SizeT.v (!var_m) + 1) * (SizeT.v (!var_n) + 1))))
     invariant (with_pure
-        (reveal (length_of var_tbl) = (SizeT.v var_m + 1) * (SizeT.v var_n + 1)))
-    invariant (with_pure
-        (forall
-          (var_k: SizeT.t).
-          ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v var_n + 1)) ||
-            (0 <= (id #int (Int32.v ((array_read var_tbl var_k))))))))
+        (reveal (length_of (!var_tbl)) = (SizeT.v (!var_m) + 1) * (SizeT.v (!var_n) + 1)))
     invariant (with_pure
         (forall
           (var_k: SizeT.t).
-          ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v var_n + 1)) ||
-            ((id #int (Int32.v ((array_read var_tbl var_k)))) <= 1000))))
+          ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v (!var_n) + 1)) ||
+            (0 <= (id #int (Int32.v ((array_read (!var_tbl) var_k))))))))
+    invariant (with_pure
+        (forall
+          (var_k: SizeT.t).
+          ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v (!var_n) + 1)) ||
+            ((id #int (Int32.v ((array_read (!var_tbl) var_k)))) <= 1000))))
     invariant (with_pure (
 lcs_table_correct
-(to_int_seq (array_value_of var_x))
-(to_int_seq (array_value_of var_y))
-(to_int_seq (array_value_of var_tbl))
-(SizeT.v var_m) (SizeT.v var_n)
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(to_int_seq (array_value_of (!var_tbl)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n))
 (SizeT.v (!var_i)) 0))
   {
     let mut var_j : SizeT.t;
     var_j := 0sz;
-    while (((!var_j) `SizeT.lte` var_n))
+    while (((!var_j) `SizeT.lte` (!var_n)))
       invariant ((live var_j) ** (live var_i))
-      invariant (((Pulse.Lib.C.Array.live_array var_tbl) **
-            (Pulse.Lib.C.Array.live_array var_x))
+      invariant (((Pulse.Lib.C.Array.live_array (!var_tbl)) **
+            (Pulse.Lib.C.Array.live_array (!var_x)))
           **
-          (Pulse.Lib.C.Array.live_array var_y))
-      invariant (with_pure ((!var_i) `SizeT.lte` var_m))
-      invariant (with_pure ((SizeT.v (!var_j)) <= ((SizeT.v var_n) + 1)))
-      invariant (with_pure ((1 <= (SizeT.v var_m)) && ((SizeT.v var_m) <= 1000)))
-      invariant (with_pure ((1 <= (SizeT.v var_n)) && ((SizeT.v var_n) <= 1000)))
+          (Pulse.Lib.C.Array.live_array (!var_y)))
+      invariant (with_pure ((!var_i) `SizeT.lte` (!var_m)))
+      invariant (with_pure ((SizeT.v (!var_j)) <= ((SizeT.v (!var_n)) + 1)))
+      invariant (with_pure ((1 <= (SizeT.v (!var_m))) && ((SizeT.v (!var_m)) <= 1000)))
+      invariant (with_pure ((1 <= (SizeT.v (!var_n))) && ((SizeT.v (!var_n)) <= 1000)))
       invariant (with_pure
-          (((reveal (length_of var_x)) = (SizeT.v var_m)) &&
-            ((reveal (length_of var_y)) = (SizeT.v var_n))))
-      invariant (with_pure (SizeT.fits ((SizeT.v var_m + 1) * (SizeT.v var_n + 1))))
+          (((reveal (length_of (!var_x))) = (SizeT.v (!var_m))) &&
+            ((reveal (length_of (!var_y))) = (SizeT.v (!var_n)))))
+      invariant (with_pure (SizeT.fits ((SizeT.v (!var_m) + 1) * (SizeT.v (!var_n) + 1))))
       invariant (with_pure
-          (reveal (length_of var_tbl) = (SizeT.v var_m + 1) * (SizeT.v var_n + 1)))
-      invariant (with_pure
-          (forall
-            (var_k: SizeT.t).
-            ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v var_n + 1) + SizeT.v (!var_j)) ||
-              (0 <= (id #int (Int32.v ((array_read var_tbl var_k))))))))
+          (reveal (length_of (!var_tbl)) = (SizeT.v (!var_m) + 1) * (SizeT.v (!var_n) + 1)))
       invariant (with_pure
           (forall
             (var_k: SizeT.t).
-            ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v var_n + 1) + SizeT.v (!var_j)) ||
-              ((id #int (Int32.v ((array_read var_tbl var_k)))) <= 1000))))
+            ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v (!var_n) + 1) + SizeT.v (!var_j)) ||
+              (0 <= (id #int (Int32.v ((array_read (!var_tbl) var_k))))))))
+      invariant (with_pure
+          (forall
+            (var_k: SizeT.t).
+            ((SizeT.v var_k >= SizeT.v (!var_i) * (SizeT.v (!var_n) + 1) + SizeT.v (!var_j)) ||
+              ((id #int (Int32.v ((array_read (!var_tbl) var_k)))) <= 1000))))
       invariant (with_pure (
 lcs_table_correct
-(to_int_seq (array_value_of var_x))
-(to_int_seq (array_value_of var_y))
-(to_int_seq (array_value_of var_tbl))
-(SizeT.v var_m) (SizeT.v var_n)
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(to_int_seq (array_value_of (!var_tbl)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n))
 (SizeT.v (!var_i)) (SizeT.v (!var_j))))
     {
-      let var_idx = (((!var_i) `SizeT.mul` var_n1) `SizeT.add` (!var_j));
+      let mut var_idx : SizeT.t;
+      var_idx := (((!var_i) `SizeT.mul` (!var_n1)) `SizeT.add` (!var_j));
       lcs_table_diag_bound_opt
-(to_int_seq (array_value_of var_x))
-(to_int_seq (array_value_of var_y))
-(to_int_seq (array_value_of var_tbl))
-(SizeT.v var_m) (SizeT.v var_n)
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(to_int_seq (array_value_of (!var_tbl)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n))
 (SizeT.v (!var_i)) (SizeT.v (!var_j));
       let mut var_diag_val : Int32.t;
       var_diag_val := (Int32.int_to_t 0);
@@ -161,17 +174,17 @@ lcs_table_correct
       var_value := (Int32.int_to_t 0);
       if (((0sz `SizeT.lt` (!var_i)) && (0sz `SizeT.lt` (!var_j)))) {
         var_diag_val :=
-          ((array_read var_tbl ((var_idx `SizeT.sub` var_n1) `SizeT.sub` 1sz)));
-        var_up_val := ((array_read var_tbl (var_idx `SizeT.sub` var_n1)));
-        var_left_val := ((array_read var_tbl (var_idx `SizeT.sub` 1sz)));
+          ((array_read (!var_tbl) (((!var_idx) `SizeT.sub` (!var_n1)) `SizeT.sub` 1sz)));
+        var_up_val := ((array_read (!var_tbl) ((!var_idx) `SizeT.sub` (!var_n1))));
+        var_left_val := ((array_read (!var_tbl) ((!var_idx) `SizeT.sub` 1sz)));
         assert (with_pure (0 <= (id #int (Int32.v (!var_diag_val)))));
         assert (with_pure ((id #int (Int32.v (!var_diag_val))) <= 999));
         assert (with_pure (0 <= (id #int (Int32.v (!var_up_val)))));
         assert (with_pure ((id #int (Int32.v (!var_up_val))) <= 1000));
         assert (with_pure (0 <= (id #int (Int32.v (!var_left_val)))));
         assert (with_pure ((id #int (Int32.v (!var_left_val))) <= 1000));
-        var_xi_val := ((array_read var_x ((!var_i) `SizeT.sub` 1sz)));
-        var_yj_val := ((array_read var_y ((!var_j) `SizeT.sub` 1sz)));
+        var_xi_val := ((array_read (!var_x) ((!var_i) `SizeT.sub` 1sz)));
+        var_yj_val := ((array_read (!var_y) ((!var_j) `SizeT.sub` 1sz)));
         if (((!var_xi_val) = (!var_yj_val))) {
           var_value := ((!var_diag_val) `Int32.add` (Int32.int_to_t 1));
         } else {
@@ -183,38 +196,46 @@ lcs_table_correct
         };
       } else {};
       lcs_step_correct
-(to_int_seq (array_value_of var_x))
-(to_int_seq (array_value_of var_y))
-(to_int_seq (array_value_of var_tbl))
-(SizeT.v var_m) (SizeT.v var_n)
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(to_int_seq (array_value_of (!var_tbl)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n))
 (SizeT.v (!var_i)) (SizeT.v (!var_j))
 (Int32.v (!var_value));
       lcs_table_update_preserves
-(to_int_seq (array_value_of var_x))
-(to_int_seq (array_value_of var_y))
-(to_int_seq (array_value_of var_tbl))
-(SizeT.v var_m) (SizeT.v var_n)
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(to_int_seq (array_value_of (!var_tbl)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n))
 (SizeT.v (!var_i)) (SizeT.v (!var_j))
 (Int32.v (!var_value));
-      (array_write var_tbl var_idx (!var_value));
+      (array_write (!var_tbl) (!var_idx) (!var_value));
       var_j := ((!var_j) `SizeT.add` 1sz);
     };
     lcs_table_next_row
-(to_int_seq (array_value_of var_x))
-(to_int_seq (array_value_of var_y))
-(to_int_seq (array_value_of var_tbl))
-(SizeT.v var_m) (SizeT.v var_n)
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(to_int_seq (array_value_of (!var_tbl)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n))
 (SizeT.v (!var_i));
     var_i := ((!var_i) `SizeT.add` 1sz);
   };
   lcs_table_result
-(to_int_seq (array_value_of var_x))
-(to_int_seq (array_value_of var_y))
-(to_int_seq (array_value_of var_tbl))
-(SizeT.v var_m) (SizeT.v var_n);
-  let var_last_idx = ((var_m `SizeT.mul` var_n1) `SizeT.add` var_n);
-  let var_result = ((array_read var_tbl var_last_idx));
-  assert (with_pure (0 <= (id #int (Int32.v var_result))));
-  assert (with_pure ((id #int (Int32.v var_result)) <= 1000));
-  return var_result;
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(to_int_seq (array_value_of (!var_tbl)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n));
+  let mut var_last_idx : SizeT.t;
+  var_last_idx := (((!var_m) `SizeT.mul` (!var_n1)) `SizeT.add` (!var_n));
+  let mut var_result : Int32.t;
+  var_result := ((array_read (!var_tbl) (!var_last_idx)));
+  assert (with_pure (0 <= (id #int (Int32.v (!var_result)))));
+  assert (with_pure ((id #int (Int32.v (!var_result))) <= 1000));
+  lcs_result_upper_bound
+(to_int_seq (array_value_of (!var_x)))
+(to_int_seq (array_value_of (!var_y)))
+(SizeT.v (!var_m)) (SizeT.v (!var_n));
+  assert (with_pure (Int32.v (!var_result) <= SizeT.v (!var_m)));
+  assert (with_pure (Int32.v (!var_result) <= SizeT.v (!var_n)));
+  return (!var_result);
 }

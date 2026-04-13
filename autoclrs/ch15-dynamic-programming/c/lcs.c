@@ -7,7 +7,7 @@
  * Proves:
  *   1. Base case: row 0 of DP table is all zeros
  *   2. Non-negativity: all table entries >= 0
- *   3. Upper bound: result <= 1000
+ *   3. Upper bound: result <= m, result <= n
  *   4. Functional correctness:
  *      result == lcs_length(x, y, m, n)
  *
@@ -21,6 +21,7 @@
 _include_pulse(open Pulse.Lib.C.Array)
 _include_pulse(open CLRS.Ch15.LCS.Spec)
 _include_pulse(open CLRS.Ch15.LCS.C.BridgeLemmas)
+_include_pulse(open CLRS.Ch15.LCS.C.BridgeLemmas2)
 
 int lcs(_array int *x, size_t m, _array int *y, size_t n, _array int *tbl)
   _preserves(x._length == m)
@@ -35,6 +36,8 @@ int lcs(_array int *x, size_t m, _array int *y, size_t n, _array int *tbl)
     reveal (length_of $(tbl)) = (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1)))
   _ensures(return >= 0)
   _ensures(return <= 1000)
+  _ensures((bool) _inline_pulse(Int32.v return_1 <= SizeT.v $(m)))
+  _ensures((bool) _inline_pulse(Int32.v return_1 <= SizeT.v $(n)))
   _ensures(_forall(size_t k,
     (bool) _inline_pulse(SizeT.v var_k >= (SizeT.v $(m) + 1) * (SizeT.v $(n) + 1))
     || tbl[k] >= 0))
@@ -188,6 +191,18 @@ int lcs(_array int *x, size_t m, _array int *y, size_t n, _array int *tbl)
   int result = tbl[last_idx];
   _assert(result >= 0);
   _assert(result <= 1000);
+
+  /* Ghost: derive tight upper bounds result <= m and result <= n */
+  _ghost_stmt(
+    lcs_result_upper_bound
+      (to_int_seq (array_value_of $(x)))
+      (to_int_seq (array_value_of $(y)))
+      (SizeT.v $(m)) (SizeT.v $(n)));
+  /* Ghost: assert tight bounds after lemma call */
+  _ghost_stmt(
+    assert (Int32.v $(result) <= SizeT.v $(m)));
+  _ghost_stmt(
+    assert (Int32.v $(result) <= SizeT.v $(n)));
 
   return result;
 }
