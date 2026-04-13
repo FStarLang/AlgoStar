@@ -33,10 +33,11 @@ FSTAR = $(FSTAR_EXE) \
 	--cache_checked_modules \
 	--cache_dir $(CACHE_DIR) \
 	--include $(PULSE_LIB) \
+	--include $(PULSE_LIB)/_cache \
 	--include $(CH26_DIR) \
 	--include $(CH26_DIR)/_cache \
 	--include $(COMMON_DIR) \
-	--z3rlimit 80 \
+	--z3rlimit 200 \
 	--fuel 1 --ifuel 1 \
 	--already_cached Prims,FStar,Pulse.Nolib,Pulse.Class,Pulse.Lib,PulseCore,CLRS.Ch26.MaxFlow.Spec,CLRS.Ch26.MaxFlow.Lemmas
 
@@ -68,6 +69,16 @@ $(foreach f,$(C_FILES),$(eval $(call make_fst_rule,$(f))))
 # c2pulse: .c → .fst
 %.fst:
 	$(C2PULSE) $<
+	sed -i '/^fn func_bfs_scan_neighbors/i #push-options "--z3rlimit 400 --split_queries always"' $@
+	sed -i '/^fn rec func_bfs_loop/i #push-options "--z3rlimit 400 --split_queries always"' $@
+	sed -i '/^fn func_bfs_residual/i #push-options "--z3rlimit 400 --split_queries always"' $@
+	sed -i '/^fn rec func_find_bottleneck_rec/i #push-options "--z3rlimit 1600"' $@
+	sed -i '/^fn func_find_bottleneck/i #push-options "--z3rlimit 400 --split_queries always"' $@
+	sed -i '/^fn rec func_augment_flow_rec/i #push-options "--z3rlimit 1600"' $@
+	sed -i '/^fn func_augment_flow/i #push-options "--z3rlimit 400 --split_queries always"' $@
+	sed -i '/^fn func_compute_flow_value/i #push-options "--z3rlimit 400 --split_queries always"' $@
+	sed -i '/^fn rec func_max_flow_loop/i #push-options "--z3rlimit 1600"' $@
+	sed -i '/^fn func_max_flow/i #push-options "--z3rlimit 400 --split_queries always"' $@
 
 # fstar: .fst → .checked
 $(CACHE_DIR)/%.fst.checked: %.fst

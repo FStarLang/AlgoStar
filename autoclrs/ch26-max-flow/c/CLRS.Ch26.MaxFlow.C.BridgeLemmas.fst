@@ -138,3 +138,89 @@ let index_fits (a b n: nat)
   = index_bound a b n;
     SizeT.fits_lte (a * n + b) (n * n);
     SizeT.fits_lte (a * n) (n * n)
+
+(** ================================================================
+    MAX_CAP bound and Int32 overflow safety lemmas
+    ================================================================ *)
+
+(** Maximum capacity value for Int32-safe computation.
+    46340^2 = 2147395600 < 2^31 - 1 = 2147483647 *)
+let max_cap : nat = 46340
+
+let max_cap_squared_fits ()
+  : Lemma (max_cap * max_cap < pow2 31)
+  = assert_norm (46340 * 46340 < pow2 31)
+
+(** Subtraction of non-negative Int32 values fits in Int32.
+    If 0 <= a <= Int32.max and 0 <= b <= Int32.max then a - b fits. *)
+let nonneg_sub_fits (a b: int)
+  : Lemma (requires 0 <= a /\ a <= 2147483647 /\ 0 <= b /\ b <= 2147483647)
+          (ensures FStar.Int.fits (a - b) 32)
+  = ()
+
+(** Product of two bounded values: their sum and difference fit in Int32 *)
+let bounded_product_fits (a b: int)
+  : Lemma (requires 0 <= a /\ a <= max_cap /\ 0 <= b /\ b <= max_cap)
+          (ensures FStar.Int.fits (a + b) 32 /\
+                   FStar.Int.fits (a - b) 32)
+  = max_cap_squared_fits ();
+    assert_norm (max_cap < pow2 31 - 1);
+    assert_norm (-(pow2 31) < -(max_cap))
+
+(** dist + 1 fits in Int32 when dist <= 46338 *)
+let dist_plus_one_fits (d: int)
+  : Lemma (requires d >= -1 /\ d <= 46338)
+          (ensures FStar.Int.fits (d + 1) 32)
+  = assert_norm (46339 < pow2 31 - 1);
+    assert_norm (-(pow2 31) < 0)
+
+(** flow + bn fits in Int32 when both bounded by max_cap *)
+let flow_plus_bn_fits (f bn: int)
+  : Lemma (requires 0 <= f /\ f <= max_cap /\ 0 < bn /\ bn <= max_cap)
+          (ensures FStar.Int.fits (f + bn) 32)
+  = max_cap_squared_fits ();
+    assert_norm (2 * max_cap < pow2 31 - 1)
+
+(** flow - bn fits in Int32 when both bounded by max_cap *)
+let flow_minus_bn_fits (f bn: int)
+  : Lemma (requires 0 <= f /\ f <= max_cap /\ 0 < bn /\ bn <= max_cap)
+          (ensures FStar.Int.fits (f - bn) 32)
+  = assert_norm (-(pow2 31) <= -(max_cap))
+
+(** Both flow+bn and flow-bn fit when all values in [0, max_cap].
+    Can be called unconditionally before conditionally writing. *)
+let flow_update_fits (f bn: int)
+  : Lemma (requires 0 <= f /\ f <= max_cap /\ 0 <= bn /\ bn <= max_cap)
+          (ensures FStar.Int.fits (f + bn) 32 /\
+                   FStar.Int.fits (f - bn) 32)
+  = max_cap_squared_fits ();
+    assert_norm (2 * max_cap < pow2 31 - 1);
+    assert_norm (-(pow2 31) <= -(max_cap))
+
+(** Flow value accumulator fits in Int32.
+    After v iterations, |fv| <= v * max_cap.
+    fv + flow_out and fv + flow_out - flow_in also fit. *)
+let fv_accumulator_fits (fv: int) (flow_out flow_in: int) (v n: nat)
+  : Lemma (requires
+             n <= max_cap /\
+             0 <= flow_out /\ flow_out <= max_cap /\
+             0 <= flow_in /\ flow_in <= max_cap /\
+             v < n /\
+             -(v * max_cap) <= fv /\ fv <= v * max_cap)
+          (ensures
+             FStar.Int.fits (fv + flow_out) 32 /\
+             FStar.Int.fits (fv + flow_out - flow_in) 32 /\
+             -((v + 1) * max_cap) <= fv + flow_out - flow_in /\
+             fv + flow_out - flow_in <= (v + 1) * max_cap)
+  = max_cap_squared_fits ();
+    assert (fv + flow_out <= v * max_cap + max_cap);
+    assert (v * max_cap + max_cap == (v + 1) * max_cap);
+    assert ((v + 1) * max_cap <= n * max_cap);
+    FStar.Math.Lemmas.lemma_mult_le_right max_cap n max_cap;
+    FStar.Math.Lemmas.lemma_mult_le_left max_cap n max_cap;
+    assert (n * max_cap <= max_cap * max_cap);
+    assert (max_cap * max_cap < pow2 31 - 1);
+    assert_norm (-(pow2 31) <= -(max_cap * max_cap));
+    assert (fv + flow_out - flow_in >= -(v * max_cap) - max_cap);
+    assert (-(v * max_cap) - max_cap == -((v + 1) * max_cap));
+    assert (-((v + 1) * max_cap) >= -(max_cap * max_cap))
