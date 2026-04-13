@@ -41,10 +41,17 @@ FSTAR = $(FSTAR_EXE) \
 # ── Source files ───────────────────────────────────────────────────
 C_FILES := $(wildcard *.c)
 
+# MatrixMultiply.fst is hand-edited (not c2pulse-generated) because
+# functional correctness proofs require pinned_array, id #int, and
+# opaque interface patterns that c2pulse cannot generate.
+HAND_EDITED_FST := MatrixMultiply.fst
+
 # Convert foo.c → Foo.fst (capitalize first letter)
 c_to_fst = $(shell echo '$(1)' | sed 's/^\(.\)/\U\1/;s/\.c$$/.fst/')
 
-FST_FILES := $(foreach f,$(C_FILES),$(call c_to_fst,$(f)))
+# Exclude hand-edited files from c2pulse generation
+C2PULSE_C_FILES := $(filter-out $(foreach f,$(HAND_EDITED_FST),$(shell echo '$(f)' | sed 's/^\(.\)/\L\1/;s/\.fst$$/.c/')),$(C_FILES))
+FST_FILES := $(foreach f,$(C2PULSE_C_FILES),$(call c_to_fst,$(f))) $(HAND_EDITED_FST)
 CHECKED   := $(addprefix $(CACHE_DIR)/,$(addsuffix .checked,$(FST_FILES)))
 
 # Also verify any hand-written .fst helper modules
@@ -57,7 +64,7 @@ HELPER_CHECKED := $(addprefix $(CACHE_DIR)/,$(addsuffix .checked,$(HELPER_FST)))
 define make_fst_rule
 $(call c_to_fst,$(1)): $(1) $$(C2PULSE) c2pulse.h
 endef
-$(foreach f,$(C_FILES),$(eval $(call make_fst_rule,$(f))))
+$(foreach f,$(C2PULSE_C_FILES),$(eval $(call make_fst_rule,$(f))))
 
 # c2pulse: .c → .fst
 %.fst:
@@ -72,4 +79,4 @@ $(CACHE_DIR)/%.fst.checked: %.fst
 verify: $(CHECKED) $(HELPER_CHECKED)
 
 clean:
-	rm -rf $(CACHE_DIR) $(FST_FILES)
+	rm -rf $(CACHE_DIR) $(foreach f,$(C2PULSE_C_FILES),$(call c_to_fst,$(f)))

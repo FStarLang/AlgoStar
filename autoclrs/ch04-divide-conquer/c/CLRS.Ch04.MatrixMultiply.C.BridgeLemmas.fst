@@ -30,17 +30,24 @@ let to_int_seq (s: Seq.seq (option Int32.t)) : Tot (Seq.seq int) =
 // Length preservation
 let to_int_seq_length (s: Seq.seq (option Int32.t))
   : Lemma (Seq.length (to_int_seq s) == Seq.length s)
+    [SMTPat (Seq.length (to_int_seq s))]
   = ()
 
 // Element access bridge
 let to_int_seq_index (s: Seq.seq (option Int32.t)) (i: nat)
   : Lemma (requires i < Seq.length s /\ Some? (Seq.index s i))
-          (ensures Seq.index (to_int_seq s) i == Int32.v (Some?.v (Seq.index s i)))
+          (ensures Seq.length (to_int_seq s) == Seq.length s /\
+                   Seq.index (to_int_seq s) i == Int32.v (Some?.v (Seq.index s i)))
   = ()
 
 // dot_product_spec over c2pulse representation
 let dot_product_spec_c (sa sb: Seq.seq (option Int32.t)) (n i j limit: nat) : Tot int =
   dot_product_spec (to_int_seq sa) (to_int_seq sb) n i j limit
+
+// Base case: dot product with limit 0 is 0
+let dot_product_spec_c_base (sa sb: Seq.seq (option Int32.t)) (n i j: nat)
+  : Lemma (dot_product_spec_c sa sb n i j 0 == 0)
+  = ()
 
 // Step lemma: unfolds dot_product_spec_c by one recursive step.
 // SMT pattern triggers automatically during k-loop invariant proof.
@@ -69,3 +76,73 @@ let mat_mul_correct_c (sa sb sc: Seq.seq (option Int32.t)) (n: nat) : prop =
 // mat_mul_partial_ij over c2pulse representation
 let mat_mul_partial_ij_c (sa sb sc: Seq.seq (option Int32.t)) (n ri cj: nat) : prop =
   mat_mul_partial_ij (to_int_seq sa) (to_int_seq sb) (to_int_seq sc) n ri cj
+
+// flat_index is injective on n×n grids
+let flat_index_injective (n i1 j1 i2 j2: nat)
+  : Lemma (requires n > 0 /\ i1 < n /\ j1 < n /\ i2 < n /\ j2 < n /\
+                    flat_index n i1 j1 == flat_index n i2 j2)
+          (ensures i1 == i2 /\ j1 == j2)
+          [SMTPat (flat_index n i1 j1); SMTPat (flat_index n i2 j2)]
+  = FStar.Math.Lemmas.lemma_div_plus j1 i1 n;
+    FStar.Math.Lemmas.lemma_div_plus j2 i2 n;
+    FStar.Math.Lemmas.small_div j1 n;
+    FStar.Math.Lemmas.small_div j2 n
+
+// to_int_seq commutes with Seq.upd for Some values
+let to_int_seq_upd (s: Seq.seq (option Int32.t)) (idx: nat) (v: Int32.t)
+  : Lemma
+    (requires idx < Seq.length s)
+    (ensures Seq.equal (to_int_seq (Seq.upd s idx (Some v)))
+                       (Seq.upd (to_int_seq s) idx (Int32.v v)))
+    [SMTPat (to_int_seq (Seq.upd s idx (Some v)))]
+  = let s' = Seq.upd s idx (Some v) in
+    let ts' = to_int_seq s' in
+    let ts = to_int_seq s in
+    let expected = Seq.upd ts idx (Int32.v v) in
+    assert (Seq.length ts' == Seq.length expected);
+    let aux (j: nat{j < Seq.length ts'})
+      : Lemma (Seq.index ts' j == Seq.index expected j) =
+      if j = idx then ()
+      else ()
+    in
+    FStar.Classical.forall_intro aux
+
+// mat_mul_partial_ij_c: base case (0, 0) is trivially true
+let mat_mul_partial_ij_c_base (sa sb sc: Seq.seq (option Int32.t)) (n: nat)
+  : Lemma
+    (requires Seq.length sc == n * n)
+    (ensures mat_mul_partial_ij_c sa sb sc n 0 0)
+    [SMTPat (mat_mul_partial_ij_c sa sb sc n 0 0)]
+  = ()
+
+// Update lemma
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+let mat_mul_partial_ij_c_update
+    (sa sb sc: Seq.seq (option Int32.t)) (n ri cj: nat) (v: Int32.t)
+  : Lemma
+    (requires
+      mat_mul_partial_ij_c sa sb sc n ri cj /\
+      ri < n /\ cj < n /\ n > 0 /\
+      id #int (Int32.v v) == dot_product_spec_c sa sb n ri cj n)
+    (ensures
+      mat_mul_partial_ij_c sa sb (Seq.upd sc (flat_index n ri cj) (Some v)) n ri (cj + 1))
+  = to_int_seq_upd sc (flat_index n ri cj) v;
+    index_bounds_lemma n ri cj 0
+#pop-options
+
+// Row advance
+let mat_mul_partial_ij_c_row_advance
+    (sa sb sc: Seq.seq (option Int32.t)) (n ri: nat)
+  : Lemma
+    (requires mat_mul_partial_ij_c sa sb sc n ri n /\ ri < n /\ n > 0)
+    (ensures mat_mul_partial_ij_c sa sb sc n (ri + 1) 0)
+  = ()
+
+// Complete
+let mat_mul_partial_ij_c_complete
+    (sa sb sc: Seq.seq (option Int32.t)) (n: nat)
+  : Lemma
+    (requires mat_mul_partial_ij_c sa sb sc n n 0 /\ n > 0)
+    (ensures mat_mul_correct_c sa sb sc n)
+    [SMTPat (mat_mul_partial_ij_c sa sb sc n n 0)]
+  = ()
