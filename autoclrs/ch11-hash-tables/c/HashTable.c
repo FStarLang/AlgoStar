@@ -58,11 +58,16 @@ _rec size_t hash_search_probe(_array int *table, size_t size, int key,
   _ensures(return <= size)
   _ensures(return < size ==> table[return] == key)
   _ensures((bool) _inline_pulse((return_1 = $(size)) ==> (forall (p: nat). p < SizeT.v $(size) ==> seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) p (SizeT.v $(size))) =!= Int32.v $(key))))
+  _ensures((bool) _inline_pulse((return_1 = $(size)) ==> ~(c_key_in_table (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key)))))
   _ensures(_forall(size_t k, k < size ==> table[k] == _old(table[k])))
   _ensures((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
   _decreases(size - count)
 {
   if (count >= size) {
+    _ghost_stmt(
+      CLRS.Ch11.HashTable.C.BridgeLemmas.lemma_probe_absent_not_in_table
+        (array_value_of (!var_table)) (SizeT.v (!var_size)) (Int32.v (!var_key))
+    );
     return size;
   }
 
@@ -73,6 +78,10 @@ _rec size_t hash_search_probe(_array int *table, size_t size, int key,
   }
 
   if (slot == -1) {
+    _ghost_stmt(
+      CLRS.Ch11.HashTable.C.BridgeLemmas.lemma_probe_absent_not_in_table
+        (array_value_of (!var_table)) (SizeT.v (!var_size)) (Int32.v (!var_key))
+    );
     return size;
   }
 
@@ -99,6 +108,8 @@ size_t hash_search(_array int *table, size_t size, int key)
   _ensures(return <= size)
   _ensures(return < size ==> table[return] == key)
   _ensures((bool) _inline_pulse((return_1 = $(size)) ==> (forall (p: nat). p < SizeT.v $(size) ==> seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) p (SizeT.v $(size))) =!= Int32.v $(key))))
+  _ensures((bool) _inline_pulse((return_1 = $(size)) ==> ~(c_key_in_table (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key)))))
+  _ensures(return < size ==> (bool) _inline_pulse(c_key_in_table (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key))))
   _ensures(_forall(size_t k, k < size ==> table[k] == _old(table[k])))
   _ensures((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
 {
@@ -125,8 +136,12 @@ _rec bool hash_insert_probe(_array int *table, size_t size, int key,
   _requires((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
   _requires((bool) _inline_pulse(forall (q: nat). q < SizeT.v $(count) ==> seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) q (SizeT.v $(size))) =!= -1 /\ seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) q (SizeT.v $(size))) =!= -2))
   _preserves_value(table._length)
-  _ensures(return ==> _exists(size_t k, k < size && table[k] == key))
+  _ensures(return ==> _exists(size_t k, k < size && table[k] == key && (_old(table[k]) == -1 || _old(table[k]) == -2)))
+  _ensures(return ==> (bool) _inline_pulse(c_key_in_table (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key))))
+  _ensures(return ==> (bool) _inline_pulse(c_key_findable (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key))))
   _ensures(return == false ==> _forall(size_t k, k < size ==> table[k] == _old(table[k])))
+  _ensures(return == false ==> (bool) _inline_pulse(forall (q: nat). q < SizeT.v $(size) ==> seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) q (SizeT.v $(size))) =!= -1 /\ seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) q (SizeT.v $(size))) =!= -2))
+  _ensures(_forall(size_t j, j < size && table[j] != _old(table[j]) ==> table[j] == key))
   _ensures((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
   _decreases(size - count)
 {
@@ -138,6 +153,10 @@ _rec bool hash_insert_probe(_array int *table, size_t size, int key,
 
   if (slot == -1 || slot == -2) {
     table[idx] = key;
+    _ghost_stmt(
+      CLRS.Ch11.HashTable.C.BridgeLemmas.lemma_valid_key_findable
+        (array_value_of (!var_table)) (SizeT.v (!var_size)) (Int32.v (!var_key))
+    );
     return true;
   }
 
@@ -161,8 +180,12 @@ bool hash_insert(_array int *table, size_t size, int key)
   _requires((bool) _inline_pulse(SizeT.fits (Int32.v $(key))))
   _requires((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
   _ensures(table._length == size)
-  _ensures(return ==> _exists(size_t k, k < size && table[k] == key))
+  _ensures(return ==> _exists(size_t k, k < size && table[k] == key && (_old(table[k]) == -1 || _old(table[k]) == -2)))
+  _ensures(return ==> (bool) _inline_pulse(c_key_in_table (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key))))
+  _ensures(return ==> (bool) _inline_pulse(c_key_findable (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key))))
   _ensures(return == false ==> _forall(size_t k, k < size ==> table[k] == _old(table[k])))
+  _ensures(return == false ==> (bool) _inline_pulse(forall (q: nat). q < SizeT.v $(size) ==> seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) q (SizeT.v $(size))) =!= -1 /\ seq_val (array_value_of $(table)) (hash_probe_nat (Int32.v $(key)) q (SizeT.v $(size))) =!= -2))
+  _ensures(_forall(size_t j, j < size && table[j] != _old(table[j]) ==> table[j] == key))
   _ensures((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
 {
   size_t start = (size_t)key % size;
@@ -182,7 +205,9 @@ bool hash_delete(_array int *table, size_t size, int key)
   _requires((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
   _ensures(table._length == size)
   _ensures(return ==> _exists(size_t j, j < size && _old(table[j]) == key && table[j] == -2))
+  _ensures(return ==> _forall(size_t k, k < size && table[k] != _old(table[k]) ==> _old(table[k]) == key && table[k] == -2))
   _ensures(return == false ==> _forall(size_t k, k < size ==> table[k] == _old(table[k])))
+  _ensures(return == false ==> (bool) _inline_pulse(~(c_key_in_table (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key)))))
   _ensures((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
 {
   size_t idx = hash_search(table, size, key);
@@ -207,11 +232,15 @@ bool hash_insert_no_dup(_array int *table, size_t size, int key)
   _requires((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
   _ensures(table._length == size)
   _ensures(return ==> _exists(size_t k, k < size && table[k] == key))
+  _ensures(return ==> (bool) _inline_pulse(c_key_in_table (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key))))
+  _ensures(return ==> (bool) _inline_pulse(c_key_findable (array_value_of $(table)) (SizeT.v $(size)) (Int32.v $(key))))
   _ensures(return == false ==> _forall(size_t k, k < size ==> table[k] == _old(table[k])))
+  _ensures(_forall(size_t j, j < size && table[j] != _old(table[j]) ==> table[j] == key))
   _ensures((bool) _inline_pulse(c_valid_ht (array_value_of $(table)) (SizeT.v $(size))))
 {
   size_t search_result = hash_search(table, size, key);
   if (search_result < size) {
+    _ghost_stmt(lemma_valid_key_findable (array_value_of (!var_table)) (SizeT.v (!var_size)) (Int32.v (!var_key)));
     return true;
   }
   return hash_insert(table, size, key);

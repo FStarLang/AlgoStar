@@ -181,3 +181,50 @@ val lemma_c2pulse_delete_bridge
               Seq.index si idx == key /\
               Seq.index si' idx == -2 /\
               Impl.seq_modified_at si si' idx))
+
+
+(** ================================================================
+    C-level predicates mirroring Impl.fsti at the c2pulse
+    representation (Seq.seq (option Int32.t) via seq_val)
+    ================================================================ *)
+
+(** Key exists at some array index *)
+let c_key_in_table (s: Seq.seq (option Int32.t)) (sz: nat{sz > 0 /\ sz == Seq.length s}) (key: int{key >= 0}) : prop =
+  exists (idx: nat). idx < sz /\ seq_val s idx == key
+
+(** Key findable by linear probing: present at some probe position
+    with no empty (-1) slot before it *)
+let c_key_findable (s: Seq.seq (option Int32.t)) (sz: nat{sz > 0 /\ sz == Seq.length s}) (key: int{key >= 0}) : prop =
+  exists (probe: nat). probe < sz /\
+    seq_val s (Impl.hash_probe_nat key probe sz) == key /\
+    (forall (p: nat). {:pattern (Impl.hash_probe_nat key p sz)}
+      p < probe ==> seq_val s (Impl.hash_probe_nat key p sz) =!= -1)
+
+(** Single-slot modification: all indices except idx are unchanged *)
+let c_seq_modified_at (s s': Seq.seq (option Int32.t)) (idx: nat) : prop =
+  Seq.length s' == Seq.length s /\ idx < Seq.length s /\
+  (forall (j: nat). j < Seq.length s /\ j =!= idx ==> seq_val s j == seq_val s' j)
+
+
+(** ================================================================
+    Bridge 4: Probe-based absence implies ~(c_key_in_table)
+    ================================================================ *)
+val lemma_probe_absent_not_in_table
+  (s: Seq.seq (option Int32.t))
+  (sz: nat{sz > 0 /\ sz == Seq.length s})
+  (key: int{key >= 0})
+  : Lemma
+    (requires forall (p: nat). p < sz ==> seq_val s (Impl.hash_probe_nat key p sz) =!= key)
+    (ensures ~(c_key_in_table s sz key))
+
+
+(** ================================================================
+    Bridge 5: c_valid_ht + c_key_in_table implies c_key_findable
+    ================================================================ *)
+val lemma_valid_key_findable
+  (s: Seq.seq (option Int32.t))
+  (sz: nat{sz > 0 /\ sz == Seq.length s})
+  (key: int{key >= 0})
+  : Lemma
+    (requires c_valid_ht s sz /\ c_key_in_table s sz key)
+    (ensures c_key_findable s sz key)

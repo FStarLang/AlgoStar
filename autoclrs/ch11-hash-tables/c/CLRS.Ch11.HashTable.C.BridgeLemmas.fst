@@ -295,3 +295,64 @@ let lemma_c2pulse_delete_bridge
       lemma_to_int_seq_index s' 0 j
     )
 #pop-options
+
+
+(** ================================================================
+    Bridge 4: Probe-based absence → ~(c_key_in_table)
+    ================================================================
+
+    If ∀p < sz. seq_val s (hp key p sz) ≠ key, then ~(c_key_in_table).
+    Proof: for any idx < sz, surjectivity gives a probe p with hp key p sz == idx,
+    so seq_val s idx == seq_val s (hp key p sz) ≠ key.
+*)
+
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+let lemma_probe_absent_not_in_table
+  (s: Seq.seq (option Int32.t))
+  (sz: nat{sz > 0 /\ sz == Seq.length s})
+  (key: int{key >= 0})
+  : Lemma
+    (requires forall (p: nat). p < sz ==> seq_val s (Impl.hash_probe_nat key p sz) =!= key)
+    (ensures ~(c_key_in_table s sz key))
+  = introduce forall (idx: nat). idx < sz ==> seq_val s idx =!= key
+    with introduce _ ==> _
+    with _. (
+      Lemmas.lemma_linear_probe_surjective key sz idx
+      // Now ∃p < sz. hp key p sz == idx, so seq_val s idx == seq_val s (hp key p sz) ≠ key
+    )
+#pop-options
+
+
+(** ================================================================
+    Bridge 5: c_valid_ht + c_key_in_table → c_key_findable
+    ================================================================
+
+    If c_valid_ht and key exists at some index, then key is findable.
+    Proof: surjectivity gives a probe for the index, and c_valid_ht
+    guarantees no -1 appears before that probe.
+*)
+
+#push-options "--z3rlimit 40 --fuel 0 --ifuel 0"
+let lemma_valid_key_findable
+  (s: Seq.seq (option Int32.t))
+  (sz: nat{sz > 0 /\ sz == Seq.length s})
+  (key: int{key >= 0})
+  : Lemma
+    (requires c_valid_ht s sz /\ c_key_in_table s sz key)
+    (ensures c_key_findable s sz key)
+  = // c_key_in_table: ∃idx < sz. seq_val s idx == key
+    // For each such idx, surjectivity gives a probe
+    introduce forall (idx: nat). idx < sz /\ seq_val s idx == key ==>
+      (exists (probe: nat). probe < sz /\
+        seq_val s (Impl.hash_probe_nat key probe sz) == key /\
+        (forall (p: nat). {:pattern (Impl.hash_probe_nat key p sz)}
+          p < probe ==> seq_val s (Impl.hash_probe_nat key p sz) =!= -1))
+    with introduce _ ==> _
+    with _. (
+      Lemmas.lemma_linear_probe_surjective key sz idx
+      // ∃p < sz. hp key p sz == idx
+      // seq_val s (hp key p sz) == seq_val s idx == key
+      // By c_valid_ht with k=key, probe=p:
+      //   ∀q < p. seq_val s (hp key q sz) ≠ -1
+    )
+#pop-options
