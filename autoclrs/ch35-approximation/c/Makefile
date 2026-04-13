@@ -81,7 +81,16 @@ $(CACHE_DIR)/%.fst.checked: %.fst
 	@mkdir -p $(CACHE_DIR)
 	$(FSTAR) --force $<
 
-verify: $(CHECKED) $(HELPER_CHECKED)
+# fstar: .fsti → .checked
+$(CACHE_DIR)/%.fsti.checked: %.fsti
+	@mkdir -p $(CACHE_DIR)
+	$(FSTAR) --force $<
+
+# Also verify .fsti helper interfaces
+HELPER_FSTI := $(wildcard *.fsti)
+HELPER_FSTI_CHECKED := $(addprefix $(CACHE_DIR)/,$(addsuffix .checked,$(HELPER_FSTI)))
+
+verify: $(CHECKED) $(HELPER_CHECKED) $(HELPER_FSTI_CHECKED)
 
 # ── Inter-module dependencies ──────────────────────────────────────
 $(CACHE_DIR)/AVCHelper.fst.checked: $(CACHE_DIR)/CLRS.Ch35.VertexCover.Spec.fst.checked

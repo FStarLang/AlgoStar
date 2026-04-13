@@ -43,6 +43,10 @@ void approx_vertex_cover(_array int *adj, size_t n, _array int *cover)
       (AVCBridgeLemmas.to_int_seq (array_value_of $(adj)))
       (AVCBridgeLemmas.to_int_seq (array_value_of $(cover)))
       (SizeT.v $(n)) (SizeT.v $(n)) 0))
+  /* Existence of minimum vertex cover */
+  _ensures((bool) _inline_pulse(
+    exists (opt: nat). CLRS.Ch35.VertexCover.Spec.min_vertex_cover_size
+      (AVCBridgeLemmas.to_int_seq (array_value_of $(adj))) (SizeT.v $(n)) opt))
   /* 2-approximation bound */
   _ensures((bool) _inline_pulse(
     forall (opt: nat). CLRS.Ch35.VertexCover.Spec.min_vertex_cover_size
