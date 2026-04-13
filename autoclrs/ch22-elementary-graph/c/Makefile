@@ -20,10 +20,12 @@ CH22_DIR   := $(CURDIR)/..
 COMMON_DIR := $(CURDIR)/../../common
 
 # Detect binary install vs source build for fstar.exe
-ifneq ($(wildcard $(ROOT)/FStar/bin/fstar.exe),)
-  FSTAR_EXE ?= $(ROOT)/FStar/bin/fstar.exe
-else ifneq ($(wildcard $(ROOT)/fstar/bin/fstar.exe),)
+# Prefer nightly (fstar/bin) over source build (FStar/bin) to match
+# the c2pulse/pulse library cache which was built with nightly.
+ifneq ($(wildcard $(ROOT)/fstar/bin/fstar.exe),)
   FSTAR_EXE ?= $(ROOT)/fstar/bin/fstar.exe
+else ifneq ($(wildcard $(ROOT)/FStar/bin/fstar.exe),)
+  FSTAR_EXE ?= $(ROOT)/FStar/bin/fstar.exe
 else
   FSTAR_EXE ?= $(ROOT)/FStar/out/bin/fstar.exe
 endif
