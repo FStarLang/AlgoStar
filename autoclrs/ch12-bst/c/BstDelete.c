@@ -11,13 +11,10 @@
  *           or has only a right child; we handle the leaf case).
  *   Case 3: Node has only left child — return 0 (unsupported, same as Pulse).
  *
- * This matches the Pulse implementation in CLRS.Ch12.BSTArray.Delete.fst:
- * the two-children and leaf cases are fully handled, while the one-child
- * (left-only) case conservatively returns false.
- *
  * Proves:
  *   1. Array lengths are preserved.
  *   2. If returns 0, arrays are unchanged.
+ *   3. BST validity is a precondition (c_valid_bst from BridgeLemmas).
  *
  * CLRS Reference: §12.3 TREE-DELETE
  */
@@ -25,6 +22,8 @@
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
+
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
 
 /* bst_minimum_idx: find index of minimum node in subtree (from BstSuccessor.c) */
 _rec size_t bst_minimum_idx(_array int *keys, _array int *valid, size_t cap, size_t i)
@@ -49,6 +48,8 @@ int bst_delete(_array int *keys, _array int *valid, size_t cap, size_t del_idx)
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
   _requires(del_idx < cap && valid[del_idx] != 0)
+  /* BST validity precondition */
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   _preserves_value(keys._length)
   _preserves_value(valid._length)
   /* If failure (return == 0), arrays are unchanged */

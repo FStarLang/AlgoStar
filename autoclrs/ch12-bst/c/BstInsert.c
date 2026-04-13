@@ -4,8 +4,11 @@
  * Array-based BST: node i has left child at 2*i+1, right child at 2*i+2.
  * Keys stored in keys[], occupancy in valid[] (0 = empty, 1 = occupied).
  *
- * Proves: if insert returns an index < cap, then keys[result] == key
- *         and valid[result] != 0 (key was placed correctly).
+ * Proves:
+ *   1. If insert returns an index < cap, then keys[result] == key
+ *      and valid[result] != 0 (key was placed correctly).
+ *   2. BST validity is preserved (c_valid_bst).
+ *   3. Only the inserted position changes (frame).
  *
  * CLRS Reference: §12.3 TREE-INSERT (recursive)
  */
@@ -13,6 +16,8 @@
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
+
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
 
 /*
  * Recursive BST insert.
@@ -27,6 +32,8 @@ _rec size_t bst_insert(_array int *keys, _array int *valid, size_t cap, int key,
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
   _requires(i <= cap)
+  /* BST validity precondition */
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   _preserves_value(keys._length)
   _preserves_value(valid._length)
   _ensures(return <= cap)

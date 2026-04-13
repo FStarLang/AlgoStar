@@ -24,6 +24,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
+
 /*
  * Find the index of the maximum-key node in the subtree rooted at i.
  * Walks right children until no valid right child exists.
@@ -97,6 +99,7 @@ size_t bst_predecessor(_array int *keys, _array int *valid, size_t cap, size_t i
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
   _requires(idx < cap && valid[idx] != 0)
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   _preserves_value(keys._length)
   _preserves_value(valid._length)
   /* Frame: arrays unmodified */

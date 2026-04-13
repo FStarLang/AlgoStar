@@ -18,6 +18,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
+
 /*
  * Recursive inorder walk helper.
  *

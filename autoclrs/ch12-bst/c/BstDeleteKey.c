@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
+
 /* Forward declaration: bst_search from BstSearch.c */
 _rec size_t bst_search(_array int *keys, _array int *valid, size_t cap, int key, size_t i)
   _requires(keys._length == cap && valid._length == cap)
@@ -45,6 +47,8 @@ int bst_delete(_array int *keys, _array int *valid, size_t cap, size_t del_idx)
 int bst_delete_key(_array int *keys, _array int *valid, size_t cap, int key)
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
+  /* BST validity precondition */
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   _preserves_value(keys._length)
   _preserves_value(valid._length)
 {

@@ -24,6 +24,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
+
 /*
  * Find the index of the minimum-key node in the subtree rooted at i.
  * (Helper for successor — returns the index, not the key.)
@@ -99,6 +101,7 @@ size_t bst_successor(_array int *keys, _array int *valid, size_t cap, size_t idx
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
   _requires(idx < cap && valid[idx] != 0)
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   _preserves_value(keys._length)
   _preserves_value(valid._length)
   /* Frame: arrays unmodified */

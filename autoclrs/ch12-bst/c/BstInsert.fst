@@ -6,6 +6,10 @@ open Pulse.Lib.C
 
 #restart-solver
 
+open CLRS.Ch12.BST.C.BridgeLemmas
+
+#restart-solver
+
 fn rec func_bst_insert
     (var_keys: (array Int32.t))
     (var_valid: (array Int32.t))
@@ -24,6 +28,8 @@ fn rec func_bst_insert
         ((reveal (length_of var_valid)) = (SizeT.v var_cap))))
   requires (with_pure ((0 < (SizeT.v var_cap)) && ((SizeT.v var_cap) < 32768)))
   requires (with_pure (var_i `SizeT.lte` var_cap))
+  requires
+    (with_pure (c_valid_bst (array_value_of var_keys) (array_value_of var_valid) (SizeT.v var_cap)))
   returns return_1 : SizeT.t
   ensures
     exists* (val_keys_0: (Seq.seq (option Int32.t))) (val_keys_1: (nat->prop)).

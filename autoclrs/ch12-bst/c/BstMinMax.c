@@ -8,6 +8,7 @@
  *   1. bst_minimum returns a key that exists in the tree (at a valid position).
  *   2. bst_maximum returns a key that exists in the tree (at a valid position).
  *   3. The arrays are unmodified (read-only operations).
+ *   4. Result bounded by root key (minimum <= root, maximum >= root).
  *
  * CLRS Reference: §12.2 TREE-MINIMUM and TREE-MAXIMUM (recursive)
  */
@@ -15,6 +16,8 @@
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
+
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
 
 /*
  * Recursive BST minimum.
@@ -24,6 +27,7 @@
  * Returns the key at the leftmost valid node in the subtree.
  *
  * Precondition: node i must be valid (valid[i] != 0).
+ * Precondition: BST is valid (c_valid_bst).
  */
 _rec int bst_minimum(_array int *keys, _array int *valid, size_t cap, size_t i)
   _requires(keys._length == cap && valid._length == cap)
@@ -31,10 +35,8 @@ _rec int bst_minimum(_array int *keys, _array int *valid, size_t cap, size_t i)
   _requires(i < cap && valid[i] != 0)
   _preserves_value(keys._length)
   _preserves_value(valid._length)
-  /* Local BST ordering: left child key < parent key */
-  _requires(_forall(size_t j,
-    j < cap && valid[j] != 0 && 2 * j + 1 < cap && valid[2 * j + 1] != 0
-      ==> keys[2 * j + 1] < keys[j]))
+  /* BST validity implies left-child ordering (via bridge lemma) */
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   /* Frame: arrays are unmodified (read-only operation) */
   _ensures(_forall(size_t j, j < cap ==> keys[j] == _old(keys[j])))
   _ensures(_forall(size_t j, j < cap ==> valid[j] == _old(valid[j])))
@@ -49,6 +51,7 @@ _rec int bst_minimum(_array int *keys, _array int *valid, size_t cap, size_t i)
   if (valid[left] == 0) {
     return keys[i];
   }
+  _ghost_stmt(c_valid_bst_local_left (array_value_of (!var_keys)) (array_value_of (!var_valid)) (SizeT.v (!var_cap)) (SizeT.v (!var_i)));
   return bst_minimum(keys, valid, cap, left);
 }
 
@@ -60,6 +63,7 @@ _rec int bst_minimum(_array int *keys, _array int *valid, size_t cap, size_t i)
  * Returns the key at the rightmost valid node in the subtree.
  *
  * Precondition: node i must be valid (valid[i] != 0).
+ * Precondition: BST is valid (c_valid_bst).
  */
 _rec int bst_maximum(_array int *keys, _array int *valid, size_t cap, size_t i)
   _requires(keys._length == cap && valid._length == cap)
@@ -67,10 +71,8 @@ _rec int bst_maximum(_array int *keys, _array int *valid, size_t cap, size_t i)
   _requires(i < cap && valid[i] != 0)
   _preserves_value(keys._length)
   _preserves_value(valid._length)
-  /* Local BST ordering: right child key > parent key */
-  _requires(_forall(size_t j,
-    j < cap && valid[j] != 0 && 2 * j + 2 < cap && valid[2 * j + 2] != 0
-      ==> keys[j] < keys[2 * j + 2]))
+  /* BST validity implies right-child ordering (via bridge lemma) */
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   /* Frame: arrays are unmodified (read-only operation) */
   _ensures(_forall(size_t j, j < cap ==> keys[j] == _old(keys[j])))
   _ensures(_forall(size_t j, j < cap ==> valid[j] == _old(valid[j])))
@@ -85,5 +87,6 @@ _rec int bst_maximum(_array int *keys, _array int *valid, size_t cap, size_t i)
   if (valid[right] == 0) {
     return keys[i];
   }
+  _ghost_stmt(c_valid_bst_local_right (array_value_of (!var_keys)) (array_value_of (!var_valid)) (SizeT.v (!var_cap)) (SizeT.v (!var_i)));
   return bst_maximum(keys, valid, cap, right);
 }

@@ -8,6 +8,7 @@
  *   1. If search returns an index < cap, then keys[result] == key
  *      and valid[result] is nonzero (search soundness).
  *   2. The arrays are unmodified (read-only operation).
+ *   3. BST validity is a precondition (c_valid_bst from BridgeLemmas).
  *
  * CLRS Reference: §12.2 TREE-SEARCH (recursive)
  */
@@ -15,6 +16,8 @@
 #include "c2pulse.h"
 #include <stdint.h>
 #include <stddef.h>
+
+_include_pulse(open CLRS.Ch12.BST.C.BridgeLemmas)
 
 /*
  * Recursive BST search.
@@ -28,6 +31,8 @@ _rec size_t bst_search(_array int *keys, _array int *valid, size_t cap, int key,
   _requires(keys._length == cap && valid._length == cap)
   _requires(cap > 0 && cap < 32768)
   _requires(i <= cap)
+  /* BST validity precondition */
+  _requires((bool) _inline_pulse(c_valid_bst (array_value_of $(keys)) (array_value_of $(valid)) (SizeT.v $(cap))))
   _preserves_value(keys._length)
   _preserves_value(valid._length)
   _ensures(return <= cap)
