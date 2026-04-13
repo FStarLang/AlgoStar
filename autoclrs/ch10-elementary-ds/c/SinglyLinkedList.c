@@ -94,6 +94,7 @@ size_t list_search(_array int *a, size_t n, int k)
   _ensures(_forall(size_t j, j < n ==> a[j] == _old(a[j])))
   _ensures(return <= 1)
   _ensures(return == 0 ==> _forall(size_t j, j < n ==> a[j] != k))
+  _ensures(return != 0 ==> _exists(size_t j, j < n && a[j] == k))
 {
   size_t idx = list_find_from(a, n, k, 0);
   if (idx < n) return 1;
