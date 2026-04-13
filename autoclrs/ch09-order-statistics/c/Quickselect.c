@@ -99,6 +99,7 @@ size_t partition_in_range(_array int *a, size_t len, size_t lo, size_t hi, int l
  *   - Full ordering within [lo, hi): a[i<k] <= result, a[i>k] >= result
  *   - Bounds: all elements in [lo, hi) stay in [lb, rb]
  *   - Elements outside [lo, hi) are unchanged
+ *   - No-fabrication: every output element in [lo,hi) existed in the input
  */
 _rec int quickselect_rec(_array int *a, size_t n, size_t k, size_t lo, size_t hi, int lb, int rb)
   _requires(a._length == n && lo <= k && k < hi && hi <= n)
@@ -111,6 +112,8 @@ _rec int quickselect_rec(_array int *a, size_t n, size_t k, size_t lo, size_t hi
   _ensures(_forall(size_t idx, k < idx && idx < hi ==> a[idx] >= return))
   _ensures(_forall(size_t idx, lo <= idx && idx < hi ==> lb <= a[idx] && a[idx] <= rb))
   _ensures(_forall(size_t idx, idx < n && (idx < lo || idx >= hi) ==> a[idx] == _old(a[idx])))
+  _ensures(_forall(size_t idx, lo <= idx && idx < hi ==>
+      _exists(size_t m, lo <= m && m < hi && a[idx] == _old(a[m]))))
   _decreases(hi - lo)
 {
   if (hi - lo <= 1) {
@@ -146,6 +149,7 @@ int quickselect(_array int *a, size_t n, size_t k)
   _ensures(return == a[k])
   _ensures(_forall(size_t idx, idx < k ==> a[idx] <= return))
   _ensures(_forall(size_t idx, k < idx && idx < n ==> a[idx] >= return))
+  _ensures(_forall(size_t p, p < n ==> _exists(size_t m, m < n && a[p] == _old(a[m]))))
 {
   /* Compute min/max bounds */
   int lb = a[0];
