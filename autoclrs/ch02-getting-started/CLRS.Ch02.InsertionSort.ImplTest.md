@@ -109,14 +109,11 @@ KaRaMeL cannot extract the typeclass dictionary pattern for
 ### Test Results
 
 ```
-=== Insertion Sort ===
-  PASS: sort [3,1,2] => [1, 2, 3]
+--- Insertion Sort tests ---
+  PASS: sort [3,1,2] => [1,2,3]
   PASS: sort [] (empty)
-  PASS: sort [42] => [42]
-  PASS: sort [1,2,3,4,5] => [1, 2, 3, 4, 5]
-  PASS: sort [5,4,3,2,1] => [1, 2, 3, 4, 5]
-  PASS: sort [3,1,3,1,2] => [1, 1, 2, 3, 3]
+  PASS: sort [42] (single)
 ```
 
-All 6 tests pass. The extracted C code correctly implements insertion sort
+All 3 tests pass. The extracted C code correctly implements insertion sort
 with the same behavior proven by the formal verification.
