@@ -18,6 +18,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+_include_pulse(open CLRS.Ch21.UnionFind.Spec)
+_include_pulse(open CLRS.Ch21.UnionFind.C.BridgeLemmas)
+
 /*
  * MAKE-SET: Initialize parent[i] = i, rank[i] = 0 for i ∈ [0,n).
  *
@@ -64,6 +67,10 @@ _rec size_t find_root(_array size_t *parent, _array size_t *rank,
   _requires(_forall(size_t i, i < n ==> rank[i] < n))
   /* Rank invariant: rank strictly increases along parent pointers (CLRS Lemma 21.4) */
   _requires(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
+  /* Spec-level: uf_inv holds on the forest */
+  _requires((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
   _preserves_value(parent._length)
   _preserves_value(rank._length)
   _ensures(_forall(size_t i, i < n ==> parent[i] < n))
@@ -72,6 +79,16 @@ _rec size_t find_root(_array size_t *parent, _array size_t *rank,
   _ensures(return < n && parent[return] == return)
   /* Rank invariant preserved (arrays unchanged, so trivially holds) */
   _ensures(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
+  /* Spec-level: uf_inv preserved */
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
+  /* Spec-level: return == pure_find(forest, x) */
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      SizeT.v return_1 ==
+        pure_find (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n)))
+                  (SizeT.v $(x)))))
   _decreases((_specint) n - (_specint) rank[x])
 {
   if (parent[x] == x) return x;
@@ -96,6 +113,10 @@ _rec size_t find_set(_array size_t *parent, _array size_t *rank,
   _requires(_forall(size_t i, i < n ==> rank[i] < n))
   /* Rank invariant (CLRS Lemma 21.4) */
   _requires(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
+  /* Spec-level: uf_inv holds on the forest */
+  _requires((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
   _ensures(parent._length >= n && rank._length >= n)
   _ensures(return < n)
   _ensures(parent[return] == return)
@@ -104,6 +125,16 @@ _rec size_t find_set(_array size_t *parent, _array size_t *rank,
   _ensures(_forall(size_t i, i < n ==> rank[i] == _old(rank[i])))
   /* Rank invariant preserved through path compression */
   _ensures(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
+  /* Spec-level: uf_inv preserved through path compression */
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
+  /* Spec-level: return is the pure_find root in the post-state forest */
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      SizeT.v return_1 ==
+        pure_find (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n)))
+                  (SizeT.v $(x)))))
   _decreases((_specint) n - (_specint) rank[x])
 {
   if (parent[x] == x) return x;
@@ -126,12 +157,27 @@ void link(_array size_t *parent, _array size_t *rank,
   _requires(_forall(size_t i, i < n ==> parent[i] < n))
   _requires(_forall(size_t i, i < n ==> rank[i] < n))
   _requires(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
+  /* Spec-level: uf_inv holds on the forest */
+  _requires((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
   _ensures(parent._length >= n && rank._length >= n)
   _ensures(_forall(size_t i, i < n ==> parent[i] < n))
   /* Rank monotonicity: ranks never decrease */
   _ensures(_forall(size_t i, i < n ==> rank[i] >= _old(rank[i])))
   /* Rank invariant preserved through union by rank */
   _ensures(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
+  /* Spec-level: uf_inv preserved through link */
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
+  /* Spec-level merge: linked roots end up in the same equivalence class */
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      pure_find (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n)))
+                (SizeT.v $(root_x)) ==
+      pure_find (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n)))
+                (SizeT.v $(root_y)))))
 {
   if (rank[root_x] < rank[root_y]) {
     parent[root_x] = root_y;
@@ -154,12 +200,20 @@ void union_sets(_array size_t *parent, _array size_t *rank,
   _requires(_forall(size_t i, i < n ==> parent[i] < n))
   _requires(_forall(size_t i, i < n ==> rank[i] < n))
   _requires(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
+  /* Spec-level: uf_inv holds on the forest */
+  _requires((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
   _ensures(parent._length >= n && rank._length >= n)
   _ensures(_forall(size_t i, i < n ==> parent[i] < n))
   /* Rank invariant preserved through union */
   _ensures(_forall(size_t i, i < n && parent[i] != i ==> rank[i] < rank[parent[i]]))
   /* Rank monotonicity */
   _ensures(_forall(size_t i, i < n ==> rank[i] >= _old(rank[i])))
+  /* Spec-level: uf_inv preserved through union */
+  _ensures((_slprop) _inline_pulse(
+    with_pure (
+      uf_inv (c_to_uf (array_value_of $(parent)) (array_value_of $(rank)) (SizeT.v $(n))))))
 {
   size_t root_x = find_root(parent, rank, x, n);
   size_t root_y = find_root(parent, rank, y, n);

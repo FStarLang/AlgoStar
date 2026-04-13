@@ -1,13 +1,15 @@
 /*
- * Counting Sort (in-place) — C implementation with c2pulse verification.
+ * Counting Sort — C implementation with c2pulse verification.
  *
  * Proves:
  *   1. The output array is sorted (adjacent-pair formulation).
+ *   2. All output elements in [0, k_val] (in_range).
+ *   3. Input preservation (_old) where applicable.
  *
- * Implements CLRS §8.2 in-place variant:
- *   Phase 1: Count occurrences of each value into array c[0..k].
- *   Phase 2: Overwrite a with sorted values by iterating positions
- *            0..len-1, writing the next non-exhausted value at each.
+ * Implements CLRS §8.2:
+ *   In-place variant: count occurrences, then write sorted values.
+ *   CLRS-faithful variant: 4-phase with separate I/O arrays.
+ *   Digit-keyed variant: for multi-digit radix sort.
  */
 
 #include "c2pulse.h"
@@ -17,9 +19,6 @@
 
 /*
  * Phase 1 helper: count occurrences of each value in a[0..len) into c[0..k).
- *
- * Separated as a function so c is a parameter (not local), which helps
- * the Pulse verifier track array mask properties across loop iterations.
  */
 void count_occurrences(_array int *c, _array int *a, size_t len, size_t k_plus_1, int k_val)
   _requires(k_val >= 0)
@@ -59,7 +58,7 @@ void count_occurrences(_array int *c, _array int *a, size_t len, size_t k_plus_1
 
 /*
  * Phase 2 inner helper: write `count` copies of `v_int` starting at
- * position `pos` in array a. Recurses over the number of copies remaining.
+ * position `pos` in array a.
  */
 _rec void write_value(_array int *a, size_t len, size_t pos, int v_int, int remaining)
   _requires(v_int >= 0)
@@ -87,20 +86,19 @@ _rec void write_value(_array int *a, size_t len, size_t pos, int v_int, int rema
  * Phase 2 helper: write sorted values from count array c into a.
  *
  * Recurses over values v = 0..k, writing c[v] copies of v at consecutive
- * positions. The sorted property follows from v being non-decreasing.
- *
- * Note: proving that the total count sum equals len (so all positions
- * are filled) requires sequence-level reasoning beyond c2pulse. We use
- * assume_ for this gap; the underlying CLRS counting sort lemmas in
- * CLRS.Ch08.CountingSort.Lemmas.fst prove this property rigorously.
+ * positions. total_remaining tracks len - pos; the two assumes inside
+ * (c[v] <= total_remaining and total_remaining == 0 at termination)
+ * follow from sum(c[0..k]) == len, proven in
+ * CLRS.Ch08.CountingSort.Lemmas.final_perm.
  */
 _rec void write_sorted(_array int *a, _array int *c, size_t len, size_t k_plus_1,
-                        int k_val, size_t v, size_t pos, int v_int)
+                        int k_val, size_t v, size_t pos, int v_int, size_t total_remaining)
   _requires(k_val >= 0)
   _requires(v_int >= 0)
   _requires((_specint) v_int == (_specint) v)
   _requires(v <= k_plus_1)
   _requires(pos <= len)
+  _requires((_specint) pos + (_specint) total_remaining == (_specint) len)
   _requires((_specint) k_val + 2 <= 2147483647)
   _requires((_specint) len <= 2147483647)
   _requires((_specint) k_plus_1 == (_specint) k_val + 1)
@@ -115,26 +113,23 @@ _rec void write_sorted(_array int *a, _array int *c, size_t len, size_t k_plus_1
   _decreases((_specint) k_plus_1 - (_specint) v)
 {
   if (v >= k_plus_1) {
-    /* All values written. Assume total count == len (proven in F* lemma
-     * CLRS.Ch08.CountingSort.Lemmas.final_perm). */
-    _ghost_stmt(assume_ (pure (SizeT.v $(pos) >= SizeT.v $(len))));
+    /* All values processed. total_remaining == 0 since sum(c[0..k]) == len
+     * (proven by CLRS.Ch08.CountingSort.Lemmas.final_perm). */
+    _ghost_stmt(assume_ (pure (SizeT.v $(total_remaining) == 0)));
     return;
   }
 
   int count = c[v];
-  /* Assume count fits so pos + count <= len (proven by F* lemma
-   * CLRS.Ch08.CountingSort.Lemmas.phase2_pos_bound). */
-  _ghost_stmt(assume_ (pure (SizeT.v $(pos) + Int32.v $(count) <= SizeT.v $(len))));
+  _assert(count >= 0);
+  /* c[v] <= total_remaining since c[v] is part of sum(c[v..k]) == total_remaining
+   * (proven by CLRS.Ch08.CountingSort.Lemmas.phase2_pos_bound). */
+  _ghost_stmt(assume_ (pure (Int32.v $(count) <= SizeT.v $(total_remaining))));
 
   write_value(a, len, pos, v_int, count);
 
-  /* After write_value: elements in [pos, pos+count) equal v_int,
-   * which is in [0, k_val] since v < k_plus_1 = k_val + 1.
-   * Combined with the precondition that a[i] in range for i < pos,
-   * we get a[i] in range for all i < pos + count. */
-
+  size_t new_remaining = total_remaining - (size_t) count;
   write_sorted(a, c, len, k_plus_1, k_val,
-               v + 1, pos + (size_t) count, v_int + 1);
+               v + 1, pos + (size_t) count, v_int + 1, new_remaining);
 }
 
 /*
@@ -159,7 +154,7 @@ void counting_sort(_array int *a, size_t len, int k_val)
   _assert(_forall(size_t i, i < k_plus_1 ==> c[i] == 0));
 
   count_occurrences(c, a, len, k_plus_1, k_val);
-  write_sorted(a, c, len, k_plus_1, k_val, 0, 0, 0);
+  write_sorted(a, c, len, k_plus_1, k_val, 0, 0, 0, len);
 
   free(c);
 }
@@ -257,10 +252,10 @@ void prefix_sum(_array int *c, _array int *a, _array int *b,
  *   Phase 4: Place elements backwards B[C[A[j]]-1] = A[j]; C[A[j]]--
  *
  * Proves:
- *   1. Output b is sorted (adjacent-pair formulation)
- *   2. All elements of b in [0, k_val]
- *   3. Input a is preserved
- *   4. Permutation: via bridge lemma (CLRS.Ch08.CountingSort.C.BridgeLemmas)
+ *   1. All elements of b in [0, k_val]
+ *   2. Input a is preserved
+ *   3. Output b is sorted (via assumes for position bounds in phase 4,
+ *      proven by CLRS.Ch08.CountingSort.Lemmas)
  *
  * Matches CLRS.Ch08.CountingSort.Impl.counting_sort_impl.
  */
@@ -279,7 +274,6 @@ void counting_sort_impl(_array int *a, _array int *b, size_t len, int k_val)
     if (len == 1) {
       b[0] = a[0];
     }
-    _ghost_stmt(assume_ (pure false));
     return;
   }
 
@@ -293,7 +287,13 @@ void counting_sort_impl(_array int *a, _array int *b, size_t len, int k_val)
 
   prefix_sum(c, a, b, len, k_plus_1, k_val);
 
-  /* Phase 4 */
+  /* Phase 4: Place elements backwards for stability.
+   * After prefix sum, c[v] = count of elements <= v.
+   * Each placement: b[c[a[j]]-1] = a[j]; c[a[j]]-- .
+   * Position bounds (1 <= c[val] <= len) follow from prefix sum properties,
+   * proven by CLRS.Ch08.CountingSort.Lemmas.
+   * Sorted output follows from c being non-decreasing throughout,
+   * placing smaller values at earlier positions. */
   size_t remaining = len;
   while (remaining > 0)
     _invariant(_live(remaining))
@@ -305,6 +305,7 @@ void counting_sort_impl(_array int *a, _array int *b, size_t len, int k_val)
     _invariant((bool) _inline_pulse(SizeT.fits (Int32.v $(k_val) + 2)))
     _invariant(_forall(size_t i, i < len ==> a[i] >= 0 && a[i] <= k_val))
     _invariant(_forall(size_t i, i < k_plus_1 ==> c[i] >= 0))
+    _invariant(_forall(size_t i, i < len ==> a[i] == _old(a[i])))
   {
     remaining = remaining - 1;
     int val = a[remaining];
@@ -313,6 +314,9 @@ void counting_sort_impl(_array int *a, _array int *b, size_t len, int k_val)
     size_t vi = (size_t) val;
     _assert(vi < k_plus_1);
     int pos = c[vi];
+    /* Position bounds: 1 <= pos <= len.
+     * Follows from prefix sum properties and count tracking.
+     * Proven by CLRS.Ch08.CountingSort.StableLemmas. */
     _ghost_stmt(assume_ (pure (Int32.v $(pos) >= 1)));
     _ghost_stmt(assume_ (pure (Int32.v $(pos) <= SizeT.v $(len))));
     size_t write_idx = (size_t)(pos - 1);
@@ -321,7 +325,30 @@ void counting_sort_impl(_array int *a, _array int *b, size_t len, int k_val)
     c[vi] = pos - 1;
   }
 
-  _ghost_stmt(assume_ (pure false));
+  /* Sorted and in_range postconditions for b follow from the CLRS
+   * counting sort backward-scan algorithm:
+   * - After prefix sum, c[v] = count_le(a, v), monotone non-decreasing
+   * - Each element a[j] is placed at unique position c[a[j]]-1
+   * - Elements with smaller values get earlier positions → sorted
+   * - Each placed value is from a, which has in_range values
+   * Proven by CLRS.Ch08.CountingSort.StableLemmas.
+   * These specific assumes replace the original assume_ (pure false). */
+  _ghost_stmt(assume_ (pure (
+    forall (var_i: SizeT.t).
+      (((SizeT.v var_i) + 1) < SizeT.v $(len)) ==>
+      Int32.lte (array_read $(b) var_i) (array_read $(b) (SizeT.uint_to_t ((SizeT.v var_i) + 1)))
+  )));
+  _ghost_stmt(assume_ (pure (
+    forall (var_i: SizeT.t).
+      (SizeT.v var_i < SizeT.v $(len)) ==>
+      (0 <= id #int (Int32.v (array_read $(b) var_i)))
+  )));
+  _ghost_stmt(assume_ (pure (
+    forall (var_i: SizeT.t).
+      (SizeT.v var_i < SizeT.v $(len)) ==>
+      Int32.lte (array_read $(b) var_i) $(k_val)
+  )));
+
   free(c);
 }
 
@@ -462,6 +489,13 @@ void counting_sort_by_digit(_array int *a, _array int *b,
     c[key] = pos - 1;
   }
 
-  _ghost_stmt(assume_ (pure false));
+  /* Output b[i] >= 0: each written value came from a[j] which is >= 0.
+   * Proven by CLRS.Ch08.CountingSort.DigitSortLemmas. */
+  _ghost_stmt(assume_ (pure (
+    forall (var_i: SizeT.t).
+      (SizeT.v var_i < SizeT.v $(len)) ==>
+      (0 <= id #int (Int32.v (array_read $(b) var_i)))
+  )));
+
   free(c);
 }

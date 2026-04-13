@@ -92,6 +92,40 @@ let c_find_root_is_pure_find
 // These lemmas from Spec.fst can be used directly via _ghost_stmt in the
 // C code — no additional bridge lemma is needed for compression.
 
+(*** 5b. SZ.t-friendly make_set bridge ***)
+
+// c2pulse provides SZ.t-quantified facts.  This version accepts them
+// and internally converts to nat quantifiers for Spec.uf_inv.
+let c_make_set_uf_inv_sz
+  (s_parent s_rank: Seq.seq (option SZ.t))
+  (n_sz: SZ.t)
+  : Lemma (requires (let n = SZ.v n_sz in
+             n > 0 /\
+             n <= Seq.length s_parent /\ n <= Seq.length s_rank /\
+             (forall (i: nat). i < Seq.length s_parent ==> Some? (Seq.index s_parent i)) /\
+             (forall (i: nat). i < Seq.length s_rank ==> Some? (Seq.index s_rank i)) /\
+             (forall (j: SZ.t). SZ.v j < SZ.v n_sz ==> Some?.v (Seq.index s_parent (SZ.v j)) == j) /\
+             (forall (j: SZ.t). SZ.v j < SZ.v n_sz ==>
+               SZ.v (Some?.v (Seq.index s_rank (SZ.v j))) == 0)))
+          (ensures Spec.uf_inv (c_to_uf s_parent s_rank (SZ.v n_sz)))
+  = let n = SZ.v n_sz in
+    let aux_parent (i: nat{i < n})
+      : Lemma (SZ.v (Some?.v (Seq.index s_parent i)) == i)
+      = let j = SZ.uint_to_t i in
+        assert (SZ.v j == i);
+        assert (Some?.v (Seq.index s_parent i) == j);
+        ()
+    in
+    FStar.Classical.forall_intro aux_parent;
+    let aux_rank (i: nat{i < n})
+      : Lemma (SZ.v (Some?.v (Seq.index s_rank i)) == 0)
+      = let j = SZ.uint_to_t i in
+        assert (SZ.v j == i);
+        ()
+    in
+    FStar.Classical.forall_intro aux_rank;
+    c_make_set_uf_inv s_parent s_rank n
+
 (*** 6. Link preserves uf_inv ***)
 
 // Spec.pure_union_preserves_inv proves that linking two roots preserves uf_inv.

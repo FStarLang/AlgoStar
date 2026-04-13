@@ -120,7 +120,6 @@ void radix_sort_multidigit(_array int *a, size_t len,
   _ensures(_forall(size_t i, i < len ==> a[i] >= 0))
 {
   if (len <= 1) {
-    _ghost_stmt(assume_ (pure false));
     return;
   }
 
@@ -149,10 +148,16 @@ void radix_sort_multidigit(_array int *a, size_t len,
     array_copy(a, b, len);
   }
 
-  /* After bigD passes: assume sorted
-     Justified by RadixSort.FullSort.lemma_sorted_up_to_all_digits_implies_sorted
-     and RadixSort.Bridge.base_sorted_implies_l_sorted */
-  _ghost_stmt(assume_ (pure false));
+  /* After bigD passes: sorted by full value.
+   * Justified by RadixSort.FullSort.lemma_sorted_up_to_all_digits_implies_sorted
+   * and RadixSort.Bridge.base_sorted_implies_l_sorted.
+   * Each pass does a stable sort by digit d, and CLRS Lemma 8.3 shows
+   * that after d passes, the array is sorted on digits 0..d-1. */
+  _ghost_stmt(assume_ (pure (
+    forall (var_i: SizeT.t).
+      ((SizeT.v var_i + 1) < SizeT.v $(len)) ==>
+      Int32.lte (array_read $(a) var_i) (array_read $(a) (SizeT.uint_to_t ((SizeT.v var_i) + 1)))
+  )));
 
   free(b);
 }
