@@ -277,7 +277,10 @@ let codeword_cons_combine
   = let aux (i: nat{i < 1 + L.length cw})
       : Lemma (Seq.index out (depth + i) == L.index (b :: cw) i)
       = if i = 0 then ()
-        else ()
+        else begin
+          assert (L.index (b :: cw) i == L.index cw (i - 1));
+          assert (depth + 1 + (i - 1) == depth + i)
+        end
     in
     Classical.forall_intro (Classical.move_requires aux)
 #pop-options

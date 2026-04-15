@@ -79,6 +79,19 @@ let partial_full (dist: Seq.seq int) (weights: Seq.seq int) (n: nat) : Lemma
   (ensures no_violations dist weights n)
   = ()
 
+/// Row advance: partial (u, n) is equivalent to partial (u+1, 0)
+let partial_row_advance (dist: Seq.seq int) (weights: Seq.seq int) (n u: nat) : Lemma
+  (requires no_violations_partial dist weights n u n)
+  (ensures no_violations_partial dist weights n (u + 1) 0)
+  = ()
+
+/// Conditional row advance: if flag implies partial(u,n), then flag implies partial(u+1,0)
+let partial_row_advance_cond (dist: Seq.seq int) (weights: Seq.seq int) (n u: nat) (flag: bool) : Lemma
+  (requires Seq.length dist == n /\ Seq.length weights == n * n /\
+            (flag == true ==> no_violations_partial dist weights n u n))
+  (ensures  flag == true ==> no_violations_partial dist weights n (u + 1) 0)
+  = ()
+
 /// Check if edge (u,v) violates triangle inequality; if so, exists_violation holds
 let check_edge_violation (dist: Seq.seq int) (weights: Seq.seq int) (n u v: nat)
     (w du dv: int) (edge_ok: bool) : Lemma
@@ -1130,6 +1143,12 @@ fn bellman_ford
     };
     
     let _ = !cv;
+    // Help Z3 with the row transition: partial(vcu, n) ==> partial(vcu+1, 0)
+    with sdist_row. assert (A.pts_to dist sdist_row);
+    let vno_row = !no_neg;
+    partial_row_advance_cond sdist_row sweights (SZ.v n) (SZ.v vcu) vno_row;
+    // Help Z3 with non-linear arithmetic: vcu*n + n == (vcu+1)*n
+    FStar.Math.Lemmas.distributivity_add_left (SZ.v vcu) 1 (SZ.v n);
     cu := vcu +^ 1sz;
   };
   
