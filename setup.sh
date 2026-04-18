@@ -4,7 +4,9 @@
 # Two modes:
 #
 #   1. Binary install (recommended for most users):
-#      ./setup.sh binary          # install latest nightly F* binary
+#      ./setup.sh binary          # install pinned release (v2026.04.17)
+#      ./setup.sh binary nightly  # install latest nightly build
+#      ./setup.sh binary v2026.04.17  # install a specific release
 #
 #   2. Source build (for F* developers):
 #      ./setup.sh                 # build F* stage3 + KaRaMeL from submodule
@@ -26,6 +28,9 @@ NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
 # Binary install destination
 FSTAR_BIN_DIR="$SCRIPT_DIR/fstar"
+
+# Pinned F* release version (update when a new release is validated)
+FSTAR_RELEASE_VERSION="v2026.04.17"
 
 red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
 green() { printf '\033[1;32m%s\033[0m\n' "$*"; }
@@ -123,9 +128,22 @@ build_karamel() {
 # ---- Binary install ----
 
 install_binary() {
-  info "Installing F* nightly binary to $FSTAR_BIN_DIR ..."
+  local version_arg="${1:-}"
+  local install_flags=()
+
+  if [ "$version_arg" = "nightly" ]; then
+    info "Installing F* latest nightly binary to $FSTAR_BIN_DIR ..."
+    install_flags=(--nightly)
+  elif [ -n "$version_arg" ]; then
+    info "Installing F* $version_arg binary to $FSTAR_BIN_DIR ..."
+    install_flags=(--release --version "$version_arg")
+  else
+    info "Installing F* $FSTAR_RELEASE_VERSION binary to $FSTAR_BIN_DIR ..."
+    install_flags=(--release --version "$FSTAR_RELEASE_VERSION")
+  fi
+
   curl -fsSL https://aka.ms/install-fstar | bash -s -- \
-    --nightly \
+    "${install_flags[@]}" \
     --dest "$FSTAR_BIN_DIR" \
     --no-link
 
@@ -150,9 +168,11 @@ install_binary() {
 # These are small build-infrastructure files not included in binary packages.
 install_pulse_mk() {
   local mk_dir="$FSTAR_BIN_DIR/pulse/mk"
-  local base_url="https://raw.githubusercontent.com/FStarLang/FStar/master/pulse/mk"
+  # Use the pinned release tag for mk files so they match the installed binary
+  local tag="${FSTAR_RELEASE_VERSION}"
+  local base_url="https://raw.githubusercontent.com/FStarLang/FStar/${tag}/pulse/mk"
 
-  info "Downloading Pulse build infrastructure (mk files)..."
+  info "Downloading Pulse build infrastructure (mk files from ${tag})..."
   mkdir -p "$mk_dir"
   for f in common.mk locate.mk test.mk krmlheader; do
     curl -fsSL "$base_url/$f" -o "$mk_dir/$f"
@@ -182,7 +202,7 @@ setup_karamel_compat() {
 case "${1:-all}" in
   binary)
     check_prereqs_binary
-    install_binary
+    install_binary "${2:-}"
     ;;
   fstar)
     check_prereqs
@@ -203,12 +223,14 @@ case "${1:-all}" in
     green "Setup complete. Run 'make' to verify all chapters."
     ;;
   *)
-    echo "Usage: $0 [binary|fstar|karamel|all]"
+    echo "Usage: $0 [binary [nightly|VERSION]|fstar|karamel|all]"
     echo
-    echo "  binary    Install F* from a pre-built nightly binary (fast)"
-    echo "  fstar     Build F* stage3 from source (requires OCaml)"
-    echo "  karamel   Build KaRaMeL from source (requires F* already built)"
-    echo "  all       Build F* + KaRaMeL from source (default)"
+    echo "  binary              Install pinned F* release ($FSTAR_RELEASE_VERSION)"
+    echo "  binary nightly      Install latest nightly F* build"
+    echo "  binary VERSION      Install a specific release (e.g. v2026.04.17)"
+    echo "  fstar               Build F* stage3 from source (requires OCaml)"
+    echo "  karamel             Build KaRaMeL from source (requires F* already built)"
+    echo "  all                 Build F* + KaRaMeL from source (default)"
     exit 1
     ;;
 esac

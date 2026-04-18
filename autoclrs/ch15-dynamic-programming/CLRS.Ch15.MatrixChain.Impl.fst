@@ -83,6 +83,7 @@ let mc_result_eq_mc_cost (dims: Seq.seq int) (n: nat)
 
 open Pulse.Lib.BoundedIntegers
 
+#push-options "--z3rlimit 20"
 //SNIPPET_START: mc_sig
 fn matrix_chain_order
   (#p: perm)
@@ -287,3 +288,4 @@ fn matrix_chain_order
   
   result
 }
+#pop-options
