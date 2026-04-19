@@ -462,7 +462,8 @@ fn tree_insert
                     Seq.equal keys_seq' (Seq.upd keys_seq idx key) /\
                     Seq.equal valid_seq' (Seq.upd valid_seq idx true))) /\
       (success ==> key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 key) /\
-      AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
+      AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi) /\
+      success == AP.insert_will_succeed keys_seq valid_seq (SZ.v t.cap) 0 key
     )
 //SNIPPET_END: tree_insert
 {
@@ -504,7 +505,11 @@ fn tree_insert
       (vs ==> vd) /\
       // BST search reaches current position (when still searching)
       (not vs /\ not vd /\ SZ.v vc < SZ.v t.cap ==>
-        AP.bst_search_reaches keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v vc) key))
+        AP.bst_search_reaches keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v vc) key) /\
+      // Insert success characterization (on pre-state arrays)
+      (vd ==> (vs == AP.insert_will_succeed keys_seq valid_seq (SZ.v t.cap) 0 key)) /\
+      (not vd ==> AP.insert_will_succeed keys_seq valid_seq (SZ.v t.cap) 0 key ==
+                  AP.insert_will_succeed keys_seq valid_seq (SZ.v t.cap) (SZ.v vc) key))
   decreases (SZ.v t.cap - SZ.v !current + (if not !done then 1 else 0))
   {
     let idx = !current;
@@ -518,6 +523,9 @@ fn tree_insert
       let old_keys = Ghost.hide ks;
       let old_valid = Ghost.hide vs';
       
+      // insert_will_succeed: empty slot → true
+      AP.lemma_iws_invalid keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) key;
+      
       t.keys.(idx) <- key;
       t.valid.(idx) <- true;
       // Prove well_formed_bst preserved after insertion
@@ -530,6 +538,8 @@ fn tree_insert
     } else {
       let current_key = t.keys.(idx);
       if (current_key = key) {
+        // insert_will_succeed: duplicate → false
+        AP.lemma_iws_duplicate keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) key;
         done := true;
       } else if (key < current_key) {
         child_indices_fit (SZ.v t.cap) (SZ.v idx);
@@ -537,9 +547,14 @@ fn tree_insert
         let two_idx = SZ.mul 2sz idx;
         let left_idx = SZ.add two_idx 1sz;
         if (SZ.gte left_idx t.cap) {
+          // insert_will_succeed: left child OOB → false
+          AP.lemma_iws_left keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) key;
+          AP.lemma_iws_oob keys_seq valid_seq (SZ.v t.cap) (SZ.v left_idx) key;
           done := true;
         } else {
           AP.lemma_bsr_extend_left keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v idx) key;
+          // insert_will_succeed: descend left
+          AP.lemma_iws_left keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) key;
           // Complexity: moving to left child increases depth by 1
           with vticks_v. assert (GR.pts_to ticks vticks_v);
           node_depth_left_child (SZ.v idx);
@@ -553,9 +568,14 @@ fn tree_insert
         let two_idx = SZ.mul 2sz idx;
         let right_idx = SZ.add two_idx 2sz;
         if (SZ.gte right_idx t.cap) {
+          // insert_will_succeed: right child OOB → false
+          AP.lemma_iws_right keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) key;
+          AP.lemma_iws_oob keys_seq valid_seq (SZ.v t.cap) (SZ.v right_idx) key;
           done := true;
         } else {
           AP.lemma_bsr_extend_right keys_seq valid_seq (SZ.v t.cap) 0 (SZ.v idx) key;
+          // insert_will_succeed: descend right
+          AP.lemma_iws_right keys_seq valid_seq (SZ.v t.cap) (SZ.v idx) key;
           // Complexity: moving to right child increases depth by 1
           with vticks_v. assert (GR.pts_to ticks vticks_v);
           node_depth_right_child (SZ.v idx);
@@ -566,6 +586,14 @@ fn tree_insert
       };
     };
   };
+  
+  // Derive success == insert_will_succeed from loop invariant clauses
+  with vc vd vs vticks. assert (
+    R.pts_to current vc **
+    R.pts_to done vd **
+    R.pts_to success_flag vs **
+    GR.pts_to ticks vticks);
+  AP.lemma_iws_post_loop keys_seq valid_seq (SZ.v t.cap) (SZ.v vc) key vd vs;
   
   !success_flag
 }

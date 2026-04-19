@@ -172,7 +172,8 @@ fn tree_insert
                     Seq.equal keys_seq' (Seq.upd keys_seq idx key) /\
                     Seq.equal valid_seq' (Seq.upd valid_seq idx true))) /\
       (success ==> key_in_subtree keys_seq' valid_seq' (SZ.v t.cap) 0 key) /\
-      AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi)
+      AP.well_formed_bst keys_seq' valid_seq' (SZ.v t.cap) 0 (Ghost.reveal lo) (Ghost.reveal hi) /\
+      success == AP.insert_will_succeed keys_seq valid_seq (SZ.v t.cap) 0 key
     )
 
 (** INORDER-WALK (§12.1): recursive inorder traversal *)

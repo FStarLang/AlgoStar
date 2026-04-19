@@ -962,3 +962,79 @@ let rec lemma_successor_swap_delete_wfb
       end
     end
 #pop-options
+
+// =======================================================================
+// Insert success characterization
+// =======================================================================
+
+/// Whether following the BST search path from position i will find an empty
+/// slot within the array capacity.  Mirrors the control flow of tree_insert.
+let rec insert_will_succeed
+  (keys: seq int) (valid: seq bool) (cap: nat) (i: nat) (key: int)
+  : Tot bool (decreases (if i < cap then cap - i else 0))
+  = i < cap && i < length keys && i < length valid &&
+    (not (index valid i) ||
+     (index valid i &&
+      index keys i <> key &&
+      (if key < index keys i
+       then insert_will_succeed keys valid cap (2 * i + 1) key
+       else insert_will_succeed keys valid cap (2 * i + 2) key)))
+
+/// Step lemma: empty slot means insert will succeed
+let lemma_iws_invalid
+  (keys: seq int) (valid: seq bool) (cap: nat) (i: nat) (key: int)
+  : Lemma
+    (requires i < cap /\ i < length keys /\ i < length valid /\ not (index valid i))
+    (ensures insert_will_succeed keys valid cap i key == true)
+  = ()
+
+/// Step lemma: duplicate key means insert will fail
+let lemma_iws_duplicate
+  (keys: seq int) (valid: seq bool) (cap: nat) (i: nat) (key: int)
+  : Lemma
+    (requires i < cap /\ i < length keys /\ i < length valid /\
+             index valid i /\ index keys i = key)
+    (ensures insert_will_succeed keys valid cap i key == false)
+  = ()
+
+/// Step lemma: valid node with key < current -> left child determines success
+let lemma_iws_left
+  (keys: seq int) (valid: seq bool) (cap: nat) (i: nat) (key: int)
+  : Lemma
+    (requires i < cap /\ i < length keys /\ i < length valid /\
+             index valid i /\ index keys i <> key /\ key < index keys i)
+    (ensures insert_will_succeed keys valid cap i key ==
+             insert_will_succeed keys valid cap (2 * i + 1) key)
+  = ()
+
+/// Step lemma: valid node with key > current -> right child determines success
+let lemma_iws_right
+  (keys: seq int) (valid: seq bool) (cap: nat) (i: nat) (key: int)
+  : Lemma
+    (requires i < cap /\ i < length keys /\ i < length valid /\
+             index valid i /\ index keys i <> key /\ not (key < index keys i))
+    (ensures insert_will_succeed keys valid cap i key ==
+             insert_will_succeed keys valid cap (2 * i + 2) key)
+  = ()
+
+/// Step lemma: out of bounds means insert will fail
+let lemma_iws_oob
+  (keys: seq int) (valid: seq bool) (cap: nat) (i: nat) (key: int)
+  : Lemma
+    (requires i >= cap \/ i >= length keys \/ i >= length valid)
+    (ensures insert_will_succeed keys valid cap i key == false)
+  = ()
+
+/// Post-loop lemma: derive success == insert_will_succeed from invariant clauses
+let lemma_iws_post_loop
+  (keys: seq int) (valid: seq bool) (cap: nat) (i: nat) (key: int)
+  (vd vs: bool)
+  : Lemma
+    (requires
+      (vs ==> vd) /\
+      (vd ==> (vs == insert_will_succeed keys valid cap 0 key)) /\
+      (not vd ==> insert_will_succeed keys valid cap 0 key ==
+                  insert_will_succeed keys valid cap i key) /\
+      (not (i < cap && not vd)))
+    (ensures vs == insert_will_succeed keys valid cap 0 key)
+  = ()

@@ -60,6 +60,12 @@ let _ : squash (subtree_in_range empty_keys empty_valid 7 0 0 100) = ()
 // key_in_subtree is false for all keys in an empty tree
 let _ : squash (~(key_in_subtree empty_keys empty_valid 7 0 5)) = ()
 
+// insert_will_succeed is true for any key in an empty tree with cap > 0
+let _ : squash (AP.insert_will_succeed empty_keys empty_valid 7 0 5) = ()
+
+// insert_will_succeed is false for cap 0 (no room)
+let _ : squash (not (AP.insert_will_succeed empty_keys empty_valid 0 0 5)) = ()
+
 (* ====================================================================
    § 2. Pulse API test — exercises tree_search and tree_insert
 
@@ -125,6 +131,11 @@ fn test_bstarray_search_insert ()
     A.pts_to t.valid vs' **
     GR.pts_to ctr vticks'
   );
+
+  // === Insert success characterization ===
+  // insert_will_succeed on empty tree is true, so insert must succeed
+  assert (pure (success == AP.insert_will_succeed (Seq.create 7 0) (Seq.create 7 false) 7 0 5));
+  assert (pure (success == true));
 
   // === Frame property verification ===
   // The strengthened postcondition tells us:
