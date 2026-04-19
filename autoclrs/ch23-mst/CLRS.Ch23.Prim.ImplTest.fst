@@ -240,11 +240,9 @@ fn test_prim_3 ()
   prim_mst_result_elim parent_seq key_seq ws 3 0;
   test_prim_mst ();
 
-  // --- Cleanup (test-only: drop_ due to missing is_full_vec in prim postcondition) ---
-  with ks2. assert (V.pts_to (key_vec) ks2);
-  drop_ (V.pts_to (key_vec) ks2);
-  with ps3. assert (V.pts_to (parent_vec) ps3);
-  drop_ (V.pts_to (parent_vec) ps3);
+  // --- Cleanup: free returned vectors (is_full_vec now in postcondition) ---
+  V.free key_vec;
+  V.free parent_vec;
 
   with ws2. assert (A.pts_to weights ws2);
   rewrite (A.pts_to weights ws2) as (A.pts_to (V.vec_to_array wv) ws2);

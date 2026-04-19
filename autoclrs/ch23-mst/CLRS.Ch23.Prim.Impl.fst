@@ -862,8 +862,8 @@ fn prim
     V.pts_to (fst res) key_seq **
     V.pts_to (snd res) parent_seq **
     pure (prim_correct key_seq parent_seq weights_seq (SZ.v n) (SZ.v source) /\
-          prim_mst_result parent_seq key_seq weights_seq (SZ.v n) (SZ.v source))
-//SNIPPET_END: prim_sig
+          prim_mst_result parent_seq key_seq weights_seq (SZ.v n) (SZ.v source) /\
+          V.is_full_vec (fst res) /\ V.is_full_vec (snd res))
 {
   // Allocate key array, initialized to infinity
   let key = V.alloc infinity n;
