@@ -220,4 +220,98 @@ fn test_counting_sort_impl ()
 }
 ```
 
+// ========== Test 3: counting_sort_by_digit (digit-keyed stable sort) ==========
+
+module Stab = CLRS.Ch08.RadixSort.Stability
+module RB = CLRS.Ch08.RadixSort.Base
+
+```pulse
+(** test_counting_sort_by_digit
+ *
+ * Exercises: counting_sort_by_digit with base=10, digit=0 (ones place)
+ *
+ * Instance: input [13;21;12], base=10, d=0
+ *   - Digit-0 values: [3;1;2]
+ *   - Stable sort on digit 0 → output sorted by ones digit
+ *   - Expected: [21;12;13] (digit 1, then 2, then 3)
+ *
+ * Ghost: extracts permutation and sorted_on_digit from
+ *        is_stable_sort_on_digit postcondition.
+ * Runtime: reads output values and checks digit ordering.
+ *)
+fn test_counting_sort_by_digit ()
+  requires emp
+  returns r: bool
+  ensures emp
+{
+  // Allocate input array [13; 21; 12]
+  let va = V.alloc #nat 0 3sz;
+  V.to_array_pts_to va;
+  let a = V.vec_to_array va;
+  rewrite (A.pts_to (V.vec_to_array va) (Seq.create 3 0))
+       as (A.pts_to a (Seq.create #nat 3 0));
+  a.(0sz) <- 13;
+  a.(1sz) <- 21;
+  a.(2sz) <- 12;
+
+  // Allocate output array [0; 0; 0]
+  let vb = V.alloc #nat 0 3sz;
+  V.to_array_pts_to vb;
+  let b = V.vec_to_array vb;
+  rewrite (A.pts_to (V.vec_to_array vb) (Seq.create 3 0))
+       as (A.pts_to b (Seq.create #nat 3 0));
+
+  with sa. assert (A.pts_to a sa);
+  with sb. assert (A.pts_to b sb);
+  A.pts_to_len a;
+  A.pts_to_len b;
+
+  // Share input array for half permission
+  A.share a;
+
+  // Sort by digit 0 (ones place) with base 10
+  counting_sort_by_digit a b 3sz 10sz 0;
+
+  // Gather input array back to full permission
+  A.gather a;
+
+  // Extract postcondition: is_stable_sort_on_digit sa sb' 0 10
+  with sb'. assert (A.pts_to b sb');
+  A.pts_to_len b;
+
+  // Ghost: extract permutation and sorted_on_digit from opaque predicate
+  Stab.is_stable_get_perm (Ghost.reveal sa) (Ghost.reveal sb') 0 10;
+  // Now have: RB.permutation sa sb'
+  assert (pure (RB.permutation (Ghost.reveal sa) (Ghost.reveal sb')));
+
+  Stab.is_stable_get_sorted (Ghost.reveal sa) (Ghost.reveal sb') 0 10;
+  // Now have: sorted_on_digit sb' 0 10
+  assert (pure (RB.sorted_on_digit (Ghost.reveal sb') 0 10));
+
+  // Runtime: read output values and verify digit ordering
+  let v0 = b.(0sz);
+  let v1 = b.(1sz);
+  let v2 = b.(2sz);
+
+  // Check that ones digits are non-decreasing
+  let d0 = v0 % 10;
+  let d1 = v1 % 10;
+  let d2 = v2 % 10;
+  let pass = d0 <= d1 && d1 <= d2;
+
+  // Cleanup
+  with sa2. assert (A.pts_to a sa2);
+  rewrite (A.pts_to a sa2) as (A.pts_to (V.vec_to_array va) sa2);
+  V.to_vec_pts_to va;
+  V.free va;
+
+  with sb2. assert (A.pts_to b sb2);
+  rewrite (A.pts_to b sb2) as (A.pts_to (V.vec_to_array vb) sb2);
+  V.to_vec_pts_to vb;
+  V.free vb;
+
+  pass
+}
+```
+
 #pop-options
