@@ -478,13 +478,13 @@ witness without claiming to enumerate all admissible outputs.
 
 ### Priority 1: Specification Gaps
 
-| Algorithm | Gap | Suggested Fix |
-|-----------|-----|---------------|
-| **BST Array (Ch12)** | Insert success/failure not characterized | Add `success ⟺ insertion_path_in_bounds(tree, key, cap)` |
-| **Counting Sort (Ch08)** | `counting_sort_by_digit` untested; stability unverified | Test the by-digit variant; prove stability (`equal keys preserve order`) |
-| **DFS (Ch22)** | Edge classification (tree/back/forward/cross) not in `Impl.fsti` | Expose `edge_type` predicate in interface |
-| **DFS (Ch22)** | White-path theorem not formalized | Add as lemma in spec module |
-| **Prim (Ch23)** | Postcondition lacks `is_full_vec` for returned vectors | Add to ensure callers can free without `drop_` |
+| Algorithm | Gap | Status |
+|-----------|-----|--------|
+| **BST Array (Ch12)** | Insert success/failure not characterized | ✅ **Resolved** — Added `insert_will_succeed` predicate; postcondition now has `success == insert_will_succeed keys valid cap 0 key` |
+| **Counting Sort (Ch08)** | `counting_sort_by_digit` untested | ✅ **Resolved** — Test exercises by-digit sort with base=10, d=0; extracts permutation + sorted_on_digit from opaque stability predicate |
+| **DFS (Ch22)** | Edge classification not in interface | ✅ **Resolved** — Added `is_back_edge`, `is_tree_or_forward_edge`, `is_cross_edge` to Graph.Common; test classifies edges at runtime |
+| **DFS (Ch22)** | White-path theorem not formalized | Open — exists in DFS.WhitePath.fst but not connected to Impl.fsti postcondition |
+| **Prim (Ch23)** | Postcondition lacks `is_full_vec` for returned vectors | ✅ **Resolved** — Added `V.is_full_vec (fst res) /\ V.is_full_vec (snd res)`; ImplTest uses `V.free` instead of `drop_` |
 
 ### Priority 2: Test Coverage Expansion
 
