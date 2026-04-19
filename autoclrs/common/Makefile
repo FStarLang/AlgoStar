@@ -1,2 +1,2 @@
-PULSE_ROOT ?= ../../FStar/pulse
+include ../config.mk
 include $(PULSE_ROOT)/mk/test.mk

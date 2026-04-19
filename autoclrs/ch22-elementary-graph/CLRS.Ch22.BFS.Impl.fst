@@ -1441,12 +1441,12 @@ fn queue_bfs
         Seq.index spred' v >= 0 /\ Seq.index spred' v < SZ.v n ==>
         Seq.index scolor' (Seq.index spred' v) <> 0 /\
         Seq.index sdist' v == Seq.index sdist' (Seq.index spred' v) + 1) /\
-      // Complexity: at most 2 * n² ticks
-      cf >= reveal c0 /\
-      cf - reveal c0 <= 2 * (SZ.v n * SZ.v n) /\
       // Shortest-path optimality: dist[w] is optimal for every reachable vertex
       (forall (w: nat) (k: nat). w < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) w k ==>
-        Seq.index sdist' w <= k)
+        Seq.index sdist' w <= k) /\
+      // Complexity: at most 2 * n² ticks
+      cf >= reveal c0 /\
+      cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
     )
 //SNIPPET_END: queue_bfs_sig
 {

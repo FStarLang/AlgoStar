@@ -1,14 +1,5 @@
-PULSE_ROOT ?= ../../FStar/pulse
-STAGE3     ?= 1
-export STAGE3
-ifndef FSTAR_EXE
-FSTAR_EXE  := $(realpath ../../FStar/out/bin/fstar.exe)
-endif
-export FSTAR_EXE
-
-KRML_HOME  ?= ../../FStar/karamel
+include ../config.mk
 KRML_EXE   ?= $(KRML_HOME)/krml
-
 include $(PULSE_ROOT)/mk/test.mk
 
 # ── C extraction and test targets ───────────────────────────────────────

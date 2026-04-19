@@ -1,6 +1,5 @@
-KRML_HOME  ?= ../../FStar/karamel
+include ../config.mk
 KRML_EXE   ?= $(KRML_HOME)/krml
-PULSE_ROOT ?= ../../FStar/pulse
 include $(PULSE_ROOT)/mk/test.mk
 OTHERFLAGS += --include ../common
 

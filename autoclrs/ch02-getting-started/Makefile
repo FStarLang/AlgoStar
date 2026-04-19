@@ -1,7 +1,4 @@
-PULSE_ROOT ?= ../../FStar/pulse
-STAGE3 ?= 1
-export STAGE3
-KRML_HOME ?= ../../FStar/karamel
+include ../config.mk
 OTHERFLAGS += --include ../common
 include $(PULSE_ROOT)/mk/test.mk
 
