@@ -6,3 +6,8 @@ fn test_bfs_3 ()
   requires emp
   returns r: bool
   ensures emp ** pure (r == true)
+
+fn test_bfs_diamond ()
+  requires emp
+  returns r: bool
+  ensures emp ** pure (r == true)

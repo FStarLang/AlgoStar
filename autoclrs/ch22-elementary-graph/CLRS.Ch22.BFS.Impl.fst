@@ -618,6 +618,555 @@ let lemma_bfs_complexity_bound (n k: nat)
     assert (n * n + n <= n * n + n * n); // since n <= n*n for n >= 1
     assert (n * n + n * n == 2 * (n * n))
 
+(* ================================================================
+   SHORTEST-PATH OPTIMALITY — predicates and lemmas
+   ================================================================ *)
+
+(* Shortest-path optimality: dist[w] <= k for any k-step path to discovered vertex w *)
+let dist_optimal (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source: nat) : prop =
+  Seq.length scolor >= n /\ Seq.length sdist >= n /\ Seq.length adj >= n * n /\
+  source < n /\
+  (forall (w: nat) (k: nat). {:pattern (Seq.index sdist w); (reachable_in adj n source w k)}
+    w < n /\ Seq.index scolor w <> 0 /\ reachable_in adj n source w k ==>
+      Seq.index sdist w <= k)
+
+(* Layer completeness: vertices reachable in < d steps are BLACK (not WHITE, not GRAY) *)
+let layer_complete (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source d: nat) : prop =
+  Seq.length scolor >= n /\ Seq.length adj >= n * n /\
+  source < n /\
+  (forall (w: nat) (k: nat). {:pattern (Seq.index scolor w); (reachable_in adj n source w k)}
+    w < n /\ reachable_in adj n source w k /\ k < d ==>
+      Seq.index scolor w <> 0 /\ Seq.index scolor w <> 1)
+
+(* Queue minimum distance: all queue entries have distance >= d *)
+let queue_dist_min (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d: int) : prop =
+  Seq.length sdist >= n /\ Seq.length squeue >= n /\ head <= tail /\ tail <= n /\
+  (forall (i: nat). {:pattern (Seq.index squeue i)}
+    i >= head /\ i < tail ==>
+      SZ.v (Seq.index squeue i) < n /\
+      Seq.index sdist (SZ.v (Seq.index squeue i)) >= d)
+
+(* Queue non-decreasing: consecutive entries have non-decreasing distance *)
+let queue_nondecreasing (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) : prop =
+  Seq.length sdist >= n /\ Seq.length squeue >= n /\ head <= tail /\ tail <= n /\
+  (forall (i: nat). {:pattern (Seq.index squeue i); (Seq.index squeue (i + 1))}
+    i >= head /\ i + 1 < tail ==>
+      SZ.v (Seq.index squeue i) < n /\
+      SZ.v (Seq.index squeue (i + 1)) < n /\
+      Seq.index sdist (SZ.v (Seq.index squeue i)) <=
+      Seq.index sdist (SZ.v (Seq.index squeue (i + 1))))
+
+(* Queue distance upper bound: all entries have distance <= d_ub *)
+let queue_dist_ub (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d_ub: int) : prop =
+  Seq.length sdist >= n /\ Seq.length squeue >= n /\ head <= tail /\ tail <= n /\
+  (forall (i: nat). {:pattern (Seq.index squeue i)}
+    i >= head /\ i < tail ==>
+      SZ.v (Seq.index squeue i) < n /\
+      Seq.index sdist (SZ.v (Seq.index squeue i)) <= d_ub)
+
+(* --- Initialization lemmas --- *)
+
+let init_dist_optimal (adj: Seq.seq int) (n: nat) (scolor_zeros sdist_zeros: Seq.seq int) (source: nat)
+  : Lemma
+    (requires
+      source < n /\ n <= Seq.length scolor_zeros /\ n <= Seq.length sdist_zeros /\
+      Seq.length adj == n * n /\
+      (forall (j:nat). j < n ==> Seq.index scolor_zeros j == 0))
+    (ensures
+      dist_optimal adj n (Seq.upd scolor_zeros source 1) (Seq.upd sdist_zeros source 0) source)
+  = ()  // Only source is non-WHITE (color 1) with dist 0. 0 <= k for any nat k.
+
+let init_layer_complete (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source: nat)
+  : Lemma
+    (requires source < n /\ n <= Seq.length scolor /\ Seq.length adj >= n * n)
+    (ensures layer_complete adj n scolor source 0)
+  = ()  // Vacuously true: no k < 0.
+
+let init_queue_dist_min (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d: int)
+  : Lemma
+    (requires
+      n >= 1 /\ Seq.length sdist >= n /\ Seq.length squeue >= n /\
+      head <= tail /\ tail <= n /\ d <= 0 /\
+      (forall (i: nat). {:pattern (Seq.index squeue i)}
+        i >= head /\ i < tail ==>
+          SZ.v (Seq.index squeue i) < n /\
+          Seq.index sdist (SZ.v (Seq.index squeue i)) >= 0))
+    (ensures queue_dist_min sdist squeue n head tail d)
+  = ()
+
+let init_queue_nondecreasing (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n: nat) (source: SZ.t)
+  : Lemma
+    (requires
+      SZ.v source < n /\ n >= 1 /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n)
+    (ensures queue_nondecreasing sdist (Seq.upd squeue 0 source) n 0 1)
+  = ()  // Single element: no consecutive pair.
+
+let init_queue_dist_ub (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n: nat)
+                       (source: SZ.t) (d_ub: int)
+  : Lemma
+    (requires
+      SZ.v source < n /\ n >= 1 /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n /\
+      Seq.index (Seq.upd sdist (SZ.v source) 0) (SZ.v source) <= d_ub)
+    (ensures queue_dist_ub (Seq.upd sdist (SZ.v source) 0) (Seq.upd squeue 0 source) n 0 1 d_ub)
+  = ()
+
+(* --- Core optimality contradiction: no short path to a WHITE vertex --- *)
+
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+let discover_optimal_contradiction
+  (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source j: nat) (d k: nat)
+  : Lemma
+    (requires
+      layer_complete adj n scolor source d /\
+      scanned_all adj n scolor /\
+      j < n /\ source < n /\
+      Seq.index scolor j == 0 /\
+      Seq.index scolor source <> 0 /\
+      Seq.length scolor >= n /\ Seq.length adj >= n * n /\
+      reachable_in adj n source j k /\ k <= d /\ k > 0)
+    (ensures False)
+  = // Unfold reachable_in at k > 0: ∃u'. u' < n ∧ reachable_in(source,u',k-1) ∧ edge(u',j)
+    // Use forall_intro to handle the existential witness.
+    let aux (u': nat)
+      : Lemma (requires u' < n /\ reachable_in adj n source u' (k - 1) /\ has_edge adj n u' j)
+              (ensures False)
+      = // k-1 < d, so layer_complete gives: scolor[u'] ≠ 0 ∧ scolor[u'] ≠ 1
+        assert (Seq.index scolor u' <> 0);
+        assert (Seq.index scolor u' <> 1);
+        // scanned_all: u' BLACK ∧ edge(u', j) → scolor[j] ≠ 0
+        // But scolor[j] = 0, contradiction
+        ()
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+(* --- Discover preservation lemmas --- *)
+
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+let discover_preserves_dist_optimal
+  (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source u j: nat) (du: nat)
+  : Lemma
+    (requires
+      dist_optimal adj n scolor sdist source /\
+      layer_complete adj n scolor source du /\
+      scanned_all adj n scolor /\
+      j < n /\ u < n /\ source < n /\
+      Seq.index scolor j == 0 /\
+      Seq.index scolor source <> 0 /\
+      Seq.index scolor u <> 0 /\
+      Seq.index sdist u == du /\
+      Seq.length scolor >= n /\ Seq.length sdist >= n /\ Seq.length adj >= n * n)
+    (ensures
+      dist_optimal adj n (Seq.upd scolor j 1) (Seq.upd sdist j (du + 1)) source)
+  = // For w ≠ j: old dist_optimal applies (color/dist unchanged).
+    // For w = j: need du + 1 ≤ k for any k-step path to j.
+    // If k ≤ du, discover_optimal_contradiction gives False.
+    let aux (k: nat)
+      : Lemma (requires reachable_in adj n source j k)
+              (ensures du + 1 <= k)
+      = if k <= du then discover_optimal_contradiction adj n scolor source j du k
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
+#pop-options
+
+let discover_preserves_layer_complete
+  (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source j d: nat)
+  : Lemma
+    (requires
+      layer_complete adj n scolor source d /\
+      j < n /\ source < n /\
+      Seq.index scolor j == 0 /\
+      Seq.length scolor >= n /\ Seq.length adj >= n * n)
+    (ensures
+      layer_complete adj n (Seq.upd scolor j 1) source d)
+  = ()  // Discovering j: for w ≠ j, color unchanged. For w = j, was WHITE → GRAY.
+        // layer_complete says non-WHITE ∧ non-GRAY. j is now GRAY (color 1),
+        // BUT j was WHITE before, so layer_complete never applied to j (it would have
+        // required j non-WHITE). Actually: layer_complete conclusion is scolor[w] ≠ 0 ∧ scolor[w] ≠ 1.
+        // For w ≠ j: same as before ✓. For w = j in old state: j is WHITE, so if
+        // reachable_in(source, j, k) ∧ k < d, layer_complete gave scolor[j] ≠ 0 — but scolor[j] = 0, contradiction.
+        // So the quantifier is vacuously satisfied for j. In new state: scolor'[j] = 1, and
+        // the conclusion requires scolor'[j] ≠ 1, which fails. But the premise
+        // reachable_in(source, j, k) ∧ k < d is impossible by the same contradiction. ✓
+
+let discover_preserves_queue_dist_min
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail j: nat) (d du: int) (vv: SZ.t)
+  : Lemma
+    (requires
+      queue_dist_min sdist squeue n head tail d /\
+      j < n /\ tail < n /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n /\
+      SZ.v vv == j /\
+      du + 1 >= d /\
+      (forall (i: nat). {:pattern (Seq.index squeue i)}
+        i >= head /\ i < tail ==> SZ.v (Seq.index squeue i) <> j))
+    (ensures
+      queue_dist_min (Seq.upd sdist j (du + 1)) (Seq.upd squeue tail vv) n head (tail + 1) d)
+  = ()  // Old entries: dist unchanged (j is WHITE, queue entries are non-WHITE with same dist).
+        // New entry at tail: dist = du + 1 >= d. ✓
+
+(* --- Blacken preservation lemmas --- *)
+
+let blacken_preserves_dist_optimal
+  (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source u: nat)
+  : Lemma
+    (requires
+      dist_optimal adj n scolor sdist source /\
+      u < n /\ Seq.index scolor u <> 0 /\
+      Seq.length scolor >= n)
+    (ensures
+      dist_optimal adj n (Seq.upd scolor u 2) sdist source)
+  = ()  // Blackening only changes color (not dist). Non-WHITE stays non-WHITE.
+
+let blacken_preserves_layer_complete
+  (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source d u: nat)
+  : Lemma
+    (requires
+      layer_complete adj n scolor source d /\
+      u < n /\ Seq.index scolor u <> 0 /\
+      Seq.length scolor >= n)
+    (ensures
+      layer_complete adj n (Seq.upd scolor u 2) source d)
+  = ()  // Blackening u: was non-WHITE → now color 2 (≠0, ≠1). Only strengthens layer_complete.
+
+let blacken_preserves_queue_dist_min
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail u: nat) (d: int)
+  : Lemma
+    (requires
+      queue_dist_min sdist squeue n head tail d /\
+      u < n)
+    (ensures
+      queue_dist_min sdist squeue n head tail d)
+  = ()  // Blackening doesn't change dist or queue.
+
+(* --- Queue ordering preservation lemmas --- *)
+
+let discover_preserves_queue_nondecreasing
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail j: nat) (du: int) (vv: SZ.t)
+  : Lemma
+    (requires
+      queue_nondecreasing sdist squeue n head tail /\
+      queue_dist_ub sdist squeue n head tail (du + 1) /\
+      j < n /\ tail < n /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n /\
+      SZ.v vv == j /\
+      du + 1 >= 0 /\
+      (forall (i: nat). {:pattern (Seq.index squeue i)}
+        i >= head /\ i < tail ==> SZ.v (Seq.index squeue i) <> j))
+    (ensures
+      queue_nondecreasing (Seq.upd sdist j (du + 1)) (Seq.upd squeue tail vv) n head (tail + 1))
+  = ()
+
+let discover_preserves_queue_dist_ub
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail j: nat) (du: int) (vv: SZ.t) (d_ub: int)
+  : Lemma
+    (requires
+      queue_dist_ub sdist squeue n head tail d_ub /\
+      j < n /\ tail < n /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n /\
+      SZ.v vv == j /\
+      du + 1 <= d_ub /\
+      (forall (i: nat). {:pattern (Seq.index squeue i)}
+        i >= head /\ i < tail ==> SZ.v (Seq.index squeue i) <> j))
+    (ensures
+      queue_dist_ub (Seq.upd sdist j (du + 1)) (Seq.upd squeue tail vv) n head (tail + 1) d_ub)
+  = ()  // Old entries: dist unchanged (j is WHITE, queue entries are non-j). ≤ d_ub. ✓
+        // New entry: du + 1 ≤ d_ub. ✓
+
+(* Blackening doesn't affect queue ordering (no dist/queue changes) *)
+let blacken_preserves_queue_nondecreasing
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail u: nat)
+  : Lemma
+    (requires queue_nondecreasing sdist squeue n head tail /\ u < n)
+    (ensures queue_nondecreasing sdist squeue n head tail)
+  = ()
+
+let blacken_preserves_queue_dist_ub
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail u: nat) (d_ub: int)
+  : Lemma
+    (requires queue_dist_ub sdist squeue n head tail d_ub /\ u < n)
+    (ensures queue_dist_ub sdist squeue n head tail d_ub)
+  = ()
+
+(* Derive queue_dist_min from queue_nondecreasing: if queue is non-decreasing and
+   front has dist d, then all entries have dist >= d.
+   This is a transitivity argument: dist[queue[head]] <= dist[queue[i]] for all i >= head. *)
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
+let rec queue_nondecreasing_implies_dist_min
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d: int) (i: nat)
+  : Lemma
+    (requires
+      queue_nondecreasing sdist squeue n head tail /\
+      head < tail /\ i >= head /\ i < tail /\
+      SZ.v (Seq.index squeue head) < n /\
+      Seq.index sdist (SZ.v (Seq.index squeue head)) >= d /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n)
+    (ensures
+      SZ.v (Seq.index squeue i) < n /\
+      Seq.index sdist (SZ.v (Seq.index squeue i)) >= d)
+    (decreases (i - head))
+  = if i = head then ()
+    else begin
+      queue_nondecreasing_implies_dist_min sdist squeue n head tail d (i - 1);
+      // IH gives: SZ.v (squeue[i-1]) < n ∧ dist[squeue[i-1]] >= d
+      // Trigger nondecreasing for pair ((i-1), (i-1)+1 = i):
+      assert (i - 1 >= head /\ (i - 1) + 1 < tail);
+      assert (Seq.index sdist (SZ.v (Seq.index squeue (i - 1))) <=
+              Seq.index sdist (SZ.v (Seq.index squeue ((i - 1) + 1))))
+    end
+#pop-options
+
+(* Universally quantified version: all queue entries have dist >= d *)
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 0"
+let queue_nondecreasing_implies_dist_min_all
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d: int)
+  : Lemma
+    (requires
+      queue_nondecreasing sdist squeue n head tail /\
+      head < tail /\
+      SZ.v (Seq.index squeue head) < n /\
+      Seq.index sdist (SZ.v (Seq.index squeue head)) >= d /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n)
+    (ensures queue_dist_min sdist squeue n head tail d)
+  = let aux (i: nat)
+      : Lemma (i >= head /\ i < tail ==>
+                 SZ.v (Seq.index squeue i) < n /\
+                 Seq.index sdist (SZ.v (Seq.index squeue i)) >= d)
+      = if i >= head && i < tail then
+          queue_nondecreasing_implies_dist_min sdist squeue n head tail d i
+    in
+    FStar.Classical.forall_intro aux
+#pop-options
+
+(* Removing the first element preserves nondecreasing *)
+#push-options "--z3rlimit 10"
+let queue_nondecreasing_tail
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat)
+  : Lemma
+    (requires queue_nondecreasing sdist squeue n head tail /\ head < tail)
+    (ensures queue_nondecreasing sdist squeue n (head + 1) tail)
+  = let aux (i: nat)
+      : Lemma (i >= head + 1 /\ i + 1 < tail ==>
+                 SZ.v (Seq.index squeue i) < n /\
+                 SZ.v (Seq.index squeue (i + 1)) < n /\
+                 Seq.index sdist (SZ.v (Seq.index squeue i)) <=
+                 Seq.index sdist (SZ.v (Seq.index squeue (i + 1))))
+      = if i >= head + 1 && i + 1 < tail then begin
+          assert (i >= head);
+          // Need both pattern terms in scope for the multi-pattern trigger
+          let _ = Seq.index squeue i in
+          let _ = Seq.index squeue (i + 1) in
+          ()
+        end
+    in
+    FStar.Classical.forall_intro aux
+#pop-options
+
+(* Removing the first element preserves upper bound *)
+let queue_dist_ub_tail
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d_ub: int)
+  : Lemma
+    (requires queue_dist_ub sdist squeue n head tail d_ub /\ head < tail)
+    (ensures queue_dist_ub sdist squeue n (head + 1) tail d_ub)
+  = ()
+
+(* If dist_ub(d_ub) and dist_min(d_ub - 1) hold for [head, tail),
+   then dist_ub(dist[queue[head]] + 1) also holds *)
+let queue_dist_ub_from_min
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d_ub: int)
+  : Lemma
+    (requires
+      queue_dist_ub sdist squeue n head tail d_ub /\
+      queue_dist_min sdist squeue n head tail (d_ub - 1) /\
+      head < tail /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n)
+    (ensures
+      queue_dist_ub sdist squeue n head tail
+        (Seq.index sdist (SZ.v (Seq.index squeue head)) + 1))
+  = ()  // dist[queue[head]] >= d_ub - 1, so dist[queue[head]] + 1 >= d_ub
+        // All entries have dist <= d_ub <= dist[queue[head]] + 1. ✓
+
+(* Conditional variant: if head < tail, establishes queue_dist_ub(dist[queue[head]] + 1) *)
+let queue_dist_ub_from_min_opt
+  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d_ub: int)
+  : Lemma
+    (requires
+      queue_dist_ub sdist squeue n head tail d_ub /\
+      queue_dist_min sdist squeue n head tail (d_ub - 1) /\
+      Seq.length sdist >= n /\ Seq.length squeue >= n)
+    (ensures
+      head < tail ==>
+        queue_dist_ub sdist squeue n head tail
+          (Seq.index sdist (SZ.v (Seq.index squeue head)) + 1))
+  = if head < tail then queue_dist_ub_from_min sdist squeue n head tail d_ub
+
+(* --- Gray vertex has dist >= d (counting/induction argument) --- *)
+
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+let rec gray_implies_dist_ge
+  (scolor: Seq.seq int) (sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
+  (n head tail: nat) (d: int) (w: nat)
+  : Lemma
+    (requires
+      Seq.length scolor >= n /\ Seq.length squeue >= n /\ Seq.length sdist >= n /\
+      count_gray scolor n == tail - head /\
+      queue_gray_unique scolor squeue n head tail /\
+      queue_dist_min sdist squeue n head tail d /\
+      w < n /\ Seq.index scolor w == 1)
+    (ensures Seq.index sdist w >= d)
+    (decreases (tail - head))
+  = if tail = head then begin
+      // Base: queue empty, count_gray = 0, but w is GRAY — contradiction
+      count_gray_zero_no_gray scolor n;
+      assert (Seq.index scolor w <> 1)
+    end else begin
+      let last = tail - 1 in
+      assert (last >= head /\ last < tail);
+      assert (last < Seq.length squeue);
+      let qlast_v = SZ.v (Seq.index squeue last) in
+      // queue_gray_unique: queue[last] is valid and GRAY
+      assert (qlast_v < n /\ Seq.index scolor qlast_v == 1);
+      if qlast_v = w then begin
+        // queue_dist_min: dist[queue[last]] >= d, i.e., dist[w] >= d
+        assert (Seq.index sdist (SZ.v (Seq.index squeue last)) >= d)
+      end else begin
+        // qlast_v ≠ w: mark qlast_v BLACK, shrink queue by 1, recurse
+        let scolor' = Seq.upd scolor qlast_v 2 in
+        // count_gray decreases by 1
+        count_gray_upd_from_gray scolor n qlast_v;
+        assert (count_gray scolor' n == last - head);
+        // w still GRAY in scolor' (w <> qlast_v)
+        assert (Seq.index scolor' w == 1);
+
+        // Establish queue_gray_unique scolor' squeue n head last
+        // Key: for i in [head, last), SZ.v(queue[i]) <> qlast_v
+        //   because queue[i] <> queue[last] (uniqueness, i <> last)
+        //   and SZ.v is injective (size_v_inj)
+        // Helper: for i in [head, last), queue[i] is valid and still GRAY in scolor'
+        let aux_gray (i: nat)
+          : Lemma (requires i >= head /\ i < last)
+                  (ensures i < Seq.length squeue /\
+                           SZ.v (Seq.index squeue i) < n /\
+                           Seq.index scolor' (SZ.v (Seq.index squeue i)) == 1)
+          = assert (i < tail);
+            assert (i < Seq.length squeue);
+            assert (SZ.v (Seq.index squeue i) < n);
+            assert (Seq.index scolor (SZ.v (Seq.index squeue i)) == 1);
+            // Uniqueness: queue[i] = queue[last] ==> i = last, but i < last
+            assert (last < Seq.length squeue);
+            if Seq.index squeue i = Seq.index squeue last then
+              assert (i == last)
+            else
+              // SZ.v injective (via size_v_inj SMTPat): queue[i] <> queue[last] ==> values differ
+              assert (SZ.v (Seq.index squeue i) <> qlast_v)
+        in
+        FStar.Classical.forall_intro (FStar.Classical.move_requires aux_gray);
+
+        // Uniqueness for [head, last) inherited from [head, tail)
+        let aux_uniq (i j: nat)
+          : Lemma (requires i >= head /\ i < last /\ j >= head /\ j < last /\
+                            Seq.index squeue i == Seq.index squeue j)
+                  (ensures i == j)
+          = assert (i < tail /\ j < tail)
+        in
+        let aux_uniq_c (i: nat)
+          : Lemma (forall (j: nat).
+              (i >= head /\ i < last /\ j >= head /\ j < last /\
+               Seq.index squeue i == Seq.index squeue j) ==> i == j)
+          = FStar.Classical.forall_intro (FStar.Classical.move_requires (aux_uniq i))
+        in
+        FStar.Classical.forall_intro aux_uniq_c;
+
+        assert (Seq.length scolor' >= n);
+        assert (queue_gray_unique scolor' squeue n head last);
+        // queue_dist_min for [head, last) is a subset of [head, tail)
+        assert (queue_dist_min sdist squeue n head last d);
+        // Recurse with scolor', shrunk queue
+        gray_implies_dist_ge scolor' sdist squeue n head last d w
+      end
+    end
+#pop-options
+
+(* --- Layer completeness from BFS invariants --- *)
+
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+let rec layer_complete_aux
+  (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
+  (source d head tail: nat) (w: nat) (k: nat)
+  : Lemma
+    (requires
+      Seq.length scolor >= n /\ Seq.length sdist >= n /\
+      Seq.length squeue >= n /\ Seq.length adj >= n * n /\
+      dist_optimal adj n scolor sdist source /\
+      scanned_all adj n scolor /\
+      source_ok scolor sdist source n /\
+      count_gray scolor n == tail - head /\
+      queue_gray_unique scolor squeue n head tail /\
+      queue_dist_min sdist squeue n head tail d /\
+      w < n /\ reachable_in adj n source w k /\ k < d)
+    (ensures Seq.index scolor w <> 0 /\ Seq.index scolor w <> 1)
+    (decreases k)
+  = if k = 0 then begin
+      // reachable_in(source, w, 0) = (w == source)
+      assert (w == source);
+      // source_ok: scolor[source] <> 0
+      assert (Seq.index scolor source <> 0);
+      // If GRAY: gray_implies_dist_ge gives dist[source] >= d
+      // But source_ok: dist[source] == 0 and k < d means d >= 1
+      if Seq.index scolor source = 1 then begin
+        gray_implies_dist_ge scolor sdist squeue n head tail d source;
+        assert (Seq.index sdist source >= d);
+        assert (Seq.index sdist source == 0)
+        // 0 >= d >= 1 — contradiction
+      end
+    end else begin
+      // k > 0: reachable_in gives exists u'. u' < n /\ reachable_in(source, u', k-1) /\ has_edge(u', w)
+      let aux_inner (u': nat)
+        : Lemma (requires u' < n /\ reachable_in adj n source u' (k - 1) /\ has_edge adj n u' w)
+                (ensures Seq.index scolor w <> 0 /\ Seq.index scolor w <> 1)
+        = // IH: k-1 < k < d, so layer_complete_aux gives u' is BLACK
+          layer_complete_aux adj n scolor sdist squeue source d head tail u' (k - 1);
+          assert (Seq.index scolor u' <> 0);
+          assert (Seq.index scolor u' <> 1);
+          // scanned_all: u' BLACK + edge(u', w) => w is non-WHITE
+          assert (Seq.index scolor w <> 0);
+          // dist_optimal: w non-WHITE + reachable_in(source, w, k) => dist[w] <= k
+          assert (Seq.index sdist w <= k);
+          // If GRAY: gray_implies_dist_ge => dist[w] >= d, but dist[w] <= k < d — contradiction
+          if Seq.index scolor w = 1 then begin
+            gray_implies_dist_ge scolor sdist squeue n head tail d w;
+            assert (Seq.index sdist w >= d);
+            assert (Seq.index sdist w <= k);
+            assert (k < d)
+          end
+      in
+      FStar.Classical.forall_intro (FStar.Classical.move_requires aux_inner)
+    end
+
+let layer_complete_from_invariants
+  (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
+  (source d head tail: nat)
+  : Lemma
+    (requires
+      dist_optimal adj n scolor sdist source /\
+      scanned_all adj n scolor /\
+      source_ok scolor sdist source n /\
+      count_gray scolor n == tail - head /\
+      queue_gray_unique scolor squeue n head tail /\
+      queue_dist_min sdist squeue n head tail d)
+    (ensures layer_complete adj n scolor source d)
+  = let aux (w: nat) (k: nat)
+      : Lemma (w < n /\ reachable_in adj n source w k /\ k < d ==>
+               Seq.index scolor w <> 0 /\ Seq.index scolor w <> 1)
+      = if w < n then
+          FStar.Classical.move_requires (layer_complete_aux adj n scolor sdist squeue source d head tail w) k
+        else ()
+    in
+    FStar.Classical.forall_intro_2 aux
+#pop-options
+
 (* Helper: discover a white vertex v from vertex u.
    Factored out to avoid Pulse unification issues with conditional branches
    that perform multiple array mutations. *)
@@ -687,7 +1236,7 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
 fn maybe_discover
   (adj: A.array int)
   (color: A.array int) (dist: A.array int) (pred: A.array int)
@@ -730,7 +1279,14 @@ fn maybe_discover
       queue_gray_unique scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) /\
       scanned_all sadj (SZ.v n) scolor /\
       scanned_partial sadj (SZ.v n) scolor (SZ.v u) (SZ.v vv) /\
-      pred_dist_ok scolor sdist spred (SZ.v n)
+      pred_dist_ok scolor sdist spred (SZ.v n) /\
+      // Optimality predicates
+      dist_optimal sadj (SZ.v n) scolor sdist (SZ.v source) /\
+      layer_complete sadj (SZ.v n) scolor (SZ.v source) du /\
+      source_ok scolor sdist (SZ.v source) (SZ.v n) /\
+      queue_dist_min sdist squeue (SZ.v n) (SZ.v head) (SZ.v vtail) du /\
+      queue_nondecreasing sdist squeue (SZ.v n) (SZ.v head) (SZ.v vtail) /\
+      queue_dist_ub sdist squeue (SZ.v n) (SZ.v head) (SZ.v vtail) (du + 1)
     )
   ensures exists* scolor' sdist' spred' squeue' vtail'.
     A.pts_to adj sadj **
@@ -771,7 +1327,13 @@ fn maybe_discover
       (SZ.v vtail' > SZ.v vtail ==>
         Seq.index scolor (SZ.v (Seq.index squeue' (SZ.v vtail))) == 0) /\
       // At most one new entry
-      SZ.v vtail' <= SZ.v vtail + 1
+      SZ.v vtail' <= SZ.v vtail + 1 /\
+      // Optimality postconditions
+      dist_optimal sadj (SZ.v n) scolor' sdist' (SZ.v source) /\
+      layer_complete sadj (SZ.v n) scolor' (SZ.v source) du /\
+      queue_dist_min sdist' squeue' (SZ.v n) (SZ.v head) (SZ.v vtail') du /\
+      queue_nondecreasing sdist' squeue' (SZ.v n) (SZ.v head) (SZ.v vtail') /\
+      queue_dist_ub sdist' squeue' (SZ.v n) (SZ.v head) (SZ.v vtail') (du + 1)
     )
 {
   if (has_edge_val <> 0 && cv = 0) {
@@ -789,6 +1351,13 @@ fn maybe_discover
     discover_preserves_queue_gray_unique scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) (SZ.v vv);
     queue_gray_unique_after_discover scolor squeue (SZ.v n) (SZ.v head) (SZ.v vtail) vv;
 
+    // Optimality preservation lemma calls (before mutation)
+    discover_preserves_dist_optimal sadj (SZ.v n) scolor sdist (SZ.v source) (SZ.v u) (SZ.v vv) du;
+    discover_preserves_layer_complete sadj (SZ.v n) scolor (SZ.v source) (SZ.v vv) du;
+    discover_preserves_queue_dist_min sdist squeue (SZ.v n) (SZ.v head) (SZ.v vtail) (SZ.v vv) du du vv;
+    discover_preserves_queue_nondecreasing sdist squeue (SZ.v n) (SZ.v head) (SZ.v vtail) (SZ.v vv) du vv;
+    discover_preserves_queue_dist_ub sdist squeue (SZ.v n) (SZ.v head) (SZ.v vtail) (SZ.v vv) du vv (du + 1);
+
     discover_vertex color dist pred queue_data q_tail u vv du n;
     // Establish count_nonwhite and queue_ok for new state
     with scolor'. assert (A.pts_to color scolor');
@@ -801,7 +1370,7 @@ fn maybe_discover
 }
 #pop-options
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)
@@ -874,7 +1443,10 @@ fn queue_bfs
         Seq.index sdist' v == Seq.index sdist' (Seq.index spred' v) + 1) /\
       // Complexity: at most 2 * n² ticks
       cf >= reveal c0 /\
-      cf - reveal c0 <= 2 * (SZ.v n * SZ.v n)
+      cf - reveal c0 <= 2 * (SZ.v n * SZ.v n) /\
+      // Shortest-path optimality: dist[w] is optimal for every reachable vertex
+      (forall (w: nat) (k: nat). w < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) w k ==>
+        Seq.index sdist' w <= k)
     )
 //SNIPPET_END: queue_bfs_sig
 {
@@ -933,6 +1505,11 @@ fn queue_bfs
   count_gray_upd_to_gray scolor_zeros (SZ.v n) (SZ.v source);
   init_pred_dist_ok scolor_zeros sdist_zeros spred_zeros (SZ.v n) (SZ.v source);
 
+  // Establish optimality predicates for main loop entry
+  init_dist_optimal sadj (SZ.v n) scolor_zeros sdist_zeros (SZ.v source);
+  init_queue_nondecreasing sdist_zeros squeue (SZ.v n) source;
+  init_queue_dist_ub sdist_zeros squeue (SZ.v n) source 1;
+
   // Step 4: Main BFS loop
   while (
     let vh = !q_head;
@@ -965,6 +1542,12 @@ fn queue_bfs
       scanned_all sadj (SZ.v n) scolor_q /\
       pred_dist_ok scolor_q sdist_q spred_q (SZ.v n) /\
       count_gray scolor_q (SZ.v n) == SZ.v vtail - SZ.v vhead /\
+      // Optimality predicates
+      dist_optimal sadj (SZ.v n) scolor_q sdist_q (SZ.v source) /\
+      queue_nondecreasing sdist_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail) /\
+      (SZ.v vhead < SZ.v vtail ==>
+        queue_dist_ub sdist_q squeue_q (SZ.v n) (SZ.v vhead) (SZ.v vtail)
+          (Seq.index sdist_q (SZ.v (Seq.index squeue_q (SZ.v vhead))) + 1)) /\
       // Complexity: vhead * (n+1) ticks so far
       vc >= reveal c0 /\
       vc - reveal c0 <= SZ.v vhead * (SZ.v n + 1)
@@ -991,6 +1574,17 @@ fn queue_bfs
     // u is non-WHITE (from queue_ok), so by dist_ok, du >= 0
     with sdist_deq. assert (A.pts_to dist sdist_deq);
     assert (pure (du >= 0));
+
+    // Derive optimality setup for inner loop from outer loop invariants
+    // queue_nondecreasing [vhead, vtail) + dist[queue[vhead]] = du →
+    //   queue_dist_min(du) for [vhead, vtail)
+    with vtail_deq. assert (R.pts_to q_tail vtail_deq);
+    queue_nondecreasing_implies_dist_min_all sdist_deq squeue_deq (SZ.v n) (SZ.v vhead) (SZ.v vtail_deq) du;
+    // Derive layer_complete(du) using full queue [vhead, vtail)
+    layer_complete_from_invariants sadj (SZ.v n) scolor_deq sdist_deq squeue_deq (SZ.v source) du (SZ.v vhead) (SZ.v vtail_deq);
+    // Derive queue properties for [vhead+1, vtail) (sub-range)
+    queue_nondecreasing_tail sdist_deq squeue_deq (SZ.v n) (SZ.v vhead) (SZ.v vtail_deq);
+    queue_dist_ub_tail sdist_deq squeue_deq (SZ.v n) (SZ.v vhead) (SZ.v vtail_deq) (du + 1);
     
     // For each v in G.Adj[u]
     let mut v: SZ.t = 0sz;
@@ -1032,6 +1626,12 @@ fn queue_bfs
         // u not in active queue [vhead+1, vtail2)
         (forall (i:nat). {:pattern (Seq.index squeue_v i)}
           i >= SZ.v vhead + 1 /\ i < SZ.v vtail2 ==> SZ.v (Seq.index squeue_v i) <> SZ.v u) /\
+        // Optimality predicates for inner loop
+        dist_optimal sadj (SZ.v n) scolor_v sdist_v (SZ.v source) /\
+        layer_complete sadj (SZ.v n) scolor_v (SZ.v source) du /\
+        queue_dist_min sdist_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) du /\
+        queue_nondecreasing sdist_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) /\
+        queue_dist_ub sdist_v squeue_v (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail2) (du + 1) /\
         // Inner loop complexity:
         vc2 >= reveal c0 /\
         vc2 - reveal c0 <= SZ.v vhead * (SZ.v n + 1) + 1 + SZ.v vv
@@ -1111,6 +1711,15 @@ fn queue_bfs
     blacken_preserves_scanned_all sadj scolor_pre_black (SZ.v n) (SZ.v u);
     count_gray_upd_from_gray scolor_pre_black (SZ.v n) (SZ.v u);
     blacken_preserves_pred_dist_ok scolor_pre_black sdist_pre_black spred_pre_black (SZ.v n) (SZ.v u);
+
+    // Optimality: blacken preserves dist_optimal, queue ordering is unchanged
+    blacken_preserves_dist_optimal sadj (SZ.v n) scolor_pre_black sdist_pre_black (SZ.v source) (SZ.v u);
+    blacken_preserves_queue_nondecreasing sdist_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (SZ.v u);
+    // Re-establish conditional queue_dist_ub for next outer iteration
+    // After inner loop: queue_dist_ub [vhead+1, vtail'] (du+1) and queue_dist_min [vhead+1, vtail'] du
+    // So dist_ub(dist[queue[vhead+1]] + 1) follows from queue_dist_ub_from_min
+    // (blacken doesn't change dist or queue, so these hold from inner loop exit)
+    queue_dist_ub_from_min_opt sdist_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (du + 1);
     
     A.op_Array_Assignment color u 2;
 
@@ -1153,6 +1762,13 @@ fn queue_bfs
   assert (pure (forall (v: nat). v < SZ.v n /\ Seq.index scolor_final v <> 0 /\
     Seq.index spred_final v >= 0 /\ Seq.index spred_final v < SZ.v n ==>
     Seq.index scolor_final (Seq.index spred_final v) <> 0 /\
-    Seq.index sdist_final v == Seq.index sdist_final (Seq.index spred_final v) + 1))
+    Seq.index sdist_final v == Seq.index sdist_final (Seq.index spred_final v) + 1));
+
+  // Optimality: dist_optimal gives dist[w] <= k for discovered vertices
+  // completeness gives: all reachable vertices are discovered
+  // Combined: for all reachable w, dist[w] <= k
+  assert (pure (dist_optimal sadj (SZ.v n) scolor_final sdist_final (SZ.v source)));
+  assert (pure (forall (w: nat) (k: nat). w < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) w k ==>
+    Seq.index sdist_final w <= k))
 }
 #pop-options

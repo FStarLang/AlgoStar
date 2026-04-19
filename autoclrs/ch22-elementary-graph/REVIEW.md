@@ -180,7 +180,7 @@ All tests use the same 3-vertex DAG: 0→1, 1→2. See individual
 
 | Algorithm | Precondition | Postcondition Precision | Spec Issue |
 |-----------|-------------|------------------------|------------|
-| **BFS** | ✅ Satisfiable | ✅ Strong — proves completeness, distances, **pred_dist consistency** | Shortest-path for general graphs requires queue-ordering invariant |
+| **BFS** | ✅ Satisfiable | ✅ Strong — proves completeness, distances, **pred_dist consistency**, **shortest-path optimality** | — |
 | **DFS** | ✅ Satisfiable | ✅ Improved — proves all BLACK, timestamps **bounded [1,2n]**, pred_edge_ok | Spec↔Impl disconnect for graph-theoretic properties (known) |
 | **TopologicalSort** | ✅ Satisfiable (DAG proof via witness) | ✅ Strong — proves valid topo order, distinct, valid indices | Minor: exact output not determinable |
 
@@ -201,14 +201,17 @@ All tests use the same 3-vertex DAG: 0→1, 1→2. See individual
 
 ### Remaining Spec Incompleteness
 
-1. **BFS Impl.fsti — Missing shortest-path property (P1)**
-   - The postcondition says `reachable_in sadj n source w dist[w]` (path EXISTS
-     of dist[w] steps) but does NOT say `∀k. reachable_in ⟹ dist[w] ≤ k`
-     (dist is SHORTEST).
-   - This property IS proven in `BFS.DistanceSpec.fst` (Theorem 22.5) but is
-     not exposed through the implementation interface.
-   - **Status:** Requires queue-ordering invariant (pigeonhole argument for
-     GRAY=queue-entries). Significant proof engineering, deferred.
+1. **BFS Impl.fsti — Missing shortest-path property (P1)** ✅ RESOLVED
+   - The postcondition now includes `∀w k. reachable_in(source,w,k) ⟹ dist[w] ≤ k`
+     (dist is SHORTEST), proven via a layer-completeness invariant with a
+     pigeonhole argument connecting GRAY vertices to queue entries.
+   - New predicates: `dist_optimal`, `layer_complete`, `queue_nondecreasing`,
+     `queue_dist_ub`, `queue_dist_min` — all threaded through inner/outer loops.
+   - Key lemmas: `gray_implies_dist_ge` (pigeonhole), `layer_complete_from_invariants`
+     (derives layer completeness on-the-fly), `discover_optimal_contradiction`.
+   - New test: 4-vertex diamond graph with two paths to vertex 3, exercising the
+     optimality postcondition.
+   - Zero admits. ~+300 lines in Impl.fst, +3 lines in Impl.fsti.
 
 2. **DFS Impl.fsti — Missing graph-theoretic properties (P2)**
    - Edge classification, white-path theorem, cycle⟺back-edge are all proven

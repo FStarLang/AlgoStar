@@ -187,7 +187,7 @@ Each `ImplTest.fst` file serves as a **spec-precision validation test**: it cons
 | 16 | Huffman Tree | **Precise Relational** | ✅ Precise | **Comprehensive** | Cost + multiset + optimality + leaf labels | 0 | None — optimality + leaf label mapping |
 | 16 | Huffman Codec | Deterministic | ✅ Precise | **Comprehensive** | Encode + Decode | 0 | None |
 | 21 | Union-Find | Relational | ✅ Precise | Moderate | 3 ops (make, find, 2× union) | 0 | Rank bound degrades per union (log bound unformalized) |
-| 22 | BFS | Relational | ✅ Precise | Moderate | 1 (3-vertex, distance precision) | 0 | Shortest-path follows from unique paths; general graphs need optimality clause |
+| 22 | BFS | Relational | ✅ Precise | Moderate | 2 (3-vertex chain, 4-vertex diamond) | 0 | None — shortest-path optimality proven |
 | 22 | DFS | Relational | ✅ Precise | Moderate | 2 (3-vertex chain, timestamps + predecessors) | 0 | Edge classification not exposed; white-path theorem not in Impl |
 | 22 | Topological Sort | **Relational** | ✅ Precise | Moderate | 1 Pulse + 2 pure helpers (3-vertex DAG) | 0 | None — correctly relational |
 | 23 | Kruskal | Relational | ✅ Precise | Moderate | 1 Pulse + 6 helper lemmas (3-vertex triangle) | 0 | None — `is_mst` proven, unique MST edges derived |
@@ -233,7 +233,7 @@ Many specs were improved in this revision cycle. Key improvements include:
 | LCS | Range constraints (`0 ≤ result ≤ min(m,n)`) added to postcondition |
 | Huffman Tree | `tree_leaf_labels_valid` added to postcondition |
 | Union-Find | Rank bound clauses + membership clause added; multi-step unions tested |
-| BFS | Distance precision proven via uniqueness lemmas; predecessor consistency tested |
+| BFS | Shortest-path optimality proven (`∀w k. reachable_in(source,w,k) ⟹ dist[w] ≤ k`); 4-vertex diamond multi-path test added exercising optimality postcondition; distance precision via upper+lower bounds |
 | DFS | Timestamp bounds (`d[u] ≤ 2n`, `f[u] ≤ 2n`) added; predecessor finish ordering (`f[v] < f[pred[v]]`); predecessor values derived from graph structure; postcondition now **Precise** — uniquely determines all timestamps |
 | Prim | Full MST property proven via `prim_mst_result` → `is_mst`; concrete output uniqueness (`key[1]=1, parent[1]=0, key[2]=2, parent[2]=1`); `key_parent_consistent` tracked; ImplTestHelper with witness spanning tree and uniqueness lemmas |
 | Kruskal | Full MST property proven via `kruskal_mst_result` → `is_mst`; unique MST edges derived (`{(0,1) w=1, (1,2) w=2}`); ImplTestHelper with `kruskal_witness_spanning_tree`, `kruskal_mst_edges`, connectivity lemmas |
@@ -279,6 +279,7 @@ These specs allow multiple correct outputs by design — the algorithm has legit
 | Algorithm | Why Relational | Constraining Properties |
 |-----------|---------------|------------------------|
 | Partition (Ch07) | Pivot choice not prescribed | Left ≤ pivot < right, permutation preserved |
+| BFS (Ch22) | Multiple shortest-path predecessors possible | `dist` uniquely determined (optimal), `pred` satisfies `dist[v] == dist[pred[v]] + 1` |
 | Activity Selection (Ch16) | Multiple maximum-cardinality selections | Count optimal, earliest-compatible |
 | Huffman Tree (Ch16) | Multiple trees with same optimal WPL | Multiset preserved, WPL optimal, leaf labels valid |
 | Kruskal (Ch23) | Multiple MSTs possible for equal-weight edges | `is_mst` (spanning + minimum weight), forest, edge membership |
