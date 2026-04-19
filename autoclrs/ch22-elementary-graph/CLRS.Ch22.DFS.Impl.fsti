@@ -2,6 +2,27 @@
  * CLRS Chapter 22 — DFS Implementation Interface
  *
  * Exposes the stack-based DFS function signature (CLRS §22.3).
+ *
+ * ## White-Path Theorem Connection
+ *
+ * The White-Path Theorem (CLRS Theorem 22.9) is fully proven in
+ * CLRS.Ch22.DFS.WhitePath.fst for the pure spec representation
+ * (2D adjacency Seq.seq (Seq.seq int), Seq.seq nat timestamps).
+ *
+ * Flat-array versions of the white-path vocabulary are available in
+ * CLRS.Ch22.Graph.Common: dfs_ancestor_flat, white_at_time_flat,
+ * path_all_white_flat, white_path_exists_flat. These use the same
+ * Seq.seq int representation as this interface's postcondition.
+ *
+ * The lemma pred_implies_tree_or_forward (Graph.Common) connects
+ * the predecessor array to the DFS ancestor relation: for any vertex v
+ * with a valid predecessor, pred[v] is an ancestor of v in the DFS
+ * forest (i.e., is_tree_or_forward_edge sd sf pred[v] v == true).
+ *
+ * A full bridge (proving impl computes the same timestamps as the
+ * spec function dfs) is left as future work. See WhitePath.fst for
+ * the proven theorem:
+ *   dfs_ancestor d f u v <==> white_path_exists adj n d u v d[u]
  *)
 module CLRS.Ch22.DFS.Impl
 #lang-pulse

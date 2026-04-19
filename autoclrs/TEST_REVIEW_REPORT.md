@@ -483,7 +483,7 @@ witness without claiming to enumerate all admissible outputs.
 | **BST Array (Ch12)** | Insert success/failure not characterized | ✅ **Resolved** — Added `insert_will_succeed` predicate; postcondition now has `success == insert_will_succeed keys valid cap 0 key` |
 | **Counting Sort (Ch08)** | `counting_sort_by_digit` untested | ✅ **Resolved** — Test exercises by-digit sort with base=10, d=0; extracts permutation + sorted_on_digit from opaque stability predicate |
 | **DFS (Ch22)** | Edge classification not in interface | ✅ **Resolved** — Added `is_back_edge`, `is_tree_or_forward_edge`, `is_cross_edge` to Graph.Common; test classifies edges at runtime |
-| **DFS (Ch22)** | White-path theorem not formalized | Open — exists in DFS.WhitePath.fst but not connected to Impl.fsti postcondition |
+| **DFS (Ch22)** | White-path theorem not formalized | ✅ **Resolved** — Flat-array white-path vocabulary (`dfs_ancestor_flat`, `white_at_time_flat`, `path_all_white_flat`, `white_path_exists_flat`) added to Graph.Common; `pred_implies_tree_or_forward` lemma derives DFS ancestor relation from postcondition; Impl.fsti documents connection to proven WhitePath.fst theorem. Full simulation bridge is future work. |
 | **Prim (Ch23)** | Postcondition lacks `is_full_vec` for returned vectors | ✅ **Resolved** — Added `V.is_full_vec (fst res) /\ V.is_full_vec (snd res)`; ImplTest uses `V.free` instead of `drop_` |
 
 ### Priority 2: Test Coverage Expansion

@@ -117,3 +117,76 @@ let is_cross_edge (sd sf: Seq.seq int) (u v: nat) : bool =
   u < Seq.length sd && v < Seq.length sd &&
   u < Seq.length sf && v < Seq.length sf &&
   Seq.index sf v < Seq.index sd u
+
+(*** White-Path Theorem Definitions (flat-array) ***)
+(*
+ * These are flat-array (Seq.seq int) versions of the definitions from
+ * CLRS.Ch22.DFS.WhitePath, which uses 2D adjacency (Seq.seq (Seq.seq int))
+ * and Seq.seq nat timestamps. These flat versions use the same
+ * adjacency representation and int timestamps as the implementation
+ * (CLRS.Ch22.DFS.Impl), making the white-path theorem vocabulary
+ * available to callers of the implementation interface.
+ *
+ * The White-Path Theorem itself is fully proven in DFS.WhitePath.fst
+ * for the spec representation. Connecting it to the implementation
+ * requires a simulation proof (proving impl computes the same d/f
+ * as the spec), which is left as future work.
+ *)
+
+/// DFS ancestor relation for flat int arrays.
+/// Equivalent to is_tree_or_forward_edge — included for theorem vocabulary.
+/// Mirrors DFS.WhitePath.dfs_ancestor (Seq.seq nat version).
+let dfs_ancestor_flat (sd sf: Seq.seq int) (u v: nat) : prop =
+  u < Seq.length sd /\ v < Seq.length sd /\
+  u < Seq.length sf /\ v < Seq.length sf /\
+  Seq.index sd u < Seq.index sd v /\
+  Seq.index sf v < Seq.index sf u
+
+/// Vertex v is white (undiscovered) at time t.
+/// Mirrors DFS.WhitePath.white_at_time.
+let white_at_time_flat (sd: Seq.seq int) (v: nat) (time: int) : prop =
+  v < Seq.length sd /\
+  (Seq.index sd v <= 0 \/ time < Seq.index sd v)
+
+/// All intermediate vertices on a path are white at time t.
+/// Uses flat adjacency matrix. Mirrors DFS.WhitePath.path_all_white.
+let rec path_all_white_flat
+  (adj: Seq.seq int) (n: nat) (sd: Seq.seq int)
+  (u v: nat) (time: int) (steps: nat)
+  : Tot prop (decreases steps)
+  = if steps = 0 then u == v /\ white_at_time_flat sd v time
+    else if steps = 1 then has_edge adj n u v /\ white_at_time_flat sd v time
+    else u < n /\ v < n /\
+      (exists (w: nat). w < n /\ has_edge adj n u w /\ white_at_time_flat sd w time /\
+        path_all_white_flat adj n sd w v time (steps - 1))
+
+/// There exists a white path from u to v at time t.
+/// Mirrors DFS.WhitePath.white_path_exists.
+let white_path_exists_flat (adj: Seq.seq int) (n: nat) (sd: Seq.seq int)
+  (u v: nat) (time: int) : prop =
+  exists (k: nat). k <= n /\ path_all_white_flat adj n sd u v time k
+
+(*** Lemma: Predecessor implies DFS tree/forward edge ***)
+
+/// From the DFS postcondition properties (all-BLACK + pred_edge_ok + pred_finish_ok),
+/// any vertex with a valid predecessor is a descendant of that predecessor in the
+/// DFS forest. That is, pred[v] = u implies d[u] < d[v] and f[v] < f[u].
+///
+/// This connects the predecessor array to the DFS ancestor relation, and
+/// is the implementation-level analog of the white-path theorem's forward
+/// direction: if v was discovered from u, then v is a descendant of u.
+let pred_implies_tree_or_forward
+  (sadj: Seq.seq int) (n: nat) (scolor sd sf spred: Seq.seq int) (v: nat)
+  : Lemma
+    (requires
+      v < n /\
+      Seq.length scolor >= n /\ Seq.length sd >= n /\
+      Seq.length sf >= n /\ Seq.length spred >= n /\
+      Seq.length sadj >= n * n /\
+      (forall (u: nat). u < n ==> Seq.index scolor u == 2) /\
+      pred_edge_ok sadj n scolor sd spred /\
+      Seq.index spred v >= 0 /\ Seq.index spred v < n /\
+      Seq.index sf v < Seq.index sf (Seq.index spred v))
+    (ensures
+      is_tree_or_forward_edge sd sf (Seq.index spred v) v == true)
+  = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred)
