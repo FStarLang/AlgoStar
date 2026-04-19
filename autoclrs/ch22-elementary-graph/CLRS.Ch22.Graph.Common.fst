@@ -91,3 +91,29 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 {
   GR.(ctr := incr_nat n)
 }
+
+(*** Edge Classification Predicates ***)
+
+/// Classify edge (u,v) as a BACK edge based on timestamps.
+/// Back edge: u's interval [d[u], f[u]] is nested inside v's [d[v], f[v]].
+/// (CLRS §22.3: v is an ancestor of u in the DFS tree)
+let is_back_edge (sd sf: Seq.seq int) (u v: nat) : bool =
+  u < Seq.length sd && v < Seq.length sd &&
+  u < Seq.length sf && v < Seq.length sf &&
+  Seq.index sd u >= Seq.index sd v && Seq.index sf u <= Seq.index sf v
+
+/// Classify edge (u,v) as a TREE or FORWARD edge based on timestamps.
+/// v's interval [d[v], f[v]] is strictly nested inside u's [d[u], f[u]].
+/// (CLRS §22.3: v is a descendant of u; tree edge if pred[v]=u)
+let is_tree_or_forward_edge (sd sf: Seq.seq int) (u v: nat) : bool =
+  u < Seq.length sd && v < Seq.length sd &&
+  u < Seq.length sf && v < Seq.length sf &&
+  Seq.index sd u < Seq.index sd v && Seq.index sf v < Seq.index sf u
+
+/// Classify edge (u,v) as a CROSS edge based on timestamps.
+/// v's interval finishes before u's begins (disjoint, v first).
+/// (CLRS §22.3: v is neither ancestor nor descendant of u)
+let is_cross_edge (sd sf: Seq.seq int) (u v: nat) : bool =
+  u < Seq.length sd && v < Seq.length sd &&
+  u < Seq.length sf && v < Seq.length sf &&
+  Seq.index sf v < Seq.index sd u
