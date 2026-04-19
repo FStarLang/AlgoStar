@@ -476,15 +476,24 @@ witness without claiming to enumerate all admissible outputs.
 
 ## Remaining Gaps and Improvement Opportunities
 
-### Priority 1: Specification Gaps
+### Priority 1: Specification Gaps — All Resolved ✅
 
-| Algorithm | Gap | Status |
-|-----------|-----|--------|
-| **BST Array (Ch12)** | Insert success/failure not characterized | ✅ **Resolved** — Added `insert_will_succeed` predicate; postcondition now has `success == insert_will_succeed keys valid cap 0 key` |
-| **Counting Sort (Ch08)** | `counting_sort_by_digit` untested | ✅ **Resolved** — Test exercises by-digit sort with base=10, d=0; extracts permutation + sorted_on_digit from opaque stability predicate |
-| **DFS (Ch22)** | Edge classification not in interface | ✅ **Resolved** — Added `is_back_edge`, `is_tree_or_forward_edge`, `is_cross_edge` to Graph.Common; test classifies edges at runtime |
-| **DFS (Ch22)** | White-path theorem not formalized | ✅ **Resolved** — Flat-array white-path vocabulary (`dfs_ancestor_flat`, `white_at_time_flat`, `path_all_white_flat`, `white_path_exists_flat`) added to Graph.Common; `pred_implies_tree_or_forward` lemma derives DFS ancestor relation from postcondition; Impl.fsti documents connection to proven WhitePath.fst theorem. Full simulation bridge is future work. |
-| **Prim (Ch23)** | Postcondition lacks `is_full_vec` for returned vectors | ✅ **Resolved** — Added `V.is_full_vec (fst res) /\ V.is_full_vec (snd res)`; ImplTest uses `V.free` instead of `drop_` |
+All five identified P1 specification gaps have been addressed:
+
+| Algorithm | Gap | Resolution |
+|-----------|-----|------------|
+| **Prim (Ch23)** | Missing `is_full_vec` on returned vectors | Postcondition strengthened; ImplTest uses `V.free` |
+| **BST Array (Ch12)** | Insert success/failure uncharacterized | `insert_will_succeed` predicate + 7 step lemmas; postcondition connects `success` to predicate |
+| **Counting Sort (Ch08)** | `counting_sort_by_digit` untested | Test exercises by-digit sort; extracts permutation + sorted_on_digit from opaque stability predicate |
+| **DFS (Ch22)** | Edge classification absent from interface | `is_back_edge`, `is_tree_or_forward_edge`, `is_cross_edge` in Graph.Common; runtime-classified in test |
+| **DFS (Ch22)** | White-path theorem not connected to Impl | Flat-array vocabulary in Graph.Common; `pred_implies_tree_or_forward` lemma; Impl.fsti documents connection to proven WhitePath.fst |
+
+**Future work (DFS white-path bridge):** The white-path theorem is fully proven
+in `DFS.WhitePath.fst` for the pure spec (2D adjacency, `Seq.seq nat`
+timestamps). Flat-array mirror definitions now exist in `Graph.Common` for the
+implementation's `Seq.seq int` representation. A full simulation proof — showing
+the imperative implementation computes the same timestamps as the spec function
+`dfs adj n` — would close the gap entirely but is a substantial effort.
 
 ### Priority 2: Test Coverage Expansion
 
