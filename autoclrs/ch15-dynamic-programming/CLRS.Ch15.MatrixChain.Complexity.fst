@@ -1,6 +1,5 @@
 module CLRS.Ch15.MatrixChain.Complexity
 
-open FStar.Mul
 
 (*
  * Complexity analysis for the matrix chain multiplication DP algorithm

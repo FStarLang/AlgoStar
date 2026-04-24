@@ -5,7 +5,6 @@
 *)
 
 module CLRS.Ch33.Segments.Complexity
-open FStar.Mul
 
 // All operations perform a constant number of arithmetic ops.
 

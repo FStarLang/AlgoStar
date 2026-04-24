@@ -9,7 +9,6 @@ module CLRS.Ch32.KMP.PureDefs
 
 open FStar.Seq
 open FStar.SizeT
-open FStar.Mul
 
 module SZ = FStar.SizeT
 

@@ -4,7 +4,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch25.FloydWarshall.Spec
 
 #set-options "--z3rlimit 20 --split_queries always"

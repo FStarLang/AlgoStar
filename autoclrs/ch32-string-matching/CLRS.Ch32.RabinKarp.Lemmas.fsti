@@ -4,7 +4,6 @@
 
 module CLRS.Ch32.RabinKarp.Lemmas
 
-open FStar.Mul
 module Seq = FStar.Seq
 
 open CLRS.Ch32.RabinKarp.Spec

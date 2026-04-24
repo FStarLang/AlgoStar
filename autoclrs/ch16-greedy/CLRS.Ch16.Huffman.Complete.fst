@@ -328,7 +328,7 @@ let init_pq (freqs: list pos{Cons? freqs}) : pq:priority_queue{is_valid_pq pq /\
 
 // EXTRACT-MIN: take head (O(1))
 let extract_min (pq: priority_queue{is_valid_pq pq}) 
-  : (htree * option priority_queue)
+  : (htree & option priority_queue)
   = match pq with
     | [t] -> (t, None)
     | t :: rest -> (t, Some rest)

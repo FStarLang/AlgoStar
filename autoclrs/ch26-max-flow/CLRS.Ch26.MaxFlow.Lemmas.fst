@@ -1,6 +1,5 @@
 module CLRS.Ch26.MaxFlow.Lemmas
 
-open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch26.MaxFlow.Spec
 
@@ -541,7 +540,7 @@ let lemma_zero_flow_valid (n: nat) (cap: Seq.seq int) (source: nat{source < n}) 
     For vertex w on the path (w ≠ head, w ≠ last), augmentation preserves
     inflow = outflow because the incoming and outgoing path edges contribute
     equal and opposite changes. *)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 80"
 let rec lemma_augment_aux_conservation
   (flow cap: Seq.seq int) (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
   (path: list nat{Cons? path /\ (forall (v: nat). L.mem v path ==> v < n)})
@@ -726,7 +725,7 @@ let lemma_augment_edge_residual_unchanged
     when they modify disjoint matrix cells. This holds when the edges are 
     different as undirected edges: {u1,v1} ≠ {u2,v2}. 
     Adjacent path edges (u,v) and (v,w) satisfy this because u ≠ w. *)
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
 let lemma_augment_edge_commute
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})

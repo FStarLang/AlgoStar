@@ -13,7 +13,6 @@
 *)
 
 module CLRS.Ch04.MatrixMultiply.Spec
-open FStar.Mul
 open FStar.Seq
 module Seq = FStar.Seq
 

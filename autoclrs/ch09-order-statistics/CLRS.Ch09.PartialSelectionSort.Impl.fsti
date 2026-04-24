@@ -61,7 +61,7 @@ fn find_min_index_from
 let complexity_bounded_select (cf c0 n k: nat) : prop =
   k > 0 /\ k <= n /\ n > 0 /\
   cf >= c0 /\
-  cf - c0 <= op_Multiply k (n - 1)
+  cf - c0 <= op_Star k (n - 1)
 
 fn select
   (a: array int)

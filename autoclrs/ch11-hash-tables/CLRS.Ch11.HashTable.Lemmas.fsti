@@ -11,7 +11,6 @@ module CLRS.Ch11.HashTable.Lemmas
 *)
 
 open FStar.Classical
-open FStar.Mul
 
 module Impl = CLRS.Ch11.HashTable.Impl
 module Spec = CLRS.Ch11.HashTable.Spec

@@ -20,7 +20,6 @@ module CLRS.Ch31.ModExpLR.ImplTest
 
 open Pulse.Lib.Pervasives
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch31.ModExpLR.Impl
 open CLRS.Ch31.ModExp.Spec
 open CLRS.Ch31.GCD.Complexity

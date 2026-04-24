@@ -8,7 +8,6 @@
 
 module CLRS.Ch31.ModExp.Complexity
 
-open FStar.Mul
 
 let lemma_log2f_halve (n: int)
   : Lemma (requires n > 1)

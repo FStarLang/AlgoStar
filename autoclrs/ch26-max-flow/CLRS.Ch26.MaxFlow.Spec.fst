@@ -1,6 +1,5 @@
 module CLRS.Ch26.MaxFlow.Spec
 
-open FStar.Mul
 open FStar.List.Tot
 
 module Seq = FStar.Seq

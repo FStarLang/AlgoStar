@@ -12,7 +12,6 @@ module CLRS.Ch33.Segments.Impl
 #lang-pulse
 open Pulse.Lib.Pervasives
 open CLRS.Ch33.Segments.Spec
-open FStar.Mul
 
 fn cross_product (x1 y1 x2 y2 x3 y3: int)
   requires emp

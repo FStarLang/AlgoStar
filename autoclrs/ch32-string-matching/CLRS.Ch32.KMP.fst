@@ -30,7 +30,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 
 #push-options "--z3rlimit 20 --ifuel 2 --fuel 2 --split_queries always"
 

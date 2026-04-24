@@ -10,7 +10,6 @@
  *)
 module CLRS.Ch22.BFS.Spec
 
-open FStar.Mul
 
 (*** Graph Representation ***)
 

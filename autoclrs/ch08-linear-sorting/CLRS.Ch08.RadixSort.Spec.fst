@@ -17,7 +17,6 @@ module CLRS.Ch08.RadixSort.Spec
 
 open FStar.Seq
 open FStar.Math.Lemmas
-open FStar.Mul
 open FStar.Classical
 open FStar.IndefiniteDescription
 open CLRS.Ch08.RadixSort.Base

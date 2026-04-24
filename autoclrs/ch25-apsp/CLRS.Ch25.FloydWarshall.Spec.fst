@@ -10,7 +10,6 @@ module CLRS.Ch25.FloydWarshall.Spec
  * NO admits. NO assumes.
  *)
 
-open FStar.Mul
 open FStar.Seq
 
 //SNIPPET_START: inf

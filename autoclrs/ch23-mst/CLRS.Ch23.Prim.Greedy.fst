@@ -6,7 +6,6 @@
 *)
 module CLRS.Ch23.Prim.Greedy
 
-open FStar.Mul
 open FStar.SizeT
 module SZ = FStar.SizeT
 module Seq = FStar.Seq

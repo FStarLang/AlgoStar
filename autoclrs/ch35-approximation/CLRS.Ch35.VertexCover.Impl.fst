@@ -4,7 +4,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch35.VertexCover.Spec
 open CLRS.Ch35.VertexCover.Lemmas

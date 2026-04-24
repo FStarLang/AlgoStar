@@ -29,7 +29,6 @@ module CLRS.Ch24.ShortestPath.Spec
    BellmanFord and Dijkstra correctness proofs.
 *)
 
-open FStar.Mul
 open FStar.List.Tot
 
 let inf : int = CLRS.Ch24.ShortestPath.Inf.inf

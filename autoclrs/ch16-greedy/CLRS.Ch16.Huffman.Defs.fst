@@ -1,6 +1,5 @@
 module CLRS.Ch16.Huffman.Defs
 open FStar.SizeT
-open FStar.Mul
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module L = FStar.List.Tot.Base

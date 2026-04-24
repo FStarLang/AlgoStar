@@ -26,7 +26,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open Pulse.Lib.Vec
 open FStar.SizeT
-open FStar.Mul
 
 #set-options "--z3rlimit 10 --fuel 1 --ifuel 0 --split_queries always"
 
@@ -219,11 +218,11 @@ let lemma_result_cost_equiv (dims: Seq.seq int) (n: nat)
 // Bounds checking lemma for 2D indexing
 let lemma_index_in_bounds (i j n: nat)
   : Lemma (requires i < n /\ j < n)
-          (ensures op_Multiply i n + j < op_Multiply n n)
+          (ensures op_Star i n + j < op_Star n n)
   = ()
 
 let lemma_table_size_positive (n: nat{n > 0})
-  : Lemma (op_Multiply n n > 0)
+  : Lemma (op_Star n n > 0)
   = ()
 
 // ========== Equivalence between ext spec and original spec for the l-loop ==========
@@ -253,7 +252,7 @@ fn extended_matrix_chain_order
       SZ.v n + 1 == Seq.length s_dims /\
       SZ.v n + 1 == A.length dims /\
       SZ.v n > 0 /\
-      SZ.fits (op_Multiply (SZ.v n) (SZ.v n)) /\
+      SZ.fits (op_Star (SZ.v n) (SZ.v n)) /\
       (forall (i: nat). i < Seq.length s_dims ==> Seq.index s_dims i > 0)
     )
   returns result: (int & V.vec SZ.t)
@@ -262,7 +261,7 @@ fn extended_matrix_chain_order
     V.pts_to (snd result) ss **
     pure (
       fst result == mc_result s_dims (SZ.v n) /\
-      Seq.length ss == op_Multiply (SZ.v n) (SZ.v n) /\
+      Seq.length ss == op_Star (SZ.v n) (SZ.v n) /\
       V.length (snd result) == Seq.length ss
     )
 //SNIPPET_END: extended_mc_sig
@@ -288,9 +287,9 @@ fn extended_matrix_chain_order
     pure (
       SZ.v vl <= SZ.v n + 1 /\
       SZ.v vl >= 2 /\
-      Seq.length sm == op_Multiply (SZ.v n) (SZ.v n) /\
+      Seq.length sm == op_Star (SZ.v n) (SZ.v n) /\
       V.length m == Seq.length sm /\
-      Seq.length ss == op_Multiply (SZ.v n) (SZ.v n) /\
+      Seq.length ss == op_Star (SZ.v n) (SZ.v n) /\
       V.length s == Seq.length ss /\
       // Remaining work from current state = total work from initial state (cost table)
       mc_outer sm s_dims (SZ.v n) (SZ.v vl) == 
@@ -314,9 +313,9 @@ fn extended_matrix_chain_order
         SZ.v vl <= SZ.v n + 1 /\
         SZ.v vl >= 2 /\
         SZ.v vi <= SZ.v n - SZ.v vl + 1 /\
-        Seq.length sm_i == op_Multiply (SZ.v n) (SZ.v n) /\
+        Seq.length sm_i == op_Star (SZ.v n) (SZ.v n) /\
         V.length m == Seq.length sm_i /\
-        Seq.length ss_i == op_Multiply (SZ.v n) (SZ.v n) /\
+        Seq.length ss_i == op_Star (SZ.v n) (SZ.v n) /\
         V.length s == Seq.length ss_i /\
         // Remaining i-work then remaining l-work = total (cost table)
         mc_outer (mc_inner_i sm_i s_dims (SZ.v n) (SZ.v vl) (SZ.v vi)) s_dims (SZ.v n) (SZ.v vl + 1) ==
@@ -357,9 +356,9 @@ fn extended_matrix_chain_order
           SZ.v vk <= SZ.v j /\
           SZ.v j == SZ.v vi + SZ.v vl - 1 /\
           SZ.v j < SZ.v n /\
-          Seq.length sm_k == op_Multiply (SZ.v n) (SZ.v n) /\
+          Seq.length sm_k == op_Star (SZ.v n) (SZ.v n) /\
           V.length m == Seq.length sm_k /\
-          Seq.length ss_k == op_Multiply (SZ.v n) (SZ.v n) /\
+          Seq.length ss_k == op_Star (SZ.v n) (SZ.v n) /\
           V.length s == Seq.length ss_k /\
           // k-loop doesn't modify table
           sm_k == sm_i_entry /\
@@ -376,17 +375,17 @@ fn extended_matrix_chain_order
         // Help SMT with SZ.fits for index computations
         assert (pure (SZ.v vi < SZ.v n /\ SZ.v vk < SZ.v n));
         lemma_index_in_bounds (SZ.v vi) (SZ.v vk) (SZ.v n);
-        assert (pure (SZ.fits (op_Multiply (SZ.v n) (SZ.v n))));
-        assert (pure (op_Multiply (SZ.v vi) (SZ.v n) + SZ.v vk < op_Multiply (SZ.v n) (SZ.v n)));
-        assert (pure (SZ.fits (op_Multiply (SZ.v vi) (SZ.v n) + SZ.v vk)));
+        assert (pure (SZ.fits (op_Star (SZ.v n) (SZ.v n))));
+        assert (pure (op_Star (SZ.v vi) (SZ.v n) + SZ.v vk < op_Star (SZ.v n) (SZ.v n)));
+        assert (pure (SZ.fits (op_Star (SZ.v vi) (SZ.v n) + SZ.v vk)));
         
         // Compute index for m[i][k]
         let idx_ik = vi *^ n + vk;
         
         // Compute index for m[k+1][j]
         lemma_index_in_bounds (SZ.v vk + 1) (SZ.v j) (SZ.v n);
-        assert (pure (op_Multiply (SZ.v vk + 1) (SZ.v n) + SZ.v j < op_Multiply (SZ.v n) (SZ.v n)));
-        assert (pure (SZ.fits (op_Multiply (SZ.v vk + 1) (SZ.v n) + SZ.v j)));
+        assert (pure (op_Star (SZ.v vk + 1) (SZ.v n) + SZ.v j < op_Star (SZ.v n) (SZ.v n)));
+        assert (pure (SZ.fits (op_Star (SZ.v vk + 1) (SZ.v n) + SZ.v j)));
         let idx_k1j = (vk + 1sz) *^ n + j;
         
         // Read m[i][k] and m[k+1][j]

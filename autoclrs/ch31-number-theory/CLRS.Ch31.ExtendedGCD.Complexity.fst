@@ -9,7 +9,6 @@
 
 module CLRS.Ch31.ExtendedGCD.Complexity
 
-open FStar.Mul
 open CLRS.Ch31.GCD.Complexity
 
 let extended_gcd_complexity (a b: nat)

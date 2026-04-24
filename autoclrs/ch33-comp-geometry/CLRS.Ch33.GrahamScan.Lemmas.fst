@@ -9,7 +9,6 @@
 module CLRS.Ch33.GrahamScan.Lemmas
 open CLRS.Ch33.Segments.Spec
 open CLRS.Ch33.GrahamScan.Spec
-open FStar.Mul
 
 module SZ = FStar.SizeT
 module Seq = FStar.Seq

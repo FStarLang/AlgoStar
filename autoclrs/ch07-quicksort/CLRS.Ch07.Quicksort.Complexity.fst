@@ -18,7 +18,7 @@ let rec worst_case_comparisons (n: nat) : nat =
 
 //SNIPPET_START: worst_case_bound
 let rec worst_case_bound (n: nat)
-  : Lemma (ensures (op_Multiply 2 (worst_case_comparisons n) == op_Multiply n (n - 1)))
+  : Lemma (ensures (op_Star 2 (worst_case_comparisons n) == op_Star n (n - 1)))
   = if n <= 1 then () 
     else worst_case_bound (n - 1)
 //SNIPPET_END: worst_case_bound
@@ -27,7 +27,7 @@ let rec worst_case_bound (n: nat)
    Useful as a simpler O(n²) bound
 *)
 let rec worst_case_quadratic_bound (n: nat)
-  : Lemma (ensures worst_case_comparisons n <= op_Multiply n n)
+  : Lemma (ensures worst_case_comparisons n <= op_Star n n)
   = if n <= 1 then ()
     else (
       worst_case_quadratic_bound (n - 1);
@@ -87,10 +87,10 @@ let rec worst_case_monotonic (m: nat) (n: nat{m <= n})
    Specifically: T(n) = n(n-1)/2 comparisons in the worst case
 *)
 let quicksort_worst_case_theorem (n: nat)
-  : Lemma (ensures op_Multiply 2 (worst_case_comparisons n) == op_Multiply n (n - 1))
+  : Lemma (ensures op_Star 2 (worst_case_comparisons n) == op_Star n (n - 1))
   = worst_case_bound n
 
 (* Corollary: The worst case is bounded by n² *)
 let quicksort_worst_case_quadratic (n: nat)
-  : Lemma (ensures worst_case_comparisons n <= op_Multiply n n)
+  : Lemma (ensures worst_case_comparisons n <= op_Star n n)
   = worst_case_quadratic_bound n

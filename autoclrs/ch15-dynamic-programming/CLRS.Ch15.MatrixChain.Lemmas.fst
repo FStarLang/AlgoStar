@@ -13,7 +13,6 @@
 module CLRS.Ch15.MatrixChain.Lemmas
 
 open FStar.Seq
-open FStar.Mul
 open FStar.Classical
 
 open CLRS.Ch15.MatrixChain.Spec

@@ -1,6 +1,5 @@
 module CLRS.Ch26.MaxFlow.Complexity
 
-open FStar.Mul
 open CLRS.Ch26.MaxFlow.Spec
 open CLRS.Ch26.MaxFlow.Lemmas
 

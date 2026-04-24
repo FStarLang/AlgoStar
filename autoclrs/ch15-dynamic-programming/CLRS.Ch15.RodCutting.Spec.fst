@@ -12,7 +12,6 @@ module CLRS.Ch15.RodCutting.Spec
 
 open FStar.List.Tot
 open FStar.Seq
-open FStar.Mul
 
 // ========== Problem Specification ==========
 

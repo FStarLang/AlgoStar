@@ -1,7 +1,6 @@
 module CLRS.Ch22.TopologicalSort.Lemmas
 
 open FStar.Seq
-open FStar.Mul
 
 (* Extending strong_order_inv: when adding a vertex v at position count
    whose all predecessors are already in output[0..count) *)

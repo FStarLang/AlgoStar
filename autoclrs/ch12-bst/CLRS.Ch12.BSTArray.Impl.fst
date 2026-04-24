@@ -9,7 +9,6 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module C = FStar.Classical
 
-open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch12.BSTArray.Complexity
 module AP = CLRS.Ch12.BSTArray.Predicates
@@ -26,8 +25,8 @@ let rec lemma_key_in_bounded_subtree
     (requires subtree_in_range keys valid cap i lo hi /\ key_in_subtree keys valid cap i key)
     (ensures lo < key /\ key < hi)
     (decreases (if i < cap then cap - i else 0))
-  = let left = op_Multiply 2 i + 1 in
-    let right = op_Multiply 2 i + 2 in
+  = let left = op_Star 2 i + 1 in
+    let right = op_Star 2 i + 2 in
     // key_in_subtree establishes i < cap /\ valid[i]
     // subtree_in_range establishes lo < keys[i] < hi
     // Case 1: key == keys[i], then lo < key < hi directly
@@ -56,9 +55,9 @@ let lemma_key_not_in_right_if_less
       Seq.index valid i /\
       key < Seq.index keys i /\
       key_in_subtree keys valid cap i key)
-    (ensures key_in_subtree keys valid cap (op_Multiply 2 i + 1) key)
+    (ensures key_in_subtree keys valid cap (op_Star 2 i + 1) key)
   = let k = Seq.index keys i in
-    let right = op_Multiply 2 i + 2 in
+    let right = op_Star 2 i + 2 in
     // key != k since key < k
     // If key were in right subtree, then k < key < hi by lemma_key_in_bounded_subtree
     // But this contradicts key < k
@@ -68,7 +67,7 @@ let lemma_key_not_in_right_if_less
     C.or_elim
       #(key_in_subtree keys valid cap right key)
       #(~(key_in_subtree keys valid cap right key))
-      #(fun _ -> key_in_subtree keys valid cap (op_Multiply 2 i + 1) key)
+      #(fun _ -> key_in_subtree keys valid cap (op_Star 2 i + 1) key)
       (fun _ -> lemma_key_in_bounded_subtree keys valid cap right k hi key) // derives False from key < k /\ k < key
       (fun _ -> ())
 
@@ -88,16 +87,16 @@ let lemma_key_not_in_left_if_greater
       Seq.index valid i /\
       key > Seq.index keys i /\
       key_in_subtree keys valid cap i key)
-    (ensures key_in_subtree keys valid cap (op_Multiply 2 i + 2) key)
+    (ensures key_in_subtree keys valid cap (op_Star 2 i + 2) key)
   = let k = Seq.index keys i in
-    let left = op_Multiply 2 i + 1 in
+    let left = op_Star 2 i + 1 in
     // key != k since key > k
     // If key were in left subtree, then lo < key < k by lemma_key_in_bounded_subtree
     // But this contradicts key > k
     C.or_elim
       #(key_in_subtree keys valid cap left key)
       #(~(key_in_subtree keys valid cap left key))
-      #(fun _ -> key_in_subtree keys valid cap (op_Multiply 2 i + 2) key)
+      #(fun _ -> key_in_subtree keys valid cap (op_Star 2 i + 2) key)
       (fun _ -> lemma_key_in_bounded_subtree keys valid cap left lo k key) // derives False from key > k /\ key < k
       (fun _ -> ())
 
@@ -153,7 +152,7 @@ let lemma_search_left_preserves_completeness
       key < Seq.index keys i)
     (ensures
       (key_in_subtree keys valid cap i key ==>
-       key_in_subtree keys valid cap (op_Multiply 2 i + 1) key))
+       key_in_subtree keys valid cap (op_Star 2 i + 1) key))
   = reveal_opaque (`%lemma_key_not_in_right_if_less) (lemma_key_not_in_right_if_less keys valid cap i lo hi);
     C.move_requires (lemma_key_not_in_right_if_less keys valid cap i lo hi) key
 
@@ -172,7 +171,7 @@ let lemma_search_right_preserves_completeness
       key > Seq.index keys i)
     (ensures
       (key_in_subtree keys valid cap i key ==>
-       key_in_subtree keys valid cap (op_Multiply 2 i + 2) key))
+       key_in_subtree keys valid cap (op_Star 2 i + 2) key))
   = reveal_opaque (`%lemma_key_not_in_left_if_greater) (lemma_key_not_in_left_if_greater keys valid cap i lo hi);
     C.move_requires (lemma_key_not_in_left_if_greater keys valid cap i lo hi) key
 
@@ -220,8 +219,8 @@ let rec lemma_insert_at_invalid_preserves_old_keys
       assert (root < Seq.length keys_new);
       // key_in_subtree requires valid_old[root] == true
       // By definition: old_key == keys_old[root] \/ in left subtree \/ in right subtree
-      let left = op_Multiply 2 root + 1 in
-      let right = op_Multiply 2 root + 2 in
+      let left = op_Star 2 root + 1 in
+      let right = op_Star 2 root + 2 in
       // Use classical reasoning to handle the disjunction
       C.or_elim
         #(key_in_subtree keys_old valid_old cap left old_key)
@@ -415,9 +414,9 @@ let rec lemma_insert_key_reachable
     else begin
       let k_i = Seq.index keys i in
       if key_val < k_i then
-        lemma_insert_key_reachable keys valid cap (op_Multiply 2 i + 1) idx key_val
+        lemma_insert_key_reachable keys valid cap (op_Star 2 i + 1) idx key_val
       else
-        lemma_insert_key_reachable keys valid cap (op_Multiply 2 i + 2) idx key_val
+        lemma_insert_key_reachable keys valid cap (op_Star 2 i + 2) idx key_val
     end
 
 // Tree insert
@@ -609,8 +608,8 @@ let rec inorder_spec
   = if i >= cap || i >= Seq.length keys || i >= Seq.length valid then []
     else if not (Seq.index valid i) then []
     else
-      let left = op_Multiply 2 i + 1 in
-      let right = op_Multiply 2 i + 2 in
+      let left = op_Star 2 i + 1 in
+      let right = op_Star 2 i + 2 in
       inorder_spec keys valid cap left @
       [Seq.index keys i] @
       inorder_spec keys valid cap right
@@ -755,8 +754,8 @@ let rec sir_bridge
     else if not (Seq.index valid i) then ()
     else begin
       let k = Seq.index keys i in
-      sir_bridge keys valid cap (op_Multiply 2 i + 1) lo k;
-      sir_bridge keys valid cap (op_Multiply 2 i + 2) k hi
+      sir_bridge keys valid cap (op_Star 2 i + 1) lo k;
+      sir_bridge keys valid cap (op_Star 2 i + 2) k hi
     end
 
 let wfb_to_sir

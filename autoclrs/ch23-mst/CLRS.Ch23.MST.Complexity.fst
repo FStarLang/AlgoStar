@@ -9,7 +9,6 @@
 *)
 module CLRS.Ch23.MST.Complexity
 
-open FStar.Mul
 
 (** Kruskal's Algorithm Complexity with Adjacency Matrix
     

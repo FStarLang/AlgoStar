@@ -21,13 +21,13 @@ val insert_sorted_ticks_bounded (t: htree) (l: list htree)
   : Lemma (ensures insert_sorted_ticks t l <= length l)
 
 /// Build Huffman tree with tick counting (returns tree and total ticks)
-val huffman_with_ticks (l: list htree{Cons? l}) : Tot (htree * nat)
+val huffman_with_ticks (l: list htree{Cons? l}) : Tot (htree & nat)
 
 /// Extract just the tick count
 val huffman_ticks (l: list htree{Cons? l}) : nat
 
 /// Helper: square function
-let square (n: nat) : Tot nat = op_Multiply n n
+let square (n: nat) : Tot nat = op_Star n n
 
 /// Key lemma: ticks bounded by n²
 val huffman_ticks_bounded (l: list htree{Cons? l})

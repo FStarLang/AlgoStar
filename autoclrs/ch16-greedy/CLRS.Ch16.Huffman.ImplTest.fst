@@ -20,7 +20,6 @@ module CLRS.Ch16.Huffman.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch16.Huffman.Impl
 open CLRS.Ch16.Huffman.Defs
 

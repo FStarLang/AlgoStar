@@ -13,7 +13,6 @@ open Pulse.Lib.Pervasives
 open CLRS.Ch33.Segments.Spec
 open CLRS.Ch33.GrahamScan.Spec
 open CLRS.Ch33.GrahamScan.Lemmas
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

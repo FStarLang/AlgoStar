@@ -1,6 +1,5 @@
 module CLRS.Ch22.TopologicalSort.Impl.Defs
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch22.TopologicalSort.Spec
 open CLRS.Ch22.TopologicalSort.Lemmas
 open CLRS.Ch22.TopologicalSort.Verified

@@ -18,7 +18,6 @@
 module CLRS.Ch33.GrahamScan
 #lang-pulse
 open Pulse.Lib.Pervasives
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

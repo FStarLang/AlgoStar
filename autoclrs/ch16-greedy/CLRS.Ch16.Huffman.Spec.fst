@@ -29,7 +29,7 @@ let rec depth (t: htree) : nat =
 //SNIPPET_START: weighted_path_length
 let rec weighted_path_length_aux (t: htree) (d: nat) : nat =
   match t with
-  | Leaf _ f -> f `op_Multiply` d
+  | Leaf _ f -> f * d
   | Internal _ l r ->
       weighted_path_length_aux l (d + 1) +
       weighted_path_length_aux r (d + 1)
@@ -51,7 +51,7 @@ let cost (t: htree) : nat = cost_aux t
 
 // Helper: relates wpl at depth d to cost plus contribution from depth
 let rec wpl_cost_relation (t: htree) (d: nat)
-  : Lemma (ensures weighted_path_length_aux t d == cost_aux t + d `op_Multiply` freq_of t)
+  : Lemma (ensures weighted_path_length_aux t d == cost_aux t + d * freq_of t)
           (decreases t)
   = match t with
     | Leaf _ f -> ()
@@ -331,7 +331,7 @@ let swap_reduces_wpl_statement (t: htree) (pos_high pos_low: tree_position) : pr
 let wpl_at_depth (t: htree) (d: nat) : nat = weighted_path_length_aux t d
 
 // Helper lemma: WPL contribution of a single leaf at depth d
-let leaf_contribution (f: pos) (d: nat) : nat = f `op_Multiply` d
+let leaf_contribution (f: pos) (d: nat) : nat = f * d
 
 // Helper lemma: Swapping two leaves at different depths affects WPL
 // The exact relationship depends on frequency and depth differences
@@ -410,8 +410,8 @@ let replace_leaf_wpl (t: htree) (position: tree_position) (f_new: pos) (d: nat)
             let Some (Leaf _ f_old) = get_subtree_at t position in
             match replace_subtree_at t position (Leaf 0 f_new) with
             | Some t' ->
-                weighted_path_length_aux t d + f_new `op_Multiply` (d + length position) ==
-                weighted_path_length_aux t' d + f_old `op_Multiply` (d + length position)
+                weighted_path_length_aux t d + f_new * (d + length position) ==
+                weighted_path_length_aux t' d + f_old * (d + length position)
             | None -> True
           ))
   = let Some (Leaf _ f_old) = get_subtree_at t position in
@@ -435,8 +435,8 @@ let swap_arithmetic (f_high f_low d_high d_low: nat) (wpl_orig wpl_swap: nat)
   : Lemma (requires
             f_high >= f_low /\
             d_high >= d_low /\
-            wpl_orig + f_low `op_Multiply` d_high + f_high `op_Multiply` d_low ==
-            wpl_swap + f_high `op_Multiply` d_high + f_low `op_Multiply` d_low)
+            wpl_orig + f_low * d_high + f_high * d_low ==
+            wpl_swap + f_high * d_high + f_low * d_low)
           (ensures wpl_swap <= wpl_orig)
   = // wpl_orig + f_low * d_high + f_high * d_low = wpl_swap + f_high * d_high + f_low * d_low
     // wpl_orig - wpl_swap = (f_high * d_high + f_low * d_low) - (f_low * d_high + f_high * d_low)
@@ -597,8 +597,8 @@ let swap_reduces_wpl_disjoint (t: htree) (pos_high pos_low: tree_position) (f_hi
         let wpl_t = weighted_path_length t in
         let wpl_s = weighted_path_length t_swapped in
         
-        assert (wpl_t + f_low `op_Multiply` d_high + f_high `op_Multiply` d_low ==
-                wpl_s + f_high `op_Multiply` d_high + f_low `op_Multiply` d_low);
+        assert (wpl_t + f_low * d_high + f_high * d_low ==
+                wpl_s + f_high * d_high + f_low * d_low);
         
         swap_arithmetic f_high f_low d_high d_low wpl_t wpl_s
     | None -> ()
@@ -1333,8 +1333,8 @@ let replace_pair_wpl
     let new_sub = Internal (f1+f2) (Leaf 0 f1) (Leaf 0 f2) in
     replace_subtree_wpl_aux t parent new_sub 0;
     let dp = length parent in
-    assert (weighted_path_length_aux old_sub dp = a `op_Multiply` (dp + 1) + b `op_Multiply` (dp + 1));
-    assert (weighted_path_length_aux new_sub dp = f1 `op_Multiply` (dp + 1) + f2 `op_Multiply` (dp + 1))
+    assert (weighted_path_length_aux old_sub dp = a * (dp + 1) + b * (dp + 1));
+    assert (weighted_path_length_aux new_sub dp = f1 * (dp + 1) + f2 * (dp + 1))
 #pop-options
 
 // find_two_mins_le2: f2 is <= all elements except possibly one copy of f1
@@ -2074,9 +2074,9 @@ let rec wpl_after_merge (t: htree) (f1 f2: pos) (d: nat)
         if (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1) then (
           assert (weighted_path_length_aux (Internal freq (Leaf 0 f1') (Leaf 0 f2')) d ==
                   weighted_path_length_aux (Leaf 0 f1') (d+1) + weighted_path_length_aux (Leaf 0 f2') (d+1));
-          assert (weighted_path_length_aux (Leaf 0 f1') (d+1) == f1' `op_Multiply` (d+1));
-          assert (weighted_path_length_aux (Leaf 0 f2') (d+1) == f2' `op_Multiply` (d+1));
-          assert (weighted_path_length_aux (Leaf 0 (f1' + f2')) d == (f1' + f2') `op_Multiply` d);
+          assert (weighted_path_length_aux (Leaf 0 f1') (d+1) == f1' * (d+1));
+          assert (weighted_path_length_aux (Leaf 0 f2') (d+1) == f2' * (d+1));
+          assert (weighted_path_length_aux (Leaf 0 (f1' + f2')) d == (f1' + f2') * d);
           ()
         ) else ()
     | Internal freq l r ->

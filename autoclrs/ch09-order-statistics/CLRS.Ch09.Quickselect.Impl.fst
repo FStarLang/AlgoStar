@@ -25,7 +25,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
-open FStar.Mul
 open CLRS.Common.Complexity
 
 module A = Pulse.Lib.Array

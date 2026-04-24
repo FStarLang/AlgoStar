@@ -8,7 +8,6 @@ module CLRS.Ch35.VertexCover.Spec
  * are in CLRS.Ch35.VertexCover.Lemmas.
  *)
 
-open FStar.Mul
 open FStar.List.Tot
 open FStar.Seq
 

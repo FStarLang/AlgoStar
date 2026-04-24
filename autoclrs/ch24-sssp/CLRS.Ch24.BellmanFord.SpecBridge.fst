@@ -10,7 +10,6 @@ module CLRS.Ch24.BellmanFord.SpecBridge
    corresponding values under appropriate boundedness conditions.
 *)
 
-open FStar.Mul
 
 module SP  = CLRS.Ch24.ShortestPath.Spec
 module BFS = CLRS.Ch24.BellmanFord.Spec

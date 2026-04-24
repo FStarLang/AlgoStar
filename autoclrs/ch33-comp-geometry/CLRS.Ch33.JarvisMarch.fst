@@ -17,7 +17,6 @@
 module CLRS.Ch33.JarvisMarch
 #lang-pulse
 open Pulse.Lib.Pervasives
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

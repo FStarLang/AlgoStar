@@ -6,7 +6,6 @@
 *)
 
 module CLRS.Ch33.JarvisMarch.Complexity
-open FStar.Mul
 
 // find_leftmost: n-1 comparisons for n points
 let find_leftmost_ops (n: nat) : nat = if n > 0 then n - 1 else 0

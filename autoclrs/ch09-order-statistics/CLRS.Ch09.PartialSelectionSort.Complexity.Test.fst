@@ -4,7 +4,6 @@
 
 module CLRS.Ch09.PartialSelectionSort.Complexity.Test
 
-open FStar.Mul
 open CLRS.Ch09.PartialSelectionSort.Complexity.Enhanced
 
 (**

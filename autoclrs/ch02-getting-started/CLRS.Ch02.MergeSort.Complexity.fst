@@ -1,6 +1,5 @@
 module CLRS.Ch02.MergeSort.Complexity
 
-open FStar.Mul
 
 (** 
   Complexity analysis for merge sort from CLRS Chapter 2.

@@ -9,7 +9,6 @@
 module CLRS.Ch23.MST.Existence
 
 open FStar.List.Tot
-open FStar.Mul
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Spec
 

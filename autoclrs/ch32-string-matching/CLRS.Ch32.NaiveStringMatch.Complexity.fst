@@ -9,7 +9,6 @@
 
 module CLRS.Ch32.NaiveStringMatch.Complexity
 
-open FStar.Mul
 
 (** Lemma: complexity is quadratic in the worst case *)
 let naive_worst_case_quadratic (n m: nat) : Lemma

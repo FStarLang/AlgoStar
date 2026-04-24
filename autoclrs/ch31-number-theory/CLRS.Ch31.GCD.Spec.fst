@@ -9,7 +9,6 @@
 
 module CLRS.Ch31.GCD.Spec
 
-open FStar.Mul
 open FStar.Math.Euclid
 open FStar.Math.Lemmas
 
@@ -51,5 +50,5 @@ let rec gcd_spec_divides (a b: nat)
       let r = a % b in
       euclidean_division_definition a b;
       divides_mult_right q b d;
-      divides_plus (op_Multiply q b) r d
+      divides_plus (op_Star q b) r d
     )

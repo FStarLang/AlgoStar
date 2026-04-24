@@ -9,7 +9,6 @@
 module CLRS.Ch33.JarvisMarch.Lemmas
 open CLRS.Ch33.Segments.Spec
 open CLRS.Ch33.JarvisMarch.Spec
-open FStar.Mul
 
 module Seq = FStar.Seq
 module SZ = FStar.SizeT

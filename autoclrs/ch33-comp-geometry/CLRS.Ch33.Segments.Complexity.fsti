@@ -5,7 +5,6 @@
 *)
 
 module CLRS.Ch33.Segments.Complexity
-open FStar.Mul
 
 val cross_product_ops : nat
 val direction_ops : nat

@@ -29,7 +29,6 @@ module CLRS.Ch35.VertexCover.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch35.VertexCover.Spec
 open CLRS.Ch35.VertexCover.Impl
 

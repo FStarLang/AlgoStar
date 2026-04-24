@@ -8,7 +8,6 @@
 
 module CLRS.Ch06.Heap.Complexity
 
-open FStar.Mul
 
 /// Floor of logarithm base 2
 val log2_floor (n: pos) : nat
@@ -72,30 +71,30 @@ val build_heap_ops_linear (n: pos)
 //SNIPPET_START: heapsort_ops_simplified
 /// HEAPSORT is O(n lg n) with constant 6
 val heapsort_ops_simplified (n: pos)
-  : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 6 n) (1 + log2_floor n))
+  : Lemma (ensures heapsort_ops n <= op_Star (op_Star 6 n) (1 + log2_floor n))
 //SNIPPET_END: heapsort_ops_simplified
 
 /// Tighter practical bound: 2n·log₂n + 4n
 val heapsort_practical_bound (n: pos)
-  : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 2 n) (log2_floor n) + op_Multiply 4 n)
+  : Lemma (ensures heapsort_ops n <= op_Star (op_Star 2 n) (log2_floor n) + op_Star 4 n)
 
 /// Asymptotic: 3n·log₂n for n ≥ 16
 val heapsort_asymptotic (n: pos{n >= 16})
-  : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 3 n) (log2_floor n))
+  : Lemma (ensures heapsort_ops n <= op_Star (op_Star 3 n) (log2_floor n))
 
 //SNIPPET_START: heapsort_better_than_quadratic
 /// Heapsort beats quadratic for n ≥ 11
 val heapsort_better_than_quadratic (n: pos{n >= 11})
-  : Lemma (ensures heapsort_ops n < op_Multiply n n)
+  : Lemma (ensures heapsort_ops n < op_Star n n)
 //SNIPPET_END: heapsort_better_than_quadratic
 
 /// Build-heap ops bounded by (n/2) * 2 * log2_floor n (= CostBound.build_cost_bound n)
 val build_heap_ops_le_root_bound (n: pos)
-  : Lemma (ensures build_heap_ops n <= op_Multiply (op_Multiply (n / 2) 2) (log2_floor n))
+  : Lemma (ensures build_heap_ops n <= op_Star (op_Star (n / 2) 2) (log2_floor n))
 
 /// Extract-max ops bounded by (n-1) * 2 * log2_floor n (= CostBound.extract_cost_bound n)
 val extract_max_ops_le_root_bound (n: pos)
-  : Lemma (ensures extract_max_ops n <= op_Multiply (op_Multiply (n - 1) 2) (log2_floor n))
+  : Lemma (ensures extract_max_ops n <= op_Star (op_Star (n - 1) 2) (log2_floor n))
 
 // ========== Definition-unfolding lemmas (for cross-module reasoning) ==========
 

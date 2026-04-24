@@ -32,7 +32,7 @@ fn max_heapify
     SZ.v idx < SZ.v heap_size /\
     SZ.v heap_size <= Seq.length s /\
     Seq.length s == A.length a /\
-    SZ.fits (op_Multiply 2 (Seq.length s) + 2)
+    SZ.fits (op_Star 2 (Seq.length s) + 2)
   })
   (#c0: erased nat)
 requires
@@ -69,7 +69,7 @@ fn build_max_heap
     SZ.v n > 0 /\
     SZ.v n <= A.length a /\
     Seq.length s0 == A.length a /\
-    SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
+    SZ.fits (op_Star 2 (Seq.length s0) + 2)
   })
   (#c0: erased nat)
 requires
@@ -84,7 +84,7 @@ ensures exists* s (cf: nat).
     is_max_heap s (SZ.v n) /\
     permutation s0 s /\
     (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
-    SZ.fits (op_Multiply 2 (Seq.length s) + 2) /\
+    SZ.fits (op_Star 2 (Seq.length s) + 2) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.build_cost_bound (SZ.v n)
   )
@@ -98,7 +98,7 @@ fn heapsort
   (#s0: erased (Seq.seq int) {
     SZ.v n <= A.length a /\
     Seq.length s0 == A.length a /\
-    SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
+    SZ.fits (op_Star 2 (Seq.length s0) + 2)
   })
   (#c0: erased nat)
 requires

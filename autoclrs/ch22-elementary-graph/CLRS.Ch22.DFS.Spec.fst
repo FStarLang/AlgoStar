@@ -18,7 +18,6 @@
  *)
 module CLRS.Ch22.DFS.Spec
 
-open FStar.Mul
 
 (*** Graph Representation ***)
 

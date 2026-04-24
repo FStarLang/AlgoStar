@@ -18,7 +18,7 @@ type minmax_result = {
 let complexity_bounded_minmax (cf c0 n: nat) : prop =
   n >= 1 /\
   cf >= c0 /\
-  cf - c0 == op_Multiply 2 (n - 1)
+  cf - c0 == op_Star 2 (n - 1)
 //SNIPPET_END: complexity_bounded_minmax
 
 //SNIPPET_START: complexity_bounded_minmax_pairs
@@ -26,5 +26,5 @@ let complexity_bounded_minmax (cf c0 n: nat) : prop =
 let complexity_bounded_minmax_pairs (cf c0 n: nat) : prop =
   n >= 1 /\
   cf >= c0 /\
-  op_Multiply 2 (cf - c0) <= op_Multiply 3 (n - 1)
+  op_Star 2 (cf - c0) <= op_Star 3 (n - 1)
 //SNIPPET_END: complexity_bounded_minmax_pairs

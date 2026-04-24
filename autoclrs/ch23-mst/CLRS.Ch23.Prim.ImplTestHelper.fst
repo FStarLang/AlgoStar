@@ -5,7 +5,6 @@
 *)
 module CLRS.Ch23.Prim.ImplTestHelper
 
-open FStar.Mul
 open FStar.Seq
 open FStar.List.Tot
 open CLRS.Ch23.MST.Spec

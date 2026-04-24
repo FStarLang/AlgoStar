@@ -346,7 +346,7 @@ val filter_weight_decomp (e_rem: edge) (t: list edge)
 // All edges matching edge_eq have the same weight
 val filter_matching_weight (e_rem: edge) (t: list edge)
   : Lemma (ensures (let c = length (filter (fun e -> edge_eq e e_rem) t) in
-                    total_weight (filter (fun e -> edge_eq e e_rem) t) = op_Multiply c e_rem.w))
+                    total_weight (filter (fun e -> edge_eq e e_rem) t) = op_Star c e_rem.w))
 
 // If mem_edge e t, then filter keeps at least one match
 val filter_match_nonempty (e_rem: edge) (t: list edge)

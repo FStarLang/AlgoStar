@@ -17,7 +17,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 
 #push-options "--z3rlimit 10 --ifuel 2 --fuel 2"
 

@@ -16,7 +16,6 @@
 
 module CLRS.Ch09.PartialSelectionSort.Complexity
 
-open FStar.Mul
 
 (**
  * Complexity Analysis for Partial Selection Sort

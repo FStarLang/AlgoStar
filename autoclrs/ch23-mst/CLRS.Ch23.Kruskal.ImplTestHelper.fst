@@ -4,7 +4,6 @@
 *)
 module CLRS.Ch23.Kruskal.ImplTestHelper
 
-open FStar.Mul
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Spec
 open CLRS.Ch23.Kruskal.Impl

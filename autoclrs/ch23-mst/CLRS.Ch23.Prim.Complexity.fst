@@ -38,7 +38,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
 open Pulse.Lib.Reference
-open FStar.Mul
 open FStar.Math.Lib
 open FStar.Math.Lemmas
 open FStar.UInt

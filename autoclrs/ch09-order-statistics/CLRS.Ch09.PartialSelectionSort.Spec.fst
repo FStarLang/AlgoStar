@@ -23,7 +23,6 @@ module CLRS.Ch09.PartialSelectionSort.Spec
 
 open FStar.Seq
 open FStar.Classical
-open FStar.Mul
 
 module Seq = FStar.Seq
 

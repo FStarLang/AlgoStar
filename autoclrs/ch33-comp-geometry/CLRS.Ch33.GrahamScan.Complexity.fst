@@ -6,7 +6,6 @@
 *)
 
 module CLRS.Ch33.GrahamScan.Complexity
-open FStar.Mul
 
 // find_bottom: n-1 comparisons
 let find_bottom_ops (n: nat) : nat = if n > 0 then n - 1 else 0

@@ -32,4 +32,4 @@ val lemma_combine_sorted_regions
 
 val lemma_triangle_step (vj: nat)
   : Lemma (requires vj >= 1)
-          (ensures op_Multiply vj (vj - 1) / 2 + vj == op_Multiply (vj + 1) vj / 2)
+          (ensures op_Star vj (vj - 1) / 2 + vj == op_Star (vj + 1) vj / 2)

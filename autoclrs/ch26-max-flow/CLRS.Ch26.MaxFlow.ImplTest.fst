@@ -16,7 +16,6 @@ module CLRS.Ch26.MaxFlow.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch26.MaxFlow.Spec
 open CLRS.Ch26.MaxFlow.Impl
 open CLRS.Ch26.MaxFlow.Lemmas.MaxFlowMinCut

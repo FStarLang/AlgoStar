@@ -91,6 +91,6 @@ let lemma_quicksort_complexity_bound (n n_left n_right: nat) (c_partition: nat)
       n_left + 1 + n_right == n /\
       c_partition == n - 1)
     (ensures
-      c_partition + op_Multiply n_left (n_left - 1) / 2 + op_Multiply n_right (n_right - 1) / 2
-      <= op_Multiply n (n - 1) / 2)
+      c_partition + op_Star n_left (n_left - 1) / 2 + op_Star n_right (n_right - 1) / 2
+      <= op_Star n (n - 1) / 2)
   = ()

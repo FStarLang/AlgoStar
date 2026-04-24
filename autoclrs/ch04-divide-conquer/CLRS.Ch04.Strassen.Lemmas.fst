@@ -7,7 +7,6 @@
 *)
 
 module CLRS.Ch04.Strassen.Lemmas
-open FStar.Mul
 open FStar.Seq
 open FStar.Math.Lemmas
 open FStar.Classical

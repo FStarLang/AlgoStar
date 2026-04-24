@@ -11,7 +11,6 @@ module CLRS.Ch35.VertexCover.Complexity
  * implementation via ghost counters.
  *)
 
-open FStar.Mul
 
 (*** Complexity definitions and proofs ***)
 

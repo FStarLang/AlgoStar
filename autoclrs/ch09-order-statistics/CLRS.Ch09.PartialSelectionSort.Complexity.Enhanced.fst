@@ -17,7 +17,6 @@
 module CLRS.Ch09.PartialSelectionSort.Complexity.Enhanced
 
 open FStar.Seq
-open FStar.Mul
 
 module Seq = FStar.Seq
 

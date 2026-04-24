@@ -1,6 +1,5 @@
 module CLRS.Ch26.MaxFlow.Lemmas
 
-open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch26.MaxFlow.Spec
 

@@ -12,7 +12,6 @@
 module CLRS.Ch08.RadixSort.Lemmas
 
 open FStar.Seq
-open FStar.Mul
 open CLRS.Ch08.RadixSort.Base
 module Stab = CLRS.Ch08.RadixSort.Stability
 

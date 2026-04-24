@@ -28,9 +28,9 @@ let is_permutation (#a:eqtype) (s1 s2: seq a) : prop
 
 let parent_index (i: nat{i > 0}) : nat = (i - 1) / 2
 
-let left_child_index (i: nat) : nat = op_Multiply 2 i + 1
+let left_child_index (i: nat) : nat = op_Star 2 i + 1
 
-let right_child_index (i: nat) : nat = op_Multiply 2 i + 2
+let right_child_index (i: nat) : nat = op_Star 2 i + 2
 
 let max_heap_property (#a:Type) (compare: a -> a -> Tot bool) (s: seq a) (heap_size: nat) (i: nat) : prop
   = i < heap_size /\ heap_size <= length s /\ (

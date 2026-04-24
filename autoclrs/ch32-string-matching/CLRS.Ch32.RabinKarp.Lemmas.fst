@@ -13,7 +13,6 @@
 
 module CLRS.Ch32.RabinKarp.Lemmas
 
-open FStar.Mul
 open FStar.Classical
 module Seq = FStar.Seq
 

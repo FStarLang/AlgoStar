@@ -8,7 +8,6 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module C = FStar.Classical
 
-open FStar.Mul
 
 module AP = CLRS.Ch12.BSTArray.Predicates
 

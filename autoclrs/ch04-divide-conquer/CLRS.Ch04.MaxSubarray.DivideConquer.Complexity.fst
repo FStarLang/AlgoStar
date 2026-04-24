@@ -58,7 +58,7 @@ let log2_ceil_halving (n: pos{n >= 2})
 // Prove: T(n) = O(n log n) via Master Theorem case 2
 // T(n) = 2T(n/2) + n, solution T(n) <= 4n(log2_ceil(n) + 1)
 let rec lemma_dc_complexity_bound (n: pos) 
-  : Lemma (ensures dc_ops_count n <= op_Multiply 4 (op_Multiply n (log2_ceil n + 1)))
+  : Lemma (ensures dc_ops_count n <= op_Star 4 (op_Star n (log2_ceil n + 1)))
           (decreases n)
 //SNIPPET_END: dc_complexity_bound
   = if n = 1 then ()
@@ -66,6 +66,6 @@ let rec lemma_dc_complexity_bound (n: pos)
       let h = n / 2 in
       assert (h >= 1);
       lemma_dc_complexity_bound h;
-      assert (op_Multiply 8 h <= op_Multiply 4 n);
+      assert (op_Star 8 h <= op_Star 4 n);
       log2_ceil_halving n
     end

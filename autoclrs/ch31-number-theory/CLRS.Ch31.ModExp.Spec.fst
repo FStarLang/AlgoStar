@@ -8,7 +8,6 @@
 
 module CLRS.Ch31.ModExp.Spec
 
-open FStar.Mul
 
 //SNIPPET_START: mod_exp_spec
 let rec pow (b: int) (e: nat) : Tot int (decreases e) =

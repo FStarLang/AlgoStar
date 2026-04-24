@@ -22,7 +22,6 @@ module CS = CLRS.Ch13.RBTree.CLRSSpec
 module G = FStar.Ghost
 module C = CLRS.Ch13.RBTree.Complexity
 module CC = CLRS.Ch13.RBTree.CLRSComplexity
-open FStar.Mul
 
 // ========== Node type and pointers ==========
 

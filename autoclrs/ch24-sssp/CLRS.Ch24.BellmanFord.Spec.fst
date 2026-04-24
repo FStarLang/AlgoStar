@@ -1,6 +1,5 @@
 module CLRS.Ch24.BellmanFord.Spec
 
-open FStar.Mul
 open FStar.Seq
 
 module Seq = FStar.Seq

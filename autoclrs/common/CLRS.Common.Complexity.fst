@@ -65,7 +65,7 @@ fn ticks (ctr: GR.ref nat) (k: nat) (#n: erased nat)
 (* ---------- Pure helpers for complexity bounds ---------- *)
 
 // Triangular number: 1 + 2 + ... + n = n*(n+1)/2
-let triangle (n: nat) : nat = op_Multiply n (n + 1) / 2
+let triangle (n: nat) : nat = op_Star n (n + 1) / 2
 
 let rec lemma_triangle_sum (n: nat)
   : Lemma (ensures triangle n == (if n = 0 then 0 else triangle (n - 1) + n))

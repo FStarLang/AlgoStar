@@ -507,7 +507,7 @@ let rec filter_weight_decomp (e_rem: edge) (t: list edge)
 // All edges matching edge_eq have the same weight
 let rec filter_matching_weight (e_rem: edge) (t: list edge)
   : Lemma (ensures (let c = length (filter (fun e -> edge_eq e e_rem) t) in
-                    total_weight (filter (fun e -> edge_eq e e_rem) t) = op_Multiply c e_rem.w))
+                    total_weight (filter (fun e -> edge_eq e e_rem) t) = op_Star c e_rem.w))
           (decreases t)
   = match t with
     | [] -> ()
@@ -575,7 +575,7 @@ let lemma_exchange_preserves_mst
     filter_match_nonempty e_rem t;
     let count = length matched in
     assert (count >= 1);
-    assert (total_weight matched = op_Multiply count e_rem.w);
+    assert (total_weight matched = op_Star count e_rem.w);
     // Length constraint: filter complement lengths sum to original
     filter_complement_length (fun e -> not (edge_eq e e_rem)) t;
     // len(filter (not.not.eq)) + len(filter not.eq) = len t

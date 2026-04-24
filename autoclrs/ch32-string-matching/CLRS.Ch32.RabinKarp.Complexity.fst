@@ -1,6 +1,5 @@
 module CLRS.Ch32.RabinKarp.Complexity
 
-open FStar.Mul
 
 (*
  * Complexity analysis for the Rabin-Karp string matching algorithm

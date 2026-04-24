@@ -32,7 +32,6 @@ module CLRS.Ch23.Prim.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch23.Prim.Impl
 open CLRS.Ch23.Prim.ImplTestHelper
 

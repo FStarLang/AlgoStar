@@ -17,3 +17,6 @@ krml/
 
 # Binary F* install (created by ./setup.sh binary)
 /fstar/
+bench/results/
+bench/BENCHMARK_REPORT.txt
+bench/repros/

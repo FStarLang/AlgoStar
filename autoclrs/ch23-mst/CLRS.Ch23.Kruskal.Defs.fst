@@ -1,6 +1,5 @@
 module CLRS.Ch23.Kruskal.Defs
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Spec
 

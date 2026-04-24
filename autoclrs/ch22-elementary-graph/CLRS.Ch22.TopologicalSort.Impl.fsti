@@ -9,7 +9,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open Pulse.Lib.WithPure
 open CLRS.Ch22.TopologicalSort.Spec
 open CLRS.Ch22.TopologicalSort.Impl.Defs

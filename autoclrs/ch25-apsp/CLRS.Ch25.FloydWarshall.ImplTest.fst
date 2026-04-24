@@ -34,7 +34,6 @@ module CLRS.Ch25.FloydWarshall.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch25.FloydWarshall.Spec
 open CLRS.Ch25.FloydWarshall.Impl
 open CLRS.Ch25.FloydWarshall.Lemmas

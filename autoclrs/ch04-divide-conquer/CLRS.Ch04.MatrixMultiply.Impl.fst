@@ -15,7 +15,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
 open Pulse.Lib.Reference
-open FStar.Mul
 open FStar.Classical
 open CLRS.Ch04.MatrixMultiply.Spec
 

@@ -31,7 +31,7 @@ let rec lcs_length (x y: seq int) (i j: nat) : Tot int (decreases i + j) =
 let lcs_at (x y: seq int) (i j: nat) : int =
   if i <= length x && j <= length y then lcs_length x y i j else 0
 
-let tbl_idx (i j: nat) (n1: nat) : nat = op_Multiply i n1 + j
+let tbl_idx (i j: nat) (n1: nat) : nat = op_Star i n1 + j
 
 // Lemma: lcs_length is non-negative
 let rec lcs_length_nonneg (x y: seq int) (i j: nat)
@@ -79,10 +79,10 @@ let lcs_recurrence_correct (x y: seq int) (i j: nat)
 // All cells (r,c) with r < i, or r == i and c < j, are correct
 let lcs_table_correct (x y: seq int) (tbl: seq int) (m n: nat) (i j: nat) : prop =
   let n1 = n + 1 in
-  length tbl == op_Multiply (m + 1) n1 /\
+  length tbl == op_Star (m + 1) n1 /\
   i <= m + 1 /\ j <= n + 1 /\
   (forall (r c: nat). (r < i \/ (r == i /\ c < j)) ==> r <= m ==> c <= n ==>
-    index tbl (op_Multiply r n1 + c) == lcs_length x y r c)
+    index tbl (op_Star r n1 + c) == lcs_length x y r c)
 
 // Lemma: updating table[i*(n+1)+j] with lcs_length value preserves correctness
 // and advances to (i, j+1)
@@ -94,14 +94,14 @@ let lcs_table_update_preserves (x y: seq int) (tbl: seq int) (m n i j: nat) (v: 
       i <= m /\ j <= n /\
       v == lcs_length x y i j)
     (ensures (
-      let idx = op_Multiply i (n + 1) + j in
+      let idx = op_Star i (n + 1) + j in
       let tbl' = upd tbl idx v in
       lcs_table_correct x y tbl' m n i (j + 1)))
   = let n1 = n + 1 in
-    let idx = op_Multiply i n1 + j in
+    let idx = op_Star i n1 + j in
     let tbl' = upd tbl idx v in
     assert (forall (r c: nat). ((r < i \/ (r == i /\ c < j + 1)) /\ r <= m /\ c <= n) ==>
-      (let idx2 = op_Multiply r n1 + c in
+      (let idx2 = op_Star r n1 + c in
        index tbl' idx2 == lcs_length x y r c))
 #pop-options
 
@@ -122,9 +122,9 @@ let lcs_step_correct (x y: seq int) (tbl: seq int) (m n i j: nat) (value: int)
       (i = 0 \/ j = 0 ==> value == 0) /\
       (i > 0 /\ j > 0 ==> (
         let n1 = n + 1 in
-        let val_diag = index tbl (op_Multiply (i - 1) n1 + (j - 1)) in
-        let val_up = index tbl (op_Multiply (i - 1) n1 + j) in
-        let val_left = index tbl (op_Multiply i n1 + (j - 1)) in
+        let val_diag = index tbl (op_Star (i - 1) n1 + (j - 1)) in
+        let val_up = index tbl (op_Star (i - 1) n1 + j) in
+        let val_left = index tbl (op_Star i n1 + (j - 1)) in
         let xi = index x (i - 1) in
         let yj = index y (j - 1) in
         value == (if xi = yj then val_diag + 1

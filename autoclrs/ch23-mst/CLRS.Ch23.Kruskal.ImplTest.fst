@@ -31,7 +31,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch23.Kruskal.Defs
 open CLRS.Ch23.Kruskal.Impl
 open CLRS.Ch23.Kruskal.ImplTestHelper

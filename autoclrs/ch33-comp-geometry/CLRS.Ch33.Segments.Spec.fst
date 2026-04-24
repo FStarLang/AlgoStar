@@ -9,7 +9,6 @@
 *)
 
 module CLRS.Ch33.Segments.Spec
-open FStar.Mul
 
 // ========== Helper Functions ==========
 

@@ -7,7 +7,6 @@
 
 module CLRS.Ch06.Heap.CostBound
 
-open FStar.Mul
 open CLRS.Ch06.Heap.Spec
 open CLRS.Ch06.Heap.Complexity
 

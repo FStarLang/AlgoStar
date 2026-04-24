@@ -49,7 +49,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open Pulse.Lib.WithPure
 open FStar.SizeT
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -928,7 +927,7 @@ fn scan_for_white_neighbor
 
 (* Helper: perform DFS-VISIT for a single white vertex *)
 
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always"
 fn dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -1154,6 +1153,12 @@ fn dfs_visit
       // Preserve stack_is_path: push vv with pred[vv] = u = sstack[topd-1]
       stack_is_path_push sstack_pre_push spred_now (SZ.v n) (SZ.v topd) vv (SZ.v u);
       count_twos_upd_non_two scolor_now (SZ.v n) (SZ.v vv) 1;
+      // Re-establish white_scan_zero: after color[vv]:=1 and scan_idx updates,
+      // any j with color'[j]==0 must have j!=vv (since color'[vv]==1) and j!=u (u is GRAY),
+      // so scan_idx'[j] is unchanged from before, and the invariant follows.
+      with scolor_disc. assert (A.pts_to color scolor_disc);
+      with sscan_disc. assert (A.pts_to scan_idx sscan_disc);
+      assert pure (Seq.index scolor_disc (SZ.v vv) == 1);
       ()
     } else {
       // No more WHITE neighbors - finish u (inlined)

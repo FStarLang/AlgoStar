@@ -30,7 +30,6 @@ module CLRS.Ch22.BFS.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch22.BFS.Impl
 open CLRS.Ch22.Graph.Common
 

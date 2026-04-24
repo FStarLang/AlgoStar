@@ -20,7 +20,6 @@ module CLRS.Ch08.RadixSort.MultiDigit
 
 open FStar.Seq
 open FStar.Math.Lemmas
-open FStar.Mul
 open FStar.Classical
 open CLRS.Ch08.RadixSort.Base
 module ID = FStar.IndefiniteDescription

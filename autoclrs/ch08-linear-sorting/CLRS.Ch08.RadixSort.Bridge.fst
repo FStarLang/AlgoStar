@@ -19,7 +19,6 @@
 module CLRS.Ch08.RadixSort.Bridge
 
 open FStar.Seq
-open FStar.Mul
 open FStar.Classical
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties

@@ -10,7 +10,6 @@ module CLRS.Ch12.BST.Complexity
  *)
 
 open CLRS.Ch12.BST.Spec
-open FStar.Mul
 
 (* Lemma: Search ticks are bounded by tree height *)
 let rec search_ticks_bounded (t: bst) (k: int)

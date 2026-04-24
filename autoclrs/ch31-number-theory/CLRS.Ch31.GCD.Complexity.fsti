@@ -9,7 +9,6 @@
 
 module CLRS.Ch31.GCD.Complexity
 
-open FStar.Mul
 open CLRS.Ch31.GCD.Spec
 
 //SNIPPET_START: gcd_steps
@@ -29,7 +28,7 @@ let rec num_bits (n: nat) : Tot nat (decreases n) =
 let gcd_complexity_bounded (cf c0: nat) (a_init b_init: nat) : prop =
   cf >= c0 /\
   cf - c0 == gcd_steps a_init b_init /\
-  (b_init > 0 ==> cf - c0 <= op_Multiply 2 (num_bits b_init) + 1)
+  (b_init > 0 ==> cf - c0 <= op_Star 2 (num_bits b_init) + 1)
 //SNIPPET_END: gcd_complexity_bounded
 
 // num_bits is monotone
@@ -45,9 +44,9 @@ val lemma_num_bits_half (n: nat)
 // Main theorem: Euclid's algorithm takes at most 2*log2(b) + 1 steps
 val lemma_gcd_steps_log (a b: nat)
   : Lemma (requires b > 0)
-          (ensures gcd_steps a b <= op_Multiply 2 (num_bits b) + 1)
+          (ensures gcd_steps a b <= op_Star 2 (num_bits b) + 1)
 
 // O(log min(a,b)) bound
 val gcd_steps_log_min (a b: nat)
   : Lemma (requires a > 0 /\ b > 0)
-          (ensures gcd_steps a b <= op_Multiply 2 (num_bits (if a <= b then a else b)) + 2)
+          (ensures gcd_steps a b <= op_Star 2 (num_bits (if a <= b then a else b)) + 2)

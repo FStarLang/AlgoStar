@@ -18,7 +18,6 @@ module CLRS.Ch32.KMP.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 
 open CLRS.Ch32.KMP
 open CLRS.Ch32.KMP.PureDefs

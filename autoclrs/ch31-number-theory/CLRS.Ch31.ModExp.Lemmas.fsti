@@ -8,7 +8,6 @@
 
 module CLRS.Ch31.ModExp.Lemmas
 
-open FStar.Mul
 open CLRS.Ch31.ModExp.Spec
 
 val pow_add (b: int) (e1 e2: nat)

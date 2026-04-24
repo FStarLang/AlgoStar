@@ -13,7 +13,6 @@ module CLRS.Ch21.UnionFind.Lemmas
 
 open FStar.Seq
 open FStar.Math.Lemmas
-open FStar.Mul  // For multiplication operator *
 open CLRS.Ch21.UnionFind.Spec
 
 module Seq = FStar.Seq

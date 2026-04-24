@@ -19,7 +19,6 @@ module CLRS.Ch25.FloydWarshall.Paths
  * NO admits. NO assumes.
  *)
 
-open FStar.Mul
 module Seq = FStar.Seq
 open FStar.List.Tot
 open CLRS.Ch25.FloydWarshall.Spec

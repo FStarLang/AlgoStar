@@ -4,7 +4,6 @@
 
 module CLRS.Ch32.NaiveStringMatch.Complexity
 
-open FStar.Mul
 
 //SNIPPET_START: complexity_bound_naive
 /// Complexity bound: cf - c0 <= (n - m + 1) * m

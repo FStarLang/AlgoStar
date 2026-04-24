@@ -13,7 +13,6 @@ open Pulse.Lib.Pervasives
 open CLRS.Ch33.Segments.Spec
 open CLRS.Ch33.JarvisMarch.Spec
 open CLRS.Ch33.JarvisMarch.Lemmas
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -264,7 +263,7 @@ fn hull_write_step
   hull_out.(vh) <- next
 }
 
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 10"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 60"
 fn jarvis_march_with_hull (#p: perm) (xs ys: array int)
   (#sxs: Ghost.erased (Seq.seq int))
   (#sys: Ghost.erased (Seq.seq int))

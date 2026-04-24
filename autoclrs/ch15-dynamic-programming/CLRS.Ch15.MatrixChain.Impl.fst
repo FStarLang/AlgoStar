@@ -23,7 +23,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open Pulse.Lib.Vec
 open FStar.SizeT
-open FStar.Mul
 
 #set-options "--z3rlimit 10 --fuel 1 --ifuel 0 --split_queries always"
 
@@ -99,7 +98,7 @@ fn matrix_chain_order
       SZ.v n + 1 == Seq.length s_dims /\
       SZ.v n + 1 == A.length dims /\
       SZ.v n > 0 /\
-      SZ.fits (op_Multiply (SZ.v n) (SZ.v n)) /\
+      SZ.fits (op_Star (SZ.v n) (SZ.v n)) /\
       (forall (i: nat). i < Seq.length s_dims ==> Seq.index s_dims i > 0)
     )
   returns result: int
@@ -136,7 +135,7 @@ fn matrix_chain_order
     pure (
       SZ.v vl <= SZ.v n + 1 /\
       SZ.v vl >= 2 /\
-      Seq.length sm == op_Multiply (SZ.v n) (SZ.v n) /\
+      Seq.length sm == op_Star (SZ.v n) (SZ.v n) /\
       V.length m == Seq.length sm /\
       mc_outer sm s_dims (SZ.v n) (SZ.v vl) == 
         mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2 /\
@@ -164,7 +163,7 @@ fn matrix_chain_order
         SZ.v vl <= SZ.v n + 1 /\
         SZ.v vl >= 2 /\
         SZ.v vi <= SZ.v n - SZ.v vl + 1 /\
-        Seq.length sm_i == op_Multiply (SZ.v n) (SZ.v n) /\
+        Seq.length sm_i == op_Star (SZ.v n) (SZ.v n) /\
         V.length m == Seq.length sm_i /\
         mc_outer (mc_inner_i sm_i s_dims (SZ.v n) (SZ.v vl) (SZ.v vi)) s_dims (SZ.v n) (SZ.v vl + 1) ==
           mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2 /\
@@ -207,7 +206,7 @@ fn matrix_chain_order
           SZ.v vk <= SZ.v j /\
           SZ.v j == SZ.v vi + SZ.v vl - 1 /\
           SZ.v j < SZ.v n /\
-          Seq.length sm_k == op_Multiply (SZ.v n) (SZ.v n) /\
+          Seq.length sm_k == op_Star (SZ.v n) (SZ.v n) /\
           V.length m == Seq.length sm_k /\
           sm_k == sm_i_entry /\
           mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost ==

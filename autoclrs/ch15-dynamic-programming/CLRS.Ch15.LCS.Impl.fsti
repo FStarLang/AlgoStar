@@ -18,7 +18,7 @@ open CLRS.Ch15.LCS.Spec
 
 let lcs_complexity_bounded (cf c0 m n: nat) : prop =
   cf >= c0 /\
-  (m > 0 /\ n > 0 ==> cf - c0 == op_Multiply (m + 1) (n + 1)) /\
+  (m > 0 /\ n > 0 ==> cf - c0 == op_Star (m + 1) (n + 1)) /\
   (m = 0 \/ n = 0 ==> cf == c0)
 
 open Pulse.Lib.BoundedIntegers
@@ -41,7 +41,7 @@ fn lcs
       SZ.v m == A.length x /\
       SZ.v n == Seq.length sy /\
       SZ.v n == A.length y /\
-      SZ.fits (op_Multiply (SZ.v m + 1) (SZ.v n + 1))
+      SZ.fits (op_Star (SZ.v m + 1) (SZ.v n + 1))
     )
   returns result: int
   ensures exists* (cf: nat).

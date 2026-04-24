@@ -6,7 +6,6 @@
 *)
 
 module CLRS.Ch04.Strassen.Complexity
-open FStar.Mul
 open FStar.Math.Lemmas
 open CLRS.Ch04.Strassen.Spec
 

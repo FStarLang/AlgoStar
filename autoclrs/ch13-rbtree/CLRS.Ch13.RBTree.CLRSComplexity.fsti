@@ -17,7 +17,6 @@
  *)
 module CLRS.Ch13.RBTree.CLRSComplexity
 
-open FStar.Mul
 open CLRS.Ch13.RBTree.Spec
 
 // ========== CLRS Insert Tick Counters ==========

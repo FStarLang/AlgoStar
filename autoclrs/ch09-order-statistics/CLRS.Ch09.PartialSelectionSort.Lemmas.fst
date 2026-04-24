@@ -11,7 +11,6 @@ module CLRS.Ch09.PartialSelectionSort.Lemmas
 
 open FStar.Seq
 open FStar.Classical
-open FStar.Mul
 
 module Seq = FStar.Seq
 open CLRS.Ch09.PartialSelectionSort.Spec

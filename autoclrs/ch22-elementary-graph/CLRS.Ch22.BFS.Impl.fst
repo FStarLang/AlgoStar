@@ -26,7 +26,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open Pulse.Lib.WithPure
 
 module A = Pulse.Lib.Array
@@ -714,7 +713,7 @@ let init_queue_dist_ub (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n: nat)
 
 (* --- Core optimality contradiction: no short path to a WHITE vertex --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 let discover_optimal_contradiction
   (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source j: nat) (d k: nat)
   : Lemma
@@ -1004,7 +1003,7 @@ let queue_dist_ub_from_min_opt
 
 (* --- Gray vertex has dist >= d (counting/induction argument) --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 let rec gray_implies_dist_ge
   (scolor: Seq.seq int) (sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
   (n head tail: nat) (d: int) (w: nat)
@@ -1091,7 +1090,7 @@ let rec gray_implies_dist_ge
 
 (* --- Layer completeness from BFS invariants --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 let rec layer_complete_aux
   (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
   (source d head tail: nat) (w: nat) (k: nat)
@@ -1236,7 +1235,7 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 fn maybe_discover
   (adj: A.array int)
   (color: A.array int) (dist: A.array int) (pred: A.array int)
@@ -1370,7 +1369,7 @@ fn maybe_discover
 }
 #pop-options
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)

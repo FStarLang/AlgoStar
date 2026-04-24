@@ -8,7 +8,6 @@ module CLRS.Ch06.Heap.Complexity
 /// - Tighter practical bound: ≤ 2n·log₂n + 4n
 /// - Heapsort beats quadratic sorting for n ≥ 11
 
-open FStar.Mul
 open FStar.Math.Lemmas
 
 /// Floor of logarithm base 2 (used throughout CLRS Chapter 6 complexity analysis)
@@ -274,7 +273,7 @@ let simple_sum_bound (n: pos) (h: nat)
 let sum_height_ops_bound (n: pos) (max_h: nat)
   : Lemma (requires max_h = log2_floor n)
           (ensures sum_from_to (fun h -> nodes_at_height n h * max_heapify_ops h) 0 max_h 
-                   <= op_Multiply 4 n)
+                   <= op_Star 4 n)
   = // This is BUILD-MAX-HEAP O(n) theorem from CLRS Theorem 6.3
     simple_sum_bound n max_h
 
@@ -291,7 +290,7 @@ let build_heap_ops_linear (n: pos)
 
 /// Extract-max operations are bounded by 2 * n * log2_floor n
 let rec extract_max_ops_bound (n: nat)
-  : Lemma (ensures extract_max_ops n <= op_Multiply (op_Multiply 2 n) (log2_floor (if n = 0 then 1 else n)))
+  : Lemma (ensures extract_max_ops n <= op_Star (op_Star 2 n) (log2_floor (if n = 0 then 1 else n)))
           (decreases n)
   = if n <= 1 then ()
     else begin
@@ -309,14 +308,14 @@ let rec extract_max_ops_bound (n: nat)
 
 /// Heapsort operations are bounded by c * n * log2(n) for suitable constant c
 let heapsort_ops_bound (n: pos)
-  : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 2 n) (1 + log2_floor n) + op_Multiply 4 n)
+  : Lemma (ensures heapsort_ops n <= op_Star (op_Star 2 n) (1 + log2_floor n) + op_Star 4 n)
   = build_heap_ops_linear n;
     extract_max_ops_bound n
 
 //SNIPPET_START: heapsort_ops_simplified
 /// Simplified: heapsort does at most c * n * (1 + log n) operations for c = 6
 let heapsort_ops_simplified (n: pos)
-  : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 6 n) (1 + log2_floor n))
+  : Lemma (ensures heapsort_ops n <= op_Star (op_Star 6 n) (1 + log2_floor n))
 //SNIPPET_END: heapsort_ops_simplified
   = heapsort_ops_bound n;
     // build_heap_ops n <= 4n
@@ -338,7 +337,7 @@ let heapsort_ops_simplified (n: pos)
 
 /// For practical purposes: heapsort uses at most 2n log n + 4n operations
 let heapsort_practical_bound (n: pos)
-  : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 2 n) (log2_floor n) + op_Multiply 4 n)
+  : Lemma (ensures heapsort_ops n <= op_Star (op_Star 2 n) (log2_floor n) + op_Star 4 n)
   = build_heap_ops_linear n;
     extract_max_ops_bound n;
     // From build_heap_ops_linear:
@@ -358,7 +357,7 @@ let heapsort_practical_bound (n: pos)
 
 /// Verify the asymptotic behavior: for large n, the n log n term dominates
 let heapsort_asymptotic (n: pos{n >= 16})
-  : Lemma (ensures heapsort_ops n <= op_Multiply (op_Multiply 3 n) (log2_floor n))
+  : Lemma (ensures heapsort_ops n <= op_Star (op_Star 3 n) (log2_floor n))
   = heapsort_practical_bound n;
     // From heapsort_practical_bound: heapsort_ops n <= 2n*log2_floor n + 4n
     // Want: 2n*log2_floor n + 4n <= 3n*log2_floor n
@@ -443,7 +442,7 @@ let log_linear_bound (n: pos{n >= 16})
 /// For n >= 11, heapsort beats naive O(n^2) sorting
 /// We use the bound: 2n log n + 4n < n^2 (valid when 2*log2_floor n + 4 < n)
 let heapsort_better_than_quadratic (n: pos{n >= 11})
-  : Lemma (ensures heapsort_ops n < op_Multiply n n)
+  : Lemma (ensures heapsort_ops n < op_Star n n)
 //SNIPPET_END: heapsort_better_than_quadratic
   = heapsort_practical_bound n;
     // From heapsort_practical_bound: heapsort_ops n <= 2n*log2_floor n + 4n
@@ -468,13 +467,35 @@ let heapsort_better_than_quadratic (n: pos{n >= 11})
 
 // ========== Root-bound lemmas for bridging to CostBound module ==========
 
-// For small n, verify computationally
-#push-options "--fuel 20 --ifuel 5 --z3rlimit 50 --split_queries always"
+// For small n, verify computationally.
+// Z3 cannot reduce sum_from_to applied to a lambda closure, so we provide an
+// unrolled helper that the normalizer + Z3 can handle directly.
+private
+let build_heap_ops_explicit (n: pos) : nat =
+  let f (h:nat) = nodes_at_height n h * max_heapify_ops h in
+  let mh = log2_floor n in
+  if mh = 0 then f 0
+  else if mh = 1 then f 0 + f 1
+  else if mh = 2 then f 0 + f 1 + f 2
+  else if mh = 3 then f 0 + f 1 + f 2 + f 3
+  else f 0 + f 1 + f 2 + f 3 + f 4  // mh = 4, covers n < 32
+
+// Prove unrolled = original for small n
+#push-options "--fuel 10 --ifuel 5 --z3rlimit 20"
+private
+let build_heap_ops_explicit_eq (n: pos)
+  : Lemma (requires n < 32)
+          (ensures build_heap_ops n == build_heap_ops_explicit n)
+  = ()
+#pop-options
+
+#push-options "--fuel 10 --ifuel 5 --z3rlimit 50 --split_queries always"
 private
 let build_heap_ops_le_root_bound_small (n: pos)
   : Lemma (requires n < 32)
           (ensures build_heap_ops n <= (n / 2) * 2 * log2_floor n)
-  = if n < 16 then () else ()
+  = build_heap_ops_explicit_eq n;
+    if n < 4 then () else if n < 8 then () else if n < 16 then () else ()
 #pop-options
 
 #push-options "--z3rlimit 10"

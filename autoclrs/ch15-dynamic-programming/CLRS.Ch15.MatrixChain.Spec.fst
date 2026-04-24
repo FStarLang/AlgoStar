@@ -16,7 +16,6 @@
 module CLRS.Ch15.MatrixChain.Spec
 
 open FStar.Seq
-open FStar.Mul
 
 // ========== Pure Specification (imperative mirror) ==========
 

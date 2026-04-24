@@ -20,7 +20,6 @@ module CLRS.Ch24.ShortestPath.Triangle
    constructions for the contraction argument.
 *)
 
-open FStar.Mul
 open FStar.List.Tot
 module Seq = FStar.Seq
 module SP = CLRS.Ch24.ShortestPath.Spec

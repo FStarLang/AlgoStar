@@ -23,7 +23,6 @@ module CLRS.Ch31.ModExpLR.Impl
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open FStar.Math.Lemmas
 open CLRS.Ch31.ModExp.Spec
 open CLRS.Ch31.ModExpLR.Lemmas
@@ -39,7 +38,7 @@ module SZ = FStar.SizeT
 
 // Basic division algebra: e/d = 2*(e/(2*d)) + (e/d)%2 for d > 0
 let lemma_bit_decompose_div (e: nat) (d: pos)
-  : Lemma (e / d == 2 * (e / (op_Multiply 2 d)) + (e / d) % 2)
+  : Lemma (e / d == 2 * (e / (op_Star 2 d)) + (e / d) % 2)
   = lemma_div_mod (e / d) 2;
     division_multiplication_lemma e d 2
 
@@ -50,7 +49,7 @@ let pow2_half (k: pos)
 
 // 2 * (pow2(k) / 2) = pow2(k) for k > 0
 let pow2_even (k: pos)
-  : Lemma (op_Multiply 2 (pow2 k / 2) == pow2 k)
+  : Lemma (op_Star 2 (pow2 k / 2) == pow2 k)
   = pow2_half k
 
 // num_bits(pow2(k)) = k + 1
@@ -113,7 +112,7 @@ let mod_exp_lr_step_bmod (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
 // (since 2*(e/(2*mask)) + (e/mask)%2 = e/mask by division algebra)
 let step_result_lemma (b: int) (e: nat) (mask: pos) (m: pos)
   : Lemma (
-      let prefix = e / (op_Multiply 2 mask) in
+      let prefix = e / (op_Star 2 mask) in
       let bit = (e / mask) % 2 in
       let d = pow b prefix % m in
       let d_sq = (d * d) % m in
@@ -121,7 +120,7 @@ let step_result_lemma (b: int) (e: nat) (mask: pos) (m: pos)
       let d_new = (if bit = 0 then d_sq else (d_sq * b_mod) % m) in
       d_new == pow b (e / mask) % m
     )
-  = let prefix = e / (op_Multiply 2 mask) in
+  = let prefix = e / (op_Star 2 mask) in
     let bit = (e / mask) % 2 in
     mod_exp_lr_step_bmod b prefix m bit;
     lemma_bit_decompose_div e mask;
@@ -202,7 +201,7 @@ fn mod_exp_lr_impl (b_init e_init: SZ.t) (m_init: SZ.t{SZ.v m_init > 0 /\ SZ.fit
         SZ.v vd >= 0 /\ SZ.v vd < SZ.v m_init /\
         (SZ.v vmask > 0 ==>
           SZ.v vmask == pow2 k /\
-          SZ.v vd == pow (SZ.v b_init) (SZ.v e_init / (op_Multiply 2 (SZ.v vmask))) % SZ.v m_init) /\
+          SZ.v vd == pow (SZ.v b_init) (SZ.v e_init / (op_Star 2 (SZ.v vmask))) % SZ.v m_init) /\
         (SZ.v vmask == 0 ==>
           mod_exp_spec (SZ.v b_init) (SZ.v e_init) (SZ.v m_init) == SZ.v vd) /\
         vc >= reveal c0 /\

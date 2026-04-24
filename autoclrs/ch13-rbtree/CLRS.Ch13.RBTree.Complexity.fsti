@@ -11,7 +11,6 @@
  *)
 module CLRS.Ch13.RBTree.Complexity
 
-open FStar.Mul
 open CLRS.Ch13.RBTree.Spec
 
 // ========== Search/Insert Tick Counters and Bounds ==========

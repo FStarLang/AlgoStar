@@ -6,7 +6,6 @@ module CLRS.Ch25.FloydWarshall.Lemmas
  * Exposes the main theorem: fw_outer computes fw_entry at level n.
  *)
 
-open FStar.Mul
 open FStar.Seq
 open CLRS.Ch25.FloydWarshall.Spec
 
