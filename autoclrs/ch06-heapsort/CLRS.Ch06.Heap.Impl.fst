@@ -236,7 +236,7 @@ ensures exists* s (cf: nat).
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
       (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
-      SZ.fits (op_Star 2 (Seq.length s_cur) + 2) /\
+      SZ.fits (2 * Seq.length s0 + 2) /\
       heaps_from s_cur (SZ.v n) (SZ.v vi) /\
       vc >= reveal c0 /\
       vc - reveal c0 <= op_Star (SZ.v half - SZ.v vi) (CB.max_heapify_bound (SZ.v n) 0)
@@ -318,7 +318,7 @@ ensures exists* s (cf: nat).
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
       (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
-      SZ.fits (op_Star 2 (Seq.length s_cur) + 2) /\
+      SZ.fits (2 * Seq.length s0 + 2) /\
       is_max_heap s_cur (SZ.v vsz) /\
       suffix_sorted_upto s_cur (SZ.v vsz) (SZ.v n) /\
       prefix_le_suffix_upto s_cur (SZ.v vsz) (SZ.v n) /\

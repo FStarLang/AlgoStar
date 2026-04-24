@@ -128,7 +128,7 @@ let step_result_lemma (b: int) (e: nat) (mask: pos) (m: pos)
 
 // ── Main function ────────────────────────────────────────────────
 
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 40"
 fn mod_exp_lr_impl (b_init e_init: SZ.t) (m_init: SZ.t{SZ.v m_init > 0 /\ SZ.fits (SZ.v m_init * SZ.v m_init)})
   (ctr: GR.ref nat) (#c0: erased nat)
   requires GR.pts_to ctr c0

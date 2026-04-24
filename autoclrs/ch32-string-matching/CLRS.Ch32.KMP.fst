@@ -31,7 +31,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 
-#push-options "--z3rlimit 20 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 80 --ifuel 2 --fuel 2 --split_queries always"
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -196,6 +196,8 @@ fn compute_prefix_function
     let final_k = !k;
     V.op_Array_Assignment pi vq final_k;
     
+    // Explicit hints for refined argument types (needed with uvar fix)
+    assert pure (SZ.v vq > 0 /\ SZ.v vq < Seq.length s_pat);
     Bridge.extend_maximality s_pat (Seq.upd s_pi_post (SZ.v vq) final_k) (SZ.v vq) (SZ.v vk_after_inner) chars_match;
     
     assert pure (is_prefix_suffix s_pat (SZ.v vq) (SZ.v final_k));
@@ -218,7 +220,7 @@ fn compute_prefix_function
 // ========== KMP Matcher ==========
 
 #restart-solver
-#push-options "--z3rlimit 20 --ifuel 1 --fuel 1"
+#push-options "--z3rlimit 80 --ifuel 1 --fuel 1"
 
 //SNIPPET_START: kmp_matcher_sig
 fn kmp_matcher
@@ -362,6 +364,7 @@ fn kmp_matcher
     };
     
     let vq_after = !q;
+    assert pure (SZ.v vq_after < SZ.v m);
     let text_char_final = A.op_Array_Access text vi;
     let pat_char_final = A.op_Array_Access pattern vq_after;
     
@@ -371,6 +374,7 @@ fn kmp_matcher
     let chars_match = (pat_char_final = text_char_final);
     let new_q_val: SZ.t = (if chars_match then vq_after +^ 1sz else vq_after);
     
+    assert pure (SZ.v new_q_val <= SZ.v m);
     q := new_q_val;
     
     let vq_final = !q;
