@@ -88,7 +88,7 @@ let digit_counts_match_prefix_zero (sc: Seq.seq int) (sa: Seq.seq nat) (d base: 
   = assert (Seq.equal (Seq.slice sa 0 0) Seq.empty)
 
 /// Phase 2 step: increment count for digit of sa[j]
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 1"
 let digit_count_phase_step
   (sa: Seq.seq nat) (sc sc': Seq.seq int) (j: nat) (d base: nat) (key: nat)
   : Lemma (requires
@@ -214,7 +214,7 @@ let phase4_b_inv_init (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base: nat)
   = reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb d base (Seq.length sa));
     digit_count_le_full sa d base
 
-#push-options "--z3rlimit 100 --split_queries always"
+#push-options "--z3rlimit 5 --split_queries always"
 let phase4_content_inv_init (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base: nat)
   : Lemma (requires
       Seq.length sc == base /\ base > 0 /\ Seq.length sa > 0 /\
@@ -317,7 +317,7 @@ let rec count_index_positive (s: Seq.seq nat) (i: nat) (x: nat)
 
 (* ========== Phase 4 position bounds ========== *)
 
-#push-options "--z3rlimit 80 --z3refresh --split_queries always"
+#push-options "--z3rlimit 20 --z3refresh --split_queries always"
 let phase4_pos_bounds (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -370,7 +370,7 @@ let phase4_c_step (sc sc': Seq.seq int) (sa: Seq.seq nat) (d base n remaining: n
 (* ========== Phase 4 step: B filling ========== *)
 
 /// Write position is outside smaller blocks
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 15"
 let write_pos_outside_smaller (sa: Seq.seq nat) (d base: nat) (remaining: nat)
                                (key v: nat) (pos: int)
   : Lemma (requires
@@ -395,7 +395,7 @@ let write_pos_outside_smaller (sa: Seq.seq nat) (d base: nat) (remaining: nat)
 #pop-options
 
 /// Write position is below larger blocks
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 10"
 let write_pos_outside_larger (sa: Seq.seq nat) (d base: nat) (remaining: nat)
                               (key v: nat) (pos sc_v: int)
   : Lemma (requires
@@ -578,7 +578,7 @@ let content_step_other_order
 
 /// Sub-lemma for phase4_content_step: v == key multiset proof
 /// Does NOT reveal opaque invariants; takes needed facts as preconditions
-#push-options "--z3rlimit 80 --fuel 2 --ifuel 1 --z3refresh --split_queries always"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1 --z3refresh --split_queries always"
 let content_step_key_multiset
   (sa sb sb': Seq.seq nat)
   (d base n remaining: nat) (key: nat)
@@ -764,7 +764,7 @@ let content_step_key_order
 #pop-options
 
 /// Main content step: reveals invariants, dispatches to sub-lemmas
-#push-options "--z3rlimit 160 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 80 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
 let phase4_content_step_multiset (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -1178,9 +1178,48 @@ let order_step_v_eq
     phase4_content_step_order_for_v_eq sc sc' sa sb sb' d base n remaining key
 #pop-options
 
+/// Per-v order proof helper (top-level to isolate verification from orchestrator context)
+#push-options "--z3rlimit 160 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+let order_step_for_v
+  (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat) (v: nat)
+  : Lemma (requires
+      phase4_c_inv sc sa d base n remaining /\
+      Seq.length sa == n /\ Seq.length sc == base /\ remaining <= n /\
+      phase4_content_inv_order sc sa sb d base n remaining /\
+      Seq.length sb == n /\
+      remaining > 0 /\ key < base /\ v < base /\
+      key == B.digit (Seq.index sa (remaining - 1)) d base /\
+      Seq.length sc' == base /\ Seq.length sb' == n /\
+      (forall (u: nat). u < base /\ u <> key ==> Seq.index sc' u == Seq.index sc u) /\
+      Seq.index sc' key == Seq.index sc key - 1 /\
+      Seq.index sc key >= 1 /\ Seq.index sc key <= n /\
+      (forall (p: nat). p < n /\ p <> Seq.index sc key - 1 ==> Seq.index sb' p == Seq.index sb p) /\
+      Seq.index sb' (Seq.index sc key - 1) == Seq.index sa (remaining - 1) /\
+      (let lo_key = Seq.index sc key in
+       let hi_key = digit_count_le sa key d base in
+       lo_key >= 0 /\ hi_key <= n /\ lo_key <= hi_key /\
+       (forall (x: nat).
+         SeqP.count x (Seq.slice sb lo_key hi_key) ==
+           (if B.digit x d base = key
+            then SeqP.count x (Seq.slice sa remaining n)
+            else 0))))
+    (ensures
+      (let lo' = Seq.index sc' v in
+       let hi = digit_count_le sa v d base in
+       lo' >= 0 /\ hi <= n /\ lo' <= hi /\
+       (forall (p1 p2: nat). lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
+         Seq.index sb' p1 <> Seq.index sb' p2 ==>
+         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
+           Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
+  = if v <> key then
+      order_step_v_neq sc sc' sa sb sb' d base n remaining key v
+    else
+      order_step_v_eq sc sc' sa sb sb' d base n remaining key
+#pop-options
+
 /// Orchestrator: proves order step using extract/pack to avoid QI explosion.
 /// Never reveals the full order invariant in a single query.
-#push-options "--z3rlimit 200 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --z3refresh"
 let phase4_content_step_order (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -1205,8 +1244,7 @@ let phase4_content_step_order (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d 
             then SeqP.count x (Seq.slice sa remaining n)
             else 0))))
     (ensures phase4_content_inv_order sc' sa sb' d base n (remaining - 1))
-  = // Build proof function for each v — calls opaque wrappers to avoid intermediate exists in context
-    let prove_v (v: nat{v < base}) : Lemma
+  = let prove_v (v: nat{v < base}) : Lemma
       (requires Seq.length sc' == base /\ Seq.length sa == n /\ Seq.length sb' == n)
       (ensures
         (let lo' = Seq.index sc' v in
@@ -1216,12 +1254,8 @@ let phase4_content_step_order (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d 
            Seq.index sb' p1 <> Seq.index sb' p2 ==>
            (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
              Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
-      = if v <> key then
-          order_step_v_neq sc sc' sa sb sb' d base n remaining key v
-        else
-          order_step_v_eq sc sc' sa sb sb' d base n remaining key
+      = order_step_for_v sc sc' sa sb sb' d base n remaining key v
     in
-    // Pack using proof function — avoids QI by not materializing all per-v results at once
     order_inv_pack sc' sa sb' d base n (remaining - 1) prove_v
 #pop-options
 
@@ -1255,7 +1289,7 @@ let phase4_content_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n
 (* ========== Phase 4 final: extract results ========== *)
 
 /// sorted_on_digit from block structure  
-#push-options "--z3rlimit 120 --z3refresh --split_queries always"
+#push-options "--z3rlimit 15 --z3refresh --split_queries always"
 let phase4_final_sorted_on_digit (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n 0 /\ phase4_b_inv sc sa sb d base n /\
@@ -1327,7 +1361,7 @@ let phase4_final_sorted_on_digit (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base 
 #pop-options
 
 /// B.permutation from content invariant
-#push-options "--z3rlimit 200 --z3refresh"
+#push-options "--z3rlimit 10 --z3refresh"
 let phase4_final_perm (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n 0 /\
@@ -1377,7 +1411,7 @@ let phase4_final_perm (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n: nat)
 
 /// Extract stability witness for a specific pair (j1, j2) from opaque invariants.
 /// Uses extraction helpers to avoid revealing full invariants in one context.
-#push-options "--z3rlimit 80 --z3refresh"
+#push-options "--z3rlimit 5 --z3refresh"
 let stability_witness (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n: nat) (j1 j2: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n 0 /\
