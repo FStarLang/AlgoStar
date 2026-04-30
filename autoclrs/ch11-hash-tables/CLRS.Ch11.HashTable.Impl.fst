@@ -229,6 +229,12 @@ fn hash_table_free (tv: V.vec int) (#s: erased (Seq.seq int))
 }
 //SNIPPET_END: ht_helpers_impl
 
+// Writing back the same value at an index is a no-op on sequences
+let lemma_seq_upd_identity (#a:Type) (s: Seq.seq a) (i: nat{i < Seq.length s})
+  : Lemma (Seq.equal (Seq.upd s i (Seq.index s i)) s)
+  [SMTPat (Seq.upd s i (Seq.index s i))]
+  = Seq.lemma_eq_intro (Seq.upd s i (Seq.index s i)) s
+
 // Returns true if successful, false if table is full
 // Proves both correctness and O(n) complexity
 #push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
