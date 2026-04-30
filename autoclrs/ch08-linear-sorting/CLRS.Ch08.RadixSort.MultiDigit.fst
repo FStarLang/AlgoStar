@@ -349,7 +349,7 @@ let rec insert_contains (h: nat) (s: seq nat) (d base: nat) (k: nat)
 #pop-options
 
 /// Insert x before equal-digit element
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec insert_before_equal (x: nat) (s: seq nat) (d base: nat) (py: nat)
   : Lemma (requires base > 0 /\ py < length s /\ digit x d base == digit (index s py) d base)
           (ensures (insert_by_digit_length x s d base;
@@ -378,7 +378,7 @@ let rec insert_before_equal (x: nat) (s: seq nat) (d base: nat) (py: nat)
 /// Explicit witness shifting needed: the existential postcondition with
 /// insert_by_digit creates a refinement matching loop (~4M quantifier
 /// instances) when Z3 attempts to find witnesses implicitly.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 80 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20 --split_queries always"
 let rec insert_preserves_order (h: nat) (s: seq nat) (d base: nat) (px py: nat)
   : Lemma (requires base > 0 /\ px < py /\ py < length s)
           (ensures (insert_by_digit_length h s d base;
@@ -427,7 +427,7 @@ let insertion_sort_unfold (s: seq nat) (d base: nat)
   = ()
 
 /// Insertion sort is stable for distinct elements
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 100"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let rec insertion_sort_stable (s: seq nat) (d base: nat) (i j: nat)
   : Lemma
     (requires base > 0 /\ i < j /\ j < length s /\
@@ -484,7 +484,7 @@ let rec two_positions (s: seq nat) (v: nat)
 /// Stable sort preserves relative order (proven via insertion sort stability)
 /// Stability for a specific pair: if i < j in input with same digit, 
 /// then there exist positions i' < j' in output with same values
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let stable_sort_preserves_order_pair
   (s: seq nat) (d: nat) (base: nat) (i: nat{i < length s}) (j: nat{j < length s /\ i < j})
   : Lemma (requires base > 0 /\ digit (index s i) d base == digit (index s j) d base)
@@ -596,7 +596,7 @@ let rec sorted_up_to_digit_intro (s: seq nat) (max_d base: nat)
     end
 
 /// Backward stability for distinct elements: if v before w in output, then v before w in input
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 100"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let backward_stability (s: seq nat) (d base: nat) (i j: nat)
   : Lemma 
     (requires base > 0 /\ distinct s /\
@@ -647,7 +647,7 @@ let rec sorted_on_digit_le (s: seq nat) (d base: nat) (i j: nat)
     )
 
 /// Helper: backward stability + lex ordering extraction (separated for VC size)
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 60"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let backward_stability_with_order (s: seq nat) (d base: nat) (i: nat)
   : Lemma
     (requires base >= 2 /\ d > 0 /\ distinct s /\
@@ -672,7 +672,7 @@ let backward_stability_with_order (s: seq nat) (d base: nat) (i: nat)
 #pop-options
 
 /// Stable sort on distinct sequences preserves sorted_up_to_digit ordering
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 80"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 20"
 let stable_sort_preserves_sorted_up_to
   (s: seq nat) (d base: nat)
   : Lemma 
@@ -807,7 +807,7 @@ let rec digit_sum_bound_multi (k: nat) (d: nat) (base: nat)
 
 /// Digit preservation: for d < bigD, digit(k, d) = digit(k % base^bigD, d)
 /// (Raw form: the d-th digit of k is the same as d-th digit of k mod base^bigD)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let digit_preserved_by_modulo_multi (k: nat) (d: nat) (bigD: nat) (base: nat)
   : Lemma (requires base >= 2 /\ d < bigD /\ pow base d > 0 /\ pow base bigD > 0)
           (ensures (k / pow base d) % base == ((k % pow base bigD) / pow base d) % base)
@@ -826,7 +826,7 @@ let digit_preserved_by_modulo_multi (k: nat) (d: nat) (bigD: nat) (base: nat)
 #pop-options
 
 /// Key: k = digit_sum k bigD base for k < pow base bigD
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec digit_decomposition_multi (k: nat) (bigD: nat) (base: nat)
   : Lemma (requires bigD > 0 /\ base >= 2 /\ k < pow base bigD)
           (ensures k == digit_sum_multi k bigD base)
@@ -945,7 +945,7 @@ let digits_lexicographic_implies_value_le
 /// Either all digits are equal, or the most significant differing digit has x<y
 /// and all higher digits are equal.
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
 let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
   : Lemma (requires base >= 2 /\
                     (forall (d:nat). d < nd ==> digit x d base <= digit y d base))

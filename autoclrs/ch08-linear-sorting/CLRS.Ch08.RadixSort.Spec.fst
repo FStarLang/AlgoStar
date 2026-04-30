@@ -304,7 +304,7 @@ let sorted_up_to_digit (s: seq nat) (max_d base: nat) : prop =
      (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base)))
 
 // Helper: given concrete witness positions, prove a < b from stability
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let order_witnesses (s_in s_out: seq nat) (d base: nat) (a b i j: nat)
   : Lemma 
     (requires is_stable_sort_by_digit s_in s_out d base /\
@@ -319,7 +319,7 @@ let order_witnesses (s_in s_out: seq nat) (d base: nat) (a b i j: nat)
 
 // Helper: find ordered input witnesses for distinct output elements with same digit.
 // Uses order_witnesses to keep reveal_opaque isolated from count_pos skolemization.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let find_input_witnesses (s_in s_out: seq nat) (d base: nat) (i j: nat)
   : Lemma 
     (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
@@ -341,7 +341,7 @@ let find_input_witnesses (s_in s_out: seq nat) (d base: nat) (i j: nat)
 #pop-options
 
 // Extract ordering for VALUES from sorted_up_to_digit (no index terms in postcondition)
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let sorted_up_to_values (s: seq nat) (max_d base: nat) (v w: nat) (a b: nat)
   : Lemma 
     (requires sorted_up_to_digit s max_d base /\
@@ -369,7 +369,7 @@ let sorted_up_to_intro (s: seq nat) (max_d base: nat)
   = reveal_opaque (`%sorted_up_to_digit) (sorted_up_to_digit s max_d base)
 
 // Combine find_input_witnesses + sorted_up_to_values + extend ordering from d-1 to d
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 100"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
   : Lemma 
     (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
@@ -412,7 +412,7 @@ let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
 
 // Key lemma: stability preserves sorted_up_to_digit property
 // This is the heart of CLRS Lemma 8.3
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 200"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let lemma_stable_sort_preserves_order
   (s_in s_out: seq nat)
   (d base: nat)
