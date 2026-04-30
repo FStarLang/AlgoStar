@@ -12,14 +12,6 @@ module L = FStar.List.Tot
 module Math = FStar.Math.Lemmas
 open CLRS.Common.ListLemmas
 
-// Helper lemma: modular arithmetic for addition
-let lemma_mod_add_assoc (a b: nat) (n: pos)
-  : Lemma ((a + b) % n == ((a % n) + b) % n)
-  = // Use the fact that (a + b) % n = ((a % n) + (b % n)) % n
-    // Then ((a % n) + b) % n = ((a % n) + (b % n)) % n since (b % n) cancels
-    Math.lemma_mod_add_distr (a % n) b n;
-    Math.lemma_mod_add_distr a b n
-
 // Helper lemma: specific case for wraparound
 let lemma_tail_update (head size: nat) (capacity: pos)
   : Lemma
@@ -29,7 +21,7 @@ let lemma_tail_update (head size: nat) (capacity: pos)
        let new_tail = (old_tail + 1) % capacity in
        let new_size = size + 1 in
        new_tail == (head + new_size) % capacity))
-  = lemma_mod_add_assoc head (size + 1) capacity
+  = Math.lemma_mod_plus_distr_l (head + size) 1 capacity
 
 // Helper lemma: dequeue tail invariant
 let lemma_tail_dequeue (head size: nat) (capacity: pos)
@@ -40,7 +32,7 @@ let lemma_tail_dequeue (head size: nat) (capacity: pos)
        let new_head = (head + 1) % capacity in
        let new_size = size - 1 in
        tail == (new_head + new_size) % capacity))
-  = lemma_mod_add_assoc head size capacity
+  = Math.lemma_mod_plus_distr_l (head + 1) (size - 1) capacity
 
 // Helper lemma: wraparound logic matches modulo
 let lemma_wraparound_eq_mod (old_val: nat) (capacity: pos)
@@ -88,7 +80,7 @@ let lemma_mod_index_shift (head: nat) (i: nat) (capacity: pos)
              ((new_head + i) % capacity == (head + (i + 1)) % capacity)))
   = let new_head = (head + 1) % capacity in
     // By modular arithmetic: ((a % n) + b) % n = (a + b) % n
-    lemma_mod_add_assoc (head + 1) i capacity
+    Math.lemma_mod_plus_distr_l (head + 1) i capacity
 
 // Helper lemma: empty queue satisfies invariant (vacuous forall)
 let lemma_empty_queue_inv (arr_seq: Seq.seq 'a) (capacity: pos)
