@@ -195,7 +195,7 @@ let phase4_content_inv (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n remainin
 
 (* ========== Phase 4 init ========== *)
 
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 5"
 let phase4_c_inv_init (sc: Seq.seq int) (sa: Seq.seq nat) (d base: nat)
   : Lemma (requires
       Seq.length sc == base /\ base > 0 /\ Seq.length sa > 0 /\
@@ -346,7 +346,7 @@ let phase4_pos_bounds (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: n
 
 (* ========== Phase 4 step: C tracking ========== *)
 
-#push-options "--z3rlimit 60"
+#push-options "--z3rlimit 10"
 let phase4_c_step (sc sc': Seq.seq int) (sa: Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
