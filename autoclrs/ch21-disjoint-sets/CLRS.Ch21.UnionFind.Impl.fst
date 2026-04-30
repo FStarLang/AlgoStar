@@ -220,28 +220,30 @@ let rec path_node_bounded (parent: Seq.seq SZ.t) (n: nat) (i: nat) (fuel: nat) (
   = if k = 0 then ()
     else path_node_bounded parent n (SZ.v (Seq.index parent i)) (fuel - 1) (k - 1)
 
-#push-options "--z3rlimit 8"
+// Factor the pigeonhole contradiction into a helper to keep Z3 queries small
+let path_len_cycle_false (parent: Seq.seq SZ.t) (n: nat) (i: nat)
+  : Lemma (requires is_forest parent n /\ i < n /\ path_len parent i n >= n)
+          (ensures False)
+  = path_len_le_fuel parent i n;
+    let pl = path_len parent i n in
+    let mk_node (k: nat{k < pl + 1}) : FStar.Fin.under n =
+      path_node_bounded parent n i n k; path_node parent i n k
+    in
+    let s : Seq.seq (FStar.Fin.under n) = Seq.init (pl + 1) mk_node in
+    let (k1, k2) = FStar.Fin.pigeonhole #n s in
+    let v = path_node parent i n k1 in
+    path_node_not_root parent i n k1;
+    path_node_eq_follow parent i n k1;
+    path_node_eq_follow parent i n k2;
+    let m = k2 - k1 in
+    follow_bounded parent n i k1;
+    follow_split parent n i k1 m;
+    nonroot_cycle_false parent n v m n
+
 let path_len_strict_bound (parent: Seq.seq SZ.t) (n: nat) (i: nat)
   : Lemma (requires is_forest parent n /\ i < n)
           (ensures path_len parent i n < n)
-  = let pl = path_len parent i n in
-    path_len_le_fuel parent i n;
-    if pl >= n then begin
-      let mk_node (k: nat{k < pl + 1}) : FStar.Fin.under n =
-        path_node_bounded parent n i n k; path_node parent i n k
-      in
-      let s : Seq.seq (FStar.Fin.under n) = Seq.init (pl + 1) mk_node in
-      let (k1, k2) = FStar.Fin.pigeonhole #n s in
-      let v = path_node parent i n k1 in
-      path_node_not_root parent i n k1;
-      path_node_eq_follow parent i n k1;
-      path_node_eq_follow parent i n k2;
-      let m = k2 - k1 in
-      follow_bounded parent n i k1;
-      follow_split parent n i k1 m;
-      nonroot_cycle_false parent n v m n
-    end
-#pop-options
+  = if path_len parent i n >= n then path_len_cycle_false parent n i
 
 let has_root_within_tight (parent: Seq.seq SZ.t) (n: nat) (i: nat)
   : Lemma (requires is_forest parent n /\ i < n)
