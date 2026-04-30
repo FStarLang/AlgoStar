@@ -82,7 +82,7 @@ let seq_merge_permutation (s1 s2: Seq.seq int)
 // Merge preserves sortedness
 // ================================================================
 
-#push-options "--z3rlimit 2 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 2 --fuel 2 --ifuel 1 --split_queries always"
 
 let rec seq_merge_all_ge (v: int) (s1 s2: Seq.seq int)
   : Lemma (requires all_ge v s1 /\ all_ge v s2)
