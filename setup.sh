@@ -135,8 +135,9 @@ install_binary() {
     info "Installing F* latest nightly binary to $FSTAR_BIN_DIR ..."
     install_flags=(--nightly)
   elif [[ "$version_arg" == nightly-* ]]; then
+    local nightly_date="${version_arg#nightly-}"
     info "Installing F* $version_arg binary to $FSTAR_BIN_DIR ..."
-    install_flags=(--nightly --version "$version_arg")
+    install_flags=(--nightly --version "$nightly_date")
   else
     info "Installing F* $version_arg binary to $FSTAR_BIN_DIR ..."
     install_flags=(--release --version "$version_arg")
@@ -172,7 +173,7 @@ install_pulse_mk() {
   local branch="fstar2"
   local base_url="https://raw.githubusercontent.com/FStarLang/FStar/${branch}/pulse/mk"
 
-  info "Downloading Pulse build infrastructure (mk files from ${tag})..."
+  info "Downloading Pulse build infrastructure (mk files from ${branch})..."
   mkdir -p "$mk_dir"
   for f in common.mk locate.mk test.mk krmlheader; do
     curl -fsSL "$base_url/$f" -o "$mk_dir/$f"
