@@ -293,8 +293,17 @@ let max_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
              (forall (j: nat). is_prefix_suffix pattern q j ==> j <= SZ.v (index pi q)) /\
              q' < q + 1 /\ is_prefix_suffix pattern q' k)
     (ensures k <= SZ.v (index pi q'))
-  = if q' < q then ()
-    else ()
+  = if q' < q then begin
+      assert (q' < q);
+      assert (is_prefix_suffix pattern q' k);
+      assert (q' < q /\ is_prefix_suffix pattern q' k);
+      ()
+    end
+    else begin
+      assert (q' == q);
+      assert (is_prefix_suffix pattern q k);
+      ()
+    end
 #pop-options
 
 #push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
