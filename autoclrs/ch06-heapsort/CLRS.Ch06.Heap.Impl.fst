@@ -269,7 +269,7 @@ ensures exists* s (cf: nat).
 // Requires SZ.fits(2*n+2) to prevent SizeT overflow in child index
 // computation (see max_heapify comment above).
 
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 70 --fuel 1 --ifuel 1"
 fn heapsort
   (a: A.array int)
   (n: SZ.t)
@@ -341,6 +341,7 @@ ensures exists* s (cf: nat).
     
     with s_swapped. assert (A.pts_to a s_swapped);
     swap_is_permutation s_cur 0 (SZ.v last);
+    swap_length s_cur 0 (SZ.v last);
     extract_extends_sorted_upto s_cur (SZ.v vsz) (SZ.v n);
     
     let new_sz = vsz - 1sz;
