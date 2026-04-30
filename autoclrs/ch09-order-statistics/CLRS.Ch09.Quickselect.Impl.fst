@@ -153,7 +153,13 @@ fn partition_in_range
 
 // ========== Helper lemma wrappers ==========
 
-#push-options "--z3rlimit 15 --split_queries always"
+/// Isolate reveal_opaque so the opaque definition doesn't pollute Z3 context
+private let reveal_perm (s_pre s1: Seq.seq int)
+  : Lemma (requires permutation s_pre s1)
+          (ensures Seq.Properties.permutation int s_pre s1)
+  = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s_pre s1)
+
+#push-options "--z3rlimit 5 --split_queries always"
 let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma
     (requires lo <= hi /\ hi <= Seq.length s_pre /\
@@ -164,8 +170,7 @@ let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
     (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
               (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
               v <= Seq.index s1 j)
-  = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s_pre s1);
-    assert (Seq.Properties.permutation int s_pre s1);
+  = reveal_perm s_pre s1;
     Lemmas.perm_unchanged_lower_bound_forall s_pre s1 lo hi
 
 let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
@@ -178,8 +183,7 @@ let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
     (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
               (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
               Seq.index s1 j <= v)
-  = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s_pre s1);
-    assert (Seq.Properties.permutation int s_pre s1);
+  = reveal_perm s_pre s1;
     Lemmas.perm_unchanged_upper_bound_forall s_pre s1 lo hi
 #pop-options
 
@@ -192,7 +196,7 @@ let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
               (forall (i: nat). k < i /\ i < Seq.length s_final ==>
                 Seq.index s_final k <= Seq.index s_final i))
     (ensures Seq.index s_final k == PSSSpec.select_spec s0 k)
-  = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s0 s_final);
+  = reveal_perm s0 s_final;
     Lemmas.seq_perm_implies_is_perm s0 s_final;
     PSSLemmas.pulse_correctness_hint s0 s_final k
 
