@@ -174,6 +174,7 @@ let cross_prod_transitivity_degenerate (cx c_y nx ny jx jy: int) : Lemma
   (ensures cross_prod cx c_y jx jy nx ny > 0) =
   cross_prod_swap23 cx c_y nx ny jx jy
 
+#push-options "--split_queries always"
 let rec find_next_aux_beats_all (xs ys: Seq.seq int) (current next: nat) (j: nat)
   : Lemma
     (requires
@@ -219,6 +220,7 @@ let rec find_next_aux_beats_all (xs ys: Seq.seq int) (current next: nat) (j: nat
     end else
       find_next_aux_beats_all xs ys current next (j + 1)
   end
+#pop-options
 
 let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   : Lemma

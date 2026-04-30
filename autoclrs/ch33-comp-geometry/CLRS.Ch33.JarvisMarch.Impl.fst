@@ -263,7 +263,7 @@ fn hull_write_step
   hull_out.(vh) <- next
 }
 
-#push-options "--fuel 2 --ifuel 0 --z3rlimit 60"
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 20"
 fn jarvis_march_with_hull (#p: perm) (xs ys: array int)
   (#sxs: Ghost.erased (Seq.seq int))
   (#sys: Ghost.erased (Seq.seq int))
@@ -343,6 +343,7 @@ fn jarvis_march_with_hull (#p: perm) (xs ys: array int)
       let go = not (next = p0) && (vh <^ len);
 
       if go {
+        jarvis_loop_step sxs sys (SZ.v p0) (SZ.v vc) (SZ.v len - SZ.v vh);
         hull_write_step sxs sys hull_out vh next len;
         h := SZ.add vh 1sz;
         current := next
