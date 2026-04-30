@@ -30,6 +30,36 @@ module RKSpec = CLRS.Ch32.RabinKarp.Spec
 open CLRS.Common.Complexity
 open CLRS.Ch32.RabinKarp.Complexity
 
+// ========== Helper lemma for inner verification loop step ==========
+
+// Combined step lemma: extend all invariant properties from k < vj to k < vj + 1
+let inner_loop_invariant_step
+    (s_text s_pat: Seq.seq nat) (s vj m: nat)
+    (hash_match chars_match: bool) (current_verified new_verified: int)
+  : Lemma
+    (requires
+      s + m <= Seq.length s_text /\ m == Seq.length s_pat /\ vj < m /\
+      (current_verified == 1 \/ current_verified == 0) /\
+      (current_verified == 1 ==>
+        (forall (k:nat). k < vj ==> Seq.index s_text (s + k) == Seq.index s_pat k)) /\
+      (current_verified == 0 ==>
+        (exists (k:nat). k < vj /\ Seq.index s_text (s + k) <> Seq.index s_pat k) \/
+        not hash_match) /\
+      (hash_match /\ (forall (k:nat). k < vj ==>
+        Seq.index s_text (s + k) == Seq.index s_pat k) ==> current_verified == 1) /\
+      chars_match == (Seq.index s_text (s + vj) = Seq.index s_pat vj) /\
+      new_verified == (if chars_match then current_verified else 0))
+    (ensures
+      (new_verified == 1 \/ new_verified == 0) /\
+      (new_verified == 1 ==>
+        (forall (k:nat). k < vj + 1 ==> Seq.index s_text (s + k) == Seq.index s_pat k)) /\
+      (new_verified == 0 ==>
+        (exists (k:nat). k < vj + 1 /\ Seq.index s_text (s + k) <> Seq.index s_pat k) \/
+        not hash_match) /\
+      (hash_match /\ (forall (k:nat). k < vj + 1 ==>
+        Seq.index s_text (s + k) == Seq.index s_pat k) ==> new_verified == 1))
+  = ()
+
 // ========== Pure Specification ==========
 
 // Pure spec function: only used in postconditions (ghost), not extracted to C
@@ -305,6 +335,11 @@ fn rabin_karp
       let chars_match = (text_char = pat_char);
       let new_verified =
         (if chars_match then current_verified else 0);
+
+      // Guide Z3: extend invariant properties from k < vj to k < vj + 1
+      inner_loop_invariant_step s_text s_pat
+        (SZ.v vs) (SZ.v vj) (SZ.v m)
+        hash_match chars_match current_verified new_verified;
 
       verified := new_verified;
       j := vj +^ 1sz;
