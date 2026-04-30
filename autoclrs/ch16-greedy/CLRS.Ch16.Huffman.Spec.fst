@@ -1631,9 +1631,322 @@ let rec find_leaf_pos_avoiding_some (t: htree) (f: pos) (avoid: tree_position)
         else find_leaf_pos_avoiding_some r f avoid_tl)
 #pop-options
 
+// Helper: single swap case (tgt_a = f1, just need to place f2 at tgt2)
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 50"
+private let greedy_exchange_single_swap
+  (t: htree) (freqs: list pos{length freqs >= 2})
+  (parent: tree_position) (a b: pos)
+  (f1 f2: pos)
+  : Lemma (requires
+      is_wpl_optimal t freqs /\
+      (let (m1, m2) = find_two_mins freqs in f1 == m1 /\ f2 == m2) /\
+      is_leaf_at t (parent @ [true]) a /\
+      is_leaf_at t (parent @ [false]) b /\
+      length (parent @ [true]) = max_leaf_depth t 0 /\
+      length (parent @ [false]) = max_leaf_depth t 0 /\
+      f1 <= f2 /\
+      mem f1 freqs /\ mem f2 freqs /\
+      (forall x. mem x freqs ==> f1 <= x) /\
+      (forall x. mem x freqs ==> (x >= f2 \/ x = f1)) /\
+      mem a freqs /\ mem b freqs /\
+      f1 <= a /\ f1 <= b /\
+      (if f2 <= b then b else a) >= f2 /\
+      (if f2 <= b then a else b) = f1 /\
+      ~((a = f1 && b = f2) || (a = f2 && b = f1)))
+    (ensures exists (t': htree). is_wpl_optimal t' freqs /\ are_siblings t' f1 f2 == true)
+  =
+    parent_has_leaf_children t parent a b;
+    let pos_a = parent @ [true] in
+    let pos_b = parent @ [false] in
+    sibling_positions_disjoint parent;
+    let tgt1 = if f2 <= b then pos_a else pos_b in
+    let tgt2 = if f2 <= b then pos_b else pos_a in
+    let tgt_a = if f2 <= b then a else b in
+    let tgt_b = if f2 <= b then b else a in
+    assert (tgt_a = f1);
+    assert (tgt_b >= f2);
+    assert (is_leaf_at t tgt1 tgt_a);
+    assert (is_leaf_at t tgt2 tgt_b);
+    assert (tgt1 =!= tgt2);
+    assert (not (is_prefix tgt1 tgt2));
+    assert (not (is_prefix tgt2 tgt1));
+    if tgt_b = f2 then ()
+    else (
+      // Single swap: tgt_b <-> f2
+      count_mem f2 (leaf_freqs t);
+      count_mem f2 freqs;
+      find_leaf_pos_none t f2;
+      find_leaf_pos_correct t f2;
+      let Some pos_f2 = find_leaf_pos t f2 in
+      if pos_f2 = tgt1 then (
+        // pos_f2 = tgt1 implies f2 = tgt_a = f1. So f1 = f2.
+        assert (f1 = f2);
+        // tgt_b <> f2 = f1. Use find_leaf_pos_avoiding to find f2 elsewhere.
+        find_two_mins_equal_count freqs;
+        assert (count f1 freqs >= 2);
+        assert (count f2 (leaf_freqs t) >= 2);
+        find_leaf_pos_avoiding_some t f2 tgt1;
+        find_leaf_pos_avoiding_correct t f2 tgt1;
+        let Some pos_f2' = find_leaf_pos_avoiding t f2 tgt1 in
+        assert (pos_f2' =!= tgt1);
+        leaf_depth_le_max t pos_f2' f2;
+        (if pos_f2' = tgt2 then (
+          // f2 = tgt_b, but tgt_b <> f2. Contradiction.
+          ()
+        ) else (
+        (if is_prefix tgt2 pos_f2' then leaf_position_no_extension t tgt2 pos_f2'
+         else if is_prefix pos_f2' tgt2 then leaf_position_no_extension t pos_f2' tgt2);
+        single_swap_optimal t tgt2 pos_f2' tgt_b f2 freqs;
+        let Some t1 = replace_subtree_at t tgt2 (Leaf 0 f2) in
+        let Some t2 = replace_subtree_at t1 pos_f2' (Leaf 0 tgt_b) in
+        get_implies_replace t tgt2 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree t tgt2 pos_f2' (Leaf 0 f2);
+        (if is_prefix pos_f2' tgt1 then leaf_position_no_extension t1 pos_f2' tgt1
+         else if is_prefix tgt1 pos_f2' then leaf_position_no_extension t1 tgt1 pos_f2');
+        get_implies_replace t1 pos_f2' (Leaf 0 tgt_b);
+        disjoint_replacement_preserves_subtree t1 pos_f2' tgt1 (Leaf 0 tgt_b);
+        replace_then_get t tgt2 (Leaf 0 f2);
+        (if is_prefix pos_f2' tgt2 then leaf_position_no_extension t1 pos_f2' tgt2
+         else if is_prefix tgt2 pos_f2' then leaf_position_no_extension t1 tgt2 pos_f2');
+        disjoint_replacement_preserves_subtree t1 pos_f2' tgt2 (Leaf 0 tgt_b);
+        parent_has_leaf_children t2 parent
+          (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
+        subtree_siblings_implies_are_siblings t2 parent f1 f2
+        ))
+      ) else (
+      leaf_depth_le_max t pos_f2 f2;
+      (if is_prefix tgt2 pos_f2 then leaf_position_no_extension t tgt2 pos_f2
+       else if is_prefix pos_f2 tgt2 then leaf_position_no_extension t pos_f2 tgt2);
+      single_swap_optimal t tgt2 pos_f2 tgt_b f2 freqs;
+      let Some t1 = replace_subtree_at t tgt2 (Leaf 0 f2) in
+      let Some t2 = replace_subtree_at t1 pos_f2 (Leaf 0 tgt_b) in
+      get_implies_replace t tgt2 (Leaf 0 f2);
+      disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf 0 f2);
+      disjoint_replacement_preserves_subtree t tgt2 pos_f2 (Leaf 0 f2);
+      (if is_prefix pos_f2 tgt1 then leaf_position_no_extension t1 pos_f2 tgt1
+       else if is_prefix tgt1 pos_f2 then leaf_position_no_extension t1 tgt1 pos_f2);
+      get_implies_replace t1 pos_f2 (Leaf 0 tgt_b);
+      disjoint_replacement_preserves_subtree t1 pos_f2 tgt1 (Leaf 0 tgt_b);
+      replace_then_get t tgt2 (Leaf 0 f2);
+      (if is_prefix pos_f2 tgt2 then leaf_position_no_extension t1 pos_f2 tgt2
+       else if is_prefix tgt2 pos_f2 then leaf_position_no_extension t1 tgt2 pos_f2);
+      disjoint_replacement_preserves_subtree t1 pos_f2 tgt2 (Leaf 0 tgt_b);
+      parent_has_leaf_children t2 parent
+        (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
+      subtree_siblings_implies_are_siblings t2 parent f1 f2
+      )
+    )
+#pop-options
+
+// Helper: double swap case (tgt_a <> f1, need to place both f1 and f2)
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 50"
+private let greedy_exchange_double_swap
+  (t: htree) (freqs: list pos{length freqs >= 2})
+  (parent: tree_position) (a b: pos)
+  (f1 f2: pos)
+  : Lemma (requires
+      is_wpl_optimal t freqs /\
+      (let (m1, m2) = find_two_mins freqs in f1 == m1 /\ f2 == m2) /\
+      is_leaf_at t (parent @ [true]) a /\
+      is_leaf_at t (parent @ [false]) b /\
+      length (parent @ [true]) = max_leaf_depth t 0 /\
+      length (parent @ [false]) = max_leaf_depth t 0 /\
+      f1 <= f2 /\
+      mem f1 freqs /\ mem f2 freqs /\
+      (forall x. mem x freqs ==> f1 <= x) /\
+      (forall x. mem x freqs ==> (x >= f2 \/ x = f1)) /\
+      mem a freqs /\ mem b freqs /\
+      f1 <= a /\ f1 <= b /\
+      (if f2 <= b then b else a) >= f2 /\
+      (if f2 <= b then a else b) <> f1 /\
+      ~((a = f1 && b = f2) || (a = f2 && b = f1)))
+    (ensures exists (t': htree). is_wpl_optimal t' freqs /\ are_siblings t' f1 f2 == true)
+  =
+    parent_has_leaf_children t parent a b;
+    let pos_a = parent @ [true] in
+    let pos_b = parent @ [false] in
+    sibling_positions_disjoint parent;
+    let tgt1 = if f2 <= b then pos_a else pos_b in
+    let tgt2 = if f2 <= b then pos_b else pos_a in
+    let tgt_a = if f2 <= b then a else b in
+    let tgt_b = if f2 <= b then b else a in
+    assert (tgt_a <> f1);
+    assert (tgt_b >= f2);
+    assert (length tgt1 = max_leaf_depth t 0);
+    assert (length tgt2 = max_leaf_depth t 0);
+    assert (is_leaf_at t tgt1 tgt_a);
+    assert (is_leaf_at t tgt2 tgt_b);
+    assert (tgt1 =!= tgt2);
+    assert (not (is_prefix tgt1 tgt2));
+    assert (not (is_prefix tgt2 tgt1));
+    // First swap: tgt_a <-> f1
+    count_mem f1 (leaf_freqs t);
+    count_mem f1 freqs;
+    find_leaf_pos_none t f1;
+    find_leaf_pos_correct t f1;
+    let Some pos_f1 = find_leaf_pos t f1 in
+    leaf_depth_le_max t pos_f1 f1;
+    assert (length tgt1 >= length pos_f1);
+    (if is_prefix tgt1 pos_f1 then leaf_position_no_extension t tgt1 pos_f1
+     else if is_prefix pos_f1 tgt1 then leaf_position_no_extension t pos_f1 tgt1);
+    single_swap_optimal t tgt1 pos_f1 tgt_a f1 freqs;
+    let Some s1 = replace_subtree_at t tgt1 (Leaf 0 f1) in
+    let Some s2 = replace_subtree_at s1 pos_f1 (Leaf 0 tgt_a) in
+    assert (is_wpl_optimal s2 freqs);
+    assert (same_frequency_multiset s2 freqs);
+    // s2 is optimal
+    replace_then_get t tgt1 (Leaf 0 f1);
+    disjoint_replacement_preserves_subtree t tgt1 pos_f1 (Leaf 0 f1);
+    (if is_prefix pos_f1 tgt1 then leaf_position_no_extension s1 pos_f1 tgt1
+     else if is_prefix tgt1 pos_f1 then leaf_position_no_extension s1 tgt1 pos_f1);
+    get_implies_replace s1 pos_f1 (Leaf 0 tgt_a);
+    disjoint_replacement_preserves_subtree s1 pos_f1 tgt1 (Leaf 0 tgt_a);
+    assert (is_leaf_at s2 tgt1 f1);
+    // tgt2 in s1 and s2
+    disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf 0 f1);
+    // pos_f1 vs tgt2
+    if pos_f1 = tgt2 then (
+      // pos_f1 = tgt2, so f1 = tgt_b and f1 = f2.
+      assert (f1 = tgt_b);
+      assert (f1 = f2);
+      find_two_mins_equal_count freqs;
+      assert (count f1 freqs >= 2);
+      assert (count f1 (leaf_freqs t) >= 2);
+      find_leaf_pos_avoiding_some t f1 tgt2;
+      find_leaf_pos_avoiding_correct t f1 tgt2;
+      let Some pos_f1' = find_leaf_pos_avoiding t f1 tgt2 in
+      assert (pos_f1' =!= tgt2);
+      leaf_depth_le_max t pos_f1' f1;
+      assert (length tgt1 >= length pos_f1');
+      if pos_f1' = tgt1 then (
+        // f1 already at tgt1 = tgt_a. But tgt_a <> f1. Contradiction.
+        assert (tgt_a = f1);
+        assert False
+      ) else (
+      (if is_prefix tgt1 pos_f1' then leaf_position_no_extension t tgt1 pos_f1'
+       else if is_prefix pos_f1' tgt1 then leaf_position_no_extension t pos_f1' tgt1);
+      single_swap_optimal t tgt1 pos_f1' tgt_a f1 freqs;
+      let Some s1' = replace_subtree_at t tgt1 (Leaf 0 f1) in
+      let Some s2' = replace_subtree_at s1' pos_f1' (Leaf 0 tgt_a) in
+      replace_then_get t tgt1 (Leaf 0 f1);
+      get_implies_replace t tgt1 (Leaf 0 f1);
+      disjoint_replacement_preserves_subtree t tgt1 pos_f1' (Leaf 0 f1);
+      (if is_prefix pos_f1' tgt1 then leaf_position_no_extension s1' pos_f1' tgt1
+       else if is_prefix tgt1 pos_f1' then leaf_position_no_extension s1' tgt1 pos_f1');
+      get_implies_replace s1' pos_f1' (Leaf 0 tgt_a);
+      disjoint_replacement_preserves_subtree s1' pos_f1' tgt1 (Leaf 0 tgt_a);
+      assert (is_leaf_at s2' tgt1 f1);
+      // tgt2 has f2 = f1 = tgt_b in s2'
+      disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf 0 f1);
+      (if is_prefix pos_f1' tgt2 then leaf_position_no_extension s1' pos_f1' tgt2
+       else if is_prefix tgt2 pos_f1' then leaf_position_no_extension s1' tgt2 pos_f1');
+      disjoint_replacement_preserves_subtree s1' pos_f1' tgt2 (Leaf 0 tgt_a);
+      assert (is_leaf_at s2' tgt2 tgt_b);
+      parent_has_leaf_children s2' parent
+        (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
+      subtree_siblings_implies_are_siblings s2' parent f1 f2
+      )
+    ) else (
+    (if is_prefix pos_f1 tgt2 then leaf_position_no_extension s1 pos_f1 tgt2
+     else if is_prefix tgt2 pos_f1 then leaf_position_no_extension s1 tgt2 pos_f1);
+    disjoint_replacement_preserves_subtree s1 pos_f1 tgt2 (Leaf 0 tgt_a);
+    assert (is_leaf_at s2 tgt2 tgt_b);
+    
+    if tgt_b = f2 then (
+      parent_has_leaf_children s2 parent
+        (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
+      subtree_siblings_implies_are_siblings s2 parent f1 f2
+    ) else (
+      // Second swap: tgt_b <-> f2 in s2
+      assert (count f2 (leaf_freqs s2) = count f2 freqs);
+      count_mem f2 (leaf_freqs s2);
+      count_mem f2 freqs;
+      find_leaf_pos_none s2 f2;
+      find_leaf_pos_correct s2 f2;
+      let Some pos_f2 = find_leaf_pos s2 f2 in
+      if pos_f2 = tgt1 then (
+        // pos_f2 = tgt1 means f2 = f1 in s2. Use find_leaf_pos_avoiding.
+        assert (f1 = f2);
+        find_two_mins_equal_count freqs;
+        assert (count f2 freqs >= 2);
+        assert (count f2 (leaf_freqs s2) >= 2);
+        find_leaf_pos_avoiding_some s2 f2 tgt1;
+        find_leaf_pos_avoiding_correct s2 f2 tgt1;
+        let Some pos_f2' = find_leaf_pos_avoiding s2 f2 tgt1 in
+        assert (pos_f2' =!= tgt1);
+        replace_leaf_preserves_max_depth t tgt1 tgt_a f1;
+        replace_leaf_preserves_max_depth s1 pos_f1 f1 tgt_a;
+        assert (max_leaf_depth s2 0 = max_leaf_depth t 0);
+        leaf_depth_le_max s2 pos_f2' f2;
+        assert (tgt_b >= f2);
+        assert (length tgt2 = max_leaf_depth t 0);
+        assert (length tgt2 >= length pos_f2');
+        if pos_f2' = tgt2 then (
+          // f2 = tgt_b, but tgt_b <> f2. Contradiction.
+          assert (tgt_b = f2);
+          assert False
+        ) else (
+        (if is_prefix tgt2 pos_f2' then leaf_position_no_extension s2 tgt2 pos_f2'
+         else if is_prefix pos_f2' tgt2 then leaf_position_no_extension s2 pos_f2' tgt2);
+        single_swap_optimal s2 tgt2 pos_f2' tgt_b f2 freqs;
+        let Some s3 = replace_subtree_at s2 tgt2 (Leaf 0 f2) in
+        let Some s4 = replace_subtree_at s3 pos_f2' (Leaf 0 tgt_b) in
+        replace_then_get s2 tgt2 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree s2 tgt2 pos_f2' (Leaf 0 f2);
+        (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1
+         else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2);
+        get_implies_replace s2 tgt2 (Leaf 0 f2);
+        disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf 0 f2);
+        (if is_prefix pos_f2' tgt1 then leaf_position_no_extension s3 pos_f2' tgt1
+         else if is_prefix tgt1 pos_f2' then leaf_position_no_extension s3 tgt1 pos_f2');
+        get_implies_replace s3 pos_f2' (Leaf 0 tgt_b);
+        disjoint_replacement_preserves_subtree s3 pos_f2' tgt1 (Leaf 0 tgt_b);
+        (if is_prefix pos_f2' tgt2 then leaf_position_no_extension s3 pos_f2' tgt2
+         else if is_prefix tgt2 pos_f2' then leaf_position_no_extension s3 tgt2 pos_f2');
+        disjoint_replacement_preserves_subtree s3 pos_f2' tgt2 (Leaf 0 tgt_b);
+        parent_has_leaf_children s4 parent
+          (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
+        subtree_siblings_implies_are_siblings s4 parent f1 f2
+        )
+      ) else (
+      replace_leaf_preserves_max_depth t tgt1 tgt_a f1;
+      replace_leaf_preserves_max_depth s1 pos_f1 f1 tgt_a;
+      assert (max_leaf_depth s2 0 = max_leaf_depth t 0);
+      leaf_depth_le_max s2 pos_f2 f2;
+      assert (tgt_b >= f2);
+      assert (length tgt2 = max_leaf_depth t 0);
+      assert (length tgt2 >= length pos_f2);
+      assert (tgt2 =!= pos_f2);
+      (if is_prefix tgt2 pos_f2 then leaf_position_no_extension s2 tgt2 pos_f2
+       else if is_prefix pos_f2 tgt2 then leaf_position_no_extension s2 pos_f2 tgt2);
+      single_swap_optimal s2 tgt2 pos_f2 tgt_b f2 freqs;
+      let Some s3 = replace_subtree_at s2 tgt2 (Leaf 0 f2) in
+      let Some s4 = replace_subtree_at s3 pos_f2 (Leaf 0 tgt_b) in
+      replace_then_get s2 tgt2 (Leaf 0 f2);
+      disjoint_replacement_preserves_subtree s2 tgt2 pos_f2 (Leaf 0 f2);
+      (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1
+       else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2);
+      get_implies_replace s2 tgt2 (Leaf 0 f2);
+      disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf 0 f2);
+      (if is_prefix pos_f2 tgt1 then leaf_position_no_extension s3 pos_f2 tgt1
+       else if is_prefix tgt1 pos_f2 then leaf_position_no_extension s3 tgt1 pos_f2);
+      get_implies_replace s3 pos_f2 (Leaf 0 tgt_b);
+      disjoint_replacement_preserves_subtree s3 pos_f2 tgt1 (Leaf 0 tgt_b);
+      (if is_prefix pos_f2 tgt2 then leaf_position_no_extension s3 pos_f2 tgt2
+       else if is_prefix tgt2 pos_f2 then leaf_position_no_extension s3 tgt2 pos_f2);
+      disjoint_replacement_preserves_subtree s3 pos_f2 tgt2 (Leaf 0 tgt_b);
+      parent_has_leaf_children s4 parent
+        (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
+      subtree_siblings_implies_are_siblings s4 parent f1 f2
+      )
+    )
+    )
+#pop-options
+
 // Exchange sub-lemma: given an optimal tree with sibling leaves a,b at max depth,
 // produce an optimal tree with f1,f2 as siblings
-#push-options "--fuel 3 --ifuel 2 --z3rlimit 100"
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 20"
 let greedy_exchange
   (t: htree) (freqs: list pos{length freqs >= 2})
   (parent: tree_position) (a b: pos)
@@ -1652,11 +1965,9 @@ let greedy_exchange
       ~((a = f1 && b = f2) || (a = f2 && b = f1)))
     (ensures exists (t': htree). is_wpl_optimal t' freqs /\ are_siblings t' f1 f2 == true)
   =
-    parent_has_leaf_children t parent a b;
     let pos_a = parent @ [true] in
     let pos_b = parent @ [false] in
     sibling_positions_disjoint parent;
-    // a,b are leaf freqs in the tree => they're in freqs => f1 <= a, f1 <= b
     subtree_leaf_mem t pos_a a;
     subtree_leaf_mem t pos_b b;
     count_mem a (leaf_freqs t);
@@ -1665,295 +1976,26 @@ let greedy_exchange
     count_mem b freqs;
     assert (f1 <= a);
     assert (f1 <= b);
-    // Choose ordering
-    let tgt1 = if f2 <= b then pos_a else pos_b in
-    let tgt2 = if f2 <= b then pos_b else pos_a in
     let tgt_a = if f2 <= b then a else b in
     let tgt_b = if f2 <= b then b else a in
-    // tgt_b >= f2: in the f2 > b case, tgt_b = a, and a >= f2 \/ a = f1.
-    // If a = f1 then f1 <= f2 and tgt_b = f1, so tgt_b >= f2 requires f1 >= f2, hence f1 = f2 = tgt_b.
     assert (mem a freqs);
     assert (a >= f2 \/ a = f1);
     assert (mem b freqs);
     assert (b >= f2 \/ b = f1);
-    assert (tgt_a >= f1);
-    // tgt_b >= f2 is NOT always true. When f2 > b and a = f1 < f2, tgt_b = a = f1 < f2.
-    // Handle this case separately.
     if not (tgt_b >= f2) then (
-      // This case is IMPOSSIBLE.
-      // tgt_b < f2 requires f2 > b (otherwise tgt_b = b >= f2).
-      // When f2 > b: tgt_b = a. And a < f2, so a = f1 (from a >= f2 \/ a = f1).
-      // Also b < f2, so b = f1 (from b >= f2 \/ b = f1).
-      // Both siblings a = b = f1 have the same frequency.
-      // Two leaves with f1 means count f1 (leaf_freqs t) >= 2.
-      // By same_frequency_multiset: count f1 freqs >= 2.
-      // Since f1 is the minimum (forall x. mem x freqs ==> f1 <= x) and appears >= 2 times,
-      // find_two_mins must return (f1, f1), so f2 = f1. But tgt_b < f2 and tgt_b = f1 means f1 < f2.
-      // Contradiction: f1 = f2 and f1 < f2.
-      // Prove: a = f1 and b = f1
+      // Impossible case
       assert (a = f1);
       assert (b = f1);
-      // Two distinct positions with Leaf f1 => count f1 (leaf_freqs t) >= 2
       two_leaves_count_ge2 t pos_a pos_b f1;
       assert (count f1 (leaf_freqs t) >= 2);
-      // same_frequency_multiset => count f1 freqs >= 2
       assert (count f1 freqs >= 2);
-      // find_two_mins returns (f1, f2) with f1 = fst, count f1 freqs >= 2
-      // => snd (find_two_mins freqs) = f1, i.e., f2 = f1
       find_two_mins_count_ge2 freqs f1;
       assert (f2 = f1)
-      // But tgt_b < f2 and tgt_b >= f1 (since tgt_b = a = f1), so f1 < f2.
-      // f1 = f2 and f1 < f2 is a contradiction. F* should derive False.
     ) else (
-    assert (is_leaf_at t tgt1 tgt_a);
-    assert (is_leaf_at t tgt2 tgt_b);
-    assert (tgt1 =!= tgt2);
-    assert (not (is_prefix tgt1 tgt2));
-    assert (not (is_prefix tgt2 tgt1));
-
-    if tgt_a = f1 then (
-      if tgt_b = f2 then ()
-      else (
-        // Single swap: tgt_b <-> f2
-        count_mem f2 (leaf_freqs t);
-        count_mem f2 freqs;
-        find_leaf_pos_none t f2;
-        find_leaf_pos_correct t f2;
-        let Some pos_f2 = find_leaf_pos t f2 in
-        if pos_f2 = tgt1 then (
-          // pos_f2 = tgt1 implies f2 = tgt_a = f1. So f1 = f2.
-          assert (f1 = f2);
-          // tgt_b <> f2 = f1. Use find_leaf_pos_avoiding to find f2 elsewhere.
-          find_two_mins_equal_count freqs;
-          assert (count f1 freqs >= 2);
-          assert (count f2 (leaf_freqs t) >= 2);
-          find_leaf_pos_avoiding_some t f2 tgt1;
-          find_leaf_pos_avoiding_correct t f2 tgt1;
-          let Some pos_f2' = find_leaf_pos_avoiding t f2 tgt1 in
-          assert (pos_f2' =!= tgt1);
-          leaf_depth_le_max t pos_f2' f2;
-          // pos_f2' vs tgt2
-          (if pos_f2' = tgt2 then (
-            // f2 = tgt_b, but tgt_b <> f2. Contradiction.
-            ()
-          ) else (
-          (if is_prefix tgt2 pos_f2' then leaf_position_no_extension t tgt2 pos_f2'
-           else if is_prefix pos_f2' tgt2 then leaf_position_no_extension t pos_f2' tgt2);
-          single_swap_optimal t tgt2 pos_f2' tgt_b f2 freqs;
-          let Some t1 = replace_subtree_at t tgt2 (Leaf 0 f2) in
-          let Some t2 = replace_subtree_at t1 pos_f2' (Leaf 0 tgt_b) in
-          // Preserve tgt1 through both replacements
-          get_implies_replace t tgt2 (Leaf 0 f2);
-          disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf 0 f2);
-          disjoint_replacement_preserves_subtree t tgt2 pos_f2' (Leaf 0 f2);
-          (if is_prefix pos_f2' tgt1 then leaf_position_no_extension t1 pos_f2' tgt1
-           else if is_prefix tgt1 pos_f2' then leaf_position_no_extension t1 tgt1 pos_f2');
-          get_implies_replace t1 pos_f2' (Leaf 0 tgt_b);
-          disjoint_replacement_preserves_subtree t1 pos_f2' tgt1 (Leaf 0 tgt_b);
-          // Preserve tgt2
-          replace_then_get t tgt2 (Leaf 0 f2);
-          (if is_prefix pos_f2' tgt2 then leaf_position_no_extension t1 pos_f2' tgt2
-           else if is_prefix tgt2 pos_f2' then leaf_position_no_extension t1 tgt2 pos_f2');
-          disjoint_replacement_preserves_subtree t1 pos_f2' tgt2 (Leaf 0 tgt_b);
-          parent_has_leaf_children t2 parent
-            (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
-          subtree_siblings_implies_are_siblings t2 parent f1 f2
-          ))
-        ) else (
-        leaf_depth_le_max t pos_f2 f2;
-        (if is_prefix tgt2 pos_f2 then leaf_position_no_extension t tgt2 pos_f2
-         else if is_prefix pos_f2 tgt2 then leaf_position_no_extension t pos_f2 tgt2);
-        single_swap_optimal t tgt2 pos_f2 tgt_b f2 freqs;
-        let Some t1 = replace_subtree_at t tgt2 (Leaf 0 f2) in
-        let Some t2 = replace_subtree_at t1 pos_f2 (Leaf 0 tgt_b) in
-        // Preserve tgt1 through both replacements
-        get_implies_replace t tgt2 (Leaf 0 f2);
-        disjoint_replacement_preserves_subtree t tgt2 tgt1 (Leaf 0 f2);
-        disjoint_replacement_preserves_subtree t tgt2 pos_f2 (Leaf 0 f2);
-        (if is_prefix pos_f2 tgt1 then leaf_position_no_extension t1 pos_f2 tgt1
-         else if is_prefix tgt1 pos_f2 then leaf_position_no_extension t1 tgt1 pos_f2);
-        get_implies_replace t1 pos_f2 (Leaf 0 tgt_b);
-        disjoint_replacement_preserves_subtree t1 pos_f2 tgt1 (Leaf 0 tgt_b);
-        // Preserve tgt2: replace_then_get + disjoint from pos_f2
-        replace_then_get t tgt2 (Leaf 0 f2);
-        (if is_prefix pos_f2 tgt2 then leaf_position_no_extension t1 pos_f2 tgt2
-         else if is_prefix tgt2 pos_f2 then leaf_position_no_extension t1 tgt2 pos_f2);
-        disjoint_replacement_preserves_subtree t1 pos_f2 tgt2 (Leaf 0 tgt_b);
-        parent_has_leaf_children t2 parent
-          (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
-        subtree_siblings_implies_are_siblings t2 parent f1 f2
-        )
-      )
-    ) else (
-      // Double swap: tgt_a <-> f1, then tgt_b <-> f2
-      count_mem f1 (leaf_freqs t);
-      count_mem f1 freqs;
-      find_leaf_pos_none t f1;
-      find_leaf_pos_correct t f1;
-      let Some pos_f1 = find_leaf_pos t f1 in
-      leaf_depth_le_max t pos_f1 f1;
-      (if is_prefix tgt1 pos_f1 then leaf_position_no_extension t tgt1 pos_f1
-       else if is_prefix pos_f1 tgt1 then leaf_position_no_extension t pos_f1 tgt1);
-      single_swap_optimal t tgt1 pos_f1 tgt_a f1 freqs;
-      let Some s1 = replace_subtree_at t tgt1 (Leaf 0 f1) in
-      let Some s2 = replace_subtree_at s1 pos_f1 (Leaf 0 tgt_a) in
-      // s2 is optimal
-      // Establish positions in s1 and s2
-      replace_then_get t tgt1 (Leaf 0 f1);
-      disjoint_replacement_preserves_subtree t tgt1 pos_f1 (Leaf 0 f1);
-      // tgt1 preserved through pos_f1 replacement
-      (if is_prefix pos_f1 tgt1 then leaf_position_no_extension s1 pos_f1 tgt1
-       else if is_prefix tgt1 pos_f1 then leaf_position_no_extension s1 tgt1 pos_f1);
-      get_implies_replace s1 pos_f1 (Leaf 0 tgt_a);
-      disjoint_replacement_preserves_subtree s1 pos_f1 tgt1 (Leaf 0 tgt_a);
-      assert (is_leaf_at s2 tgt1 f1);
-      // tgt2 in s1 and s2
-      disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf 0 f1);
-      // pos_f1 vs tgt2: if equal, then f1 = tgt_b, and tgt_b >= f2 >= f1, so f1 = f2 = tgt_b
-      if pos_f1 = tgt2 then (
-        // pos_f1 = tgt2, so f1 = tgt_b and f1 = f2.
-        // t already has f2 (= f1) at tgt2. Just need f1 at tgt1.
-        // Use find_leaf_pos_avoiding to find f1 not at tgt2.
-        assert (f1 = tgt_b);
-        assert (f1 = f2);
-        find_two_mins_equal_count freqs;
-        assert (count f1 freqs >= 2);
-        assert (count f1 (leaf_freqs t) >= 2);
-        find_leaf_pos_avoiding_some t f1 tgt2;
-        find_leaf_pos_avoiding_correct t f1 tgt2;
-        let Some pos_f1' = find_leaf_pos_avoiding t f1 tgt2 in
-        assert (pos_f1' =!= tgt2);
-        leaf_depth_le_max t pos_f1' f1;
-        if pos_f1' = tgt1 then (
-          // f1 already at tgt1 = tgt_a. But tgt_a <> f1 (we're in else branch). Contradiction.
-          ()
-        ) else (
-        (if is_prefix tgt1 pos_f1' then leaf_position_no_extension t tgt1 pos_f1'
-         else if is_prefix pos_f1' tgt1 then leaf_position_no_extension t pos_f1' tgt1);
-        single_swap_optimal t tgt1 pos_f1' tgt_a f1 freqs;
-        let Some s1' = replace_subtree_at t tgt1 (Leaf 0 f1) in
-        let Some s2' = replace_subtree_at s1' pos_f1' (Leaf 0 tgt_a) in
-        // tgt1 has f1 in s2'
-        replace_then_get t tgt1 (Leaf 0 f1);
-        get_implies_replace t tgt1 (Leaf 0 f1);
-        disjoint_replacement_preserves_subtree t tgt1 pos_f1' (Leaf 0 f1);
-        (if is_prefix pos_f1' tgt1 then leaf_position_no_extension s1' pos_f1' tgt1
-         else if is_prefix tgt1 pos_f1' then leaf_position_no_extension s1' tgt1 pos_f1');
-        get_implies_replace s1' pos_f1' (Leaf 0 tgt_a);
-        disjoint_replacement_preserves_subtree s1' pos_f1' tgt1 (Leaf 0 tgt_a);
-        assert (is_leaf_at s2' tgt1 f1);
-        // tgt2 has f2 = f1 = tgt_b in s2'
-        disjoint_replacement_preserves_subtree t tgt1 tgt2 (Leaf 0 f1);
-        (if is_prefix pos_f1' tgt2 then leaf_position_no_extension s1' pos_f1' tgt2
-         else if is_prefix tgt2 pos_f1' then leaf_position_no_extension s1' tgt2 pos_f1');
-        disjoint_replacement_preserves_subtree s1' pos_f1' tgt2 (Leaf 0 tgt_a);
-        assert (is_leaf_at s2' tgt2 tgt_b);
-        parent_has_leaf_children s2' parent
-          (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
-        subtree_siblings_implies_are_siblings s2' parent f1 f2
-        )
-      ) else (
-      (if is_prefix pos_f1 tgt2 then leaf_position_no_extension s1 pos_f1 tgt2
-       else if is_prefix tgt2 pos_f1 then leaf_position_no_extension s1 tgt2 pos_f1);
-      disjoint_replacement_preserves_subtree s1 pos_f1 tgt2 (Leaf 0 tgt_a);
-      assert (is_leaf_at s2 tgt2 tgt_b);
-      
-      if tgt_b = f2 then (
-        parent_has_leaf_children s2 parent
-          (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
-        subtree_siblings_implies_are_siblings s2 parent f1 f2
-      ) else (
-        // Second swap: tgt_b <-> f2 in s2
-        count_mem f2 (leaf_freqs s2);
-        count_mem f2 freqs;
-        find_leaf_pos_none s2 f2;
-        find_leaf_pos_correct s2 f2;
-        let Some pos_f2 = find_leaf_pos s2 f2 in
-        if pos_f2 = tgt1 then (
-          // pos_f2 = tgt1 means f2 = f1 in s2. Use find_leaf_pos_avoiding.
-          assert (f1 = f2);
-          find_two_mins_equal_count freqs;
-          assert (count f2 freqs >= 2);
-          assert (count f2 (leaf_freqs s2) >= 2);
-          find_leaf_pos_avoiding_some s2 f2 tgt1;
-          find_leaf_pos_avoiding_correct s2 f2 tgt1;
-          let Some pos_f2' = find_leaf_pos_avoiding s2 f2 tgt1 in
-          assert (pos_f2' =!= tgt1);
-          replace_leaf_preserves_max_depth t tgt1 tgt_a f1;
-          replace_leaf_preserves_max_depth s1 pos_f1 f1 tgt_a;
-          assert (max_leaf_depth s2 0 = max_leaf_depth t 0);
-          leaf_depth_le_max s2 pos_f2' f2;
-          assert (tgt_b >= f2);
-          assert (length tgt2 = max_leaf_depth t 0);
-          assert (length tgt2 >= length pos_f2');
-          if pos_f2' = tgt2 then (
-            // f2 = tgt_b, but tgt_b <> f2. Contradiction.
-            ()
-          ) else (
-          (if is_prefix tgt2 pos_f2' then leaf_position_no_extension s2 tgt2 pos_f2'
-           else if is_prefix pos_f2' tgt2 then leaf_position_no_extension s2 pos_f2' tgt2);
-          single_swap_optimal s2 tgt2 pos_f2' tgt_b f2 freqs;
-          let Some s3 = replace_subtree_at s2 tgt2 (Leaf 0 f2) in
-          let Some s4 = replace_subtree_at s3 pos_f2' (Leaf 0 tgt_b) in
-          // Establish positions in s3 and s4
-          replace_then_get s2 tgt2 (Leaf 0 f2);
-          disjoint_replacement_preserves_subtree s2 tgt2 pos_f2' (Leaf 0 f2);
-          // tgt1 preserved in s3
-          (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1
-           else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2);
-          get_implies_replace s2 tgt2 (Leaf 0 f2);
-          disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf 0 f2);
-          // tgt1 preserved in s4
-          (if is_prefix pos_f2' tgt1 then leaf_position_no_extension s3 pos_f2' tgt1
-           else if is_prefix tgt1 pos_f2' then leaf_position_no_extension s3 tgt1 pos_f2');
-          get_implies_replace s3 pos_f2' (Leaf 0 tgt_b);
-          disjoint_replacement_preserves_subtree s3 pos_f2' tgt1 (Leaf 0 tgt_b);
-          // tgt2 preserved in s4
-          (if is_prefix pos_f2' tgt2 then leaf_position_no_extension s3 pos_f2' tgt2
-           else if is_prefix tgt2 pos_f2' then leaf_position_no_extension s3 tgt2 pos_f2');
-          disjoint_replacement_preserves_subtree s3 pos_f2' tgt2 (Leaf 0 tgt_b);
-          parent_has_leaf_children s4 parent
-            (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
-          subtree_siblings_implies_are_siblings s4 parent f1 f2
-          )
-        ) else (
-        replace_leaf_preserves_max_depth t tgt1 tgt_a f1;
-        replace_leaf_preserves_max_depth s1 pos_f1 f1 tgt_a;
-        assert (max_leaf_depth s2 0 = max_leaf_depth t 0);
-        leaf_depth_le_max s2 pos_f2 f2;
-        assert (tgt_b >= f2);
-        assert (length tgt2 = max_leaf_depth t 0);
-        assert (length tgt2 >= length pos_f2);
-        assert (tgt2 =!= pos_f2);
-        (if is_prefix tgt2 pos_f2 then leaf_position_no_extension s2 tgt2 pos_f2
-         else if is_prefix pos_f2 tgt2 then leaf_position_no_extension s2 pos_f2 tgt2);
-        single_swap_optimal s2 tgt2 pos_f2 tgt_b f2 freqs;
-        let Some s3 = replace_subtree_at s2 tgt2 (Leaf 0 f2) in
-        let Some s4 = replace_subtree_at s3 pos_f2 (Leaf 0 tgt_b) in
-        // Establish positions in s3 and s4
-        replace_then_get s2 tgt2 (Leaf 0 f2);
-        disjoint_replacement_preserves_subtree s2 tgt2 pos_f2 (Leaf 0 f2);
-        // tgt1 preserved in s3
-        (if is_prefix tgt2 tgt1 then leaf_position_no_extension s2 tgt2 tgt1
-         else if is_prefix tgt1 tgt2 then leaf_position_no_extension s2 tgt1 tgt2);
-        get_implies_replace s2 tgt2 (Leaf 0 f2);
-        disjoint_replacement_preserves_subtree s2 tgt2 tgt1 (Leaf 0 f2);
-        // tgt1 preserved in s4
-        (if is_prefix pos_f2 tgt1 then leaf_position_no_extension s3 pos_f2 tgt1
-         else if is_prefix tgt1 pos_f2 then leaf_position_no_extension s3 tgt1 pos_f2);
-        get_implies_replace s3 pos_f2 (Leaf 0 tgt_b);
-        disjoint_replacement_preserves_subtree s3 pos_f2 tgt1 (Leaf 0 tgt_b);
-        // tgt2 preserved in s4
-        (if is_prefix pos_f2 tgt2 then leaf_position_no_extension s3 pos_f2 tgt2
-         else if is_prefix tgt2 pos_f2 then leaf_position_no_extension s3 tgt2 pos_f2);
-        disjoint_replacement_preserves_subtree s3 pos_f2 tgt2 (Leaf 0 tgt_b);
-        parent_has_leaf_children s4 parent
-          (if f2 <= b then f1 else f2) (if f2 <= b then f2 else f1);
-        subtree_siblings_implies_are_siblings s4 parent f1 f2
-        )
-      )
-      )
-    )
+      if tgt_a = f1 then
+        greedy_exchange_single_swap t freqs parent a b f1 f2
+      else
+        greedy_exchange_double_swap t freqs parent a b f1 f2
     )
 #pop-options
 
