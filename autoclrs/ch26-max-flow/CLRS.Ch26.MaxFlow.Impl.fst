@@ -492,6 +492,22 @@ let queue_ok (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (vtail n: nat) : prop 
 let queue_prefix_preserved (sq sq': Seq.seq SZ.t) (vtail: nat) : prop =
   forall (j: nat). j < vtail ==> seq_get_sz sq' j == seq_get_sz sq j
 
+(** Updating queue at index vtail preserves prefix below vtail *)
+let lemma_queue_prefix_upd (squeue: Seq.seq SZ.t) (vtail: nat) (v: SZ.t)
+  : Lemma
+    (requires vtail < Seq.length squeue)
+    (ensures queue_prefix_preserved squeue (Seq.upd squeue vtail v) vtail)
+  = ()
+
+(** Seq.upd color at idx preserves non-zero entries elsewhere *)
+let lemma_seq_upd_preserves_nonzero (scolor: Seq.seq int) (n idx: nat) (v: int)
+  : Lemma
+    (requires idx < Seq.length scolor /\ Seq.length scolor >= n /\ v <> 0)
+    (ensures
+      (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get (Seq.upd scolor idx v) j <> 0) /\
+      (forall (j: nat). j < n /\ j <> idx /\ seq_get scolor j == 1 ==> seq_get (Seq.upd scolor idx v) j == 1))
+  = ()
+
 (** Extending queue with a fresh element preserves uniqueness.
     The new element has color 0 while all existing entries have non-zero color,
     so the new element must differ from all existing entries. *)
@@ -1919,9 +1935,14 @@ let elim_discover_delta
       queue_color1 scolor' squeue' vtail vtail' n)
   = reveal_opaque (`%discover_delta) (discover_delta scolor scolor' spred' squeue squeue' cap_seq flow_seq n u vv source vtail vtail')
 
+(** Arithmetic helper: a = b + 1 ==> a + c = b + (c + 1) — isolated to avoid quantifier context *)
+private let lemma_count_sum_arith (a b c: int)
+  : Lemma (requires a == b + 1) (ensures a + c == b + (c + 1))
+  = ()
+
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 1200 --fuel 1 --ifuel 1 --split_queries always --ext no:optimize_let_vc --z3refresh"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -1955,22 +1976,15 @@ let maybe_discover_then_proof
     let sp' = Seq.upd spred (SZ.v vv) u in
     let sq' = Seq.upd squeue vtail vv in
     mk_bfs_inv_props sc' sp' sq' cap_seq flow_seq n source (vtail + 1);
-    assert (bfs_inv_props sc' sp' sq' cap_seq flow_seq n source (vtail + 1));
-    assert (vtail + 1 >= vtail);
-    assert (nbr_colored_if_residual sc' cap_seq flow_seq n u (SZ.v vv));
-    assert (count_color1 sc' n == count_color1 scolor n + 1);
-    assert (count_color1 sc' n + vtail == count_color1 scolor n + (vtail + 1));
-    assert (queue_prefix_preserved squeue sq' vtail);
-    // Single-element queue_color1 via helper lemma
+    lemma_queue_prefix_upd squeue vtail vv;
+    lemma_seq_upd_preserves_nonzero scolor n (SZ.v vv) 1;
+    // Establish Seq.upd facts needed by lemma_queue_color1_singleton and mk_discover_delta
     assert (seq_get_sz sq' vtail == vv);
     assert (seq_get sc' (SZ.v vv) == 1);
-    assert (SZ.v (seq_get_sz sq' vtail) == SZ.v vv);
-    assert (seq_get sc' (SZ.v (seq_get_sz sq' vtail)) == 1);
+    assert (nbr_colored_if_residual sc' cap_seq flow_seq n u (SZ.v vv));
+    assert (count_color1 sc' n == count_color1 scolor n + 1);
+    lemma_count_sum_arith (count_color1 sc' n) (count_color1 scolor n) vtail;
     lemma_queue_color1_singleton sc' sq' vtail n;
-    assert (queue_color1 sc' sq' vtail (vtail + 1) n);
-    // Color preservation
-    assert (forall (j: nat). j < n /\ seq_get scolor j <> 0 ==> seq_get sc' j <> 0);
-    assert (forall (j: nat). j < n /\ seq_get scolor j == 1 ==> seq_get sc' j == 1);
     mk_discover_delta scolor sc' sp' squeue sq'
       cap_seq flow_seq n u (SZ.v vv) source vtail (vtail + 1)
 #pop-options
@@ -2097,7 +2111,7 @@ fn maybe_discover
 #pop-options
 
 (** Explore all neighbors of vertex u in the residual graph *)
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
 fn bfs_explore_neighbors
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2249,7 +2263,8 @@ fn bfs_explore_neighbors
 #pop-options
 
 (** Main BFS: returns whether sink was reached *)
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1 --split_queries always"
+#restart-solver
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
 fn bfs_residual
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
