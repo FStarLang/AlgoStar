@@ -45,6 +45,31 @@ module Spec = CLRS.Ch32.KMP.Spec
 open CLRS.Ch32.KMP.PureDefs
 open CLRS.Common.Complexity
 
+// ========== Helper lemma: connect Pulse inner loop result to kmp_step_result ==========
+
+// After the inner failure-chain loop, the Pulse variable q_after equals
+// follow_fail evaluated at that position. This lemma connects the Pulse
+// if-then-else (chars_match → q_after+1, else q_after) to kmp_step_result.
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 20"
+let kmp_step_connection
+    (pattern pi_int: Seq.seq int) (q_init q_after: nat) (c: int) (m: nat)
+    (chars_match: bool)
+  : Lemma
+    (requires
+      m == Seq.length pattern /\ m > 0 /\
+      Seq.length pi_int == m /\
+      Spec.pi_max pattern pi_int /\
+      q_after < m /\
+      Spec.follow_fail pattern pi_int q_init c ==
+        Spec.follow_fail pattern pi_int q_after c /\
+      (q_after == 0 \/ (q_after < Seq.length pattern /\ Seq.index pattern q_after == c)) /\
+      chars_match == (Seq.index pattern q_after = c))
+    (ensures (
+      let new_q = if chars_match then q_after + 1 else q_after in
+      new_q == Spec.kmp_step_result pattern pi_int q_init c m))
+  = ()
+#pop-options
+
 // ========== Compute Prefix Function ==========
 
 //SNIPPET_START: compute_prefix_function_sig
@@ -374,6 +399,13 @@ fn kmp_matcher
     let chars_match = (pat_char_final = text_char_final);
     let new_q_val: SZ.t = (if chars_match then vq_after +^ 1sz else vq_after);
     
+    // Bridge Pulse computation to spec's kmp_step_result
+    kmp_step_connection (reveal s_pat)
+      (Bridge.sz_seq_to_int (reveal s_pi))
+      (SZ.v vq_init) (SZ.v vq_after)
+      (Seq.index (reveal s_text) (SZ.v vi))
+      (SZ.v m) chars_match;
+    
     assert pure (SZ.v new_q_val <= SZ.v m);
     q := new_q_val;
     
@@ -394,6 +426,17 @@ fn kmp_matcher
     Spec.kmp_count_step (reveal s_text) (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vi) (SZ.v vq_init) (SZ.v vcount_outer);
     
     let vi_next = vi +^ 1sz;
+
+    // Assert spec invariants from kmp_count_step
+    assert pure (
+      Spec.is_max_prefix_below s_text s_pat (SZ.v vi + 1) (SZ.v new_q_after_match));
+    assert pure (
+      SZ.v vi + 1 >= SZ.v m ==>
+        SZ.v new_count_val == Spec.count_before s_text s_pat (SZ.v vi + 1 - SZ.v m + 1));
+    assert pure (
+      SZ.v vi + 1 < SZ.v m ==> SZ.v new_count_val == 0);
+    
+    // Assert remaining invariant properties
     assert pure (SZ.v old_count <= SZ.v vi + 1);
     assert pure (SZ.v new_count_val <= SZ.v vi + 2);
     assert pure (SZ.v vi_next == SZ.v vi + 1);
