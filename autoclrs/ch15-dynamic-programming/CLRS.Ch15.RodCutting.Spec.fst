@@ -66,6 +66,15 @@ let rec accum_max (prices: seq nat) (r: seq nat) (j: nat) (limit: nat)
          let candidate = index prices (limit - 1) + index r (j - limit) in
          (if candidate >= prev then candidate else prev)
 
+// Explicit one-step unfolding of accum_max for use at fuel 0
+let accum_max_step (prices: seq nat) (r: seq nat) (j: nat) (i: nat)
+  : Lemma (requires i >= 1 /\ j >= 1 /\ i <= j /\ i - 1 < length prices /\ j - i < length r)
+          (ensures accum_max prices r j i ==
+                   (let prev = accum_max prices r j (i - 1) in
+                    let candidate = index prices (i - 1) + index r (j - i) in
+                    if candidate >= prev then candidate else prev))
+  = ()
+
 // Build the optimal revenue table bottom-up
 // build_opt len prices = sequence of length len+1 where s[k] = optimal revenue for rod of length k
 let rec build_opt (prices: seq nat) (len: nat)
