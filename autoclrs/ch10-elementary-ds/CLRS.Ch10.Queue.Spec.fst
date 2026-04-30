@@ -21,7 +21,7 @@ type queue (a: Type) = {
 }
 
 /// Queue invariant: front empty implies back empty
-let queue_inv (#a: Type) (q: queue a) : Type0 =
+let queue_inv (#a: Type) (q: queue a) : prop =
   Cons? q.front \/ (Nil? q.front /\ Nil? q.back)
 
 /// Well-formed queue

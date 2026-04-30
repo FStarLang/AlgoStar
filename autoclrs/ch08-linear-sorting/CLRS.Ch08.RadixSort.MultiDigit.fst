@@ -672,7 +672,7 @@ let backward_stability_with_order (s: seq nat) (d base: nat) (i: nat)
 #pop-options
 
 /// Stable sort on distinct sequences preserves sorted_up_to_digit ordering
-#push-options "--fuel 1 --ifuel 0 --z3rlimit 40"
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 80"
 let stable_sort_preserves_sorted_up_to
   (s: seq nat) (d base: nat)
   : Lemma 
@@ -907,7 +907,7 @@ let digits_lexicographic_implies_value_le
     // Case 1: all digits equal => digit_sums equal => x == y
     // Case 2: exists d with digit_x(d) < digit_y(d) and higher digits equal
     //         => digit_sum x num_digits <= digit_sum y num_digits => x <= y
-    match FStar.StrongExcludedMiddle.strong_excluded_middle
+    match FStar.IndefiniteDescription.strong_excluded_middle
       (forall (d: nat). d < num_digits ==> digit x d base == digit y d base) with
     | true -> digit_sum_equal_multi x y num_digits base
     | false -> 
@@ -1130,7 +1130,7 @@ let example_radix_sort () : seq nat =
   radix_sort input 3 10
 
 /// The example produces a sorted sequence
-#push-options "--warn_error -271"
+#push-options "--warn_error -271 --z3rlimit 20"
 let example_radix_sort_correct ()
   : Lemma (ensures (let result = example_radix_sort () in
                    sorted result))

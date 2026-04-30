@@ -115,7 +115,7 @@ let lemma_zero_array_eq_create (s: Seq.seq int) (len: nat)
     This connects the imperative postcondition to the spec-level predicate
     used by the MFMC theorem. The two predicates are equivalent when indices
     are in range: seq_get s (u*n+v) = get s n u v = Seq.index s (u*n+v). *)
-#push-options "--z3rlimit 10"
+#push-options "--z3rlimit 20"
 let imp_valid_flow_implies_valid_flow (flow_seq cap_seq: Seq.seq int) (n source sink: nat)
   : Lemma
     (requires imp_valid_flow flow_seq cap_seq n source sink)
@@ -1921,7 +1921,7 @@ let elim_discover_delta
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 1200 --fuel 1 --ifuel 1 --split_queries always --ext no:optimize_let_vc --z3refresh"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)

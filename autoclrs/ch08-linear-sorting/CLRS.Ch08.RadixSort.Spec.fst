@@ -393,7 +393,7 @@ let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
       (fun b -> a < b /\ b < length s_in /\
         index s_in a == v /\ index s_in b == w) in
     sorted_up_to_values s_in (d - 1) base v w a b;
-    match FStar.StrongExcludedMiddle.strong_excluded_middle
+    match FStar.IndefiniteDescription.strong_excluded_middle
       (exists (d0: nat). d0 <= d - 1 /\
         digit v d0 base < digit w d0 base /\
         (forall (d': nat). d0 < d' /\ d' <= d - 1 ==> digit v d' base == digit w d' base)) with
@@ -625,7 +625,7 @@ let lemma_digits_le_implies_value_le (x y bigD base: nat)
           (ensures x <= y)
   = digit_decomposition x bigD base;
     digit_decomposition y bigD base;
-    match FStar.StrongExcludedMiddle.strong_excluded_middle
+    match FStar.IndefiniteDescription.strong_excluded_middle
       (forall (d: nat). d < bigD ==> digit x d base == digit y d base) with
     | true -> lemma_digit_sum_extensional x y bigD base bigD
     | false ->

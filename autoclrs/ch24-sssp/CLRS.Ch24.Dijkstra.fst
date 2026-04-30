@@ -173,7 +173,7 @@ let relax_round_lb_post
 #pop-options
 
 /// Bridge lemma: pred_ok is preserved by the relaxation round
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 120 --fuel 0 --ifuel 0"
 let relax_round_pred_ok
   (sweights sdist_pre sdist_after: Seq.seq int)
   (spred_pre spred_after: Seq.seq SZ.t)

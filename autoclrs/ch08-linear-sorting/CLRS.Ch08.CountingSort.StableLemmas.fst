@@ -325,7 +325,7 @@ let final_sorted (sa sb: Seq.seq nat) (k: nat)
 #pop-options
 
 // Permutation helper: count elements in block-structured output
-#push-options "--z3rlimit 200 --split_queries always"
+#push-options "--z3rlimit 400 --split_queries always"
 let rec perm_count_blocks (sa sb: Seq.seq nat) (k: nat) (v: nat) (w: nat)
   : Lemma (requires v <= k /\
                     count_le sa k == Seq.length sa /\ S.in_range sa k /\

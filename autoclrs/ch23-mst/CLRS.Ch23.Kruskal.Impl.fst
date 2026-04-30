@@ -1545,7 +1545,7 @@ let rec edges_from_arrays_no_self_loops
 #pop-options
 
 /// For connected graphs with ec < n-1, the scan MUST find a cross-component edge.
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let connected_implies_vbw_positive
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat) (vbw: int)
     (vbu vbv: nat)
@@ -1938,7 +1938,7 @@ let kruskal_mst_inv_step_add
 
 // Step maintenance: not adding an edge
 #restart-solver
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_mst_inv_step_noop
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -2096,7 +2096,7 @@ let kruskal_spanning_step_count
     end
 #pop-options
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 1200 --fuel 2 --ifuel 2 --split_queries always --ext no:optimize_let_vc --z3refresh"
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))

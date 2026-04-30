@@ -939,10 +939,10 @@ let bf_negative_cycle_detection (#n: nat) (adj: adj_matrix n) (src: nat{src < n}
     // Since d_v > d_u + w (or d_v = None), dist_extra[v] ≠ dist[v]
     FStar.Classical.exists_elim
       (exists (v: nat). v < n /\ get_dist dist_extra v <> get_dist dist v)
-      (FStar.Squash.get_proof (exists_relaxable_edge adj dist))
+      (() <: squash (exists_relaxable_edge adj dist))
       (fun u -> FStar.Classical.exists_elim
         (exists (v: nat). v < n /\ get_dist dist_extra v <> get_dist dist v)
-        (FStar.Squash.get_proof (exists (v': nat). v' < n /\ edge_weight adj u v' < inf /\
+        (() <: squash (exists (v': nat). v' < n /\ edge_weight adj u v' < inf /\
           (match get_dist dist u with
            | None -> False
            | Some d_u ->

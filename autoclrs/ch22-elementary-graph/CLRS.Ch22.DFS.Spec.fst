@@ -2394,7 +2394,7 @@ let cycle_implies_back_edge
     (ensures has_back_edge (dfs adj n) adj n)
   = let st = dfs adj n in
     topo_order_iff_no_back_edge adj n;
-    if FStar.StrongExcludedMiddle.strong_excluded_middle (has_back_edge st adj n) then ()
+    if FStar.IndefiniteDescription.strong_excluded_middle (has_back_edge st adj n) then ()
     else (
       assert (forall (a b: nat). a < n /\ b < n /\ has_edge n adj a b ==> f_of st a > f_of st b);
       path_finish_decreasing adj n st u u k;
@@ -2850,7 +2850,7 @@ let cycle_iff_back_edge
         Classical.forall_intro (fun k ->
           Classical.move_requires (fwd u v) k)));
     // Backward: back_edge → cycle
-    if FStar.StrongExcludedMiddle.strong_excluded_middle (has_back_edge (dfs adj n) adj n) then
+    if FStar.IndefiniteDescription.strong_excluded_middle (has_back_edge (dfs adj n) adj n) then
       back_edge_implies_cycle adj n
     else ()
 

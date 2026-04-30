@@ -13,7 +13,7 @@ module CLRS.Ch22.DFS.TopologicalSort
 open CLRS.Ch22.DFS.Spec
 
 module TS = CLRS.Ch22.TopologicalSort.Spec
-module SEM = FStar.StrongExcludedMiddle
+module SEM = FStar.IndefiniteDescription
 module ID = FStar.IndefiniteDescription
 
 (*** §1. Adjacency Matrix Bridge ***)

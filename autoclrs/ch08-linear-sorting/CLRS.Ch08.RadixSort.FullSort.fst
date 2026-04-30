@@ -240,7 +240,7 @@ let digits_lex_order_implies_numeric_order
     if bigD = 1 then ()
     else (
       // Case split: all digits equal vs exists separating digit
-      match FStar.StrongExcludedMiddle.strong_excluded_middle
+      match FStar.IndefiniteDescription.strong_excluded_middle
         (forall (d: nat). d < bigD ==> digit x d base == digit y d base) with
       | true -> 
         // All digits equal: digit_sum x = digit_sum y, so x = y

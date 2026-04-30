@@ -748,7 +748,7 @@ let cost_invariant_from_merge_bundle
     freq2_le_remaining_root_freqs pq0 pq1 active0 freq1 freq2 idx1 idx2 j1 j2
 #pop-options
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
 private
 let merge_bundle_step_aux
   (freq_seq: Seq.seq int)

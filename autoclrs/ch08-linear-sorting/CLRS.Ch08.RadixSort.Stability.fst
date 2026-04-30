@@ -364,7 +364,7 @@ let lemma_stable_pass_preserves_ordering
             digit_strict_lt_gives_lex v w d base
           else begin
             assert (digit v d base == digit w d base);
-            match FStar.StrongExcludedMiddle.strong_excluded_middle
+            match FStar.IndefiniteDescription.strong_excluded_middle
               (exists (d0: nat). d0 < d /\
                 digit v d0 base < digit w d0 base /\
                 (forall (d': nat). d0 < d' /\ d' < d ==> digit v d' base == digit w d' base)) with

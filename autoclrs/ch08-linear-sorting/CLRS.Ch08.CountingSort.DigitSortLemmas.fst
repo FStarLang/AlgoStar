@@ -78,16 +78,6 @@ let rec digit_count_append (s1 s2: Seq.seq nat) (v d base: nat)
 
 (* ========== Phase 2: digit counting ========== *)
 
-let digit_counts_match_prefix (sc: Seq.seq int) (sa: Seq.seq nat)
-                               (d base: nat) (progress: nat) : prop =
-  Seq.length sc == base /\ base > 0 /\
-  progress <= Seq.length sa /\
-  (forall (v: nat). v < base ==>
-    Seq.index sc v == digit_count (Seq.slice sa 0 progress) v d base)
-
-let digit_counts_match (sc: Seq.seq int) (sa: Seq.seq nat) (d base: nat) : prop =
-  digit_counts_match_prefix sc sa d base (Seq.length sa)
-
 /// When all counts are zero, digit_counts_match_prefix holds at progress 0
 let digit_counts_match_prefix_zero (sc: Seq.seq int) (sa: Seq.seq nat) (d base: nat)
   : Lemma (requires
@@ -123,14 +113,6 @@ let digit_count_phase_step
 #pop-options
 
 (* ========== Phase 3: prefix sums for digit counts ========== *)
-
-let digit_prefix_sum_inv (sc: Seq.seq int) (sa: Seq.seq nat)
-                          (d base: nat) (progress: nat) : prop =
-  Seq.length sc == base /\ base > 0 /\
-  progress >= 1 /\ progress <= base /\
-  (forall (v: nat). v < progress ==> Seq.index sc v == digit_count_le sa v d base) /\
-  (forall (v: nat). v >= progress /\ v < base ==>
-    Seq.index sc v == digit_count (Seq.slice sa 0 (Seq.length sa)) v d base)
 
 let digit_prefix_sum_init (sc: Seq.seq int) (sa: Seq.seq nat) (d base: nat)
   : Lemma (requires digit_counts_match sc sa d base /\ base > 0)
@@ -437,7 +419,7 @@ let write_pos_outside_larger (sa: Seq.seq nat) (d base: nat) (remaining: nat)
 
 /// Sub-lemma for phase4_b_step: does NOT reveal opaque defs.
 /// Takes the needed facts from the old b-invariant explicitly.
-#push-options "--z3rlimit 40 --z3refresh --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 40 --z3refresh --fuel 2 --ifuel 2 --z3seed 1"
 let phase4_b_step_core
   (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires

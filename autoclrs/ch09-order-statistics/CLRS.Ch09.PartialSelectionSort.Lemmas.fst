@@ -106,7 +106,7 @@ let equal_head_tail (s1 s2: seq int)
 #pop-options
 
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 //SNIPPET_START: sorted_permutation_equal
 let rec sorted_permutation_equal (s1 s2: seq int)
   : Lemma (requires is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
@@ -116,6 +116,7 @@ let rec sorted_permutation_equal (s1 s2: seq int)
   = if Seq.length s1 = 0 then ()
     else begin
       sorted_perm_heads_equal s1 s2;
+      assert (Seq.length s1 = Seq.length s2);
       if Seq.length s1 = 1 then ()
       else begin
         sorted_tail s1;

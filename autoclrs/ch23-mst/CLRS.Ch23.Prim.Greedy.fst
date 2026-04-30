@@ -364,7 +364,7 @@ let prim_safe_update_non_mst
 (*** Core Greedy Step via Cut Property ***)
 
 /// The main cut_property application. Uses KeyInv predicates as preconditions.
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 300 --fuel 2 --ifuel 1 --split_queries always"
 let prim_cut_step
     (ps ks ims ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma

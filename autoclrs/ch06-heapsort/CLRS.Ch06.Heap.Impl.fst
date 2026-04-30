@@ -193,7 +193,7 @@ ensures exists* s' (cf: nat).
 
 #restart-solver
 
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn build_max_heap
   (a: A.array int)
   (n: SZ.t)
@@ -269,7 +269,7 @@ ensures exists* s (cf: nat).
 // Requires SZ.fits(2*n+2) to prevent SizeT overflow in child index
 // computation (see max_heapify comment above).
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 fn heapsort
   (a: A.array int)
   (n: SZ.t)

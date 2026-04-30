@@ -110,13 +110,13 @@ let lemma_seq_eq_test_adj (s: Seq.seq int)
 //   Seq.index (fw_outer test_adj 3 0) (qi*3+qj) == fw_entry test_adj 3 qi qj 3
 // The SMT solver evaluates fw_entry to the expected concrete value.
 
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 20 --split_queries always"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 160 --split_queries always"
 
 // Step 1: Prove fw_entry values for all 9 entries (same as SpecTest.fst)
 let fw_val_00 () : Lemma (fw_entry test_adj 3 0 0 3 == 0) = ()
 let fw_val_01 () : Lemma (fw_entry test_adj 3 0 1 3 == 5) = ()
 let fw_val_02 () : Lemma (fw_entry test_adj 3 0 2 3 == 20) = ()
-let fw_val_10 () : Lemma (fw_entry test_adj 3 1 0 3 == 45) = ()
+let fw_val_10 () : Lemma (fw_entry test_adj 3 1 0 3 == 45) = assert_norm (fw_entry test_adj 3 1 0 3 == 45)
 let fw_val_11 () : Lemma (fw_entry test_adj 3 1 1 3 == 0) = ()
 let fw_val_12 () : Lemma (fw_entry test_adj 3 1 2 3 == 15) = ()
 let fw_val_20 () : Lemma (fw_entry test_adj 3 2 0 3 == 30) = ()

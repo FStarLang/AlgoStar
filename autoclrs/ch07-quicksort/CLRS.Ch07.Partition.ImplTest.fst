@@ -42,7 +42,7 @@ let int_leq (a b: int) : (r:bool{r <==> Prims.op_LessThanOrEqual a b}) =
 
 // Test file: concrete 3-element reasoning needs fuel for count/permutation unfolding.
 // split_queries helps Z3 handle count facts independently.
-#push-options "--fuel 4 --z3rlimit 15 --split_queries always"
+#push-options "--fuel 4 --z3rlimit 30 --split_queries always"
 
 (* Lemma: for input [3; 1; 2], the partition postcondition determines
    that the three sub-sequences form a valid split of exactly these elements.
