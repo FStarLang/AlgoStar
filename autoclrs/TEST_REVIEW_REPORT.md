@@ -116,30 +116,22 @@ fn test_create_free ()
 
 ### Relational Specifications
 
-Some specifications are inherently relational, meaning the allow multiple valid
+Some specifications are inherently relational, meaning they allow multiple valid
 outputs for a given input.
 
-A good example of this is CLRS.Ch22.TopologicalSort.Impl, which only proves that
-it returns a valid topological sort, of which there may be many. This is a
+A good example of this is CLRS.Ch23.Kruskal.Impl, 
+which only proves that
+it returns a valid minimal spanning tree, of which there may be several; and further, the order
+of edges in the predecessor array is undetermined. This is a
 common style of specification that does not overly constrain implementations,
 while also providing useful, abstract specifications to clients.
 
 In such cases, we have instructed agents to author test cases that enumerate all
 possible correct outputs and prove that the postcondition is sufficiently strong
-to prove that
+to prove that the output satisfies a disjunction of all the legal outputs.
 
-  - each correct output is admissible by the postcondition
-  - no other outputs are admissible by the postcondition
-
-However, so far, we have yet to have agents generate such strong tests for
-relational specifications. 
-
-For example, for the case of topological sort, the test proves that the expected
-output is indeed a valid topological sort, but does not prove that the returned
-sort is exact one expected, nor does it enumerate all the legal outputs:
-https://github.com/FStarLang/AlgoStar/blob/_address_reviews/autoclrs/ch22-elementary-graph/CLRS.Ch22.TopologicalSort.ImplTest.md#what-is-not-proven
-
-We are working to improve this.
+You can see an example of such a disjunctive assertion in a test of Kruskal here:
+https://github.com/FStarLang/AlgoStar/blob/main/autoclrs/ch23-mst/CLRS.Ch23.Kruskal.ImplTest.fst#L162
 
 ## Summary of Results
 
