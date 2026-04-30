@@ -46,6 +46,10 @@ let transfer_larger_slice
     assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (lb <= Seq.index s ((k+shift) - shift)));
     assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (lb <= Seq.index s k))
 
+// transfer_smaller_slice and transfer_strictly_larger_slice need ifuel 2
+// for deterministic Seq.slice quantifier instantiation.
+#restart-solver
+#push-options "--ifuel 2"
 let transfer_smaller_slice
   (s : Seq.seq int)
   (shift : nat)
@@ -58,7 +62,11 @@ let transfer_smaller_slice
   = assert (forall (k: int). l <= k /\ k < r ==> (Seq.index s (k - shift) <= rb));
     assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (Seq.index s ((k+shift) - shift) <= rb));
     assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (Seq.index s k <= rb))
+#pop-options
 
+// Restart solver to clear context from transfer_smaller_slice.
+#restart-solver
+#push-options "--ifuel 2"
 let transfer_strictly_larger_slice
   (s : Seq.seq int)
   (shift : nat)
@@ -71,4 +79,5 @@ let transfer_strictly_larger_slice
   = assert (forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)));
     assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (lb < Seq.index s ((k+shift) - shift)));
     assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (lb < Seq.index s k))
+#pop-options
 #pop-options
