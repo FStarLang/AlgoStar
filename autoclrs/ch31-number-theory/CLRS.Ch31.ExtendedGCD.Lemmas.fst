@@ -12,7 +12,6 @@
 module CLRS.Ch31.ExtendedGCD.Lemmas
 
 open FStar.Math.Lemmas
-open FStar.Mul
 open FStar.Math.Euclid
 open CLRS.Ch31.GCD.Spec
 open CLRS.Ch31.ExtendedGCD.Spec

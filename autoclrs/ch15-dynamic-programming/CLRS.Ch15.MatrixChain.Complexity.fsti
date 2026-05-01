@@ -1,6 +1,5 @@
 module CLRS.Ch15.MatrixChain.Complexity
 
-open FStar.Mul
 
 val mc_inner_sum (n: nat) (l: nat) : Tot nat
 

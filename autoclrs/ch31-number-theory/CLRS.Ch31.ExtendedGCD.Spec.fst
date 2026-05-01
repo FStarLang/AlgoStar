@@ -9,7 +9,6 @@
 
 module CLRS.Ch31.ExtendedGCD.Spec
 
-open FStar.Mul
 open CLRS.Ch31.GCD.Spec
 
 // Uses gcd_spec from CLRS.Ch31.GCD.Spec to avoid duplication

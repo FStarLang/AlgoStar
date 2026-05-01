@@ -69,6 +69,11 @@ val swap_index_j (s:Seq.seq int) (i j:nat{i < Seq.length s /\ j < Seq.length s /
 val swap_index_other (s:Seq.seq int) (i j k:nat{i < Seq.length s /\ j < Seq.length s /\ k < Seq.length s /\ k <> i /\ k <> j})
   : Lemma (Seq.index (swap_seq s i j) k == Seq.index s k)
 
+val swap_unchanged_above (s:Seq.seq int) (i j:nat{i < Seq.length s /\ j < Seq.length s}) (bound:nat)
+  : Lemma (requires i < bound /\ j < bound)
+          (ensures forall (k:nat). bound <= k /\ k < Seq.length s ==> 
+                    Seq.index (swap_seq s i j) k == Seq.index s k)
+
 val swap_is_permutation (s: Seq.seq int) (i j: nat)
   : Lemma (requires i < Seq.length s /\ j < Seq.length s)
           (ensures permutation s (swap_seq s i j))
@@ -167,7 +172,37 @@ val sorted_upto_from_parts (s:Seq.seq int) (n:nat)
   : Lemma (requires suffix_sorted_upto s 1 n /\ prefix_le_suffix_upto s 1 n)
           (ensures sorted_upto s n)
 
-// ========== Non-_upto convenience wrappers ==========
+// ========== Extract-step helper (combines all per-iteration proof work) ==========
+
+val extract_step_lemma
+  (s_cur: Seq.seq int) (s_heapified: Seq.seq int) (s0: Seq.seq int)
+  (vsz n: nat)
+  : Lemma
+    (requires
+      vsz > 1 /\ vsz <= n /\ n <= Seq.length s_cur /\
+      Seq.length s_cur == Seq.length s0 /\
+      permutation s_cur (swap_seq s_cur 0 (vsz - 1)) /\
+      Seq.length (swap_seq s_cur 0 (vsz - 1)) == Seq.length s_cur /\
+      is_max_heap s_cur vsz /\
+      suffix_sorted_upto s_cur vsz n /\
+      prefix_le_suffix_upto s_cur vsz n /\
+      permutation s0 s_cur /\
+      (forall (k:nat). n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
+      // From max_heapify postcondition:
+      Seq.length s_heapified == Seq.length (swap_seq s_cur 0 (vsz - 1)) /\
+      heaps_from s_heapified (vsz - 1) 0 /\
+      permutation (swap_seq s_cur 0 (vsz - 1)) s_heapified /\
+      (forall (k:nat). (vsz - 1) <= k /\ k < Seq.length s_heapified ==>
+        Seq.index s_heapified k == Seq.index (swap_seq s_cur 0 (vsz - 1)) k))
+    (ensures
+      vsz - 1 > 0 /\
+      vsz - 1 <= n /\
+      Seq.length s_heapified == Seq.length s0 /\
+      permutation s0 s_heapified /\
+      (forall (k:nat). n <= k /\ k < Seq.length s_heapified ==> Seq.index s_heapified k == Seq.index s0 k) /\
+      is_max_heap s_heapified (vsz - 1) /\
+      suffix_sorted_upto s_heapified (vsz - 1) n /\
+      prefix_le_suffix_upto s_heapified (vsz - 1) n)
 
 val extract_extends_sorted (s:Seq.seq int) (len:nat{len <= Seq.length s /\ len > 1})
   : Lemma (requires is_max_heap s len /\

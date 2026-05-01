@@ -4,7 +4,6 @@
 *)
 module CLRS.Ch23.Kruskal.ImplTestHelper
 
-open FStar.Mul
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Spec
 open CLRS.Ch23.Kruskal.Impl
@@ -13,7 +12,7 @@ module Seq = FStar.Seq
 
 let test_adj : Seq.seq int = Seq.seq_of_list [0; 1; 3; 1; 0; 2; 3; 2; 0]
 
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 300 "
 
 let test_symmetric () : Lemma (symmetric_adj test_adj 3) =
   assert_norm (Seq.length test_adj == 9);
@@ -115,11 +114,21 @@ let kruskal_witness_spanning_tree ()
     assert (is_path_from_to [e01; e12] 0 2);
     assert (subset_edges [e01; e12] t);
     acyclic_when_unreachable 3 [] e12;
+    assert (acyclic 3 (e12 :: []));
+    // Help SMT prove ~(reachable [e12] e01.u e01.v)
+    let not_reachable (path: list edge)
+      : Lemma (subset_edges path [e12] /\ is_path_from_to path 0 1 ==> False)
+      = ()
+    in
+    Classical.forall_intro (Classical.move_requires not_reachable);
+    assert (~(reachable [e12] 0 1));
+    assert (~(mem_edge e01 [e12]));
+    assert (e01.u < 3 /\ e01.v < 3);
     acyclic_when_unreachable 3 [e12] e01
 
 #pop-options
 
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 375 --split_queries always"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 800 --split_queries always --ext no:optimize_let_vc"
 /// From is_mst of the concrete graph, derive the unique MST edges.
 /// The MST is 0--1--2 with weight 3.
 let kruskal_mst_edges (es: list edge)

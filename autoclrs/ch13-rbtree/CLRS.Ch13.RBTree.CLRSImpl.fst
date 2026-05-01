@@ -38,7 +38,6 @@ module G = FStar.Ghost
 module L = CLRS.Ch13.RBTree.Lemmas
 module C = CLRS.Ch13.RBTree.Complexity
 module CC = CLRS.Ch13.RBTree.CLRSComplexity
-open FStar.Mul
 
 // ============================================================
 // Ghost fold/unfold helpers

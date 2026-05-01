@@ -4,7 +4,6 @@
 
 module CLRS.Ch32.RabinKarp.Complexity
 
-open FStar.Mul
 
 //SNIPPET_START: rk_complexity
 (** Best case complexity: O(n + m) when no spurious hash matches occur *)

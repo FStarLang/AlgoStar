@@ -21,7 +21,6 @@ module SZ = FStar.SizeT
 module Seq = FStar.Seq
 module C = FStar.Classical
 
-open FStar.Mul
 open FStar.List.Tot
 open CLRS.Ch12.BSTArray.Complexity
 module AP = CLRS.Ch12.BSTArray.Predicates
@@ -68,8 +67,8 @@ let rec subtree_in_range
     else if not (Seq.index valid i) then True
     else 
       let k = Seq.index keys i in
-      let left = op_Multiply 2 i + 1 in
-      let right = op_Multiply 2 i + 2 in
+      let left = op_Star 2 i + 1 in
+      let right = op_Star 2 i + 2 in
       lo < k /\ k < hi /\
       subtree_in_range keys valid cap left lo k /\
       subtree_in_range keys valid cap right k hi
@@ -84,8 +83,8 @@ let rec key_in_subtree
   = i < cap /\ i < Seq.length keys /\ i < Seq.length valid /\
     Seq.index valid i /\
     (Seq.index keys i == key \/
-     key_in_subtree keys valid cap (op_Multiply 2 i + 1) key \/
-     key_in_subtree keys valid cap (op_Multiply 2 i + 2) key)
+     key_in_subtree keys valid cap (op_Star 2 i + 1) key \/
+     key_in_subtree keys valid cap (op_Star 2 i + 2) key)
 
 // ============================================================
 // Public Operations

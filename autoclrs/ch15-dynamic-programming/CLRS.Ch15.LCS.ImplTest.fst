@@ -17,7 +17,6 @@ module CLRS.Ch15.LCS.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch15.LCS.Impl
 open CLRS.Ch15.LCS.Spec
 
@@ -33,8 +32,8 @@ let lcs_expected ()
 
 let lcs_pre_satisfiable ()
   : Lemma
-    (ensures SZ.fits (op_Multiply (SZ.v 3sz + 1) (SZ.v 3sz + 1)))
-  = assert_norm (SZ.fits (op_Multiply (SZ.v 3sz + 1) (SZ.v 3sz + 1)))
+    (ensures SZ.fits (op_Star (SZ.v 3sz + 1) (SZ.v 3sz + 1)))
+  = assert_norm (SZ.fits (op_Star (SZ.v 3sz + 1) (SZ.v 3sz + 1)))
 
 fn test_lcs ()
   requires emp

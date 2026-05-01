@@ -15,7 +15,6 @@ module CLRS.Ch11.HashTable.Complexity
    - hash_insert_no_dup: at most  2 * size  probes
 *)
 
-open FStar.Mul
 
 (** Number of empty (NIL) slots in a sequence *)
 val count_empty (s: FStar.Seq.seq int) : nat

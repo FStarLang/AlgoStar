@@ -8,7 +8,6 @@
 
 module CLRS.Ch31.ModExp.Complexity
 
-open FStar.Mul
 
 // log2 for complexity bound (floor of log base 2, transparent for unfolding)
 let rec log2f (n: int) : Tot nat (decreases (if n > 0 then n else 0)) =

@@ -8,7 +8,6 @@ module CLRS.Ch24.BellmanFord.Lemmas
    - CLRS.Ch24.BellmanFord.TriangleInequality  (relaxation fixpoint ⇒ triangle)
 *)
 
-open FStar.Mul
 
 module SB  = CLRS.Ch24.BellmanFord.SpecBridge
 module BTI = CLRS.Ch24.BellmanFord.TriangleInequality

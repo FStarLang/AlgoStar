@@ -15,7 +15,6 @@
  *)
 module CLRS.Ch13.RBTree.Lemmas
 
-open FStar.Mul
 open CLRS.Ch13.RBTree.Spec
 
 (*** Theorem 13.1: Height Bound ***)

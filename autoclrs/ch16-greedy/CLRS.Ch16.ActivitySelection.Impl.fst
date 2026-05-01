@@ -50,7 +50,7 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 
 // ========== Activity Selection Algorithm ==========
 
-#push-options "--z3rlimit 15 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 2"
 //SNIPPET_START: activity_selection_sig
 fn activity_selection 
   (#p: perm)

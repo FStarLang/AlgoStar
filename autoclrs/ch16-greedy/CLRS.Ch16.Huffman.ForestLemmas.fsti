@@ -1,6 +1,5 @@
 module CLRS.Ch16.Huffman.ForestLemmas
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch16.Huffman.Defs
 module SZ = FStar.SizeT
 module Seq = FStar.Seq

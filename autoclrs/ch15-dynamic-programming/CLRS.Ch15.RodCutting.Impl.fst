@@ -51,7 +51,8 @@ let lemma_triangle_step (n: nat)
 
 // ========== Main Implementation ==========
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 2 --split_queries always"
+#restart-solver
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
 
 open Pulse.Lib.BoundedIntegers
 
@@ -137,6 +138,10 @@ fn rod_cutting
       let candidate = price_i + r_j_minus_i;
       let new_q = (if candidate > vq then candidate else vq);
       q := new_q;
+
+      // Explicitly unfold accum_max one step (avoids fuel-driven cascade)
+      with sr_body. assert (V.pts_to r sr_body);
+      accum_max_step s_prices sr_body (SZ.v vj) (SZ.v vi);
 
       // Count the candidate evaluation — one ghost tick
       tick ctr;

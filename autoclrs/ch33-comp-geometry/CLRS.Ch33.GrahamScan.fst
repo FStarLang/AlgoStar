@@ -18,7 +18,6 @@
 module CLRS.Ch33.GrahamScan
 #lang-pulse
 open Pulse.Lib.Pervasives
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -353,6 +352,7 @@ let scan_step_preserves_left_turns
   let hull' = Seq.upd hull top' p_idx in
   assert (forall (i: nat). i < top' ==> Seq.index hull' i == Seq.index hull i);
   assert (top' <= top);
+  all_left_turns_sz_prefix xs ys hull top top';
   ()
 #pop-options
 

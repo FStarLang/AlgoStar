@@ -13,7 +13,6 @@
 module CLRS.Ch33.Segments
 #lang-pulse
 open Pulse.Lib.Pervasives
-open FStar.Mul
 
 // ========== Pure Specifications ==========
 

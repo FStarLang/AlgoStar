@@ -176,7 +176,7 @@ let bucket_index_bound (v min_val max_val: int) (k: pos)
   : Lemma (ensures bucket_index v min_val max_val k < k)
   = ()
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 10"
 let bucket_index_monotone (v1 v2 min_val max_val: int) (k: pos)
   : Lemma (requires min_val < max_val /\ min_val <= v1 /\ v1 < max_val /\
                      min_val <= v2 /\ v2 < max_val /\ v1 <= v2)
@@ -221,7 +221,7 @@ let rec sum_filter_lengths_nil (curr: nat) (k: pos) (min_val max_val: int)
   = if curr >= k then ()
     else sum_filter_lengths_nil (curr + 1) k min_val max_val
 
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let rec sum_filter_lengths_cons (h: int) (t: list int) (curr: nat) (k: pos) (min_val max_val: int)
   : Lemma 
     (requires curr <= k /\ min_val <= h /\ h < max_val /\ min_val < max_val)
@@ -319,7 +319,7 @@ let rec sort_all_buckets_all_sorted (buckets: list (list int))
       insertion_sort_correct b;
       sort_all_buckets_all_sorted bs
 
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let rec concat_sorted_ordered 
   (buckets: list (list int)) (min_val max_val: int) (k: pos) (offset: nat)
   : Lemma 
@@ -377,7 +377,7 @@ let rec sort_all_buckets_count (buckets: list (list int)) (x: int)
       List.append_count b (concat_all bs) x;
       List.append_count (insertion_sort b) (concat_all (sort_all_buckets bs)) x
 
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let rec create_all_buckets_perm 
   (xs: list int) (curr: nat) (k: pos) (min_val max_val: int) (x: int)
   : Lemma 
@@ -400,7 +400,7 @@ let rec create_all_buckets_perm
 (* ========== Main Algorithm ========== *)
 
 //SNIPPET_START: bucket_sort_sig
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
 let bucket_sort (xs: list int) (k: pos)
   : Pure (list int)
     (requires True)

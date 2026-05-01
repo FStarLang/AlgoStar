@@ -507,7 +507,7 @@ let rec filter_weight_decomp (e_rem: edge) (t: list edge)
 // All edges matching edge_eq have the same weight
 let rec filter_matching_weight (e_rem: edge) (t: list edge)
   : Lemma (ensures (let c = length (filter (fun e -> edge_eq e e_rem) t) in
-                    total_weight (filter (fun e -> edge_eq e e_rem) t) = op_Multiply c e_rem.w))
+                    total_weight (filter (fun e -> edge_eq e e_rem) t) = op_Star c e_rem.w))
           (decreases t)
   = match t with
     | [] -> ()
@@ -549,7 +549,7 @@ let rec filter_complement_length (f: edge -> bool) (t: list edge)
 
 // If we can show that exchanging edges preserves spanning tree property
 // and doesn't increase weight, we prove the cut property
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 300"
 let lemma_exchange_preserves_mst 
     (g: graph)
     (t: list edge)      // Original MST
@@ -575,7 +575,7 @@ let lemma_exchange_preserves_mst
     filter_match_nonempty e_rem t;
     let count = length matched in
     assert (count >= 1);
-    assert (total_weight matched = op_Multiply count e_rem.w);
+    assert (total_weight matched = op_Star count e_rem.w);
     // Length constraint: filter complement lengths sum to original
     filter_complement_length (fun e -> not (edge_eq e e_rem)) t;
     // len(filter (not.not.eq)) + len(filter not.eq) = len t
@@ -722,7 +722,7 @@ let reachable_simple (es: list edge) (a b: nat)
 
 // Decidable reachability via strong excluded middle
 let reachable_dec (es: list edge) (u v: nat) : GTot bool =
-  FStar.StrongExcludedMiddle.strong_excluded_middle (reachable es u v)
+  FStar.IndefiniteDescription.strong_excluded_middle (reachable es u v)
 
 // Component edge predicate: both endpoints reachable from root
 let is_comp_edge (es: list edge) (root: nat) (ed: edge) : GTot bool =
@@ -1342,7 +1342,7 @@ let acyclic_implies_unreachable (n: nat) (t: list edge) (e: edge)
                     e.u < n /\ e.v < n /\ e.u <> e.v /\
                     ~(mem_edge e t))
           (ensures ~(reachable t e.u e.v))
-  = if FStar.StrongExcludedMiddle.strong_excluded_middle (reachable t e.u e.v) then begin
+  = if FStar.IndefiniteDescription.strong_excluded_middle (reachable t e.u e.v) then begin
       // Extract simple path from e.u to e.v in t
       reachable_simple t e.u e.v;
       // Now exists simple path P. Form cycle e :: rev(P).
@@ -1453,7 +1453,7 @@ let rec subset_edges_t_to_erem_ft (p: list edge) (e_rem: edge) (t: list edge)
 // then T - {e_rem} + {e_add} is still a spanning tree.
 // Proof requires: (1) e_rem removal splits T into two components,
 // (2) e_add reconnects them (since it's on the path), (3) acyclicity is restored.
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
 let exchange_is_spanning_tree
     (g: graph) (t: list edge) (e_add e_rem: edge) (path: list edge)
   : Lemma (requires is_spanning_tree g t /\
@@ -1541,7 +1541,7 @@ let exchange_is_spanning_tree
       #(fun _ -> ~(reachable ft e_add.u e_add.v))
       (fun (_: squash (reachable ft e_add.u e_rem.u /\ reachable ft e_rem.v e_add.v)) ->
         // Case A: ft: e_add.u → e_rem.u and ft: e_rem.v → e_add.v
-        if FStar.StrongExcludedMiddle.strong_excluded_middle (reachable ft e_add.u e_add.v) then begin
+        if FStar.IndefiniteDescription.strong_excluded_middle (reachable ft e_add.u e_add.v) then begin
           reachable_symmetric ft e_add.u e_rem.u;
           reachable_transitive ft e_rem.u e_add.u e_add.v;
           reachable_symmetric ft e_rem.v e_add.v;
@@ -1551,7 +1551,7 @@ let exchange_is_spanning_tree
         end)
       (fun (_: squash (reachable ft e_add.u e_rem.v /\ reachable ft e_rem.u e_add.v)) ->
         // Case B: ft: e_add.u → e_rem.v and ft: e_rem.u → e_add.v (symmetric)
-        if FStar.StrongExcludedMiddle.strong_excluded_middle (reachable ft e_add.u e_add.v) then begin
+        if FStar.IndefiniteDescription.strong_excluded_middle (reachable ft e_add.u e_add.v) then begin
           reachable_symmetric ft e_add.u e_rem.v;
           reachable_transitive ft e_rem.v e_add.u e_add.v;
           reachable_symmetric ft e_rem.u e_add.v;

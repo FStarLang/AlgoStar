@@ -6,7 +6,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open Pulse.Lib.Vec
 open FStar.SizeT
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -38,7 +37,7 @@ fn matrix_chain_order
       SZ.v n + 1 == Seq.length s_dims /\
       SZ.v n + 1 == A.length dims /\
       SZ.v n > 0 /\
-      SZ.fits (op_Multiply (SZ.v n) (SZ.v n)) /\
+      SZ.fits (op_Star (SZ.v n) (SZ.v n)) /\
       (forall (i: nat). i < Seq.length s_dims ==> Seq.index s_dims i > 0)
     )
   returns result: int

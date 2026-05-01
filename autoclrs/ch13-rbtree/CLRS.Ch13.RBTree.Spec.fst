@@ -20,7 +20,6 @@
  *)
 module CLRS.Ch13.RBTree.Spec
 
-open FStar.Mul
 
 (*** Basic Definitions ***)
 

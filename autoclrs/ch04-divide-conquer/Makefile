@@ -35,10 +35,12 @@ $(foreach m,$(ALL_EXTRACT_MODULES),$(eval $(call krml_rule,$(m))))
 KRML_INPUT_FILES  = $(foreach m,$(ALL_EXTRACT_MODULES),$(OUTPUT_DIR)/$(subst .,_,$(m)).krml)
 KRML_BUNDLE_FLAGS = -bundle '$(BUNDLE_API)=CLRS.Ch04.*' \
                     -bundle 'FStar.*,Pulse.*,PulseCore.*,Prims'
-KRML_EXTRA_FLAGS  = -header=$(PULSE_ROOT)/mk/krmlheader
+KRML_EXTRA_FLAGS  = -header=$(PULSE_ROOT)/mk/krmlheader \
+                    -add-include '"prims_compat.h"'
 EXTRACT_C_FILES   = $(OUTPUT_DIR)/$(BUNDLE_C_STEM).c
 EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
-                    $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
+                    $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c \
+                    prims_compat.c
 
 include ../autoclrs.test.mk
 

@@ -9,7 +9,6 @@ module CLRS.Ch12.BSTArray.Predicates
 
 open FStar.Seq
 open FStar.Classical
-open FStar.Mul
 
 // Helper lemma to prove that child indices fit in SZ.t
 let child_indices_fit (cap: nat) (i: nat)

@@ -31,7 +31,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch23.Kruskal.Defs
 open CLRS.Ch23.Kruskal.Impl
 open CLRS.Ch23.Kruskal.ImplTestHelper
@@ -49,7 +48,7 @@ let sz_eq (a b: SZ.t) : (r:bool{r <==> SZ.v a = SZ.v b}) =
 
 (* ---------- Test ---------- *)
 
-#push-options "--z3rlimit 150 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 800 --fuel 4 --ifuel 4 --split_queries always --z3refresh --ext no:optimize_let_vc"
 
 ```pulse
 fn test_kruskal_satisfiability ()

@@ -1,6 +1,5 @@
 module CLRS.Ch22.TopologicalSort.Impl.Defs
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch22.TopologicalSort.Spec
 open CLRS.Ch22.TopologicalSort.Lemmas
 open CLRS.Ch22.TopologicalSort.Verified
@@ -954,6 +953,7 @@ let lemma_vtail_lt_n (squeue: Seq.seq SZ.t) (vtail n vv: nat)
 
 (* Combined step lemma: does inner_indeg_step + pn_entries_below_step + pn_extra_inv_step + pn_enqueue_complete_step
    in one F* lemma. This avoids Pulse VC elaboration issues with multiple lemma calls. *)
+#push-options "--split_queries always"
 let pn_combined_step
   (adj: Seq.seq int) (n: nat)
   (sin_degree sin_deg_cur sin_deg_new: Seq.seq int)
@@ -1043,6 +1043,7 @@ let pn_combined_step
     end;
     pn_enqueue_complete_step sin_degree sin_deg_cur sin_deg_new
       squeue_cur squeue_new vtail_start vtail_cur vtail_new n vv
+#pop-options
 
 (* ================================================================
    BRIDGE LEMMAS: Derive queue properties from pn_extra_inv

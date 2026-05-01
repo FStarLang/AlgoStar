@@ -6,7 +6,6 @@
 
 module CLRS.Ch24.Dijkstra.Complexity
 
-open FStar.Mul
 
 module D = CLRS.Ch24.Dijkstra
 

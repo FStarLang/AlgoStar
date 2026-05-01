@@ -23,7 +23,6 @@ module CLRS.Ch08.RadixSort.FullSort
 
 open FStar.Seq
 open FStar.Math.Lemmas
-open FStar.Mul
 open FStar.Classical
 open CLRS.Ch08.RadixSort.Base
 open CLRS.Ch08.RadixSort.Stability
@@ -79,7 +78,7 @@ let rec pow_split (base a b: nat)
     end
 
 /// Helper: Raw form - digits below preserved by modulo  
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let digit_preserved_by_modulo_raw (k: nat) (d: nat) (bigD: nat) (base: nat)
   : Lemma (requires base >= 2 /\ d < bigD /\ bigD > 0 /\ pow base d > 0 /\ pow base bigD > 0)
           (ensures (k / pow base d) % base == ((k % pow base bigD) / pow base d) % base)
@@ -112,7 +111,7 @@ let digit_preserved_by_modulo (k: nat) (d: nat) (bigD: nat) (base: nat)
 
 /// Key property: a number equals the sum of its digits times powers of base
 /// For k < base^bigD, we have k = sum_{i=0}^{bigD-1} digit(k,i) * base^i
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec digit_decomposition (k: nat) (bigD: nat) (base: nat)
   : Lemma (requires bigD > 0 /\ base >= 2 /\ k < pow base bigD)
           (ensures k == digit_sum k bigD base)
@@ -241,7 +240,7 @@ let digits_lex_order_implies_numeric_order
     if bigD = 1 then ()
     else (
       // Case split: all digits equal vs exists separating digit
-      match FStar.StrongExcludedMiddle.strong_excluded_middle
+      match FStar.IndefiniteDescription.strong_excluded_middle
         (forall (d: nat). d < bigD ==> digit x d base == digit y d base) with
       | true -> 
         // All digits equal: digit_sum x = digit_sum y, so x = y
@@ -275,7 +274,7 @@ let digits_all_equal_implies_equal
 
 /// Helper: prove sorted by induction after establishing pairwise order
 /// Note: This requires standard sequence lemmas about tail and indexing
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec lemma_pairwise_le_implies_sorted (s: seq nat)
   : Lemma (requires length s > 0 /\
                     (forall (i j: nat). i < length s /\ j < length s /\ i < j ==> 

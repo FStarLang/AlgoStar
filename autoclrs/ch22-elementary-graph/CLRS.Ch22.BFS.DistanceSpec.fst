@@ -13,7 +13,6 @@ module CLRS.Ch22.BFS.DistanceSpec
 open FStar.List.Tot
 open FStar.Seq
 open FStar.Classical
-open FStar.Mul
 
 module Seq = FStar.Seq
 module L = FStar.List.Tot

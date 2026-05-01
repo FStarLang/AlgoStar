@@ -30,7 +30,6 @@ module Seq = FStar.Seq
 module PrimSpec = CLRS.Ch23.Prim.Spec
 module Bridge = CLRS.Ch23.Kruskal.Bridge
 
-open FStar.Mul
 
 /// Use a large value for infinity that fits in SizeT
 let infinity : SZ.t = 65535sz

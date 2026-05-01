@@ -9,7 +9,6 @@
 
 module CLRS.Ch31.ModExpLR.Lemmas
 
-open FStar.Mul
 open CLRS.Ch31.ModExp.Spec
 open CLRS.Ch31.GCD.Complexity
 

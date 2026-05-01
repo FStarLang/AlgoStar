@@ -18,7 +18,6 @@ module CLRS.Ch33.Segments.ImplTest
 open Pulse.Lib.Pervasives
 open CLRS.Ch33.Segments.Impl
 open CLRS.Ch33.Segments.Spec
-open FStar.Mul
 
 (* ========== Test: cross_product ==========
 

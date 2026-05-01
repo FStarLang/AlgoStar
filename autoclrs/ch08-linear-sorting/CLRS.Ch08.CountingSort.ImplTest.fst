@@ -297,7 +297,9 @@ fn test_counting_sort_by_digit ()
   let d0 = v0 % 10;
   let d1 = v1 % 10;
   let d2 = v2 % 10;
-  let pass = d0 <= d1 && d1 <= d2;
+  let p1 : bool = d0 <= d1;
+  let p2 : bool = d1 <= d2;
+  let pass = p1 && p2;
 
   // Cleanup
   with sa2. assert (A.pts_to a sa2);

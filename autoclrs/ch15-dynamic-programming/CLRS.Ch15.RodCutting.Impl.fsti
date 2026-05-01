@@ -16,7 +16,7 @@ module Seq = FStar.Seq
 
 open CLRS.Ch15.RodCutting.Spec
 
-let triangle (n: nat) : nat = op_Multiply n (Prims.op_Addition n 1) / 2
+let triangle (n: nat) : nat = op_Star n (Prims.op_Addition n 1) / 2
 
 let rod_cutting_bounded (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == triangle n

@@ -237,7 +237,7 @@ fn select
       sorted_prefix s_curr (SZ.v vround) /\
       prefix_leq_suffix s_curr (SZ.v vround) /\
       vc >= reveal c0 /\
-      vc - reveal c0 <= op_Multiply (SZ.v vround) (SZ.v n - 1)
+      vc - reveal c0 <= op_Star (SZ.v vround) (SZ.v n - 1)
     )
   decreases (SZ.v k `Prims.op_Subtraction` SZ.v !round)
   {

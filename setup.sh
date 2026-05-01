@@ -30,7 +30,7 @@ NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 FSTAR_BIN_DIR="$SCRIPT_DIR/fstar"
 
 # Pinned F* release version (update when a new release is validated)
-FSTAR_RELEASE_VERSION="v2026.04.17"
+FSTAR_RELEASE_VERSION="nightly-2026-04-29"
 
 red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
 green() { printf '\033[1;32m%s\033[0m\n' "$*"; }
@@ -128,18 +128,19 @@ build_karamel() {
 # ---- Binary install ----
 
 install_binary() {
-  local version_arg="${1:-}"
+  local version_arg="${1:-$FSTAR_RELEASE_VERSION}"
   local install_flags=()
 
   if [ "$version_arg" = "nightly" ]; then
     info "Installing F* latest nightly binary to $FSTAR_BIN_DIR ..."
     install_flags=(--nightly)
-  elif [ -n "$version_arg" ]; then
+  elif [[ "$version_arg" == nightly-* ]]; then
+    local nightly_date="${version_arg#nightly-}"
+    info "Installing F* $version_arg binary to $FSTAR_BIN_DIR ..."
+    install_flags=(--nightly --version "$nightly_date")
+  else
     info "Installing F* $version_arg binary to $FSTAR_BIN_DIR ..."
     install_flags=(--release --version "$version_arg")
-  else
-    info "Installing F* $FSTAR_RELEASE_VERSION binary to $FSTAR_BIN_DIR ..."
-    install_flags=(--release --version "$FSTAR_RELEASE_VERSION")
   fi
 
   curl -fsSL https://aka.ms/install-fstar | bash -s -- \
@@ -168,11 +169,11 @@ install_binary() {
 # These are small build-infrastructure files not included in binary packages.
 install_pulse_mk() {
   local mk_dir="$FSTAR_BIN_DIR/pulse/mk"
-  # Use the pinned release tag for mk files so they match the installed binary
-  local tag="${FSTAR_RELEASE_VERSION}"
-  local base_url="https://raw.githubusercontent.com/FStarLang/FStar/${tag}/pulse/mk"
+  # Use fstar2 branch for mk files (nightly builds track fstar2 HEAD)
+  local branch="fstar2"
+  local base_url="https://raw.githubusercontent.com/FStarLang/FStar/${branch}/pulse/mk"
 
-  info "Downloading Pulse build infrastructure (mk files from ${tag})..."
+  info "Downloading Pulse build infrastructure (mk files from ${branch})..."
   mkdir -p "$mk_dir"
   for f in common.mk locate.mk test.mk krmlheader; do
     curl -fsSL "$base_url/$f" -o "$mk_dir/$f"
@@ -227,7 +228,7 @@ case "${1:-all}" in
     echo
     echo "  binary              Install pinned F* release ($FSTAR_RELEASE_VERSION)"
     echo "  binary nightly      Install latest nightly F* build"
-    echo "  binary VERSION      Install a specific release (e.g. v2026.04.17)"
+    echo "  binary VERSION      Install a specific release or nightly (e.g. v2026.04.17, nightly-2026-04-29)"
     echo "  fstar               Build F* stage3 from source (requires OCaml)"
     echo "  karamel             Build KaRaMeL from source (requires F* already built)"
     echo "  all                 Build F* + KaRaMeL from source (default)"

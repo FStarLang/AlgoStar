@@ -12,7 +12,6 @@ module CLRS.Ch25.FloydWarshall.Lemmas
  * NO admits. NO assumes.
  *)
 
-open FStar.Mul
 open FStar.Seq
 open CLRS.Ch25.FloydWarshall.Spec
 

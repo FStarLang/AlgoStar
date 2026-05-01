@@ -35,7 +35,6 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-open FStar.Mul
 open CLRS.Ch12.BSTArray.Impl
 open CLRS.Ch12.BSTArray.Complexity
 module AP = CLRS.Ch12.BSTArray.Predicates

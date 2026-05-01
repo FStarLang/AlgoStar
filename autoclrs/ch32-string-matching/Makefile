@@ -34,7 +34,7 @@ EXTRACT_C_FILES   = $(EXTRACT_DIR)/Ch32_StringMatch.c
 # fstar_int32.c provides FStar_Int32_to_string (dependency of prims.c)
 EXTRA_C_SOURCES   = $(KRML_HOME)/krmllib/dist/generic/prims.c \
                     $(KRML_HOME)/krmllib/dist/generic/fstar_int32.c
-CC_EXTRA_FLAGS    = -Wno-unused-function
+CC_EXTRA_FLAGS    = -Wno-unused-function -include ch32_shims.h
 CC_EXTRA_INCLUDES = -I $(EXTRACT_DIR)/internal
 
 # Cancel Pulse's generic pattern rules for the extract dir

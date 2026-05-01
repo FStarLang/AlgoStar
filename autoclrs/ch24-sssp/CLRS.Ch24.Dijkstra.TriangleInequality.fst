@@ -1,6 +1,5 @@
 module CLRS.Ch24.Dijkstra.TriangleInequality
 
-open FStar.Mul
 module Seq = FStar.Seq
 
 (*

@@ -8,7 +8,6 @@ module CLRS.Ch35.VertexCover.Spec
  * are in CLRS.Ch35.VertexCover.Lemmas.
  *)
 
-open FStar.Mul
 open FStar.List.Tot
 open FStar.Seq
 
@@ -26,14 +25,14 @@ let edges_share_vertex (e1 e2: edge) : bool =
   let (u2, v2) = e2 in
   u1 = u2 || u1 = v2 || v1 = u2 || v1 = v2
 
-let rec pairwise_disjoint (m: list edge) : Type0 =
+let rec pairwise_disjoint (m: list edge) : prop =
   match m with
   | [] -> True
   | e :: rest ->
       (forall (e': edge). memP e' rest ==> ~(edges_share_vertex e e')) /\
       pairwise_disjoint rest
 
-let is_valid_cover_for_edges (c: cover_fn) (edges: list edge) : Type0 =
+let is_valid_cover_for_edges (c: cover_fn) (edges: list edge) : prop =
   forall (e: edge). memP e edges ==> (let (u, v) = e in c u \/ c v)
 
 let rec count_cover (c: cover_fn) (n: nat) : Tot nat (decreases n) =
@@ -55,17 +54,17 @@ let rec extract_edges (adj: seq int) (n: nat) (u v: nat)
        else extract_edges adj n u (v + 1)
 
 // A cover is valid for a graph if it covers all edges
-let is_valid_graph_cover (adj: seq int) (n: nat) (c: cover_fn) : Type0 =
+let is_valid_graph_cover (adj: seq int) (n: nat) (c: cover_fn) : prop =
   let edges = extract_edges adj n 0 1 in
   is_valid_cover_for_edges c edges
 
 //SNIPPET_START: min_vertex_cover
-let is_minimum_vertex_cover (adj: seq int) (n: nat) (c_min: cover_fn) : Type0 =
+let is_minimum_vertex_cover (adj: seq int) (n: nat) (c_min: cover_fn) : prop =
   is_valid_graph_cover adj n c_min /\
   (forall (c': cover_fn). is_valid_graph_cover adj n c' ==>
     count_cover c_min n <= count_cover c' n)
 
-let min_vertex_cover_size (adj: seq int) (n: nat) (opt: nat) : Type0 =
+let min_vertex_cover_size (adj: seq int) (n: nat) (opt: nat) : prop =
   exists (c_min: cover_fn). 
     is_minimum_vertex_cover adj n c_min /\ 
     count_cover c_min n = opt

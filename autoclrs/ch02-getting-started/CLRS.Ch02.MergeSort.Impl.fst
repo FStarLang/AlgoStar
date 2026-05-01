@@ -35,6 +35,8 @@ module GR = Pulse.Lib.GhostReference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
+#set-options "--split_queries always"
+
 // ================================================================
 // Helper: copy range between arrays
 // ================================================================
@@ -86,7 +88,7 @@ fn copy_range
 // Merge Implementation
 // ================================================================
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
 
 //SNIPPET_START: merge_sig
 fn merge

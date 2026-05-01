@@ -21,7 +21,6 @@ module CLRS.Ch08.RadixSort.Stability
 
 open FStar.Seq
 open FStar.Math.Lemmas
-open FStar.Mul
 open FStar.Classical
 open FStar.IndefiniteDescription
 open CLRS.Ch08.RadixSort.Base
@@ -209,7 +208,7 @@ let sorted_on_to_up_to_base_case (s: seq nat) (base: nat)
     sorted_up_to_digit_intro s 0 base
 
 /// Helper: sorted_up_to_digit at witnesses gives lex ordering on values
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 50"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let lemma_sorted_implies_lex_values (s_in: seq nat) (d: nat) (base: nat) (v w: nat) (i1 i2: nat)
   : Lemma (requires d > 0 /\ base > 0 /\
                     i1 < i2 /\ i2 < length s_in /\
@@ -227,7 +226,7 @@ let lemma_sorted_implies_lex_values (s_in: seq nat) (d: nat) (base: nat) (v w: n
 /// Isolated per-pair proof: given specific output positions i < j with equal digit d,
 /// derive lower-digit ordering using stability + sorted_up_to_digit.
 /// This is isolated so Z3 only sees the minimal set of hypotheses.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 80"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let stable_preserves_lower_order_pair
   (s_in s_out: seq nat) (d base: nat) (i j: nat)
   : Lemma 
@@ -300,7 +299,7 @@ let extend_all_equal
   = ()
 
 /// Helper: extends lower-digit strict ordering to include digit d when equal.
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 10"
 let extend_exists_case
   (v w: nat) (d: nat) (base: nat)
   : Lemma 
@@ -335,7 +334,7 @@ let digit_strict_lt_gives_lex
 ///
 /// If input is sorted on digits 0..d-1, and we apply a stable sort on digit d,
 /// then output is sorted on digits 0..d.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 200"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 120"
 let lemma_stable_pass_preserves_ordering
   (s_in s_out: seq nat) (d: nat) (base: nat)
   : Lemma (requires base > 0 /\
@@ -365,7 +364,7 @@ let lemma_stable_pass_preserves_ordering
             digit_strict_lt_gives_lex v w d base
           else begin
             assert (digit v d base == digit w d base);
-            match FStar.StrongExcludedMiddle.strong_excluded_middle
+            match FStar.IndefiniteDescription.strong_excluded_middle
               (exists (d0: nat). d0 < d /\
                 digit v d0 base < digit w d0 base /\
                 (forall (d': nat). d0 < d' /\ d' < d ==> digit v d' base == digit w d' base)) with

@@ -70,7 +70,7 @@ fn find_minmax
       (exists (k:nat). k < SZ.v vi /\ Seq.index s0 k == vmax) /\
       (forall (k:nat). k < SZ.v vi ==> vmax >= Seq.index s0 k) /\
       vc >= reveal c0 /\
-      vc - reveal c0 == op_Multiply 2 (SZ.v vi - 1)
+      vc - reveal c0 == op_Star 2 (SZ.v vi - 1)
     )
   decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {
@@ -162,8 +162,8 @@ fn find_minmax_pairs
       (exists (k:nat). k < SZ.v vi /\ Seq.index s0 k == vmax) /\
       (forall (k:nat). k < SZ.v vi ==> vmax >= Seq.index s0 k) /\
       vc >= reveal c0 /\
-      op_Multiply 2 (vc - reveal c0) <= op_Multiply 3 (SZ.v vi) - 2 /\
-      (SZ.v vi >= 2 ==> op_Multiply 2 (vc - reveal c0) + 4 <= op_Multiply 3 (SZ.v vi))
+      op_Star 2 (vc - reveal c0) <= op_Star 3 (SZ.v vi) - 2 /\
+      (SZ.v vi >= 2 ==> op_Star 2 (vc - reveal c0) + 4 <= op_Star 3 (SZ.v vi))
     )
   decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
   {

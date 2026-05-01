@@ -10,7 +10,6 @@ module CLRS.Ch09.Quickselect.Complexity
    Which solves to: T(n) = n + (n-1) + ... + 2 = n(n+1)/2 - 1 = O(n²)
 *)
 
-open FStar.Mul
 
 (* Worst-case cost for quickselect
    T(0) = 0, T(1) = 0

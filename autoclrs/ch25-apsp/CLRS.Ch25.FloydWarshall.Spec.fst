@@ -10,7 +10,6 @@ module CLRS.Ch25.FloydWarshall.Spec
  * NO admits. NO assumes.
  *)
 
-open FStar.Mul
 open FStar.Seq
 
 //SNIPPET_START: inf
@@ -139,3 +138,22 @@ let rec lemma_fw_outer_len (d: seq int) (n k: nat)
       lemma_fw_outer_len (fw_inner_i d n k 0) n (k + 1)
     end
 //SNIPPET_END: length_lemmas
+
+(*** Boundary lemmas: base cases for loop exits ***)
+
+//SNIPPET_START: boundary_lemmas
+let lemma_fw_inner_j_base (d: seq int) (n k i j: nat) (d_ik: int)
+  : Lemma (requires j >= n \/ i >= n \/ k >= n \/ length d <> n * n)
+          (ensures fw_inner_j d n k i j d_ik == d)
+  = ()
+
+let lemma_fw_inner_i_base (d: seq int) (n k i: nat)
+  : Lemma (requires i >= n \/ k >= n \/ length d <> n * n)
+          (ensures fw_inner_i d n k i == d)
+  = ()
+
+let lemma_fw_outer_base (d: seq int) (n k: nat)
+  : Lemma (requires k >= n \/ length d <> n * n)
+          (ensures fw_outer d n k == d)
+  = ()
+//SNIPPET_END: boundary_lemmas

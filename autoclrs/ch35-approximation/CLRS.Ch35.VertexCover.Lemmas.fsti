@@ -9,7 +9,6 @@ module CLRS.Ch35.VertexCover.Lemmas
  * 0 admits. Fully proven.
  *)
 
-open FStar.Mul
 open FStar.List.Tot
 open FStar.Seq
 open CLRS.Ch35.VertexCover.Spec

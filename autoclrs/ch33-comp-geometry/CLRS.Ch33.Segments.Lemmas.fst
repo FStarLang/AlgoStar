@@ -6,7 +6,6 @@
 
 module CLRS.Ch33.Segments.Lemmas
 open CLRS.Ch33.Segments.Spec
-open FStar.Mul
 
 //SNIPPET_START: cross_product_properties
 let cross_product_antisymmetric (x1 y1 x2 y2 x3 y3: int) : Lemma

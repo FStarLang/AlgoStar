@@ -5,7 +5,6 @@
 *)
 module CLRS.Ch09.Quickselect.Complexity
 
-open FStar.Mul
 
 val qs_cost (n: nat) : nat
 

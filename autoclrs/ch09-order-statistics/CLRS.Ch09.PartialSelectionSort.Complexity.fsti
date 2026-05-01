@@ -5,7 +5,6 @@
 *)
 module CLRS.Ch09.PartialSelectionSort.Complexity
 
-open FStar.Mul
 
 /// Exact comparison count: k rounds, each scanning n-1 elements.
 val select_comparisons (n k: nat) : nat

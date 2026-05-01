@@ -19,7 +19,6 @@
 
 module CLRS.Ch32.RabinKarp.Spec
 
-open FStar.Mul
 open FStar.Classical
 module Seq = FStar.Seq
 
@@ -167,6 +166,7 @@ let rec pow_mod_correct (d:nat) (exp:nat) (q:pos)
     else (pow_mod_correct d (exp - 1) q;
           FStar.Math.Lemmas.lemma_mod_mul_distr_r d (pow d (exp - 1)) q)
 
+#push-options "--z3rlimit 20"
 let lemma_mod_sub_via_add (a b:int) (q:pos)
   : Lemma ((a + q - b % q) % q == (a - b) % q)
   = FStar.Math.Lemmas.lemma_mod_sub_distr a b q;
@@ -175,6 +175,7 @@ let lemma_mod_sub_via_add (a b:int) (q:pos)
     assert (b % q >= 0 /\ b % q < q);
     FStar.Math.Lemmas.lemma_mod_sub_distr a (b % q) q
 
+#pop-options
 //SNIPPET_START: rolling_hash_step_correct
 /// rolling_hash_step computes the same result as the proven rolling_hash_proven.
 #push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
@@ -305,7 +306,7 @@ let rec rabin_karp_matches_no_false_positives
 #pop-options
 
 /// No false negatives: every valid match appears in results.
-#push-options "--fuel 2 --ifuel 2 --z3rlimit 50 --split_queries always"
+#push-options "--fuel 2 --ifuel 2 --z3rlimit 400 --split_queries always --ext no:optimize_let_vc"
 let rec rabin_karp_matches_no_false_negatives
     (text pattern:Seq.seq nat) (d:nat) (q:nat{q <> 0})
     (s:nat) (current_hash:nat)

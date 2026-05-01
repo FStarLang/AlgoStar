@@ -3,7 +3,6 @@ module CLRS.Common.CountOnes
 /// General-purpose lemmas about counting entries equal to 1 in integer sequences.
 /// Used by Dijkstra's algorithm to track visited vertex count.
 
-open FStar.Mul
 module Seq = FStar.Seq
 
 /// Count of entries equal to 1 in s[0..n)

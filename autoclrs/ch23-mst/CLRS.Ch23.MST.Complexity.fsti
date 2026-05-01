@@ -7,7 +7,6 @@
 
 module CLRS.Ch23.MST.Complexity
 
-open FStar.Mul
 
 /// Kruskal iterations with adjacency matrix: (V-1) × V²
 val kruskal_iterations (v: nat) : nat

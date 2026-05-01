@@ -102,7 +102,7 @@ let rec count_create (n:nat) (x:nat) (w:nat)
     )
 
 /// If for every element, count in s1 <= count in s2, then length s1 <= length s2
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 2"
 let rec count_le_length_le (s1 s2: Seq.seq nat)
   : Lemma (requires forall (w:nat). SeqP.count w s1 <= SeqP.count w s2)
           (ensures Seq.length s1 <= Seq.length s2)
@@ -126,7 +126,7 @@ let rec count_le_length_le (s1 s2: Seq.seq nat)
 #pop-options
 
 /// Given phase2_inv, the next block fits: pos + count(cur_v, s0) <= length s0
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 2"
 let phase2_pos_bound (sa s0:Seq.seq nat) (pos:nat) (cur_v:nat) (k:nat)
   : Lemma (requires phase2_inv sa s0 pos cur_v k /\ in_range s0 k /\ cur_v <= k)
           (ensures pos + SeqP.count cur_v s0 <= Seq.length s0)
@@ -145,7 +145,7 @@ let phase2_pos_bound (sa s0:Seq.seq nat) (pos:nat) (cur_v:nat) (k:nat)
 #pop-options
 
 /// Extending a sorted prefix by one element of value >= all existing elements
-#push-options "--z3rlimit 40"
+#push-options "--z3rlimit 5"
 let write_extend_sorted (s s':Seq.seq nat) (pos:nat) (val_w:nat)
   : Lemma (requires Seq.length s == Seq.length s' /\
                     pos < Seq.length s /\
@@ -186,7 +186,7 @@ let rec block_count (s:Seq.seq nat) (pos:nat) (cnt:nat) (val_w:nat) (v:nat)
 
 /// Final lemma: after all values 0..k are written with correct counts,
 /// the output has same counts as input => permutation
-#push-options "--z3rlimit 50"
+#push-options "--z3rlimit 30"
 let final_perm (s0 sa:Seq.seq nat) (k:nat) (pos:nat)
   : Lemma (requires Seq.length sa >= Seq.length s0 /\
                     in_range s0 k /\
@@ -218,7 +218,7 @@ let permutation_symmetric (s1 s2: Seq.seq nat)
     reveal_opaque (`%Spec.permutation) (Spec.permutation s2 s1)
 
 /// Permutation preserves in_range: if s1 is in_range k and s2 is a permutation, then s2 is in_range k
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 30 --fuel 2 --ifuel 2"
 let permutation_preserves_in_range (s1 s2: Seq.seq nat) (k: nat)
   : Lemma (requires permutation s1 s2 /\ in_range s1 k)
           (ensures in_range s2 k)
@@ -238,7 +238,7 @@ let permutation_preserves_in_range (s1 s2: Seq.seq nat) (k: nat)
 
 /// Combined phase 2 step: after writing cnt copies of cur_v at [pos, pos+cnt)
 /// Phase 2 invariant holds for cur_v+1
-#push-options "--z3rlimit 100"
+#push-options "--z3rlimit 30"
 let phase2_step (sa_before sa_after s0:Seq.seq nat) (pos:nat) (cnt:nat) (cur_v:nat) (k:nat)
   : Lemma (requires phase2_inv sa_before s0 pos cur_v k /\
                     Seq.length sa_after == Seq.length s0 /\

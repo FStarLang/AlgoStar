@@ -28,4 +28,4 @@ let lemma_combine_sorted_regions
   = ()
 
 let lemma_triangle_step (vj: nat)
-  = assert (op_Multiply vj (vj - 1) + op_Multiply 2 vj == op_Multiply vj (vj + 1))
+  = assert (op_Star vj (vj - 1) + op_Star 2 vj == op_Star vj (vj + 1))

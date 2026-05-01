@@ -30,7 +30,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
 open Pulse.Lib.Reference
-open FStar.Mul
 
 module SZ = FStar.SizeT
 module Seq = FStar.Seq

@@ -13,7 +13,6 @@ module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-open FStar.Mul
 
 module AP = CLRS.Ch12.BSTArray.Predicates
 open CLRS.Ch12.BSTArray.Impl

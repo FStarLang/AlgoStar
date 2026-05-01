@@ -4,7 +4,6 @@
 module CLRS.Ch22.TopologicalSort.Lemmas
 
 open FStar.Seq
-open FStar.Mul
 
 let strong_order_inv (adj: seq int) (n: nat) (output: seq int) (count: nat) : prop =
   count <= Seq.length output /\

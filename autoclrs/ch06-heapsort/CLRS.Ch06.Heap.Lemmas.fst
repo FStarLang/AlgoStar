@@ -88,6 +88,16 @@ let swap_index_j (s:Seq.seq int) (i j:nat{i < Seq.length s /\ j < Seq.length s /
 let swap_index_other (s:Seq.seq int) (i j k:nat{i < Seq.length s /\ j < Seq.length s /\ k < Seq.length s /\ k <> i /\ k <> j})
   : Lemma (Seq.index (swap_seq s i j) k == Seq.index s k) = ()
 
+let swap_unchanged_above (s:Seq.seq int) (i j:nat{i < Seq.length s /\ j < Seq.length s}) (bound:nat)
+  : Lemma (requires i < bound /\ j < bound)
+          (ensures forall (k:nat). bound <= k /\ k < Seq.length s ==> 
+                    Seq.index (swap_seq s i j) k == Seq.index s k)
+  = let aux (k:nat{bound <= k /\ k < Seq.length s})
+      : Lemma (Seq.index (swap_seq s i j) k == Seq.index s k)
+      = swap_index_other s i j k
+    in
+    Classical.forall_intro (Classical.move_requires aux)
+
 let swap_is_permutation (s: Seq.seq int) (i j: nat)
   : Lemma (requires i < Seq.length s /\ j < Seq.length s)
           (ensures permutation s (swap_seq s i j))
@@ -272,7 +282,7 @@ let index_mem_intro (s:Seq.seq int) (idx:nat{idx < Seq.length s})
 // ========== Range-bounded lemmas for prefix sorting ==========
 // The _upto versions are the general form; non-_upto versions delegate to them.
 
-#push-options "--split_queries always"
+#push-options "--split_queries always --z3rlimit 10"
 let extract_extends_sorted_upto (s:Seq.seq int) (len n:nat)
   : Lemma (requires n <= Seq.length s /\ len <= n /\ len > 1 /\
                     is_max_heap s len /\
@@ -317,7 +327,7 @@ let perm_prefix_witness (s1 s2:Seq.seq int) (k:nat) (x:int)
 #pop-options
 
 // Helper: element at index i in s2 exists at some index in s1's prefix
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 2 --split_queries always"
 private
 let perm_prefix_bounded_aux_upto (s1 s2:Seq.seq int) (k n:nat) (i:nat) (j:nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
@@ -366,6 +376,50 @@ let sorted_upto_from_parts (s:Seq.seq int) (n:nat)
   : Lemma (requires suffix_sorted_upto s 1 n /\ prefix_le_suffix_upto s 1 n)
           (ensures sorted_upto s n)
   = ()
+
+// ========== Extract-step helper (combines all per-iteration proof work) ==========
+
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+let extract_step_lemma
+  (s_cur: Seq.seq int) (s_heapified: Seq.seq int) (s0: Seq.seq int)
+  (vsz n: nat)
+  : Lemma
+    (requires
+      vsz > 1 /\ vsz <= n /\ n <= Seq.length s_cur /\
+      Seq.length s_cur == Seq.length s0 /\
+      permutation s_cur (swap_seq s_cur 0 (vsz - 1)) /\
+      Seq.length (swap_seq s_cur 0 (vsz - 1)) == Seq.length s_cur /\
+      is_max_heap s_cur vsz /\
+      suffix_sorted_upto s_cur vsz n /\
+      prefix_le_suffix_upto s_cur vsz n /\
+      permutation s0 s_cur /\
+      (forall (k:nat). n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
+      Seq.length s_heapified == Seq.length (swap_seq s_cur 0 (vsz - 1)) /\
+      heaps_from s_heapified (vsz - 1) 0 /\
+      permutation (swap_seq s_cur 0 (vsz - 1)) s_heapified /\
+      (forall (k:nat). (vsz - 1) <= k /\ k < Seq.length s_heapified ==>
+        Seq.index s_heapified k == Seq.index (swap_seq s_cur 0 (vsz - 1)) k))
+    (ensures
+      vsz - 1 > 0 /\
+      vsz - 1 <= n /\
+      Seq.length s_heapified == Seq.length s0 /\
+      permutation s0 s_heapified /\
+      (forall (k:nat). n <= k /\ k < Seq.length s_heapified ==> Seq.index s_heapified k == Seq.index s0 k) /\
+      is_max_heap s_heapified (vsz - 1) /\
+      suffix_sorted_upto s_heapified (vsz - 1) n /\
+      prefix_le_suffix_upto s_heapified (vsz - 1) n)
+  = // Sorted suffix after swap
+    extract_extends_sorted_upto s_cur vsz n;
+    // Permutation chain
+    compose_permutations s0 s_cur (swap_seq s_cur 0 (vsz - 1));
+    compose_permutations s0 (swap_seq s_cur 0 (vsz - 1)) s_heapified;
+    // Heap property
+    heaps_from_zero s_heapified (vsz - 1);
+    // Sorted suffix preservation
+    perm_preserves_sorted_suffix_upto (swap_seq s_cur 0 (vsz - 1)) s_heapified (vsz - 1) n;
+    // Tail preservation: swap doesn't touch indices >= n
+    swap_unchanged_above s_cur 0 (vsz - 1) n
+#pop-options
 
 // ========== Non-_upto convenience wrappers ==========
 // These delegate to the _upto versions with n = Seq.length s.

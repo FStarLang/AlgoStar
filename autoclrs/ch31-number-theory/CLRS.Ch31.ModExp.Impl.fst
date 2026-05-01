@@ -20,7 +20,6 @@ module CLRS.Ch31.ModExp.Impl
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open FStar.Math.Lemmas
 open CLRS.Ch31.ModExp.Spec
 open CLRS.Ch31.ModExp.Lemmas

@@ -10,7 +10,6 @@
  *)
 module CLRS.Ch22.TopologicalSort.Spec
 
-open FStar.Mul
 
 (*** Graph Representation ***)
 

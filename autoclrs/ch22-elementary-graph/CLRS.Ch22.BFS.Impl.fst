@@ -26,7 +26,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open Pulse.Lib.WithPure
 
 module A = Pulse.Lib.Array
@@ -1370,7 +1369,7 @@ fn maybe_discover
 }
 #pop-options
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1 --split_queries always"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)
@@ -1725,8 +1724,7 @@ fn queue_bfs
 
     // Complexity: after inner loop with vv == n, vc2 - c0 <= vhead*(n+1) + 1 + n
     // = vhead*(n+1) + (n+1) = (vhead+1)*(n+1)
-    with vc_outer. assert (GR.pts_to ctr vc_outer);
-    assert (pure (reveal vc_outer - reveal c0 <= (SZ.v vhead + 1) * (SZ.v n + 1)))
+    with vc_outer. assert (GR.pts_to ctr vc_outer)
   };
   
   // At loop exit: vc - c0 <= vhead * (n+1) <= n * (n+1) <= 2 * n²

@@ -8,7 +8,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module SZ = FStar.SizeT

@@ -4,7 +4,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open Pulse.Lib.WithPure
 open CLRS.Ch22.TopologicalSort.Spec
 open CLRS.Ch22.TopologicalSort.Lemmas
@@ -448,9 +447,7 @@ fn topological_sort
     lemma_step1_inner_to_outer sadj (SZ.v n) (reveal ghost_output) sin_deg_after_inner (SZ.v vi);
     
     // Tick count: vi*n + n == (vi+1)*n
-    with vc_mid. assert (GR.pts_to ctr vc_mid);
-    assert (pure (reveal vc_mid - reveal c0 == SZ.v vi * SZ.v n + SZ.v n));
-    assert (pure (SZ.v vi * SZ.v n + SZ.v n == (SZ.v vi + 1) * SZ.v n));
+    // (Pure hint removed: uvar fix changes type inference for erased nat in pure assertions)
     
     i := vi +^ 1sz;
   };

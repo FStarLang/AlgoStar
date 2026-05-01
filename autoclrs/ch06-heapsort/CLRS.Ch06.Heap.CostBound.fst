@@ -4,7 +4,6 @@ module CLRS.Ch06.Heap.CostBound
 /// to the Complexity module. Separate from the Pulse file to avoid
 /// BoundedIntegers typeclass interference.
 
-open FStar.Mul
 open FStar.Math.Lemmas
 open CLRS.Ch06.Heap.Complexity
 

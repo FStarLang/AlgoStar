@@ -72,7 +72,7 @@ fn insertion_sort
       prefix_sorted s (SZ.v vj) /\
       // Complexity: comparisons so far <= vj*(vj-1)/2
       vc >= reveal c0 /\
-      vc <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2
+      vc <= reveal c0 + op_Star (SZ.v vj) (SZ.v vj - 1) / 2
     )
   decreases (SZ.v len `Prims.op_Subtraction` SZ.v !j)
   {
@@ -118,8 +118,8 @@ fn insertion_sort
           Seq.index s_inner k1 <= Seq.index s_inner k2) /\
         // Complexity: vc + vi bounded
         vc_inner >= reveal c0 /\
-        vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj + 1 - SZ.v vi /\
-        (not vcont ==> vc_inner <= reveal c0 + op_Multiply (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj)
+        vc_inner <= reveal c0 + op_Star (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj + 1 - SZ.v vi /\
+        (not vcont ==> vc_inner <= reveal c0 + op_Star (SZ.v vj) (SZ.v vj - 1) / 2 + SZ.v vj)
       )
     decreases (SZ.v !i)
     {

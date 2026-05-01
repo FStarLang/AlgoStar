@@ -12,7 +12,6 @@
 *)
 
 module CLRS.Ch33.GrahamScan.Spec
-open FStar.Mul
 open CLRS.Ch33.Segments.Spec
 
 module SZ = FStar.SizeT

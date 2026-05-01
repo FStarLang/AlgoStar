@@ -29,7 +29,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch23.MST.Spec
 open CLRS.Ch23.Kruskal.Spec
 open CLRS.Ch23.Kruskal.Defs
@@ -1546,7 +1545,8 @@ let rec edges_from_arrays_no_self_loops
 #pop-options
 
 /// For connected graphs with ec < n-1, the scan MUST find a cross-component edge.
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#restart-solver
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let connected_implies_vbw_positive
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t) (seu sev: Seq.seq int) (n ec: nat) (vbw: int)
     (vbu vbv: nat)
@@ -1574,12 +1574,19 @@ let connected_implies_vbw_positive
       (vbw > 0 ==> UF.find_pure sparent vbu n n <> UF.find_pure sparent vbv n n))
     (ensures vbw > 0)
   = if vbw = 0 then begin
+      let es = edges_from_arrays seu sev ec 0 in
       scan_min_inv_complete sparent sadj n vbw vbu vbv;
       scan_zero_implies_all_connected sadj sparent seu sev n ec;
+      assert (all_connected n es);
       edges_from_arrays_no_self_loops sadj seu sev n ec 0;
       edges_from_arrays_length seu sev ec 0;
-      acyclic_connected_length n (edges_from_arrays seu sev ec 0)
-      // acyclic_connected_length gives length >= n-1, but length == ec < n-1. Contradiction.
+      assert (FStar.List.Tot.length es == ec);
+      assert (acyclic n es);
+      assert (all_edges_distinct es);
+      acyclic_connected_length n es;
+      assert (FStar.List.Tot.length es >= n - 1);
+      assert (ec >= n - 1);
+      assert False
     end
 #pop-options
 
@@ -1939,7 +1946,7 @@ let kruskal_mst_inv_step_add
 
 // Step maintenance: not adding an edge
 #restart-solver
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2 --split_queries always"
 let kruskal_mst_inv_step_noop
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -2049,6 +2056,8 @@ let kruskal_spanning_step_distinct
     end
     else ()
 
+#restart-solver
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let kruskal_spanning_step_count
     (sadj: Seq.seq int) (sparent: Seq.seq SZ.t)
     (seu sev: Seq.seq int) (n ec ec' round: nat)
@@ -2096,8 +2105,9 @@ let kruskal_spanning_step_count
       FStar.Classical.move_requires aux ()
     end
 #pop-options
+#pop-options
 
-#push-options "--z3rlimit 50 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 1200 --fuel 2 --ifuel 2 --split_queries always --ext no:optimize_let_vc --z3refresh"
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))

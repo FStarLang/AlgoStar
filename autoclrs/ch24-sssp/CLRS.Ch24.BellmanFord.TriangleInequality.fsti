@@ -10,7 +10,6 @@
 module CLRS.Ch24.BellmanFord.TriangleInequality
 
 open FStar.Seq
-open FStar.Mul
 
 let inf : int = CLRS.Ch24.ShortestPath.Inf.inf
 

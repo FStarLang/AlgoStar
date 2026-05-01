@@ -18,7 +18,6 @@
  *)
 module CLRS.Ch13.RBTree.Complexity
 
-open FStar.Mul
 open CLRS.Ch13.RBTree.Spec
 open CLRS.Ch13.RBTree.Lemmas
 

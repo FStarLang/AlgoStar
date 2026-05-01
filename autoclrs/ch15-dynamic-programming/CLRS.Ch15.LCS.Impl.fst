@@ -51,11 +51,11 @@ open Pulse.Lib.BoundedIntegers
 // Bound checking lemmas
 let lemma_index_in_bounds (i j m n: nat)
   : Lemma (requires i <= m /\ j <= n)
-          (ensures op_Multiply i (n + 1) + j < op_Multiply (m + 1) (n + 1))
+          (ensures op_Star i (n + 1) + j < op_Star (m + 1) (n + 1))
   = ()
 
 let lemma_table_size_positive (m n: nat)
-  : Lemma (op_Multiply (m + 1) (n + 1) > 0)
+  : Lemma (op_Star (m + 1) (n + 1) > 0)
   = ()
 
 // ========== Main Implementation ==========
@@ -79,7 +79,7 @@ fn lcs
       SZ.v m == A.length x /\
       SZ.v n == Seq.length sy /\
       SZ.v n == A.length y /\
-      SZ.fits (op_Multiply (SZ.v m + 1) (SZ.v n + 1))
+      SZ.fits (op_Star (SZ.v m + 1) (SZ.v n + 1))
     )
   returns result: int
   ensures exists* (cf: nat).
@@ -116,11 +116,11 @@ fn lcs
     A.pts_to y #py sy **
     pure (
       SZ.v vi <= SZ.v m + 1 /\
-      Seq.length stable == op_Multiply (SZ.v m + 1) (SZ.v n + 1) /\
+      Seq.length stable == op_Star (SZ.v m + 1) (SZ.v n + 1) /\
       V.length table == Seq.length stable /\
       lcs_table_correct sx sy stable (SZ.v m) (SZ.v n) (SZ.v vi) 0 /\
       vc >= reveal c0 /\
-      vc - reveal c0 == op_Multiply (SZ.v vi) (SZ.v n + 1)
+      vc - reveal c0 == op_Star (SZ.v vi) (SZ.v n + 1)
     )
   decreases (Prims.op_Addition (SZ.v m) 1 `Prims.op_Subtraction` SZ.v !i)
   {
@@ -138,11 +138,11 @@ fn lcs
       pure (
         SZ.v vi <= SZ.v m /\
         SZ.v vj <= SZ.v n + 1 /\
-        Seq.length stable_inner == op_Multiply (SZ.v m + 1) (SZ.v n + 1) /\
+        Seq.length stable_inner == op_Star (SZ.v m + 1) (SZ.v n + 1) /\
         V.length table == Seq.length stable_inner /\
         lcs_table_correct sx sy stable_inner (SZ.v m) (SZ.v n) (SZ.v vi) (SZ.v vj) /\
         vc_inner >= reveal c0 /\
-        vc_inner - reveal c0 == op_Multiply (SZ.v vi) (SZ.v n + 1) + SZ.v vj
+        vc_inner - reveal c0 == op_Star (SZ.v vi) (SZ.v n + 1) + SZ.v vj
       )
     decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !j)
     {

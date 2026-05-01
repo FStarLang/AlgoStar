@@ -8,7 +8,6 @@
 
 module CLRS.Ch31.ModExp.Lemmas
 
-open FStar.Mul
 open FStar.Math.Lemmas
 open CLRS.Ch31.ModExp.Spec
 

@@ -13,7 +13,6 @@ module CLRS.Ch12.BSTArray.Lemmas
  *)
 
 open FStar.Seq
-open FStar.Mul
 open CLRS.Ch12.BST.Spec
 open CLRS.Ch12.BSTArray.Predicates
 open CLRS.Ch12.BSTArray.Refinement

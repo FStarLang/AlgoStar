@@ -286,7 +286,7 @@ let rec find_max_compatible (start: Seq.seq int) (finish: Seq.seq int) (n: nat) 
   : GTot nat (decreases k) =
   if k = 0 then 0
   else
-    if FStar.StrongExcludedMiddle.strong_excluded_middle
+    if FStar.IndefiniteDescription.strong_excluded_middle
          (exists (sel: list nat). L.length sel = k /\
                                  mutually_compatible start finish sel /\
                                  list_sorted_indices sel n)
@@ -322,7 +322,7 @@ let rec find_max_compatible_lower_bound
           (ensures find_max_compatible start finish n k >= m)
           (decreases k)
   = if k = 0 then ()
-    else if FStar.StrongExcludedMiddle.strong_excluded_middle
+    else if FStar.IndefiniteDescription.strong_excluded_middle
               (exists (sel: list nat). L.length sel = k /\
                                       mutually_compatible start finish sel /\
                                       list_sorted_indices sel n)
@@ -348,7 +348,7 @@ let rec find_max_compatible_upper_bound
   : Lemma (ensures find_max_compatible start finish n k <= k)
           (decreases k)
   = if k = 0 then ()
-    else if FStar.StrongExcludedMiddle.strong_excluded_middle
+    else if FStar.IndefiniteDescription.strong_excluded_middle
               (exists (sel: list nat). L.length sel = k /\
                                       mutually_compatible start finish sel /\
                                       list_sorted_indices sel n)
@@ -370,7 +370,7 @@ let rec find_max_compatible_no_larger
     (decreases k)
   = if k = 0 then ()
     else 
-      let b = FStar.StrongExcludedMiddle.strong_excluded_middle
+      let b = FStar.IndefiniteDescription.strong_excluded_middle
                 (exists (sel: list nat). L.length sel = k /\
                                         mutually_compatible start finish sel /\
                                         list_sorted_indices sel n) in

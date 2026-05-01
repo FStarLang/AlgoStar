@@ -62,7 +62,7 @@ let rec insert_sorted_ticks_bounded (t: htree) (l: list htree)
 // Build Huffman tree with tick counting
 // Returns: (tree, total_ticks)
 let rec huffman_with_ticks (l: list htree{Cons? l})
-  : Tot (htree * nat) (decreases length l)
+  : Tot (htree & nat) (decreases length l)
   = match l with
     | [t] -> 
         // Base case: single tree, no operations needed

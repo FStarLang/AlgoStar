@@ -61,7 +61,7 @@ fn naive_string_match
       SZ.v m > 0 /\
       SZ.v m <= SZ.v n /\
       SZ.fits (SZ.v n - SZ.v m + 2) /\
-      SZ.fits (op_Multiply (SZ.v n - SZ.v m + 1) (SZ.v m))
+      SZ.fits (op_Star (SZ.v n - SZ.v m + 1) (SZ.v m))
     )
   returns result: SZ.t
   ensures exists* (cf: nat).
@@ -91,7 +91,7 @@ fn naive_string_match
       SZ.v vcount == count_matches_up_to s_text s_pat (SZ.v vs) /\
       SZ.v vcount <= SZ.v vs /\
       vc >= reveal c0 /\
-      vc - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m)
+      vc - reveal c0 <= op_Star (SZ.v vs) (SZ.v m)
     )
   decreases (SZ.v n - SZ.v !s)
   {
@@ -119,8 +119,8 @@ fn naive_string_match
         (vall_match == false ==> (exists (k: nat). k < SZ.v vj /\ 
           Seq.index s_text (SZ.v vs + k) <> Seq.index s_pat k)) /\
         vc_inner >= reveal c0 /\
-        vc_inner - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v vj /\
-        vc_inner - reveal c0 <= op_Multiply (SZ.v vs) (SZ.v m) + SZ.v m
+        vc_inner - reveal c0 <= op_Star (SZ.v vs) (SZ.v m) + SZ.v vj /\
+        vc_inner - reveal c0 <= op_Star (SZ.v vs) (SZ.v m) + SZ.v m
       )
     decreases (SZ.v m - SZ.v !j)
     {

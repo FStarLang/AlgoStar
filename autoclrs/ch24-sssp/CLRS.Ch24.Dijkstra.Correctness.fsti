@@ -11,7 +11,6 @@
 
 module CLRS.Ch24.Dijkstra.Correctness
 
-open FStar.Mul
 open FStar.Seq
 
 module Seq = FStar.Seq

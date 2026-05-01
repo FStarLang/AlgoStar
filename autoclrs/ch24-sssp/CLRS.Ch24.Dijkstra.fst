@@ -5,7 +5,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Vec
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -173,8 +172,118 @@ let relax_round_lb_post
     FStar.Classical.forall_intro aux
 #pop-options
 
+/// Helper: pred_consistent is preserved by the relaxation round
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries no"
+let relax_round_pred_consistent
+  (sweights sdist_pre sdist_after: Seq.seq int)
+  (spred_pre spred_after: Seq.seq SZ.t)
+  (svisited_pre: Seq.seq int)
+  (n source u: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ u < n /\
+      Seq.length sweights == n * n /\
+      Seq.length sdist_pre == n /\ Seq.length sdist_after == n /\
+      Seq.length spred_pre == n /\ Seq.length spred_after == n /\
+      Seq.length svisited_pre == n /\
+      Seq.index sdist_pre source == 0 /\
+      all_non_negative sdist_pre /\
+      all_weights_non_negative sweights /\
+      pred_consistent spred_pre sdist_pre sweights n source /\
+      (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist_pre v < SP.inf ==>
+        SZ.v (Seq.index spred_pre v) < n /\
+        Seq.index svisited_pre (SZ.v (Seq.index spred_pre v)) = 1) /\
+      (forall (x: nat). x < n /\ (Seq.index svisited_pre x = 1 \/ x = u) ==>
+        Seq.index sdist_after x == Seq.index sdist_pre x) /\
+      (forall (v: nat). v < n ==>
+        (Seq.index sdist_after v == Seq.index sdist_pre v /\
+         Seq.index spred_after v == Seq.index spred_pre v) \/
+        (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
+         Seq.index sdist_after v < Seq.index sdist_pre v /\
+         Seq.index sweights (u * n + v) < SP.inf /\
+         Seq.index sdist_pre u < SP.inf /\
+         SZ.v (Seq.index spred_after v) == u))
+    )
+    (ensures pred_consistent spred_after sdist_after sweights n source)
+  = let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf}) : Lemma
+      (ensures (let p = SZ.v (Seq.index spred_after v) in
+                p < n /\
+                p * n + v < Seq.length sweights /\
+                Seq.index sweights (p * n + v) < SP.inf /\
+                Seq.index sdist_after p < SP.inf /\
+                Seq.index sdist_after v == Seq.index sdist_after p + Seq.index sweights (p * n + v)))
+      = if Seq.index sdist_after v = Seq.index sdist_pre v &&
+           Seq.index spred_after v = Seq.index spred_pre v
+        then begin
+          let p = SZ.v (Seq.index spred_pre v) in
+          assert (Seq.index svisited_pre p = 1);
+          assert (Seq.index sdist_after p == Seq.index sdist_pre p)
+        end else begin
+          assert (SZ.v (Seq.index spred_after v) == u);
+          assert (Seq.index sdist_after u == Seq.index sdist_pre u)
+        end
+    in
+    FStar.Classical.forall_intro aux
+#pop-options
+
+/// Helper: predecessors remain visited after the relaxation round
+#push-options "--z3rlimit 15 --fuel 0 --ifuel 0 --split_queries no"
+let relax_round_pred_visited
+  (sweights sdist_pre sdist_after: Seq.seq int)
+  (spred_pre spred_after: Seq.seq SZ.t)
+  (svisited_pre: Seq.seq int)
+  (n source u: nat)
+  : Lemma
+    (requires
+      n > 0 /\ source < n /\ u < n /\
+      Seq.length sweights == n * n /\
+      Seq.length sdist_pre == n /\ Seq.length sdist_after == n /\
+      Seq.length spred_pre == n /\ Seq.length spred_after == n /\
+      Seq.length svisited_pre == n /\
+      Seq.index svisited_pre u = 0 /\
+      Seq.index sdist_pre source == 0 /\
+      all_non_negative sdist_pre /\
+      all_weights_non_negative sweights /\
+      (forall (j: nat). j < n ==>
+        (Seq.index svisited_pre j = 0 \/ Seq.index svisited_pre j = 1)) /\
+      (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist_pre v < SP.inf ==>
+        SZ.v (Seq.index spred_pre v) < n /\
+        Seq.index svisited_pre (SZ.v (Seq.index spred_pre v)) = 1) /\
+      (forall (x: nat). x < n /\ (Seq.index svisited_pre x = 1 \/ x = u) ==>
+        Seq.index sdist_after x == Seq.index sdist_pre x) /\
+      (forall (v: nat). v < n ==>
+        (Seq.index sdist_after v == Seq.index sdist_pre v /\
+         Seq.index spred_after v == Seq.index spred_pre v) \/
+        (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
+         Seq.index sdist_after v < Seq.index sdist_pre v /\
+         Seq.index sweights (u * n + v) < SP.inf /\
+         Seq.index sdist_pre u < SP.inf /\
+         SZ.v (Seq.index spred_after v) == u))
+    )
+    (ensures (let svisited_now = Seq.upd svisited_pre u 1 in
+              Seq.length svisited_now == n /\
+              (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf ==>
+                SZ.v (Seq.index spred_after v) < n /\
+                Seq.index svisited_now (SZ.v (Seq.index spred_after v)) = 1)))
+  = let svisited_now = Seq.upd svisited_pre u 1 in
+    Seq.lemma_index_upd1 svisited_pre u 1;
+    let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf}) : Lemma
+      (ensures (SZ.v (Seq.index spred_after v) < n /\
+                Seq.index svisited_now (SZ.v (Seq.index spred_after v)) = 1))
+      = if Seq.index sdist_after v = Seq.index sdist_pre v &&
+           Seq.index spred_after v = Seq.index spred_pre v
+        then begin
+          let p = SZ.v (Seq.index spred_pre v) in
+          assert (Seq.index svisited_pre p = 1);
+          Seq.lemma_index_upd2 svisited_pre u 1 p
+        end else
+          assert (SZ.v (Seq.index spred_after v) == u)
+    in
+    FStar.Classical.forall_intro aux
+#pop-options
+
 /// Bridge lemma: pred_ok is preserved by the relaxation round
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let relax_round_pred_ok
   (sweights sdist_pre sdist_after: Seq.seq int)
   (spred_pre spred_after: Seq.seq SZ.t)
@@ -208,34 +317,8 @@ let relax_round_pred_ok
          SZ.v (Seq.index spred_after v) == u))
     )
     (ensures pred_ok spred_after sdist_after sweights (Seq.upd svisited_pre u 1) n source)
-  = let svisited_now = Seq.upd svisited_pre u 1 in
-    Seq.lemma_index_upd1 svisited_pre u 1;
-    assert (Seq.index svisited_now u = 1);
-    // Source is never "updated" since dist[source] = 0 and the update requires strict decrease
-    // (dist_u + w >= 0 = dist_pre[source], so no strict decrease is possible)
-    assert (Seq.index sdist_after source == Seq.index sdist_pre source);
-    assert (Seq.index spred_after source == Seq.index spred_pre source);
-    let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf}) : Lemma
-      (ensures (let p = SZ.v (Seq.index spred_after v) in
-                p < n /\
-                p * n + v < Seq.length sweights /\
-                Seq.index sweights (p * n + v) < SP.inf /\
-                Seq.index sdist_after p < SP.inf /\
-                Seq.index sdist_after v == Seq.index sdist_after p + Seq.index sweights (p * n + v) /\
-                Seq.index svisited_now p = 1))
-      = if Seq.index sdist_after v = Seq.index sdist_pre v &&
-           Seq.index spred_after v = Seq.index spred_pre v
-        then begin
-          let p = SZ.v (Seq.index spred_pre v) in
-          assert (Seq.index svisited_pre p = 1);
-          assert (Seq.index sdist_after p == Seq.index sdist_pre p);
-          assert (Seq.index svisited_now p = 1)
-        end else begin
-          assert (SZ.v (Seq.index spred_after v) == u);
-          assert (Seq.index sdist_after u == Seq.index sdist_pre u)
-        end
-    in
-    FStar.Classical.forall_intro aux
+  = relax_round_pred_consistent sweights sdist_pre sdist_after spred_pre spred_after svisited_pre n source u;
+    relax_round_pred_visited sweights sdist_pre sdist_after spred_pre spred_after svisited_pre n source u
 #pop-options
 
 (* ===== Ghost invariants for triangle inequality proof ===== *)
@@ -735,7 +818,7 @@ fn dijkstra_relax_round
 }
 #pop-options
 
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0 --split_queries always"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)

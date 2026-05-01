@@ -4,6 +4,10 @@
 
 #include <stddef.h>
 #include "krml/internal/compat.h"
+#include "Prims.h"
+
+/* F* nightly (2026.03.24+) extracts op_Star; krmllib still uses op_Multiply */
+#define Prims_op_Star Prims_op_Multiply
 
 static inline krml_checked_int_t FStar_SizeT_v(size_t x) {
   return (krml_checked_int_t)x;

@@ -9,7 +9,6 @@
 
 module CLRS.Ch31.ModExpLR.Complexity
 
-open FStar.Mul
 open CLRS.Ch31.GCD.Complexity
 
 // Complexity bound for left-to-right modular exponentiation

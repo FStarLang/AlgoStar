@@ -23,7 +23,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open Pulse.Lib.Vec
 open FStar.SizeT
-open FStar.Mul
 
 #set-options "--z3rlimit 10 --fuel 1 --ifuel 0 --split_queries always"
 
@@ -79,11 +78,18 @@ let mc_result_eq_mc_cost (dims: Seq.seq int) (n: nat)
           (ensures mc_result dims n == MCL.mc_cost dims 0 (n - 1))
   = MCL.mc_spec_equiv dims n
 
+// Helper: intermediate multiplication fits in SizeT when the full table fits
+let lemma_mul_fits (i n: nat)
+  : Lemma (requires i < n /\ n * n >= 0 /\ SZ.fits (n * n))
+          (ensures i * n < n * n /\ SZ.fits (i * n))
+  = assert (i * n <= (n - 1) * n);
+    assert ((n - 1) * n == n * n - n)
+
 // ========== Main Implementation ==========
 
 open Pulse.Lib.BoundedIntegers
 
-#push-options "--z3rlimit 20"
+#push-options "--z3rlimit 10"
 //SNIPPET_START: mc_sig
 fn matrix_chain_order
   (#p: perm)
@@ -99,7 +105,7 @@ fn matrix_chain_order
       SZ.v n + 1 == Seq.length s_dims /\
       SZ.v n + 1 == A.length dims /\
       SZ.v n > 0 /\
-      SZ.fits (op_Multiply (SZ.v n) (SZ.v n)) /\
+      SZ.fits (op_Star (SZ.v n) (SZ.v n)) /\
       (forall (i: nat). i < Seq.length s_dims ==> Seq.index s_dims i > 0)
     )
   returns result: int
@@ -136,7 +142,7 @@ fn matrix_chain_order
     pure (
       SZ.v vl <= SZ.v n + 1 /\
       SZ.v vl >= 2 /\
-      Seq.length sm == op_Multiply (SZ.v n) (SZ.v n) /\
+      Seq.length sm == op_Star (SZ.v n) (SZ.v n) /\
       V.length m == Seq.length sm /\
       mc_outer sm s_dims (SZ.v n) (SZ.v vl) == 
         mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2 /\
@@ -164,7 +170,7 @@ fn matrix_chain_order
         SZ.v vl <= SZ.v n + 1 /\
         SZ.v vl >= 2 /\
         SZ.v vi <= SZ.v n - SZ.v vl + 1 /\
-        Seq.length sm_i == op_Multiply (SZ.v n) (SZ.v n) /\
+        Seq.length sm_i == op_Star (SZ.v n) (SZ.v n) /\
         V.length m == Seq.length sm_i /\
         mc_outer (mc_inner_i sm_i s_dims (SZ.v n) (SZ.v vl) (SZ.v vi)) s_dims (SZ.v n) (SZ.v vl + 1) ==
           mc_outer (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2 /\
@@ -207,7 +213,7 @@ fn matrix_chain_order
           SZ.v vk <= SZ.v j /\
           SZ.v j == SZ.v vi + SZ.v vl - 1 /\
           SZ.v j < SZ.v n /\
-          Seq.length sm_k == op_Multiply (SZ.v n) (SZ.v n) /\
+          Seq.length sm_k == op_Star (SZ.v n) (SZ.v n) /\
           V.length m == Seq.length sm_k /\
           sm_k == sm_i_entry /\
           mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost ==
@@ -220,12 +226,16 @@ fn matrix_chain_order
         let vk = !k;
         let vmin_cost = !min_cost;
         
+        // Establish index bounds before computing
+        lemma_index_in_bounds (SZ.v vi) (SZ.v vk) (SZ.v n);
+        lemma_index_in_bounds (SZ.v vk + 1) (SZ.v j) (SZ.v n);
+        lemma_mul_fits (SZ.v vi) (SZ.v n);
+        lemma_mul_fits (SZ.v vk + 1) (SZ.v n);
+        
         // Compute index for m[i][k]
         let idx_ik = vi *^ n + vk;
-        lemma_index_in_bounds (SZ.v vi) (SZ.v vk) (SZ.v n);
         
         // Compute index for m[k+1][j]
-        lemma_index_in_bounds (SZ.v vk + 1) (SZ.v j) (SZ.v n);
         let idx_k1j = (vk + 1sz) *^ n + j;
         
         // Read m[i][k] and m[k+1][j]
@@ -253,8 +263,9 @@ fn matrix_chain_order
       
       // Store m[i][j] = min_cost
       let final_min_cost = !min_cost;
-      let idx_ij = vi *^ n + j;
       lemma_index_in_bounds (SZ.v vi) (SZ.v j) (SZ.v n);
+      lemma_mul_fits (SZ.v vi) (SZ.v n);
+      let idx_ij = vi *^ n + j;
       
       V.op_Array_Assignment m idx_ij final_min_cost;
       
@@ -272,8 +283,8 @@ fn matrix_chain_order
   mc_inner_sum_zero (SZ.v n) (SZ.v vl_final);
   
   // Extract result: m[0][n-1]
-  let result_idx = 0sz *^ n + (n - 1sz);
   lemma_index_in_bounds 0 (SZ.v n - 1) (SZ.v n);
+  let result_idx = 0sz *^ n + (n - 1sz);
   
   // Get the ghost sequence for the final table
   with sm_final. assert (V.pts_to m sm_final);

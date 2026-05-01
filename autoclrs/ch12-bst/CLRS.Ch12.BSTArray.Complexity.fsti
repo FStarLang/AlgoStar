@@ -11,7 +11,6 @@ module CLRS.Ch12.BSTArray.Complexity
  * CLRS Reference: Theorem 12.2
  *)
 
-open FStar.Mul
 
 (** Compute floor of log base 2 of a positive natural number *)
 let rec log2_floor (n:nat{n > 0}) : nat =

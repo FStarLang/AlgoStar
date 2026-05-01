@@ -1,7 +1,6 @@
 module CLRS.Ch22.TopologicalSort.Lemmas
 
 open FStar.Seq
-open FStar.Mul
 
 (* Extending strong_order_inv: when adding a vertex v at position count
    whose all predecessors are already in output[0..count) *)
@@ -56,7 +55,7 @@ let lemma_queue_preds_extend_output
 (* When a vertex w is newly enqueued (added at position qt in queue),
    and all predecessors of w are in output[0..count+1),
    the queue preds property extends *)
-#push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 4 --ifuel 2 --split_queries always --ext no:optimize_let_vc"
 let lemma_queue_preds_enqueue
   (adj: seq int) (n: nat) (queue_old queue_new: seq FStar.SizeT.t) (qh qt: nat)
    (output: seq int) (count: nat) (w: FStar.SizeT.t)
@@ -74,7 +73,26 @@ let lemma_queue_preds_enqueue
         Seq.index adj (u * n + FStar.SizeT.v w) <> 0 ==>
         (exists (k: nat). k < count /\ Seq.index output k == u)))
     (ensures queue_preds_in_output_sz adj n queue_new qh (qt + 1) output count)
-  = ()
+  = let aux (qi: nat) : Lemma
+      (requires qh <= qi /\ qi < qt + 1)
+      (ensures (qi < Seq.length queue_new /\
+                (let w' = FStar.SizeT.v (Seq.index queue_new qi) in
+                w' >= 0 /\ w' < n /\
+                (forall (u: nat). u < n /\ u * n + w' < n * n /\ Seq.index adj (u * n + w') <> 0 ==>
+                  (exists (k: nat). k < count /\ Seq.index output k == u)))))
+    = assert (qi <= qt);
+      assert (qt < Seq.length queue_new);
+      assert (qi < Seq.length queue_new);
+      if qi < qt then begin
+        assert (Seq.index queue_new qi == Seq.index queue_old qi);
+        assert (qi < Seq.length queue_old);
+        ()
+      end else begin
+        assert (qi = qt);
+        ()
+      end
+    in
+    Classical.forall_intro (Classical.move_requires aux)
 #pop-options
 
 (* When a vertex is NOT enqueued (just overwriting some position in queue

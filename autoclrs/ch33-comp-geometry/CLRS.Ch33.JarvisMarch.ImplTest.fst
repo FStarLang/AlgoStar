@@ -27,7 +27,6 @@ open Pulse.Lib.Pervasives
 open CLRS.Ch33.Segments.Spec
 open CLRS.Ch33.JarvisMarch.Spec
 open CLRS.Ch33.JarvisMarch.Impl
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec

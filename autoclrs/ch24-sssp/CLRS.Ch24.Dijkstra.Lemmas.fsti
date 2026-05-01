@@ -8,7 +8,6 @@ module CLRS.Ch24.Dijkstra.Lemmas
    - CLRS.Ch24.Dijkstra.TriangleInequality  (relaxation ⇒ triangle inequality)
 *)
 
-open FStar.Mul
 
 module DC  = CLRS.Ch24.Dijkstra.Correctness
 module DTI = CLRS.Ch24.Dijkstra.TriangleInequality

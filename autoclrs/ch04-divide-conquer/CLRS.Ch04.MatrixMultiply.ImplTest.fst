@@ -24,7 +24,6 @@ module CLRS.Ch04.MatrixMultiply.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch04.MatrixMultiply.Impl
 open CLRS.Ch04.MatrixMultiply.Spec
 
@@ -71,11 +70,11 @@ let mm_dot_products (sa sb: Seq.seq int)
 let mm_2sz_pre ()
   : Lemma
     (ensures SZ.v 2sz > 0 /\
-             SZ.v 4sz == op_Multiply (SZ.v 2sz) (SZ.v 2sz) /\
-             SZ.fits (op_Multiply (SZ.v 2sz) (SZ.v 2sz)))
+             SZ.v 4sz == op_Star (SZ.v 2sz) (SZ.v 2sz) /\
+             SZ.fits (op_Star (SZ.v 2sz) (SZ.v 2sz)))
   = assert_norm (SZ.v 2sz > 0 /\
-                 SZ.v 4sz == op_Multiply (SZ.v 2sz) (SZ.v 2sz) /\
-                 SZ.fits (op_Multiply (SZ.v 2sz) (SZ.v 2sz)))
+                 SZ.v 4sz == op_Star (SZ.v 2sz) (SZ.v 2sz) /\
+                 SZ.fits (op_Star (SZ.v 2sz) (SZ.v 2sz)))
 
 // ---------- Test function ----------
 
@@ -128,9 +127,9 @@ fn test_matrix_multiply_2x2 ()
 
   // Establish preconditions
   mm_2sz_pre ();
-  assert (pure (Seq.length sa0 == op_Multiply (SZ.v 2sz) (SZ.v 2sz)));
-  assert (pure (Seq.length sb0 == op_Multiply (SZ.v 2sz) (SZ.v 2sz)));
-  assert (pure (Seq.length sc0 == op_Multiply (SZ.v 2sz) (SZ.v 2sz)));
+  assert (pure (Seq.length sa0 == op_Star (SZ.v 2sz) (SZ.v 2sz)));
+  assert (pure (Seq.length sb0 == op_Star (SZ.v 2sz) (SZ.v 2sz)));
+  assert (pure (Seq.length sc0 == op_Star (SZ.v 2sz) (SZ.v 2sz)));
 
   // C = A × B
   let ctr = GR.alloc #nat 0;

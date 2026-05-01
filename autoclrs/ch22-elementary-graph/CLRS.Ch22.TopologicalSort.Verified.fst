@@ -19,7 +19,6 @@ module CLRS.Ch22.TopologicalSort.Verified
 
 open CLRS.Ch22.TopologicalSort.Spec
 open CLRS.Ch22.TopologicalSort.Lemmas
-open FStar.Mul
 
 (**
  * Pure proof: strong_order_inv implies topological ordering on int sequences

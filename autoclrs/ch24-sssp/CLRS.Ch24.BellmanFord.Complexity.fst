@@ -1,6 +1,5 @@
 module CLRS.Ch24.BellmanFord.Complexity
 
-open FStar.Mul
 
 (*
  * Complexity analysis for Bellman-Ford algorithm with adjacency matrix representation.

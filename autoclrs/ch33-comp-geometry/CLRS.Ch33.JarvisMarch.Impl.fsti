@@ -10,7 +10,6 @@ module CLRS.Ch33.JarvisMarch.Impl
 open Pulse.Lib.Pervasives
 open CLRS.Ch33.Segments.Spec
 open CLRS.Ch33.JarvisMarch.Spec
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

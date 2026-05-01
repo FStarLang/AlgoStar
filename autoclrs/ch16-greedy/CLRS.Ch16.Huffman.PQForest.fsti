@@ -1,5 +1,4 @@
 module CLRS.Ch16.Huffman.PQForest
-open FStar.Mul
 open CLRS.Ch16.Huffman.Defs
 open CLRS.Ch16.Huffman.PQLemmas
 open CLRS.Ch16.Huffman.ForestLemmas

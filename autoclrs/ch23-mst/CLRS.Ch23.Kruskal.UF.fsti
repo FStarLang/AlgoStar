@@ -13,7 +13,6 @@ module CLRS.Ch23.Kruskal.UF
 open FStar.List.Tot
 open FStar.Seq
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch23.MST.Spec
 
 module SZ = FStar.SizeT

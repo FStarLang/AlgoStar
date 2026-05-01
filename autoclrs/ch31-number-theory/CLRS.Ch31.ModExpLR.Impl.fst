@@ -23,7 +23,6 @@ module CLRS.Ch31.ModExpLR.Impl
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 open FStar.Math.Lemmas
 open CLRS.Ch31.ModExp.Spec
 open CLRS.Ch31.ModExpLR.Lemmas
@@ -39,7 +38,7 @@ module SZ = FStar.SizeT
 
 // Basic division algebra: e/d = 2*(e/(2*d)) + (e/d)%2 for d > 0
 let lemma_bit_decompose_div (e: nat) (d: pos)
-  : Lemma (e / d == 2 * (e / (op_Multiply 2 d)) + (e / d) % 2)
+  : Lemma (e / d == 2 * (e / (op_Star 2 d)) + (e / d) % 2)
   = lemma_div_mod (e / d) 2;
     division_multiplication_lemma e d 2
 
@@ -50,7 +49,7 @@ let pow2_half (k: pos)
 
 // 2 * (pow2(k) / 2) = pow2(k) for k > 0
 let pow2_even (k: pos)
-  : Lemma (op_Multiply 2 (pow2 k / 2) == pow2 k)
+  : Lemma (op_Star 2 (pow2 k / 2) == pow2 k)
   = pow2_half k
 
 // num_bits(pow2(k)) = k + 1
@@ -113,7 +112,7 @@ let mod_exp_lr_step_bmod (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
 // (since 2*(e/(2*mask)) + (e/mask)%2 = e/mask by division algebra)
 let step_result_lemma (b: int) (e: nat) (mask: pos) (m: pos)
   : Lemma (
-      let prefix = e / (op_Multiply 2 mask) in
+      let prefix = e / (op_Star 2 mask) in
       let bit = (e / mask) % 2 in
       let d = pow b prefix % m in
       let d_sq = (d * d) % m in
@@ -121,11 +120,72 @@ let step_result_lemma (b: int) (e: nat) (mask: pos) (m: pos)
       let d_new = (if bit = 0 then d_sq else (d_sq * b_mod) % m) in
       d_new == pow b (e / mask) % m
     )
-  = let prefix = e / (op_Multiply 2 mask) in
+  = let prefix = e / (op_Star 2 mask) in
     let bit = (e / mask) % 2 in
     mod_exp_lr_step_bmod b prefix m bit;
     lemma_bit_decompose_div e mask;
     assert (e / mask == 2 * prefix + bit)
+
+// ── Step-result bridge lemmas ───────────────────────────────────
+// Take concrete values matching the Pulse computation and prove
+// the step result directly, avoiding Z3 let-binding matching.
+
+let step_bridge_bit0 (b: int) (e: nat) (mask: pos) (m: pos) (vd sq: int)
+  : Lemma
+    (requires
+      vd == pow b (e / (op_Star 2 mask)) % m /\
+      sq == (vd * vd) % m /\
+      (e / mask) % 2 == 0)
+    (ensures sq == pow b (e / mask) % m)
+  = step_result_lemma b e mask m
+
+let step_bridge_bit1 (b: int) (e: nat) (mask: pos) (m: pos)
+  (vd sq bmod d_new: int)
+  : Lemma
+    (requires
+      vd == pow b (e / (op_Star 2 mask)) % m /\
+      sq == (vd * vd) % m /\
+      bmod == b % m /\
+      d_new == (sq * bmod) % m /\
+      (e / mask) % 2 == 1)
+    (ensures d_new == pow b (e / mask) % m)
+  = step_result_lemma b e mask m
+
+// ── Invariant preservation helpers ──────────────────────────────
+
+// pow2 k > 1 implies k > 0
+let pow2_gt_one_implies_pos (k: nat)
+  : Lemma (requires pow2 k > 1) (ensures k > 0)
+  = ()
+
+// After the step: connect d_new to invariant for mask/2 when k > 0
+let inv_preservation_k_pos (b: int) (e: nat) (mask: pos) (m: pos) (k: pos)
+  (d_new: int)
+  : Lemma
+    (requires
+      mask == pow2 k /\
+      d_new == pow b (e / mask) % m)
+    (ensures (
+      let new_mask = mask / 2 in
+      new_mask > 0 /\
+      new_mask == pow2 (k - 1) /\
+      d_new == pow b (e / (op_Star 2 new_mask)) % m /\
+      d_new >= 0 /\ d_new < m))
+  = pow2_half k;
+    pow2_even k;
+    lemma_mod_lt (pow b (e / mask)) m
+
+// Terminal case: when mask = pow2 0, d_new = mod_exp_spec
+let inv_preservation_terminal (b: int) (e: nat) (mask: pos) (m: pos)
+  (d_new: int)
+  : Lemma
+    (requires
+      mask == pow2 0 /\
+      d_new == pow b (e / mask) % m)
+    (ensures
+      mod_exp_spec b e m == d_new /\
+      d_new >= 0 /\ d_new < m)
+  = lemma_mod_lt (pow b (e / mask)) m
 
 // ── Main function ────────────────────────────────────────────────
 
@@ -202,7 +262,7 @@ fn mod_exp_lr_impl (b_init e_init: SZ.t) (m_init: SZ.t{SZ.v m_init > 0 /\ SZ.fit
         SZ.v vd >= 0 /\ SZ.v vd < SZ.v m_init /\
         (SZ.v vmask > 0 ==>
           SZ.v vmask == pow2 k /\
-          SZ.v vd == pow (SZ.v b_init) (SZ.v e_init / (op_Multiply 2 (SZ.v vmask))) % SZ.v m_init) /\
+          SZ.v vd == pow (SZ.v b_init) (SZ.v e_init / (op_Star 2 (SZ.v vmask))) % SZ.v m_init) /\
         (SZ.v vmask == 0 ==>
           mod_exp_spec (SZ.v b_init) (SZ.v e_init) (SZ.v m_init) == SZ.v vd) /\
         vc >= reveal c0 /\
@@ -220,45 +280,64 @@ fn mod_exp_lr_impl (b_init e_init: SZ.t) (m_init: SZ.t{SZ.v m_init > 0 /\ SZ.fit
       // Concrete bit extraction
       let bit = (e_init /^ vmask) %^ 2sz;
 
-      // Ghost proof: step correctness
-      step_result_lemma (SZ.v b_init) (SZ.v e_init) (SZ.v vmask) (SZ.v m_init);
-
       // Prove multiplication fits in SZ.t
       assert (pure (SZ.v vd * SZ.v vd <= SZ.v vd * SZ.v m_init));
       assert (pure (SZ.v vd * SZ.v m_init < SZ.v m_init * SZ.v m_init));
 
       let sq = (vd *^ vd) %^ m_init;
 
-      // Move tick/mask/k_update into each bit branch so d is concrete
-      // (avoids match expression in d that Z3 can't reason about)
       if (bit =^ 1sz) {
         // bit = 1: d_new = (sq * b_mod) % m
+        assert (pure ((SZ.v e_init / SZ.v vmask) % 2 == 1));
         assert (pure (SZ.v sq * SZ.v b_mod <= SZ.v sq * SZ.v m_init));
         assert (pure (SZ.v sq * SZ.v m_init < SZ.v m_init * SZ.v m_init));
-        d := (sq *^ b_mod) %^ m_init;
+        let d_new = (sq *^ b_mod) %^ m_init;
 
+        // Bridge: connect concrete d_new to step result
+        step_bridge_bit1 (SZ.v b_init) (SZ.v e_init) (SZ.v vmask) (SZ.v m_init)
+          (SZ.v vd) (SZ.v sq) (SZ.v b_mod) (SZ.v d_new);
+
+        d := d_new;
         tick ctr;
         mask := vmask /^ 2sz;
 
         if (vmask >^ 1sz) {
-          pow2_half kv;
-          pow2_even kv;
+          // k > 0: connect to new invariant via mask halving
+          pow2_gt_one_implies_pos kv;
+          inv_preservation_k_pos (SZ.v b_init) (SZ.v e_init) (SZ.v vmask)
+            (SZ.v m_init) kv (SZ.v d_new);
+          assert (pure (SZ.v vmask / 2 > 0));
+          assert (pure (SZ.v vmask / 2 == pow2 (kv - 1)));
+          assert (pure (SZ.v d_new == pow (SZ.v b_init) (SZ.v e_init / (op_Star 2 (SZ.v vmask / 2))) % SZ.v m_init));
           GR.op_Colon_Equals k_ref (kv - 1);
         } else {
+          // k = 0: terminal case
+          inv_preservation_terminal (SZ.v b_init) (SZ.v e_init) (SZ.v vmask)
+            (SZ.v m_init) (SZ.v d_new);
           GR.op_Colon_Equals k_ref 0;
         };
       } else {
         // bit = 0: d_new = sq
-        d := sq;
+        assert (pure ((SZ.v e_init / SZ.v vmask) % 2 == 0));
+        // Bridge: connect sq to step result
+        step_bridge_bit0 (SZ.v b_init) (SZ.v e_init) (SZ.v vmask) (SZ.v m_init)
+          (SZ.v vd) (SZ.v sq);
 
+        d := sq;
         tick ctr;
         mask := vmask /^ 2sz;
 
         if (vmask >^ 1sz) {
-          pow2_half kv;
-          pow2_even kv;
+          pow2_gt_one_implies_pos kv;
+          inv_preservation_k_pos (SZ.v b_init) (SZ.v e_init) (SZ.v vmask)
+            (SZ.v m_init) kv (SZ.v sq);
+          assert (pure (SZ.v vmask / 2 > 0));
+          assert (pure (SZ.v vmask / 2 == pow2 (kv - 1)));
+          assert (pure (SZ.v sq == pow (SZ.v b_init) (SZ.v e_init / (op_Star 2 (SZ.v vmask / 2))) % SZ.v m_init));
           GR.op_Colon_Equals k_ref (kv - 1);
         } else {
+          inv_preservation_terminal (SZ.v b_init) (SZ.v e_init) (SZ.v vmask)
+            (SZ.v m_init) (SZ.v sq);
           GR.op_Colon_Equals k_ref 0;
         };
       };

@@ -29,7 +29,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Vec
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec

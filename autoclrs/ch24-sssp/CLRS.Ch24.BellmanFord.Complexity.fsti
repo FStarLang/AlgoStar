@@ -8,7 +8,6 @@ module CLRS.Ch24.BellmanFord.Complexity
    - Asymptotic: ≤ 2v³ for v ≥ 1
 *)
 
-open FStar.Mul
 
 /// Total iteration count: initialization + (v-1) relaxation rounds + detection
 val bellman_ford_iterations (v: nat) : nat

@@ -18,7 +18,6 @@ module CLRS.Ch08.RadixSort.Base
 
 open FStar.Seq
 open FStar.Math.Lemmas
-open FStar.Mul
 open FStar.Classical
 module Seq = FStar.Seq
 

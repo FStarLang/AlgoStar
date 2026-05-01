@@ -2,7 +2,6 @@ module CLRS.Ch12.BSTArray.Spec
 
 open FStar.Seq
 open FStar.Classical
-open FStar.Mul
 open CLRS.Ch12.BSTArray.Predicates
 
 (* ========================================================================

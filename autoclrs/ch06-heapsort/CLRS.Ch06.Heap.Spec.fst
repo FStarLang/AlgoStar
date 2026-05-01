@@ -19,8 +19,8 @@ module SeqP = FStar.Seq.Properties
 
 //SNIPPET_START: heap_indices
 let parent_idx (i:nat{i > 0}) : nat = (i - 1) / 2
-let left_idx (i:nat) : nat = op_Multiply 2 i + 1
-let right_idx (i:nat) : nat = op_Multiply 2 i + 2
+let left_idx (i:nat) : nat = op_Star 2 i + 1
+let right_idx (i:nat) : nat = op_Star 2 i + 2
 //SNIPPET_END: heap_indices
 
 // ========== Max-heap predicates ==========

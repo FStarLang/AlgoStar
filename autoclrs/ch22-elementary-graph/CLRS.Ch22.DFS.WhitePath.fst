@@ -10,7 +10,6 @@
  *)
 module CLRS.Ch22.DFS.WhitePath
 
-open FStar.Mul
 open CLRS.Ch22.DFS.Spec
 
 (*** Core Definitions ***)

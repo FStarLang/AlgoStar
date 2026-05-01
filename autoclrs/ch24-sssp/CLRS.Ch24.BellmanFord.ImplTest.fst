@@ -25,7 +25,6 @@ friend CLRS.Ch24.ShortestPath.Inf
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec

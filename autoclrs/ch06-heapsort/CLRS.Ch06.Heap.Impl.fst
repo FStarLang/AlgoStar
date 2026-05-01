@@ -83,7 +83,7 @@ fn rec max_heapify
     SZ.v idx < SZ.v heap_size /\
     SZ.v heap_size <= Seq.length s /\
     Seq.length s == A.length a /\
-    SZ.fits (op_Multiply 2 (Seq.length s) + 2)
+    SZ.fits (op_Star 2 (Seq.length s) + 2)
   })
   (#c0: erased nat)
 requires
@@ -193,7 +193,7 @@ ensures exists* s' (cf: nat).
 
 #restart-solver
 
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn build_max_heap
   (a: A.array int)
   (n: SZ.t)
@@ -202,7 +202,7 @@ fn build_max_heap
     SZ.v n > 0 /\
     SZ.v n <= A.length a /\
     Seq.length s0 == A.length a /\
-    SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
+    SZ.fits (op_Star 2 (Seq.length s0) + 2)
   })
   (#c0: erased nat)
 requires
@@ -217,7 +217,7 @@ ensures exists* s (cf: nat).
     is_max_heap s (SZ.v n) /\
     permutation s0 s /\
     (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
-    SZ.fits (op_Multiply 2 (Seq.length s) + 2) /\
+    SZ.fits (op_Star 2 (Seq.length s) + 2) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.build_cost_bound (SZ.v n)
   )
@@ -236,10 +236,10 @@ ensures exists* s (cf: nat).
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
       (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
-      SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
+      SZ.fits (2 * Seq.length s0 + 2) /\
       heaps_from s_cur (SZ.v n) (SZ.v vi) /\
       vc >= reveal c0 /\
-      vc - reveal c0 <= op_Multiply (SZ.v half - SZ.v vi) (CB.max_heapify_bound (SZ.v n) 0)
+      vc - reveal c0 <= op_Star (SZ.v half - SZ.v vi) (CB.max_heapify_bound (SZ.v n) 0)
     )
   decreases (SZ.v !i)
   {
@@ -269,7 +269,7 @@ ensures exists* s (cf: nat).
 // Requires SZ.fits(2*n+2) to prevent SizeT overflow in child index
 // computation (see max_heapify comment above).
 
-#push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 70 --fuel 1 --ifuel 1"
 fn heapsort
   (a: A.array int)
   (n: SZ.t)
@@ -277,7 +277,7 @@ fn heapsort
   (#s0: erased (Seq.seq int) {
     SZ.v n <= A.length a /\
     Seq.length s0 == A.length a /\
-    SZ.fits (op_Multiply 2 (Seq.length s0) + 2)
+    SZ.fits (op_Star 2 (Seq.length s0) + 2)
   })
   (#c0: erased nat)
 requires
@@ -318,13 +318,13 @@ ensures exists* s (cf: nat).
       Seq.length s_cur == A.length a /\
       permutation s0 s_cur /\
       (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
-      SZ.fits (op_Multiply 2 (Seq.length s_cur) + 2) /\
+      SZ.fits (2 * Seq.length s0 + 2) /\
       is_max_heap s_cur (SZ.v vsz) /\
       suffix_sorted_upto s_cur (SZ.v vsz) (SZ.v n) /\
       prefix_le_suffix_upto s_cur (SZ.v vsz) (SZ.v n) /\
       vc >= reveal c0 /\
       vc - reveal c0 <= CB.build_cost_bound (SZ.v n) +
-                         op_Multiply (SZ.v n - SZ.v vsz) (CB.max_heapify_bound (SZ.v n) 0)
+                         op_Star (SZ.v n - SZ.v vsz) (CB.max_heapify_bound (SZ.v n) 0)
     )
   //SNIPPET_END: extract_max_loop
   decreases (SZ.v !heap_sz)
@@ -341,6 +341,7 @@ ensures exists* s (cf: nat).
     
     with s_swapped. assert (A.pts_to a s_swapped);
     swap_is_permutation s_cur 0 (SZ.v last);
+    swap_length s_cur 0 (SZ.v last);
     extract_extends_sorted_upto s_cur (SZ.v vsz) (SZ.v n);
     
     let new_sz = vsz - 1sz;

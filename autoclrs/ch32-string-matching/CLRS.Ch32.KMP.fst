@@ -30,9 +30,8 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 
-#push-options "--z3rlimit 20 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 80 --ifuel 2 --fuel 2 --split_queries always"
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -45,6 +44,31 @@ module Spec = CLRS.Ch32.KMP.Spec
 
 open CLRS.Ch32.KMP.PureDefs
 open CLRS.Common.Complexity
+
+// ========== Helper lemma: connect Pulse inner loop result to kmp_step_result ==========
+
+// After the inner failure-chain loop, the Pulse variable q_after equals
+// follow_fail evaluated at that position. This lemma connects the Pulse
+// if-then-else (chars_match → q_after+1, else q_after) to kmp_step_result.
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 20"
+let kmp_step_connection
+    (pattern pi_int: Seq.seq int) (q_init q_after: nat) (c: int) (m: nat)
+    (chars_match: bool)
+  : Lemma
+    (requires
+      m == Seq.length pattern /\ m > 0 /\
+      Seq.length pi_int == m /\
+      Spec.pi_max pattern pi_int /\
+      q_after < m /\
+      Spec.follow_fail pattern pi_int q_init c ==
+        Spec.follow_fail pattern pi_int q_after c /\
+      (q_after == 0 \/ (q_after < Seq.length pattern /\ Seq.index pattern q_after == c)) /\
+      chars_match == (Seq.index pattern q_after = c))
+    (ensures (
+      let new_q = if chars_match then q_after + 1 else q_after in
+      new_q == Spec.kmp_step_result pattern pi_int q_init c m))
+  = ()
+#pop-options
 
 // ========== Compute Prefix Function ==========
 
@@ -197,6 +221,8 @@ fn compute_prefix_function
     let final_k = !k;
     V.op_Array_Assignment pi vq final_k;
     
+    // Explicit hints for refined argument types (needed with uvar fix)
+    assert pure (SZ.v vq > 0 /\ SZ.v vq < Seq.length s_pat);
     Bridge.extend_maximality s_pat (Seq.upd s_pi_post (SZ.v vq) final_k) (SZ.v vq) (SZ.v vk_after_inner) chars_match;
     
     assert pure (is_prefix_suffix s_pat (SZ.v vq) (SZ.v final_k));
@@ -219,7 +245,7 @@ fn compute_prefix_function
 // ========== KMP Matcher ==========
 
 #restart-solver
-#push-options "--z3rlimit 20 --ifuel 1 --fuel 1"
+#push-options "--z3rlimit 80 --ifuel 1 --fuel 1"
 
 //SNIPPET_START: kmp_matcher_sig
 fn kmp_matcher
@@ -363,6 +389,7 @@ fn kmp_matcher
     };
     
     let vq_after = !q;
+    assert pure (SZ.v vq_after < SZ.v m);
     let text_char_final = A.op_Array_Access text vi;
     let pat_char_final = A.op_Array_Access pattern vq_after;
     
@@ -372,6 +399,14 @@ fn kmp_matcher
     let chars_match = (pat_char_final = text_char_final);
     let new_q_val: SZ.t = (if chars_match then vq_after +^ 1sz else vq_after);
     
+    // Bridge Pulse computation to spec's kmp_step_result
+    kmp_step_connection (reveal s_pat)
+      (Bridge.sz_seq_to_int (reveal s_pi))
+      (SZ.v vq_init) (SZ.v vq_after)
+      (Seq.index (reveal s_text) (SZ.v vi))
+      (SZ.v m) chars_match;
+    
+    assert pure (SZ.v new_q_val <= SZ.v m);
     q := new_q_val;
     
     let vq_final = !q;
@@ -391,6 +426,17 @@ fn kmp_matcher
     Spec.kmp_count_step (reveal s_text) (reveal s_pat) (Bridge.sz_seq_to_int (reveal s_pi)) (SZ.v vi) (SZ.v vq_init) (SZ.v vcount_outer);
     
     let vi_next = vi +^ 1sz;
+
+    // Assert spec invariants from kmp_count_step
+    assert pure (
+      Spec.is_max_prefix_below s_text s_pat (SZ.v vi + 1) (SZ.v new_q_after_match));
+    assert pure (
+      SZ.v vi + 1 >= SZ.v m ==>
+        SZ.v new_count_val == Spec.count_before s_text s_pat (SZ.v vi + 1 - SZ.v m + 1));
+    assert pure (
+      SZ.v vi + 1 < SZ.v m ==> SZ.v new_count_val == 0);
+    
+    // Assert remaining invariant properties
     assert pure (SZ.v old_count <= SZ.v vi + 1);
     assert pure (SZ.v new_count_val <= SZ.v vi + 2);
     assert pure (SZ.v vi_next == SZ.v vi + 1);

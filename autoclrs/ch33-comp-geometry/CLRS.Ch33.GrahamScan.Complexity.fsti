@@ -5,7 +5,6 @@
 *)
 
 module CLRS.Ch33.GrahamScan.Complexity
-open FStar.Mul
 
 val find_bottom_ops (n: nat) : nat
 val polar_cmp_ops : nat

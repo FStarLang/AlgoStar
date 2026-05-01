@@ -18,7 +18,6 @@ module CLRS.Ch15.MatrixChain.ImplTest
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open FStar.Mul
 open CLRS.Ch15.MatrixChain.Impl
 open CLRS.Ch15.MatrixChain.Spec
 
@@ -35,9 +34,9 @@ let mc_expected ()
 let mc_pre_satisfiable ()
   : Lemma
     (ensures SZ.v 3sz > 0 /\
-             SZ.fits (op_Multiply (SZ.v 3sz) (SZ.v 3sz)))
+             SZ.fits (op_Star (SZ.v 3sz) (SZ.v 3sz)))
   = assert_norm (SZ.v 3sz > 0 /\
-                 SZ.fits (op_Multiply (SZ.v 3sz) (SZ.v 3sz)))
+                 SZ.fits (op_Star (SZ.v 3sz) (SZ.v 3sz)))
 
 #push-options "--z3rlimit 10"
 

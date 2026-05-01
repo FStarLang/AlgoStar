@@ -5,7 +5,6 @@
 *)
 
 module CLRS.Ch33.JarvisMarch.Complexity
-open FStar.Mul
 
 val find_leftmost_ops (n: nat) : nat
 val find_next_ops (n: nat) : nat

@@ -11,7 +11,6 @@ module CLRS.Ch09.PartialSelectionSort.Lemmas
 
 open FStar.Seq
 open FStar.Classical
-open FStar.Mul
 
 module Seq = FStar.Seq
 open CLRS.Ch09.PartialSelectionSort.Spec
@@ -106,8 +105,27 @@ let equal_head_tail (s1 s2: seq int)
     Seq.cons_head_tail s2
 #pop-options
 
+/// The inductive step: establishes preconditions for the recursive call and
+/// invokes equal_head_tail. Separated to isolate the expensive quantifier VC.
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
+private let sorted_permutation_equal_inductive (s1 s2: seq int)
+  (recurse: (s1': seq int) -> (s2': seq int) ->
+       Lemma (requires is_sorted s1' /\ is_sorted s2' /\ is_permutation s1' s2' /\
+                       Seq.length s1' < Seq.length s1)
+             (ensures Seq.equal s1' s2'))
+  : Lemma (requires Seq.length s1 > 1 /\ is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
+          (ensures Seq.equal s1 s2)
+  = sorted_perm_heads_equal s1 s2;
+    sorted_tail s1;
+    sorted_tail s2;
+    perm_tails s1 s2;
+    recurse (Seq.tail s1) (Seq.tail s2);
+    equal_head_tail s1 s2
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 1"
 //SNIPPET_START: sorted_permutation_equal
 let rec sorted_permutation_equal (s1 s2: seq int)
   : Lemma (requires is_sorted s1 /\ is_sorted s2 /\ is_permutation s1 s2)
@@ -115,17 +133,11 @@ let rec sorted_permutation_equal (s1 s2: seq int)
           (decreases Seq.length s1)
 //SNIPPET_END: sorted_permutation_equal
   = if Seq.length s1 = 0 then ()
-    else begin
-      sorted_perm_heads_equal s1 s2;
-      if Seq.length s1 = 1 then ()
-      else begin
-        sorted_tail s1;
-        sorted_tail s2;
-        perm_tails s1 s2;
-        sorted_permutation_equal (Seq.tail s1) (Seq.tail s2);
-        equal_head_tail s1 s2
-      end
-    end
+    else if Seq.length s1 = 1 then
+      sorted_perm_heads_equal s1 s2
+    else
+      sorted_permutation_equal_inductive s1 s2
+        (fun s1' s2' -> sorted_permutation_equal s1' s2')
 #pop-options
 
 // ========== Correctness proofs (from Correctness.fst) ==========

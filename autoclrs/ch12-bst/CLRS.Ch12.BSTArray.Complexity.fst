@@ -1,6 +1,5 @@
 module CLRS.Ch12.BSTArray.Complexity
 
-open FStar.Mul
 
 (** Array-backed BST Complexity Analysis
     

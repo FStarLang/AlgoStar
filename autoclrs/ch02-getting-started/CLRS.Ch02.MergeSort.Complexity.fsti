@@ -5,7 +5,6 @@
 *)
 module CLRS.Ch02.MergeSort.Complexity
 
-open FStar.Mul
 
 /// Ceiling of log base 2
 val log2_ceil (n: pos) : nat

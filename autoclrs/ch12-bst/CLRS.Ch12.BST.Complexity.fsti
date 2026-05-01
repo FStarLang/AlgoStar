@@ -13,7 +13,6 @@ module CLRS.Ch12.BST.Complexity
  *)
 
 open CLRS.Ch12.BST.Spec
-open FStar.Mul
 
 (** Max of two natural numbers *)
 let max (a: nat) (b: nat) : nat = if a >= b then a else b

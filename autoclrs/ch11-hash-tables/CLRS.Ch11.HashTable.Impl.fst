@@ -21,7 +21,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open FStar.Mul
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -229,6 +228,12 @@ fn hash_table_free (tv: V.vec int) (#s: erased (Seq.seq int))
   V.free tv
 }
 //SNIPPET_END: ht_helpers_impl
+
+// Writing back the same value at an index is a no-op on sequences
+let lemma_seq_upd_identity (#a:Type) (s: Seq.seq a) (i: nat{i < Seq.length s})
+  : Lemma (Seq.equal (Seq.upd s i (Seq.index s i)) s)
+  [SMTPat (Seq.upd s i (Seq.index s i))]
+  = Seq.lemma_eq_intro (Seq.upd s i (Seq.index s i)) s
 
 // Returns true if successful, false if table is full
 // Proves both correctness and O(n) complexity

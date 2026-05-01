@@ -10,7 +10,6 @@ module CLRS.Ch31.GCD.Impl
 
 open Pulse.Lib.Pervasives
 open FStar.SizeT
-open FStar.Mul
 open FStar.Math.Euclid
 open CLRS.Ch31.GCD.Spec
 open CLRS.Ch31.GCD.Complexity
@@ -29,5 +28,5 @@ val gcd_impl (a_init b_init: SZ.t)
       divides (SZ.v result) (SZ.v b_init) /\
       cf >= reveal c0 /\
       cf - reveal c0 == gcd_steps (SZ.v a_init) (SZ.v b_init) /\
-      (SZ.v b_init > 0 ==> cf - reveal c0 <= op_Multiply 2 (num_bits (SZ.v b_init)) + 1)
+      (SZ.v b_init > 0 ==> cf - reveal c0 <= op_Star 2 (num_bits (SZ.v b_init)) + 1)
     ))

@@ -21,7 +21,6 @@ module CLRS.Ch31.ExtendedGCD.ImplTest
 
 open Pulse.Lib.Pervasives
 open FStar.SizeT
-open FStar.Mul
 open FStar.Math.Euclid
 open CLRS.Ch31.ExtendedGCD.Impl
 open CLRS.Ch31.ExtendedGCD.Spec

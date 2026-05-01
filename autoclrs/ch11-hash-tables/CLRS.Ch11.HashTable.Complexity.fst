@@ -10,7 +10,6 @@ module CLRS.Ch11.HashTable.Complexity
    - Lemmas about how insert/delete affect available slot counts
 *)
 
-open FStar.Mul
 
 module Seq = FStar.Seq
 

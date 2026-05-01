@@ -35,7 +35,7 @@ let rec seq_max (s: Seq.seq int) : GTot int (decreases (Seq.length s)) =
 
 //SNIPPET_START: complexity_bounded_quadratic
 let complexity_bounded_quadratic (cf c0 n: nat) : prop =
-  cf >= c0 /\ cf - c0 <= op_Multiply n (n - 1) / 2
+  cf >= c0 /\ cf - c0 <= op_Star n (n - 1) / 2
 //SNIPPET_END: complexity_bounded_quadratic
 
 // ========== Lemma signatures ==========
@@ -88,5 +88,5 @@ val lemma_quicksort_complexity_bound (n n_left n_right: nat) (c_partition: nat)
       n_left + 1 + n_right == n /\
       c_partition == n - 1)
     (ensures
-      c_partition + op_Multiply n_left (n_left - 1) / 2 + op_Multiply n_right (n_right - 1) / 2
-      <= op_Multiply n (n - 1) / 2)
+      c_partition + op_Star n_left (n_left - 1) / 2 + op_Star n_right (n_right - 1) / 2
+      <= op_Star n (n - 1) / 2)

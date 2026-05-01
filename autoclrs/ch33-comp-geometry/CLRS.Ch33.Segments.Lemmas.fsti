@@ -6,7 +6,6 @@
 
 module CLRS.Ch33.Segments.Lemmas
 open CLRS.Ch33.Segments.Spec
-open FStar.Mul
 
 //SNIPPET_START: cross_product_properties
 // Antisymmetry: swapping p2 ↔ p3 negates the cross product

@@ -17,7 +17,6 @@ module CLRS.Ch08.RadixSort.Spec
 
 open FStar.Seq
 open FStar.Math.Lemmas
-open FStar.Mul
 open FStar.Classical
 open FStar.IndefiniteDescription
 open CLRS.Ch08.RadixSort.Base
@@ -305,7 +304,7 @@ let sorted_up_to_digit (s: seq nat) (max_d base: nat) : prop =
      (forall (d: nat). d <= max_d ==> digit (index s i) d base == digit (index s j) d base)))
 
 // Helper: given concrete witness positions, prove a < b from stability
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let order_witnesses (s_in s_out: seq nat) (d base: nat) (a b i j: nat)
   : Lemma 
     (requires is_stable_sort_by_digit s_in s_out d base /\
@@ -320,7 +319,7 @@ let order_witnesses (s_in s_out: seq nat) (d base: nat) (a b i j: nat)
 
 // Helper: find ordered input witnesses for distinct output elements with same digit.
 // Uses order_witnesses to keep reveal_opaque isolated from count_pos skolemization.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 100"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let find_input_witnesses (s_in s_out: seq nat) (d base: nat) (i j: nat)
   : Lemma 
     (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
@@ -342,7 +341,7 @@ let find_input_witnesses (s_in s_out: seq nat) (d base: nat) (i j: nat)
 #pop-options
 
 // Extract ordering for VALUES from sorted_up_to_digit (no index terms in postcondition)
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 50"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
 let sorted_up_to_values (s: seq nat) (max_d base: nat) (v w: nat) (a b: nat)
   : Lemma 
     (requires sorted_up_to_digit s max_d base /\
@@ -370,7 +369,7 @@ let sorted_up_to_intro (s: seq nat) (max_d base: nat)
   = reveal_opaque (`%sorted_up_to_digit) (sorted_up_to_digit s max_d base)
 
 // Combine find_input_witnesses + sorted_up_to_values + extend ordering from d-1 to d
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 100"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
   : Lemma 
     (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
@@ -394,7 +393,7 @@ let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
       (fun b -> a < b /\ b < length s_in /\
         index s_in a == v /\ index s_in b == w) in
     sorted_up_to_values s_in (d - 1) base v w a b;
-    match FStar.StrongExcludedMiddle.strong_excluded_middle
+    match FStar.IndefiniteDescription.strong_excluded_middle
       (exists (d0: nat). d0 <= d - 1 /\
         digit v d0 base < digit w d0 base /\
         (forall (d': nat). d0 < d' /\ d' <= d - 1 ==> digit v d' base == digit w d' base)) with
@@ -413,7 +412,7 @@ let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
 
 // Key lemma: stability preserves sorted_up_to_digit property
 // This is the heart of CLRS Lemma 8.3
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 200"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 5"
 let lemma_stable_sort_preserves_order
   (s_in s_out: seq nat)
   (d base: nat)
@@ -626,7 +625,7 @@ let lemma_digits_le_implies_value_le (x y bigD base: nat)
           (ensures x <= y)
   = digit_decomposition x bigD base;
     digit_decomposition y bigD base;
-    match FStar.StrongExcludedMiddle.strong_excluded_middle
+    match FStar.IndefiniteDescription.strong_excluded_middle
       (forall (d: nat). d < bigD ==> digit x d base == digit y d base) with
     | true -> lemma_digit_sum_extensional x y bigD base bigD
     | false ->
