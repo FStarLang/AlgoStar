@@ -392,16 +392,7 @@ let rec lemma_kruskal_process_maximal_forest
             assert (same_component forest e'.u e'.v);
             same_component_mono forest e e'.u e'.v
           end
-        end;
-        
-        eliminate exists (prefix: list edge). all_sorted == prefix @ (e :: rest)
-          returns (exists (prefix': list edge). all_sorted == prefix' @ rest)
-          with _. begin
-            List.Tot.Properties.append_assoc prefix [e] rest;
-            assert (all_sorted == (prefix @ [e]) @ rest)
-          end;
-        
-        lemma_kruskal_process_maximal_forest rest all_sorted forest' n
+        end
       end else begin
         assert (forest' == forest);
         introduce forall (e': edge). mem_edge e' all_sorted /\ ~(mem_edge e' rest) /\
@@ -425,17 +416,17 @@ let rec lemma_kruskal_process_maximal_forest
             assert (~(mem_edge e' sorted_edges));
             ()
           end
+        end
+      end;
+
+      eliminate exists (prefix: list edge). all_sorted == prefix @ (e :: rest)
+        returns (exists (prefix': list edge). all_sorted == prefix' @ rest)
+        with _. begin
+          List.Tot.Properties.append_assoc prefix [e] rest;
+          assert (all_sorted == (prefix @ [e]) @ rest)
         end;
-        
-        eliminate exists (prefix: list edge). all_sorted == prefix @ (e :: rest)
-          returns (exists (prefix': list edge). all_sorted == prefix' @ rest)
-          with _. begin
-            List.Tot.Properties.append_assoc prefix [e] rest;
-            assert (all_sorted == (prefix @ [e]) @ rest)
-          end;
-        
-        lemma_kruskal_process_maximal_forest rest all_sorted forest' n
-      end
+
+      lemma_kruskal_process_maximal_forest rest all_sorted forest' n
 
 // MST invariant: kruskal_process maintains "forest is subset of some MST"
 // This needs the "minimum weight among unused cross-component edges" property
@@ -1202,10 +1193,6 @@ let rec count_pred (f: nat -> bool) (n: nat) : nat =
 let count_reachable (es: list edge) (root: nat) (n m: nat) : nat =
   count_pred (fun v -> v < n && same_component_dec es root v) m
 
-let rec count_pred_le (f: nat -> bool) (n: nat)
-  : Lemma (ensures count_pred f n <= n) (decreases n)
-  = if n = 0 then () else count_pred_le f (n - 1)
-
 // If f1 implies f2, count f1 ≤ count f2
 let rec count_pred_mono (f1 f2: (nat -> bool)) (n: nat)
   : Lemma (requires forall (i: nat). i < n ==> f1 i ==> f2 i)
@@ -1336,14 +1323,6 @@ let reachable_uses_component_edges (es: list edge) (root v: nat)
       in
       path_in_filtered path
     end
-
-// The component filter respects edge_eq
-let component_filter_respects_eq (es: list edge) (root: nat) (e1 e2: edge)
-  : Lemma (requires edge_eq e1 e2)
-          (ensures (let g = fun (e: edge) -> same_component_dec es root e.u &&
-                                              same_component_dec es root e.v in
-                    g e1 = g e2))
-  = edge_eq_endpoints e1 e2
 
 // Bridge edge decomposition: symmetric version (e.v reachable, e.u not)
 let bridge_edge_reachability_sym (tl: list edge) (e: edge) (root v: nat)
@@ -1918,12 +1897,6 @@ let component_of_empty (v: nat) (n: nat)
           (ensures component_of [] v n == [v])
   = vertices_in_component_empty v n 0
 
-/// Helper: vertex j is not in component_of [] i n when i <> j and both < n
-let not_in_different_component_empty (i j: nat) (n: nat)
-  : Lemma (requires i < n /\ j < n /\ i <> j)
-          (ensures ~(mem j (component_of [] i n)))
-  = component_of_empty i n
-
 /// Helper: build_components with empty edges produces n singletons
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec build_components_empty_length (n: nat) (i: nat{i <= n})
@@ -1979,76 +1952,4 @@ let rec build_components_empty_length (n: nat) (i: nat{i <= n})
     end
 #pop-options
 
-// Initially n components (each vertex is its own component)
-let lemma_initial_components (n: nat)
-  : Lemma (requires n > 0)
-          (ensures length (components [] n) = n)
-  = build_components_empty_length n 0 []
 
-// Final spanning tree has 1 component
-let lemma_spanning_tree_one_component (g: graph) (t: list edge)
-  : Lemma (requires is_spanning_tree g t)
-          (ensures length (components t g.n) = 1)
-  = // all_connected g.n t: forall v < g.n. reachable t 0 v
-    // So same_component t 0 v for all v < g.n
-    // By BFS completeness: same_component_dec t 0 v = true for all v < g.n
-    let n = g.n in
-    assert (n > 0);
-    assert (all_connected n t);
-
-    // Step 1: same_component_dec t 0 v = true for all v < n
-    let aux_dec (v: nat)
-      : Lemma (requires v < n) (ensures same_component_dec t 0 v = true)
-      = assert (reachable t 0 v);
-        same_component_dec_complete t 0 v
-    in
-
-    // Step 2: vertices_in_component t 0 n i includes all vertices from i to n-1
-    let rec all_in_component (i: nat{i <= n})
-      : Lemma (ensures forall (v: nat). i <= v /\ v < n ==>
-                        mem v (vertices_in_component t 0 n i))
-              (decreases (n - i))
-      = if i >= n then ()
-        else begin
-          aux_dec i;
-          assert (same_component_dec t 0 i = true);
-          all_in_component (i + 1);
-          // vertices_in_component t 0 n i = i :: vertices_in_component t 0 n (i+1)
-          // All v with i+1 <= v < n are in the tail (by IH)
-          // And i itself is the head
-          ()
-        end
-    in
-    all_in_component 0;
-    // component_of t 0 n contains all vertices 0..n-1
-    assert (forall (v: nat). v < n ==> mem v (component_of t 0 n));
-
-    // Step 3: in_some_component returns true for all v < n when acc = [component_of t 0 n]
-    let in_comp_of_0 (v: nat)
-      : Lemma (requires v < n)
-              (ensures in_some_component v [component_of t 0 n] = true)
-      = assert (mem v (component_of t 0 n))
-    in
-
-    // Step 4: build_components with i=0 creates exactly [component_of t 0 n]
-    // At i=0: 0 is not in acc=[]. Creates component_of t 0 n. acc = [component_of t 0 n].
-    // For i=1..n-1: i is in component_of t 0 n, so in_some_component i acc = true. Skip.
-    let rec build_one_comp (i: nat{i <= n})
-      : Lemma (requires i > 0)
-              (ensures build_components t n i [component_of t 0 n] == [component_of t 0 n])
-              (decreases (n - i))
-      = if i >= n then ()
-        else begin
-          in_comp_of_0 i;
-          assert (in_some_component i [component_of t 0 n] = true);
-          build_one_comp (i + 1)
-        end
-    in
-
-    // At i=0: 0 is not in [], creates component_of t 0 n
-    in_some_component_false 0 ([] #(list nat));
-    assert (in_some_component 0 ([] #(list nat)) = false);
-    // build_components t n 0 [] = build_components t n 1 [component_of t 0 n]
-    if n > 1 then build_one_comp 1
-    else ()
-    // Result: [component_of t 0 n], length = 1

@@ -272,29 +272,6 @@ let lemma_triangle_bfs
     lemma_has_residual_pred_finds cap flow n prev u v 0;
     assert (has_residual_pred cap flow n prev v 0 == true)
 
-(** Triangle inequality for shortest_path_distance:
-    if edge (u,v) exists in G_f, then spd(v) ≤ spd(u) + 1 *)
-#push-options "--z3rlimit 20"
-let lemma_spd_triangle
-  (cap flow: Seq.seq int) 
-  (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
-  (source: nat{source < n})
-  (u v: nat{u < n /\ v < n})
-  : Lemma
-    (requires has_residual_capacity cap flow n u v == true)
-    (ensures shortest_path_distance cap flow n source v <=
-             shortest_path_distance cap flow n source u + 1)
-  = let d_u = shortest_path_distance cap flow n source u in
-    lemma_find_spd_bounded cap flow n source u 0;
-    if d_u >= n then
-      lemma_find_spd_bounded cap flow n source v 0
-    else begin
-      lemma_spd_implies_visited cap flow n source u;
-      lemma_triangle_bfs cap flow n source d_u u v;
-      lemma_find_spd_le cap flow n source v 0 (d_u + 1)
-    end
-#pop-options
-
 (* ================================================================
    AUGMENTATION EDGE ANALYSIS — which edges are new after augmentation?
    ================================================================ *)
@@ -315,30 +292,6 @@ let rec is_shortest_augmenting_path
       shortest_path_distance cap flow n source v =
         shortest_path_distance cap flow n source u + 1 /\
       is_shortest_augmenting_path cap flow n source (v :: rest)
-
-(** On a shortest path, consecutive vertices have consecutive distances *)
-let lemma_shortest_path_distances
-  (cap flow: Seq.seq int)
-  (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
-  (source: nat{source < n})
-  (u v: nat{u < n /\ v < n})
-  (rest: list nat)
-  : Lemma
-    (requires is_shortest_augmenting_path cap flow n source (u :: v :: rest))
-    (ensures shortest_path_distance cap flow n source v =
-             shortest_path_distance cap flow n source u + 1)
-  = ()
-
-(** If (v,u) are consecutive on a path, then v < n and u < n *)
-let lemma_path_vertices_valid
-  (cap flow: Seq.seq int)
-  (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
-  (source: nat{source < n})
-  (v u: nat) (rest: list nat)
-  : Lemma
-    (requires is_shortest_augmenting_path cap flow n source (v :: u :: rest))
-    (ensures v < n /\ u < n)
-  = ()
 
 (** augment_edge on (p,q) doesn't change residual of (u,v) when u,v ∉ {p,q} and p ≠ q *)
 #push-options "--z3rlimit 10"
@@ -612,24 +565,6 @@ let rec lemma_shortest_path_member_distance_aux
         assert (shortest_path_distance cap flow n source y = d + 1);
         lemma_shortest_path_member_distance_aux cap flow n source (y :: rest) v (d + 1)
       end
-
-(** On a shortest augmenting path starting at source, if v is on the path,
-    then δ_f(s,v) is bounded by the path length - 1 *)
-let lemma_shortest_path_member_distance
-  (cap flow: Seq.seq int)
-  (n: nat{n > 0 /\ Seq.length cap == n * n /\ Seq.length flow == n * n})
-  (source: nat{source < n})
-  (path: list nat)
-  (v: nat{v < n})
-  : Lemma
-    (requires 
-      is_shortest_augmenting_path cap flow n source path /\
-      Cons? path /\
-      FStar.List.Tot.hd path = source /\
-      FStar.List.Tot.mem v path)
-    (ensures shortest_path_distance cap flow n source v <= FStar.List.Tot.length path - 1)
-  = lemma_spd_source_zero cap flow n source;
-    lemma_shortest_path_member_distance_aux cap flow n source path v 0
 
 (** Lemma 26.7 — BFS layer formulation:
     For all k, if v is reachable within k steps in G_{f'}, 
@@ -1396,25 +1331,6 @@ let augmentation_step
            }
          else st)
       else st
-
-(** Lemma: augmentation_step doesn't decrease ticks *)
-let lemma_augmentation_step_monotone
-  (#n: nat)
-  (st: edmonds_karp_state n)
-  (path: option (list nat))
-  : Lemma (ensures (augmentation_step st path).ticks >= st.ticks)
-  = match path with
-    | None -> ()
-    | Some p ->
-      if Cons? p && 
-         all_vertices_in_bounds p n &&
-         FStar.List.Tot.hd p = st.source &&
-         FStar.List.Tot.last p = st.sink
-      then
-        (lemma_all_vertices_in_bounds p n;
-         let bn = bottleneck st.capacity st.flow n p in
-         if bn > 0 then () else ())
-      else ()
 
 (** Lemma: augmentation_step adds at most augmentation_cost ticks *)
 let lemma_augmentation_step_bounded

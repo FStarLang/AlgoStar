@@ -866,21 +866,7 @@ let merge_bundle_step_aux
     cost_invariant_from_merge_bundle freq_seq nd_old pq0 pq1 active0 n
       freq1 freq2 idx1 idx2 j1 j2;
     cost_invariant_merge_step active0 j1 j2 freq1 freq2 sum_freq idx1 merged
-      t1 t2 (seq_to_pos_list freq_seq 0);
-    // Assert postcondition conjuncts explicitly to help Z3 assemble them
-    assert (valid_pq_entries pq3 n);
-    assert (pq_freqs_positive pq3);
-    assert (pq_idx_unique pq3);
-    assert (pq_indices_in_forest pq3 new_active);
-    assert (pq_tree_freq_match pq3 new_active);
-    assert (forest_has_pq_entry pq3 new_active);
-    assert (forest_distinct_indices new_active);
-    assert (forall (k: nat). k < L.length new_active ==>
-      SZ.v (entry_idx (L.index new_active k)) < n /\
-      Seq.index nd_new (SZ.v (entry_idx (L.index new_active k))) == entry_ptr (L.index new_active k));
-    assert (forall (x: pos). L.count x (all_leaf_freqs new_active) == L.count x (seq_to_pos_list freq_seq 0));
-    assert (forest_total_cost new_active + HOpt.greedy_cost (forest_root_freqs new_active) ==
-      HOpt.greedy_cost (seq_to_pos_list freq_seq 0))
+      t1 t2 (seq_to_pos_list freq_seq 0)
 #pop-options
 
 let merge_bundle_step
