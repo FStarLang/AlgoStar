@@ -8,6 +8,7 @@
 module ISMM.UF.SizeRank
 
 open FStar.Seq
+open FStar.Mul
 module Seq = FStar.Seq
 open ISMM.UnionFind.Spec
 
