@@ -622,11 +622,7 @@ let final_pred_finish_lemma
 let lemma_dfs_bound_correct (outer_count inner_count n: nat)
   : Lemma (requires n >= 1 /\ outer_count <= n /\ inner_count <= n * n)
           (ensures outer_count + inner_count <= 2 * (n * n))
-  = assert (outer_count <= n);
-    assert (n <= n * n);
-    assert (outer_count + inner_count <= n + n * n);
-    assert (n + n * n <= n * n + n * n);
-    assert (n * n + n * n == 2 * (n * n))
+  = ()
 
 (* ================================================================
    SUM_SCAN_IDX — sum of scan_idx values for complexity accounting

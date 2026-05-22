@@ -97,13 +97,6 @@ let lemma_imp_flow_value_eq (s: Seq.seq int) (n source: nat)
     (ensures imp_flow_value s n source == flow_value s n source)
   = ()
 
-(** imp_sum_flow_out agrees with sum_flow_out when constraints hold *)
-let lemma_imp_sum_flow_out_eq (s: Seq.seq int) (n v k: nat)
-  : Lemma
-    (requires n > 0 /\ v < n /\ Seq.length s == n * n)
-    (ensures imp_sum_flow_out s n v k == sum_flow_out s n v k)
-  = ()
-
 (** Zero-initialized array equals Seq.create *)
 let lemma_zero_array_eq_create (s: Seq.seq int) (len: nat)
   : Lemma
@@ -168,11 +161,6 @@ let queue_valid (squeue: Seq.seq SZ.t) (head tail: nat) (n: nat) : prop =
 let preds_in_range (spred: Seq.seq int) (n: nat) : prop =
   Seq.length spred == n /\
   (forall (v: nat). v < n ==> seq_get spred v >= -1 /\ seq_get spred v < n)
-
-(** Pred entries for discovered non-source vertices are valid *)
-let pred_valid (spred scolor: Seq.seq int) (n source: nat) : prop =
-  forall (v: nat). v < n /\ v <> source /\ seq_get scolor v <> 0 ==>
-    seq_get spred v >= 0 /\ seq_get spred v < n
 
 (* ================================================================
    BFS CORRECTNESS PREDICATES
@@ -320,15 +308,6 @@ let lemma_discover_preserves_bfs_pred_ok
     mk_bfs_pred_ok sc' sp' sd' cap_seq flow_seq n source (vtail + 1)
 #pop-options
 
-(** No-discovery preserves bfs_pred_ok *)
-let lemma_nodiscover_preserves_bfs_pred_ok
-  (scolor spred sdist cap_seq flow_seq: Seq.seq int)
-  (n source vtail: nat)
-  : Lemma
-    (requires bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail)
-    (ensures bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail)
-  = ()
-
 (** Color change from 1 to 2 preserves bfs_pred_ok *)
 let lemma_color2_preserves_bfs_pred_ok
   (scolor spred sdist cap_seq flow_seq: Seq.seq int)
@@ -347,18 +326,6 @@ let lemma_color2_preserves_bfs_pred_ok
     // if v <> u: sc'[v] = scolor[v], and sc'[pred[v]] <> 0 since scolor[pred[v]] <> 0 and
     //   pred[v] <> u (pred[v] could be u, but sc'[u] = 2 <> 0)
     mk_bfs_pred_ok sc' spred sdist cap_seq flow_seq n source vtail
-
-(** Monotonicity: bfs_pred_ok with vtail implies bfs_pred_ok with larger vtail *)
-let lemma_bfs_pred_ok_monotone
-  (scolor spred sdist cap_seq flow_seq: Seq.seq int)
-  (n source vtail vtail': nat)
-  : Lemma
-    (requires
-      bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail /\
-      vtail' >= vtail)
-    (ensures bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail')
-  = elim_bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail;
-    mk_bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail'
 
 (** BFS completeness: every residual neighbor of a colored vertex is also colored.
     This holds at BFS termination: the queue is empty, so all reachable vertices
@@ -410,11 +377,6 @@ let partial_nbrs_colored (scolor cap_seq flow_seq: Seq.seq int) (n u bound: nat)
       seq_get scolor w <> 0) /\
      (seq_get flow_seq (w * n + u) > 0 ==>
       seq_get scolor w <> 0)))
-
-let lemma_partial_nbrs_zero (scolor cap_seq flow_seq: Seq.seq int) (n u: nat)
-  : Lemma (requires u < n)
-    (ensures partial_nbrs_colored scolor cap_seq flow_seq n u 0)
-  = ()
 
 let lemma_partial_nbrs_to_all (scolor cap_seq flow_seq: Seq.seq int) (n u: nat)
   : Lemma (requires partial_nbrs_colored scolor cap_seq flow_seq n u n)
@@ -538,12 +500,6 @@ let lemma_queue_unique_extend
     assert (queue_entries_unique squeue' (vtail + 1))
       by (FStar.Tactics.norm [delta_only [`%queue_entries_unique; `%seq_get_sz]];
           FStar.Tactics.smt ())
-
-(** Updating queue beyond vtail preserves uniqueness in [0, vtail) *)
-let lemma_queue_unique_frame (squeue: Seq.seq SZ.t) (vtail: nat) (idx: nat) (v: SZ.t)
-  : Lemma (requires queue_entries_unique squeue vtail /\ idx >= vtail /\ idx < Seq.length squeue)
-    (ensures queue_entries_unique (Seq.upd squeue idx v) vtail)
-  = ()
 
 (** queue_color1 after setting color[u]=2, using queue uniqueness to skip position vhead *)
 let lemma_queue_color1_after_set2

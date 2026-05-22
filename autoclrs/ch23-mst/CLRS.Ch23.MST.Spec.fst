@@ -481,16 +481,6 @@ let lemma_cycle_crosses_cut_twice
   = // Cycle from e.u to e.u: s(e.u) = s(e.u). Uses e. all_edges_distinct.
     find_t_crossing cycle e t s e.u e.u
 
-// Replacing one edge with another of less/equal weight preserves connectivity
-let lemma_edge_replacement_preserves_connectivity
-    (n: nat) (t: list edge) (e_old e_new: edge)
-  : Lemma (requires all_connected n t /\
-                    mem_edge e_old t /\
-                    e_new.w <= e_old.w /\
-                    all_connected n (e_new :: t)) // assuming new edge maintains connectivity
-          (ensures all_connected n ((e_new :: t) ))
-  = () // Trivial from assumption
-
 (*** Weight Lemmas for Edge Exchange ***)
 
 // Filtering out an edge: weight decomposition
@@ -1726,29 +1716,6 @@ let cut_property g a e s =
     )
 #pop-options
 
-(*** Corollary: Generic MST Algorithm Correctness ***)
-
-// If we start with empty set and repeatedly add safe edges,
-// we eventually build an MST
-let generic_mst_correctness_sketch
-    (g: graph)
-    (a: list edge)  // Current safe edge set
-    (steps: nat)    // Remaining steps
-  : Lemma (requires (exists (t: list edge). is_mst g t /\ subset_edges a t) /\
-                    length a < g.n - 1)
-          (ensures  True) // Would ensure: can extend A to MST
-  = if steps = 0 then ()
-    else begin
-      // Find a cut respecting A and a light edge e crossing it
-      // By cut_property, A ∪ {e} ⊆ some MST
-      // Recurse with A ∪ {e}
-      () // Sketch: ensures is True, so trivially satisfied
-    end
-
-// Final note: This formalization captures the essence of CLRS Theorem 23.1
-// A complete proof would require substantial graph theory infrastructure
-// particularly for reasoning about paths, cycles, and connectivity
-
 (*** MST Existence: acyclic + connected → n-1 edges ***)
 
 // Helper: e ∉ subset of set not containing e
@@ -1822,21 +1789,6 @@ let acyclic_edge_disconnects (n: nat) (e: edge) (tl: list edge)
       reachable_implies_not_acyclic n tl e
     in
     FStar.Classical.move_requires aux ()
-
-// Redundant edge impossible for acyclic graph:
-// If both endpoints reachable from root in tl, then e :: tl has a cycle.
-let acyclic_no_redundant (n: nat) (e: edge) (tl: list edge) (root: nat)
-  : Lemma (requires acyclic n (e :: tl) /\ e.u < n /\ e.v < n /\ e.u <> e.v /\
-                    ~(mem_edge e tl) /\
-                    reachable tl root e.u /\ reachable tl root e.v)
-          (ensures False)
-  = reachable_symmetric tl root e.u;
-    reachable_transitive tl e.u root e.v;
-    let aux_sub (ed: edge) : Lemma (requires mem_edge ed tl)
-                                    (ensures mem_edge ed (e :: tl)) = () in
-    FStar.Classical.forall_intro (FStar.Classical.move_requires aux_sub);
-    acyclic_subset n (e :: tl) tl;
-    reachable_implies_not_acyclic n tl e
 
 // Helper: ghost_filter over superset
 let rec ghost_filter_superset
