@@ -403,10 +403,12 @@ let kmp_step_maximal (text pattern pi: seq int) (i q: nat)
           else ()
         end
         else begin
-          if k - 1 = 0 then begin
+          if k = 1 then begin
+            assert (k - 1 = 0);
             assert (index pattern 0 = c)
           end
           else begin
+            assert (k > 1);
             matched_prefix_implies_ps text pattern i q (k - 1);
             assert (is_prefix_suffix #int pattern (q - 1) (k - 1));
             assert (index pattern (k - 1) = c);
