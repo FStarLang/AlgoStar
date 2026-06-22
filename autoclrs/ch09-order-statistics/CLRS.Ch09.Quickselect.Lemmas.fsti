@@ -12,6 +12,30 @@ open FStar.Seq
 module Seq = FStar.Seq
 module Spec = CLRS.Ch09.PartialSelectionSort.Spec
 
+val perm_unchanged_lower_bound
+  (s_pre s1: Seq.seq int) (lo hi: nat) (v: int) (j: nat)
+  : Lemma
+    (requires lo <= hi /\ hi <= Seq.length s_pre /\
+              Seq.length s_pre == Seq.length s1 /\
+              lo <= j /\ j < hi /\
+              Seq.Properties.permutation int s_pre s1 /\
+              (forall (idx: nat). idx < Seq.length s1 ==>
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx) /\
+              (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m))
+    (ensures v <= Seq.index s1 j)
+
+val perm_unchanged_upper_bound
+  (s_pre s1: Seq.seq int) (lo hi: nat) (v: int) (j: nat)
+  : Lemma
+    (requires lo <= hi /\ hi <= Seq.length s_pre /\
+              Seq.length s_pre == Seq.length s1 /\
+              lo <= j /\ j < hi /\
+              Seq.Properties.permutation int s_pre s1 /\
+              (forall (idx: nat). idx < Seq.length s1 ==>
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx) /\
+              (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v))
+    (ensures Seq.index s1 j <= v)
+
 /// If all values in s_pre[lo..hi) are >= v, and s1 is a permutation of s_pre
 /// with elements outside [lo,hi) unchanged, then all values in s1[lo..hi) are >= v.
 val perm_unchanged_lower_bound_forall

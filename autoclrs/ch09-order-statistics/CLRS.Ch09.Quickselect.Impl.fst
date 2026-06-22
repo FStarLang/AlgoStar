@@ -171,7 +171,17 @@ let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
               (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
               v <= Seq.index s1 j)
   = reveal_perm s_pre s1;
-    Lemmas.perm_unchanged_lower_bound_forall s_pre s1 lo hi
+    let aux (j: nat) (v: int) : Lemma
+      (lo <= j /\ j < hi /\
+        (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
+        v <= Seq.index s1 j)
+    = Classical.impl_intro_gen
+        #(lo <= j /\ j < hi /\
+          (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m))
+        #(fun _ -> v <= Seq.index s1 j)
+        (fun _ -> Lemmas.perm_unchanged_lower_bound s_pre s1 lo hi v j)
+    in
+    Classical.forall_intro_2 aux
 
 let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma
@@ -184,7 +194,17 @@ let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
               (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
               Seq.index s1 j <= v)
   = reveal_perm s_pre s1;
-    Lemmas.perm_unchanged_upper_bound_forall s_pre s1 lo hi
+    let aux (j: nat) (v: int) : Lemma
+      (lo <= j /\ j < hi /\
+        (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
+        Seq.index s1 j <= v)
+    = Classical.impl_intro_gen
+        #(lo <= j /\ j < hi /\
+          (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v))
+        #(fun _ -> Seq.index s1 j <= v)
+        (fun _ -> Lemmas.perm_unchanged_upper_bound s_pre s1 lo hi v j)
+    in
+    Classical.forall_intro_2 aux
 #pop-options
 
 let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
