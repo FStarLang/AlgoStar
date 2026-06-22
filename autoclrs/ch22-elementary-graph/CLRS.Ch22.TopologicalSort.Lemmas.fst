@@ -226,15 +226,16 @@ let rec lemma_zero_crp_from_all_preds (adj: seq int) (n: nat) (output: seq int) 
 
 (* Corollary: queue_preds + indeg_correct implies in_deg == 0 for each queue entry *)
 #push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
-let lemma_queue_entry_zero_indeg
-  (adj: seq int) (n: nat) (in_deg: seq int) (queue: seq FStar.SizeT.t)
+let lemma_queue_entry_crp_zero
+  (adj: seq int) (n: nat) (queue: seq FStar.SizeT.t)
   (output: seq int) (count: nat) (qh qt: nat) (qi: nat)
   : Lemma
     (requires
       queue_preds_in_output_sz adj n queue qh qt output count /\
-      indeg_correct adj n in_deg output count /\
       qi >= qh /\ qi < qt)
-    (ensures Seq.index in_deg (FStar.SizeT.v (Seq.index queue qi)) == 0)
+    (ensures (
+      let w = FStar.SizeT.v (Seq.index queue qi) in
+      w < n /\ count_remaining_preds adj n output count w n == 0))
   = let w = FStar.SizeT.v (Seq.index queue qi) in
     // Step 1: queue_preds gives exists form for all preds of w
     // Step 2: convert exists → is_in_output for each pred
@@ -247,6 +248,20 @@ let lemma_queue_entry_zero_indeg
     FStar.Classical.forall_intro (FStar.Classical.move_requires aux);
     // Step 3: all preds in output → count_remaining_preds == 0
     lemma_zero_crp_from_all_preds adj n output count w n
+
+let lemma_queue_entry_zero_indeg
+  (adj: seq int) (n: nat) (in_deg: seq int) (queue: seq FStar.SizeT.t)
+  (output: seq int) (count: nat) (qh qt: nat) (qi: nat)
+  : Lemma
+    (requires
+      queue_preds_in_output_sz adj n queue qh qt output count /\
+      indeg_correct adj n in_deg output count /\
+      qi >= qh /\ qi < qt)
+    (ensures Seq.index in_deg (FStar.SizeT.v (Seq.index queue qi)) == 0)
+  = let w = FStar.SizeT.v (Seq.index queue qi) in
+    lemma_queue_entry_crp_zero adj n queue output count qh qt qi;
+    assert (w < n);
+    assert (Seq.index in_deg w == count_remaining_preds adj n output count w n)
 #pop-options
 
 (* Forall-lifted: all old queue entries have zero in-degree.
@@ -646,4 +661,3 @@ let find_non_output_predecessor_full
       Seq.index adj (u * n + v) <> 0 /\
       not (is_in_output output count u))
   = find_non_output_predecessor adj n output count v n
-
