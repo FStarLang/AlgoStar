@@ -113,15 +113,15 @@ let lemma_seq_eq_test_adj (s: Seq.seq int)
 #push-options "--fuel 8 --ifuel 2 --z3rlimit 15 --split_queries always"
 
 // Step 1: Prove fw_entry values for all 9 entries (same as SpecTest.fst)
-let fw_val_00 () : Lemma (fw_entry test_adj 3 0 0 3 == 0) = ()
-let fw_val_01 () : Lemma (fw_entry test_adj 3 0 1 3 == 5) = ()
-let fw_val_02 () : Lemma (fw_entry test_adj 3 0 2 3 == 20) = ()
+let fw_val_00 () : Lemma (fw_entry test_adj 3 0 0 3 == 0) = assert_norm (fw_entry test_adj 3 0 0 3 == 0)
+let fw_val_01 () : Lemma (fw_entry test_adj 3 0 1 3 == 5) = assert_norm (fw_entry test_adj 3 0 1 3 == 5)
+let fw_val_02 () : Lemma (fw_entry test_adj 3 0 2 3 == 20) = assert_norm (fw_entry test_adj 3 0 2 3 == 20)
 let fw_val_10 () : Lemma (fw_entry test_adj 3 1 0 3 == 45) = assert_norm (fw_entry test_adj 3 1 0 3 == 45)
-let fw_val_11 () : Lemma (fw_entry test_adj 3 1 1 3 == 0) = ()
-let fw_val_12 () : Lemma (fw_entry test_adj 3 1 2 3 == 15) = ()
-let fw_val_20 () : Lemma (fw_entry test_adj 3 2 0 3 == 30) = ()
-let fw_val_21 () : Lemma (fw_entry test_adj 3 2 1 3 == 35) = ()
-let fw_val_22 () : Lemma (fw_entry test_adj 3 2 2 3 == 0) = ()
+let fw_val_11 () : Lemma (fw_entry test_adj 3 1 1 3 == 0) = assert_norm (fw_entry test_adj 3 1 1 3 == 0)
+let fw_val_12 () : Lemma (fw_entry test_adj 3 1 2 3 == 15) = assert_norm (fw_entry test_adj 3 1 2 3 == 15)
+let fw_val_20 () : Lemma (fw_entry test_adj 3 2 0 3 == 30) = assert_norm (fw_entry test_adj 3 2 0 3 == 30)
+let fw_val_21 () : Lemma (fw_entry test_adj 3 2 1 3 == 35) = assert_norm (fw_entry test_adj 3 2 1 3 == 35)
+let fw_val_22 () : Lemma (fw_entry test_adj 3 2 2 3 == 0) = assert_norm (fw_entry test_adj 3 2 2 3 == 0)
 
 // Step 2: Connect fw_outer to fw_entry, then to concrete values
 let post_entry_00 () : Lemma (Seq.index (fw_outer test_adj 3 0) 0 == 0)
