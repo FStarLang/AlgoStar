@@ -67,6 +67,14 @@ let lemma_hash_probe_consistent (key: int{key >= 0 /\ SZ.fits key}) (i: SZ.t) (s
   : Lemma (ensures SZ.v (hash_probe key i size) == hash_probe_nat key (SZ.v i) (SZ.v size))
   = ()
 
+// Linear probing is injective across one full table scan.
+let lemma_hash_probe_nat_injective
+  (key: int{key >= 0}) (size: nat{size > 0}) (p q: nat)
+  : Lemma
+    (requires p < size /\ q < size /\ hash_probe_nat key p size == hash_probe_nat key q size)
+    (ensures p == q)
+  = FStar.Math.Lemmas.lemma_mod_plus_injective size (key % size) p q
+
 // Instantiation lemma for probes_not_key
 let lemma_probes_not_key_inst 
   (s: Seq.seq int) 
@@ -169,6 +177,11 @@ let lemma_valid_ht_insert
     (ensures valid_ht (Seq.upd s (hash_probe_nat key probe_i size) key) size)
   = let idx = hash_probe_nat key probe_i size in
     let s' = Seq.upd s idx key in
+    lemma_hash_probe_nat_in_bounds key probe_i size;
+    assert (idx < size);
+    assert (Seq.length s == size);
+    Seq.lemma_len_upd idx key s;
+    assert (Seq.length s' == size);
     introduce forall (k: int) (probe: nat).
       k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
       (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
@@ -177,7 +190,30 @@ let lemma_valid_ht_insert
       introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
       with introduce _ ==> _
       with _. (
-        ()
+        let cur = hash_probe_nat k probe size in
+        let prev = hash_probe_nat k p size in
+        if cur = idx then (
+          Seq.lemma_index_upd1 s idx key;
+          assert (k == key);
+          lemma_hash_probe_nat_injective key size probe probe_i;
+          assert (probe == probe_i);
+          assert (p < probe_i);
+          assert (Seq.index s (hash_probe_nat key p size) =!= -1);
+          if prev = idx then (
+            lemma_hash_probe_nat_injective key size p probe_i;
+            assert False
+          ) else (
+            Seq.lemma_index_upd2 s idx key prev
+          )
+        ) else (
+          Seq.lemma_index_upd2 s idx key cur;
+          assert (Seq.index s cur == k);
+          assert (Seq.index s prev =!= -1);
+          if prev = idx then
+            Seq.lemma_index_upd1 s idx key
+          else
+            Seq.lemma_index_upd2 s idx key prev
+        )
       )
     )
 #pop-options
