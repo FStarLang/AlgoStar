@@ -95,7 +95,6 @@ fn cases_of_is_dlist (x: dlist) (l: list int)
       with w tail. _;
       let v = Some?.v x;
       rewrite each w as v;
-      rewrite each tail as ({ key = head; next = tail }).next in (is_dlist tail tl);
       fold (is_dlist_cases (Some v) l);
       rewrite each (Some #(box node) v) as x
     }

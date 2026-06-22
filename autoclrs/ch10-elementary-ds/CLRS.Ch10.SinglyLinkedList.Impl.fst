@@ -42,7 +42,6 @@ fn list_insert (x: int) (head: dlist)
 {
   // Allocate new node: key = x, next = old head
   let nd = Box.alloc #node { key = x; next = head };
-  rewrite each head as ({ key = x; next = head }).next in (is_dlist head 'l);
   fold (is_dlist (Some nd) (x :: 'l));
   Some nd
 }
@@ -115,8 +114,6 @@ fn rec list_delete (head: dlist) (k: int)
         with l'. assert (is_dlist new_tail l');
         // Update the node to point to new_tail
         vl := { key = nd.key; next = new_tail };
-        rewrite each new_tail as ({ key = nd.key; next = new_tail }).next
-          in (is_dlist new_tail l');
         fold (is_dlist (Some vl) (nd.key :: l'));
         (Some vl)
       }
@@ -148,7 +145,6 @@ fn list_insert_tick (x: int) (head: dlist) (ctr: GR.ref nat)
 {
   let nd = Box.alloc #node { key = x; next = head };
   tick ctr;
-  rewrite each head as ({ key = x; next = head }).next in (is_dlist head 'l);
   fold (is_dlist (Some nd) (x :: 'l));
   Some nd
 }
@@ -219,8 +215,6 @@ fn rec list_delete_tick (head: dlist) (k: int) (ctr: GR.ref nat)
         let new_tail = list_delete_tick nd.next k ctr;
         with cf1. assert (is_dlist new_tail (remove_first k _tl) ** GR.pts_to ctr cf1);
         vl := { key = nd.key; next = new_tail };
-        rewrite each new_tail as ({ key = nd.key; next = new_tail }).next
-          in (is_dlist new_tail (remove_first k _tl));
         fold (is_dlist (Some vl) (nd.key :: remove_first k _tl));
         (Some vl)
       }
