@@ -397,6 +397,14 @@ let rec create_all_buckets_perm
     )
 #pop-options
 
+let rec not_mem_count_zero (xs: list int) (y: int)
+  : Lemma (requires not (List.mem y xs))
+          (ensures List.count y xs == 0)
+          (decreases xs)
+  = match xs with
+    | [] -> ()
+    | _ :: tl -> not_mem_count_zero tl y
+
 (* ========== Main Algorithm ========== *)
 
 //SNIPPET_START: bucket_sort_sig
@@ -446,7 +454,10 @@ let bucket_sort (xs: list int) (k: pos)
           assert (min_val <= Cons?.hd xs /\ Cons?.hd xs <= max_val);
           assert (forall z. List.mem z xs ==> min_val <= z /\ z < max_val + 1);
           assert (not (List.mem y xs));
-          List.mem_count xs y
+          not_mem_count_zero xs y;
+          assert (List.count y xs == 0);
+          assert (List.count y (concat_all buckets) == 0);
+          assert (List.count y (concat_all sorted_buckets) == 0)
         end else ()
       in
       FStar.Classical.forall_intro perm_aux;

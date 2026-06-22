@@ -315,6 +315,11 @@ let rec count_index_positive (s: Seq.seq nat) (i: nat) (x: nat)
   = if i = 0 then ()
     else count_index_positive (Seq.tail s) (i - 1) x
 
+let pred_le_and_neq_implies_le (pos p: nat)
+  : Lemma (requires pos >= 1 /\ pos - 1 <= p /\ p <> pos - 1)
+          (ensures pos <= p)
+  = ()
+
 (* ========== Phase 4 position bounds ========== *)
 
 #push-options "--z3rlimit 20 --z3refresh --split_queries always"
@@ -465,7 +470,11 @@ let phase4_b_step_core
             (ensures p < n /\ B.digit (Seq.index sb' p) d base == key)
             = if p = pos - 1 then ()
               else begin
+                pred_le_and_neq_implies_le pos p;
                 assert (p >= pos);
+                assert (Seq.index sc key <= p);
+                assert (p < n /\ B.digit (Seq.index sb p) d base == key);
+                assert (p < n /\ p <> Seq.index sc key - 1);
                 assert (Seq.index sb' p == Seq.index sb p)
               end
           in
@@ -1336,23 +1345,32 @@ let phase4_final_sorted_on_digit (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base 
       (requires k <= n)
       (ensures B.sorted_on_digit (Seq.slice sb k n) d base)
       (decreases (n - k))
-      = if n - k <= 1 then ()
+      = if n - k <= 1 then
+          assert (Seq.length (Seq.slice sb k n) <= 1)
         else begin
-          digit_at k;
-          digit_at (k + 1);
+          assert (k < n);
+          assert (k + 1 < n);
           // k is in block vk with dcl(vk-1) <= k, k+1 is in block vk1 with dcl(vk1-1) <= k+1
           // If vk > vk1 then dcl(vk-1) >= dcl(vk1) > k+1 > k >= dcl(vk-1), contradiction
           // So digit(sb[k]) = vk <= vk1 = digit(sb[k+1])
           let vk = B.digit (Seq.index sb k) d base in
           let vk1 = B.digit (Seq.index sb (k + 1)) d base in
+          in_block_of_digit sc sa sb d base n k;
+          in_block_of_digit sc sa sb d base n (k + 1);
           if vk > vk1 then begin
             // vk - 1 >= vk1, so dcl(vk-1) >= dcl(vk1) by monotonicity
+            assert (vk1 <= vk - 1);
             digit_count_le_monotone sa vk1 (vk - 1) d base;
+            c_inv_sc_eq sc sa d base n vk;
+            assert (digit_count_le sa (vk - 1) d base <= k);
             // dcl(vk1) > k+1 (from digit_at(k+1)) and dcl(vk-1) <= k (from digit_at(k))
             // So k >= dcl(vk-1) >= dcl(vk1) > k+1, contradiction
             assert false
           end;
+          assert (vk <= vk1);
+          assert (B.digit (Seq.index sb k) d base <= B.digit (Seq.index sb (k + 1)) d base);
           prove_sorted (k + 1);
+          SeqP.lemma_tail_slice sb k n;
           assert (Seq.equal (Seq.tail (Seq.slice sb k n)) (Seq.slice sb (k + 1) n))
         end
     in

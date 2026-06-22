@@ -330,6 +330,11 @@ let digit_strict_lt_gives_lex
                 (forall (d': nat). d0 < d' /\ d' <= d ==> digit v d' base == digit w d' base))
   = ()
 
+let le_not_lt_eq_nat (a b: nat)
+  : Lemma (requires a <= b /\ not (a < b))
+          (ensures a == b)
+  = ()
+
 /// MAIN THEOREM: Each pass of stable digit sort extends sorted range by one digit
 ///
 /// If input is sorted on digits 0..d-1, and we apply a stable sort on digit d,
@@ -363,6 +368,8 @@ let lemma_stable_pass_preserves_ordering
           if digit v d base < digit w d base then
             digit_strict_lt_gives_lex v w d base
           else begin
+            assert (not (digit v d base < digit w d base));
+            le_not_lt_eq_nat (digit v d base) (digit w d base);
             assert (digit v d base == digit w d base);
             match FStar.IndefiniteDescription.strong_excluded_middle
               (exists (d0: nat). d0 < d /\
@@ -521,4 +528,3 @@ let theorem_radix_sort_stability_summary
                    permutation s_in s_out)
   = lemma_stable_pass_preserves_ordering s_in s_out d base;
     is_stable_get_perm s_in s_out d base
-

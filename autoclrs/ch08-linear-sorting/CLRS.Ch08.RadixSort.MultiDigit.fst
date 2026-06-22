@@ -397,6 +397,12 @@ let rec insert_preserves_order (h: nat) (s: seq nat) (d base: nat) (px py: nat)
                 let rt = insert_by_digit h t d base in
                 let result = insert_by_digit h s d base in
                 assert (result == Seq.cons (index s 0) rt);
+                assert (px - 1 < length s - 1);
+                assert (py - 1 < length s - 1);
+                SeqP.index_tail s (px - 1);
+                SeqP.index_tail s (py - 1);
+                assert (index t (px - 1) == index s px);
+                assert (index t (py - 1) == index s py);
                 let px'' = ID.indefinite_description_ghost nat
                   (fun px'' -> exists (py'': nat). px'' < py'' /\ py'' < length rt /\
                     index rt px'' == index t (px - 1) /\ index rt py'' == index t (py - 1)) in
@@ -406,6 +412,12 @@ let rec insert_preserves_order (h: nat) (s: seq nat) (d base: nat) (px py: nat)
                 // Witnesses for result = cons (head s) rt: shift +1
                 // result[px''+1] = rt[px''] = t[px-1] = s[px]
                 // result[py''+1] = rt[py''] = t[py-1] = s[py]
+                assert (px'' + 1 <= length rt);
+                assert (py'' + 1 <= length rt);
+                SeqP.index_cons_r (index s 0) rt (px'' + 1);
+                SeqP.index_cons_r (index s 0) rt (py'' + 1);
+                assert (index result (px'' + 1) == index rt px'');
+                assert (index result (py'' + 1) == index rt py'');
                 assert (px'' + 1 < py'' + 1 /\ py'' + 1 < length result /\
                         index result (px'' + 1) == index s px /\
                         index result (py'' + 1) == index s py)))
@@ -451,7 +463,19 @@ let rec insertion_sort_stable (s: seq nat) (d base: nat) (i j: nat)
         (fun pos -> pos < length sorted_tail /\ index sorted_tail pos == index s j) in
       insert_before_equal (index s 0) sorted_tail d base pos
     ) else (
+      assert (i - 1 < length s - 1);
+      assert (j - 1 < length s - 1);
+      SeqP.index_tail s (i - 1);
+      SeqP.index_tail s (j - 1);
+      assert (index (tail s) (i - 1) == index s i);
+      assert (index (tail s) (j - 1) == index s j);
       insertion_sort_stable (tail s) d base (i - 1) (j - 1);
+      assert (exists (i'' j'': nat). i'' < j'' /\ j'' < length sorted_tail /\
+        index sorted_tail i'' == index (tail s) (i - 1) /\
+        index sorted_tail j'' == index (tail s) (j - 1));
+      assert (exists (i'' j'': nat). i'' < j'' /\ j'' < length sorted_tail /\
+        index sorted_tail i'' == index s i /\
+        index sorted_tail j'' == index s j);
       let i'' = ID.indefinite_description_ghost nat 
         (fun i'' -> exists (j'': nat). i'' < j'' /\ j'' < length sorted_tail /\
           index sorted_tail i'' == index s i /\ index sorted_tail j'' == index s j) in
