@@ -104,7 +104,7 @@ let pred_consistent (spred: Seq.seq SZ.t) (sdist sweights: Seq.seq int) (n sourc
   Seq.length sdist == n /\
   Seq.length sweights >= n * n /\
   (source < n ==> SZ.v (Seq.index spred source) == source) /\
-  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < SP.inf ==>
+  (forall (v: nat{v < n}). v <> source /\ Seq.index sdist v < SP.inf ==>
     (let p = SZ.v (Seq.index spred v) in
      p < n /\
      p * n + v < Seq.length sweights /\
@@ -117,7 +117,7 @@ let pred_consistent (spred: Seq.seq SZ.t) (sdist sweights: Seq.seq int) (n sourc
 let pred_ok (spred: Seq.seq SZ.t) (sdist sweights svisited: Seq.seq int) (n source: nat) : prop =
   pred_consistent spred sdist sweights n source /\
   Seq.length svisited == n /\
-  (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist v < SP.inf ==>
+  (forall (v: nat{v < n}). v <> source /\ Seq.index sdist v < SP.inf ==>
     SZ.v (Seq.index spred v) < n /\
     Seq.index svisited (SZ.v (Seq.index spred v)) = 1)
 
@@ -190,12 +190,12 @@ let relax_round_pred_consistent
       all_non_negative sdist_pre /\
       all_weights_non_negative sweights /\
       pred_consistent spred_pre sdist_pre sweights n source /\
-      (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist_pre v < SP.inf ==>
+      (forall (v: nat{v < n}). v <> source /\ Seq.index sdist_pre v < SP.inf ==>
         SZ.v (Seq.index spred_pre v) < n /\
         Seq.index svisited_pre (SZ.v (Seq.index spred_pre v)) = 1) /\
-      (forall (x: nat). x < n /\ (Seq.index svisited_pre x = 1 \/ x = u) ==>
+      (forall (x: nat{x < n}). (Seq.index svisited_pre x = 1 \/ x = u) ==>
         Seq.index sdist_after x == Seq.index sdist_pre x) /\
-      (forall (v: nat). v < n ==>
+      (forall (v: nat{v < n}).
         (Seq.index sdist_after v == Seq.index sdist_pre v /\
          Seq.index spred_after v == Seq.index spred_pre v) \/
         (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
@@ -205,23 +205,27 @@ let relax_round_pred_consistent
          SZ.v (Seq.index spred_after v) == u))
     )
     (ensures pred_consistent spred_after sdist_after sweights n source)
-  = let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf}) : Lemma
-      (ensures (let p = SZ.v (Seq.index spred_after v) in
-                p < n /\
-                p * n + v < Seq.length sweights /\
-                Seq.index sweights (p * n + v) < SP.inf /\
-                Seq.index sdist_after p < SP.inf /\
-                Seq.index sdist_after v == Seq.index sdist_after p + Seq.index sweights (p * n + v)))
-      = if Seq.index sdist_after v = Seq.index sdist_pre v &&
-           Seq.index spred_after v = Seq.index spred_pre v
-        then begin
-          let p = SZ.v (Seq.index spred_pre v) in
-          assert (Seq.index svisited_pre p = 1);
-          assert (Seq.index sdist_after p == Seq.index sdist_pre p)
-        end else begin
-          assert (SZ.v (Seq.index spred_after v) == u);
-          assert (Seq.index sdist_after u == Seq.index sdist_pre u)
-        end
+  = let aux (v: nat{v < n}) : Lemma
+      (ensures v <> source /\ Seq.index sdist_after v < SP.inf ==>
+        (let p = SZ.v (Seq.index spred_after v) in
+         p < n /\
+         p * n + v < Seq.length sweights /\
+         Seq.index sweights (p * n + v) < SP.inf /\
+         Seq.index sdist_after p < SP.inf /\
+         Seq.index sdist_after v == Seq.index sdist_after p + Seq.index sweights (p * n + v)))
+      =
+        if v <> source then
+          if Seq.index sdist_after v < SP.inf then
+            if Seq.index sdist_after v = Seq.index sdist_pre v &&
+               Seq.index spred_after v = Seq.index spred_pre v
+            then begin
+              let p = SZ.v (Seq.index spred_pre v) in
+              assert (Seq.index svisited_pre p = 1);
+              assert (Seq.index sdist_after p == Seq.index sdist_pre p)
+            end else begin
+              assert (SZ.v (Seq.index spred_after v) == u);
+              assert (Seq.index sdist_after u == Seq.index sdist_pre u)
+            end
     in
     FStar.Classical.forall_intro aux
 #pop-options
@@ -246,12 +250,12 @@ let relax_round_pred_visited
       all_weights_non_negative sweights /\
       (forall (j: nat). j < n ==>
         (Seq.index svisited_pre j = 0 \/ Seq.index svisited_pre j = 1)) /\
-      (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist_pre v < SP.inf ==>
+      (forall (v: nat{v < n}). v <> source /\ Seq.index sdist_pre v < SP.inf ==>
         SZ.v (Seq.index spred_pre v) < n /\
         Seq.index svisited_pre (SZ.v (Seq.index spred_pre v)) = 1) /\
-      (forall (x: nat). x < n /\ (Seq.index svisited_pre x = 1 \/ x = u) ==>
+      (forall (x: nat{x < n}). (Seq.index svisited_pre x = 1 \/ x = u) ==>
         Seq.index sdist_after x == Seq.index sdist_pre x) /\
-      (forall (v: nat). v < n ==>
+      (forall (v: nat{v < n}).
         (Seq.index sdist_after v == Seq.index sdist_pre v /\
          Seq.index spred_after v == Seq.index spred_pre v) \/
         (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
@@ -262,22 +266,26 @@ let relax_round_pred_visited
     )
     (ensures (let svisited_now = Seq.upd svisited_pre u 1 in
               Seq.length svisited_now == n /\
-              (forall (v: nat). v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf ==>
+              (forall (v: nat{v < n}). v <> source /\ Seq.index sdist_after v < SP.inf ==>
                 SZ.v (Seq.index spred_after v) < n /\
                 Seq.index svisited_now (SZ.v (Seq.index spred_after v)) = 1)))
   = let svisited_now = Seq.upd svisited_pre u 1 in
     Seq.lemma_index_upd1 svisited_pre u 1;
-    let aux (v: nat{v < n /\ v <> source /\ Seq.index sdist_after v < SP.inf}) : Lemma
-      (ensures (SZ.v (Seq.index spred_after v) < n /\
-                Seq.index svisited_now (SZ.v (Seq.index spred_after v)) = 1))
-      = if Seq.index sdist_after v = Seq.index sdist_pre v &&
-           Seq.index spred_after v = Seq.index spred_pre v
-        then begin
-          let p = SZ.v (Seq.index spred_pre v) in
-          assert (Seq.index svisited_pre p = 1);
-          Seq.lemma_index_upd2 svisited_pre u 1 p
-        end else
-          assert (SZ.v (Seq.index spred_after v) == u)
+    let aux (v: nat{v < n}) : Lemma
+      (ensures v <> source /\ Seq.index sdist_after v < SP.inf ==>
+        SZ.v (Seq.index spred_after v) < n /\
+        Seq.index svisited_now (SZ.v (Seq.index spred_after v)) = 1)
+      =
+        if v <> source then
+          if Seq.index sdist_after v < SP.inf then
+            if Seq.index sdist_after v = Seq.index sdist_pre v &&
+               Seq.index spred_after v = Seq.index spred_pre v
+            then begin
+              let p = SZ.v (Seq.index spred_pre v) in
+              assert (Seq.index svisited_pre p = 1);
+              Seq.lemma_index_upd2 svisited_pre u 1 p
+            end else
+              assert (SZ.v (Seq.index spred_after v) == u)
     in
     FStar.Classical.forall_intro aux
 #pop-options
@@ -304,10 +312,10 @@ let relax_round_pred_ok
         (Seq.index svisited_pre j = 0 \/ Seq.index svisited_pre j = 1)) /\
       pred_ok spred_pre sdist_pre sweights svisited_pre n source /\
       (* Visited vertices' distances don't change *)
-      (forall (x: nat). x < n /\ (Seq.index svisited_pre x = 1 \/ x = u) ==>
+      (forall (x: nat{x < n}). (Seq.index svisited_pre x = 1 \/ x = u) ==>
         Seq.index sdist_after x == Seq.index sdist_pre x) /\
       (* Relax effect: for each v, either unchanged or STRICTLY improved through u *)
-      (forall (v: nat). v < n ==>
+      (forall (v: nat{v < n}).
         (Seq.index sdist_after v == Seq.index sdist_pre v /\
          Seq.index spred_after v == Seq.index spred_pre v) \/
         (Seq.index sdist_after v == Seq.index sdist_pre u + Seq.index sweights (u * n + v) /\
@@ -1006,4 +1014,3 @@ fn dijkstra
   assert (pure (pred_consistent spred_final sdist_final sweights (SZ.v n) (SZ.v source)));
 }
 #pop-options
-
