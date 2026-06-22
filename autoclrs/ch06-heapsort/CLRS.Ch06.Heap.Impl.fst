@@ -36,6 +36,24 @@ module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
 module CB = CLRS.Ch06.Heap.CostBound
 
+let heap_sz_exit_eq_one (v:nat)
+  : Lemma
+    (requires v > 0 /\ ~(v > 1))
+    (ensures v == 1)
+  = ()
+
+let heapsort_final_cost_bound (n:pos) (heap_sz:nat) (cf c0:nat)
+  : Lemma
+    (requires
+      heap_sz == 1 /\
+      cf >= c0 /\
+      cf - c0 <= CB.build_cost_bound n +
+                 (n - heap_sz) * CB.max_heapify_bound n 0)
+    (ensures
+      cf >= c0 /\
+      cf - c0 <= CB.heapsort_cost_bound n)
+  = assert (n - heap_sz == n - 1)
+
 // ========== Ghost tick ==========
 
 let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
@@ -359,8 +377,17 @@ ensures exists* s (cf: nat).
     heap_sz := new_sz;
   };
   
-  with s_final. assert (A.pts_to a s_final);
+  with vheap_final s_final vc_final.
+    assert (R.pts_to heap_sz vheap_final ** A.pts_to a s_final ** GR.pts_to ctr vc_final);
+  heap_sz_exit_eq_one (SZ.v vheap_final);
+  assert (pure (SZ.v vheap_final == 1));
+  assert (pure (suffix_sorted_upto s_final 1 (SZ.v n)));
+  assert (pure (prefix_le_suffix_upto s_final 1 (SZ.v n)));
   sorted_upto_from_parts s_final (SZ.v n);
+  assert (pure (sorted_upto s_final (SZ.v n)));
+  heapsort_final_cost_bound (SZ.v n) (SZ.v vheap_final) vc_final (reveal c0);
+  assert (pure (vc_final >= reveal c0));
+  assert (pure (vc_final - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)));
   ()
   } // else n > 0
 }
