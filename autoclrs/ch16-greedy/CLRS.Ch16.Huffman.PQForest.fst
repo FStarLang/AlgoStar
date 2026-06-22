@@ -162,6 +162,50 @@ let extends_mem (#t:eqtype) {| Pulse.Lib.TotalOrder.total_order t |}
 
 // Helper: trace index from list_remove_two result back to original list
 // Shows that rem[k] == active[k'] for some k' not equal to j1 or j2
+#push-options "--z3rlimit 8"
+private
+let adjusted_second_index (len j1 j2: nat)
+  : Pure nat
+      (requires j1 < len /\ j2 < len /\ j1 <> j2)
+      (ensures fun r -> r < len - 1 /\ r == (if j2 < j1 then j2 else j2 - 1))
+  = if j2 < j1 then begin
+      assert (j2 < len - 1);
+      j2
+    end
+    else begin
+      assert (j1 < j2);
+      assert (j2 > 0);
+      assert (j2 - 1 < len - 1);
+      j2 - 1
+    end
+#pop-options
+
+#push-options "--z3rlimit 10"
+private
+let adjusted_second_index_entry (#a: Type) (entries: list a) (j1 j2: nat)
+  : Lemma
+      (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2)
+      (ensures (
+        let rem1 = list_remove_at entries j1 in
+        let j2' = adjusted_second_index (L.length entries) j1 j2 in
+        j2' < L.length rem1 /\ L.index rem1 j2' == L.index entries j2))
+  = list_remove_at_length entries j1;
+    let rem1 = list_remove_at entries j1 in
+    let j2' = adjusted_second_index (L.length entries) j1 j2 in
+    assert (j2' < L.length rem1);
+    list_remove_at_index entries j1 j2';
+    if j2 < j1 then begin
+      assert (j2' == j2);
+      assert (j2' < j1)
+    end
+    else begin
+      assert (j1 < j2);
+      assert (j2' == j2 - 1);
+      assert (j1 <= j2');
+      assert (j2' + 1 == j2)
+    end
+#pop-options
+
 #push-options "--z3rlimit 30"
 private
 let list_remove_two_trace (#a: Type) (active: list a) (j1 j2: nat) (k: nat)
@@ -848,17 +892,19 @@ let merge_bundle_step_aux
     pq_tree_freq_match_merge_step pq2 pq3 active0 j1 j2 idx1 freq1 freq2 merged t1 t2 sum_freq;
     // forest_has_pq_entry
     forest_has_pq_entry_remove_at pq0 active0 j1;
-    assert (j1 < j2 \/ j2 < j1);
-    let j2' : nat = if j2 < j1 then j2 else (assert (j2 > 0); j2 - 1) in
     list_remove_at_length active0 j1;
-    forest_has_pq_entry_remove_at pq0 (list_remove_at active0 j1) j2';
+    let rem1 = list_remove_at active0 j1 in
+    let j2' : nat = adjusted_second_index (L.length active0) j1 j2 in
+    assert (j2' == (if j2 < j1 then j2 else j2 - 1));
+    assert (j2' < L.length rem1);
+    forest_has_pq_entry_remove_at pq0 rem1 j2';
     list_remove_two_no_idx active0 j1 j2 idx1;
     forest_has_pq_entry_shrink pq0 pq1 (freq1, idx1) rem;
     list_remove_two_length active0 j1 j2;
-    let rem1 = list_remove_at active0 j1 in
-    list_remove_at_length active0 j1;
     forest_distinct_indices_remove_at active0 j1;
-    list_remove_at_index active0 j1 j2';
+    adjusted_second_index_entry active0 j1 j2;
+    assert (L.index rem1 j2' == L.index active0 j2);
+    assert (entry_idx (L.index rem1 j2') == idx2);
     list_remove_at_no_idx rem1 j2' idx2;
     forest_has_pq_entry_shrink pq1 pq2 (freq2, idx2) rem;
     forest_has_pq_entry_prepend pq2 pq3 sum_freq idx1 rem (idx1, merged, new_tree);
