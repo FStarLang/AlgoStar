@@ -85,6 +85,41 @@ let lemma_mul_fits (i n: nat)
   = assert (i * n <= (n - 1) * n);
     assert ((n - 1) * n == n * n - n)
 
+let incr_nat_reveal (n: erased nat)
+  : Lemma (reveal (incr_nat n) == reveal n + 1)
+    [SMTPat (incr_nat n)]
+  = ()
+
+let mc_k_counter_step (vc:nat) (c0:nat) (total_iters:nat) (j:nat) (k:nat) (rem:nat)
+  : Lemma (requires k < j /\
+                    vc + (j - k) + rem == c0 + total_iters)
+          (ensures vc + 1 + (j - (k + 1)) + rem == c0 + total_iters)
+  = assert (j - k == 1 + (j - (k + 1)))
+
+let mc_inner_k_step (table: Seq.seq int) (dims: Seq.seq int)
+                    (n i j k: nat) (acc: int)
+  : Lemma (requires i < n /\ j < n /\ k < j /\
+                    Seq.length table == op_Star n n /\
+                    Seq.length dims == op_Addition n 1)
+          (ensures
+            (let idx_ik = op_Addition (op_Star i n) k in
+             let idx_k1j = op_Addition (op_Star (op_Addition k 1) n) j in
+             let cost_ik = Seq.index table idx_ik in
+             let cost_k1j = Seq.index table idx_k1j in
+             let dim_i = Seq.index dims i in
+             let dim_k1 = Seq.index dims (op_Addition k 1) in
+             let dim_j1 = Seq.index dims (op_Addition j 1) in
+             let q = op_Addition (op_Addition cost_ik cost_k1j)
+                       (op_Star (op_Star dim_i dim_k1) dim_j1) in
+             let new_min = if q < acc then q else acc in
+             mc_inner_k table dims n i j k acc ==
+               mc_inner_k table dims n i j (op_Addition k 1) new_min))
+  = assert (k + 1 <= j);
+    assert (k + 1 < n);
+    assert (j + 1 < n + 1);
+    lemma_index_in_bounds i k n;
+    lemma_index_in_bounds (k + 1) j n
+
 // ========== Main Implementation ==========
 
 open Pulse.Lib.BoundedIntegers
@@ -189,9 +224,21 @@ fn matrix_chain_order
       
       // Capture the table state at i-loop entry for use after k-loop
       with sm_i_entry. assert (V.pts_to m sm_i_entry);
+      with vc_i. assert (GR.pts_to ctr vc_i);
 
       // Transition: middle invariant -> inner invariant
+      assert (pure (SZ.v vi + SZ.v vl <= SZ.v n));
       mc_remaining_i_step (SZ.v n) (SZ.v vl) (SZ.v vi);
+      assert (pure (SZ.v j == SZ.v vi + SZ.v vl - 1));
+      assert (pure (SZ.v j - SZ.v vi == SZ.v vl - 1));
+      assert (pure (
+        mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi) ==
+        (SZ.v j - SZ.v vi) + mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi + 1)));
+      assert (pure (
+        vc_i + (SZ.v j - SZ.v vi) +
+        mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi + 1) +
+        mc_inner_sum (SZ.v n) (SZ.v vl + 1) ==
+        reveal c0 + mc_iterations (SZ.v n)));
       
       // Try all split points k from i to j-1
       let mut k: SZ.t = vi;
@@ -225,6 +272,8 @@ fn matrix_chain_order
       {
         let vk = !k;
         let vmin_cost = !min_cost;
+        with sm_k. assert (V.pts_to m sm_k);
+        with vc_k. assert (GR.pts_to ctr vc_k);
         
         // Establish index bounds before computing
         lemma_index_in_bounds (SZ.v vi) (SZ.v vk) (SZ.v n);
@@ -253,10 +302,32 @@ fn matrix_chain_order
         
         // Update min_cost = min(min_cost, q)
         let new_min = (if q < vmin_cost then q else vmin_cost);
+        assert (pure (SZ.v idx_ik == SZ.v vi * SZ.v n + SZ.v vk));
+        assert (pure (SZ.v idx_k1j == (SZ.v vk + 1) * SZ.v n + SZ.v j));
+        assert (pure (SZ.v (vk + 1sz) == SZ.v vk + 1));
+        assert (pure (cost_ik == Seq.index sm_k (SZ.v vi * SZ.v n + SZ.v vk)));
+        assert (pure (cost_k1j == Seq.index sm_k ((SZ.v vk + 1) * SZ.v n + SZ.v j)));
+        assert (pure (dim_i == Seq.index s_dims (SZ.v vi)));
+        assert (pure (dim_k1 == Seq.index s_dims (SZ.v vk + 1)));
+        assert (pure (dim_j1 == Seq.index s_dims (SZ.v j + 1)));
+        assert (pure (q ==
+          Seq.index sm_k (SZ.v vi * SZ.v n + SZ.v vk) +
+          Seq.index sm_k ((SZ.v vk + 1) * SZ.v n + SZ.v j) +
+          Seq.index s_dims (SZ.v vi) * Seq.index s_dims (SZ.v vk + 1) *
+          Seq.index s_dims (SZ.v j + 1)));
+        mc_inner_k_step sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost;
+        assert (pure (
+          mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk) vmin_cost ==
+          mc_inner_k sm_k s_dims (SZ.v n) (SZ.v vi) (SZ.v j) (SZ.v vk + 1) new_min));
+        mc_k_counter_step (reveal vc_k) (reveal c0) (mc_iterations (SZ.v n))
+          (SZ.v j) (SZ.v vk)
+          (mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi + 1) +
+           mc_inner_sum (SZ.v n) (SZ.v vl + 1));
         min_cost := new_min;
 
         // Count the k-iteration — one ghost tick
         tick ctr;
+        incr_nat_reveal vc_k;
         
         k := vk + 1sz;
       };

@@ -388,6 +388,8 @@ let rec lemma_mc_inner_i_fills_correctly
       let j = start_i + l - 1 in
       let min_cost = mc_inner_k table dims n start_i j start_i 1000000000 in
       let table' = Seq.upd table (start_i * n + j) min_cost in
+      assert (length table' == length table);
+      assert (length table' == n * n);
       
       // (i0, j0) <> (start_i, j) because start_i < i0
       assert (start_i <> i0);

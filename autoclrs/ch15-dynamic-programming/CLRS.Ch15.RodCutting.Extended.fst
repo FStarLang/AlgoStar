@@ -132,10 +132,12 @@ let cut_matches (prices: Seq.seq nat) (sr: Seq.seq nat)
 
 // s_cuts optimality: s_cuts[j] achieves the optimal revenue
 let cuts_achieve_optimal (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t) (bound: nat) : prop =
-  (forall (k: nat) (s: nat). k >= 1 /\ k <= bound /\ k < Seq.length sc /\ k < Seq.length sr /\
-    s == SZ.v (Seq.index sc k) /\ s >= 1 ==>
-    s <= k /\ s - 1 < Seq.length prices /\ k - s < Seq.length sr /\
-    cut_matches prices sr s k)
+  (forall (k: nat). {:pattern (Seq.index sc k)}
+    k >= 1 /\ k <= bound /\ k < Seq.length sc /\ k < Seq.length sr ==>
+    (let s = SZ.v (Seq.index sc k) in
+     s >= 1 ==>
+     s <= k /\ s - 1 < Seq.length prices /\ k - s < Seq.length sr /\
+     cut_matches prices sr s k))
 
 // DP table correctness
 let dp_correct (prices: Seq.seq nat) (sr: Seq.seq nat) (bound: nat) : prop =
@@ -196,6 +198,39 @@ let rec accum_argmax_valid (prices: Seq.seq nat) (r: Seq.seq nat) (j: nat) (limi
       ()
     )
 
+let accum_argmax_step (prices: Seq.seq nat) (r: Seq.seq nat) (j: nat) (limit: nat)
+  : Lemma (requires limit > 0 /\ j > 0 /\ limit <= j /\
+                    limit - 1 < Seq.length prices /\
+                    j - limit < Seq.length r)
+          (ensures accum_argmax prices r j limit ==
+            (let prev_max = accum_max prices r j (limit - 1) in
+             let prev_argmax = accum_argmax prices r j (limit - 1) in
+             let candidate = Seq.index prices (limit - 1) + Seq.index r (j - limit) in
+             if candidate >= prev_max then limit else prev_argmax))
+  = ()
+
+let accum_argmax_update (prices: Seq.seq nat) (r: Seq.seq nat) (j: nat) (limit: nat)
+                        (prev_argmax: nat)
+  : Lemma (requires limit > 0 /\ j > 0 /\ limit <= j /\
+                    limit - 1 < Seq.length prices /\
+                    j - limit < Seq.length r /\
+                    (limit >= 2 ==>
+                      prev_argmax == accum_argmax prices r j (limit - 1)))
+          (ensures
+            (let prev_max = accum_max prices r j (limit - 1) in
+             let candidate = Seq.index prices (limit - 1) + Seq.index r (j - limit) in
+             (if candidate >= prev_max then limit else prev_argmax) ==
+               accum_argmax prices r j limit))
+  = accum_argmax_step prices r j limit;
+    let prev_max = accum_max prices r j (limit - 1) in
+    let candidate = Seq.index prices (limit - 1) + Seq.index r (j - limit) in
+    if candidate >= prev_max then ()
+    else if limit = 1 then begin
+      assert (prev_max == 0);
+      assert (candidate >= 0);
+      assert (False)
+    end
+
 // Lemma: updating s_cuts at position j preserves validity for all k < j+1
 let sc_upd_valid (sc: Seq.seq SZ.t) (v: SZ.t) (j: nat)
   : Lemma (requires j < Seq.length sc /\
@@ -232,27 +267,34 @@ let cuts_upd_valid (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t)
                     cuts_achieve_optimal prices sr' sc' j))
   = let sr' = Seq.upd sr j q in
     let sc' = Seq.upd sc j v in
-    let aux (k: nat) (s: nat{k >= 1 /\ k <= j /\ k < Seq.length sc' /\ k < Seq.length sr' /\
-                             s == SZ.v (Seq.index sc' k) /\ s >= 1}) : Lemma
-      (s <= k /\ s - 1 < Seq.length prices /\ k - s < Seq.length sr' /\
+    let aux (k: nat{k >= 1 /\ k <= j /\ k < Seq.length sc' /\ k < Seq.length sr'}) : Lemma
+      (let s = SZ.v (Seq.index sc' k) in
+       s >= 1 ==>
+       s <= k /\ s - 1 < Seq.length prices /\ k - s < Seq.length sr' /\
        cut_matches prices sr' s k)
       = if k = j then (
+          let s = SZ.v (Seq.index sc' k) in
           Seq.lemma_index_upd1 sc j v;
           Seq.lemma_index_upd1 sr j q;
           Seq.lemma_index_upd2 #nat sr j q (j - SZ.v v)
         ) else (
+          let s = SZ.v (Seq.index sc' k) in
           Seq.lemma_index_upd2 #SZ.t sc j v k;
           Seq.lemma_index_upd2 #nat sr j q k;
           let s0 = SZ.v (Seq.index sc k) in
+          assert (s == s0);
           assert (s0 >= 1 /\ s0 <= k);
+          assert (s0 - 1 < Seq.length prices);
           assert (k - s0 < j);
+          assert (k - s0 < Seq.length sr);
+          assert (cut_matches prices sr s0 k);
           Seq.lemma_index_upd2 #nat sr j q (k - s0)
         )
     in
-    Classical.forall_intro_2 aux
+    Classical.forall_intro aux
 
 // Lemma: when dp_correct holds, cuts_achieve_optimal implies the postcondition property
-#push-options "--z3rlimit 5"
+#push-options "--z3rlimit 10"
 let cuts_optimal_from_dp (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ.t) (n: nat)
   : Lemma (requires dp_correct prices sr n /\ 
                      cuts_achieve_optimal prices sr sc n /\
@@ -282,11 +324,15 @@ let cuts_optimal_from_dp (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ
       // From cuts_achieve_optimal: cut_matches prices sr s j
       // cut_matches: prices[s-1] + sr[j-s] == sr[j]
       // From dp_correct: sr[j] == optimal_revenue j, sr[j-s] == optimal_revenue (j-s)
+      assert (j < Seq.length sc);
+      assert (j < Seq.length sr);
+      assert (s == SZ.v (Seq.index sc j));
       assert (s >= 1 /\ s <= j);
       assert (s - 1 < Seq.length prices);
       assert (j - s < Seq.length sr);
       assert (cut_matches prices sr s j);
       assert (Seq.index sr j == optimal_revenue prices j);
+      assert (j - s <= n);
       if j - s >= 0 && j - s <= n then
         assert (Seq.index sr (j - s) == optimal_revenue prices (j - s))
     in
@@ -490,6 +536,13 @@ fn extended_rod_cutting
       // Prove: new_q == accum_max s_prices sr_inner (SZ.v vj) (SZ.v vi)
       assert (pure (new_q == accum_max s_prices sr_inner (SZ.v vj) (SZ.v vi)));
       // Prove: new_best_i tracks the argmax
+      assert (pure (price_i == Seq.index s_prices (SZ.v vi - 1)));
+      assert (pure (r_j_minus_i == Seq.index sr_inner (SZ.v vj - SZ.v vi)));
+      accum_argmax_update s_prices sr_inner (SZ.v vj) (SZ.v vi) (SZ.v v_best);
+      assert (pure (
+        (if candidate >= vq then SZ.v vi else SZ.v v_best) ==
+          accum_argmax s_prices sr_inner (SZ.v vj) (SZ.v vi)));
+      assert (pure (SZ.v new_best_i == (if candidate >= vq then SZ.v vi else SZ.v v_best)));
       assert (pure (SZ.v new_best_i == accum_argmax s_prices sr_inner (SZ.v vj) (SZ.v vi)));
       
       q := new_q;
