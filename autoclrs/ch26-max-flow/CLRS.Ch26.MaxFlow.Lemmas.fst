@@ -725,7 +725,7 @@ let lemma_augment_edge_residual_unchanged
     when they modify disjoint matrix cells. This holds when the edges are 
     different as undirected edges: {u1,v1} ≠ {u2,v2}. 
     Adjacent path edges (u,v) and (v,w) satisfy this because u ≠ w. *)
-#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
 let lemma_augment_edge_commute
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
@@ -753,23 +753,39 @@ let lemma_augment_edge_commute
           if (a = u1 && b = v1) || (a = v1 && b = u1) then begin
             // Cell (a,b) affected by ae1, NOT by ae2.
             // ae2 doesn't modify (u1,v1) or (v1,u1):
+            assert (u1 <> u2 \/ v1 <> v2);
+            assert (u1 <> v2 \/ v1 <> u2);
             lemma_augment_edge_only_modifies flow cap n u2 v2 delta u1 v1;
+            assert (v1 <> u2 \/ u1 <> v2);
+            assert (v1 <> v2 \/ u1 <> u2);
             lemma_augment_edge_only_modifies flow cap n u2 v2 delta v1 u1;
             // So f2[u1,v1] = flow[u1,v1] and f2[v1,u1] = flow[v1,u1]
             // → residual(f2, u1, v1) = residual(flow, u1, v1) → same branch
             // → f1[a,b] = ae1(flow)[a,b] = ae1(f2)[a,b] = f21[a,b]
             // Also: ae2 doesn't modify (a,b), so f12[a,b] = f1[a,b]
+            assert (a <> u2 \/ b <> v2);
+            assert (a <> v2 \/ b <> u2);
             lemma_augment_edge_only_modifies f1 cap n u2 v2 delta a b
             // So f12[a,b] = f1[a,b] = f21[a,b]
           end
           else if (a = u2 && b = v2) || (a = v2 && b = u2) then begin
             // Symmetric: cell (a,b) affected by ae2, NOT by ae1.
+            assert (u2 <> u1 \/ v2 <> v1);
+            assert (u2 <> v1 \/ v2 <> u1);
             lemma_augment_edge_only_modifies flow cap n u1 v1 delta u2 v2;
+            assert (v2 <> u1 \/ u2 <> v1);
+            assert (v2 <> v1 \/ u2 <> u1);
             lemma_augment_edge_only_modifies flow cap n u1 v1 delta v2 u2;
+            assert (a <> u1 \/ b <> v1);
+            assert (a <> v1 \/ b <> u1);
             lemma_augment_edge_only_modifies f2 cap n u1 v1 delta a b
           end
           else begin
             // Cell (a,b) not affected by either ae
+            assert (a <> u1 \/ b <> v1);
+            assert (a <> v1 \/ b <> u1);
+            assert (a <> u2 \/ b <> v2);
+            assert (a <> v2 \/ b <> u2);
             lemma_augment_edge_only_modifies flow cap n u1 v1 delta a b;
             lemma_augment_edge_only_modifies flow cap n u2 v2 delta a b;
             lemma_augment_edge_only_modifies f1 cap n u2 v2 delta a b;
