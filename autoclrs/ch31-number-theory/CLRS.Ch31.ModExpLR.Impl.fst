@@ -99,13 +99,19 @@ let mod_exp_lr_step_bmod (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
     )
   = let d = pow b prefix % m in
     let d_sq = (d * d) % m in
+    let d_new0 = (if bit = 0 then d_sq else (d_sq * b) % m) in
+    let d_new = (if bit = 0 then d_sq else (d_sq * (b % m)) % m) in
     mod_exp_lr_step b prefix m bit;
-    assert (let d_new0 = (if bit = 0 then d_sq else (d_sq * b) % m) in
-            d_new0 == pow b (2 * prefix + bit) % m);
-    if bit = 1 then (
+    assert (d_new0 == pow b (2 * prefix + bit) % m);
+    if bit = 0 then
+      assert (d_new == d_new0)
+    else (
+      assert (bit == 1);
       lemma_mod_mul_distr_r d_sq b m;
-      assert ((d_sq * (b % m)) % m == (d_sq * b) % m)
-    )
+      assert ((d_sq * b) % m == (d_sq * (b % m)) % m);
+      assert (d_new == d_new0)
+    );
+    assert (d_new == pow b (2 * prefix + bit) % m)
 #pop-options
 
 // After the step, d_new = pow b (e / mask) % m
