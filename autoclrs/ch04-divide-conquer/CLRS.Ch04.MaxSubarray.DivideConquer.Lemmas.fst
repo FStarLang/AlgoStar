@@ -198,8 +198,16 @@ let dc_kadane_equivalence (s: Seq.seq int)
   lemma_kadane_correct s 0 0 (Seq.index s 0);
   lemma_dc_sum_correct s 0 n;
   lemma_dc_nonempty s 0 n;
-  let (_, l, r) = find_maximum_subarray_dc s 0 n in
+  let (sum, l, r) = find_maximum_subarray_dc s 0 n in
+  assert (l < r);
+  assert (sum == sum_range s l r);
+  assert (find_maximum_subarray_sum s == sum);
   lemma_max_sub_ge s (n - 1) l r;
+  assert (max_subarray_spec s >= sum);
   let (mj, mk) = max_sub_witness s (n - 1) in
-  lemma_dc_optimal s 0 n mj mk
+  assert (mj < mk);
+  assert (mk <= n);
+  assert (max_subarray_spec s == sum_range s mj mk);
+  lemma_dc_optimal s 0 n mj mk;
+  assert (sum >= max_subarray_spec s)
 //SNIPPET_END: dc_kadane_equivalence
