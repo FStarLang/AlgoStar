@@ -199,6 +199,31 @@ let jarvis_loop_step (xs ys: Seq.seq int) (start current: nat) (fuel: nat)
                        (find_next_spec xs ys current) (fuel - 1) /\
                    jarvis_loop_count xs ys start current fuel >= 1) = ()
 
+#push-options "--z3rlimit 10"
+let jarvis_loop_progress_after_step
+  (xs ys: Seq.seq int) (start current next h n: nat)
+  : Lemma
+    (requires
+      h < n /\
+      next == find_next_spec xs ys current /\
+      next <> start /\
+      h + jarvis_loop_count xs ys start current (n - h) == jarvis_march_spec xs ys)
+    (ensures
+      (h + 1) + jarvis_loop_count xs ys start next (n - (h + 1)) ==
+      jarvis_march_spec xs ys) =
+  let fuel = n - h in
+  assert (fuel > 0);
+  assert (find_next_spec xs ys current <> start);
+  jarvis_loop_step xs ys start current fuel;
+  assert (fuel - 1 == n - (h + 1));
+  assert (
+    h + jarvis_loop_count xs ys start current fuel ==
+    h + (1 + jarvis_loop_count xs ys start next (n - (h + 1))));
+  assert (
+    h + (1 + jarvis_loop_count xs ys start next (n - (h + 1))) ==
+    (h + 1) + jarvis_loop_count xs ys start next (n - (h + 1)))
+#pop-options
+
 // ========== Convex Hull Correctness Properties ==========
 
 //SNIPPET_START: correctness_defs
@@ -471,7 +496,7 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_spec_bounded xs ys current
 
 // Extending a valid Jarvis hull by one vertex preserves validity.
-#push-options "--z3rlimit 30 --split_queries always"
+#push-options "--z3rlimit 10 --split_queries always"
 let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
   : Lemma
     (requires
@@ -483,9 +508,54 @@ let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) 
     (ensures
       valid_jarvis_hull xs ys (Seq.upd hull h next) (h + 1)) =
   let hull' = Seq.upd hull h next in
-  assert (forall (i: nat). i < h ==> Seq.index hull' i == Seq.index hull i);
+  // Seq.upd facts
+  assert (Seq.length hull' == Seq.length hull);
   assert (Seq.index hull' h == next);
-  assert (Seq.length hull' == Seq.length hull)
+  assert (forall (i: nat). i < h ==> Seq.index hull' i == Seq.index hull i);
+  // hull'[0] == find_leftmost_spec (h >= 1 so index 0 unchanged)
+  assert (Seq.index hull' 0 == Seq.index hull 0);
+  assert (SZ.v (Seq.index hull' 0) == find_leftmost_spec xs ys);
+  // all indices < h+1 are in bounds
+  assert (SZ.v (Seq.index hull' h) < Seq.length xs);
+  assert_spinoff (forall (i: nat). i < h + 1 ==> SZ.v (Seq.index hull' i) < Seq.length xs);
+  // find_next chain for indices < h preserved
+  assert_spinoff (forall (i: nat). i >= 1 /\ i < h ==>
+    SZ.v (Seq.index hull' i) == find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1))));
+  // chain for index h
+  assert (Seq.index hull' (h - 1) == Seq.index hull (h - 1));
+  calc (==) {
+    SZ.v (Seq.index hull' h);
+    == {}
+    SZ.v next;
+    == {}
+    find_next_spec xs ys (SZ.v (Seq.index hull (h - 1)));
+    == {}
+    find_next_spec xs ys (SZ.v (Seq.index hull' (h - 1)));
+  };
+  // Combined chain for postcondition, proved pointwise to avoid a large
+  // quantified SMT query over Seq.upd.
+  let aux (i: nat) : Lemma
+    (ensures (i >= 1 /\ i < h + 1 ==>
+      SZ.v (Seq.index hull' i) == find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1)))))
+    = if i >= 1 && i < h + 1 then begin
+        if i < h then begin
+          assert (i - 1 < h);
+          assert (Seq.index hull' i == Seq.index hull i);
+          assert (Seq.index hull' (i - 1) == Seq.index hull (i - 1));
+          assert (SZ.v (Seq.index hull i) == find_next_spec xs ys (SZ.v (Seq.index hull (i - 1))))
+        end else begin
+          assert (h <= i);
+          assert (i <= h);
+          assert (i == h);
+          assert (Seq.index hull' i == next);
+          assert (Seq.index hull' (i - 1) == Seq.index hull (h - 1));
+          assert (SZ.v next == find_next_spec xs ys (SZ.v (Seq.index hull (h - 1))));
+          assert (SZ.v (Seq.index hull' i) ==
+                  find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1))))
+        end
+      end else ()
+  in
+  FStar.Classical.forall_intro aux
 #pop-options
 
 //SNIPPET_END: correctness_lemmas
@@ -690,6 +760,13 @@ fn jarvis_march (#p: perm) (xs ys: array int)
       let go = not (next = p0) && (vh <^ len);
 
       if go {
+        jarvis_loop_progress_after_step
+          sxs sys (SZ.v p0) (SZ.v vc) (SZ.v next) (SZ.v vh) (SZ.v len);
+        assert (pure (
+          SZ.v (SZ.add vh 1sz) +
+          jarvis_loop_count sxs sys (SZ.v p0) (SZ.v next)
+            (SZ.v len - SZ.v (SZ.add vh 1sz))
+          == jarvis_march_spec sxs sys));
         h := SZ.add vh 1sz;
         current := next
       } else {

@@ -59,6 +59,18 @@ val jarvis_loop_step (xs ys: Seq.seq int) (start current: nat) (fuel: nat)
                        (find_next_spec xs ys current) (fuel - 1) /\
                    jarvis_loop_count xs ys start current fuel >= 1)
 
+val jarvis_loop_progress_after_step
+  (xs ys: Seq.seq int) (start current next h n: nat)
+  : Lemma
+    (requires
+      h < n /\
+      next == find_next_spec xs ys current /\
+      next <> start /\
+      h + jarvis_loop_count xs ys start current (n - h) == jarvis_march_spec xs ys)
+    (ensures
+      (h + 1) + jarvis_loop_count xs ys start next (n - (h + 1)) ==
+      jarvis_march_spec xs ys)
+
 // ========== Correctness Lemmas ==========
 
 // find_leftmost returns the lexicographic minimum (x, then y).

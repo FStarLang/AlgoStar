@@ -344,7 +344,20 @@ fn jarvis_march_with_hull (#p: perm) (xs ys: array int)
 
       if go {
         jarvis_loop_step sxs sys (SZ.v p0) (SZ.v vc) (SZ.v len - SZ.v vh);
+        jarvis_loop_progress_after_step
+          sxs sys (SZ.v p0) (SZ.v vc) (SZ.v next) (SZ.v vh) (SZ.v len);
         hull_write_step sxs sys hull_out vh next len;
+        with shull_next. _;
+        assert (pure (valid_jarvis_hull sxs sys shull_next (SZ.v vh + 1)));
+        assert (pure (Seq.index shull_next (SZ.v vh) == next));
+        assert (pure (SZ.v (SZ.add vh 1sz) == SZ.v vh + 1));
+        assert (pure (valid_jarvis_hull sxs sys shull_next (SZ.v (SZ.add vh 1sz))));
+        assert (pure (SZ.v next == SZ.v (Seq.index shull_next (SZ.v (SZ.add vh 1sz) - 1))));
+        assert (pure (
+          SZ.v (SZ.add vh 1sz) +
+          jarvis_loop_count sxs sys (SZ.v p0) (SZ.v next)
+            (SZ.v len - SZ.v (SZ.add vh 1sz))
+          == jarvis_march_spec sxs sys));
         h := SZ.add vh 1sz;
         current := next
       } else {
