@@ -61,6 +61,21 @@ val suffix_gives_index (merged: Seq.seq int) (k: nat) (suffix: Seq.seq int)
                      Seq.length suffix > 0)
           (ensures Seq.head suffix == Seq.index merged k)
 
+/// Updating position k with the next target element extends a proved prefix by one.
+val upd_prefix_extend (old new_s target: Seq.seq int) (k: nat) (v: int)
+  : Lemma (requires k < Seq.length old /\
+                     k < Seq.length target /\
+                     Seq.length new_s == Seq.length old /\
+                     new_s == Seq.upd old k v /\
+                     (forall (p: nat). p < k ==> Seq.index old p == Seq.index target p) /\
+                     v == Seq.index target k)
+          (ensures forall (p: nat). p < k + 1 ==> Seq.index new_s p == Seq.index target p)
+
+/// A merge cost bound for k written elements also bounds k+1 written elements.
+val merge_complexity_extend_hi (cf c0 k: nat)
+  : Lemma (requires merge_complexity_bounded cf c0 0 k)
+          (ensures merge_complexity_bounded cf c0 0 (k + 1))
+
 /// ms_cost split lemma: cost of left + right + merge <= total cost
 val ms_cost_split (n: int{n >= 2})
   : Lemma (ensures ms_cost (n / 2) + ms_cost (n - n / 2) + n <= ms_cost n)

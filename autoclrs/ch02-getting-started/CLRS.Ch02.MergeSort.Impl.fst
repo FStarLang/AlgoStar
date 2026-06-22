@@ -183,31 +183,106 @@ fn merge
     
     if (vi = l1) {
       // Left exhausted, take from right
+      with vc_pre. assert (GR.pts_to ctr vc_pre);
       suffix_step_right s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
       let v = tmp2.(vj);
+      suffix_gives_index ghost_merged (SZ.v vk)
+        (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1))
+                   (Seq.slice s2 (SZ.v vj) (SZ.v l2)));
+      assert (pure (v == Seq.index ghost_merged (SZ.v vk)));
+      Seq.lemma_tail_slice ghost_merged (SZ.v vk) (Seq.length ghost_merged);
+      assert (pure (
+        Seq.equal (Seq.slice ghost_merged (SZ.v vk + 1) (Seq.length ghost_merged))
+                  (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1))
+                             (Seq.slice s2 (SZ.v vj + 1) (SZ.v l2)))));
+      with s_before. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_before);
+      assert (pure (forall (p: nat). p < SZ.v vk ==>
+        Seq.index s_before p == Seq.index ghost_merged p));
       pts_to_range_upd a (lo +^ vk) v;
+      with s_next. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_next);
+      Seq.lemma_len_upd (SZ.v vk) v s_before;
+      assert (pure (Seq.length s_next == Seq.length s_before));
+      upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v;
+      merge_complexity_extend_hi vc_pre (reveal c0) (SZ.v vk);
       j := vj +^ 1sz;
       k := vk +^ 1sz;
     } else {
      if (vj = l2) {
       // Right exhausted, take from left
+      with vc_pre. assert (GR.pts_to ctr vc_pre);
       suffix_step_left s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
       let v = tmp1.(vi);
+      suffix_gives_index ghost_merged (SZ.v vk)
+        (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1))
+                   (Seq.slice s2 (SZ.v vj) (SZ.v l2)));
+      assert (pure (v == Seq.index ghost_merged (SZ.v vk)));
+      Seq.lemma_tail_slice ghost_merged (SZ.v vk) (Seq.length ghost_merged);
+      assert (pure (
+        Seq.equal (Seq.slice ghost_merged (SZ.v vk + 1) (Seq.length ghost_merged))
+                  (seq_merge (Seq.slice s1 (SZ.v vi + 1) (SZ.v l1))
+                             (Seq.slice s2 (SZ.v vj) (SZ.v l2)))));
+      with s_before. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_before);
+      assert (pure (forall (p: nat). p < SZ.v vk ==>
+        Seq.index s_before p == Seq.index ghost_merged p));
       pts_to_range_upd a (lo +^ vk) v;
+      with s_next. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_next);
+      Seq.lemma_len_upd (SZ.v vk) v s_before;
+      assert (pure (Seq.length s_next == Seq.length s_before));
+      upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v;
+      merge_complexity_extend_hi vc_pre (reveal c0) (SZ.v vk);
       i := vi +^ 1sz;
       k := vk +^ 1sz;
      } else {
       let v1 = tmp1.(vi);
       let v2 = tmp2.(vj);
+      with vc_pre. assert (GR.pts_to ctr vc_pre);
       tick ctr;  // one comparison
       if (Prims.op_LessThanOrEqual v1 v2) {
         suffix_step_left s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
+        suffix_gives_index ghost_merged (SZ.v vk)
+          (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1))
+                     (Seq.slice s2 (SZ.v vj) (SZ.v l2)));
+        assert (pure (v1 == Seq.index ghost_merged (SZ.v vk)));
+        Seq.lemma_tail_slice ghost_merged (SZ.v vk) (Seq.length ghost_merged);
+        assert (pure (
+          Seq.equal (Seq.slice ghost_merged (SZ.v vk + 1) (Seq.length ghost_merged))
+                    (seq_merge (Seq.slice s1 (SZ.v vi + 1) (SZ.v l1))
+                               (Seq.slice s2 (SZ.v vj) (SZ.v l2)))));
+        incr_nat_reveal vc_pre;
+        with s_before. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_before);
+        assert (pure (forall (p: nat). p < SZ.v vk ==>
+          Seq.index s_before p == Seq.index ghost_merged p));
         pts_to_range_upd a (lo +^ vk) v1;
+        with s_next. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_next);
+        Seq.lemma_len_upd (SZ.v vk) v1 s_before;
+        assert (pure (Seq.length s_next == Seq.length s_before));
+        assert (pure (Seq.index s_next (SZ.v vk) == Seq.index ghost_merged (SZ.v vk)));
+        upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v1;
+        assert (pure (merge_complexity_bounded (reveal (incr_nat vc_pre)) (reveal c0) 0 (SZ.v vk + 1)));
         i := vi +^ 1sz;
         k := vk +^ 1sz;
       } else {
         suffix_step_right s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
+        suffix_gives_index ghost_merged (SZ.v vk)
+          (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1))
+                     (Seq.slice s2 (SZ.v vj) (SZ.v l2)));
+        assert (pure (v2 == Seq.index ghost_merged (SZ.v vk)));
+        Seq.lemma_tail_slice ghost_merged (SZ.v vk) (Seq.length ghost_merged);
+        assert (pure (
+          Seq.equal (Seq.slice ghost_merged (SZ.v vk + 1) (Seq.length ghost_merged))
+                    (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1))
+                               (Seq.slice s2 (SZ.v vj + 1) (SZ.v l2)))));
+        incr_nat_reveal vc_pre;
+        with s_before. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_before);
+        assert (pure (forall (p: nat). p < SZ.v vk ==>
+          Seq.index s_before p == Seq.index ghost_merged p));
         pts_to_range_upd a (lo +^ vk) v2;
+        with s_next. assert (pts_to_range a (SZ.v lo) (SZ.v hi) s_next);
+        Seq.lemma_len_upd (SZ.v vk) v2 s_before;
+        assert (pure (Seq.length s_next == Seq.length s_before));
+        assert (pure (Seq.index s_next (SZ.v vk) == Seq.index ghost_merged (SZ.v vk)));
+        upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v2;
+        assert (pure (merge_complexity_bounded (reveal (incr_nat vc_pre)) (reveal c0) 0 (SZ.v vk + 1)));
         j := vj +^ 1sz;
         k := vk +^ 1sz;
       };

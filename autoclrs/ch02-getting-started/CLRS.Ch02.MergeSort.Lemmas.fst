@@ -103,6 +103,11 @@ let sorted_tail (s: Seq.seq int)
           (ensures sorted (Seq.tail s))
   = ()
 
+let sorted_cons (h: int) (t: Seq.seq int)
+  : Lemma (requires sorted t /\ all_ge h t)
+          (ensures sorted (Seq.cons h t))
+  = ()
+
 let rec seq_merge_sorted (s1 s2: Seq.seq int)
   : Lemma (requires sorted s1 /\ sorted s2)
           (ensures sorted (seq_merge s1 s2))
@@ -119,12 +124,14 @@ let rec seq_merge_sorted (s1 s2: Seq.seq int)
         sorted_all_ge_head s1;
         sorted_all_ge_head s2;
         seq_merge_all_ge h1 (Seq.tail s1) s2;
+        sorted_cons h1 (seq_merge (Seq.tail s1) s2);
         ()
       ) else (
         seq_merge_sorted s1 (Seq.tail s2);
         sorted_all_ge_head s1;
         sorted_all_ge_head s2;
         seq_merge_all_ge h2 s1 (Seq.tail s2);
+        sorted_cons h2 (seq_merge s1 (Seq.tail s2));
         ()
       )
 
@@ -211,6 +218,31 @@ let slice_full (s: Seq.seq int)
   = ()
 
 let suffix_gives_index (merged: Seq.seq int) (k: nat) (suffix: Seq.seq int)
+  = ()
+
+let upd_prefix_extend (old new_s target: Seq.seq int) (k: nat) (v: int)
+  : Lemma (requires k < Seq.length old /\
+                      k < Seq.length target /\
+                      Seq.length new_s == Seq.length old /\
+                      new_s == Seq.upd old k v /\
+                      (forall (p: nat). p < k ==> Seq.index old p == Seq.index target p) /\
+                      v == Seq.index target k)
+           (ensures forall (p: nat). p < k + 1 ==> Seq.index new_s p == Seq.index target p)
+  = let aux (p: nat)
+      : Lemma (p < k + 1 ==> Seq.index new_s p == Seq.index target p)
+      = if p < k + 1 then
+          if p = k then
+            Seq.lemma_index_upd1 old k v
+          else (
+            assert (p < k);
+            Seq.lemma_index_upd2 old k v p
+          )
+    in
+    Classical.forall_intro aux
+
+let merge_complexity_extend_hi (cf c0 k: nat)
+  : Lemma (requires merge_complexity_bounded cf c0 0 k)
+           (ensures merge_complexity_bounded cf c0 0 (k + 1))
   = ()
 
 #pop-options
