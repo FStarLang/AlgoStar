@@ -14,6 +14,7 @@ open Pulse.Lib.Pervasives
 module A = Pulse.Lib.Array
 module CB = CLRS.Ch06.Heap.CostBound
 module Classical = FStar.Classical
+module HC = CLRS.Ch06.Heap.Complexity
 module MR = Pulse.Lib.MonotonicGhostRef
 module O = FStar.Order
 module R = Pulse.Lib.Reference
@@ -529,6 +530,14 @@ let heapsort_final_cost_bound (n:pos) (heap_sz:nat) (cf c0:nat)
       cf - c0 <= CB.heapsort_cost_bound n)
   = assert (n - heap_sz == n - 1)
 
+let heapsort_cost_bound_explicit (n:nat)
+  : Lemma (CB.heapsort_cost_bound n ==
+      (if n = 0 then 0
+       else (n / 2) * (2 * HC.log2_floor n) +
+            (n - 1) * (2 * HC.log2_floor n)))
+  = if n = 0 then ()
+    else CB.max_heapify_bound_root n
+
 #push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn rec max_heapify (#a: eqtype)
   (arr: A.array a) (idx: nat) (heap_size: nat) (start: Ghost.erased nat)
@@ -831,7 +840,11 @@ ensures exists* s' ticks.
   MR.pts_to ctr #1.0R ticks **
   pure (SC.sorted #a #ord s' /\
         SC.permutation s0 s' /\
-        ticks <= reveal i + CB.heapsort_cost_bound (Seq.length s0))
+        ticks <= reveal i +
+          (let n = Seq.length s0 in
+           if n = 0 then 0
+           else (n / 2) * (2 * HC.log2_floor n) +
+                (n - 1) * (2 * HC.log2_floor n)))
 {
   A.pts_to_len arr;
   heapsort arr (SZ.v len) ctr #ord iord #s0 #i;
@@ -840,6 +853,11 @@ ensures exists* s' ticks.
   permutation_same_length s0 s;
   sorted_upto_implies_sc_sorted ord s;
   sc_permutation_of_sp_permutation s0 s;
-  assert (pure (cf <= reveal i + CB.heapsort_cost_bound (Seq.length s0)));
+  heapsort_cost_bound_explicit (Seq.length s0);
+  assert (pure (cf <= reveal i +
+    (let n = Seq.length s0 in
+     if n = 0 then 0
+     else (n / 2) * (2 * HC.log2_floor n) +
+          (n - 1) * (2 * HC.log2_floor n))));
   ()
 }

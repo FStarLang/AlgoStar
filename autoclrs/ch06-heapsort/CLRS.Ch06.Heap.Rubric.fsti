@@ -4,7 +4,7 @@ module CLRS.Ch06.Heap.Rubric
 open Pulse.Lib.Pervasives
 
 module A = Pulse.Lib.Array
-module CB = CLRS.Ch06.Heap.CostBound
+module HC = CLRS.Ch06.Heap.Complexity
 module MR = Pulse.Lib.MonotonicGhostRef
 module SC = CLRS.Common.Complexity.Sorting.Class
 module Seq = FStar.Seq
@@ -25,4 +25,8 @@ ensures exists* s' ticks.
   MR.pts_to ctr #1.0R ticks **
   pure (SC.sorted #a #ord s' /\
         SC.permutation s0 s' /\
-        ticks <= reveal i + CB.heapsort_cost_bound (Seq.length s0))
+        ticks <= reveal i +
+          (let n = Seq.length s0 in
+           if n = 0 then 0
+           else (n / 2) * (2 * HC.log2_floor n) +
+                (n - 1) * (2 * HC.log2_floor n)))
