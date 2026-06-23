@@ -14,7 +14,6 @@ open Pulse.Lib.Pervasives
 module A = Pulse.Lib.Array
 module CB = CLRS.Ch06.Heap.CostBound
 module Classical = FStar.Classical
-module C = Pulse.Lib.Core
 module MR = Pulse.Lib.MonotonicGhostRef
 module O = FStar.Order
 module R = Pulse.Lib.Reference
@@ -530,15 +529,6 @@ let heapsort_final_cost_bound (n:pos) (heap_sz:nat) (cf c0:nat)
       cf - c0 <= CB.heapsort_cost_bound n)
   = assert (n - heap_sz == n - 1)
 
-ghost
-fn set_ticks (ctr: SC.ticks_t) (#cur: erased nat) (target: nat)
-  requires MR.pts_to ctr #1.0R cur
-  requires pure (reveal cur <= target)
-  ensures MR.pts_to ctr #1.0R target
-{
-  MR.update ctr target
-}
-
 #push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn rec max_heapify (#a: eqtype)
   (arr: A.array a) (idx: nat) (heap_size: nat) (start: Ghost.erased nat)
@@ -835,11 +825,13 @@ fn heapsort_sort (#a: eqtype)
   (iord: SC.instrumented_total_order a ord ctr)
   (#s0: erased (Seq.seq a))
   (#i: erased nat)
-requires (arr |-> s0 ** pure (A.length arr == SZ.v len)) **
-  MR.pts_to ctr #1.0R i
-ensures (C.op_exists_Star (fun (s': Seq.seq a) ->
-  arr |-> s' ** pure (SC.sorted #a #ord s' /\ SC.permutation s0 s'))) **
-  MR.pts_to ctr #1.0R (reveal i + CB.heapsort_cost_bound (Seq.length s0))
+requires arr |-> s0 ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
+ensures exists* s' ticks.
+  arr |-> s' **
+  MR.pts_to ctr #1.0R ticks **
+  pure (SC.sorted #a #ord s' /\
+        SC.permutation s0 s' /\
+        ticks <= reveal i + CB.heapsort_cost_bound (Seq.length s0))
 {
   A.pts_to_len arr;
   heapsort arr (SZ.v len) ctr #ord iord #s0 #i;
@@ -848,8 +840,6 @@ ensures (C.op_exists_Star (fun (s': Seq.seq a) ->
   permutation_same_length s0 s;
   sorted_upto_implies_sc_sorted ord s;
   sc_permutation_of_sp_permutation s0 s;
-  C.intro_pure (SC.sorted #a #ord s /\ SC.permutation s0 s) ();
-  C.intro_exists (fun (s': Seq.seq a) ->
-    arr |-> s' ** pure (SC.sorted #a #ord s' /\ SC.permutation s0 s')) s;
-  set_ticks ctr #cf (reveal i + CB.heapsort_cost_bound (Seq.length s0))
+  assert (pure (cf <= reveal i + CB.heapsort_cost_bound (Seq.length s0)));
+  ()
 }
