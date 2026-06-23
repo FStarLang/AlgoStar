@@ -3,7 +3,7 @@
 
    This module is separate from the extraction-facing int implementation.  It is
    a generic top-down merge sort whose only element comparisons go through the
-   shared instrumented comparator, and whose final tick count is padded to the
+   shared instrumented comparator, and whose final tick count is bounded by the
    ch02 merge-sort recurrence budget.
 *)
 module CLRS.Ch02.MergeSort.Rubric
@@ -79,15 +79,6 @@ let is_sorted_to_sc (#a: Type) {| ord: TO.total_order a |} (s: Seq.seq a)
   : Lemma (requires sorted s)
           (ensures SC.sorted #a #ord s)
   = ()
-
-ghost
-fn set_ticks (ctr: SC.ticks_t) (#cur: erased nat) (target: nat)
-  requires MR.pts_to ctr #1.0R cur
-  requires pure (reveal cur <= target)
-  ensures MR.pts_to ctr #1.0R target
-{
-  MR.update ctr target
-}
 
 let rec seq_merge (#a: Type) {| ord: TO.total_order a |} (s1 s2: Seq.seq a)
   : Tot (Seq.seq a) (decreases (Seq.length s1 + Seq.length s2))
@@ -704,8 +695,13 @@ fn merge_sort_sort (#a: Type0)
   (#i: erased nat)
   norewrite
 requires arr |-> s0 ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
-ensures exists* s'. arr |-> s' ** pure (SC.sorted #a #ord s' /\ SC.permutation s0 s') **
-  MR.pts_to ctr #1.0R (reveal i + merge_sort_comparisons (Seq.length s0))
+ensures exists* s' (ticks: nat).
+  arr |-> s' **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    SC.sorted #a #ord s' /\
+    SC.permutation s0 s' /\
+    ticks <= reveal i + merge_sort_comparisons (Seq.length s0))
 {
   A.pts_to_len arr;
   assert (pure (A.length arr == Seq.length s0));
@@ -718,8 +714,12 @@ ensures exists* s'. arr |-> s' ** pure (SC.sorted #a #ord s' /\ SC.permutation s
   pts_to_range_elim arr 1.0R s;
   is_sorted_to_sc #a #(reveal ord) s;
   is_permutation_to_sc #a #(reveal ord) s0 s;
+  assert (pure (range_len 0sz len == SZ.v len));
   assert (pure (merge_sort_comparisons (SZ.v len) == merge_sort_comparisons (Seq.length s0)));
-  set_ticks ctr #cf (reveal i + merge_sort_comparisons (Seq.length s0));
+  assert (pure (
+    SC.sorted #a #ord s /\
+    SC.permutation s0 s /\
+    cf <= reveal i + merge_sort_comparisons (Seq.length s0)));
 }
 
 instance merge_sort_array_sort (a: Type0) : SC.array_sort a merge_sort_comparisons =

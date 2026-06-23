@@ -195,15 +195,6 @@ let insertion_sort_comparisons_step (vj: nat)
           (ensures insertion_sort_comparisons vj + vj == insertion_sort_comparisons (vj + 1))
   = CLRS.Ch02.InsertionSort.Lemmas.lemma_triangle_step vj
 
-ghost
-fn set_ticks (ctr: SC.ticks_t) (#cur: erased nat) (target: nat)
-  requires MR.pts_to ctr #1.0R cur
-  requires pure (reveal cur <= target)
-  ensures MR.pts_to ctr #1.0R target
-{
-  MR.update ctr target
-}
-
 fn insertion_sort_core (#a: Type0)
   (arr: A.array a)
   (len: SZ.t)
@@ -358,15 +349,23 @@ fn insertion_sort_sort (#a: Type0)
   (#i: erased nat)
   norewrite
 requires arr |-> s0 ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
-ensures exists* s'. arr |-> s' ** pure (SC.sorted #a #ord s' /\ SC.permutation s0 s') **
- MR.pts_to ctr #1.0R (reveal i + insertion_sort_comparisons (Seq.length s0))
+ensures exists* s' (ticks: nat).
+  arr |-> s' **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    SC.sorted #a #ord s' /\
+    SC.permutation s0 s' /\
+    ticks <= reveal i + insertion_sort_comparisons (Seq.length s0))
 {
   A.pts_to_len arr;
   insertion_sort_core arr len ctr #ord iord #s0 #i;
   with s cf. assert (arr |-> s ** MR.pts_to ctr #1.0R cf);
   is_sorted_to_sc #a #(reveal ord) s;
   is_permutation_to_sc #a #(reveal ord) s0 s;
-  set_ticks ctr #cf (reveal i + insertion_sort_comparisons (Seq.length s0));
+  assert (pure (
+    SC.sorted #a #ord s /\
+    SC.permutation s0 s /\
+    cf <= reveal i + insertion_sort_comparisons (Seq.length s0)));
 }
 
 instance insertion_sort_array_sort (a: Type0) : SC.array_sort a insertion_sort_comparisons =
