@@ -353,15 +353,6 @@ fn partition_wrapper_with_ticks (#a: eqtype)
   p
 }
 
-ghost
-fn set_ticks (ctr: SC.ticks_t) (#cur: erased nat) (target: nat)
-  requires MR.pts_to ctr #1.0R cur
-  requires pure (reveal cur <= target)
-  ensures MR.pts_to ctr #1.0R target
-{
-  MR.update ctr target
-}
-
 fn rec quicksort_core (#a: eqtype)
   (arr: A.array a)
   (lo: nat)
@@ -433,10 +424,13 @@ fn quicksort_sort (#a: eqtype)
   (iord: SC.instrumented_total_order a ord ctr)
   (#s: erased (Seq.seq a))
   (#i: erased nat)
-  norewrite
-  requires ((arr |-> s ** pure (A.length arr == SZ.v len)) ** MR.pts_to ctr #1.0R i)
-  ensures ((exists* s'. (arr |-> s' ** pure (SC.sorted #a #ord s' /\ SC.permutation s s'))) **
-           MR.pts_to ctr #1.0R (reveal i + QC.worst_case_comparisons (Seq.length s)))
+  requires arr |-> s ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
+  ensures exists* s' ticks.
+    arr |-> s' **
+    MR.pts_to ctr #1.0R ticks **
+    pure (SC.sorted #a #ord s' /\
+          SC.permutation s s' /\
+          ticks <= reveal i + QC.worst_case_comparisons (Seq.length s))
 {
   A.pts_to_len arr;
   A.pts_to_range_intro arr 1.0R s;
@@ -444,12 +438,10 @@ fn quicksort_sort (#a: eqtype)
   with s_out. assert (A.pts_to_range arr 0 (A.length arr) s_out);
   with cf. assert (MR.pts_to ctr #1.0R cf);
   sc_permutation_of_sp_permutation s s_out;
-  set_ticks ctr #cf (reveal i + QC.worst_case_comparisons (Seq.length s));
+  assert (pure (cf <= reveal i + QC.worst_case_comparisons (Seq.length s)));
   A.pts_to_range_elim arr 1.0R s_out
 }
 
-instance quicksort_array_sort (a: eqtype) : SC.array_sort a QC.worst_case_comparisons =
-  Pulse.Lib.Core.slprop_equivs ();
-  {
-    sort = quicksort_sort #a;
-  }
+instance quicksort_array_sort (a: eqtype) : SC.array_sort a QC.worst_case_comparisons = {
+  sort = quicksort_sort #a;
+}
