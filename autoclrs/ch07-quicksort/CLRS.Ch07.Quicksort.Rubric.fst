@@ -430,7 +430,7 @@ fn quicksort_sort (#a: eqtype)
     MR.pts_to ctr #1.0R ticks **
     pure (SC.sorted #a #ord s' /\
           SC.permutation s s' /\
-          ticks <= reveal i + QC.worst_case_comparisons (Seq.length s))
+          ticks <= reveal i + Seq.length s * (Seq.length s - 1) / 2)
 {
   A.pts_to_len arr;
   A.pts_to_range_intro arr 1.0R s;
@@ -438,10 +438,12 @@ fn quicksort_sort (#a: eqtype)
   with s_out. assert (A.pts_to_range arr 0 (A.length arr) s_out);
   with cf. assert (MR.pts_to ctr #1.0R cf);
   sc_permutation_of_sp_permutation s s_out;
-  assert (pure (cf <= reveal i + QC.worst_case_comparisons (Seq.length s)));
+  QC.worst_case_bound (Seq.length s);
+  assert (pure (QC.worst_case_comparisons (Seq.length s) <= Seq.length s * (Seq.length s - 1) / 2));
+  assert (pure (cf <= reveal i + Seq.length s * (Seq.length s - 1) / 2));
   A.pts_to_range_elim arr 1.0R s_out
 }
 
-instance quicksort_array_sort (a: eqtype) : SC.array_sort a QC.worst_case_comparisons = {
+instance quicksort_array_sort (a: eqtype) : SC.array_sort a (fun n -> n * (n - 1) / 2) = {
   sort = quicksort_sort #a;
 }
