@@ -18,7 +18,7 @@ let rec merge_sort_ops (n: pos) : Tot nat (decreases n)
     else 2 * merge_sort_ops (ceil_div2 n) + n
 
 /// The closed-form upper bound: 4n⌈log₂ n⌉ + 4n
-val merge_sort_bound (n: pos) : nat
+val merge_sort_bound (n: pos) : b:nat{b == 4 * n * log2_ceil n + 4 * n}
 
 /// Final theorem: merge sort is O(n log n)
 val merge_sort_is_n_log_n (n: pos)

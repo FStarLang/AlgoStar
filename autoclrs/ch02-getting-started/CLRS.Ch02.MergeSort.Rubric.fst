@@ -4,7 +4,7 @@
    This module is separate from the extraction-facing int implementation.  It is
    a generic top-down merge sort whose only element comparisons go through the
    shared instrumented comparator, and whose final tick count is bounded by the
-   ch02 merge-sort recurrence budget.
+   ch02 merge-sort closed-form budget.
 *)
 module CLRS.Ch02.MergeSort.Rubric
 #lang-pulse
@@ -367,6 +367,13 @@ let merge_sort_comparisons_nonnegative (n: nat)
   : Lemma (ensures 0 <= merge_sort_comparisons n)
   = ()
 
+let merge_sort_comparisons_closed_bound (n: nat)
+  : Lemma (ensures
+      merge_sort_comparisons n <=
+        (if n > 0 then 4 * n * MS.log2_ceil n + 4 * n else 0))
+  = if n = 0 then ()
+    else MS.merge_sort_is_n_log_n n
+
 fn copy_range (#a: Type0)
   (src dst: A.array a)
   (src_lo dst_lo len: SZ.t)
@@ -701,7 +708,10 @@ ensures exists* s' (ticks: nat).
   pure (
     SC.sorted #a #ord s' /\
     SC.permutation s0 s' /\
-    ticks <= reveal i + merge_sort_comparisons (Seq.length s0))
+    ticks <= reveal i +
+      (if Seq.length s0 > 0 then
+         4 * Seq.length s0 * MS.log2_ceil (Seq.length s0) + 4 * Seq.length s0
+       else 0))
 {
   A.pts_to_len arr;
   assert (pure (A.length arr == Seq.length s0));
@@ -716,13 +726,18 @@ ensures exists* s' (ticks: nat).
   is_permutation_to_sc #a #(reveal ord) s0 s;
   assert (pure (range_len 0sz len == SZ.v len));
   assert (pure (merge_sort_comparisons (SZ.v len) == merge_sort_comparisons (Seq.length s0)));
+  merge_sort_comparisons_closed_bound (Seq.length s0);
   assert (pure (
     SC.sorted #a #ord s /\
     SC.permutation s0 s /\
-    cf <= reveal i + merge_sort_comparisons (Seq.length s0)));
+    cf <= reveal i +
+      (if Seq.length s0 > 0 then
+         4 * Seq.length s0 * MS.log2_ceil (Seq.length s0) + 4 * Seq.length s0
+       else 0)));
 }
 
-instance merge_sort_array_sort (a: Type0) : SC.array_sort a (fun n -> if n = 0 then 0 else MS.merge_sort_ops n) =
+instance merge_sort_array_sort (a: Type0) : SC.array_sort a (fun n ->
+  if n > 0 then 4 * n * MS.log2_ceil n + 4 * n else 0) =
   Pulse.Lib.Core.slprop_equivs ();
   {
     sort = merge_sort_sort #a
