@@ -722,7 +722,7 @@ ensures exists* s' (ticks: nat).
     cf <= reveal i + merge_sort_comparisons (Seq.length s0)));
 }
 
-instance merge_sort_array_sort (a: Type0) : SC.array_sort a merge_sort_comparisons =
+instance merge_sort_array_sort (a: Type0) : SC.array_sort a (fun n -> if n = 0 then 0 else MS.merge_sort_ops n) =
   Pulse.Lib.Core.slprop_equivs ();
   {
     sort = merge_sort_sort #a

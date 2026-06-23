@@ -368,7 +368,7 @@ ensures exists* s' (ticks: nat).
     cf <= reveal i + insertion_sort_comparisons (Seq.length s0)));
 }
 
-instance insertion_sort_array_sort (a: Type0) : SC.array_sort a insertion_sort_comparisons =
+instance insertion_sort_array_sort (a: Type0) : SC.array_sort a (fun n -> n * (n - 1) / 2) =
   Pulse.Lib.Core.slprop_equivs ();
   {
     sort = insertion_sort_sort #a
