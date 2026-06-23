@@ -30,7 +30,7 @@ NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 FSTAR_BIN_DIR="$SCRIPT_DIR/fstar"
 
 # Pinned F* release version (update when a new release is validated)
-FSTAR_RELEASE_VERSION="nightly-2026-04-29"
+FSTAR_RELEASE_VERSION="v2026.06.21"
 
 red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
 green() { printf '\033[1;32m%s\033[0m\n' "$*"; }

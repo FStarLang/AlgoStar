@@ -123,10 +123,22 @@ let kruskal_witness_spanning_tree ()
     Classical.forall_intro (Classical.move_requires not_reachable);
     assert (~(reachable [e12] 0 1));
     assert (~(mem_edge e01 [e12]));
+    assert (e01.u == 0 /\ e01.v == 1);
+    assert (~(reachable [e12] e01.u e01.v));
     assert (e01.u < 3 /\ e01.v < 3);
+    assert (acyclic 3 [e12]);
     acyclic_when_unreachable 3 [e12] e01
 
 #pop-options
+
+let test_graph_edges_mem (e: edge)
+  : Lemma
+    (ensures
+      mem_edge e (adj_array_to_graph test_adj 3).edges =
+      mem_edge e [{u=0;v=1;w=1}; {u=0;v=2;w=3}; {u=1;v=2;w=2}])
+  = assert_norm (
+      mem_edge e (adj_array_to_graph test_adj 3).edges =
+      mem_edge e [{u=0;v=1;w=1}; {u=0;v=2;w=3}; {u=1;v=2;w=2}])
 
 #push-options "--fuel 10 --ifuel 10 --z3rlimit 800 --split_queries always --ext no:optimize_let_vc"
 /// From is_mst of the concrete graph, derive the unique MST edges.
@@ -137,10 +149,10 @@ let kruskal_mst_edges (es: list edge)
     (ensures mem_edge {u=0;v=1;w=1} es /\ mem_edge {u=1;v=2;w=2} es /\
              total_weight es == 3)
   = kruskal_witness_spanning_tree ();
-    assert_norm ((adj_array_to_graph test_adj 3).edges ==
-      [{u=0;v=1;w=1}; {u=0;v=2;w=3}; {u=1;v=2;w=2}]);
     match es with
     | [hd; hd2] ->
+      test_graph_edges_mem hd;
+      test_graph_edges_mem hd2;
       // Eliminate the duplicate-(0,1) case via reachability
       (match edge_eq hd {u=0;v=1;w=1}, edge_eq hd2 {u=0;v=1;w=1} with
        | true, true ->

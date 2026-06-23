@@ -90,8 +90,22 @@ open FStar.SizeT
 module SZ = FStar.SizeT
 open CLRS.Ch23.Prim.Impl
 open CLRS.Ch23.Prim.Defs
+module Greedy = CLRS.Ch23.Prim.Greedy
 
 let tw : Seq.seq SZ.t = Seq.seq_of_list [0sz; 1sz; 3sz; 1sz; 0sz; 2sz; 3sz; 2sz; 0sz]
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
+let tw_symmetric () : Lemma (symmetric_weights tw 3)
+  = assert_norm (Seq.length tw == 9);
+    assert_norm (Seq.equal tw (Seq.seq_of_list [0sz; 1sz; 3sz; 1sz; 0sz; 2sz; 3sz; 2sz; 0sz]))
+
+let weights_to_adj_wf_tw (ws: Seq.seq SZ.t)
+  : Lemma (requires Seq.length ws == 9 /\ ws == tw)
+          (ensures well_formed_adj (weights_to_adj_matrix ws 3) 3)
+  = tw_symmetric ();
+    assert (symmetric_weights ws 3);
+    Greedy.weights_to_adj_well_formed ws 3
+#pop-options
 
 // Direct case analysis: given key = tw[parent*3+v] with parent<3,
 // enumerate all possibilities
@@ -212,7 +226,7 @@ let mst_edge_facts (ps ks ws: Seq.seq SZ.t)
     mem_edge_subset e2 (edges_from_parent_key ps ks 3 0 0) g.edges;
     CLRS.Ch23.Prim.Spec.adj_to_graph_edges_valid adj 3 e1;
     CLRS.Ch23.Prim.Spec.adj_to_graph_edges_valid adj 3 e2;
-    CLRS.Ch23.Prim.Spec.well_formed_adj_intro adj 3;
+    weights_to_adj_wf_tw ws;
     CLRS.Ch23.Prim.Spec.adj_to_graph_edge_weight adj 3 e1;
     CLRS.Ch23.Prim.Spec.adj_to_graph_edge_weight adj 3 e2;
     assert_norm (SZ.v (Seq.index tw 0) < SZ.v CLRS.Ch23.Prim.Defs.infinity);

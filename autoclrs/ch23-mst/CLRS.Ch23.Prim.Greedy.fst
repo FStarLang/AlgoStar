@@ -288,6 +288,66 @@ let graph_edge_weight_eq
     weights_to_adj_preserves ws n e.u e.v
 #pop-options
 
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10 --split_queries always"
+let graph_edge_weight_bounds
+    (ws: Seq.seq SZ.t) (n: nat) (e: edge)
+  : Lemma
+    (requires n > 0 /\ Seq.length ws == n * n /\
+              valid_weights ws n /\ symmetric_weights ws n /\ no_zero_edges ws n /\
+              mem_edge e (PrimSpec.adj_to_graph (weights_to_adj_matrix ws n) n).edges /\
+              e.u < n /\ e.v < n /\ e.u <> e.v)
+    (ensures (
+      let w = SZ.v (Seq.index ws (e.u * n + e.v)) in
+      e.u * n + e.v < n * n /\
+      w > 0 /\ w < SZ.v infinity /\
+      e.w = w))
+  = graph_edge_weight_eq ws n e;
+    lemma_index_bound e.u e.v n;
+    let w = SZ.v (Seq.index ws (e.u * n + e.v)) in
+    assert (KeyInv.swt ws n e.u e.v = w);
+    if w = 0 then assert (e.u = e.v);
+    assert (w > 0 /\ w < SZ.v infinity)
+#pop-options
+
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10 --split_queries always"
+let crossing_edge_at_least_min_key
+    (ks ims ws: Seq.seq SZ.t) (n min_u: nat) (e: edge)
+  : Lemma
+    (requires
+      n > 0 /\ min_u < n /\
+      Seq.length ks == n /\ Seq.length ims == n /\ Seq.length ws == n * n /\
+      valid_weights ws n /\ symmetric_weights ws n /\ no_zero_edges ws n /\
+      KeyInv.key_inv ks ims ws n /\
+      mem_edge e (PrimSpec.adj_to_graph (weights_to_adj_matrix ws n) n).edges /\
+      crosses_cut e (fun v -> v < n && SZ.v (Seq.index ims v) = 1) /\
+      (forall (v:nat). v < n /\ SZ.v (Seq.index ims v) <> 1 ==>
+        SZ.v (Seq.index ks min_u) <= SZ.v (Seq.index ks v)))
+    (ensures SZ.v (Seq.index ks min_u) <= e.w)
+  = let adj = weights_to_adj_matrix ws n in
+    let s : cut = fun v -> v < n && SZ.v (Seq.index ims v) = 1 in
+    PrimSpec.adj_to_graph_edges_valid adj n e;
+    graph_edge_weight_bounds ws n e;
+    KeyInv.key_inv_bare ks ims ws n;
+    if s e.u then begin
+      assert (s e.u = true);
+      assert (s e.v = false);
+      assert (SZ.v (Seq.index ims e.u) = 1);
+      assert (SZ.v (Seq.index ims e.v) <> 1);
+      assert (SZ.v (Seq.index ks min_u) <= SZ.v (Seq.index ks e.v));
+      assert (SZ.v (Seq.index ks e.v) <= SZ.v (Seq.index ws (e.u * n + e.v)))
+    end else begin
+      assert (s e.u = false);
+      assert (s e.v = true);
+      assert (SZ.v (Seq.index ims e.u) <> 1);
+      assert (SZ.v (Seq.index ims e.v) = 1);
+      assert (SZ.v (Seq.index ks min_u) <= SZ.v (Seq.index ks e.u));
+      lemma_index_bound e.v e.u n;
+      assert (SZ.v (Seq.index ws (e.v * n + e.u)) = SZ.v (Seq.index ws (e.u * n + e.v)));
+      assert (SZ.v (Seq.index ks e.u) <= SZ.v (Seq.index ws (e.v * n + e.u)));
+      assert (SZ.v (Seq.index ks e.u) <= e.w)
+    end
+#pop-options
+
 (*** Greedy Safety Predicate ***)
 
 /// Opaque greedy safety: there exists an MST T containing all current edges.
@@ -456,28 +516,10 @@ let prim_cut_step
     FStar.Classical.forall_intro (FStar.Classical.move_requires mem_proof);
     respects_proof old_es;
     // is_light_edge: use key_inv + extract-min
-    KeyInv.key_inv_bare ks ims ws n;
     let light_proof (e': edge) : Lemma
       (requires mem_edge e' g.edges /\ crosses_cut e' s)
       (ensures new_edge.w <= e'.w)
-      = PrimSpec.adj_to_graph_edges_valid adj n e';
-        graph_edge_weight_eq ws n e';
-        lemma_index_bound (e'.u) (e'.v) n;
-        lemma_index_bound (e'.v) (e'.u) n;
-        // e'.w = swt = SZ.v (Seq.index ws (e'.u * n + e'.v))
-        // no_zero_edges + e'.u <> e'.v → weight > 0
-        // valid_weights → weight < infinity
-        // symmetric → weights[v*n+u] = weights[u*n+v]
-        if s e'.u then begin
-          // e'.u in MST, e'.v not: key_inv gives key[e'.v] <= weights[e'.u*n+e'.v]
-          // extract-min: key[u] <= key[e'.v]
-          ()
-        end else begin
-          // e'.v in MST, e'.u not: key_inv gives key[e'.u] <= weights[e'.v*n+e'.u]
-          // symmetric: weights[e'.v*n+e'.u] = weights[e'.u*n+e'.v] = e'.w
-          // extract-min: key[u] <= key[e'.u] <= e'.w
-          ()
-        end
+      = crossing_edge_at_least_min_key ks ims ws n u e'
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires light_proof);
     // valid edges

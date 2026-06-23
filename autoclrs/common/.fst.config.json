@@ -1,9 +1,7 @@
 {
+    "fstar_exe" : "../../fstar/bin/fstar.exe",
     "include_dirs": [
-        "${PULSE_HOME}/lib/pulse",
-        "."
     ],
     "options": [
-        "--ext", "fly_deps"
     ]
 }
