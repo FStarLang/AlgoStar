@@ -17,7 +17,7 @@ WORKDIR="$(cd "$(dirname "$0")" && pwd)"
 
 # All chapters with review.md files
 ALL_CHAPTERS=(
-  ch02 ch04 ch06 ch07 ch08 ch09 ch10 ch11 ch12 ch13
+  ch04 ch06 ch07 ch08 ch09 ch10 ch11 ch12 ch13
   ch15 ch16 ch21 ch22 ch24 ch25 ch26 ch31 ch32 ch33 ch35
 )
 
@@ -73,7 +73,7 @@ for i in "${!CHAPTERS[@]}"; do
 
   # Source .bashrc for interactive-shell setup (PATH, dotnet, etc.),
   # then add project-local FStar/bin to PATH.
-  cmd="source ~/.bashrc 2>/dev/null; export PATH=\"${WORKDIR}/FStar/bin:\${PATH}\"; cd ${WORKDIR} && copilot --allow-all --alt-screen --autopilot -i \"${short_prompt}\""
+  cmd="source ~/.bashrc 2>/dev/null; source ~/.bash_profile 2>/dev/null; export PATH=\"${WORKDIR}/FStar/bin:\${PATH}\"; cd ${WORKDIR} && copilot --allow-all --agent proof-copilot:fstar-coder --autopilot -i \"${short_prompt}\""
 
   if $DRY_RUN; then
     echo "[DRY-RUN] Wrote ${prompt_path}"

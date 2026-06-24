@@ -12,6 +12,9 @@ module Seq = FStar.Seq
 
 let test_adj : Seq.seq int = Seq.seq_of_list [0; 1; 3; 1; 0; 2; 3; 2; 0]
 
+let test_graph_edges : list edge =
+  [{u=0;v=1;w=1}; {u=0;v=2;w=3}; {u=1;v=2;w=2}]
+
 #push-options "--fuel 10 --ifuel 10 --z3rlimit 300 "
 
 let test_symmetric () : Lemma (symmetric_adj test_adj 3) =
@@ -131,14 +134,79 @@ let kruskal_witness_spanning_tree ()
 
 #pop-options
 
+let test_graph_edge_at_mem (u v: nat)
+  : Lemma
+    (requires u < 3 /\ v < 3 /\ u < v /\ adj_weight test_adj 3 u v > 0)
+    (ensures mem_edge {u=u; v=v; w=adj_weight test_adj 3 u v} test_graph_edges)
+  = assert_norm (Seq.length test_adj == 9);
+    let cur : edge = {u=u; v=v; w=adj_weight test_adj 3 u v} in
+    if u = 0 then begin
+      if v = 1 then begin
+        let e01 : edge = {u=0; v=1; w=1} in
+        assert_norm (adj_weight test_adj 3 0 1 == 1);
+        assert_norm (mem_edge e01 test_graph_edges == true);
+        mem_edge_eq e01 cur test_graph_edges
+      end else if v = 2 then begin
+        let e02 : edge = {u=0; v=2; w=3} in
+        assert_norm (adj_weight test_adj 3 0 2 == 3);
+        assert_norm (mem_edge e02 test_graph_edges == true);
+        mem_edge_eq e02 cur test_graph_edges
+      end
+      else
+        assert false
+    end else if u = 1 then begin
+      if v = 2 then begin
+        let e12 : edge = {u=1; v=2; w=2} in
+        assert_norm (adj_weight test_adj 3 1 2 == 2);
+        assert_norm (mem_edge e12 test_graph_edges == true);
+        mem_edge_eq e12 cur test_graph_edges
+      end
+      else
+        assert false
+    end else
+      assert false
+
+let rec test_row_edges_mem (u v: nat) (e: edge)
+  : Lemma
+    (requires u < 3 /\ v <= 3 /\ mem_edge e (adj_row_edges test_adj 3 u v))
+    (ensures mem_edge e test_graph_edges)
+    (decreases (3 - v))
+  = if v >= 3 then ()
+    else begin
+      assert_norm (Seq.length test_adj == 9);
+      let w = Seq.index test_adj (u * 3 + v) in
+      let hd : edge = {u=u; v=v; w=w} in
+      if w > 0 && u < v then begin
+        if edge_eq e hd then begin
+          test_graph_edge_at_mem u v;
+          edge_eq_symmetric e hd;
+          mem_edge_eq hd e test_graph_edges
+        end else
+          test_row_edges_mem u (v + 1) e
+      end else
+        test_row_edges_mem u (v + 1) e
+    end
+
+let rec test_all_edges_mem (u: nat) (e: edge)
+  : Lemma
+    (requires u <= 3 /\ mem_edge e (adj_all_edges test_adj 3 u))
+    (ensures mem_edge e test_graph_edges)
+    (decreases (3 - u))
+  = if u >= 3 then ()
+    else begin
+      mem_edge_append e (adj_row_edges test_adj 3 u 0) (adj_all_edges test_adj 3 (u + 1));
+      if mem_edge e (adj_row_edges test_adj 3 u 0) then
+        test_row_edges_mem u 0 e
+      else
+        test_all_edges_mem (u + 1) e
+    end
+
 let test_graph_edges_mem (e: edge)
   : Lemma
-    (ensures
-      mem_edge e (adj_array_to_graph test_adj 3).edges =
-      mem_edge e [{u=0;v=1;w=1}; {u=0;v=2;w=3}; {u=1;v=2;w=2}])
-  = assert_norm (
-      mem_edge e (adj_array_to_graph test_adj 3).edges =
-      mem_edge e [{u=0;v=1;w=1}; {u=0;v=2;w=3}; {u=1;v=2;w=2}])
+    (requires mem_edge e (adj_array_to_graph test_adj 3).edges)
+    (ensures mem_edge e test_graph_edges)
+  = assert_norm (Seq.length test_adj == 9);
+    test_all_edges_mem 0 e
 
 #push-options "--fuel 10 --ifuel 10 --z3rlimit 800 --split_queries always --ext no:optimize_let_vc"
 /// From is_mst of the concrete graph, derive the unique MST edges.
@@ -151,6 +219,8 @@ let kruskal_mst_edges (es: list edge)
   = kruskal_witness_spanning_tree ();
     match es with
     | [hd; hd2] ->
+      assert (mem_edge hd (adj_array_to_graph test_adj 3).edges);
+      assert (mem_edge hd2 (adj_array_to_graph test_adj 3).edges);
       test_graph_edges_mem hd;
       test_graph_edges_mem hd2;
       // Eliminate the duplicate-(0,1) case via reachability
