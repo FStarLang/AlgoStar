@@ -10,6 +10,7 @@ module CLRS.Ch07.Quicksort.Rubric
 #lang-pulse
 
 open Pulse.Lib.Pervasives
+open Pulse.Lib.TotalOrder
 
 module A = Pulse.Lib.Array
 module MR = Pulse.Lib.MonotonicGhostRef
@@ -55,32 +56,83 @@ let partition_pred (#a: Type) (ord: TO.total_order a)
       (lo <= kk /\ kk < i_plus_1 ==> le_ord ord (Seq.index s k) pivot) /\
       (i_plus_1 <= kk /\ kk < j ==> gt_ord ord (Seq.index s k) pivot))
 
-let rec sc_count_eq_sp_count (#a: eqtype) (x: a) (s: Seq.seq a)
-  : Lemma (ensures SC.count x s == SP.count x s)
-          (decreases (Seq.length s))
-  = if Seq.length s = 0 then ()
-    else sc_count_eq_sp_count x (Seq.tail s)
+let rec count (#a: Type) {| TO.total_order a |} (x: a) (s: Seq.seq a)
+  : Tot nat (decreases Seq.length s)
+  = if Seq.length s = 0 then 0
+    else if Seq.head s ==? x
+    then 1 + count x (Seq.tail s)
+    else count x (Seq.tail s)
 
-let sc_permutation_of_sp_permutation (#a: eqtype) (s0 s1: Seq.seq a)
+let permutation (#a: Type) {| TO.total_order a |} (s0 s1: Seq.seq a) =
+  forall (x: a). count x s0 == count x s1
+
+let mem (#a: Type) {| TO.total_order a |} (x: a) (s: Seq.seq a) =
+  count x s > 0
+
+let rec index_mem (#a: Type) {| TO.total_order a |} (x: a) (s: Seq.seq a)
+  : Pure nat
+      (requires mem x s)
+      (ensures fun i -> i < Seq.length s /\ Seq.index s i == x)
+      (decreases (Seq.length s))
+  = if Seq.head s ==? x then 0 else 1 + index_mem x (Seq.tail s)
+
+let rec seq_mem_k (#a: Type) {| TO.total_order a |} (s: Seq.seq a) (k: nat{k < Seq.length s})
+  : Lemma (ensures mem (Seq.index s k) s)
+          (decreases (Seq.length s))
+  = if k = 0 then () else seq_mem_k (Seq.tail s) (k - 1)
+
+let rec count_eq (#a: Type) {| ord: TO.total_order a |} (x: a) (s: Seq.seq a)
+  : Lemma (ensures count x s == SC.count x s)
+          (decreases Seq.length s)
+  = if Seq.length s = 0 then ()
+    else (
+      assert (Seq.head s ==? x <==> Seq.head s == x);
+      count_eq x (Seq.tail s)
+    )
+
+let is_permutation_to_sc (#a: Type) {| ord: TO.total_order a |} (s0 s1: Seq.seq a)
   : Lemma
-    (requires SP.permutation a s0 s1)
+    (requires permutation s0 s1)
     (ensures SC.permutation s0 s1)
   = let aux (x: a)
       : Lemma (SC.count x s0 == SC.count x s1)
-      = sc_count_eq_sp_count x s0;
-        sc_count_eq_sp_count x s1
+      = count_eq x s0;
+        count_eq x s1
     in
     FStar.Classical.forall_intro aux
 
-let sp_permutation_refl (#a: eqtype) (s: Seq.seq a)
-  : Lemma (ensures SP.permutation a s s)
+let permutation_refl (#a: Type) {| ord: TO.total_order a |} (s: Seq.seq a)
+  : Lemma (ensures permutation s s)
   = ()
 
-let sp_permutation_trans (#a: eqtype) (s0 s1 s2: Seq.seq a)
+let permutation_trans (#a: Type) {| ord: TO.total_order a |} (s0 s1 s2: Seq.seq a)
   : Lemma
-    (requires SP.permutation a s0 s1 /\ SP.permutation a s1 s2)
-    (ensures SP.permutation a s0 s2)
+    (requires permutation s0 s1 /\ permutation s1 s2)
+    (ensures permutation s0 s2)
   = ()
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
+let rec count_append (#a: Type) {| ord: TO.total_order a |} (x: a) (s1 s2: Seq.seq a)
+  : Lemma (ensures count x (Seq.append s1 s2) == count x s1 + count x s2)
+          (decreases Seq.length s1)
+  = if Seq.length s1 = 0 then (
+      assert (Seq.equal (Seq.append s1 s2) s2)
+    ) else (
+      SP.lemma_head_append s1 s2;
+      SP.lemma_tail_append s1 s2;
+      SP.lemma_append_cons s1 s2;
+      count_append x (Seq.tail s1) s2;
+      if Seq.head s1 ==? x then (
+        assert (count x (Seq.append s1 s2) == 1 + count x (Seq.append (Seq.tail s1) s2));
+        assert (count x s1 == 1 + count x (Seq.tail s1));
+        assert (count x (Seq.append s1 s2) == count x s1 + count x s2)
+      ) else (
+        assert (count x (Seq.append s1 s2) == count x (Seq.append (Seq.tail s1) s2));
+        assert (count x s1 == count x (Seq.tail s1));
+        assert (count x (Seq.append s1 s2) == count x s1 + count x s2)
+      )
+    )
+#pop-options
 
 let seq_swap_commute (#a: Type) (s: Seq.seq a) (i j: nat_smaller (Seq.length s))
   : Lemma (seq_swap s i j == seq_swap s j i)
@@ -90,21 +142,63 @@ let seq_swap_commute (#a: Type) (s: Seq.seq a) (i j: nat_smaller (Seq.length s))
     assert (forall (k:nat{k < Seq.length sij}). (Seq.index sij k == Seq.index sji k));
     Seq.lemma_eq_elim sij sji
 
-let sp_permutation_swap (#a: eqtype) (s: Seq.seq a) (i j: nat_smaller (Seq.length s))
-  : Lemma (ensures SP.permutation a s (seq_swap s i j))
-  = if j <= i
-    then SP.lemma_swap_permutes s j i
-    else (SP.lemma_swap_permutes s i j; seq_swap_commute s i j)
+let rec upd_count (#a: Type) {| TO.total_order a |} (s: Seq.seq a) (i: nat) (x: a) (z: a)
+   : Lemma
+     (requires i < Seq.length s)
+     (ensures (
+       if Seq.index s i ==? x
+       then Seq.upd s i x == s
+       else (
+         if z ==? x
+         then count x (Seq.upd s i x) == count x s + 1
+         else if z ==? Seq.index s i
+         then count z (Seq.upd s i x) == count z s - 1
+         else count z (Seq.upd s i x) == count z s)
+     ))
+     (decreases Seq.length s)
+     [SMTPat (count z (Seq.upd s i x))]
+   = if Seq.index s i ==? x
+     then assert (Seq.equal (Seq.upd s i x) s)
+     else (
+       if i = 0 then ()
+       else upd_count (Seq.tail s) (i - 1) x z
+     )
 
-let sp_append_permutations_3 (#a: eqtype)
+let permutation_swap (#a: Type) {| ord: TO.total_order a |} (s: Seq.seq a) (i j: nat_smaller (Seq.length s))
+  : Lemma (ensures permutation s (seq_swap s i j))
+  = let x = Seq.index s i in
+    let y = Seq.index s j in
+    if i = j then assert (Seq.equal (seq_swap s i j) s)
+    else if x ==? y then assert (Seq.equal (seq_swap s i j) s)
+    else
+      let s1 = Seq.upd s i y in
+      let aux (z: a) : Lemma (count z s == count z (seq_swap s i j)) =
+        Seq.lemma_index_upd2 s i y j;
+        assert (Seq.index s1 j == y);
+        upd_count s i y z;
+        upd_count s1 j x z
+      in
+      FStar.Classical.forall_intro aux
+
+let append_permutations (#a: Type) {| ord: TO.total_order a |} (s1 s2 s1' s2': Seq.seq a)
+  : Lemma
+    (requires permutation s1 s1' /\ permutation s2 s2')
+    (ensures permutation (Seq.append s1 s2) (Seq.append s1' s2'))
+  = let aux (x: a) : Lemma (count x (Seq.append s1 s2) == count x (Seq.append s1' s2')) =
+      count_append x s1 s2;
+      count_append x s1' s2'
+    in
+    FStar.Classical.forall_intro aux
+
+let append_permutations_3 (#a: Type) {| ord: TO.total_order a |}
   (s1 s2 s3 s1' s3': Seq.seq a)
   : Lemma
-    (requires SP.permutation a s1 s1' /\ SP.permutation a s3 s3')
-    (ensures SP.permutation a (Seq.append s1 (Seq.append s2 s3))
-                             (Seq.append s1' (Seq.append s2 s3')))
-  = sp_permutation_refl s2;
-    SP.append_permutations s2 s3 s2 s3';
-    SP.append_permutations s1 (Seq.append s2 s3) s1' (Seq.append s2 s3')
+    (requires permutation s1 s1' /\ permutation s3 s3')
+    (ensures permutation (Seq.append s1 (Seq.append s2 s3))
+                         (Seq.append s1' (Seq.append s2 s3')))
+  = permutation_refl s2;
+    append_permutations s2 s3 s2 s3';
+    append_permutations s1 (Seq.append s2 s3) s1' (Seq.append s2 s3')
 
 let le_ord_refl (#a: Type) (ord: TO.total_order a) (x: a)
   : Lemma (ensures le_ord ord x x)
@@ -116,39 +210,39 @@ let gt_ord_implies_pivot_le (#a: Type) (ord: TO.total_order a) (x pivot: a)
     (ensures le_ord ord pivot x)
   = ()
 
-let permutation_preserves_smaller_than (#a: eqtype) (ord: TO.total_order a)
+let permutation_preserves_smaller_than (#a: Type) (ord: TO.total_order a)
   (s0 s1: Seq.seq a) (pivot: a)
   : Lemma
-    (requires SP.permutation a s0 s1 /\ smaller_than ord s0 pivot)
+    (requires permutation #a #ord s0 s1 /\ smaller_than ord s0 pivot)
     (ensures smaller_than ord s1 pivot)
   = let aux (k: nat{k < Seq.length s1})
       : Lemma (ensures le_ord ord (Seq.index s1 k) pivot)
       = let x = Seq.index s1 k in
-        SP.seq_mem_k s1 k;
-        assert (SP.mem x s1);
-        assert (SP.count x s1 > 0);
-        assert (SP.count x s0 == SP.count x s1);
-        assert (SP.mem x s0);
-        let i = SP.index_mem x s0 in
+        seq_mem_k #a #ord s1 k;
+        assert (mem #a #ord x s1);
+        assert (count #a #ord x s1 > 0);
+        assert (count #a #ord x s0 == count #a #ord x s1);
+        assert (mem #a #ord x s0);
+        let i = index_mem #a #ord x s0 in
         assert (Seq.index s0 i == x);
         assert (le_ord ord (Seq.index s0 i) pivot)
     in
     FStar.Classical.forall_intro aux
 
-let permutation_preserves_larger_than (#a: eqtype) (ord: TO.total_order a)
+let permutation_preserves_larger_than (#a: Type) (ord: TO.total_order a)
   (s0 s1: Seq.seq a) (pivot: a)
   : Lemma
-    (requires SP.permutation a s0 s1 /\ larger_than ord s0 pivot)
+    (requires permutation #a #ord s0 s1 /\ larger_than ord s0 pivot)
     (ensures larger_than ord s1 pivot)
   = let aux (k: nat{k < Seq.length s1})
       : Lemma (ensures gt_ord ord (Seq.index s1 k) pivot)
       = let x = Seq.index s1 k in
-        SP.seq_mem_k s1 k;
-        assert (SP.mem x s1);
-        assert (SP.count x s1 > 0);
-        assert (SP.count x s0 == SP.count x s1);
-        assert (SP.mem x s0);
-        let i = SP.index_mem x s0 in
+        seq_mem_k #a #ord s1 k;
+        assert (mem #a #ord x s1);
+        assert (count #a #ord x s1 > 0);
+        assert (count #a #ord x s0 == count #a #ord x s1);
+        assert (mem #a #ord x s0);
+        let i = index_mem #a #ord x s0 in
         assert (Seq.index s0 i == x);
         assert (gt_ord ord (Seq.index s0 i) pivot)
     in
@@ -217,7 +311,7 @@ let op_Array_Assignment
         ))
 = pts_to_range_upd arr i v #l #r
 
-fn swap (#a: eqtype) (arr: A.array a) (i j: nat) (#l:nat{l <= i /\ l <= j}) (#r:nat{i < r /\ j < r})
+fn swap (#a: Type0) (#ord: erased (TO.total_order a)) (arr: A.array a) (i j: nat) (#l:nat{l <= i /\ l <= j}) (#r:nat{i < r /\ j < r})
   (#s0: Ghost.erased (Seq.seq a))
   requires A.pts_to_range arr l r s0
   ensures
@@ -225,7 +319,7 @@ fn swap (#a: eqtype) (arr: A.array a) (i j: nat) (#l:nat{l <= i /\ l <= j}) (#r:
       A.pts_to_range arr l r s **
       pure (Seq.length s0 = r - l /\
             s == seq_swap s0 (i - l) (j - l) /\
-            SP.permutation a s0 s)
+            permutation #a #ord s0 s)
 {
   A.pts_to_range_prop arr;
   let vi = arr.(SZ.uint_to_t i);
@@ -233,11 +327,11 @@ fn swap (#a: eqtype) (arr: A.array a) (i j: nat) (#l:nat{l <= i /\ l <= j}) (#r:
   (arr.(SZ.uint_to_t i) <- vj);
   (arr.(SZ.uint_to_t j) <- vi);
   with s1. assert (A.pts_to_range arr l r s1);
-  sp_permutation_swap s0 (i - l) (j - l);
-  assert (pure (SP.permutation a s0 (seq_swap s0 (i - l) (j - l))))
+  permutation_swap #a #ord s0 (i - l) (j - l);
+  assert (pure (permutation #a #ord s0 (seq_swap s0 (i - l) (j - l))))
 }
 
-fn partition_with_ticks (#a: eqtype)
+fn partition_with_ticks (#a: Type0)
   (arr: A.array a)
   (lo: nat)
   (hi: (hi:nat{lo < hi}))
@@ -264,7 +358,7 @@ fn partition_with_ticks (#a: eqtype)
         (kk == p ==> Seq.index s k == Seq.index s (p - lo)) /\
         (p < kk /\ kk < hi ==> gt_ord ord (Seq.index s k) (Seq.index s (p - lo)))
       )) /\
-      SP.permutation a s0 s /\
+      permutation #a #ord s0 s /\
       cf == reveal c0 + (hi - lo - 1)
     )
 {
@@ -281,9 +375,9 @@ fn partition_with_ticks (#a: eqtype)
         lo <= !j /\ !j <= hi - 1 /\
         lo <= !i_plus_1 /\ !i_plus_1 <= !j /\
         Seq.length s = hi - lo /\
-        Seq.index s (hi - 1 - lo) = pivot /\
+        Seq.index s (hi - 1 - lo) == pivot /\
         partition_pred ord s lo (!j) (!i_plus_1) pivot /\
-        SP.permutation a s0 s /\
+        permutation #a #ord s0 s /\
         vc == reveal c0 + (!j - lo)
       ))
   decreases (hi - !j)
@@ -295,7 +389,7 @@ fn partition_with_ticks (#a: eqtype)
 
     if (O.le cmp) {
       let vi_plus_1 = !i_plus_1;
-      swap arr vi_plus_1 vj;
+      swap #a #ord arr vi_plus_1 vj;
       i_plus_1 := vi_plus_1 + 1;
       j := vj + 1;
     } else {
@@ -304,12 +398,12 @@ fn partition_with_ticks (#a: eqtype)
   };
 
   let vi_plus_1 = !i_plus_1;
-  swap arr vi_plus_1 (hi - 1);
+  swap #a #ord arr vi_plus_1 (hi - 1);
 
   vi_plus_1
 }
 
-fn partition_wrapper_with_ticks (#a: eqtype)
+fn partition_wrapper_with_ticks (#a: Type0)
   (arr: A.array a)
   (lo: nat)
   (hi: (hi:nat{lo < hi}))
@@ -334,7 +428,7 @@ fn partition_wrapper_with_ticks (#a: eqtype)
       Seq.length s1 == p - lo /\ Seq.length s_pivot == 1 /\ Seq.length s2 == hi - (p+1) /\
       smaller_than ord s1 (Seq.index s_pivot 0) /\
       larger_than ord s2 (Seq.index s_pivot 0) /\
-      SP.permutation a s0 (Seq.append s1 (Seq.append s_pivot s2)) /\
+      permutation #a #ord s0 (Seq.append s1 (Seq.append s_pivot s2)) /\
       cf == reveal c0 + (hi - lo - 1)
     ))
 {
@@ -353,7 +447,7 @@ fn partition_wrapper_with_ticks (#a: eqtype)
   p
 }
 
-fn rec quicksort_core (#a: eqtype)
+fn rec quicksort_core (#a: Type0)
   (arr: A.array a)
   (lo: nat)
   (hi: (hi:nat{lo <= hi}))
@@ -372,14 +466,14 @@ fn rec quicksort_core (#a: eqtype)
     MR.pts_to ctr #1.0R cf **
     pure (
       SC.sorted #a #ord s /\
-      SP.permutation a s0 s /\
+      permutation #a #ord s0 s /\
       complexity_bounded_by_worst_case cf (reveal c0) (hi - lo)
     )
 {
   if (lo < hi) {
     if (hi <= lo + 1) {
       sorted_singleton ord s0;
-      sp_permutation_refl s0;
+      permutation_refl #a #ord s0;
       ()
     } else {
       let p = partition_wrapper_with_ticks arr lo hi #ord ctr iord #s0 #c0;
@@ -401,7 +495,7 @@ fn rec quicksort_core (#a: eqtype)
       permutation_preserves_larger_than ord s_right s_right' (Seq.index s_pivot 0);
       sorted_singleton ord s_pivot;
       sorted_append_with_pivot ord s_left' s_pivot s_right' (Seq.index s_pivot 0);
-      sp_append_permutations_3 s_left s_pivot s_right s_left' s_right';
+      append_permutations_3 #a #ord s_left s_pivot s_right s_left' s_right';
 
       pts_to_range_join arr p (p+1) hi;
       pts_to_range_join arr lo p hi;
@@ -411,12 +505,12 @@ fn rec quicksort_core (#a: eqtype)
     }
   } else {
     sorted_singleton ord s0;
-    sp_permutation_refl s0;
+    permutation_refl #a #ord s0;
     ()
   }
 }
 
-fn quicksort_sort (#a: eqtype)
+fn quicksort_sort (#a: Type0)
   (arr: A.array a)
   (len: SZ.t)
   (ctr: SC.ticks_t)
@@ -425,7 +519,7 @@ fn quicksort_sort (#a: eqtype)
   (#s: erased (Seq.seq a))
   (#i: erased nat)
   requires arr |-> s ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
-  ensures exists* s' ticks.
+  ensures exists* s' (ticks: nat).
     arr |-> s' **
     MR.pts_to ctr #1.0R ticks **
     pure (SC.sorted #a #ord s' /\
@@ -437,13 +531,33 @@ fn quicksort_sort (#a: eqtype)
   quicksort_core arr 0 (SZ.v len) #ord ctr iord #s #i;
   with s_out. assert (A.pts_to_range arr 0 (A.length arr) s_out);
   with cf. assert (MR.pts_to ctr #1.0R cf);
-  sc_permutation_of_sp_permutation s s_out;
+  is_permutation_to_sc #a #ord s s_out;
   QC.worst_case_bound (Seq.length s);
   assert (pure (QC.worst_case_comparisons (Seq.length s) <= Seq.length s * (Seq.length s - 1) / 2));
   assert (pure (cf <= reveal i + Seq.length s * (Seq.length s - 1) / 2));
   A.pts_to_range_elim arr 1.0R s_out
 }
 
-instance quicksort_array_sort (a: eqtype) : SC.array_sort a (fun n -> n * (n - 1) / 2) = {
-  sort = quicksort_sort #a;
+fn quicksort_sort_poly (a: Type0)
+  (arr: A.array a)
+  (len: SZ.t)
+  (ctr: SC.ticks_t)
+  (#ord: erased (TO.total_order a))
+  (iord: SC.instrumented_total_order a ord ctr)
+  (#s: erased (Seq.seq a))
+  (#i: erased nat)
+  norewrite
+  requires arr |-> s ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
+  ensures exists* s' (ticks: nat).
+    arr |-> s' **
+    MR.pts_to ctr #1.0R ticks **
+    pure (SC.sorted #a #ord s' /\
+          SC.permutation s s' /\
+          ticks <= reveal i + Seq.length s * (Seq.length s - 1) / 2)
+{
+  quicksort_sort #a arr len ctr #ord iord #s #i
+}
+
+instance quicksort_array_sort : SC.array_sort (fun n -> n * (n - 1) / 2) = {
+  sort = quicksort_sort_poly;
 }
