@@ -40,8 +40,9 @@ let instrumented_total_order (a:Type) (ord:Pulse.Lib.TotalOrder.total_order a) (
   ensures MR.pts_to ctr #1.0R (i + 1)
   ensures pure (o == x `ord.TO.compare` y)
 
-class array_sort (a:Type) (f: nat -> nat) = {
-  sort: (fn (arr:A.array a)
+class array_sort (f: nat -> nat) = {
+  sort: (fn (a:Type)
+            (arr:A.array a)
             (len:SZ.t) 
             (ctr:ticks_t)
             (#ord:erased (TO.total_order a))
