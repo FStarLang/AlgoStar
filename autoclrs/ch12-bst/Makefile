@@ -1,4 +1,5 @@
 include ../config.mk
+OTHERFLAGS += --include ../common
 include $(PULSE_ROOT)/mk/test.mk
 
 # ── C extraction and test for Chapter 12 BSTs ──────────────────────

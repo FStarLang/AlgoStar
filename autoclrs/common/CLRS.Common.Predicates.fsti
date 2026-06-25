@@ -43,3 +43,4 @@ val max_heap_property (#a:Type) (compare: a -> a -> Tot bool) (s: seq a) (heap_s
 
 /// Predicate: entire sequence satisfies max-heap property
 val is_max_heap (#a:Type) (compare: a -> a -> Tot bool) (s: seq a) (heap_size: nat) : prop
+

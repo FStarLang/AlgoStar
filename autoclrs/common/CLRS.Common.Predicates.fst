@@ -43,3 +43,4 @@ let max_heap_property (#a:Type) (compare: a -> a -> Tot bool) (s: seq a) (heap_s
 let is_max_heap (#a:Type) (compare: a -> a -> Tot bool) (s: seq a) (heap_size: nat) : prop
   = heap_size <= length s /\
     (forall (i: nat). i < heap_size ==> max_heap_property compare s heap_size i)
+
