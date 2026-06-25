@@ -368,8 +368,29 @@ ensures exists* s' (ticks: nat).
     cf <= reveal i + insertion_sort_comparisons (Seq.length s0)));
 }
 
-instance insertion_sort_array_sort (a: Type0) : SC.array_sort a (fun n -> n * (n - 1) / 2) =
+fn insertion_sort_sort_poly (a: Type0)
+  (arr: A.array a)
+  (len: SZ.t)
+  (ctr: SC.ticks_t)
+  (#ord: erased (TO.total_order a))
+  (iord: SC.instrumented_total_order a ord ctr)
+  (#s0: erased (Seq.seq a))
+  (#i: erased nat)
+  norewrite
+requires arr |-> s0 ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
+ensures exists* s' (ticks: nat).
+  arr |-> s' **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    SC.sorted #a #ord s' /\
+    SC.permutation s0 s' /\
+    ticks <= reveal i + insertion_sort_comparisons (Seq.length s0))
+{
+  insertion_sort_sort #a arr len ctr #ord iord #s0 #i
+}
+
+instance insertion_sort_array_sort : SC.array_sort (fun n -> n * (n - 1) / 2) =
   Pulse.Lib.Core.slprop_equivs ();
   {
-    sort = insertion_sort_sort #a
+    sort = insertion_sort_sort_poly
   }

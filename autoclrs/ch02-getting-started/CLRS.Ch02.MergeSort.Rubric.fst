@@ -736,9 +736,33 @@ ensures exists* s' (ticks: nat).
        else 0)));
 }
 
-instance merge_sort_array_sort (a: Type0) : SC.array_sort a (fun n ->
+fn merge_sort_sort_poly (a: Type0)
+  (arr: A.array a)
+  (len: SZ.t)
+  (ctr: SC.ticks_t)
+  (#ord: erased (TO.total_order a))
+  (iord: SC.instrumented_total_order a ord ctr)
+  (#s0: erased (Seq.seq a))
+  (#i: erased nat)
+  norewrite
+requires arr |-> s0 ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
+ensures exists* s' (ticks: nat).
+  arr |-> s' **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    SC.sorted #a #ord s' /\
+    SC.permutation s0 s' /\
+    ticks <= reveal i +
+      (if Seq.length s0 > 0 then
+         4 * Seq.length s0 * MS.log2_ceil (Seq.length s0) + 4 * Seq.length s0
+       else 0))
+{
+  merge_sort_sort #a arr len ctr #ord iord #s0 #i
+}
+
+instance merge_sort_array_sort : SC.array_sort (fun n ->
   if n > 0 then 4 * n * MS.log2_ceil n + 4 * n else 0) =
   Pulse.Lib.Core.slprop_equivs ();
   {
-    sort = merge_sort_sort #a
+    sort = merge_sort_sort_poly
   }
