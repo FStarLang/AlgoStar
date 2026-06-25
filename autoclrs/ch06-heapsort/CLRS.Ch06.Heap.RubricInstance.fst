@@ -5,11 +5,12 @@ module HC = CLRS.Ch06.Heap.Complexity
 module HR = CLRS.Ch06.Heap.Rubric
 module SC = CLRS.Common.Complexity.Sorting.Class
 
-instance heapsort_array_sort (a: eqtype) : SC.array_sort a
+instance heapsort_array_sort : SC.array_sort
   (fun n ->
-    if n = 0 then 0
-    else (n / 2) * (2 * HC.log2_floor n) +
-         (n - 1) * (2 * HC.log2_floor n))
+    if n > 0 then
+      (n / 2) * (2 * HC.log2_floor n) +
+      (n - 1) * (2 * HC.log2_floor n)
+    else 0)
 = {
-  sort = HR.heapsort_sort #a;
+  sort = HR.heapsort_sort;
 }

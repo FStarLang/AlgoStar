@@ -10,6 +10,7 @@ module CLRS.Ch06.Heap.Rubric
 #lang-pulse
 
 open Pulse.Lib.Pervasives
+open Pulse.Lib.TotalOrder
 
 module A = Pulse.Lib.Array
 module CB = CLRS.Ch06.Heap.CostBound
@@ -71,37 +72,113 @@ let sorted_upto (#a: Type) (ord: TO.total_order a) (s: Seq.seq a) (n: nat) =
   n <= Seq.length s /\
   (forall (i j: nat). i <= j /\ j < n ==> le_ord ord (Seq.index s i) (Seq.index s j))
 
-let permutation (#a: eqtype) (s0 s1: Seq.seq a) : prop = SP.permutation a s0 s1
+let rec count (#a: Type) {| TO.total_order a |} (x: a) (s: Seq.seq a)
+  : Tot nat (decreases Seq.length s)
+  = if Seq.length s = 0 then 0
+    else if Seq.head s ==? x
+    then 1 + count x (Seq.tail s)
+    else count x (Seq.tail s)
+
+let permutation (#a: Type) {| TO.total_order a |} (s0 s1: Seq.seq a) =
+  forall (x: a). count x s0 == count x s1
+
+let mem (#a: Type) {| TO.total_order a |} (x: a) (s: Seq.seq a) =
+  count x s > 0
+
+let rec index_mem (#a: Type) {| TO.total_order a |} (x: a) (s: Seq.seq a)
+  : Pure nat
+      (requires mem x s)
+      (ensures fun i -> i < Seq.length s /\ Seq.index s i == x)
+      (decreases (Seq.length s))
+  = if Seq.head s ==? x then 0 else 1 + index_mem x (Seq.tail s)
+
+let rec seq_mem_k (#a: Type) {| TO.total_order a |} (s: Seq.seq a) (k: nat{k < Seq.length s})
+  : Lemma (ensures mem (Seq.index s k) s)
+          (decreases (Seq.length s))
+  = if k = 0 then () else seq_mem_k (Seq.tail s) (k - 1)
 
 let swap_seq (#a: Type) (s:Seq.seq a) (i j:nat{i < Seq.length s /\ j < Seq.length s}) : Seq.seq a =
   Seq.upd (Seq.upd s i (Seq.index s j)) j (Seq.index s i)
 
-let rec sc_count_eq_sp_count (#a: eqtype) (x: a) (s: Seq.seq a)
-  : Lemma (ensures SC.count x s == SP.count x s)
+let rec count_eq (#a: Type) {| ord: TO.total_order a |} (x: a) (s: Seq.seq a)
+  : Lemma (ensures count x s == SC.count x s)
           (decreases (Seq.length s))
   = if Seq.length s = 0 then ()
-    else sc_count_eq_sp_count x (Seq.tail s)
+    else (
+      assert (Seq.head s ==? x <==> Seq.head s == x);
+      count_eq x (Seq.tail s)
+    )
 
-let sc_permutation_of_sp_permutation (#a: eqtype) (s0 s1: Seq.seq a)
+let permutation_to_sc (#a: Type) {| ord: TO.total_order a |} (s0 s1: Seq.seq a)
   : Lemma
-    (requires SP.permutation a s0 s1)
+    (requires permutation s0 s1)
     (ensures SC.permutation s0 s1)
   = let aux (x: a)
       : Lemma (SC.count x s0 == SC.count x s1)
-      = sc_count_eq_sp_count x s0;
-        sc_count_eq_sp_count x s1
+      = count_eq x s0;
+        count_eq x s1
     in
     Classical.forall_intro aux
 
-let sp_permutation_refl (#a: eqtype) (s: Seq.seq a)
+let sp_permutation_refl (#a: Type) {| ord: TO.total_order a |} (s: Seq.seq a)
   : Lemma (ensures permutation s s)
   = ()
 
-let sp_permutation_trans (#a: eqtype) (s0 s1 s2: Seq.seq a)
+let sp_permutation_trans (#a: Type) {| ord: TO.total_order a |} (s0 s1 s2: Seq.seq a)
   : Lemma
     (requires permutation s0 s1 /\ permutation s1 s2)
     (ensures permutation s0 s2)
   = ()
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
+let rec count_append (#a: Type) {| ord: TO.total_order a |} (x: a) (s1 s2: Seq.seq a)
+  : Lemma (ensures count x (Seq.append s1 s2) == count x s1 + count x s2)
+          (decreases Seq.length s1)
+  = if Seq.length s1 = 0 then (
+      assert (Seq.equal (Seq.append s1 s2) s2)
+    ) else (
+      SP.lemma_head_append s1 s2;
+      SP.lemma_tail_append s1 s2;
+      SP.lemma_append_cons s1 s2;
+      count_append x (Seq.tail s1) s2;
+      if Seq.head s1 ==? x then (
+        assert (count x (Seq.append s1 s2) == 1 + count x (Seq.append (Seq.tail s1) s2));
+        assert (count x s1 == 1 + count x (Seq.tail s1));
+        assert (count x (Seq.append s1 s2) == count x s1 + count x s2)
+      ) else (
+        assert (count x (Seq.append s1 s2) == count x (Seq.append (Seq.tail s1) s2));
+        assert (count x s1 == count x (Seq.tail s1));
+        assert (count x (Seq.append s1 s2) == count x s1 + count x s2)
+      )
+    )
+#pop-options
+
+let count_slice (#a: Type) {| ord: TO.total_order a |} (s: Seq.seq a) (i: nat{i <= Seq.length s}) (x: a)
+  : Lemma (ensures count x s == count x (Seq.slice s 0 i) + count x (Seq.slice s i (Seq.length s)))
+  = Seq.lemma_split s i;
+    count_append x (Seq.slice s 0 i) (Seq.slice s i (Seq.length s))
+
+let rec upd_count (#a: Type) {| ord: TO.total_order a |} (s: Seq.seq a) (i: nat) (x: a) (z: a)
+  : Lemma
+    (requires i < Seq.length s)
+    (ensures (
+      if Seq.index s i ==? x
+      then Seq.upd s i x == s
+      else (
+        if z ==? x
+        then count x (Seq.upd s i x) == count x s + 1
+        else if z ==? Seq.index s i
+        then count z (Seq.upd s i x) == count z s - 1
+        else count z (Seq.upd s i x) == count z s)
+    ))
+    (decreases Seq.length s)
+    [SMTPat (count z (Seq.upd s i x))]
+  = if Seq.index s i ==? x
+    then assert (Seq.equal (Seq.upd s i x) s)
+    else (
+      if i = 0 then ()
+      else upd_count (Seq.tail s) (i - 1) x z
+    )
 
 let parent_idx_lt (i:nat{i > 0}) : Lemma (parent_idx i < i) = ()
 
@@ -148,13 +225,7 @@ let almost_to_full (#a: Type) (ord: TO.total_order a)
           (ensures heaps_from ord s len k)
   = ()
 
-let permutation_same_length (#a: eqtype) (s1 s2 : Seq.seq a)
-  : Lemma (requires permutation s1 s2)
-          (ensures Seq.length s1 == Seq.length s2)
-          [SMTPat (permutation s1 s2)]
-  = SP.perm_len s1 s2
-
-let compose_permutations (#a: eqtype) (s1 s2 s3: Seq.seq a)
+let compose_permutations (#a: Type0) {| ord: TO.total_order a |} (s1 s2 s3: Seq.seq a)
   : Lemma (requires permutation s1 s2 /\ permutation s2 s3)
     (ensures permutation s1 s3)
     [SMTPat (permutation s1 s2); SMTPat (permutation s2 s3)]
@@ -183,17 +254,24 @@ let swap_unchanged_above (#a: Type)
     in
     Classical.forall_intro (Classical.move_requires aux)
 
-let swap_is_permutation (#a: eqtype) (s: Seq.seq a) (i j: nat)
+let swap_is_permutation (#a: Type0) {| ord: TO.total_order a |} (s: Seq.seq a) (i j: nat)
   : Lemma (requires i < Seq.length s /\ j < Seq.length s)
           (ensures permutation s (swap_seq s i j))
-  = if i = j then
+  = let x = Seq.index s i in
+    let y = Seq.index s j in
+    if i = j then
       Seq.lemma_eq_elim s (swap_seq s i j)
-    else if i < j then (
-      assert (Seq.equal (swap_seq s i j) (Seq.swap s i j));
-      SP.lemma_swap_permutes s i j
-    ) else (
-      assert (Seq.equal (swap_seq s i j) (Seq.swap s j i));
-      SP.lemma_swap_permutes s j i
+    else if x ==? y then
+      assert (Seq.equal (swap_seq s i j) s)
+    else (
+      let s1 = Seq.upd s i y in
+      let aux (z: a) : Lemma (count z s == count z (swap_seq s i j)) =
+        Seq.lemma_index_upd2 s i y j;
+        assert (Seq.index s1 j == y);
+        upd_count s i y z;
+        upd_count s1 j x z
+      in
+      Classical.forall_intro aux
     )
 
 #push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
@@ -363,15 +441,9 @@ let slice_suffix_eq (#a: Type) (s1 s2:Seq.seq a) (k:nat)
           (ensures Seq.equal (Seq.slice s1 k (Seq.length s1)) (Seq.slice s2 k (Seq.length s2)))
   = ()
 
-let index_mem_intro (#a: eqtype) (s:Seq.seq a) (idx:nat{idx < Seq.length s})
-  : Lemma (ensures SP.mem (Seq.index s idx) s)
-  = let x = Seq.index s idx in
-    let suffix = Seq.slice s idx (Seq.length s) in
-    assert (Seq.head suffix == x);
-    SP.lemma_mem_inversion suffix;
-    assert (SP.mem x suffix);
-    SP.lemma_mem_append (Seq.slice s 0 idx) suffix;
-    Seq.lemma_split s idx
+let index_mem_intro (#a: Type0) {| ord: TO.total_order a |} (s:Seq.seq a) (idx:nat{idx < Seq.length s})
+  : Lemma (ensures mem (Seq.index s idx) s)
+  = seq_mem_k s idx
 
 #push-options "--split_queries always --z3rlimit 10"
 let extract_extends_sorted_upto (#a: Type) (ord: TO.total_order a)
@@ -398,13 +470,13 @@ let extract_extends_sorted_upto (#a: Type) (ord: TO.total_order a)
 
 #push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
 private
-let perm_prefix_witness (#a: eqtype) (s1 s2:Seq.seq a) (k:nat) (x:a)
+let perm_prefix_witness (#a: Type0) {| ord: TO.total_order a |} (s1 s2:Seq.seq a) (k:nat) (x:a)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
                     k <= Seq.length s1 /\
                     (forall (m:nat). k <= m /\ m < Seq.length s1 ==> Seq.index s2 m == Seq.index s1 m) /\
                     permutation s1 s2 /\
-                    SP.mem x (Seq.slice s2 0 k))
-          (ensures SP.mem x (Seq.slice s1 0 k))
+                    mem x (Seq.slice s2 0 k))
+          (ensures mem x (Seq.slice s1 0 k))
   = let len = Seq.length s1 in
     let sl1 = Seq.slice s1 0 k in
     let sl2 = Seq.slice s2 0 k in
@@ -412,20 +484,24 @@ let perm_prefix_witness (#a: eqtype) (s1 s2:Seq.seq a) (k:nat) (x:a)
     let suf2 = Seq.slice s2 k len in
     slice_suffix_eq s1 s2 k;
     Seq.lemma_eq_elim suf1 suf2;
-    SP.lemma_count_slice s1 k;
-    SP.lemma_count_slice s2 k
+    count_slice s1 k x;
+    count_slice s2 k x;
+    assert (count x s1 == count x s2);
+    assert (count x suf1 == count x suf2);
+    assert (count x sl2 > 0);
+    assert (count x sl1 > 0)
 #pop-options
 
 #push-options "--z3rlimit 20 --fuel 2 --ifuel 2 --split_queries always"
 private
-let perm_prefix_bounded_aux_upto (#a: eqtype) (ord: TO.total_order a)
+let perm_prefix_bounded_aux_upto (#a: Type0) (ord: TO.total_order a)
   (s1 s2:Seq.seq a) (k n:nat) (i:nat) (j:nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
                     k <= n /\ n <= Seq.length s1 /\
                     suffix_sorted_upto ord s1 k n /\
                     prefix_le_suffix_upto ord s1 k n /\
                     (forall (m:nat). k <= m /\ m < Seq.length s1 ==> Seq.index s2 m == Seq.index s1 m) /\
-                    permutation s1 s2 /\
+                    permutation #a #ord s1 s2 /\
                     i < k /\ j >= k /\ j < n)
           (ensures le_ord ord (Seq.index s2 i) (Seq.index s2 j))
   = let len = Seq.length s1 in
@@ -433,9 +509,9 @@ let perm_prefix_bounded_aux_upto (#a: eqtype) (ord: TO.total_order a)
     let sl2 = Seq.slice s2 0 k in
     let x = Seq.index sl2 i in
     Seq.lemma_index_slice s2 0 k i;
-    index_mem_intro sl2 i;
-    perm_prefix_witness s1 s2 k x;
-    let m = SP.index_mem x sl1 in
+    index_mem_intro #a #ord sl2 i;
+    perm_prefix_witness #a #ord s1 s2 k x;
+    let m = index_mem #a #ord x sl1 in
     Seq.lemma_index_slice s1 0 k m;
     assert (Seq.index s1 m == x);
     assert (m < k /\ k <= j /\ j < n);
@@ -443,17 +519,16 @@ let perm_prefix_bounded_aux_upto (#a: eqtype) (ord: TO.total_order a)
 #pop-options
 
 #push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
-let perm_preserves_sorted_suffix_upto (#a: eqtype) (ord: TO.total_order a)
+let perm_preserves_sorted_suffix_upto (#a: Type0) (ord: TO.total_order a)
   (s1 s2:Seq.seq a) (k n:nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
                     k <= n /\ n <= Seq.length s1 /\
                     suffix_sorted_upto ord s1 k n /\
                     prefix_le_suffix_upto ord s1 k n /\
                     (forall (j:nat). k <= j /\ j < Seq.length s1 ==> Seq.index s2 j == Seq.index s1 j) /\
-                    permutation s1 s2)
+                    permutation #a #ord s1 s2)
           (ensures suffix_sorted_upto ord s2 k n /\ prefix_le_suffix_upto ord s2 k n)
-  = permutation_same_length s1 s2;
-    let aux (i:nat) (j:nat)
+  = let aux (i:nat) (j:nat)
       : Lemma (ensures (i < k /\ k <= j /\ j < n) ==> le_ord ord (Seq.index s2 i) (Seq.index s2 j))
       = if i < k && k <= j && j < n then
           perm_prefix_bounded_aux_upto ord s1 s2 k n i j
@@ -476,37 +551,37 @@ let sorted_upto_implies_sc_sorted (#a: Type) (ord: TO.total_order a) (s: Seq.seq
         le_ord ord (Seq.index s i) (Seq.index s j)))
 
 #push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
-let extract_step_lemma (#a: eqtype) (ord: TO.total_order a)
+let extract_step_lemma (#a: Type0) (ord: TO.total_order a)
   (s_cur: Seq.seq a) (s_heapified: Seq.seq a) (s0: Seq.seq a)
   (vsz n: nat)
   : Lemma
     (requires
       vsz > 1 /\ vsz <= n /\ n <= Seq.length s_cur /\
       Seq.length s_cur == Seq.length s0 /\
-      permutation s_cur (swap_seq s_cur 0 (vsz - 1)) /\
+      permutation #a #ord s_cur (swap_seq s_cur 0 (vsz - 1)) /\
       Seq.length (swap_seq s_cur 0 (vsz - 1)) == Seq.length s_cur /\
       is_max_heap ord s_cur vsz /\
       suffix_sorted_upto ord s_cur vsz n /\
       prefix_le_suffix_upto ord s_cur vsz n /\
-      permutation s0 s_cur /\
+      permutation #a #ord s0 s_cur /\
       (forall (k:nat). n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
       Seq.length s_heapified == Seq.length (swap_seq s_cur 0 (vsz - 1)) /\
       heaps_from ord s_heapified (vsz - 1) 0 /\
-      permutation (swap_seq s_cur 0 (vsz - 1)) s_heapified /\
+      permutation #a #ord (swap_seq s_cur 0 (vsz - 1)) s_heapified /\
       (forall (k:nat). (vsz - 1) <= k /\ k < Seq.length s_heapified ==>
         Seq.index s_heapified k == Seq.index (swap_seq s_cur 0 (vsz - 1)) k))
     (ensures
       vsz - 1 > 0 /\
       vsz - 1 <= n /\
       Seq.length s_heapified == Seq.length s0 /\
-      permutation s0 s_heapified /\
+      permutation #a #ord s0 s_heapified /\
       (forall (k:nat). n <= k /\ k < Seq.length s_heapified ==> Seq.index s_heapified k == Seq.index s0 k) /\
       is_max_heap ord s_heapified (vsz - 1) /\
       suffix_sorted_upto ord s_heapified (vsz - 1) n /\
       prefix_le_suffix_upto ord s_heapified (vsz - 1) n)
   = extract_extends_sorted_upto ord s_cur vsz n;
-    compose_permutations s0 s_cur (swap_seq s_cur 0 (vsz - 1));
-    compose_permutations s0 (swap_seq s_cur 0 (vsz - 1)) s_heapified;
+    compose_permutations #a #ord s0 s_cur (swap_seq s_cur 0 (vsz - 1));
+    compose_permutations #a #ord s0 (swap_seq s_cur 0 (vsz - 1)) s_heapified;
     heaps_from_zero ord s_heapified (vsz - 1);
     perm_preserves_sorted_suffix_upto ord (swap_seq s_cur 0 (vsz - 1)) s_heapified (vsz - 1) n;
     swap_unchanged_above s_cur 0 (vsz - 1) n
@@ -532,14 +607,15 @@ let heapsort_final_cost_bound (n:pos) (heap_sz:nat) (cf c0:nat)
 
 let heapsort_cost_bound_explicit (n:nat)
   : Lemma (CB.heapsort_cost_bound n ==
-      (if n = 0 then 0
-       else (n / 2) * (2 * HC.log2_floor n) +
-            (n - 1) * (2 * HC.log2_floor n)))
+      (if n > 0 then
+         (n / 2) * (2 * HC.log2_floor n) +
+         (n - 1) * (2 * HC.log2_floor n)
+       else 0))
   = if n = 0 then ()
     else CB.max_heapify_bound_root n
 
 #push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
-fn rec max_heapify (#a: eqtype)
+fn rec max_heapify (#a: Type0)
   (arr: A.array a) (idx: nat) (heap_size: nat) (start: Ghost.erased nat)
   (ctr: SC.ticks_t)
   (#ord: erased (TO.total_order a))
@@ -571,7 +647,7 @@ ensures exists* s' (cf: nat).
     Seq.length s' == Seq.length s /\
     heap_size <= Seq.length s' /\
     heaps_from ord s' heap_size start /\
-    permutation s s' /\
+    permutation #a #ord s s' /\
     (forall (k:nat). heap_size <= k /\ k < Seq.length s ==> Seq.index s' k == Seq.index s k) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.max_heapify_bound heap_size idx
@@ -580,7 +656,7 @@ ensures exists* s' (cf: nat).
   let left = left_idx idx;
   if (left >= heap_size) {
     almost_to_full ord s heap_size start idx;
-    sp_permutation_refl s;
+    sp_permutation_refl #a #ord s;
     ()
   } else {
     let right = right_idx idx;
@@ -602,7 +678,7 @@ ensures exists* s' (cf: nat).
           let vl = arr.(SZ.uint_to_t left);
           arr.(SZ.uint_to_t idx) <- vl;
           arr.(SZ.uint_to_t left) <- vi;
-          swap_is_permutation s idx left;
+          swap_is_permutation #a #ord s idx left;
           swap_length s idx left;
           swap_index_i s idx left;
           max_heapify arr left heap_size start ctr #ord iord #(swap_seq s idx left)
@@ -610,7 +686,7 @@ ensures exists* s' (cf: nat).
           not_lt_ord_implies_ge ord cur lv;
           le_ord_trans ord rv lv cur;
           almost_to_full ord s heap_size start idx;
-          sp_permutation_refl s;
+          sp_permutation_refl #a #ord s;
           ()
         }
       } else {
@@ -626,7 +702,7 @@ ensures exists* s' (cf: nat).
           let vr = arr.(SZ.uint_to_t right);
           arr.(SZ.uint_to_t idx) <- vr;
           arr.(SZ.uint_to_t right) <- vi;
-          swap_is_permutation s idx right;
+          swap_is_permutation #a #ord s idx right;
           swap_length s idx right;
           swap_index_i s idx right;
           max_heapify arr right heap_size start ctr #ord iord #(swap_seq s idx right)
@@ -634,7 +710,7 @@ ensures exists* s' (cf: nat).
           not_lt_ord_implies_ge ord cur rv;
           le_ord_trans ord lv rv cur;
           almost_to_full ord s heap_size start idx;
-          sp_permutation_refl s;
+          sp_permutation_refl #a #ord s;
           ()
         }
       }
@@ -652,14 +728,14 @@ ensures exists* s' (cf: nat).
         let vl = arr.(SZ.uint_to_t left);
         arr.(SZ.uint_to_t idx) <- vl;
         arr.(SZ.uint_to_t left) <- vi;
-        swap_is_permutation s idx left;
+        swap_is_permutation #a #ord s idx left;
         swap_length s idx left;
         swap_index_i s idx left;
         max_heapify arr left heap_size start ctr #ord iord #(swap_seq s idx left)
       } else {
         not_lt_ord_implies_ge ord cur lv;
         almost_to_full ord s heap_size start idx;
-        sp_permutation_refl s;
+        sp_permutation_refl #a #ord s;
         ()
       }
     }
@@ -668,7 +744,7 @@ ensures exists* s' (cf: nat).
 #pop-options
 
 #push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
-fn build_max_heap (#a: eqtype)
+fn build_max_heap (#a: Type0)
   (arr: A.array a)
   (n: nat)
   (ctr: SC.ticks_t)
@@ -687,7 +763,7 @@ ensures exists* s (cf: nat).
     Seq.length s == Seq.length s0 /\
     n <= Seq.length s /\
     is_max_heap ord s n /\
-    permutation s0 s /\
+    permutation #a #ord s0 s /\
     (forall (k:nat). n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.build_cost_bound n
@@ -696,7 +772,7 @@ ensures exists* s (cf: nat).
   let half : nat = n / 2;
   let mut i: nat = half;
   heaps_from_half ord s0 n;
-  sp_permutation_refl s0;
+  sp_permutation_refl #a #ord s0;
 
   while (!i > 0)
   invariant exists* (vi:nat) s_cur (vc: nat).
@@ -708,7 +784,7 @@ ensures exists* s (cf: nat).
       vi <= half /\
       Seq.length s_cur == Seq.length s0 /\
       Seq.length s_cur == A.length arr /\
-      permutation s0 s_cur /\
+      permutation #a #ord s0 s_cur /\
       (forall (k:nat). n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
       heaps_from ord s_cur n vi /\
       vc >= reveal c0 /\
@@ -733,7 +809,7 @@ ensures exists* s (cf: nat).
 #pop-options
 
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
-fn heapsort (#a: eqtype)
+fn heapsort (#a: Type0)
   (arr: A.array a)
   (n: nat)
   (ctr: SC.ticks_t)
@@ -751,14 +827,14 @@ ensures exists* s (cf: nat).
   pure (
     Seq.length s == Seq.length s0 /\
     sorted_upto ord s n /\
-    permutation s0 s /\
+    permutation #a #ord s0 s /\
     (forall (k:nat). n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.heapsort_cost_bound n
   )
 {
   if (n = 0) {
-    sp_permutation_refl s0;
+    sp_permutation_refl #a #ord s0;
     ()
   } else {
     build_max_heap arr n ctr #ord iord;
@@ -776,7 +852,7 @@ ensures exists* s (cf: nat).
         vsz <= n /\
         Seq.length s_cur == Seq.length s0 /\
         Seq.length s_cur == A.length arr /\
-        permutation s0 s_cur /\
+        permutation #a #ord s0 s_cur /\
         (forall (k:nat). n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
         is_max_heap ord s_cur vsz /\
         suffix_sorted_upto ord s_cur vsz n /\
@@ -796,7 +872,7 @@ ensures exists* s (cf: nat).
       arr.(SZ.uint_to_t 0) <- vl;
       arr.(SZ.uint_to_t last) <- v0;
 
-      swap_is_permutation s_cur 0 last;
+      swap_is_permutation #a #ord s_cur 0 last;
       swap_length s_cur 0 last;
       extract_extends_sorted_upto ord s_cur vsz n;
 
@@ -826,7 +902,7 @@ ensures exists* s (cf: nat).
 }
 #pop-options
 
-fn heapsort_sort (#a: eqtype)
+fn heapsort_sort (a: Type0)
   (arr: A.array a)
   (len: SZ.t)
   (ctr: SC.ticks_t)
@@ -834,30 +910,34 @@ fn heapsort_sort (#a: eqtype)
   (iord: SC.instrumented_total_order a ord ctr)
   (#s0: erased (Seq.seq a))
   (#i: erased nat)
+  norewrite
 requires arr |-> s0 ** pure (A.length arr == SZ.v len) ** MR.pts_to ctr #1.0R i
-ensures exists* s' ticks.
+ensures exists* s' (ticks: nat).
   arr |-> s' **
   MR.pts_to ctr #1.0R ticks **
   pure (SC.sorted #a #ord s' /\
         SC.permutation s0 s' /\
         ticks <= reveal i +
           (let n = Seq.length s0 in
-           if n = 0 then 0
-           else (n / 2) * (2 * HC.log2_floor n) +
-                (n - 1) * (2 * HC.log2_floor n)))
+           if n > 0 then
+             (n / 2) * (2 * HC.log2_floor n) +
+             (n - 1) * (2 * HC.log2_floor n)
+           else 0))
 {
   A.pts_to_len arr;
   heapsort arr (SZ.v len) ctr #ord iord #s0 #i;
   with s. assert (arr |-> s);
   with cf. assert (MR.pts_to ctr #1.0R cf);
-  permutation_same_length s0 s;
+  assert (pure (Seq.length s == Seq.length s0));
+  assert (pure (Seq.length s == SZ.v len));
   sorted_upto_implies_sc_sorted ord s;
-  sc_permutation_of_sp_permutation s0 s;
+  permutation_to_sc #a #ord s0 s;
   heapsort_cost_bound_explicit (Seq.length s0);
   assert (pure (cf <= reveal i +
     (let n = Seq.length s0 in
-     if n = 0 then 0
-     else (n / 2) * (2 * HC.log2_floor n) +
-          (n - 1) * (2 * HC.log2_floor n))));
+     if n > 0 then
+       (n / 2) * (2 * HC.log2_floor n) +
+       (n - 1) * (2 * HC.log2_floor n)
+     else 0)));
   ()
 }
