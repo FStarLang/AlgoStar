@@ -115,6 +115,21 @@ let mat_mul_partial_ij (#a:Type) (ops:semiring a) (sa sb sc:Seq.seq a)
     (i < ri \/ (i == ri /\ j < cj)) /\ i < n /\ j < n ==>
     Seq.index sc (flat_index n i j) == dot_product_spec ops sa sb n i j n)
 
+[@@"opaque_to_smt"]
+let matrix_lengths (#a:Type) (sa sb sc:Seq.seq a) (n:nat) : prop =
+  Seq.length sa == n * n /\
+  Seq.length sb == n * n /\
+  Seq.length sc == n * n
+
+let matrix_lengths_elim (#a:Type) (sa sb sc:Seq.seq a) (n:nat)
+  : Lemma
+      (requires matrix_lengths sa sb sc n)
+      (ensures Seq.length sa == n * n /\
+               Seq.length sb == n * n /\
+               Seq.length sc == n * n)
+  =
+  reveal_opaque (`%matrix_lengths) (matrix_lengths sa sb sc n)
+
 class array_binary_search (f:nat -> nat) = {
   search:
     (fn (a:Type0)
@@ -162,13 +177,14 @@ class array_max_subarray (f:nat -> nat) = {
         pure (result == max_subarray_spec ops s /\ ticks <= i + f (Seq.length s)));
 }
 
-class square_matrix_multiply (f:nat -> nat) = {
+class square_matrix_multiply
+  (repr: Type0 -> Type0)
+  (owns: (a:Type0) -> repr a -> Seq.seq a -> Seq.seq a -> Seq.seq a -> slprop)
+  (f:nat -> nat)
+= {
   multiply:
     (fn (a:Type0)
-        (#pa #pb:perm)
-        (ma:A.array a)
-        (mb:A.array a)
-        (mc:A.array a)
+        (m:repr a)
         (n:SZ.t)
         (ctr:ticks_t)
         (#ops:erased (semiring a))
@@ -180,21 +196,16 @@ class square_matrix_multiply (f:nat -> nat) = {
         (#sc:erased (Seq.seq a))
         (#i:erased nat)
       requires
-        A.pts_to ma #pa sa **
-        A.pts_to mb #pb sb **
-        A.pts_to mc sc **
+        owns a m sa sb sc **
         MR.pts_to ctr #1.0R i **
         pure (
           SZ.v n > 0 /\
           zero == ops.sr_zero /\
           SZ.fits (SZ.v n * SZ.v n) /\
-          Seq.length sa == SZ.v n * SZ.v n /\
-          Seq.length sb == SZ.v n * SZ.v n /\
-          Seq.length sc == SZ.v n * SZ.v n)
-      ensures exists* sc' ticks.
-        A.pts_to ma #pa sa **
-        A.pts_to mb #pb sb **
-        A.pts_to mc sc' **
+          matrix_lengths sa sb sc (SZ.v n))
+      returns _:unit
+      ensures exists* (sc': Seq.seq a) (ticks: nat).
+        owns a m sa sb sc' **
         MR.pts_to ctr #1.0R ticks **
         pure (mat_mul_correct ops sa sb sc' (SZ.v n) /\ ticks <= i + f (SZ.v n)));
 }
