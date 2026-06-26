@@ -1,4 +1,5 @@
 include ../config.mk
+OTHERFLAGS += --include ../common
 KRML_EXE   ?= $(KRML_HOME)/krml
 include $(PULSE_ROOT)/mk/test.mk
 

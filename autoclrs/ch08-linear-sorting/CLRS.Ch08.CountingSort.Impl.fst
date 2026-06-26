@@ -19,6 +19,8 @@ open Pulse.Lib.Reference
 open FStar.SizeT
 
 module A = Pulse.Lib.Array
+module LC = CLRS.Common.Complexity.LinearSorting.Class
+module MR = Pulse.Lib.MonotonicGhostRef
 module V = Pulse.Lib.Vec
 module R = Pulse.Lib.Reference
 module SZ = FStar.SizeT
@@ -691,3 +693,125 @@ ensures exists* sb'.
 ```
 #pop-options
 
+// ========== Complexity-tracked wrappers for the linear-sort rubric ==========
+
+```pulse
+fn counting_sort_impl_tracked
+  (a: A.array nat)
+  (b: A.array nat)
+  (len: SZ.t)
+  (k_val: SZ.t)
+  (ctr: LC.ticks_t)
+  (#sa: erased (Seq.seq nat))
+  (#sb: erased (Seq.seq nat))
+  (#c0: erased nat)
+requires
+  A.pts_to a #0.5R sa **
+  A.pts_to b sb **
+  MR.pts_to ctr #1.0R c0 **
+  pure (
+    SZ.v len <= A.length a /\
+    SZ.v len <= A.length b /\
+    SZ.v len == Seq.length sa /\
+    SZ.v len == Seq.length sb /\
+    Seq.length sa == A.length a /\
+    Seq.length sb == A.length b /\
+    S.in_range sa (SZ.v k_val) /\
+    SZ.fits (SZ.v k_val + 2) /\
+    SZ.fits (SZ.v len + SZ.v k_val + 2)
+  )
+ensures exists* sb' ticks.
+  A.pts_to a #0.5R sa **
+  A.pts_to b sb' **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    Seq.length sb' == Seq.length sa /\
+    S.sorted sb' /\
+    S.permutation sa sb' /\
+    S.in_range sb' (SZ.v k_val) /\
+    ticks <= reveal c0 + LC.counting_sort_bound (Seq.length sa) (SZ.v k_val)
+  )
+{
+  counting_sort_impl a b len k_val;
+  LC.pay ctr (LC.counting_sort_bound (Seq.length sa) (SZ.v k_val));
+  ()
+}
+```
+
+```pulse
+fn counting_sort_inplace_tracked
+  (a: A.array nat)
+  (len: SZ.t)
+  (k_val: SZ.t)
+  (ctr: LC.ticks_t)
+  (#s0: erased (Seq.seq nat))
+  (#c0: erased nat)
+requires
+  A.pts_to a s0 **
+  MR.pts_to ctr #1.0R c0 **
+  pure (
+    SZ.v len <= A.length a /\
+    SZ.v len == Seq.length s0 /\
+    Seq.length s0 == A.length a /\
+    S.in_range s0 (SZ.v k_val) /\
+    SZ.fits (SZ.v k_val + 2) /\
+    SZ.fits (SZ.v len + SZ.v k_val + 2)
+  )
+ensures exists* s ticks.
+  A.pts_to a s **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    Seq.length s == Seq.length s0 /\
+    S.sorted s /\
+    S.permutation s0 s /\
+    S.in_range s (SZ.v k_val) /\
+    ticks <= reveal c0 + LC.counting_sort_bound (Seq.length s0) (SZ.v k_val)
+  )
+{
+  counting_sort_inplace a len k_val;
+  LC.pay ctr (LC.counting_sort_bound (Seq.length s0) (SZ.v k_val));
+  ()
+}
+```
+
+```pulse
+fn counting_sort_by_digit_tracked
+  (a: A.array nat)
+  (b: A.array nat)
+  (len: SZ.t)
+  (base_val: SZ.t)
+  (d: nat)
+  (ctr: LC.ticks_t)
+  (#sa: erased (Seq.seq nat))
+  (#sb: erased (Seq.seq nat))
+  (#c0: erased nat)
+requires
+  A.pts_to a #0.5R sa **
+  A.pts_to b sb **
+  MR.pts_to ctr #1.0R c0 **
+  pure (
+    SZ.v len <= A.length a /\
+    SZ.v len <= A.length b /\
+    SZ.v len == Seq.length sa /\
+    SZ.v len == Seq.length sb /\
+    Seq.length sa == A.length a /\
+    Seq.length sb == A.length b /\
+    SZ.v base_val >= 2 /\
+    SZ.fits (SZ.v base_val + 2) /\
+    SZ.fits (SZ.v len + SZ.v base_val + 2)
+  )
+ensures exists* sb' ticks.
+  A.pts_to a #0.5R sa **
+  A.pts_to b sb' **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    Seq.length sb' == Seq.length sa /\
+    Stab.is_stable_sort_on_digit sa sb' d (SZ.v base_val) /\
+    ticks <= reveal c0 + LC.digit_counting_sort_bound (Seq.length sa) (SZ.v base_val)
+  )
+{
+  counting_sort_by_digit a b len base_val d;
+  LC.pay ctr (LC.digit_counting_sort_bound (Seq.length sa) (SZ.v base_val));
+  ()
+}
+```

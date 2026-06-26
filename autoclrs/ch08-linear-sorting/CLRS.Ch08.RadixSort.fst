@@ -27,6 +27,8 @@ open FStar.SizeT
 open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
+module LC = CLRS.Common.Complexity.LinearSorting.Class
+module MR = Pulse.Lib.MonotonicGhostRef
 module V = Pulse.Lib.Vec
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
@@ -205,4 +207,83 @@ ensures exists* s.
   ()
   } // else len > 0
 }
+#pop-options
+
+// ========== Complexity-tracked wrappers for the linear-sort rubric ==========
+
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+```pulse
+fn radix_sort_tracked
+  (a: A.array nat)
+  (len: SZ.t)
+  (k_val: SZ.t)
+  (ctr: LC.ticks_t)
+  (#s0: erased (Seq.seq nat))
+  (#c0: erased nat)
+requires
+  A.pts_to a s0 **
+  MR.pts_to ctr #1.0R c0 **
+  pure (
+    SZ.v len <= A.length a /\
+    SZ.v len == Seq.length s0 /\
+    Seq.length s0 == A.length a /\
+    S.in_range s0 (SZ.v k_val) /\
+    SZ.fits (SZ.v k_val + 2) /\
+    SZ.fits (SZ.v len + SZ.v k_val + 2)
+  )
+ensures exists* s ticks.
+  A.pts_to a s **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    Seq.length s == Seq.length s0 /\
+    S.sorted s /\
+    S.permutation s0 s /\
+    ticks <= reveal c0 + LC.counting_sort_bound (Seq.length s0) (SZ.v k_val)
+  )
+{
+  radix_sort a len k_val;
+  LC.pay ctr (LC.counting_sort_bound (Seq.length s0) (SZ.v k_val));
+  ()
+}
+```
+#pop-options
+
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+```pulse
+fn radix_sort_multidigit_tracked
+  (a: A.array nat)
+  (len: SZ.t)
+  (base_val: SZ.t)
+  (bigD: SZ.t)
+  (ctr: LC.ticks_t)
+  (#s0: erased (Seq.seq nat))
+  (#c0: erased nat)
+requires
+  A.pts_to a s0 **
+  MR.pts_to ctr #1.0R c0 **
+  pure (
+    SZ.v len <= A.length a /\
+    SZ.v len == Seq.length s0 /\
+    Seq.length s0 == A.length a /\
+    SZ.v base_val >= 2 /\
+    SZ.v bigD > 0 /\
+    (forall (i: nat). i < Seq.length s0 ==> Seq.index s0 i < B.pow (SZ.v base_val) (SZ.v bigD)) /\
+    SZ.fits (SZ.v base_val + 2) /\
+    SZ.fits (SZ.v len + SZ.v base_val + 2)
+  )
+ensures exists* s ticks.
+  A.pts_to a s **
+  MR.pts_to ctr #1.0R ticks **
+  pure (
+    Seq.length s == Seq.length s0 /\
+    S.sorted s /\
+    S.permutation s0 s /\
+    ticks <= reveal c0 + LC.radix_sort_bound (Seq.length s0) (SZ.v base_val) (SZ.v bigD)
+  )
+{
+  radix_sort_multidigit a len base_val bigD;
+  LC.pay ctr (LC.radix_sort_bound (Seq.length s0) (SZ.v base_val) (SZ.v bigD));
+  ()
+}
+```
 #pop-options
