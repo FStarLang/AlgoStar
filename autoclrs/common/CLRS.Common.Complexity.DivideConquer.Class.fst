@@ -55,7 +55,7 @@ type ordered_monoid (a:Type0) = {
 }
 
 let max_ord (#a:Type) (ops:ordered_monoid a) (x y:a) : Tot a =
-  if ge (x `ops.om_ord.TO.compare` y) then x else y
+  if gt (y `ops.om_ord.TO.compare` x) then y else x
 
 let rec kadane_spec (#a:Type) (ops:ordered_monoid a) (s:Seq.seq a) (i:nat)
   (current_sum:a) (best_sum:a)
