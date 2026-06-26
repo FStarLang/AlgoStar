@@ -145,13 +145,17 @@ class array_max_subarray (f:nat -> nat) = {
         (len:SZ.t)
         (ctr:ticks_t)
         (#ops:erased (ordered_monoid a))
+        (zero:a)
         (iadd:instrumented_binary_op a ops.om_add ctr)
         (icmp:instrumented_total_order a ops.om_ord ctr)
         (#s:erased (Seq.seq a))
         (#i:erased nat)
       preserves A.pts_to arr #p s
       requires MR.pts_to ctr #1.0R i **
-        pure (SZ.v len == Seq.length s /\ Seq.length s <= A.length arr /\ SZ.v len > 0)
+        pure (zero == ops.om_zero /\
+              SZ.v len == Seq.length s /\
+              Seq.length s <= A.length arr /\
+              SZ.v len > 0)
       returns result:a
       ensures exists* ticks.
         MR.pts_to ctr #1.0R ticks **
@@ -168,6 +172,7 @@ class square_matrix_multiply (f:nat -> nat) = {
         (n:SZ.t)
         (ctr:ticks_t)
         (#ops:erased (semiring a))
+        (zero:a)
         (iadd:instrumented_binary_op a ops.sr_add ctr)
         (imul:instrumented_binary_op a ops.sr_mul ctr)
         (#sa:erased (Seq.seq a))
@@ -181,6 +186,7 @@ class square_matrix_multiply (f:nat -> nat) = {
         MR.pts_to ctr #1.0R i **
         pure (
           SZ.v n > 0 /\
+          zero == ops.sr_zero /\
           SZ.fits (SZ.v n * SZ.v n) /\
           Seq.length sa == SZ.v n * SZ.v n /\
           Seq.length sb == SZ.v n * SZ.v n /\
