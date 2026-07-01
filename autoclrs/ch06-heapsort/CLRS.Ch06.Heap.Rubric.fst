@@ -917,12 +917,7 @@ ensures exists* s' (ticks: nat).
   MR.pts_to ctr #1.0R ticks **
   pure (SC.sorted #a #ord s' /\
         SC.permutation s0 s' /\
-        ticks <= reveal i +
-          (let n = Seq.length s0 in
-           if n > 0 then
-             (n / 2) * (2 * HC.log2_floor n) +
-             (n - 1) * (2 * HC.log2_floor n)
-           else 0))
+        ticks <= reveal i + heapsort_sort_bound (Seq.length s0))
 {
   A.pts_to_len arr;
   heapsort arr (SZ.v len) ctr #ord iord #s0 #i;
@@ -933,11 +928,10 @@ ensures exists* s' (ticks: nat).
   sorted_upto_implies_sc_sorted ord s;
   permutation_to_sc #a #ord s0 s;
   heapsort_cost_bound_explicit (Seq.length s0);
-  assert (pure (cf <= reveal i +
-    (let n = Seq.length s0 in
-     if n > 0 then
-       (n / 2) * (2 * HC.log2_floor n) +
-       (n - 1) * (2 * HC.log2_floor n)
-     else 0)));
+  assert (pure (cf <= reveal i + heapsort_sort_bound (Seq.length s0)));
   ()
+}
+
+instance heapsort_array_sort : SC.array_sort heapsort_sort_bound = {
+  sort = heapsort_sort;
 }

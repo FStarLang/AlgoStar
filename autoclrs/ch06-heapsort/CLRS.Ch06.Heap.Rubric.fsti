@@ -11,6 +11,12 @@ module Seq = FStar.Seq
 module SZ = FStar.SizeT
 module TO = Pulse.Lib.TotalOrder
 
+let heapsort_sort_bound (n: nat) : nat =
+  if n > 0 then
+    (n / 2) * (2 * HC.log2_floor n) +
+    (n - 1) * (2 * HC.log2_floor n)
+  else 0
+
 fn heapsort_sort (a: Type0)
   (arr: A.array a)
   (len: SZ.t)
@@ -26,9 +32,6 @@ ensures exists* s' (ticks: nat).
   MR.pts_to ctr #1.0R ticks **
   pure (SC.sorted #a #ord s' /\
         SC.permutation s0 s' /\
-        ticks <= reveal i +
-          (let n = Seq.length s0 in
-           if n > 0 then
-             (n / 2) * (2 * HC.log2_floor n) +
-             (n - 1) * (2 * HC.log2_floor n)
-           else 0))
+        ticks <= reveal i + heapsort_sort_bound (Seq.length s0))
+
+instance val heapsort_array_sort : SC.array_sort u#0 heapsort_sort_bound
