@@ -414,24 +414,27 @@ fn copy_range (#a: Type0)
 }
 
 fn merge (#a: Type0)
-  (arr: A.array a)
+  (arr scratch: A.array a)
   (lo mid hi: SZ.t)
   (ctr: SC.ticks_t)
   (#ord: erased (TO.total_order a))
   (iord: SC.instrumented_total_order a ord ctr)
   (#c0: erased nat)
-  (#s1 #s2: Ghost.erased (Seq.seq a))
+  (#s1 #s2 #scratch1 #scratch2: Ghost.erased (Seq.seq a))
   requires
     pts_to_range arr (SZ.v lo) (SZ.v mid) s1 **
     pts_to_range arr (SZ.v mid) (SZ.v hi) s2 **
+    pts_to_range scratch (SZ.v lo) (SZ.v mid) scratch1 **
+    pts_to_range scratch (SZ.v mid) (SZ.v hi) scratch2 **
     MR.pts_to ctr #1.0R c0 **
     pure (
       SZ.v lo < SZ.v mid /\
       SZ.v mid < SZ.v hi /\
       sorted #a #ord s1 /\
       sorted #a #ord s2)
-  ensures exists* s_out (cf: nat).
+  ensures exists* s_out scratch_out (cf: nat).
     pts_to_range arr (SZ.v lo) (SZ.v hi) s_out **
+    pts_to_range scratch (SZ.v lo) (SZ.v hi) scratch_out **
     MR.pts_to ctr #1.0R cf **
     pure (
       sorted #a #ord s_out /\
@@ -440,31 +443,14 @@ fn merge (#a: Type0)
 {
   pts_to_range_prop arr #(SZ.v lo) #(SZ.v mid);
   pts_to_range_prop arr #(SZ.v mid) #(SZ.v hi);
+  pts_to_range_prop scratch #(SZ.v lo) #(SZ.v mid);
+  pts_to_range_prop scratch #(SZ.v mid) #(SZ.v hi);
 
   let l1 = SZ.(mid -^ lo);
   let l2 = SZ.(hi -^ mid);
 
-  let init1 = pts_to_range_index arr lo #(SZ.v lo) #(SZ.v mid);
-  let init2 = pts_to_range_index arr mid #(SZ.v mid) #(SZ.v hi);
-
-  let tmp1_v = V.alloc init1 l1;
-  V.to_array_pts_to tmp1_v;
-  let tmp1 = V.vec_to_array tmp1_v;
-  rewrite (A.pts_to (V.vec_to_array tmp1_v) (Seq.create (SZ.v l1) init1))
-       as (A.pts_to tmp1 (Seq.create (SZ.v l1) init1));
-  let tmp2_v = V.alloc init2 l2;
-  V.to_array_pts_to tmp2_v;
-  let tmp2 = V.vec_to_array tmp2_v;
-  rewrite (A.pts_to (V.vec_to_array tmp2_v) (Seq.create (SZ.v l2) init2))
-       as (A.pts_to tmp2 (Seq.create (SZ.v l2) init2));
-
-  pts_to_range_intro tmp1 1.0R (Seq.create (SZ.v l1) init1);
-  copy_range arr tmp1 lo 0sz l1;
-  pts_to_range_elim tmp1 1.0R (reveal s1);
-
-  pts_to_range_intro tmp2 1.0R (Seq.create (SZ.v l2) init2);
-  copy_range arr tmp2 mid 0sz l2;
-  pts_to_range_elim tmp2 1.0R (reveal s2);
+  copy_range arr scratch lo lo l1;
+  copy_range arr scratch mid mid l2;
 
   pts_to_range_join arr (SZ.v lo) (SZ.v mid) (SZ.v hi);
 
@@ -480,8 +466,8 @@ fn merge (#a: Type0)
     R.pts_to i vi **
     R.pts_to j vj **
     R.pts_to k vk **
-    A.pts_to tmp1 (reveal s1) **
-    A.pts_to tmp2 (reveal s2) **
+    pts_to_range scratch (SZ.v lo) (SZ.v mid) s1 **
+    pts_to_range scratch (SZ.v mid) (SZ.v hi) s2 **
     pts_to_range arr (SZ.v lo) (SZ.v hi) s_cur **
     MR.pts_to ctr #1.0R vc **
     pure (
@@ -501,7 +487,7 @@ fn merge (#a: Type0)
 
     if (vi = l1) {
       suffix_step_right #a #(reveal ord) s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
-      let v = tmp2.(vj);
+      let v = pts_to_range_index scratch (SZ.(mid +^ vj)) #(SZ.v mid) #(SZ.v hi);
       suffix_gives_index ghost_merged (SZ.v vk)
         (seq_merge #a #ord (Seq.slice s1 (SZ.v vi) (SZ.v l1))
                         (Seq.slice s2 (SZ.v vj) (SZ.v l2)));
@@ -524,7 +510,7 @@ fn merge (#a: Type0)
     } else {
       if (vj = l2) {
         suffix_step_left #a #(reveal ord) s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
-        let v = tmp1.(vi);
+        let v = pts_to_range_index scratch (SZ.(lo +^ vi)) #(SZ.v lo) #(SZ.v mid);
         suffix_gives_index ghost_merged (SZ.v vk)
           (seq_merge #a #ord (Seq.slice s1 (SZ.v vi) (SZ.v l1))
                           (Seq.slice s2 (SZ.v vj) (SZ.v l2)));
@@ -545,8 +531,8 @@ fn merge (#a: Type0)
         i := SZ.(vi +^ 1sz);
         k := SZ.(vk +^ 1sz);
       } else {
-        let v1 = tmp1.(vi);
-        let v2 = tmp2.(vj);
+        let v1 = pts_to_range_index scratch (SZ.(lo +^ vi)) #(SZ.v lo) #(SZ.v mid);
+        let v2 = pts_to_range_index scratch (SZ.(mid +^ vj)) #(SZ.v mid) #(SZ.v hi);
         with vc_pre. assert (MR.pts_to ctr #1.0R vc_pre);
         let cmp = iord v1 v2;
         assert (pure (cmp == v1 `ord.TO.compare` v2));
@@ -608,14 +594,7 @@ fn merge (#a: Type0)
   pts_to_range_prop arr #(SZ.v lo) #(SZ.v hi);
   assert (pure (Seq.equal s_final (reveal ghost_merged)));
 
-  rewrite (A.pts_to tmp1 (reveal s1))
-       as (A.pts_to (V.vec_to_array tmp1_v) (reveal s1));
-  V.to_vec_pts_to tmp1_v;
-  V.free tmp1_v;
-  rewrite (A.pts_to tmp2 (reveal s2))
-       as (A.pts_to (V.vec_to_array tmp2_v) (reveal s2));
-  V.to_vec_pts_to tmp2_v;
-  V.free tmp2_v;
+  pts_to_range_join scratch (SZ.v lo) (SZ.v mid) (SZ.v hi);
 
   seq_merge_sorted #a #(reveal ord) s1 s2;
   seq_merge_permutation #a #(reveal ord) s1 s2;
@@ -628,18 +607,21 @@ fn merge (#a: Type0)
 
 fn rec merge_sort_aux (#a: Type0)
   (arr: A.array a)
+  (scratch: A.array a)
   (lo hi: SZ.t)
   (ctr: SC.ticks_t)
   (#ord: erased (TO.total_order a))
   (iord: SC.instrumented_total_order a ord ctr)
   (#c0: erased nat)
-  (#s: Ghost.erased (Seq.seq a))
+  (#s #scratch_s: Ghost.erased (Seq.seq a))
   requires
     pts_to_range arr (SZ.v lo) (SZ.v hi) s **
+    pts_to_range scratch (SZ.v lo) (SZ.v hi) scratch_s **
     MR.pts_to ctr #1.0R c0
   requires pure (SZ.v lo <= SZ.v hi)
-  ensures exists* s' (cf: nat).
+  ensures exists* s' scratch_s' (cf: nat).
     pts_to_range arr (SZ.v lo) (SZ.v hi) s' **
+    pts_to_range scratch (SZ.v lo) (SZ.v hi) scratch_s' **
     MR.pts_to ctr #1.0R cf **
     pure (
       sorted #a #ord s' /\
@@ -648,6 +630,7 @@ fn rec merge_sort_aux (#a: Type0)
   decreases (range_len lo hi)
 {
   pts_to_range_prop arr;
+  pts_to_range_prop scratch;
   let len = SZ.(hi -^ lo);
   if (SZ.(len <^ 2sz)) {
     assert (pure (Seq.length s <= 1));
@@ -665,19 +648,31 @@ fn rec merge_sort_aux (#a: Type0)
     assert (pure (SZ.v hi - SZ.v mid == SZ.v len - SZ.v len / 2));
 
     pts_to_range_split arr (SZ.v lo) (SZ.v mid) (SZ.v hi);
+    pts_to_range_split scratch (SZ.v lo) (SZ.v mid) (SZ.v hi);
     with s1. assert (pts_to_range arr (SZ.v lo) (SZ.v mid) s1);
     with s2. assert (pts_to_range arr (SZ.v mid) (SZ.v hi) s2);
+    with scratch1. assert (pts_to_range scratch (SZ.v lo) (SZ.v mid) scratch1);
+    with scratch2. assert (pts_to_range scratch (SZ.v mid) (SZ.v hi) scratch2);
 
-    merge_sort_aux arr lo mid ctr #ord iord;
-    with s1' c1. assert (pts_to_range arr (SZ.v lo) (SZ.v mid) s1' ** MR.pts_to ctr #1.0R c1);
+    merge_sort_aux arr scratch lo mid ctr #ord iord;
+    with s1' scratch1' c1. assert (
+      pts_to_range arr (SZ.v lo) (SZ.v mid) s1' **
+      pts_to_range scratch (SZ.v lo) (SZ.v mid) scratch1' **
+      MR.pts_to ctr #1.0R c1);
 
-    merge_sort_aux arr mid hi ctr #ord iord;
-    with s2' c2. assert (pts_to_range arr (SZ.v mid) (SZ.v hi) s2' ** MR.pts_to ctr #1.0R c2);
+    merge_sort_aux arr scratch mid hi ctr #ord iord;
+    with s2' scratch2' c2. assert (
+      pts_to_range arr (SZ.v mid) (SZ.v hi) s2' **
+      pts_to_range scratch (SZ.v mid) (SZ.v hi) scratch2' **
+      MR.pts_to ctr #1.0R c2);
 
     append_permutations #a #(reveal ord) s1 s2 s1' s2';
 
-    merge arr lo mid hi ctr #ord iord;
-    with s_out cf. assert (pts_to_range arr (SZ.v lo) (SZ.v hi) s_out ** MR.pts_to ctr #1.0R cf);
+    merge arr scratch lo mid hi ctr #ord iord;
+    with s_out scratch_out cf. assert (
+      pts_to_range arr (SZ.v lo) (SZ.v hi) s_out **
+      pts_to_range scratch (SZ.v lo) (SZ.v hi) scratch_out **
+      MR.pts_to ctr #1.0R cf);
 
     permutation_trans #a #(reveal ord) s (Seq.append s1 s2) (Seq.append s1' s2');
     permutation_trans #a #(reveal ord) s (Seq.append s1' s2') s_out;
@@ -716,24 +711,61 @@ ensures exists* s' (ticks: nat).
   A.pts_to_len arr;
   assert (pure (A.length arr == Seq.length s0));
   assert (pure (Seq.length s0 == SZ.v len));
-  pts_to_range_intro arr 1.0R (reveal s0);
-  merge_sort_aux arr 0sz len ctr #ord iord;
-  with s cf. assert (pts_to_range arr 0 (SZ.v len) s ** MR.pts_to ctr #1.0R cf);
-  rewrite (pts_to_range arr 0 (SZ.v len) s)
-      as (pts_to_range arr 0 (A.length arr) s);
-  pts_to_range_elim arr 1.0R s;
-  is_sorted_to_sc #a #(reveal ord) s;
-  is_permutation_to_sc #a #(reveal ord) s0 s;
-  assert (pure (range_len 0sz len == SZ.v len));
-  assert (pure (merge_sort_comparisons (SZ.v len) == merge_sort_comparisons (Seq.length s0)));
-  merge_sort_comparisons_closed_bound (Seq.length s0);
-  assert (pure (
-    SC.sorted #a #ord s /\
-    SC.permutation s0 s /\
-    cf <= reveal i +
-      (if Seq.length s0 > 0 then
-         4 * Seq.length s0 * MS.log2_ceil (Seq.length s0) + 4 * Seq.length s0
-       else 0)));
+  if (SZ.(len <^ 2sz)) {
+    assert (pure (Seq.length s0 <= 1));
+    small_sorted #a #(reveal ord) s0;
+    permutation_refl #a #(reveal ord) s0;
+    is_sorted_to_sc #a #(reveal ord) s0;
+    is_permutation_to_sc #a #(reveal ord) s0 s0;
+    merge_sort_comparisons_closed_bound (Seq.length s0);
+    assert (pure (
+      SC.sorted #a #ord s0 /\
+      SC.permutation s0 s0 /\
+      reveal i <= reveal i +
+        (if Seq.length s0 > 0 then
+           4 * Seq.length s0 * MS.log2_ceil (Seq.length s0) + 4 * Seq.length s0
+         else 0)));
+  } else {
+    assert (pure (SZ.v len >= 2));
+    let init = arr.(0sz);
+    let scratch_v = V.alloc init len;
+    V.to_array_pts_to scratch_v;
+    let scratch = V.vec_to_array scratch_v;
+    rewrite (A.pts_to (V.vec_to_array scratch_v) (Seq.create (SZ.v len) init))
+         as (A.pts_to scratch (Seq.create (SZ.v len) init));
+    A.pts_to_len scratch;
+    assert (pure (A.length scratch == SZ.v len));
+
+    pts_to_range_intro arr 1.0R (reveal s0);
+    pts_to_range_intro scratch 1.0R (Seq.create (SZ.v len) init);
+    merge_sort_aux arr scratch 0sz len ctr #ord iord;
+    with s scratch_s cf. assert (
+      pts_to_range arr 0 (SZ.v len) s **
+      pts_to_range scratch 0 (SZ.v len) scratch_s **
+      MR.pts_to ctr #1.0R cf);
+    rewrite (pts_to_range arr 0 (SZ.v len) s)
+        as (pts_to_range arr 0 (A.length arr) s);
+    pts_to_range_elim arr 1.0R s;
+    rewrite (pts_to_range scratch 0 (SZ.v len) scratch_s)
+        as (pts_to_range scratch 0 (A.length scratch) scratch_s);
+    pts_to_range_elim scratch 1.0R scratch_s;
+    rewrite (A.pts_to scratch scratch_s)
+        as (A.pts_to (V.vec_to_array scratch_v) scratch_s);
+    V.to_vec_pts_to scratch_v;
+    V.free scratch_v;
+    is_sorted_to_sc #a #(reveal ord) s;
+    is_permutation_to_sc #a #(reveal ord) s0 s;
+    assert (pure (range_len 0sz len == SZ.v len));
+    assert (pure (merge_sort_comparisons (SZ.v len) == merge_sort_comparisons (Seq.length s0)));
+    merge_sort_comparisons_closed_bound (Seq.length s0);
+    assert (pure (
+      SC.sorted #a #ord s /\
+      SC.permutation s0 s /\
+      cf <= reveal i +
+        (if Seq.length s0 > 0 then
+           4 * Seq.length s0 * MS.log2_ceil (Seq.length s0) + 4 * Seq.length s0
+         else 0)));
+  }
 }
 
 fn merge_sort_sort_poly (a: Type0)
