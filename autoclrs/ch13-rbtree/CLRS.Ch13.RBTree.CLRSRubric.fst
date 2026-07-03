@@ -38,6 +38,41 @@ let rec node_count (a:Type0) (t:rbtree a) : nat =
   | Leaf -> 0
   | Node _ l _ r -> 1 + node_count a l + node_count a r
 
+// ---- RB Invariant Predicates ----
+
+let rec bh (a:Type0) (t:rbtree a) : nat =
+  match t with
+  | Leaf -> 0
+  | Node c l _ _ -> if c = Black then 1 + bh a l else bh a l
+
+let is_root_black (a:Type0) (t:rbtree a) : bool =
+  match t with
+  | Leaf -> true
+  | Node c _ _ _ -> c = Black
+
+let rec no_red_red (a:Type0) (t:rbtree a) : bool =
+  match t with
+  | Leaf -> true
+  | Node c l _ r ->
+    (if c = Red then
+       (match l with Leaf -> true | Node cl _ _ _ -> cl = Black) &&
+       (match r with Leaf -> true | Node cr _ _ _ -> cr = Black)
+     else true) &&
+    no_red_red a l && no_red_red a r
+
+let rec same_bh (a:Type0) (t:rbtree a) : bool =
+  match t with
+  | Leaf -> true
+  | Node _ l _ r -> bh a l = bh a r && same_bh a l && same_bh a r
+
+let is_rbtree (a:Type0) (t:rbtree a) : bool =
+  is_root_black a t && no_red_red a t && same_bh a t
+
+let almost_no_red_red (a:Type0) (t:rbtree a) : bool =
+  match t with
+  | Leaf -> true
+  | Node _ l _ r -> no_red_red a l && no_red_red a r
+
 let empty_model (a:Type0) : GTot (rbtree a) = Leaf
 
 let rec find_model (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
@@ -75,7 +110,7 @@ let rec is_bst (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) : GTot boo
   | Node _ l v r -> all_lt a ord l v && all_gt a ord r v && is_bst a ord l && is_bst a ord r
 
 let valid (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) : GTot prop =
-  is_bst a ord t = true
+  is_rbtree a t = true /\ is_bst a ord t = true
 
 let is_red_node (a:Type0) (t:rbtree a) : bool =
   match t with
@@ -115,6 +150,80 @@ let set_color_find (a:Type0) (ord:erased (TO.total_order a)) (c:color) (t:rbtree
   = match t with
     | Leaf -> ()
     | Node _ l k r -> ()
+
+let set_color_same_bh (a:Type0) (c:color) (t:rbtree a)
+  : Lemma (ensures same_bh a (set_color a c t) == same_bh a t)
+  = match t with
+    | Leaf -> ()
+    | Node _ l k r -> ()
+
+let set_color_no_red_red_black (a:Type0) (t:rbtree a)
+  : Lemma (requires no_red_red a t)
+          (ensures no_red_red a (set_color a Black t))
+  = match t with
+    | Leaf -> ()
+    | Node _ l k r -> ()
+
+let make_black_same_bh (a:Type0) (t:rbtree a)
+  : Lemma (ensures same_bh a (make_black a t) == same_bh a t)
+  = set_color_same_bh a Black t
+
+let make_black_no_red_red (a:Type0) (t:rbtree a)
+  : Lemma (requires no_red_red a t)
+          (ensures no_red_red a (make_black a t))
+  = set_color_no_red_red_black a t
+
+let make_black_is_rbtree (a:Type0) (t:rbtree a)
+  : Lemma (requires same_bh a t /\ no_red_red a t)
+          (ensures is_rbtree a (make_black a t))
+  = make_black_same_bh a t;
+    make_black_no_red_red a t
+
+// ===== Height Bound Lemmas =====
+
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 5"
+let rec min_nodes_poly (a:Type0) (t:rbtree a)
+  : Lemma (requires same_bh a t /\ no_red_red a t)
+          (ensures node_count a t >= pow2 (bh a t) - 1)
+          (decreases (height a t))
+  = match t with | Leaf -> () | Node _ l _ r ->
+      min_nodes_poly a l; min_nodes_poly a r;
+      Math.Lemmas.pow2_plus 1 (bh a l)
+#pop-options
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
+let rec bh_height_bound_poly (a:Type0) (t:rbtree a)
+  : Lemma (requires no_red_red a t /\ same_bh a t)
+          (ensures height a t <= 2 * bh a t + (if Node? t && (Node?.c t) = Red then 1 else 0))
+          (decreases (height a t))
+  = match t with | Leaf -> () | Node _ l _ r ->
+      bh_height_bound_poly a l; bh_height_bound_poly a r
+#pop-options
+
+#push-options "--fuel 2 --ifuel 0 --z3rlimit 5"
+let rec pow2_log2_le_poly (n:pos)
+  : Lemma (ensures pow2 (SC.log2_floor n) <= n) (decreases n)
+  = if n = 1 then ()
+    else begin pow2_log2_le_poly (n/2); Math.Lemmas.pow2_plus 1 (SC.log2_floor (n/2)) end
+#pop-options
+
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 5"
+let rec log2_floor_ge_poly (n:pos) (k:nat)
+  : Lemma (requires n >= pow2 k) (ensures SC.log2_floor n >= k) (decreases k)
+  = if k = 0 then ()
+    else begin
+      Math.Lemmas.pow2_plus 1 (k-1);
+      assert (n >= 2); assert (n/2 >= pow2 (k-1));
+      log2_floor_ge_poly (n/2) (k-1)
+    end
+#pop-options
+
+let height_bound_poly (a:Type0) (t:rbtree a)
+  : Lemma (requires is_rbtree a t /\ node_count a t >= 1)
+          (ensures height a t <= 2 * SC.log2_floor (node_count a t + 1))
+  = bh_height_bound_poly a t;
+    min_nodes_poly a t;
+    log2_floor_ge_poly (node_count a t + 1) (bh a t)
 
 // ===== BST Weaken Lemmas =====
 
@@ -612,6 +721,121 @@ let make_black_find_poly (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) 
   : Lemma (ensures find_model a ord (make_black a t) key == find_model a ord t key)
   = set_color_find a ord Black t key
 
+// ===== Insert RB Preservation =====
+
+let ins_almost_no_red_red (a:Type0) (t:rbtree a) : bool =
+  almost_no_red_red a t &&
+  (match t with
+   | Node Red l _ r -> not (is_red_node a l && is_red_node a r)
+   | _ -> true)
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
+let clrs_fixup_left_same_bh (a:Type0) (c:color) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires same_bh a l /\ same_bh a r /\ bh a l = bh a r)
+      (ensures same_bh a (clrs_fixup_left a c l v r))
+  = ()
+
+let clrs_fixup_right_same_bh (a:Type0) (c:color) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires same_bh a l /\ same_bh a r /\ bh a l = bh a r)
+      (ensures same_bh a (clrs_fixup_right a c l v r))
+  = ()
+
+let clrs_fixup_left_bh (a:Type0) (c:color) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires same_bh a l /\ same_bh a r /\ bh a l = bh a r)
+      (ensures bh a (clrs_fixup_left a c l v r) = bh a (Node c l v r))
+  = ()
+
+let clrs_fixup_right_bh (a:Type0) (c:color) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires same_bh a l /\ same_bh a r /\ bh a l = bh a r)
+      (ensures bh a (clrs_fixup_right a c l v r) = bh a (Node c l v r))
+  = ()
+#pop-options
+
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 10"
+let clrs_fixup_left_restores_no_red_red (a:Type0) (c:color) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires c = Black /\ ins_almost_no_red_red a l /\ no_red_red a r)
+      (ensures no_red_red a (clrs_fixup_left a c l v r))
+  = match l with
+    | Node Red (Node Red _ _ _) _ _ ->
+        if is_red_node a r then () else ()
+    | Node Red _ _ (Node Red _ _ _) ->
+        if is_red_node a r then () else ()
+    | _ -> ()
+
+let clrs_fixup_right_restores_no_red_red (a:Type0) (c:color) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires c = Black /\ no_red_red a l /\ ins_almost_no_red_red a r)
+      (ensures no_red_red a (clrs_fixup_right a c l v r))
+  = match r with
+    | Node Red (Node Red _ _ _) _ _ ->
+        if is_red_node a l then () else ()
+    | Node Red _ _ (Node Red _ _ _) ->
+        if is_red_node a l then () else ()
+    | _ -> ()
+
+let clrs_fixup_left_almost (a:Type0) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires no_red_red a l /\ no_red_red a r /\ not (is_red_node a r))
+      (ensures almost_no_red_red a (clrs_fixup_left a Red l v r) /\
+               ins_almost_no_red_red a (clrs_fixup_left a Red l v r))
+  = ()
+
+let clrs_fixup_right_almost (a:Type0) (l:rbtree a) (v:a) (r:rbtree a)
+  : Lemma
+      (requires no_red_red a l /\ no_red_red a r /\ not (is_red_node a l))
+      (ensures almost_no_red_red a (clrs_fixup_right a Red l v r) /\
+               ins_almost_no_red_red a (clrs_fixup_right a Red l v r))
+  = ()
+#pop-options
+
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
+let rec clrs_ins_properties (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (k:a)
+  : Lemma
+      (requires same_bh a t /\ no_red_red a t)
+      (ensures same_bh a (clrs_ins_model a ord t k) /\
+               bh a (clrs_ins_model a ord t k) = bh a t /\
+               ins_almost_no_red_red a (clrs_ins_model a ord t k) /\
+               (Node? t /\ Black? (Node?.c t) ==> no_red_red a (clrs_ins_model a ord t k)) /\
+               (Leaf? t ==> no_red_red a (clrs_ins_model a ord t k)))
+      (decreases t)
+  = match t with
+    | Leaf -> ()
+    | Node c l v r ->
+        let cmp = k `ord.TO.compare` v in
+        if lt cmp then begin
+          clrs_ins_properties a ord l k;
+          clrs_fixup_left_same_bh a c (clrs_ins_model a ord l k) v r;
+          clrs_fixup_left_bh a c (clrs_ins_model a ord l k) v r;
+          if c = Black then
+            clrs_fixup_left_restores_no_red_red a c (clrs_ins_model a ord l k) v r
+          else
+            clrs_fixup_left_almost a (clrs_ins_model a ord l k) v r
+        end else if gt cmp then begin
+          clrs_ins_properties a ord r k;
+          clrs_fixup_right_same_bh a c l v (clrs_ins_model a ord r k);
+          clrs_fixup_right_bh a c l v (clrs_ins_model a ord r k);
+          if c = Black then
+            clrs_fixup_right_restores_no_red_red a c l v (clrs_ins_model a ord r k)
+          else
+            clrs_fixup_right_almost a l v (clrs_ins_model a ord r k)
+        end else ()
+#pop-options
+
+let clrs_insert_is_rbtree (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (k:a)
+  : Lemma (requires is_rbtree a t)
+          (ensures is_rbtree a (clrs_insert_model a ord t k))
+  = clrs_ins_properties a ord t k;
+    match t with
+    | Leaf -> make_black_is_rbtree a (clrs_ins_model a ord t k)
+    | Node c _ _ _ ->
+        assert (c = Black);
+        make_black_is_rbtree a (clrs_ins_model a ord t k)
+
 #push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let rec clrs_ins_all_lt (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (k:a) (bound:a)
   : Lemma (requires all_lt a ord t bound /\ lt_ord a ord k bound)
@@ -664,7 +888,8 @@ let rec clrs_ins_preserves_bst (a:Type0) (ord:erased (TO.total_order a)) (t:rbtr
 
 let clrs_insert_model_valid (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (k:a)
   : Lemma (requires valid a ord t) (ensures valid a ord (clrs_insert_model a ord t k))
-  = clrs_ins_preserves_bst a ord t k;
+  = clrs_insert_is_rbtree a ord t k;
+    clrs_ins_preserves_bst a ord t k;
     set_color_is_bst a ord Black (clrs_ins_model a ord t k)
 
 #push-options "--fuel 3 --ifuel 2 --z3rlimit 20"
@@ -1313,9 +1538,159 @@ let rec clrs_del_preserves_bst (a:Type0) (ord:erased (TO.total_order a)) (t:rbtr
                   clrs_resolve_right_is_bst a ord c l successor (fst (clrs_del_model a ord r successor))
 #pop-options
 
+// ===== Delete RB Preservation =====
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10 --split_queries always"
+let clrs_del_cases234_left_props
+    (a:Type0) (c:color) (x:rbtree a) (v:a)
+    (w:rbtree a{Node? w /\ Black? (Node?.c w)})
+  : Lemma
+      (requires same_bh a x /\ same_bh a w /\ bh a x + 1 = bh a w /\
+                no_red_red a x /\ no_red_red a w)
+      (ensures (let res = clrs_del_cases234_left a c x v w in
+                same_bh a (fst res) /\
+                (snd res ==> bh a (fst res) = bh a w /\ almost_no_red_red a (fst res)) /\
+                (not (snd res) ==> bh a (fst res) = (if c = Black then 1 + bh a w else bh a w) /\
+                                      no_red_red a (fst res))))
+  = let Node Black wl wy wr = w in
+    assert (bh a x = bh a wl);
+    assert (bh a wl = bh a wr);
+    match wl, wr with
+    | Node Red _ _ _, Node Red _ _ _ -> ()
+    | Node Red _ _ _, _ -> ()
+    | _, Node Red _ _ _ -> ()
+    | _, _ -> ()
+#pop-options
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10 --split_queries always"
+let clrs_del_cases234_right_props
+    (a:Type0) (c:color) (w:rbtree a{Node? w /\ Black? (Node?.c w)})
+    (v:a) (x:rbtree a)
+  : Lemma
+      (requires same_bh a w /\ same_bh a x /\ bh a x + 1 = bh a w /\
+                no_red_red a w /\ no_red_red a x)
+      (ensures (let res = clrs_del_cases234_right a c w v x in
+                same_bh a (fst res) /\
+                (snd res ==> bh a (fst res) = bh a w /\ almost_no_red_red a (fst res)) /\
+                (not (snd res) ==> bh a (fst res) = (if c = Black then 1 + bh a w else bh a w) /\
+                                      no_red_red a (fst res))))
+  = let Node Black wl wy wr = w in
+    assert (bh a x = bh a wr);
+    assert (bh a wl = bh a wr);
+    match wr, wl with
+    | Node Red _ _ _, Node Red _ _ _ -> ()
+    | Node Red _ _ _, _ -> ()
+    | _, Node Red _ _ _ -> ()
+    | _, _ -> ()
+#pop-options
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10 --split_queries always"
+let clrs_resolve_left_props
+    (a:Type0) (c:color) (x:rbtree a) (v:a) (w:rbtree a)
+  : Lemma
+      (requires same_bh a x /\ same_bh a w /\ bh a x + 1 = bh a w /\
+                no_red_red a x /\ no_red_red a w /\
+                (c = Red ==> ~(Node? w /\ Red? (Node?.c w))))
+      (ensures (let res = clrs_resolve_left a c x v w in
+                same_bh a (fst res) /\
+                (snd res ==> bh a (fst res) = bh a w /\ almost_no_red_red a (fst res)) /\
+                (not (snd res) ==> bh a (fst res) = (if c = Black then 1 + bh a w else bh a w) /\
+                                      no_red_red a (fst res))))
+  = match w with
+    | Node Red wl wy wr ->
+        clrs_del_cases234_left_props a Red x v wl
+    | Node Black _ _ _ ->
+        clrs_del_cases234_left_props a c x v w
+    | _ -> ()
+
+let clrs_resolve_right_props
+    (a:Type0) (c:color) (w:rbtree a) (v:a) (x:rbtree a)
+  : Lemma
+      (requires same_bh a w /\ same_bh a x /\ bh a x + 1 = bh a w /\
+                no_red_red a w /\ no_red_red a x /\
+                (c = Red ==> ~(Node? w /\ Red? (Node?.c w))))
+      (ensures (let res = clrs_resolve_right a c w v x in
+                same_bh a (fst res) /\
+                (snd res ==> bh a (fst res) = bh a w /\ almost_no_red_red a (fst res)) /\
+                (not (snd res) ==> bh a (fst res) = (if c = Black then 1 + bh a w else bh a w) /\
+                                      no_red_red a (fst res))))
+  = match w with
+    | Node Red wl wy wr ->
+        clrs_del_cases234_right_props a Red wr v x
+    | Node Black _ _ _ ->
+        clrs_del_cases234_right_props a c w v x
+    | _ -> ()
+#pop-options
+
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10 --split_queries always"
+let rec clrs_del_props (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (k:a)
+  : Lemma
+      (requires same_bh a t /\ no_red_red a t /\ is_bst a ord t)
+      (ensures (let res = clrs_del_model a ord t k in
+                same_bh a (fst res) /\
+                (snd res ==>
+                  Node? t /\ Black? (Node?.c t) /\
+                  bh a (fst res) = bh a t - 1 /\ no_red_red a (fst res)) /\
+                (not (snd res) ==>
+                  bh a (fst res) = bh a t /\
+                  (Node? t /\ Black? (Node?.c t) ==> no_red_red a (fst res)) /\
+                  (Node? t /\ Red? (Node?.c t) ==> no_red_red a (fst res)))))
+      (decreases t)
+  =
+  match t with
+  | Leaf -> ()
+  | Node c l v r ->
+      let cmp = k `ord.TO.compare` v in
+      if lt cmp then begin
+        clrs_del_props a ord l k;
+        if snd (clrs_del_model a ord l k) then begin
+          assert (c = Red ==> ~(Node? r /\ Red? (Node?.c r)));
+          clrs_resolve_left_props a c (fst (clrs_del_model a ord l k)) v r
+        end
+      end else if gt cmp then begin
+        clrs_del_props a ord r k;
+        if snd (clrs_del_model a ord r k) then begin
+          assert (c = Red ==> ~(Node? l /\ Red? (Node?.c l)));
+          clrs_resolve_right_props a c l v (fst (clrs_del_model a ord r k))
+        end
+      end else begin
+        match l, r with
+        | Leaf, Leaf -> ()
+        | Leaf, Node _ _ _ _ ->
+            assert (c = Black)
+        | Node _ _ _ _, Leaf ->
+            assert (c = Black)
+        | _, _ ->
+            minimum_nonempty a r;
+            match minimum_model a r with
+            | None -> ()
+            | Some successor ->
+                clrs_del_props a ord r successor;
+                if snd (clrs_del_model a ord r successor) then begin
+                  assert (c = Red ==> ~(Node? l /\ Red? (Node?.c l)));
+                  clrs_resolve_right_props a c l successor (fst (clrs_del_model a ord r successor))
+                end
+      end
+#pop-options
+
+let clrs_delete_is_rbtree (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (k:a)
+  : Lemma (requires is_rbtree a t /\ is_bst a ord t)
+          (ensures is_rbtree a (clrs_delete_model a ord t k))
+  =
+  clrs_del_props a ord t k;
+  let res = clrs_del_model a ord t k in
+  match t with
+  | Leaf ->
+      make_black_is_rbtree a (fst res)
+  | Node c _ _ _ ->
+      assert (c = Black);
+      if snd res then () else ();
+      make_black_is_rbtree a (fst res)
+
 let clrs_delete_model_valid (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
   : Lemma (requires valid a ord t) (ensures valid a ord (clrs_delete_model a ord t key))
-  = clrs_del_preserves_bst a ord t key;
+  = clrs_delete_is_rbtree a ord t key;
+    clrs_del_preserves_bst a ord t key;
     set_color_is_bst a ord Black (fst (clrs_del_model a ord t key))
 
 #push-options "--fuel 5 --ifuel 3 --z3rlimit 20"
@@ -1631,39 +2006,39 @@ let clrs_delete_ticks (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (ke
   =
   clrs_del_ticks a ord t key
 
-let search_bound (h:nat) (_n:nat) : nat = h
-let insert_bound (h:nat) (_n:nat) : nat = h
-let delete_bound (h:nat) (_n:nat) : nat = 2 * h + 1
+let search_bound : nat -> nat -> nat = SC.rb_search_bound
+let insert_bound : nat -> nat -> nat = SC.rb_insert_bound
+let delete_bound : nat -> nat -> nat = SC.rb_delete_bound
 
-let rec search_ticks_bounded (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
-  : Lemma (ensures search_ticks a ord t key <= search_bound (height a t) (node_count a t))
+let rec search_ticks_le_height (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (ensures search_ticks a ord t key <= height a t)
   =
   match t with
   | Leaf -> ()
   | Node _ l k r ->
       let cmp = key `ord.TO.compare` k in
-      if lt cmp then search_ticks_bounded a ord l key
-      else if gt cmp then search_ticks_bounded a ord r key
+      if lt cmp then search_ticks_le_height a ord l key
+      else if gt cmp then search_ticks_le_height a ord r key
 
-let rec clrs_ins_ticks_bounded (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
-  : Lemma (ensures clrs_insert_ticks a ord t key <= insert_bound (height a t) (node_count a t))
+let rec clrs_ins_ticks_le_height (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (ensures clrs_insert_ticks a ord t key <= height a t)
   =
   match t with
   | Leaf -> ()
   | Node _ l k r ->
       let cmp = key `ord.TO.compare` k in
-      if lt cmp then clrs_ins_ticks_bounded a ord l key
-      else if gt cmp then clrs_ins_ticks_bounded a ord r key
+      if lt cmp then clrs_ins_ticks_le_height a ord l key
+      else if gt cmp then clrs_ins_ticks_le_height a ord r key
 
-let rec clrs_del_ticks_bounded (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
-  : Lemma (ensures clrs_delete_ticks a ord t key <= delete_bound (height a t) (node_count a t))
+let rec clrs_del_ticks_le_height (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (ensures clrs_delete_ticks a ord t key <= 2 * height a t + 1)
   =
   match t with
   | Leaf -> ()
   | Node _ l k r ->
       let cmp = key `ord.TO.compare` k in
-      if lt cmp then clrs_del_ticks_bounded a ord l key
-      else if gt cmp then clrs_del_ticks_bounded a ord r key
+      if lt cmp then clrs_del_ticks_le_height a ord l key
+      else if gt cmp then clrs_del_ticks_le_height a ord r key
       else
         match l, r with
         | Leaf, Leaf -> ()
@@ -1671,8 +2046,29 @@ let rec clrs_del_ticks_bounded (a:Type0) (ord:erased (TO.total_order a)) (t:rbtr
         | _, Leaf -> ()
         | _, _ ->
             match minimum_model a r with
-            | Some sk -> clrs_del_ticks_bounded a ord r sk
+            | Some sk -> clrs_del_ticks_le_height a ord r sk
             | None -> ()
+
+let search_ticks_bounded (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (requires valid a ord t)
+          (ensures search_ticks a ord t key <= search_bound (height a t) (node_count a t))
+  = search_ticks_le_height a ord t key;
+    if node_count a t = 0 then ()
+    else height_bound_poly a t
+
+let clrs_ins_ticks_bounded (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (requires valid a ord t)
+          (ensures clrs_insert_ticks a ord t key <= insert_bound (height a t) (node_count a t))
+  = clrs_ins_ticks_le_height a ord t key;
+    if node_count a t = 0 then ()
+    else height_bound_poly a t
+
+let clrs_del_ticks_bounded (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (requires valid a ord t)
+          (ensures clrs_delete_ticks a ord t key <= delete_bound (height a t) (node_count a t))
+  = clrs_del_ticks_le_height a ord t key;
+    if node_count a t = 0 then ()
+    else height_bound_poly a t
 
 let rec rbtree_subtree (a:Type0) (ct:rb_ptr a) (ft:rbtree a) (parent:rb_ptr a)
   : Tot slprop (decreases ft)
