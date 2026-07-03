@@ -37,6 +37,8 @@ let rec node_count (a:Type0) (t:rbtree a) : nat =
   | Leaf -> 0
   | Node _ l _ r -> 1 + node_count a l + node_count a r
 
+let empty_model (a:Type0) : GTot (rbtree a) = Leaf
+
 // ---- RB Invariant Predicates ----
 
 let rec bh (a:Type0) (t:rbtree a) : nat =
@@ -383,6 +385,101 @@ let reveal_ord (a:Type0) (ord:erased (TO.total_order a)) : Lemma (
   (forall (x y:a). {:pattern ord.TO.compare x y}
     ord.TO.compare x y == TO.flip_order (ord.TO.compare y x)))
   = let _ = ord.TO.properties in ()
+
+let rec find_model_some_eq (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma
+      (requires Some? (find_model a ord t key))
+      (ensures Some?.v (find_model a ord t key) == key)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node _ l k r ->
+      let cmp = key `ord.TO.compare` k in
+      if lt cmp then find_model_some_eq a ord l key
+      else if gt cmp then find_model_some_eq a ord r key
+      else ()
+
+let find_empty (a:Type0) (ord:erased (TO.total_order a)) (key:a)
+  : Lemma (ensures find_model a ord (empty_model a) key == None)
+  = ()
+
+// ===== Small order helpers (mirroring ch12) =====
+
+let compare_eq_is_eq (a:Type0) (ord:erased (TO.total_order a)) (x y:a)
+  : Lemma (requires eq (x `ord.TO.compare` y)) (ensures x == y)
+  = let _ = ord.TO.properties in ()
+
+let compare_eq_of_eq (a:Type0) (ord:erased (TO.total_order a)) (x y:a)
+  : Lemma (requires x == y) (ensures eq (x `ord.TO.compare` y) = true)
+  = let _ = ord.TO.properties in ()
+
+let flip_gt_lt (a:Type0) (ord:erased (TO.total_order a)) (x y:a)
+  : Lemma (requires gt_ord a ord x y = true) (ensures lt_ord a ord y x = true)
+  = reveal_ord a ord
+
+let flip_lt_gt (a:Type0) (ord:erased (TO.total_order a)) (x y:a)
+  : Lemma (requires lt_ord a ord x y = true) (ensures gt_ord a ord y x = true)
+  = reveal_ord a ord
+
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
+let rec find_none_all_lt (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma
+      (requires all_lt a ord t key = true)
+      (ensures find_model a ord t key == None)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node _ l k r ->
+      find_none_all_lt a ord l key;
+      find_none_all_lt a ord r key
+
+let rec find_none_all_gt (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma
+      (requires all_gt a ord t key = true)
+      (ensures find_model a ord t key == None)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node _ l k r ->
+      find_none_all_gt a ord l key;
+      find_none_all_gt a ord r key
+
+let rec find_some_all_lt_poly (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (bound:a) (key:a)
+  : Lemma
+      (requires all_lt a ord t bound /\ Some? (find_model a ord t key))
+      (ensures lt_ord a ord key bound)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node _ l v r ->
+      let cmp = key `ord.TO.compare` v in
+      if lt cmp then find_some_all_lt_poly a ord l bound key
+      else if gt cmp then find_some_all_lt_poly a ord r bound key
+      else compare_eq_is_eq a ord key v
+
+let rec find_some_all_gt_poly (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (bound:a) (key:a)
+  : Lemma
+      (requires all_gt a ord t bound /\ Some? (find_model a ord t key))
+      (ensures gt_ord a ord key bound)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node _ l v r ->
+      let cmp = key `ord.TO.compare` v in
+      if lt cmp then find_some_all_gt_poly a ord l bound key
+      else if gt cmp then find_some_all_gt_poly a ord r bound key
+      else compare_eq_is_eq a ord key v
+#pop-options
 
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec all_lt_weaken_poly (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (b1 b2:a)
@@ -879,6 +976,302 @@ let delete_model_valid (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (k
   : Lemma (requires valid a ord t) (ensures valid a ord (delete_model a ord t k))
   = delete_is_rbtree_poly a ord t k; delete_preserves_bst_poly a ord t k
 
+// ===== SCAFFOLD: find preserved by rotations / fuse (to be filled in) =====
+
+let redden_find_poly (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (ensures find_model a ord (redden a t) key == find_model a ord t key)
+  = match t with
+    | Leaf -> ()
+    | Node _ _ _ _ -> ()
+
+let make_black_find_poly (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (ensures find_model a ord (make_black a t) key == find_model a ord t key)
+  = match t with
+    | Leaf -> ()
+    | Node _ _ _ _ -> ()
+
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 20"
+let balance_find_poly (a:Type0) (ord:erased (TO.total_order a)) (c:color) (l:rbtree a) (v:a) (r:rbtree a) (key:a)
+  : Lemma (requires is_bst a ord l /\ is_bst a ord r /\ all_lt a ord l v /\ all_gt a ord r v)
+          (ensures find_model a ord (balance a c l v r) key == find_model a ord (Node c l v r) key)
+  = reveal_ord a ord;
+    match c, l, r with
+    | Black, Node Red (Node Red a_ x b) y c_, _ ->
+      let cy = key `ord.TO.compare` y in
+      if eq cy then compare_eq_is_eq a ord key y
+    | Black, Node Red a_ x (Node Red b y c_), _ ->
+      let cy = key `ord.TO.compare` y in
+      if eq cy then compare_eq_is_eq a ord key y
+    | Black, _, Node Red (Node Red b y c_) z d ->
+      let cy = key `ord.TO.compare` y in
+      if eq cy then compare_eq_is_eq a ord key y
+    | Black, _, Node Red b y (Node Red c_ z d) ->
+      let cy = key `ord.TO.compare` y in
+      if eq cy then compare_eq_is_eq a ord key y
+    | _ -> ()
+#pop-options
+
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 20"
+let balL_find_poly (a:Type0) (ord:erased (TO.total_order a)) (l:rbtree a) (v:a) (r:rbtree a) (key:a)
+  : Lemma (requires is_bst a ord l /\ is_bst a ord r /\ all_lt a ord l v /\ all_gt a ord r v)
+          (ensures find_model a ord (balL a l v r) key == find_model a ord (Node Black l v r) key)
+  = reveal_ord a ord;
+    match l, r with
+    | Node Red a_ x b, _ -> ()
+    | _, Node Black b y c ->
+      balance_find_poly a ord Black l v (Node Red b y c) key
+    | _, Node Red (Node Black b y c) z d ->
+      let cy = key `ord.TO.compare` y in
+      let cv = key `ord.TO.compare` v in
+      let cz = key `ord.TO.compare` z in
+      redden_find_poly a ord d key;
+      balance_find_poly a ord Black c z (redden a d) key;
+      if eq cy then compare_eq_is_eq a ord key y
+      else if eq cv then compare_eq_is_eq a ord key v
+      else if eq cz then compare_eq_is_eq a ord key z
+    | _ -> ()
+#pop-options
+
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 20"
+let balR_find_poly (a:Type0) (ord:erased (TO.total_order a)) (l:rbtree a) (v:a) (r:rbtree a) (key:a)
+  : Lemma (requires is_bst a ord l /\ is_bst a ord r /\ all_lt a ord l v /\ all_gt a ord r v)
+          (ensures find_model a ord (balR a l v r) key == find_model a ord (Node Black l v r) key)
+  = reveal_ord a ord;
+    match l, r with
+    | _, Node Red b y c -> ()
+    | Node Black a_ x b, _ ->
+      balance_find_poly a ord Black (Node Red a_ x b) v r key
+    | Node Red a_ x (Node Black b y c), _ ->
+      let cx = key `ord.TO.compare` x in
+      let cv = key `ord.TO.compare` v in
+      let cy = key `ord.TO.compare` y in
+      redden_find_poly a ord a_ key;
+      balance_find_poly a ord Black (redden a a_) x b key;
+      if eq cx then compare_eq_is_eq a ord key x
+      else if eq cv then compare_eq_is_eq a ord key v
+      else if eq cy then compare_eq_is_eq a ord key y
+    | _ -> ()
+#pop-options
+
+#push-options "--fuel 5 --ifuel 3 --z3rlimit 20"
+let rec fuse_find_poly (a:Type0) (ord:erased (TO.total_order a)) (l r:rbtree a) (sep:a) (key:a)
+  : Lemma (requires is_bst a ord l /\ is_bst a ord r /\ all_lt a ord l sep /\ all_gt a ord r sep)
+          (ensures find_model a ord (fuse_model a l r) key ==
+                   (if lt (key `ord.TO.compare` sep) then find_model a ord l key
+                    else if gt (key `ord.TO.compare` sep) then find_model a ord r key
+                    else None))
+          (decreases (node_count a l + node_count a r))
+  = reveal_ord a ord;
+    let cs = key `ord.TO.compare` sep in
+    match l, r with
+    | Leaf, _ ->
+      if lt cs then begin
+        flip_lt_gt a ord key sep;
+        all_gt_weaken_poly a ord r sep key;
+        find_none_all_gt a ord r key
+      end else if eq cs then begin
+        compare_eq_is_eq a ord key sep;
+        find_none_all_gt a ord r key
+      end
+    | _, Leaf ->
+      if gt cs then begin
+        flip_gt_lt a ord key sep;
+        all_lt_weaken_poly a ord l sep key;
+        find_none_all_lt a ord l key
+      end else if eq cs then begin
+        compare_eq_is_eq a ord key sep;
+        find_none_all_lt a ord l key
+      end
+    | Node Red a_ x b, Node Red c y d ->
+      fuse_find_poly a ord b c sep key;
+      fuse_is_bst_poly a ord b c sep;
+      let cx = key `ord.TO.compare` x in
+      let cy = key `ord.TO.compare` y in
+      if eq cx then compare_eq_is_eq a ord key x;
+      if eq cy then compare_eq_is_eq a ord key y;
+      if eq cs then compare_eq_is_eq a ord key sep;
+      (match fuse_model a b c with
+       | Node Red b' z c' ->
+         compare_eq_of_eq a ord z z;
+         fuse_find_poly a ord b c sep z;
+         let czs = z `ord.TO.compare` sep in
+         if lt czs then find_some_all_gt_poly a ord b x z
+         else if gt czs then find_some_all_lt_poly a ord c y z
+         else compare_eq_is_eq a ord z sep;
+         let cz = key `ord.TO.compare` z in
+         if eq cz then compare_eq_is_eq a ord key z
+       | _ -> ())
+    | Node Black a_ x b, Node Black c y d ->
+      fuse_find_poly a ord b c sep key;
+      fuse_is_bst_poly a ord b c sep;
+      all_gt_weaken_poly a ord c sep x;
+      all_lt_weaken_poly a ord b sep y;
+      fuse_all_gt_poly a ord b c x;
+      fuse_all_lt_poly a ord b c y;
+      let cx = key `ord.TO.compare` x in
+      let cy = key `ord.TO.compare` y in
+      if eq cx then compare_eq_is_eq a ord key x;
+      if eq cy then compare_eq_is_eq a ord key y;
+      if eq cs then compare_eq_is_eq a ord key sep;
+      (match fuse_model a b c with
+       | Node Red b' z c' ->
+         compare_eq_of_eq a ord z z;
+         fuse_find_poly a ord b c sep z;
+         let czs = z `ord.TO.compare` sep in
+         if lt czs then find_some_all_gt_poly a ord b x z
+         else if gt czs then find_some_all_lt_poly a ord c y z
+         else compare_eq_is_eq a ord z sep;
+         let cz = key `ord.TO.compare` z in
+         if eq cz then compare_eq_is_eq a ord key z
+       | _ ->
+         all_gt_weaken_poly a ord d y x;
+         balL_find_poly a ord a_ x (Node Black (fuse_model a b c) y d) key)
+    | Node Red a_ x b, _ ->
+      fuse_find_poly a ord b r sep key;
+      let cx = key `ord.TO.compare` x in
+      if eq cx then compare_eq_is_eq a ord key x;
+      if eq cs then compare_eq_is_eq a ord key sep
+    | _, Node Red c y d ->
+      fuse_find_poly a ord l c sep key;
+      let cy = key `ord.TO.compare` y in
+      if eq cy then compare_eq_is_eq a ord key y;
+      if eq cs then compare_eq_is_eq a ord key sep
+#pop-options
+
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 20"
+let rec find_ins_hit (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (requires is_bst a ord t)
+          (ensures find_model a ord (ins_model a ord t key) key == Some key)
+          (decreases t)
+  = reveal_ord a ord;
+    match t with
+    | Leaf -> compare_eq_of_eq a ord key key
+    | Node c l k r ->
+      let cmp = key `ord.TO.compare` k in
+      if lt cmp then begin
+        find_ins_hit a ord l key;
+        ins_preserves_bst_poly a ord l key;
+        ins_all_lt_poly a ord l key k;
+        balance_find_poly a ord c (ins_model a ord l key) k r key
+      end else if gt cmp then begin
+        find_ins_hit a ord r key;
+        ins_preserves_bst_poly a ord r key;
+        ins_all_gt_poly a ord r key k;
+        balance_find_poly a ord c l k (ins_model a ord r key) key
+      end else compare_eq_is_eq a ord key k
+
+let rec find_ins_other (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (inserted key:a)
+  : Lemma (requires is_bst a ord t /\ SC.same_key a ord key inserted = false)
+          (ensures find_model a ord (ins_model a ord t inserted) key == find_model a ord t key)
+          (decreases t)
+  = reveal_ord a ord;
+    match t with
+    | Leaf -> ()
+    | Node c l k r ->
+      let cmpi = inserted `ord.TO.compare` k in
+      let cmpk = key `ord.TO.compare` k in
+      if lt cmpi then begin
+        find_ins_other a ord l inserted key;
+        ins_preserves_bst_poly a ord l inserted;
+        ins_all_lt_poly a ord l inserted k;
+        balance_find_poly a ord c (ins_model a ord l inserted) k r key
+      end else if gt cmpi then begin
+        find_ins_other a ord r inserted key;
+        ins_preserves_bst_poly a ord r inserted;
+        ins_all_gt_poly a ord r inserted k;
+        balance_find_poly a ord c l k (ins_model a ord r inserted) key
+      end else ()
+#pop-options
+
+let find_insert_hit (a:Type0) (ord:erased (TO.total_order a)) (m:rbtree a) (key:a)
+  : Lemma (requires valid a ord m)
+          (ensures find_model a ord (insert_model a ord m key) key == Some key)
+  = find_ins_hit a ord m key;
+    make_black_find_poly a ord (ins_model a ord m key) key
+
+let find_insert_other (a:Type0) (ord:erased (TO.total_order a)) (m:rbtree a) (inserted key:a)
+  : Lemma (requires valid a ord m /\ SC.same_key a ord key inserted = false)
+          (ensures find_model a ord (insert_model a ord m inserted) key == find_model a ord m key)
+  = find_ins_other a ord m inserted key;
+    make_black_find_poly a ord (ins_model a ord m inserted) key
+
+#push-options "--fuel 3 --ifuel 2 --z3rlimit 20"
+let rec find_del_hit (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
+  : Lemma (requires is_bst a ord t)
+          (ensures find_model a ord (del_model a ord t key) key == None)
+          (decreases t)
+  = reveal_ord a ord;
+    match t with
+    | Leaf -> ()
+    | Node c l k r ->
+      let cmp = key `ord.TO.compare` k in
+      if lt cmp then begin
+        match l with
+        | Node Black _ _ _ ->
+          find_del_hit a ord l key;
+          del_preserves_bst_poly a ord l key;
+          del_all_lt_poly a ord l key k;
+          balL_find_poly a ord (del_model a ord l key) k r key
+        | _ -> find_del_hit a ord l key
+      end else if gt cmp then begin
+        match r with
+        | Node Black _ _ _ ->
+          find_del_hit a ord r key;
+          del_preserves_bst_poly a ord r key;
+          del_all_gt_poly a ord r key k;
+          balR_find_poly a ord l k (del_model a ord r key) key
+        | _ -> find_del_hit a ord r key
+      end else fuse_find_poly a ord l r k key
+
+let rec find_del_other (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (deleted key:a)
+  : Lemma (requires is_bst a ord t /\ SC.same_key a ord key deleted = false)
+          (ensures find_model a ord (del_model a ord t deleted) key == find_model a ord t key)
+          (decreases t)
+  = reveal_ord a ord;
+    match t with
+    | Leaf -> ()
+    | Node c l k r ->
+      let cmpd = deleted `ord.TO.compare` k in
+      let cmpk = key `ord.TO.compare` k in
+      if lt cmpd then begin
+        match l with
+        | Node Black _ _ _ ->
+          find_del_other a ord l deleted key;
+          del_preserves_bst_poly a ord l deleted;
+          del_all_lt_poly a ord l deleted k;
+          balL_find_poly a ord (del_model a ord l deleted) k r key
+        | _ -> find_del_other a ord l deleted key
+      end else if gt cmpd then begin
+        match r with
+        | Node Black _ _ _ ->
+          find_del_other a ord r deleted key;
+          del_preserves_bst_poly a ord r deleted;
+          del_all_gt_poly a ord r deleted k;
+          balR_find_poly a ord l k (del_model a ord r deleted) key
+        | _ -> find_del_other a ord r deleted key
+      end else begin
+        fuse_find_poly a ord l r k key;
+        if eq cmpk then begin
+          compare_eq_is_eq a ord deleted k;
+          compare_eq_is_eq a ord key k;
+          compare_eq_of_eq a ord key deleted
+        end
+      end
+#pop-options
+
+let find_delete_hit (a:Type0) (ord:erased (TO.total_order a)) (m:rbtree a) (key:a)
+  : Lemma (requires valid a ord m)
+          (ensures find_model a ord (delete_model a ord m key) key == None)
+  = find_del_hit a ord m key;
+    make_black_find_poly a ord (del_model a ord m key) key
+
+let find_delete_other (a:Type0) (ord:erased (TO.total_order a)) (m:rbtree a) (deleted key:a)
+  : Lemma (requires valid a ord m /\ SC.same_key a ord key deleted = false)
+          (ensures find_model a ord (delete_model a ord m deleted) key == find_model a ord m key)
+  = find_del_other a ord m deleted key;
+    make_black_find_poly a ord (del_model a ord m deleted) key
+
+
 // ===== SC Tick Bound Lemmas =====
 
 let rec search_ticks_le_height (a:Type0) (ord:erased (TO.total_order a)) (t:rbtree a) (key:a)
@@ -1022,6 +1415,48 @@ ghost fn rb_case_some (a:Type0) (x:rb_ptr a) (bp:rb_node_ptr a)
   rewrite each x as (Some bp);
   cases_of_rb a (Some bp) ft;
   unfold (rb_cases a)
+}
+
+fn create (a:Type0)
+  (#ord:erased (TO.total_order a))
+  requires emp
+  returns tree:rb_ptr a
+  ensures owns a tree (empty_model a) ** pure (valid a ord (empty_model a))
+{
+  let tree : rb_ptr a = None #(rb_node_ptr a);
+  intro_rb_leaf a tree;
+  fold (owns a tree (empty_model a));
+  tree
+}
+
+fn rec free_rbtree (a:Type0) (tree:rb_ptr a)
+  requires rb_subtree a tree 'ft
+  ensures emp
+  decreases 'ft
+{
+  match tree {
+    None -> {
+      cases_of_rb a (None #(rb_node_ptr a)) 'ft;
+      unfold (rb_cases a)
+    }
+    Some bp -> {
+      rb_case_some a (Some bp) bp;
+      let node = !bp;
+      free_rbtree a node.left;
+      free_rbtree a node.right;
+      Box.free bp
+    }
+  }
+}
+
+fn dispose (a:Type0)
+  (tree:rb_ptr a)
+  (#m:erased (rbtree a))
+  requires owns a tree m
+  ensures emp
+{
+  unfold (owns a tree m);
+  free_rbtree a tree
 }
 
 ghost fn rb_subtree_some_is_node (a:Type0) (x:rb_ptr a) (bp:rb_node_ptr a)
@@ -1992,6 +2427,7 @@ instance rb_search_structure_instance :
     rbtree
     owns
     valid
+    empty_model
     find_model
     insert_model
     delete_model
@@ -2001,7 +2437,25 @@ instance rb_search_structure_instance :
     SC.rb_insert_bound
     SC.rb_delete_bound
 = {
+  create = create;
+  dispose = dispose;
   search = search;
   insert = insert;
   delete = delete;
+}
+
+instance rb_search_model_laws_instance :
+  SC.search_model_laws
+    rbtree
+    valid
+    empty_model
+    find_model
+    insert_model
+    delete_model
+= {
+  find_empty = find_empty;
+  find_insert_hit = find_insert_hit;
+  find_insert_other = find_insert_other;
+  find_delete_hit = find_delete_hit;
+  find_delete_other = find_delete_other;
 }

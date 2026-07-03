@@ -34,6 +34,8 @@ let rec size (a:Type0) (t:bst a) : nat =
   | Leaf -> 0
   | Node l _ r -> 1 + size a l + size a r
 
+let empty_model (a:Type0) : GTot (bst a) = Leaf
+
 let rec find_model (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (key:a)
   : GTot (option a)
   =
@@ -218,6 +220,93 @@ let flip_lt_gt (a:Type0) (ord:erased (TO.total_order a)) (x y:a)
   : Lemma (requires lt_ord a ord x y = true) (ensures gt_ord a ord y x = true)
   = reveal_ord a ord
 
+let compare_eq_is_eq (a:Type0) (ord:erased (TO.total_order a)) (x y:a)
+  : Lemma (requires eq (x `ord.TO.compare` y)) (ensures x == y)
+  = let _ = ord.TO.properties in ()
+
+let compare_eq_of_eq (a:Type0) (ord:erased (TO.total_order a)) (x y:a)
+  : Lemma (requires x == y) (ensures eq (x `ord.TO.compare` y) = true)
+  = let _ = ord.TO.properties in ()
+
+let rec find_model_some_eq (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (key:a)
+  : Lemma
+      (requires Some? (find_model a ord t key))
+      (ensures Some?.v (find_model a ord t key) == key)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node l k r ->
+      let c = key `ord.TO.compare` k in
+      if lt c then find_model_some_eq a ord l key
+      else if gt c then find_model_some_eq a ord r key
+      else ()
+
+let find_empty (a:Type0) (ord:erased (TO.total_order a)) (key:a)
+  : Lemma (ensures find_model a ord (empty_model a) key == None)
+  = ()
+
+let rec find_insert_hit (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (key:a)
+  : Lemma
+      (requires valid a ord t)
+      (ensures find_model a ord (insert_model a ord t key) key == Some key)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node l k r ->
+      let c = key `ord.TO.compare` k in
+      if lt c then find_insert_hit a ord l key
+      else if gt c then find_insert_hit a ord r key
+      else ()
+
+let rec find_insert_other (a:Type0) (ord:erased (TO.total_order a)) (t:bst a)
+  (inserted key:a)
+  : Lemma
+      (requires valid a ord t /\ SC.same_key a ord key inserted = false)
+      (ensures find_model a ord (insert_model a ord t inserted) key == find_model a ord t key)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node l k r ->
+      let ci = inserted `ord.TO.compare` k in
+      let ck = key `ord.TO.compare` k in
+      if lt ci then begin
+        if lt ck then find_insert_other a ord l inserted key
+      end else if gt ci then begin
+        if gt ck then find_insert_other a ord r inserted key
+      end
+
+let rec find_none_all_lt (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (key:a)
+  : Lemma
+      (requires all_lt a ord t key = true)
+      (ensures find_model a ord t key == None)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node l k r ->
+      find_none_all_lt a ord l key;
+      find_none_all_lt a ord r key
+
+let rec find_none_all_gt (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (key:a)
+  : Lemma
+      (requires all_gt a ord t key = true)
+      (ensures find_model a ord t key == None)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node l k r ->
+      find_none_all_gt a ord l key;
+      find_none_all_gt a ord r key
+
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec all_lt_weaken (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (b1 b2:a)
   : Lemma (requires all_lt a ord t b1 = true /\ lt_ord a ord b1 b2 = true)
@@ -269,6 +358,45 @@ let rec minimum_gt_bound (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (bo
         minimum_nonempty a l;
         minimum_gt_bound a ord l bound
 #pop-options
+
+let rec find_minimum_hit (a:Type0) (ord:erased (TO.total_order a)) (t:bst a)
+  : Lemma
+      (requires is_bst a ord t = true /\ Some? (minimum_model a t))
+      (ensures find_model a ord t (Some?.v (minimum_model a t)) ==
+               Some (Some?.v (minimum_model a t)))
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node Leaf k r ->
+      compare_eq_of_eq a ord k k
+  | Node l k r ->
+      minimum_nonempty a l;
+      minimum_in_all_lt a ord l k;
+      find_minimum_hit a ord l
+
+let rec all_gt_of_lt_min (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (key:a)
+  : Lemma
+      (requires is_bst a ord t = true /\
+                Some? (minimum_model a t) /\
+                lt_ord a ord key (Some?.v (minimum_model a t)) = true)
+      (ensures all_gt a ord t key = true)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node Leaf k r ->
+      flip_lt_gt a ord key k;
+      all_gt_weaken a ord r k key
+  | Node l k r ->
+      minimum_nonempty a l;
+      minimum_in_all_lt a ord l k;
+      all_gt_of_lt_min a ord l key;
+      assert (lt_ord a ord key k = true);
+      flip_lt_gt a ord key k;
+      all_gt_weaken a ord r k key
 
 // Insert preserves all_lt/all_gt bounds
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
@@ -421,6 +549,114 @@ let rec delete_valid_lemma (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (
                       del_all_gt_min a ord r                  // all_gt (delete_model r successor) successor
 #pop-options
 
+let rec find_delete_hit (a:Type0) (ord:erased (TO.total_order a)) (t:bst a) (key:a)
+  : Lemma
+      (requires valid a ord t)
+      (ensures find_model a ord (delete_model a ord t key) key == None)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node l k r ->
+      let c = key `ord.TO.compare` k in
+      if lt c then find_delete_hit a ord l key
+      else if gt c then find_delete_hit a ord r key
+      else
+        match l, r with
+        | Leaf, _ ->
+            assert (eq c);
+            compare_eq_is_eq a ord key k;
+            find_none_all_gt a ord r key;
+            assert (find_model a ord r key == None)
+        | _, Leaf ->
+            assert (eq c);
+            compare_eq_is_eq a ord key k;
+            find_none_all_lt a ord l key;
+            assert (find_model a ord l key == None)
+        | _, _ ->
+            assert (eq c);
+            compare_eq_is_eq a ord key k;
+            minimum_nonempty a r;
+            match minimum_model a r with
+            | None -> ()
+            | Some successor ->
+                minimum_gt_bound a ord r key;
+                flip_gt_lt a ord successor key;
+                find_none_all_lt a ord l key;
+                assert (lt_ord a ord key successor = true);
+                assert (find_model a ord l key == None);
+                assert (find_model a ord (Node l successor (delete_model a ord r successor)) key == None)
+
+let rec find_delete_other (a:Type0) (ord:erased (TO.total_order a)) (t:bst a)
+  (deleted key:a)
+  : Lemma
+      (requires valid a ord t /\ SC.same_key a ord key deleted = false)
+      (ensures find_model a ord (delete_model a ord t deleted) key == find_model a ord t key)
+      (decreases t)
+  =
+  reveal_ord a ord;
+  match t with
+  | Leaf -> ()
+  | Node l k r ->
+      let cd = deleted `ord.TO.compare` k in
+      let ck = key `ord.TO.compare` k in
+      if lt cd then begin
+        if lt ck then find_delete_other a ord l deleted key
+      end else if gt cd then begin
+        if gt ck then find_delete_other a ord r deleted key
+      end else begin
+        assert (eq cd);
+        compare_eq_is_eq a ord deleted k;
+        if lt ck then begin
+          match l, r with
+          | Leaf, _ ->
+              flip_lt_gt a ord key k;
+              all_gt_weaken a ord r k key;
+              find_none_all_gt a ord r key
+          | _, Leaf -> ()
+          | _, _ ->
+              minimum_nonempty a r;
+              match minimum_model a r with
+              | None -> ()
+              | Some successor ->
+                  minimum_gt_bound a ord r k;
+                  flip_gt_lt a ord successor k;
+                  assert (lt_ord a ord key successor = true)
+        end else if gt ck then begin
+          match l, r with
+          | Leaf, _ -> ()
+          | _, Leaf ->
+              flip_gt_lt a ord key k;
+              all_lt_weaken a ord l k key;
+              find_none_all_lt a ord l key
+          | _, _ ->
+              minimum_nonempty a r;
+              match minimum_model a r with
+              | None -> ()
+              | Some successor ->
+                  let cs = key `ord.TO.compare` successor in
+                  if lt cs then begin
+                    flip_gt_lt a ord key k;
+                    all_lt_weaken a ord l k key;
+                    find_none_all_lt a ord l key;
+                    all_gt_of_lt_min a ord r key;
+                    find_none_all_gt a ord r key
+                  end else if gt cs then begin
+                    find_delete_other a ord r successor key
+                  end else begin
+                    assert (eq cs);
+                    compare_eq_is_eq a ord key successor;
+                    find_minimum_hit a ord r
+                  end
+        end else begin
+          assert (eq ck);
+          compare_eq_is_eq a ord key k;
+          compare_eq_of_eq a ord key deleted;
+          assert (SC.same_key a ord key deleted = true)
+        end
+      end
+
 let rec bst_subtree (a:Type0) (ct:bst_ptr a) (ft:bst a) (parent:bst_ptr a)
   : Tot slprop (decreases ft)
   =
@@ -517,6 +753,48 @@ ghost fn bst_case_some (a:Type0) (x:bst_ptr a) (bp:bst_node_ptr a)
   rewrite each x as (Some bp);
   cases_of_bst a (Some bp) ft parent;
   unfold (bst_cases a)
+}
+
+fn create (a:Type0)
+  (#ord:erased (TO.total_order a))
+  requires emp
+  returns tree:bst_ptr a
+  ensures owns a tree (empty_model a) ** pure (valid a ord (empty_model a))
+{
+  let tree : bst_ptr a = None #(bst_node_ptr a);
+  intro_bst_leaf a tree (None #(bst_node_ptr a));
+  fold (owns a tree (empty_model a));
+  tree
+}
+
+fn rec free_bst (a:Type0) (tree:bst_ptr a)
+  requires bst_subtree a tree 'ft 'parent
+  ensures emp
+  decreases 'ft
+{
+  match tree {
+    None -> {
+      cases_of_bst a (None #(bst_node_ptr a)) 'ft 'parent;
+      unfold (bst_cases a)
+    }
+    Some bp -> {
+      bst_case_some a (Some bp) bp;
+      let node = !bp;
+      free_bst a node.left;
+      free_bst a node.right;
+      Box.free bp
+    }
+  }
+}
+
+fn dispose (a:Type0)
+  (tree:bst_ptr a)
+  (#m:erased (bst a))
+  requires owns a tree m
+  ensures emp
+{
+  unfold (owns a tree m);
+  free_bst a tree
 }
 
 fn rec tree_search (a:Type0)
@@ -860,6 +1138,7 @@ instance bst_search_structure_instance :
     bst
     owns
     valid
+    empty_model
     find_model
     insert_model
     delete_model
@@ -869,7 +1148,25 @@ instance bst_search_structure_instance :
     SC.bst_insert_bound
     SC.bst_delete_bound
 = {
+  create = create;
+  dispose = dispose;
   search = search;
   insert = insert;
   delete = delete;
+}
+
+instance bst_search_model_laws_instance :
+  SC.search_model_laws
+    bst
+    valid
+    empty_model
+    find_model
+    insert_model
+    delete_model
+= {
+  find_empty = find_empty;
+  find_insert_hit = find_insert_hit;
+  find_insert_other = find_insert_other;
+  find_delete_hit = find_delete_hit;
+  find_delete_other = find_delete_other;
 }

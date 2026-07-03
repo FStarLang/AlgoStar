@@ -48,11 +48,71 @@ let rb_insert_bound (_h:nat) (n:nat) : nat =
 let rb_delete_bound (_h:nat) (n:nat) : nat =
   if n = 0 then 2 else 4 * log2_floor (n + 1) + 2
 
+let same_key (a:Type0) (ord:erased (TO.total_order a)) (x y:a) : GTot bool =
+  eq (x `ord.TO.compare` y)
+
+class search_model_laws
+  (model: Type0 -> Type0)
+  (valid: (a:Type0) -> erased (TO.total_order a) -> model a -> GTot prop)
+  (empty_model: (a:Type0) -> GTot (model a))
+  (find_model: (a:Type0) -> erased (TO.total_order a) -> model a -> a -> GTot (option a))
+  (insert_model: (a:Type0) -> erased (TO.total_order a) -> model a -> a -> GTot (model a))
+  (delete_model: (a:Type0) -> erased (TO.total_order a) -> model a -> a -> GTot (model a))
+= {
+  find_empty:
+    ((a:Type0) ->
+     (ord:erased (TO.total_order a)) ->
+     (key:a) ->
+       Lemma
+         (ensures find_model a ord (empty_model a) key == None));
+
+  find_insert_hit:
+    ((a:Type0) ->
+     (ord:erased (TO.total_order a)) ->
+     (m:model a) ->
+     (key:a) ->
+       Lemma
+         (requires valid a ord m)
+         (ensures find_model a ord (insert_model a ord m key) key == Some key));
+
+  find_insert_other:
+    ((a:Type0) ->
+     (ord:erased (TO.total_order a)) ->
+     (m:model a) ->
+     (inserted:a) ->
+     (key:a) ->
+       Lemma
+         (requires valid a ord m /\ same_key a ord key inserted = false)
+         (ensures find_model a ord (insert_model a ord m inserted) key ==
+                  find_model a ord m key));
+
+  find_delete_hit:
+    ((a:Type0) ->
+     (ord:erased (TO.total_order a)) ->
+     (m:model a) ->
+     (key:a) ->
+       Lemma
+         (requires valid a ord m)
+         (ensures find_model a ord (delete_model a ord m key) key == None));
+
+  find_delete_other:
+    ((a:Type0) ->
+     (ord:erased (TO.total_order a)) ->
+     (m:model a) ->
+     (deleted:a) ->
+     (key:a) ->
+       Lemma
+         (requires valid a ord m /\ same_key a ord key deleted = false)
+         (ensures find_model a ord (delete_model a ord m deleted) key ==
+                  find_model a ord m key));
+}
+
 class search_structure
   (repr: Type0 -> Type0)
   (model: Type0 -> Type0)
   (owns: (a:Type0) -> repr a -> model a -> slprop)
   (valid: (a:Type0) -> erased (TO.total_order a) -> model a -> GTot prop)
+  (empty_model: (a:Type0) -> GTot (model a))
   (find_model: (a:Type0) -> erased (TO.total_order a) -> model a -> a -> GTot (option a))
   (insert_model: (a:Type0) -> erased (TO.total_order a) -> model a -> a -> GTot (model a))
   (delete_model: (a:Type0) -> erased (TO.total_order a) -> model a -> a -> GTot (model a))
@@ -60,6 +120,20 @@ class search_structure
   (size: (a:Type0) -> model a -> nat)
   (search_bound insert_bound delete_bound: nat -> nat -> nat)
 = {
+  create:
+    (fn (a:Type0)
+        (#ord:erased (TO.total_order a))
+      requires emp
+      returns tree:repr a
+      ensures owns a tree (empty_model a) ** pure (valid a ord (empty_model a)));
+
+  dispose:
+    (fn (a:Type0)
+        (tree:repr a)
+        (#m:erased (model a))
+      requires owns a tree m
+      ensures emp);
+
   search:
     (fn (a:Type0)
         (tree:repr a)
