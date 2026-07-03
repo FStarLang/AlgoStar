@@ -278,15 +278,6 @@ let blacken_preserves_pred_dist_ok
    PREDICATE LEMMAS — Key reasoning steps for BFS proof
    ================================================================ *)
 
-(* Discovering (WHITE->GRAY) preserves source_ok *)
-let discover_preserves_source_ok
-  (scolor sdist: Seq.seq int) (source n j: nat) (dval: int)
-  : Lemma
-    (requires source_ok scolor sdist source n /\ j < n /\ n <= Seq.length scolor /\
-             n <= Seq.length sdist /\ Seq.index scolor j == 0 /\ dval >= 0)
-    (ensures source_ok (Seq.upd scolor j 1) (Seq.upd sdist j dval) source n)
-  = ()  // source != j (source is non-WHITE, j is WHITE)
-
 (* Blackening preserves source_ok *)
 let blacken_preserves_source_ok
   (scolor sdist: Seq.seq int) (source n u: nat)
@@ -294,15 +285,6 @@ let blacken_preserves_source_ok
     (requires source_ok scolor sdist source n /\ u < n /\ n <= Seq.length scolor)
     (ensures source_ok (Seq.upd scolor u 2) sdist source n)
   = ()  // Either u == source (2 <> 0) or u != source (unchanged)
-
-(* Discovering preserves dist_ok *)
-let discover_preserves_dist_ok
-  (scolor sdist: Seq.seq int) (n j: nat) (dval: int)
-  : Lemma
-    (requires dist_ok scolor sdist n /\ j < n /\ n <= Seq.length scolor /\
-             n <= Seq.length sdist /\ Seq.index scolor j == 0 /\ dval >= 0)
-    (ensures dist_ok (Seq.upd scolor j 1) (Seq.upd sdist j dval) n)
-  = ()  // old non-WHITE: unchanged; j: new color 1, dist dval >= 0
 
 (* Discovering vertex j from u preserves dist_reachable.
    Precondition: u is discovered (color[u] <> 0) with dist[u] = du,
@@ -347,15 +329,6 @@ let blacken_preserves_dist_ok
     (ensures dist_ok (Seq.upd scolor u 2) sdist n)
   = ()  // For w != u: unchanged. For w == u: was non-WHITE so dist >= 0, still >= 0.
 
-(* Discovering preserves queue_ok for existing entries *)
-let discover_preserves_queue_ok
-  (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail j: nat)
-  : Lemma
-    (requires queue_ok scolor squeue n head tail /\ j < n /\ n <= Seq.length scolor /\
-             Seq.index scolor j == 0)
-    (ensures queue_ok (Seq.upd scolor j 1) squeue n head tail)
-  = ()  // Queue entries are non-WHITE, j is WHITE, so j != any queue entry. Colors unchanged.
-
 (* Blackening preserves queue_ok when u is not in queue range *)
 let blacken_preserves_queue_ok
   (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail u: nat)
@@ -377,22 +350,6 @@ let frame_preserves_source_ok
       (forall (w:nat). w < n /\ Seq.index scolor w <> 0 ==> Seq.index scolor' w == Seq.index scolor w) /\
       (forall (w:nat). w < n /\ Seq.index scolor w <> 0 ==> Seq.index sdist' w == Seq.index sdist w))
     (ensures source_ok scolor' sdist' source n)
-  = ()
-
-(* Frame preserves dist_ok when only WHITE->non-WHITE changes with non-negative dist *)
-let frame_preserves_dist_ok
-  (scolor scolor' sdist sdist': Seq.seq int) (n: nat)
-  : Lemma
-    (requires
-      dist_ok scolor sdist n /\
-      Seq.length scolor' >= n /\ Seq.length sdist' >= n /\
-      // Frame: old non-WHITE unchanged
-      (forall (w:nat). w < n /\ Seq.index scolor w <> 0 ==>
-        Seq.index scolor' w == Seq.index scolor w /\ Seq.index sdist' w == Seq.index sdist w) /\
-      // New non-WHITE vertices have non-negative dist
-      (forall (w:nat). w < n /\ Seq.index scolor w == 0 /\ Seq.index scolor' w <> 0 ==>
-        Seq.index sdist' w >= 0))
-    (ensures dist_ok scolor' sdist' n)
   = ()
 
 (* Proving queue_ok after discovering a WHITE vertex.
@@ -458,16 +415,6 @@ let blacken_preserves_scanned_all (sadj scolor: Seq.seq int) (n u: nat)
           (ensures scanned_all sadj n (Seq.upd scolor u 2))
   = ()
 
-let init_scanned_partial (sadj scolor: Seq.seq int) (n u: nat)
-  : Lemma (requires n <= Seq.length scolor /\ n * n <= Seq.length sadj /\ u < n)
-          (ensures scanned_partial sadj n scolor u 0)
-  = ()
-
-let discover_preserves_scanned_partial (sadj scolor: Seq.seq int) (n u k j: nat)
-  : Lemma (requires scanned_partial sadj n scolor u k /\ j < n /\ Seq.index scolor j == 0)
-          (ensures scanned_partial sadj n (Seq.upd scolor j 1) u k)
-  = ()
-
 let extend_scanned_partial_discover (sadj scolor: Seq.seq int) (n u vv: nat)
   : Lemma
     (requires scanned_partial sadj n scolor u vv /\ vv < n /\ u < n /\
@@ -481,12 +428,6 @@ let extend_scanned_partial_skip (sadj scolor: Seq.seq int) (n u vv: nat)
               n <= Seq.length scolor /\ n * n <= Seq.length sadj /\
               (Seq.index sadj (u * n + vv) = 0 \/ Seq.index scolor vv <> 0))
     (ensures scanned_partial sadj n scolor u (vv + 1))
-  = ()
-
-let blacken_preserves_scanned_partial (sadj scolor: Seq.seq int) (n u k: nat)
-  : Lemma (requires scanned_partial sadj n scolor u k /\ u < n /\ n <= Seq.length scolor /\
-                    Seq.index scolor u <> 0)
-          (ensures scanned_partial sadj n (Seq.upd scolor u 2) u k)
   = ()
 
 (* ================================================================
@@ -675,24 +616,6 @@ let init_dist_optimal (adj: Seq.seq int) (n: nat) (scolor_zeros sdist_zeros: Seq
       dist_optimal adj n (Seq.upd scolor_zeros source 1) (Seq.upd sdist_zeros source 0) source)
   = ()  // Only source is non-WHITE (color 1) with dist 0. 0 <= k for any nat k.
 
-let init_layer_complete (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source: nat)
-  : Lemma
-    (requires source < n /\ n <= Seq.length scolor /\ Seq.length adj >= n * n)
-    (ensures layer_complete adj n scolor source 0)
-  = ()  // Vacuously true: no k < 0.
-
-let init_queue_dist_min (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (d: int)
-  : Lemma
-    (requires
-      n >= 1 /\ Seq.length sdist >= n /\ Seq.length squeue >= n /\
-      head <= tail /\ tail <= n /\ d <= 0 /\
-      (forall (i: nat). {:pattern (Seq.index squeue i)}
-        i >= head /\ i < tail ==>
-          SZ.v (Seq.index squeue i) < n /\
-          Seq.index sdist (SZ.v (Seq.index squeue i)) >= 0))
-    (ensures queue_dist_min sdist squeue n head tail d)
-  = ()
-
 let init_queue_nondecreasing (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n: nat) (source: SZ.t)
   : Lemma
     (requires
@@ -819,27 +742,6 @@ let blacken_preserves_dist_optimal
       dist_optimal adj n (Seq.upd scolor u 2) sdist source)
   = ()  // Blackening only changes color (not dist). Non-WHITE stays non-WHITE.
 
-let blacken_preserves_layer_complete
-  (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source d u: nat)
-  : Lemma
-    (requires
-      layer_complete adj n scolor source d /\
-      u < n /\ Seq.index scolor u <> 0 /\
-      Seq.length scolor >= n)
-    (ensures
-      layer_complete adj n (Seq.upd scolor u 2) source d)
-  = ()  // Blackening u: was non-WHITE → now color 2 (≠0, ≠1). Only strengthens layer_complete.
-
-let blacken_preserves_queue_dist_min
-  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail u: nat) (d: int)
-  : Lemma
-    (requires
-      queue_dist_min sdist squeue n head tail d /\
-      u < n)
-    (ensures
-      queue_dist_min sdist squeue n head tail d)
-  = ()  // Blackening doesn't change dist or queue.
-
 (* --- Queue ordering preservation lemmas --- *)
 
 let discover_preserves_queue_nondecreasing
@@ -880,13 +782,6 @@ let blacken_preserves_queue_nondecreasing
   : Lemma
     (requires queue_nondecreasing sdist squeue n head tail /\ u < n)
     (ensures queue_nondecreasing sdist squeue n head tail)
-  = ()
-
-let blacken_preserves_queue_dist_ub
-  (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail u: nat) (d_ub: int)
-  : Lemma
-    (requires queue_dist_ub sdist squeue n head tail d_ub /\ u < n)
-    (ensures queue_dist_ub sdist squeue n head tail d_ub)
   = ()
 
 (* Derive queue_dist_min from queue_nondecreasing: if queue is non-decreasing and
