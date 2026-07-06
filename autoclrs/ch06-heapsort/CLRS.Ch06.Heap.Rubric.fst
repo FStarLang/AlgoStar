@@ -16,6 +16,7 @@ module A = Pulse.Lib.Array
 module CB = CLRS.Ch06.Heap.CostBound
 module Classical = FStar.Classical
 module HC = CLRS.Ch06.Heap.Complexity
+module Math = FStar.Math.Lemmas
 module MR = Pulse.Lib.MonotonicGhostRef
 module O = FStar.Order
 module R = Pulse.Lib.Reference
@@ -30,6 +31,67 @@ let nat_smaller (n: nat) = i:nat{i < n}
 let parent_idx (i:nat{i > 0}) : nat = (i - 1) / 2
 let left_idx (i:nat) : nat = 2 * i + 1
 let right_idx (i:nat) : nat = 2 * i + 2
+
+let left_idx_before_heap_size (heap_size idx: SZ.t)
+  : Lemma
+    (requires
+      SZ.v heap_size > 0 /\
+      SZ.v idx < SZ.v heap_size /\
+      SZ.v idx < SZ.v (SZ.div heap_size 2sz))
+    (ensures left_idx (SZ.v idx) < SZ.v heap_size)
+  =
+  Math.lemma_div_mod (SZ.v heap_size) 2
+
+let left_idx_after_heap_size (heap_size idx: SZ.t)
+  : Lemma
+    (requires
+      SZ.v heap_size > 0 /\
+      SZ.v idx < SZ.v heap_size /\
+      ~(SZ.v idx < SZ.v (SZ.div heap_size 2sz)))
+    (ensures left_idx (SZ.v idx) >= SZ.v heap_size)
+  =
+  Math.lemma_div_mod (SZ.v heap_size) 2
+
+let left_child_sizet (s_len:nat) (heap_size idx: SZ.t)
+  : Lemma
+    (requires
+      SZ.fits s_len /\
+      SZ.v heap_size <= s_len /\
+      left_idx (SZ.v idx) < SZ.v heap_size)
+    (ensures SZ.fits (2 * SZ.v idx) /\
+             SZ.fits (left_idx (SZ.v idx)))
+  =
+  SZ.fits_lte (left_idx (SZ.v idx)) s_len;
+  SZ.fits_lte (2 * SZ.v idx) (left_idx (SZ.v idx))
+
+let right_idx_before_heap_size (heap_size left: SZ.t) (idx:nat)
+  : Lemma
+    (requires
+      SZ.v left == left_idx idx /\
+      SZ.v left < SZ.v heap_size - 1)
+    (ensures right_idx idx < SZ.v heap_size)
+  =
+  ()
+
+let right_idx_after_heap_size (heap_size left: SZ.t) (idx:nat)
+  : Lemma
+    (requires
+      SZ.v left == left_idx idx /\
+      SZ.v heap_size > 0 /\
+      ~(SZ.v left < SZ.v heap_size - 1))
+    (ensures right_idx idx >= SZ.v heap_size)
+  =
+  ()
+
+let right_child_sizet (s_len:nat) (heap_size idx: SZ.t)
+  : Lemma
+    (requires
+      SZ.fits s_len /\
+      SZ.v heap_size <= s_len /\
+      right_idx (SZ.v idx) < SZ.v heap_size)
+    (ensures SZ.fits (right_idx (SZ.v idx)))
+  =
+  SZ.fits_lte (right_idx (SZ.v idx)) s_len
 
 let le_ord (#a: Type) (ord: TO.total_order a) (x y: a) : Tot bool =
   O.le (x `ord.TO.compare` y)
@@ -616,125 +678,137 @@ let heapsort_cost_bound_explicit (n:nat)
 
 #push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn rec max_heapify (#a: Type0)
-  (arr: A.array a) (idx: nat) (heap_size: nat) (start: Ghost.erased nat)
+  (arr: A.array a) (idx: SZ.t) (heap_size: SZ.t) (start: Ghost.erased nat)
   (ctr: SC.ticks_t)
   (#ord: erased (TO.total_order a))
   (iord: SC.instrumented_total_order a ord ctr)
-  (#s: erased (Seq.seq a))
+  (#s: erased (Seq.seq a) {
+    SZ.v idx < SZ.v heap_size /\
+    SZ.v heap_size <= Seq.length s /\
+    Seq.length s == A.length arr /\
+    SZ.fits (Seq.length s)
+  })
   (#c0: erased nat)
 requires
   A.pts_to arr s **
   MR.pts_to ctr #1.0R c0 **
   pure (
-    heap_size > 0 /\
-    idx < heap_size /\
-    heap_size <= Seq.length s /\
-    Seq.length s == A.length arr /\
-    idx >= start /\
-    almost_heaps_from ord s heap_size start idx /\
-    (idx > 0 /\ parent_idx idx >= start ==>
-      (left_idx idx < heap_size ==>
-        le_ord ord (Seq.index s (left_idx idx)) (Seq.index s (parent_idx idx))) /\
-      (right_idx idx < heap_size ==>
-        le_ord ord (Seq.index s (right_idx idx)) (Seq.index s (parent_idx idx))))
+    SZ.v idx >= start /\
+    almost_heaps_from ord s (SZ.v heap_size) start (SZ.v idx) /\
+    (SZ.v idx > 0 /\ parent_idx (SZ.v idx) >= start ==>
+      (left_idx (SZ.v idx) < SZ.v heap_size ==>
+        le_ord ord (Seq.index s (left_idx (SZ.v idx))) (Seq.index s (parent_idx (SZ.v idx)))) /\
+      (right_idx (SZ.v idx) < SZ.v heap_size ==>
+        le_ord ord (Seq.index s (right_idx (SZ.v idx))) (Seq.index s (parent_idx (SZ.v idx)))))
   )
 ensures exists* s' (cf: nat).
   A.pts_to arr s' **
   MR.pts_to ctr #1.0R cf **
   pure (
-    heap_size > 0 /\
-    idx < heap_size /\
     Seq.length s' == Seq.length s /\
-    heap_size <= Seq.length s' /\
-    heaps_from ord s' heap_size start /\
+    heaps_from ord s' (SZ.v heap_size) start /\
     permutation #a #ord s s' /\
-    (forall (k:nat). heap_size <= k /\ k < Seq.length s ==> Seq.index s' k == Seq.index s k) /\
+    (forall (k:nat). SZ.v heap_size <= k /\ k < Seq.length s ==> Seq.index s' k == Seq.index s k) /\
     cf >= reveal c0 /\
-    cf - reveal c0 <= CB.max_heapify_bound heap_size idx
+    cf - reveal c0 <= CB.max_heapify_bound (SZ.v heap_size) (SZ.v idx)
   )
 {
-  let left = left_idx idx;
-  if (left >= heap_size) {
-    almost_to_full ord s heap_size start idx;
+  let half = SZ.div heap_size 2sz;
+  if (SZ.gte idx half) {
+    left_idx_after_heap_size heap_size idx;
+    almost_to_full ord s (SZ.v heap_size) start (SZ.v idx);
     sp_permutation_refl #a #ord s;
     ()
   } else {
-    let right = right_idx idx;
-    let cur = arr.(SZ.uint_to_t idx);
-    let lv = arr.(SZ.uint_to_t left);
-    if (right < heap_size) {
-      let rv = arr.(SZ.uint_to_t right);
+    left_idx_before_heap_size heap_size idx;
+    left_child_sizet (Seq.length s) heap_size idx;
+    let two_idx = SZ.mul 2sz idx;
+    assert (pure (SZ.v two_idx == 2 * SZ.v idx));
+    assert (pure (SZ.fits (SZ.v two_idx + 1)));
+    let left = SZ.add two_idx 1sz;
+    assert (pure (SZ.v left == left_idx (SZ.v idx)));
+    let cur = arr.(idx);
+    let lv = arr.(left);
+    let last = SZ.sub heap_size 1sz;
+    if (SZ.lt left last) {
+      right_idx_before_heap_size heap_size left (SZ.v idx);
+      right_child_sizet (Seq.length s) heap_size idx;
+      assert (pure (SZ.fits (SZ.v left + 1)));
+      let right = SZ.add left 1sz;
+      assert (pure (SZ.v right == right_idx (SZ.v idx)));
+      let rv = arr.(right);
       let cmp_lr = iord lv rv;
       if (not (O.lt cmp_lr)) {
         not_lt_ord_implies_ge ord lv rv;
         let cmp_cur_l = iord cur lv;
-        CB.max_heapify_bound_left heap_size idx;
+        CB.max_heapify_bound_left (SZ.v heap_size) (SZ.v idx);
         if (O.lt cmp_cur_l) {
           lt_ord_implies_le ord cur lv;
-          sift_down_swap_lemma_from ord s heap_size start idx left;
-          grandparent_after_swap_from ord s heap_size start idx left;
-          left_idx_inj idx left;
-          let vi = arr.(SZ.uint_to_t idx);
-          let vl = arr.(SZ.uint_to_t left);
-          arr.(SZ.uint_to_t idx) <- vl;
-          arr.(SZ.uint_to_t left) <- vi;
-          swap_is_permutation #a #ord s idx left;
-          swap_length s idx left;
-          swap_index_i s idx left;
-          max_heapify arr left heap_size start ctr #ord iord #(swap_seq s idx left)
+          sift_down_swap_lemma_from ord s (SZ.v heap_size) start (SZ.v idx) (SZ.v left);
+          grandparent_after_swap_from ord s (SZ.v heap_size) start (SZ.v idx) (SZ.v left);
+          left_idx_inj (SZ.v idx) (SZ.v left);
+          let vi = arr.(idx);
+          let vl = arr.(left);
+          arr.(idx) <- vl;
+          arr.(left) <- vi;
+          swap_is_permutation #a #ord s (SZ.v idx) (SZ.v left);
+          swap_length s (SZ.v idx) (SZ.v left);
+          swap_index_i s (SZ.v idx) (SZ.v left);
+          max_heapify arr left heap_size start ctr #ord iord #(swap_seq s (SZ.v idx) (SZ.v left))
         } else {
           not_lt_ord_implies_ge ord cur lv;
           le_ord_trans ord rv lv cur;
-          almost_to_full ord s heap_size start idx;
+          almost_to_full ord s (SZ.v heap_size) start (SZ.v idx);
           sp_permutation_refl #a #ord s;
           ()
         }
       } else {
         lt_ord_implies_le ord lv rv;
         let cmp_cur_r = iord cur rv;
-        CB.max_heapify_bound_right heap_size idx;
+        CB.max_heapify_bound_right (SZ.v heap_size) (SZ.v idx);
         if (O.lt cmp_cur_r) {
           lt_ord_implies_le ord cur rv;
-          sift_down_swap_lemma_from ord s heap_size start idx right;
-          grandparent_after_swap_from ord s heap_size start idx right;
-          right_idx_inj idx right;
-          let vi = arr.(SZ.uint_to_t idx);
-          let vr = arr.(SZ.uint_to_t right);
-          arr.(SZ.uint_to_t idx) <- vr;
-          arr.(SZ.uint_to_t right) <- vi;
-          swap_is_permutation #a #ord s idx right;
-          swap_length s idx right;
-          swap_index_i s idx right;
-          max_heapify arr right heap_size start ctr #ord iord #(swap_seq s idx right)
+          sift_down_swap_lemma_from ord s (SZ.v heap_size) start (SZ.v idx) (SZ.v right);
+          grandparent_after_swap_from ord s (SZ.v heap_size) start (SZ.v idx) (SZ.v right);
+          right_idx_inj (SZ.v idx) (SZ.v right);
+          let vi = arr.(idx);
+          let vr = arr.(right);
+          arr.(idx) <- vr;
+          arr.(right) <- vi;
+          swap_is_permutation #a #ord s (SZ.v idx) (SZ.v right);
+          swap_length s (SZ.v idx) (SZ.v right);
+          swap_index_i s (SZ.v idx) (SZ.v right);
+          max_heapify arr right heap_size start ctr #ord iord #(swap_seq s (SZ.v idx) (SZ.v right))
         } else {
           not_lt_ord_implies_ge ord cur rv;
           le_ord_trans ord lv rv cur;
-          almost_to_full ord s heap_size start idx;
+          almost_to_full ord s (SZ.v heap_size) start (SZ.v idx);
           sp_permutation_refl #a #ord s;
           ()
         }
       }
     } else {
+      right_idx_after_heap_size heap_size left (SZ.v idx);
       let _cmp_pad = iord lv lv;
       le_ord_refl ord lv;
       let cmp_cur_l = iord cur lv;
-      CB.max_heapify_bound_left heap_size idx;
+      CB.max_heapify_bound_left (SZ.v heap_size) (SZ.v idx);
       if (O.lt cmp_cur_l) {
         lt_ord_implies_le ord cur lv;
-        sift_down_swap_lemma_from ord s heap_size start idx left;
-        grandparent_after_swap_from ord s heap_size start idx left;
-        left_idx_inj idx left;
-        let vi = arr.(SZ.uint_to_t idx);
-        let vl = arr.(SZ.uint_to_t left);
-        arr.(SZ.uint_to_t idx) <- vl;
-        arr.(SZ.uint_to_t left) <- vi;
-        swap_is_permutation #a #ord s idx left;
-        swap_length s idx left;
-        swap_index_i s idx left;
-        max_heapify arr left heap_size start ctr #ord iord #(swap_seq s idx left)
+        sift_down_swap_lemma_from ord s (SZ.v heap_size) start (SZ.v idx) (SZ.v left);
+        grandparent_after_swap_from ord s (SZ.v heap_size) start (SZ.v idx) (SZ.v left);
+        left_idx_inj (SZ.v idx) (SZ.v left);
+        let vi = arr.(idx);
+        let vl = arr.(left);
+        arr.(idx) <- vl;
+        arr.(left) <- vi;
+        swap_is_permutation #a #ord s (SZ.v idx) (SZ.v left);
+        swap_length s (SZ.v idx) (SZ.v left);
+        swap_index_i s (SZ.v idx) (SZ.v left);
+        max_heapify arr left heap_size start ctr #ord iord #(swap_seq s (SZ.v idx) (SZ.v left))
       } else {
         not_lt_ord_implies_ge ord cur lv;
-        almost_to_full ord s heap_size start idx;
+        almost_to_full ord s (SZ.v heap_size) start (SZ.v idx);
         sp_permutation_refl #a #ord s;
         ()
       }
@@ -746,64 +820,71 @@ ensures exists* s' (cf: nat).
 #push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn build_max_heap (#a: Type0)
   (arr: A.array a)
-  (n: nat)
+  (n: SZ.t)
   (ctr: SC.ticks_t)
   (#ord: erased (TO.total_order a))
   (iord: SC.instrumented_total_order a ord ctr)
-  (#s0: erased (Seq.seq a))
+  (#s0: erased (Seq.seq a) {
+    SZ.v n > 0 /\
+    SZ.v n <= A.length arr /\
+    Seq.length s0 == A.length arr /\
+    SZ.fits (Seq.length s0)
+  })
   (#c0: erased nat)
 requires
   A.pts_to arr s0 **
   MR.pts_to ctr #1.0R c0 **
-  pure (n > 0 /\ n <= A.length arr /\ Seq.length s0 == A.length arr)
+  pure True
 ensures exists* s (cf: nat).
   A.pts_to arr s **
   MR.pts_to ctr #1.0R cf **
   pure (
     Seq.length s == Seq.length s0 /\
-    n <= Seq.length s /\
-    is_max_heap ord s n /\
+    SZ.v n <= Seq.length s /\
+    is_max_heap ord s (SZ.v n) /\
     permutation #a #ord s0 s /\
-    (forall (k:nat). n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
+    (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
+    SZ.fits (Seq.length s) /\
     cf >= reveal c0 /\
-    cf - reveal c0 <= CB.build_cost_bound n
+    cf - reveal c0 <= CB.build_cost_bound (SZ.v n)
   )
 {
-  let half : nat = n / 2;
-  let mut i: nat = half;
-  heaps_from_half ord s0 n;
+  let half = SZ.div n 2sz;
+  let mut i: SZ.t = half;
+  heaps_from_half ord s0 (SZ.v n);
   sp_permutation_refl #a #ord s0;
 
-  while (!i > 0)
-  invariant exists* (vi:nat) s_cur (vc: nat).
+  while (SZ.gt (!i) 0sz)
+  invariant exists* vi s_cur (vc: nat).
     R.pts_to i vi **
     A.pts_to arr s_cur **
     MR.pts_to ctr #1.0R vc **
     pure (
-      n > 0 /\
-      vi <= half /\
+      SZ.v n > 0 /\
+      SZ.v vi <= SZ.v half /\
       Seq.length s_cur == Seq.length s0 /\
       Seq.length s_cur == A.length arr /\
       permutation #a #ord s0 s_cur /\
-      (forall (k:nat). n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
-      heaps_from ord s_cur n vi /\
+      (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
+      SZ.fits (Seq.length s_cur) /\
+      heaps_from ord s_cur (SZ.v n) (SZ.v vi) /\
       vc >= reveal c0 /\
-      vc - reveal c0 <= (half - vi) * CB.max_heapify_bound n 0
+      vc - reveal c0 <= (SZ.v half - SZ.v vi) * CB.max_heapify_bound (SZ.v n) 0
     )
-  decreases (!i)
+  decreases (SZ.v !i)
   {
     let vi = !i;
-    let idx : nat = vi - 1;
+    let idx = SZ.sub vi 1sz;
     i := idx;
     with s_cur. assert (A.pts_to arr s_cur);
-    heaps_from_to_almost ord s_cur n idx idx;
-    CB.max_heapify_bound_le_root n idx;
-    max_heapify arr idx n idx ctr #ord iord #s_cur;
+    heaps_from_to_almost ord s_cur (SZ.v n) (SZ.v idx) (SZ.v idx);
+    CB.max_heapify_bound_le_root (SZ.v n) (SZ.v idx);
+    max_heapify arr idx n (SZ.v idx) ctr #ord iord #s_cur;
     ()
   };
 
   with s_built. assert (A.pts_to arr s_built);
-  heaps_from_zero ord s_built n;
+  heaps_from_zero ord s_built (SZ.v n);
   ()
 }
 #pop-options
@@ -811,92 +892,97 @@ ensures exists* s (cf: nat).
 #push-options "--z3rlimit 50 --fuel 1 --ifuel 1"
 fn heapsort (#a: Type0)
   (arr: A.array a)
-  (n: nat)
+  (n: SZ.t)
   (ctr: SC.ticks_t)
   (#ord: erased (TO.total_order a))
   (iord: SC.instrumented_total_order a ord ctr)
-  (#s0: erased (Seq.seq a))
+  (#s0: erased (Seq.seq a) {
+    SZ.v n <= A.length arr /\
+    Seq.length s0 == A.length arr /\
+    SZ.fits (Seq.length s0)
+  })
   (#c0: erased nat)
 requires
   A.pts_to arr s0 **
   MR.pts_to ctr #1.0R c0 **
-  pure (n <= A.length arr /\ Seq.length s0 == A.length arr)
+  pure True
 ensures exists* s (cf: nat).
   A.pts_to arr s **
   MR.pts_to ctr #1.0R cf **
   pure (
     Seq.length s == Seq.length s0 /\
-    sorted_upto ord s n /\
+    sorted_upto ord s (SZ.v n) /\
     permutation #a #ord s0 s /\
-    (forall (k:nat). n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
+    (forall (k:nat). SZ.v n <= k /\ k < Seq.length s ==> Seq.index s k == Seq.index s0 k) /\
     cf >= reveal c0 /\
-    cf - reveal c0 <= CB.heapsort_cost_bound n
+    cf - reveal c0 <= CB.heapsort_cost_bound (SZ.v n)
   )
 {
-  if (n = 0) {
+  if (n = 0sz) {
     sp_permutation_refl #a #ord s0;
     ()
   } else {
     build_max_heap arr n ctr #ord iord;
 
-    let mut heap_sz: nat = n;
+    let mut heap_sz: SZ.t = n;
 
-    while (!heap_sz > 1)
-    invariant exists* (vsz:nat) s_cur (vc: nat).
+    while (SZ.gt (!heap_sz) 1sz)
+    invariant exists* vsz s_cur (vc: nat).
       R.pts_to heap_sz vsz **
       A.pts_to arr s_cur **
       MR.pts_to ctr #1.0R vc **
       pure (
-        n > 0 /\
-        vsz > 0 /\
-        vsz <= n /\
+        SZ.v n > 0 /\
+        SZ.v vsz > 0 /\
+        SZ.v vsz <= SZ.v n /\
         Seq.length s_cur == Seq.length s0 /\
         Seq.length s_cur == A.length arr /\
         permutation #a #ord s0 s_cur /\
-        (forall (k:nat). n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
-        is_max_heap ord s_cur vsz /\
-        suffix_sorted_upto ord s_cur vsz n /\
-        prefix_le_suffix_upto ord s_cur vsz n /\
+        (forall (k:nat). SZ.v n <= k /\ k < Seq.length s_cur ==> Seq.index s_cur k == Seq.index s0 k) /\
+        SZ.fits (Seq.length s_cur) /\
+        is_max_heap ord s_cur (SZ.v vsz) /\
+        suffix_sorted_upto ord s_cur (SZ.v vsz) (SZ.v n) /\
+        prefix_le_suffix_upto ord s_cur (SZ.v vsz) (SZ.v n) /\
         vc >= reveal c0 /\
-        vc - reveal c0 <= CB.build_cost_bound n +
-                         (n - vsz) * CB.max_heapify_bound n 0
+        vc - reveal c0 <= CB.build_cost_bound (SZ.v n) +
+                         (SZ.v n - SZ.v vsz) * CB.max_heapify_bound (SZ.v n) 0
       )
-    decreases (!heap_sz)
+    decreases (SZ.v !heap_sz)
     {
       let vsz = !heap_sz;
       with s_cur. assert (A.pts_to arr s_cur);
 
-      let last : nat = vsz - 1;
-      let v0 = arr.(SZ.uint_to_t 0);
-      let vl = arr.(SZ.uint_to_t last);
-      arr.(SZ.uint_to_t 0) <- vl;
-      arr.(SZ.uint_to_t last) <- v0;
+      let last = SZ.sub vsz 1sz;
+      let v0 = arr.(0sz);
+      let vl = arr.(last);
+      arr.(0sz) <- vl;
+      arr.(last) <- v0;
 
-      swap_is_permutation #a #ord s_cur 0 last;
-      swap_length s_cur 0 last;
-      extract_extends_sorted_upto ord s_cur vsz n;
+      swap_is_permutation #a #ord s_cur 0 (SZ.v last);
+      swap_length s_cur 0 (SZ.v last);
+      extract_extends_sorted_upto ord s_cur (SZ.v vsz) (SZ.v n);
 
-      let new_sz : nat = vsz - 1;
-      extract_almost_heaps ord s_cur vsz;
-      CB.max_heapify_bound_monotone new_sz n 0;
-      max_heapify arr 0 new_sz 0 ctr #ord iord #(swap_seq s_cur 0 last);
+      let new_sz = SZ.sub vsz 1sz;
+      extract_almost_heaps ord s_cur (SZ.v vsz);
+      CB.max_heapify_bound_monotone (SZ.v new_sz) (SZ.v n) 0;
+      max_heapify arr 0sz new_sz 0 ctr #ord iord #(swap_seq s_cur 0 (SZ.v last));
       with s_heapified. assert (A.pts_to arr s_heapified);
       with vc_after. assert (MR.pts_to ctr #1.0R vc_after);
-      FStar.Math.Lemmas.distributivity_add_left (n - vsz) 1 (CB.max_heapify_bound n 0);
-      heaps_from_zero ord s_heapified new_sz;
-      perm_preserves_sorted_suffix_upto ord (swap_seq s_cur 0 last) s_heapified new_sz n;
+      FStar.Math.Lemmas.distributivity_add_left (SZ.v n - SZ.v vsz) 1 (CB.max_heapify_bound (SZ.v n) 0);
+      heaps_from_zero ord s_heapified (SZ.v new_sz);
+      perm_preserves_sorted_suffix_upto ord (swap_seq s_cur 0 (SZ.v last)) s_heapified (SZ.v new_sz) (SZ.v n);
 
       heap_sz := new_sz;
     };
 
     with vheap_final s_final vc_final.
       assert (R.pts_to heap_sz vheap_final ** A.pts_to arr s_final ** MR.pts_to ctr #1.0R vc_final);
-    heap_sz_exit_eq_one vheap_final;
-    assert (pure (vheap_final == 1));
-    assert (pure (suffix_sorted_upto ord s_final 1 n));
-    assert (pure (prefix_le_suffix_upto ord s_final 1 n));
-    sorted_upto_from_parts ord s_final n;
-    heapsort_final_cost_bound n vheap_final vc_final (reveal c0);
+    heap_sz_exit_eq_one (SZ.v vheap_final);
+    assert (pure (SZ.v vheap_final == 1));
+    assert (pure (suffix_sorted_upto ord s_final 1 (SZ.v n)));
+    assert (pure (prefix_le_suffix_upto ord s_final 1 (SZ.v n)));
+    sorted_upto_from_parts ord s_final (SZ.v n);
+    heapsort_final_cost_bound (SZ.v n) (SZ.v vheap_final) vc_final (reveal c0);
     ()
   }
 }
@@ -920,7 +1006,8 @@ ensures exists* s' (ticks: nat).
         ticks <= reveal i + heapsort_sort_bound (Seq.length s0))
 {
   A.pts_to_len arr;
-  heapsort arr (SZ.v len) ctr #ord iord #s0 #i;
+  assert (pure (SZ.fits (Seq.length s0)));
+  heapsort arr len ctr #ord iord #s0 #i;
   with s. assert (arr |-> s);
   with cf. assert (MR.pts_to ctr #1.0R cf);
   assert (pure (Seq.length s == Seq.length s0));
