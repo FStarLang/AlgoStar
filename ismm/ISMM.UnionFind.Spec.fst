@@ -17,6 +17,7 @@
 module ISMM.UnionFind.Spec
 
 open FStar.Seq
+open FStar.Mul
 module Seq = FStar.Seq
 open ISMM.Status
 
