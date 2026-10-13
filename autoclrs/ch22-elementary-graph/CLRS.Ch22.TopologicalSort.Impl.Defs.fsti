@@ -7,7 +7,7 @@ open CLRS.Ch22.TopologicalSort.Verified
 module SZ = FStar.SizeT
 module Seq = FStar.Seq
 
-#set-options "--z3rlimit 10 --split_queries always"
+#set-options "--z3rlimit 10"
 
 // Helper lemma: if u < n, v < n, and n*n fits, then u*n+v < n*n and fits
 val lemma_index_in_bounds (u v n: nat)

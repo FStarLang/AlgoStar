@@ -229,7 +229,7 @@ let prim_inv
     key_seq parent_seq in_mst_seq weights_seq n source
 
 /// Init: all vacuously true at start
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 5"
 let prim_inv_init
     (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -757,7 +757,7 @@ fn update_keys
 /// Hoisted outer loop body: one complete iteration of Prim's algorithm.
 /// find_min → add to MST → greedy step → update keys
 /// Takes and returns prim_loop_state, keeping fn prim's VC minimal.
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 5"
 fn prim_step
   (#p: perm)
   (key_a: array SZ.t)

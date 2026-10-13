@@ -267,7 +267,7 @@ let fold_pi_max_up_to (#a: eqtype) (pattern: seq a) (pi: seq SZ.t) (bound: nat)
 
 /// Top-level helper: validity at any q' < q+1 from separate facts.
 /// Must be top-level to avoid inner function subtyping issues.
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let valid_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern}) (q': nat{q' < length pattern})
   : Lemma
@@ -283,7 +283,7 @@ let valid_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
 
 /// Top-level helper: maximality at any q' < q+1 from separate flat foralls.
 /// Explicit case split avoids Z3 trigger matching issues.
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let max_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern}) (q': nat{q' < length pattern}) (k: nat)
   : Lemma

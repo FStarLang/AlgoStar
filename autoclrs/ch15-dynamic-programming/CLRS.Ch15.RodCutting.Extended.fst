@@ -419,7 +419,7 @@ let cuts_are_optimal_intro (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq 
 open Pulse.Lib.BoundedIntegers
 
 #pop-options
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 
 //SNIPPET_START: extended_sig
 fn extended_rod_cutting

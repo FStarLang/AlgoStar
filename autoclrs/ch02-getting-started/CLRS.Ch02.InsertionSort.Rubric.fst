@@ -151,7 +151,7 @@ let inner_invariant
     (forall (k: nat). 0 <= k /\ k < Seq.length rhs ==> Seq.index rhs k >=? key)
   )
 
-#push-options "--fuel 0 --ifuel 1 --split_queries no --z3rlimit_factor 5"
+#push-options "--fuel 0 --ifuel 1 --z3rlimit_factor 5"
 #restart-solver
 let step_inner_invariant
       (#t: Type)
@@ -170,7 +170,7 @@ let step_inner_invariant
   = ()
 #pop-options
 
-#push-options "--fuel 0 --ifuel 1 --split_queries no --z3rlimit_factor 2"
+#push-options "--fuel 0 --ifuel 1 --z3rlimit_factor 2"
 #restart-solver
 let step_outer_invariant
       (#t: Type)

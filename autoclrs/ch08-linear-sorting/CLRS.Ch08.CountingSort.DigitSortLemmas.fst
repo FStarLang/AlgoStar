@@ -214,7 +214,7 @@ let phase4_b_inv_init (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base: nat)
   = reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb d base (Seq.length sa));
     digit_count_le_full sa d base
 
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 5"
 let phase4_content_inv_init (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base: nat)
   : Lemma (requires
       Seq.length sc == base /\ base > 0 /\ Seq.length sa > 0 /\
@@ -322,7 +322,7 @@ let pred_le_and_neq_implies_le (pos p: nat)
 
 (* ========== Phase 4 position bounds ========== *)
 
-#push-options "--z3rlimit 20 --z3refresh --split_queries always"
+#push-options "--z3rlimit 20 --z3refresh"
 let phase4_pos_bounds (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -531,7 +531,7 @@ let pos_not_in_other_block (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaini
 #pop-options
 
 /// Sub-lemma: v <> key, multiset part
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --z3refresh --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --z3refresh"
 let content_step_other_multiset
   (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key v: nat)
   (lo hi: nat)
@@ -587,7 +587,7 @@ let content_step_other_order
 
 /// Sub-lemma for phase4_content_step: v == key multiset proof
 /// Does NOT reveal opaque invariants; takes needed facts as preconditions
-#push-options "--z3rlimit 15 --fuel 2 --ifuel 1 --z3refresh --split_queries always"
+#push-options "--z3rlimit 15 --fuel 2 --ifuel 1 --z3refresh"
 let content_step_key_multiset
   (sa sb sb': Seq.seq nat)
   (d base n remaining: nat) (key: nat)
@@ -745,7 +745,7 @@ let key_order_case_old
 
 /// Sub-lemma for phase4_content_step: v == key, NEW element order (p1=pos)
 /// Uses bounded types to avoid Seq.index subtyping issues under split queries
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --z3refresh"
 let content_step_key_order
   (sa sb sb': Seq.seq nat)
   (d base n remaining: nat) (key: nat)
@@ -773,7 +773,7 @@ let content_step_key_order
 #pop-options
 
 /// Main content step: reveals invariants, dispatches to sub-lemmas
-#push-options "--z3rlimit 80 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 80 --fuel 0 --ifuel 0 --z3refresh"
 let phase4_content_step_multiset (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n remaining /\
@@ -1029,7 +1029,7 @@ let bridge_agreement (sb sb': Seq.seq nat) (n pos lo hi: nat)
 #pop-options
 
 /// Per-v order step for v <> key case
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --z3refresh"
 let phase4_content_step_order_for_v_neq
   (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat) (v: nat)
   : Lemma (requires
@@ -1069,7 +1069,7 @@ let phase4_content_step_order_for_v_neq
 #pop-options
 
 /// Per-v order step for v == key case: uses isolated sub-lemma calls
-#push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 40 --fuel 0 --ifuel 0 --z3refresh"
 let phase4_content_step_order_for_v_eq
   (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat)
   : Lemma (requires
@@ -1188,7 +1188,7 @@ let order_step_v_eq
 #pop-options
 
 /// Per-v order proof helper (top-level to isolate verification from orchestrator context)
-#push-options "--z3rlimit 160 --fuel 0 --ifuel 0 --z3refresh --split_queries always"
+#push-options "--z3rlimit 160 --fuel 0 --ifuel 0 --z3refresh"
 let order_step_for_v
   (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remaining: nat) (key: nat) (v: nat)
   : Lemma (requires
@@ -1298,7 +1298,7 @@ let phase4_content_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n
 (* ========== Phase 4 final: extract results ========== *)
 
 /// sorted_on_digit from block structure  
-#push-options "--z3rlimit 15 --z3refresh --split_queries always"
+#push-options "--z3rlimit 15 --z3refresh"
 let phase4_final_sorted_on_digit (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n: nat)
   : Lemma (requires
       phase4_c_inv sc sa d base n 0 /\ phase4_b_inv sc sa sb d base n /\

@@ -554,7 +554,7 @@ private let lemma_exists_shift_bound
   = ()
 #pop-options
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 30 --split_queries always"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
 
 let rec find_chain_duplicate
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)

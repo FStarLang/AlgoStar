@@ -400,7 +400,7 @@ let frame_preserves_dist_ok
    - Seq.upd axiom fires on conclusion → introduces Seq.index squeue i
    - queue_ok trigger fires → gives scolor[squeue[i]] <> 0
    - scolor[v] == 0 + scolor[squeue[i]] <> 0 → squeue[i] <> v → Seq.upd scolor unchanged *)
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10"
 let queue_ok_after_discover
   (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (v: SZ.t)
   : Lemma
@@ -547,7 +547,7 @@ let discover_preserves_queue_gray_unique
     (ensures queue_gray_unique (Seq.upd scolor j 1) squeue n head tail)
   = ()
 
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10"
 let queue_gray_unique_after_discover
   (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (v: SZ.t)
   : Lemma
@@ -713,7 +713,7 @@ let init_queue_dist_ub (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n: nat)
 
 (* --- Core optimality contradiction: no short path to a WHITE vertex --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let discover_optimal_contradiction
   (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source j: nat) (d k: nat)
   : Lemma
@@ -743,7 +743,7 @@ let discover_optimal_contradiction
 
 (* --- Discover preservation lemmas --- *)
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let discover_preserves_dist_optimal
   (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source u j: nat) (du: nat)
   : Lemma
@@ -1003,7 +1003,7 @@ let queue_dist_ub_from_min_opt
 
 (* --- Gray vertex has dist >= d (counting/induction argument) --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec gray_implies_dist_ge
   (scolor: Seq.seq int) (sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
   (n head tail: nat) (d: int) (w: nat)
@@ -1090,7 +1090,7 @@ let rec gray_implies_dist_ge
 
 (* --- Layer completeness from BFS invariants --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec layer_complete_aux
   (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
   (source d head tail: nat) (w: nat) (k: nat)
@@ -1170,7 +1170,7 @@ let layer_complete_from_invariants
    Factored out to avoid Pulse unification issues with conditional branches
    that perform multiple array mutations. *)
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 fn discover_vertex
   (color: A.array int) (dist: A.array int) (pred: A.array int)
   (queue_data: A.array SZ.t) (q_tail: ref SZ.t)
@@ -1235,7 +1235,7 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 fn maybe_discover
   (adj: A.array int)
   (color: A.array int) (dist: A.array int) (pred: A.array int)
@@ -1369,7 +1369,7 @@ fn maybe_discover
 }
 #pop-options
 
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)

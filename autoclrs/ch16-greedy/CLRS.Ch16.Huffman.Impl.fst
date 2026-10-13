@@ -138,7 +138,7 @@ fn forest_own_take_at
 
 // Prove: forest_own entries == 
 //   is_htree(entries[j1]) ** is_htree(entries[j2]) ** forest_own(remove_two entries j1 j2)
-#push-options "--split_queries always --z3rlimit 40"
+#push-options "--z3rlimit 40"
 let forest_own_split_two_lemma
   (entries: list forest_entry)
   (j1 j2: nat)
@@ -237,7 +237,7 @@ fn root_freq (p: hnode_ptr) (ft: HSpec.htree)
 
 // Local wrapper: calls merge_bundle_step with all preconditions pre-computed.
 // This isolates the heavy SMT work from the Pulse VC.
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 let merge_step_local
   (freq_seq: Seq.seq int) (nd_contents0: Seq.seq hnode_ptr) (merged: hnode_ptr)
   (pq0 pq1 pq2 pq3: Seq.seq pq_entry)
@@ -284,7 +284,7 @@ let merge_step_local
 #pop-options
 
 //SNIPPET_START: huffman_tree_sig
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 20"
 fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))

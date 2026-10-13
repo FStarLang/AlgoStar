@@ -444,7 +444,7 @@ let init_pred_edge_ok (sadj scolor sd spred: Seq.seq int) (n: nat)
   = reveal_opaque (`%pred_edge_ok) (pred_edge_ok sadj n scolor sd spred)
 
 (* Top-of-stack vertex has no BLACK predecessor *)
-#push-options "--z3rlimit 5 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let stack_top_pred_not_black
   (scolor: Seq.seq int) (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n top: nat)
   : Lemma
@@ -500,7 +500,7 @@ let stack_is_path_pop (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n top: nat)
     reveal_opaque (`%stack_is_path) (stack_is_path sstack spred n (top - 1))
 
 (* Pushing preserves stack_is_path when pred[new] = stack[top-1] *)
-#push-options "--z3rlimit 5 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let stack_is_path_push
   (sstack: Seq.seq SZ.t) (spred: Seq.seq int) (n top: nat) (vv_sz: SZ.t) (u: nat)
   : Lemma
@@ -536,7 +536,7 @@ let discover_preserves_pred_finish_ok
 (* Finishing vertex u preserves pred_finish_ok.
    PRECONDITION: u's predecessor (if valid) is not BLACK.
    In DFS, u's parent is still GRAY on the stack below u. *)
-#push-options "--z3rlimit 5 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let finish_preserves_pred_finish_ok
   (sadj scolor sd sf spred: Seq.seq int) (n u: nat) (time: int)
   : Lemma
@@ -668,7 +668,7 @@ let rec sum_scan_idx_all_zero (sscan: Seq.seq SZ.t) (k: nat{k <= Seq.length ssca
    Sets d[v], color[v]=GRAY, pred[v]=u, pushes v onto stack.
    Factored out to avoid Pulse unification issues with conditional branches. *)
 
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn discover_vertex_dfs
   (color: A.array int) (d: A.array int) (pred: A.array int)
   (stack_data: A.array SZ.t) (stack_top: ref SZ.t)
@@ -756,7 +756,7 @@ fn discover_vertex_dfs
 (* Helper: finish a vertex u.
    Sets f[u], color[u]=BLACK, pops u from stack. *)
 
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn finish_vertex
   (color: A.array int) (f: A.array int)
   (stack_data: A.array SZ.t)
@@ -830,7 +830,7 @@ let dfs_time_bound (scolor: Seq.seq int) (n: nat) (vtime: int)
 (* Helper: scan adjacency row for next WHITE neighbor starting from scan_pos.
    Reads adj and color; only modifies ghost counter ctr (via tick). *)
 
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn scan_for_white_neighbor
   (adj: A.array int)
   (color: A.array int)
@@ -927,7 +927,7 @@ fn scan_for_white_neighbor
 
 (* Helper: perform DFS-VISIT for a single white vertex *)
 
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
 fn dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -1212,7 +1212,7 @@ fn dfs_visit
 (* Helper: conditionally perform DFS-VISIT if vertex is WHITE.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 fn maybe_dfs_visit
   (adj: A.array int)
   (n: SZ.t)
@@ -1311,7 +1311,7 @@ fn maybe_dfs_visit
    Main stack-based DFS — proves both correctness and complexity
    ================================================================ *)
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 //SNIPPET_START: stack_dfs_sig
 fn stack_dfs
   (adj: A.array int)

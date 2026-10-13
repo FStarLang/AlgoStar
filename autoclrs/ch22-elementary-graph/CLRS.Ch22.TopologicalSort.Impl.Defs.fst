@@ -953,7 +953,7 @@ let lemma_vtail_lt_n (squeue: Seq.seq SZ.t) (vtail n vv: nat)
 
 (* Combined step lemma: does inner_indeg_step + pn_entries_below_step + pn_extra_inv_step + pn_enqueue_complete_step
    in one F* lemma. This avoids Pulse VC elaboration issues with multiple lemma calls. *)
-#push-options "--split_queries always"
+#push-options ""
 let pn_combined_step
   (adj: Seq.seq int) (n: nat)
   (sin_degree sin_deg_cur sin_deg_new: Seq.seq int)

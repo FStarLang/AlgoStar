@@ -46,7 +46,7 @@ let rec bits_as_list_length (s: Seq.seq bool) (lo hi: nat)
 // Decode one symbol by walking the heap tree from `cur` to a leaf.
 // `ft` is the spec-level tree (needed for proof; erased at extraction).
 // Returns (symbol, new_bit_position).
-#push-options "--z3rlimit 40 --split_queries always"
+#push-options "--z3rlimit 40"
 fn rec decode_step_impl
   (cur: hnode_ptr) (ft: HSpec.htree)
   (bits: A.array bool) (pos bit_len: SZ.t)
@@ -172,7 +172,7 @@ let decode_suffix_step
 
 // Full decoder: decode entire bitstring into an output array.
 // Postcondition: output matches pure decode.
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 20"
 fn decode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (bits: A.array bool) (bit_len: SZ.t)
@@ -287,7 +287,7 @@ let codeword_cons_combine
 // Walk the tree to find the codeword for a given symbol.
 // Writes codeword bits into cw_buf starting at position depth.
 // Returns (found, codeword_length).
-#push-options "--z3rlimit 40 --split_queries always --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
 fn rec codeword_impl
   (cur: hnode_ptr) (ft: HSpec.htree) (sym: nat)
   (cw_buf: A.array bool) (depth: SZ.t) (max_depth: SZ.t)
@@ -493,7 +493,7 @@ let encode_prefix_combine
 // Encode: for each symbol in msg, look up codeword and write to output.
 // Uses suffix-based invariant: tracks encode of remaining symbols.
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn encode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (msg: A.array nat) (msg_len: SZ.t)

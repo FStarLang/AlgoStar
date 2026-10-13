@@ -77,7 +77,7 @@ ensures exists* s.
 // Correctness from RadixSort.Stability and RadixSort.FullSort.
 
 //SNIPPET_START: radix_sort_multidigit_sig
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn radix_sort_multidigit
   (a: A.array nat)
   (len: SZ.t)

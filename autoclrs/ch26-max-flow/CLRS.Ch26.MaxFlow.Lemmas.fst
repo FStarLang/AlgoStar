@@ -725,7 +725,7 @@ let lemma_augment_edge_residual_unchanged
     when they modify disjoint matrix cells. This holds when the edges are 
     different as undirected edges: {u1,v1} ≠ {u2,v2}. 
     Adjacent path edges (u,v) and (v,w) satisfy this because u ≠ w. *)
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let lemma_augment_edge_commute
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})

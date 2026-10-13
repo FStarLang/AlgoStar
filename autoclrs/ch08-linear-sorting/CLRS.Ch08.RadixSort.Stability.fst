@@ -123,7 +123,7 @@ let is_stable_get_witnesses (s_in s_out: seq nat) (d base: nat) (j1 j2: nat)
 
 /// Pack components into is_stable_sort_on_digit.
 /// The order_proof function provides stability witnesses for each pair.
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let pack_is_stable (s_in s_out: seq nat) (d base: nat)
   (order_proof: (j1: nat) -> (j2: nat) -> Lemma
     (requires j1 < j2 /\ j2 < length s_out /\
@@ -409,7 +409,7 @@ let extract_stable_sort_property
 /// the output is sorted on digits 0..d-1.
 ///
 /// This is the key inductive invariant for radix sort correctness.
-#push-options "--split_queries always"
+#push-options ""
 let rec radix_sort_invariant
   (s0: seq nat)            // Initial input
   (steps: list (seq nat))  // Intermediate sequences after each pass

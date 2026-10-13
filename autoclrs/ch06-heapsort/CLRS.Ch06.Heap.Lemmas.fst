@@ -282,7 +282,7 @@ let index_mem_intro (s:Seq.seq int) (idx:nat{idx < Seq.length s})
 // ========== Range-bounded lemmas for prefix sorting ==========
 // The _upto versions are the general form; non-_upto versions delegate to them.
 
-#push-options "--split_queries always --z3rlimit 10"
+#push-options "--z3rlimit 10"
 let extract_extends_sorted_upto (s:Seq.seq int) (len n:nat)
   : Lemma (requires n <= Seq.length s /\ len <= n /\ len > 1 /\
                     is_max_heap s len /\
@@ -327,7 +327,7 @@ let perm_prefix_witness (s1 s2:Seq.seq int) (k:nat) (x:int)
 #pop-options
 
 // Helper: element at index i in s2 exists at some index in s1's prefix
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
 private
 let perm_prefix_bounded_aux_upto (s1 s2:Seq.seq int) (k n:nat) (i:nat) (j:nat)
   : Lemma (requires Seq.length s1 == Seq.length s2 /\
@@ -426,7 +426,7 @@ let extract_step_lemma
 // suffix_sorted s k ≡ suffix_sorted_upto s k (Seq.length s)
 // prefix_le_suffix s k ≡ prefix_le_suffix_upto s k (Seq.length s)
 
-#push-options "--split_queries always"
+#push-options ""
 let extract_extends_sorted (s:Seq.seq int) (len:nat{len <= Seq.length s /\ len > 1})
   : Lemma (requires is_max_heap s len /\
                     suffix_sorted s len /\

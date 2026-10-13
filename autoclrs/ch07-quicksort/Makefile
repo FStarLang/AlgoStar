@@ -1,6 +1,5 @@
 include ../config.mk
 OTHERFLAGS += --include ../common
-OTHERFLAGS += --split_queries always
 include $(PULSE_ROOT)/mk/test.mk
 
 # ── C extraction and test targets ──────────────────────────────────

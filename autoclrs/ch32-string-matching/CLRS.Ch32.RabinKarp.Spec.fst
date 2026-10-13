@@ -73,7 +73,7 @@ let lemma_mod_add_3 (a b c:int) (p:pos)
 
 /// Key lemma: extract the most-significant digit from the hash.
 ///   hash(i,j) == (hash(i+1,j) + d^(j-i-1) · x[i]) % q
-#push-options "--z3rlimit 20 --ifuel 0 --fuel 2 --split_queries no"
+#push-options "--z3rlimit 20 --ifuel 0 --fuel 2"
 #restart-solver
 let rec hash_inversion (x:Seq.seq nat) (d:nat) (q:nat{q <> 0})
                        (i:nat) (j:nat{i < j /\ j <= Seq.length x})
@@ -306,7 +306,7 @@ let rec rabin_karp_matches_no_false_positives
 #pop-options
 
 /// No false negatives: every valid match appears in results.
-#push-options "--fuel 2 --ifuel 2 --z3rlimit 400 --split_queries always --ext no:optimize_let_vc"
+#push-options "--fuel 2 --ifuel 2 --z3rlimit 400 --ext no:optimize_let_vc"
 let rec rabin_karp_matches_no_false_negatives
     (text pattern:Seq.seq nat) (d:nat) (q:nat{q <> 0})
     (s:nat) (current_hash:nat)

@@ -84,7 +84,7 @@ let rec count_matches_up_to_bounded (text pattern: Seq.seq nat) (limit: nat)
     else count_matches_up_to_bounded text pattern (limit - 1)
 
 // Key combined lemma: should_count equivalence
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let should_count_correct
     (text pattern: Seq.seq nat) (d: nat) (q: pos) (s m: nat)
     (hash_match: bool) (final_verified: int) (final_j: nat)

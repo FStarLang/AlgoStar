@@ -311,7 +311,7 @@ let cross_prod_swap23 (x1 y1 x2 y2 x3 y3: int) : Lemma
 //   Multiply H2 by ay: bx*cy*ay >= cx*by*ay
 //   Since bx*ay*cy = bx*cy*ay: ax*by*cy >= cx*by*ay
 //   Since by > 0: ax*cy >= cx*ay. QED
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10"
 let half_plane_transitivity (ax ay bx b_y cx cy: int) : Lemma
   (requires ay >= 0 /\ b_y > 0 /\ cy >= 0 /\
             ax * b_y - bx * ay >= 0 /\
@@ -402,7 +402,7 @@ let dy (ys: Seq.seq int) (current k: nat) : int =
 //              (general position — ensures strict ordering).
 // Under these conditions, find_next_spec returns the most-clockwise point.
 
-#push-options "--split_queries always"
+#push-options ""
 let rec find_next_aux_beats_all (xs ys: Seq.seq int) (current next: nat) (j: nat)
   : Lemma
     (requires
@@ -496,7 +496,7 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_spec_bounded xs ys current
 
 // Extending a valid Jarvis hull by one vertex preserves validity.
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10"
 let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
   : Lemma
     (requires

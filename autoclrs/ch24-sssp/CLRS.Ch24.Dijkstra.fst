@@ -173,7 +173,7 @@ let relax_round_lb_post
 #pop-options
 
 /// Helper: pred_consistent is preserved by the relaxation round
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries no"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let relax_round_pred_consistent
   (sweights sdist_pre sdist_after: Seq.seq int)
   (spred_pre spred_after: Seq.seq SZ.t)
@@ -231,7 +231,7 @@ let relax_round_pred_consistent
 #pop-options
 
 /// Helper: predecessors remain visited after the relaxation round
-#push-options "--z3rlimit 15 --fuel 0 --ifuel 0 --split_queries no"
+#push-options "--z3rlimit 15 --fuel 0 --ifuel 0"
 let relax_round_pred_visited
   (sweights sdist_pre sdist_after: Seq.seq int)
   (spred_pre spred_after: Seq.seq SZ.t)
@@ -625,7 +625,7 @@ let extend_relaxed_from_u
 #pop-options
 
 // Relax loop + bridge lemmas, extracted to its own scope for SMT tractability
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
 fn dijkstra_relax_round
   (weights: A.array int)
   (n: SZ.t)
@@ -826,7 +826,7 @@ fn dijkstra_relax_round
 }
 #pop-options
 
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)

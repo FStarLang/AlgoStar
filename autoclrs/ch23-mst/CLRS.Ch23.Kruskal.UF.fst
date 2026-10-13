@@ -375,7 +375,7 @@ let uf_complete_init (sparent: Seq.seq SZ.t) (n: nat)
 #pop-options
 
 // Union step: after adding edge (u_val, v_val) and setting parent'[root_u] = root_v
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 15 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
 let uf_complete_union
     (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)

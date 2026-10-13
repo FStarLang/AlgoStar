@@ -32,7 +32,7 @@ let permutation_swap (s: Seq.seq int) (i j: nat_smaller (Seq.length s))
 // These lemmas relate forall-quantified preconditions to slice-based postconditions.
 // Split queries isolate the postcondition sub-query from ground terms, preventing
 // Z3 from instantiating the quantifiers. Disable split_queries here.
-#push-options "--split_queries no"
+#push-options ""
 let transfer_larger_slice
   (s : Seq.seq int)
   (shift : nat)

@@ -1016,7 +1016,7 @@ let clrs_delete_preserves_bst (t: rbtree) (k: int)
 (*** DELETE — RB Property Preservation ***)
 
 // Helper: deficit tracking invariant for clrs_resolve_left/right
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let clrs_del_cases234_left_props (c: color) (x: rbtree) (v: int)
     (w: rbtree{Node? w /\ Black? (Node?.c w)})
   : Lemma
@@ -1037,7 +1037,7 @@ let clrs_del_cases234_left_props (c: color) (x: rbtree) (v: int)
     | _, _ -> ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let clrs_del_cases234_right_props (c: color) (w: rbtree{Node? w /\ Black? (Node?.c w)})
     (v: int) (x: rbtree)
   : Lemma
@@ -1058,7 +1058,7 @@ let clrs_del_cases234_right_props (c: color) (w: rbtree{Node? w /\ Black? (Node?
     | _, _ -> ()
 #pop-options
 
-#push-options "--fuel 4 --ifuel 2 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 4 --ifuel 2 --z3rlimit 10"
 let clrs_resolve_left_props (c: color) (x: rbtree) (v: int) (w: rbtree)
   : Lemma
     (requires same_bh x /\ same_bh w /\ bh x + 1 = bh w /\
@@ -1103,7 +1103,7 @@ let clrs_resolve_right_props (c: color) (w: rbtree) (v: int) (x: rbtree)
 
 // Main delete RB preservation: clrs_del preserves same_bh and
 // tracks deficit/no_red_red depending on deficit flag
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let rec clrs_del_props (t: rbtree) (k: int)
   : Lemma
     (requires same_bh t /\ no_red_red t /\ is_bst t)

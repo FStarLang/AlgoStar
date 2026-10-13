@@ -371,7 +371,7 @@ let kmp_step_valid (text pattern pi: seq int) (i q: nat)
 #pop-options
 
 /// The KMP step result is the true maximum (possibly = m)
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 1 --split_queries always --ext no:optimize_let_vc"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 1 --ext no:optimize_let_vc"
 let kmp_step_maximal (text pattern pi: seq int) (i q: nat)
   : Lemma
     (requires pi_max pattern pi /\
@@ -519,7 +519,7 @@ let matches_at_dec_iff (text pattern: seq int) (s: nat)
 // ========== Match Detection Equivalence ==========
 
 /// q_new = m iff there's a match at position i+1-m
-#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --split_queries always --ext no:optimize_let_vc"
+#push-options "--z3rlimit 400 --fuel 2 --ifuel 1 --ext no:optimize_let_vc"
 let kmp_match_iff (text pattern pi: seq int) (i q: nat)
   : Lemma
     (requires pi_max pattern pi /\

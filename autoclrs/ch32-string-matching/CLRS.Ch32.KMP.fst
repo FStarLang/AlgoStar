@@ -31,7 +31,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 
-#push-options "--z3rlimit 80 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 80 --ifuel 2 --fuel 2"
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec

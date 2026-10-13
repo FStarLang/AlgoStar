@@ -228,7 +228,7 @@ let elim_bfs_pred_ok (scolor spred sdist cap_seq flow_seq: Seq.seq int) (n sourc
   = reveal_opaque (`%bfs_pred_ok) (bfs_pred_ok scolor spred sdist cap_seq flow_seq n source vtail)
 
 (** Discovery preserves bfs_pred_ok: when discovering vv from u *)
-#push-options "--split_queries always"
+#push-options ""
 let lemma_discover_preserves_bfs_pred_ok
   (scolor spred sdist cap_seq flow_seq: Seq.seq int)
   (n source u vv vtail: nat)
@@ -1942,7 +1942,7 @@ private let lemma_count_sum_arith (a b c: int)
 
 (** Proof helper for maybe_discover then-branch: packs discover_delta without Seq.upd in call *)
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 let maybe_discover_then_proof
   (scolor spred: Seq.seq int) (squeue: Seq.seq SZ.t)
   (cap_seq flow_seq: Seq.seq int)
@@ -2111,7 +2111,7 @@ fn maybe_discover
 #pop-options
 
 (** Explore all neighbors of vertex u in the residual graph *)
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 fn bfs_explore_neighbors
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)
@@ -2264,7 +2264,7 @@ fn bfs_explore_neighbors
 
 (** Main BFS: returns whether sink was reached *)
 #restart-solver
-#push-options "--z3rlimit 80 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 80 --fuel 1 --ifuel 1"
 fn bfs_residual
   (capacity flow color pred dist: A.array int)
   (queue: A.array SZ.t)

@@ -318,7 +318,7 @@ fn process_neighbors
 }
 #pop-options
 
-#push-options "--z3rlimit 10 --split_queries always --ifuel 2"
+#push-options "--z3rlimit 10 --ifuel 2"
 // Input: adjacency matrix adj (n×n represented as flat array)
 // Output: array containing topological order of vertices
 //SNIPPET_START: topological_sort_sig

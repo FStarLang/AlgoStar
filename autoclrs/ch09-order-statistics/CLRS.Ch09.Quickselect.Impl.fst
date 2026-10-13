@@ -159,7 +159,7 @@ private let reveal_perm (s_pre s1: Seq.seq int)
           (ensures Seq.Properties.permutation int s_pre s1)
   = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s_pre s1)
 
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 5"
 let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma
     (requires lo <= hi /\ hi <= Seq.length s_pre /\
@@ -222,7 +222,7 @@ let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
 
 // ========== Quickselect — single function, correctness + complexity ==========
 
-#push-options "--z3rlimit 5 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --ifuel 2 --fuel 2"
 //SNIPPET_START: quickselect
 fn quickselect
   (a: A.array int)

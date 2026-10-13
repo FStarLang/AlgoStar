@@ -207,7 +207,7 @@ fn do_union
 #pop-options
 
 // Lemma for when we add an edge: proves uf_inv, is_forest, valid_endpoints for new state.
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 2"
 let kruskal_add_edge_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int)
@@ -1897,7 +1897,7 @@ let kruskal_mst_inv_step_add_safety
 // Step maintenance: adding an edge
 // Transfers all predicates from seu/sev to seu'/sev' via ext lemmas
 #restart-solver
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let kruskal_mst_inv_step_add
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -1949,7 +1949,7 @@ let kruskal_mst_inv_step_add
 
 // Step maintenance: not adding an edge
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 let kruskal_mst_inv_step_noop
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -1982,7 +1982,7 @@ let kruskal_mst_inv_step_noop
 
 // Wrapper for both cases
 #restart-solver
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let kruskal_mst_inv_step
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec ec': nat)
@@ -2110,7 +2110,7 @@ let kruskal_spanning_step_count
 #pop-options
 #pop-options
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --split_queries always --ext no:optimize_let_vc"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --ext no:optimize_let_vc"
 fn find_min_cross_edge
   (#p: perm)
   (adj: A.array int)
@@ -2238,7 +2238,7 @@ fn find_min_cross_edge
 }
 #pop-options
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --split_queries always --ext no:optimize_let_vc"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --ext no:optimize_let_vc"
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))

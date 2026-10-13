@@ -160,7 +160,7 @@ private let cancel_mul_div (a: nat) (b: pos) : Lemma ((a * b) / b = a) = lemma_d
 private let floor_mul_le (a: nat) (b: pos) (c: nat) : Lemma ((a / b) * c <= a * c / b) =
   lemma_div_mod a b; lemma_div_plus ((a % b) * c) ((a / b) * c) b
 
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10"
 
 /// Scaling: pow2(H) * sum floor(n*h/2^h) <= n * weighted_pow2_sum(0,H)
 private let rec scaled_floor_sum_bound (n: pos) (h max_h: nat)
@@ -489,7 +489,7 @@ let build_heap_ops_explicit_eq (n: pos)
   = ()
 #pop-options
 
-#push-options "--fuel 10 --ifuel 5 --z3rlimit 50 --split_queries always"
+#push-options "--fuel 10 --ifuel 5 --z3rlimit 50"
 private
 let build_heap_ops_le_root_bound_small (n: pos)
   : Lemma (requires n < 32)

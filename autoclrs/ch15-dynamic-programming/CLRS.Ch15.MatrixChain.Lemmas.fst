@@ -311,7 +311,7 @@ let rec lemma_mc_inner_i_preserves_shorter
 
 /// Helper: at position i (where i+l-1 < n), mc_inner_i writes the correct value
 /// to table[i][i+l-1] and preserves it in subsequent steps.
-#push-options "--split_queries always"
+#push-options ""
 let rec lemma_mc_inner_i_fills_correctly
   (table: seq int) (dims: seq int) (n l i0: nat) (start_i: nat)
   : Lemma

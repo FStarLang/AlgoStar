@@ -285,7 +285,7 @@ let rec insert_by_digit_permutation
 
 /// Lemma: insertion_sort_by_digit is a permutation
 #restart-solver
-#push-options "--z3rlimit 30 --split_queries always"
+#push-options "--z3rlimit 30"
 let insertion_sort_permutation_base
   (s: seq nat{length s = 0}) (d: nat) (base: pos)
   : Lemma (permutation s (insertion_sort_by_digit s d base))
@@ -378,7 +378,7 @@ let rec insert_before_equal (x: nat) (s: seq nat) (d base: nat) (py: nat)
 /// Explicit witness shifting needed: the existential postcondition with
 /// insert_by_digit creates a refinement matching loop (~4M quantifier
 /// instances) when Z3 attempts to find witnesses implicitly.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec insert_preserves_order (h: nat) (s: seq nat) (d base: nat) (px py: nat)
   : Lemma (requires base > 0 /\ px < py /\ py < length s)
           (ensures (insert_by_digit_length h s d base;
@@ -742,7 +742,7 @@ let rec radix_sort_permutation
 #pop-options
 
 /// Helper for radix_sort_invariant inductive step
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 20"
 let radix_sort_invariant_step
   (s: seq nat) (num_digits: nat) (base: nat)
   : Lemma (requires base >= 2 /\ distinct s /\ num_digits > 1 /\
@@ -969,7 +969,7 @@ let digits_lexicographic_implies_value_le
 /// Either all digits are equal, or the most significant differing digit has x<y
 /// and all higher digits are equal.
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
   : Lemma (requires base >= 2 /\
                     (forall (d:nat). d < nd ==> digit x d base <= digit y d base))

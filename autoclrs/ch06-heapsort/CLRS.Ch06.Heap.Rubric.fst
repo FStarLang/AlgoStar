@@ -373,7 +373,7 @@ let index_mem_intro (#a: eqtype) (s:Seq.seq a) (idx:nat{idx < Seq.length s})
     SP.lemma_mem_append (Seq.slice s 0 idx) suffix;
     Seq.lemma_split s idx
 
-#push-options "--split_queries always --z3rlimit 10"
+#push-options "--z3rlimit 10"
 let extract_extends_sorted_upto (#a: Type) (ord: TO.total_order a)
   (s:Seq.seq a) (len n:nat)
   : Lemma (requires n <= Seq.length s /\ len <= n /\ len > 1 /\
@@ -416,7 +416,7 @@ let perm_prefix_witness (#a: eqtype) (s1 s2:Seq.seq a) (k:nat) (x:a)
     SP.lemma_count_slice s2 k
 #pop-options
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 2"
 private
 let perm_prefix_bounded_aux_upto (#a: eqtype) (ord: TO.total_order a)
   (s1 s2:Seq.seq a) (k n:nat) (i:nat) (j:nat)
