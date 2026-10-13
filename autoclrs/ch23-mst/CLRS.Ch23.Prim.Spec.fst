@@ -648,7 +648,7 @@ let lemma_tree_connected_extend
     lemma_add_to_tree_preserves_length its e.v;
     introduce forall (v: nat). v < length its' /\ index its' v = true ==>
       reachable (e :: tree_edges) start v
-    with introduce _ ==> _ with _h.
+    with introduce _ ==> _ with
       if v = e.v then begin
         lemma_reachable_extend tree_edges e start e.u;
         lemma_single_edge_reachable e tree_edges;
@@ -758,7 +758,7 @@ let lemma_prim_step_is_light
     // minimality
     lemma_find_min_aux_min adj n in_tree 0 None;
     introduce forall (e': edge). mem_edge e' g.edges /\ crosses_cut e' s ==> e.w <= e'.w
-    with introduce _ ==> _ with _h. begin
+    with introduce _ ==> _ with begin
       lemma_adj_extract adj n e';
       if s e'.u then ()
       else begin
@@ -839,7 +839,7 @@ let rec lemma_prim_aux_count_and_conn
       assert (reachable tree_edges start 0);
       reachable_symmetric tree_edges start 0;
       introduce forall (v: nat). v < n ==> reachable tree_edges 0 v
-      with introduce _ ==> _ with _h. begin
+      with introduce _ ==> _ with begin
         assert (index its v = true);
         assert (reachable tree_edges start v);
         reachable_transitive tree_edges 0 start v
@@ -851,7 +851,7 @@ let rec lemma_prim_aux_count_and_conn
       assert (index its 0 = true);
       reachable_symmetric tree_edges start 0;
       introduce forall (v: nat). v < n ==> reachable tree_edges 0 v
-      with introduce _ ==> _ with _h. begin
+      with introduce _ ==> _ with begin
         assert (index its v = true);
         reachable_transitive tree_edges 0 start v
       end
@@ -957,7 +957,7 @@ let lemma_prim_step_preserves_safety
     
     // All edges in adj_to_graph have valid endpoints
     introduce forall (e': edge). mem_edge e' g.edges ==> e'.u < g.n /\ e'.v < g.n
-    with introduce _ ==> _ with _. adj_to_graph_edges_valid adj n e';
+    with introduce _ ==> _ with adj_to_graph_edges_valid adj n e';
     
     // Apply cut property (CLRS Corollary 23.2)
     cut_property g tree_edges e s;
@@ -1015,7 +1015,7 @@ let rec lemma_prim_aux_safety
         // thus != e.v (which is not in in_tree_set), so preserved
         introduce forall (e': edge). mem_edge e' (e :: tree_edges) ==>
           in_tree in_tree' e'.u /\ in_tree in_tree' e'.v
-        with introduce _ ==> _ with _h. begin
+        with introduce _ ==> _ with begin
           if edge_eq e' e then begin
             if e'.u = e.u && e'.v = e.v then ()
             else begin
@@ -1272,7 +1272,7 @@ let pure_prim_is_mst (adj: adj_matrix) (n: nat) (start: nat)
         introduce forall (v2: nat) (cycle: list edge).
           v2 < n /\ subset_edges cycle result /\ Cons? cycle /\ all_edges_distinct cycle ==>
           ~(is_path_from_to cycle v2 v2)
-        with introduce _ ==> _ with _. (
+        with introduce _ ==> _ with (
           subset_edges_transitive cycle result t
         );
         // Now: is_spanning_tree g result

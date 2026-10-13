@@ -201,7 +201,7 @@ let rec build_lcs_subseq_x (x y: seq int) (i j: nat)
       let k = length prev in
       introduce forall (j:nat). j < k ==> index sub j == index prev j
       with introduce _ ==> _
-      with _. lemma_snoc_index_below prev v j;
+      with lemma_snoc_index_below prev v j;
       is_subseq_ext sub prev k x (i - 1)
     end
     else begin
@@ -244,7 +244,7 @@ let rec build_lcs_subseq_y (x y: seq int) (i j: nat)
       let k = length prev in
       introduce forall (j:nat). j < k ==> index sub j == index prev j
       with introduce _ ==> _
-      with _. lemma_snoc_index_below prev v j;
+      with lemma_snoc_index_below prev v j;
       is_subseq_ext sub prev k y (j - 1)
     end
     else begin
@@ -304,4 +304,4 @@ let lcs_length_is_longest (x y: seq int)
     introduce forall (sub: seq int). is_common_subsequence sub x y ==>
       length sub <= lcs_length x y (length x) (length y)
     with introduce _ ==> _
-    with _. lcs_optimality x y sub
+    with lcs_optimality x y sub

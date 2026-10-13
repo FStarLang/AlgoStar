@@ -237,7 +237,7 @@ let parent_in_mst_after_update
     introduce forall (v w: nat). v < n /\ w < n /\
       SZ.v (Seq.index ks_new v) < SZ.v (65535sz) /\ v <> source /\
       w == SZ.v (Seq.index ps_new v) ==> SZ.v (Seq.index ims w) = 1
-    with introduce _ ==> _ with _.
+    with introduce _ ==> _ with
       if SZ.v (Seq.index ims v) = 1 then begin
         ims_unchanged_at ks_old ps_old ks_new ps_new ims n source v;
         // Now: ps_old[v] == ps_new[v] AND ks_old[v] == ks_new[v]

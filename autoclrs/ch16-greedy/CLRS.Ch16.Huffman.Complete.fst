@@ -1455,11 +1455,7 @@ let make_min_siblings (t: htree) (freqs: list pos{length freqs >= 2})
         is_leaf_at t (parent @ [false]) fr /\
         length (parent @ [true]) = max_leaf_depth t 0 /\
         length (parent @ [false]) = max_leaf_depth t 0
-    returns exists (t': htree).
-        same_frequency_multiset t' freqs /\
-        are_siblings t' f1 f2 == true /\
-        weighted_path_length t' <= weighted_path_length t
-    with _. (
+    with (
       parent_has_leaf_children t parent fl fr;
       let pos_a = parent @ [true] in
       let pos_b = parent @ [false] in

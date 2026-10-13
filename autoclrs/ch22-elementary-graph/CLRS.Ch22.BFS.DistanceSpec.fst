@@ -468,8 +468,7 @@ let rec visited_implies_path_exists (n: nat) (adj: Seq.seq bool) (source: nat{so
         
         // There exists a frontier vertex u with edge u -> v
         eliminate exists (u: nat). L.mem u prev_st.current_frontier /\ has_edge n adj u v /\ not (Seq.index prev_st.visited v)
-        returns (exists (p: list nat). path_from_to n adj source v p /\ path_length p <= k)
-        with _. (
+        with (
           // u has an edge to v, so u < n (from has_edge definition)
           assert (u < n /\ v < n);
           // u was in frontier at step k-1
@@ -479,8 +478,7 @@ let rec visited_implies_path_exists (n: nat) (adj: Seq.seq bool) (source: nat{so
           visited_implies_path_exists n adj source u (k - 1);
           
           eliminate exists (p: list nat). path_from_to n adj source u p /\ path_length p <= k - 1
-          returns (exists (p: list nat). path_from_to n adj source v p /\ path_length p <= k)
-          with _. (
+          with (
             // Extend path with edge u -> v
             path_extend n adj p v;
             let p' = p @ [v] in
@@ -753,12 +751,10 @@ let rec has_path_sound (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
     end else begin
       check_via_scan_elim n adj s v (len - 1) 0;
       eliminate exists (w: nat). w < n /\ has_edge n adj s w /\ has_path_of_length n adj w v (len - 1)
-      returns exists (p: list nat). path_from_to n adj s v p /\ path_length p = len
-      with _. begin
+      with begin
         has_path_sound n adj w v (len - 1);
         eliminate exists (p': list nat). path_from_to n adj w v p' /\ path_length p' = len - 1
-        returns exists (p: list nat). path_from_to n adj s v p /\ path_length p = len
-        with _. begin
+        with begin
           let p = s :: p' in
           assert (L.hd p = s);
           assert (L.last p == L.last p');
@@ -1016,8 +1012,7 @@ let bfs_correctness (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (v: n
         visited_implies_path_exists n adj source v k;
         shortest_path_property n adj source v k;
         eliminate exists (p: list nat). path_from_to n adj source v p /\ path_length p <= k
-        returns d_bfs == shortest_path_dist n adj source v
-        with _. begin
+        with begin
           assert (path_length p = k);
           has_path_complete n adj source v p;
           assert (k >= 1);
@@ -1027,8 +1022,7 @@ let bfs_correctness (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (v: n
           find_min_some n adj source v 1 k';
           has_path_sound n adj source v k';
           eliminate exists (p': list nat). path_from_to n adj source v p' /\ path_length p' = k'
-          returns d_bfs == shortest_path_dist n adj source v
-          with _. begin
+          with begin
             shortest_path_property n adj source v k;
             assert (k' = k);
             assert (shortest_path_dist n adj source v == Some k)
@@ -1042,8 +1036,7 @@ let bfs_correctness (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (v: n
           = if has_path_of_length n adj source v len then begin
               has_path_sound n adj source v len;
               eliminate exists (p: list nat). path_from_to n adj source v p /\ path_length p = len
-              returns False
-              with _. begin
+              with begin
                 path_implies_visited n adj source v p;
                 find_visit_none_not_visited n adj source v len
               end
@@ -1080,11 +1073,9 @@ let reachable_trans (n: nat) (adj: Seq.seq bool) (s: nat) (u: nat) (v: nat)
     (requires reachable n adj s u /\ reachable n adj u v)
     (ensures reachable n adj s v)
   = eliminate exists (p1: list nat). path_from_to n adj s u p1
-    returns reachable n adj s v
-    with _. (
+    with (
       eliminate exists (p2: list nat). path_from_to n adj u v p2
-      returns reachable n adj s v
-      with _. (
+      with (
         if L.length p2 <= 1 then (
           // p2 = [u] so u = v, p1 already goes from s to v
           assert (path_from_to n adj s v p1)

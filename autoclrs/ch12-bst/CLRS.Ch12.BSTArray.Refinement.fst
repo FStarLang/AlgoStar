@@ -240,9 +240,9 @@ let lemma_search_refinement
               bst_search (array_to_bst keys valid cap i) key)
   = introduce key_in_subtree keys valid cap i key ==>
               bst_search (array_to_bst keys valid cap i) key == true
-    with _h. lemma_search_forward keys valid cap i lo hi key;
+    with lemma_search_forward keys valid cap i lo hi key;
     introduce bst_search (array_to_bst keys valid cap i) key == true ==>
               key_in_subtree keys valid cap i key
-    with _h. lemma_search_backward keys valid cap i key
+    with lemma_search_backward keys valid cap i key
 
 #pop-options

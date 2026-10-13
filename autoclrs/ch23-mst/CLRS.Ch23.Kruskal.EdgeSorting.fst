@@ -171,12 +171,11 @@ let lemma_stable_permutation_equal_mst_weight
               (ensures all_connected g1.n g1.edges)
       = introduce forall (v: nat). v < g1.n ==> reachable g1.edges 0 v
         with introduce _ ==> _
-        with _. (
+        with (
           assert (reachable mst 0 v);
           eliminate exists (path: list edge).
             subset_edges path mst /\ is_path_from_to path 0 v
-          returns reachable g1.edges 0 v
-          with _. subset_edges_transitive path mst g1.edges
+          with subset_edges_transitive path mst g1.edges
         )
     in
     Classical.forall_intro (Classical.move_requires derive_connected);
@@ -193,7 +192,7 @@ let lemma_stable_permutation_equal_mst_weight
       = assert (is_spanning_tree g2 mst);
         introduce forall (t: list edge). is_spanning_tree g2 t ==> total_weight mst <= total_weight t
         with introduce _ ==> _
-        with _. (
+        with (
           assert (is_spanning_tree g1 t)
         )
     in

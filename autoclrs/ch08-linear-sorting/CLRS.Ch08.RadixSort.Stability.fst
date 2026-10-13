@@ -140,7 +140,7 @@ let pack_is_stable (s_in s_out: seq nat) (d base: nat)
       index s_out j1 <> index s_out j2 ==>
       (exists (i1 i2: nat). i1 < i2 /\ i2 < length s_in /\
         index s_in i1 == index s_out j1 /\ index s_in i2 == index s_out j2)
-    with introduce _ ==> _ with _.
+    with introduce _ ==> _ with
       order_proof j1 j2
 #pop-options
 

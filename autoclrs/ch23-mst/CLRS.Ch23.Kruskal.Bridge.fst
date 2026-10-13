@@ -141,7 +141,7 @@ let greedy_step_safe (g: graph) (forest: list edge) (e: edge)
     // So e.w ≤ e'.w (by precondition)
     introduce forall (e': edge).
       mem_edge e' g.edges /\ crosses_cut e' s ==> e.w <= e'.w
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       crossing_means_unreachable forest e.u e' s
     end;
     assert (is_light_edge e s g);
@@ -159,7 +159,7 @@ let acyclic_subset (a b: list edge) (n: nat)
   = introduce forall (v: nat) (cycle: list edge).
       v < n /\ subset_edges cycle a /\ Cons? cycle /\ all_edges_distinct cycle ==>
       ~(is_path_from_to cycle v v)
-    with introduce _ ==> _ with _. subset_edges_transitive cycle a b
+    with introduce _ ==> _ with subset_edges_transitive cycle a b
 
 /// Helper: remove first matching edge from a list
 let rec remove_edge_first (e: edge) (l: list edge) : list edge =
@@ -293,7 +293,7 @@ let rec total_weight_mutual_eq (a b: list edge)
       // b' ⊆ tl: each e ∈ b' is in b, hence in (hd :: tl) = a.
       // If edge_eq e hd, derive contradiction via counting.
       introduce forall (e: edge). mem_edge e b' ==> mem_edge e tl
-      with introduce _ ==> _ with _. begin
+      with introduce _ ==> _ with begin
         remove_edge_first_still_in e hd b;
         assert (mem_edge e b);
         assert (mem_edge e (hd :: tl));
@@ -348,7 +348,7 @@ let connected_subset_of_tree (g: graph) (result mst: list edge)
                     (forall (e: edge). mem_edge e mst ==> e.u <> e.v))
           (ensures forall (e: edge). mem_edge e mst ==> mem_edge e result)
   = introduce forall (e: edge). mem_edge e mst ==> mem_edge e result
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       if not (mem_edge e result) then begin
         // e.u and e.v are valid vertices, both connected in result
         assert (e.u < g.n /\ e.v < g.n /\ e.u <> e.v);
@@ -390,9 +390,9 @@ let safe_spanning_tree_is_mst (g: graph) (forest: list edge)
 
         // MST edges have valid endpoints
         introduce forall (e: edge). mem_edge e t ==> e.u < g.n /\ e.v < g.n
-        with introduce _ ==> _ with _. mem_edge_subset e t g.edges;
+        with introduce _ ==> _ with mem_edge_subset e t g.edges;
         introduce forall (e: edge). mem_edge e t ==> e.u <> e.v
-        with introduce _ ==> _ with _. mem_edge_subset e t g.edges;
+        with introduce _ ==> _ with mem_edge_subset e t g.edges;
 
         // Every edge of t is in forest (connected-subset-of-tree argument)
         connected_subset_of_tree g forest t;
@@ -415,6 +415,6 @@ let safe_spanning_tree_is_mst (g: graph) (forest: list edge)
 
         introduce forall (t': list edge).
           is_spanning_tree g t' ==> total_weight forest <= total_weight t'
-        with introduce _ ==> _ with _. ()
+        with introduce _ ==> _ with ()
       )
 #pop-options

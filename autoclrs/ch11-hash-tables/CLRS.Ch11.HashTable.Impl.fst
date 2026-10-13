@@ -153,10 +153,10 @@ let lemma_valid_ht_delete
       k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
       (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
     with introduce _ ==> _
-    with _. (
+    with (
       introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
       with introduce _ ==> _
-      with _. ()
+      with ()
     )
 #pop-options
 
@@ -186,10 +186,10 @@ let lemma_valid_ht_insert
       k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
       (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
     with introduce _ ==> _
-    with _. (
+    with (
       introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
       with introduce _ ==> _
-      with _. (
+      with (
         let cur = hash_probe_nat k probe size in
         let prev = hash_probe_nat k p size in
         if cur = idx then (
@@ -230,7 +230,7 @@ let lemma_all_probes_full_implies_all_slots_full
     (ensures forall (j: nat). j < size ==> Seq.index s j =!= -1 /\ Seq.index s j =!= -2)
   = introduce forall (j: nat). j < size ==> Seq.index s j =!= -1 /\ Seq.index s j =!= -2
     with introduce _ ==> _
-    with _. (
+    with (
       let h = key % size in
       let p = (j + size - h) % size in
       FStar.Math.Lemmas.lemma_mod_add_distr h (j + size - h) size;

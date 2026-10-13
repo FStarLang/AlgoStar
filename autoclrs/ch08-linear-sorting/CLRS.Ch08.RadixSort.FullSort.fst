@@ -251,8 +251,7 @@ let digits_lex_order_implies_numeric_order
         eliminate exists (d0: nat).
           d0 < bigD /\ digit x d0 base < digit y d0 base /\
           (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base)
-        returns digit_sum x bigD base <= digit_sum y bigD base
-        with _. lemma_digit_sum_msd_le_3 x y bigD d0 base
+        with lemma_digit_sum_msd_le_3 x y bigD d0 base
     )
 #pop-options
 

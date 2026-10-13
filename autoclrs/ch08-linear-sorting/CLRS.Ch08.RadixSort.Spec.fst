@@ -634,8 +634,7 @@ let lemma_digits_le_implies_value_le (x y bigD base: nat)
       eliminate exists (d0: nat).
         d0 < bigD /\ digit x d0 base < digit y d0 base /\
         (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base)
-      returns digit_sum x bigD base bigD <= digit_sum y bigD base bigD
-      with _. lemma_digit_sum_msd_le x y bigD base bigD d0
+      with lemma_digit_sum_msd_le x y bigD base bigD d0
 #pop-options
 
 // Helper: if all adjacent pairs are ordered, the sequence is sorted

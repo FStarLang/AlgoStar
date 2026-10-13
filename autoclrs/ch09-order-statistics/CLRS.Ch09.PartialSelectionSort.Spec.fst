@@ -242,7 +242,7 @@ let sorted_cons (h: int) (t: seq int)
   = let r = Seq.cons h t in
     introduce forall (i: nat) (j: nat). i < Seq.length r /\ j < Seq.length r /\ i <= j ==> Seq.index r i <= Seq.index r j
     with introduce _ ==> _
-    with _. (
+    with (
       if i = 0 then (
         if j = 0 then ()
         else assert (Seq.index r j == Seq.index t (j - 1))
@@ -280,7 +280,7 @@ let sorted_tail_spec (s: seq int)
     let n = Seq.length t in
     introduce forall (i: nat) (j: nat). i < n /\ j < n /\ i <= j ==> Seq.index t i <= Seq.index t j
     with introduce _ ==> _
-    with _. (
+    with (
       assert (Seq.index t i == Seq.index s (i + 1));
       assert (Seq.index t j == Seq.index s (j + 1));
       assert (i + 1 <= j + 1)

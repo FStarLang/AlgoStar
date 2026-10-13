@@ -791,7 +791,7 @@ let remaining_no_idx (active: list forest_entry) (j1 j2: nat) (idx1: SZ.t)
     let rem = list_remove_at rem1 j2' in
     introduce forall (k: nat). k < L.length rem ==> entry_idx (L.index rem k) <> idx1
     with introduce _ ==> _
-    with _. (
+    with (
       // Step 1: trace k in rem to k1 in rem1
       list_remove_at_index rem1 j2' k;
       let k1 : nat = if k < j2' then k else k + 1 in

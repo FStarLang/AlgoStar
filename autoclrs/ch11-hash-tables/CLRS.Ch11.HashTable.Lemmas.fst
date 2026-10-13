@@ -160,7 +160,7 @@ let lemma_delete_unique_guarantees_absence
     lemma_key_in_table_iff_array_has_key s' size key;
     introduce forall (j: nat). j < Seq.length s' ==> Seq.index s' j =!= key
     with introduce _ ==> _
-    with _. (
+    with (
       if j = idx then ()
       else ()
     )
@@ -194,7 +194,7 @@ let lemma_insert_fresh_unique_key
       i < Seq.length s' /\ j < Seq.length s' /\
       Seq.index s' i == key /\ Seq.index s' j == key ==> i == j
     with introduce _ ==> _
-    with _. (
+    with (
       assert (i == idx);
       assert (j == idx)
     )

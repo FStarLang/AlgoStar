@@ -1021,8 +1021,7 @@ let reachable_implies_sp_dist_finite
       path_source p == s /\ path_dest p == v /\
       path_edges p <= n - 1 /\
       path_valid p n /\ path_all_edges_exist p weights n
-    returns sp_dist weights n s v < inf
-    with _. sp_dist_faithful weights n s v p
+    with sp_dist_faithful weights n s v p
 
 (* Backward: sp_dist < inf ⟹ reachable *)
 let sp_dist_finite_implies_reachable
