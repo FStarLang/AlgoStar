@@ -219,8 +219,9 @@ let rec build_path_prefix
     (ensures fun vs ->
       Seq.length vs == m + 1 /\
       Seq.index vs 0 == u /\
-      (forall (i:nat). i < m + 1 ==> Seq.index vs i < n) /\
-      (forall (i:nat). i < m ==> TS.has_edge n adj (Seq.index vs i) (Seq.index vs (i + 1))))
+      (forall (i:nat). {:pattern (Seq.index vs i)} i < m + 1 ==> Seq.index vs i < n) /\
+      (forall (i:nat). {:pattern (TS.has_edge n adj (Seq.index vs i) (Seq.index vs (i + 1)))}
+        i < m ==> TS.has_edge n adj (Seq.index vs i) (Seq.index vs (i + 1))))
     (decreases m)
   = if m = 0 then
       Seq.create 1 u
@@ -267,7 +268,8 @@ let rec build_path_prefix
             assert (i < Seq.length rest);
             assert (Seq.index result i == Seq.index rest (i - 1));
             assert (Seq.index result (i + 1) == Seq.index rest i);
-            assert (i - 1 < m - 1)
+            assert (i - 1 < m - 1);
+            assert (TS.has_edge n adj (Seq.index rest (i - 1)) (Seq.index rest (i - 1 + 1)))
           )
       in
       Classical.forall_intro (fun (i:nat{i + 1 < Seq.length result}) -> aux_edge i);
@@ -519,7 +521,6 @@ let higher_f_implies_earlier_position
               if v < w then assert (f i == v)
               else assert (f i == v - 1)
           in
-          Classical.forall_intro (Classical.move_requires aux_bound);
           // f is injective (since order is distinct and the remapping preserves injectivity)
           let aux_inj (i j:nat) : Lemma
             (requires i < n /\ j < n /\ i <> j)
@@ -556,6 +557,7 @@ let higher_f_implies_earlier_position
             : Lemma (ensures forall (j:nat). i < n /\ j < n /\ i <> j ==> f i <> f j)
             = Classical.forall_intro (Classical.move_requires (aux_inj i))
           in
+          Classical.forall_intro (Classical.move_requires aux_bound);
           Classical.forall_intro aux_inj_forall;
           injective_bound f n (n - 1)
         )
