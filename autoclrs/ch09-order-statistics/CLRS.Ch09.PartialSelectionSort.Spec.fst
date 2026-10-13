@@ -30,7 +30,8 @@ module Seq = FStar.Seq
 
 // A sequence is sorted if every element is ≤ all later elements
 let is_sorted (s: seq int) : prop =
-  forall (i: nat) (j: nat). i < Seq.length s /\ j < Seq.length s /\ i <= j ==>
+  forall (i: nat) (j: nat). {:pattern (Seq.index s i); (Seq.index s j)}
+    i < Seq.length s /\ j < Seq.length s /\ i <= j ==>
     Seq.index s i <= Seq.index s j
 
 // Count occurrences of a value in a sequence
