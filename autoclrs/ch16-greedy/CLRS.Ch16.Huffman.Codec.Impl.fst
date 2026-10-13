@@ -108,6 +108,12 @@ fn rec decode_step_impl
 
 // ========== decode_impl: full decoder ==========
 
+// Regroupings of index sums, proved in an empty context so that the
+// suffix-step lemmas below get them as hypotheses rather than as goals
+let add_succ_regroup (a b: nat) : Lemma (a + (b + 1) == (a + 1) + b) = ()
+let add_assoc_nat (a b c: nat) : Lemma (a + (b + c) == a + b + c) = ()
+let add_sub_cancel_nat (a b: nat) : Lemma (requires a <= b) (ensures a + (b - a) == b) = ()
+
 #push-options "--z3rlimit 20"
 // Helper: after decoding one symbol, the suffix invariant is maintained
 let decode_suffix_step
@@ -155,6 +161,7 @@ let decode_suffix_step
     assert (Some? (HCodec.decode ft (bits_as_list bits_seq new_pos bit_len)));
     let new_rem = Some?.v (HCodec.decode ft (bits_as_list bits_seq new_pos bit_len)) in
     assert (remaining == sym :: new_rem);
+    assert (L.length remaining == L.length new_rem + 1);
     // sym is the head
     HCodec.list_index_zero #nat sym new_rem;
     // from requires forall with i=0
@@ -165,7 +172,9 @@ let decode_suffix_step
       = HCodec.list_index_succ #nat sym new_rem i;
         assert (L.index (sym :: new_rem) (i + 1) == L.index new_rem i);
         assert (L.index remaining (i + 1) == L.index new_rem i);
-        assert (i + 1 < L.length remaining)
+        assert (i + 1 < L.length remaining);
+        assert (L.index remaining (i + 1) == L.index full_msg (out_v + (i + 1)));
+        add_succ_regroup out_v i
     in
     Classical.forall_intro (Classical.move_requires aux)
 #pop-options
@@ -239,6 +248,8 @@ fn decode_impl
 
     // Prove remaining is non-empty (Cons?) so out_v < out_len
     HCodec.decode_cons ft (bits_as_list bits_seq (SZ.v p) (SZ.v bit_len));
+    // ... and that new_pos > p, for the decreases clause
+    bits_as_list_length bits_seq (SZ.v new_pos) (SZ.v bit_len);
 
     // Write symbol to output
     A.op_Dot_Lparen_Rparen_Less_Minus output ov sym;
@@ -452,7 +463,9 @@ let encode_suffix_step
     Classical.forall_intro (Classical.move_requires aux_cw);
     let aux_suffix (j: nat{j < L.length new_remaining})
       : Lemma (L.index new_remaining j == L.index full_enc (bp + L.length cw + j))
-      = append_index_right cw new_remaining j
+      = append_index_right cw new_remaining j;
+        assert (L.index remaining_enc (L.length cw + j) == L.index full_enc (bp + (L.length cw + j)));
+        add_assoc_nat bp (L.length cw) j
     in
     Classical.forall_intro (Classical.move_requires aux_suffix)
 #pop-options
@@ -483,6 +496,7 @@ let encode_prefix_combine
       = if i < bp then ()
         else begin
           let k = i - bp in
+          add_sub_cancel_nat bp i;
           assert (Seq.index out_new (bp + k) == L.index cw k);
           assert (L.index cw k == L.index full_enc (bp + k))
         end
