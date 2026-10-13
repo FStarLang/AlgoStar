@@ -955,9 +955,9 @@ let queue_nondecreasing_tail
       = if i >= head + 1 && i + 1 < tail then begin
           assert (i >= head);
           // Need both pattern terms in scope for the multi-pattern trigger
-          let _ = Seq.index squeue i in
-          let _ = Seq.index squeue (i + 1) in
-          ()
+          let qi = Seq.index squeue i in
+          let qi1 = Seq.index squeue (i + 1) in
+          assert (SZ.v qi < n /\ SZ.v qi1 < n)
         end
     in
     FStar.Classical.forall_intro aux
