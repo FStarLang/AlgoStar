@@ -5,9 +5,8 @@
    and permutation (over int sequences) used across all sorting-related
    chapters: Ch02, Ch06, Ch07, Ch08, Ch09.
    
-   NOTE: When using this module from #lang-pulse files that also open
-   Pulse.Lib.BoundedIntegers, ensure BoundedIntegers is opened before
-   this module so that operator overloads (<=, <, etc.) are consistent.
+   NOTE: The operators (<=, <, etc.) used here are the plain Prims
+   operators on int (Pulse.Lib.BoundedIntegers no longer exists).
    
    For algorithms over `seq nat` (e.g., RadixSort), a count-based
    permutation definition is used instead (defined locally in those modules).
@@ -17,7 +16,6 @@ module CLRS.Common.SortSpec
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
-open Pulse.Lib.BoundedIntegers
 // 
 //SNIPPET_START: definitions
 let sorted (s: Seq.seq int) : prop

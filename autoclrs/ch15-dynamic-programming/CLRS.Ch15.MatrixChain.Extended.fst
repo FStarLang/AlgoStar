@@ -238,8 +238,6 @@ let lemma_table_size_positive (n: nat{n > 0})
 
 // ========== Main Implementation ==========
 
-open Pulse.Lib.BoundedIntegers
-
 //SNIPPET_START: extended_mc_sig
 fn extended_matrix_chain_order
   (#p: perm)

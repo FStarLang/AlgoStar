@@ -13,7 +13,6 @@ module CLRS.Ch02.MergeSort.Spec
 module Seq = FStar.Seq
 open CLRS.Common.SortSpec
 open CLRS.Ch02.MergeSort.Complexity
-open Pulse.Lib.BoundedIntegers
 
 //SNIPPET_START: seq_merge
 /// Pure merge of two sorted sequences

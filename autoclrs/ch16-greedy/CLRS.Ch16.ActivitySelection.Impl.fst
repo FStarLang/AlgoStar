@@ -27,7 +27,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference

@@ -16,7 +16,6 @@ module CLRS.Ch07.Partition.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch07.Partition.Impl
 open CLRS.Ch07.Partition.Lemmas

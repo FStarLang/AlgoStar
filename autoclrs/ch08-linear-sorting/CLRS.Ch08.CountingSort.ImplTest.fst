@@ -19,7 +19,6 @@ module CLRS.Ch08.CountingSort.ImplTest
 #lang-pulse
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch08.CountingSort.Impl
 

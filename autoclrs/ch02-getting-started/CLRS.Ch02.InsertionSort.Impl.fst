@@ -17,7 +17,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 open CLRS.Common.SortSpec
 open CLRS.Ch02.InsertionSort.Spec
 open CLRS.Ch02.InsertionSort.Lemmas

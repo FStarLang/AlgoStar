@@ -44,8 +44,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
 
 open CLRS.Ch15.LCS.Spec
 
-open Pulse.Lib.BoundedIntegers
-
 // ========== Helper Lemmas ==========
 
 // Bound checking lemmas

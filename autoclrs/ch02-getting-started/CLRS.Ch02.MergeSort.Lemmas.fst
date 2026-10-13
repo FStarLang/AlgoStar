@@ -14,7 +14,6 @@ module CLRS.Ch02.MergeSort.Lemmas
 open CLRS.Common.SortSpec
 open CLRS.Ch02.MergeSort.Spec
 open CLRS.Ch02.MergeSort.Complexity
-open Pulse.Lib.BoundedIntegers
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical

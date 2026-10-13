@@ -24,7 +24,6 @@ module CLRS.Ch02.InsertionSort.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch02.InsertionSort.Impl
 

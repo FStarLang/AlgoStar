@@ -16,7 +16,6 @@ module CLRS.Ch09.SimultaneousMinMax.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch09.SimultaneousMinMax.Impl
 open CLRS.Ch09.SimultaneousMinMax.Spec

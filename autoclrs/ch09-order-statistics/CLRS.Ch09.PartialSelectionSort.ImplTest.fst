@@ -17,7 +17,6 @@ module CLRS.Ch09.PartialSelectionSort.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch09.PartialSelectionSort.Impl
 open CLRS.Ch09.PartialSelectionSort.Spec

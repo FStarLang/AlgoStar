@@ -22,7 +22,6 @@ module CLRS.Ch06.Heap.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch06.Heap.Impl
 open CLRS.Ch06.Heap.Spec

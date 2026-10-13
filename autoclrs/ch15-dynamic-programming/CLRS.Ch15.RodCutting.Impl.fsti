@@ -21,8 +21,6 @@ let triangle (n: nat) : nat = op_Star n (Prims.op_Plus n 1) / 2
 let rod_cutting_bounded (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == triangle n
 
-open Pulse.Lib.BoundedIntegers
-
 fn rod_cutting
   (#p: perm)
   (prices: A.array nat)

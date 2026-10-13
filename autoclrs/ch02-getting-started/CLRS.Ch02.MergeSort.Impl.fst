@@ -21,7 +21,6 @@ open Pulse.Lib.Array
 open Pulse.Lib.Array.PtsToRange
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 open CLRS.Common.SortSpec
 open CLRS.Common.Complexity
 open CLRS.Ch02.MergeSort.Spec

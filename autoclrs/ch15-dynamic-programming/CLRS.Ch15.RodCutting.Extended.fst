@@ -416,8 +416,6 @@ let cuts_are_optimal_intro (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq 
 
 // ========== Main Implementation ==========
 
-open Pulse.Lib.BoundedIntegers
-
 #pop-options
 #push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 

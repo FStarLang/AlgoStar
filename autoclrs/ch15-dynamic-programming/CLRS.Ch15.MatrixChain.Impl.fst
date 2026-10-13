@@ -122,8 +122,6 @@ let mc_inner_k_step (table: Seq.seq int) (dims: Seq.seq int)
 
 // ========== Main Implementation ==========
 
-open Pulse.Lib.BoundedIntegers
-
 #push-options "--z3rlimit 10"
 //SNIPPET_START: mc_sig
 fn matrix_chain_order

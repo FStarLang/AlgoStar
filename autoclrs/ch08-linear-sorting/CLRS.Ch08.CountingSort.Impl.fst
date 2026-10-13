@@ -287,8 +287,6 @@ ensures exists* sb'.
 
 // ========== In-place Counting Sort (2-phase variant used by RadixSort) ==========
 
-open Pulse.Lib.BoundedIntegers
-
 #push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --z3smtopt '(set-option :smt.qi.eager_threshold 100)'"
 ```pulse
 fn counting_sort_inplace

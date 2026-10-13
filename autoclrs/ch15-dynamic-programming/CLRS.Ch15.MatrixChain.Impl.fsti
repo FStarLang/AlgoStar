@@ -21,8 +21,6 @@ module MCL = CLRS.Ch15.MatrixChain.Lemmas
 let mc_complexity_bounded (cf c0 n: nat) : prop =
   cf >= c0 /\ cf - c0 == mc_iterations n
 
-open Pulse.Lib.BoundedIntegers
-
 fn matrix_chain_order
   (#p: perm)
   (dims: A.array int)

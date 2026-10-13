@@ -54,8 +54,6 @@ let lemma_triangle_step (n: nat)
 #restart-solver
 #push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 
-open Pulse.Lib.BoundedIntegers
-
 //SNIPPET_START: rod_cutting_sig
 fn rod_cutting
   (#p: perm)

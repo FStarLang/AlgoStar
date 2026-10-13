@@ -26,8 +26,6 @@ fn tick (ctr: GR.ref nat) (#n: erased nat)
   GR.(ctr := incr_nat n)
 }
 
-open Pulse.Lib.BoundedIntegers
-
 // Helper: row-major index is within n*n (NL arithmetic)
 let index_bound_lemma (a b n: nat)
   : Lemma (requires a < n /\ b < n)

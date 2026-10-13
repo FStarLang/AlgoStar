@@ -24,7 +24,6 @@ module CLRS.Ch08.RadixSort
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
