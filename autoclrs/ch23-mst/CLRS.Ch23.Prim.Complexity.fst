@@ -120,6 +120,12 @@ let lemma_loop_exit_v_iter_equals_n (v n: nat)
           (ensures v == n)
   = () // Trivial: v >= n /\ v <= n ==> v == n
 
+// Helper lemma: one more iteration raises the tick bound by 3 * n.
+let lemma_iter_bound_step (v n: nat)
+  : Lemma (v * 3 * n + 3 * n == (v + 1) * 3 * n)
+  = distributivity_add_left v 1 3;
+    distributivity_add_left (v * 3) 3 n
+
 
 
 inline_for_extraction  
@@ -242,8 +248,9 @@ fn prim_complexity
       // We use 3*n to account for overhead
       vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n
     )
-  // TODO: decreases — proof interference
+  decreases (SZ.v n - SZ.v !iter)
   {
+    let cur_iter = !iter;
     // Find minimum key vertex not in MST
     let mut min_idx: SZ.t = 0sz;
     let mut min_key: SZ.t = infinity;
@@ -265,6 +272,7 @@ fn prim_complexity
       pure (
         SZ.v v_find_i <= SZ.v n /\
         SZ.v v_min_idx < SZ.v n /\
+        v_iter == cur_iter /\
         SZ.v v_iter < SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
@@ -330,6 +338,7 @@ fn prim_complexity
       pure (
         SZ.v v_update_i <= SZ.v n /\
         SZ.v u < SZ.v n /\
+        v_iter == cur_iter /\
         SZ.v v_iter < SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
@@ -403,6 +412,7 @@ fn prim_complexity
     assert (pure (vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n + SZ.v n + SZ.v n));
     assert (pure (SZ.v v_iter * 3 * SZ.v n + SZ.v n + SZ.v n 
                   <= SZ.v v_iter * 3 * SZ.v n + 3 * SZ.v n));
+    lemma_iter_bound_step (SZ.v v_iter) (SZ.v n);
     assert (pure (SZ.v v_iter * 3 * SZ.v n + 3 * SZ.v n 
                   == (SZ.v v_iter + 1) * 3 * SZ.v n));
     assert (pure (vc - reveal c0 <= (SZ.v v_iter + 1) * 3 * SZ.v n));
