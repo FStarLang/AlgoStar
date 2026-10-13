@@ -94,7 +94,7 @@ fn find_minmax
   let final_min = !min;
   let final_max = !max;
   
-  { min_val = final_min; max_val = final_max }
+  ({ min_val = final_min; max_val = final_max })
 }
 
 // ========== CLRS pair-processing — ⌊3n/2⌋ comparisons ==========
@@ -198,6 +198,6 @@ fn find_minmax_pairs
 
   let final_min = !min_ref;
   let final_max = !max_ref;
-  { min_val = final_min; max_val = final_max }
+  ({ min_val = final_min; max_val = final_max })
 }
 #pop-options
