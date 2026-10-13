@@ -298,7 +298,8 @@ let mst_test_facts (ps ks ws: Seq.seq SZ.t)
       SZ.v (Seq.index ps 1) <> 1 /\
       SZ.v (Seq.index ps 2) <> 2 /\
       SZ.v (Seq.index ks 1) + SZ.v (Seq.index ks 2) <= 3)
-  = prim_mst_result_elim ps ks ws 3 0;
+  = assert (Seq.length ws == 3 * 3);
+    prim_mst_result_elim ps ks ws 3 0;
     mst_edge_facts ps ks ws;
     mst_total_weight ks ps ws
 #pop-options
