@@ -126,6 +126,7 @@ ensures exists* s' (cf: nat).
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.max_heapify_bound (SZ.v heap_size) (SZ.v idx)
   )
+  decreases (SZ.v heap_size - SZ.v idx)
 {
   let left = SZ.add (SZ.mul 2sz idx) 1sz;
   if (SZ.gte left heap_size) {

@@ -375,6 +375,7 @@ fn rec quicksort_core (#a: eqtype)
       SP.permutation a s0 s /\
       complexity_bounded_by_worst_case cf (reveal c0) (hi - lo)
     )
+  decreases (hi - lo)
 {
   if (lo < hi) {
     if (hi <= lo + 1) {

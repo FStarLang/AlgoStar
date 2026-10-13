@@ -576,6 +576,7 @@ ensures exists* s' (cf: nat).
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.max_heapify_bound heap_size idx
   )
+  decreases (heap_size - idx)
 {
   let left = left_idx idx;
   if (left >= heap_size) {

@@ -327,6 +327,7 @@ fn rec merge_sort_aux
     GR.pts_to ctr cf **
     pure (sorted s' /\ permutation s s' /\
           sort_complexity_bounded cf (reveal c0) (SZ.v lo) (SZ.v hi))
+  decreases (SZ.v hi - SZ.v lo)
 {
   pts_to_range_prop a;
   let len = hi -^ lo;

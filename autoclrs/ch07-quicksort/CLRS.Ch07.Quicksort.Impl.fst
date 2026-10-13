@@ -108,6 +108,7 @@ fn rec clrs_quicksort_with_ticks
       pure_post_quicksort a lo hi lb rb s0 s /\
       complexity_bounded_quadratic cf (reveal c0) (hi - lo)
     )
+  decreases (hi - lo)
 //SNIPPET_END: clrs_quicksort_with_ticks_sig
 {
   if (lo < hi)
