@@ -141,7 +141,7 @@ let cuts_achieve_optimal (prices: Seq.seq nat) (sr: Seq.seq nat) (sc: Seq.seq SZ
 
 // DP table correctness
 let dp_correct (prices: Seq.seq nat) (sr: Seq.seq nat) (bound: nat) : prop =
-  (forall (k: nat). k <= bound /\ k < Seq.length sr ==>
+  (forall (k: nat). {:pattern (Seq.index sr k)} k <= bound /\ k < Seq.length sr ==>
     Seq.index sr k == optimal_revenue prices k)
 
 // Lemma: extending dp_correct via Seq.upd
@@ -554,6 +554,10 @@ fn extended_rod_cutting
     let final_best_i = !best_i;
     
     with sr_pre. assert (V.pts_to r sr_pre);
+
+    // The inner loop exits with i == vj + 1
+    with vi_final. assert (R.pts_to i vi_final);
+    assert (pure (SZ.v vi_final - 1 == SZ.v vj));
 
     // Explicitly connect final_best_i to accum_argmax from loop invariant
     assert (pure (SZ.v final_best_i == accum_argmax s_prices sr_pre (SZ.v vj) (SZ.v vj)));
