@@ -78,7 +78,8 @@ let mod_exp_step_odd (vr vb: int) (ve: nat{ve > 0 /\ ve % 2 == 1}) (m: pos)
     pow_odd vb ve;
     lemma_mod_mul_distr_l (vr * vb) (pow ((vb * vb) % m) (ve / 2)) m;
     lemma_mod_mul_distr_r (vr * vb) (pow ((vb * vb) % m) (ve / 2)) m;
-    lemma_mod_mul_distr_r (vr * vb) (pow (vb * vb) (ve / 2)) m
+    lemma_mod_mul_distr_r (vr * vb) (pow (vb * vb) (ve / 2)) m;
+    paren_mul_right vr vb (pow (vb * vb) (ve / 2))
 
 //SNIPPET_START: mod_exp_step
 let mod_exp_step (vr vb: int) (ve: nat) (m: pos)
