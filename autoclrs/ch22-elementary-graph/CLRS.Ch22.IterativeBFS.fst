@@ -109,8 +109,8 @@ fn bfs
       SZ.v vi <= SZ.v n /\
       Seq.length scolor_i == SZ.v n /\
       Seq.length sdist_i == SZ.v n /\
-      (forall (j: nat). j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
-      (forall (j: nat). j < SZ.v vi ==> Seq.index sdist_i j == (-1))
+      (forall (j: nat). {:pattern (Seq.index scolor_i j)} j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
+      (forall (j: nat). {:pattern (Seq.index sdist_i j)} j < SZ.v vi ==> Seq.index sdist_i j == (-1))
     )
   decreases (SZ.v n - SZ.v !i)
   {
@@ -139,10 +139,11 @@ fn bfs
       Seq.index scolor_r (SZ.v source) == 1 /\
       Seq.index sdist_r (SZ.v source) == 0 /\
       // Reachability completeness: vertices reachable in <= vround steps are visited
-      (forall (v: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
+      (forall (v: nat). {:pattern (Seq.index scolor_r v)}
+        v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
         Seq.index scolor_r v <> 0) /\
       // Distance soundness: visited vertices have valid distances
-      (forall (v: nat). v < SZ.v n /\ Seq.index scolor_r v <> 0 ==>
+      (forall (v: nat). {:pattern (Seq.index scolor_r v)} v < SZ.v n /\ Seq.index scolor_r v <> 0 ==>
         Seq.index sdist_r v >= 0 /\
         reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_r v))
     )
@@ -164,15 +165,16 @@ fn bfs
         Seq.length sdist_u == SZ.v n /\
         Seq.index scolor_u (SZ.v source) == 1 /\
         Seq.index sdist_u (SZ.v source) == 0 /\
-        (forall (v: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
+        (forall (v: nat). {:pattern (Seq.index scolor_u v)}
+          v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
           Seq.index scolor_u v <> 0) /\
-        (forall (u_idx: nat) (v_idx: nat). 
+        (forall (u_idx: nat) (v_idx: nat). {:pattern (has_edge sadj (SZ.v n) u_idx v_idx)}
           u_idx < SZ.v vu /\ v_idx < SZ.v n /\
           reachable_in sadj (SZ.v n) (SZ.v source) u_idx (SZ.v vround) /\
           has_edge sadj (SZ.v n) u_idx v_idx ==>
           Seq.index scolor_u v_idx <> 0) /\
         // Distance soundness carried through
-        (forall (v: nat). v < SZ.v n /\ Seq.index scolor_u v <> 0 ==>
+        (forall (v: nat). {:pattern (Seq.index scolor_u v)} v < SZ.v n /\ Seq.index scolor_u v <> 0 ==>
           Seq.index sdist_u v >= 0 /\
           reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_u v))
       )
@@ -201,20 +203,21 @@ fn bfs
           SZ.fits (SZ.v vu * SZ.v n + SZ.v vv) /\
           Seq.index scolor_v (SZ.v source) == 1 /\
           Seq.index sdist_v (SZ.v source) == 0 /\
-          (forall (w: nat). w < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) w (SZ.v vround) ==> 
+          (forall (w: nat). {:pattern (Seq.index scolor_v w)}
+            w < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) w (SZ.v vround) ==> 
             Seq.index scolor_v w <> 0) /\
-          (forall (u_idx: nat) (v_idx: nat). 
+          (forall (u_idx: nat) (v_idx: nat). {:pattern (has_edge sadj (SZ.v n) u_idx v_idx)}
             u_idx < SZ.v vu /\ v_idx < SZ.v n /\
             reachable_in sadj (SZ.v n) (SZ.v source) u_idx (SZ.v vround) /\
             has_edge sadj (SZ.v n) u_idx v_idx ==>
             Seq.index scolor_v v_idx <> 0) /\
-          (forall (v_idx: nat).
+          (forall (v_idx: nat). {:pattern (has_edge sadj (SZ.v n) (SZ.v vu) v_idx)}
             v_idx < SZ.v vv /\
             reachable_in sadj (SZ.v n) (SZ.v source) (SZ.v vu) (SZ.v vround) /\
             has_edge sadj (SZ.v n) (SZ.v vu) v_idx ==>
             Seq.index scolor_v v_idx <> 0) /\
           // Distance soundness carried through inner loop
-          (forall (w: nat). w < SZ.v n /\ Seq.index scolor_v w <> 0 ==>
+          (forall (w: nat). {:pattern (Seq.index scolor_v w)} w < SZ.v n /\ Seq.index scolor_v w <> 0 ==>
             Seq.index sdist_v w >= 0 /\
             reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist_v w)) /\
           // dist[vu] is preserved during inner loop
