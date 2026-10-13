@@ -52,7 +52,7 @@ let count_extend (s:Seq.seq nat) (j:nat{j < Seq.length s}) (v:nat)
     let sl2 = Seq.slice s 0 (j+1) in
     let elt = Seq.slice s j (j+1) in
     assert (Seq.equal sl2 (Seq.append sl1 elt));
-    SeqP.lemma_append_count sl1 elt
+    SeqP.lemma_append_count_aux v sl1 elt
 #pop-options
 
 let count_phase_step (s0:Seq.seq nat) (sc sc':Seq.seq int) 
@@ -245,9 +245,12 @@ let phase2_step (sa_before sa_after s0:Seq.seq nat) (pos:nat) (cnt:nat) (cur_v:n
                     pos + cnt <= Seq.length sa_after /\
                     cnt == SeqP.count cur_v s0 /\
                     cur_v <= k /\
-                    (forall (i:nat). pos <= i /\ i < pos + cnt ==> Seq.index sa_after i == cur_v) /\
-                    (forall (i:nat). i < pos ==> Seq.index sa_after i == Seq.index sa_before i) /\
-                    (forall (i:nat). pos + cnt <= i /\ i < Seq.length sa_after ==>
+                    (forall (i:nat). {:pattern (Seq.index sa_after i)}
+                      pos <= i /\ i < pos + cnt ==> Seq.index sa_after i == cur_v) /\
+                    (forall (i:nat). {:pattern (Seq.index sa_after i)}
+                      i < pos ==> Seq.index sa_after i == Seq.index sa_before i) /\
+                    (forall (i:nat). {:pattern (Seq.index sa_after i)}
+                      pos + cnt <= i /\ i < Seq.length sa_after ==>
                       Seq.index sa_after i == Seq.index sa_before i))
           (ensures phase2_inv sa_after s0 (pos + cnt) (cur_v + 1) k)
   = write_block_sorted sa_after pos cnt cur_v;

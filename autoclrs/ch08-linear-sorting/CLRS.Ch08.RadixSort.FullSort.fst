@@ -276,7 +276,8 @@ let digits_all_equal_implies_equal
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec lemma_pairwise_le_implies_sorted (s: seq nat)
   : Lemma (requires length s > 0 /\
-                    (forall (i j: nat). i < length s /\ j < length s /\ i < j ==> 
+                    (forall (i j: nat). {:pattern (index s i); (index s j)}
+                      i < length s /\ j < length s /\ i < j ==> 
                       index s i <= index s j))
           (ensures sorted s)
           (decreases (length s))

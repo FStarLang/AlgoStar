@@ -522,6 +522,20 @@ let phase4_sc_nonneg (sc: Seq.seq int) (sa: Seq.seq nat) (k n remaining: nat) (v
     // So sc[v] = count_le sa v - count(v, suffix) >= 0
 #pop-options
 
+// Step B filling, case v = key: the new position pos-1 holds key,
+// and the old positions [pos, count_le sa key) are preserved
+let phase4_b_step_key (sc' : Seq.seq int) (sa sb_curr sb_curr': Seq.seq nat) (n key: nat) (pos: int)
+  : Lemma (requires
+      key < Seq.length sc' /\ Seq.length sb_curr == n /\ Seq.length sb_curr' == n /\
+      pos >= 1 /\ pos <= n /\ count_le sa key <= n /\
+      Seq.index sc' key == pos - 1 /\
+      (forall (p: nat). pos <= p /\ p < count_le sa key ==> p < n /\ Seq.index sb_curr p == key) /\
+      (forall (p: nat). p < n /\ p <> pos - 1 ==> Seq.index sb_curr' p == Seq.index sb_curr p) /\
+      Seq.index sb_curr' (pos - 1) == key)
+    (ensures (forall (p: nat). Seq.index sc' key <= p /\ p < count_le sa key ==>
+                p < n /\ Seq.index sb_curr' p == key))
+  = ()
+
 // Step B filling
 #push-options "--z3rlimit 30 --fuel 2 --ifuel 2"
 let phase4_b_step (sc sc': Seq.seq int) (sa sb_curr sb_curr': Seq.seq nat) (k n remaining: nat) (key: nat)
@@ -564,7 +578,7 @@ let phase4_b_step (sc sc': Seq.seq int) (sa sb_curr sb_curr': Seq.seq nat) (k n 
           // v = key: sc'[key] = pos-1
           // p = pos-1: sb_curr'[pos-1] = key = v
           // p > pos-1: p >= pos = sc[key], old b_inv: sb_curr[p] = key, p != pos-1: sb_curr'[p] = key = v
-          ()
+          phase4_b_step_key sc' sa sb_curr sb_curr' n key pos
         )
     in
     Classical.forall_intro (Classical.move_requires target)
@@ -577,7 +591,6 @@ let phase4_final_sorted (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat)
                     Seq.length sc == k + 1 /\ Seq.length sa == n /\ n > 0 /\ Seq.length sb_curr == n /\ S.in_range sa k)
           (ensures S.sorted sb_curr)
   = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa k n 0);
-    reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb_curr k n);
     assert (Seq.equal (Seq.slice sa 0 n) sa);
     let aux (v: (v:nat{v < Seq.length sc}))
       : Lemma (requires v <= k)
@@ -586,6 +599,7 @@ let phase4_final_sorted (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat)
         if v = 0 then count_le_negative sa (-1)
     in
     Classical.forall_intro (Classical.move_requires aux);
+    reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb_curr k n);
     count_le_full sa k;
     count_le_negative sa (-1);
     final_sorted sa sb_curr k
@@ -598,7 +612,6 @@ let phase4_final_perm (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat)
                     Seq.length sc == k + 1 /\ Seq.length sa == n /\ n > 0 /\ Seq.length sb_curr == n /\ S.in_range sa k)
           (ensures S.permutation sb_curr sa)
   = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa k n 0);
-    reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb_curr k n);
     assert (Seq.equal (Seq.slice sa 0 n) sa);
     let aux (v: (v:nat{v < Seq.length sc}))
       : Lemma (requires v <= k)
@@ -607,6 +620,7 @@ let phase4_final_perm (sc: Seq.seq int) (sa sb_curr: Seq.seq nat) (k n: nat)
         if v = 0 then count_le_negative sa (-1)
     in
     Classical.forall_intro (Classical.move_requires aux);
+    reveal_opaque (`%phase4_b_inv) (phase4_b_inv sc sa sb_curr k n);
     count_le_full sa k;
     count_le_negative sa (-1);
     final_perm sa sb_curr k

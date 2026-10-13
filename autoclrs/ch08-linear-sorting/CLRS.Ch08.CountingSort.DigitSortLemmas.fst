@@ -167,7 +167,7 @@ let phase4_content_inv_multiset (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n
     (let lo = Seq.index sc v in
      let hi = digit_count_le sa v d base in
      lo >= 0 /\ hi <= n /\ lo <= hi /\
-     (forall (x: nat).
+     (forall (x: nat). {:pattern (SeqP.count x (Seq.slice sb lo hi))}
        SeqP.count x (Seq.slice sb lo hi) ==
          (if B.digit x d base = v
           then SeqP.count x (Seq.slice sa remaining n)
@@ -182,7 +182,8 @@ let phase4_content_inv_order (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n re
     (let lo = Seq.index sc v in
      let hi = digit_count_le sa v d base in
      lo >= 0 /\ hi <= n /\ lo <= hi /\
-     (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+     (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+       lo <= p1 /\ p1 < p2 /\ p2 < hi /\
        Seq.index sb p1 <> Seq.index sb p2 ==>
        (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
          Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2))))
@@ -330,8 +331,7 @@ let phase4_pos_bounds (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: n
       remaining > 0 /\ key < base /\
       key == B.digit (Seq.index sa (remaining - 1)) d base)
     (ensures Seq.index sc key >= 1 /\ Seq.index sc key <= n)
-  = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa d base n remaining);
-    let suffix = Seq.slice sa remaining n in
+  = let suffix = Seq.slice sa remaining n in
     digit_count_le_bounded sa key d base;
     // key is the digit of sa[remaining-1] which is NOT in suffix
     // So digit_count(sa, key) = digit_count(prefix, key) + digit_count(suffix, key) >= 1 + digit_count(suffix, key)
@@ -346,6 +346,7 @@ let phase4_pos_bounds (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: n
     assert (Seq.length mid == 1);
     assert (Seq.head mid == Seq.index sa (remaining - 1));
     // sc[key] = digit_count_le(key) - digit_count(suffix, key)
+    reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa d base n remaining);
     digit_count_le_step sa key d base
 #pop-options
 
@@ -572,18 +573,29 @@ let content_step_other_order
   : Lemma (requires
       Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
       lo >= 0 /\ hi <= n /\ lo <= hi /\
-      (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+      (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+        lo <= p1 /\ p1 < p2 /\ p2 < hi /\
         Seq.index sb p1 <> Seq.index sb p2 ==>
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2)) /\
       (forall (p:nat). lo <= p /\ p < hi ==> Seq.index sb' p == Seq.index sb p))
     (ensures
-      (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+      (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+        lo <= p1 /\ p1 < p2 /\ p2 < hi /\
         Seq.index sb' p1 <> Seq.index sb' p2 ==>
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)))
   = ()
 #pop-options
+
+/// Slices that avoid the only position where two sequences differ agree pointwise
+let slices_agree_off_pos (s1 s2: Seq.seq nat) (n pos lo hi: nat)
+  : Lemma (requires Seq.length s1 == n /\ Seq.length s2 == n /\
+                    pos < lo /\ lo <= hi /\ hi <= n /\
+                    (forall (p:nat). p < n /\ p <> pos ==> Seq.index s1 p == Seq.index s2 p))
+          (ensures (forall (i:nat). i < hi - lo ==>
+                     Seq.index (Seq.slice s1 lo hi) i == Seq.index (Seq.slice s2 lo hi) i))
+  = ()
 
 /// Sub-lemma for phase4_content_step: v == key multiset proof
 /// Does NOT reveal opaque invariants; takes needed facts as preconditions
@@ -623,6 +635,7 @@ let content_step_key_multiset
       = // Split count on sb' side: [pos..hi) = [pos..lo) ++ [lo..hi)
         slice_count_split sb' pos lo hi x;
         // [lo..hi) unchanged: sb'[lo..hi) == sb[lo..hi)
+        slices_agree_off_pos sb' sb n pos lo hi;
         count_pointwise_eq (Seq.slice sb' lo hi) (Seq.slice sb lo hi) x;
         // Split count on sa side: [remaining-1..n) = [remaining-1..remaining) ++ [remaining..n)
         slice_count_split sa (remaining - 1) remaining n x;
@@ -733,7 +746,8 @@ let key_order_case_old
       pos == lo - 1 /\
       pos < p1 /\ p1 < p2 /\ p2 < hi /\
       Seq.index sb' p1 <> Seq.index sb' p2 /\
-      (forall (q1 q2: nat). lo <= q1 /\ q1 < q2 /\ q2 < hi /\
+      (forall (q1 q2: nat). {:pattern (Seq.index sb q1); (Seq.index sb q2)}
+        lo <= q1 /\ q1 < q2 /\ q2 < hi /\
         Seq.index sb q1 <> Seq.index sb q2 ==>
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb q1 /\ Seq.index sa j2 == Seq.index sb q2)) /\
@@ -918,7 +932,8 @@ let order_inv_extract (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n remaining
       (let lo = Seq.index sc v in
        let hi = digit_count_le sa v d base in
        lo >= 0 /\ hi <= n /\ lo <= hi /\
-       (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+         lo <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb p1 <> Seq.index sb p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2))))
@@ -946,7 +961,8 @@ let order_inv_pack (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n remaining: n
       (let lo = Seq.index sc v in
        let hi = digit_count_le sa v d base in
        lo >= 0 /\ hi <= n /\ lo <= hi /\
-       (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+         lo <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb p1 <> Seq.index sb p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2)))))
@@ -958,7 +974,8 @@ let order_inv_pack (sc: Seq.seq int) (sa sb: Seq.seq nat) (d base n remaining: n
       (let lo = Seq.index sc v in
        let hi = digit_count_le sa v d base in
        lo >= 0 /\ hi <= n /\ lo <= hi /\
-       (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+         lo <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb p1 <> Seq.index sb p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2)))
@@ -981,12 +998,14 @@ let combine_key_order
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb' pos /\ Seq.index sa j2 == Seq.index sb' p2)) /\
       // Old elements: p1 >= lo pairs
-      (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+      (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+        lo <= p1 /\ p1 < p2 /\ p2 < hi /\
         Seq.index sb' p1 <> Seq.index sb' p2 ==>
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)))
     (ensures
-      (forall (p1 p2: nat). pos <= p1 /\ p1 < p2 /\ p2 < hi /\
+      (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+        pos <= p1 /\ p1 < p2 /\ p2 < hi /\
         Seq.index sb' p1 <> Seq.index sb' p2 ==>
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)))
@@ -1001,14 +1020,16 @@ let key_block_old_order
       Seq.length sa == n /\ Seq.length sb == n /\ Seq.length sb' == n /\
       pos >= 0 /\ lo >= 1 /\ hi <= n /\ lo <= hi /\ pos == lo - 1 /\
       // Old order for [lo, hi) in sb
-      (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+      (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+        lo <= p1 /\ p1 < p2 /\ p2 < hi /\
         Seq.index sb p1 <> Seq.index sb p2 ==>
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2)) /\
       // Direct agreement: sb' == sb on [lo, hi)
       (forall (p:nat). lo <= p /\ p < hi ==> Seq.index sb' p == Seq.index sb p))
     (ensures
-      (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+      (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+        lo <= p1 /\ p1 < p2 /\ p2 < hi /\
         Seq.index sb' p1 <> Seq.index sb' p2 ==>
         (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
           Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2)))
@@ -1045,7 +1066,8 @@ let phase4_content_step_order_for_v_neq
       (let lo = Seq.index sc v in
        let hi = digit_count_le sa v d base in
        lo >= 0 /\ hi <= n /\ lo <= hi /\
-       (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+         lo <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb p1 <> Seq.index sb p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2))))
@@ -1053,7 +1075,8 @@ let phase4_content_step_order_for_v_neq
       (let lo' = Seq.index sc' v in
        let hi = digit_count_le sa v d base in
        lo' >= 0 /\ hi <= n /\ lo' <= hi /\
-       (forall (p1 p2: nat). lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+         lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb' p1 <> Seq.index sb' p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
@@ -1086,7 +1109,8 @@ let phase4_content_step_order_for_v_eq
       (let lo = Seq.index sc key in
        let hi = digit_count_le sa key d base in
        lo >= 0 /\ hi <= n /\ lo <= hi /\
-       (forall (p1 p2: nat). lo <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb p1); (Seq.index sb p2)}
+         lo <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb p1 <> Seq.index sb p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb p1 /\ Seq.index sa j2 == Seq.index sb p2))) /\
@@ -1102,7 +1126,8 @@ let phase4_content_step_order_for_v_eq
       (let lo' = Seq.index sc' key in
        let hi = digit_count_le sa key d base in
        lo' >= 0 /\ hi <= n /\ lo' <= hi /\
-       (forall (p1 p2: nat). lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+         lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb' p1 <> Seq.index sb' p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
@@ -1142,7 +1167,8 @@ let order_step_v_neq
       (let lo' = Seq.index sc' v in
        let hi = digit_count_le sa v d base in
        lo' >= 0 /\ hi <= n /\ lo' <= hi /\
-       (forall (p1 p2: nat). lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+         lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb' p1 <> Seq.index sb' p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
@@ -1179,7 +1205,8 @@ let order_step_v_eq
       (let lo' = Seq.index sc' key in
        let hi = digit_count_le sa key d base in
        lo' >= 0 /\ hi <= n /\ lo' <= hi /\
-       (forall (p1 p2: nat). lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+         lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb' p1 <> Seq.index sb' p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
@@ -1216,7 +1243,8 @@ let order_step_for_v
       (let lo' = Seq.index sc' v in
        let hi = digit_count_le sa v d base in
        lo' >= 0 /\ hi <= n /\ lo' <= hi /\
-       (forall (p1 p2: nat). lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
+       (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+         lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
          Seq.index sb' p1 <> Seq.index sb' p2 ==>
          (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
            Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
@@ -1259,7 +1287,8 @@ let phase4_content_step_order (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d 
         (let lo' = Seq.index sc' v in
          let hi = digit_count_le sa v d base in
          lo' >= 0 /\ hi <= n /\ lo' <= hi /\
-         (forall (p1 p2: nat). lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
+         (forall (p1 p2: nat). {:pattern (Seq.index sb' p1); (Seq.index sb' p2)}
+           lo' <= p1 /\ p1 < p2 /\ p2 < hi /\
            Seq.index sb' p1 <> Seq.index sb' p2 ==>
            (exists (j1 j2: nat). j1 < j2 /\ j2 < n /\
              Seq.index sa j1 == Seq.index sb' p1 /\ Seq.index sa j2 == Seq.index sb' p2))))
