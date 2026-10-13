@@ -105,12 +105,6 @@ fn list_search (hd tl: dptr) (k: int)
   returns found: bool
   ensures pure (found <==> L.mem k 'l)
 
-/// LIST-SEARCH-BACK: Search for key k (back-to-front), O(n)
-fn list_search_back (hd tl: dptr) (k: int)
-  preserves dll hd tl 'l
-  returns found: bool
-  ensures pure (found <==> L.mem k 'l)
-
 /// LIST-SEARCH returning pointer (Some if found, None if not)
 fn list_search_ptr (hd tl: dptr) (k: int)
   preserves dll hd tl 'l
@@ -121,19 +115,18 @@ fn list_search_ptr (hd tl: dptr) (k: int)
     | Some _ -> L.mem k 'l
   )
 
+/// LIST-SEARCH-BACK: Search for key k (back-to-front), O(n)
+fn list_search_back (hd tl: dptr) (k: int)
+  preserves dll hd tl 'l
+  returns found: bool
+  ensures pure (found <==> L.mem k 'l)
+
 /// LIST-DELETE: Delete first occurrence of key k
 fn list_delete (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
   requires exists* hd tl.
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
   ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_first k l)
-
-/// LIST-DELETE-LAST: Delete last occurrence of key k
-fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
-  requires exists* hd tl.
-    pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
-  ensures exists* hd' tl'.
-    pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_last k l)
 
 /// LIST-DELETE-NODE: Delete element at index i
 fn list_delete_node
@@ -144,4 +137,11 @@ fn list_delete_node
     pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
   ensures exists* hd' tl'.
     pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_at i l)
+
+/// LIST-DELETE-LAST: Delete last occurrence of key k
+fn list_delete_last (hd_ref tl_ref: ref dptr) (k: int) (#l: erased (list int))
+  requires exists* hd tl.
+    pts_to hd_ref hd ** pts_to tl_ref tl ** dll hd tl l
+  ensures exists* hd' tl'.
+    pts_to hd_ref hd' ** pts_to tl_ref tl' ** dll hd' tl' (remove_last k l)
 //SNIPPET_END: dll_ops

@@ -155,52 +155,6 @@ fn hash_insert
     )
 //SNIPPET_END: ht_hash_insert
 
-//SNIPPET_START: ht_hash_insert_no_dup
-// Insert a key only if it is not already present (prevents duplicates)
-// Returns true if the key is in the table after the call (either already
-// present or freshly inserted), false if the table is full and the key
-// was not already present.
-// Complexity: at most 2 * size probes (one search + one insert)
-fn hash_insert_no_dup
-  (table: A.array int)
-  (#s: erased (Seq.seq int))
-  (size: SZ.t)
-  (key: int{key >= 0 /\ SZ.fits key})
-  (ctr: GR.ref nat)
-  (#c0: erased nat)
-  requires
-    A.pts_to table s **
-    GR.pts_to ctr c0 **
-    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\
-          valid_ht s (SZ.v size))
-  returns result: bool
-  ensures exists* s' cf.
-    A.pts_to table s' **
-    GR.pts_to ctr cf **
-    pure (
-      Seq.length s' == SZ.v size /\
-      Seq.length s' == Seq.length s /\
-      valid_ht s' (SZ.v size) /\
-      cf >= reveal c0 /\ cf - reveal c0 <= 2 * SZ.v size /\
-      (if result
-       then (key_in_table s' (SZ.v size) key /\
-             key_findable s' (SZ.v size) key /\
-             // No duplicate: either table unchanged (key was already there)
-             // or key was freshly inserted at one empty/deleted slot
-             (s' == s \/
-              (exists (idx: nat). idx < SZ.v size /\
-                (Seq.index s idx == -1 \/ Seq.index s idx == -2) /\
-                Seq.index s' idx == key /\
-                seq_modified_at s s' idx /\
-                ~(key_in_table s (SZ.v size) key))))
-       else (s' == s /\ ~(key_in_table s (SZ.v size) key) /\
-             (forall (q: nat). {:pattern (hash_probe_nat key q (SZ.v size))}
-               q < SZ.v size ==>
-                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -1 /\
-                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -2)))
-    )
-//SNIPPET_END: ht_hash_insert_no_dup
-
 //SNIPPET_START: ht_hash_search
 // Search for a key in the hash table
 // Returns the index if found, or returns size (invalid index) if not found
@@ -273,3 +227,49 @@ fn hash_delete
        else (Seq.equal s' s /\ ~(key_in_table s (SZ.v size) key)))
     )
 //SNIPPET_END: ht_hash_delete
+
+//SNIPPET_START: ht_hash_insert_no_dup
+// Insert a key only if it is not already present (prevents duplicates)
+// Returns true if the key is in the table after the call (either already
+// present or freshly inserted), false if the table is full and the key
+// was not already present.
+// Complexity: at most 2 * size probes (one search + one insert)
+fn hash_insert_no_dup
+  (table: A.array int)
+  (#s: erased (Seq.seq int))
+  (size: SZ.t)
+  (key: int{key >= 0 /\ SZ.fits key})
+  (ctr: GR.ref nat)
+  (#c0: erased nat)
+  requires
+    A.pts_to table s **
+    GR.pts_to ctr c0 **
+    pure (SZ.v size > 0 /\ Seq.length s == SZ.v size /\
+          valid_ht s (SZ.v size))
+  returns result: bool
+  ensures exists* s' cf.
+    A.pts_to table s' **
+    GR.pts_to ctr cf **
+    pure (
+      Seq.length s' == SZ.v size /\
+      Seq.length s' == Seq.length s /\
+      valid_ht s' (SZ.v size) /\
+      cf >= reveal c0 /\ cf - reveal c0 <= 2 * SZ.v size /\
+      (if result
+       then (key_in_table s' (SZ.v size) key /\
+             key_findable s' (SZ.v size) key /\
+             // No duplicate: either table unchanged (key was already there)
+             // or key was freshly inserted at one empty/deleted slot
+             (s' == s \/
+              (exists (idx: nat). idx < SZ.v size /\
+                (Seq.index s idx == -1 \/ Seq.index s idx == -2) /\
+                Seq.index s' idx == key /\
+                seq_modified_at s s' idx /\
+                ~(key_in_table s (SZ.v size) key))))
+       else (s' == s /\ ~(key_in_table s (SZ.v size) key) /\
+             (forall (q: nat). {:pattern (hash_probe_nat key q (SZ.v size))}
+               q < SZ.v size ==>
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -1 /\
+                 Seq.index s (hash_probe_nat key q (SZ.v size)) =!= -2)))
+    )
+//SNIPPET_END: ht_hash_insert_no_dup
