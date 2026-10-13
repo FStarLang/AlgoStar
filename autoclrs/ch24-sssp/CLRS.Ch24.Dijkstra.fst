@@ -172,6 +172,11 @@ let relax_round_lb_post
     FStar.Classical.forall_intro aux
 #pop-options
 
+/// Helper: the row-major index of an edge between two vertices is in bounds
+let edge_index_in_bounds (u v n: nat)
+  : Lemma (requires u < n /\ v < n) (ensures u * n + v < n * n)
+  = FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1)
+
 /// Helper: pred_consistent is preserved by the relaxation round
 #push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let relax_round_pred_consistent
@@ -224,6 +229,7 @@ let relax_round_pred_consistent
               assert (Seq.index sdist_after p == Seq.index sdist_pre p)
             end else begin
               assert (SZ.v (Seq.index spred_after v) == u);
+              edge_index_in_bounds u v n;
               assert (Seq.index sdist_after u == Seq.index sdist_pre u)
             end
     in
