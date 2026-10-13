@@ -19,11 +19,13 @@ module Classical = FStar.Classical
 // 
 //SNIPPET_START: definitions
 let sorted (s: Seq.seq int) : prop
-  = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
+  = forall (i j: nat). {:pattern (Seq.index s i); (Seq.index s j)}
+      i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
 let prefix_sorted (s: Seq.seq int) (k: nat) : prop =
   k <= Seq.length s /\
-  (forall (i j: nat). i <= j /\ j < k ==> Seq.index s i <= Seq.index s j)
+  (forall (i j: nat). {:pattern (Seq.index s i); (Seq.index s j)}
+    i <= j /\ j < k ==> Seq.index s i <= Seq.index s j)
 
 [@@"opaque_to_smt"]
 let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
