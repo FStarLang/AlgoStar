@@ -217,7 +217,12 @@ let lemma_stable_permutation_equal_mst_weight
     assert (subset_edges pk1 g1.edges);
     lemma_subset_edges_transfer pk1 g1.edges g2.edges;
     assert (subset_edges pk2 g2.edges);
-    lemma_subset_edges_transfer pk2 g2.edges g1.edges
+    lemma_subset_edges_transfer pk2 g2.edges g1.edges;
+    // Each is a spanning tree of the other graph, so neither weighs more
+    assert (is_spanning_tree g2 pk1);
+    assert (is_spanning_tree g1 pk2);
+    assert (total_weight pk1 <= total_weight pk2);
+    assert (total_weight pk2 <= total_weight pk1)
 #pop-options
 
 (*** Precondition for Kruskal ***)
