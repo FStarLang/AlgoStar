@@ -112,6 +112,8 @@ let rec lemma_dot_product_add_left
     else begin
       lemma_dot_product_add_left a1 a2 b i j (k - 1);
       lemma_matrix_add_elem a1 a2 i (k - 1);
+      FStar.Math.Lemmas.distributivity_add_left
+        (get_elem a1 i (k - 1)) (get_elem a2 i (k - 1)) (get_elem b (k - 1) j);
       ()
     end
 
