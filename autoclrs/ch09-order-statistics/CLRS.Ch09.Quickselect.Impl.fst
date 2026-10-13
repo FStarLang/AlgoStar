@@ -165,20 +165,16 @@ let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
               Seq.length s_pre == Seq.length s1 /\
               permutation s_pre s1 /\
               (forall (idx: nat). idx < Seq.length s1 ==>
-                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx))
-    (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
-              (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
-              v <= Seq.index s1 j)
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx) /\
+              (forall (i j: nat). i < lo /\ lo <= j /\ j < hi ==>
+                Seq.index s_pre i <= Seq.index s_pre j))
+    (ensures forall (i j: nat). i < lo /\ lo <= j /\ j < hi ==>
+              Seq.index s1 i <= Seq.index s1 j)
   = reveal_perm s_pre s1;
-    let aux (j: nat) (v: int) : Lemma
-      (lo <= j /\ j < hi /\
-        (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
-        v <= Seq.index s1 j)
-    = Classical.impl_intro_gen
-        #(lo <= j /\ j < hi /\
-          (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m))
-        #(fun _ -> v <= Seq.index s1 j)
-        (fun _ -> Lemmas.perm_unchanged_lower_bound s_pre s1 lo hi v j)
+    let aux (i j: nat) : Lemma
+      (i < lo /\ lo <= j /\ j < hi ==> Seq.index s1 i <= Seq.index s1 j)
+    = if i < lo && lo <= j && j < hi then
+        Lemmas.perm_unchanged_lower_bound s_pre s1 lo hi (Seq.index s_pre i) j
     in
     Classical.forall_intro_2 aux
 
@@ -188,20 +184,16 @@ let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
               Seq.length s_pre == Seq.length s1 /\
               permutation s_pre s1 /\
               (forall (idx: nat). idx < Seq.length s1 ==>
-                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx))
-    (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
-              (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
-              Seq.index s1 j <= v)
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx) /\
+              (forall (i j: nat). lo <= i /\ i < hi /\ hi <= j /\ j < Seq.length s_pre ==>
+                Seq.index s_pre i <= Seq.index s_pre j))
+    (ensures forall (i j: nat). lo <= i /\ i < hi /\ hi <= j /\ j < Seq.length s1 ==>
+              Seq.index s1 i <= Seq.index s1 j)
   = reveal_perm s_pre s1;
-    let aux (j: nat) (v: int) : Lemma
-      (lo <= j /\ j < hi /\
-        (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
-        Seq.index s1 j <= v)
-    = Classical.impl_intro_gen
-        #(lo <= j /\ j < hi /\
-          (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v))
-        #(fun _ -> Seq.index s1 j <= v)
-        (fun _ -> Lemmas.perm_unchanged_upper_bound s_pre s1 lo hi v j)
+    let aux (i j: nat) : Lemma
+      (lo <= i /\ i < hi /\ hi <= j /\ j < Seq.length s1 ==> Seq.index s1 i <= Seq.index s1 j)
+    = if lo <= i && i < hi && hi <= j && j < Seq.length s1 then
+        Lemmas.perm_unchanged_upper_bound s_pre s1 lo hi (Seq.index s_pre j) i
     in
     Classical.forall_intro_2 aux
 #pop-options
