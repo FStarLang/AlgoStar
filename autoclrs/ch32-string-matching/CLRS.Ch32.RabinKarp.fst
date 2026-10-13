@@ -371,6 +371,7 @@ fn rabin_karp
       let old_char = A.op_Dot_Lparen_Rparen text vs;
       let new_char = A.op_Dot_Lparen_Rparen text (vs +^ m);
       let new_hash = (d * ((vt_hash_outer + q - (old_char * h) % q) % q) + new_char) % q;
+      assert (pure (SZ.v vs + SZ.v m < Seq.length s_text));
       RKSpec.rolling_hash_step_correct s_text d q (SZ.v vs) (SZ.v m) vt_hash_outer h;
       t_hash := new_hash;
       s := vs +^ 1sz
