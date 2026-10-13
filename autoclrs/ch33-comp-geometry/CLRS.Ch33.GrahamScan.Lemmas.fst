@@ -175,6 +175,7 @@ let scan_step_preserves_left_turns
           assert (Seq.index hull' (i + 2) == Seq.index hull (i + 2))
         end else begin
           // Boundary case: i + 2 == top', i.e., i == top' - 2
+          assert (i + 2 == top');
           assert (Seq.index hull' i == Seq.index hull (top' - 2));
           assert (Seq.index hull' (i + 1) == Seq.index hull (top' - 1));
           assert (Seq.index hull' (i + 2) == p_idx)
