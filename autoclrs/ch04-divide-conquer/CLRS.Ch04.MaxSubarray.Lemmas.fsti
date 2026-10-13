@@ -27,9 +27,9 @@ val lemma_kadane_correct (s: Seq.seq int) (i: nat) (cur best: int)
   : Lemma
     (requires i <= Seq.length s /\ Seq.length s > 0 /\
               (i = 0 ==> cur == 0 /\ best == Seq.index s 0) /\
-              (i > 0 ==> cur == max_suffix_sum s (Prims.op_Subtraction i 1) /\
-                         best == max_sub_sum s (Prims.op_Subtraction i 1)))
-    (ensures kadane_spec s i cur best == max_sub_sum s (Prims.op_Subtraction (Seq.length s) 1))
+              (i > 0 ==> cur == max_suffix_sum s (Prims.op_Minus i 1) /\
+                         best == max_sub_sum s (Prims.op_Minus i 1)))
+    (ensures kadane_spec s i cur best == max_sub_sum s (Prims.op_Minus (Seq.length s) 1))
 
 val theorem_kadane_optimal (s: Seq.seq int) (i j: nat)
   : Lemma

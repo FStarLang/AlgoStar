@@ -472,7 +472,7 @@ let has_min_dist_unvisited (sdist svisited: Seq.seq int) (n idx: nat) : prop =
 
 // ========== Ghost tick for complexity counting ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -563,11 +563,11 @@ fn find_min_unvisited
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    let visited_i = V.op_Array_Access visited vi;
+    let visited_i = V.op_Dot_Lparen_Rparen visited vi;
     
     if (visited_i = 0)
     {
-      let dist_i = A.op_Array_Access dist vi;
+      let dist_i = A.op_Dot_Lparen_Rparen dist vi;
       let curr_min = !min_val;
       
       if (dist_i < curr_min)
@@ -772,11 +772,11 @@ fn dijkstra_relax_round
 
     lemma_2d_index_fits (SZ.v u) (SZ.v vv) (SZ.v n);
     let w_idx = u *^ n +^ vv;
-    let w = A.op_Array_Access weights w_idx;
+    let w = A.op_Dot_Lparen_Rparen weights w_idx;
 
-    let visited_v = V.op_Array_Access visited vv;
-    let old_dist = A.op_Array_Access dist vv;
-    let old_pred = A.op_Array_Access pred vv;
+    let visited_v = V.op_Dot_Lparen_Rparen visited vv;
+    let old_dist = A.op_Dot_Lparen_Rparen dist vv;
+    let old_pred = A.op_Dot_Lparen_Rparen pred vv;
 
     let can_relax = (visited_v = 0 && w < SP.inf && dist_u < SP.inf);
     let sum = dist_u + w;
@@ -790,8 +790,8 @@ fn dijkstra_relax_round
     assert pure (Seq.index (Seq.upd sdist_v (SZ.v vv) new_dist) (SZ.v u) == dist_u);
     extend_relaxed_from_u sdist_v sweights (SZ.v n) (SZ.v u) (SZ.v vv) new_dist dist_u;
 
-    A.op_Array_Assignment dist vv new_dist;
-    A.op_Array_Assignment pred vv new_pred;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vv new_dist;
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vv new_pred;
 
     tick ctr;
 
@@ -900,8 +900,8 @@ fn dijkstra
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else SP.inf);
-    A.op_Array_Assignment dist vi new_val;
-    A.op_Array_Assignment pred vi vi;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vi new_val;
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vi vi;
     tick ctr;
     init_i := vi +^ 1sz;
   };
@@ -970,13 +970,13 @@ fn dijkstra
     count_ones_not_all_visited svisited_pre (SZ.v n);
     
     // Mark u as visited
-    V.op_Array_Assignment visited u 1;
+    V.op_Dot_Lparen_Rparen_Less_Minus visited u 1;
     
     // Update count_ones after marking
     count_ones_mark svisited_pre (SZ.v n) (SZ.v u);
     
     // Get dist[u] — cached, won't change during relaxation
-    let dist_u = A.op_Array_Access dist u;
+    let dist_u = A.op_Dot_Lparen_Rparen dist u;
     
     // Relax all neighbors of u — n ticks (also updates pred)
     dijkstra_relax_round weights n source dist pred visited u dist_u ctr

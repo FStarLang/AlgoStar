@@ -27,7 +27,7 @@ module Spec = CLRS.Ch04.MaxSubarray.Spec
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -78,7 +78,7 @@ fn max_subarray
       // Complexity: exactly i ticks so far (relative to c0)
       vc == reveal c0 + SZ.v vi
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let vcur = !current_sum;

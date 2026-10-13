@@ -1832,13 +1832,13 @@ fn bfs_init
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment color vi 0;
-    A.op_Array_Assignment pred vi (-1);
-    A.op_Array_Assignment dist vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus color vi 0;
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vi (-1);
     i := vi +^ 1sz
   };
-  A.op_Array_Assignment color source 1;
-  A.op_Array_Assignment dist source 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus color source 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist source 0;
   ()
 }
 #pop-options
@@ -2068,12 +2068,12 @@ fn maybe_discover
     )
 {
   let vt = !q_tail;
-  let cv: int = A.op_Array_Access color vv;
+  let cv: int = A.op_Dot_Lparen_Rparen color vv;
   let idx_fwd: SZ.t = u *^ n +^ vv;
   let idx_bwd: SZ.t = vv *^ n +^ u;
-  let cap_val: int = A.op_Array_Access capacity idx_fwd;
-  let flow_fwd: int = A.op_Array_Access flow idx_fwd;
-  let flow_bwd: int = A.op_Array_Access flow idx_bwd;
+  let cap_val: int = A.op_Dot_Lparen_Rparen capacity idx_fwd;
+  let flow_fwd: int = A.op_Dot_Lparen_Rparen flow idx_fwd;
+  let flow_bwd: int = A.op_Dot_Lparen_Rparen flow idx_bwd;
   let res_fwd: int = cap_val - flow_fwd;
   // Reveal BFS invariant facts (AFTER array reads to avoid Ill-typed elaboration)
   elim_bfs_inv_props scolor spred squeue cap_seq flow_seq (SZ.v n) (SZ.v source) (SZ.v vtail);
@@ -2086,7 +2086,7 @@ fn maybe_discover
     maybe_discover_then_proof scolor spred squeue cap_seq flow_seq
       (SZ.v n) (SZ.v u) (SZ.v source) (SZ.v vtail) vv;
     // Perform stateful updates
-    let du: int = A.op_Array_Access dist u;
+    let du: int = A.op_Dot_Lparen_Rparen dist u;
     // Prove bfs_pred_ok preserved through discovery
     // Assert residual condition explicitly (connects runtime values to seq_get)
     assert (pure (
@@ -2094,10 +2094,10 @@ fn maybe_discover
       seq_get flow_seq (SZ.v vv * SZ.v n + SZ.v u) > 0));
     lemma_discover_preserves_bfs_pred_ok scolor spred sdist cap_seq flow_seq
       (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v vv) (SZ.v vtail);
-    A.op_Array_Assignment color vv 1;
-    A.op_Array_Assignment pred vv (SZ.v u);
-    A.op_Array_Assignment dist vv (du + 1);
-    A.op_Array_Assignment queue vt vv;
+    A.op_Dot_Lparen_Rparen_Less_Minus color vv 1;
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vv (SZ.v u);
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vv (du + 1);
+    A.op_Dot_Lparen_Rparen_Less_Minus queue vt vv;
     q_tail := vt +^ 1sz;
     ()
   }
@@ -2319,7 +2319,7 @@ fn bfs_residual
     )
 {
   bfs_init color pred dist n source;
-  A.op_Array_Assignment queue 0sz source;
+  A.op_Dot_Lparen_Rparen_Less_Minus queue 0sz source;
   // Establish invariant preconditions for the BFS loop
   with scolor_init. assert (A.pts_to color scolor_init);
   with squeue_init. assert (A.pts_to queue squeue_init);
@@ -2374,7 +2374,7 @@ fn bfs_residual
     with sc_cur. assert (A.pts_to color sc_cur);
     with sq_cur. assert (A.pts_to queue sq_cur);
     with vt_cur. assert (R.pts_to q_tail vt_cur);
-    let u: SZ.t = A.op_Array_Access queue vh;
+    let u: SZ.t = A.op_Dot_Lparen_Rparen queue vh;
     ();
     q_head := vh +^ 1sz;
     bfs_explore_neighbors capacity flow color pred dist queue n u source q_tail;
@@ -2398,7 +2398,7 @@ fn bfs_residual
     with sp_post. assert (A.pts_to pred sp_post);
     lemma_color2_preserves_bfs_pred_ok sc_post sp_post sd_post cap_seq flow_seq
       (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v vtail_post);
-    A.op_Array_Assignment color u 2;
+    A.op_Dot_Lparen_Rparen_Less_Minus color u 2;
     ()
   };
 
@@ -2415,7 +2415,7 @@ fn bfs_residual
   lemma_count_zero_no_color1 sc_final (SZ.v n);
   lemma_processed_to_bfs_complete sc_final cap_seq flow_seq (SZ.v n);
 
-  let sink_color: int = A.op_Array_Access color sink;
+  let sink_color: int = A.op_Dot_Lparen_Rparen color sink;
   (sink_color <> 0)
 }
 #pop-options
@@ -2501,7 +2501,7 @@ fn find_bottleneck_imp
   decreases (seq_get sdist (SZ.v !current))
   {
     let vc = !current;
-    let u_int: int = A.op_Array_Access pred vc;
+    let u_int: int = A.op_Dot_Lparen_Rparen pred vc;
     // From pred_ok: vc is discovered and vc ≠ source, so pred[vc] >= 0 and pred[vc] < n
     if (u_int >= 0)
     {
@@ -2512,9 +2512,9 @@ fn find_bottleneck_imp
       let idx_fwd: SZ.t = u *^ n +^ vc;
       let idx_bwd: SZ.t = vc *^ n +^ u;
       assert (pure (SZ.v idx_fwd < SZ.v n * SZ.v n /\ SZ.v idx_bwd < SZ.v n * SZ.v n));
-      let cap_val: int = A.op_Array_Access capacity idx_fwd;
-      let flow_fwd: int = A.op_Array_Access flow idx_fwd;
-      let flow_bwd: int = A.op_Array_Access flow idx_bwd;
+      let cap_val: int = A.op_Dot_Lparen_Rparen capacity idx_fwd;
+      let flow_fwd: int = A.op_Dot_Lparen_Rparen flow idx_fwd;
+      let flow_bwd: int = A.op_Dot_Lparen_Rparen flow idx_bwd;
       let res_fwd: int = cap_val - flow_fwd;
       let vbn = !bottleneck;
       // Pure lemma: does all the case analysis + fuel mono
@@ -2621,7 +2621,7 @@ fn augment_imp
   decreases (seq_get sdist (SZ.v !current))
   {
     let vc = !current;
-    let u_int: int = A.op_Array_Access pred vc;
+    let u_int: int = A.op_Dot_Lparen_Rparen pred vc;
     if (u_int >= 0)
     {
       let u: SZ.t = SZ.uint_to_t u_int;
@@ -2631,8 +2631,8 @@ fn augment_imp
       let idx_fwd: SZ.t = u *^ n +^ vc;
       let idx_bwd: SZ.t = vc *^ n +^ u;
       assert (pure (SZ.v idx_fwd < SZ.v n * SZ.v n /\ SZ.v idx_bwd < SZ.v n * SZ.v n));
-      let cap_val: int = A.op_Array_Access capacity idx_fwd;
-      let flow_fwd: int = A.op_Array_Access flow idx_fwd;
+      let cap_val: int = A.op_Dot_Lparen_Rparen capacity idx_fwd;
+      let flow_fwd: int = A.op_Dot_Lparen_Rparen flow idx_fwd;
       // Call step lemma to get: AVP(fs, vc, n) == AVP(augment_edge(fs, ..., u, vc, bn), u, n)
       with _fs. assert (A.pts_to flow _fs);
       lemma_augment_step scolor spred sdist cap_seq flow_seq _fs
@@ -2641,15 +2641,15 @@ fn augment_imp
       {
         // residual_capacity > 0 → augment_edge = Seq.upd at u*n+v
         lemma_augment_edge_fwd _fs cap_seq (SZ.v n) (SZ.v u) (SZ.v vc) bn;
-        A.op_Array_Assignment flow idx_fwd (flow_fwd + bn);
+        A.op_Dot_Lparen_Rparen_Less_Minus flow idx_fwd (flow_fwd + bn);
         current := u
       }
       else
       {
-        let flow_bwd: int = A.op_Array_Access flow idx_bwd;
+        let flow_bwd: int = A.op_Dot_Lparen_Rparen flow idx_bwd;
         // residual_capacity <= 0 → augment_edge = Seq.upd at v*n+u
         lemma_augment_edge_bwd _fs cap_seq (SZ.v n) (SZ.v u) (SZ.v vc) bn;
-        A.op_Array_Assignment flow idx_bwd (flow_bwd - bn);
+        A.op_Dot_Lparen_Rparen_Less_Minus flow idx_bwd (flow_bwd - bn);
         current := u
       }
     }
@@ -2713,7 +2713,7 @@ fn check_valid_caps_fn
   decreases (SZ.v nn - SZ.v !i)
   {
     let vi = !i;
-    let c: int = A.op_Array_Access capacity vi;
+    let c: int = A.op_Dot_Lparen_Rparen capacity vi;
     if (c < 0) { result := false } else { () };
     i := vi +^ 1sz
   };
@@ -2760,7 +2760,7 @@ fn compute_sum_out_fn
   {
     let jv = !j;
     let idx = v *^ n +^ jv;
-    let fval = A.op_Array_Access arr idx;
+    let fval = A.op_Dot_Lparen_Rparen arr idx;
     acc := !acc + fval;
     j := jv +^ 1sz
   };
@@ -2803,7 +2803,7 @@ fn compute_sum_in_fn
   {
     let uv = !u;
     let idx = uv *^ n +^ v;
-    let fval = A.op_Array_Access arr idx;
+    let fval = A.op_Dot_Lparen_Rparen arr idx;
     acc := !acc + fval;
     u := uv +^ 1sz
   };
@@ -2864,7 +2864,7 @@ fn zero_init_flow
   decreases (SZ.v nn - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment flow vi 0;
+    A.op_Dot_Lparen_Rparen_Less_Minus flow vi 0;
     i := vi +^ 1sz
   };
   ()

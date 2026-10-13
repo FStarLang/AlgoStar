@@ -28,7 +28,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -115,7 +115,7 @@ fn binary_search
       (not vfound /\ SZ.v vhi > SZ.v vlo ==>
         (vc - reveal c0) + log2f (SZ.v vhi - SZ.v vlo) <= log2f (SZ.v len))
     )
-  decreases ((if not !found then 1 else 0) `Prims.op_Addition` (SZ.v !hi `Prims.op_Subtraction` SZ.v !lo))
+  decreases ((if not !found then 1 else 0) `Prims.op_Plus` (SZ.v !hi `Prims.op_Minus` SZ.v !lo))
   {
     let vlo = !lo;
     let vhi = !hi;

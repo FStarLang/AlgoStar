@@ -737,18 +737,18 @@ fn discover_vertex_dfs
   let t = !time_ref;
   time_ref := t + 1;
   // v.d = time
-  A.op_Array_Assignment d vv (t + 1);
+  A.op_Dot_Lparen_Rparen_Less_Minus d vv (t + 1);
   // v.color = GRAY
   count_ones_upd_to_one scolor (SZ.v n) (SZ.v vv);
-  A.op_Array_Assignment color vv 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus color vv 1;
   // v.pi = u
-  A.op_Array_Assignment pred vv (SZ.v u);
+  A.op_Dot_Lparen_Rparen_Less_Minus pred vv (SZ.v u);
   // scan_idx[vv] = 0 (already 0 by white_scan_zero precondition)
   sum_scan_idx_upd sscan (SZ.v n) (SZ.v vv) 0sz;
-  A.op_Array_Assignment scan_idx vv 0sz;
+  A.op_Dot_Lparen_Rparen_Less_Minus scan_idx vv 0sz;
   // PUSH(stack, v)
   let top = !stack_top;
-  A.op_Array_Assignment stack_data top vv;
+  A.op_Dot_Lparen_Rparen_Less_Minus stack_data top vv;
   stack_top := SZ.add top 1sz
 }
 #pop-options
@@ -805,12 +805,12 @@ fn finish_vertex
 {
   // u.color = BLACK
   count_ones_upd_from_one scolor (SZ.v n) (SZ.v u) 2;
-  A.op_Array_Assignment color u 2;
+  A.op_Dot_Lparen_Rparen_Less_Minus color u 2;
   // time++
   let t = !time_ref;
   time_ref := t + 1;
   // u.f = time
-  A.op_Array_Assignment f u (t + 1);
+  A.op_Dot_Lparen_Rparen_Less_Minus f u (t + 1);
   // POP(stack)
   let top = !stack_top;
   stack_top := SZ.sub top 1sz
@@ -908,9 +908,9 @@ fn scan_for_white_neighbor
     let offset: SZ.t = SZ.mul u n;
     let idx: SZ.t = SZ.add offset vscan;
     product_strict_bound (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vscan);
-    let has_edge_val: int = A.op_Array_Access adj idx;
+    let has_edge_val: int = A.op_Dot_Lparen_Rparen adj idx;
 
-    let cvscan: int = A.op_Array_Access color vscan;
+    let cvscan: int = A.op_Dot_Lparen_Rparen color vscan;
 
     if (has_edge_val <> 0 && cvscan = 0) {
       found_ref := true;
@@ -1017,17 +1017,17 @@ fn dfs_visit
   // Discover vs (no tick -- scan ticks suffice for complexity bound)
   let t = !time_ref;
   time_ref := t + 1;
-  A.op_Array_Assignment d vs (t + 1);
+  A.op_Dot_Lparen_Rparen_Less_Minus d vs (t + 1);
   count_ones_upd_to_one scolor (SZ.v n) (SZ.v vs);
-  A.op_Array_Assignment color vs 1;      // GRAY
-  A.op_Array_Assignment pred vs (-1);    // NIL
+  A.op_Dot_Lparen_Rparen_Less_Minus color vs 1;      // GRAY
+  A.op_Dot_Lparen_Rparen_Less_Minus pred vs (-1);    // NIL
   // scan_idx[vs] = 0 (already 0 since vs is WHITE, by white_scan_zero)
   sum_scan_idx_upd sscan (SZ.v n) (SZ.v vs) 0sz;
-  A.op_Array_Assignment scan_idx vs 0sz;
+  A.op_Dot_Lparen_Rparen_Less_Minus scan_idx vs 0sz;
   
   // PUSH(stack, vs)
   let top = !stack_top;
-  A.op_Array_Assignment stack_data top vs;
+  A.op_Dot_Lparen_Rparen_Less_Minus stack_data top vs;
   stack_top := SZ.add top 1sz;
 
   // Establish DFS tracking after inline discover
@@ -1086,12 +1086,12 @@ fn dfs_visit
     // u = PEEK(stack)
     let top = !stack_top;
     let u_idx: SZ.t = SZ.sub top 1sz;
-    let u: SZ.t = A.op_Array_Access stack_data u_idx;
+    let u: SZ.t = A.op_Dot_Lparen_Rparen stack_data u_idx;
     
     assert (pure (SZ.v u < SZ.v n));
 
     // Get current scan position for u
-    let scan_pos: SZ.t = A.op_Array_Access scan_idx u;
+    let scan_pos: SZ.t = A.op_Dot_Lparen_Rparen scan_idx u;
     
     assert (pure (SZ.v scan_pos <= SZ.v n));
     fits_product_smaller (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v scan_pos);
@@ -1107,7 +1107,7 @@ fn dfs_visit
     with sscan_before_upd. assert (A.pts_to scan_idx sscan_before_upd);
     with vc_after_scan. assert (GR.pts_to ctr vc_after_scan);
     sum_scan_idx_upd sscan_before_upd (SZ.v n) (SZ.v u) final_scan;
-    A.op_Array_Assignment scan_idx u final_scan;
+    A.op_Dot_Lparen_Rparen_Less_Minus scan_idx u final_scan;
 
     let found = !found_white;
     if (found) {
@@ -1130,18 +1130,18 @@ fn dfs_visit
       // Inline discover_vertex_dfs
       let td = !time_ref;
       time_ref := td + 1;
-      A.op_Array_Assignment d vv (td + 1);
+      A.op_Dot_Lparen_Rparen_Less_Minus d vv (td + 1);
       count_ones_upd_to_one scolor_now (SZ.v n) (SZ.v vv);
-      A.op_Array_Assignment color vv 1;
-      A.op_Array_Assignment pred vv (SZ.v u);
+      A.op_Dot_Lparen_Rparen_Less_Minus color vv 1;
+      A.op_Dot_Lparen_Rparen_Less_Minus pred vv (SZ.v u);
       // scan_idx[vv] = 0 (already 0 by white_scan_zero)
       with sscan_pre_disc. assert (A.pts_to scan_idx sscan_pre_disc);
       sum_scan_idx_upd sscan_pre_disc (SZ.v n) (SZ.v vv) 0sz;
-      A.op_Array_Assignment scan_idx vv 0sz;
+      A.op_Dot_Lparen_Rparen_Less_Minus scan_idx vv 0sz;
       // Capture stack state BEFORE push
       with sstack_pre_push. assert (A.pts_to stack_data sstack_pre_push);
       let topd = !stack_top;
-      A.op_Array_Assignment stack_data topd vv;
+      A.op_Dot_Lparen_Rparen_Less_Minus stack_data topd vv;
       stack_top := SZ.add topd 1sz;
       // Reestablish DFS tracking
       discover_preserves_tracking scolor_now sd_now sf_now (SZ.v n) (SZ.v vv) vtime_now;
@@ -1171,10 +1171,10 @@ fn dfs_visit
       with sstack_now. assert (A.pts_to stack_data sstack_now);
       // Inline finish_vertex
       count_ones_upd_from_one scolor_now (SZ.v n) (SZ.v u) 2;
-      A.op_Array_Assignment color u 2;
+      A.op_Dot_Lparen_Rparen_Less_Minus color u 2;
       let tf = !time_ref;
       time_ref := tf + 1;
-      A.op_Array_Assignment f u (tf + 1);
+      A.op_Dot_Lparen_Rparen_Less_Minus f u (tf + 1);
       let topf = !stack_top;
       stack_top := SZ.sub topf 1sz;
       // Reestablish DFS tracking
@@ -1423,10 +1423,10 @@ fn stack_dfs
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment color vi 0;      // WHITE
-    A.op_Array_Assignment d vi (-1);
-    A.op_Array_Assignment f vi (-1);
-    A.op_Array_Assignment pred vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus color vi 0;      // WHITE
+    A.op_Dot_Lparen_Rparen_Less_Minus d vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus f vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vi (-1);
     i := SZ.add vi 1sz
   };
 
@@ -1460,7 +1460,7 @@ fn stack_dfs
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment scan_idx vi 0sz;
+    A.op_Dot_Lparen_Rparen_Less_Minus scan_idx vi 0sz;
     i := SZ.add vi 1sz
   };
 
@@ -1525,7 +1525,7 @@ fn stack_dfs
     tick ctr;
 
     // Check if s is WHITE
-    let cs: int = A.op_Array_Access color vs;
+    let cs: int = A.op_Dot_Lparen_Rparen color vs;
     
     // Conditionally perform DFS-VISIT
     maybe_dfs_visit adj n vs cs color d f pred stack_data scan_idx stack_top time_ref ctr;

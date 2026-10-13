@@ -147,7 +147,7 @@ let compute_weight_idx = compute_weight_idx_u64
 
 // ========== Ghost tick counter ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -200,7 +200,7 @@ fn prim_complexity
        as (A.pts_to key_a (Seq.create (SZ.v n) infinity));
   
   // Set key[source] = 0
-  A.op_Array_Assignment key_a source 0sz;
+  A.op_Dot_Lparen_Rparen_Less_Minus key_a source 0sz;
   
   // Establish initial correctness properties
   with key_seq_init. assert (A.pts_to key_a key_seq_init);
@@ -277,8 +277,8 @@ fn prim_complexity
     decreases (SZ.v n - SZ.v !find_i)
     {
       let v_find_i = !find_i;
-      let ki = A.op_Array_Access key_a v_find_i;
-      let in_mst_i = A.op_Array_Access in_mst v_find_i;
+      let ki = A.op_Dot_Lparen_Rparen key_a v_find_i;
+      let in_mst_i = A.op_Dot_Lparen_Rparen in_mst v_find_i;
       let v_min_key = !min_key;
       let v_min_idx = !min_idx;
       
@@ -299,7 +299,7 @@ fn prim_complexity
     
     // Add min_idx to MST
     let u = !min_idx;
-    A.op_Array_Assignment in_mst u 1sz;
+    A.op_Dot_Lparen_Rparen_Less_Minus in_mst u 1sz;
     
     // Update keys of neighbors
     let mut update_i: SZ.t = 0sz;
@@ -346,12 +346,12 @@ fn prim_complexity
       let v = !update_i;
       
       // Read current values
-      let key_v = A.op_Array_Access key_a v;
-      let in_mst_v = A.op_Array_Access in_mst v;
+      let key_v = A.op_Dot_Lparen_Rparen key_a v;
+      let in_mst_v = A.op_Dot_Lparen_Rparen in_mst v;
       
       // Compute weight index: u * n + v
       let weight_idx = compute_weight_idx u n v;
-      let weight_uv = A.op_Array_Access weights weight_idx;
+      let weight_uv = A.op_Dot_Lparen_Rparen weights weight_idx;
       
       // Count the comparison/update operation
       tick ctr;
@@ -367,7 +367,7 @@ fn prim_complexity
       assert (pure (SZ.v new_key_v <= SZ.v infinity));
       
       // Write unconditionally
-      A.op_Array_Assignment key_a v new_key_v;
+      A.op_Dot_Lparen_Rparen_Less_Minus key_a v new_key_v;
       
       update_i := v +^ 1sz;
     };

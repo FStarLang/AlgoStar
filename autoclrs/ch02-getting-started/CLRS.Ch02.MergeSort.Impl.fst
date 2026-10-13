@@ -68,7 +68,7 @@ fn copy_range
       (forall (k: nat). k < SZ.v vi ==> Seq.index s_cur k == Seq.index s_src k) /\
       (forall (k: nat). SZ.v vi <= k /\ k < SZ.v len ==> Seq.index s_cur k == Seq.index s_dst k)
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let v = pts_to_range_index src (src_lo +^ vi);
@@ -173,8 +173,8 @@ fn merge
       // Complexity: comparisons so far <= elements written
       merge_complexity_bounded vc (reveal c0) 0 (SZ.v vk)
     )
-  decreases Prims.op_Addition (SZ.v l1 `Prims.op_Subtraction` SZ.v !i)
-                               (SZ.v l2 `Prims.op_Subtraction` SZ.v !j)
+  decreases Prims.op_Plus (SZ.v l1 `Prims.op_Minus` SZ.v !i)
+                               (SZ.v l2 `Prims.op_Minus` SZ.v !j)
   {
     let vi = !i;
     let vj = !j;
@@ -236,7 +236,7 @@ fn merge
       let v2 = tmp2.(vj);
       with vc_pre. assert (GR.pts_to ctr vc_pre);
       tick ctr;  // one comparison
-      if (Prims.op_LessThanOrEqual v1 v2) {
+      if (Prims.op_Less_Equals v1 v2) {
         suffix_step_left s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
         suffix_gives_index ghost_merged (SZ.v vk)
           (seq_merge (Seq.slice s1 (SZ.v vi) (SZ.v l1))

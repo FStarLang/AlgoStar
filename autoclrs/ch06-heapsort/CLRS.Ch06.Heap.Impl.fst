@@ -56,7 +56,7 @@ let heapsort_final_cost_bound (n:pos) (heap_sz:nat) (cf c0:nat)
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)

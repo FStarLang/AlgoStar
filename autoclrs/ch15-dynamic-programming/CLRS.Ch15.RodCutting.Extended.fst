@@ -473,7 +473,7 @@ fn extended_rod_cutting
       // s_cuts achieve optimal: prices[s[k]-1] + r[k-s[k]] == r[k]
       cuts_achieve_optimal s_prices sr sc (SZ.v vj - 1)
     )
-  decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !j)
+  decreases (Prims.op_Plus (SZ.v n) 1 `Prims.op_Minus` SZ.v !j)
   {
     let vj = !j;
     
@@ -511,7 +511,7 @@ fn extended_rod_cutting
         // Preserve outer cuts_achieve_optimal through inner loop
         cuts_achieve_optimal s_prices sr_inner sc_inner (SZ.v vj - 1)
       )
-    decreases (Prims.op_Addition (SZ.v vj) 1 `Prims.op_Subtraction` SZ.v !i)
+    decreases (Prims.op_Plus (SZ.v vj) 1 `Prims.op_Minus` SZ.v !i)
     {
       let vi = !i;
       let vq = !q;
@@ -520,9 +520,9 @@ fn extended_rod_cutting
       with sr_inner sc_inner. assert (V.pts_to r sr_inner ** V.pts_to s_cuts sc_inner);
       
       let idx_price = vi - 1sz;
-      let price_i = A.op_Array_Access prices idx_price;
+      let price_i = A.op_Dot_Lparen_Rparen prices idx_price;
       
-      let r_j_minus_i = V.op_Array_Access r (vj - vi);
+      let r_j_minus_i = V.op_Dot_Lparen_Rparen r (vj - vi);
       
       let candidate = price_i + r_j_minus_i;
       
@@ -568,12 +568,12 @@ fn extended_rod_cutting
     
     with sc_pre. assert (V.pts_to s_cuts sc_pre);
     
-    V.op_Array_Assignment r vj final_q;
+    V.op_Dot_Lparen_Rparen_Less_Minus r vj final_q;
     
     with sr_new. assert (V.pts_to r sr_new);
     assert (pure (sr_new == Seq.upd sr_pre (SZ.v vj) final_q));
     
-    V.op_Array_Assignment s_cuts vj final_best_i;
+    V.op_Dot_Lparen_Rparen_Less_Minus s_cuts vj final_best_i;
     
     with sc_new. assert (V.pts_to s_cuts sc_new);
     assert (pure (sc_new == Seq.upd sc_pre (SZ.v vj) final_best_i));
@@ -602,7 +602,7 @@ fn extended_rod_cutting
   cuts_are_optimal_intro s_prices sr_final sc_final (SZ.v n);
   assert (pure (cuts_are_optimal s_prices sc_final (SZ.v n)));
   
-  let result = V.op_Array_Access r n;
+  let result = V.op_Dot_Lparen_Rparen r n;
   
   V.free r;
   

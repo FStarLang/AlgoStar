@@ -103,11 +103,11 @@ fn test_rabin_karp ()
   let text = V.vec_to_array tv;
   rewrite (A.pts_to (V.vec_to_array tv) (Seq.create 5 0))
        as (A.pts_to text (Seq.create 5 0));
-  A.op_Array_Assignment text 0sz 1;
-  A.op_Array_Assignment text 1sz 2;
-  A.op_Array_Assignment text 2sz 1;
-  A.op_Array_Assignment text 3sz 2;
-  A.op_Array_Assignment text 4sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 0sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 1sz 2;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 2sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 3sz 2;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 4sz 1;
 
   // Pattern: [1, 2, 1] (length 3, nat)
   let pv = V.alloc #nat 0 3sz;
@@ -115,9 +115,9 @@ fn test_rabin_karp ()
   let pat = V.vec_to_array pv;
   rewrite (A.pts_to (V.vec_to_array pv) (Seq.create 3 0))
        as (A.pts_to pat (Seq.create 3 0));
-  A.op_Array_Assignment pat 0sz 1;
-  A.op_Array_Assignment pat 1sz 2;
-  A.op_Array_Assignment pat 2sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus pat 0sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus pat 1sz 2;
+  A.op_Dot_Lparen_Rparen_Less_Minus pat 2sz 1;
 
   // Ghost counter
   let ctr = GR.alloc #nat 0;

@@ -115,14 +115,14 @@ fn bfs
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment color vi 0;
-    A.op_Array_Assignment dist vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus color vi 0;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vi (-1);
     i := SZ.add vi 1sz;
   };
 
   // Mark source as visited with distance 0
-  A.op_Array_Assignment color source 1;
-  A.op_Array_Assignment dist source 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus color source 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist source 0;
 
   // Run n relaxation rounds
   let mut round: SZ.t = 0sz;
@@ -181,7 +181,7 @@ fn bfs
       let vu = !u;
 
       // Read dist[u] before inner loop
-      let du: int = A.op_Array_Access dist vu;
+      let du: int = A.op_Dot_Lparen_Rparen dist vu;
 
       let mut v: SZ.t = 0sz;
       while (!v <^ n)
@@ -224,11 +224,11 @@ fn bfs
       {
         let vv = !v;
 
-        let cu: int = A.op_Array_Access color vu;
+        let cu: int = A.op_Dot_Lparen_Rparen color vu;
         let offset: SZ.t = SZ.mul vu n;
         let idx: SZ.t = SZ.add offset vv;
-        let has_edge_val: int = A.op_Array_Access adj idx;
-        let cv: int = A.op_Array_Access color vv;
+        let has_edge_val: int = A.op_Dot_Lparen_Rparen adj idx;
+        let cv: int = A.op_Dot_Lparen_Rparen color vv;
 
         assert pure (
           (has_edge_val <> 0) <==> has_edge sadj (SZ.v n) (SZ.v vu) (SZ.v vv)
@@ -245,12 +245,12 @@ fn bfs
            has_edge sadj (SZ.v n) (SZ.v vu) (SZ.v vv) /\
            reachable_in sadj (SZ.v n) (SZ.v source) (SZ.v vv) (du + 1)));
 
-        A.op_Array_Assignment color vv new_cv;
+        A.op_Dot_Lparen_Rparen_Less_Minus color vv new_cv;
 
         // Update distance: if visiting v for the first time, dist[v] = dist[u] + 1
-        let dv: int = A.op_Array_Access dist vv;
+        let dv: int = A.op_Dot_Lparen_Rparen dist vv;
         let new_dv: int = (if cu <> 0 && has_edge_val <> 0 && cv = 0 then du + 1 else dv);
-        A.op_Array_Assignment dist vv new_dv;
+        A.op_Dot_Lparen_Rparen_Less_Minus dist vv new_dv;
 
         v := SZ.add vv 1sz;
       };

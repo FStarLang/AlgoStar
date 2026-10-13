@@ -40,9 +40,9 @@ module S = CLRS.Ch08.CountingSort.Spec
 let std_sort3_nat (s: Seq.seq nat)
   : Lemma
     (requires Seq.length s == 3 /\
-              (forall (i j:nat). Prims.op_LessThanOrEqual i j /\
-                                 Prims.op_LessThan j 3 ==>
-                                 Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j)) /\
+              (forall (i j:nat). Prims.op_Less_Equals i j /\
+                                 Prims.op_Less j 3 ==>
+                                 Prims.op_Less_Equals (Seq.index s i) (Seq.index s j)) /\
               SP.permutation nat (Seq.seq_of_list [3; 1; 2]) s)
     (ensures Seq.index s 0 == 1 /\ Seq.index s 1 == 2 /\ Seq.index s 2 == 3)
 = SP.perm_len (Seq.seq_of_list [3; 1; 2]) s;
@@ -78,8 +78,8 @@ let completeness_inplace (s0 s: Seq.seq nat)
 = input_is_sort3 s0;
   Seq.lemma_eq_elim s0 (Seq.seq_of_list [3; 1; 2]);
   reveal_opaque (`%S.permutation) (S.permutation s0 s);
-  assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
-  assert (forall (x y:nat). (x <= y) == Prims.op_LessThanOrEqual x y);
+  assert (forall (i j:nat). (i <= j) == Prims.op_Less_Equals i j);
+  assert (forall (x y:nat). (x <= y) == Prims.op_Less_Equals x y);
   std_sort3_nat s
 
 (* Completeness for counting_sort_impl:
@@ -97,8 +97,8 @@ let completeness_impl (sa sb': Seq.seq nat)
 = input_is_sort3 sa;
   Seq.lemma_eq_elim sa (Seq.seq_of_list [3; 1; 2]);
   reveal_opaque (`%S.permutation) (S.permutation sa sb');
-  assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
-  assert (forall (x y:nat). (x <= y) == Prims.op_LessThanOrEqual x y);
+  assert (forall (i j:nat). (i <= j) == Prims.op_Less_Equals i j);
+  assert (forall (x y:nat). (x <= y) == Prims.op_Less_Equals x y);
   std_sort3_nat sb'
 
 // ========== Test 1: counting_sort_inplace ==========

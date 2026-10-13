@@ -182,7 +182,7 @@ let quicksort_complexity_step (n n_left n_right: nat)
       <= QC.worst_case_comparisons n)
   = QC.partition_split_bounded n n_left
 
-let op_Array_Access
+let ( .() )
   (#a: Type)
   (arr: A.array a)
   (i: SZ.t)
@@ -198,7 +198,7 @@ let op_Array_Access
             res == Seq.index s (SZ.v i - l)))
 = pts_to_range_index arr i #l #r #s #p
 
-let op_Array_Assignment
+let ( .()<- )
   (#a: Type)
   (arr: A.array a)
   (i: SZ.t)

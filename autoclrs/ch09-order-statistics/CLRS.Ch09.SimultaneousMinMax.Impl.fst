@@ -72,7 +72,7 @@ fn find_minmax
       vc >= reveal c0 /\
       vc - reveal c0 == op_Star 2 (SZ.v vi - 1)
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let elem = a.(vi);
@@ -165,7 +165,7 @@ fn find_minmax_pairs
       op_Star 2 (vc - reveal c0) <= op_Star 3 (SZ.v vi) - 2 /\
       (SZ.v vi >= 2 ==> op_Star 2 (vc - reveal c0) + 4 <= op_Star 3 (SZ.v vi))
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let a_i = a.(vi);

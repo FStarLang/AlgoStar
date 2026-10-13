@@ -148,7 +148,7 @@ ensures exists* s.
       SZ.fits (SZ.v base_val + 2) /\
       SZ.fits (SZ.v len + SZ.v base_val + 2)
     )
-  decreases (SZ.v bigD `Prims.op_Subtraction` SZ.v !d)
+  decreases (SZ.v bigD `Prims.op_Minus` SZ.v !d)
   {
     let vd = !d;
     with s_curr. assert (A.pts_to a s_curr);

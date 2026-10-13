@@ -111,10 +111,10 @@ let singl_sorted (s: Seq.seq int)
    Call this lemma before using sorted with explicit Prims operator reasoning. *)
 let sorted_as_prims (s: Seq.seq int)
   : Lemma (requires sorted s)
-          (ensures forall (i j:nat). Prims.op_LessThanOrEqual i j /\
-                                     Prims.op_LessThan j (Seq.length s) ==>
-                                     Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j))
+          (ensures forall (i j:nat). Prims.op_Less_Equals i j /\
+                                     Prims.op_Less j (Seq.length s) ==>
+                                     Prims.op_Less_Equals (Seq.index s i) (Seq.index s j))
   = assert_norm (sorted s ==
-      (forall (i j: nat). Prims.op_LessThanOrEqual i j /\
-                          Prims.op_LessThan j (Seq.length s) ==>
-                          Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j)))
+      (forall (i j: nat). Prims.op_Less_Equals i j /\
+                          Prims.op_Less j (Seq.length s) ==>
+                          Prims.op_Less_Equals (Seq.index s i) (Seq.index s j)))

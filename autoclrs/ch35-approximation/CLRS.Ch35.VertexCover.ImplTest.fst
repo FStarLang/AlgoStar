@@ -153,9 +153,9 @@ fn test_vertex_cover_triangle ()
   rewrite (A.pts_to (V.vec_to_array cover) s_cover)
        as (A.pts_to cover_a s_cover);
 
-  let c0 = A.op_Array_Access cover_a 0sz;
-  let c1 = A.op_Array_Access cover_a 1sz;
-  let c2 = A.op_Array_Access cover_a 2sz;
+  let c0 = A.op_Dot_Lparen_Rparen cover_a 0sz;
+  let c1 = A.op_Dot_Lparen_Rparen cover_a 1sz;
+  let c2 = A.op_Dot_Lparen_Rparen cover_a 2sz;
 
   // Runtime check: cover is one of the 3 valid 2-vertex covers for K₃
   // Uses only comparisons (no int arithmetic) to avoid Prims_op_Addition in extraction

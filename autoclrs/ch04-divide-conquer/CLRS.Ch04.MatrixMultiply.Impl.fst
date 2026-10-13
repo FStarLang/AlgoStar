@@ -28,7 +28,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -125,7 +125,7 @@ fn matrix_multiply
       assert pure (SZ.v idx_c < SZ.v n * SZ.v n);
       
       // Initialize C[i][j] = 0 = dot_product_spec ... 0
-      A.op_Array_Assignment c idx_c 0;
+      A.op_Dot_Lparen_Rparen_Less_Minus c idx_c 0;
       
       let mut k: SZ.t = 0sz;
       
@@ -164,13 +164,13 @@ fn matrix_multiply
         assert pure (SZ.fits (SZ.v vk * SZ.v n + SZ.v vj));
         let idx_b = vk *^ n +^ vj;
         
-        let a_val = A.op_Array_Access a idx_a;
-        let b_val = A.op_Array_Access b idx_b;
-        let c_val = A.op_Array_Access c idx_c;
+        let a_val = A.op_Dot_Lparen_Rparen a idx_a;
+        let b_val = A.op_Dot_Lparen_Rparen b idx_b;
+        let c_val = A.op_Dot_Lparen_Rparen c idx_c;
         
         let new_val = c_val + a_val * b_val;
         
-        A.op_Array_Assignment c idx_c new_val;
+        A.op_Dot_Lparen_Rparen_Less_Minus c idx_c new_val;
 
         // Count the multiply-add — one ghost tick
         tick ctr;

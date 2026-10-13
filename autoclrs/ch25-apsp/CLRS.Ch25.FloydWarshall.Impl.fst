@@ -16,7 +16,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick (erased at extraction) ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -90,7 +90,7 @@ fn floyd_warshall
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vk * SZ.v n * SZ.v n
     )
-  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !k)
+  decreases (SZ.v n `Prims.op_Minus` SZ.v !k)
 //SNIPPET_END: outer_loop
   {
     let vk = !k;
@@ -110,7 +110,7 @@ fn floyd_warshall
         vc_i >= reveal c0 /\
         vc_i - reveal c0 == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n
       )
-    decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
+    decreases (SZ.v n `Prims.op_Minus` SZ.v !i)
 //SNIPPET_END: inner_i_loop
     {
       let vi = !i;
@@ -118,7 +118,7 @@ fn floyd_warshall
 
       // Read d_ik once (cached for entire j-loop, matching pure spec)
       let idx_ik = vi *^ n +^ vk;
-      let d_ik = A.op_Array_Access dist idx_ik;
+      let d_ik = A.op_Dot_Lparen_Rparen dist idx_ik;
 
 //SNIPPET_START: inner_j_loop
       while (!j <^ n)
@@ -137,7 +137,7 @@ fn floyd_warshall
           vc_j >= reveal c0 /\
           vc_j - reveal c0 == SZ.v vk * SZ.v n * SZ.v n + SZ.v vi * SZ.v n + SZ.v vj
         )
-      decreases (SZ.v n `Prims.op_Subtraction` SZ.v !j)
+      decreases (SZ.v n `Prims.op_Minus` SZ.v !j)
 //SNIPPET_END: inner_j_loop
       {
         let vj = !j;
@@ -151,15 +151,15 @@ fn floyd_warshall
         let idx_kj = vk *^ n +^ vj;
 
         // Read values
-        let d_ij = A.op_Array_Access dist idx_ij;
-        let d_kj = A.op_Array_Access dist idx_kj;
+        let d_ij = A.op_Dot_Lparen_Rparen dist idx_ij;
+        let d_kj = A.op_Dot_Lparen_Rparen dist idx_kj;
 
         // Compute new value unconditionally (use Prims ops for krml extraction)
-        let via_k = Prims.op_Addition d_ik d_kj;
-        let new_val = (if Prims.op_LessThan via_k d_ij then via_k else d_ij);
+        let via_k = Prims.op_Plus d_ik d_kj;
+        let new_val = (if Prims.op_Less via_k d_ij then via_k else d_ij);
 
         // Write unconditionally (no conditional writes)
-        A.op_Array_Assignment dist idx_ij new_val;
+        A.op_Dot_Lparen_Rparen_Less_Minus dist idx_ij new_val;
 
         // Count the relaxation — one ghost tick
         tick ctr;

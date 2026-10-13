@@ -78,7 +78,7 @@ fn partition_in_range
 //SNIPPET_END: partition_in_range
 {
   let hi_m1 = hi -^ 1sz;
-  let pivot = A.op_Array_Access a hi_m1;
+  let pivot = A.op_Dot_Lparen_Rparen a hi_m1;
 
   let mut i_ref: SZ.t = lo;
   let mut j_ref: SZ.t = lo;
@@ -107,15 +107,15 @@ fn partition_in_range
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vj - SZ.v lo
     )
-  decreases (SZ.v hi_m1 `Prims.op_Subtraction` SZ.v !j_ref)
+  decreases (SZ.v hi_m1 `Prims.op_Minus` SZ.v !j_ref)
   {
     let vj = !j_ref;
     let vi = !i_ref;
 
     with s_pre. assert (A.pts_to a s_pre);
 
-    let aj = A.op_Array_Access a vj;
-    let ai = A.op_Array_Access a vi;
+    let aj = A.op_Dot_Lparen_Rparen a vj;
+    let ai = A.op_Dot_Lparen_Rparen a vi;
 
     tick ctr;
     let should_swap = (aj <= pivot);
@@ -124,8 +124,8 @@ fn partition_in_range
 
     let new_ai = (if should_swap then aj else ai);
     let new_aj = (if should_swap then ai else aj);
-    A.op_Array_Assignment a vi new_ai;
-    A.op_Array_Assignment a vj new_aj;
+    A.op_Dot_Lparen_Rparen_Less_Minus a vi new_ai;
+    A.op_Dot_Lparen_Rparen_Less_Minus a vj new_aj;
     with s_post. assert (A.pts_to a s_post);
 
     if (should_swap) {
@@ -140,10 +140,10 @@ fn partition_in_range
   };
 
   let vi = !i_ref;
-  let ai = A.op_Array_Access a vi;
+  let ai = A.op_Dot_Lparen_Rparen a vi;
   with s_pre2. assert (A.pts_to a s_pre2);
-  A.op_Array_Assignment a vi pivot;
-  A.op_Array_Assignment a hi_m1 ai;
+  A.op_Dot_Lparen_Rparen_Less_Minus a vi pivot;
+  A.op_Dot_Lparen_Rparen_Less_Minus a hi_m1 ai;
   with s_final. assert (A.pts_to a s_final);
   swap_is_permutation s_pre2 (SZ.v vi) (SZ.v hi_m1);
 
@@ -283,7 +283,7 @@ fn quickselect
       vc >= reveal c0 /\
       vc - reveal c0 + QC.qs_cost (SZ.v vhi - SZ.v vlo) <= QC.qs_cost (SZ.v n)
     )
-  decreases (SZ.v !hi_ref `Prims.op_Subtraction` SZ.v !lo_ref)
+  decreases (SZ.v !hi_ref `Prims.op_Minus` SZ.v !lo_ref)
   {
     let vlo = !lo_ref;
     let vhi = !hi_ref;
@@ -317,7 +317,7 @@ fn quickselect
     };
   };
 
-  let result = A.op_Array_Access a k;
+  let result = A.op_Dot_Lparen_Rparen a k;
   with s_final. assert (A.pts_to a s_final);
   quickselect_correctness s0 s_final (SZ.v k);
   result

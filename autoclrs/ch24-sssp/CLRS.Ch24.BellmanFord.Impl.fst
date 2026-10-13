@@ -734,7 +734,7 @@ let nncf_implies_no_violations
 // ========== Main Algorithm ==========
 
 // Ghost tick for complexity counting
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -868,7 +868,7 @@ fn bellman_ford
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else SP.inf);
-    A.op_Array_Assignment dist vi new_val;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vi new_val;
     tick ctr;
     init_i := vi +^ 1sz;
   };
@@ -936,7 +936,7 @@ fn bellman_ford
     decreases (SZ.v n - SZ.v !u)
     {
       let vu = !u;
-      let dist_u = A.op_Array_Access dist vu;
+      let dist_u = A.op_Dot_Lparen_Rparen dist vu;
       
       assert pure (dist_u < SP.inf \/ dist_u == SP.inf);
       
@@ -977,9 +977,9 @@ fn bellman_ford
         with sdist_v. assert (A.pts_to dist sdist_v);
         
         let w_idx = vu *^ n +^ vv;
-        let w_uv = A.op_Array_Access weights w_idx;
+        let w_uv = A.op_Dot_Lparen_Rparen weights w_idx;
         
-        let old_dist_v = A.op_Array_Access dist vv;
+        let old_dist_v = A.op_Dot_Lparen_Rparen dist vv;
         
         let can_relax = (w_uv < SP.inf && dist_u < SP.inf);
         let sum = dist_u + w_uv;
@@ -1023,7 +1023,7 @@ fn bellman_ford
         extend_current_u_relaxed_cond sdist_v sweights (SZ.v n) (SZ.v source) (SZ.v vround - 1) (SZ.v vu) (SZ.v vv)
           new_dist_v;
         
-        A.op_Array_Assignment dist vv new_dist_v;
+        A.op_Dot_Lparen_Rparen_Less_Minus dist vv new_dist_v;
         tick ctr;
         
         v := vv +^ 1sz;
@@ -1092,7 +1092,7 @@ fn bellman_ford
   {
     let vcu = !cu;
     with sdist_check. assert (A.pts_to dist sdist_check);
-    let dist_cu = A.op_Array_Access dist vcu;
+    let dist_cu = A.op_Dot_Lparen_Rparen dist vcu;
     
     let mut cv: SZ.t = 0sz;
     
@@ -1120,9 +1120,9 @@ fn bellman_ford
       let vcv = !cv;
       
       let w_idx = vcu *^ n +^ vcv;
-      let w = A.op_Array_Access weights w_idx;
+      let w = A.op_Dot_Lparen_Rparen weights w_idx;
       let d_u = dist_cu;
-      let d_v = A.op_Array_Access dist vcv;
+      let d_v = A.op_Dot_Lparen_Rparen dist vcv;
       
       // Check triangle inequality for this edge
       let edge_ok = (w >= SP.inf || d_u >= SP.inf || d_v <= d_u + w);

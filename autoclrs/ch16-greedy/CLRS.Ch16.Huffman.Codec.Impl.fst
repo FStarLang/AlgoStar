@@ -80,7 +80,7 @@ fn rec decode_step_impl
       // Prove pos < bit_len (decode_step on Internal needs non-empty bits)
       bits_as_list_length bits_seq (SZ.v pos) (SZ.v bit_len);
       HCodec.decode_step_internal_nil f l r;
-      let b = A.op_Array_Access bits pos;
+      let b = A.op_Dot_Lparen_Rparen bits pos;
       bits_as_list_cons bits_seq (SZ.v pos) (SZ.v bit_len);
       HCodec.decode_step_internal f l r b (bits_as_list bits_seq (SZ.v pos + 1) (SZ.v bit_len));
       let new_pos = pos +^ 1sz;
@@ -241,7 +241,7 @@ fn decode_impl
     HCodec.decode_cons ft (bits_as_list bits_seq (SZ.v p) (SZ.v bit_len));
 
     // Write symbol to output
-    A.op_Array_Assignment output ov sym;
+    A.op_Dot_Lparen_Rparen_Less_Minus output ov sym;
 
     // Prove suffix invariant is maintained
     decode_suffix_step ft bits_seq (SZ.v p) (SZ.v bit_len) (SZ.v ov) sym (SZ.v new_pos);
@@ -332,7 +332,7 @@ fn rec codeword_impl
       let node = Box.op_Bang cur;
 
       // Write true at depth, try left subtree
-      A.op_Array_Assignment cw_buf depth true;
+      A.op_Dot_Lparen_Rparen_Less_Minus cw_buf depth true;
       let lp_rt = Some?.v node.left;
       rewrite (is_htree lp l) as (is_htree lp_rt l);
       let left_result = codeword_impl lp_rt l sym cw_buf (depth +^ 1sz) max_depth;
@@ -348,7 +348,7 @@ fn rec codeword_impl
         (true, snd left_result +^ 1sz)
       } else {
         // Not in left, try right with false
-        A.op_Array_Assignment cw_buf depth false;
+        A.op_Dot_Lparen_Rparen_Less_Minus cw_buf depth false;
         let rp_rt = Some?.v node.right;
         rewrite (is_htree rp r) as (is_htree rp_rt r);
         let right_result = codeword_impl rp_rt r sym cw_buf (depth +^ 1sz) max_depth;
@@ -549,7 +549,7 @@ fn encode_impl
     let bp = !bit_pos;
 
     // Read the symbol
-    let s = A.op_Array_Access msg si;
+    let s = A.op_Dot_Lparen_Rparen msg si;
 
     // Decompose: syms_as_list si msg_len = s :: syms_as_list (si+1) msg_len
     syms_as_list_cons msg_seq (SZ.v si) (SZ.v msg_len);

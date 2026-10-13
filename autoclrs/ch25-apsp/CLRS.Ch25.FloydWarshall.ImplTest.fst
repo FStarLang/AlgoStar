@@ -49,7 +49,7 @@ module Seq = FStar.Seq
 
 inline_for_extraction
 let int_eq (a b: int) : (r:bool{r <==> a = b}) =
-  not (Prims.op_LessThan a b || Prims.op_LessThan b a)
+  not (Prims.op_Less a b || Prims.op_Less b a)
 
 (*** Concrete test instance — 3×3 graph ***)
 
@@ -177,15 +177,15 @@ fn test_floyd_warshall_impl ()
        as (A.pts_to dist (Seq.create 9 0));
 
   // Write the adjacency matrix
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   // Capture input ghost state and prove it equals test_adj
   with s_in. assert (A.pts_to dist s_in);
@@ -212,15 +212,15 @@ fn test_floyd_warshall_impl ()
   post_entry_22 ();
 
   // Runtime reads — these survive extraction to C
-  let v0 = A.op_Array_Access dist 0sz;
-  let v1 = A.op_Array_Access dist 1sz;
-  let v2 = A.op_Array_Access dist 2sz;
-  let v3 = A.op_Array_Access dist 3sz;
-  let v4 = A.op_Array_Access dist 4sz;
-  let v5 = A.op_Array_Access dist 5sz;
-  let v6 = A.op_Array_Access dist 6sz;
-  let v7 = A.op_Array_Access dist 7sz;
-  let v8 = A.op_Array_Access dist 8sz;
+  let v0 = A.op_Dot_Lparen_Rparen dist 0sz;
+  let v1 = A.op_Dot_Lparen_Rparen dist 1sz;
+  let v2 = A.op_Dot_Lparen_Rparen dist 2sz;
+  let v3 = A.op_Dot_Lparen_Rparen dist 3sz;
+  let v4 = A.op_Dot_Lparen_Rparen dist 4sz;
+  let v5 = A.op_Dot_Lparen_Rparen dist 5sz;
+  let v6 = A.op_Dot_Lparen_Rparen dist 6sz;
+  let v7 = A.op_Dot_Lparen_Rparen dist 7sz;
+  let v8 = A.op_Dot_Lparen_Rparen dist 8sz;
 
   // Runtime comparison — survives extraction to C
   let pass = int_eq v0 0 && int_eq v1 5 && int_eq v2 20
@@ -276,15 +276,15 @@ fn test_neg_cycle_check_true ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
        as (A.pts_to dist (Seq.create 9 0));
 
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   with s_in. assert (A.pts_to dist s_in);
   lemma_seq_eq_test_adj s_in;
@@ -350,15 +350,15 @@ fn test_neg_cycle_check_false ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
        as (A.pts_to dist (Seq.create 9 0));
 
-  A.op_Array_Assignment dist 0sz (-1);
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz (-1);
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   with s_in. assert (A.pts_to dist s_in);
   lemma_seq_eq_neg_diag_adj s_in;
@@ -415,15 +415,15 @@ fn test_floyd_warshall_safe_impl ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
        as (A.pts_to dist (Seq.create 9 0));
 
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   with s_in. assert (A.pts_to dist s_in);
   lemma_seq_eq_test_adj s_in;
@@ -452,15 +452,15 @@ fn test_floyd_warshall_safe_impl ()
   fw_safe_entry_connection test_adj 3 2 2; fw_val_22 ();
 
   // Runtime reads
-  let v0 = A.op_Array_Access dist 0sz;
-  let v1 = A.op_Array_Access dist 1sz;
-  let v2 = A.op_Array_Access dist 2sz;
-  let v3 = A.op_Array_Access dist 3sz;
-  let v4 = A.op_Array_Access dist 4sz;
-  let v5 = A.op_Array_Access dist 5sz;
-  let v6 = A.op_Array_Access dist 6sz;
-  let v7 = A.op_Array_Access dist 7sz;
-  let v8 = A.op_Array_Access dist 8sz;
+  let v0 = A.op_Dot_Lparen_Rparen dist 0sz;
+  let v1 = A.op_Dot_Lparen_Rparen dist 1sz;
+  let v2 = A.op_Dot_Lparen_Rparen dist 2sz;
+  let v3 = A.op_Dot_Lparen_Rparen dist 3sz;
+  let v4 = A.op_Dot_Lparen_Rparen dist 4sz;
+  let v5 = A.op_Dot_Lparen_Rparen dist 5sz;
+  let v6 = A.op_Dot_Lparen_Rparen dist 6sz;
+  let v7 = A.op_Dot_Lparen_Rparen dist 7sz;
+  let v8 = A.op_Dot_Lparen_Rparen dist 8sz;
 
   // Runtime comparison
   let pass = int_eq v0 0 && int_eq v1 5 && int_eq v2 20

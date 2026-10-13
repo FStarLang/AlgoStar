@@ -37,8 +37,8 @@ inline_for_extraction
 let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 inline_for_extraction
-let int_leq (a b: int) : (r:bool{r <==> Prims.op_LessThanOrEqual a b}) =
-  Prims.op_LessThanOrEqual a b
+let int_leq (a b: int) : (r:bool{r <==> Prims.op_Less_Equals a b}) =
+  Prims.op_Less_Equals a b
 
 // Test file: concrete 3-element reasoning needs fuel for count/permutation unfolding.
 // split_queries helps Z3 handle count facts independently.

@@ -31,7 +31,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick primitives ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -354,14 +354,14 @@ fn hash_insert
     // Tick: one probe operation (array access + comparisons)
     tick ctr;
     
-    let slot = A.op_Array_Access table idx;
+    let slot = A.op_Dot_Lparen_Rparen table idx;
     
     // Check if we can insert here (empty or deleted)
     let can_insert = (slot = -1 || slot = -2);
     
     // Compute new value for this slot
     let new_val = (if can_insert then key else slot);
-    A.op_Array_Assignment table idx new_val;
+    A.op_Dot_Lparen_Rparen_Less_Minus table idx new_val;
     
     assert pure (lemma_hash_probe_consistent key vi size; 
                  SZ.v idx == hash_probe_nat key (SZ.v vi) (SZ.v size));
@@ -452,7 +452,7 @@ fn hash_search
     // Tick: one probe operation (array access + comparisons)
     tick ctr;
     
-    let slot = A.op_Array_Access table idx;
+    let slot = A.op_Dot_Lparen_Rparen table idx;
     
     // Found the key
     let is_found = (slot = key);
@@ -527,7 +527,7 @@ fn hash_delete
   if (search_result <^ size) {
     // Key found at search_result — mark as DELETED (-2)
     assert pure (lemma_valid_ht_delete s (SZ.v size) (SZ.v search_result); true);
-    A.op_Array_Assignment table search_result (-2);
+    A.op_Dot_Lparen_Rparen_Less_Minus table search_result (-2);
     true
   } else {
     // Key not found — table unchanged

@@ -191,7 +191,7 @@ fn test_max_flow_completeness ()
 
   // Set capacity: single edge 0→1 with capacity 7
   // Index 1 in 2×2 flat matrix = position (0,1) = edge 0→1
-  A.op_Array_Assignment capacity 1sz 7;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity 1sz 7;
 
   // Bind updated capacity ghost sequence
   with cap_seq. assert (A.pts_to capacity cap_seq);
@@ -401,9 +401,9 @@ fn test_max_flow_3v ()
   rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
 
   // Edge 0→1 cap 10, edge 1→2 cap 5, edge 0→2 cap 15
-  A.op_Array_Assignment capacity (0sz *^ n +^ 1sz) 10;
-  A.op_Array_Assignment capacity (1sz *^ n +^ 2sz) 5;
-  A.op_Array_Assignment capacity (0sz *^ n +^ 2sz) 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (0sz *^ n +^ 1sz) 10;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (1sz *^ n +^ 2sz) 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (0sz *^ n +^ 2sz) 15;
 
   with sc2. assert (A.pts_to capacity sc2);
   let caps_ok = check_valid_caps_fn capacity nn;
@@ -462,10 +462,10 @@ fn test_max_flow_diamond ()
   rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
 
   // 0→1 cap 10, 0→2 cap 10, 1→3 cap 10, 2→3 cap 10
-  A.op_Array_Assignment capacity (0sz *^ n +^ 1sz) 10;
-  A.op_Array_Assignment capacity (0sz *^ n +^ 2sz) 10;
-  A.op_Array_Assignment capacity (1sz *^ n +^ 3sz) 10;
-  A.op_Array_Assignment capacity (2sz *^ n +^ 3sz) 10;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (0sz *^ n +^ 1sz) 10;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (0sz *^ n +^ 2sz) 10;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (1sz *^ n +^ 3sz) 10;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (2sz *^ n +^ 3sz) 10;
 
   with sc2. assert (A.pts_to capacity sc2);
   let caps_ok = check_valid_caps_fn capacity nn;
@@ -523,8 +523,8 @@ fn test_max_flow_bottleneck ()
   rewrite (A.pts_to (V.vec_to_array fv) sf) as (A.pts_to flow sf);
 
   // 0→1 cap 100, 1→2 cap 1
-  A.op_Array_Assignment capacity (0sz *^ n +^ 1sz) 100;
-  A.op_Array_Assignment capacity (1sz *^ n +^ 2sz) 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (0sz *^ n +^ 1sz) 100;
+  A.op_Dot_Lparen_Rparen_Less_Minus capacity (1sz *^ n +^ 2sz) 1;
 
   with sc2. assert (A.pts_to capacity sc2);
   let caps_ok = check_valid_caps_fn capacity nn;

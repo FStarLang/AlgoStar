@@ -42,9 +42,9 @@ module SS = CLRS.Common.SortSpec
    Uses explicit Prims operators so Z3 can reason about element ordering. *)
 let std_sort3 (s: Seq.seq int)
   : Lemma
-    (requires (forall (i j:nat). Prims.op_LessThanOrEqual i j /\
-                                 Prims.op_LessThan j (Seq.length s) ==>
-                                 Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j)) /\
+    (requires (forall (i j:nat). Prims.op_Less_Equals i j /\
+                                 Prims.op_Less j (Seq.length s) ==>
+                                 Prims.op_Less_Equals (Seq.index s i) (Seq.index s j)) /\
               SP.permutation int (Seq.seq_of_list [3; 1; 2]) s)
     (ensures Seq.index s 0 == 1 /\ Seq.index s 1 == 2 /\ Seq.index s 2 == 3)
 = SP.perm_len (Seq.seq_of_list [3; 1; 2]) s;

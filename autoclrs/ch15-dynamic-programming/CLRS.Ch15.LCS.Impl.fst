@@ -30,7 +30,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -122,7 +122,7 @@ fn lcs
       vc >= reveal c0 /\
       vc - reveal c0 == op_Star (SZ.v vi) (SZ.v n + 1)
     )
-  decreases (Prims.op_Addition (SZ.v m) 1 `Prims.op_Subtraction` SZ.v !i)
+  decreases (Prims.op_Plus (SZ.v m) 1 `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let mut j: SZ.t = 0sz;
@@ -144,7 +144,7 @@ fn lcs
         vc_inner >= reveal c0 /\
         vc_inner - reveal c0 == op_Star (SZ.v vi) (SZ.v n + 1) + SZ.v vj
       )
-    decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !j)
+    decreases (Prims.op_Plus (SZ.v n) 1 `Prims.op_Minus` SZ.v !j)
     {
       let vj = !j;
       with s_before. assert (V.pts_to table s_before);
@@ -160,11 +160,11 @@ fn lcs
       let idx_diag = safe_vi_m1 *^ (n + 1sz) + safe_vj_m1;
       let idx_up = safe_vi_m1 *^ (n + 1sz) + vj;
       let idx_left = vi *^ (n + 1sz) + safe_vj_m1;
-      let val_diag = V.op_Array_Access table idx_diag;
-      let val_up = V.op_Array_Access table idx_up;
-      let val_left = V.op_Array_Access table idx_left;
-      let xi = A.op_Array_Access x safe_vi_m1;
-      let yj = A.op_Array_Access y safe_vj_m1;
+      let val_diag = V.op_Dot_Lparen_Rparen table idx_diag;
+      let val_up = V.op_Dot_Lparen_Rparen table idx_up;
+      let val_left = V.op_Dot_Lparen_Rparen table idx_left;
+      let xi = A.op_Dot_Lparen_Rparen x safe_vi_m1;
+      let yj = A.op_Dot_Lparen_Rparen y safe_vj_m1;
 
       let value_to_store: int =
         (if vi = 0sz || vj = 0sz then 0
@@ -173,7 +173,7 @@ fn lcs
          else val_left);
 
       lcs_step_correct sx sy s_before (SZ.v m) (SZ.v n) (SZ.v vi) (SZ.v vj) value_to_store;
-      V.op_Array_Assignment table idx value_to_store;
+      V.op_Dot_Lparen_Rparen_Less_Minus table idx value_to_store;
       with s_after. assert (V.pts_to table s_after);
       lcs_table_update_preserves sx sy s_before (SZ.v m) (SZ.v n) (SZ.v vi) (SZ.v vj) value_to_store;
       assert (pure (Seq.equal s_after (Seq.upd s_before (SZ.v idx) value_to_store)));
@@ -191,7 +191,7 @@ fn lcs
 
   let result_idx = m *^ (n + 1sz) + n;
   lemma_index_in_bounds (SZ.v m) (SZ.v n) (SZ.v m) (SZ.v n);
-  let result = V.op_Array_Access table result_idx;
+  let result = V.op_Dot_Lparen_Rparen table result_idx;
   V.free table;
   result
   }

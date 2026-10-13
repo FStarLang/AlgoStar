@@ -39,7 +39,7 @@ module MCL = CLRS.Ch15.MatrixChain.Lemmas
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -100,20 +100,20 @@ let mc_inner_k_step (table: Seq.seq int) (dims: Seq.seq int)
                     (n i j k: nat) (acc: int)
   : Lemma (requires i < n /\ j < n /\ k < j /\
                     Seq.length table == op_Star n n /\
-                    Seq.length dims == op_Addition n 1)
+                    Seq.length dims == op_Plus n 1)
           (ensures
-            (let idx_ik = op_Addition (op_Star i n) k in
-             let idx_k1j = op_Addition (op_Star (op_Addition k 1) n) j in
+            (let idx_ik = op_Plus (op_Star i n) k in
+             let idx_k1j = op_Plus (op_Star (op_Plus k 1) n) j in
              let cost_ik = Seq.index table idx_ik in
              let cost_k1j = Seq.index table idx_k1j in
              let dim_i = Seq.index dims i in
-             let dim_k1 = Seq.index dims (op_Addition k 1) in
-             let dim_j1 = Seq.index dims (op_Addition j 1) in
-             let q = op_Addition (op_Addition cost_ik cost_k1j)
+             let dim_k1 = Seq.index dims (op_Plus k 1) in
+             let dim_j1 = Seq.index dims (op_Plus j 1) in
+             let q = op_Plus (op_Plus cost_ik cost_k1j)
                        (op_Star (op_Star dim_i dim_k1) dim_j1) in
              let new_min = if q < acc then q else acc in
              mc_inner_k table dims n i j k acc ==
-               mc_inner_k table dims n i j (op_Addition k 1) new_min))
+               mc_inner_k table dims n i j (op_Plus k 1) new_min))
   = assert (k + 1 <= j);
     assert (k + 1 < n);
     assert (j + 1 < n + 1);
@@ -184,7 +184,7 @@ fn matrix_chain_order
       vc >= reveal c0 /\
       vc + mc_inner_sum (SZ.v n) (SZ.v vl) == reveal c0 + mc_iterations (SZ.v n)
     )
-  decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !l)
+  decreases (Prims.op_Plus (SZ.v n) 1 `Prims.op_Minus` SZ.v !l)
   {
     let vl = !l;
     
@@ -212,7 +212,7 @@ fn matrix_chain_order
         vc_i >= reveal c0 /\
         vc_i + mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi) + mc_inner_sum (SZ.v n) (SZ.v vl + 1) == reveal c0 + mc_iterations (SZ.v n)
       )
-    decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
+    decreases (SZ.v n `Prims.op_Minus` SZ.v !i)
     {
       let vi = !i;
       
@@ -268,7 +268,7 @@ fn matrix_chain_order
           vc_k >= reveal c0 /\
           vc_k + (SZ.v j - SZ.v vk) + mc_remaining_i (SZ.v n) (SZ.v vl) (SZ.v vi + 1) + mc_inner_sum (SZ.v n) (SZ.v vl + 1) == reveal c0 + mc_iterations (SZ.v n)
         )
-      decreases (SZ.v j `Prims.op_Subtraction` SZ.v !k)
+      decreases (SZ.v j `Prims.op_Minus` SZ.v !k)
       {
         let vk = !k;
         let vmin_cost = !min_cost;
@@ -288,13 +288,13 @@ fn matrix_chain_order
         let idx_k1j = (vk + 1sz) *^ n + j;
         
         // Read m[i][k] and m[k+1][j]
-        let cost_ik = V.op_Array_Access m idx_ik;
-        let cost_k1j = V.op_Array_Access m idx_k1j;
+        let cost_ik = V.op_Dot_Lparen_Rparen m idx_ik;
+        let cost_k1j = V.op_Dot_Lparen_Rparen m idx_k1j;
         
         // Read dimensions: p[i], p[k+1], p[j+1]
-        let dim_i = A.op_Array_Access dims vi;
-        let dim_k1 = A.op_Array_Access dims (vk + 1sz);
-        let dim_j1 = A.op_Array_Access dims (j + 1sz);
+        let dim_i = A.op_Dot_Lparen_Rparen dims vi;
+        let dim_k1 = A.op_Dot_Lparen_Rparen dims (vk + 1sz);
+        let dim_j1 = A.op_Dot_Lparen_Rparen dims (j + 1sz);
         
         // Compute cost of multiplying matrices i..k and k+1..j
         let mult_cost = dim_i * dim_k1 * dim_j1;
@@ -338,7 +338,7 @@ fn matrix_chain_order
       lemma_mul_fits (SZ.v vi) (SZ.v n);
       let idx_ij = vi *^ n + j;
       
-      V.op_Array_Assignment m idx_ij final_min_cost;
+      V.op_Dot_Lparen_Rparen_Less_Minus m idx_ij final_min_cost;
       
       i := vi + 1sz;
     };
@@ -363,7 +363,7 @@ fn matrix_chain_order
   // Help SMT: mc_outer at vl > n is the identity
   lemma_mc_outer_len (Seq.create (SZ.v n * SZ.v n) 0) s_dims (SZ.v n) 2;
   
-  let result = V.op_Array_Access m result_idx;
+  let result = V.op_Dot_Lparen_Rparen m result_idx;
   
   // Free the table
   V.free m;

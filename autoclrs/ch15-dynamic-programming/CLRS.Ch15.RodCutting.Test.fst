@@ -29,16 +29,16 @@ fn test_rod_cutting_example ()
   let prices_arr = V.vec_to_array pv;
   rewrite (A.pts_to (V.vec_to_array pv) (Seq.create 10 (1 <: nat))) as (A.pts_to prices_arr (Seq.create 10 (1 <: nat)));
   
-  A.op_Array_Assignment prices_arr 0sz (1 <: nat);
-  A.op_Array_Assignment prices_arr 1sz (5 <: nat);
-  A.op_Array_Assignment prices_arr 2sz (8 <: nat);
-  A.op_Array_Assignment prices_arr 3sz (9 <: nat);
-  A.op_Array_Assignment prices_arr 4sz (10 <: nat);
-  A.op_Array_Assignment prices_arr 5sz (17 <: nat);
-  A.op_Array_Assignment prices_arr 6sz (17 <: nat);
-  A.op_Array_Assignment prices_arr 7sz (20 <: nat);
-  A.op_Array_Assignment prices_arr 8sz (24 <: nat);
-  A.op_Array_Assignment prices_arr 9sz (30 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 0sz (1 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 1sz (5 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 2sz (8 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 3sz (9 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 4sz (10 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 5sz (17 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 6sz (17 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 7sz (20 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 8sz (24 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 9sz (30 <: nat);
   
   // Compute maximum revenue for rod of length 10
   let ctr = GR.alloc #nat 0;

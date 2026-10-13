@@ -48,7 +48,7 @@ let clrs_partition_pred (s:Seq.seq int) (lo:nat) (j:nat) (i_plus_1: nat) (pivot:
 
 // ========== Array access via pts_to_range ==========
 
-let op_Array_Access
+let ( .() )
   (#t: Type)
   (a: A.array t)
   (i: SZ.t)
@@ -64,7 +64,7 @@ let op_Array_Access
             res == Seq.index s (SZ.v i - l)))
 = pts_to_range_index a i #l #r #s #p
 
-let op_Array_Assignment
+let ( .()<- )
   (#t: Type)
   (a: A.array t)
   (i: SZ.t)

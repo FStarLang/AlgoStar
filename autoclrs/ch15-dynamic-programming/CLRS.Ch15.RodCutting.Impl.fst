@@ -33,7 +33,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -101,7 +101,7 @@ fn rod_cutting
       vc >= reveal c0 /\
       vc - reveal c0 == triangle (SZ.v vj - 1)
     )
-  decreases (Prims.op_Addition (SZ.v n) 1 `Prims.op_Subtraction` SZ.v !j)
+  decreases (Prims.op_Plus (SZ.v n) 1 `Prims.op_Minus` SZ.v !j)
   {
     let vj = !j;
     let mut q: nat = 0;
@@ -127,14 +127,14 @@ fn rod_cutting
         vc_inner >= reveal c0 /\
         vc_inner - reveal c0 == triangle (SZ.v vj - 1) + (SZ.v vi - 1)
       )
-    decreases (Prims.op_Addition (SZ.v vj) 1 `Prims.op_Subtraction` SZ.v !i)
+    decreases (Prims.op_Plus (SZ.v vj) 1 `Prims.op_Minus` SZ.v !i)
     {
       let vi = !i;
       let vq = !q;
 
       let idx_price = vi - 1sz;
-      let price_i = A.op_Array_Access prices idx_price;
-      let r_j_minus_i = V.op_Array_Access r (vj - vi);
+      let price_i = A.op_Dot_Lparen_Rparen prices idx_price;
+      let r_j_minus_i = V.op_Dot_Lparen_Rparen r (vj - vi);
       let candidate = price_i + r_j_minus_i;
       let new_q = (if candidate > vq then candidate else vq);
       q := new_q;
@@ -152,7 +152,7 @@ fn rod_cutting
     let final_q = !q;
     with sr_pre. assert (V.pts_to r sr_pre);
     accum_max_dp_correct s_prices sr_pre (SZ.v vj);
-    V.op_Array_Assignment r vj final_q;
+    V.op_Dot_Lparen_Rparen_Less_Minus r vj final_q;
     with sr_new. assert (V.pts_to r sr_new);
 
     // After inner loop: vc - c0 == triangle(vj-1) + vj == triangle(vj)
@@ -161,7 +161,7 @@ fn rod_cutting
     j := vj + 1sz;
   };
 
-  let result = V.op_Array_Access r n;
+  let result = V.op_Dot_Lparen_Rparen r n;
   V.free r;
   result
 }

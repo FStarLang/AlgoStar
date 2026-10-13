@@ -74,7 +74,7 @@ fn insertion_sort
       vc >= reveal c0 /\
       vc <= reveal c0 + op_Star (SZ.v vj) (SZ.v vj - 1) / 2
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !j)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !j)
   {
     let vj = !j;
     with s_outer. assert (A.pts_to a s_outer);
@@ -86,7 +86,7 @@ fn insertion_sort
     // Initial comparison: tick for the first comparison
     if (vj >^ 0sz) {
       let prev = a.(vj - 1sz);
-      cont := (Prims.op_GreaterThan prev key);
+      cont := (Prims.op_Greater prev key);
       tick ctr;
     } else {
       cont := false;
@@ -143,7 +143,7 @@ fn insertion_sort
       
       if (new_i >^ 0sz) {
         let new_prev = a.(new_i - 1sz);
-        cont := (Prims.op_GreaterThan new_prev key);
+        cont := (Prims.op_Greater new_prev key);
         // Tick for inner comparison
         tick ctr;
       } else {

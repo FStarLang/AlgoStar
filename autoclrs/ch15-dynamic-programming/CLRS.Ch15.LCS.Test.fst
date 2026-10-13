@@ -31,13 +31,13 @@ fn test_lcs_example ()
   let x_arr = V.vec_to_array xv;
   rewrite (A.pts_to (V.vec_to_array xv) (Seq.create 7 65)) as (A.pts_to x_arr (Seq.create 7 65));
 
-  A.op_Array_Assignment x_arr 0sz 65;  // A
-  A.op_Array_Assignment x_arr 1sz 66;  // B
-  A.op_Array_Assignment x_arr 2sz 67;  // C
-  A.op_Array_Assignment x_arr 3sz 66;  // B
-  A.op_Array_Assignment x_arr 4sz 68;  // D
-  A.op_Array_Assignment x_arr 5sz 65;  // A
-  A.op_Array_Assignment x_arr 6sz 66;  // B
+  A.op_Dot_Lparen_Rparen_Less_Minus x_arr 0sz 65;  // A
+  A.op_Dot_Lparen_Rparen_Less_Minus x_arr 1sz 66;  // B
+  A.op_Dot_Lparen_Rparen_Less_Minus x_arr 2sz 67;  // C
+  A.op_Dot_Lparen_Rparen_Less_Minus x_arr 3sz 66;  // B
+  A.op_Dot_Lparen_Rparen_Less_Minus x_arr 4sz 68;  // D
+  A.op_Dot_Lparen_Rparen_Less_Minus x_arr 5sz 65;  // A
+  A.op_Dot_Lparen_Rparen_Less_Minus x_arr 6sz 66;  // B
 
   // y = "BDCABA" as ASCII ints
   let yv = V.alloc 66 6sz;
@@ -45,12 +45,12 @@ fn test_lcs_example ()
   let y_arr = V.vec_to_array yv;
   rewrite (A.pts_to (V.vec_to_array yv) (Seq.create 6 66)) as (A.pts_to y_arr (Seq.create 6 66));
 
-  A.op_Array_Assignment y_arr 0sz 66;  // B
-  A.op_Array_Assignment y_arr 1sz 68;  // D
-  A.op_Array_Assignment y_arr 2sz 67;  // C
-  A.op_Array_Assignment y_arr 3sz 65;  // A
-  A.op_Array_Assignment y_arr 4sz 66;  // B
-  A.op_Array_Assignment y_arr 5sz 65;  // A
+  A.op_Dot_Lparen_Rparen_Less_Minus y_arr 0sz 66;  // B
+  A.op_Dot_Lparen_Rparen_Less_Minus y_arr 1sz 68;  // D
+  A.op_Dot_Lparen_Rparen_Less_Minus y_arr 2sz 67;  // C
+  A.op_Dot_Lparen_Rparen_Less_Minus y_arr 3sz 65;  // A
+  A.op_Dot_Lparen_Rparen_Less_Minus y_arr 4sz 66;  // B
+  A.op_Dot_Lparen_Rparen_Less_Minus y_arr 5sz 65;  // A
 
   // Compute LCS length for m=7, n=6
   let ctr = GR.alloc #nat 0;

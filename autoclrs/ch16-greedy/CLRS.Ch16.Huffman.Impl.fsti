@@ -25,7 +25,7 @@ module HOpt = CLRS.Ch16.Huffman.Optimality
 module HCmplx = CLRS.Ch16.Huffman.Complexity
 open CLRS.Ch16.Huffman.Defs
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 /// Extract the root frequency from a spec-level Huffman tree.
 let htree_freq (t: HSpec.htree) : int =

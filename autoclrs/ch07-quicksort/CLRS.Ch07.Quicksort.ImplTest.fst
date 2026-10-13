@@ -36,7 +36,7 @@ let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 (* Completeness lemma: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
    Bridges BoundedIntegers typeclass operators (used in SS.sorted) to Prims operators,
-   and uses Prims.op_Equality in assert_norm so the normalizer can reduce SP.count.
+   and uses Prims.op_Equals in assert_norm so the normalizer can reduce SP.count.
    Uses pointwise sorted assertions instead of quantifier bridging for efficiency. *)
 #push-options "--fuel 8 --z3rlimit 10"
 let completeness_sort3 (s: Seq.seq int)
@@ -46,19 +46,19 @@ let completeness_sort3 (s: Seq.seq int)
 = // Permutation preserves length
   SP.perm_len (Seq.seq_of_list [3; 1; 2]) s;
   // Bridge BoundedIntegers <= to Prims <= so Z3 can use sorted pointwise
-  assert (forall (x y:int). (x <= y) == Prims.op_LessThanOrEqual x y);
-  assert (forall (i j:nat). (i <= j) == Prims.op_LessThanOrEqual i j);
-  assert (forall (i j:nat). (i < j) == Prims.op_LessThan i j);
+  assert (forall (x y:int). (x <= y) == Prims.op_Less_Equals x y);
+  assert (forall (i j:nat). (i <= j) == Prims.op_Less_Equals i j);
+  assert (forall (i j:nat). (i < j) == Prims.op_Less i j);
   // Instantiate sorted at specific index pairs (avoids expensive quantifier chaining)
-  assert (Prims.op_LessThanOrEqual (Seq.index s 0) (Seq.index s 1));
-  assert (Prims.op_LessThanOrEqual (Seq.index s 0) (Seq.index s 2));
-  assert (Prims.op_LessThanOrEqual (Seq.index s 1) (Seq.index s 2));
-  // Use Prims.op_Equality so the normalizer can reduce SP.count on concrete input
-  assert_norm (Prims.op_Equality #int (SP.count 1 (Seq.seq_of_list [3; 1; 2])) 1);
-  assert_norm (Prims.op_Equality #int (SP.count 2 (Seq.seq_of_list [3; 1; 2])) 1);
-  assert_norm (Prims.op_Equality #int (SP.count 3 (Seq.seq_of_list [3; 1; 2])) 1);
-  assert_norm (Prims.op_Equality #int (SP.count 0 (Seq.seq_of_list [3; 1; 2])) 0);
-  assert_norm (Prims.op_Equality #int (SP.count 4 (Seq.seq_of_list [3; 1; 2])) 0)
+  assert (Prims.op_Less_Equals (Seq.index s 0) (Seq.index s 1));
+  assert (Prims.op_Less_Equals (Seq.index s 0) (Seq.index s 2));
+  assert (Prims.op_Less_Equals (Seq.index s 1) (Seq.index s 2));
+  // Use Prims.op_Equals so the normalizer can reduce SP.count on concrete input
+  assert_norm (Prims.op_Equals #int (SP.count 1 (Seq.seq_of_list [3; 1; 2])) 1);
+  assert_norm (Prims.op_Equals #int (SP.count 2 (Seq.seq_of_list [3; 1; 2])) 1);
+  assert_norm (Prims.op_Equals #int (SP.count 3 (Seq.seq_of_list [3; 1; 2])) 1);
+  assert_norm (Prims.op_Equals #int (SP.count 0 (Seq.seq_of_list [3; 1; 2])) 0);
+  assert_norm (Prims.op_Equals #int (SP.count 4 (Seq.seq_of_list [3; 1; 2])) 0)
 #pop-options
 
 // Pulse test functions need modest fuel/rlimit for connecting array writes

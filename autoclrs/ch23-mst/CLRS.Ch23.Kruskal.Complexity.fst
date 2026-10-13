@@ -177,7 +177,7 @@ let final_bound_lemma (n vround: nat)
 
 // ========== Ghost tick counter ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -236,7 +236,7 @@ fn find_complexity
   {
     let vcurr = !curr;
     valid_parents_index sparent (SZ.v n) (SZ.v vcurr);
-    let p = A.op_Array_Access parent vcurr;
+    let p = A.op_Dot_Lparen_Rparen parent vcurr;
     curr := p;
     let vsteps = !steps;
     
@@ -271,7 +271,7 @@ fn do_union_complexity
 {
   valid_parents_length sparent (SZ.v n);
   valid_parents_seq_upd sparent (SZ.v n) (SZ.v root_u) root_v;
-  A.op_Array_Assignment parent root_u root_v;
+  A.op_Dot_Lparen_Rparen_Less_Minus parent root_u root_v;
   tick ctr;
 }
 #pop-options
@@ -340,7 +340,7 @@ fn kruskal_complexity
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment parent vi vi;
+    A.op_Dot_Lparen_Rparen_Less_Minus parent vi vi;
     tick ctr;
     i := vi +^ 1sz;
   };
@@ -447,7 +447,7 @@ fn kruskal_complexity
         lemma_index_in_bounds (SZ.v vui) (SZ.v vvi) (SZ.v n);
         let offset: SZ.t = SZ.mul vui n;
         let idx: SZ.t = SZ.add offset vvi;
-        let w = A.op_Array_Access adj idx;
+        let w = A.op_Dot_Lparen_Rparen adj idx;
         let vbw = !best_w;
         let vbu_old = !best_u;
         let vbv_old = !best_v;
@@ -488,14 +488,14 @@ fn kruskal_complexity
     with seu_cur. assert (A.pts_to edge_u seu_cur);
     with sev_cur. assert (A.pts_to edge_v sev_cur);
     valid_endpoints_len seu_cur sev_cur (SZ.v n) (SZ.v vec);
-    let old_eu0 = A.op_Array_Access edge_u 0sz;
-    let old_ev0 = A.op_Array_Access edge_v 0sz;
+    let old_eu0 = A.op_Dot_Lparen_Rparen edge_u 0sz;
+    let old_ev0 = A.op_Dot_Lparen_Rparen edge_v 0sz;
     let write_pos: SZ.t = (if should_add then vec else 0sz);
     let val_eu = (if should_add then SZ.v vbu else old_eu0);
     let val_ev = (if should_add then SZ.v vbv else old_ev0);
     valid_endpoints_conditional_write seu_cur sev_cur (SZ.v n) (SZ.v vec) (SZ.v vbu) (SZ.v vbv) should_add;
-    A.op_Array_Assignment edge_u write_pos val_eu;
-    A.op_Array_Assignment edge_v write_pos val_ev;
+    A.op_Dot_Lparen_Rparen_Less_Minus edge_u write_pos val_eu;
+    A.op_Dot_Lparen_Rparen_Less_Minus edge_v write_pos val_ev;
     
     edge_count := (if should_add then vec +^ 1sz else vec);
     

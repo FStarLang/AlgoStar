@@ -40,15 +40,15 @@ fn test_floyd_warshall ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0)) as (A.pts_to dist (Seq.create 9 0));
   
   // Initialize matrix
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
   
   // Ghost tick counter (erased at extraction)
   let ctr = GR.alloc #nat 0;
@@ -80,15 +80,15 @@ fn test_check_no_negative_cycle ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0)) as (A.pts_to dist (Seq.create 9 0));
   
   // Initialize with same matrix as main test
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
   
   let ctr = GR.alloc #nat 0;
   
