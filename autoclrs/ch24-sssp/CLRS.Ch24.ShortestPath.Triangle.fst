@@ -258,6 +258,12 @@ let rec chain_telescoping
     end
 #pop-options
 
+// The index of the element appended last
+let last_index_of_snoc (i len prev_len: nat)
+  : Lemma (requires i < len /\ ~(i < len - 1) /\ prev_len + 1 == len)
+          (ensures i == len - 1 /\ i - prev_len == 0)
+  = ()
+
 // Build the chain as a sequence for pigeonhole
 #push-options "--z3rlimit 60 --fuel 1 --ifuel 1"
 let rec build_chain_seq
@@ -283,6 +289,7 @@ let rec build_chain_seq
             Seq.lemma_index_app1 prev_seq suffix i;
             assert (Seq.index result i == Seq.index prev_seq i)
           end else begin
+            last_index_of_snoc i len (Seq.length prev_seq);
             Seq.lemma_index_app2 prev_seq suffix i;
             assert (Seq.index result i == Seq.index suffix (i - Seq.length prev_seq));
             assert (i - Seq.length prev_seq == 0);
