@@ -421,6 +421,11 @@ let lemma_partial_nbrs_to_all (scolor cap_seq flow_seq: Seq.seq int) (n u: nat)
     (ensures all_nbrs_colored scolor cap_seq flow_seq n u)
   = ()
 
+(** The only nat in [bound, bound + 1) is bound *)
+let lemma_nat_eq_of_bounds (w bound: nat)
+  : Lemma (requires bound <= w /\ w < bound + 1) (ensures w == bound)
+  = ()
+
 (** Step: extend partial_nbrs_colored from bound to bound+1.
     Requires that neighbor `bound` is colored (if it has positive residual).
     Also handles the case where scolor changed (non-zero preservation). *)
@@ -453,7 +458,7 @@ let lemma_partial_nbrs_step
         ()
       end else begin
         // w == bound: directly from the precondition
-        ()
+        lemma_nat_eq_of_bounds w bound
       end
     in
     Classical.forall_intro (Classical.move_requires aux)
