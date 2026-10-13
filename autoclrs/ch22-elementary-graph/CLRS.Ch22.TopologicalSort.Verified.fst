@@ -470,7 +470,8 @@ let rec build_chain_value
     (requires
       v0 < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
       not (is_in_output output count v0) /\
-      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+      (forall (w: nat). {:pattern (count_remaining_preds adj n output count w n)}
+        w < n /\ not (is_in_output output count w) ==>
         count_remaining_preds adj n output count w n > 0))
     (ensures fun v -> v < n /\ not (is_in_output output count v))
     (decreases k)
@@ -486,7 +487,8 @@ let lemma_chain_edge
     (requires
       v0 < n /\ k < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
       not (is_in_output output count v0) /\
-      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+      (forall (w: nat). {:pattern (count_remaining_preds adj n output count w n)}
+        w < n /\ not (is_in_output output count w) ==>
         count_remaining_preds adj n output count w n > 0))
     (ensures has_edge n adj
       (build_chain_value adj n output count v0 (k + 1))
@@ -500,7 +502,8 @@ let rec lemma_chain_has_path
     (requires
       v0 < n /\ i <= j /\ j <= n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
       not (is_in_output output count v0) /\
-      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+      (forall (w: nat). {:pattern (count_remaining_preds adj n output count w n)}
+        w < n /\ not (is_in_output output count w) ==>
         count_remaining_preds adj n output count w n > 0))
     (ensures has_path adj n
       (build_chain_value adj n output count v0 j)
@@ -546,7 +549,8 @@ private let lemma_exists_shift_bound
     (requires
       v0 < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
       not (is_in_output output count v0) /\
-      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+      (forall (w: nat). {:pattern (count_remaining_preds adj n output count w n)}
+        w < n /\ not (is_in_output output count w) ==>
         count_remaining_preds adj n output count w n > 0) /\
       build_chain_value adj n output count v0 p <> vk /\
       (exists (j: nat). j >= p /\ j < k /\ build_chain_value adj n output count v0 j == vk))
@@ -563,7 +567,8 @@ let rec find_chain_duplicate
     (requires
       v0 < n /\ k <= n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
       not (is_in_output output count v0) /\
-      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+      (forall (w: nat). {:pattern (count_remaining_preds adj n output count w n)}
+        w < n /\ not (is_in_output output count w) ==>
         count_remaining_preds adj n output count w n > 0) /\
       Seq.length visited == n /\
       count_visited visited n == k /\
@@ -613,7 +618,8 @@ let lemma_non_output_implies_cycle
     (requires
       v0 < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
       not (is_in_output output count v0) /\
-      (forall (w: nat). w < n /\ not (is_in_output output count w) ==>
+      (forall (w: nat). {:pattern (count_remaining_preds adj n output count w n)}
+        w < n /\ not (is_in_output output count w) ==>
         count_remaining_preds adj n output count w n > 0))
     (ensures has_cycle adj n)
   = let visited0 = Seq.create n false in

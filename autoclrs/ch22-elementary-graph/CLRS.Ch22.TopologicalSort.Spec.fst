@@ -57,7 +57,8 @@ let rec has_path (adj: Seq.seq int) (n: nat) (u v: nat) (k: nat)
   : Tot prop (decreases k)
   = if k = 0 then u == v
     else if k = 1 then has_edge n adj u v
-    else exists (w: nat). w < n /\ has_edge n adj u w /\ has_path adj n w v (k - 1)
+    else exists (w: nat). {:pattern (has_edge n adj u w) \/ (has_path adj n w v (k - 1))}
+      w < n /\ has_edge n adj u w /\ has_path adj n w v (k - 1)
 
 // A cycle exists: there's a path from some vertex u back to itself
 let has_cycle (adj: Seq.seq int) (n: nat) : prop =
