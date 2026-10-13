@@ -369,7 +369,8 @@ let sorted_up_to_intro (s: seq nat) (max_d base: nat)
   = reveal_opaque (`%sorted_up_to_digit) (sorted_up_to_digit s max_d base)
 
 // Combine find_input_witnesses + sorted_up_to_values + extend ordering from d-1 to d
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+// (digit's definition is not needed and only lures Z3 into non-linear arithmetic)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10 --using_facts_from '* -CLRS.Ch08.RadixSort.Base.digit'"
 let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
   : Lemma 
     (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
