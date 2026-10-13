@@ -370,6 +370,15 @@ let kmp_step_valid (text pattern pi: seq int) (i q: nat)
     end
 #pop-options
 
+/// A prefix of length k > 0 matched at i + 1 is a prefix of length k - 1
+/// matched at i, extended by text[i] = pattern[k - 1]
+let matched_prefix_step_back (text pattern: seq int) (i k: nat)
+  : Lemma
+    (requires matched_prefix_at text pattern (i + 1) k /\ k > 0)
+    (ensures matched_prefix_at text pattern i (k - 1) /\
+             index text i == index pattern (k - 1))
+  = ()
+
 /// The KMP step result is the true maximum (possibly = m)
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1 --ext no:optimize_let_vc"
 let kmp_step_maximal (text pattern pi: seq int) (i q: nat)
@@ -391,6 +400,7 @@ let kmp_step_maximal (text pattern pi: seq int) (i q: nat)
               (ensures k <= q_new) =
       if k = 0 then ()
       else begin
+        matched_prefix_step_back text pattern i k;
         assert (matched_prefix_at text pattern i (k - 1));
         assert (k - 1 < m);
         assert (index text i == index pattern (k - 1));
