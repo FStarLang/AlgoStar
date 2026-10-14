@@ -123,33 +123,35 @@ let fw_val_20 () : Lemma (fw_entry test_adj 3 2 0 3 == 30) = assert_norm (fw_ent
 let fw_val_21 () : Lemma (fw_entry test_adj 3 2 1 3 == 35) = assert_norm (fw_entry test_adj 3 2 1 3 == 35)
 let fw_val_22 () : Lemma (fw_entry test_adj 3 2 2 3 == 0) = assert_norm (fw_entry test_adj 3 2 2 3 == 0)
 
+let test_adj_wb () : Lemma (weights_bounded test_adj 3) = assert_norm (weights_bounded test_adj 3)
+
 // Step 2: Connect fw_outer to fw_entry, then to concrete values
 let post_entry_00 () : Lemma (Seq.index (fw_outer test_adj 3 0) 0 == 0)
-  = fw_val_00 (); floyd_warshall_full_correctness test_adj 3 0 0
+  = fw_val_00 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 0 0
 
 let post_entry_01 () : Lemma (Seq.index (fw_outer test_adj 3 0) 1 == 5)
-  = fw_val_01 (); floyd_warshall_full_correctness test_adj 3 0 1
+  = fw_val_01 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 0 1
 
 let post_entry_02 () : Lemma (Seq.index (fw_outer test_adj 3 0) 2 == 20)
-  = fw_val_02 (); floyd_warshall_full_correctness test_adj 3 0 2
+  = fw_val_02 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 0 2
 
 let post_entry_10 () : Lemma (Seq.index (fw_outer test_adj 3 0) 3 == 45)
-  = fw_val_10 (); floyd_warshall_full_correctness test_adj 3 1 0
+  = fw_val_10 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 1 0
 
 let post_entry_11 () : Lemma (Seq.index (fw_outer test_adj 3 0) 4 == 0)
-  = fw_val_11 (); floyd_warshall_full_correctness test_adj 3 1 1
+  = fw_val_11 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 1 1
 
 let post_entry_12 () : Lemma (Seq.index (fw_outer test_adj 3 0) 5 == 15)
-  = fw_val_12 (); floyd_warshall_full_correctness test_adj 3 1 2
+  = fw_val_12 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 1 2
 
 let post_entry_20 () : Lemma (Seq.index (fw_outer test_adj 3 0) 6 == 30)
-  = fw_val_20 (); floyd_warshall_full_correctness test_adj 3 2 0
+  = fw_val_20 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 2 0
 
 let post_entry_21 () : Lemma (Seq.index (fw_outer test_adj 3 0) 7 == 35)
-  = fw_val_21 (); floyd_warshall_full_correctness test_adj 3 2 1
+  = fw_val_21 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 2 1
 
 let post_entry_22 () : Lemma (Seq.index (fw_outer test_adj 3 0) 8 == 0)
-  = fw_val_22 (); floyd_warshall_full_correctness test_adj 3 2 2
+  = fw_val_22 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 2 2
 
 #pop-options
 

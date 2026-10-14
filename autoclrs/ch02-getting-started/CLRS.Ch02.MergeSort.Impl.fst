@@ -86,6 +86,12 @@ fn copy_range
 // Merge Implementation
 // ================================================================
 
+// Index bookkeeping for the merge loop, in a small context
+let merge_index_step (vi vj vk vj1 vk1: int)
+  : Lemma (requires vk == vi + vj /\ vj1 == vj + 1 /\ vk1 == vk + 1)
+          (ensures vk1 == vi + vj1)
+  = ()
+
 #push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 
 //SNIPPET_START: merge_sig
@@ -202,8 +208,11 @@ fn merge
       assert (pure (Seq.length s_next == Seq.length s_before));
       upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v;
       merge_complexity_extend_hi vc_pre (reveal c0) (SZ.v vk);
-      j := vj +^ 1sz;
-      k := vk +^ 1sz;
+      let vj1 = vj +^ 1sz;
+      let vk1 = vk +^ 1sz;
+      merge_index_step (SZ.v vi) (SZ.v vj) (SZ.v vk) (SZ.v vj1) (SZ.v vk1);
+      j := vj1;
+      k := vk1;
     } else {
      if (vj = l2) {
       // Right exhausted, take from left
@@ -228,8 +237,11 @@ fn merge
       assert (pure (Seq.length s_next == Seq.length s_before));
       upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v;
       merge_complexity_extend_hi vc_pre (reveal c0) (SZ.v vk);
-      i := vi +^ 1sz;
-      k := vk +^ 1sz;
+      let vi1 = vi +^ 1sz;
+      let vk1 = vk +^ 1sz;
+      merge_index_step (SZ.v vj) (SZ.v vi) (SZ.v vk) (SZ.v vi1) (SZ.v vk1);
+      i := vi1;
+      k := vk1;
      } else {
       let v1 = tmp1.(vi);
       let v2 = tmp2.(vj);
@@ -257,8 +269,11 @@ fn merge
         assert (pure (Seq.index s_next (SZ.v vk) == Seq.index ghost_merged (SZ.v vk)));
         upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v1;
         assert (pure (merge_complexity_bounded (reveal (incr_nat vc_pre)) (reveal c0) 0 (SZ.v vk + 1)));
-        i := vi +^ 1sz;
-        k := vk +^ 1sz;
+        let vi1 = vi +^ 1sz;
+        let vk1 = vk +^ 1sz;
+        merge_index_step (SZ.v vj) (SZ.v vi) (SZ.v vk) (SZ.v vi1) (SZ.v vk1);
+        i := vi1;
+        k := vk1;
       } else {
         suffix_step_right s1 s2 (SZ.v vi) (SZ.v l1) (SZ.v vj) (SZ.v l2);
         suffix_gives_index ghost_merged (SZ.v vk)
@@ -281,8 +296,11 @@ fn merge
         assert (pure (Seq.index s_next (SZ.v vk) == Seq.index ghost_merged (SZ.v vk)));
         upd_prefix_extend s_before s_next ghost_merged (SZ.v vk) v2;
         assert (pure (merge_complexity_bounded (reveal (incr_nat vc_pre)) (reveal c0) 0 (SZ.v vk + 1)));
-        j := vj +^ 1sz;
-        k := vk +^ 1sz;
+        let vj1 = vj +^ 1sz;
+        let vk1 = vk +^ 1sz;
+        merge_index_step (SZ.v vi) (SZ.v vj) (SZ.v vk) (SZ.v vj1) (SZ.v vk1);
+        j := vj1;
+        k := vk1;
       };
      };
     };

@@ -62,6 +62,12 @@ let hash_mod_idem (x:Seq.seq nat) (d:nat) (q:nat{q <> 0})
 
 let pow_lemma (d m:nat) : Lemma (d * pow d m == pow d (m + 1)) = ()
 
+let lemma_distr_shift (d h p p' xi:int)
+  : Lemma (requires d * p == p')
+          (ensures d * (h + p * xi) == d * h + p' * xi)
+  = FStar.Math.Lemmas.distributivity_add_right d h (p * xi);
+    FStar.Math.Lemmas.paren_mul_right d p xi
+
 let lemma_mod_add_distr_l (a b:int) (n:pos)
   : Lemma ((a % n + b) % n = (a + b) % n)
   = FStar.Math.Lemmas.lemma_mod_add_distr b a n
@@ -97,10 +103,9 @@ let rec hash_inversion (x:Seq.seq nat) (d:nat) (q:nat{q <> 0})
                   pow d (j - i - 2) * Seq.index x i) q }
           (d * (hash x d q (i + 1) (j - 1) +
                 pow d (j - i - 2) * Seq.index x i)) % q;
-        (==) { FStar.Math.Lemmas.distributivity_add_right d
-                 (hash x d q (i + 1) (j - 1))
-                 (pow d (j - i - 2) * Seq.index x i);
-               pow_lemma d (j - i - 2) }
+        (==) { pow_lemma d (j - i - 2);
+               lemma_distr_shift d (hash x d q (i + 1) (j - 1))
+                 (pow d (j - i - 2)) (pow d (j - i - 1)) (Seq.index x i) }
           (h_lsd + msd) % q;
         }
       in
@@ -149,13 +154,32 @@ let eq_sub_seq #a (x:Seq.seq a) (i j:nat) (y:Seq.seq a) (i' j':nat) : prop =
   j - i == j' - i' /\ j <= Seq.length x /\ j' <= Seq.length y /\
   (forall (k:nat). k < j - i ==> Seq.index x (i + k) == Seq.index y (i' + k))
 
+let hash_unfold (x:Seq.seq nat) (d:nat) (q:nat{q <> 0})
+                (i:nat) (j:nat{i < j /\ j <= Seq.length x})
+  : Lemma (hash x d q i j == (d * hash x d q i (j - 1) + Seq.index x (j - 1)) % q)
+  = ()
+
+let hash_empty (x:Seq.seq nat) (d:nat) (q:nat{q <> 0}) (i:nat{i <= Seq.length x})
+  : Lemma (hash x d q i i == 0)
+  = ()
+
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
 let rec hash_slice_lemma (x y:Seq.seq nat) (d:nat) (q:nat{q <> 0})
                          (i:nat) (j:nat{i <= j /\ j <= Seq.length x})
                          (i':nat) (j':nat{i' <= j' /\ j' <= Seq.length y})
   : Lemma (requires eq_sub_seq x i j y i' j')
           (ensures hash x d q i j == hash y d q i' j')
           (decreases j - i)
-  = if i = j then () else hash_slice_lemma x y d q i (j - 1) i' (j' - 1)
+  = if i = j then (hash_empty x d q i; hash_empty y d q i')
+    else begin
+      let k : nat = j - 1 - i in
+      assert (Seq.index x (i + k) == Seq.index y (i' + k));
+      assert (eq_sub_seq x i (j - 1) y i' (j' - 1));
+      hash_slice_lemma x y d q i (j - 1) i' (j' - 1);
+      hash_unfold x d q i j;
+      hash_unfold y d q i' j'
+    end
+#pop-options
 
 (*** Connecting pow_mod and rolling_hash_step to the proven hash ***)
 
@@ -170,10 +194,7 @@ let rec pow_mod_correct (d:nat) (exp:nat) (q:pos)
 let lemma_mod_sub_via_add (a b:int) (q:pos)
   : Lemma ((a + q - b % q) % q == (a - b) % q)
   = FStar.Math.Lemmas.lemma_mod_sub_distr a b q;
-    assert ((a - b) % q == (a - b % q) % q);
-    FStar.Math.Lemmas.modulo_lemma (b % q) q;
-    assert (b % q >= 0 /\ b % q < q);
-    FStar.Math.Lemmas.lemma_mod_sub_distr a (b % q) q
+    FStar.Math.Lemmas.lemma_mod_plus (a - b % q) 1 q
 
 #pop-options
 //SNIPPET_START: rolling_hash_step_correct
@@ -306,7 +327,7 @@ let rec rabin_karp_matches_no_false_positives
 #pop-options
 
 /// No false negatives: every valid match appears in results.
-#push-options "--fuel 2 --ifuel 2 --z3rlimit 400 --ext no:optimize_let_vc"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 40 --ext no:optimize_let_vc --using_facts_from '* -CLRS.Ch32.RabinKarp.Spec.hash -CLRS.Ch32.RabinKarp.Spec.pow -CLRS.Ch32.RabinKarp.Spec.pow_mod -CLRS.Ch32.RabinKarp.Spec.rolling_hash_step'"
 let rec rabin_karp_matches_no_false_negatives
     (text pattern:Seq.seq nat) (d:nat) (q:nat{q <> 0})
     (s:nat) (current_hash:nat)

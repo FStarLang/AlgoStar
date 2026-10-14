@@ -287,6 +287,11 @@ let lemma_standard_multiply_quadrant_decomp
     ()
 #pop-options
 
+// Helper: bounds on half of a size (linear arithmetic in an empty context)
+let lemma_half_bounds (n:nat{n > 1})
+  : Lemma (ensures 0 < n / 2 /\ n / 2 < n)
+  = ()
+
 // Helper: prove element-wise equality for a specific element
 #push-options "--z3rlimit 22 --fuel 2 --ifuel 1"
 let rec lemma_strassen_elem_correct 
@@ -299,6 +304,8 @@ let rec lemma_strassen_elem_correct
     else begin
       let half = n / 2 in
       lemma_pow2_half n;
+      lemma_half_bounds n;
+      assert (0 < half /\ half < n);
       
       // Extract quadrants  
       let a11 = submatrix a 0 half 0 half in

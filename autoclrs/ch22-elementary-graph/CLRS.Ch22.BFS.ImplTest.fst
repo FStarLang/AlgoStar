@@ -145,7 +145,9 @@ let lemma_only_1_step_to_1 (k: nat)
         : Lemma (requires u < 3 /\ reachable_in test_adj 3 0 u (k-1) /\
                            has_edge test_adj 3 u 1)
                 (ensures False)
-        = lemma_only_0_steps_to_0 (k-1)
+        = if u = 0 then lemma_only_0_steps_to_0 (k-1)
+          else if u = 1 then assert (u * 3 + 1 == 4)
+          else assert (u * 3 + 1 == 7)
       in
       FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
     )
@@ -169,7 +171,9 @@ let lemma_only_2_steps_to_2 (k: nat)
         : Lemma (requires u < 3 /\ reachable_in test_adj 3 0 u (k-1) /\
                            has_edge test_adj 3 u 2)
                 (ensures False)
-        = lemma_only_1_step_to_1 (k-1)
+        = if u = 1 then lemma_only_1_step_to_1 (k-1)
+          else if u = 0 then assert (u * 3 + 2 == 2)
+          else assert (u * 3 + 2 == 8)
       in
       FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
     )

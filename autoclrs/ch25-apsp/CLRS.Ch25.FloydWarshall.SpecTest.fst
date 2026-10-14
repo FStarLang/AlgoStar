@@ -66,7 +66,8 @@ let test_weights_bounded () : Lemma (weights_bounded test_adj 3)
 let test_full_correctness (qi qj: nat) : Lemma
     (requires qi < 3 /\ qj < 3)
     (ensures index (fw_outer test_adj 3 0) (qi * 3 + qj) == fw_entry test_adj 3 qi qj 3)
-  = floyd_warshall_full_correctness test_adj 3 qi qj
+  = test_weights_bounded ();
+    floyd_warshall_full_correctness test_adj 3 qi qj
 
 // Test: weights_bounded implies all fw_entry values are non-negative
 let test_nonneg_entry () : Lemma (

@@ -551,6 +551,10 @@ let rec lemma_init_length (#a: Type) (p: list a{Cons? p})
   : Lemma (ensures L.length (L.init p) = L.length p - 1) (decreases p)
   = match p with | [_] -> () | _ :: rest -> lemma_init_length rest
 
+let lemma_singleton_hd_last (#a: Type) (p: list a{Cons? p})
+  : Lemma (ensures L.length p = 1 ==> L.hd p == L.last p)
+  = match p with | [_] -> () | _ -> ()
+
 (** Path with ≤ fuel+1 vertices implies is_reachable *)
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let rec lemma_path_implies_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (flow: flow_matrix n)
@@ -565,6 +569,7 @@ let rec lemma_path_implies_reachable (#n: nat{n > 0}) (cap: capacity_matrix n) (
     (decreases fuel)
   = if v = source then ()
     else begin
+      lemma_singleton_hd_last p;
       lemma_init_traversable cap flow p;
       lemma_last_edge cap flow p;
       lemma_init_length p;

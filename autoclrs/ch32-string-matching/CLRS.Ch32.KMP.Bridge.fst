@@ -280,7 +280,7 @@ let valid_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
              q' < q + 1)
     (ensures is_prefix_suffix pattern q' (SZ.v (index pi q')))
   = if q' < q then ()
-    else ()
+    else assert (q' == q)
 #pop-options
 
 /// Top-level helper: maximality at any q' < q+1 from separate flat foralls.

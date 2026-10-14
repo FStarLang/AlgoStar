@@ -162,6 +162,17 @@ private let floor_mul_le (a: nat) (b: pos) (c: nat) : Lemma ((a / b) * c <= a * 
 
 #push-options "--z3rlimit 10"
 
+/// Arithmetic core of one step of scaled_floor_sum_bound
+private let scaled_step_arith (n h pmh p s1 w1: nat) (ph: pos)
+  : Lemma (requires p == ph * pmh /\ p * s1 <= n * w1)
+          (ensures p * (n * h / ph + s1) <= n * (h * pmh + w1))
+  = floor_mul_le (n * h) ph p;
+    assert (n * h * p == (n * h * pmh) * ph);
+    cancel_mul_div (n * h * pmh) ph;
+    distributivity_add_right p (n * h / ph) s1;
+    distributivity_add_right n (h * pmh) w1;
+    paren_mul_right n h pmh
+
 /// Scaling: pow2(H) * sum floor(n*h/2^h) <= n * weighted_pow2_sum(0,H)
 private let rec scaled_floor_sum_bound (n: pos) (h max_h: nat)
   : Lemma (requires h <= max_h + 1)
@@ -170,9 +181,10 @@ private let rec scaled_floor_sum_bound (n: pos) (h max_h: nat)
   = if h > max_h then ()
     else begin
       scaled_floor_sum_bound n (h + 1) max_h;
-      floor_mul_le (n * h) (pow2 h) (pow2 max_h);
       pow2_plus h (max_h - h);
-      cancel_mul_div (n * h * pow2 (max_h - h)) (pow2 h)
+      scaled_step_arith n h (pow2 (max_h - h)) (pow2 max_h)
+        (sum_from_to (fun i -> n * i / pow2 i) (h + 1) max_h)
+        (weighted_pow2_sum (h + 1) max_h) (pow2 h)
     end
 
 /// Core bound: sum floor(n*h/2^h) < 2n (geometric series convergence)

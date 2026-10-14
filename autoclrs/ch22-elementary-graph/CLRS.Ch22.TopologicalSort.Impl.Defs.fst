@@ -230,6 +230,35 @@ let queue_entries_valid_after_enqueue
 (* After processing rows [0, row) fully and columns [0, col) of row `row`,
    in_degree[j] == count_remaining_preds adj n output 0 j (row+1) for j < col,
    in_degree[j] == count_remaining_preds adj n output 0 j row    for j >= col. *)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+let step1_inner_step_aux
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg in_deg': Seq.seq int)
+  (row col: nat)
+  : Lemma
+    (requires
+      col < n /\ Seq.length in_deg == n /\ Seq.length in_deg' == n /\
+      (forall (j: nat). j < col ==>
+        Seq.index in_deg j == count_remaining_preds adj n output 0 j (row + 1)) /\
+      (forall (j: nat). col <= j /\ j < n ==>
+        Seq.index in_deg j == count_remaining_preds adj n output 0 j row) /\
+      (forall (k: nat). {:pattern (Seq.index in_deg' k)} k < n /\ k <> col ==>
+        Seq.index in_deg' k == Seq.index in_deg k) /\
+      Seq.index in_deg' col == count_remaining_preds adj n output 0 col (row + 1))
+    (ensures
+      (forall (j: nat). j < col + 1 ==>
+        Seq.index in_deg' j == count_remaining_preds adj n output 0 j (row + 1)) /\
+      (forall (j: nat). col + 1 <= j /\ j < n ==>
+        Seq.index in_deg' j == count_remaining_preds adj n output 0 j row))
+  = introduce forall (j: nat). j < col + 1 ==>
+        Seq.index in_deg' j == count_remaining_preds adj n output 0 j (row + 1)
+    with introduce _ ==> _
+    with (if j = col then () else assert (Seq.index in_deg' j == Seq.index in_deg j));
+    introduce forall (j: nat). col + 1 <= j /\ j < n ==>
+        Seq.index in_deg' j == count_remaining_preds adj n output 0 j row
+    with introduce _ ==> _
+    with assert (Seq.index in_deg' j == Seq.index in_deg j)
+#pop-options
+
 [@@  "opaque_to_smt"]
 let lemma_step1_inner_step
   (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (in_deg in_deg': Seq.seq int)
@@ -253,7 +282,8 @@ let lemma_step1_inner_step
     (ensures step1_inner_inv adj n output in_deg' row (col + 1))
   = reveal_opaque (`%step1_inner_inv) (step1_inner_inv adj n output in_deg row col);
     reveal_opaque (`%step1_inner_inv) (step1_inner_inv adj n output in_deg' row (col + 1));
-    lemma_crp_zero_step adj n output col row
+    lemma_crp_zero_step adj n output col row;
+    step1_inner_step_aux adj n output in_deg in_deg' row col
 
 (* Outer loop: inner invariant at col=0 follows from outer invariant *)
 let lemma_step1_outer_to_inner

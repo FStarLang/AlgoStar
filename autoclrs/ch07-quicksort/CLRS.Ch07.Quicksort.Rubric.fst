@@ -87,7 +87,10 @@ let seq_swap_commute (#a: Type) (s: Seq.seq a) (i j: nat_smaller (Seq.length s))
   = let sij = seq_swap s i j in
     let sji = seq_swap s j i in
     assert (Seq.length sij = Seq.length sji);
-    assert (forall (k:nat{k < Seq.length sij}). (Seq.index sij k == Seq.index sji k));
+    let aux (k:nat{k < Seq.length sij}) : Lemma (Seq.index sij k == Seq.index sji k) =
+      if k = i then () else if k = j then () else ()
+    in
+    FStar.Classical.forall_intro aux;
     Seq.lemma_eq_elim sij sji
 
 let sp_permutation_swap (#a: eqtype) (s: Seq.seq a) (i j: nat_smaller (Seq.length s))

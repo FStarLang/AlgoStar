@@ -244,6 +244,12 @@ fn compute_prefix_function
 
 // ========== KMP Matcher ==========
 
+// Linear arithmetic for the amortized comparison bound, in a small context
+let kmp_amortized_step (vc c0 vq qn qa vi vin: int)
+  : Lemma (requires vc - c0 + vq <= 2 * vi /\ qn <= vq + 1 /\ qa <= qn /\ vin == vi + 1)
+          (ensures (vc + 1) - c0 + qa <= 2 * vin)
+  = ()
+
 #restart-solver
 #push-options "--z3rlimit 80 --ifuel 1 --fuel 1"
 
@@ -394,7 +400,10 @@ fn kmp_matcher
     let pat_char_final = A.op_Dot_Lparen_Rparen pattern vq_after;
     
     // Count the extend-check comparison
+    with vc_pre. assert (GR.pts_to ctr vc_pre);
+    assert pure (vc_pre - reveal c0 + SZ.v vq_after <= 2 * SZ.v vi);
     tick ctr;
+    incr_nat_reveal vc_pre;
     
     let chars_match = (pat_char_final = text_char_final);
     let new_q_val: SZ.t = (if chars_match then vq_after +^ 1sz else vq_after);
@@ -443,6 +452,9 @@ fn kmp_matcher
     assert pure (SZ.v new_count_val <= SZ.v vi_next + 1);
     assert pure (SZ.v pi_val_for_reset < SZ.v m);
     assert pure (SZ.v new_q_after_match < SZ.v m);
+    assert pure (SZ.v new_q_val <= SZ.v vq_after + 1);
+    assert pure (SZ.v new_q_after_match <= SZ.v new_q_val);
+    kmp_amortized_step vc_pre (reveal c0) (SZ.v vq_after) (SZ.v new_q_val) (SZ.v new_q_after_match) (SZ.v vi) (SZ.v vi_next);
     
     count_matches := new_count_val;
     q := new_q_after_match;

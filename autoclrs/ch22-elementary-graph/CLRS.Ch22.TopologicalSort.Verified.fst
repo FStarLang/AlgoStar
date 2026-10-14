@@ -558,6 +558,43 @@ private let lemma_exists_shift_bound
   = ()
 #pop-options
 
+// Helper: marking the k-th chain value as visited extends both visited-set invariants
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+private let lemma_chain_visited_step
+  (adj: Seq.seq int) (n: nat) (output: Seq.seq int) (count: nat) (v0: nat)
+  (k: nat) (visited: Seq.seq bool)
+  : Lemma
+    (requires
+      v0 < n /\ count <= Seq.length output /\ Seq.length adj == n * n /\ n > 0 /\
+      not (is_in_output output count v0) /\
+      (forall (w: nat). {:pattern (count_remaining_preds adj n output count w n)}
+        w < n /\ not (is_in_output output count w) ==>
+        count_remaining_preds adj n output count w n > 0) /\
+      Seq.length visited == n /\
+      (forall (v: nat). v < n /\ Seq.index visited v ==>
+        (exists (j: nat). j < k /\ build_chain_value adj n output count v0 j == v)) /\
+      (forall (j: nat). j < k ==> Seq.index visited (build_chain_value adj n output count v0 j)))
+    (ensures (
+      let vk = build_chain_value adj n output count v0 k in
+      let visited' = Seq.upd visited vk true in
+      (forall (v: nat). v < n /\ Seq.index visited' v ==>
+        (exists (j: nat). j < k + 1 /\ build_chain_value adj n output count v0 j == v)) /\
+      (forall (j: nat). j < k + 1 ==> Seq.index visited' (build_chain_value adj n output count v0 j))))
+  = let vk = build_chain_value adj n output count v0 k in
+    let visited' = Seq.upd visited vk true in
+    let a (j: nat) : Lemma (requires j < k + 1)
+      (ensures Seq.index visited' (build_chain_value adj n output count v0 j)) =
+      let vj = build_chain_value adj n output count v0 j in
+      if j = k then () else assert (Seq.index visited vj)
+    in
+    let b (v: nat) : Lemma (requires v < n /\ Seq.index visited' v)
+      (ensures exists (j: nat). j < k + 1 /\ build_chain_value adj n output count v0 j == v) =
+      if v = vk then () else assert (Seq.index visited v)
+    in
+    Classical.forall_intro (Classical.move_requires a);
+    Classical.forall_intro (Classical.move_requires b)
+#pop-options
+
 #push-options "--fuel 1 --ifuel 1 --z3rlimit 30"
 
 let rec find_chain_duplicate
@@ -604,6 +641,7 @@ let rec find_chain_duplicate
       // k < n (visited has k true entries out of n, found a false → k < n)
       let visited' = Seq.upd visited vk true in
       lemma_count_visited_set visited n vk;
+      lemma_chain_visited_step adj n output count v0 k visited;
       find_chain_duplicate adj n output count v0 (k + 1) visited'
     end
 
