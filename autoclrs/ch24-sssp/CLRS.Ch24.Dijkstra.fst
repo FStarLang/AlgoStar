@@ -630,6 +630,45 @@ let extend_relaxed_from_u
   assert (Seq.index sdist' u == dist_u)
 #pop-options
 
+// Helper: extend the per-vertex "unchanged or relaxed via u" invariant of
+// the relax loop by one step (vertex vv gets new_dist / new_pred).
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
+let extend_relax_choice
+  (sdist_pre sdist_v sweights: Seq.seq int)
+  (spred_pre spred_v: Seq.seq SZ.t)
+  (n u vv: nat) (new_dist: int) (new_pred: SZ.t) : Lemma
+  (requires
+    u < n /\ vv < n /\ u * n + n <= Seq.length sweights /\
+    Seq.length sdist_v == n /\ Seq.length spred_v == n /\
+    Seq.length sdist_pre == n /\ Seq.length spred_pre == n /\
+    (forall (v': nat). v' < vv /\ v' < n ==>
+      (Seq.index sdist_v v' == Seq.index sdist_pre v' /\
+       Seq.index spred_v v' == Seq.index spred_pre v') \/
+      (Seq.index sdist_v v' == Seq.index sdist_pre u + Seq.index sweights (u * n + v') /\
+       Seq.index sdist_v v' < Seq.index sdist_pre v' /\
+       Seq.index sweights (u * n + v') < SP.inf /\
+       Seq.index sdist_pre u < SP.inf /\
+       SZ.v (Seq.index spred_v v') == u)) /\
+    ((new_dist == Seq.index sdist_pre vv /\ new_pred == Seq.index spred_pre vv) \/
+     (new_dist == Seq.index sdist_pre u + Seq.index sweights (u * n + vv) /\
+      new_dist < Seq.index sdist_pre vv /\
+      Seq.index sweights (u * n + vv) < SP.inf /\
+      Seq.index sdist_pre u < SP.inf /\
+      SZ.v new_pred == u)))
+  (ensures
+    (let sdist' = Seq.upd sdist_v vv new_dist in
+     let spred' = Seq.upd spred_v vv new_pred in
+     forall (v': nat). v' < vv + 1 /\ v' < n ==>
+      (Seq.index sdist' v' == Seq.index sdist_pre v' /\
+       Seq.index spred' v' == Seq.index spred_pre v') \/
+      (Seq.index sdist' v' == Seq.index sdist_pre u + Seq.index sweights (u * n + v') /\
+       Seq.index sdist' v' < Seq.index sdist_pre v' /\
+       Seq.index sweights (u * n + v') < SP.inf /\
+       Seq.index sdist_pre u < SP.inf /\
+       SZ.v (Seq.index spred' v') == u)))
+  = ()
+#pop-options
+
 // Relax loop + bridge lemmas, extracted to its own scope for SMT tractability
 #push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
 fn dijkstra_relax_round
@@ -795,13 +834,19 @@ fn dijkstra_relax_round
     assert pure ((w < SP.inf /\ dist_u < SP.inf) ==> new_dist <= dist_u + w);
     assert pure (Seq.index (Seq.upd sdist_v (SZ.v vv) new_dist) (SZ.v u) == dist_u);
     extend_relaxed_from_u sdist_v sweights (SZ.v n) (SZ.v u) (SZ.v vv) new_dist dist_u;
+    with spred_v. assert (A.pts_to pred spred_v);
+    lemma_2d_index_fits (SZ.v u) (SZ.v n - 1) (SZ.v n);
+    extend_relax_choice sdist_pre sdist_v sweights spred_pre spred_v
+      (SZ.v n) (SZ.v u) (SZ.v vv) new_dist new_pred;
 
     A.op_Dot_Lparen_Rparen_Less_Minus dist vv new_dist;
     A.op_Dot_Lparen_Rparen_Less_Minus pred vv new_pred;
 
     tick ctr;
 
-    v := vv +^ 1sz;
+    let next_v = vv +^ 1sz;
+    assert (pure (SZ.v next_v == SZ.v vv + 1));
+    v := next_v;
   };
 
   let _ = !v;
@@ -831,6 +876,14 @@ fn dijkstra_relax_round
   assert (pure (visited_le_unvisited sdist_after svisited_now (SZ.v n)));
 }
 #pop-options
+
+// Tick accounting for one round of the main loop: n ticks for find_min
+// plus n ticks for relaxation turn round r's budget into round (r+1)'s.
+let dijkstra_round_ticks (c0 n r vc: nat)
+  : Lemma (requires vc == c0 + n + 2 * r * n + 2 * n)
+          (ensures vc == c0 + n + 2 * (r + 1) * n)
+  = FStar.Math.Lemmas.distributivity_add_left (2 * r) 2 n;
+    FStar.Math.Lemmas.distributivity_add_right 2 r 1
 
 #push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
 //SNIPPET_START: dijkstra_sig
@@ -994,7 +1047,12 @@ fn dijkstra
     with svisited_after. assert (V.pts_to visited svisited_after);
     assert (pure (pred_ok spred_after sdist_after sweights svisited_after (SZ.v n) (SZ.v source)));
     
-    round := vround +^ 1sz;
+    // Tick accounting: this round consumed 2n ticks
+    with vc_after. assert (GR.pts_to ctr vc_after);
+    dijkstra_round_ticks (reveal c0) (SZ.v n) (SZ.v vround) vc_after;
+    let next_round = vround +^ 1sz;
+    assert (pure (SZ.v next_round == SZ.v vround + 1));
+    round := next_round;
   };
   
   let _ = !round;
