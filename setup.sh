@@ -4,7 +4,7 @@
 # Two modes:
 #
 #   1. Binary install (recommended for most users):
-#      ./setup.sh binary          # install pinned release (v2026.04.17)
+#      ./setup.sh binary          # install pinned build (nightly-2026-10-17, Z3 5.3.0)
 #      ./setup.sh binary nightly  # install latest nightly build
 #      ./setup.sh binary v2026.04.17  # install a specific release
 #
@@ -29,8 +29,9 @@ NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 # Binary install destination
 FSTAR_BIN_DIR="$SCRIPT_DIR/fstar"
 
-# Pinned F* release version (update when a new release is validated)
-FSTAR_RELEASE_VERSION="v2026.06.21"
+# Pinned F* build: a release (vYYYY.MM.DD) or nightly-YYYY-MM-DD.
+# nightly-2026-10-17 bundles and defaults to Z3 5.3.0 (FStarLang/FStar#4654).
+FSTAR_RELEASE_VERSION="nightly-2026-10-17"
 
 red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
 green() { printf '\033[1;32m%s\033[0m\n' "$*"; }

@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install F* (pinned release)
+      - name: Install F* (pinned build)
         run: ./setup.sh binary
 
       - name: Show F* version
