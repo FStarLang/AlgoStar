@@ -219,8 +219,9 @@ let rec build_path_prefix
     (ensures fun vs ->
       Seq.length vs == m + 1 /\
       Seq.index vs 0 == u /\
-      (forall (i:nat). i < m + 1 ==> Seq.index vs i < n) /\
-      (forall (i:nat). i < m ==> TS.has_edge n adj (Seq.index vs i) (Seq.index vs (i + 1))))
+      (forall (i:nat). {:pattern (Seq.index vs i)} i < m + 1 ==> Seq.index vs i < n) /\
+      (forall (i:nat). {:pattern (TS.has_edge n adj (Seq.index vs i) (Seq.index vs (i + 1)))}
+        i < m ==> TS.has_edge n adj (Seq.index vs i) (Seq.index vs (i + 1))))
     (decreases m)
   = if m = 0 then
       Seq.create 1 u
@@ -267,7 +268,8 @@ let rec build_path_prefix
             assert (i < Seq.length rest);
             assert (Seq.index result i == Seq.index rest (i - 1));
             assert (Seq.index result (i + 1) == Seq.index rest i);
-            assert (i - 1 < m - 1)
+            assert (i - 1 < m - 1);
+            assert (TS.has_edge n adj (Seq.index rest (i - 1)) (Seq.index rest (i - 1 + 1)))
           )
       in
       Classical.forall_intro (fun (i:nat{i + 1 < Seq.length result}) -> aux_edge i);
@@ -305,7 +307,7 @@ let rec edges_form_ts_path
 ///   recurse (decreases k). Otherwise, decompose the first n+1 vertices.
 ///   By no-shorter-cycle, these n+1 vertices are all distinct and < n,
 ///   which contradicts injective_bound.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 25 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 25"
 let any_cycle_implies_ts_has_cycle
   (adj: Seq.seq int) (n: nat{n > 0}) (u: nat) (k: nat)
   : Lemma
@@ -456,7 +458,7 @@ let is_permutation (order: Seq.seq nat) (n: nat) : prop =
 /// Proof: u is at position pu, v at position pv.
 /// If pv ≤ pu, then by sorted order, f[order[pv]] ≥ f[order[pu]], i.e., f[v] ≥ f[u].
 /// But f[u] > f[v]. Contradiction. So pu < pv.
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let higher_f_implies_earlier_position
   (st: dfs_state) (order: Seq.seq nat) (n: nat) (u v: nat)
   : Lemma
@@ -519,7 +521,6 @@ let higher_f_implies_earlier_position
               if v < w then assert (f i == v)
               else assert (f i == v - 1)
           in
-          Classical.forall_intro (Classical.move_requires aux_bound);
           // f is injective (since order is distinct and the remapping preserves injectivity)
           let aux_inj (i j:nat) : Lemma
             (requires i < n /\ j < n /\ i <> j)
@@ -556,6 +557,7 @@ let higher_f_implies_earlier_position
             : Lemma (ensures forall (j:nat). i < n /\ j < n /\ i <> j ==> f i <> f j)
             = Classical.forall_intro (Classical.move_requires (aux_inj i))
           in
+          Classical.forall_intro (Classical.move_requires aux_bound);
           Classical.forall_intro aux_inj_forall;
           injective_bound f n (n - 1)
         )

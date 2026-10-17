@@ -172,8 +172,13 @@ let relax_round_lb_post
     FStar.Classical.forall_intro aux
 #pop-options
 
+/// Helper: the row-major index of an edge between two vertices is in bounds
+let edge_index_in_bounds (u v n: nat)
+  : Lemma (requires u < n /\ v < n) (ensures u * n + v < n * n)
+  = FStar.Math.Lemmas.lemma_mult_le_right n u (n - 1)
+
 /// Helper: pred_consistent is preserved by the relaxation round
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries no"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let relax_round_pred_consistent
   (sweights sdist_pre sdist_after: Seq.seq int)
   (spred_pre spred_after: Seq.seq SZ.t)
@@ -224,6 +229,7 @@ let relax_round_pred_consistent
               assert (Seq.index sdist_after p == Seq.index sdist_pre p)
             end else begin
               assert (SZ.v (Seq.index spred_after v) == u);
+              edge_index_in_bounds u v n;
               assert (Seq.index sdist_after u == Seq.index sdist_pre u)
             end
     in
@@ -231,7 +237,7 @@ let relax_round_pred_consistent
 #pop-options
 
 /// Helper: predecessors remain visited after the relaxation round
-#push-options "--z3rlimit 15 --fuel 0 --ifuel 0 --split_queries no"
+#push-options "--z3rlimit 15 --fuel 0 --ifuel 0"
 let relax_round_pred_visited
   (sweights sdist_pre sdist_after: Seq.seq int)
   (spred_pre spred_after: Seq.seq SZ.t)
@@ -472,7 +478,7 @@ let has_min_dist_unvisited (sdist svisited: Seq.seq int) (n idx: nat) : prop =
 
 // ========== Ghost tick for complexity counting ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -563,11 +569,11 @@ fn find_min_unvisited
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    let visited_i = V.op_Array_Access visited vi;
+    let visited_i = V.op_Dot_Lparen_Rparen visited vi;
     
     if (visited_i = 0)
     {
-      let dist_i = A.op_Array_Access dist vi;
+      let dist_i = A.op_Dot_Lparen_Rparen dist vi;
       let curr_min = !min_val;
       
       if (dist_i < curr_min)
@@ -624,8 +630,47 @@ let extend_relaxed_from_u
   assert (Seq.index sdist' u == dist_u)
 #pop-options
 
+// Helper: extend the per-vertex "unchanged or relaxed via u" invariant of
+// the relax loop by one step (vertex vv gets new_dist / new_pred).
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
+let extend_relax_choice
+  (sdist_pre sdist_v sweights: Seq.seq int)
+  (spred_pre spred_v: Seq.seq SZ.t)
+  (n u vv: nat) (new_dist: int) (new_pred: SZ.t) : Lemma
+  (requires
+    u < n /\ vv < n /\ u * n + n <= Seq.length sweights /\
+    Seq.length sdist_v == n /\ Seq.length spred_v == n /\
+    Seq.length sdist_pre == n /\ Seq.length spred_pre == n /\
+    (forall (v': nat). v' < vv /\ v' < n ==>
+      (Seq.index sdist_v v' == Seq.index sdist_pre v' /\
+       Seq.index spred_v v' == Seq.index spred_pre v') \/
+      (Seq.index sdist_v v' == Seq.index sdist_pre u + Seq.index sweights (u * n + v') /\
+       Seq.index sdist_v v' < Seq.index sdist_pre v' /\
+       Seq.index sweights (u * n + v') < SP.inf /\
+       Seq.index sdist_pre u < SP.inf /\
+       SZ.v (Seq.index spred_v v') == u)) /\
+    ((new_dist == Seq.index sdist_pre vv /\ new_pred == Seq.index spred_pre vv) \/
+     (new_dist == Seq.index sdist_pre u + Seq.index sweights (u * n + vv) /\
+      new_dist < Seq.index sdist_pre vv /\
+      Seq.index sweights (u * n + vv) < SP.inf /\
+      Seq.index sdist_pre u < SP.inf /\
+      SZ.v new_pred == u)))
+  (ensures
+    (let sdist' = Seq.upd sdist_v vv new_dist in
+     let spred' = Seq.upd spred_v vv new_pred in
+     forall (v': nat). v' < vv + 1 /\ v' < n ==>
+      (Seq.index sdist' v' == Seq.index sdist_pre v' /\
+       Seq.index spred' v' == Seq.index spred_pre v') \/
+      (Seq.index sdist' v' == Seq.index sdist_pre u + Seq.index sweights (u * n + v') /\
+       Seq.index sdist' v' < Seq.index sdist_pre v' /\
+       Seq.index sweights (u * n + v') < SP.inf /\
+       Seq.index sdist_pre u < SP.inf /\
+       SZ.v (Seq.index spred' v') == u)))
+  = ()
+#pop-options
+
 // Relax loop + bridge lemmas, extracted to its own scope for SMT tractability
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
 fn dijkstra_relax_round
   (weights: A.array int)
   (n: SZ.t)
@@ -772,11 +817,11 @@ fn dijkstra_relax_round
 
     lemma_2d_index_fits (SZ.v u) (SZ.v vv) (SZ.v n);
     let w_idx = u *^ n +^ vv;
-    let w = A.op_Array_Access weights w_idx;
+    let w = A.op_Dot_Lparen_Rparen weights w_idx;
 
-    let visited_v = V.op_Array_Access visited vv;
-    let old_dist = A.op_Array_Access dist vv;
-    let old_pred = A.op_Array_Access pred vv;
+    let visited_v = V.op_Dot_Lparen_Rparen visited vv;
+    let old_dist = A.op_Dot_Lparen_Rparen dist vv;
+    let old_pred = A.op_Dot_Lparen_Rparen pred vv;
 
     let can_relax = (visited_v = 0 && w < SP.inf && dist_u < SP.inf);
     let sum = dist_u + w;
@@ -789,13 +834,19 @@ fn dijkstra_relax_round
     assert pure ((w < SP.inf /\ dist_u < SP.inf) ==> new_dist <= dist_u + w);
     assert pure (Seq.index (Seq.upd sdist_v (SZ.v vv) new_dist) (SZ.v u) == dist_u);
     extend_relaxed_from_u sdist_v sweights (SZ.v n) (SZ.v u) (SZ.v vv) new_dist dist_u;
+    with spred_v. assert (A.pts_to pred spred_v);
+    lemma_2d_index_fits (SZ.v u) (SZ.v n - 1) (SZ.v n);
+    extend_relax_choice sdist_pre sdist_v sweights spred_pre spred_v
+      (SZ.v n) (SZ.v u) (SZ.v vv) new_dist new_pred;
 
-    A.op_Array_Assignment dist vv new_dist;
-    A.op_Array_Assignment pred vv new_pred;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vv new_dist;
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vv new_pred;
 
     tick ctr;
 
-    v := vv +^ 1sz;
+    let next_v = vv +^ 1sz;
+    assert (pure (SZ.v next_v == SZ.v vv + 1));
+    v := next_v;
   };
 
   let _ = !v;
@@ -826,7 +877,15 @@ fn dijkstra_relax_round
 }
 #pop-options
 
-#push-options "--z3rlimit 30 --fuel 0 --ifuel 0 --split_queries always"
+// Tick accounting for one round of the main loop: n ticks for find_min
+// plus n ticks for relaxation turn round r's budget into round (r+1)'s.
+let dijkstra_round_ticks (c0 n r vc: nat)
+  : Lemma (requires vc == c0 + n + 2 * r * n + 2 * n)
+          (ensures vc == c0 + n + 2 * (r + 1) * n)
+  = FStar.Math.Lemmas.distributivity_add_left (2 * r) 2 n;
+    FStar.Math.Lemmas.distributivity_add_right 2 r 1
+
+#push-options "--z3rlimit 30 --fuel 0 --ifuel 0"
 //SNIPPET_START: dijkstra_sig
 fn dijkstra
   (weights: A.array int)
@@ -900,8 +959,8 @@ fn dijkstra
   {
     let vi = !init_i;
     let new_val: int = (if vi = source then 0 else SP.inf);
-    A.op_Array_Assignment dist vi new_val;
-    A.op_Array_Assignment pred vi vi;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vi new_val;
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vi vi;
     tick ctr;
     init_i := vi +^ 1sz;
   };
@@ -970,13 +1029,13 @@ fn dijkstra
     count_ones_not_all_visited svisited_pre (SZ.v n);
     
     // Mark u as visited
-    V.op_Array_Assignment visited u 1;
+    V.op_Dot_Lparen_Rparen_Less_Minus visited u 1;
     
     // Update count_ones after marking
     count_ones_mark svisited_pre (SZ.v n) (SZ.v u);
     
     // Get dist[u] — cached, won't change during relaxation
-    let dist_u = A.op_Array_Access dist u;
+    let dist_u = A.op_Dot_Lparen_Rparen dist u;
     
     // Relax all neighbors of u — n ticks (also updates pred)
     dijkstra_relax_round weights n source dist pred visited u dist_u ctr
@@ -988,7 +1047,12 @@ fn dijkstra
     with svisited_after. assert (V.pts_to visited svisited_after);
     assert (pure (pred_ok spred_after sdist_after sweights svisited_after (SZ.v n) (SZ.v source)));
     
-    round := vround +^ 1sz;
+    // Tick accounting: this round consumed 2n ticks
+    with vc_after. assert (GR.pts_to ctr vc_after);
+    dijkstra_round_ticks (reveal c0) (SZ.v n) (SZ.v vround) vc_after;
+    let next_round = vround +^ 1sz;
+    assert (pure (SZ.v next_round == SZ.v vround + 1));
+    round := next_round;
   };
   
   let _ = !round;

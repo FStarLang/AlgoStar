@@ -14,7 +14,6 @@ module CLRS.Ch02.MergeSort.Lemmas
 open CLRS.Common.SortSpec
 open CLRS.Ch02.MergeSort.Spec
 open CLRS.Ch02.MergeSort.Complexity
-open Pulse.Lib.BoundedIntegers
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
@@ -82,7 +81,7 @@ let seq_merge_permutation (s1 s2: Seq.seq int)
 // Merge preserves sortedness
 // ================================================================
 
-#push-options "--z3rlimit 2 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 2 --fuel 2 --ifuel 1"
 
 let rec seq_merge_all_ge (v: int) (s1 s2: Seq.seq int)
   : Lemma (requires all_ge v s1 /\ all_ge v s2)

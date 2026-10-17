@@ -16,7 +16,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 open CLRS.Ch09.MinMax.Spec
 open CLRS.Common.Complexity
 
@@ -70,7 +69,7 @@ fn find_minimum
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi - 1
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let curr = a.(vi);
@@ -134,7 +133,7 @@ fn find_maximum
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi - 1
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let curr = a.(vi);

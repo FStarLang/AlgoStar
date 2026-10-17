@@ -154,57 +154,93 @@ let rec find_pure_rerouted
       find_pure_rerouted sparent sparent' pv (steps - 1) n root_u root_v
     end
 
-// Key theorem: union maintains the UF invariant
-// After adding edge (u_val, v_val) and setting parent[root_u] := root_v
-#push-options "--z3rlimit 300 --fuel 2 --ifuel 2"
-let uf_inv_union
+// Common precondition of uf_inv_union
+[@@"opaque_to_smt"]
+let union_pre
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge) : prop =
+  uf_inv sparent edges n ec /\
+  u_val < n /\ v_val < n /\
+  root_u = find_pure sparent u_val n n /\
+  root_v = find_pure sparent v_val n n /\
+  root_u <> root_v /\
+  valid_parents sparent' n /\
+  SZ.v (Seq.index sparent' root_u) = root_v /\
+  (forall (i: nat). i < n /\ i <> root_u ==>
+    Seq.index sparent' i == Seq.index sparent i) /\
+  new_edge.u = u_val /\ new_edge.v = v_val /\
+  ec + 1 < n /\
+  all_edges_valid edges n
+
+// Routing: find_pure sparent' v n n for each v
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+let union_route
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge) (v: nat)
+  : Lemma (requires union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge /\ v < n)
+          (ensures find_pure sparent' v n n =
+                     (if find_pure sparent v n n = root_u then root_v
+                      else find_pure sparent v n n) /\
+                   find_pure sparent' v n n < n)
+  = reveal_opaque (`%union_pre) (union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge);
+    find_pure_bounded sparent u_val n n;
+    find_pure_bounded sparent v_val n n;
+    if find_pure sparent v n n = root_u then begin
+      find_pure_rerouted sparent sparent' v ec n root_u root_v;
+      find_pure_split sparent' v (ec + 1) (n - ec - 1) n;
+      find_pure_fixed sparent' root_v (n - ec - 1) n
+    end else begin
+      find_pure_unchanged sparent sparent' v n n root_u;
+      find_pure_bounded sparent v n n
+    end
+
+// ec+1 steps suffice for all v
+let union_steps
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge) (v: nat)
+  : Lemma (requires union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge /\ v < n)
+          (ensures find_pure sparent' v (ec + 1) n = find_pure sparent' v n n)
+  = reveal_opaque (`%union_pre) (union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge);
+    find_pure_bounded sparent u_val n n;
+    find_pure_bounded sparent v_val n n;
+    union_route sparent sparent' edges n ec u_val v_val root_u root_v new_edge v;
+    if find_pure sparent v n n = root_u then
+      find_pure_rerouted sparent sparent' v ec n root_u root_v
+    else begin
+      find_pure_unchanged sparent sparent' v ec n root_u;
+      find_pure_split sparent' v ec 1 n;
+      find_pure_fixed sparent' (find_pure sparent v n n) 1 n
+    end
+
+// Roots of sparent' are fixed points
+let union_fixp
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge) (v: nat)
+  : Lemma (requires union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge /\ v < n /\
+                    valid_parents sparent' n)
+          (ensures find_pure sparent' v n n < n /\
+                   SZ.v (Seq.index sparent' (find_pure sparent' v n n)) = find_pure sparent' v n n)
+  = reveal_opaque (`%union_pre) (union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge);
+    union_route sparent sparent' edges n ec u_val v_val root_u root_v new_edge v;
+    union_route sparent sparent' edges n ec u_val v_val root_u root_v new_edge v_val
+#pop-options
+
+// Completeness: reachable vertices share a root in sparent'
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
+let union_complete
     (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
-  : Lemma (requires uf_inv sparent edges n ec /\
-                    u_val < n /\ v_val < n /\
-                    root_u = find_pure sparent u_val n n /\
-                    root_v = find_pure sparent v_val n n /\
-                    root_u <> root_v /\
-                    valid_parents sparent' n /\
-                    SZ.v (Seq.index sparent' root_u) = root_v /\
-                    (forall (i: nat). i < n /\ i <> root_u ==>
-                      Seq.index sparent' i == Seq.index sparent i) /\
-                    new_edge.u = u_val /\ new_edge.v = v_val /\
-                    ec + 1 < n /\
-                    all_edges_valid edges n)
-          (ensures uf_inv sparent' (new_edge :: edges) n (ec + 1))
-  = find_pure_bounded sparent u_val n n;
-    find_pure_bounded sparent v_val n n;
-    // Establish routing: find_pure sparent' v n n for each v
+  : Lemma (requires union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge)
+          (ensures forall (u v: nat). u < n /\ v < n /\ reachable (new_edge :: edges) u v ==>
+                     find_pure sparent' u n n = find_pure sparent' v n n)
+  = reveal_opaque (`%union_pre) (union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge);
     let route (v: nat) : Lemma (requires v < n)
       (ensures find_pure sparent' v n n =
                (if find_pure sparent v n n = root_u then root_v
                 else find_pure sparent v n n) /\
                find_pure sparent' v n n < n) =
-      if find_pure sparent v n n = root_u then begin
-        find_pure_rerouted sparent sparent' v ec n root_u root_v;
-        find_pure_split sparent' v (ec + 1) (n - ec - 1) n;
-        find_pure_fixed sparent' root_v (n - ec - 1) n
-      end else begin
-        find_pure_unchanged sparent sparent' v n n root_u;
-        find_pure_bounded sparent v n n
-      end
+      union_route sparent sparent' edges n ec u_val v_val root_u root_v new_edge v
     in
-    FStar.Classical.forall_intro (FStar.Classical.move_requires route);
-    // ec+1 steps suffice for all v
-    let stp (v: nat) : Lemma (requires v < n)
-      (ensures find_pure sparent' v (ec + 1) n = find_pure sparent' v n n) =
-      route v;
-      if find_pure sparent v n n = root_u then
-        find_pure_rerouted sparent sparent' v ec n root_u root_v
-      else begin
-        find_pure_unchanged sparent sparent' v ec n root_u;
-        find_pure_split sparent' v ec 1 n;
-        find_pure_fixed sparent' (find_pure sparent v n n) 1 n
-      end
-    in
-    FStar.Classical.forall_intro (FStar.Classical.move_requires stp);
-    // Completeness: comp_reachable
     let comp (x: nat) : nat =
       if x < n then find_pure sparent' x n n else x in
     route u_val; route v_val;
@@ -229,8 +265,59 @@ let uf_inv_union
       FStar.Classical.forall_intro (FStar.Classical.move_requires (full u))
     in
     FStar.Classical.forall_intro (FStar.Classical.move_requires wrap)
-    // Z3 derives remaining uf_inv conjuncts (root fixed points, etc.) 
-    // from routing + old uf_inv + parent' properties
+#pop-options
+
+let uf_inv_intro (sparent: Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+  : Lemma (requires valid_parents sparent n /\ ec < n /\
+                    (forall (v: nat). v < n ==>
+                      find_pure sparent v n n < n /\
+                      SZ.v (Seq.index sparent (find_pure sparent v n n)) = find_pure sparent v n n /\
+                      find_pure sparent v ec n = find_pure sparent v n n) /\
+                    (forall (u v: nat). u < n /\ v < n /\ reachable edges u v ==>
+                      find_pure sparent u n n = find_pure sparent v n n))
+          (ensures uf_inv sparent edges n ec)
+  = ()
+
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
+let union_all
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
+  : Lemma (requires union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge /\
+                    valid_parents sparent' n /\ ec + 1 < n)
+          (ensures uf_inv sparent' (new_edge :: edges) n (ec + 1))
+  = let p (v: nat) : Lemma (requires v < n)
+      (ensures find_pure sparent' v n n < n /\
+               SZ.v (Seq.index sparent' (find_pure sparent' v n n)) = find_pure sparent' v n n /\
+               find_pure sparent' v (ec + 1) n = find_pure sparent' v n n) =
+      union_fixp sparent sparent' edges n ec u_val v_val root_u root_v new_edge v;
+      union_steps sparent sparent' edges n ec u_val v_val root_u root_v new_edge v
+    in
+    FStar.Classical.forall_intro (FStar.Classical.move_requires p);
+    union_complete sparent sparent' edges n ec u_val v_val root_u root_v new_edge;
+    uf_inv_intro sparent' (new_edge :: edges) n (ec + 1)
+#pop-options
+
+// Key theorem: union maintains the UF invariant
+// After adding edge (u_val, v_val) and setting parent[root_u] := root_v
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
+let uf_inv_union
+    (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
+    (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)
+  : Lemma (requires uf_inv sparent edges n ec /\
+                    u_val < n /\ v_val < n /\
+                    root_u = find_pure sparent u_val n n /\
+                    root_v = find_pure sparent v_val n n /\
+                    root_u <> root_v /\
+                    valid_parents sparent' n /\
+                    SZ.v (Seq.index sparent' root_u) = root_v /\
+                    (forall (i: nat). i < n /\ i <> root_u ==>
+                      Seq.index sparent' i == Seq.index sparent i) /\
+                    new_edge.u = u_val /\ new_edge.v = v_val /\
+                    ec + 1 < n /\
+                    all_edges_valid edges n)
+          (ensures uf_inv sparent' (new_edge :: edges) n (ec + 1))
+  = reveal_opaque (`%union_pre) (union_pre sparent sparent' edges n ec u_val v_val root_u root_v new_edge);
+    union_all sparent sparent' edges n ec u_val v_val root_u root_v new_edge
 #pop-options
 
 let not_mem_when_unreachable (e: edge) (edges: list edge)
@@ -375,7 +462,7 @@ let uf_complete_init (sparent: Seq.seq SZ.t) (n: nat)
 #pop-options
 
 // Union step: after adding edge (u_val, v_val) and setting parent'[root_u] = root_v
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 15 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 15"
 let uf_complete_union
     (sparent sparent': Seq.seq SZ.t) (edges: list edge) (n: nat) (ec: nat)
     (u_val v_val: nat) (root_u root_v: nat) (new_edge: edge)

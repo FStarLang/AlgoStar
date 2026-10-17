@@ -76,7 +76,7 @@ let mst_trivial (g: graph)
     introduce forall (v: nat) (cycle: list edge).
       v < 1 /\ subset_edges cycle ([] #edge) /\ Cons? cycle /\ all_edges_distinct cycle ==>
       ~(is_path_from_to cycle v v)
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       match cycle with
       | hd :: _ -> assert (mem_edge hd ([] #edge) = false)
     end;
@@ -87,7 +87,7 @@ let mst_trivial (g: graph)
     assert (is_spanning_tree g ([] #edge));
     // [] is MST: any spanning tree of 1-vertex graph has 0 edges
     introduce forall (t: list edge). is_spanning_tree g t ==> total_weight ([] #edge) <= total_weight t
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       assert (length t = 0)
     end
 #pop-options
@@ -144,7 +144,7 @@ let rec mst_exists_aux (g: graph) (fuel: nat)
           // So t has minimum weight and is MST
           introduce forall (t': list edge).
             is_spanning_tree g t' ==> total_weight t <= total_weight t'
-          with introduce _ ==> _ with _. weight_bound t'
+          with introduce _ ==> _ with weight_bound t'
         end else begin
           // Inductive case: fuel > 0
           // By excluded middle: either t is MST or it's not
@@ -164,7 +164,7 @@ let rec mst_exists_aux (g: graph) (fuel: nat)
                         (ensures is_mst g t)
                 = introduce forall (t': list edge).
                     is_spanning_tree g t' ==> total_weight t <= total_weight t'
-                  with introduce _ ==> _ with _. ()
+                  with introduce _ ==> _ with ()
               in
               FStar.Classical.move_requires derive_mst ();
               // Context now has: ~(exists lighter) ==> is_mst g t

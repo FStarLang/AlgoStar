@@ -22,7 +22,6 @@ module CLRS.Ch06.Heap.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch06.Heap.Impl
 open CLRS.Ch06.Heap.Spec
@@ -42,16 +41,16 @@ let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 // ========== Test 1: heapsort completeness on [3;1;2] ==========
 
-#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --warn_error -349 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --warn_error -349"
 
 (* Pure helper: sorted + permutation of [3;1;2] uniquely determines [1;2;3].
    Uses SP.count to prove that each element appears exactly once, then
    the sorted constraint pins each position. *)
 let std_sort3 (s: Seq.seq int)
   : Lemma
-    (requires (forall (i j:nat). Prims.op_LessThanOrEqual i j /\
-                                 Prims.op_LessThan j (Seq.length s) ==>
-                                 Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j)) /\
+    (requires (forall (i j:nat). Prims.op_Less_Equals i j /\
+                                 Prims.op_Less j (Seq.length s) ==>
+                                 Prims.op_Less_Equals (Seq.index s i) (Seq.index s j)) /\
               SP.permutation int (Seq.seq_of_list [3; 1; 2]) s)
     (ensures Seq.index s 0 == 1 /\ Seq.index s 1 == 2 /\ Seq.index s 2 == 3)
 = SP.perm_len (Seq.seq_of_list [3; 1; 2]) s;
@@ -147,7 +146,7 @@ fn test_heapsort_3 ()
 
 // ========== Test 2: build_max_heap completeness — root = max ==========
 
-#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4"
 
 (* Pure helper: max-heap + permutation of [3;1;2] determines root == 3.
    root_ge_element gives s[0] >= s[i] for all i < 3, and count reasoning
@@ -273,7 +272,7 @@ fn test_heapsort_0 ()
 
 // ========== Test 4: heapsort prefix sorting (n < array length) ==========
 
-#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4"
 
 (* Pure helper: sorted_upto 2 + permutation of [7;5;3] with s[2]==3
    determines s[0]==5 /\ s[1]==7.  The preservation clause gives s[2]==3,
@@ -352,7 +351,7 @@ fn test_heapsort_prefix ()
 
 // ========== Test 5: heapsort with duplicates [2;1;2] ==========
 
-#push-options "--z3rlimit 40 --fuel 8 --ifuel 4 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 8 --ifuel 4"
 
 (* Pure helper: sorted + permutation of [2;1;2] determines [1;2;2].
    count(1)=1, count(2)=2 pins the unique sorted output. *)

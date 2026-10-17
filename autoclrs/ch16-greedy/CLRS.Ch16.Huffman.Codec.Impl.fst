@@ -46,7 +46,7 @@ let rec bits_as_list_length (s: Seq.seq bool) (lo hi: nat)
 // Decode one symbol by walking the heap tree from `cur` to a leaf.
 // `ft` is the spec-level tree (needed for proof; erased at extraction).
 // Returns (symbol, new_bit_position).
-#push-options "--z3rlimit 40 --split_queries always"
+#push-options "--z3rlimit 40"
 fn rec decode_step_impl
   (cur: hnode_ptr) (ft: HSpec.htree)
   (bits: A.array bool) (pos bit_len: SZ.t)
@@ -80,7 +80,7 @@ fn rec decode_step_impl
       // Prove pos < bit_len (decode_step on Internal needs non-empty bits)
       bits_as_list_length bits_seq (SZ.v pos) (SZ.v bit_len);
       HCodec.decode_step_internal_nil f l r;
-      let b = A.op_Array_Access bits pos;
+      let b = A.op_Dot_Lparen_Rparen bits pos;
       bits_as_list_cons bits_seq (SZ.v pos) (SZ.v bit_len);
       HCodec.decode_step_internal f l r b (bits_as_list bits_seq (SZ.v pos + 1) (SZ.v bit_len));
       let new_pos = pos +^ 1sz;
@@ -107,6 +107,12 @@ fn rec decode_step_impl
 #pop-options
 
 // ========== decode_impl: full decoder ==========
+
+// Regroupings of index sums, proved in an empty context so that the
+// suffix-step lemmas below get them as hypotheses rather than as goals
+let add_succ_regroup (a b: nat) : Lemma (a + (b + 1) == (a + 1) + b) = ()
+let add_assoc_nat (a b c: nat) : Lemma (a + (b + c) == a + b + c) = ()
+let add_sub_cancel_nat (a b: nat) : Lemma (requires a <= b) (ensures a + (b - a) == b) = ()
 
 #push-options "--z3rlimit 20"
 // Helper: after decoding one symbol, the suffix invariant is maintained
@@ -155,6 +161,7 @@ let decode_suffix_step
     assert (Some? (HCodec.decode ft (bits_as_list bits_seq new_pos bit_len)));
     let new_rem = Some?.v (HCodec.decode ft (bits_as_list bits_seq new_pos bit_len)) in
     assert (remaining == sym :: new_rem);
+    assert (L.length remaining == L.length new_rem + 1);
     // sym is the head
     HCodec.list_index_zero #nat sym new_rem;
     // from requires forall with i=0
@@ -165,14 +172,16 @@ let decode_suffix_step
       = HCodec.list_index_succ #nat sym new_rem i;
         assert (L.index (sym :: new_rem) (i + 1) == L.index new_rem i);
         assert (L.index remaining (i + 1) == L.index new_rem i);
-        assert (i + 1 < L.length remaining)
+        assert (i + 1 < L.length remaining);
+        assert (L.index remaining (i + 1) == L.index full_msg (out_v + (i + 1)));
+        add_succ_regroup out_v i
     in
     Classical.forall_intro (Classical.move_requires aux)
 #pop-options
 
 // Full decoder: decode entire bitstring into an output array.
 // Postcondition: output matches pure decode.
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 20"
 fn decode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (bits: A.array bool) (bit_len: SZ.t)
@@ -239,9 +248,11 @@ fn decode_impl
 
     // Prove remaining is non-empty (Cons?) so out_v < out_len
     HCodec.decode_cons ft (bits_as_list bits_seq (SZ.v p) (SZ.v bit_len));
+    // ... and that new_pos > p, for the decreases clause
+    bits_as_list_length bits_seq (SZ.v new_pos) (SZ.v bit_len);
 
     // Write symbol to output
-    A.op_Array_Assignment output ov sym;
+    A.op_Dot_Lparen_Rparen_Less_Minus output ov sym;
 
     // Prove suffix invariant is maintained
     decode_suffix_step ft bits_seq (SZ.v p) (SZ.v bit_len) (SZ.v ov) sym (SZ.v new_pos);
@@ -287,7 +298,7 @@ let codeword_cons_combine
 // Walk the tree to find the codeword for a given symbol.
 // Writes codeword bits into cw_buf starting at position depth.
 // Returns (found, codeword_length).
-#push-options "--z3rlimit 40 --split_queries always --fuel 1 --ifuel 1"
+#push-options "--z3rlimit 40 --fuel 1 --ifuel 1"
 fn rec codeword_impl
   (cur: hnode_ptr) (ft: HSpec.htree) (sym: nat)
   (cw_buf: A.array bool) (depth: SZ.t) (max_depth: SZ.t)
@@ -332,7 +343,7 @@ fn rec codeword_impl
       let node = Box.op_Bang cur;
 
       // Write true at depth, try left subtree
-      A.op_Array_Assignment cw_buf depth true;
+      A.op_Dot_Lparen_Rparen_Less_Minus cw_buf depth true;
       let lp_rt = Some?.v node.left;
       rewrite (is_htree lp l) as (is_htree lp_rt l);
       let left_result = codeword_impl lp_rt l sym cw_buf (depth +^ 1sz) max_depth;
@@ -348,7 +359,7 @@ fn rec codeword_impl
         (true, snd left_result +^ 1sz)
       } else {
         // Not in left, try right with false
-        A.op_Array_Assignment cw_buf depth false;
+        A.op_Dot_Lparen_Rparen_Less_Minus cw_buf depth false;
         let rp_rt = Some?.v node.right;
         rewrite (is_htree rp r) as (is_htree rp_rt r);
         let right_result = codeword_impl rp_rt r sym cw_buf (depth +^ 1sz) max_depth;
@@ -452,7 +463,9 @@ let encode_suffix_step
     Classical.forall_intro (Classical.move_requires aux_cw);
     let aux_suffix (j: nat{j < L.length new_remaining})
       : Lemma (L.index new_remaining j == L.index full_enc (bp + L.length cw + j))
-      = append_index_right cw new_remaining j
+      = append_index_right cw new_remaining j;
+        assert (L.index remaining_enc (L.length cw + j) == L.index full_enc (bp + (L.length cw + j)));
+        add_assoc_nat bp (L.length cw) j
     in
     Classical.forall_intro (Classical.move_requires aux_suffix)
 #pop-options
@@ -483,6 +496,7 @@ let encode_prefix_combine
       = if i < bp then ()
         else begin
           let k = i - bp in
+          add_sub_cancel_nat bp i;
           assert (Seq.index out_new (bp + k) == L.index cw k);
           assert (L.index cw k == L.index full_enc (bp + k))
         end
@@ -493,7 +507,7 @@ let encode_prefix_combine
 // Encode: for each symbol in msg, look up codeword and write to output.
 // Uses suffix-based invariant: tracks encode of remaining symbols.
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn encode_impl
   (root: hnode_ptr) (ft: HSpec.htree)
   (msg: A.array nat) (msg_len: SZ.t)
@@ -549,7 +563,7 @@ fn encode_impl
     let bp = !bit_pos;
 
     // Read the symbol
-    let s = A.op_Array_Access msg si;
+    let s = A.op_Dot_Lparen_Rparen msg si;
 
     // Decompose: syms_as_list si msg_len = s :: syms_as_list (si+1) msg_len
     syms_as_list_cons msg_seq (SZ.v si) (SZ.v msg_len);

@@ -408,7 +408,7 @@ let rec not_mem_count_zero (xs: list int) (y: int)
 (* ========== Main Algorithm ========== *)
 
 //SNIPPET_START: bucket_sort_sig
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 1"
 let bucket_sort (xs: list int) (k: pos)
   : Pure (list int)
     (requires True)

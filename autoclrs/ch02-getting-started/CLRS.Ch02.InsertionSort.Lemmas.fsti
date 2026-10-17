@@ -4,7 +4,6 @@
 module CLRS.Ch02.InsertionSort.Lemmas
 
 open CLRS.Common.SortSpec
-open Pulse.Lib.BoundedIntegers
 module Seq = FStar.Seq
 
 val lemma_prefix_le_key

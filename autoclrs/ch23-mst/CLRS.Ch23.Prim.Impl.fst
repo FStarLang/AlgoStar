@@ -229,7 +229,7 @@ let prim_inv
     key_seq parent_seq in_mst_seq weights_seq n source
 
 /// Init: all vacuously true at start
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 5"
 let prim_inv_init
     (key_seq parent_seq in_mst_seq weights_seq: Seq.seq SZ.t) (n source: nat)
   : Lemma
@@ -609,8 +609,8 @@ fn find_min_vertex
   decreases (SZ.v n - SZ.v !find_i)
   {
     let v_find_i = !find_i;
-    let ki = A.op_Array_Access key_a v_find_i;
-    let in_mst_i = A.op_Array_Access in_mst v_find_i;
+    let ki = A.op_Dot_Lparen_Rparen key_a v_find_i;
+    let in_mst_i = A.op_Dot_Lparen_Rparen in_mst v_find_i;
     let v_min_key = !min_key;
     let v_min_idx = !min_idx;
     
@@ -723,12 +723,12 @@ fn update_keys
   decreases (SZ.v n - SZ.v !update_i)
   {
     let v = !update_i;
-    let key_v = A.op_Array_Access key_a v;
-    let in_mst_v = A.op_Array_Access in_mst v;
+    let key_v = A.op_Dot_Lparen_Rparen key_a v;
+    let in_mst_v = A.op_Dot_Lparen_Rparen in_mst v;
     let weight_idx = compute_weight_idx u n v;
     lemma_index_bound (SZ.v u) (SZ.v v) (SZ.v n);
-    let weight_uv = A.op_Array_Access weights weight_idx;
-    let old_parent_v = A.op_Array_Access parent_a v;
+    let weight_uv = A.op_Dot_Lparen_Rparen weights weight_idx;
+    let old_parent_v = A.op_Dot_Lparen_Rparen parent_a v;
     let cond_not_in_mst = (in_mst_v = 0sz);
     let cond_weight_better = (weight_uv <^ key_v);
     let cond_weight_valid = (weight_uv <^ infinity);
@@ -740,8 +740,8 @@ fn update_keys
     prim_kpc_step ks ps weights_seq (SZ.v n) (SZ.v source) (SZ.v v) new_key_v new_parent_v should_update_key;
     KeyInv.update_progress_step ks0 ps0 ks ps in_mst_seq (SZ.v n) (SZ.v source) (SZ.v u) (SZ.v v) new_key_v new_parent_v should_update_key;
     KeyInv.keys_bounded_partial_step ks weights_seq in_mst_seq (SZ.v n) (SZ.v u) (SZ.v v) new_key_v should_update_key;
-    A.op_Array_Assignment key_a v new_key_v;
-    A.op_Array_Assignment parent_a v new_parent_v;
+    A.op_Dot_Lparen_Rparen_Less_Minus key_a v new_key_v;
+    A.op_Dot_Lparen_Rparen_Less_Minus parent_a v new_parent_v;
     update_i := v +^ 1sz;
   };
   with ks_f ps_f. assert (A.pts_to key_a ks_f ** A.pts_to parent_a ps_f);
@@ -757,7 +757,7 @@ fn update_keys
 /// Hoisted outer loop body: one complete iteration of Prim's algorithm.
 /// find_min → add to MST → greedy step → update keys
 /// Takes and returns prim_loop_state, keeping fn prim's VC minimal.
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 5"
 fn prim_step
   (#p: perm)
   (key_a: array SZ.t)
@@ -805,7 +805,7 @@ fn prim_step
     (forall (j:nat). j < SZ.v n /\ SZ.v (Seq.index ims_pre j) = 0 ==>
       SZ.v (min_key_val) <= SZ.v (Seq.index ks_pre j))
   ));
-  A.op_Array_Assignment in_mst u 1sz;
+  A.op_Dot_Lparen_Rparen_Less_Minus in_mst u 1sz;
   
   // 3. Greedy step: add u to MST, maintain prim_safe + noRepeats
   with ims_post. assert (A.pts_to in_mst ims_post);
@@ -879,7 +879,7 @@ fn prim
        as (A.pts_to parent_a (Seq.create (SZ.v n) source));
   
   // Set key[source] = 0
-  A.op_Array_Assignment key_a source 0sz;
+  A.op_Dot_Lparen_Rparen_Less_Minus key_a source 0sz;
   
   // Establish initial correctness properties
   with key_seq_init. assert (A.pts_to key_a key_seq_init);
@@ -960,7 +960,7 @@ fn prim
   prim_kpc_parent_source ks_end ps_end weights_seq (SZ.v n) (SZ.v source) source;
   // Transfer prim_mst_result through parent[source] update
   Greedy.prim_mst_result_upd_source ps_end ks_end weights_seq (SZ.v n) (SZ.v source) source;
-  A.op_Array_Assignment parent_a source source;
+  A.op_Dot_Lparen_Rparen_Less_Minus parent_a source source;
   with ps_final. assert (A.pts_to parent_a ps_final);
   lemma_upd_preserves_parent_valid ps_end (SZ.v source) source (SZ.v n);
   prim_kpc_elim ks_end ps_final weights_seq (SZ.v n) (SZ.v source);

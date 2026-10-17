@@ -22,7 +22,8 @@ let sorted (s: Seq.seq nat)
   = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
 let sorted_prefix (s:Seq.seq nat) (n:nat{n <= Seq.length s}) : prop =
-  forall (i j: nat). i <= j /\ j < n ==> Seq.index s i <= Seq.index s j
+  forall (i j: nat). {:pattern (Seq.index s i); (Seq.index s j)}
+    i <= j /\ j < n ==> Seq.index s i <= Seq.index s j
 
 [@@"opaque_to_smt"]
 let permutation (s1 s2: Seq.seq nat) : prop = (SeqP.permutation nat s1 s2)

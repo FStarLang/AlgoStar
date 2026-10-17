@@ -285,7 +285,7 @@ let rec insert_by_digit_permutation
 
 /// Lemma: insertion_sort_by_digit is a permutation
 #restart-solver
-#push-options "--z3rlimit 30 --split_queries always"
+#push-options "--z3rlimit 30"
 let insertion_sort_permutation_base
   (s: seq nat{length s = 0}) (d: nat) (base: pos)
   : Lemma (permutation s (insertion_sort_by_digit s d base))
@@ -378,7 +378,7 @@ let rec insert_before_equal (x: nat) (s: seq nat) (d base: nat) (py: nat)
 /// Explicit witness shifting needed: the existential postcondition with
 /// insert_by_digit creates a refinement matching loop (~4M quantifier
 /// instances) when Z3 attempts to find witnesses implicitly.
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 20 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 20"
 let rec insert_preserves_order (h: nat) (s: seq nat) (d base: nat) (px py: nat)
   : Lemma (requires base > 0 /\ px < py /\ py < length s)
           (ensures (insert_by_digit_length h s d base;
@@ -587,7 +587,8 @@ let rec lex_le_r_transitive (u v w: nat) (max_d base: nat)
     end else ()
 
 /// Extract lex_le_r for arbitrary index pairs from sorted_up_to_digit
-#push-options "--z3rlimit 20"
+/// (digit's definition, which involves non-linear arithmetic, is not needed here)
+#push-options "--z3rlimit 20 --using_facts_from '* -CLRS.Ch08.RadixSort.Base.digit'"
 let rec sorted_up_to_digit_elim (s: seq nat) (max_d base: nat) (i j: nat)
   : Lemma (requires sorted_up_to_digit s max_d base /\ i < j /\ j < length s)
           (ensures lex_le_r (index s i) (index s j) max_d base) (decreases j)
@@ -657,18 +658,26 @@ let backward_stability (s: seq nat) (d base: nat) (i j: nat)
 #pop-options
 
 /// sorted_on_digit implies digit-monotonicity for all pairs
+/// (digit's definition, which involves non-linear arithmetic, is not needed here)
+#push-options "--fuel 1 --ifuel 0 --z3rlimit 10 --using_facts_from '* -CLRS.Ch08.RadixSort.Base.digit'"
 let rec sorted_on_digit_le (s: seq nat) (d base: nat) (i j: nat)
   : Lemma (requires sorted_on_digit s d base /\ i < j /\ j < length s)
           (ensures digit (index s i) d base <= digit (index s j) d base)
           (decreases j)
   = if i = 0 && j = 1 then ()
     else if i = 0 then (
+      let t = tail s in
       sorted_on_digit_tail s d base;
-      sorted_on_digit_le (tail s) d base 0 (j - 1)
+      assert (index t (j - 1) == index s j);
+      sorted_on_digit_le t d base 0 (j - 1)
     ) else (
+      let t = tail s in
       sorted_on_digit_tail s d base;
-      sorted_on_digit_le (tail s) d base (i - 1) (j - 1)
+      assert (index t (i - 1) == index s i);
+      assert (index t (j - 1) == index s j);
+      sorted_on_digit_le t d base (i - 1) (j - 1)
     )
+#pop-options
 
 /// Helper: backward stability + lex ordering extraction (separated for VC size)
 #push-options "--fuel 0 --ifuel 0 --z3rlimit 5"
@@ -742,7 +751,7 @@ let rec radix_sort_permutation
 #pop-options
 
 /// Helper for radix_sort_invariant inductive step
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 20"
 let radix_sort_invariant_step
   (s: seq nat) (num_digits: nat) (base: nat)
   : Lemma (requires base >= 2 /\ distinct s /\ num_digits > 1 /\
@@ -892,7 +901,19 @@ let rec digit_decomposition_multi (k: nat) (bigD: nat) (base: nat)
 
 /// digit_sum ordering when MSD differs: if digit x d0 < digit y d0 and
 /// all higher digits (d0 < d' < d) are equal, then digit_sum x d ≤ digit_sum y d
-#push-options "--z3rlimit 30 --fuel 2"
+/// One unfolding of digit_sum_multi, proved in isolation
+let digit_sum_multi_unfold (k: nat) (d: pos) (base: pos)
+  : Lemma (digit_sum_multi k d base == digit k (d - 1) base * pow base (d - 1) + digit_sum_multi k (d - 1) base)
+  = assert_norm (digit_sum_multi k d base == digit k (d - 1) base * pow base (d - 1) + digit_sum_multi k (d - 1) base)
+
+/// Arithmetic core of the MSD comparison (no recursive definitions involved)
+let msd_arith_multi (dx dy sx sy p: int)
+  : Lemma (requires p > 0 /\ dx < dy /\ 0 <= sx /\ sx < p /\ 0 <= sy)
+          (ensures dx * p + sx <= dy * p + sy)
+  = lemma_mult_le_right p dx (dy - 1);
+    distributivity_sub_left dy 1 p
+
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let rec digit_sum_msd_le_multi (x y: nat) (d d0: nat) (base: nat)
   : Lemma (requires base >= 2 /\ d0 < d /\
                     digit x d0 base < digit y d0 base /\
@@ -902,10 +923,17 @@ let rec digit_sum_msd_le_multi (x y: nat) (d d0: nat) (base: nat)
   = if d = d0 + 1 then (
       pow_positive base d0;
       digit_sum_bound_multi x d0 base;
-      lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1)
+      digit_sum_multi_unfold x d base;
+      digit_sum_multi_unfold y d base;
+      msd_arith_multi (digit x d0 base) (digit y d0 base)
+                      (digit_sum_multi x d0 base) (digit_sum_multi y d0 base) (pow base d0)
     ) else (
-      assert (digit x (d - 1) base == digit y (d - 1) base);
-      digit_sum_msd_le_multi x y (d - 1) d0 base
+      let d1 : nat = d - 1 in
+      assert (d0 < d1 /\ d1 < d);
+      assert (digit x d1 base == digit y d1 base);
+      digit_sum_msd_le_multi x y d1 d0 base;
+      digit_sum_multi_unfold x d base;
+      digit_sum_multi_unfold y d base
     )
 #pop-options
 
@@ -969,7 +997,7 @@ let digits_lexicographic_implies_value_le
 /// Either all digits are equal, or the most significant differing digit has x<y
 /// and all higher digits are equal.
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
   : Lemma (requires base >= 2 /\
                     (forall (d:nat). d < nd ==> digit x d base <= digit y d base))
@@ -1160,7 +1188,7 @@ let example_radix_sort_correct ()
                    sorted result))
   = let input : seq nat = Seq.seq_of_list [170; 45; 75; 90; 2; 24; 802; 66] in
     pow_positive 10 3;
-    assert (pow 10 3 == 1000);
+    assert_norm (pow 10 3 == 1000);
     assert (forall (i: nat). i < length input ==> index input i < 1000);
     assert (distinct input);
     radix_sort_correct input 3 10

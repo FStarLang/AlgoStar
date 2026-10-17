@@ -119,15 +119,17 @@ let pi_max_sz_up_to (#a: eqtype) (pattern: seq a) (pi: seq SZ.t) (bound: nat) : 
   bound <= length pattern /\
   length pi >= length pattern /\
   length pattern > 0 /\
-  (forall (q: nat). q < bound ==>
+  (forall (q: nat). {:pattern (index pi q)} q < bound ==>
     is_prefix_suffix pattern q (SZ.v (index pi q))) /\
-  (forall (q: nat) (k: nat). q < bound /\ is_prefix_suffix pattern q k ==> k <= SZ.v (index pi q))
+  (forall (q: nat) (k: nat). {:pattern (is_prefix_suffix pattern q k)}
+    q < bound /\ is_prefix_suffix pattern q k ==> k <= SZ.v (index pi q))
 
 /// Inner loop invariant: all PS values above current k have been checked
 /// and found to mismatch pattern[q].
 let all_ps_above_mismatch (#a: eqtype) (pattern: seq a)
     (q: nat{q > 0 /\ q < length pattern}) (k_cur: nat) : prop =
-  forall (j: nat). j > k_cur /\ is_prefix_suffix pattern (q - 1) j /\ j < length pattern ==>
+  forall (j: nat). {:pattern (is_prefix_suffix pattern (q - 1) j)}
+    j > k_cur /\ is_prefix_suffix pattern (q - 1) j /\ j < length pattern ==>
     index pattern j <> index pattern q
 
 /// Base case: pi[0] = 0 is trivially maximal (only PS of position 0 is k=0)
@@ -267,7 +269,7 @@ let fold_pi_max_up_to (#a: eqtype) (pattern: seq a) (pi: seq SZ.t) (bound: nat)
 
 /// Top-level helper: validity at any q' < q+1 from separate facts.
 /// Must be top-level to avoid inner function subtyping issues.
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let valid_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern}) (q': nat{q' < length pattern})
   : Lemma
@@ -278,12 +280,12 @@ let valid_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
              q' < q + 1)
     (ensures is_prefix_suffix pattern q' (SZ.v (index pi q')))
   = if q' < q then ()
-    else ()
+    else assert (q' == q)
 #pop-options
 
 /// Top-level helper: maximality at any q' < q+1 from separate flat foralls.
 /// Explicit case split avoids Z3 trigger matching issues.
-#push-options "--z3rlimit 20 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 0 --ifuel 0"
 let max_at_combined (#a: eqtype) (pattern: seq a) (pi: seq SZ.t)
     (q: nat{0 < q /\ q < length pattern}) (q': nat{q' < length pattern}) (k: nat)
   : Lemma

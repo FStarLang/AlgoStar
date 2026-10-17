@@ -251,7 +251,7 @@ let list_remove_two_trace (#a: Type) (active: list a) (j1 j2: nat) (k: nat)
     end
 #pop-options
 
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --z3refresh"
 let freq2_le_at_rem_pos
   (pq0 pq1: Seq.seq pq_entry) (active0: list forest_entry)
   (freq1 freq2: pos) (idx1 idx2: SZ.t) (j1 j2: nat) (k: nat)
@@ -485,7 +485,7 @@ let forest_has_pq_entry_prepend
 
 // ========== Section 5: Merge step helpers ==========
 
-#push-options "--z3rlimit 40 --split_queries always --z3refresh"
+#push-options "--z3rlimit 40 --z3refresh"
 let list_remove_two_preserves_entry (entries: list forest_entry) (j1 j2 k: nat)
   : Lemma (requires j1 < L.length entries /\ j2 < L.length entries /\ j1 <> j2 /\
                     k < L.length entries /\ k <> j1 /\ k <> j2 /\
@@ -562,7 +562,7 @@ let pq_merge_step_single_mem
     pq_entry_freq_ok_remove_two (fst y) (snd y) active0 j1 j2;
     pq_entry_freq_ok_prepend (fst y) (snd y) rem new_entry
 
-#push-options "--split_queries always"
+#push-options ""
 let merge_step_new_entry_freq_ok
   (rem: list forest_entry) (idx1: SZ.t) (merged: hnode_ptr) (sum_freq: pos)
   (t1 t2: HSpec.htree)
@@ -746,7 +746,7 @@ let merge_bundle_intro (freq_seq: Seq.seq int) (nd_contents: Seq.seq hnode_ptr)
           (ensures merge_bundle freq_seq nd_contents pq active n)
   = reveal_opaque (`%merge_bundle) merge_bundle
 
-#push-options "--z3rlimit 30 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 30 --fuel 1 --ifuel 1"
 let cost_invariant_from_merge_bundle
   (freq_seq: Seq.seq int) (nd_old: Seq.seq hnode_ptr)
   (pq0 pq1: Seq.seq pq_entry)
@@ -792,7 +792,7 @@ let cost_invariant_from_merge_bundle
     freq2_le_remaining_root_freqs pq0 pq1 active0 freq1 freq2 idx1 idx2 j1 j2
 #pop-options
 
-#push-options "--z3rlimit 60 --fuel 1 --ifuel 1 --split_queries always --z3refresh"
+#push-options "--z3rlimit 60 --fuel 1 --ifuel 1 --z3refresh"
 private
 let merge_bundle_step_aux
   (freq_seq: Seq.seq int)

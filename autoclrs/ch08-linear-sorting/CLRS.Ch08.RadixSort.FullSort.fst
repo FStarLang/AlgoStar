@@ -187,8 +187,20 @@ let rec lemma_digit_sum_bound_3 (k: nat) (d: nat) (base: nat)
       ()
     )
 
+/// Helper: arithmetic core of the MSD comparison (no recursive definitions involved)
+let lemma_msd_arith (dx dy sx sy p: int)
+  : Lemma (requires p > 0 /\ dx < dy /\ 0 <= sx /\ sx < p /\ 0 <= sy)
+          (ensures dx * p + sx <= dy * p + sy)
+  = lemma_mult_le_right p dx (dy - 1);
+    distributivity_sub_left dy 1 p
+
+/// Helper: one unfolding of digit_sum, proved in isolation
+let digit_sum_unfold (k: nat) (d: pos) (base: pos)
+  : Lemma (digit_sum k d base == digit k (d - 1) base * pow base (d - 1) + digit_sum k (d - 1) base)
+  = assert_norm (digit_sum k d base == digit k (d - 1) base * pow base (d - 1) + digit_sum k (d - 1) base)
+
 /// Helper: digit_sum ordering when MSD differs
-#push-options "--z3rlimit 30 --fuel 2"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let rec lemma_digit_sum_msd_le_3 (x y: nat) (d d0: nat) (base: nat)
   : Lemma (requires base >= 2 /\ d0 < d /\
                     digit x d0 base < digit y d0 base /\
@@ -199,18 +211,18 @@ let rec lemma_digit_sum_msd_le_3 (x y: nat) (d d0: nat) (base: nat)
       // digit_sum k (d0+1) = digit k d0 * pow base d0 + digit_sum k d0
       pow_positive base d0;
       lemma_digit_sum_bound_3 x d0 base;
-      // digit(x,d0) < digit(y,d0) => digit(x,d0) <= digit(y,d0) - 1
-      // digit(x,d0) * base^d0 + digit_sum x d0 
-      //   <= (digit(y,d0) - 1) * base^d0 + (base^d0 - 1)
-      //   = digit(y,d0) * base^d0 - 1
-      //   <= digit(y,d0) * base^d0 + digit_sum y d0
-      lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1);
-      ()
+      digit_sum_unfold x d base;
+      digit_sum_unfold y d base;
+      lemma_msd_arith (digit x d0 base) (digit y d0 base)
+                      (digit_sum x d0 base) (digit_sum y d0 base) (pow base d0)
     ) else (
       // d > d0 + 1: digit(x, d-1) == digit(y, d-1) since d-1 > d0
-      assert (digit x (d - 1) base == digit y (d - 1) base);
-      lemma_digit_sum_msd_le_3 x y (d - 1) d0 base;
-      ()
+      let d1 : nat = d - 1 in
+      assert (d0 < d1 /\ d1 < d);
+      assert (digit x d1 base == digit y d1 base);
+      lemma_digit_sum_msd_le_3 x y d1 d0 base;
+      digit_sum_unfold x d base;
+      digit_sum_unfold y d base
     )
 #pop-options
 
@@ -251,8 +263,7 @@ let digits_lex_order_implies_numeric_order
         eliminate exists (d0: nat).
           d0 < bigD /\ digit x d0 base < digit y d0 base /\
           (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base)
-        returns digit_sum x bigD base <= digit_sum y bigD base
-        with _. lemma_digit_sum_msd_le_3 x y bigD d0 base
+        with lemma_digit_sum_msd_le_3 x y bigD d0 base
     )
 #pop-options
 
@@ -277,7 +288,8 @@ let digits_all_equal_implies_equal
 #push-options "--fuel 2 --ifuel 1 --z3rlimit 5"
 let rec lemma_pairwise_le_implies_sorted (s: seq nat)
   : Lemma (requires length s > 0 /\
-                    (forall (i j: nat). i < length s /\ j < length s /\ i < j ==> 
+                    (forall (i j: nat). {:pattern (index s i); (index s j)}
+                      i < length s /\ j < length s /\ i < j ==> 
                       index s i <= index s j))
           (ensures sorted s)
           (decreases (length s))

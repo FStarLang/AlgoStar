@@ -24,7 +24,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 open CLRS.Common.Complexity
 
 module A = Pulse.Lib.Array
@@ -78,7 +77,7 @@ fn partition_in_range
 //SNIPPET_END: partition_in_range
 {
   let hi_m1 = hi -^ 1sz;
-  let pivot = A.op_Array_Access a hi_m1;
+  let pivot = A.op_Dot_Lparen_Rparen a hi_m1;
 
   let mut i_ref: SZ.t = lo;
   let mut j_ref: SZ.t = lo;
@@ -107,15 +106,15 @@ fn partition_in_range
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vj - SZ.v lo
     )
-  decreases (SZ.v hi_m1 `Prims.op_Subtraction` SZ.v !j_ref)
+  decreases (SZ.v hi_m1 `Prims.op_Minus` SZ.v !j_ref)
   {
     let vj = !j_ref;
     let vi = !i_ref;
 
     with s_pre. assert (A.pts_to a s_pre);
 
-    let aj = A.op_Array_Access a vj;
-    let ai = A.op_Array_Access a vi;
+    let aj = A.op_Dot_Lparen_Rparen a vj;
+    let ai = A.op_Dot_Lparen_Rparen a vi;
 
     tick ctr;
     let should_swap = (aj <= pivot);
@@ -124,8 +123,8 @@ fn partition_in_range
 
     let new_ai = (if should_swap then aj else ai);
     let new_aj = (if should_swap then ai else aj);
-    A.op_Array_Assignment a vi new_ai;
-    A.op_Array_Assignment a vj new_aj;
+    A.op_Dot_Lparen_Rparen_Less_Minus a vi new_ai;
+    A.op_Dot_Lparen_Rparen_Less_Minus a vj new_aj;
     with s_post. assert (A.pts_to a s_post);
 
     if (should_swap) {
@@ -140,10 +139,10 @@ fn partition_in_range
   };
 
   let vi = !i_ref;
-  let ai = A.op_Array_Access a vi;
+  let ai = A.op_Dot_Lparen_Rparen a vi;
   with s_pre2. assert (A.pts_to a s_pre2);
-  A.op_Array_Assignment a vi pivot;
-  A.op_Array_Assignment a hi_m1 ai;
+  A.op_Dot_Lparen_Rparen_Less_Minus a vi pivot;
+  A.op_Dot_Lparen_Rparen_Less_Minus a hi_m1 ai;
   with s_final. assert (A.pts_to a s_final);
   swap_is_permutation s_pre2 (SZ.v vi) (SZ.v hi_m1);
 
@@ -159,27 +158,23 @@ private let reveal_perm (s_pre s1: Seq.seq int)
           (ensures Seq.Properties.permutation int s_pre s1)
   = reveal_opaque (`%QSpec.permutation) (QSpec.permutation s_pre s1)
 
-#push-options "--z3rlimit 5 --split_queries always"
+#push-options "--z3rlimit 5"
 let perm_lower_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
   : Lemma
     (requires lo <= hi /\ hi <= Seq.length s_pre /\
               Seq.length s_pre == Seq.length s1 /\
               permutation s_pre s1 /\
               (forall (idx: nat). idx < Seq.length s1 ==>
-                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx))
-    (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
-              (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
-              v <= Seq.index s1 j)
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx) /\
+              (forall (i j: nat). i < lo /\ lo <= j /\ j < hi ==>
+                Seq.index s_pre i <= Seq.index s_pre j))
+    (ensures forall (i j: nat). i < lo /\ lo <= j /\ j < hi ==>
+              Seq.index s1 i <= Seq.index s1 j)
   = reveal_perm s_pre s1;
-    let aux (j: nat) (v: int) : Lemma
-      (lo <= j /\ j < hi /\
-        (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m) ==>
-        v <= Seq.index s1 j)
-    = Classical.impl_intro_gen
-        #(lo <= j /\ j < hi /\
-          (forall (m: nat). lo <= m /\ m < hi ==> v <= Seq.index s_pre m))
-        #(fun _ -> v <= Seq.index s1 j)
-        (fun _ -> Lemmas.perm_unchanged_lower_bound s_pre s1 lo hi v j)
+    let aux (i j: nat) : Lemma
+      (i < lo /\ lo <= j /\ j < hi ==> Seq.index s1 i <= Seq.index s1 j)
+    = if i < lo && lo <= j && j < hi then
+        Lemmas.perm_unchanged_lower_bound s_pre s1 lo hi (Seq.index s_pre i) j
     in
     Classical.forall_intro_2 aux
 
@@ -189,20 +184,16 @@ let perm_upper_bound_forall (s_pre s1: Seq.seq int) (lo hi: nat)
               Seq.length s_pre == Seq.length s1 /\
               permutation s_pre s1 /\
               (forall (idx: nat). idx < Seq.length s1 ==>
-                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx))
-    (ensures forall (j: nat) (v: int). lo <= j /\ j < hi /\
-              (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
-              Seq.index s1 j <= v)
+                (idx < lo \/ hi <= idx) ==> Seq.index s1 idx == Seq.index s_pre idx) /\
+              (forall (i j: nat). lo <= i /\ i < hi /\ hi <= j /\ j < Seq.length s_pre ==>
+                Seq.index s_pre i <= Seq.index s_pre j))
+    (ensures forall (i j: nat). lo <= i /\ i < hi /\ hi <= j /\ j < Seq.length s1 ==>
+              Seq.index s1 i <= Seq.index s1 j)
   = reveal_perm s_pre s1;
-    let aux (j: nat) (v: int) : Lemma
-      (lo <= j /\ j < hi /\
-        (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v) ==>
-        Seq.index s1 j <= v)
-    = Classical.impl_intro_gen
-        #(lo <= j /\ j < hi /\
-          (forall (m: nat). lo <= m /\ m < hi ==> Seq.index s_pre m <= v))
-        #(fun _ -> Seq.index s1 j <= v)
-        (fun _ -> Lemmas.perm_unchanged_upper_bound s_pre s1 lo hi v j)
+    let aux (i j: nat) : Lemma
+      (lo <= i /\ i < hi /\ hi <= j /\ j < Seq.length s1 ==> Seq.index s1 i <= Seq.index s1 j)
+    = if lo <= i && i < hi && hi <= j && j < Seq.length s1 then
+        Lemmas.perm_unchanged_upper_bound s_pre s1 lo hi (Seq.index s_pre j) i
     in
     Classical.forall_intro_2 aux
 #pop-options
@@ -222,7 +213,7 @@ let quickselect_correctness (s0 s_final: Seq.seq int) (k: nat)
 
 // ========== Quickselect — single function, correctness + complexity ==========
 
-#push-options "--z3rlimit 5 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --ifuel 2 --fuel 2"
 //SNIPPET_START: quickselect
 fn quickselect
   (a: A.array int)
@@ -283,7 +274,7 @@ fn quickselect
       vc >= reveal c0 /\
       vc - reveal c0 + QC.qs_cost (SZ.v vhi - SZ.v vlo) <= QC.qs_cost (SZ.v n)
     )
-  decreases (SZ.v !hi_ref `Prims.op_Subtraction` SZ.v !lo_ref)
+  decreases (SZ.v !hi_ref `Prims.op_Minus` SZ.v !lo_ref)
   {
     let vlo = !lo_ref;
     let vhi = !hi_ref;
@@ -317,7 +308,7 @@ fn quickselect
     };
   };
 
-  let result = A.op_Array_Access a k;
+  let result = A.op_Dot_Lparen_Rparen a k;
   with s_final. assert (A.pts_to a s_final);
   quickselect_correctness s0 s_final (SZ.v k);
   result

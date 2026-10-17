@@ -237,7 +237,7 @@ let parent_in_mst_after_update
     introduce forall (v w: nat). v < n /\ w < n /\
       SZ.v (Seq.index ks_new v) < SZ.v (65535sz) /\ v <> source /\
       w == SZ.v (Seq.index ps_new v) ==> SZ.v (Seq.index ims w) = 1
-    with introduce _ ==> _ with _.
+    with introduce _ ==> _ with
       if SZ.v (Seq.index ims v) = 1 then begin
         ims_unchanged_at ks_old ps_old ks_new ps_new ims n source v;
         // Now: ps_old[v] == ps_new[v] AND ks_old[v] == ks_new[v]
@@ -596,7 +596,7 @@ let lift_predicates_add_vertex
 /// Full rebuild: from pre-add state + update_progress + keys_bounded_by_u,
 /// produce prim_inv_bundle on NEW keys and NEW ims.
 /// All reasoning done here with reveal_opaque in KeyInv's tight context.
-#push-options "--z3rlimit 5 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let full_rebuild_after_update
     (safe_old kpc_old safe_new kpc_new: prop)
     (ks_old ps_old ks_new ps_new ws ims_old ims_new: Seq.seq SZ.t) (n source u: nat)

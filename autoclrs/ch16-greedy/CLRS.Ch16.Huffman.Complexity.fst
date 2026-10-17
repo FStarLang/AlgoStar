@@ -141,7 +141,7 @@ let huffman_complexity_simple (n: nat{n >= 1})
   = introduce forall (l: list htree). Cons? l /\ length l == n ==> huffman_ticks l <= square n
     with (
       introduce _ ==> _
-      with _. huffman_complexity l
+      with huffman_complexity l
     )
 
 (*** Example: Verify on concrete input ***)

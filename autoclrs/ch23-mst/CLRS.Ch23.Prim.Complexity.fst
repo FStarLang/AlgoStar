@@ -120,6 +120,12 @@ let lemma_loop_exit_v_iter_equals_n (v n: nat)
           (ensures v == n)
   = () // Trivial: v >= n /\ v <= n ==> v == n
 
+// Helper lemma: one more iteration raises the tick bound by 3 * n.
+let lemma_iter_bound_step (v n: nat)
+  : Lemma (v * 3 * n + 3 * n == (v + 1) * 3 * n)
+  = distributivity_add_left v 1 3;
+    distributivity_add_left (v * 3) 3 n
+
 
 
 inline_for_extraction  
@@ -147,7 +153,7 @@ let compute_weight_idx = compute_weight_idx_u64
 
 // ========== Ghost tick counter ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -200,7 +206,7 @@ fn prim_complexity
        as (A.pts_to key_a (Seq.create (SZ.v n) infinity));
   
   // Set key[source] = 0
-  A.op_Array_Assignment key_a source 0sz;
+  A.op_Dot_Lparen_Rparen_Less_Minus key_a source 0sz;
   
   // Establish initial correctness properties
   with key_seq_init. assert (A.pts_to key_a key_seq_init);
@@ -242,8 +248,9 @@ fn prim_complexity
       // We use 3*n to account for overhead
       vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n
     )
-  // TODO: decreases — proof interference
+  decreases (SZ.v n - SZ.v !iter)
   {
+    let cur_iter = !iter;
     // Find minimum key vertex not in MST
     let mut min_idx: SZ.t = 0sz;
     let mut min_key: SZ.t = infinity;
@@ -265,6 +272,7 @@ fn prim_complexity
       pure (
         SZ.v v_find_i <= SZ.v n /\
         SZ.v v_min_idx < SZ.v n /\
+        v_iter == cur_iter /\
         SZ.v v_iter < SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
@@ -277,8 +285,8 @@ fn prim_complexity
     decreases (SZ.v n - SZ.v !find_i)
     {
       let v_find_i = !find_i;
-      let ki = A.op_Array_Access key_a v_find_i;
-      let in_mst_i = A.op_Array_Access in_mst v_find_i;
+      let ki = A.op_Dot_Lparen_Rparen key_a v_find_i;
+      let in_mst_i = A.op_Dot_Lparen_Rparen in_mst v_find_i;
       let v_min_key = !min_key;
       let v_min_idx = !min_idx;
       
@@ -299,7 +307,7 @@ fn prim_complexity
     
     // Add min_idx to MST
     let u = !min_idx;
-    A.op_Array_Assignment in_mst u 1sz;
+    A.op_Dot_Lparen_Rparen_Less_Minus in_mst u 1sz;
     
     // Update keys of neighbors
     let mut update_i: SZ.t = 0sz;
@@ -330,6 +338,7 @@ fn prim_complexity
       pure (
         SZ.v v_update_i <= SZ.v n /\
         SZ.v u < SZ.v n /\
+        v_iter == cur_iter /\
         SZ.v v_iter < SZ.v n /\
         Seq.length key_seq == SZ.v n /\
         Seq.length in_mst_seq == SZ.v n /\
@@ -346,12 +355,12 @@ fn prim_complexity
       let v = !update_i;
       
       // Read current values
-      let key_v = A.op_Array_Access key_a v;
-      let in_mst_v = A.op_Array_Access in_mst v;
+      let key_v = A.op_Dot_Lparen_Rparen key_a v;
+      let in_mst_v = A.op_Dot_Lparen_Rparen in_mst v;
       
       // Compute weight index: u * n + v
       let weight_idx = compute_weight_idx u n v;
-      let weight_uv = A.op_Array_Access weights weight_idx;
+      let weight_uv = A.op_Dot_Lparen_Rparen weights weight_idx;
       
       // Count the comparison/update operation
       tick ctr;
@@ -367,7 +376,7 @@ fn prim_complexity
       assert (pure (SZ.v new_key_v <= SZ.v infinity));
       
       // Write unconditionally
-      A.op_Array_Assignment key_a v new_key_v;
+      A.op_Dot_Lparen_Rparen_Less_Minus key_a v new_key_v;
       
       update_i := v +^ 1sz;
     };
@@ -403,6 +412,7 @@ fn prim_complexity
     assert (pure (vc - reveal c0 <= SZ.v v_iter * 3 * SZ.v n + SZ.v n + SZ.v n));
     assert (pure (SZ.v v_iter * 3 * SZ.v n + SZ.v n + SZ.v n 
                   <= SZ.v v_iter * 3 * SZ.v n + 3 * SZ.v n));
+    lemma_iter_bound_step (SZ.v v_iter) (SZ.v n);
     assert (pure (SZ.v v_iter * 3 * SZ.v n + 3 * SZ.v n 
                   == (SZ.v v_iter + 1) * 3 * SZ.v n));
     assert (pure (vc - reveal c0 <= (SZ.v v_iter + 1) * 3 * SZ.v n));

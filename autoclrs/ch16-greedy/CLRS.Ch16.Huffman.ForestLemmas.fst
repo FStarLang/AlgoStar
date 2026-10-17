@@ -235,7 +235,7 @@ let forest_distinct_indices_after_merge
     forest_distinct_indices_prepend (list_remove_two active0 j1 j2) (idx, merged, tree)
 
 // Node-pointer correspondence after Seq.upd at idx1
-#push-options "--split_queries always --z3rlimit 30"
+#push-options "--z3rlimit 30"
 let node_ptr_correspondence_upd_tail
   (active0: list forest_entry) (j1 j2: nat)
   (idx1: SZ.t) (merged: hnode_ptr) (tree: HSpec.htree)
@@ -791,7 +791,7 @@ let remaining_no_idx (active: list forest_entry) (j1 j2: nat) (idx1: SZ.t)
     let rem = list_remove_at rem1 j2' in
     introduce forall (k: nat). k < L.length rem ==> entry_idx (L.index rem k) <> idx1
     with introduce _ ==> _
-    with _. (
+    with (
       // Step 1: trace k in rem to k1 in rem1
       list_remove_at_index rem1 j2' k;
       let k1 : nat = if k < j2' then k else k + 1 in

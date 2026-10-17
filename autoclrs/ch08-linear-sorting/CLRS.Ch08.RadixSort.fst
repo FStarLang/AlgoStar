@@ -24,7 +24,6 @@ module CLRS.Ch08.RadixSort
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -77,7 +76,7 @@ ensures exists* s.
 // Correctness from RadixSort.Stability and RadixSort.FullSort.
 
 //SNIPPET_START: radix_sort_multidigit_sig
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 fn radix_sort_multidigit
   (a: A.array nat)
   (len: SZ.t)
@@ -148,7 +147,7 @@ ensures exists* s.
       SZ.fits (SZ.v base_val + 2) /\
       SZ.fits (SZ.v len + SZ.v base_val + 2)
     )
-  decreases (SZ.v bigD `Prims.op_Subtraction` SZ.v !d)
+  decreases (SZ.v bigD `Prims.op_Minus` SZ.v !d)
   {
     let vd = !d;
     with s_curr. assert (A.pts_to a s_curr);

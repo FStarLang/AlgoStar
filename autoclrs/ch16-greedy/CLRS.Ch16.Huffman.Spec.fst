@@ -978,12 +978,7 @@ let rec max_depth_has_sibling_leaves (t: htree)
                       is_leaf_at l (parent @ [false]) fr /\
                       length (parent @ [true]) = ml /\
                       length (parent @ [false]) = ml
-          returns exists (parent: tree_position) (fl fr: pos).
-                      is_leaf_at t (parent @ [true]) fl /\
-                      is_leaf_at t (parent @ [false]) fr /\
-                      length (parent @ [true]) = max_leaf_depth t 0 /\
-                      length (parent @ [false]) = max_leaf_depth t 0
-          with _. (
+          with (
             let parent' = true :: parent in
             assert (get_subtree_at t (parent' @ [true]) == get_subtree_at l (parent @ [true]));
             assert (get_subtree_at t (parent' @ [false]) == get_subtree_at l (parent @ [false]));
@@ -1014,12 +1009,7 @@ let rec max_depth_has_sibling_leaves (t: htree)
                       is_leaf_at r (parent @ [false]) fr /\
                       length (parent @ [true]) = mr /\
                       length (parent @ [false]) = mr
-          returns exists (parent: tree_position) (fl fr: pos).
-                      is_leaf_at t (parent @ [true]) fl /\
-                      is_leaf_at t (parent @ [false]) fr /\
-                      length (parent @ [true]) = max_leaf_depth t 0 /\
-                      length (parent @ [false]) = max_leaf_depth t 0
-          with _. (
+          with (
             let parent' = false :: parent in
             assert (get_subtree_at t (parent' @ [true]) == get_subtree_at r (parent @ [true]));
             assert (get_subtree_at t (parent' @ [false]) == get_subtree_at r (parent @ [false]));
@@ -2018,8 +2008,7 @@ let greedy_choice_theorem (freqs: list pos{length freqs >= 2})
             is_leaf_at t (parent @ [false]) fr /\
             length (parent @ [true]) = max_leaf_depth t 0 /\
             length (parent @ [false]) = max_leaf_depth t 0
-        returns exists (t': htree). is_wpl_optimal t' freqs /\ are_siblings t' f1 f2 == true
-        with _. (
+        with (
           parent_has_leaf_children t parent fl fr;
           if (fl = f1 && fr = f2) || (fl = f2 && fr = f1) then
             subtree_siblings_implies_are_siblings t parent f1 f2

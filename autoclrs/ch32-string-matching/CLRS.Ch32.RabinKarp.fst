@@ -84,7 +84,7 @@ let rec count_matches_up_to_bounded (text pattern: Seq.seq nat) (limit: nat)
     else count_matches_up_to_bounded text pattern (limit - 1)
 
 // Key combined lemma: should_count equivalence
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let should_count_correct
     (text pattern: Seq.seq nat) (d: nat) (q: pos) (s m: nat)
     (hash_match: bool) (final_verified: int) (final_j: nat)
@@ -159,7 +159,7 @@ fn compute_hash
     let vi = !i;
     let vacc = !acc;
 
-    let c = A.op_Array_Access arr (start +^ vi);
+    let c = A.op_Dot_Lparen_Rparen arr (start +^ vi);
     // hash(start, start+vi+1) = (d * hash(start, start+vi) + x[start+vi]) % q
     let new_acc = (d * vacc + c) % q;
     acc := new_acc;
@@ -325,8 +325,8 @@ fn rabin_karp
     {
       let vj = !j;
 
-      let text_char = A.op_Array_Access text (vs +^ vj);
-      let pat_char = A.op_Array_Access pattern vj;
+      let text_char = A.op_Dot_Lparen_Rparen text (vs +^ vj);
+      let pat_char = A.op_Dot_Lparen_Rparen pattern vj;
 
       // Count the comparison — one ghost tick
       tick ctr;
@@ -368,9 +368,10 @@ fn rabin_karp
       s := vs +^ 1sz
     } else {
       // Rolling hash update: t_{s+1} = (d * ((t_s + q - (old*h)%q) % q) + new) % q
-      let old_char = A.op_Array_Access text vs;
-      let new_char = A.op_Array_Access text (vs +^ m);
+      let old_char = A.op_Dot_Lparen_Rparen text vs;
+      let new_char = A.op_Dot_Lparen_Rparen text (vs +^ m);
       let new_hash = (d * ((vt_hash_outer + q - (old_char * h) % q) % q) + new_char) % q;
+      assert (pure (SZ.v vs + SZ.v m < Seq.length s_text));
       RKSpec.rolling_hash_step_correct s_text d q (SZ.v vs) (SZ.v m) vt_hash_outer h;
       t_hash := new_hash;
       s := vs +^ 1sz

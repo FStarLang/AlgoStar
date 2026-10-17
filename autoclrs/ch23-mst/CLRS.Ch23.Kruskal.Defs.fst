@@ -24,7 +24,7 @@ let lemma_index_in_bounds (u v n: nat)
 // edges_from_arrays is defined transparently in the .fsti
 
 // Transfer lemma for extensional array equality
-#push-options "--z3rlimit 5 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let valid_endpoints_ext (seu sev seu' sev': Seq.seq int) (n ec: nat)
   : Lemma (requires valid_endpoints seu sev n ec /\
                     ec <= n /\
@@ -149,7 +149,7 @@ let edges_adj_pos_elim (sadj: Seq.seq int) (seu sev: Seq.seq int) (n ec: nat)
                      adj_weight sadj n (Seq.index seu k) (Seq.index sev k) > 0))
   = reveal_opaque (`%edges_adj_pos) (edges_adj_pos sadj seu sev n ec)
 
-#push-options "--z3rlimit 5 --fuel 0 --ifuel 0 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let edges_adj_pos_ext (sadj: Seq.seq int) (seu sev seu' sev': Seq.seq int) (n ec: nat)
   : Lemma (requires edges_adj_pos sadj seu sev n ec /\
                     ec <= n /\

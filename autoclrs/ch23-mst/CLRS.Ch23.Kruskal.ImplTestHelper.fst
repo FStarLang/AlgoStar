@@ -208,7 +208,7 @@ let test_graph_edges_mem (e: edge)
   = assert_norm (Seq.length test_adj == 9);
     test_all_edges_mem 0 e
 
-#push-options "--fuel 10 --ifuel 10 --z3rlimit 800 --split_queries always --ext no:optimize_let_vc"
+#push-options "--fuel 10 --ifuel 10 --z3rlimit 800 --ext no:optimize_let_vc"
 /// From is_mst of the concrete graph, derive the unique MST edges.
 /// The MST is 0--1--2 with weight 3.
 let kruskal_mst_edges (es: list edge)

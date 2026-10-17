@@ -288,7 +288,7 @@ let graph_edge_weight_eq
     weights_to_adj_preserves ws n e.u e.v
 #pop-options
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let graph_edge_weight_bounds
     (ws: Seq.seq SZ.t) (n: nat) (e: edge)
   : Lemma
@@ -309,7 +309,7 @@ let graph_edge_weight_bounds
     assert (w > 0 /\ w < SZ.v infinity)
 #pop-options
 
-#push-options "--fuel 1 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let crossing_edge_at_least_min_key
     (ks ims ws: Seq.seq SZ.t) (n min_u: nat) (e: edge)
   : Lemma
@@ -424,7 +424,7 @@ let prim_safe_update_non_mst
 (*** Core Greedy Step via Cut Property ***)
 
 /// The main cut_property application. Uses KeyInv predicates as preconditions.
-#push-options "--z3rlimit 300 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 300 --fuel 2 --ifuel 1"
 let prim_cut_step
     (ps ks ims ws: Seq.seq SZ.t) (n source u: nat)
   : Lemma
@@ -1034,7 +1034,7 @@ let prim_mst_result_upd_source
 
 /// Post-loop MST derivation
 #restart-solver
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 1"
 let derive_prim_is_mst
     (ks ps ims ws: Seq.seq SZ.t) (n source: nat)
   : Lemma

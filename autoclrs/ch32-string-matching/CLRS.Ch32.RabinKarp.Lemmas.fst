@@ -44,7 +44,7 @@ let rec rabin_karp_matches_no_false_positives
 #pop-options
 
 /// No false negatives: every valid match appears in results.
-#push-options "--fuel 2 --ifuel 2 --z3rlimit 400 --split_queries always --ext no:optimize_let_vc"
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 40 --ext no:optimize_let_vc --using_facts_from '* -CLRS.Ch32.RabinKarp.Spec.hash -CLRS.Ch32.RabinKarp.Spec.pow -CLRS.Ch32.RabinKarp.Spec.pow_mod -CLRS.Ch32.RabinKarp.Spec.rolling_hash_step'"
 let rec rabin_karp_matches_no_false_negatives
     (text pattern:Seq.seq nat) (d:nat) (q:nat{q <> 0})
     (s:nat) (current_hash:nat)

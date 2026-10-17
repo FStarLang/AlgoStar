@@ -23,7 +23,7 @@ module ML = FStar.Math.Lemmas
    GHOST TICK — for complexity tracking
    ================================================================ *)
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -117,18 +117,18 @@ fn maybe_enqueue
   // Compute edge index: u * n + vv
   lemma_index_in_bounds (SZ.v u) (SZ.v vv) (SZ.v n);
   let idx = u *^ n +^ vv;
-  let edge_val = A.op_Array_Access adj idx;
-  let old_deg = A.op_Array_Access in_degree vv;
+  let edge_val = A.op_Dot_Lparen_Rparen adj idx;
+  let old_deg = A.op_Dot_Lparen_Rparen in_degree vv;
   let vqt = !queue_tail;
   
   if (edge_val <> 0) {
     // Edge exists: decrement in_degree[vv]
     let new_deg: int = old_deg - 1;
-    A.op_Array_Assignment in_degree vv new_deg;
+    A.op_Dot_Lparen_Rparen_Less_Minus in_degree vv new_deg;
     
     if (new_deg = 0 && SZ.lt vqt n) {
       // Enqueue vv
-      A.op_Array_Assignment queue_data vqt vv;
+      A.op_Dot_Lparen_Rparen_Less_Minus queue_data vqt vv;
       queue_tail := SZ.add vqt 1sz
     } else {
       ()
@@ -318,7 +318,7 @@ fn process_neighbors
 }
 #pop-options
 
-#push-options "--z3rlimit 10 --split_queries always --ifuel 2"
+#push-options "--z3rlimit 10 --ifuel 2"
 // Input: adjacency matrix adj (n×n represented as flat array)
 // Output: array containing topological order of vertices
 //SNIPPET_START: topological_sort_sig
@@ -423,12 +423,12 @@ fn topological_sort
       
       // Check if edge from vi to vj exists
       let idx = vi *^ n +^ vj;
-      let edge_val = A.op_Array_Access adj idx;
+      let edge_val = A.op_Dot_Lparen_Rparen adj idx;
       
       // If edge exists, increment in_degree[vj]
-      let old_deg = A.op_Array_Access in_degree vj;
+      let old_deg = A.op_Dot_Lparen_Rparen in_degree vj;
       let new_deg: int = (if edge_val <> 0 then old_deg + 1 else old_deg);
-      A.op_Array_Assignment in_degree vj new_deg;
+      A.op_Dot_Lparen_Rparen_Less_Minus in_degree vj new_deg;
       
       // Prove step1_inner_inv advances
       with sin_deg_new. assert (A.pts_to in_degree sin_deg_new);
@@ -492,10 +492,10 @@ fn topological_sort
     with squeue_pre. assert (A.pts_to queue squeue_pre);
     
     // Read in_degree[vi] (in_degree is framed — not in invariant)
-    let deg = A.op_Array_Access in_degree vi;
+    let deg = A.op_Dot_Lparen_Rparen in_degree vi;
     
     // Unconditionally write queue[vqt] = vi
-    A.op_Array_Assignment queue vqt vi;
+    A.op_Dot_Lparen_Rparen_Less_Minus queue vqt vi;
     with squeue_post. assert (A.pts_to queue squeue_post);
     
     // Conditionally advance queue_tail
@@ -595,13 +595,13 @@ fn topological_sort
     kahn_outer_inv_elim sadj (SZ.v n) sin_deg_pre squeue_pre soutput_pre (SZ.v vqh) (SZ.v vqt) (SZ.v vout);
     
     // Dequeue vertex u
-    let u = A.op_Array_Access queue vqh;
+    let u = A.op_Dot_Lparen_Rparen queue vqh;
     assert (pure (SZ.v u < SZ.v n));
     lemma_index_in_bounds (SZ.v u) 0 (SZ.v n);
     
     // Add u to output
     let u_int = SZ.v u;
-    A.op_Array_Assignment output vout u_int;
+    A.op_Dot_Lparen_Rparen_Less_Minus output vout u_int;
     
     // Capture post-write output state
     with soutput_post. assert (A.pts_to output soutput_post);

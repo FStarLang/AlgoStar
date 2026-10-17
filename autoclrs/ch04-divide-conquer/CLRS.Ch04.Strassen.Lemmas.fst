@@ -112,6 +112,8 @@ let rec lemma_dot_product_add_left
     else begin
       lemma_dot_product_add_left a1 a2 b i j (k - 1);
       lemma_matrix_add_elem a1 a2 i (k - 1);
+      FStar.Math.Lemmas.distributivity_add_left
+        (get_elem a1 i (k - 1)) (get_elem a2 i (k - 1)) (get_elem b (k - 1) j);
       ()
     end
 
@@ -285,8 +287,13 @@ let lemma_standard_multiply_quadrant_decomp
     ()
 #pop-options
 
+// Helper: bounds on half of a size (linear arithmetic in an empty context)
+let lemma_half_bounds (n:nat{n > 1})
+  : Lemma (ensures 0 < n / 2 /\ n / 2 < n)
+  = ()
+
 // Helper: prove element-wise equality for a specific element
-#push-options "--z3rlimit 22 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 22 --fuel 2 --ifuel 1"
 let rec lemma_strassen_elem_correct 
   (a b:matrix{cols a == rows b /\ is_square a /\ is_square b /\ pow2_size a})
   (i:nat{i < rows a}) (j:nat{j < cols b})
@@ -297,6 +304,8 @@ let rec lemma_strassen_elem_correct
     else begin
       let half = n / 2 in
       lemma_pow2_half n;
+      lemma_half_bounds n;
+      assert (0 < half /\ half < n);
       
       // Extract quadrants  
       let a11 = submatrix a 0 half 0 half in

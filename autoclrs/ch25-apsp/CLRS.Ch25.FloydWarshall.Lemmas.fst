@@ -84,7 +84,7 @@ let rec lemma_fw_inner_j_earlier_col
     end
 
 (* Key: fw_inner_j correctly computes relaxation for row i *)
-#push-options "--split_queries always"
+#push-options ""
 let rec lemma_fw_inner_j_correct
   (d: seq int) (n k i j: nat) (d_ik: int) (j': nat)
   : Lemma

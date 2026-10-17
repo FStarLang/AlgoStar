@@ -55,7 +55,7 @@ let lemma_queue_preds_extend_output
 (* When a vertex w is newly enqueued (added at position qt in queue),
    and all predecessors of w are in output[0..count+1),
    the queue preds property extends *)
-#push-options "--z3rlimit 40 --fuel 4 --ifuel 2 --split_queries always --ext no:optimize_let_vc"
+#push-options "--z3rlimit 40 --fuel 4 --ifuel 2 --ext no:optimize_let_vc"
 let lemma_queue_preds_enqueue
   (adj: seq int) (n: nat) (queue_old queue_new: seq FStar.SizeT.t) (qh qt: nat)
    (output: seq int) (count: nat) (w: FStar.SizeT.t)

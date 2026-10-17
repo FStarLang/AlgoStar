@@ -123,7 +123,7 @@ let lemma_mod_add_3 (a b c:int) (p:pos)
 = lemma_mod_add_distr_l (a + b) c p;
   lemma_mod_add_distr_l (a + c) b p
 
-#push-options "--z3rlimit_factor 10 --ifuel 0 --fuel 2 --split_queries no"
+#push-options "--z3rlimit_factor 10 --ifuel 0 --fuel 2"
 #restart-solver
 // This is the main utility lemma on the hash function
 // It allows inverting the hash to inspect the most significant digit
@@ -316,7 +316,7 @@ let maybe_found #t (xs pat:str t) (o:option nat) =
   | None -> forall j. ~(pat `occurs_at j` xs)
   | Some i -> pat`occurs_at i` xs
 
-#push-options "--fuel 0 --ifuel 0 --z3rlimit_factor 4 --split_queries no"
+#push-options "--fuel 0 --ifuel 0 --z3rlimit_factor 4"
 #restart-solver
 let rabin_karp_matcher_nat
     (xs pat:str nat)

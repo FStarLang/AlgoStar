@@ -31,7 +31,7 @@ module Seq = FStar.Seq
 
 // ========== Ghost tick primitives ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -153,10 +153,10 @@ let lemma_valid_ht_delete
       k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
       (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
     with introduce _ ==> _
-    with _. (
+    with (
       introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
       with introduce _ ==> _
-      with _. ()
+      with ()
     )
 #pop-options
 
@@ -186,10 +186,10 @@ let lemma_valid_ht_insert
       k >= 0 /\ probe < size /\ Seq.index s' (hash_probe_nat k probe size) == k ==>
       (forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1)
     with introduce _ ==> _
-    with _. (
+    with (
       introduce forall (p: nat). p < probe ==> Seq.index s' (hash_probe_nat k p size) =!= -1
       with introduce _ ==> _
-      with _. (
+      with (
         let cur = hash_probe_nat k probe size in
         let prev = hash_probe_nat k p size in
         if cur = idx then (
@@ -230,7 +230,7 @@ let lemma_all_probes_full_implies_all_slots_full
     (ensures forall (j: nat). j < size ==> Seq.index s j =!= -1 /\ Seq.index s j =!= -2)
   = introduce forall (j: nat). j < size ==> Seq.index s j =!= -1 /\ Seq.index s j =!= -2
     with introduce _ ==> _
-    with _. (
+    with (
       let h = key % size in
       let p = (j + size - h) % size in
       FStar.Math.Lemmas.lemma_mod_add_distr h (j + size - h) size;
@@ -354,14 +354,14 @@ fn hash_insert
     // Tick: one probe operation (array access + comparisons)
     tick ctr;
     
-    let slot = A.op_Array_Access table idx;
+    let slot = A.op_Dot_Lparen_Rparen table idx;
     
     // Check if we can insert here (empty or deleted)
     let can_insert = (slot = -1 || slot = -2);
     
     // Compute new value for this slot
     let new_val = (if can_insert then key else slot);
-    A.op_Array_Assignment table idx new_val;
+    A.op_Dot_Lparen_Rparen_Less_Minus table idx new_val;
     
     assert pure (lemma_hash_probe_consistent key vi size; 
                  SZ.v idx == hash_probe_nat key (SZ.v vi) (SZ.v size));
@@ -452,7 +452,7 @@ fn hash_search
     // Tick: one probe operation (array access + comparisons)
     tick ctr;
     
-    let slot = A.op_Array_Access table idx;
+    let slot = A.op_Dot_Lparen_Rparen table idx;
     
     // Found the key
     let is_found = (slot = key);
@@ -527,7 +527,7 @@ fn hash_delete
   if (search_result <^ size) {
     // Key found at search_result — mark as DELETED (-2)
     assert pure (lemma_valid_ht_delete s (SZ.v size) (SZ.v search_result); true);
-    A.op_Array_Assignment table search_result (-2);
+    A.op_Dot_Lparen_Rparen_Less_Minus table search_result (-2);
     true
   } else {
     // Key not found — table unchanged

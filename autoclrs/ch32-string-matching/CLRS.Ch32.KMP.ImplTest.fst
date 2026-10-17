@@ -108,11 +108,11 @@ fn test_kmp_string_match ()
   let text = V.vec_to_array tv;
   rewrite (A.pts_to (V.vec_to_array tv) (Seq.create 5 0))
        as (A.pts_to text (Seq.create 5 0));
-  A.op_Array_Assignment text 0sz 0;
-  A.op_Array_Assignment text 1sz 1;
-  A.op_Array_Assignment text 2sz 0;
-  A.op_Array_Assignment text 3sz 1;
-  A.op_Array_Assignment text 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 1sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 2sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 3sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus text 4sz 0;
 
   // Pattern: [0, 1, 0] (length 3)
   let pv = V.alloc 0 3sz;
@@ -120,9 +120,9 @@ fn test_kmp_string_match ()
   let pat = V.vec_to_array pv;
   rewrite (A.pts_to (V.vec_to_array pv) (Seq.create 3 0))
        as (A.pts_to pat (Seq.create 3 0));
-  A.op_Array_Assignment pat 0sz 0;
-  A.op_Array_Assignment pat 1sz 1;
-  A.op_Array_Assignment pat 2sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus pat 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus pat 1sz 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus pat 2sz 0;
 
   // Ghost counter
   let ctr = GR.alloc #nat 0;

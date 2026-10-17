@@ -13,7 +13,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 open CLRS.Ch09.SimultaneousMinMax.Spec
 open CLRS.Common.Complexity
 
@@ -72,7 +71,7 @@ fn find_minmax
       vc >= reveal c0 /\
       vc - reveal c0 == op_Star 2 (SZ.v vi - 1)
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let elem = a.(vi);
@@ -95,7 +94,7 @@ fn find_minmax
   let final_min = !min;
   let final_max = !max;
   
-  { min_val = final_min; max_val = final_max }
+  ({ min_val = final_min; max_val = final_max })
 }
 
 // ========== CLRS pair-processing — ⌊3n/2⌋ comparisons ==========
@@ -165,7 +164,7 @@ fn find_minmax_pairs
       op_Star 2 (vc - reveal c0) <= op_Star 3 (SZ.v vi) - 2 /\
       (SZ.v vi >= 2 ==> op_Star 2 (vc - reveal c0) + 4 <= op_Star 3 (SZ.v vi))
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let a_i = a.(vi);
@@ -199,6 +198,6 @@ fn find_minmax_pairs
 
   let final_min = !min_ref;
   let final_max = !max_ref;
-  { min_val = final_min; max_val = final_max }
+  ({ min_val = final_min; max_val = final_max })
 }
 #pop-options

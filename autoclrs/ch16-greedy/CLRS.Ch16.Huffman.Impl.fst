@@ -138,7 +138,7 @@ fn forest_own_take_at
 
 // Prove: forest_own entries == 
 //   is_htree(entries[j1]) ** is_htree(entries[j2]) ** forest_own(remove_two entries j1 j2)
-#push-options "--split_queries always --z3rlimit 40"
+#push-options "--z3rlimit 40"
 let forest_own_split_two_lemma
   (entries: list forest_entry)
   (j1 j2: nat)
@@ -237,7 +237,7 @@ fn root_freq (p: hnode_ptr) (ft: HSpec.htree)
 
 // Local wrapper: calls merge_bundle_step with all preconditions pre-computed.
 // This isolates the heavy SMT work from the Pulse VC.
-#push-options "--z3rlimit 20 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 1 --ifuel 1"
 let merge_step_local
   (freq_seq: Seq.seq int) (nd_contents0: Seq.seq hnode_ptr) (merged: hnode_ptr)
   (pq0 pq1 pq2 pq3: Seq.seq pq_entry)
@@ -284,7 +284,7 @@ let merge_step_local
 #pop-options
 
 //SNIPPET_START: huffman_tree_sig
-#push-options "--z3rlimit 20 --split_queries always"
+#push-options "--z3rlimit 20"
 fn huffman_tree
   (freqs: A.array int)
   (#freq_seq: Ghost.erased (Seq.seq int))
@@ -346,7 +346,7 @@ fn huffman_tree
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    let freq_val = A.op_Array_Access freqs vi;
+    let freq_val = A.op_Dot_Lparen_Rparen freqs vi;
     
     // Grab old state before mutations
     with active_old. assert (forest_own active_old);
@@ -354,7 +354,7 @@ fn huffman_tree
     
     // Allocate leaf node on the heap
     let leaf = alloc_hnode ({ sym = SZ.v vi; freq = freq_val; left = (None #hnode_ptr); right = (None #hnode_ptr) } <: hnode);
-    V.op_Array_Assignment nodes vi leaf;
+    V.op_Dot_Lparen_Rparen_Less_Minus nodes vi leaf;
     
     // Insert (freq, index) into PQ
     with pq_old. assert (PQ.is_pqueue pq pq_old (SZ.v n));
@@ -437,8 +437,8 @@ fn huffman_tree
     pq_freqs_positive_shrink pq1 pq2 (freq2, idx2);
     
     // Read tree pointers from nodes array
-    let left_ptr = V.op_Array_Access nodes idx1;
-    let right_ptr = V.op_Array_Access nodes idx2;
+    let left_ptr = V.op_Dot_Lparen_Rparen nodes idx1;
+    let right_ptr = V.op_Dot_Lparen_Rparen nodes idx2;
     
     // Ghost: find positions and establish take_two preconditions
     // (combined lemma: proves Some? for both, idx1 <> idx2, and positions distinct)
@@ -474,7 +474,7 @@ fn huffman_tree
       (entry_tree (L.index active0 (Some?.v (find_entry_by_idx active0 idx2))))));
     
     // Store merged node in nodes[idx1] and insert into PQ
-    V.op_Array_Assignment nodes idx1 merged;
+    V.op_Dot_Lparen_Rparen_Less_Minus nodes idx1 merged;
     PQ.insert pq (sum_freq, idx1);
     with pq3. assert (PQ.is_pqueue pq pq3 (SZ.v n));
     extends_length pq2 pq3 (sum_freq, idx1);
@@ -550,7 +550,7 @@ fn huffman_tree
   // Ghost: link result_idx to forest via find_entry_by_idx_spec
   find_entry_by_idx_spec active_final result_idx;
   
-  let result = V.op_Array_Access nodes result_idx;
+  let result = V.op_Dot_Lparen_Rparen nodes result_idx;
   
   // Ghost: take the tree from forest_own using find_entry_by_idx position
   // (same pattern as merge loop: use Some?.v (find_entry_by_idx ...) as the index)

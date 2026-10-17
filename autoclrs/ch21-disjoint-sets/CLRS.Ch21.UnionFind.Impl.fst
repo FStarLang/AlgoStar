@@ -65,6 +65,16 @@ let to_uf_upd_both (sp srank: Seq.seq SZ.t) (n: nat{n <= Seq.length sp /\ n <= S
   = to_nat_seq_upd sp n ip vp;
     to_nat_seq_upd srank n ir vr
 
+// Incrementing one rank keeps every rank between its old value and old value + 1
+let upd_rank_incr_bounds (srank: Seq.seq SZ.t) (n: nat) (r: nat{r < Seq.length srank}) (v: SZ.t)
+  : Lemma (requires SZ.v v == SZ.v (Seq.index srank r) + 1)
+          (ensures
+            (forall (i: nat). {:pattern (Seq.index (Seq.upd srank r v) i)}
+              i < n /\ i < Seq.length (Seq.upd srank r v) /\ i < Seq.length srank ==>
+              SZ.v (Seq.index (Seq.upd srank r v) i) >= SZ.v (Seq.index srank i) /\
+              SZ.v (Seq.index (Seq.upd srank r v) i) <= SZ.v (Seq.index srank i) + 1))
+  = ()
+
 // ========== Imperative forest invariants (for loop termination) ==========
 
 let well_formed (parent: Seq.seq SZ.t) (n: nat) : prop =
@@ -692,6 +702,9 @@ fn union
         let new_rank = SZ.add rank_x 1sz;
         rank.(root_x) <- new_rank;
         to_uf_upd_both sp2 srank (SZ.v n) (SZ.v root_y) root_x (SZ.v root_x) new_rank;
+        upd_rank_incr_bounds srank (SZ.v n) (SZ.v root_x) new_rank;
+        assert (pure (to_uf (Seq.upd sp2 (SZ.v root_y) root_x) (Seq.upd srank (SZ.v root_x) new_rank) (SZ.v n) ==
+                      Spec.pure_union (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y)));
         Spec.pure_union_preserves_inv (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_same_set (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);
         Spec.pure_union_stability (to_uf sp2 srank (SZ.v n)) (SZ.v x) (SZ.v y);

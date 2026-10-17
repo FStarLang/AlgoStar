@@ -80,7 +80,7 @@ let fits_product_smaller (a b c d: nat)
 (*** Ghost Tick Counter for Complexity Tracking ***)
 
 /// Increment an erased nat (ghost-only, erased at extraction)
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 /// Ghost tick: increment a ghost counter (for complexity accounting)
 ghost

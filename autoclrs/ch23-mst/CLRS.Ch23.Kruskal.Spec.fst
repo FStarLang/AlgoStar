@@ -299,7 +299,7 @@ let lemma_kruskal_step_safe_edge (g: graph) (e: edge) (forest: list edge)
     //       contradicting the crossing. So ~(same_component forest e'.u e'.v).
     //     Then precondition gives e.w <= e'.w. ✓
     introduce forall (e': edge). mem_edge e' g.edges /\ crosses_cut e' s ==> e.w <= e'.w
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       if mem_edge e' forest then begin
         // e' in forest => doesn't cross cut (from respects)
         let rec respects_implies (f: list edge) (e': edge) (s: cut)
@@ -353,8 +353,7 @@ let same_component_mono (edges: list edge) (e: edge) (u v: nat)
   : Lemma (requires same_component edges u v)
           (ensures same_component (e :: edges) u v)
   = eliminate exists (path: list edge). subset_edges path edges /\ is_path_from_to path u v
-    returns same_component (e :: edges) u v
-    with _. begin
+    with begin
       subset_edges_cons path e edges
     end
 
@@ -384,7 +383,7 @@ let rec lemma_kruskal_process_maximal_forest
         introduce forall (e': edge). mem_edge e' all_sorted /\ ~(mem_edge e' rest) /\
                             e'.u < n /\ e'.v < n ==>
                     mem_edge e' forest' \/ same_component forest' e'.u e'.v
-        with introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
           if edge_eq e' e then ()
           else if mem_edge e' forest then ()
           else begin
@@ -395,8 +394,7 @@ let rec lemma_kruskal_process_maximal_forest
         end;
         
         eliminate exists (prefix: list edge). all_sorted == prefix @ (e :: rest)
-          returns (exists (prefix': list edge). all_sorted == prefix' @ rest)
-          with _. begin
+          with begin
             List.Tot.Properties.append_assoc prefix [e] rest;
             assert (all_sorted == (prefix @ [e]) @ rest)
           end;
@@ -407,7 +405,7 @@ let rec lemma_kruskal_process_maximal_forest
         introduce forall (e': edge). mem_edge e' all_sorted /\ ~(mem_edge e' rest) /\
                             e'.u < n /\ e'.v < n ==>
                     mem_edge e' forest' \/ same_component forest' e'.u e'.v
-        with introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
           if edge_eq e' e then begin
             edge_eq_endpoints e' e;
             if mem_edge e forest then begin
@@ -428,8 +426,7 @@ let rec lemma_kruskal_process_maximal_forest
         end;
         
         eliminate exists (prefix: list edge). all_sorted == prefix @ (e :: rest)
-          returns (exists (prefix': list edge). all_sorted == prefix' @ rest)
-          with _. begin
+          with begin
             List.Tot.Properties.append_assoc prefix [e] rest;
             assert (all_sorted == (prefix @ [e]) @ rest)
           end;
@@ -478,7 +475,7 @@ let rec lemma_kruskal_process_mst_invariant
         introduce forall (e': edge). 
           mem_edge e' g.edges /\ not (mem_edge e' forest) /\ ~(same_component forest e'.u e'.v) ==>
           e.w <= e'.w
-        with introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
           // e' is in g.edges, not in forest, different components
           if mem_edge e' (e :: rest) then begin
             // e' is in sorted_edges = e :: rest
@@ -542,7 +539,7 @@ let rec lemma_kruskal_process_mst_invariant
         introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' rest) /\
           ~(mem_edge e' forest') ==>
           same_component forest' e'.u e'.v
-        with introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
           // e' is not in rest and not in forest'
           // If edge_eq e' e: then e' is in forest' (since e is head of forest'). Contradiction.
           if edge_eq e' e then begin
@@ -579,7 +576,7 @@ let rec lemma_kruskal_process_mst_invariant
         introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' rest) /\
           ~(mem_edge e' forest') ==>
           same_component forest' e'.u e'.v
-        with introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
           if edge_eq e' e then begin
             edge_eq_endpoints e' e;
             if mem_edge e forest then begin
@@ -940,7 +937,7 @@ let connected_subset_of_tree_is_tree (g: graph) (result mst: list edge)
                     (forall (e: edge). mem_edge e mst ==> e.u <> e.v))
           (ensures forall (e: edge). mem_edge e mst ==> mem_edge e result)
   = introduce forall (e: edge). mem_edge e mst ==> mem_edge e result
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       // Suppose e ∈ mst. We want e ∈ result.
       // By contradiction: suppose e ∉ result.
       if not (mem_edge e result) then begin
@@ -965,7 +962,7 @@ let connected_subset_of_tree_is_tree (g: graph) (result mst: list edge)
           = introduce forall (v: nat) (cycle: list edge).
               v < n /\ subset_edges cycle a /\ Cons? cycle /\ all_edges_distinct cycle ==>
               ~(is_path_from_to cycle v v)
-            with introduce _ ==> _ with _. begin
+            with introduce _ ==> _ with begin
               subset_edges_transitive cycle a b
             end
         in
@@ -1077,8 +1074,7 @@ let redundant_edge_reachability (tl: list edge) (e: edge) (root v: nat)
     else begin
       eliminate exists (path: list edge).
         subset_edges path (e :: tl) /\ is_path_from_to path root v
-      returns same_component tl root v
-      with _. begin
+      with begin
         if root = v then same_component_reflexive tl root
         else begin
           extract_simple_path path root v;
@@ -1121,8 +1117,7 @@ let neither_endpoint_reachability (tl: list edge) (e: edge) (root v: nat)
           (ensures same_component tl root v)
   = eliminate exists (path: list edge).
       subset_edges path (e :: tl) /\ is_path_from_to path root v
-    returns same_component tl root v
-    with _. begin
+    with begin
       if root = v then same_component_reflexive tl root
       else begin
         extract_simple_path path root v;
@@ -1157,8 +1152,7 @@ let bridge_edge_reachability (tl: list edge) (e: edge) (root v: nat)
     else begin
       eliminate exists (path: list edge).
         subset_edges path (e :: tl) /\ is_path_from_to path root v
-      returns (same_component tl root v \/ same_component tl e.v v)
-      with _. begin
+      with begin
         if root = v then begin same_component_reflexive tl root; () end
         else begin
           extract_simple_path path root v;
@@ -1301,8 +1295,7 @@ let reachable_uses_component_edges (es: list edge) (root v: nat)
                               same_component_dec es root e.v in
     eliminate exists (path: list edge).
       subset_edges path es /\ is_path_from_to path root v
-    returns same_component (filter_edges g es) root v
-    with _. begin
+    with begin
       same_component_reflexive es root;
       path_stays_in_component es root path root v;
       // All edges in path have endpoints reachable from root
@@ -1355,8 +1348,7 @@ let bridge_edge_reachability_sym (tl: list edge) (e: edge) (root v: nat)
     else begin
       eliminate exists (path: list edge).
         subset_edges path (e :: tl) /\ is_path_from_to path root v
-      returns (same_component tl root v \/ same_component tl e.u v)
-      with _. begin
+      with begin
         if root = v then begin same_component_reflexive tl root; () end
         else begin
           extract_simple_path path root v;
@@ -1625,14 +1617,14 @@ let theorem_kruskal_produces_spanning_tree (g: graph)
     // Part 3: Result connects all vertices
     lemma_kruskal_process_maximal_forest sorted sorted [] g.n;
     introduce forall (v: nat). v < g.n ==> reachable result 0 v
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       FStar.Classical.exists_elim (reachable result 0 v)
         #_ 
         #(fun (path: list edge) -> subset_edges path g.edges /\ is_path_from_to path 0 v) ()
         (fun (path: list edge{subset_edges path g.edges /\ is_path_from_to path 0 v}) ->
           introduce forall (e: edge). mem_edge e path ==> 
             mem_edge e result \/ same_component result e.u e.v
-          with introduce _ ==> _ with _. begin
+          with introduce _ ==> _ with begin
             mem_edge_of_subset e path g.edges;
             assert (e.u < g.n /\ e.v < g.n);
             sort_edges_mem e g.edges
@@ -1647,7 +1639,7 @@ let theorem_kruskal_produces_spanning_tree (g: graph)
     lemma_kruskal_process_no_repeats sorted [] g.n;
     noRepeats_is_all_edges_distinct result;
     introduce forall (e: edge). mem_edge e result ==> e.u < g.n /\ e.v < g.n /\ e.u <> e.v
-    with introduce _ ==> _ with _. mem_edge_of_subset e result g.edges;
+    with introduce _ ==> _ with mem_edge_of_subset e result g.edges;
     acyclic_connected_length g.n result
 #pop-options
 
@@ -1735,7 +1727,7 @@ let rec total_weight_mutual_eq (a b: list edge)
       //
       // Let me try the direct approach:
       introduce forall (e: edge). mem_edge e b' ==> mem_edge e tl
-      with introduce _ ==> _ with _. begin
+      with introduce _ ==> _ with begin
         mem_remove_edge_first_mem e hd b;
         assert (mem_edge e b);
         assert (mem_edge e (hd :: tl));
@@ -1836,7 +1828,7 @@ let theorem_kruskal_produces_mst (g: graph)
     sort_edges_subset g.edges;
     introduce forall (e': edge). mem_edge e' g.edges /\ ~(mem_edge e' sorted) /\
       ~(mem_edge e' ([] #edge)) ==> same_component ([] #edge) e'.u e'.v
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       sort_edges_mem e' g.edges
     end;
     lemma_kruskal_process_mst_invariant g sorted [];
@@ -1847,9 +1839,9 @@ let theorem_kruskal_produces_mst (g: graph)
       (fun (mst': list edge{is_mst g mst' /\ subset_edges result mst'}) ->
         // mst' edges inherit valid endpoints and no self-loops
         introduce forall (e: edge). mem_edge e mst' ==> e.u < g.n /\ e.v < g.n
-        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
+        with introduce _ ==> _ with mem_edge_of_subset e mst' g.edges;
         introduce forall (e: edge). mem_edge e mst' ==> e.u <> e.v
-        with introduce _ ==> _ with _. mem_edge_of_subset e mst' g.edges;
+        with introduce _ ==> _ with mem_edge_of_subset e mst' g.edges;
         connected_subset_of_tree_is_tree g result mst';
         // forall e in mst'. mem_edge e result
         
@@ -1873,7 +1865,7 @@ let theorem_kruskal_produces_mst (g: graph)
         assert (total_weight result = total_weight mst');
         
         introduce forall (t: list edge). is_spanning_tree g t ==> total_weight result <= total_weight t
-        with introduce _ ==> _ with _. ()
+        with introduce _ ==> _ with ()
       )
 
 (*** Additional Helper Properties ***)
@@ -1956,8 +1948,7 @@ let rec build_components_empty_length (n: nat) (i: nat{i <= n})
           else begin
             assert (mem c acc);
             eliminate exists (j: nat{j < i}). c == [j]
-            returns exists (j: nat{j < i + 1}). c == [j]
-            with _. ()
+            with ()
           end
       in
       FStar.Classical.forall_intro (FStar.Classical.move_requires aux2);
@@ -1969,8 +1960,7 @@ let rec build_components_empty_length (n: nat) (i: nat{i <= n})
             else begin
               assert (mem c acc);
               eliminate exists (j: nat{j < i}). c == [j]
-              returns ~(mem (i + 1) c)
-              with _. ()
+              with ()
             end
         in
         FStar.Classical.forall_intro (FStar.Classical.move_requires aux3)

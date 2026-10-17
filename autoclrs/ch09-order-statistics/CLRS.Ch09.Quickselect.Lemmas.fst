@@ -25,7 +25,7 @@ let slice_eq_from_pointwise (s1 s2: Seq.seq int) (a b: nat)
 
 // ========== Count in range is permutation-invariant when outside is unchanged ==========
 
-#push-options "--z3rlimit 5 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
   : Lemma (requires lo <= hi /\ hi <= Seq.length s_pre /\
                     Seq.length s_pre == Seq.length s1 /\
@@ -78,7 +78,7 @@ let rec count_pos_has_index (s: Seq.seq int) (x: int)
 
 // ========== Main lemma: lower bound preservation ==========
 
-#push-options "--z3rlimit 5 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let perm_unchanged_lower_bound
   (s_pre s1: Seq.seq int) (lo hi: nat) (v: int) (j: nat)
   : Lemma
@@ -103,7 +103,7 @@ let perm_unchanged_lower_bound
 
 // ========== Symmetric: upper bound preservation ==========
 
-#push-options "--z3rlimit 5 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
 let perm_unchanged_upper_bound
   (s_pre s1: Seq.seq int) (lo hi: nat) (v: int) (j: nat)
   : Lemma

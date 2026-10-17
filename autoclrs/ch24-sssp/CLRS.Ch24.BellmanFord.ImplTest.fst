@@ -69,7 +69,7 @@ let tw_weights_in_range () : Lemma (SP.weights_in_range tw_seq 3) =
    - sp_dist(0,0) = 0
    - sp_dist(0,1) = 4  (direct edge 0→1)
    - sp_dist(0,2) = 2  (path 0→1→2: 4+(-2) < 5) *)
-#push-options "--z3rlimit 40 --split_queries always"
+#push-options "--z3rlimit 40"
 let sp_dist_v0 () : Lemma (SP.sp_dist tw_seq 3 0 0 == 0) =
   assert_norm (SP.sp_dist tw_seq 3 0 0 == 0)
 

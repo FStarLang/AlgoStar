@@ -280,7 +280,7 @@ fn enqueue (#t:Type0) (q: queue t) (#contents: erased (list t)) (x: t)
   let size_val = B.(!q.size);
   
   // Write element at tail position
-  V.op_Array_Assignment q.data tail_val x;
+  V.op_Dot_Lparen_Rparen_Less_Minus q.data tail_val x;
   with new_arr_seq. assert (V.pts_to q.data new_arr_seq);
   
   // Calculate new tail with wraparound
@@ -346,7 +346,7 @@ fn dequeue (#t:Type0) (q: queue t) (#contents: erased (list t))
   let size_val = B.(!q.size);
   
   // Read the element at the head
-  let elem = V.op_Array_Access q.data head_val;
+  let elem = V.op_Dot_Lparen_Rparen q.data head_val;
   
   // Prove elem is the first element of contents
   assert (pure (SZ.v head_v < reveal q.capacity));

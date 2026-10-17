@@ -48,7 +48,7 @@ let rec sorted_edges_indices_helper (es: list edge)
         sorted_edges_indices_helper (e2 :: rest);
         introduce forall (i j: nat). i < j /\ j < length es ==> (index es i).w <= (index es j).w
         with introduce _ ==> _
-        with _. (
+        with (
           if i = 0 then (
             // e1.w <= e2.w from sorted_edges, and e2.w <= (index (e2::rest) (j-1)).w from IH
             if j = 1 then ()

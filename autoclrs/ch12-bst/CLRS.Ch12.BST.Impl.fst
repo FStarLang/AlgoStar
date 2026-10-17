@@ -150,6 +150,7 @@ fn rec tree_search (tree: bst_ptr) (k: int) (ticks: GR.ref nat)
   returns result: bool
   ensures GR.pts_to ticks ('n + bst_search_ticks 'ft k) **
           pure (result == bst_search 'ft k)
+  decreases (reveal 'ft)
 {
   match tree {
     None -> {
@@ -207,6 +208,7 @@ fn rec tree_minimum (tree: bst_ptr) (bp: bst_node_ptr) (ticks: GR.ref nat)
   returns result: int
   ensures GR.pts_to ticks ('n + bst_minimum_ticks 'ft) **
           pure (bst_minimum 'ft == Some result)
+  decreases (reveal 'ft)
 {
   rewrite each tree as (Some bp);
   bst_case_some (Some bp) bp;
@@ -250,6 +252,7 @@ fn rec tree_maximum (tree: bst_ptr) (bp: bst_node_ptr) (ticks: GR.ref nat)
   returns result: int
   ensures GR.pts_to ticks ('n + bst_maximum_ticks 'ft) **
           pure (bst_maximum 'ft == Some result)
+  decreases (reveal 'ft)
 {
   rewrite each tree as (Some bp);
   bst_case_some (Some bp) bp;
@@ -334,6 +337,7 @@ fn rec tree_insert (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat
   ensures bst_subtree y (bst_insert 'ft k) parent **
           GR.pts_to ticks ('n + bst_insert_ticks 'ft k) **
           pure (bst_valid 'ft ==> bst_valid (bst_insert 'ft k))
+  decreases (reveal 'ft)
 {
   insert_valid_implication 'ft k;
   match tree {
@@ -482,7 +486,7 @@ fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat
   ensures bst_subtree result (bst_delete 'ft k) parent **
           GR.pts_to ticks ('n + bst_delete_ticks 'ft k) **
           pure (bst_valid 'ft ==> bst_valid (bst_delete 'ft k))
-  decreases 'ft
+  decreases (reveal 'ft)
 {
   delete_valid_implication 'ft k;
   match tree {
@@ -574,7 +578,7 @@ fn rec tree_delete (tree: bst_ptr) (k: int) (parent: bst_ptr) (ticks: GR.ref nat
 fn rec free_bst (tree: bst_ptr)
   requires bst_subtree tree 'ft 'parent
   ensures emp
-  decreases 'ft
+  decreases (reveal 'ft)
 {
   match tree {
     None -> {

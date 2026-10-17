@@ -21,8 +21,8 @@ let is_sorted (s: Seq.seq int) : prop =
 // ========== Pure helper: log2 floor ==========
 
 let rec log2f (n: int) : Tot nat (decreases (if n > 0 then n else 0)) =
-  if Prims.op_LessThanOrEqual n 1 then 0
-  else Prims.op_Addition 1 (log2f (Prims.op_Division n 2))
+  if Prims.op_Less_Equals n 1 then 0
+  else Prims.op_Plus 1 (log2f (Prims.op_Slash n 2))
 
 // ========== Complexity bound predicate ==========
 

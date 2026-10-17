@@ -181,6 +181,18 @@ let lemma_augment_edge_conservation_other (flow: Seq.seq int) (cap: Seq.seq int)
       (lemma_sum_flow_into_update_other flow n v u (get flow n v u - delta) w n;
        lemma_sum_flow_out_update_other flow n v u (get flow n v u - delta) w n)
 
+(** Cells in different rows of an n×n matrix have different row-major indices *)
+let lemma_cell_index_distinct (n: nat) (a b u v: nat)
+  : Lemma (requires a < n /\ b < n /\ u < n /\ v < n /\ a <> u)
+          (ensures a * n + b <> u * n + v)
+  = if a < u then begin
+      FStar.Math.Lemmas.lemma_mult_le_right n (a + 1) u;
+      FStar.Math.Lemmas.distributivity_add_left a 1 n
+    end else begin
+      FStar.Math.Lemmas.lemma_mult_le_right n (u + 1) a;
+      FStar.Math.Lemmas.distributivity_add_left u 1 n
+    end
+
 (** Lemma: For intermediate vertices on path, inflow and outflow both increase by delta *)
 #push-options "--z3rlimit 10"
 let lemma_augment_edge_conservation_intermediate (flow: Seq.seq int) (cap: Seq.seq int)
@@ -213,6 +225,7 @@ let lemma_augment_edge_conservation_intermediate (flow: Seq.seq int) (cap: Seq.s
     assert (u2 = v1);
     // Help SMT: the first augment at (u1,v1) doesn't change cell (v1,v2) since u1≠v1
     // flow' = set flow n u1 v1 (...), and (v1,v2) ≠ (u1,v1) since v1≠u1
+    lemma_cell_index_distinct n u1 v1 v1 v2;
     assert (u1 * n + v1 <> v1 * n + v2);
     assert (get flow' n v1 v2 == get flow n v1 v2);
     assert (residual_capacity cap flow' n v1 v2 == residual_capacity cap flow n v1 v2);
@@ -725,7 +738,7 @@ let lemma_augment_edge_residual_unchanged
     when they modify disjoint matrix cells. This holds when the edges are 
     different as undirected edges: {u1,v1} ≠ {u2,v2}. 
     Adjacent path edges (u,v) and (v,w) satisfy this because u ≠ w. *)
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let lemma_augment_edge_commute
   (flow cap: Seq.seq int)
   (n: nat{n > 0 /\ Seq.length flow == n * n /\ Seq.length cap == n * n})
@@ -749,6 +762,7 @@ let lemma_augment_edge_commute
       : Lemma (Seq.index f12 i == Seq.index f21 i)
       = let a = i / n in
         let b = i % n in
+        FStar.Math.Lemmas.euclidean_division_definition i n;
         if a < n && b < n then begin
           if (a = u1 && b = v1) || (a = v1 && b = u1) then begin
             // Cell (a,b) affected by ae1, NOT by ae2.

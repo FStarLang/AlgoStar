@@ -311,7 +311,7 @@ let rec lemma_mc_inner_i_preserves_shorter
 
 /// Helper: at position i (where i+l-1 < n), mc_inner_i writes the correct value
 /// to table[i][i+l-1] and preserves it in subsequent steps.
-#push-options "--split_queries always"
+#push-options ""
 let rec lemma_mc_inner_i_fills_correctly
   (table: seq int) (dims: seq int) (n l i0: nat) (start_i: nat)
   : Lemma
@@ -355,7 +355,7 @@ let rec lemma_mc_inner_i_fills_correctly
       introduce forall (i':nat) (j':nat).
         (i' < n /\ j' < n /\ i' <= j' /\ j' - i' < j - start_i) ==>
           index table (i' * n + j') == mc_cost dims i' j'
-      with introduce _ ==> _ with _.
+      with introduce _ ==> _ with
         (lemma_index_in_bounds i' j' n);
       
       // Use the cost bound to establish the sentinel precondition
@@ -401,7 +401,7 @@ let rec lemma_mc_inner_i_fills_correctly
       introduce forall (i':nat) (j':nat).
         (i' < n /\ j' < n /\ i' <= j' /\ j' - i' < l - 1) ==>
           index table' (i' * n + j') == mc_cost dims i' j'
-      with introduce _ ==> _ with _. begin
+      with introduce _ ==> _ with begin
         lemma_index_in_bounds i' j' n;
         if i' = start_i && j' = j then
           ()  // j - start_i = l - 1, contradiction with j' - i' < l - 1
@@ -452,7 +452,7 @@ let lemma_mc_inner_i_correct
       (i0 < n /\ j0 < n /\ i0 <= j0 /\ j0 - i0 < l) ==>
         index t' (i0 * n + j0) == mc_cost dims i0 j0
     with introduce _ ==> _
-    with _. aux i0 j0
+    with aux i0 j0
 #pop-options
 
 // ========== mc_outer correctness ==========
@@ -730,7 +730,7 @@ let discharge_all_costs_bounded (dims: seq int) (n: nat) (d: nat)
     (ensures all_costs_bounded dims n n 1000000000)
   = introduce forall (i j: nat).
       (i < n /\ j < n /\ i <= j /\ j - i < n) ==> mc_cost dims i j <= 1000000000
-    with introduce _ ==> _ with _.
+    with introduce _ ==> _ with
       (mc_cost_bounded dims i j d;
        // mc_cost dims i j <= (j - i) * d * d * d
        // (j - i) <= (n - 1) since i < n, j < n, i <= j

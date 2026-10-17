@@ -1455,11 +1455,7 @@ let make_min_siblings (t: htree) (freqs: list pos{length freqs >= 2})
         is_leaf_at t (parent @ [false]) fr /\
         length (parent @ [true]) = max_leaf_depth t 0 /\
         length (parent @ [false]) = max_leaf_depth t 0
-    returns exists (t': htree).
-        same_frequency_multiset t' freqs /\
-        are_siblings t' f1 f2 == true /\
-        weighted_path_length t' <= weighted_path_length t
-    with _. (
+    with (
       parent_has_leaf_children t parent fl fr;
       let pos_a = parent @ [true] in
       let pos_b = parent @ [false] in
@@ -1525,7 +1521,42 @@ let rec not_are_siblings_implies_replace_none (t: htree) (f1 f2: pos)
         not_are_siblings_implies_replace_none l f1 f2;
         not_are_siblings_implies_replace_none r f1 f2
 
+// One-step unfolding of replace_siblings_with_merged / leaf_freqs at a non-sibling Internal node
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
+let replace_unfold_left (fr: pos) (l r: htree) (f1 f2: pos)
+  : Lemma (requires Internal? l /\ Some? (replace_siblings_with_merged l f1 f2))
+          (ensures (let Some l' = replace_siblings_with_merged l f1 f2 in
+                    Some? (replace_siblings_with_merged (Internal fr l r) f1 f2) /\
+                    leaf_freqs (Some?.v (replace_siblings_with_merged (Internal fr l r) f1 f2)) ==
+                      leaf_freqs l' @ leaf_freqs r /\
+                    leaf_freqs (Internal fr l r) == leaf_freqs l @ leaf_freqs r))
+  = ()
+
+let replace_unfold_right (fr: pos) (l r: htree) (f1 f2: pos)
+  : Lemma (requires Internal? r /\ None? (replace_siblings_with_merged l f1 f2) /\
+                    Some? (replace_siblings_with_merged r f1 f2))
+          (ensures (let Some r' = replace_siblings_with_merged r f1 f2 in
+                    Some? (replace_siblings_with_merged (Internal fr l r) f1 f2) /\
+                    leaf_freqs (Some?.v (replace_siblings_with_merged (Internal fr l r) f1 f2)) ==
+                      leaf_freqs l @ leaf_freqs r' /\
+                    leaf_freqs (Internal fr l r) == leaf_freqs l @ leaf_freqs r))
+  = match l with
+    | Leaf _ _ -> ()
+    | Internal _ _ _ -> ()
+#pop-options
+
 #push-options "--fuel 3 --ifuel 2 --z3rlimit 10"
+let replace_siblings_changes_count_base (fr: pos) (s1 s2: nat) (f1' f2' f1 f2: pos) (x: pos)
+  : Lemma (requires (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1))
+          (ensures (let t = Internal fr (Leaf s1 f1') (Leaf s2 f2') in
+                    Some? (replace_siblings_with_merged t f1 f2) /\
+                   (let Some t' = replace_siblings_with_merged t f1 f2 in
+                    count x (leaf_freqs t') + (if x = f1 then 1 else 0) + (if x = f2 then 1 else 0) =
+                    count x (leaf_freqs t) + (if x = f1 + f2 then 1 else 0))))
+  = ()
+#pop-options
+
+#push-options "--fuel 1 --ifuel 1 --z3rlimit 10"
 let rec replace_siblings_changes_count (t: htree) (f1 f2: pos) (x: pos)
   : Lemma (requires are_siblings t f1 f2 == true)
           (ensures Some? (replace_siblings_with_merged t f1 f2) /\
@@ -1536,13 +1567,13 @@ let rec replace_siblings_changes_count (t: htree) (f1 f2: pos) (x: pos)
   = are_siblings_implies_replace t f1 f2;
     match t with
     | Leaf _ _ -> ()
-    | Internal _ (Leaf _ f1') (Leaf _ f2') ->
-        if (f1' = f1 && f2' = f2) || (f1' = f2 && f2' = f1) then ()
-        else ()
-    | Internal _ l r ->
+    | Internal fr (Leaf s1 f1') (Leaf s2 f2') ->
+        replace_siblings_changes_count_base fr s1 s2 f1' f2' f1 f2 x
+    | Internal fr l r ->
         if are_siblings l f1 f2 then (
           replace_siblings_changes_count l f1 f2 x;
           are_siblings_implies_replace l f1 f2;
+          replace_unfold_left fr l r f1 f2;
           let Some l' = replace_siblings_with_merged l f1 f2 in
           count_append x (leaf_freqs l') (leaf_freqs r);
           count_append x (leaf_freqs l) (leaf_freqs r)
@@ -1552,6 +1583,7 @@ let rec replace_siblings_changes_count (t: htree) (f1 f2: pos) (x: pos)
           assert (replace_siblings_with_merged l f1 f2 == None);
           replace_siblings_changes_count r f1 f2 x;
           are_siblings_implies_replace r f1 f2;
+          replace_unfold_right fr l r f1 f2;
           let Some r' = replace_siblings_with_merged r f1 f2 in
           count_append x (leaf_freqs l) (leaf_freqs r');
           count_append x (leaf_freqs l) (leaf_freqs r)

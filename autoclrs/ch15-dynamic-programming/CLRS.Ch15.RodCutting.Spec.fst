@@ -143,21 +143,9 @@ let accum_max_dp_correct (prices: seq nat) (sr: seq nat) (j: nat)
           (ensures accum_max prices sr j j == optimal_revenue prices j)
   = let prev = build_opt prices (j - 1) in
     assert (length prev == j);
-    let rec aux (k:nat) 
-      : Lemma (requires k < j)
-              (ensures index sr k == index prev k)
-              (decreases k)
-      = optimal_revenue_consistent prices k (j - 1)
+    let aux (k:nat)
+      : Lemma (k < j /\ k < length sr /\ k < length prev ==> index sr k == index prev k)
+      = if k < j && k < length sr then optimal_revenue_consistent prices k (j - 1)
     in
-    let rec apply_aux (k:nat)
-      : Lemma (requires k <= j)
-              (ensures forall (i:nat). i < k ==> index sr i == index prev i)
-              (decreases k)
-      = if k = 0 then ()
-        else (
-          apply_aux (k - 1);
-          aux (k - 1)
-        )
-    in
-    apply_aux j;
+    FStar.Classical.forall_intro aux;
     accum_max_ext prices sr prev j j

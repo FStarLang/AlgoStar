@@ -112,13 +112,13 @@ ensures exists* sb'.
     with sc. assert (V.pts_to c sc);
     
     // Read A[j]
-    let val_j = A.op_Array_Access a vj;
+    let val_j = A.op_Dot_Lparen_Rparen a vj;
     
     // Read C[val_j]
-    let count_old = V.op_Array_Access c (SZ.uint_to_t val_j);
+    let count_old = V.op_Dot_Lparen_Rparen c (SZ.uint_to_t val_j);
     
     // C[val_j] = C[val_j] + 1
-    V.op_Array_Assignment c (SZ.uint_to_t val_j) (count_old + 1);
+    V.op_Dot_Lparen_Rparen_Less_Minus c (SZ.uint_to_t val_j) (count_old + 1);
     
     with sc'. assert (V.pts_to c sc');
     
@@ -169,13 +169,13 @@ ensures exists* sb'.
     let vi_minus_1 = vi -^ 1sz;
     
     // Read C[i-1]
-    let prev_count = V.op_Array_Access c vi_minus_1;
+    let prev_count = V.op_Dot_Lparen_Rparen c vi_minus_1;
     
     // Read C[i]
-    let curr_count = V.op_Array_Access c vi;
+    let curr_count = V.op_Dot_Lparen_Rparen c vi;
     
     // C[i] = C[i] + C[i-1]
-    V.op_Array_Assignment c vi (curr_count + prev_count);
+    V.op_Dot_Lparen_Rparen_Less_Minus c vi (curr_count + prev_count);
     
     with sc'. assert (V.pts_to c sc');
     SL.prefix_sum_step sc sc' sa (SZ.v k_val) (SZ.v vi);
@@ -230,24 +230,24 @@ ensures exists* sb'.
     assert (pure (SZ.v vj_back < SZ.v len));
     
     // Read A[j_back]
-    let val_j = A.op_Array_Access a vj_back;
+    let val_j = A.op_Dot_Lparen_Rparen a vj_back;
     
     // From precondition in_range sa (SZ.v k_val) and vj_back < len
     assert (pure (val_j <= SZ.v k_val));
     
     // Read C[val_j]
-    let pos = V.op_Array_Access c (SZ.uint_to_t val_j);
+    let pos = V.op_Dot_Lparen_Rparen c (SZ.uint_to_t val_j);
     
     // Prove pos >= 1 /\ pos <= len from tracking invariant
     SL.phase4_c_pos_bounds sc sa (SZ.v k_val) (SZ.v len) (SZ.v vj_back + 1) val_j;
     
     // B[C[A[j]]-1] = A[j]  (CLRS uses 1-based, we use 0-based)
-    A.op_Array_Assignment b (SZ.uint_to_t (pos - 1)) val_j;
+    A.op_Dot_Lparen_Rparen_Less_Minus b (SZ.uint_to_t (pos - 1)) val_j;
     
     with sb_curr'. assert (A.pts_to b sb_curr');
     
     // C[A[j]]--
-    V.op_Array_Assignment c (SZ.uint_to_t val_j) (pos - 1);
+    V.op_Dot_Lparen_Rparen_Less_Minus c (SZ.uint_to_t val_j) (pos - 1);
     
     with sc'. assert (V.pts_to c sc');
     
@@ -286,8 +286,6 @@ ensures exists* sb'.
 #pop-options
 
 // ========== In-place Counting Sort (2-phase variant used by RadixSort) ==========
-
-open Pulse.Lib.BoundedIntegers
 
 #push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --z3smtopt '(set-option :smt.qi.eager_threshold 100)'"
 ```pulse
@@ -339,14 +337,14 @@ ensures exists* s.
       V.is_full_vec c_arr /\
       L.counts_match_prefix sc s0 k (SZ.v vj)
     )
-  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !j)
+  decreases (SZ.v n `Prims.op_Minus` SZ.v !j)
   {
     let vj = !j;
     with sc. assert (V.pts_to c_arr sc);
     let val_j = a.(vj);
     let idx : SZ.t = SZ.uint_to_t val_j;
-    let old_count = V.op_Array_Access c_arr idx;
-    V.op_Array_Assignment c_arr idx (Prims.op_Addition old_count 1);
+    let old_count = V.op_Dot_Lparen_Rparen c_arr idx;
+    V.op_Dot_Lparen_Rparen_Less_Minus c_arr idx (Prims.op_Plus old_count 1);
     with sc'. assert (V.pts_to c_arr sc');
     L.count_phase_step s0 sc sc' (SZ.v vj) k val_j;
     j := vj + 1sz;
@@ -376,14 +374,14 @@ ensures exists* s.
       L.phase2_inv sa s0 (SZ.v vpos) (SZ.v vcv) k /\
       L.counts_match sc s0 k
     )
-  decreases (Prims.op_Addition (SZ.v k_val) 1 `Prims.op_Subtraction` SZ.v !cur_v)
+  decreases (Prims.op_Plus (SZ.v k_val) 1 `Prims.op_Minus` SZ.v !cur_v)
   {
     let vcv = !cur_v;
     let vpos = !pos;
     let vcvn = !cur_v_nat;
     with sc sa. assert (V.pts_to c_arr sc ** A.pts_to a sa);
     
-    let cnt = V.op_Array_Access c_arr vcv;
+    let cnt = V.op_Dot_Lparen_Rparen c_arr vcv;
     L.count_bounded s0 (SZ.v vcv);
     L.phase2_pos_bound sa s0 (SZ.v vpos) (SZ.v vcv) k;
     let cnt_sz : SZ.t = SZ.uint_to_t cnt;
@@ -411,7 +409,7 @@ ensures exists* s.
         (forall (i:nat). SZ.v vpos + SZ.v vw <= i /\ i < Seq.length sa_inner ==>
           Seq.index sa_inner i == Seq.index sa i)
       )
-    decreases (SZ.v cnt_sz `Prims.op_Subtraction` SZ.v !w)
+    decreases (SZ.v cnt_sz `Prims.op_Minus` SZ.v !w)
     {
       let vw = !w;
       with sa_w. assert (A.pts_to a sa_w);
@@ -432,7 +430,7 @@ ensures exists* s.
     
     pos := vpos + cnt_sz;
     cur_v := vcv + 1sz;
-    cur_v_nat := Prims.op_Addition vcvn 1;
+    cur_v_nat := Prims.op_Plus vcvn 1;
   };
   
   with vcv_f vpos_f vcvn_f sc_f sa_f.
@@ -450,7 +448,7 @@ ensures exists* s.
 
 // ========== Digit-keyed Counting Sort (for multi-digit RadixSort) ==========
 
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 ```pulse
 fn counting_sort_by_digit
   (a: A.array nat)     // Input array (read-only)
@@ -516,24 +514,24 @@ ensures exists* sb'.
       Seq.length sc == SZ.v base_val /\
       DL.digit_counts_match_prefix sc sa d (SZ.v base_val) (SZ.v vj)
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !j)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !j)
   {
     let vj = !j;
 
     with sc. assert (V.pts_to c sc);
 
     // Read A[j]
-    let val_j = A.op_Array_Access a vj;
+    let val_j = A.op_Dot_Lparen_Rparen a vj;
 
     // Compute digit key
     let key = B.digit val_j d (SZ.v base_val);
     B.digit_bound val_j d (SZ.v base_val);
 
     // Read C[key]
-    let count_old = V.op_Array_Access c (SZ.uint_to_t key);
+    let count_old = V.op_Dot_Lparen_Rparen c (SZ.uint_to_t key);
 
     // C[key] = C[key] + 1
-    V.op_Array_Assignment c (SZ.uint_to_t key) (count_old + 1);
+    V.op_Dot_Lparen_Rparen_Less_Minus c (SZ.uint_to_t key) (count_old + 1);
 
     with sc'. assert (V.pts_to c sc');
 
@@ -571,7 +569,7 @@ ensures exists* sb'.
       Seq.length sc == SZ.v base_val /\
       DL.digit_prefix_sum_inv sc sa d (SZ.v base_val) (SZ.v vi)
     )
-  decreases (SZ.v base_val `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v base_val `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
 
@@ -580,13 +578,13 @@ ensures exists* sb'.
     let vi_minus_1 = vi -^ 1sz;
 
     // Read C[i-1]
-    let prev_count = V.op_Array_Access c vi_minus_1;
+    let prev_count = V.op_Dot_Lparen_Rparen c vi_minus_1;
 
     // Read C[i]
-    let curr_count = V.op_Array_Access c vi;
+    let curr_count = V.op_Dot_Lparen_Rparen c vi;
 
     // C[i] = C[i] + C[i-1]
-    V.op_Array_Assignment c vi (curr_count + prev_count);
+    V.op_Dot_Lparen_Rparen_Less_Minus c vi (curr_count + prev_count);
 
     with sc'. assert (V.pts_to c sc');
     DL.digit_prefix_sum_step sc sc' sa d (SZ.v base_val) (SZ.v vi);
@@ -639,25 +637,25 @@ ensures exists* sb'.
     assert (pure (SZ.v vj_back < SZ.v len));
 
     // Read A[j_back]
-    let val_j = A.op_Array_Access a vj_back;
+    let val_j = A.op_Dot_Lparen_Rparen a vj_back;
 
     // Compute digit key
     let key = B.digit val_j d (SZ.v base_val);
     B.digit_bound val_j d (SZ.v base_val);
 
     // Read C[key]
-    let pos = V.op_Array_Access c (SZ.uint_to_t key);
+    let pos = V.op_Dot_Lparen_Rparen c (SZ.uint_to_t key);
 
     // Prove pos >= 1 /\ pos <= len from tracking invariant
     DL.phase4_pos_bounds sc sa d (SZ.v base_val) (SZ.v len) (SZ.v vj_back + 1) key;
 
     // B[pos-1] = val_j  (CLRS uses 1-based, we use 0-based)
-    A.op_Array_Assignment b (SZ.uint_to_t (pos - 1)) val_j;
+    A.op_Dot_Lparen_Rparen_Less_Minus b (SZ.uint_to_t (pos - 1)) val_j;
 
     with sb_curr'. assert (A.pts_to b sb_curr');
 
     // C[key]--
-    V.op_Array_Assignment c (SZ.uint_to_t key) (pos - 1);
+    V.op_Dot_Lparen_Rparen_Less_Minus c (SZ.uint_to_t key) (pos - 1);
 
     with sc'. assert (V.pts_to c sc');
 

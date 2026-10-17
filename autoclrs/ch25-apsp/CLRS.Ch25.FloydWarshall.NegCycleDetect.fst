@@ -64,11 +64,11 @@ fn check_no_negative_cycle
       (vok == false ==>
         ~(non_negative_diagonal contents (SZ.v n)))
     )
-  decreases (SZ.v n `Prims.op_Subtraction` SZ.v !v)
+  decreases (SZ.v n `Prims.op_Minus` SZ.v !v)
   {
     let vv = !v;
     let idx = vv *^ n +^ vv;
-    let d_vv = A.op_Array_Access dist idx;
+    let d_vv = A.op_Dot_Lparen_Rparen dist idx;
     if (d_vv < 0) {
       ok := false
     };

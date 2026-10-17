@@ -129,8 +129,7 @@ let same_component_symmetric (edges: list edge) (u v: nat)
   : Lemma (requires same_component edges u v)
           (ensures same_component edges v u)
   = eliminate exists (path: list edge). subset_edges path edges /\ is_path_from_to path u v
-    returns same_component edges v u
-    with _. (
+    with (
       is_path_reverse path u v;
       subset_edges_rev path edges
     )
@@ -140,11 +139,9 @@ let same_component_transitive (edges: list edge) (u v w: nat)
   : Lemma (requires same_component edges u v /\ same_component edges v w)
           (ensures same_component edges u w)
   = eliminate exists (p1: list edge). subset_edges p1 edges /\ is_path_from_to p1 u v
-    returns same_component edges u w
-    with _. (
+    with (
       eliminate exists (p2: list edge). subset_edges p2 edges /\ is_path_from_to p2 v w
-      returns same_component edges u w
-      with _. (
+      with (
         is_path_concat p1 p2 u v w;
         subset_edges_concat p1 p2 edges
       )
@@ -296,8 +293,7 @@ let neighbor_reaches (edges: list edge) (v u w: nat)
   =
     edge_neighbors_sound edges v u;
     eliminate exists e. mem_edge e edges /\ ((e.u = v /\ e.v = u) \/ (e.v = v /\ e.u = u))
-    returns reachable edges v w
-    with _. (
+    with (
       edge_gives_reachability edges v u e;
       reachability_transitive edges v u w
     )
@@ -615,15 +611,15 @@ let rec bfs_complete_invariant
       assert (length visited >= max + 1);
       introduce forall (v: nat). mem v visited ==>
         (forall (w: nat). mem w (edge_neighbors edges v) ==> mem w visited)
-      with introduce _ ==> _ with _. begin
+      with introduce _ ==> _ with begin
         introduce forall (w: nat). mem w (edge_neighbors edges v) ==> mem w visited
-        with introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
           edge_neighbors_bounded edges v w;
           noRepeats_covers_all visited max w
         end
       end;
       introduce forall (v: nat). mem v frontier ==> mem v visited
-      with introduce _ ==> _ with _.
+      with introduce _ ==> _ with
         noRepeats_covers_all visited max v
     end
     else match frontier with
@@ -660,9 +656,9 @@ let rec bfs_complete_invariant
 
         introduce forall (u: nat). mem u visited' ==>
           (forall (w: nat). mem w (edge_neighbors edges u) ==> (mem w visited' \/ mem w frontier'))
-        with introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
           introduce forall (w: nat). mem w (edge_neighbors edges u) ==> (mem w visited' \/ mem w frontier')
-          with introduce _ ==> _ with _. begin
+          with introduce _ ==> _ with begin
             if u = v then
               mem_append w rest new_neighbors
             else if mem w visited then ()
@@ -748,8 +744,7 @@ let same_component_dec_complete (edges: list edge) (u v: nat)
       let fuel = max_vertex_in_edges edges + 1 in
       let result = bfs_reach_list edges [u] [] fuel in
       eliminate exists (path: list edge). subset_edges path edges /\ is_path_from_to path u v
-        returns same_component_dec edges u v = true
-        with _. begin
+        with begin
           let e :: _ = path in
           assert (mem_edge e edges);
           assert (e.u = u \/ e.v = u);
@@ -804,8 +799,7 @@ let lemma_component_implies_same (edges: list edge) (u v: nat) (n: nat) (comp: l
   = components_structure edges n;
     // comp is component_of edges seed n for some seed
     eliminate exists seed. comp == component_of edges seed n
-    returns same_component edges u v
-    with _. begin
+    with begin
       assert (comp == component_of edges seed n);
       assert (mem u (component_of edges seed n));
       assert (mem v (component_of edges seed n));

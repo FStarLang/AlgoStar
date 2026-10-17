@@ -22,7 +22,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 
 open CLRS.Ch06.Heap.Spec
 open CLRS.Ch06.Heap.Lemmas
@@ -56,7 +55,7 @@ let heapsort_final_cost_bound (n:pos) (heap_sz:nat) (cf c0:nat)
 
 // ========== Ghost tick ==========
 
-let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Addition (reveal n) 1)
+let incr_nat (n: erased nat) : erased nat = hide (Prims.op_Plus (reveal n) 1)
 
 ghost
 fn tick (ctr: GR.ref nat) (#n: erased nat)
@@ -127,6 +126,7 @@ ensures exists* s' (cf: nat).
     cf >= reveal c0 /\
     cf - reveal c0 <= CB.max_heapify_bound (SZ.v heap_size) (SZ.v idx)
   )
+  decreases (SZ.v heap_size - SZ.v idx)
 {
   let left = SZ.add (SZ.mul 2sz idx) 1sz;
   if (SZ.gte left heap_size) {

@@ -400,7 +400,7 @@ let frame_preserves_dist_ok
    - Seq.upd axiom fires on conclusion → introduces Seq.index squeue i
    - queue_ok trigger fires → gives scolor[squeue[i]] <> 0
    - scolor[v] == 0 + scolor[squeue[i]] <> 0 → squeue[i] <> v → Seq.upd scolor unchanged *)
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10"
 let queue_ok_after_discover
   (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (v: SZ.t)
   : Lemma
@@ -547,7 +547,7 @@ let discover_preserves_queue_gray_unique
     (ensures queue_gray_unique (Seq.upd scolor j 1) squeue n head tail)
   = ()
 
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10"
 let queue_gray_unique_after_discover
   (scolor: Seq.seq int) (squeue: Seq.seq SZ.t) (n head tail: nat) (v: SZ.t)
   : Lemma
@@ -713,7 +713,7 @@ let init_queue_dist_ub (sdist: Seq.seq int) (squeue: Seq.seq SZ.t) (n: nat)
 
 (* --- Core optimality contradiction: no short path to a WHITE vertex --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let discover_optimal_contradiction
   (adj: Seq.seq int) (n: nat) (scolor: Seq.seq int) (source j: nat) (d k: nat)
   : Lemma
@@ -743,7 +743,7 @@ let discover_optimal_contradiction
 
 (* --- Discover preservation lemmas --- *)
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 let discover_preserves_dist_optimal
   (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (source u j: nat) (du: nat)
   : Lemma
@@ -955,9 +955,9 @@ let queue_nondecreasing_tail
       = if i >= head + 1 && i + 1 < tail then begin
           assert (i >= head);
           // Need both pattern terms in scope for the multi-pattern trigger
-          let _ = Seq.index squeue i in
-          let _ = Seq.index squeue (i + 1) in
-          ()
+          let qi = Seq.index squeue i in
+          let qi1 = Seq.index squeue (i + 1) in
+          assert (SZ.v qi < n /\ SZ.v qi1 < n)
         end
     in
     FStar.Classical.forall_intro aux
@@ -1003,7 +1003,7 @@ let queue_dist_ub_from_min_opt
 
 (* --- Gray vertex has dist >= d (counting/induction argument) --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec gray_implies_dist_ge
   (scolor: Seq.seq int) (sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
   (n head tail: nat) (d: int) (w: nat)
@@ -1090,7 +1090,7 @@ let rec gray_implies_dist_ge
 
 (* --- Layer completeness from BFS invariants --- *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 let rec layer_complete_aux
   (adj: Seq.seq int) (n: nat) (scolor sdist: Seq.seq int) (squeue: Seq.seq SZ.t)
   (source d head tail: nat) (w: nat) (k: nat)
@@ -1170,7 +1170,7 @@ let layer_complete_from_invariants
    Factored out to avoid Pulse unification issues with conditional branches
    that perform multiple array mutations. *)
 
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
 fn discover_vertex
   (color: A.array int) (dist: A.array int) (pred: A.array int)
   (queue_data: A.array SZ.t) (q_tail: ref SZ.t)
@@ -1219,15 +1219,15 @@ fn discover_vertex
     )
 {
   // v.color = GRAY
-  A.op_Array_Assignment color vv 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus color vv 1;
   
   // v.d = u.d + 1
-  A.op_Array_Assignment dist vv (du + 1);
+  A.op_Dot_Lparen_Rparen_Less_Minus dist vv (du + 1);
   // v.pi = u
-  A.op_Array_Assignment pred vv (SZ.v u);
+  A.op_Dot_Lparen_Rparen_Less_Minus pred vv (SZ.v u);
   // ENQUEUE(Q, v)
   let t = !q_tail;
-  A.op_Array_Assignment queue_data t vv;
+  A.op_Dot_Lparen_Rparen_Less_Minus queue_data t vv;
   q_tail := SZ.add t 1sz
 }
 #pop-options
@@ -1235,7 +1235,7 @@ fn discover_vertex
 (* Helper: conditionally discover a vertex if WHITE and edge exists.
    Both branches produce the same slprop shape, solving Pulse unification. *)
 
-#push-options "--z3rlimit 20 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 20 --fuel 2 --ifuel 1"
 fn maybe_discover
   (adj: A.array int)
   (color: A.array int) (dist: A.array int) (pred: A.array int)
@@ -1369,7 +1369,7 @@ fn maybe_discover
 }
 #pop-options
 
-#push-options "--z3rlimit 60 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 60 --fuel 2 --ifuel 1"
 fn queue_bfs
   (adj: A.array int)
   (n: SZ.t)
@@ -1473,9 +1473,9 @@ fn queue_bfs
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment color vi 0;
-    A.op_Array_Assignment dist vi (-1);
-    A.op_Array_Assignment pred vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus color vi 0;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus pred vi (-1);
     i := SZ.add vi 1sz
   };
 
@@ -1483,14 +1483,14 @@ fn queue_bfs
   with scolor_zeros. assert (A.pts_to color scolor_zeros);
   with sdist_zeros. assert (A.pts_to dist sdist_zeros);
   with spred_zeros. assert (A.pts_to pred spred_zeros);
-  A.op_Array_Assignment color source 1;    // s.color = GRAY
-  A.op_Array_Assignment dist source 0;     // s.d = 0
-  A.op_Array_Assignment pred source (-1);  // s.pi = NIL
+  A.op_Dot_Lparen_Rparen_Less_Minus color source 1;    // s.color = GRAY
+  A.op_Dot_Lparen_Rparen_Less_Minus dist source 0;     // s.d = 0
+  A.op_Dot_Lparen_Rparen_Less_Minus pred source (-1);  // s.pi = NIL
 
   // Step 3: ENQUEUE(Q, s)
   let mut q_head: SZ.t = 0sz;
   let mut q_tail: SZ.t = 0sz;
-  A.op_Array_Assignment queue_data 0sz source;
+  A.op_Dot_Lparen_Rparen_Less_Minus queue_data 0sz source;
   q_tail := 1sz;
 
   // Establish predicates for main loop entry
@@ -1558,7 +1558,7 @@ fn queue_bfs
     
     // u = DEQUEUE(Q)
     let vhead = !q_head;
-    let u: SZ.t = A.op_Array_Access queue_data vhead;
+    let u: SZ.t = A.op_Dot_Lparen_Rparen queue_data vhead;
 
     // By queue_ok invariant: u < n and color[u] <> 0
     // By queue_gray_unique: color[u] == 1 (GRAY)
@@ -1569,7 +1569,7 @@ fn queue_bfs
     assert (pure (Seq.index scolor_deq (SZ.v u) == 1));
     q_head := SZ.add vhead 1sz;
     
-    let du: int = A.op_Array_Access dist u;
+    let du: int = A.op_Dot_Lparen_Rparen dist u;
     // u is non-WHITE (from queue_ok), so by dist_ok, du >= 0
     with sdist_deq. assert (A.pts_to dist sdist_deq);
     assert (pure (du >= 0));
@@ -1646,10 +1646,10 @@ fn queue_bfs
       product_strict_bound (SZ.v n) (SZ.v n) (SZ.v u) (SZ.v vv);
       let offset: SZ.t = SZ.mul u n;
       let idx: SZ.t = SZ.add offset vv;
-      let has_edge_val: int = A.op_Array_Access adj idx;
+      let has_edge_val: int = A.op_Dot_Lparen_Rparen adj idx;
 
       // Read color[v]
-      let cv: int = A.op_Array_Access color vv;
+      let cv: int = A.op_Dot_Lparen_Rparen color vv;
 
       // Capture pre-state for assertions after maybe_discover
       with scolor_pre. assert (A.pts_to color scolor_pre);
@@ -1720,7 +1720,7 @@ fn queue_bfs
     // (blacken doesn't change dist or queue, so these hold from inner loop exit)
     queue_dist_ub_from_min_opt sdist_pre_black squeue_pre_black (SZ.v n) (SZ.v vhead + 1) (SZ.v vtail_pre_black) (du + 1);
     
-    A.op_Array_Assignment color u 2;
+    A.op_Dot_Lparen_Rparen_Less_Minus color u 2;
 
     // Complexity: after inner loop with vv == n, vc2 - c0 <= vhead*(n+1) + 1 + n
     // = vhead*(n+1) + (n+1) = (vhead+1)*(n+1)

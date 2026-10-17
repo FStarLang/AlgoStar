@@ -45,7 +45,7 @@ let max_subarray_spec (s: Seq.seq int) : Tot int =
 let rec sum_range (s: Seq.seq int) (i j: nat) : Pure int
   (requires i <= j /\ j <= Seq.length s)
   (ensures fun _ -> True)
-  (decreases Prims.op_Subtraction j i)
+  (decreases Prims.op_Minus j i)
   =
   if i >= j then 0
   else Seq.index s i + sum_range s (i + 1) j
@@ -55,7 +55,7 @@ let rec lemma_sum_range_append (s: Seq.seq int) (i j k: nat)
   : Lemma
     (requires i <= j /\ j <= k /\ k <= Seq.length s)
     (ensures sum_range s i k == sum_range s i j + sum_range s j k)
-    (decreases Prims.op_Subtraction j i)
+    (decreases Prims.op_Minus j i)
   =
   if i >= j then ()
   else lemma_sum_range_append s (i + 1) j k
@@ -66,13 +66,13 @@ let rec lemma_sum_range_append (s: Seq.seq int) (i j k: nat)
 let rec max_suffix_sum (s: Seq.seq int) (i: nat) : Pure int
   (requires i < Seq.length s) (ensures fun _ -> True) (decreases i) =
   if i = 0 then Seq.index s 0
-  else max_int (Seq.index s i) (max_suffix_sum s (Prims.op_Subtraction i 1) + Seq.index s i)
+  else max_int (Seq.index s i) (max_suffix_sum s (Prims.op_Minus i 1) + Seq.index s i)
 
 // Global max non-empty subarray sum in s[0..i+1)
 let rec max_sub_sum (s: Seq.seq int) (i: nat) : Pure int
   (requires i < Seq.length s) (ensures fun _ -> True) (decreases i) =
   if i = 0 then Seq.index s 0
-  else max_int (max_sub_sum s (Prims.op_Subtraction i 1)) (max_suffix_sum s i)
+  else max_int (max_sub_sum s (Prims.op_Minus i 1)) (max_suffix_sum s i)
 
 // ========== Complexity bound predicate (Kadane) ==========
 

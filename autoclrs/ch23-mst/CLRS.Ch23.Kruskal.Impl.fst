@@ -182,7 +182,7 @@ fn find
   decreases (SZ.v n - SZ.v !steps)
   {
     let vcurr = !curr;
-    let p = A.op_Array_Access parent vcurr;
+    let p = A.op_Dot_Lparen_Rparen parent vcurr;
     curr := p;
     let vsteps = !steps;
     steps := vsteps +^ 1sz;
@@ -202,12 +202,12 @@ fn do_union
   ensures exists* sparent'. A.pts_to parent sparent' **
     pure (do_union_post sparent sparent' (SZ.v root_u) (SZ.v root_v) (SZ.v n))
 {
-  A.op_Array_Assignment parent root_u root_v;
+  A.op_Dot_Lparen_Rparen_Less_Minus parent root_u root_v;
 }
 #pop-options
 
 // Lemma for when we add an edge: proves uf_inv, is_forest, valid_endpoints for new state.
-#push-options "--z3rlimit 40 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 40 --fuel 2 --ifuel 2"
 let kruskal_add_edge_proof
     (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int)
@@ -629,6 +629,7 @@ let rec weighted_edge_weight_from_mem
     else
       let wu = Seq.index seu i in
       let wv = Seq.index sev i in
+      index_bound wu wv n;
       let ww = Seq.index sadj (wu * n + wv) in
       let w_hd : edge = {u = wu; v = wv; w = ww} in
       if edge_eq e w_hd then
@@ -1897,7 +1898,7 @@ let kruskal_mst_inv_step_add_safety
 // Step maintenance: adding an edge
 // Transfers all predicates from seu/sev to seu'/sev' via ext lemmas
 #restart-solver
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let kruskal_mst_inv_step_add
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -1949,7 +1950,7 @@ let kruskal_mst_inv_step_add
 
 // Step maintenance: not adding an edge
 #restart-solver
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 2 --ifuel 2"
 let kruskal_mst_inv_step_noop
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec: nat)
@@ -1982,7 +1983,7 @@ let kruskal_mst_inv_step_noop
 
 // Wrapper for both cases
 #restart-solver
-#push-options "--z3rlimit 5 --fuel 2 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 5 --fuel 2 --ifuel 2"
 let kruskal_mst_inv_step
     (sadj: Seq.seq int) (sparent sparent': Seq.seq SZ.t)
     (seu sev seu' sev': Seq.seq int) (n ec ec': nat)
@@ -2110,7 +2111,7 @@ let kruskal_spanning_step_count
 #pop-options
 #pop-options
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --split_queries always --ext no:optimize_let_vc"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --ext no:optimize_let_vc"
 fn find_min_cross_edge
   (#p: perm)
   (adj: A.array int)
@@ -2208,7 +2209,7 @@ fn find_min_cross_edge
       lemma_index_in_bounds (SZ.v vui) (SZ.v vvi) (SZ.v n);
       let offset: SZ.t = SZ.mul vui n;
       let idx: SZ.t = SZ.add offset vvi;
-      let w = A.op_Array_Access adj idx;
+      let w = A.op_Dot_Lparen_Rparen adj idx;
       let vbw = !best_w;
       let vbu_old = !best_u;
       let vbv_old = !best_v;
@@ -2238,7 +2239,7 @@ fn find_min_cross_edge
 }
 #pop-options
 
-#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --split_queries always --ext no:optimize_let_vc"
+#push-options "--z3rlimit 200 --fuel 2 --ifuel 2 --ext no:optimize_let_vc"
 fn kruskal
   (adj: A.array int)
   (#p: perm) (#sadj: Ghost.erased (Seq.seq int))
@@ -2292,7 +2293,7 @@ fn kruskal
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment parent vi vi;
+    A.op_Dot_Lparen_Rparen_Less_Minus parent vi vi;
     i := vi +^ 1sz;
   };
   
@@ -2364,11 +2365,11 @@ fn kruskal
     let should_add: bool = (vbw > 0 && root_u <> root_v && vec <^ n);
     
     // Branchless writes: when not adding, preserve old values at position 0
-    let old_eu0 = A.op_Array_Access edge_u 0sz;
-    let old_ev0 = A.op_Array_Access edge_v 0sz;
+    let old_eu0 = A.op_Dot_Lparen_Rparen edge_u 0sz;
+    let old_ev0 = A.op_Dot_Lparen_Rparen edge_v 0sz;
     let write_pos: SZ.t = (if should_add then vec else 0sz);
-    A.op_Array_Assignment edge_u write_pos (if should_add then vbu else old_eu0);
-    A.op_Array_Assignment edge_v write_pos (if should_add then vbv else old_ev0);
+    A.op_Dot_Lparen_Rparen_Less_Minus edge_u write_pos (if should_add then vbu else old_eu0);
+    A.op_Dot_Lparen_Rparen_Less_Minus edge_v write_pos (if should_add then vbv else old_ev0);
     edge_count := (if should_add then vec +^ 1sz else vec);
     do_union parent root_u root_v n;
     

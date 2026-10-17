@@ -272,9 +272,9 @@ fn approx_vertex_cover
       let idx = u_times_n +^ vv;
       
       // Read values
-      let cu = A.op_Array_Access cover_a vu;
-      let cv = A.op_Array_Access cover_a vv;
-      let has_edge = A.op_Array_Access adj idx;
+      let cu = A.op_Dot_Lparen_Rparen cover_a vu;
+      let cv = A.op_Dot_Lparen_Rparen cover_a vv;
+      let has_edge = A.op_Dot_Lparen_Rparen adj idx;
       
       // Compute new values (unconditionally)
       let new_cu = (if has_edge <> 0 && cu = 0 && cv = 0 then 1 else cu);
@@ -290,8 +290,8 @@ fn approx_vertex_cover
       matching_inv_step s_adj s_cov_before (SZ.v n) (SZ.v vu) (SZ.v vv) vm_cur cu cv has_edge new_cu new_cv;
       
       // Write unconditionally
-      A.op_Array_Assignment cover_a vu new_cu;
-      A.op_Array_Assignment cover_a vv new_cv;
+      A.op_Dot_Lparen_Rparen_Less_Minus cover_a vu new_cu;
+      A.op_Dot_Lparen_Rparen_Less_Minus cover_a vv new_cv;
       
       // Ghost: update matching
       let new_vm : Ghost.erased (list Spec.edge) =

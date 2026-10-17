@@ -16,7 +16,6 @@ module CLRS.Ch07.Partition.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch07.Partition.Impl
 open CLRS.Ch07.Partition.Lemmas
@@ -37,12 +36,12 @@ inline_for_extraction
 let int_eq (a b: int) : (r:bool{r <==> a = b}) = a = b
 
 inline_for_extraction
-let int_leq (a b: int) : (r:bool{r <==> Prims.op_LessThanOrEqual a b}) =
-  Prims.op_LessThanOrEqual a b
+let int_leq (a b: int) : (r:bool{r <==> Prims.op_Less_Equals a b}) =
+  Prims.op_Less_Equals a b
 
 // Test file: concrete 3-element reasoning needs fuel for count/permutation unfolding.
 // split_queries helps Z3 handle count facts independently.
-#push-options "--fuel 4 --z3rlimit 30 --split_queries always"
+#push-options "--fuel 4 --z3rlimit 30"
 
 (* Lemma: for input [3; 1; 2], the partition postcondition determines
    that the three sub-sequences form a valid split of exactly these elements.

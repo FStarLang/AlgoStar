@@ -43,8 +43,13 @@ let lemma_mod_mul_both (a b: int) (m: pos)
   = lemma_mod_mul_distr_l a (b % m) m;
     lemma_mod_mul_distr_r a b m
 
+// pow b (e + 1) == pow b e * b
+let lemma_pow_succ (b: int) (e: nat)
+  : Lemma (pow b (e + 1) == pow b e * b)
+  = ()
+
 // Left-to-right step lemma
-#push-options "--z3rlimit 10 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
 let mod_exp_lr_step (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
   : Lemma (
       let d = pow b prefix % m in
@@ -52,10 +57,18 @@ let mod_exp_lr_step (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
       let d_new = (if bit = 0 then d_sq else (d_sq * b) % m) in
       d_new == pow b (2 * prefix + bit) % m
     )
-  = lemma_mod_mul_both (pow b prefix) (pow b prefix) m;
+  = let p = pow b prefix in
+    let e = 2 * prefix in
+    lemma_mod_mul_both p p m;
     pow_add b prefix prefix;
-    assert (prefix + prefix == 2 * prefix);
+    assert (prefix + prefix == e);
+    let q = pow b e in
+    // ((p % m) * (p % m)) % m == q % m
+    assert (((p % m) * (p % m)) % m == q % m);
     if bit = 1 then (
-      lemma_mod_mul_distr_l (pow b (2 * prefix)) b m
-    ) else ()
+      lemma_mod_mul_distr_l q b m;
+      lemma_pow_succ b e
+    ) else (
+      assert (e + bit == e)
+    )
 #pop-options

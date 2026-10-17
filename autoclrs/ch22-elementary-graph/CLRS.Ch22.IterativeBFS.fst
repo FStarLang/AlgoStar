@@ -109,20 +109,20 @@ fn bfs
       SZ.v vi <= SZ.v n /\
       Seq.length scolor_i == SZ.v n /\
       Seq.length sdist_i == SZ.v n /\
-      (forall (j: nat). j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
-      (forall (j: nat). j < SZ.v vi ==> Seq.index sdist_i j == (-1))
+      (forall (j: nat). {:pattern (Seq.index scolor_i j)} j < SZ.v vi ==> Seq.index scolor_i j == 0) /\
+      (forall (j: nat). {:pattern (Seq.index sdist_i j)} j < SZ.v vi ==> Seq.index sdist_i j == (-1))
     )
   decreases (SZ.v n - SZ.v !i)
   {
     let vi = !i;
-    A.op_Array_Assignment color vi 0;
-    A.op_Array_Assignment dist vi (-1);
+    A.op_Dot_Lparen_Rparen_Less_Minus color vi 0;
+    A.op_Dot_Lparen_Rparen_Less_Minus dist vi (-1);
     i := SZ.add vi 1sz;
   };
 
   // Mark source as visited with distance 0
-  A.op_Array_Assignment color source 1;
-  A.op_Array_Assignment dist source 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus color source 1;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist source 0;
 
   // Run n relaxation rounds
   let mut round: SZ.t = 0sz;
@@ -139,10 +139,11 @@ fn bfs
       Seq.index scolor_r (SZ.v source) == 1 /\
       Seq.index sdist_r (SZ.v source) == 0 /\
       // Reachability completeness: vertices reachable in <= vround steps are visited
-      (forall (v: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
+      (forall (v: nat). {:pattern (Seq.index scolor_r v)}
+        v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
         Seq.index scolor_r v <> 0) /\
       // Distance soundness: visited vertices have valid distances
-      (forall (v: nat). v < SZ.v n /\ Seq.index scolor_r v <> 0 ==>
+      (forall (v: nat). {:pattern (Seq.index scolor_r v)} v < SZ.v n /\ Seq.index scolor_r v <> 0 ==>
         Seq.index sdist_r v >= 0 /\
         reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_r v))
     )
@@ -164,15 +165,16 @@ fn bfs
         Seq.length sdist_u == SZ.v n /\
         Seq.index scolor_u (SZ.v source) == 1 /\
         Seq.index sdist_u (SZ.v source) == 0 /\
-        (forall (v: nat). v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
+        (forall (v: nat). {:pattern (Seq.index scolor_u v)}
+          v < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) v (SZ.v vround) ==> 
           Seq.index scolor_u v <> 0) /\
-        (forall (u_idx: nat) (v_idx: nat). 
+        (forall (u_idx: nat) (v_idx: nat). {:pattern (has_edge sadj (SZ.v n) u_idx v_idx)}
           u_idx < SZ.v vu /\ v_idx < SZ.v n /\
           reachable_in sadj (SZ.v n) (SZ.v source) u_idx (SZ.v vround) /\
           has_edge sadj (SZ.v n) u_idx v_idx ==>
           Seq.index scolor_u v_idx <> 0) /\
         // Distance soundness carried through
-        (forall (v: nat). v < SZ.v n /\ Seq.index scolor_u v <> 0 ==>
+        (forall (v: nat). {:pattern (Seq.index scolor_u v)} v < SZ.v n /\ Seq.index scolor_u v <> 0 ==>
           Seq.index sdist_u v >= 0 /\
           reachable_in sadj (SZ.v n) (SZ.v source) v (Seq.index sdist_u v))
       )
@@ -181,7 +183,7 @@ fn bfs
       let vu = !u;
 
       // Read dist[u] before inner loop
-      let du: int = A.op_Array_Access dist vu;
+      let du: int = A.op_Dot_Lparen_Rparen dist vu;
 
       let mut v: SZ.t = 0sz;
       while (!v <^ n)
@@ -201,20 +203,21 @@ fn bfs
           SZ.fits (SZ.v vu * SZ.v n + SZ.v vv) /\
           Seq.index scolor_v (SZ.v source) == 1 /\
           Seq.index sdist_v (SZ.v source) == 0 /\
-          (forall (w: nat). w < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) w (SZ.v vround) ==> 
+          (forall (w: nat). {:pattern (Seq.index scolor_v w)}
+            w < SZ.v n /\ reachable_in sadj (SZ.v n) (SZ.v source) w (SZ.v vround) ==> 
             Seq.index scolor_v w <> 0) /\
-          (forall (u_idx: nat) (v_idx: nat). 
+          (forall (u_idx: nat) (v_idx: nat). {:pattern (has_edge sadj (SZ.v n) u_idx v_idx)}
             u_idx < SZ.v vu /\ v_idx < SZ.v n /\
             reachable_in sadj (SZ.v n) (SZ.v source) u_idx (SZ.v vround) /\
             has_edge sadj (SZ.v n) u_idx v_idx ==>
             Seq.index scolor_v v_idx <> 0) /\
-          (forall (v_idx: nat).
+          (forall (v_idx: nat). {:pattern (has_edge sadj (SZ.v n) (SZ.v vu) v_idx)}
             v_idx < SZ.v vv /\
             reachable_in sadj (SZ.v n) (SZ.v source) (SZ.v vu) (SZ.v vround) /\
             has_edge sadj (SZ.v n) (SZ.v vu) v_idx ==>
             Seq.index scolor_v v_idx <> 0) /\
           // Distance soundness carried through inner loop
-          (forall (w: nat). w < SZ.v n /\ Seq.index scolor_v w <> 0 ==>
+          (forall (w: nat). {:pattern (Seq.index scolor_v w)} w < SZ.v n /\ Seq.index scolor_v w <> 0 ==>
             Seq.index sdist_v w >= 0 /\
             reachable_in sadj (SZ.v n) (SZ.v source) w (Seq.index sdist_v w)) /\
           // dist[vu] is preserved during inner loop
@@ -224,11 +227,11 @@ fn bfs
       {
         let vv = !v;
 
-        let cu: int = A.op_Array_Access color vu;
+        let cu: int = A.op_Dot_Lparen_Rparen color vu;
         let offset: SZ.t = SZ.mul vu n;
         let idx: SZ.t = SZ.add offset vv;
-        let has_edge_val: int = A.op_Array_Access adj idx;
-        let cv: int = A.op_Array_Access color vv;
+        let has_edge_val: int = A.op_Dot_Lparen_Rparen adj idx;
+        let cv: int = A.op_Dot_Lparen_Rparen color vv;
 
         assert pure (
           (has_edge_val <> 0) <==> has_edge sadj (SZ.v n) (SZ.v vu) (SZ.v vv)
@@ -245,12 +248,12 @@ fn bfs
            has_edge sadj (SZ.v n) (SZ.v vu) (SZ.v vv) /\
            reachable_in sadj (SZ.v n) (SZ.v source) (SZ.v vv) (du + 1)));
 
-        A.op_Array_Assignment color vv new_cv;
+        A.op_Dot_Lparen_Rparen_Less_Minus color vv new_cv;
 
         // Update distance: if visiting v for the first time, dist[v] = dist[u] + 1
-        let dv: int = A.op_Array_Access dist vv;
+        let dv: int = A.op_Dot_Lparen_Rparen dist vv;
         let new_dv: int = (if cu <> 0 && has_edge_val <> 0 && cv = 0 then du + 1 else dv);
-        A.op_Array_Assignment dist vv new_dv;
+        A.op_Dot_Lparen_Rparen_Less_Minus dist vv new_dv;
 
         v := SZ.add vv 1sz;
       };

@@ -17,7 +17,6 @@ module CLRS.Ch09.PartialSelectionSort.ImplTest
 
 open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
-open Pulse.Lib.BoundedIntegers
 open FStar.SizeT
 open CLRS.Ch09.PartialSelectionSort.Impl
 open CLRS.Ch09.PartialSelectionSort.Spec
@@ -30,7 +29,7 @@ module GR = Pulse.Lib.GhostReference
 
 inline_for_extraction
 let int_eq (a b: int) : bool =
-  not (Prims.op_LessThan a b || Prims.op_LessThan b a)
+  not (Prims.op_Less a b || Prims.op_Less b a)
 
 let int_eq_correct (a b: int)
   : Lemma (int_eq a b <==> a = b) = ()

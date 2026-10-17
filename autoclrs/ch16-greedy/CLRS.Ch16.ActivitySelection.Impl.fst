@@ -27,7 +27,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module R = Pulse.Lib.Reference
@@ -111,7 +110,7 @@ fn activity_selection
         vc >= reveal c0 /\
         vc - reveal c0 == SZ.v vi - 1
       )
-    decreases (SZ.v n `Prims.op_Subtraction` SZ.v !i)
+    decreases (SZ.v n `Prims.op_Minus` SZ.v !i)
     {
       let vi = !i;
       let curr_start = start_times.(vi);
@@ -126,7 +125,7 @@ fn activity_selection
       assert pure (vlast_finish <= curr_finish);
       
       // Compute both possible next selections
-      let selected = Prims.op_GreaterThanOrEqual curr_start vlast_finish;
+      let selected = Prims.op_Greater_Equals curr_start vlast_finish;
       
       // Count the comparison — one ghost tick
       tick ctr;

@@ -352,7 +352,7 @@ let acyclic_when_unreachable (n: nat) (t: list edge) (e: edge)
       vv < n /\ subset_edges cycle (e :: t) /\ Cons? cycle /\ all_edges_distinct cycle ==>
       ~(is_path_from_to cycle vv vv)
     with introduce _ ==> _
-    with _. (
+    with (
       let show_false ()
         : Lemma (requires is_path_from_to cycle vv vv) (ensures False) =
         cycle_must_use_e n t e vv cycle;
@@ -608,7 +608,7 @@ let lemma_exchange_preserves_mst
     // So: total_weight t' = total_weight t <= total_weight t''
     introduce forall (t'': list edge). is_spanning_tree g t'' ==> total_weight t' <= total_weight t''
     with introduce _ ==> _
-    with _h. ()
+    with ()
 #pop-options
 
 (*** Simple Path Extraction ***)
@@ -932,7 +932,7 @@ let reachable_in_component (es: list edge) (root v: nat)
               assert (reachable es root hd.u /\ reachable es root hd.v);
               assert (f hd);
               introduce forall (e1 e2: edge). edge_eq e1 e2 ==> f e1 = f e2
-              with introduce _ ==> _ with _. edge_eq_endpoints e1 e2;
+              with introduce _ ==> _ with edge_eq_endpoints e1 e2;
               mem_edge_ghost_filter hd f es;
               path_in_filter tl_p
         in
@@ -957,8 +957,8 @@ let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
     | [] ->
       // Only root is reachable from itself with no edges
       introduce forall (v: nat). v < n ==> reachable ([] #edge) root v ==> v = root
-      with introduce _ ==> _ with _. begin
-        introduce _ ==> _ with _. reachable_empty root v
+      with introduce _ ==> _ with begin
+        introduce _ ==> _ with reachable_empty root v
       end;
       count_reachable_at_most_one ([] #edge) root n n root
 
@@ -967,16 +967,16 @@ let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
       if reachable_dec tl root e.u && reachable_dec tl root e.v then begin
         // Redundant edge: reachability unchanged, count doesn't increase
         introduce forall (v: nat). v < n ==> reachable es root v ==> reachable tl root v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _. reachable_redundant tl e root v
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with reachable_redundant tl e root v
         end;
         count_reachable_mono es tl root root n n
 
       end else if not (reachable_dec tl root e.u) && not (reachable_dec tl root e.v) then begin
         // Neither endpoint reachable: count doesn't increase
         introduce forall (v: nat). v < n ==> reachable es root v ==> reachable tl root v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _. reachable_neither tl e root v
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with reachable_neither tl e root v
         end;
         count_reachable_mono es tl root root n n
 
@@ -1009,23 +1009,23 @@ let rec count_reachable_bound (es: list edge) (root: nat) (n: nat)
 
         // count(tl, root) <= count(es_r, root) (from reachable_in_component)
         introduce forall (v: nat). v < n ==> reachable tl root v ==> reachable es_r root v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _. reachable_in_component tl root v
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with reachable_in_component tl root v
         end;
         count_reachable_mono tl es_r root root n n;
 
         // count(tl, nr) <= count(es_nr, nr) (from reachable_in_component)
         introduce forall (v: nat). v < n ==> reachable tl nr v ==> reachable es_nr nr v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _. reachable_in_component tl nr v
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with reachable_in_component tl nr v
         end;
         count_reachable_mono tl es_nr nr nr n n;
 
         // Bridge decomposition: reachable es root v ==> reachable tl root v \/ reachable tl nr v
         introduce forall (v: nat). v < n ==> reachable es root v ==>
           reachable tl root v \/ reachable tl nr v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with begin
             if reachable_dec tl root e.u then
               reachable_bridge tl e root v e.u e.v
             else
@@ -1051,7 +1051,7 @@ let connected_min_edges (n: nat) (es: list edge)
   : Lemma (requires n > 0 /\ all_connected n es)
           (ensures length es >= n - 1)
   = introduce forall (v: nat). v < n ==> reachable es 0 v
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       assert (reachable es 0 v)
     end;
     let rec count_all (m: nat)
@@ -1119,7 +1119,7 @@ let acyclic_subset (n: nat) (es es': list edge)
       v < n /\ subset_edges cycle es' /\ Cons? cycle /\ all_edges_distinct cycle ==>
       ~(is_path_from_to cycle v v)
     with introduce _ ==> _
-    with _. (
+    with (
       let aux (e: edge)
         : Lemma (requires mem_edge e cycle)
                 (ensures mem_edge e es) =
@@ -1453,7 +1453,7 @@ let rec subset_edges_t_to_erem_ft (p: list edge) (e_rem: edge) (t: list edge)
 // then T - {e_rem} + {e_add} is still a spanning tree.
 // Proof requires: (1) e_rem removal splits T into two components,
 // (2) e_add reconnects them (since it's on the path), (3) acyclicity is restored.
-#push-options "--z3rlimit 100 --fuel 2 --ifuel 1 --split_queries always"
+#push-options "--z3rlimit 100 --fuel 2 --ifuel 1"
 let exchange_is_spanning_tree
     (g: graph) (t: list edge) (e_add e_rem: edge) (path: list edge)
   : Lemma (requires is_spanning_tree g t /\
@@ -1504,7 +1504,7 @@ let exchange_is_spanning_tree
         v < g.n /\ subset_edges c (e_rem :: ft) /\ Cons? c /\
         all_edges_distinct c /\ is_path_from_to c v v ==> False
       with introduce _ ==> _
-      with _h. begin
+      with begin
         // Transfer: subset_edges c (e_rem :: ft) => subset_edges c t
         let rec subset_transfer (c': list edge)
           : Lemma (requires subset_edges c' (e_rem :: ft))
@@ -1611,7 +1611,7 @@ let exchange_is_spanning_tree
     // => reachable t' 0 v
     introduce forall (v: nat). v < g.n ==> reachable t' 0 v
     with introduce _ ==> _
-    with _h. begin
+    with begin
       // reachable t 0 v
       assert (all_connected g.n t);
       // Transfer: t → (e_rem :: ft) → t'
@@ -1639,7 +1639,7 @@ let exchange_is_spanning_tree
     // === Proving count = 1 ===
     // First establish all_connected g.n (e_rem :: ft)
     introduce forall (v: nat). v < g.n ==> reachable (e_rem :: ft) 0 v
-    with introduce _ ==> _ with _. begin
+    with introduce _ ==> _ with begin
       reachable_t_iff_erem_ft t e_rem 0 v
     end;
     assert (all_connected g.n (e_rem :: ft));
@@ -1714,7 +1714,7 @@ let cut_property g a e s =
                 lemma_exchange_preserves_mst g t e e';
                 // Derive is_mst g t' from the disjunction
                 introduce forall (t'': list edge). is_spanning_tree g t'' ==> total_weight t' <= total_weight t''
-                with introduce _ ==> _ with _h. ();
+                with introduce _ ==> _ with ();
                 assert (is_mst g t');
                 // subset_edges (e :: a) t': e is head, a avoids e' (respects cut)
                 edge_eq_reflexive e;
@@ -2081,8 +2081,8 @@ let rec acyclic_count_lower_bound
         FStar.Classical.forall_intro (FStar.Classical.move_requires fwd);
         // count(es) >= count(tl) via monotonicity
         introduce forall (v: nat). v < n ==> reachable tl root v ==> reachable es root v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _.
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with
             FStar.Classical.exists_elim (reachable es root v)
               #(list edge)
               #(fun p -> is_path_from_to p root v /\ subset_edges p tl) ()
@@ -2104,8 +2104,8 @@ let rec acyclic_count_lower_bound
         acyclic_count_lower_bound tl nr n;
         // count(es, root) >= count(tl, root) + count(tl, nr) via disjoint_lower
         introduce forall (v: nat). v < n ==> reachable tl root v ==> reachable es root v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _.
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with
             FStar.Classical.exists_elim (reachable es root v)
               #(list edge)
               #(fun p -> is_path_from_to p root v /\ subset_edges p tl) ()
@@ -2115,8 +2115,8 @@ let rec acyclic_count_lower_bound
         end;
         bridge_edge_in_component tl e root;
         introduce forall (v: nat). v < n ==> reachable tl nr v ==> reachable es root v
-        with introduce _ ==> _ with _. begin
-          introduce _ ==> _ with _. begin
+        with introduce _ ==> _ with begin
+          introduce _ ==> _ with begin
             FStar.Classical.exists_elim (reachable es nr v)
               #(list edge)
               #(fun p -> is_path_from_to p nr v /\ subset_edges p tl) ()
@@ -2191,7 +2191,7 @@ let acyclic_connected_length (n: nat) (es: list edge)
   = connected_min_edges n es;
     acyclic_count_lower_bound es 0 n;
     introduce forall (v: nat). v < n ==> reachable es 0 v
-    with introduce _ ==> _ with _. assert (reachable es 0 v);
+    with introduce _ ==> _ with assert (reachable es 0 v);
     let rec count_all (m: nat)
       : Lemma (requires forall (v: nat). v < n ==> reachable es 0 v)
               (ensures count_reachable es 0 n m = min m n) (decreases m)

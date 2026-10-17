@@ -369,7 +369,8 @@ let sorted_up_to_intro (s: seq nat) (max_d base: nat)
   = reveal_opaque (`%sorted_up_to_digit) (sorted_up_to_digit s max_d base)
 
 // Combine find_input_witnesses + sorted_up_to_values + extend ordering from d-1 to d
-#push-options "--fuel 0 --ifuel 0 --z3rlimit 10"
+// (digit's definition is not needed and only lures Z3 into non-linear arithmetic)
+#push-options "--fuel 0 --ifuel 0 --z3rlimit 10 --using_facts_from '* -CLRS.Ch08.RadixSort.Base.digit'"
 let get_lower_ordering (s_in s_out: seq nat) (d base: nat) (i j: nat)
   : Lemma 
     (requires base >= 2 /\ is_stable_sort_by_digit s_in s_out d base /\
@@ -634,8 +635,7 @@ let lemma_digits_le_implies_value_le (x y bigD base: nat)
       eliminate exists (d0: nat).
         d0 < bigD /\ digit x d0 base < digit y d0 base /\
         (forall (d': nat). d0 < d' /\ d' < bigD ==> digit x d' base == digit y d' base)
-      returns digit_sum x bigD base bigD <= digit_sum y bigD base bigD
-      with _. lemma_digit_sum_msd_le x y bigD base bigD d0
+      with lemma_digit_sum_msd_le x y bigD base bigD d0
 #pop-options
 
 // Helper: if all adjacent pairs are ordered, the sequence is sorted

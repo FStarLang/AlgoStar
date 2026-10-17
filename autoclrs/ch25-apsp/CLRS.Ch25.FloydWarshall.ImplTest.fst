@@ -49,7 +49,7 @@ module Seq = FStar.Seq
 
 inline_for_extraction
 let int_eq (a b: int) : (r:bool{r <==> a = b}) =
-  not (Prims.op_LessThan a b || Prims.op_LessThan b a)
+  not (Prims.op_Less a b || Prims.op_Less b a)
 
 (*** Concrete test instance — 3×3 graph ***)
 
@@ -110,7 +110,7 @@ let lemma_seq_eq_test_adj (s: Seq.seq int)
 //   Seq.index (fw_outer test_adj 3 0) (qi*3+qj) == fw_entry test_adj 3 qi qj 3
 // The SMT solver evaluates fw_entry to the expected concrete value.
 
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 15 --split_queries always"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 15"
 
 // Step 1: Prove fw_entry values for all 9 entries (same as SpecTest.fst)
 let fw_val_00 () : Lemma (fw_entry test_adj 3 0 0 3 == 0) = assert_norm (fw_entry test_adj 3 0 0 3 == 0)
@@ -123,33 +123,35 @@ let fw_val_20 () : Lemma (fw_entry test_adj 3 2 0 3 == 30) = assert_norm (fw_ent
 let fw_val_21 () : Lemma (fw_entry test_adj 3 2 1 3 == 35) = assert_norm (fw_entry test_adj 3 2 1 3 == 35)
 let fw_val_22 () : Lemma (fw_entry test_adj 3 2 2 3 == 0) = assert_norm (fw_entry test_adj 3 2 2 3 == 0)
 
+let test_adj_wb () : Lemma (weights_bounded test_adj 3) = assert_norm (weights_bounded test_adj 3)
+
 // Step 2: Connect fw_outer to fw_entry, then to concrete values
 let post_entry_00 () : Lemma (Seq.index (fw_outer test_adj 3 0) 0 == 0)
-  = fw_val_00 (); floyd_warshall_full_correctness test_adj 3 0 0
+  = fw_val_00 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 0 0
 
 let post_entry_01 () : Lemma (Seq.index (fw_outer test_adj 3 0) 1 == 5)
-  = fw_val_01 (); floyd_warshall_full_correctness test_adj 3 0 1
+  = fw_val_01 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 0 1
 
 let post_entry_02 () : Lemma (Seq.index (fw_outer test_adj 3 0) 2 == 20)
-  = fw_val_02 (); floyd_warshall_full_correctness test_adj 3 0 2
+  = fw_val_02 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 0 2
 
 let post_entry_10 () : Lemma (Seq.index (fw_outer test_adj 3 0) 3 == 45)
-  = fw_val_10 (); floyd_warshall_full_correctness test_adj 3 1 0
+  = fw_val_10 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 1 0
 
 let post_entry_11 () : Lemma (Seq.index (fw_outer test_adj 3 0) 4 == 0)
-  = fw_val_11 (); floyd_warshall_full_correctness test_adj 3 1 1
+  = fw_val_11 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 1 1
 
 let post_entry_12 () : Lemma (Seq.index (fw_outer test_adj 3 0) 5 == 15)
-  = fw_val_12 (); floyd_warshall_full_correctness test_adj 3 1 2
+  = fw_val_12 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 1 2
 
 let post_entry_20 () : Lemma (Seq.index (fw_outer test_adj 3 0) 6 == 30)
-  = fw_val_20 (); floyd_warshall_full_correctness test_adj 3 2 0
+  = fw_val_20 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 2 0
 
 let post_entry_21 () : Lemma (Seq.index (fw_outer test_adj 3 0) 7 == 35)
-  = fw_val_21 (); floyd_warshall_full_correctness test_adj 3 2 1
+  = fw_val_21 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 2 1
 
 let post_entry_22 () : Lemma (Seq.index (fw_outer test_adj 3 0) 8 == 0)
-  = fw_val_22 (); floyd_warshall_full_correctness test_adj 3 2 2
+  = fw_val_22 (); test_adj_wb (); floyd_warshall_full_correctness test_adj 3 2 2
 
 #pop-options
 
@@ -177,15 +179,15 @@ fn test_floyd_warshall_impl ()
        as (A.pts_to dist (Seq.create 9 0));
 
   // Write the adjacency matrix
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   // Capture input ghost state and prove it equals test_adj
   with s_in. assert (A.pts_to dist s_in);
@@ -212,15 +214,15 @@ fn test_floyd_warshall_impl ()
   post_entry_22 ();
 
   // Runtime reads — these survive extraction to C
-  let v0 = A.op_Array_Access dist 0sz;
-  let v1 = A.op_Array_Access dist 1sz;
-  let v2 = A.op_Array_Access dist 2sz;
-  let v3 = A.op_Array_Access dist 3sz;
-  let v4 = A.op_Array_Access dist 4sz;
-  let v5 = A.op_Array_Access dist 5sz;
-  let v6 = A.op_Array_Access dist 6sz;
-  let v7 = A.op_Array_Access dist 7sz;
-  let v8 = A.op_Array_Access dist 8sz;
+  let v0 = A.op_Dot_Lparen_Rparen dist 0sz;
+  let v1 = A.op_Dot_Lparen_Rparen dist 1sz;
+  let v2 = A.op_Dot_Lparen_Rparen dist 2sz;
+  let v3 = A.op_Dot_Lparen_Rparen dist 3sz;
+  let v4 = A.op_Dot_Lparen_Rparen dist 4sz;
+  let v5 = A.op_Dot_Lparen_Rparen dist 5sz;
+  let v6 = A.op_Dot_Lparen_Rparen dist 6sz;
+  let v7 = A.op_Dot_Lparen_Rparen dist 7sz;
+  let v8 = A.op_Dot_Lparen_Rparen dist 8sz;
 
   // Runtime comparison — survives extraction to C
   let pass = int_eq v0 0 && int_eq v1 5 && int_eq v2 20
@@ -276,15 +278,15 @@ fn test_neg_cycle_check_true ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
        as (A.pts_to dist (Seq.create 9 0));
 
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   with s_in. assert (A.pts_to dist s_in);
   lemma_seq_eq_test_adj s_in;
@@ -350,15 +352,15 @@ fn test_neg_cycle_check_false ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
        as (A.pts_to dist (Seq.create 9 0));
 
-  A.op_Array_Assignment dist 0sz (-1);
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz (-1);
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   with s_in. assert (A.pts_to dist s_in);
   lemma_seq_eq_neg_diag_adj s_in;
@@ -415,15 +417,15 @@ fn test_floyd_warshall_safe_impl ()
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 9 0))
        as (A.pts_to dist (Seq.create 9 0));
 
-  A.op_Array_Assignment dist 0sz 0;
-  A.op_Array_Assignment dist 1sz 5;
-  A.op_Array_Assignment dist 2sz inf;
-  A.op_Array_Assignment dist 3sz 50;
-  A.op_Array_Assignment dist 4sz 0;
-  A.op_Array_Assignment dist 5sz 15;
-  A.op_Array_Assignment dist 6sz 30;
-  A.op_Array_Assignment dist 7sz inf;
-  A.op_Array_Assignment dist 8sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 0sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 1sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 2sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 3sz 50;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 4sz 0;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 5sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 6sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 7sz inf;
+  A.op_Dot_Lparen_Rparen_Less_Minus dist 8sz 0;
 
   with s_in. assert (A.pts_to dist s_in);
   lemma_seq_eq_test_adj s_in;
@@ -452,15 +454,15 @@ fn test_floyd_warshall_safe_impl ()
   fw_safe_entry_connection test_adj 3 2 2; fw_val_22 ();
 
   // Runtime reads
-  let v0 = A.op_Array_Access dist 0sz;
-  let v1 = A.op_Array_Access dist 1sz;
-  let v2 = A.op_Array_Access dist 2sz;
-  let v3 = A.op_Array_Access dist 3sz;
-  let v4 = A.op_Array_Access dist 4sz;
-  let v5 = A.op_Array_Access dist 5sz;
-  let v6 = A.op_Array_Access dist 6sz;
-  let v7 = A.op_Array_Access dist 7sz;
-  let v8 = A.op_Array_Access dist 8sz;
+  let v0 = A.op_Dot_Lparen_Rparen dist 0sz;
+  let v1 = A.op_Dot_Lparen_Rparen dist 1sz;
+  let v2 = A.op_Dot_Lparen_Rparen dist 2sz;
+  let v3 = A.op_Dot_Lparen_Rparen dist 3sz;
+  let v4 = A.op_Dot_Lparen_Rparen dist 4sz;
+  let v5 = A.op_Dot_Lparen_Rparen dist 5sz;
+  let v6 = A.op_Dot_Lparen_Rparen dist 6sz;
+  let v7 = A.op_Dot_Lparen_Rparen dist 7sz;
+  let v8 = A.op_Dot_Lparen_Rparen dist 8sz;
 
   // Runtime comparison
   let pass = int_eq v0 0 && int_eq v1 5 && int_eq v2 20

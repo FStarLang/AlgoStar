@@ -7,7 +7,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 
 module A = Pulse.Lib.Array
 module SZ = FStar.SizeT
@@ -87,7 +86,7 @@ fn select
       sorted_prefix s_final (SZ.v k) /\
       prefix_leq_suffix s_final (SZ.v k) /\
       SZ.v k > 0 /\
-      result == Seq.index s_final (SZ.v k `Prims.op_Subtraction` 1) /\
-      result == PSSSpec.select_spec s0 (SZ.v k `Prims.op_Subtraction` 1) /\
+      result == Seq.index s_final (SZ.v k `Prims.op_Minus` 1) /\
+      result == PSSSpec.select_spec s0 (SZ.v k `Prims.op_Minus` 1) /\
       complexity_bounded_select cf (reveal c0) (SZ.v n) (SZ.v k)
     )

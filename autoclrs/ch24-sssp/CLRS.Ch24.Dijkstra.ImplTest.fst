@@ -78,7 +78,7 @@ let tw_all_nonneg () : Lemma (SP.all_weights_non_negative tw_seq) =
 
 (* With friend CLRS.Ch24.ShortestPath.Inf, the normalizer can fully evaluate
    sp_dist on our concrete graph since inf = 1000000 is visible. *)
-#push-options "--z3rlimit 40 --split_queries always"
+#push-options "--z3rlimit 40"
 let sp_dist_v0 () : Lemma (SP.sp_dist tw_seq 3 0 0 == 0) =
   assert_norm (SP.sp_dist tw_seq 3 0 0 == 0)
 
@@ -116,7 +116,7 @@ let completeness_dijkstra_3 (sdist: Seq.seq int) (sw: Seq.seq int)
    with pred[v] < 3. Case analysis on pred[v] ∈ {0,1,2} using
    concrete sp_dist and weight values eliminates all but one option:
      pred[1] = 0 (only 0+3=3 works), pred[2] = 1 (only 3+2=5 works). *)
-#push-options "--z3rlimit 40 --split_queries always"
+#push-options "--z3rlimit 40"
 let completeness_pred_3 (spred: Seq.seq SZ.t) (sw: Seq.seq int)
   : Lemma
     (requires

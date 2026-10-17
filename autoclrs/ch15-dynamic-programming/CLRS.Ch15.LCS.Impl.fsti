@@ -21,8 +21,6 @@ let lcs_complexity_bounded (cf c0 m n: nat) : prop =
   (m > 0 /\ n > 0 ==> cf - c0 == op_Star (m + 1) (n + 1)) /\
   (m = 0 \/ n = 0 ==> cf == c0)
 
-open Pulse.Lib.BoundedIntegers
-
 fn lcs
   (#px #py: perm)
   (x: A.array int)

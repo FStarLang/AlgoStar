@@ -26,7 +26,7 @@ let test_well_formed () : Lemma (well_formed_adj test_adj 3) =
   assert_norm (Seq.length (Seq.index test_adj 1) == 3);
   assert_norm (Seq.length (Seq.index test_adj 2) == 3);
   introduce forall (u: nat). u < 3 ==> Seq.length (Seq.index test_adj u) = 3
-  with introduce _ ==> _ with _. (if u = 0 then () else if u = 1 then () else ());
+  with introduce _ ==> _ with (if u = 0 then () else if u = 1 then () else ());
   assert_norm (Seq.index (Seq.index test_adj 0) 0 = 0);
   assert_norm (Seq.index (Seq.index test_adj 0) 1 = 1);
   assert_norm (Seq.index (Seq.index test_adj 0) 2 = 3);
@@ -298,7 +298,8 @@ let mst_test_facts (ps ks ws: Seq.seq SZ.t)
       SZ.v (Seq.index ps 1) <> 1 /\
       SZ.v (Seq.index ps 2) <> 2 /\
       SZ.v (Seq.index ks 1) + SZ.v (Seq.index ks 2) <= 3)
-  = prim_mst_result_elim ps ks ws 3 0;
+  = assert (Seq.length ws == 3 * 3);
+    prim_mst_result_elim ps ks ws 3 0;
     mst_edge_facts ps ks ws;
     mst_total_weight ks ps ws
 #pop-options

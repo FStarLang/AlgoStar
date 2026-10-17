@@ -26,7 +26,7 @@ let test_adj : seq int = seq_of_list [0; 5; 1000000; 50; 0; 15; 30; 1000000; 0]
 // 2 [ 30  35  0  ]
 
 // Verify each entry of the FW recurrence at level n=3
-#push-options "--fuel 8 --ifuel 2 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 8 --ifuel 2 --z3rlimit 10"
 let test_00 () : Lemma (fw_entry test_adj 3 0 0 3 == 0) = ()
 let test_01 () : Lemma (fw_entry test_adj 3 0 1 3 == 5) = ()
 let test_02 () : Lemma (fw_entry test_adj 3 0 2 3 == 20) = ()
@@ -66,7 +66,8 @@ let test_weights_bounded () : Lemma (weights_bounded test_adj 3)
 let test_full_correctness (qi qj: nat) : Lemma
     (requires qi < 3 /\ qj < 3)
     (ensures index (fw_outer test_adj 3 0) (qi * 3 + qj) == fw_entry test_adj 3 qi qj 3)
-  = floyd_warshall_full_correctness test_adj 3 qi qj
+  = test_weights_bounded ();
+    floyd_warshall_full_correctness test_adj 3 qi qj
 
 // Test: weights_bounded implies all fw_entry values are non-negative
 let test_nonneg_entry () : Lemma (

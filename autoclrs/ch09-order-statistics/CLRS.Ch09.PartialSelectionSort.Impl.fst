@@ -18,7 +18,6 @@ open Pulse.Lib.Pervasives
 open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
-open Pulse.Lib.BoundedIntegers
 open CLRS.Common.Complexity
 
 module A = Pulse.Lib.Array
@@ -145,7 +144,7 @@ fn find_min_index_from
       vc >= reveal c0 /\
       vc - reveal c0 == SZ.v vi - SZ.v start - 1
     )
-  decreases (SZ.v len `Prims.op_Subtraction` SZ.v !i)
+  decreases (SZ.v len `Prims.op_Minus` SZ.v !i)
   {
     let vi = !i;
     let vmin_idx = !min_idx;
@@ -176,9 +175,9 @@ let select_correctness (s0 s_final: Seq.seq int) (k: nat)
               permutation s0 s_final /\
               sorted_prefix s_final k /\
               prefix_leq_suffix s_final k)
-    (ensures Seq.index s_final (k `Prims.op_Subtraction` 1) ==
-             PSSSpec.select_spec s0 (k `Prims.op_Subtraction` 1))
-  = let p = k `Prims.op_Subtraction` 1 in
+    (ensures Seq.index s_final (k `Prims.op_Minus` 1) ==
+             PSSSpec.select_spec s0 (k `Prims.op_Minus` 1))
+  = let p = k `Prims.op_Minus` 1 in
     // From sorted_prefix: ∀ i < p. s_final[i] ≤ s_final[p] (since i < k-1 < k)
     assert (forall (i: nat). i < p ==> Seq.index s_final i <= Seq.index s_final p);
     // From prefix_leq_suffix: ∀ j ≥ k. s_final[k-1] ≤ s_final[j]
@@ -217,8 +216,8 @@ fn select
       sorted_prefix s_final (SZ.v k) /\
       prefix_leq_suffix s_final (SZ.v k) /\
       SZ.v k > 0 /\
-      result == Seq.index s_final (SZ.v k `Prims.op_Subtraction` 1) /\
-      result == PSSSpec.select_spec s0 (SZ.v k `Prims.op_Subtraction` 1) /\
+      result == Seq.index s_final (SZ.v k `Prims.op_Minus` 1) /\
+      result == PSSSpec.select_spec s0 (SZ.v k `Prims.op_Minus` 1) /\
       complexity_bounded_select cf (reveal c0) (SZ.v n) (SZ.v k)
     )
 //SNIPPET_END: select
@@ -239,7 +238,7 @@ fn select
       vc >= reveal c0 /\
       vc - reveal c0 <= op_Star (SZ.v vround) (SZ.v n - 1)
     )
-  decreases (SZ.v k `Prims.op_Subtraction` SZ.v !round)
+  decreases (SZ.v k `Prims.op_Minus` SZ.v !round)
   {
     let vround = !round;
     with s_pre. assert (A.pts_to a s_pre);

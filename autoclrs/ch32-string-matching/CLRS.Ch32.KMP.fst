@@ -31,7 +31,7 @@ open Pulse.Lib.Array
 open Pulse.Lib.Reference
 open FStar.SizeT
 
-#push-options "--z3rlimit 80 --ifuel 2 --fuel 2 --split_queries always"
+#push-options "--z3rlimit 80 --ifuel 2 --fuel 2"
 
 module A = Pulse.Lib.Array
 module V = Pulse.Lib.Vec
@@ -178,10 +178,10 @@ fn compute_prefix_function
       
       let vk_pos = (vk >^ 0sz);
       let safe_pi_idx: SZ.t = (if vk_pos then vk -^ 1sz else 0sz);
-      let pi_prev = V.op_Array_Access pi safe_pi_idx;
+      let pi_prev = V.op_Dot_Lparen_Rparen pi safe_pi_idx;
       
-      let pk = A.op_Array_Access pattern vk;
-      let pq = A.op_Array_Access pattern vq;
+      let pk = A.op_Dot_Lparen_Rparen pattern vk;
+      let pq = A.op_Dot_Lparen_Rparen pattern vq;
       
       let should_update: bool = (vk_pos && pk <> pq);
       
@@ -205,8 +205,8 @@ fn compute_prefix_function
     with _ _vd_post _vki_post s_pi_post _vci_post. _;
     let vk_after_inner = !k;
     
-    let pk_final = A.op_Array_Access pattern vk_after_inner;
-    let pq_final = A.op_Array_Access pattern vq;
+    let pk_final = A.op_Dot_Lparen_Rparen pattern vk_after_inner;
+    let pq_final = A.op_Dot_Lparen_Rparen pattern vq;
     
     // Count the extend-check comparison
     tick ctr;
@@ -219,7 +219,7 @@ fn compute_prefix_function
     k := new_k_final;
     
     let final_k = !k;
-    V.op_Array_Assignment pi vq final_k;
+    V.op_Dot_Lparen_Rparen_Less_Minus pi vq final_k;
     
     // Explicit hints for refined argument types (needed with uvar fix)
     assert pure (SZ.v vq > 0 /\ SZ.v vq < Seq.length s_pat);
@@ -243,6 +243,12 @@ fn compute_prefix_function
 #pop-options
 
 // ========== KMP Matcher ==========
+
+// Linear arithmetic for the amortized comparison bound, in a small context
+let kmp_amortized_step (vc c0 vq qn qa vi vin: int)
+  : Lemma (requires vc - c0 + vq <= 2 * vi /\ qn <= vq + 1 /\ qa <= qn /\ vin == vi + 1)
+          (ensures (vc + 1) - c0 + qa <= 2 * vin)
+  = ()
 
 #restart-solver
 #push-options "--z3rlimit 80 --ifuel 1 --fuel 1"
@@ -364,8 +370,8 @@ fn kmp_matcher
     decreases %[(if !done_follow then 0 else 1); SZ.v !q]
     {
       let vq = !q;
-      let text_char = A.op_Array_Access text vi;
-      let pat_char = A.op_Array_Access pattern vq;
+      let text_char = A.op_Dot_Lparen_Rparen text vi;
+      let pat_char = A.op_Dot_Lparen_Rparen pattern vq;
       
       let should_follow: bool = (vq >^ 0sz && pat_char <> text_char);
       
@@ -373,7 +379,7 @@ fn kmp_matcher
         // Follow failure chain — count this comparison, q decreases
         tick ctr;
         let safe_idx = vq -^ 1sz;
-        let pi_val = V.op_Array_Access pi safe_idx;
+        let pi_val = V.op_Dot_Lparen_Rparen pi safe_idx;
         
         assert pure (is_prefix_suffix s_pat (SZ.v vq - 1) (SZ.v pi_val));
         assert pure (SZ.v pi_val <= SZ.v vq - 1);
@@ -390,11 +396,14 @@ fn kmp_matcher
     
     let vq_after = !q;
     assert pure (SZ.v vq_after < SZ.v m);
-    let text_char_final = A.op_Array_Access text vi;
-    let pat_char_final = A.op_Array_Access pattern vq_after;
+    let text_char_final = A.op_Dot_Lparen_Rparen text vi;
+    let pat_char_final = A.op_Dot_Lparen_Rparen pattern vq_after;
     
     // Count the extend-check comparison
+    with vc_pre. assert (GR.pts_to ctr vc_pre);
+    assert pure (vc_pre - reveal c0 + SZ.v vq_after <= 2 * SZ.v vi);
     tick ctr;
+    incr_nat_reveal vc_pre;
     
     let chars_match = (pat_char_final = text_char_final);
     let new_q_val: SZ.t = (if chars_match then vq_after +^ 1sz else vq_after);
@@ -418,7 +427,7 @@ fn kmp_matcher
     let new_count_val: SZ.t = (if have_match then old_count +^ 1sz else old_count);
     
     let pi_idx_for_reset = m -^ 1sz;
-    let pi_val_for_reset = V.op_Array_Access pi pi_idx_for_reset;
+    let pi_val_for_reset = V.op_Dot_Lparen_Rparen pi pi_idx_for_reset;
     let new_q_after_match: SZ.t = (if have_match then pi_val_for_reset else vq_final);
     
     // Connect Pulse result to spec via kmp_count_step
@@ -443,6 +452,9 @@ fn kmp_matcher
     assert pure (SZ.v new_count_val <= SZ.v vi_next + 1);
     assert pure (SZ.v pi_val_for_reset < SZ.v m);
     assert pure (SZ.v new_q_after_match < SZ.v m);
+    assert pure (SZ.v new_q_val <= SZ.v vq_after + 1);
+    assert pure (SZ.v new_q_after_match <= SZ.v new_q_val);
+    kmp_amortized_step vc_pre (reveal c0) (SZ.v vq_after) (SZ.v new_q_val) (SZ.v new_q_after_match) (SZ.v vi) (SZ.v vi_next);
     
     count_matches := new_count_val;
     q := new_q_after_match;

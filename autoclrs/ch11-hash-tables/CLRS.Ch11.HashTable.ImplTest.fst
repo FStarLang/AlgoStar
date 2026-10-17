@@ -49,7 +49,7 @@ let lemma_create_no_key (n: nat{n > 0}) (key: int{key >= 0})
     // and Seq.index (Seq.create n (-1)) _ == -1 != key (since key >= 0).
     // So no probe finds the key, meaning key_in_table is false.
     introduce forall (probe: nat). probe < n ==> Seq.index (Seq.create n (-1)) (hash_probe_nat key probe n) =!= key
-    with introduce _ ==> _ with _. (
+    with introduce _ ==> _ with (
       lemma_hash_probe_nat_in_bounds key probe n;
       lemma_create_index n (-1) (hash_probe_nat key probe n)
     )

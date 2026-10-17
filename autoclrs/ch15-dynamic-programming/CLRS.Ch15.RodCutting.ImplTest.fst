@@ -50,10 +50,10 @@ fn test_rod_cutting ()
   A.pts_to_len prices_arr;
   assert (pure (A.length prices_arr == SZ.v 4sz));
 
-  A.op_Array_Assignment prices_arr 0sz (1 <: nat);
-  A.op_Array_Assignment prices_arr 1sz (5 <: nat);
-  A.op_Array_Assignment prices_arr 2sz (8 <: nat);
-  A.op_Array_Assignment prices_arr 3sz (9 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 0sz (1 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 1sz (5 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 2sz (8 <: nat);
+  A.op_Dot_Lparen_Rparen_Less_Minus prices_arr 3sz (9 <: nat);
 
   rod_cutting_pre_satisfiable ();
 

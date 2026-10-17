@@ -201,10 +201,7 @@ let white_path_transitive
       : Lemma
         ((path_all_white adj n d u w time s1 /\ path_all_white adj n d w v time s2) ==>
          (exists (s: nat). path_all_white adj n d u v time s))
-      = Classical.move_requires_2
-          (fun (s1': nat) (s2': nat) ->
-            path_all_white_compose adj n d u w v time s1' s2')
-          s1 s2
+      = Classical.move_requires_2 (path_all_white_compose adj n d u w v time) s1 s2
     in
     Classical.forall_to_exists_2 aux
 

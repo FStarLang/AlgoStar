@@ -87,7 +87,10 @@ let seq_swap_commute (#a: Type) (s: Seq.seq a) (i j: nat_smaller (Seq.length s))
   = let sij = seq_swap s i j in
     let sji = seq_swap s j i in
     assert (Seq.length sij = Seq.length sji);
-    assert (forall (k:nat{k < Seq.length sij}). (Seq.index sij k == Seq.index sji k));
+    let aux (k:nat{k < Seq.length sij}) : Lemma (Seq.index sij k == Seq.index sji k) =
+      if k = i then () else if k = j then () else ()
+    in
+    FStar.Classical.forall_intro aux;
     Seq.lemma_eq_elim sij sji
 
 let sp_permutation_swap (#a: eqtype) (s: Seq.seq a) (i j: nat_smaller (Seq.length s))
@@ -182,7 +185,7 @@ let quicksort_complexity_step (n n_left n_right: nat)
       <= QC.worst_case_comparisons n)
   = QC.partition_split_bounded n n_left
 
-let op_Array_Access
+let ( .() )
   (#a: Type)
   (arr: A.array a)
   (i: SZ.t)
@@ -198,7 +201,7 @@ let op_Array_Access
             res == Seq.index s (SZ.v i - l)))
 = pts_to_range_index arr i #l #r #s #p
 
-let op_Array_Assignment
+let ( .()<- )
   (#a: Type)
   (arr: A.array a)
   (i: SZ.t)
@@ -375,6 +378,7 @@ fn rec quicksort_core (#a: eqtype)
       SP.permutation a s0 s /\
       complexity_bounded_by_worst_case cf (reveal c0) (hi - lo)
     )
+  decreases (hi - lo)
 {
   if (lo < hi) {
     if (hi <= lo + 1) {

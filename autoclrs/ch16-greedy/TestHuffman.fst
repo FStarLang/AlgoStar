@@ -33,12 +33,12 @@ fn test_huffman_simple ()
   V.to_array_pts_to fv;
   let freqs = V.vec_to_array fv;
   rewrite (A.pts_to (V.vec_to_array fv) (Seq.create 6 5)) as (A.pts_to freqs (Seq.create 6 5));
-  A.op_Array_Assignment freqs 0sz 5;
-  A.op_Array_Assignment freqs 1sz 9;
-  A.op_Array_Assignment freqs 2sz 12;
-  A.op_Array_Assignment freqs 3sz 13;
-  A.op_Array_Assignment freqs 4sz 16;
-  A.op_Array_Assignment freqs 5sz 45;
+  A.op_Dot_Lparen_Rparen_Less_Minus freqs 0sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus freqs 1sz 9;
+  A.op_Dot_Lparen_Rparen_Less_Minus freqs 2sz 12;
+  A.op_Dot_Lparen_Rparen_Less_Minus freqs 3sz 13;
+  A.op_Dot_Lparen_Rparen_Less_Minus freqs 4sz 16;
+  A.op_Dot_Lparen_Rparen_Less_Minus freqs 5sz 45;
   
   // Build Huffman tree (verified optimal) — drop result for test
   let ghost_ctr = GR.alloc #nat 0;

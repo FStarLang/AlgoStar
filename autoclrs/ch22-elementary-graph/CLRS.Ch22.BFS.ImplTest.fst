@@ -92,7 +92,7 @@ let reachable_0_in_0 ()
 #pop-options
 
 // Vertex 1 is reachable from 0 in 1 step via edge 0→1
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let reachable_1_in_1 ()
   : Lemma (reachable_in test_adj 3 0 1 1)
   = assert_norm (Seq.index test_adj (0 * 3 + 1) <> 0);
@@ -100,7 +100,7 @@ let reachable_1_in_1 ()
 #pop-options
 
 // Vertex 2 is reachable from 0 in 2 steps via 0→1→2
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let reachable_2_in_2 ()
   : Lemma (reachable_in test_adj 3 0 2 2)
   = assert_norm (Seq.index test_adj (0 * 3 + 1) <> 0);
@@ -113,7 +113,7 @@ let reachable_2_in_2 ()
 
 // No vertex has an edge to vertex 0 in test_adj
 // (adj[0*3+0]=0, adj[1*3+0]=0, adj[2*3+0]=0)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 
 let lemma_no_edge_to_0 ()
   : Lemma (forall (u:nat). ~(has_edge test_adj 3 u 0))
@@ -145,7 +145,9 @@ let lemma_only_1_step_to_1 (k: nat)
         : Lemma (requires u < 3 /\ reachable_in test_adj 3 0 u (k-1) /\
                            has_edge test_adj 3 u 1)
                 (ensures False)
-        = lemma_only_0_steps_to_0 (k-1)
+        = if u = 0 then lemma_only_0_steps_to_0 (k-1)
+          else if u = 1 then assert (u * 3 + 1 == 4)
+          else assert (u * 3 + 1 == 7)
       in
       FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
     )
@@ -169,7 +171,9 @@ let lemma_only_2_steps_to_2 (k: nat)
         : Lemma (requires u < 3 /\ reachable_in test_adj 3 0 u (k-1) /\
                            has_edge test_adj 3 u 2)
                 (ensures False)
-        = lemma_only_1_step_to_1 (k-1)
+        = if u = 1 then lemma_only_1_step_to_1 (k-1)
+          else if u = 0 then assert (u * 3 + 2 == 2)
+          else assert (u * 3 + 2 == 8)
       in
       FStar.Classical.forall_intro (FStar.Classical.move_requires aux)
     )
@@ -178,7 +182,7 @@ let lemma_only_2_steps_to_2 (k: nat)
 
 (*** Main test ***)
 
-#push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2"
 
 ```pulse
 fn test_bfs_3 ()
@@ -408,7 +412,7 @@ let reachable_diamond_0_in_0 ()
 #pop-options
 
 // Vertex 1 is reachable from 0 in 1 step via edge 0→1
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let reachable_diamond_1_in_1 ()
   : Lemma (reachable_in test_adj_diamond 4 0 1 1)
   = assert_norm (Seq.index test_adj_diamond (0 * 4 + 1) <> 0);
@@ -416,7 +420,7 @@ let reachable_diamond_1_in_1 ()
 #pop-options
 
 // Vertex 2 is reachable from 0 in 1 step via edge 0→2
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let reachable_diamond_2_in_1 ()
   : Lemma (reachable_in test_adj_diamond 4 0 2 1)
   = assert_norm (Seq.index test_adj_diamond (0 * 4 + 2) <> 0);
@@ -424,7 +428,7 @@ let reachable_diamond_2_in_1 ()
 #pop-options
 
 // Vertex 3 is reachable from 0 in 2 steps via 0→1→3
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let reachable_diamond_3_in_2_via_1 ()
   : Lemma (reachable_in test_adj_diamond 4 0 3 2)
   = assert_norm (Seq.index test_adj_diamond (0 * 4 + 1) <> 0);
@@ -434,7 +438,7 @@ let reachable_diamond_3_in_2_via_1 ()
 #pop-options
 
 // Vertex 3 is reachable from 0 in 2 steps via 0→2→3
-#push-options "--fuel 3 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 3 --ifuel 1 --z3rlimit 10"
 let reachable_diamond_3_in_2_via_2 ()
   : Lemma (reachable_in test_adj_diamond 4 0 3 2)
   = assert_norm (Seq.index test_adj_diamond (0 * 4 + 2) <> 0);
@@ -462,7 +466,7 @@ let lemma_diamond_at_least_1_step_to_2 (k: nat)
 #pop-options
 
 // Any path from 0 to 3 has length ≥ 2 (no direct edge 0→3 exists)
-#push-options "--fuel 2 --ifuel 1 --z3rlimit 10 --split_queries always"
+#push-options "--fuel 2 --ifuel 1 --z3rlimit 10"
 let lemma_diamond_at_least_2_steps_to_3 (k: nat)
   : Lemma (requires reachable_in test_adj_diamond 4 0 3 k)
           (ensures k >= 2)
@@ -478,7 +482,7 @@ let lemma_diamond_at_least_2_steps_to_3 (k: nat)
 
 (*** Diamond main test ***)
 
-#push-options "--z3rlimit 10 --fuel 4 --ifuel 2 --split_queries always"
+#push-options "--z3rlimit 10 --fuel 4 --ifuel 2"
 
 ```pulse
 fn test_bfs_diamond ()

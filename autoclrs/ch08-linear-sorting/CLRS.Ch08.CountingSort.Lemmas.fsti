@@ -133,9 +133,12 @@ val phase2_step (sa_before sa_after s0:Seq.seq nat) (pos:nat) (cnt:nat) (cur_v:n
                     pos + cnt <= Seq.length sa_after /\
                     cnt == SeqP.count cur_v s0 /\
                     cur_v <= k /\
-                    (forall (i:nat). pos <= i /\ i < pos + cnt ==> Seq.index sa_after i == cur_v) /\
-                    (forall (i:nat). i < pos ==> Seq.index sa_after i == Seq.index sa_before i) /\
-                    (forall (i:nat). pos + cnt <= i /\ i < Seq.length sa_after ==>
+                    (forall (i:nat). {:pattern (Seq.index sa_after i)}
+                      pos <= i /\ i < pos + cnt ==> Seq.index sa_after i == cur_v) /\
+                    (forall (i:nat). {:pattern (Seq.index sa_after i)}
+                      i < pos ==> Seq.index sa_after i == Seq.index sa_before i) /\
+                    (forall (i:nat). {:pattern (Seq.index sa_after i)}
+                      pos + cnt <= i /\ i < Seq.length sa_after ==>
                       Seq.index sa_after i == Seq.index sa_before i))
           (ensures phase2_inv sa_after s0 (pos + cnt) (cur_v + 1) k)
 

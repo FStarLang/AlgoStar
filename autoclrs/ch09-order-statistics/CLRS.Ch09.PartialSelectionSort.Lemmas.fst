@@ -26,7 +26,7 @@ let sorted_tail (s: seq int)
     let n = Seq.length t in
     introduce forall (i: nat) (j: nat). i < n /\ j < n /\ i <= j ==> Seq.index t i <= Seq.index t j
     with introduce _ ==> _
-    with _. (
+    with (
         Seq.lemma_index_slice s 1 (Seq.length s) i;
         Seq.lemma_index_slice s 1 (Seq.length s) j;
         assert (Seq.index t i == Seq.index s (i + 1));

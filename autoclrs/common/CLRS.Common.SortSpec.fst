@@ -5,9 +5,8 @@
    and permutation (over int sequences) used across all sorting-related
    chapters: Ch02, Ch06, Ch07, Ch08, Ch09.
    
-   NOTE: When using this module from #lang-pulse files that also open
-   Pulse.Lib.BoundedIntegers, ensure BoundedIntegers is opened before
-   this module so that operator overloads (<=, <, etc.) are consistent.
+   NOTE: The operators (<=, <, etc.) used here are the plain Prims
+   operators on int (Pulse.Lib.BoundedIntegers no longer exists).
    
    For algorithms over `seq nat` (e.g., RadixSort), a count-based
    permutation definition is used instead (defined locally in those modules).
@@ -17,15 +16,16 @@ module CLRS.Common.SortSpec
 module Seq = FStar.Seq
 module SeqP = FStar.Seq.Properties
 module Classical = FStar.Classical
-open Pulse.Lib.BoundedIntegers
 // 
 //SNIPPET_START: definitions
 let sorted (s: Seq.seq int) : prop
-  = forall (i j: nat). i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
+  = forall (i j: nat). {:pattern (Seq.index s i); (Seq.index s j)}
+      i <= j /\ j < Seq.length s ==> Seq.index s i <= Seq.index s j
 
 let prefix_sorted (s: Seq.seq int) (k: nat) : prop =
   k <= Seq.length s /\
-  (forall (i j: nat). i <= j /\ j < k ==> Seq.index s i <= Seq.index s j)
+  (forall (i j: nat). {:pattern (Seq.index s i); (Seq.index s j)}
+    i <= j /\ j < k ==> Seq.index s i <= Seq.index s j)
 
 [@@"opaque_to_smt"]
 let permutation (s1 s2: Seq.seq int) : prop = (Seq.Properties.permutation int s1 s2)
@@ -111,10 +111,10 @@ let singl_sorted (s: Seq.seq int)
    Call this lemma before using sorted with explicit Prims operator reasoning. *)
 let sorted_as_prims (s: Seq.seq int)
   : Lemma (requires sorted s)
-          (ensures forall (i j:nat). Prims.op_LessThanOrEqual i j /\
-                                     Prims.op_LessThan j (Seq.length s) ==>
-                                     Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j))
+          (ensures forall (i j:nat). Prims.op_Less_Equals i j /\
+                                     Prims.op_Less j (Seq.length s) ==>
+                                     Prims.op_Less_Equals (Seq.index s i) (Seq.index s j))
   = assert_norm (sorted s ==
-      (forall (i j: nat). Prims.op_LessThanOrEqual i j /\
-                          Prims.op_LessThan j (Seq.length s) ==>
-                          Prims.op_LessThanOrEqual (Seq.index s i) (Seq.index s j)))
+      (forall (i j: nat). Prims.op_Less_Equals i j /\
+                          Prims.op_Less j (Seq.length s) ==>
+                          Prims.op_Less_Equals (Seq.index s i) (Seq.index s j)))

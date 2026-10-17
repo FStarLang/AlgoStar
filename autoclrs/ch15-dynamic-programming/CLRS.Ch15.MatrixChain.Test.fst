@@ -32,13 +32,13 @@ fn test_matrix_chain ()
   let dims = V.vec_to_array dv;
   rewrite (A.pts_to (V.vec_to_array dv) (Seq.create 7 30)) as (A.pts_to dims (Seq.create 7 30));
   
-  A.op_Array_Assignment dims 0sz 30;
-  A.op_Array_Assignment dims 1sz 35;
-  A.op_Array_Assignment dims 2sz 15;
-  A.op_Array_Assignment dims 3sz 5;
-  A.op_Array_Assignment dims 4sz 10;
-  A.op_Array_Assignment dims 5sz 20;
-  A.op_Array_Assignment dims 6sz 25;
+  A.op_Dot_Lparen_Rparen_Less_Minus dims 0sz 30;
+  A.op_Dot_Lparen_Rparen_Less_Minus dims 1sz 35;
+  A.op_Dot_Lparen_Rparen_Less_Minus dims 2sz 15;
+  A.op_Dot_Lparen_Rparen_Less_Minus dims 3sz 5;
+  A.op_Dot_Lparen_Rparen_Less_Minus dims 4sz 10;
+  A.op_Dot_Lparen_Rparen_Less_Minus dims 5sz 20;
+  A.op_Dot_Lparen_Rparen_Less_Minus dims 6sz 25;
   
   // n = 6 (number of matrices)
   let n = 6sz;
