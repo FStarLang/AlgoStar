@@ -537,6 +537,7 @@ private let rec lemma_digit_sum_le (k1 k2 bigD base d: nat)
     (decreases d)
   = if d = 0 || base = 0 then ()
     else begin
+      assert (d > 0);
       lemma_digit_sum_le k1 k2 bigD base (d - 1);
       pow_positive base (d - 1);
       lemma_mult_le_right (pow base (d - 1)) (digit k1 (d - 1) base) (digit k2 (d - 1) base)
@@ -585,30 +586,38 @@ private let rec lemma_digit_sum_equal_upper (k1 k2 bigD base d d0: nat)
 
 // Helper for the MSD proof: digit_sum ordering when exists a separating digit
 #push-options "--z3rlimit 30 --fuel 2"
+// The base case d = d0 + 1 of lemma_digit_sum_msd_le
+private let lemma_digit_sum_msd_le_base (x y bigD base d0: nat)
+  : Lemma (requires base >= 2 /\ d0 < bigD /\ digit x d0 base < digit y d0 base)
+          (ensures digit_sum x bigD base (d0 + 1) <= digit_sum y bigD base (d0 + 1))
+  = // digit_sum k bigD base (d0+1) = digit(k, d0) * base^d0 + digit_sum k bigD base d0
+    pow_positive base d0;
+    lemma_digit_sum_bound x bigD base d0;
+    // digit(x,d0) < digit(y,d0), so digit(x,d0) <= digit(y,d0) - 1
+    // digit(x,d0) * base^d0 + digit_sum x bigD base d0
+    //   <= (digit(y,d0) - 1) * base^d0 + (base^d0 - 1)
+    //   = digit(y,d0) * base^d0 - 1
+    //   <= digit(y,d0) * base^d0 + digit_sum y bigD base d0
+    lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1)
+#pop-options
+
+#restart-solver
+#push-options "--z3rlimit 30 --fuel 1"
 private let rec lemma_digit_sum_msd_le (x y bigD base d d0: nat)
   : Lemma (requires base >= 2 /\ d0 < d /\ d <= bigD /\
                     digit x d0 base < digit y d0 base /\
                     (forall (d': nat). d0 < d' /\ d' < d ==> digit x d' base == digit y d' base))
           (ensures digit_sum x bigD base d <= digit_sum y bigD base d)
           (decreases d)
-  = if d = d0 + 1 then (
-      // digit_sum k bigD base (d0+1) = digit(k, d0) * base^d0 + digit_sum k bigD base d0
-      pow_positive base d0;
-      lemma_digit_sum_bound x bigD base d0;
-      // digit(x,d0) < digit(y,d0), so digit(x,d0) <= digit(y,d0) - 1
-      // digit(x,d0) * base^d0 + digit_sum x bigD base d0
-      //   <= (digit(y,d0) - 1) * base^d0 + (base^d0 - 1)
-      //   = digit(y,d0) * base^d0 - 1
-      //   <= digit(y,d0) * base^d0 + digit_sum y bigD base d0
-      lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1);
-      ()
-    ) else (
-      // d > d0 + 1, so d - 1 > d0
+  = if d > d0 + 1 then (
+      // d - 1 > d0
       // digit_sum k bigD base d = digit(k, d-1) * base^(d-1) + digit_sum k bigD base (d-1)
       // digit(x, d-1) == digit(y, d-1) since d-1 > d0
       assert (digit x (d - 1) base == digit y (d - 1) base);
       lemma_digit_sum_msd_le x y bigD base (d - 1) d0;
       ()
+    ) else (
+      lemma_digit_sum_msd_le_base x y bigD base d0
     )
 #pop-options
 
