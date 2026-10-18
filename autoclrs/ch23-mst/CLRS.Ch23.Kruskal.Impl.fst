@@ -557,6 +557,7 @@ let rec noRepeats_transfer
       noRepeats_transfer sadj seu sev n ec (i + 1);
       let wu = Seq.index seu i in
       let wv = Seq.index sev i in
+      index_bound wu wv n;
       let ww = Seq.index sadj (wu * n + wv) in
       let w_hd : edge = {u = wu; v = wv; w = ww} in
       FStar.Classical.move_requires
