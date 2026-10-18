@@ -190,6 +190,22 @@ let step_outer_invariant
   = ()
 #pop-options
 
+#push-options "--fuel 0 --ifuel 1 --z3rlimit_factor 2"
+#restart-solver
+let init_inner_invariant
+      (#t: Type)
+      {| total_order t |}
+      (s: Seq.seq t)
+      (vj: SZ.t)
+  : Lemma
+    (requires
+      1 <= SZ.v vj /\
+      SZ.v vj < Seq.length s /\
+      sorted (Seq.slice s 0 (SZ.v vj)))
+    (ensures inner_invariant s s (Seq.index s (SZ.v vj)) (SZ.sub vj 1sz) vj false)
+  = ()
+#pop-options
+
 let insertion_sort_comparisons_step (vj: nat)
   : Lemma (requires vj >= 1)
           (ensures insertion_sort_comparisons vj + vj == insertion_sort_comparisons (vj + 1))
@@ -248,7 +264,7 @@ ensures exists* s' (cf: nat).
       let first = arr.(!idx);
       let first_cmp = iord first key;
       cont := O.gt first_cmp;
-
+      init_inner_invariant #a #ord ss vj;
       while (!cont)
       invariant exists* vi vdone vcont vfuel s_inner (vc_inner: nat) vj_next.
         R.pts_to idx vi **
