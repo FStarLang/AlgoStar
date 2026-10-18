@@ -63,7 +63,8 @@ let digit_at_lower (k: nat) (d: nat) (base: nat)
     // digit (k/base) (d-1) base = ((k/base) / base^(d-1)) % base
     //                           = (k / (base * base^(d-1))) % base
     //                           = (k / base^d) % base
-    ()
+    assert (pow base d == base * pow base (d - 1));
+    division_multiplication_lemma k base (pow base (d - 1))
 
 /// Helper: pow splits: base^(a+b) = base^a * base^b
 let rec pow_split (base a b: nat)
@@ -201,21 +202,27 @@ let digit_sum_unfold (k: nat) (d: pos) (base: pos)
 
 /// Helper: digit_sum ordering when MSD differs
 #push-options "--z3rlimit 10 --fuel 0 --ifuel 0"
+// The base case d = d0 + 1 of lemma_digit_sum_msd_le_3
+private let lemma_digit_sum_msd_le_3_base (x y d0 base: nat)
+  : Lemma (requires base >= 2 /\ digit x d0 base < digit y d0 base)
+          (ensures digit_sum x (d0 + 1) base <= digit_sum y (d0 + 1) base)
+  = // digit_sum k (d0+1) = digit k d0 * pow base d0 + digit_sum k d0
+    pow_positive base d0;
+    lemma_digit_sum_bound_3 x d0 base;
+    digit_sum_unfold x (d0 + 1) base;
+    digit_sum_unfold y (d0 + 1) base;
+    lemma_msd_arith (digit x d0 base) (digit y d0 base)
+                    (digit_sum x d0 base) (digit_sum y d0 base) (pow base d0)
+
+#restart-solver
 let rec lemma_digit_sum_msd_le_3 (x y: nat) (d d0: nat) (base: nat)
   : Lemma (requires base >= 2 /\ d0 < d /\
                     digit x d0 base < digit y d0 base /\
                     (forall (d': nat). d0 < d' /\ d' < d ==> digit x d' base == digit y d' base))
           (ensures digit_sum x d base <= digit_sum y d base)
           (decreases d)
-  = if d = d0 + 1 then (
-      // digit_sum k (d0+1) = digit k d0 * pow base d0 + digit_sum k d0
-      pow_positive base d0;
-      lemma_digit_sum_bound_3 x d0 base;
-      digit_sum_unfold x d base;
-      digit_sum_unfold y d base;
-      lemma_msd_arith (digit x d0 base) (digit y d0 base)
-                      (digit_sum x d0 base) (digit_sum y d0 base) (pow base d0)
-    ) else (
+  = if d = d0 + 1 then lemma_digit_sum_msd_le_3_base x y d0 base
+    else (
       // d > d0 + 1: digit(x, d-1) == digit(y, d-1) since d-1 > d0
       let d1 : nat = d - 1 in
       assert (d0 < d1 /\ d1 < d);

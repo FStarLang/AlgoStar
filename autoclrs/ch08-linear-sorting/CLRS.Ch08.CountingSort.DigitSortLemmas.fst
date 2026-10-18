@@ -375,6 +375,11 @@ let phase4_c_step (sc sc': Seq.seq int) (sa: Seq.seq nat) (d base n remaining: n
 
 (* ========== Phase 4 step: B filling ========== *)
 
+// Proved separately: in the context of the write_pos lemmas below Z3 times out on it.
+let seq_split_at (s: Seq.seq nat) (i: nat{i <= Seq.length s})
+  : Lemma (Seq.equal s (Seq.append (Seq.slice s 0 i) (Seq.slice s i (Seq.length s))))
+  = ()
+
 /// Write position is outside smaller blocks
 #push-options "--z3rlimit 15"
 let write_pos_outside_smaller (sa: Seq.seq nat) (d base: nat) (remaining: nat)
@@ -391,7 +396,7 @@ let write_pos_outside_smaller (sa: Seq.seq nat) (d base: nat) (remaining: nat)
     let n = Seq.length sa in
     let suffix = Seq.slice sa remaining n in
     let prefix = Seq.slice sa 0 remaining in
-    assert (Seq.equal sa (Seq.append prefix suffix));
+    seq_split_at sa remaining;
     digit_count_append prefix suffix key d base;
     let pre1 = Seq.slice sa 0 (remaining - 1) in
     let mid = Seq.slice sa (remaining - 1) remaining in
@@ -418,7 +423,7 @@ let write_pos_outside_larger (sa: Seq.seq nat) (d base: nat) (remaining: nat)
     digit_count_le_step sa v d base;
     let suffix = Seq.slice sa remaining n in
     let prefix = Seq.slice sa 0 remaining in
-    assert (Seq.equal sa (Seq.append prefix suffix));
+    seq_split_at sa remaining;
     digit_count_append prefix suffix v d base;
     digit_count_le_monotone sa key (v - 1) d base
 #pop-options
@@ -510,6 +515,15 @@ let phase4_b_step (sc sc': Seq.seq int) (sa sb sb': Seq.seq nat) (d base n remai
 
 (* ========== Phase 4 step: content tracking ========== *)
 
+// One instance of phase4_c_inv: revealing the whole invariant in
+// pos_not_in_other_block makes Z3 time out on its trivial arithmetic goals.
+let phase4_c_inv_at (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: nat) (v: nat)
+  : Lemma (requires phase4_c_inv sc sa d base n remaining /\ Seq.length sc == base /\ v < base)
+          (ensures Seq.length sa == n /\ remaining <= n /\
+                   Seq.index sc v == digit_count_le sa v d base -
+                     digit_count (Seq.slice sa remaining n) v d base)
+  = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa d base n remaining)
+
 /// pos is not in block v when v <> key
 #push-options "--z3rlimit 40"
 let pos_not_in_other_block (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaining: nat) (key v: nat)
@@ -521,10 +535,8 @@ let pos_not_in_other_block (sc: Seq.seq int) (sa: Seq.seq nat) (d base n remaini
       Seq.index sc key >= 1)
     (ensures (let pos = Seq.index sc key - 1 in
              pos < Seq.index sc v \/ pos >= digit_count_le sa v d base))
-  = reveal_opaque (`%phase4_c_inv) (phase4_c_inv sc sa d base n remaining);
-    let suffix = Seq.slice sa remaining n in
-    assert (Seq.index sc key == digit_count_le sa key d base - digit_count suffix key d base);
-    assert (Seq.index sc v == digit_count_le sa v d base - digit_count suffix v d base);
+  = phase4_c_inv_at sc sa d base n remaining key;
+    phase4_c_inv_at sc sa d base n remaining v;
     if v < key then
       write_pos_outside_smaller sa d base remaining key v (Seq.index sc key)
     else

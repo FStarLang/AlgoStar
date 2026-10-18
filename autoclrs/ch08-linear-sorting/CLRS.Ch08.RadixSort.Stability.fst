@@ -167,6 +167,12 @@ let sorted_up_to_digit_singleton (x: nat) (d: nat) (base: nat)
 
 (* ========== Core stability theorem ========== *)
 
+// Proved separately: in the context of sorted_on_digit_at Z3 times out on it.
+private let index_tail_pred (s: seq nat) (k: nat)
+  : Lemma (requires 0 < k /\ k < length s)
+          (ensures index (tail s) (k - 1) == index s k)
+  = ()
+
 /// sorted_on_digit implies digit ordering for all pairs (not just adjacent).
 /// Proof by induction: adjacent pairs are ordered, then transitivity for non-adjacent.
 let rec sorted_on_digit_at (s: seq nat) (d: nat) (base: nat) (i j: nat)
@@ -180,16 +186,16 @@ let rec sorted_on_digit_at (s: seq nat) (d: nat) (base: nat) (i j: nat)
       else (
         // s[0] <= s[1] and s[1] <= s[j] by induction on tail
         sorted_on_digit_at (tail s) d base 0 (j - 1);
-        assert (index (tail s) 0 == index s 1);
-        assert (index (tail s) (j - 1) == index s j)
+        index_tail_pred s 1;
+        index_tail_pred s j
       )
     ) else (
       // Shift: sorted_on_digit s => sorted_on_digit (tail s)
       // index (tail s) (i-1) = index s i, index (tail s) (j-1) = index s j
       assert (sorted_on_digit (tail s) d base);
       sorted_on_digit_at (tail s) d base (i - 1) (j - 1);
-      assert (index (tail s) (i - 1) == index s i);
-      assert (index (tail s) (j - 1) == index s j)
+      index_tail_pred s i;
+      index_tail_pred s j
     )
 
 /// Base case helper: sorted_on_digit at digit 0 implies sorted_up_to_digit at digit 0
