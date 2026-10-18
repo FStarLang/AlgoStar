@@ -264,6 +264,34 @@ let find_next_all_left_of (xs ys: Seq.seq int) (current: nat)
   find_next_aux_beats_all xs ys current current 0;
   find_next_spec_bounded xs ys current
 
+// Pointwise chain step for extend_valid_jarvis_hull, proved outside its
+// large SMT context (where the index arithmetic times out).
+private let extend_chain_at (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t) (i: nat)
+  : Lemma
+    (requires
+      valid_jarvis_hull xs ys hull h /\
+      h < Seq.length hull /\
+      SZ.v next == find_next_spec xs ys (SZ.v (Seq.index hull (h - 1))))
+    (ensures (let hull' = Seq.upd hull h next in
+      i >= 1 /\ i < h + 1 ==>
+      SZ.v (Seq.index hull' i) == find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1)))))
+  = let hull' = Seq.upd hull h next in
+    if i >= 1 && i < h + 1 then begin
+      if i < h then begin
+        assert (i - 1 < h);
+        assert (Seq.index hull' i == Seq.index hull i);
+        assert (Seq.index hull' (i - 1) == Seq.index hull (i - 1));
+        assert (SZ.v (Seq.index hull i) == find_next_spec xs ys (SZ.v (Seq.index hull (i - 1))))
+      end else begin
+        assert (i == h);
+        assert (Seq.index hull' i == next);
+        assert (Seq.index hull' (i - 1) == Seq.index hull (h - 1));
+        assert (SZ.v next == find_next_spec xs ys (SZ.v (Seq.index hull (h - 1))));
+        assert (SZ.v (Seq.index hull' i) ==
+                find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1))))
+      end
+    end else ()
+
 #push-options "--z3rlimit 10"
 let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) (next: SZ.t)
   : Lemma
@@ -305,21 +333,7 @@ let extend_valid_jarvis_hull (xs ys: Seq.seq int) (hull: Seq.seq SZ.t) (h: nat) 
   let aux (i: nat) : Lemma
     (ensures (i >= 1 /\ i < h + 1 ==>
       SZ.v (Seq.index hull' i) == find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1)))))
-    = if i >= 1 && i < h + 1 then begin
-        if i < h then begin
-          assert (i - 1 < h);
-          assert (Seq.index hull' i == Seq.index hull i);
-          assert (Seq.index hull' (i - 1) == Seq.index hull (i - 1));
-          assert (SZ.v (Seq.index hull i) == find_next_spec xs ys (SZ.v (Seq.index hull (i - 1))))
-        end else begin
-          assert (i == h);
-          assert (Seq.index hull' i == next);
-          assert (Seq.index hull' (i - 1) == Seq.index hull (h - 1));
-          assert (SZ.v next == find_next_spec xs ys (SZ.v (Seq.index hull (h - 1))));
-          assert (SZ.v (Seq.index hull' i) ==
-                  find_next_spec xs ys (SZ.v (Seq.index hull' (i - 1))))
-        end
-      end else ()
+    = extend_chain_at xs ys hull h next i
   in
   FStar.Classical.forall_intro aux
 #pop-options
