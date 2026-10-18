@@ -42,9 +42,11 @@ let transfer_larger_slice
   : Lemma
     (requires forall (k: int). l <= k /\ k < r ==> (lb <= Seq.index s (k - shift)))
     (ensures larger_than (Seq.slice s (l - shift) (r - shift)) lb)
-  = assert (forall (k: int). l <= k /\ k < r ==> (lb <= Seq.index s (k - shift)));
-    assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (lb <= Seq.index s ((k+shift) - shift)));
-    assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (lb <= Seq.index s k))
+  = let aux (k: int)
+      : Lemma (l - shift <= k /\ k < r - shift ==> lb <= Seq.index s k)
+      = if l - shift <= k && k < r - shift
+        then assert (lb <= Seq.index s ((k + shift) - shift)) in
+    FStar.Classical.forall_intro aux
 
 // transfer_smaller_slice and transfer_strictly_larger_slice need ifuel 2
 // for deterministic Seq.slice quantifier instantiation.
@@ -59,9 +61,11 @@ let transfer_smaller_slice
   : Lemma
     (requires forall (k: int). l <= k /\ k < r ==> (Seq.index s (k - shift) <= rb))
     (ensures smaller_than (Seq.slice s (l - shift) (r - shift)) rb)
-  = assert (forall (k: int). l <= k /\ k < r ==> (Seq.index s (k - shift) <= rb));
-    assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (Seq.index s ((k+shift) - shift) <= rb));
-    assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (Seq.index s k <= rb))
+  = let aux (k: int)
+      : Lemma (l - shift <= k /\ k < r - shift ==> Seq.index s k <= rb)
+      = if l - shift <= k && k < r - shift
+        then assert (Seq.index s ((k + shift) - shift) <= rb) in
+    FStar.Classical.forall_intro aux
 #pop-options
 
 // Restart solver to clear context from transfer_smaller_slice.
@@ -76,8 +80,10 @@ let transfer_strictly_larger_slice
   : Lemma
     (requires forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)))
     (ensures strictly_larger_than (Seq.slice s (l - shift) (r - shift)) lb)
-  = assert (forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)));
-    assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (lb < Seq.index s ((k+shift) - shift)));
-    assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (lb < Seq.index s k))
+  = let aux (k: int)
+      : Lemma (l - shift <= k /\ k < r - shift ==> lb < Seq.index s k)
+      = if l - shift <= k && k < r - shift
+        then assert (lb < Seq.index s ((k + shift) - shift)) in
+    FStar.Classical.forall_intro aux
 #pop-options
 #pop-options
