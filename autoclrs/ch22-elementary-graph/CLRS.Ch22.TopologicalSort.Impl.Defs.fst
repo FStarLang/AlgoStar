@@ -945,6 +945,7 @@ let rec lemma_sum_counts_bounded (squeue: Seq.seq SZ.t) (lo hi m: nat)
   = if m = 0 then ()
     else lemma_sum_counts_bounded squeue lo hi (m - 1)
 
+#push-options "--fuel 1 --ifuel 0"
 let rec lemma_sum_counts_skip_bounded (squeue: Seq.seq SZ.t) (lo hi m vv: nat)
   : Lemma
     (requires lo <= hi /\ hi <= Seq.length squeue /\ vv < m /\
@@ -959,6 +960,7 @@ let rec lemma_sum_counts_skip_bounded (squeue: Seq.seq SZ.t) (lo hi m vv: nat)
       lemma_sum_counts_bounded squeue lo hi (m - 1)
     end
     else lemma_sum_counts_skip_bounded squeue lo hi (m - 1) vv
+#pop-options
 
 #push-options "--z3rlimit 10 --fuel 1 --ifuel 0"
 let lemma_vtail_lt_n (squeue: Seq.seq SZ.t) (vtail n vv: nat)
