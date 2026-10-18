@@ -50,7 +50,10 @@ let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
     Seq.Properties.lemma_append_count_aux x pre_m pre_r;
     Seq.Properties.lemma_append_count_aux x pre_l (Seq.append s1_m pre_r);
     Seq.Properties.lemma_append_count_aux x s1_m pre_r;
-    ()
+    let c = Seq.Properties.count x in
+    assert (c s_pre == c pre_l + (c pre_m + c pre_r));
+    assert (c s1 == c pre_l + (c s1_m + c pre_r));
+    assert (c s_pre == c s1)
 #pop-options
 
 // ========== If s[j] exists, count(s[j], s) >= 1 ==========
