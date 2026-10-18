@@ -1025,6 +1025,7 @@ let rec lemma_seq_to_list_aux_preserves_sorted
       // sel has at least 2 elements from index i
       // Seq.index sel i < Seq.index sel (i+1) from strictly_increasing
       lemma_seq_to_list_aux_preserves_sorted sel n (i + 1);
+      assert (Seq.index sel i < Seq.index sel (i + 1));
       ()
     end
 
