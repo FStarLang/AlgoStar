@@ -233,6 +233,17 @@ let ps_nesting (pattern: seq int) (q: nat{q < length pattern}) (k j: nat)
     Classical.forall_intro (Classical.move_requires aux)
 #pop-options
 
+// One unfolding of follow_fail along a failure link (keeps the step out of
+// follow_fail_maximal's SMT context, where it otherwise times out).
+#push-options "--fuel 1"
+private let follow_fail_link (pattern pi: seq int) (k: nat) (c: int)
+  : Lemma
+    (requires k > 0 /\ k - 1 < length pi /\ index pi (k - 1) >= 0 /\ index pi (k - 1) < k /\
+              ~(k < length pattern && index pattern k = c))
+    (ensures follow_fail pattern pi k c == follow_fail pattern pi (index pi (k - 1)) c)
+  = ()
+#pop-options
+
 /// Key lemma: follow_fail finds any target in the failure chain.
 /// If target is a PS of k-1 with pattern[target] = c, then follow_fail >= target.
 #push-options "--z3rlimit 200 --fuel 2 --ifuel 1 --ext no:optimize_let_vc"
@@ -251,9 +262,11 @@ let rec follow_fail_maximal (pattern pi: seq int) (k: nat) (c: int) (target: nat
       assert (target <= k - 1)
     else begin
       assert (target <= piv);
-      if target = piv then
+      if target = piv then begin
+        follow_fail_link pattern pi k c;
         if piv < length pattern && index pattern piv = c then ()
         else assert false
+      end
       else begin
         ps_nesting pattern (k - 1) piv target;
         follow_fail_maximal pattern pi piv c target
