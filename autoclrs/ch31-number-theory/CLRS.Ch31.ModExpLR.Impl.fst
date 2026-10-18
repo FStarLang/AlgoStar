@@ -106,7 +106,6 @@ let mod_exp_lr_step_bmod (b: int) (prefix: nat) (m: pos) (bit: nat{bit <= 1})
     if bit = 0 then
       assert (d_new == d_new0)
     else (
-      assert (bit == 1);
       lemma_mod_mul_distr_r d_sq b m;
       assert ((d_sq * b) % m == (d_sq * (b % m)) % m);
       assert (d_new == d_new0)
