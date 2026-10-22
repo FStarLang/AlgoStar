@@ -525,9 +525,11 @@ fn huffman_tree
       freq_seq;
     
     // Count one merge iteration — ghost tick
+    with vc0. assert (GR.pts_to ctr vc0);
     tick ctr;
     
     let viter = !iter;
+    assert (pure (reveal (incr_nat vc0) - reveal c0 == SZ.v (viter +^ 1sz)));
     iter := viter +^ 1sz;
   };
   
