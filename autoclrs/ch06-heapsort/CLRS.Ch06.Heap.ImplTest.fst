@@ -369,6 +369,7 @@ let completeness_sort_dupes (s0 s: Seq.seq int)
   assert_norm (Seq.index l 0 == 2);
   assert_norm (Seq.index l 1 == 1);
   assert_norm (Seq.index l 2 == 2);
+  assert (forall (i:nat). i < 3 ==> i == 0 \/ i == 1 \/ i == 2);
   assert (Seq.equal s0 l);
   SP.perm_len l s;
   assert_norm (SP.count 1 l == 1);

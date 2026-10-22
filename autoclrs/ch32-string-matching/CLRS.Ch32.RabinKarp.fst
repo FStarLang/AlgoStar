@@ -359,6 +359,7 @@ fn rabin_karp
 
     count_matches_up_to_unfold s_text s_pat (SZ.v vs + 1);
     count_matches_up_to_bounded s_text s_pat (SZ.v vs + 1);
+    FStar.Math.Lemmas.distributivity_add_left (SZ.v vs) 1 (SZ.v m);
 
     // Update rolling hash for next position
     let is_last = (vs = max_s);
@@ -368,6 +369,8 @@ fn rabin_karp
       s := vs +^ 1sz
     } else {
       // Rolling hash update: t_{s+1} = (d * ((t_s + q - (old*h)%q) % q) + new) % q
+      assert (pure (SZ.v vs < SZ.v max_s));
+      assert (pure (SZ.v vs + SZ.v m < Seq.length s_text));
       let old_char = A.op_Dot_Lparen_Rparen text vs;
       let new_char = A.op_Dot_Lparen_Rparen text (vs +^ m);
       let new_hash = (d * ((vt_hash_outer + q - (old_char * h) % q) % q) + new_char) % q;

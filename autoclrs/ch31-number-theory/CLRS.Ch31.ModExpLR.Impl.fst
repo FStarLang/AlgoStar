@@ -192,6 +192,8 @@ let inv_preservation_terminal (b: int) (e: nat) (mask: pos) (m: pos)
       d_new >= 0 /\ d_new < m)
   = lemma_mod_lt (pow b (e / mask)) m
 
+let mod2_cases (x: int) : Lemma (x % 2 == 0 \/ x % 2 == 1) = ()
+
 // ── Main function ────────────────────────────────────────────────
 
 #push-options "--z3rlimit 10"
@@ -284,6 +286,7 @@ fn mod_exp_lr_impl (b_init e_init: SZ.t) (m_init: SZ.t{SZ.v m_init > 0 /\ SZ.fit
 
       // Concrete bit extraction
       let bit = (e_init /^ vmask) %^ 2sz;
+      mod2_cases (SZ.v e_init / SZ.v vmask);
 
       // Prove multiplication fits in SZ.t
       assert (pure (SZ.v vd * SZ.v vd <= SZ.v vd * SZ.v m_init));

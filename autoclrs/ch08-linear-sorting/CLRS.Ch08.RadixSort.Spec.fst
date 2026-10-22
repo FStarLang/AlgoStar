@@ -617,6 +617,7 @@ private let rec lemma_digit_sum_msd_le (x y bigD base d d0: nat)
       lemma_digit_sum_msd_le x y bigD base (d - 1) d0;
       ()
     ) else (
+      assert (d == d0 + 1);
       lemma_digit_sum_msd_le_base x y bigD base d0
     )
 #pop-options
