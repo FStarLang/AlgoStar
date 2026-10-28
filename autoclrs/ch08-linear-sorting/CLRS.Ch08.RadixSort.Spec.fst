@@ -601,7 +601,8 @@ private let rec lemma_digit_sum_msd_le (x y bigD base d d0: nat)
       //   = digit(y,d0) * base^d0 - 1
       //   <= digit(y,d0) * base^d0 + digit_sum y bigD base d0
       lemma_mult_le_right (pow base d0) (digit x d0 base) (digit y d0 base - 1);
-      ()
+      assert (digit_sum x bigD base d == digit x d0 base * pow base d0 + digit_sum x bigD base d0);
+      assert (digit_sum y bigD base d == digit y d0 base * pow base d0 + digit_sum y bigD base d0)
     ) else (
       // d > d0 + 1, so d - 1 > d0
       // digit_sum k bigD base d = digit(k, d-1) * base^(d-1) + digit_sum k bigD base (d-1)

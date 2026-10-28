@@ -101,6 +101,7 @@ let digit_count_phase_step
     (ensures digit_counts_match_prefix sc' sa d base (j + 1))
   = let s1 = Seq.slice sa 0 j in
     let s2 = Seq.slice sa j (j + 1) in
+    Seq.lemma_split (Seq.slice sa 0 (j + 1)) j;
     assert (Seq.equal (Seq.slice sa 0 (j + 1)) (Seq.append s1 s2));
     let aux (v: nat{v < base}) : Lemma
       (digit_count (Seq.slice sa 0 (j + 1)) v d base ==
@@ -391,6 +392,7 @@ let write_pos_outside_smaller (sa: Seq.seq nat) (d base: nat) (remaining: nat)
     let n = Seq.length sa in
     let suffix = Seq.slice sa remaining n in
     let prefix = Seq.slice sa 0 remaining in
+    Seq.lemma_split sa remaining;
     assert (Seq.equal sa (Seq.append prefix suffix));
     digit_count_append prefix suffix key d base;
     let pre1 = Seq.slice sa 0 (remaining - 1) in

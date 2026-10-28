@@ -211,8 +211,8 @@ let rec lemma_digit_sum_msd_le_3 (x y: nat) (d d0: nat) (base: nat)
       // digit_sum k (d0+1) = digit k d0 * pow base d0 + digit_sum k d0
       pow_positive base d0;
       lemma_digit_sum_bound_3 x d0 base;
-      digit_sum_unfold x d base;
-      digit_sum_unfold y d base;
+      digit_sum_unfold x (d0 + 1) base;
+      digit_sum_unfold y (d0 + 1) base;
       lemma_msd_arith (digit x d0 base) (digit y d0 base)
                       (digit_sum x d0 base) (digit_sum y d0 base) (pow base d0)
     ) else (

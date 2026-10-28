@@ -78,6 +78,8 @@ let transfer_strictly_larger_slice
     (ensures strictly_larger_than (Seq.slice s (l - shift) (r - shift)) lb)
   = assert (forall (k: int). l <= k /\ k < r ==> (lb < Seq.index s (k - shift)));
     assert (forall (k: int). l <= (k+shift) /\ (k+shift) < r ==> (lb < Seq.index s ((k+shift) - shift)));
-    assert (forall (k: int). l - shift <= k /\ k < r - shift ==> (lb < Seq.index s k))
+    introduce forall (k: int). l - shift <= k /\ k < r - shift ==> (lb < Seq.index s k)
+    with introduce _ ==> _
+    with assert (lb < Seq.index s ((k+shift) - shift))
 #pop-options
 #pop-options
