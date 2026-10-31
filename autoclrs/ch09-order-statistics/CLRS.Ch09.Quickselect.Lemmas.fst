@@ -25,7 +25,24 @@ let slice_eq_from_pointwise (s1 s2: Seq.seq int) (a b: nat)
 
 // ========== Count in range is permutation-invariant when outside is unchanged ==========
 
-#push-options "--z3rlimit 5 --fuel 1 --ifuel 1"
+// count over s splits into the counts over s[0..lo), s[lo..hi), s[hi..n)
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
+let count_split3 (s: Seq.seq int) (lo hi: nat) (x: int)
+  : Lemma (requires lo <= hi /\ hi <= Seq.length s)
+          (ensures Seq.Properties.count x s ==
+                   Seq.Properties.count x (Seq.slice s 0 lo) +
+                   (Seq.Properties.count x (Seq.slice s lo hi) +
+                    Seq.Properties.count x (Seq.slice s hi (Seq.length s))))
+  = let n = Seq.length s in
+    let l = Seq.slice s 0 lo in
+    let m = Seq.slice s lo hi in
+    let r = Seq.slice s hi n in
+    Seq.lemma_eq_elim s (Seq.append l (Seq.append m r));
+    Seq.Properties.lemma_append_count_aux x l (Seq.append m r);
+    Seq.Properties.lemma_append_count_aux x m r
+#pop-options
+
+#push-options "--z3rlimit 5 --fuel 0 --ifuel 0"
 let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
   : Lemma (requires lo <= hi /\ hi <= Seq.length s_pre /\
                     Seq.length s_pre == Seq.length s1 /\
@@ -40,20 +57,9 @@ let count_range_eq (s_pre s1: Seq.seq int) (lo hi: nat) (x: int)
     Seq.lemma_eq_elim (Seq.slice s_pre 0 lo) (Seq.slice s1 0 lo);
     slice_eq_from_pointwise s_pre s1 hi n;
     Seq.lemma_eq_elim (Seq.slice s_pre hi n) (Seq.slice s1 hi n);
-    let pre_l = Seq.slice s_pre 0 lo in
-    let pre_m = Seq.slice s_pre lo hi in
-    let pre_r = Seq.slice s_pre hi n in
-    let s1_m = Seq.slice s1 lo hi in
-    Seq.lemma_eq_elim s_pre (Seq.append pre_l (Seq.append pre_m pre_r));
-    Seq.lemma_eq_elim s1 (Seq.append pre_l (Seq.append s1_m pre_r));
-    Seq.Properties.lemma_append_count_aux x pre_l (Seq.append pre_m pre_r);
-    Seq.Properties.lemma_append_count_aux x pre_m pre_r;
-    Seq.Properties.lemma_append_count_aux x pre_l (Seq.append s1_m pre_r);
-    Seq.Properties.lemma_append_count_aux x s1_m pre_r;
-    let c = Seq.Properties.count x in
-    assert (c s_pre == c pre_l + (c pre_m + c pre_r));
-    assert (c s1 == c pre_l + (c s1_m + c pre_r));
-    assert (c s_pre == c s1)
+    count_split3 s_pre lo hi x;
+    count_split3 s1 lo hi x;
+    assert (Seq.Properties.count x s_pre == Seq.Properties.count x s1)
 #pop-options
 
 // ========== If s[j] exists, count(s[j], s) >= 1 ==========
