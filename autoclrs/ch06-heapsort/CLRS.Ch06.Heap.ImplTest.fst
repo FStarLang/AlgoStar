@@ -60,6 +60,20 @@ let std_sort3 (s: Seq.seq int)
   assert_norm (SP.count 0 (Seq.seq_of_list [3; 1; 2]) == 0);
   assert_norm (SP.count 4 (Seq.seq_of_list [3; 1; 2]) == 0)
 
+(* Two sequences of length 3 with the same elements are equal; proved in a
+   small context, with no fuel. *)
+#push-options "--fuel 0 --ifuel 0"
+let seq3_eq (s0 l: Seq.seq int)
+  : Lemma
+    (requires Seq.length s0 == 3 /\ Seq.length l == 3 /\
+              Seq.index s0 0 == Seq.index l 0 /\
+              Seq.index s0 1 == Seq.index l 1 /\
+              Seq.index s0 2 == Seq.index l 2)
+    (ensures s0 == l)
+= assert (forall (i:nat{i < 3}). i == 0 \/ i == 1 \/ i == 2);
+  Seq.lemma_eq_intro s0 l
+#pop-options
+
 (* Completeness lemma: bridges from heapsort's postcondition predicates
    (sorted_upto, permutation) to the uniqueness proof.
 
@@ -83,11 +97,11 @@ let completeness_sort3 (s0 s: Seq.seq int)
   assert_norm (Seq.index l 0 == 3);
   assert_norm (Seq.index l 1 == 1);
   assert_norm (Seq.index l 2 == 2);
-  assert (Seq.equal s0 l);
-  Seq.lemma_eq_elim s0 l;
+  seq3_eq s0 l;
   SP.perm_len s0 s;
   std_sort3 s
 
+#push-options "--fuel 1 --ifuel 1"
 ```pulse
 (* Completeness: y = heapsort([3,1,2]); assert(y == [1,2,3]) *)
 fn test_heapsort_3 ()
@@ -106,6 +120,7 @@ fn test_heapsort_3 ()
 
   // Bind input ghost
   with s0. assert (A.pts_to arr s0);
+  assert (pure (Seq.length s0 == 3 /\ Seq.index s0 0 == 3 /\ Seq.index s0 1 == 1 /\ Seq.index s0 2 == 2));
 
   // Allocate ghost counter
   let ctr = GR.alloc #nat 0;
@@ -141,6 +156,7 @@ fn test_heapsort_3 ()
   pass
 }
 ```
+#pop-options
 
 #pop-options
 
@@ -166,7 +182,7 @@ let heap_root3 (s0 s: Seq.seq int)
   assert_norm (Seq.index l 0 == 3);
   assert_norm (Seq.index l 1 == 1);
   assert_norm (Seq.index l 2 == 2);
-  assert (Seq.equal s0 l);
+  seq3_eq s0 l;
   SP.perm_len l s;
   assert_norm (SP.count 3 l == 1);
   assert_norm (SP.count 1 l == 1);
@@ -176,6 +192,7 @@ let heap_root3 (s0 s: Seq.seq int)
   root_ge_element s 3 1;
   root_ge_element s 3 2
 
+#push-options "--fuel 1 --ifuel 1"
 ```pulse
 (* build_max_heap completeness: build_max_heap([3,1,2]); assert(root == 3) *)
 fn test_build_max_heap_3 ()
@@ -192,6 +209,7 @@ fn test_build_max_heap_3 ()
   arr.(2sz) <- 2;
 
   with s0. assert (A.pts_to arr s0);
+  assert (pure (Seq.length s0 == 3 /\ Seq.index s0 0 == 3 /\ Seq.index s0 1 == 1 /\ Seq.index s0 2 == 2));
   let ctr = GR.alloc #nat 0;
 
   build_max_heap arr 3sz ctr;
@@ -217,6 +235,7 @@ fn test_build_max_heap_3 ()
   pass
 }
 ```
+#pop-options
 
 #pop-options
 
@@ -293,7 +312,7 @@ let completeness_prefix2 (s0 s: Seq.seq int)
   assert_norm (Seq.index l 0 == 7);
   assert_norm (Seq.index l 1 == 5);
   assert_norm (Seq.index l 2 == 3);
-  assert (Seq.equal s0 l);
+  seq3_eq s0 l;
   SP.perm_len l s;
   assert_norm (SP.count 7 l == 1);
   assert_norm (SP.count 5 l == 1);
@@ -301,6 +320,7 @@ let completeness_prefix2 (s0 s: Seq.seq int)
   assert_norm (SP.count 0 l == 0);
   assert_norm (SP.count 8 l == 0)
 
+#push-options "--fuel 1 --ifuel 1"
 ```pulse
 (* Prefix sort: heapsort([7,5,3], n=2); assert first 2 sorted, third unchanged *)
 fn test_heapsort_prefix ()
@@ -317,6 +337,7 @@ fn test_heapsort_prefix ()
   arr.(2sz) <- 3;
 
   with s0. assert (A.pts_to arr s0);
+  assert (pure (Seq.length s0 == 3 /\ Seq.index s0 0 == 7 /\ Seq.index s0 1 == 5 /\ Seq.index s0 2 == 3));
   let ctr = GR.alloc #nat 0;
 
   heapsort arr 2sz ctr;
@@ -346,6 +367,7 @@ fn test_heapsort_prefix ()
   pass
 }
 ```
+#pop-options
 
 #pop-options
 
@@ -369,14 +391,14 @@ let completeness_sort_dupes (s0 s: Seq.seq int)
   assert_norm (Seq.index l 0 == 2);
   assert_norm (Seq.index l 1 == 1);
   assert_norm (Seq.index l 2 == 2);
-  assert (forall (i:nat). i < 3 ==> i == 0 \/ i == 1 \/ i == 2);
-  assert (Seq.equal s0 l);
+  seq3_eq s0 l;
   SP.perm_len l s;
   assert_norm (SP.count 1 l == 1);
   assert_norm (SP.count 2 l == 2);
   assert_norm (SP.count 0 l == 0);
   assert_norm (SP.count 3 l == 0)
 
+#push-options "--fuel 1 --ifuel 1"
 ```pulse
 (* Duplicates: heapsort([2,1,2]); assert output == [1,2,2] *)
 fn test_heapsort_duplicates ()
@@ -393,6 +415,7 @@ fn test_heapsort_duplicates ()
   arr.(2sz) <- 2;
 
   with s0. assert (A.pts_to arr s0);
+  assert (pure (Seq.length s0 == 3 /\ Seq.index s0 0 == 2 /\ Seq.index s0 1 == 1 /\ Seq.index s0 2 == 2));
   let ctr = GR.alloc #nat 0;
 
   heapsort arr 3sz ctr;
@@ -421,5 +444,6 @@ fn test_heapsort_duplicates ()
   pass
 }
 ```
+#pop-options
 
 #pop-options
