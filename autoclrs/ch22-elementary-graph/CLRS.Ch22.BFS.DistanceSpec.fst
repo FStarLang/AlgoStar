@@ -890,7 +890,7 @@ let rec find_visit_some (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
 #pop-options
 
 // If find_visit_time returns None, v is never visited
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let rec find_visit_none (n: nat) (adj: Seq.seq bool) (source: nat{source < n})
                          (v: nat{v < n}) (start: nat{start <= n + 1}) (step: nat)
   : Lemma
@@ -988,7 +988,7 @@ let rec find_min_none_all (n: nat) (adj: Seq.seq bool{Seq.length adj = n * n})
 // --- Main correctness theorem ---
 
 // Main theorem: BFS computes shortest path distances
-#push-options "--z3rlimit 10 --fuel 2 --ifuel 1"
+#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
 let bfs_correctness (n: nat) (adj: Seq.seq bool) (source: nat{source < n}) (v: nat{v < n})
   : Lemma
     (requires Seq.length adj = n * n)

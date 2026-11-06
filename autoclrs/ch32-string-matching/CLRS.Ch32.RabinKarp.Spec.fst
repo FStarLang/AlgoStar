@@ -174,10 +174,16 @@ let rec hash_slice_lemma (x y:Seq.seq nat) (d:nat) (q:nat{q <> 0})
     else begin
       let k : nat = j - 1 - i in
       assert (Seq.index x (i + k) == Seq.index y (i' + k));
+      let c = Seq.index x (j - 1) in
+      assert (c == Seq.index y (j' - 1));
       assert (eq_sub_seq x i (j - 1) y i' (j' - 1));
       hash_slice_lemma x y d q i (j - 1) i' (j' - 1);
+      let h = hash x d q i (j - 1) in
+      assert (h == hash y d q i' (j' - 1));
       hash_unfold x d q i j;
-      hash_unfold y d q i' j'
+      hash_unfold y d q i' j';
+      assert (hash x d q i j == (d * h + c) % q);
+      assert (hash y d q i' j' == (d * h + c) % q)
     end
 #pop-options
 

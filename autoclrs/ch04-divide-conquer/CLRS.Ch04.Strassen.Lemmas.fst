@@ -322,6 +322,7 @@ let rec lemma_strassen_elem_correct
       lemma_submatrix_square_pow2 a;
       lemma_submatrix_square_pow2 b;
       assert (n - half == half);
+      assert (2 * half == rows a);
 
       assert (is_square a11);
       assert (is_square a12);

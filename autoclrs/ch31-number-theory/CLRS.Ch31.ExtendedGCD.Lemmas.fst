@@ -147,6 +147,10 @@ let div_sum_exact (r: nat) (b: nat) (q: nat) (d: pos)
     assert (q * b + r == (q * kb + kr) * d);
     cancel_mul_div (q * kb + kr) d
 
+let abs_mul_nat (q: nat) (y: int)
+  : Lemma (abs (q * y) == q * abs y)
+  = if y >= 0 then () else neg_mul_right q y
+
 //SNIPPET_START: extended_gcd_coeff_bounds
 /// Coefficient bounds (CLRS Theorem 31.8):
 /// When a > 0 and b > 0, the Bézout coefficients satisfy
@@ -178,6 +182,12 @@ let rec extended_gcd_coeff_bounds (a b: nat)
       // |y| = |x' - q*y'| ≤ |x'| + q*|y'| ≤ r/d + q*(b/d) = a/d
       extended_gcd_coeff_bounds b r;
       extended_gcd_divides_both b r;
-      let (| d, _x', _y' |) = extended_gcd b r in
-      div_sum_exact r b q d
+      let (| d, x', y' |) = extended_gcd b r in
+      div_sum_exact r b q d;
+      // Spell out the nonlinear steps of |x' - q*y'| <= r/d + q*(b/d) = a/d
+      assert (extended_gcd a b == (| d, y', x' - q * y' |));
+      lemma_mult_le_left q (abs y') (b / d);
+      abs_mul_nat q y';
+      assert (abs (x' - q * y') <= abs x' + q * abs y');
+      assert (q * b + r == a)
     )

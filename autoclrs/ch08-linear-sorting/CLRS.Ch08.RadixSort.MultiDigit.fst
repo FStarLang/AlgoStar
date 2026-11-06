@@ -996,33 +996,29 @@ let digits_lexicographic_implies_value_le
 /// Helper: from ∀d<nd. digit x d ≤ digit y d, establish lexicographic ordering.
 /// Either all digits are equal, or the most significant differing digit has x<y
 /// and all higher digits are equal.
-#restart-solver
-#push-options "--z3rlimit 10 --fuel 1 --ifuel 1"
-let rec digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
+// Proved for arbitrary digit functions: with `digit` itself, Z3 unfolds its
+// definition and gets lost in nonlinear arithmetic on these trivial goals.
+private let rec lex_of_pointwise_le (f g: nat -> nat) (nd: nat)
+  : Lemma (requires forall (d:nat). d < nd ==> f d <= g d)
+          (ensures (forall (d:nat). d < nd ==> f d == g d) \/
+                   (exists (d:nat). d < nd /\ f d < g d /\
+                      (forall (d':nat). d < d' /\ d' < nd ==> f d' == g d')))
+          (decreases nd)
+  = if nd = 0 then ()
+    else begin
+      assert (f (nd - 1) <= g (nd - 1));
+      if f (nd - 1) < g (nd - 1) then ()
+      else lex_of_pointwise_le f g (nd - 1)
+    end
+
+let digitwise_le_implies_lex (x y: nat) (nd: nat) (base: nat)
   : Lemma (requires base >= 2 /\
                     (forall (d:nat). d < nd ==> digit x d base <= digit y d base))
           (ensures (forall (d:nat). d < nd ==> digit x d base == digit y d base) \/
                    (exists (d:nat). d < nd /\
                       digit x d base < digit y d base /\
                       (forall (d':nat). d < d' /\ d' < nd ==> digit x d' base == digit y d' base)))
-          (decreases nd)
-  = if nd = 0 then ()
-    else begin
-      let dx = digit x (nd - 1) base in
-      let dy = digit y (nd - 1) base in
-      assert (nd - 1 < nd);  // trigger
-      assert (dx <= dy);
-      if dx < dy then begin
-        assert (digit x (nd - 1) base < digit y (nd - 1) base);
-        assert (forall (d':nat). (nd - 1) < d' /\ d' < nd ==> digit x d' base == digit y d' base);
-        ()
-      end else begin
-        assert (dx == dy);
-        digitwise_le_implies_lex x y (nd - 1) base;
-        ()
-      end
-    end
-#pop-options
+  = lex_of_pointwise_le (fun d -> digit x d base) (fun d -> digit y d base) nd
 
 /// Helper: sorted on all digits implies sorted by value
 /// If a sequence is sorted when comparing each digit position independently,
